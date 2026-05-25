@@ -1,0 +1,46 @@
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- prompt-template-sha256: {{.PromptTemplatesHash}} -->
+<!-- prompt-type: workspace-profile -->
+<!-- editable: true -->
+
+# Workspace Profile Prompt
+
+You are analyzing workspace `{{.WorkspaceName}}`.
+
+Workspace root:
+```text
+{{.WorkspaceRoot}}
+```
+
+Detected projects:
+{{range .Projects}}
+- `{{.ID}}`: `{{.Path}}`, type `{{.Type}}`, language `{{.Language}}`
+{{else}}
+- No projects detected yet. Infer candidates from build files and directory boundaries first.
+{{end}}
+
+# Analysis Goal
+
+Output workspace-level facts only. This prompt feeds the root `.claude/.agents` skill. Child project architecture, coding style, business methods, and local patterns belong in that project's project profile, project spec, and skill.
+
+Prioritize these facts:
+
+1. Child project responsibilities and boundaries: what each project owns, exposes, and depends on.
+2. Shared/contracts/infra path responsibilities: whether these paths are consumed by multiple projects and which projects must be checked after changes.
+3. Dependency direction across frontend, backend, middleware, shared libraries, contracts, and deployment config.
+4. Synchronization relationships among API contracts, generated code, SDKs, deployment config, environment variables, database schemas, and tests.
+5. Impact radius: paths that require multiple child project skills to be read together.
+
+# Routing Hints
+
+Write routing as executable decisions, for example:
+
+- `frontend/**` routes only to the `frontend` child project skill.
+- `proto/**` routes to frontend, backend, and middleware project skills that consume the contract.
+- `deploy/**` routes to runtime service project skills affected by deployment config.
+
+# Constraints
+
+- Do not turn one child project's internal rules into workspace rules.
+- If a dependency cannot be confirmed, keep a TODO and name the evidence path that should be inspected.
+- Preserve paths, commands, config keys, environment variables, and code identifiers verbatim.

@@ -153,6 +153,15 @@ func Info(msg string, args ...any) {
 	}
 }
 
+// InfoAfterProgress 记录一般信息；控制台输出会等当前进度步骤结束后再打印
+func InfoAfterProgress(msg string, args ...any) {
+	progress.PrintConsoleLineAfterProgress(colorize(msg, colors.White))
+
+	if logger != nil {
+		logger.Info(msg, args...)
+	}
+}
+
 // Warn 记录警告信息，并同步写入控制台和文件
 func Warn(msg string, args ...any) {
 	// 控制台黄色输出（用户提示） - 只输出消息本身

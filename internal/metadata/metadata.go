@@ -10,16 +10,17 @@ import (
 )
 
 const (
-	// ProgramVersion is the CLI version shown by `skills-seed --version`
-	ProgramVersion = "v0.0.2"
+	// ProgramVersion 是 `skills-seed --version` 展示的 CLI 版本
+	ProgramVersion = "v0.0.3"
 
 	UnavailableHash = "unavailable"
 
 	PromptTemplatesRoot = "templates/prompts"
 	SkillsTemplatesRoot = "templates/skills"
 
-	CommonTemplateProvider  = "common"
-	ProjectTemplateProvider = "project"
+	CommonTemplateProvider    = "common"
+	ProjectTemplateProvider   = "project"
+	WorkspaceTemplateProvider = "workspace"
 
 	PromptTemplateExt        = ".txt.tmpl"
 	ProjectPromptTemplateExt = ".md.tmpl"
@@ -27,7 +28,7 @@ const (
 	GenericTemplateExt       = ".tmpl"
 )
 
-// TemplateProviderFallbacks returns provider-specific lookup order
+// TemplateProviderFallbacks 返回 provider 模板查找顺序
 func TemplateProviderFallbacks(provider string) []string {
 	var providers []string
 	seen := make(map[string]bool)
@@ -61,6 +62,15 @@ func ProjectPromptTemplatePath(name, locale string) string {
 		fileName = name + "." + locale + ProjectPromptTemplateExt
 	}
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, ProjectTemplateProvider, fileName))
+}
+
+// WorkspacePromptTemplatePath 返回工作区提示词模板路径
+func WorkspacePromptTemplatePath(name, locale string) string {
+	fileName := name + ProjectPromptTemplateExt
+	if locale != "" {
+		fileName = name + "." + locale + ProjectPromptTemplateExt
+	}
+	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, WorkspaceTemplateProvider, fileName))
 }
 
 // SkillsTemplatePath 返回 Skills 模板路径

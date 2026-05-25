@@ -795,6 +795,81 @@ other = "Refreshing project profile: {{.ProjectName}}\nProject root: {{.ProjectR
 [ProfileRefreshComplete]
 other = "Project profile refreshed"
 
+[ProjectProfileReadFailed]
+other = "Failed to read project profile"
+
+[ProjectProfileParseFailed]
+other = "Failed to parse project profile"
+
+[ProjectProfileNil]
+other = "Project profile cannot be nil"
+
+[ProjectProfileCreateDirFailed]
+other = "Failed to create project profile directory"
+
+[ProjectProfileMarshalFailed]
+other = "Failed to serialize project profile"
+
+[ProjectProfileWriteFailed]
+other = "Failed to write project profile"
+
+[ProjectSpecReadFailed]
+other = "Failed to read project spec"
+
+[ProjectSpecParseFailed]
+other = "Failed to parse project spec"
+
+[ProjectSpecNil]
+other = "Project spec cannot be nil"
+
+[ProjectSpecCreateDirFailed]
+other = "Failed to create project spec directory"
+
+[ProjectSpecMarshalFailed]
+other = "Failed to serialize project spec"
+
+[ProjectSpecWriteFailed]
+other = "Failed to write project spec"
+
+[ProjectSpecRenderFailed]
+other = "Failed to render project spec"
+
+[WorkspaceProfileReadFailed]
+other = "Failed to read workspace profile"
+
+[WorkspaceProfileParseFailed]
+other = "Failed to parse workspace profile"
+
+[WorkspaceProfileNil]
+other = "Workspace profile cannot be nil"
+
+[WorkspaceProfileCreateDirFailed]
+other = "Failed to create workspace profile directory"
+
+[WorkspaceProfileMarshalFailed]
+other = "Failed to serialize workspace profile"
+
+[WorkspaceProfileWriteFailed]
+other = "Failed to write workspace profile"
+
+[WorkspaceSpecReadFailed]
+other = "Failed to read workspace spec"
+
+[WorkspaceSpecParseFailed]
+other = "Failed to parse workspace spec"
+
+[WorkspaceSpecNil]
+other = "Workspace spec cannot be nil"
+
+[WorkspaceSpecCreateDirFailed]
+other = "Failed to create workspace spec directory"
+
+[WorkspaceSpecMarshalFailed]
+other = "Failed to serialize workspace spec"
+
+[WorkspaceSpecWriteFailed]
+other = "Failed to write workspace spec"
+
 # 检查
 [CheckStarting]
 other = "Checking code quality..."
@@ -1455,6 +1530,15 @@ other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguag
 [LearnCurrentFocusInfo]
 other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMode}}"
 
+[LearnCurrentFocusOutsideRoot]
+other = "Focus path {{.Path}} is outside the project root"
+
+[LearnCurrentFocusNotAccessible]
+other = "Focus path {{.Path}} is not accessible"
+
+[LearnCurrentProfileModeInvalid]
+other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or refresh"
+
 [LearnCurrentResult]
 other = "Analysis completed:\n  • Patterns: {{.PatternsCount}}\n  • Business rules: {{.BusinessRulesCount}}\n  • Best practices: {{.BestPracticesCount}}"
 
@@ -1472,6 +1556,18 @@ other = "Skipped project profile refresh"
 
 [LearnCurrentProfileFailed]
 other = "Failed to generate project profile: {{.Error}}"
+
+[LearnWorkspaceStart]
+other = "Starting workspace project learning"
+
+[LearnWorkspaceComplete]
+other = "Workspace learning completed"
+
+[WorkspaceProjectsMissing]
+other = "workspace mode requires workspace.projects in .skills-seed/config.yaml"
+
+[ProjectModeLocked]
+other = "Initialization mode is locked and cannot change from {{.LockedMode}} to {{.ConfigMode}}. Run skills-seed reset --mode {{.ConfigMode}} to switch modes."
 
 [LearnCurrentComplete]
 other = "Current codebase learning completed"
@@ -1546,3 +1642,15 @@ other = "Not a git repository: {{.Path}}"
 
 [ErrInitAlreadyInitialized]
 other = "skills-seed already initialized"
+
+[InitFlagMode]
+other = "Initialization mode: project or workspace"
+
+[InitFlagWorkspace]
+other = "Initialize as workspace mode, equivalent to --mode workspace"
+
+[ResetShort]
+other = "Back up and reset skills-seed initialization state"
+
+[ResetBackupFailed]
+other = "Failed to back up .skills-seed"

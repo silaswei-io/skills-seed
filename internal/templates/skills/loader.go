@@ -27,14 +27,14 @@ type RenderedFile struct {
 	Content string
 }
 
-// ReferenceItem describes one generated reference file linked from SKILL.md
+// ReferenceItem 描述 SKILL.md 中链接的一个参考文件
 type ReferenceItem struct {
 	Title       string
 	Description string
 	Path        string
 }
 
-// ReferenceGroup groups related pattern reference files for the main skill
+// ReferenceGroup 描述主技能文档中的一组参考文件
 type ReferenceGroup struct {
 	Title string
 	Items []ReferenceItem
@@ -152,6 +152,22 @@ func (l *Loader) RenderProjectOverview(data interface{}) (string, error) {
 // RenderReferenceFile renders a standalone references/{name}.md template
 func (l *Loader) RenderReferenceFile(name string, data interface{}) (string, error) {
 	tmpl, err := l.LoadReferenceFile(name)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+
+	return normalizeMarkdown(buf.String()), nil
+}
+
+// RenderRelative 渲染 skills 模板目录下的任意相对模板
+func (l *Loader) RenderRelative(relativeName string, data interface{}) (string, error) {
+	key := "relative/" + relativeName
+	tmpl, err := l.loadTemplate(key, relativeName, metadata.SkillsTemplateExt)
 	if err != nil {
 		return "", err
 	}

@@ -15,6 +15,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/git"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/checker"
@@ -26,20 +28,23 @@ import (
 
 // Container 应用容器
 type Container struct {
-	SeedPath     string // .skills-seed 目录的路径
-	Config       *config.Config
-	ConfigRepo   *config.Repository
-	GitRepo      *git.Repository
-	PatternRepo  *boltdb.PatternRepository
-	ProfileRepo  *profilestore.Repository
-	Agent        agent.Agent
-	AnalyzerSvc  *analyzer.AnalyzerService
-	LearnerSvc   *learner.LearnerService
-	CheckerSvc   *checker.CheckerService
-	GeneratorSvc *generator.GeneratorService
-	MergerSvc    *merger.MergerService
-	PromptLoader *prompts.Loader
-	SkillsLoader *skills.Loader
+	SeedPath             string // .skills-seed 目录的路径
+	Config               *config.Config
+	ConfigRepo           *config.Repository
+	GitRepo              *git.Repository
+	PatternRepo          *boltdb.PatternRepository
+	ProfileRepo          *profilestore.Repository
+	StateRepo            *statestore.Repository
+	WorkspaceProfileRepo *workspacestore.ProfileRepository
+	WorkspaceSpecRepo    *workspacestore.SpecRepository
+	Agent                agent.Agent
+	AnalyzerSvc          *analyzer.AnalyzerService
+	LearnerSvc           *learner.LearnerService
+	CheckerSvc           *checker.CheckerService
+	GeneratorSvc         *generator.GeneratorService
+	MergerSvc            *merger.MergerService
+	PromptLoader         *prompts.Loader
+	SkillsLoader         *skills.Loader
 }
 
 // AgentFactory 创建指定 provider 的 Agent
@@ -93,6 +98,9 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	}
 
 	profileRepo := profilestore.NewRepository(seedPath)
+	stateRepo := statestore.NewRepository(seedPath)
+	workspaceProfileRepo := workspacestore.NewProfileRepository(seedPath)
+	workspaceSpecRepo := workspacestore.NewSpecRepository(seedPath)
 
 	// 5. 创建加载器
 	promptLoader := prompts.NewLoader(cfg.Agent.Provider, locale, seedPath)
@@ -114,20 +122,23 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo)
 
 	return &Container{
-		SeedPath:     seedPath,
-		Config:       cfg,
-		ConfigRepo:   configRepo,
-		GitRepo:      gitRepo,
-		PatternRepo:  patternRepo,
-		ProfileRepo:  profileRepo,
-		Agent:        agentImpl,
-		AnalyzerSvc:  analyzerSvc,
-		LearnerSvc:   learnerSvc,
-		CheckerSvc:   checkerSvc,
-		GeneratorSvc: generatorSvc,
-		MergerSvc:    mergerSvc,
-		PromptLoader: promptLoader,
-		SkillsLoader: skillsLoader,
+		SeedPath:             seedPath,
+		Config:               cfg,
+		ConfigRepo:           configRepo,
+		GitRepo:              gitRepo,
+		PatternRepo:          patternRepo,
+		ProfileRepo:          profileRepo,
+		StateRepo:            stateRepo,
+		WorkspaceProfileRepo: workspaceProfileRepo,
+		WorkspaceSpecRepo:    workspaceSpecRepo,
+		Agent:                agentImpl,
+		AnalyzerSvc:          analyzerSvc,
+		LearnerSvc:           learnerSvc,
+		CheckerSvc:           checkerSvc,
+		GeneratorSvc:         generatorSvc,
+		MergerSvc:            mergerSvc,
+		PromptLoader:         promptLoader,
+		SkillsLoader:         skillsLoader,
 	}, nil
 }
 

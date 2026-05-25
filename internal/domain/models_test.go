@@ -238,6 +238,12 @@ func TestPattern_IsSimilar(t *testing.T) {
 			p2:      &Pattern{Name: "Use descriptive names", Category: CategoryError},
 			similar: false,
 		},
+		{
+			name:    "different workspace project",
+			p1:      &Pattern{Name: "Use context", Category: CategoryAPI, ProjectID: "backend", ScopePath: "backend"},
+			p2:      &Pattern{Name: "Use context", Category: CategoryAPI, ProjectID: "frontend", ScopePath: "frontend"},
+			similar: false,
+		},
 	}
 
 	for _, tt := range tests {

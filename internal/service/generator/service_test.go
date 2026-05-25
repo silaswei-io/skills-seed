@@ -365,6 +365,71 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	assertNoBrokenMarkdownLinks(t, tmpDir)
 }
 
+func TestGenerateWorkspaceSkills_RendersChildProjectSpec(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+
+	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
+	pattern.ProjectID = "backend"
+	pattern.ScopePath = "backend"
+	pattern.WorkspaceRole = "backend"
+	pattern.Confidence = 0.95
+	pattern.Frequency = 3
+	pattern.SetDescription("wrap backend errors")
+	pattern.SetRule("use fmt.Errorf with %w")
+
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	var savedSpec *domain.ProjectSpec
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
+			require.Equal(t, "backend", projectID)
+			return &domain.ProjectProfile{
+				ProjectName:    "backend",
+				Language:       "go",
+				Summary:        "backend service",
+				GeneratedAt:    "2026-05-19 12:00:00",
+				KeyModules:     []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer"}},
+				CommonUtils:    []domain.UtilityFunction{{Name: "Normalize", File: "internal/pkg/normalize.go", Description: "normalize values"}},
+				ConfigPatterns: []string{"yaml config"},
+			}, nil
+		},
+		SaveSpecForProjectFn: func(ctx context.Context, projectID string, spec *domain.ProjectSpec) error {
+			require.Equal(t, "backend", projectID)
+			copied := *spec
+			savedSpec = &copied
+			return nil
+		},
+	}
+	loader := skills.NewLoaderForAgent("codex", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Provider: "codex"},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg)
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
+	require.NotNil(t, savedSpec)
+	assert.Equal(t, "backend", savedSpec.ProjectID)
+	assert.Equal(t, "backend", savedSpec.ScopePath)
+	require.Len(t, savedSpec.PatternRules, 1)
+	assert.Equal(t, "Error Wrapping", savedSpec.PatternRules[0].Name)
+
+	specContent := readGeneratedFile(t, projectRoot, "backend", ".agents", "skills", "backend-dev", "references", "project-spec.md")
+	assert.Contains(t, specContent, "backend service")
+	assert.Contains(t, specContent, "Error Wrapping")
+
+	childSkill := readGeneratedFile(t, projectRoot, "backend", ".agents", "skills", "backend-dev", "SKILL.md")
+	assert.Contains(t, childSkill, "./references/project-spec.md")
+	assertNoBrokenMarkdownLinks(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "backend-dev"))
+}
+
 func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Business Flow", domain.CategoryBusiness)
 	pattern.Confidence = 0.916

@@ -6,16 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/utils"
+	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -103,6 +106,9 @@ func historyDefaults(cont *container.Container) (int, int) {
 func runLearnCurrent(cont *container.Container) error {
 	if err := commandutil.RequireAgentAvailable(cont); err != nil {
 		return err
+	}
+	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
+		return runLearnWorkspaceCurrent(cont)
 	}
 
 	ctx := context.Background()
@@ -318,7 +324,103 @@ func runLearnCurrent(cont *container.Container) error {
 		"patterns_count", len(patterns),
 		"saved_count", savedCount,
 	)
+	if err := commandutil.MarkLearned(ctx, cont); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func runLearnWorkspaceCurrent(cont *container.Container) error {
+	ctx := context.Background()
+	startedAt := time.Now()
+	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
+	projectConfig := cont.ConfigRepo.GetProjectConfig()
+	if len(workspaceConfig.Projects) == 0 {
+		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
+	}
+
+	projectRoot := projectConfig.RootPath
+	if projectRoot == "" {
+		var err error
+		projectRoot, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+	}
+	workspaceName := projectConfig.Name
+	if workspaceName == "" {
+		workspaceName = filepath.Base(projectRoot)
+	}
+
+	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
+		return err
+	}
+
+	if cont.WorkspaceProfileRepo != nil {
+		profile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
+		profile.GeneratedAt = time.Now().Format(time.RFC3339)
+		if err := cont.WorkspaceProfileRepo.Save(ctx, profile); err != nil {
+			return err
+		}
+	}
+
+	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
+	logger.Info(i18n.Get("LearnWorkspaceStart"), "projects", len(workspaceConfig.Projects), "parallelism", parallelism)
+
+	var mu sync.Mutex
+	totalPatterns := 0
+	totalSaved := 0
+	err := workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
+		projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
+		result, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRootPath, project.ID, project.Language, analyzer.AnalyzeCodebaseOptions{})
+		if err != nil {
+			return err
+		}
+
+		for i := range learnedPatterns {
+			learnedPatterns[i].ProjectID = project.ID
+			learnedPatterns[i].ScopePath = project.Path
+			learnedPatterns[i].WorkspaceRole = project.Type
+		}
+		saved := cont.LearnerSvc.SavePatterns(ctx, learnedPatterns, "learn_workspace_current:"+project.ID)
+
+		projectProfile := analyzer.NewProjectProfile(&analyzer.AnalyzeProjectResult{
+			Language: project.Language,
+			Summary:  result.Summary,
+		}, project.ID, project.Language)
+		projectAnalysis, err := cont.AnalyzerSvc.AnalyzeProjectFullWithLanguage(ctx, projectRootPath, project.ID, project.Language)
+		if err == nil {
+			projectProfile = analyzer.NewProjectProfile(projectAnalysis, project.ID, project.Language)
+		}
+		if cont.ProfileRepo != nil {
+			if err := cont.ProfileRepo.SaveForProject(ctx, project.ID, projectProfile); err != nil {
+				return err
+			}
+		}
+
+		mu.Lock()
+		totalPatterns += len(learnedPatterns)
+		totalSaved += saved
+		mu.Unlock()
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := commandutil.MarkLearned(ctx, cont); err != nil {
+		return err
+	}
+
+	logger.Info(i18n.Get("LearnWorkspaceComplete"), "patterns", totalPatterns, "saved", totalSaved)
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "command.learn_workspace_current",
+		"duration", time.Since(startedAt),
+		"projects_count", len(workspaceConfig.Projects),
+		"patterns_count", totalPatterns,
+		"saved_count", totalSaved,
+	)
 	return nil
 }
 
@@ -356,10 +458,10 @@ func resolveFocusPaths(projectRoot string, paths []string) ([]string, error) {
 			return nil, err
 		}
 		if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
-			return nil, fmt.Errorf("focus path %q is outside project root", rawPath)
+			return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentFocusOutsideRoot", map[string]interface{}{"Path": rawPath}))
 		}
 		if _, err := os.Stat(path); err != nil {
-			return nil, fmt.Errorf("focus path %q is not accessible: %w", rawPath, err)
+			return nil, fmt.Errorf("%s: %w", i18n.GetWithParams("LearnCurrentFocusNotAccessible", map[string]interface{}{"Path": rawPath}), err)
 		}
 		if seen[path] {
 			continue
@@ -388,7 +490,7 @@ func shouldRefreshProfile(projectRoot string, focusPaths []string, mode string, 
 	case learnCurrentProfileRefresh:
 		return true, nil
 	default:
-		return false, fmt.Errorf("invalid profile mode %q: expected auto, skip, or refresh", mode)
+		return false, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileModeInvalid", map[string]interface{}{"Mode": mode}))
 	}
 }
 
@@ -495,6 +597,9 @@ func runLearnHistory(cont *container.Container) error {
 	}))
 
 	// 调用学习服务
+	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
+		return err
+	}
 	err := cont.LearnerSvc.Learn(ctx, limit, since, batchSize)
 	if err != nil {
 		logger.Error(i18n.GetWithParams("LearnHistoryFailed", map[string]interface{}{"Error": err.Error()}))
@@ -516,6 +621,9 @@ func runLearnHistory(cont *container.Container) error {
 	count, err := cont.PatternRepo.Count(ctx)
 	if err == nil {
 		logger.Info(i18n.GetWithParams("LearnHistoryTotalPatterns", map[string]interface{}{"Count": count}))
+	}
+	if err := commandutil.MarkLearned(ctx, cont); err != nil {
+		return err
 	}
 
 	return nil

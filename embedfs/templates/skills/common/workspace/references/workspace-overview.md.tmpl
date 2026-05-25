@@ -1,0 +1,57 @@
+# Workspace Overview
+
+This file describes workspace-level entry points and routing. For a child project's internal architecture, business methods, utilities, and project rules, read that child skill's `references/project-spec.md` and `references/project-overview.md`.
+
+## Projects
+
+{{range .Projects}}
+- `{{.ID}}`: `{{.Path}}`, type `{{.Type}}`, language `{{.Language}}`
+  - Skill: `{{.Path}}/.agents/skills/{{.SkillName}}/SKILL.md` or `{{.Path}}/.claude/skills/{{.SkillName}}/SKILL.md`
+  - Project spec: `{{.Path}}/.agents/skills/{{.SkillName}}/references/project-spec.md` or `{{.Path}}/.claude/skills/{{.SkillName}}/references/project-spec.md`
+{{else}}
+- No child projects configured.
+{{end}}
+
+{{if .Shared}}
+## Shared Paths
+
+{{range .Shared}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - After changes, check every child project that imports, packages, or generates this shared content.
+{{end}}
+{{end}}
+
+{{if .Contracts}}
+## Contract Paths
+
+{{range .Contracts}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - After changes, check producers, consumers, generated clients, server handlers, middleware adapters, and tests.
+{{end}}
+{{end}}
+
+{{if .Infra}}
+## Infra Paths
+
+{{range .Infra}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - After changes, check child projects affected by deployment targets, environment variables, gateway rules, or middleware config.
+{{end}}
+{{end}}
+
+## Routing Table
+
+| Path Pattern | Child Project | What To Read |
+| --- | --- | --- |
+{{range .Projects}}
+| `{{.Path}}/**` | `{{.ID}}` | child `SKILL.md` and `references/project-spec.md` |
+{{end}}
+{{if .Contracts}}
+| `contracts/**` or configured contract paths | related producers and consumers | all contract-affected child project skills |
+{{end}}
+{{if .Shared}}
+| `shared/**` or configured shared paths | all consumers | all child skills that import shared content |
+{{end}}
+{{if .Infra}}
+| `infra/**` or configured infra paths | deployment-affected projects | runtime service, middleware, and deployment target skills |
+{{end}}

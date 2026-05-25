@@ -15,6 +15,13 @@ import "time"
 // DefaultLocale 默认语言设置
 const DefaultLocale = "zh-CN"
 
+const (
+	// ModeProject 表示把初始化根目录作为单个项目处理
+	ModeProject = "project"
+	// ModeWorkspace 表示把初始化根目录作为包含多个子项目的工作区处理
+	ModeWorkspace = "workspace"
+)
+
 // ==================== Pattern ====================
 
 // Category 模式分类
@@ -71,6 +78,9 @@ type Pattern struct {
 	MergedFrom     []string        // 从哪些模式ID汇总而来
 	Generated      bool            // 是否已生成到 skills
 	BusinessMethod *BusinessMethod // 业务方法信息（可选，仅用于 utils 和 business 分类）
+	ProjectID      string          `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
+	ScopePath      string          `json:"scope_path,omitempty"`     // workspace 模式下的路径范围
+	WorkspaceRole  string          `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
 	CreatedAt      time.Time
 	UpdatedAt      time.Time // 最后更新时间
 }
@@ -158,7 +168,10 @@ func (p *Pattern) Merge(other *Pattern) {
 // IsSimilar 判断两个模式是否相似
 // 通过名称和分类来判断
 func (p *Pattern) IsSimilar(other *Pattern) bool {
-	return p.Name == other.Name && p.Category == other.Category
+	return p.Name == other.Name &&
+		p.Category == other.Category &&
+		p.ProjectID == other.ProjectID &&
+		p.ScopePath == other.ScopePath
 }
 
 // ==================== Issue ====================

@@ -1,0 +1,57 @@
+# 工作区概览
+
+本文件描述工作区级入口和路由信息。子项目内部架构、业务方法、工具方法和项目规范，请读取对应子项目 skill 的 `references/project-spec.md` 与 `references/project-overview.md`。
+
+## 子项目
+
+{{range .Projects}}
+- `{{.ID}}`: `{{.Path}}`，类型 `{{.Type}}`，语言 `{{.Language}}`
+  - Skill: `{{.Path}}/.agents/skills/{{.SkillName}}/SKILL.md` 或 `{{.Path}}/.claude/skills/{{.SkillName}}/SKILL.md`
+  - Project spec: `{{.Path}}/.agents/skills/{{.SkillName}}/references/project-spec.md` 或 `{{.Path}}/.claude/skills/{{.SkillName}}/references/project-spec.md`
+{{else}}
+- 暂未配置子项目。
+{{end}}
+
+{{if .Shared}}
+## 共享路径
+
+{{range .Shared}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - 变更后检查所有导入、打包或生成该共享内容的子项目。
+{{end}}
+{{end}}
+
+{{if .Contracts}}
+## 契约路径
+
+{{range .Contracts}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - 变更后检查契约生产者、消费者、生成客户端、服务端处理器、中间件适配器和测试。
+{{end}}
+{{end}}
+
+{{if .Infra}}
+## 基础设施路径
+
+{{range .Infra}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - 变更后检查部署目标、环境变量、网关或中间件配置影响到的子项目。
+{{end}}
+{{end}}
+
+## 路由表
+
+| 路径模式 | 子项目 | 读取内容 |
+| --- | --- | --- |
+{{range .Projects}}
+| `{{.Path}}/**` | `{{.ID}}` | 子项目 `SKILL.md` 和 `references/project-spec.md` |
+{{end}}
+{{if .Contracts}}
+| `contracts/**` 或已配置契约路径 | 相关生产者和消费者 | 所有受契约影响的子项目 skill |
+{{end}}
+{{if .Shared}}
+| `shared/**` 或已配置共享路径 | 所有消费者 | 所有导入共享内容的子项目 skill |
+{{end}}
+{{if .Infra}}
+| `infra/**` 或已配置基础设施路径 | 受部署影响项目 | 运行服务、中间件和部署目标相关 skill |
+{{end}}

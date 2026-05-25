@@ -2,6 +2,34 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.3]
+
+### Features
+
+- Add `skills-seed init --mode workspace` / `--workspace` for multi-project workspace initialization
+- Add `skills-seed reset --mode ...` with automatic `.skills-seed` backup before reinitialization
+- Add `project.mode`, `workspace.projects`, and `agent.parallelism` configuration
+- Support concurrent child-project learning in workspace mode, with `project_id`, `scope_path`, and `workspace_role` written to learned patterns
+- Generate root `.claude/.agents` workspace skills plus child-project `.claude/.agents` skills in workspace mode
+- Generate project-level `project-spec.json` and `references/project-spec.md`, including independent specs for workspace child projects
+
+### Templates
+
+- Add `embedfs/templates/prompts/common/workspace-*` common workspace prompts
+- Add `embedfs/templates/prompts/workspace/*` workspace initialization prompt templates
+- Add `embedfs/templates/skills/common/workspace/*` root workspace skill and reference templates
+- Expand workspace common prompts with strict JSON output, routing rules, impact radius, cross-project change order, and parallel-agent constraints
+- Normalize top-level section comments in config templates so every module title is wrapped with `# ========================================`
+- Keep child projects on existing `embedfs/templates/prompts/project/` and project skill templates, with generated content linking to `references/project-spec.md`
+
+### Compatibility
+
+- Lock the initialization mode after learning or skill generation starts to prevent project/workspace data shape drift
+
+### Experience
+
+- Adjust Agent token-usage console output order so it no longer interrupts the active progress step completion line
+
 ## [v0.0.2]
 
 ### Features

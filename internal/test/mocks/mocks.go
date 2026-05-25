@@ -266,8 +266,14 @@ func (m *MockPatternRepository) Count(ctx context.Context) (int, error) {
 
 // MockProjectProfileRepository 模拟项目画像仓储
 type MockProjectProfileRepository struct {
-	GetFn  func(ctx context.Context) (*domain.ProjectProfile, error)
-	SaveFn func(ctx context.Context, profile *domain.ProjectProfile) error
+	GetFn                func(ctx context.Context) (*domain.ProjectProfile, error)
+	SaveFn               func(ctx context.Context, profile *domain.ProjectProfile) error
+	GetForProjectFn      func(ctx context.Context, projectID string) (*domain.ProjectProfile, error)
+	SaveForProjectFn     func(ctx context.Context, projectID string, profile *domain.ProjectProfile) error
+	GetSpecFn            func(ctx context.Context) (*domain.ProjectSpec, error)
+	SaveSpecFn           func(ctx context.Context, spec *domain.ProjectSpec) error
+	GetSpecForProjectFn  func(ctx context.Context, projectID string) (*domain.ProjectSpec, error)
+	SaveSpecForProjectFn func(ctx context.Context, projectID string, spec *domain.ProjectSpec) error
 }
 
 // Get 模拟获取项目画像
@@ -287,6 +293,54 @@ func (m *MockProjectProfileRepository) Get(ctx context.Context) (*domain.Project
 func (m *MockProjectProfileRepository) Save(ctx context.Context, profile *domain.ProjectProfile) error {
 	if m.SaveFn != nil {
 		return m.SaveFn(ctx, profile)
+	}
+	return nil
+}
+
+// GetForProject 模拟获取 workspace 子项目画像
+func (m *MockProjectProfileRepository) GetForProject(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
+	if m.GetForProjectFn != nil {
+		return m.GetForProjectFn(ctx, projectID)
+	}
+	return m.Get(ctx)
+}
+
+// SaveForProject 模拟保存 workspace 子项目画像
+func (m *MockProjectProfileRepository) SaveForProject(ctx context.Context, projectID string, profile *domain.ProjectProfile) error {
+	if m.SaveForProjectFn != nil {
+		return m.SaveForProjectFn(ctx, projectID, profile)
+	}
+	return m.Save(ctx, profile)
+}
+
+// GetSpec 模拟获取项目规范
+func (m *MockProjectProfileRepository) GetSpec(ctx context.Context) (*domain.ProjectSpec, error) {
+	if m.GetSpecFn != nil {
+		return m.GetSpecFn(ctx)
+	}
+	return nil, nil
+}
+
+// SaveSpec 模拟保存项目规范
+func (m *MockProjectProfileRepository) SaveSpec(ctx context.Context, spec *domain.ProjectSpec) error {
+	if m.SaveSpecFn != nil {
+		return m.SaveSpecFn(ctx, spec)
+	}
+	return nil
+}
+
+// GetSpecForProject 模拟获取 workspace 子项目规范
+func (m *MockProjectProfileRepository) GetSpecForProject(ctx context.Context, projectID string) (*domain.ProjectSpec, error) {
+	if m.GetSpecForProjectFn != nil {
+		return m.GetSpecForProjectFn(ctx, projectID)
+	}
+	return nil, nil
+}
+
+// SaveSpecForProject 模拟保存 workspace 子项目规范
+func (m *MockProjectProfileRepository) SaveSpecForProject(ctx context.Context, projectID string, spec *domain.ProjectSpec) error {
+	if m.SaveSpecForProjectFn != nil {
+		return m.SaveSpecForProjectFn(ctx, projectID, spec)
 	}
 	return nil
 }
@@ -324,17 +378,21 @@ func (m *MockCommitTracker) GetAnalyzedCommits(ctx context.Context) ([]string, e
 
 // MockConfigReader 模拟配置读取
 type MockConfigReader struct {
-	ProjectCfg  config.ProjectConfig
-	AgentCfg    config.AgentConfig
-	LearningCfg config.LearningConfig
-	AutoFixCfg  config.AutoFixConfig
-	OutputCfg   config.OutputConfig
-	LoggingCfg  config.LoggingConfig
-	Exclude     []string
+	ProjectCfg   config.ProjectConfig
+	WorkspaceCfg config.WorkspaceConfig
+	AgentCfg     config.AgentConfig
+	LearningCfg  config.LearningConfig
+	AutoFixCfg   config.AutoFixConfig
+	OutputCfg    config.OutputConfig
+	LoggingCfg   config.LoggingConfig
+	Exclude      []string
 }
 
 // GetProjectConfig 模拟获取项目配置
 func (m *MockConfigReader) GetProjectConfig() config.ProjectConfig { return m.ProjectCfg }
+
+// GetWorkspaceConfig 模拟获取工作区配置
+func (m *MockConfigReader) GetWorkspaceConfig() config.WorkspaceConfig { return m.WorkspaceCfg }
 
 // GetAgentConfig 模拟获取 Agent 配置
 func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentCfg }

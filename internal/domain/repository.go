@@ -50,6 +50,45 @@ type ProjectProfileRepository interface {
 	Save(ctx context.Context, profile *ProjectProfile) error
 }
 
+// ScopedProjectProfileRepository 保存指定 workspace 子项目的画像
+type ScopedProjectProfileRepository interface {
+	GetForProject(ctx context.Context, projectID string) (*ProjectProfile, error)
+	SaveForProject(ctx context.Context, projectID string, profile *ProjectProfile) error
+}
+
+// ProjectSpecRepository 保存项目级开发规范
+type ProjectSpecRepository interface {
+	GetSpec(ctx context.Context) (*ProjectSpec, error)
+	SaveSpec(ctx context.Context, spec *ProjectSpec) error
+}
+
+// ScopedProjectSpecRepository 保存 workspace 子项目的开发规范
+type ScopedProjectSpecRepository interface {
+	GetSpecForProject(ctx context.Context, projectID string) (*ProjectSpec, error)
+	SaveSpecForProject(ctx context.Context, projectID string, spec *ProjectSpec) error
+}
+
+// RuntimeStateRepository 保存初始化后需要锁定的运行状态
+type RuntimeStateRepository interface {
+	Get(ctx context.Context) (*RuntimeState, error)
+	Save(ctx context.Context, state *RuntimeState) error
+	LockMode(ctx context.Context, mode string) (*RuntimeState, error)
+	MarkLearned(ctx context.Context, mode string) error
+	MarkSkillsGenerated(ctx context.Context, mode string) error
+}
+
+// WorkspaceProfileRepository 保存工作区画像
+type WorkspaceProfileRepository interface {
+	Get(ctx context.Context) (*WorkspaceProfile, error)
+	Save(ctx context.Context, profile *WorkspaceProfile) error
+}
+
+// WorkspaceSpecRepository 保存用于根 skills 的工作区规范
+type WorkspaceSpecRepository interface {
+	Get(ctx context.Context) (*WorkspaceSpec, error)
+	Save(ctx context.Context, spec *WorkspaceSpec) error
+}
+
 // GitRepository Git 操作接口
 type GitRepository interface {
 	// GetCommits 获取提交历史

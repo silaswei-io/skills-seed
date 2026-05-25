@@ -18,18 +18,20 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Project  ProjectConfig  `yaml:"project"`
-	Agent    AgentConfig    `yaml:"agent"`
-	Learning LearningConfig `yaml:"learning"`
-	AutoFix  AutoFixConfig  `yaml:"autofix"`
-	Output   OutputConfig   `yaml:"output"`
-	Logging  LoggingConfig  `yaml:"logging"`
-	Exclude  []string       `yaml:"exclude"` // 全局排除配置
+	Project   ProjectConfig   `yaml:"project"`
+	Workspace WorkspaceConfig `yaml:"workspace"`
+	Agent     AgentConfig     `yaml:"agent"`
+	Learning  LearningConfig  `yaml:"learning"`
+	AutoFix   AutoFixConfig   `yaml:"autofix"`
+	Output    OutputConfig    `yaml:"output"`
+	Logging   LoggingConfig   `yaml:"logging"`
+	Exclude   []string        `yaml:"exclude"` // 全局排除配置
 }
 
 // ProjectConfig 项目配置
 type ProjectConfig struct {
 	Name          string `yaml:"name"`
+	Mode          string `yaml:"mode"` // 初始化模式：project 或 workspace
 	Language      string `yaml:"language"`
 	InitializedAt string `yaml:"initialized_at"` // 改用字符串存储，更易读
 	GitRemote     string `yaml:"git_remote"`
@@ -43,6 +45,29 @@ type AgentConfig struct {
 	Commands         map[string]string `yaml:"commands"`           // provider -> CLI 命令
 	Timeout          int               `yaml:"timeout"`            // 超时时间（秒）
 	AllowUserPlugins bool              `yaml:"allow_user_plugins"` // 是否加载用户插件
+	Parallelism      int               `yaml:"parallelism"`        // 并发 Agent 数，0 表示自动
+}
+
+// WorkspaceConfig 工作区配置
+type WorkspaceConfig struct {
+	Projects  []WorkspaceProjectConfig `yaml:"projects"`
+	Shared    []WorkspacePathConfig    `yaml:"shared"`
+	Contracts []WorkspacePathConfig    `yaml:"contracts"`
+	Infra     []WorkspacePathConfig    `yaml:"infra"`
+}
+
+// WorkspaceProjectConfig 工作区子项目配置
+type WorkspaceProjectConfig struct {
+	ID       string `yaml:"id"`
+	Path     string `yaml:"path"`
+	Type     string `yaml:"type"`
+	Language string `yaml:"language"`
+}
+
+// WorkspacePathConfig 工作区特殊路径配置
+type WorkspacePathConfig struct {
+	Path        string `yaml:"path"`
+	Description string `yaml:"description,omitempty"`
 }
 
 // LearningConfig 学习配置
@@ -172,6 +197,10 @@ func (r *Repository) save(cfg *Config) error {
 	// 替换模板中的占位符
 	content := string(templateData)
 	content = r.replaceConfigValues(content, cfg)
+	var parsed Config
+	if err := yaml.Unmarshal([]byte(content), &parsed); err != nil {
+		return r.saveWithMarshal(cfg)
+	}
 
 	// 写入文件
 	if err := os.WriteFile(r.configPath, []byte(content), 0644); err != nil {
@@ -199,6 +228,7 @@ func (r *Repository) saveWithMarshal(cfg *Config) error {
 func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	// 项目信息
 	content = replaceYAMLValueInSection(content, "project:", "name:", cfg.Project.Name)
+	content = replaceYAMLValueInSection(content, "project:", "mode:", cfg.Project.Mode)
 	content = replaceYAMLValueInSection(content, "project:", "language:", cfg.Project.Language)
 	content = replaceYAMLValueInSection(content, "project:", "locale:", cfg.Project.Locale)
 	content = replaceYAMLValueInSection(content, "project:", "git_remote:", cfg.Project.GitRemote)
@@ -207,11 +237,15 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 		content = replaceYAMLValueInSection(content, "project:", "initialized_at:", cfg.Project.InitializedAt)
 	}
 
+	// 工作区配置
+	content = replaceYAMLWorkspaceConfig(content, cfg.Workspace)
+
 	// Agent 配置
 	content = replaceYAMLValueInSection(content, "agent:", "provider:", cfg.Agent.Provider)
 	content = replaceYAMLStringMapInSection(content, "agent:", "commands:", cfg.Agent.Commands)
 	content = replaceYAMLValueInSection(content, "agent:", "timeout:", cfg.Agent.Timeout)
 	content = replaceYAMLValueInSection(content, "agent:", "allow_user_plugins:", cfg.Agent.AllowUserPlugins)
+	content = replaceYAMLValueInSection(content, "agent:", "parallelism:", cfg.Agent.Parallelism)
 
 	// 学习配置
 	content = replaceYAMLValueInSection(content, "learning:", "max_commits:", cfg.Learning.MaxCommits)
@@ -425,6 +459,43 @@ func sortedStringKeys(values map[string]string) []string {
 	return keys
 }
 
+func replaceYAMLWorkspaceConfig(content string, workspace WorkspaceConfig) string {
+	lines := strings.Split(content, "\n")
+	start := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if trimmed == "workspace:" {
+			start = i
+			break
+		}
+	}
+	if start < 0 {
+		return content
+	}
+
+	end := start + 1
+	for end < len(lines) {
+		line := lines[end]
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		if indent == 0 && trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			break
+		}
+		end++
+	}
+
+	data, err := yaml.Marshal(map[string]WorkspaceConfig{"workspace": workspace})
+	if err != nil {
+		return content
+	}
+	replacement := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+
+	return strings.Join(append(append(lines[:start], replacement...), lines[end:]...), "\n")
+}
+
 // defaultConfig 默认配置
 func (r *Repository) defaultConfig(locale string) *Config {
 	// 如果指定了 locale，使用指定的；否则检测系统语言
@@ -488,6 +559,13 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 		cfg.Agent.Timeout = 1800
 	}
 
+	if cfg.Project.Mode == "" {
+		cfg.Project.Mode = domain.ModeProject
+	}
+	if cfg.Project.Mode != domain.ModeProject && cfg.Project.Mode != domain.ModeWorkspace {
+		cfg.Project.Mode = domain.ModeProject
+	}
+
 	if cfg.Output.SkillsPaths == nil {
 		cfg.Output.SkillsPaths = map[string]string{}
 	}
@@ -531,6 +609,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 	return &Config{
 		Project: ProjectConfig{
 			Name:          "project",
+			Mode:          domain.ModeProject,
 			Language:      "go",
 			InitializedAt: time.Now().Format("2006-01-02 15:04:05"),
 			Locale:        locale,
@@ -542,6 +621,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			},
 			Timeout:          1800,
 			AllowUserPlugins: false,
+			Parallelism:      0,
 		},
 		Learning: LearningConfig{
 			MaxCommits: 50,
@@ -575,6 +655,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 // Reader 配置读取接口（供 service 层依赖）
 type Reader interface {
 	GetProjectConfig() ProjectConfig
+	GetWorkspaceConfig() WorkspaceConfig
 	GetAgentConfig() AgentConfig
 	GetLearningConfig() LearningConfig
 	GetAutoFixConfig() AutoFixConfig
@@ -586,6 +667,11 @@ type Reader interface {
 // GetProjectConfig 获取项目配置
 func (r *Repository) GetProjectConfig() ProjectConfig {
 	return r.config.Project
+}
+
+// GetWorkspaceConfig 获取工作区配置
+func (r *Repository) GetWorkspaceConfig() WorkspaceConfig {
+	return r.config.Workspace
 }
 
 // GetAgentConfig 获取 Agent 配置
@@ -624,6 +710,12 @@ func (r *Repository) SetProjectName(name string) error {
 	return r.Update(r.config)
 }
 
+// SetProjectMode 设置初始化模式
+func (r *Repository) SetProjectMode(mode string) error {
+	r.config.Project.Mode = mode
+	return r.Update(r.config)
+}
+
 // SetProjectLanguage 设置项目语言
 func (r *Repository) SetProjectLanguage(language string) error {
 	r.config.Project.Language = language
@@ -645,6 +737,12 @@ func (r *Repository) SetRootPath(rootPath string) error {
 // SetLocale 设置语言
 func (r *Repository) SetLocale(locale string) error {
 	r.config.Project.Locale = locale
+	return r.Update(r.config)
+}
+
+// SetWorkspaceConfig 设置工作区配置
+func (r *Repository) SetWorkspaceConfig(workspace WorkspaceConfig) error {
+	r.config.Workspace = workspace
 	return r.Update(r.config)
 }
 

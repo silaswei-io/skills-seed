@@ -83,8 +83,43 @@ func TestPrintConsoleLineClearsActiveProgressLine(t *testing.T) {
 	}
 }
 
+func TestPrintConsoleLineAfterProgressPrintsAfterCompletedStep(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := New(1)
+		tracker.enabled = true
+
+		tracker.StartStep("分析当前代码库")
+		PrintConsoleLineAfterProgress("Token 消耗: 本次 575.5k")
+		tracker.CompleteStep("分析当前代码库")
+	})
+
+	completedIndex := strings.Index(output, "[############################] 1/1   分析当前代码库")
+	if completedIndex < 0 {
+		t.Fatalf("expected completed progress line before deferred console output, got %q", output)
+	}
+	tokenIndex := strings.Index(output, "Token 消耗: 本次 575.5k")
+	if tokenIndex < 0 {
+		t.Fatalf("expected deferred token usage output, got %q", output)
+	}
+	if tokenIndex < completedIndex {
+		t.Fatalf("expected deferred token usage output after completed progress line, got %q", output)
+	}
+}
+
+func TestPrintConsoleLineAfterProgressPrintsImmediatelyWithoutActiveStep(t *testing.T) {
+	output := captureStdout(t, func() {
+		PrintConsoleLineAfterProgress("Token 消耗: 本次 120.1k")
+	})
+
+	if output != "Token 消耗: 本次 120.1k\n" {
+		t.Fatalf("expected console output immediately without active progress step, got %q", output)
+	}
+}
+
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
+	resetConsoleState()
+	defer resetConsoleState()
 
 	tempFile, err := os.CreateTemp(t.TempDir(), "stdout")
 	if err != nil {
@@ -108,4 +143,13 @@ func captureStdout(t *testing.T, fn func()) string {
 		t.Fatalf("read captured stdout: %v", err)
 	}
 	return string(data)
+}
+
+func resetConsoleState() {
+	consoleMu.Lock()
+	defer consoleMu.Unlock()
+
+	progressActive = false
+	progressLineOpen = false
+	pendingConsoleLines = nil
 }

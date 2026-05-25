@@ -1,0 +1,45 @@
+---
+name: {{.SkillName}}
+description: Use when modifying, reviewing, or extending {{.WorkspaceName}} workspace code, especially cross-project changes, contracts, shared code, or deployment config
+---
+
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- skills-template-sha256: {{.SkillsTemplatesHash}} -->
+
+# {{.WorkspaceName}} Workspace Development Skill
+
+The root skill handles workspace-level routing, cross-project coordination, and impact radius. Child project implementation details, coding style, business methods, and project rules must be read from the corresponding child skill and `references/project-spec.md`.
+
+## Workflow
+
+1. Classify the task scope by path: single child project, contracts, shared code, infra, or cross-project flow.
+2. Read [Workspace Overview](./references/workspace-overview.md) and [Cross-Project Rules](./references/cross-project-rules.md).
+3. Load affected child project `SKILL.md` files, then load each child project's `references/project-spec.md` as needed.
+4. For cross-project work, settle the contract or shared interface before splitting implementation boundaries.
+5. Do not promote one child project's internal convention into a workspace rule; child details belong to child skills.
+
+## Routing Rules
+
+{{range .Projects}}
+- `{{.Path}}/**` -> read `{{.Path}}/.agents/skills/{{.SkillName}}/SKILL.md` or `{{.Path}}/.claude/skills/{{.SkillName}}/SKILL.md`, then read `{{.Path}}/.agents/skills/{{.SkillName}}/references/project-spec.md` as needed
+{{end}}
+{{if .Contracts}}
+- When contract paths change, read producer and consumer child project skills together; do not update only one side.
+{{end}}
+{{if .Shared}}
+- When shared paths change, read every child project skill that imports, packages, or generates the shared content.
+{{end}}
+{{if .Infra}}
+- When infra paths change, read child project skills affected by deployment, config, gateway, or middleware rules.
+{{end}}
+
+## References
+
+- [Workspace Overview](./references/workspace-overview.md)
+- [Cross-Project Rules](./references/cross-project-rules.md)
+
+## Parallel Work
+
+- Distinct child project paths may be handled by multiple agents in parallel when each agent writes only within its child project.
+- The same file or path under `contracts`, `shared`, or `infra` should be handled serially; stabilize the contract or shared interface before child projects proceed in parallel.
+- Before parallel work, list affected projects and write boundaries. After parallel work, verify interface, generated artifacts, config, and tests stay consistent.

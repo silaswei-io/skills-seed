@@ -1,0 +1,46 @@
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- prompt-template-sha256: {{.PromptTemplatesHash}} -->
+<!-- prompt-type: workspace-profile -->
+<!-- editable: true -->
+
+# 工作区画像提示词
+
+你正在分析工作区 `{{.WorkspaceName}}`。
+
+工作区根目录：
+```text
+{{.WorkspaceRoot}}
+```
+
+已识别子项目：
+{{range .Projects}}
+- `{{.ID}}`: `{{.Path}}`，类型 `{{.Type}}`，语言 `{{.Language}}`
+{{else}}
+- 暂未识别子项目；请优先根据构建文件和目录边界判断候选项目。
+{{end}}
+
+# 分析目标
+
+只输出工作区级事实画像，用于生成根 `.claude/.agents` skill。子项目内部架构、编码风格、业务方法和局部 patterns 留给子项目自己的 project profile、project spec 和 skill。
+
+请优先补充以下事实：
+
+1. 子项目职责和边界：每个子项目负责什么、对外暴露什么、依赖谁。
+2. shared/contracts/infra 目录职责：这些路径是否被多个项目消费，变更后需要检查哪些项目。
+3. 依赖方向：前端、后端、中间件、共享库、契约、部署配置之间的调用或生成关系。
+4. 同步关系：接口契约、生成代码、SDK、部署配置、环境变量、数据库 schema 和测试之间如何联动。
+5. 影响半径：哪些路径变更必须同时读取多个子项目 skill。
+
+# 路由线索
+
+请把路径路由写成可执行判断，例如：
+
+- `frontend/**` 只路由到 `frontend` 子项目 skill。
+- `proto/**` 同时路由到使用该契约的前端、后端和中间件子项目 skill。
+- `deploy/**` 路由到受部署配置影响的运行服务子项目 skill。
+
+# 约束
+
+- 不要把单个子项目的内部规范写成工作区规范。
+- 如果依赖关系无法确认，请保留 TODO，并说明需要检查的证据路径。
+- 路径、命令、配置 key、环境变量和代码标识符保留原文。

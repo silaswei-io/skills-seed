@@ -94,6 +94,32 @@ func TestRepository_GetProjectConfig(t *testing.T) {
 	assert.NotEmpty(t, projectCfg.InitializedAt)
 }
 
+func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
+	seedPath := t.TempDir()
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	cfg := repo.Get()
+	cfg.Project.Mode = "workspace"
+	cfg.Workspace.Projects = []WorkspaceProjectConfig{
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+	}
+	cfg.Workspace.Contracts = []WorkspacePathConfig{{Path: "proto", Description: "API contracts"}}
+	require.NoError(t, repo.Update(cfg))
+
+	content, err := os.ReadFile(filepath.Join(seedPath, "config.yaml"))
+	require.NoError(t, err)
+	require.Contains(t, string(content), `id: frontend`)
+	require.Contains(t, string(content), `path: proto`)
+
+	reloaded, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 2)
+	require.Equal(t, "backend", reloaded.GetWorkspaceConfig().Projects[1].ID)
+	require.Equal(t, "API contracts", reloaded.GetWorkspaceConfig().Contracts[0].Description)
+}
+
 func TestRepository_GetAgentConfig(t *testing.T) {
 	repo := setupTestConfig(t)
 	agentCfg := repo.GetAgentConfig()

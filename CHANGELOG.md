@@ -2,6 +2,34 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.3]
+
+### 功能
+
+- 支持 `skills-seed init --mode workspace` / `--workspace` 初始化多子项目工作区
+- 新增 `skills-seed reset --mode ...`，切换初始化模式时默认备份旧 `.skills-seed`
+- 配置新增 `project.mode`、`workspace.projects` 和 `agent.parallelism`
+- workspace 模式下支持按子项目并发学习，并为 patterns 写入 `project_id`、`scope_path`、`workspace_role`
+- workspace 模式下生成根 `.claude/.agents` 入口 skills，并为子项目生成各自 `.claude/.agents` skills
+- 生成项目级 `project-spec.json` 和 `references/project-spec.md`，workspace 子项目也拥有独立项目规范
+
+### 模板
+
+- 新增 `embedfs/templates/prompts/common/workspace-*` 工作区通用提示词
+- 新增 `embedfs/templates/prompts/workspace/*` 工作区初始化提示词模板
+- 新增 `embedfs/templates/skills/common/workspace/*` 工作区根 skills 与 references 模板
+- 工作区通用提示词补充严格 JSON 输出、路由规则、影响半径、跨项目改动顺序和并发 Agent 约束
+- 统一配置模板顶层模块注释风格，所有模块标题使用 `# ========================================` 包裹
+- 子项目继续复用 `embedfs/templates/prompts/project/` 与现有 project skills 模板，并在生成内容中引用 `references/project-spec.md`
+
+### 兼容性
+
+- 开始学习或生成后会锁定初始化模式，避免在 project/workspace 之间直接切换导致数据结构混用
+
+### 体验
+
+- 调整 Agent Token 消耗的控制台输出顺序，避免打断正在执行的进度步骤完成日志
+
 ## [v0.0.2]
 
 ### 功能

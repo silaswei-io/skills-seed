@@ -111,6 +111,35 @@ func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
 	}
 }
 
+func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
+	loader := NewLoaderForAgent("codex", "zh-CN")
+	data := map[string]interface{}{
+		"ProgramVersion":      "v0.0.3",
+		"SkillsTemplatesHash": "hash",
+		"SkillName":           "demo-workspace",
+		"WorkspaceName":       "demo",
+		"Projects": []map[string]string{
+			{
+				"ID":        "backend",
+				"Path":      "backend",
+				"Type":      "backend",
+				"Language":  "go",
+				"SkillName": "backend-dev",
+			},
+		},
+		"Shared":    []map[string]string{},
+		"Contracts": []map[string]string{{"Path": "proto"}},
+		"Infra":     []map[string]string{},
+	}
+
+	content, err := loader.RenderRelative("workspace/SKILL", data)
+	require.NoError(t, err)
+
+	require.Contains(t, content, "description: 修改、审查或扩展 demo 工作区代码时使用")
+	require.Contains(t, content, "backend/.agents/skills/backend-dev/SKILL.md")
+	require.NotContains(t, content, "Use when modifying")
+}
+
 // TestLoader_RenderReference 测试分类模板渲染
 func TestLoader_RenderReference(t *testing.T) {
 	loader := NewLoader("zh-CN")
@@ -233,7 +262,7 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 					require.NoError(t, err)
 					require.NotEmpty(t, overview)
 
-					for _, reference := range []string{"business-methods", "modules", "common-utils"} {
+					for _, reference := range []string{"business-methods", "modules", "common-utils", "project-spec"} {
 						referenceContent, err := loader.RenderReferenceFile(reference, projectOverviewData())
 						require.NoError(t, err)
 						require.NotEmpty(t, referenceContent)
@@ -390,5 +419,17 @@ func projectOverviewData() map[string]interface{} {
 		"BusinessMethods": []domain.BusinessMethod{{Name: "Demo", Location: "internal/demo.go:10", Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
 		"CommonUtils":     []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
 		"ConfigPatterns":  []string{"yaml config"},
+		"ProjectID":       "demo",
+		"ScopePath":       "demo",
+		"WorkspaceRole":   "backend",
+		"Boundaries": []domain.ProjectSpecBoundary{
+			{Type: "module", Name: "service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Paths: []string{"internal/service"}},
+		},
+		"PatternRules": []domain.ProjectSpecPatternRule{
+			{Name: "Error Wrapping", Category: "error", Description: "wrap errors", Rule: "use %w", Confidence: 0.9, Frequency: 2},
+		},
+		"Touchpoints": []domain.ProjectSpecTouchpoint{
+			{Kind: "business_method", Name: "Demo", Path: "internal/demo.go:10", Description: "demo"},
+		},
 	}
 }

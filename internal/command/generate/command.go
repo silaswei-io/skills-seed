@@ -55,6 +55,9 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 	tracker := progress.New(2)
 
 	logger.Info(i18n.Get("GenerateStarting"))
+	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
+		return err
+	}
 
 	// 获取模式数量
 	var count int
@@ -115,6 +118,9 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 
 	logger.Info(i18n.Get("GenerateSuccessMsg"))
 	logger.Info(i18n.GetWithParams("GenerateOutputPath", map[string]interface{}{"Path": effectiveOutputPath}))
+	if err := commandutil.MarkSkillsGenerated(ctx, cont); err != nil {
+		return err
+	}
 
 	return nil
 }

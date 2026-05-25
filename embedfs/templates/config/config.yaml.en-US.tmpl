@@ -1,10 +1,9 @@
 # ========================================
-# Project Basic Configuration
-# ========================================
-
 # Project Information
+# ========================================
 project:
   name: ""                   # Project name (auto-filled during init)
+  mode: "project"            # Init mode: project (single project) or workspace (multi-project workspace). Locked after learning or generation starts
   language: "go"             # Primary language: go, typescript, python, etc.
   locale: "en-US"            # CLI output language: zh-CN (Chinese) or en-US (English)
   git_remote: ""             # Git remote repository URL (auto-filled during init)
@@ -12,10 +11,17 @@ project:
   initialized_at: ""         # Project initialization time (auto-filled during init)
 
 # ========================================
+# Workspace Configuration
+# ========================================
+workspace:
+  projects: []               # Child projects, for example: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
+  shared: []                 # Shared libraries or shared code paths, for example: [{path: "pkg"}]
+  contracts: []              # API contract paths, for example: [{path: "proto"}]
+  infra: []                  # Deployment/operations paths, for example: [{path: "deploy"}]
+
+# ========================================
 # AI Agent Configuration
 # ========================================
-
-# Agent Configuration
 agent:
   provider: "claude"         # Current agent provider; matches keys in commands and output.skills_paths
   commands:                  # provider -> CLI command path; add new providers here
@@ -23,8 +29,11 @@ agent:
     codex: "codex"
   timeout: 1800              # AI request timeout (seconds)
   allow_user_plugins: false  # Whether agents may load user plugins; disabled by default for batch stability
+  parallelism: 0             # Number of concurrent agents; 0 means automatic (project=1, workspace=project count with cap)
 
+# ========================================
 # Learning Configuration
+# ========================================
 learning:
   max_commits: 50            # Default number of Git commits to analyze
   batch_size: 5              # Number of commits to analyze per AI call in batch mode
@@ -32,8 +41,6 @@ learning:
 # ========================================
 # Auto-Fix Configuration (check --fix)
 # ========================================
-
-# Auto-Fix Configuration
 autofix:
   strategy: "patch"          # Fix strategy: patch: Generate .patch files (recommended, safe); backup: Backup files before modification; stash: Apply fixes then git stash; branch: Create new branch to apply fixes
   backup_path: "backups"     # Backup path (relative to .skills-seed directory)
@@ -41,8 +48,6 @@ autofix:
 # ========================================
 # Output Configuration
 # ========================================
-
-# Output Configuration
 output:
   skills_paths:                    # provider -> Skills output path; add new providers here
     claude: ".claude/skills/skills-seed-skills"
@@ -51,8 +56,6 @@ output:
 # ========================================
 # Logging Configuration
 # ========================================
-
-# Logging Configuration
 logging:
   level: "DEBUG"             # Log level: DEBUG, INFO, WARN, ERROR
   logs_path: "logs"          # Log path (relative to .skills-seed directory)
@@ -61,8 +64,6 @@ logging:
 # ========================================
 # Global Exclusion Configuration
 # ========================================
-
-# Global Exclusion Configuration
 exclude:                     # Files/directories to exclude from all learning and analysis
   - "vendor/**"              # Go dependencies directory
   - "node_modules/**"        # Node.js dependencies directory

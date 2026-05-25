@@ -25,11 +25,14 @@ import (
 
 // GeneratorService 生成服务
 type GeneratorService struct {
-	patternRepo  domain.PatternRepository
-	profileRepo  domain.ProjectProfileRepository
-	skillsLoader *skills.Loader
-	agent        agent.Agent // 添加AI Agent
-	configRepo   config.Reader
+	patternRepo       domain.PatternRepository
+	profileRepo       domain.ProjectProfileRepository
+	scopedProfileRepo domain.ScopedProjectProfileRepository
+	projectSpecRepo   domain.ProjectSpecRepository
+	scopedSpecRepo    domain.ScopedProjectSpecRepository
+	skillsLoader      *skills.Loader
+	agent             agent.Agent // 添加AI Agent
+	configRepo        config.Reader
 }
 
 type projectOverviewTemplateData struct {
@@ -37,10 +40,30 @@ type projectOverviewTemplateData struct {
 	OverviewReferences []skills.ReferenceItem
 }
 
+type projectSpecTemplateData struct {
+	domain.ProjectSpec
+}
+
 type categoryReferenceMeta struct {
 	Group       string
 	Title       string
 	Description string
+}
+
+type workspaceSkillTemplateData struct {
+	ProgramVersion      string
+	SkillsTemplatesHash string
+	SkillName           string
+	WorkspaceName       string
+	Projects            []workspaceProjectTemplateData
+	Shared              []config.WorkspacePathConfig
+	Contracts           []config.WorkspacePathConfig
+	Infra               []config.WorkspacePathConfig
+}
+
+type workspaceProjectTemplateData struct {
+	config.WorkspaceProjectConfig
+	SkillName string
 }
 
 // NewGeneratorService 创建生成服务
@@ -51,17 +74,26 @@ func NewGeneratorService(
 	ag agent.Agent,
 	configRepo config.Reader,
 ) *GeneratorService {
+	scopedProfileRepo, _ := profileRepo.(domain.ScopedProjectProfileRepository)
+	projectSpecRepo, _ := profileRepo.(domain.ProjectSpecRepository)
+	scopedSpecRepo, _ := profileRepo.(domain.ScopedProjectSpecRepository)
 	return &GeneratorService{
-		patternRepo:  patternRepo,
-		profileRepo:  profileRepo,
-		skillsLoader: skillsLoader,
-		agent:        ag,
-		configRepo:   configRepo,
+		patternRepo:       patternRepo,
+		profileRepo:       profileRepo,
+		scopedProfileRepo: scopedProfileRepo,
+		projectSpecRepo:   projectSpecRepo,
+		scopedSpecRepo:    scopedSpecRepo,
+		skillsLoader:      skillsLoader,
+		agent:             ag,
+		configRepo:        configRepo,
 	}
 }
 
 // GenerateSkills 生成 Skills 文件夹
 func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string) error {
+	if s.configRepo != nil && s.configRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
+		return s.GenerateWorkspaceSkills(ctx)
+	}
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "generator.generate_skills",
@@ -147,7 +179,18 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 	// 6. 计算统计信息（用于 writeSkillsOutput）
 	stats := s.calculateStats(patterns)
 
-	if err := s.writeSkillsOutput(ctx, resolvedOutputPath, patterns, summaryResult, stats); err != nil {
+	profile, err := s.loadProjectProfile(ctx)
+	if err != nil {
+		return err
+	}
+	profile = cleanProjectProfile(profile)
+	spec := s.projectSpecFromProfileAndPatterns(profile, patterns, config.WorkspaceProjectConfig{})
+	if s.projectSpecRepo != nil {
+		if err := s.projectSpecRepo.SaveSpec(ctx, spec); err != nil {
+			return err
+		}
+	}
+	if err := s.writeSkillsOutput(ctx, resolvedOutputPath, patterns, summaryResult, stats, profile, spec, generatedSkillName(s.configRepo.GetProjectConfig().Name)); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.generate_skills",
 			"duration", time.Since(startedAt),
@@ -164,6 +207,64 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 		"patterns_count", len(patterns),
 		"resolved_output_path", resolvedOutputPath,
 		"categories_count", len(stats.ByCategory),
+	)
+	return nil
+}
+
+// GenerateWorkspaceSkills 生成工作区根 skills 和各子项目 skills
+func (s *GeneratorService) GenerateWorkspaceSkills(ctx context.Context) error {
+	startedAt := time.Now()
+	projectConfig := s.configRepo.GetProjectConfig()
+	workspaceConfig := s.configRepo.GetWorkspaceConfig()
+	if len(workspaceConfig.Projects) == 0 {
+		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
+	}
+
+	projectRoot := projectConfig.RootPath
+	rootOutputPaths := s.workspaceRootOutputPaths(projectRoot, projectConfig.Name)
+	for _, outputPath := range rootOutputPaths {
+		if err := s.writeWorkspaceRootSkill(outputPath, projectConfig, workspaceConfig); err != nil {
+			return err
+		}
+	}
+
+	allPatterns, err := s.patternRepo.GetAll(ctx)
+	if err != nil {
+		return err
+	}
+	for _, project := range workspaceConfig.Projects {
+		projectPatterns := patternsForProject(allPatterns, project.ID)
+		if len(projectPatterns) == 0 {
+			continue
+		}
+		profile, err := s.loadProjectProfileForWorkspace(ctx, project)
+		if err != nil {
+			return err
+		}
+		spec := s.projectSpecFromProfileAndPatterns(profile, projectPatterns, project)
+		if s.scopedSpecRepo != nil {
+			if err := s.scopedSpecRepo.SaveSpecForProject(ctx, project.ID, spec); err != nil {
+				return err
+			}
+		}
+		summary := s.ensureCategorySummaries(projectPatterns, nil)
+		stats := s.calculateStats(projectPatterns)
+		result := &agent.GenerateSkillsResult{CategorySummaries: summary}
+		for _, outputPath := range projectOutputPaths(projectRoot, project) {
+			outputPath, err = utils.ResolvePath(projectRoot, outputPath)
+			if err != nil {
+				return err
+			}
+			if err := s.writeSkillsOutput(ctx, outputPath, projectPatterns, result, stats, profile, spec, generatedSkillName(project.ID)); err != nil {
+				return err
+			}
+		}
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "generator.generate_workspace_skills",
+		"duration", time.Since(startedAt),
+		"projects_count", len(workspaceConfig.Projects),
 	)
 	return nil
 }
@@ -186,7 +287,7 @@ func summarizePatternsForAgent(patterns []domain.Pattern) []map[string]interface
 	return summary
 }
 
-func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats) error {
+func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "generator.write_skills_output",
@@ -226,19 +327,29 @@ func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath str
 
 	projectConfig := s.configRepo.GetProjectConfig()
 	skillsTemplatesHash := metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS))
-	profile, err := s.loadProjectProfile(ctx)
-	if err != nil {
-		return err
+	if profile == nil {
+		return fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
 	}
 	profile = cleanProjectProfile(profile)
+	if skillName == "" {
+		skillName = generatedSkillName(projectConfig.Name)
+	}
+	templateProjectName := projectConfig.Name
+	if profile.ProjectName != "" {
+		templateProjectName = profile.ProjectName
+	}
+	templateLanguage := projectConfig.Language
+	if profile.Language != "" {
+		templateLanguage = profile.Language
+	}
 
 	// 准备模板数据
 	data := map[string]interface{}{
 		"ProgramVersion":      metadata.ProgramVersion,
 		"SkillsTemplatesHash": skillsTemplatesHash,
-		"ProjectName":         projectConfig.Name,
-		"SkillName":           generatedSkillName(projectConfig.Name),
-		"Language":            projectConfig.Language,
+		"ProjectName":         templateProjectName,
+		"SkillName":           skillName,
+		"Language":            templateLanguage,
 		"PatternCount":        len(patterns),
 		"AvgConfidence":       stats.AvgConfidence * 100,
 		"Categories":          len(summaryResult.CategorySummaries),
@@ -286,7 +397,7 @@ func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath str
 	}
 
 	// 7. 生成参考文档
-	if err := s.generateReferenceFiles(ctx, outputPath, summaryResult.CategorySummaries, patterns, profile); err != nil {
+	if err := s.generateReferenceFiles(ctx, outputPath, summaryResult.CategorySummaries, patterns, profile, spec); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.generate_reference_files",
 			"duration", time.Since(startedAt),
@@ -320,6 +431,22 @@ func (s *GeneratorService) loadProjectProfile(ctx context.Context) (*domain.Proj
 		return nil, err
 	}
 	return profile, nil
+}
+
+func (s *GeneratorService) loadProjectProfileForWorkspace(ctx context.Context, project config.WorkspaceProjectConfig) (*domain.ProjectProfile, error) {
+	if s.scopedProfileRepo == nil {
+		return nil, fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
+	}
+	profile, err := s.scopedProfileRepo.GetForProject(ctx, project.ID)
+	if err == nil {
+		return profile, nil
+	}
+	return &domain.ProjectProfile{
+		ProjectName: project.ID,
+		Language:    project.Language,
+		Summary:     project.Type,
+		GeneratedAt: time.Now().Format("2006-01-02 15:04:05"),
+	}, nil
 }
 
 func (s *GeneratorService) generateAgentMetadata(outputPath string, data map[string]interface{}) error {
@@ -655,8 +782,196 @@ func generatedSkillName(projectName string) string {
 	return name
 }
 
+func patternsForProject(patterns []domain.Pattern, projectID string) []domain.Pattern {
+	filtered := make([]domain.Pattern, 0)
+	for _, pattern := range patterns {
+		if pattern.ProjectID == projectID || pattern.ProjectID == "" {
+			filtered = append(filtered, pattern)
+		}
+	}
+	return filtered
+}
+
+func (s *GeneratorService) projectSpecFromProfileAndPatterns(profile *domain.ProjectProfile, patterns []domain.Pattern, project config.WorkspaceProjectConfig) *domain.ProjectSpec {
+	if profile == nil {
+		return nil
+	}
+
+	spec := &domain.ProjectSpec{
+		ProjectName:       profile.ProjectName,
+		Language:          profile.Language,
+		Summary:           profile.Summary,
+		ConfigPatterns:    append([]string(nil), profile.ConfigPatterns...),
+		FrameworkPatterns: append([]string(nil), profile.FrameworkPatterns...),
+		GeneratedAt:       time.Now().Format("2006-01-02 15:04:05"),
+	}
+	if project.ID != "" {
+		spec.ProjectID = project.ID
+		spec.ProjectName = project.ID
+		spec.ScopePath = project.Path
+		spec.WorkspaceRole = project.Type
+		if project.Language != "" {
+			spec.Language = project.Language
+		}
+	}
+	if spec.ProjectName == "" {
+		spec.ProjectName = "project"
+	}
+	if spec.Language == "" {
+		spec.Language = "unknown"
+	}
+
+	for _, layer := range profile.Layers {
+		spec.Boundaries = append(spec.Boundaries, domain.ProjectSpecBoundary{
+			Type:             "layer",
+			Name:             layer.Name,
+			Description:      layer.Description,
+			Responsibilities: append([]string(nil), layer.Responsibilities...),
+			Paths:            append([]string(nil), layer.Files...),
+		})
+	}
+	for _, module := range profile.KeyModules {
+		spec.Boundaries = append(spec.Boundaries, domain.ProjectSpecBoundary{
+			Type:             "module",
+			Name:             module.Name,
+			Description:      module.Description,
+			Responsibilities: append([]string(nil), module.Responsibilities...),
+			Paths:            []string{module.Path},
+		})
+	}
+
+	for _, pattern := range strongestPatterns(patterns, 12) {
+		spec.PatternRules = append(spec.PatternRules, domain.ProjectSpecPatternRule{
+			Name:        pattern.Name,
+			Category:    string(pattern.Category),
+			Description: pattern.Description,
+			Rule:        pattern.Rule,
+			Confidence:  pattern.Confidence,
+			Frequency:   pattern.Frequency,
+		})
+	}
+
+	for _, method := range profile.BusinessMethods {
+		spec.Touchpoints = append(spec.Touchpoints, domain.ProjectSpecTouchpoint{
+			Kind:        "business_method",
+			Name:        method.Name,
+			Path:        method.Location,
+			Description: method.Description,
+		})
+	}
+	for _, utility := range profile.CommonUtils {
+		spec.Touchpoints = append(spec.Touchpoints, domain.ProjectSpecTouchpoint{
+			Kind:        "common_utility",
+			Name:        utility.Name,
+			Path:        utility.File,
+			Description: utility.Description,
+		})
+	}
+
+	return spec
+}
+
+func strongestPatterns(patterns []domain.Pattern, limit int) []domain.Pattern {
+	filtered := make([]domain.Pattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		if strings.TrimSpace(pattern.Name) == "" {
+			continue
+		}
+		filtered = append(filtered, pattern)
+	}
+	sort.SliceStable(filtered, func(i, j int) bool {
+		if filtered[i].Confidence == filtered[j].Confidence {
+			if filtered[i].Frequency == filtered[j].Frequency {
+				return filtered[i].Name < filtered[j].Name
+			}
+			return filtered[i].Frequency > filtered[j].Frequency
+		}
+		return filtered[i].Confidence > filtered[j].Confidence
+	})
+	if limit > 0 && len(filtered) > limit {
+		return filtered[:limit]
+	}
+	return filtered
+}
+
+func (s *GeneratorService) workspaceRootOutputPaths(projectRoot, workspaceName string) []string {
+	name := workspaceSkillName(workspaceName)
+	return []string{
+		filepath.Join(projectRoot, ".claude", "skills", name),
+		filepath.Join(projectRoot, ".agents", "skills", name),
+	}
+}
+
+func workspaceSkillName(workspaceName string) string {
+	name := generatedSkillName(workspaceName)
+	if strings.HasSuffix(name, "-dev") {
+		return strings.TrimSuffix(name, "-dev") + "-workspace"
+	}
+	return name + "-workspace"
+}
+
+func projectOutputPaths(projectRoot string, project config.WorkspaceProjectConfig) []string {
+	name := generatedSkillName(project.ID)
+	projectRootPath := filepath.Join(projectRoot, filepath.FromSlash(project.Path))
+	return []string{
+		filepath.Join(projectRootPath, ".claude", "skills", name),
+		filepath.Join(projectRootPath, ".agents", "skills", name),
+	}
+}
+
+func (s *GeneratorService) writeWorkspaceRootSkill(outputPath string, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) error {
+	if err := os.MkdirAll(filepath.Join(outputPath, "references"), 0755); err != nil {
+		return err
+	}
+
+	data := workspaceTemplateData(projectConfig, workspaceConfig)
+	content, err := s.skillsLoader.RenderRelative("workspace/SKILL", data)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outputPath, "SKILL.md"), []byte(content), 0644); err != nil {
+		return err
+	}
+	overview, err := s.skillsLoader.RenderRelative("workspace/references/workspace-overview", data)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outputPath, "references", "workspace-overview.md"), []byte(overview), 0644); err != nil {
+		return err
+	}
+	rules, err := s.skillsLoader.RenderRelative("workspace/references/cross-project-rules", data)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outputPath, "references", "cross-project-rules.md"), []byte(rules), 0644)
+}
+
+func workspaceTemplateData(projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) workspaceSkillTemplateData {
+	name := projectConfig.Name
+	if name == "" {
+		name = "workspace"
+	}
+	projects := make([]workspaceProjectTemplateData, 0, len(workspaceConfig.Projects))
+	for _, project := range workspaceConfig.Projects {
+		projects = append(projects, workspaceProjectTemplateData{
+			WorkspaceProjectConfig: project,
+			SkillName:              generatedSkillName(project.ID),
+		})
+	}
+	return workspaceSkillTemplateData{
+		ProgramVersion:      metadata.ProgramVersion,
+		SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
+		SkillName:           workspaceSkillName(name),
+		WorkspaceName:       name,
+		Projects:            projects,
+		Shared:              workspaceConfig.Shared,
+		Contracts:           workspaceConfig.Contracts,
+		Infra:               workspaceConfig.Infra,
+	}
+}
+
 // generateReferenceFiles 生成所有参考文档
-func (s *GeneratorService) generateReferenceFiles(ctx context.Context, outputPath string, summaries map[string]agent.CategorySummary, patterns []domain.Pattern, profile *domain.ProjectProfile) error {
+func (s *GeneratorService) generateReferenceFiles(ctx context.Context, outputPath string, summaries map[string]agent.CategorySummary, patterns []domain.Pattern, profile *domain.ProjectProfile, spec *domain.ProjectSpec) error {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "generator.generate_reference_files",
@@ -677,6 +992,11 @@ func (s *GeneratorService) generateReferenceFiles(ctx context.Context, outputPat
 	}
 	if err := s.generateProfileReferenceFiles(refsPath, profile); err != nil {
 		return err
+	}
+	if spec != nil {
+		if err := s.generateProjectSpec(refsPath, spec); err != nil {
+			return err
+		}
 	}
 
 	// 2. 创建 patterns 目录，并清理旧版 examples 目录
@@ -703,6 +1023,23 @@ func (s *GeneratorService) generateReferenceFiles(ctx context.Context, outputPat
 		"duration", time.Since(startedAt),
 		"refs_path", refsPath,
 		"summaries_count", len(summaries),
+	)
+	return nil
+}
+
+func (s *GeneratorService) generateProjectSpec(refsPath string, spec *domain.ProjectSpec) error {
+	specPath := filepath.Join(refsPath, "project-spec.md")
+	content, err := s.skillsLoader.RenderReferenceFile("project-spec", projectSpecTemplateData{ProjectSpec: *spec})
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("ProjectSpecRenderFailed"), err)
+	}
+	if err := os.WriteFile(specPath, []byte(content), 0644); err != nil {
+		return err
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "generator.generate_project_spec",
+		"path", specPath,
+		"content_length", len(content),
 	)
 	return nil
 }

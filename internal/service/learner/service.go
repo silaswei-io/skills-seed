@@ -100,6 +100,9 @@ func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, oper
 	newPattern.Frequency = p.Frequency
 	newPattern.Source = p.Source
 	newPattern.BusinessMethod = p.BusinessMethod
+	newPattern.ProjectID = p.ProjectID
+	newPattern.ScopePath = p.ScopePath
+	newPattern.WorkspaceRole = p.WorkspaceRole
 
 	existing, err := s.patternRepo.FindSimilar(ctx, newPattern)
 	if err != nil {

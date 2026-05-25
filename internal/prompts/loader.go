@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
@@ -20,6 +22,7 @@ type Loader struct {
 	locale    string
 	seedPath  string
 	templates map[string]*template.Template
+	mu        sync.RWMutex
 }
 
 // NewLoader 创建提示词模板加载器
@@ -38,6 +41,12 @@ func NewLoader(agentName, locale, seedPath string) *Loader {
 
 // Load 加载指定提示词模板
 func (l *Loader) Load(name string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if _, ok := l.templates[name]; ok {
+		return nil
+	}
+
 	data, err := l.readEmbeddedTemplate(name)
 	if err != nil {
 		return err
@@ -76,7 +85,10 @@ func (l *Loader) templateAgentNames() []string {
 
 // Render 渲染指定提示词模板
 func (l *Loader) Render(name string, data interface{}) (string, error) {
-	if _, ok := l.templates[name]; !ok {
+	l.mu.RLock()
+	_, loaded := l.templates[name]
+	l.mu.RUnlock()
+	if !loaded {
 		if err := l.Load(name); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "prompt.load",
@@ -89,7 +101,9 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 		}
 	}
 
+	l.mu.RLock()
 	tmpl := l.templates[name]
+	l.mu.RUnlock()
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -118,6 +132,8 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	projectProfile := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "project-profile.md"))
 	commonProjectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "common.md"))
 	projectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", name+".project.md"))
+	scopedProfile, scopedCommon, scopedPrompt := l.readScopedProjectPrompts(name, data)
+	workspacePrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "workspace", name+".md"))
 	customPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "custom", name+".override.md"))
 
 	var parts []string
@@ -133,6 +149,18 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	if projectPrompt != "" {
 		parts = append(parts, strings.TrimSpace(projectPrompt))
 	}
+	if scopedProfile != "" {
+		parts = append(parts, strings.TrimSpace(scopedProfile))
+	}
+	if scopedCommon != "" {
+		parts = append(parts, strings.TrimSpace(scopedCommon))
+	}
+	if scopedPrompt != "" {
+		parts = append(parts, strings.TrimSpace(scopedPrompt))
+	}
+	if workspacePrompt != "" {
+		parts = append(parts, strings.TrimSpace(workspacePrompt))
+	}
 	if customPrompt != "" {
 		parts = append(parts, strings.TrimSpace(customPrompt))
 	}
@@ -146,6 +174,10 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 		"project_profile_length", len(projectProfile),
 		"common_project_prompt_length", len(commonProjectPrompt),
 		"project_prompt_length", len(projectPrompt),
+		"scoped_project_profile_length", len(scopedProfile),
+		"scoped_common_project_prompt_length", len(scopedCommon),
+		"scoped_project_prompt_length", len(scopedPrompt),
+		"workspace_prompt_length", len(workspacePrompt),
 		"custom_prompt_length", len(customPrompt),
 		"final_length", len(rendered),
 		"has_seed_path", true,
@@ -156,6 +188,8 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 
 // Clear 清空已加载的提示词模板缓存
 func (l *Loader) Clear() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.templates = make(map[string]*template.Template)
 }
 
@@ -175,6 +209,49 @@ func (l *Loader) readPromptFile(path string) string {
 		return ""
 	}
 	return string(data)
+}
+
+func (l *Loader) readScopedProjectPrompts(name string, data interface{}) (string, string, string) {
+	projectName := promptProjectName(data)
+	if projectName == "" {
+		return "", "", ""
+	}
+	basePath := filepath.Join(l.seedPath, "prompts", "projects", projectName)
+	return l.readPromptFile(filepath.Join(basePath, "project-profile.md")),
+		l.readPromptFile(filepath.Join(basePath, "common.md")),
+		l.readPromptFile(filepath.Join(basePath, name+".project.md"))
+}
+
+func promptProjectName(data interface{}) string {
+	if data == nil {
+		return ""
+	}
+	value := reflect.ValueOf(data)
+	if value.Kind() == reflect.Pointer {
+		if value.IsNil() {
+			return ""
+		}
+		value = value.Elem()
+	}
+	if value.Kind() == reflect.Map {
+		for _, key := range value.MapKeys() {
+			if fmt.Sprint(key.Interface()) == "ProjectName" || fmt.Sprint(key.Interface()) == "PROJECT_NAME" {
+				mapValue := value.MapIndex(key)
+				if mapValue.IsValid() {
+					return fmt.Sprint(mapValue.Interface())
+				}
+			}
+		}
+		return ""
+	}
+	if value.Kind() != reflect.Struct {
+		return ""
+	}
+	field := value.FieldByName("ProjectName")
+	if field.IsValid() && field.Kind() == reflect.String {
+		return field.String()
+	}
+	return ""
 }
 
 func funcMap() template.FuncMap {

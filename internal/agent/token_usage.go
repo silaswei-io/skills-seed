@@ -23,7 +23,7 @@ func LogTokenUsage(agentName, operation string, usage tokenusage.Usage) {
 	fields = append(fields, tokenusage.Fields(usage, "")...)
 	fields = append(fields, tokenusage.Fields(total, "cumulative_")...)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentTokenUsage"), fields...)
-	logger.Info(tokenUsageConsoleMessage(agentName, operation, usage, total), fields...)
+	logger.InfoAfterProgress(tokenUsageConsoleMessage(agentName, operation, usage, total), fields...)
 }
 
 // LogTokenUsageSummary 输出累计令牌消耗汇总

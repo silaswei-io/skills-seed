@@ -1,0 +1,35 @@
+# Cross-Project Rules
+
+## Core Principles
+
+- Before editing a child project, read that project's `SKILL.md` and `references/project-spec.md`.
+- When changing contracts, shared libraries, or deployment config, identify producers, consumers, and runtime impact before reading affected skills.
+- Do not promote a child project's local convention into a workspace-wide rule unless multiple projects depend on it.
+- Workspace rules only cover cross-project coordination. Child implementation details belong to child skills.
+
+## Change Order
+
+1. Confirm path scope and affected child projects.
+2. If contracts or shared code are involved, stabilize the contract, schema, type, or shared interface first.
+3. Update producer implementation, then update consumer calls, generated code, or adapters.
+4. Update infra, environment variables, deployment config, or middleware rules.
+5. Run affected project tests, generation commands, or build commands.
+
+## Load Multiple Skills When
+
+{{if .Contracts}}
+- After changing contract paths, read related frontend, backend, middleware, or SDK child skills together and check generated clients, server handlers, middleware adapters, and tests.
+{{end}}
+{{if .Shared}}
+- After changing shared paths, read every child skill that imports, packages, or generates the shared code.
+{{end}}
+{{if .Infra}}
+- After changing infra paths, read child skills affected by deployment, config, gateway, or middleware rules.
+{{end}}
+
+## Parallel Agent Constraints
+
+- Multiple agents may handle non-overlapping child project paths in parallel.
+- Each agent must write only within its child project path. Shared, contract, and infra paths should be handled by one agent first.
+- Consumer projects should proceed in parallel only after the contract or shared interface is stable.
+- Before merging parallel results, verify interface shapes, error codes, environment variables, generated artifacts, and tests remain consistent.

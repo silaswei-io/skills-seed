@@ -1,0 +1,45 @@
+---
+name: {{.SkillName}}
+description: 修改、审查或扩展 {{.WorkspaceName}} 工作区代码时使用，尤其涉及多个子项目、接口契约、共享代码或部署配置时
+---
+
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- skills-template-sha256: {{.SkillsTemplatesHash}} -->
+
+# {{.WorkspaceName}} 工作区开发技能
+
+根 skill 负责工作区级路由、跨项目协作和影响半径判断。子项目内部实现、编码风格、业务方法和项目规范必须读取对应子项目 skill 与 `references/project-spec.md`。
+
+## 工作流
+
+1. 先根据路径判断任务范围：单子项目、contracts、shared、infra 或跨项目流程。
+2. 读取本 skill 的 [工作区概览](./references/workspace-overview.md) 和 [跨项目规则](./references/cross-project-rules.md)。
+3. 按路由读取受影响子项目的 `SKILL.md`，再读取子项目内的 `references/project-spec.md`。
+4. 如果任务跨越多个子项目，先确定契约或共享接口，再分配各子项目写入边界。
+5. 不要把某个子项目内部约定提升为工作区规则；内部细节以子项目 skill 为准。
+
+## 路由规则
+
+{{range .Projects}}
+- `{{.Path}}/**` -> 读取 `{{.Path}}/.agents/skills/{{.SkillName}}/SKILL.md` 或 `{{.Path}}/.claude/skills/{{.SkillName}}/SKILL.md`，并按需读取 `{{.Path}}/.agents/skills/{{.SkillName}}/references/project-spec.md`
+{{end}}
+{{if .Contracts}}
+- 契约路径变更时，同时读取契约生产者和消费者子项目 skill；不要只改一端。
+{{end}}
+{{if .Shared}}
+- 共享路径变更时，同时读取所有导入、打包或生成该共享内容的子项目 skill。
+{{end}}
+{{if .Infra}}
+- 基础设施路径变更时，同时读取受部署、配置、网关或中间件规则影响的子项目 skill。
+{{end}}
+
+## 参考
+
+- [工作区概览](./references/workspace-overview.md)
+- [跨项目规则](./references/cross-project-rules.md)
+
+## 并发处理
+
+- 不同子项目路径可以由多个 Agent 并发处理，但每个 Agent 必须只写自己的子项目路径。
+- `contracts`、`shared`、`infra` 中的同一文件或同一路径应串行处理，先稳定契约或共享接口，再让子项目并发跟进。
+- 并发前先列出受影响项目和写入边界；并发后统一检查接口、生成物、配置和测试是否一致。

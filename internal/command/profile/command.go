@@ -93,6 +93,9 @@ func refreshProfile(cont *container.Container, language string) error {
 	}
 
 	ctx := context.Background()
+	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
+		return err
+	}
 	projectRoot, projectName, currentLanguage, err := resolveProjectContext(cont, language)
 	if err != nil {
 		return err
@@ -113,6 +116,9 @@ func refreshProfile(cont *container.Container, language string) error {
 	}
 
 	logger.Info(i18n.Get("ProfileRefreshComplete"))
+	if err := commandutil.MarkLearned(ctx, cont); err != nil {
+		return err
+	}
 	return nil
 }
 

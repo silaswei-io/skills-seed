@@ -12,9 +12,11 @@ import (
 )
 
 var (
-	frames           = []string{"|", "/", "-", "\\"}
-	consoleMu        sync.Mutex
-	progressLineOpen bool
+	frames              = []string{"|", "/", "-", "\\"}
+	consoleMu           sync.Mutex
+	progressActive      bool
+	progressLineOpen    bool
+	pendingConsoleLines []string
 )
 
 // Tracker 以步骤为单位显示进度
@@ -178,9 +180,12 @@ func (t *Tracker) renderLocked(newline bool) {
 	}
 	if newline {
 		fmt.Fprintln(os.Stdout)
+		progressActive = false
 		progressLineOpen = false
+		flushPendingConsoleLinesLocked()
 		return
 	}
+	progressActive = true
 	progressLineOpen = true
 }
 
@@ -194,6 +199,25 @@ func PrintConsoleLine(message string) {
 		progressLineOpen = false
 	}
 	fmt.Fprintln(os.Stdout, message)
+}
+
+// PrintConsoleLineAfterProgress 输出普通控制台消息；如果当前步骤仍在刷新，则延迟到步骤结束后输出
+func PrintConsoleLineAfterProgress(message string) {
+	consoleMu.Lock()
+	defer consoleMu.Unlock()
+
+	if progressActive {
+		pendingConsoleLines = append(pendingConsoleLines, message)
+		return
+	}
+	fmt.Fprintln(os.Stdout, message)
+}
+
+func flushPendingConsoleLinesLocked() {
+	for _, message := range pendingConsoleLines {
+		fmt.Fprintln(os.Stdout, message)
+	}
+	pendingConsoleLines = nil
 }
 
 func isTerminal(file *os.File) bool {

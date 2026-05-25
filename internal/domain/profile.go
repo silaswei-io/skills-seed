@@ -21,6 +21,49 @@ type ProjectProfile struct {
 	GeneratedAt       string              `json:"generated_at"`
 }
 
+// ProjectSpec 是由项目画像和已学习模式生成的项目级开发规范
+type ProjectSpec struct {
+	ProjectID         string                   `json:"project_id,omitempty"`
+	ProjectName       string                   `json:"project_name"`
+	ScopePath         string                   `json:"scope_path,omitempty"`
+	WorkspaceRole     string                   `json:"workspace_role,omitempty"`
+	Language          string                   `json:"language"`
+	Summary           string                   `json:"summary,omitempty"`
+	Boundaries        []ProjectSpecBoundary    `json:"boundaries,omitempty"`
+	PatternRules      []ProjectSpecPatternRule `json:"pattern_rules,omitempty"`
+	ConfigPatterns    []string                 `json:"config_patterns,omitempty"`
+	FrameworkPatterns []string                 `json:"framework_patterns,omitempty"`
+	Touchpoints       []ProjectSpecTouchpoint  `json:"touchpoints,omitempty"`
+	GeneratedAt       string                   `json:"generated_at"`
+}
+
+// ProjectSpecBoundary 描述项目内需要保护的层次、模块或职责边界
+type ProjectSpecBoundary struct {
+	Type             string   `json:"type"`
+	Name             string   `json:"name"`
+	Description      string   `json:"description,omitempty"`
+	Responsibilities []string `json:"responsibilities,omitempty"`
+	Paths            []string `json:"paths,omitempty"`
+}
+
+// ProjectSpecPatternRule 描述从 patterns 中提炼出的可执行规则
+type ProjectSpecPatternRule struct {
+	Name        string  `json:"name"`
+	Category    string  `json:"category"`
+	Description string  `json:"description,omitempty"`
+	Rule        string  `json:"rule,omitempty"`
+	Confidence  float64 `json:"confidence"`
+	Frequency   int     `json:"frequency"`
+}
+
+// ProjectSpecTouchpoint 描述改动时应优先检查的业务方法、工具或模块入口
+type ProjectSpecTouchpoint struct {
+	Kind        string `json:"kind"`
+	Name        string `json:"name"`
+	Path        string `json:"path,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
 // ArchitectureLayer describes one logical layer in the project
 type ArchitectureLayer struct {
 	Name             string   `json:"name"`
