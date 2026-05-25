@@ -46,7 +46,7 @@ func TestRenderOmitsPercentWhenStepCountsAreDisplayed(t *testing.T) {
 	}
 }
 
-func TestPrintConsoleLineBreaksActiveProgressLine(t *testing.T) {
+func TestPrintConsoleLineClearsActiveProgressLineBeforeConsoleOutput(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := New(1)
 		tracker.enabled = true
@@ -56,8 +56,30 @@ func TestPrintConsoleLineBreaksActiveProgressLine(t *testing.T) {
 		tracker.CompleteStep("分析当前代码库")
 	})
 
-	if !strings.Contains(output, "分析当前代码库\nToken 消耗") {
-		t.Fatalf("expected console message to start on a new line after active progress output, got %q", output)
+	if !strings.Contains(output, "\r\x1b[2KToken 消耗") {
+		t.Fatalf("expected active progress line to be cleared before console output, got %q", output)
+	}
+}
+
+func TestPrintConsoleLineClearsActiveProgressLine(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := New(2)
+		tracker.enabled = true
+		tracker.done = 1
+
+		tracker.StartStep("写入技能文件")
+		PrintConsoleLine("Token 消耗: 本次 120.1k")
+		tracker.CompleteStep("写入技能文件")
+	})
+
+	if strings.Contains(output, "[##############--------------] 2/2 | 写入技能文件\n") {
+		t.Fatalf("expected active progress line to be cleared instead of preserved with newline, got %q", output)
+	}
+	if !strings.Contains(output, "[##############--------------] 2/2 | 写入技能文件\r\x1b[2KToken 消耗") {
+		t.Fatalf("expected console output to overwrite active progress line, got %q", output)
+	}
+	if !strings.Contains(output, "[############################] 2/2") {
+		t.Fatalf("expected completed progress line to still be printed, got %q", output)
 	}
 }
 

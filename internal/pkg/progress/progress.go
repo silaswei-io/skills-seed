@@ -190,7 +190,7 @@ func PrintConsoleLine(message string) {
 	defer consoleMu.Unlock()
 
 	if progressLineOpen {
-		fmt.Fprintln(os.Stdout)
+		fmt.Fprint(os.Stdout, "\r\033[2K")
 		progressLineOpen = false
 	}
 	fmt.Fprintln(os.Stdout, message)
