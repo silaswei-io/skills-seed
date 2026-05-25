@@ -1,0 +1,72 @@
+# ========================================
+# Project Basic Configuration
+# ========================================
+
+# Project Information
+project:
+  name: ""                   # Project name (auto-filled during init)
+  language: "go"             # Primary language: go, typescript, python, etc.
+  locale: "en-US"            # CLI output language: zh-CN (Chinese) or en-US (English)
+  git_remote: ""             # Git remote repository URL (auto-filled during init)
+  root_path: ""              # Project root directory absolute path (auto-filled during init)
+  initialized_at: ""         # Project initialization time (auto-filled during init)
+
+# ========================================
+# AI Agent Configuration
+# ========================================
+
+# Agent Configuration
+agent:
+  provider: "claude"         # Current agent provider; matches keys in commands and output.skills_paths
+  commands:                  # provider -> CLI command path; add new providers here
+    claude: "claude"
+    codex: "codex"
+  timeout: 1800              # AI request timeout (seconds)
+  allow_user_plugins: false  # Whether agents may load user plugins; disabled by default for batch stability
+
+# Learning Configuration
+learning:
+  max_commits: 50            # Default number of Git commits to analyze
+  batch_size: 5              # Number of commits to analyze per AI call in batch mode
+
+# ========================================
+# Auto-Fix Configuration (check --fix)
+# ========================================
+
+# Auto-Fix Configuration
+autofix:
+  strategy: "patch"          # Fix strategy: patch: Generate .patch files (recommended, safe); backup: Backup files before modification; stash: Apply fixes then git stash; branch: Create new branch to apply fixes
+  backup_path: "backups"     # Backup path (relative to .skills-seed directory)
+
+# ========================================
+# Output Configuration
+# ========================================
+
+# Output Configuration
+output:
+  skills_paths:                    # provider -> Skills output path; add new providers here
+    claude: ".claude/skills/skills-seed-skills"
+    codex: ".agents/skills/skills-seed-skills"
+
+# ========================================
+# Logging Configuration
+# ========================================
+
+# Logging Configuration
+logging:
+  level: "DEBUG"             # Log level: DEBUG, INFO, WARN, ERROR
+  logs_path: "logs"          # Log path (relative to .skills-seed directory)
+  max_log_files: 30          # Maximum number of log files (auto-cleanup)
+
+# ========================================
+# Global Exclusion Configuration
+# ========================================
+
+# Global Exclusion Configuration
+exclude:                     # Files/directories to exclude from all learning and analysis
+  - "vendor/**"              # Go dependencies directory
+  - "node_modules/**"        # Node.js dependencies directory
+  - "**/*.pb.go"             # Protobuf generated files
+  - "**/*.gen.go"            # Code generated files
+  - "**/mocks/**"            # Mock test files
+  - "**/testdata/**"         # Test data directory

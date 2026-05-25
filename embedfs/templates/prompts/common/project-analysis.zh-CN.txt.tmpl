@@ -1,0 +1,117 @@
+# 角色定义
+
+你是一名资深软件架构师。请基于提供的项目上下文，生成用于技能文档的结构化项目概览。
+
+# 项目信息
+
+- **项目名称**: {{.ProjectName}}
+- **项目路径**: {{.RootPath}}
+- **主要语言**: {{.Language}}
+{{- if .Structure}}
+
+# 项目目录结构
+
+```
+{{.Structure}}
+```
+{{- end}}
+{{- if .MainFiles}}
+
+# 入口文件
+
+{{range .MainFiles}}
+- {{.}}
+{{- end}}
+{{- end}}
+{{- if .ReadmePath}}
+
+# README 文件
+
+- {{.ReadmePath}}
+{{- end}}
+
+# 分析要求
+
+请识别：
+
+1. 技术栈、框架和关键依赖。
+2. 架构层次和模块职责。
+3. 模块依赖图和关键数据流。
+4. 重要业务方法，必须包含完整签名和文件位置。
+5. 通用工具方法和配置模式。
+
+你运行在项目根目录中，请按路径自行读取入口文件、README 和必要源码。不要编造上下文中无法确认的信息。如果信息不足，对应数组留空，或在相关描述里使用简短 TODO 说明。
+
+# 语言要求
+
+- 所有面向用户阅读的自然语言字段必须使用简体中文，包括 `architecture`、`layers`、`dependency_graph`、`data_flow`、`framework_patterns`、`structure`、`key_modules`、`business_methods`、`common_utils`、`config_patterns` 和 `summary`。
+- 如果代码、README 或目录名中出现英文，请用中文概括，不要直接复制成英文说明。
+- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量和代码标识符必须保留原文，例如 Cobra、Viper、goctl、protoc、JZERO_*、GetCommand。
+- `framework_patterns` 必须用中文描述框架使用方式，例如“Cobra 命令模式：每个命令包暴露 GetCommand() 并由 main.go 注册”，不要输出 “Cobra command pattern” 这类英文句子。
+
+# 输出格式
+
+只返回符合以下结构的合法 JSON 对象：
+
+```json
+{
+  "project_name": "{{.ProjectName}}",
+  "language": "{{.Language}}",
+  "frameworks": ["框架或库名称"],
+  "architecture": "具体架构描述",
+  "layers": [
+    {
+      "name": "层次名称",
+      "description": "层次职责",
+      "responsibilities": ["具体职责"],
+      "files": ["path/to/file.go"]
+    }
+  ],
+  "dependency_graph": "Handler -> Service -> Repository -> Database",
+  "data_flow": "Request -> validation -> business logic -> persistence -> response",
+  "framework_patterns": ["具体框架使用模式"],
+  "structure": "具体项目结构摘要",
+  "key_modules": [
+    {
+      "name": "模块名称",
+      "path": "module/path",
+      "description": "模块作用",
+      "responsibilities": ["具体职责"],
+      "dependencies": ["依赖模块"],
+      "dependents": ["被依赖模块"],
+      "key_methods": ["重要方法签名"]
+    }
+  ],
+  "business_methods": [
+    {
+      "name": "MethodName",
+      "location": "file/path.go:line",
+      "description": "业务逻辑说明",
+      "usage": "何时调用该方法",
+      "type": "domain|common",
+      "function": "完整方法签名",
+      "prerequisites": "调用前置条件或依赖",
+      "returns": "返回值和可能错误"
+    }
+  ],
+  "common_utils": [
+    {
+      "name": "FunctionName",
+      "file": "file/path.go",
+      "signature": "func FunctionName(...) ...",
+      "description": "工具方法作用",
+      "usage": "何时使用"
+    }
+  ],
+  "config_patterns": ["配置模式"],
+  "dependencies": ["依赖名称"],
+  "summary": "具体项目概览"
+}
+```
+
+# 严格输出要求
+
+- 整个响应只能是一个合法 JSON 对象。
+- 必须以 `{` 开头，以 `}` 结束。
+- 不要使用 markdown 代码块包裹 JSON。
+- JSON 前后不要添加解释性文字。

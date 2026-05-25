@@ -1,0 +1,72 @@
+# ========================================
+# 项目基础配置
+# ========================================
+
+# 项目信息
+project:
+  name: ""                   # 项目名称(init 时自动填充)
+  language: "go"             # 项目主要语言: go, typescript, python 等
+  locale: "zh-CN"            # CLI 输出语言: zh-CN(中文) 或 en-US(英文)
+  git_remote: ""             # Git 远程仓库地址(init 时自动填充)
+  root_path: ""              # 项目根目录绝对路径(init 时自动填充)
+  initialized_at: ""         # 项目初始化时间(init 时自动填充)
+
+# ========================================
+# AI Agent 配置
+# ========================================
+
+# Agent 配置
+agent:
+  provider: "claude"         # 当前 Agent 提供方，对应 commands 和 output.skills_paths 的 key
+  commands:                  # provider -> CLI 命令路径，新增 provider 时在这里增加 key
+    claude: "claude"
+    codex: "codex"
+  timeout: 1800              # AI 请求超时时间(秒)
+  allow_user_plugins: false  # 是否允许 Agent 加载用户插件；默认关闭以避免批处理被插件干扰
+
+# 学习配置
+learning:
+  max_commits: 50            # 默认分析的 Git 提交数量
+  batch_size: 5              # 批量分析时,单次 AI 调用分析的 commit 数量
+
+# ========================================
+# 自动修复配置(check --fix)
+# ========================================
+
+# 自动修复配置
+autofix:
+  strategy: "patch"          # 修复策略: patch: 生成 .patch 文件(推荐,安全); backup: 备份原文件后修改; stash: 应用修复后 git stash; branch: 创建新分支应用修复
+  backup_path: "backups"     # 备份路径(相对于 .skills-seed 目录)
+
+# ========================================
+# 输出配置
+# ========================================
+
+# 输出配置
+output:
+  skills_paths:                   # provider -> Skills 输出路径，新增 provider 时在这里增加 key
+    claude: ".claude/skills/skills-seed-skills"
+    codex: ".agents/skills/skills-seed-skills"
+
+# ========================================
+# 日志配置
+# ========================================
+
+# 日志配置
+logging:
+  level: "DEBUG"             # 日志级别: DEBUG, INFO, WARN, ERROR
+  logs_path: "logs"          # 日志路径(相对于 .skills-seed 目录)
+  max_log_files: 30          # 日志文件最大数量(自动清理旧日志)
+
+# ========================================
+# 全局排除配置
+# ========================================
+
+# 全局排除配置
+exclude:                     # 所有学习和分析都不包含的文件/目录
+  - "vendor/**"              # Go 依赖目录
+  - "node_modules/**"        # Node.js 依赖目录
+  - "**/*.pb.go"             # Protobuf 生成文件
+  - "**/*.gen.go"            # 代码生成文件
+  - "**/mocks/**"            # Mock 测试文件
+  - "**/testdata/**"         # 测试数据目录

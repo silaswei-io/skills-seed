@@ -1,0 +1,103 @@
+# Role Definition
+
+You are a code pattern analysis expert skilled at generating comprehensive skill documentation from learned patterns.
+
+# Project Information
+- **Name**: {{.PROJECT_NAME}}
+- **Language**: {{.LANGUAGE}}
+- **Total Patterns**: {{.PATTERNS_COUNT}}
+
+# Analysis Steps
+
+## Step 1: Read Pattern Data
+
+<patterns_data count="{{.PATTERNS_COUNT}}">
+{{.PATTERNS_JSON}}
+</patterns_data>
+
+Each pattern includes: ID, name, category, confidence, frequency, description, rule, business method info.
+
+## Step 2: Check Existing Skills (Optional)
+
+{{if .EXISTING_SKILLS_PATH}}
+Skills documentation has been generated before at `{{.EXISTING_SKILLS_PATH}}`. You are running in the project root; read it by path to identify parts needing updates. Do not assume a Claude-only output path.
+{{else}}
+This is the first time generating Skills documentation.
+{{end}}
+
+## Step 3: Generate Summary
+
+Focus on (by priority):
+1. **Business Patterns** ⭐⭐⭐ - Domain knowledge, business rules
+2. **Business Methods & Tools** ⭐⭐⭐ - Project-specific methods (NOT standard CRUD)
+3. **API Patterns** - External interfaces
+4. **Database Patterns** - Data integrity
+
+Actions:
+- Merge similar patterns, remove duplicates
+- Extract project-specific business methods (type: `domain` for project-specific, `common` for generic)
+- Create actionable summaries and identify key patterns
+- **IMPORTANT**: Provide detailed, specific content - NOT generic placeholders
+- Each category summary must be 2-3 substantive sentences with concrete details
+- Each usage scenario must be specific and actionable
+- Business rules and best practices must be derived from actual patterns, not generic advice
+
+## Output Format
+
+Return ONLY a valid JSON object (no markdown code blocks, no extra text):
+
+```json
+{
+  "category_summaries": {
+    "business": {
+      "category": "business",
+      "summary": "Concrete 2-3 sentence summary describing actual business domain patterns found in the codebase. Example: 'This project uses a layered domain model with Repository pattern for data access. Business logic is encapsulated in Service layer with clear separation from data operations. Domain entities follow DDD principles with aggregate roots.'",
+      "patterns": ["Specific Pattern Name 1", "Specific Pattern Name 2"],
+      "usage_scenes": ["When implementing user authentication flow", "When creating order processing workflow"],
+      "priority": 5,
+      "business_methods": [
+        {
+          "name": "ProcessPayment",
+          "location": "internal/service/payment/service.go",
+          "description": "Handles payment processing with validation and error handling",
+          "function": "Validates payment request, calls payment gateway, handles response, updates order status",
+          "usage": "Use when processing payments in checkout flow",
+          "type": "domain"
+        }
+      ]
+    }
+  },
+  "key_patterns": [
+    {
+      "name": "Repository Pattern Implementation",
+      "category": "business",
+      "importance": "high",
+      "summary": "Consistently used across all data access layers with interface-based design",
+      "when_to_use": "Use when implementing new data access for any domain entity"
+    }
+  ],
+  "business_rules": ["Specific rule: All user inputs must be validated at service layer", "Specific rule: Database transactions must be used for multi-step operations"],
+  "best_practices": ["Concrete practice: Use dependency injection for all service dependencies", "Concrete practice: Log all external API calls with request/response"],
+  "common_patterns": ["Concrete pattern: Factory pattern for creating domain entities", "Concrete pattern: Builder pattern for complex object construction"],
+  "key_insights": ["Project uses clean architecture with clear separation of concerns", "Team prefers composition over inheritance"],
+  "improvement_suggestions": ["Consider adding caching layer for frequently accessed data", "Add more comprehensive error codes for API responses"]
+}
+```
+
+**IMPORTANT**:
+- All text fields must contain **specific, actionable content** derived from the patterns
+- NO generic placeholders like "Implement X" or "Use when doing Y"
+- All summaries must reference actual patterns found in the codebase
+- Business rules must be specific to the project, not generic best practices
+
+## Category Priorities (for `priority` field)
+- business: 5, api/database: 4, naming/structure/error/concurrency: 3, utils/config/middleware/testing: 2
+
+# ⚠️ CRITICAL OUTPUT REQUIREMENT
+
+Your ENTIRE response must be ONLY a valid JSON object.
+- Start with `{` and end with `}`
+- NO markdown code blocks (no ```)
+- NO explanatory text before or after the JSON
+- NO summary, introduction, or conclusion
+- If you want to add notes, put them inside the JSON as a "notes" field

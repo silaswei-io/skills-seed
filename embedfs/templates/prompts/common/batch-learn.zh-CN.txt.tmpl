@@ -1,0 +1,248 @@
+你是一位代码模式提取专家。分析这些Git提交并提取模式。
+
+# 要分析的变更
+
+{{if .CommitFiles}}
+{{range $i, $cf := .CommitFiles}}
+提交 {{$i}}: {{$cf.Commit.Hash}}
+作者: {{$cf.Commit.Author}}
+日期: {{$cf.Commit.Date.Format "2006-01-02 15:04:05"}}
+消息: {{$cf.Commit.Message}}
+变更文件：
+{{range $cf.Files}}
+- {{.}}
+{{end}}
+{{end}}
+{{else}}
+{{range $i, $c := .Commits}}
+提交 {{$i}}: {{$c.Hash}}
+作者: {{$c.Author}}
+日期: {{$c.Date.Format "2006-01-02 15:04:05"}}
+消息: {{$c.Message}}
+{{end}}
+{{end}}
+
+你运行在项目根目录中。请按提交 hash 和文件路径自行查看提交涉及的完整代码与变更，不要只基于文件名猜测。
+
+# 要提取的模式类型
+
+## 1. 强业务方法（仅限真实领域逻辑）
+
+优先提取包含**复杂业务逻辑**的方法：
+
+- **业务规则方法**：验证规则、计算逻辑、状态转换、审批流程
+- **跨实体操作**：涉及多个领域实体的业务操作
+- **工作流方法**：多步骤业务流程、状态机实现
+- **特殊处理**：加密解密、签名验证、权限校验、数据转换
+
+**不要提取**：简单的 CRUD（GetByID、Save、Delete、Create）
+
+**业务方法示例**：
+```go
+// ✅ 提取这个：包含业务逻辑
+func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error {
+    // 1. 验证订单状态
+    order, err := s.repo.GetByID(ctx, orderID)
+    if err != nil {
+        return fmt.Errorf("order not found: %w", err)
+    }
+    if order.Status != OrderStatusPending {
+        return ErrInvalidOrderStatus
+    }
+
+    // 2. 调用支付网关
+    result, err := s.paymentGateway.Charge(ctx, payment)
+    if err != nil {
+        order.Status = OrderStatusPaymentFailed
+        s.repo.Save(ctx, order)
+        return fmt.Errorf("payment failed: %w", err)
+    }
+
+    // 3. 更新订单状态
+    order.Status = OrderStatusPaid
+    order.PaymentID = result.TransactionID
+    return s.repo.Save(ctx, order)
+}
+
+// ❌ 不提取这个：简单 CRUD
+func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error) {
+    var order Order
+    err := r.db.WithContext(ctx).Where("id = ?", id).First(&order).Error
+    return &order, err
+}
+```
+
+## 业务模式深挖流程（必须执行）
+
+在输出 JSON 之前，先在内部完成以下步骤：
+
+1. 建立**业务候选清单**：
+   - 逐个提交分析提交消息、变更文件路径和你读取到的代码证据。
+   - 优先关注 Service、UseCase、Handler、Repository、Client、Job、Consumer、Utils 中新增或修改的方法。
+   - 把包含业务语义的方法、流程、规则、状态变化、跨模块调用、外部调用、数据转换、异常处理分支都列为候选。
+
+2. 执行**业务模式展开**：
+   - 一个业务方法不要只输出一个大而泛的模式。
+   - 根据代码证据拆出多个可复用模式，例如“请求校验模式”“业务状态推进模式”“跨仓储事务编排模式”“外部系统调用模式”“失败补偿/降级模式”“业务错误映射模式”“领域数据转换模式”。
+   - **不要把多个业务细节压缩成一个泛化模式**。如果一个方法同时包含领域规则和技术约定，领域规则可输出为 business，事务、查询、路由、错误包装、配置加载、中间件链等必须输出为对应具体分类。
+   - 具体分类优先：business 不是默认分类，不要为每个候选强行生成 business 模式。
+   - 业务模式只保留领域规则、状态流转、跨实体业务编排和真实业务工作流；纯技术约定即使位于 Service 或 Handler 中，也不要归为 business。
+
+3. 丰富每个业务模式：
+   - `description` 说明业务场景、触发条件、核心步骤和边界。
+   - `rule` 写成可执行的团队约定，说明何时必须使用、顺序要求和错误处理要求。
+   - `good_example` 使用实际代码，优先截取最能体现业务规则的 5-30 行。
+   - `business_method.description` 说明完整业务意图，不要只重复函数名。
+   - `business_method.prerequisites` 和 `returns` 必须写出调用前置条件、依赖、返回值和错误语义。
+
+4. 控制质量：
+   - 只基于提交和代码证据提取，不要编造不存在的业务。
+   - 不要因为已有相似模式就丢弃新细节；如果本次提交补充了新的分支、状态、错误或调用场景，应作为新模式或重大改进输出。
+   - 低价值 CRUD、普通字段赋值、纯转发方法不要作为业务模式，除非它们参与了更大的业务流程。
+
+## 2. 数据库操作模式 ⭐⭐
+
+- 事务管理：开启、提交、回滚
+- 查询构建：条件组合、关联加载
+- ORM 使用方式（GORM/Ent/XORM）
+- 错误处理和重试逻辑
+
+## 3. 错误处理和日志 ⭐⭐
+
+- 日志记录位置和格式（结构化日志）
+- 错误包装和传播（fmt.Errorf with %w）
+- 自定义错误类型定义
+- HTTP 错误响应格式
+
+## 4. API 和中间件 ⭐
+
+- 路由注册模式
+- 中间件使用（认证/日志/限流）
+- 请求/响应结构
+- 参数验证方式
+
+## 5. 配置和依赖管理
+
+- 配置文件格式和加载
+- 环境变量使用
+- 依赖注入方式
+
+# 系统性模式识别（重点）
+
+**跨文件的统一模式**：
+
+1. 如果多个文件都使用了相同的错误处理方式 → 提取为"错误处理模式"
+2. 如果多个 service 都有相似的初始化方式 → 提取为"服务初始化模式"
+3. 如果多个 API 都使用了相同的中间件 → 提取为"中间件使用模式"
+4. 如果多个 repository 都使用了相同的事务处理 → 提取为"事务管理模式"
+
+**框架特定模式**：
+
+- **Gin**: 路由注册、中间件链、上下文处理
+- **GORM**: 查询构建、关联加载、事务使用
+- **Zap**: 结构化日志、日志级别使用
+- **Viper**: 配置读取、环境变量绑定
+
+# 提取内容（具体分类优先）
+
+从这些分类提取模式：
+- **business**: 领域规则、状态流转、跨实体业务编排、业务工作流
+- **utils**: 辅助函数、工具、完整签名的方法
+- **api**: REST端点、请求/响应格式
+- **database**: 查询、事务、数据访问模式
+- **error**: 错误处理、包装、日志
+- **structure**: 代码组织、分层
+- **naming**: 文件/变量命名约定
+- **config**: 配置管理
+- **middleware**: 中间件使用
+
+# 语言要求
+
+- 所有面向用户阅读的自然语言字段必须使用简体中文，包括 `name`、`description`、`rule` 和 `business_method` 内的说明字段。
+- 如果提交消息、代码注释或依赖说明中出现英文，请改写成中文；框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量和代码标识符保留原文。
+- 不要输出 “Repository pattern”、“Use when ...”、“Concrete pattern ...” 这类英文说明短语，除非它们是代码标识符或专有名词的一部分。
+
+# 必需格式
+
+每个模式必须提供：
+1. **id**: 唯一的kebab-case标识符
+2. **name**: 清晰的描述性名称
+3. **category**: 上述分类之一
+4. **description**: 功能描述和使用时机
+5. **good_example**: 实际代码（5-30行）- 必需
+6. **bad_example**: 需要避免的常见错误（如适用）
+7. **rule**: 何时应用此模式
+8. **confidence**: 0.0到1.0（确定程度）
+9. **frequency**: 在这些提交中出现的次数
+10. **business_method**: 仅用于工具/业务方法：
+    - **name**: 完整方法签名（如"ProcessOrderPayment(ctx, orderID, payment) error"）
+    - **location**: "文件路径.go:行号"
+    - **layer**: "Service/Repository/Handler/Utils"
+    - **function**: 包含参数和返回值的完整签名
+    - **prerequisites**: 需要先设置什么（如事务已开启、配置已加载）
+    - **returns**: 返回内容包括错误
+    - **type**: "domain"（项目特有业务逻辑）或 "common"（可复用工具）
+    - **description**: 详细的业务逻辑说明
+    - **usage**: 何时调用此方法
+
+# 输出示例
+
+```json
+{
+  "patterns": [
+    {
+      "id": "order-payment-processing",
+      "name": "订单支付处理流程",
+      "category": "business",
+      "description": "处理订单支付的完整流程，包括状态验证、支付网关调用、订单状态更新",
+      "good_example": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error {\n\t// 1. 验证订单状态\n\torder, err := s.repo.GetByID(ctx, orderID)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"order not found: %w\", err)\n\t}\n\tif order.Status != OrderStatusPending {\n\t\treturn ErrInvalidOrderStatus\n\t}\n\n\t// 2. 调用支付网关\n\tresult, err := s.paymentGateway.Charge(ctx, payment)\n\tif err != nil {\n\t\torder.Status = OrderStatusPaymentFailed\n\t\ts.repo.Save(ctx, order)\n\t\treturn fmt.Errorf(\"payment failed: %w\", err)\n\t}\n\n\t// 3. 更新订单状态\n\torder.Status = OrderStatusPaid\n\torder.PaymentID = result.TransactionID\n\treturn s.repo.Save(ctx, order)\n}",
+      "rule": "订单支付必须包含状态验证、支付网关调用、订单状态更新三个步骤，失败时需回滚订单状态",
+      "confidence": 0.95,
+      "frequency": 5,
+      "business_method": {
+        "name": "OrderService.ProcessOrderPayment(ctx, orderID, payment) error",
+        "location": "internal/service/order.go:120",
+        "layer": "Service",
+        "description": "处理订单支付的完整流程，包含状态验证、支付网关集成、订单状态更新",
+        "function": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error",
+        "prerequisites": "需要已初始化 OrderRepository 和 PaymentGateway，订单必须存在且为待支付状态",
+        "returns": "成功返回 nil，失败返回包装后的错误（订单不存在、状态错误、支付失败）",
+        "type": "domain",
+        "usage": "在用户完成支付选择、点击支付按钮时调用"
+      }
+    },
+    {
+      "id": "gorm-transaction-pattern",
+      "name": "GORM 事务处理模式",
+      "category": "database",
+      "description": "使用 GORM 的 Transaction 方法处理数据库事务，自动提交或回滚",
+      "good_example": "err := s.db.Transaction(func(tx *gorm.DB) error {\n\tif err := tx.Create(&user).Error; err != nil {\n\t\treturn err // 自动回滚\n\t}\n\treturn tx.Create(&profile).Error\n})",
+      "bad_example": "tx := s.db.Begin()\ntx.Create(&user)\nif err != nil {\n\ttx.Rollback()\n\treturn err\n}\ntx.Commit()",
+      "rule": "使用 db.Transaction() 而非手动 Begin/Commit/Rollback",
+      "confidence": 0.90,
+      "frequency": 8
+    }
+  ]
+}
+```
+
+# 关键规则
+
+1. 仅返回有效的JSON - 不要markdown，前后不要文本
+2. 每个模式的`good_example`必须有实际代码（5-30行）
+3. 仅对工具/业务方法使用`business_method`
+4. **先判断最具体分类**：数据库、API、错误、配置、中间件、结构、工具模式不得归入 business；跳过简单 CRUD
+5. 如不适用则保持`bad_example`为空
+6. 代码示例必须语法正确且可复制粘贴
+
+{{if .KnownPatternsJSON}}
+# 已有模式 ({{.KnownPatternsCount}})
+
+专注于新模式或重大改进。
+
+```json
+{{.KnownPatternsJSON}}
+```
+{{end}}
+
+现在仅返回JSON对象：

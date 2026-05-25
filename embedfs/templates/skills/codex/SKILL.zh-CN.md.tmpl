@@ -1,0 +1,89 @@
+---
+name: {{.SkillName}}
+description: 修改、审查或扩展 {{.ProjectName}} {{.Language}} 代码时使用，尤其涉及架构、模块边界、业务流程、工具方法、生成层或仓库约定时。
+---
+
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- skills-template-sha256: {{.SkillsTemplatesHash}} -->
+
+# {{.ProjectName}} 开发技能（Codex）
+
+**语言**: {{.Language}}
+**最后更新**: {{.LastUpdated}}
+**已学习模式**: {{.PatternCount}}
+**平均置信度**: {{printf "%.2f" .AvgConfidence}}%
+
+---
+
+## 工作流
+
+处理本仓库任务时：
+1. 任务涉及架构、模块边界或项目特定业务方法时，先阅读 [项目概览](./references/project-overview.md)。
+2. 只打开当前任务相关的模式参考文件。
+3. 高置信度模式按项目约定处理，中等置信度模式作为参考。
+4. 创建新方法前，优先复用 references 中记录的业务方法和工具方法。
+5. 如果仓库或 references 中没有足够依据，明确说明缺口，不要编造实现。
+
+---
+
+## 模式参考
+
+- **[项目概览](./references/project-overview.md)** - 架构、技术栈、关键模块
+{{if .OverviewReferences}}
+
+### 项目详情
+{{range .OverviewReferences}}
+- **[{{.Title}}]({{.Path}})** - {{.Description}}
+{{end}}
+{{end}}
+
+{{if .ReferenceGroups}}
+{{range .ReferenceGroups}}
+### {{.Title}}
+{{range .Items}}
+- **[{{.Title}}]({{.Path}})** - {{.Description}}
+{{end}}
+
+{{end}}
+{{else}}
+*暂未生成分类模式参考。*
+{{end}}
+
+---
+
+## 仓库规则
+
+- 引入新模式或抽象前，先检查附近已有代码。
+- 遵守项目概览中描述的模块依赖和职责边界。
+- 如果参考中已有项目特定业务方法或工具方法，优先复用。
+- 对生成中缺失或未接入的内容保留显式 `TODO`，不要静默跳过。
+
+### 模式置信度级别
+```
+新模式 (30%) → 形成中 (50%) → 已建立 (70%) → 约定 (90%)
+```
+
+---
+
+## 模式统计
+
+- **模式总数**: {{.PatternCount}}
+- **平均置信度**: {{printf "%.2f" .AvgConfidence}}%
+- **分类数量**: {{.Categories}}
+
+---
+
+## 持续学习
+
+通过分析最近的提交来更新模式：
+```bash
+# 从最近的提交学习
+skills-seed learn history --since=7d
+
+# 按当前 provider 配置的输出路径重新生成技能文件
+skills-seed generate-skills
+```
+
+---
+
+*此技能随每次提交变得更智能。由 [skills-seed](https://github.com/silaswei-io/skills-seed) 生成。*

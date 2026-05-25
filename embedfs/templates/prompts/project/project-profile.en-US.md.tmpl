@@ -1,0 +1,37 @@
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- prompt-template-sha256: {{.PromptTemplatesHash}} -->
+<!-- prompt-type: project-profile -->
+<!-- editable: true -->
+
+# Project Profile
+
+- Project Name: {{.ProjectName}}
+- Primary Language: {{.Language}}
+- Project Root: {{.ProjectRoot}}
+
+{{- if .MainFiles}}
+## Entry Files
+
+{{range .MainFiles}}- {{.}}
+{{end}}
+
+{{- end}}
+{{- if .Structure}}
+## Structure Summary
+
+```text
+{{.Structure}}
+```
+
+{{- end}}
+## Architecture Summary
+
+Describe the current layering, main flows, key modules, and dependency directions here.
+
+## Key Modules
+
+List important directories, responsibilities, and boundaries here.
+
+## Team Coding Style
+
+Describe naming, error handling, logging, config, and testing conventions here.

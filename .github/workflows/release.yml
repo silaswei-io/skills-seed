@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Extract release notes
+        run: |
+          version="${GITHUB_REF_NAME}"
+          awk -v version="$version" '
+            $0 == "## [" version "]" { capture = 1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > .release-notes.md
+
+          if [ ! -s .release-notes.md ]; then
+            echo "No changelog entry found for ${version}" >&2
+            exit 1
+          fi
+
+      - name: Build release assets
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME}"
+          mkdir -p dist
+
+          build() {
+            goos="$1"
+            goarch="$2"
+            suffix="$3"
+            name="skills-seed_${version}_${goos}_${suffix}"
+            binary="skills-seed"
+
+            if [ "$goos" = "windows" ]; then
+              binary="skills-seed.exe"
+            fi
+
+            mkdir -p "dist/${name}"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build \
+              -ldflags="-s -w" \
+              -o "dist/${name}/${binary}" \
+              ./cmd/skills-seed
+
+            cp LICENSE README.md README.en.md CHANGELOG.md CHANGELOG.en.md CONTRIBUTING.md CONTRIBUTING.en.md "dist/${name}/"
+
+            if [ "$goos" = "windows" ]; then
+              (cd dist && zip -r "${name}.zip" "${name}")
+            else
+              tar -czf "dist/${name}.tar.gz" -C dist "${name}"
+            fi
+
+            rm -rf "dist/${name}"
+          }
+
+          build linux amd64 x86_64
+          build linux arm64 arm64
+          build darwin amd64 x86_64
+          build darwin arm64 arm64
+          build windows amd64 x86_64
+
+          (cd dist && sha256sum * > checksums.txt)
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/* \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file .release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

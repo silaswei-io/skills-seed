@@ -1,0 +1,743 @@
+// Package analyzer 提供代码分析服务
+//
+// 本包实现代码模式分析、项目结构分析和代码库分析功能：
+//   - AnalyzePatterns: 分析代码模式，发现问题
+//   - AnalyzeProject: 分析项目结构和特点
+//   - AnalyzeCurrentCodebase: 分析现有代码库（不依赖 commit 历史）
+//
+// 服务职责：
+//   - 调用 AI Agent 进行代码分析
+//   - 转换领域模型和 Agent 模型
+//   - 包装错误为领域错误
+package analyzer
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
+)
+
+// Service 代码分析服务
+// 职责：分析代码、提取模式、分析项目结构
+type AnalyzerService struct {
+	agent      agent.Agent
+	configRepo config.Reader
+}
+
+// NewAnalyzerService 创建分析服务
+func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerService {
+	return &AnalyzerService{
+		agent:      ag,
+		configRepo: configRepo,
+	}
+}
+
+// AnalyzePatternsRequest 分析模式请求
+type AnalyzePatternsRequest struct {
+	Files         []domain.FileInfo
+	KnownPatterns []domain.Pattern
+	RecentCommits []domain.CommitInfo
+}
+
+// AnalyzePatternsResult 分析模式结果
+type AnalyzePatternsResult struct {
+	Issues      []domain.Issue
+	Suggestions []string
+	Confidence  float64
+}
+
+// AnalyzePatterns 分析代码模式
+// 从文件和提交中分析编码模式，发现潜在问题
+func (s *AnalyzerService) AnalyzePatterns(ctx context.Context, req *AnalyzePatternsRequest) (*AnalyzePatternsResult, error) {
+	startedAt := time.Now()
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
+		"operation", "analyzer.analyze_patterns",
+		"files_count", len(req.Files),
+		"known_patterns_count", len(req.KnownPatterns),
+		"recent_commits_count", len(req.RecentCommits),
+	)
+
+	projectContext := agent.ProjectContext{
+		Name:     "project",
+		Language: "go",
+	}
+	if s.configRepo != nil {
+		projectConfig := s.configRepo.GetProjectConfig()
+		if projectConfig.Name != "" {
+			projectContext.Name = projectConfig.Name
+		}
+		if projectConfig.Language != "" {
+			projectContext.Language = projectConfig.Language
+		}
+	}
+
+	// 调用 Agent
+	analyzeReq := &agent.AnalyzeRequest{
+		Files:         req.Files,
+		Patterns:      req.KnownPatterns,
+		RecentCommits: req.RecentCommits,
+		Context:       projectContext,
+	}
+
+	result, err := s.agent.AnalyzeCode(ctx, analyzeReq)
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.analyze_patterns",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+		return nil, domain.NewDomainError(
+			domain.ErrAIService,
+			i18n.Get("AnalyzerAnalyzePatternsFailed"),
+			err,
+		)
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.analyze_patterns",
+		"duration", time.Since(startedAt),
+		"issues_count", len(result.Issues),
+		"suggestions_count", len(result.Suggestions),
+		"confidence", result.Confidence,
+	)
+
+	return &AnalyzePatternsResult{
+		Issues:      result.Issues,
+		Suggestions: result.Suggestions,
+		Confidence:  result.Confidence,
+	}, nil
+}
+
+// AnalyzeProjectRequest 项目分析请求
+type AnalyzeProjectRequest struct {
+	ProjectName string
+	RootPath    string
+	Language    string
+	Structure   string
+	ReadmePath  string
+	MainFiles   []string
+}
+
+// AnalyzeProjectResult 项目分析结果
+type AnalyzeProjectResult struct {
+	Language          string
+	Frameworks        []string
+	Architecture      string
+	Structure         string
+	Layers            []domain.ArchitectureLayer
+	DependencyGraph   string
+	DataFlow          string
+	FrameworkPatterns []string
+	CommonUtils       []domain.UtilityFunction
+	KeyModules        []domain.ModuleInfo
+	ConfigPatterns    []string
+	Dependencies      []string
+	BusinessMethods   []domain.BusinessMethod
+	Summary           string
+}
+
+// AnalyzeProject 分析项目结构和特点
+func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error) {
+	startedAt := time.Now()
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
+		"operation", "analyzer.analyze_project",
+		"project_name", req.ProjectName,
+		"root_path", req.RootPath,
+		"language", req.Language,
+		"structure_length", len(req.Structure),
+		"readme_path", req.ReadmePath,
+		"main_files_count", len(req.MainFiles),
+	)
+
+	agentReq := &agent.AnalyzeProjectRequest{
+		ProjectName: req.ProjectName,
+		RootPath:    req.RootPath,
+		Language:    req.Language,
+		Structure:   req.Structure,
+		ReadmePath:  req.ReadmePath,
+		MainFiles:   req.MainFiles,
+	}
+
+	result, err := s.agent.AnalyzeProject(ctx, agentReq)
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.analyze_project",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+		return nil, domain.NewDomainError(
+			domain.ErrAIService,
+			i18n.Get("AnalyzerAnalyzeProjectFailed"),
+			err,
+		)
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.analyze_project",
+		"duration", time.Since(startedAt),
+		"frameworks_count", len(result.Frameworks),
+		"dependencies_count", len(result.Dependencies),
+		"business_methods_count", len(result.BusinessMethods),
+		"key_modules_count", len(result.KeyModules),
+	)
+
+	return &AnalyzeProjectResult{
+		Language:          result.Language,
+		Frameworks:        result.Frameworks,
+		Architecture:      result.Architecture,
+		Structure:         result.Structure,
+		Layers:            result.Layers,
+		DependencyGraph:   result.DependencyGraph,
+		DataFlow:          result.DataFlow,
+		FrameworkPatterns: result.FrameworkPatterns,
+		CommonUtils:       result.CommonUtils,
+		KeyModules:        result.KeyModules,
+		ConfigPatterns:    result.ConfigPatterns,
+		Dependencies:      result.Dependencies,
+		BusinessMethods:   result.BusinessMethods,
+		Summary:           result.Summary,
+	}, nil
+}
+
+// AnalyzeCurrentCodebaseRequest 当前代码库分析请求
+type AnalyzeCurrentCodebaseRequest struct {
+	ProjectName string
+	RootPath    string
+	Language    string
+	FocusPaths  []string
+	Structure   string
+	MainFiles   []string
+	SampleFiles []agent.SampleFile
+}
+
+// AnalyzeCurrentCodebaseResult 当前代码库分析结果
+type AnalyzeCurrentCodebaseResult struct {
+	Patterns          []domain.Pattern
+	CategorySummaries map[string]agent.CategorySummary
+	BusinessRules     []string
+	BestPractices     []string
+	CommonPatterns    []string
+	Summary           string
+}
+
+// AnalyzeCurrentCodebase 分析当前代码库
+// 从现有代码中提取初始模式（不依赖 commit 历史）
+func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *AnalyzeCurrentCodebaseRequest) (*AnalyzeCurrentCodebaseResult, error) {
+	startedAt := time.Now()
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
+		"operation", "analyzer.analyze_current_codebase",
+		"project_name", req.ProjectName,
+		"root_path", req.RootPath,
+		"language", req.Language,
+		"structure_length", len(req.Structure),
+		"main_files_count", len(req.MainFiles),
+		"sample_files_count", len(req.SampleFiles),
+		"sample_content_bytes", sampleFilesContentBytes(req.SampleFiles),
+	)
+
+	agentReq := &agent.AnalyzeCurrentCodebaseRequest{
+		ProjectName: req.ProjectName,
+		RootPath:    req.RootPath,
+		Language:    req.Language,
+		FocusPaths:  req.FocusPaths,
+		Structure:   req.Structure,
+		MainFiles:   req.MainFiles,
+		SampleFiles: req.SampleFiles,
+	}
+
+	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.analyze_current_codebase",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+		return nil, domain.NewDomainError(
+			domain.ErrAIService,
+			i18n.Get("AnalyzerAnalyzeCodebaseFailed"),
+			err,
+		)
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.analyze_current_codebase",
+		"duration", time.Since(startedAt),
+		"patterns_count", len(result.Patterns),
+		"category_summaries_count", len(result.CategorySummaries),
+		"business_rules_count", len(result.BusinessRules),
+		"best_practices_count", len(result.BestPractices),
+		"common_patterns_count", len(result.CommonPatterns),
+	)
+
+	return &AnalyzeCurrentCodebaseResult{
+		Patterns:          result.Patterns,
+		CategorySummaries: result.CategorySummaries,
+		BusinessRules:     result.BusinessRules,
+		BestPractices:     result.BestPractices,
+		CommonPatterns:    result.CommonPatterns,
+		Summary:           result.Summary,
+	}, nil
+}
+
+// GetProjectStructure 获取项目目录结构
+func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error) {
+	startedAt := time.Now()
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
+		"operation", "analyzer.get_project_structure",
+		"project_root", projectRoot,
+	)
+
+	// 使用 tree 命令获取目录结构（如果可用）
+	if _, err := exec.LookPath("tree"); err == nil {
+		cmd := exec.Command("tree", "-L", "3", "-I", "vendor|node_modules|.git|.skills-seed", projectRoot)
+		output, err := cmd.Output()
+		if err == nil {
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+				"operation", "analyzer.get_project_structure",
+				"method", "tree",
+				"duration", time.Since(startedAt),
+				"output_length", len(output),
+			)
+			return string(output), nil
+		}
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.get_project_structure.tree",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+	}
+
+	// 如果 tree 命令不可用，使用 find 作为后备
+	var structure strings.Builder
+	err := filepath.Walk(projectRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 跳过隐藏目录和常见排除目录
+		if info.IsDir() {
+			name := filepath.Base(path)
+			if name == ".git" || name == ".skills-seed" || name == "vendor" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+		}
+
+		// 获取相对路径
+		relPath, err := filepath.Rel(projectRoot, path)
+		if err != nil {
+			return nil
+		}
+
+		// 只显示前3层
+		depth := strings.Count(relPath, string(filepath.Separator))
+		if depth > 3 {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// 添加缩进
+		indent := strings.Repeat("  ", depth)
+		structure.WriteString(indent)
+		if info.IsDir() {
+			structure.WriteString("📁 ")
+		} else {
+			structure.WriteString("📄 ")
+		}
+		structure.WriteString(info.Name())
+		structure.WriteString("\n")
+
+		return nil
+	})
+
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.get_project_structure.walk",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+		return "", err
+	}
+
+	result := structure.String()
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.get_project_structure",
+		"method", "walk",
+		"duration", time.Since(startedAt),
+		"output_length", len(result),
+	)
+
+	return result, nil
+}
+
+// FindMainFiles 查找主要入口文件
+func (s *AnalyzerService) FindMainFiles(projectRoot string) []string {
+	startedAt := time.Now()
+	var mainFiles []string
+
+	// 常见的主入口文件模式
+	patterns := []string{
+		"main.go",
+		"cmd/*/main.go",
+		"cmd/*/*/main.go",
+		"command/*/main.go",
+		"command/*/*/main.go",
+		"index.js",
+		"index.ts",
+		"app.js",
+		"app.py",
+		"main.py",
+	}
+
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(filepath.Join(projectRoot, pattern))
+		if err == nil {
+			for _, match := range matches {
+				relPath, _ := filepath.Rel(projectRoot, match)
+				mainFiles = append(mainFiles, relPath)
+			}
+		}
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.find_main_files",
+		"project_root", projectRoot,
+		"duration", time.Since(startedAt),
+		"main_files_count", len(mainFiles),
+	)
+
+	return mainFiles
+}
+
+func (s *AnalyzerService) FindReadmePath(projectRoot string) string {
+	readmePath := filepath.Join(projectRoot, "README.md")
+	if _, err := os.Stat(readmePath); err != nil {
+		return ""
+	}
+	return "README.md"
+}
+
+// AnalyzeProjectFull 完整项目分析
+func (s *AnalyzerService) AnalyzeProjectFull(ctx context.Context, projectRoot, projectName string) (*AnalyzeProjectResult, error) {
+	return s.AnalyzeProjectFullWithLanguage(ctx, projectRoot, projectName, "")
+}
+
+// AnalyzeProjectFullWithLanguage 完整项目分析，可由命令行显式指定语言覆盖配置。
+func (s *AnalyzerService) AnalyzeProjectFullWithLanguage(ctx context.Context, projectRoot, projectName, requestedLanguage string) (*AnalyzeProjectResult, error) {
+	startedAt := time.Now()
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
+		"operation", "analyzer.analyze_project_full",
+		"project_root", projectRoot,
+		"project_name", projectName,
+	)
+
+	// 获取项目语言
+	language := requestedLanguage
+	if s.configRepo != nil {
+		if language == "" {
+			language = s.configRepo.GetProjectConfig().Language
+		}
+	}
+	if language == "" {
+		language = "unknown"
+	}
+	structure, _ := s.GetProjectStructure(projectRoot)
+
+	// 调用 Agent 分析项目（Agent 会自己探索项目结构）
+	req := &AnalyzeProjectRequest{
+		ProjectName: projectName,
+		RootPath:    projectRoot,
+		Language:    language,
+		Structure:   structure,
+		ReadmePath:  s.FindReadmePath(projectRoot),
+		MainFiles:   s.FindMainFiles(projectRoot),
+	}
+
+	result, err := s.AnalyzeProject(ctx, req)
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.analyze_project_full",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+		return nil, err
+	}
+	if result.Language == "" {
+		result.Language = language
+	}
+	if result.Structure == "" {
+		result.Structure = structure
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.analyze_project_full",
+		"duration", time.Since(startedAt),
+	)
+	return result, nil
+}
+
+// NewProjectProfile converts an analysis result into the durable project profile format.
+func NewProjectProfile(result *AnalyzeProjectResult, projectName, language string) *domain.ProjectProfile {
+	if result == nil {
+		return nil
+	}
+	if language == "" {
+		language = result.Language
+	}
+	if language == "" {
+		language = "unknown"
+	}
+
+	return &domain.ProjectProfile{
+		ProjectName:       projectName,
+		Language:          language,
+		Frameworks:        result.Frameworks,
+		Architecture:      result.Architecture,
+		Structure:         result.Structure,
+		CommonUtils:       result.CommonUtils,
+		KeyModules:        result.KeyModules,
+		ConfigPatterns:    result.ConfigPatterns,
+		Dependencies:      result.Dependencies,
+		Layers:            result.Layers,
+		DependencyGraph:   result.DependencyGraph,
+		DataFlow:          result.DataFlow,
+		FrameworkPatterns: result.FrameworkPatterns,
+		BusinessMethods:   result.BusinessMethods,
+		Summary:           result.Summary,
+		GeneratedAt:       time.Now().Format("2006-01-02 15:04:05"),
+	}
+}
+
+// AnalyzeCodebaseOptions controls how current-code learning collects context.
+type AnalyzeCodebaseOptions struct {
+	FocusPaths []string
+}
+
+// AnalyzeCodebaseFull 完整代码库分析（提取模式并转换为 domain.Pattern）
+func (s *AnalyzerService) AnalyzeCodebaseFull(ctx context.Context, projectRoot, projectName, language string) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
+	return s.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, language, AnalyzeCodebaseOptions{})
+}
+
+// AnalyzeCodebaseFullWithOptions 完整代码库分析，支持指定扫描范围。
+func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCodebaseOptions) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
+	startedAt := time.Now()
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
+		"operation", "analyzer.analyze_codebase_full",
+		"project_root", projectRoot,
+		"project_name", projectName,
+		"language", language,
+		"focus_paths_count", len(opts.FocusPaths),
+	)
+
+	// 预收集项目数据
+	structure, _ := s.GetProjectStructure(projectRoot)
+	focusPaths := relativeFocusPaths(projectRoot, opts.FocusPaths)
+	if len(focusPaths) > 0 {
+		structure = focusedStructure(structure, focusPaths)
+	}
+	mainFiles := s.FindMainFiles(projectRoot)
+	sampleFiles := s.collectSampleFilesFromRoots(projectRoot, opts.FocusPaths, language)
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.collect_codebase_context",
+		"duration", time.Since(startedAt),
+		"structure_length", len(structure),
+		"focus_paths_count", len(focusPaths),
+		"main_files_count", len(mainFiles),
+		"sample_files_count", len(sampleFiles),
+		"sample_content_bytes", sampleFilesContentBytes(sampleFiles),
+	)
+
+	req := &AnalyzeCurrentCodebaseRequest{
+		ProjectName: projectName,
+		RootPath:    projectRoot,
+		Language:    language,
+		FocusPaths:  focusPaths,
+		Structure:   structure,
+		MainFiles:   mainFiles,
+		SampleFiles: sampleFiles,
+	}
+
+	result, err := s.AnalyzeCurrentCodebase(ctx, req)
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.analyze_codebase_full",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+		return nil, nil, err
+	}
+
+	// Patterns 已经是 []domain.Pattern，直接使用
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.analyze_codebase_full",
+		"duration", time.Since(startedAt),
+		"patterns_count", len(result.Patterns),
+	)
+	return result, result.Patterns, nil
+}
+
+// collectSampleFiles 收集项目中的代表性代码文件
+func (s *AnalyzerService) collectSampleFiles(projectRoot, language string) []agent.SampleFile {
+	return s.collectSampleFilesFromRoots(projectRoot, nil, language)
+}
+
+func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRoots []string, language string) []agent.SampleFile {
+	startedAt := time.Now()
+	var ext string
+	switch language {
+	case "go":
+		ext = ".go"
+	case "typescript", "javascript":
+		ext = ".ts"
+		if language == "javascript" {
+			ext = ".js"
+		}
+	case "python":
+		ext = ".py"
+	case "java":
+		ext = ".java"
+	default:
+		ext = ".go"
+	}
+
+	// 排除目录
+	excludeDirs := map[string]bool{
+		"vendor": true, "node_modules": true, ".git": true, ".skills-seed": true,
+		"testdata": true, "mocks": true, "docs": true, "scripts": true,
+	}
+
+	// 排除文件后缀
+	excludeSuffixes := map[string]bool{
+		"_test.go": true, "_test.py": true, "_test.ts": true,
+	}
+
+	var files []agent.SampleFile
+	maxFiles := 15
+	seenFiles := make(map[string]bool)
+	excludePatterns := []string(nil)
+	if s.configRepo != nil {
+		excludePatterns = s.configRepo.GetExclude()
+	}
+	if len(scanRoots) == 0 {
+		scanRoots = []string{projectRoot}
+	}
+
+	for _, scanRoot := range scanRoots {
+		if len(files) >= maxFiles {
+			break
+		}
+		if scanRoot == "" {
+			continue
+		}
+
+		if err := filepath.Walk(scanRoot, func(path string, info os.FileInfo, err error) error {
+			if err != nil || len(files) >= maxFiles {
+				return nil
+			}
+
+			if info.IsDir() {
+				name := filepath.Base(path)
+				if excludeDirs[name] {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
+			if !strings.HasSuffix(path, ext) {
+				return nil
+			}
+
+			relPath, _ := filepath.Rel(projectRoot, path)
+			relPath = filepath.ToSlash(relPath)
+			if seenFiles[relPath] || filefilter.MatchExcluded(relPath, excludePatterns) {
+				return nil
+			}
+
+			// 排除测试文件和生成文件
+			base := filepath.Base(path)
+			for suffix := range excludeSuffixes {
+				if strings.HasSuffix(base, suffix) {
+					return nil
+				}
+			}
+			if strings.HasSuffix(base, ".pb.go") || strings.HasSuffix(base, ".gen.go") {
+				return nil
+			}
+			if info.Size() == 0 {
+				return nil
+			}
+
+			files = append(files, agent.SampleFile{
+				Path: relPath,
+			})
+			seenFiles[relPath] = true
+
+			logger.Diagnostic(i18n.Get("LoggerAnalyzerSampleFileCollected"), "file", relPath, "size", info.Size())
+			return nil
+		}); err != nil {
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+				"operation", "analyzer.collect_sample_files",
+				"duration", time.Since(startedAt),
+				"scan_root", scanRoot,
+				"error", err,
+			)
+		}
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.collect_sample_files",
+		"project_root", projectRoot,
+		"language", language,
+		"extension", ext,
+		"scan_roots_count", len(scanRoots),
+		"duration", time.Since(startedAt),
+		"sample_files_count", len(files),
+		"sample_content_bytes", sampleFilesContentBytes(files),
+	)
+
+	return files
+}
+
+func relativeFocusPaths(projectRoot string, paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+	focusPaths := make([]string, 0, len(paths))
+	for _, path := range paths {
+		rel, err := filepath.Rel(projectRoot, path)
+		if err != nil {
+			continue
+		}
+		focusPaths = append(focusPaths, filepath.ToSlash(rel))
+	}
+	return focusPaths
+}
+
+func focusedStructure(projectStructure string, focusPaths []string) string {
+	var b strings.Builder
+	b.WriteString("Focused scan paths:\n")
+	for _, path := range focusPaths {
+		b.WriteString("- ")
+		b.WriteString(path)
+		b.WriteByte('\n')
+	}
+	if projectStructure != "" {
+		b.WriteString("\nProject structure:\n")
+		b.WriteString(projectStructure)
+	}
+	return b.String()
+}
+
+func sampleFilesContentBytes(files []agent.SampleFile) int {
+	return 0
+}

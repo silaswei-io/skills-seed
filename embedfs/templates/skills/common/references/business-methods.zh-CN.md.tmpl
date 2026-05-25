@@ -1,0 +1,36 @@
+# {{.ProjectName}} 强业务方法
+
+本文件记录项目画像中提取的复杂业务逻辑方法。修改业务流程、复用领域能力或生成新业务代码前，优先检查这里是否已有可复用方法。
+
+{{if .BusinessMethods}}
+{{range .BusinessMethods}}{{if .Name}}
+## {{.Name}}
+
+- **位置**: `{{.Location}}`
+{{if .Type}}- **类型**: {{.Type}}{{end}}
+- **功能**: {{.Description}}
+{{if .Function}}
+
+**方法签名**:
+```go
+{{.Function}}
+```
+{{end}}
+{{if .Prerequisites}}
+**前置条件**: {{.Prerequisites}}
+{{end}}
+{{if .Returns}}
+**返回值**: {{.Returns}}
+{{end}}
+{{if .Usage}}
+**使用场景**: {{.Usage}}
+{{end}}
+
+{{end}}{{end}}
+{{else}}
+*业务方法信息尚未提取*
+{{end}}
+
+---
+
+*此文档由 skills-seed 自动生成*

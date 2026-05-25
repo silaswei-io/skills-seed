@@ -1,0 +1,139 @@
+# {{.ProjectName}} 项目概览
+
+**语言**: {{.Language}}
+**生成时间**: {{.GeneratedAt}}
+
+---
+
+## 项目简介
+
+{{if .Summary}}{{.Summary}}{{else}}*项目简介尚未提取*{{end}}
+
+## 技术架构
+
+{{if .Architecture}}{{.Architecture}}{{else}}*技术架构信息尚未提取*{{end}}
+
+{{if .OverviewReferences}}
+## 详细参考
+
+{{range .OverviewReferences}}
+- **[{{.Title}}]({{.Path}})** - {{.Description}}
+{{end}}
+{{end}}
+
+### 架构层次
+
+{{if .Layers}}
+{{range .Layers}}
+#### {{.Name}}
+
+**描述**: {{.Description}}
+
+**职责**:
+{{range .Responsibilities}}
+- {{.}}
+{{end}}
+
+**主要文件**:
+{{range .Files}}
+- `{{.}}`
+{{end}}
+
+{{end}}
+{{else}}
+*架构层次信息尚未提取*
+{{end}}
+
+### 模块依赖关系
+
+{{if .DependencyGraph}}
+```
+{{.DependencyGraph}}
+```
+{{else}}
+*依赖关系信息尚未提取*
+{{end}}
+
+{{if .DataFlow}}
+### 关键数据流向
+
+```
+{{.DataFlow}}
+```
+{{end}}
+
+### 主要框架
+
+{{if .Frameworks}}
+{{range .Frameworks}}
+- {{.}}
+{{end}}
+{{else}}
+*框架信息尚未提取*
+{{end}}
+
+### 核心依赖
+
+{{if .Dependencies}}
+{{range .Dependencies}}
+- {{.}}
+{{end}}
+{{else}}
+*依赖信息尚未提取*
+{{end}}
+
+{{if .FrameworkPatterns}}
+### 框架使用模式
+
+{{range .FrameworkPatterns}}
+- {{.}}
+{{end}}
+{{end}}
+
+## 项目结构
+
+{{if .Structure}}
+```
+{{.Structure}}
+```
+{{else}}
+*项目结构信息尚未提取*
+{{end}}
+
+## 关键模块
+
+{{if .KeyModules}}
+已提取 {{len .KeyModules}} 个关键模块，完整职责、依赖和关键方法见 [关键模块](./modules.md)。
+{{else}}
+*关键模块信息尚未提取*
+{{end}}
+
+## 强业务方法
+
+{{if .BusinessMethods}}
+已提取 {{len .BusinessMethods}} 个强业务方法，完整方法签名、前置条件和使用场景见 [强业务方法](./business-methods.md)。
+{{else}}
+*业务方法信息尚未提取*
+{{end}}
+
+## 通用工具
+
+{{if .CommonUtils}}
+已提取 {{len .CommonUtils}} 个通用工具方法，完整签名和使用场景见 [通用工具](./common-utils.md)。
+{{else}}
+*通用工具信息尚未提取*
+{{end}}
+
+## 配置模式
+
+{{if .ConfigPatterns}}
+{{range .ConfigPatterns}}
+- {{.}}
+{{end}}
+{{else}}
+*配置模式信息尚未提取*
+{{end}}
+
+---
+
+*此文档由 skills-seed 自动生成，基于项目初始分析*

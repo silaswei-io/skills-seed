@@ -1,0 +1,58 @@
+# {{.Category}} 模式概览
+
+**分类**: {{.Category}}
+**优先级**: {{.Priority}}
+**模式数量**: {{.PatternCount}}
+**置信度**: {{printf "%.2f" .Confidence}}%
+**最后更新**: {{.LastUpdated}}
+
+---
+
+## 概述
+
+{{.Summary}}
+
+{{if .PatternObjects}}
+## 详细模式
+
+{{range .PatternObjects}}
+### {{.Name}}
+
+{{if .Description}}**描述**: {{.Description}}{{end}}
+
+{{if .Rule}}**规则**: {{.Rule}}{{end}}
+
+**置信度**: {{printf "%.2f" (mul .Confidence 100)}}% | **出现次数**: {{.Frequency}}
+
+{{if .GoodExample}}
+#### 正确示例
+
+```go
+{{.GoodExample}}
+```
+{{end}}
+
+{{if .BadExample}}
+#### 避免示例
+
+```go
+{{.BadExample}}
+```
+{{end}}
+
+---
+
+{{end}}
+{{end}}
+
+{{if .UsageScenes}}
+## 使用场景
+
+{{range .UsageScenes}}
+- {{.}}
+{{end}}
+{{end}}
+
+---
+
+*此文档由 skills-seed 从 {{len .PatternObjects}} 个模式自动生成*

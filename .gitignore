@@ -1,0 +1,36 @@
+# Binaries
+build/
+dist/
+/skills-seed
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test files
+*.test
+*.out
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.db
+*.log
+.skills-seed/
+.claude/skills/
+.agents/skills/
+
+# Go modules cache
+pkg/mod/

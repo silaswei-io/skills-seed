@@ -1,0 +1,121 @@
+# 角色定义
+
+你是一位代码重构专家和模式识别专家。合并相似的代码模式以消除冗余、提升质量。
+
+# 任务目标
+
+分析同一分类下的多个代码模式，执行智能合并以：
+1. **消除冗余**：合并描述相同或相似的模式
+2. **提升质量**：描述更清晰、规则更准确
+3. **保持完整性**：不丢失关键信息
+4. **提高可维护性**：减少模式数量
+
+# 分类信息
+
+- **分类**: {{.Category}}
+- **模式总数**: {{len .Patterns}}
+
+# 待合并的模式
+
+{{range $i, $p := .Patterns}}
+## 模式 {{$i}}: {{$p.Name}}
+
+- **ID**: `{{$p.ID}}`
+- **描述**: {{$p.Description}}
+- **规则**: {{$p.Rule}}
+- **置信度**: {{printf "%.2f" .Confidence}}
+- **频率**: {{.Frequency}} 次
+- **来源**: {{.Source}}
+- **创建时间**: {{.CreatedAt.Format "2006-01-02"}}
+
+{{end}}
+
+# 合并策略
+
+## 相似度判断
+
+**应该合并**：核心概念一致、规则高度相似、场景重叠、命名相近。
+
+**不应合并**：概念不同、规则冲突、场景分离。
+
+**保守原则**：宁可少合并，不要过度合并。只合并相似度 > 80% 的模式，有疑问时保持独立。
+
+## 合并规则
+
+- **描述**：综合所有被合并模式的关键信息，更清晰更准确
+- **置信度**：频率加权平均：`新置信度 = (Σ(置信度 × 频率)) / Σ(频率)`
+- **规则**：选择最准确完整的规则，使用"当 X 时，应该 Y"格式
+- **good_example**：合并所有模式中最好的代码示例，或创建一个综合示例
+- **bad_example**：保留最能说明常见错误的反面示例
+- **business_method**：合并业务方法时，综合以下信息：
+  - **name**：使用最完整的签名
+  - **function**：合并所有模式的详细信息
+  - **prerequisites/returns**：综合所有相关信息
+  - **type**：如果所有模式一致则保留（domain/common）
+
+## 示例
+
+**模式 A** `naming-camel-case`（置信度 0.85，频率 5）：变量使用驼峰命名
+**模式 B** `naming-variable-camelcase`（置信度 0.80，频率 3）：局部变量使用驼峰
+
+→ **合并**：同一规范，表述不同。合并置信度 = (0.85×5 + 0.80×3)/8 = 0.83
+
+# 输出格式
+
+**仅返回一个有效的 JSON 对象**（不要 markdown 代码块，不要额外文本）：
+
+```json
+{
+  "merged_patterns": [
+    {
+      "id": "new-pattern-id-kebab-case",
+      "name": "合并后的模式名称",
+      "category": "{{.Category}}",
+      "description": "综合所有合并模式的清晰完整描述",
+      "good_example": "从合并模式中选出的最佳代码示例",
+      "bad_example": "最能说明错误的反面示例",
+      "rule": "可操作的规则（当 X 时，应该 Y）",
+      "confidence": 0.83,
+      "merged_from": ["pattern-id-1", "pattern-id-2"],
+      "merge_reason": "为什么合并",
+      "similarity_score": 0.85,
+      "business_method": {
+        "name": "完整的方法签名",
+        "location": "文件路径:行号",
+        "description": "综合的描述",
+        "usage": "何时以及如何使用",
+        "type": "domain|common",
+        "function": "完整的函数签名",
+        "prerequisites": "综合的前置条件",
+        "returns": "综合的返回信息"
+      }
+    }
+  ],
+  "unchanged_patterns": [
+    {
+      "id": "pattern-id-3",
+      "reason": "为什么保持独立",
+      "similarity_score": 0.2
+    }
+  ],
+  "summary": {
+    "total_input": {{len .Patterns}},
+    "total_merged": 4,
+    "total_unchanged": 6,
+    "merge_count": 2
+  }
+}
+```
+
+- **merged_patterns**: 合并结果，含 `merged_from` ID 和 `merge_reason`
+- **unchanged_patterns**: 独立模式，含 `reason` 和 `similarity_score`
+- **summary**: total_input = total_merged + total_unchanged
+
+# ⚠️ 关键输出要求
+
+你的整个回复必须只是一个有效的 JSON 对象。
+- 以 `{` 开始，以 `}` 结束
+- 不要使用 markdown 代码块（不要 ```)
+- JSON 前后不要有任何说明文字
+- 不要包含总结、介绍或结论
+- 如果需要添加注释，请放在 JSON 中的 "notes" 字段里

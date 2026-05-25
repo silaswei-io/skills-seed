@@ -1,0 +1,37 @@
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- prompt-template-sha256: {{.PromptTemplatesHash}} -->
+<!-- prompt-type: project-profile -->
+<!-- editable: true -->
+
+# 项目画像
+
+- 项目名称: {{.ProjectName}}
+- 主要语言: {{.Language}}
+- 项目根目录: {{.ProjectRoot}}
+
+{{- if .MainFiles}}
+## 入口文件
+
+{{range .MainFiles}}- {{.}}
+{{end}}
+
+{{- end}}
+{{- if .Structure}}
+## 目录结构摘要
+
+```text
+{{.Structure}}
+```
+
+{{- end}}
+## 架构摘要
+
+请补充当前项目的分层、主流程、关键模块和依赖关系。
+
+## 关键模块
+
+请补充重要目录、职责与边界。
+
+## 团队编码风格
+
+请补充命名、错误处理、日志、配置和测试风格。

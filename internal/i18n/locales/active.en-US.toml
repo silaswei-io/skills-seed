@@ -1,0 +1,1548 @@
+[InitShort]
+other = "Initialize skills-seed project"
+
+[RootShort]
+other = "Growing project skills for AI agents"
+
+[RootLong]
+other = "A project-level skill that learns from Git history\nto help AI agents understand your codebase better.\n\nThis tool integrates with the configured AI agent for deep code analysis\nand learns your team's coding patterns automatically."
+
+[InitLongDesc]
+other = "Initialize skills-seed in your project.\n\nThis command will:\n  • Create .skills-seed/ directory\n  • Generate default configuration (config.yaml)\n  • Initialize BoltDB database\n  • Prepare cross-agent compatible prompt and skills templates\n\nPlease run this command in the root directory of a Git repository.\n\nExamples:\n  # Initialize in current project\n  skills-seed init"
+
+[InitStart]
+other = "Initialize skills-seed"
+
+[InitSuccess]
+other = "initialized successfully"
+
+[InitFailed]
+other = "Initialization failed: {{.Error}}"
+
+[InitSkillLocation]
+other = "skills-seed location: {{.Path}}"
+
+[InitNextSteps]
+other = "Next steps:"
+
+[InitStepLearn]
+other = "  1. Analyze current code and create project profile: skills-seed learn current"
+
+[InitStepWatch]
+other = "  2. Generate skills documentation: skills-seed generate-skills"
+
+[InitStepPatterns]
+other = "  3. View learned patterns: skills-seed view patterns"
+
+[InitStepRules]
+other = "  4. Optionally install the hook: skills-seed hook install"
+
+[InitAnalyzingProject]
+other = "Analyzing project..."
+
+[InitAnalysisStep1]
+other = "Step 1/5: Getting project structure..."
+
+[InitAnalysisStep2]
+other = "Step 2/5: Reading README file..."
+
+[InitAnalysisStep3]
+other = "Step 3/5: Finding main entry files..."
+
+[InitAnalysisStep4]
+other = "Step 4/5: Calling AI to analyze project..."
+
+[InitAnalysisStep5]
+other = "Step 5/5: Generating project overview..."
+
+[InitAnalysisWarning]
+other = "Warning: Project analysis failed: {{.Error}}"
+
+[InitAnalysisClaudeOutput]
+other = "Claude raw output:\n{{.Output}}"
+
+[InitAnalysisClaudeOutputTruncated]
+other = "Claude raw output (first 500 chars):\n{{.Output}}"
+
+[InitAnalysisExtractedJSON]
+other = "Extracted JSON:\n{{.JSON}}"
+
+[InitAnalysisParseResult]
+other = "Parse result: Project={{.ProjectName}}, Language={{.Language}}, Frameworks={{.Frameworks}}"
+
+[InitAnalysisSkip]
+other = "Skipping project analysis. You can manually run 'skills-seed learn current' later to learn project patterns"
+
+[InitAnalysisSuccess]
+other = "Project analysis completed, generated skills-seed project overview"
+
+# 初始化命令 - 日志消息
+[InitSetProjectNameFailed]
+other = "Failed to set project name"
+
+[InitSetRootPathFailed]
+other = "Failed to set project root path"
+
+[InitCreateProjectPromptsFailed]
+other = "Failed to initialize project prompts"
+
+[InitCreateContainerFailed]
+other = "Failed to create container"
+
+[InitLocaleInvalid]
+other = "--locale must be 'zh-CN' or 'en-US'"
+
+[InitI18nInitFailed]
+other = "Failed to initialize i18n"
+
+[InitGetCurrentDirFailed]
+other = "Failed to get current directory"
+
+[InitCreateDirFailed]
+other = "Failed to create directory: {{.Path}}"
+
+[InitCreateConfigFailed]
+other = "Failed to create config"
+
+[InitSetLocaleFailed]
+other = "Failed to set locale"
+
+[InitLoggerInitFailed]
+other = "Failed to initialize logger"
+
+[PromptCreateDirFailed]
+other = "Failed to create prompt directory: {{.Path}}"
+
+[AgentProviderUnsupported]
+other = "Unsupported agent provider: {{.Provider}}"
+
+[AgentRenderAnalyzePromptFailed]
+other = "Failed to render analyze prompt"
+
+[AgentRenderBatchLearnPromptFailed]
+other = "Failed to render batch-learn prompt"
+
+[AgentRenderGenerateFixesPromptFailed]
+other = "Failed to render generate_fixes prompt"
+
+[AgentRenderGenerateSkillsPromptFailed]
+other = "Failed to render generate_skills_summary prompt"
+
+[AgentRenderMergePatternsPromptFailed]
+other = "Failed to render merge-patterns prompt"
+
+[AgentRenderProjectAnalysisPromptFailed]
+other = "Failed to render project-analysis prompt"
+
+[AgentRenderInitSkillsPromptFailed]
+other = "Failed to render init-skills prompt"
+
+[AgentCodexAnalyzeFailed]
+other = "Codex analyze code failed"
+
+[AgentCodexLearnFailed]
+other = "Codex learn from commit failed"
+
+[AgentCodexBatchLearnFailed]
+other = "Codex batch learn failed"
+
+[AgentCodexGenerateFixesFailed]
+other = "Codex generate fixes failed"
+
+[AgentCodexGenerateSkillsFailed]
+other = "Codex generate skills summary failed"
+
+[AgentCodexMergePatternsFailed]
+other = "Codex merge patterns failed"
+
+[AgentCodexProjectAnalysisFailed]
+other = "Codex project analysis failed"
+
+[AgentCodexCodebaseAnalysisFailed]
+other = "Codex codebase analysis failed"
+
+[AgentCodexCLIFailed]
+other = "Codex CLI call failed"
+
+[AgentCodexPrepareWorkDirFailed]
+other = "Failed to prepare Codex temporary work directory"
+
+[AgentCodexExtractFinalContentWarn]
+other = "Failed to extract final Codex content"
+
+[AgentCodexNoFinalMessage]
+other = "No final Codex message found"
+
+[BootstrapI18nInitWarn]
+other = "Warning: failed to initialize i18n"
+
+[BootstrapLoggerInitWarn]
+other = "Warning: failed to initialize logger"
+
+[CliFatalError]
+other = "Error"
+
+[ContainerLoadConfigFailed]
+other = "Failed to load config"
+
+[ContainerI18nInitFailed]
+other = "Failed to initialize i18n"
+
+[ContainerCreatePatternRepoFailed]
+other = "Failed to create pattern repository"
+
+[ContainerSubscribeLoggingFailed]
+other = "Failed to subscribe logging handler"
+
+[ContainerSubscribeStatsFailed]
+other = "Failed to subscribe stats handler"
+
+[UtilsReadConfigFailed]
+other = "Failed to read config file"
+
+[UtilsParseConfigFailed]
+other = "Failed to parse config file"
+
+[HookCreateDirFailed]
+other = "Failed to create hooks directory"
+
+[HookWriteFileFailed]
+other = "Failed to write hook file"
+
+[HookRemoveFileFailed]
+other = "Failed to remove hook file"
+
+[HookGetStagedFilesFailed]
+other = "Failed to get staged files"
+
+[GeneratorMarshalPatternsFailed]
+other = "Failed to marshal patterns"
+
+[GeneratorGenerateSummaryFailed]
+other = "Failed to generate skills summary"
+
+[GeneratorRenderPatternTemplateFailed]
+other = "Failed to render category pattern template"
+
+[AnalyzerCreateSkillsDirFailed]
+other = "Failed to create skills directory"
+
+[AnalyzerCreateReferencesDirFailed]
+other = "Failed to create references directory"
+
+[AnalyzerWriteOverviewFailed]
+other = "Failed to write project overview"
+
+[AnalyzerAnalyzePatternsFailed]
+other = "AI analysis failed"
+
+[AnalyzerAnalyzeProjectFailed]
+other = "Project analysis failed"
+
+[AnalyzerAnalyzeCodebaseFailed]
+other = "Codebase analysis failed"
+
+[ConfigReadFailed]
+other = "Failed to read config"
+
+[ConfigParseFailed]
+other = "Failed to parse config"
+
+[ConfigCreateDirFailed]
+other = "Failed to create config directory"
+
+[ConfigWriteFailed]
+other = "Failed to write config"
+
+[ConfigMarshalFailed]
+other = "Failed to marshal config"
+
+[GitLogFailed]
+other = "Failed to read Git commit history"
+
+[GitShowFailed]
+other = "Failed to read Git commit details"
+
+[GitDiffCachedFailed]
+other = "Failed to read Git staged diff"
+
+[GitListFilesFailed]
+other = "Failed to read Git tracked files"
+
+[GitRevParseFailed]
+other = "Failed to read current Git branch"
+
+[GitStashFailed]
+other = "Git stash failed"
+
+[GitCreateBranchFailed]
+other = "Failed to create Git branch"
+
+[GitCheckoutFailed]
+other = "Failed to switch Git branch"
+
+[AgentClaudeAnalyzeFailed]
+other = "Claude analyze code failed"
+
+[AgentClaudeLearnFailed]
+other = "Claude learn from commit failed"
+
+[AgentClaudeBatchLearnFailed]
+other = "Claude batch learn failed"
+
+[AgentClaudeGenerateFixesFailed]
+other = "Claude generate fixes failed"
+
+[AgentClaudeGenerateSkillsFailed]
+other = "Claude generate skills summary failed"
+
+[AgentClaudeMergePatternsFailed]
+other = "Claude merge patterns failed"
+
+[AgentClaudeProjectAnalysisFailed]
+other = "Claude project analysis failed"
+
+[AgentClaudeCLIFailed]
+other = "Claude CLI call failed"
+
+[AgentClaudeRateLimited]
+other = "Claude rate limited"
+
+[AgentClaudeRateLimitExhausted]
+other = "Claude rate limit retries exhausted"
+
+[AgentParseResultFailed]
+other = "Failed to parse AI result"
+
+[AgentJSONUnmarshalSimpleFailed]
+other = "Failed to unmarshal JSON"
+
+[AgentEmptyAIOutput]
+other = "Empty AI output"
+
+[AgentEmptyAIOutputHint]
+other = "AI returned an empty response"
+
+[AgentEmptyAIResponse]
+other = "AI returned an empty response"
+
+[AgentNoJSONFound]
+other = "No JSON found"
+
+[AgentNoJSONFoundHint]
+other = "No opening JSON brace found"
+
+[AgentNoJSONObjectFound]
+other = "No JSON object found in AI response"
+
+[AgentUnmatchedBraces]
+other = "Unmatched JSON braces"
+
+[AgentUnmatchedJSONBraces]
+other = "Unmatched JSON braces in AI response"
+
+[AgentInvalidJSON]
+other = "Invalid JSON"
+
+[AgentInvalidJSONError]
+other = "Invalid JSON"
+
+[AgentNoValidJSONFound]
+other = "No valid JSON found in output"
+
+[AgentExtractJSONError]
+other = "Failed to extract JSON"
+
+[AgentAnalyzeCodebaseFailedSummary]
+other = "Failed to analyze codebase"
+
+[AgentParseAnalysisResultFailedSummary]
+other = "Failed to parse analysis result"
+
+[AgentClaudeCallSucceeded]
+other = "Claude CLI call succeeded"
+
+[LearnerMarshalKnownPatternsFailed]
+other = "Failed to marshal known patterns"
+
+[LearnerGetCommitsFailed]
+other = "Failed to get Git commits"
+
+[LearnerGetCommitFilesFailed]
+other = "Failed to get commit changed files"
+
+[LearnerAILearnFailed]
+other = "AI learning failed"
+
+[InitSkipProjectAnalysisNoContainer]
+other = "Skipping project analysis (container not created)"
+
+[InitAnalyzingCurrentCodebase]
+other = "Analyzing current codebase..."
+
+[InitAnalyzeCodebaseFailed]
+other = "Failed to analyze codebase"
+
+[InitSkipCodebaseAnalysis]
+other = "Skipping codebase analysis. You can run 'skills-seed learn current' later to learn coding patterns"
+
+[InitSkipCodebaseAnalysisNoContainer]
+other = "Skipping codebase analysis (container not created)"
+
+[InitProjectAnalysisStart]
+other = "Starting project analysis"
+
+[InitGetProjectStructure]
+other = "Getting project structure"
+
+[InitGetProjectStructureFailed]
+other = "Failed to get project structure"
+
+[InitProjectStructureSuccess]
+other = "Project structure retrieved successfully"
+
+[InitReadmeReadSuccess]
+other = "README read successfully"
+
+[InitReadmeNotExistOrFailed]
+other = "README file does not exist or failed to read"
+
+[InitFoundMainFiles]
+other = "Found main entry files"
+
+[InitCallingAIAnalyzeProject]
+other = "Calling AI to analyze project"
+
+[InitAIAnalyzeFailed]
+other = "AI analysis failed"
+
+[InitAIAnalyzeComplete]
+other = "AI analysis completed"
+
+[InitGenerateOverviewFailed]
+other = "Failed to generate project overview"
+
+[InitProjectAnalysisComplete]
+other = "Project analysis completed"
+
+[InitCodebaseAnalysisStart]
+other = "Starting codebase analysis"
+
+[InitCallingAIAnalyzeCodebase]
+other = "Calling AI to analyze codebase"
+
+[InitAIAnalyzeCodebaseComplete]
+other = "AI analysis completed"
+
+[InitSavePatternFailed]
+other = "Failed to save pattern"
+
+[InitSavePatternsToDatabase]
+other = "Saving patterns to database"
+
+[InitCodebaseAnalysisComplete]
+other = "Codebase analysis completed"
+
+[LearnShort]
+other = "Learn from Git history"
+
+[LearnNotInitialized]
+other = "skills-seed not initialized"
+
+[LearnRunInitFirst]
+other = "Please run 'skills-seed init' first"
+
+[LearnLongDesc]
+other = "Learn coding patterns from Git commit history.\n\nThis command will:\n  • Analyze recent Git commits\n  • Extract coding patterns using configured AI agent\n  • Save learned patterns to database\n  • Auto-generate code rules\n\nAfter learning, use 'skills-seed check' to check code quality.\n\nExamples:\n  # Learn from last 50 commits\n  skills-seed learn history --limit=50\n\n  # Learn from commits in last 30 days\n  skills-seed learn history --since=30d"
+
+[LearnFromHistory]
+other = "Learning from Git history"
+
+[LearnAnalyzingCommits]
+other = "Analyzing {{.Count}} commits..."
+
+[CheckShort]
+other = "Check staged files"
+
+[CheckNotInitialized]
+other = "skills-seed not initialized"
+
+[CheckRunInitFirst]
+other = "Please run 'skills-seed init' first"
+
+[CheckLongDesc]
+other = "Check if staged files comply with coding standards.\n\nThis command will:\n  • Get Git staged files\n  • Analyze code using configured AI agent\n  • Find issues based on learned patterns\n  • Provide fix suggestions\n\nUsually runs automatically via Git pre-commit hook.\n\nExamples:\n  # Check staged files\n  skills-seed check\n\n  # Check all files\n  skills-seed check --all"
+
+[GenerateShort]
+other = "Generate AI Agent skills"
+
+[GenerateNotInitialized]
+other = "skills-seed not initialized"
+
+[GenerateRunInitFirst]
+other = "Please run 'skills-seed init' first"
+
+[GenerateLongDesc]
+other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read the project profile saved by learn current/profile refresh\n  • Select the provider-specific template directory from agent.provider\n  • Generate SKILL.md and references/ documentation\n  • Generate metadata such as agents/openai.yaml when the template provides it\n\nRun 'skills-seed learn current' or 'skills-seed profile refresh' before generating.\n\nExamples:\n  # Generate skills to the current provider default location\n  skills-seed generate-skills\n\n  # Specify output directory\n  skills-seed generate-skills --output <skills-output-dir>"
+
+[GenerateGenerating]
+other = "Generating AI Agent skills..."
+
+[GenerateSuccess]
+other = "Skills generated successfully"
+
+[GenerateOutputLocation]
+other = "Generated to: {{.Path}}"
+
+[HookShort]
+other = "Manage Git hooks"
+
+[HookLongDesc]
+other = "Manage Git pre-commit hooks.\n\nThis command can:\n  • Install pre-commit hook\n  • Uninstall pre-commit hook\n  • Manually run hook check\n\nAfter installation, 'skills-seed check' will run automatically before each git commit.\n\nExamples:\n  # Install hook\n  skills-seed hook install\n\n  # Uninstall hook\n  skills-seed hook uninstall\n\n  # Run manually\n  skills-seed hook run"
+
+[HookFlagInstall]
+other = "Install Git pre-commit hook"
+
+[HookFlagUninstall]
+other = "Uninstall Git pre-commit hook"
+
+[HookInstallShort]
+other = "Install Git pre-commit hook"
+
+[HookUninstallShort]
+other = "Uninstall Git pre-commit hook"
+
+[HookRunShort]
+other = "Run the pre-commit hook manually"
+
+[HookInstallSuccess]
+other = "Hook installed"
+
+[HookUninstallSuccess]
+other = "Hook uninstalled"
+
+[AnalyzeShort]
+other = "Analyze specific files"
+
+[AnalyzeNotInitialized]
+other = "skills-seed not initialized"
+
+[AnalyzeRunInitFirst]
+other = "Please run 'skills-seed init' first"
+
+[AnalyzeLongDesc]
+other = "Analyze specified files or directories.\n\nThis command will:\n  • Analyze specified files\n  • Check code using configured AI agent\n  • Not depend on Git status\n\nUseful for:\n  • Analyzing files before staging\n  • Checking files in different branches\n  • Quick analysis without Git context\n\nExamples:\n  # Analyze single file\n  skills-seed analyze main.go\n\n  # Analyze directory\n  skills-seed analyze src/\n\n  # Analyze multiple files\n  skills-seed analyze *.go"
+
+[ViewShort]
+other = "View learned content"
+
+[ViewNotInitialized]
+other = "skills-seed not initialized"
+
+[ViewRunInitFirst]
+other = "Please run 'skills-seed init' first"
+
+[ViewLongDesc]
+other = "View learned patterns and generated rules.\n\nSubcommands:\n  patterns  - View all learned patterns\n  rules     - View all generated rules\n\nExamples:\n  # View patterns\n  skills-seed view patterns\n\n  # View rules\n  skills-seed view rules"
+
+[ScanShort]
+other = "Scan and analyze project"
+
+[ScanNotInitialized]
+other = "skills-seed not initialized"
+
+[ScanRunInitFirst]
+other = "Please run 'skills-seed init' first"
+
+[ScanLongDesc]
+other = "Scan and analyze entire project.\n\nThis command will:\n  • Scan all files in project\n  • Analyze code using configured AI agent\n  • Learn current codebase state\n  • Optionally generate AI Agent skills\n\nUseful for:\n  • After new project initialization\n  • Need comprehensive codebase analysis\n  • Generate project skills\n\nExamples:\n  # Scan project\n  skills-seed scan\n\n  # Scan and generate skills\n  skills-seed scan --generate-skills\n\n  # Scan all file types\n  skills-seed scan --all"
+
+[ScanAnalyzingProject]
+other = "Analyzing current project..."
+
+[ScanNoFiles]
+other = "No files found to analyze"
+
+[ScanFoundFiles]
+other = "Found {{.Count}} files"
+
+[ScanCompleted]
+other = "Project scan completed"
+
+# 查看模式
+[ViewPatternsShort]
+other = "View all learned patterns"
+
+[ViewPatternsLong]
+other = "View all learned patterns from Git history."
+
+[ViewNoPatterns]
+other = "No patterns learned yet."
+
+[ViewPatternsTotal]
+other = "Learned patterns ({{.Count}} total):"
+
+[ViewPatternConfidence]
+other = "   Confidence: {{.Confidence}} | Frequency: {{.Frequency}}"
+
+[ViewPatternDescription]
+other = "   Description: {{.Description}}"
+
+# 查看规则
+[ViewRulesShort]
+other = "View all generated rules"
+
+[ViewRulesLong]
+other = "View all generated rules from patterns."
+
+[ViewNoRules]
+other = "No rules generated yet."
+
+[ViewRulesTotal]
+other = "Generated rules ({{.Count}} total):"
+
+[ViewRuleDescription]
+other = "   Description: {{.Description}}"
+
+[ViewRulePatterns]
+other = "   Patterns: {{.Count}}"
+
+[ViewFailed]
+other = "Failed: {{.Error}}"
+
+# 分析
+[AnalyzeNoFiles]
+other = "Error: no files provided"
+
+[AnalyzeGetRootFailed]
+other = "failed to get project root: {{.Error}}"
+
+[AnalyzeAnalyzing]
+other = "Analyzing {{.Count}} files..."
+
+[AnalyzeFile]
+other = "  - {{.File}}"
+
+# 钩子
+[HookBothFlagsError]
+other = "Error: cannot use both --install and --uninstall"
+
+[HookInstallFailed]
+other = "Hook install failed: {{.Error}}"
+
+[HookUninstallFailed]
+other = "Hook uninstall failed: {{.Error}}"
+
+[HookRunFailed]
+other = "Hook run failed: {{.Error}}"
+
+[HookNoStagedFiles]
+other = "No staged files to check"
+
+[HookCheckingFiles]
+other = "Checking {{.Count}} files..."
+
+[HookCheckPassed]
+other = "Check passed"
+
+# 扫描
+[ScanProjectRoot]
+other = "  Project root: {{.Path}}"
+
+# 学习
+[LearnStarting]
+other = "Starting to learn from Git history..."
+
+[LearnAnalyzingCommitsCount]
+other = "Analyzing up to {{.Count}} commits"
+
+[LearnFlagMerge]
+other = "Merge similar patterns using AI after learning"
+
+[LearnNoCommits]
+other = "No new commits to learn"
+
+[LearnBatchStarting]
+other = "Batch learning commits..."
+
+[LearnBatchProgress]
+other = "Batch learning commits {{.Current}}/{{.Total}}"
+
+[ProgressLearnCurrentPrepareProject]
+other = "Preparing project context"
+
+[ProgressLearnCurrentAnalyzeCodebase]
+other = "Analyzing current codebase"
+
+[ProgressLearnCurrentSavePatterns]
+other = "Saving learned patterns"
+
+[ProgressLearnCurrentSaveProfile]
+other = "Analyzing and saving project profile"
+
+[ProgressLearnCurrentSkipProfile]
+other = "Skipping project profile refresh"
+
+[ProgressLearnHistoryBatch]
+other = "Analyzing batch {{.Current}}/{{.Total}} (commits {{.Start}}-{{.End}}/{{.CommitTotal}})"
+
+[ProgressMergePatternsAI]
+other = "Merging similar patterns with AI"
+
+[LearnFailed]
+other = "Failed to learn: {{.Error}}"
+
+[LearnCompleted]
+other = "Learning completed!"
+
+[LearnTotalPatterns]
+other = "Total patterns learned: {{.Count}}"
+
+# 生成
+[GenerateStarting]
+other = "Generating AI Agent skills..."
+
+[GenerateCountFailed]
+other = "Failed to count patterns: {{.Error}}"
+
+[GenerateNoPatterns]
+other = "No patterns learned yet. Run 'skills-seed learn current' first."
+
+[GenerateFoundPatterns]
+other = "Found {{.Count}} patterns"
+
+[ProgressGenerateCountPatterns]
+other = "Counting learned patterns"
+
+[ProgressGenerateWriteSkills]
+other = "Writing skill files"
+
+[GenerateFailed]
+other = "Failed to generate skills: {{.Error}}"
+
+[GenerateSuccessMsg]
+other = "Skills generated successfully!"
+
+[GenerateOutputPath]
+other = "Output: {{.Path}}"
+
+[GenerateProjectProfileMissing]
+other = "Project profile is missing, so project overview cannot be generated. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
+
+# 生成合并
+[GenerateFlagMerge]
+other = "Merge similar patterns before generating (deprecated; use patterns merge)"
+
+[GenerateMergeStarting]
+other = "Starting to merge similar patterns..."
+
+[GenerateMergeDeprecated]
+other = "'generate-skills --merge' is deprecated. Use 'skills-seed patterns merge' before 'skills-seed generate-skills' instead."
+
+[GenerateMergeFailed]
+other = "Merge failed: {{.Error}}"
+
+[GenerateMergeCompleted]
+other = "Merge completed"
+
+[GenerateMergedCount]
+other = "Merged pattern count: {{.Count}}"
+
+# 模式
+[PatternsShort]
+other = "Manage learned patterns"
+
+[PatternsLongDesc]
+other = "Manage learned code patterns, including explicit merging of similar patterns."
+
+[PatternsMergeShort]
+other = "Merge similar patterns"
+
+[PatternsMergeFlagCategory]
+other = "Only merge the specified category"
+
+[PatternsMergeFlagDryRun]
+other = "Preview merge results without writing to the database"
+
+[PatternsMergeComplete]
+other = "Patterns merged: input {{.TotalInput}}, merged output {{.TotalMerged}}, unchanged {{.TotalUnchanged}}, merge operations {{.MergeCount}}"
+
+# 画像
+[ProfileShort]
+other = "Show or refresh the project profile"
+
+[ProfileLongDesc]
+other = "Show or refresh the project profile generated by learn current. The profile is used to render references/project-overview.md."
+
+[ProfileShowShort]
+other = "Show the current project profile summary"
+
+[ProfileRefreshShort]
+other = "Re-analyze the project and save the project profile"
+
+[ProfileMissing]
+other = "Project profile does not exist. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
+
+[ProfileShowHeader]
+other = "Project profile: {{.ProjectName}} ({{.Language}})\nGenerated at: {{.GeneratedAt}}"
+
+[ProfileShowStats]
+other = "Stats: frameworks {{.Frameworks}}, dependencies {{.Dependencies}}, modules {{.Modules}}, business methods {{.BusinessMethods}}"
+
+[ProfileRefreshStarting]
+other = "Refreshing project profile: {{.ProjectName}}\nProject root: {{.ProjectRoot}}\nLanguage: {{.Language}}"
+
+[ProfileRefreshComplete]
+other = "Project profile refreshed"
+
+# 检查
+[CheckStarting]
+other = "Checking code quality..."
+
+[CheckAllFiles]
+other = "Checking all files..."
+
+[CheckStagedFiles]
+other = "Checking staged files..."
+
+[CheckFailed]
+other = "Failed to check: {{.Error}}"
+
+[CheckNoIssues]
+other = "No issues found!"
+
+[CheckFoundIssues]
+other = "Found {{.Count}} issues:"
+
+[CheckSuggestion]
+other = "   Suggestion: {{.Suggestion}}"
+
+# 交互式检查选项
+[InteractiveFoundIssues]
+other = "Found {{.Count}} issues"
+
+[InteractiveSelectAction]
+other = "How would you like to handle these issues?"
+
+[InteractiveAutoFix]
+other = "Auto Fix and Commit"
+
+[InteractiveAutoFixDesc]
+other = "Commit user changes first, then apply auto-fixes (fixes not committed)"
+
+[InteractiveManualFix]
+other = "Manual Fix"
+
+[InteractiveManualFixDesc]
+other = "Exit and manually fix these issues"
+
+[InteractiveLearnAndCommit]
+other = "Learn and Continue"
+
+[InteractiveLearnAndCommitDesc]
+other = "Learn current code as new patterns, then continue committing"
+
+[InteractiveAutoFixing]
+other = "Auto-fixing..."
+
+[InteractiveManualFixHint]
+other = "Please manually fix the issues above and try again"
+
+[InteractiveLearning]
+other = "Learning from current code patterns..."
+
+[InteractiveLearningFailed]
+other = "Learning failed: {{.Error}}"
+
+[InteractiveLearningSuccess]
+other = "Learning completed, continuing with commit"
+
+# 策略选择
+[InteractiveSelectStrategy]
+other = "Select Auto-Fix Strategy"
+
+[InteractiveSelectStrategyHint]
+other = "Choose how to apply automatic fixes:"
+
+[StrategyPatch]
+other = "Patch Mode"
+
+[StrategyPatchDesc]
+other = "Generate .patch file for review before applying (recommended)"
+
+[StrategyBackup]
+other = "Backup Mode"
+
+[StrategyBackupDesc]
+other = "Backup files then modify directly, easy to restore"
+
+[StrategyStash]
+other = "Stash Mode"
+
+[StrategyStashDesc]
+other = "Use git stash to store fixes, can pop anytime"
+
+[StrategyBranch]
+other = "Branch Mode"
+
+[StrategyBranchDesc]
+other = "Apply fixes on new branch, original branch unchanged"
+
+# 自动修复
+[AutoFixPatchCreated]
+other = "Patch file created: {{.Path}}\nApply with 'git apply {{.Path}}'"
+
+[AutoFixBackupCreated]
+other = "Backup created: {{.Path}}\nFiles modified, restore from backup if needed"
+
+[AutoFixDirectApplied]
+other = "Fixes applied directly (no backup)"
+
+[AutoFixStashCreated]
+other = "Stash created: {{.Message}}\nRestore fixes with 'git stash pop'"
+
+[AutoFixBranchCreated]
+other = "New branch created: {{.BranchName}}\nFixes applied on new branch, original branch unchanged"
+
+# 模式合并
+[LearnMergeStarting]
+other = "Starting AI pattern merge..."
+
+[LearnMergeFailed]
+other = "Pattern merge failed: {{.Error}}"
+
+[LearnMergeCompleted]
+other = "Pattern merge completed"
+
+[LearnMergeCategory]
+other = "Merging category {{.Category}} ({{.Count}} patterns)..."
+
+[LearnMergeWarning]
+other = "Warning: Failed to merge category {{.Category}}: {{.Error}}"
+
+[LearnMergePatternMerged]
+other = "  Merged pattern: {{.Name}} (from {{.Count}} patterns)"
+
+[LearnMergeDeleteFailed]
+other = "Warning: Failed to delete old pattern {{.ID}}: {{.Error}}"
+
+[LearnMergeSaveFailed]
+other = "Warning: Failed to save merged pattern {{.Name}}: {{.Error}}"
+
+[LearnMergeNoPatterns]
+other = "No patterns to merge"
+
+[LearnMergeCategoryComplete]
+other = "Category {{.Category}} merge complete: {{.Input}} input, {{.Merged}} merged, {{.Unchanged}} unchanged"
+
+# 查看分类
+[ViewCategoryBusiness]
+other = "Business Logic Patterns"
+
+[ViewCategoryDatabase]
+other = "Database Operation Patterns"
+
+[ViewCategoryAPI]
+other = "API Design Patterns"
+
+[ViewCategoryNaming]
+other = "Naming Patterns"
+
+[ViewCategoryError]
+other = "Error Handling Patterns"
+
+[ViewCategoryStructure]
+other = "Code Structure Patterns"
+
+[ViewCategoryConcurrency]
+other = "Concurrency Patterns"
+
+[ViewCategoryTesting]
+other = "Testing Patterns"
+
+[ViewCategoryUtils]
+other = "Utility Method Patterns"
+
+[ViewCategoryMiddleware]
+other = "Middleware Patterns"
+
+[ViewCategoryConfig]
+other = "Configuration Management Patterns"
+
+[ViewCategoryUnknown]
+other = "Other Patterns"
+
+[ViewCategoryPatternCount]
+other = "{{.Count}} patterns, avg confidence: {{.Confidence}}%"
+
+[ViewPatternFrequency]
+other = "Confidence: {{.Confidence}}% | Frequency: {{.Frequency}} times"
+
+[ViewStatsSummary]
+other = "Statistics Summary:"
+
+[ViewStatsCategoryLine]
+other = "{{.Category}}: {{.Count}} patterns"
+
+[ViewNoPatternsInCategory]
+other = "No patterns found for category '{{.Category}}'"
+
+# 生成服务
+[GeneratorNoPatterns]
+other = "No patterns learned, skipping skills generation"
+
+[GeneratorAnalyzingPatterns]
+other = "Analyzing {{.Count}} patterns with AI..."
+
+[GeneratorAIFailed]
+other = "AI skill summary generation failed: {{.Error}}"
+
+[GeneratorCompleted]
+other = "Skills generation completed"
+
+[LoggerGeneratorSkipEmptyCategoryPattern]
+other = "Skipping empty category pattern generation"
+
+[LoggerGeneratorGeneratingPatternFile]
+other = "Generating pattern file"
+
+[LoggerAnalyzerSampleFileCollected]
+other = "Sample file collected"
+
+# 代理消息
+[AgentParsingOutputLength]
+other = "Parsing AI output"
+
+[AgentExtractJSONFailed]
+other = "Failed to extract JSON from AI output"
+
+[AgentOriginalOutput]
+other = "AI original output"
+
+[AgentExtractedJSON]
+other = "Successfully extracted JSON"
+
+[AgentJSONUnmarshalFailed]
+other = "JSON parsing failed"
+
+[AgentJSONContent]
+other = "JSON content"
+
+[AgentLanguageFieldEmpty]
+other = "Language field returned by AI is empty, using default value"
+
+[AgentSummaryFieldEmpty]
+other = "Summary field returned by AI is empty, using default value"
+
+[AgentNoProjectSummary]
+other = "No project summary"
+
+[AgentArchitectureFieldEmpty]
+other = "Architecture field returned by AI is empty, using default value"
+
+[AgentUnknownArchitecture]
+other = "Unknown architecture"
+
+[AgentParseSuccess]
+other = "AI output parsed successfully"
+
+[AgentParsingFailedSummary]
+other = "Project analysis completed but parsing failed. Raw output length: {{.Length}} characters"
+
+# 更新服务
+[UpdaterSummaryTemplate]
+other = "{{.Category}} guidelines summarized from {{.Count}} patterns"
+
+# 事件统计
+[EventStatsTitle]
+other = "\n=== Event Statistics ==="
+
+[EventStatsLine]
+other = "{{.EventType}}: {{.Count}}"
+
+# ==================== 日志消息 ====================
+
+# 日志 - 检查命令
+[LoggerCheckIssueFormat]
+other = "%d. %s %s:%d"
+
+[LoggerCheckIssueMessage]
+other = "   %s"
+
+[LoggerCheckSelectorError]
+other = "Selector error: {{.Error}}"
+
+[LoggerCheckStrategyError]
+other = "Strategy selection error: {{.Error}}"
+
+[LoggerCheckAutoFixApplying]
+other = "Applying auto-fix..."
+
+[LoggerCheckAutoFixFailed]
+other = "Auto-fix failed: {{.Error}}"
+
+[LoggerCheckUsingStrategy]
+other = "Using strategy: {{.Strategy}}"
+
+[LoggerCheckNoFixGenerated]
+other = "No fixes generated"
+
+[LoggerCheckFixCount]
+other = "Generated fixes for {{.Count}} files"
+
+[LoggerCheckReviewPatch]
+other = "\nReview patch:"
+
+[LoggerCheckCatPatch]
+other = "  cat {{.Path}}"
+
+[LoggerCheckApplyPatch]
+other = "\nApply patch:"
+
+[LoggerCheckGitApply]
+other = "  git apply {{.Path}}"
+
+[LoggerCheckReversePatch]
+other = "\nReverse patch:"
+
+[LoggerCheckGitApplyReverse]
+other = "  git apply --reverse {{.Path}}"
+
+[LoggerCheckRestoreNeeded]
+other = "\nTo restore:"
+
+[LoggerCheckCpBackup]
+other = "  cp -r {{.Path}}/* ."
+
+[LoggerCheckRestoreFix]
+other = "\nRestore fix:"
+
+[LoggerCheckGitStashPop]
+other = "  git stash pop"
+
+[LoggerCheckViewFix]
+other = "\nView fix:"
+
+[LoggerCheckGitDiffMain]
+other = "  git diff main"
+
+[LoggerCheckCreatePR]
+other = "\nCreate PR:"
+
+[LoggerCheckGhPRCreate]
+other = "  gh pr create --base main --head {{.Branch}}"
+
+[LoggerCheckFileReadError]
+other = "Cannot read file {{.File}}: {{.Error}}"
+
+[LoggerCheckConfidence]
+other = "Fix confidence: {{.Confidence}}%"
+
+# 日志 - 学习服务
+[LoggerLearnerStart]
+other = "Starting learning"
+
+[LoggerLearnerInvalidBatchSize]
+other = "Invalid batch size, using 1"
+
+[LoggerLearnerNoCommits]
+other = "No commits to learn"
+
+[LoggerLearnerCheckCommitStatusFailed]
+other = "Failed to check commit status"
+
+[LoggerLearnerCommitsToLearn]
+other = "Commits to learn"
+
+[LoggerLearnerBatchStart]
+other = "Batch learning"
+
+[LoggerLearnerBatchFailed]
+other = "Batch learning failed"
+
+[LoggerLearnerBatchComplete]
+other = "Batch learning completed"
+
+[LoggerLearnerSaveMergedFailed]
+other = "Failed to save merged pattern"
+
+[LoggerLearnerMergedPattern]
+other = "Merged pattern"
+
+[LoggerLearnerSaveNewFailed]
+other = "Failed to save new pattern"
+
+[LoggerLearnerNewPattern]
+other = "New pattern"
+
+[LoggerLearnerMarkAnalyzedFailed]
+other = "Failed to mark commit as analyzed"
+
+[LoggerLearnerComplete]
+other = "Learning completed"
+
+[LoggerLearnerMergeStart]
+other = "Starting pattern merge"
+
+[LoggerLearnerProcessingCategory]
+other = "Processing category"
+
+[LoggerLearnerCategoryMergeFailed]
+other = "Category merge failed"
+
+[LoggerLearnerPatternMergedSuccess]
+other = "Pattern merged successfully"
+
+[LoggerLearnerCategoryMergeComplete]
+other = "Category merge completed"
+
+[LoggerLearnerAllCategoriesComplete]
+other = "All categories merged"
+
+[LoggerLearnerDeleteOldFailed]
+other = "Failed to delete old pattern"
+
+# 日志 - 更新服务
+[LoggerUpdaterStart]
+other = "Starting Skills document update"
+
+[LoggerUpdaterNoPatterns]
+other = "No patterns, skipping update"
+
+[LoggerUpdaterPatternsLoaded]
+other = "Patterns loaded"
+
+[LoggerUpdaterMainSkillComplete]
+other = "Main SKILL.md generated"
+
+[LoggerUpdaterComplete]
+other = "Skills document update completed"
+
+[LoggerUpdaterCreateDirFailed]
+other = "Failed to create category directory"
+
+[LoggerUpdaterRenderTemplateFailed]
+other = "Failed to render category template"
+
+[LoggerUpdaterWriteFileFailed]
+other = "Failed to write category document"
+
+# 日志 - 合并服务
+[LoggerMergerStart]
+other = "Starting pattern merge"
+
+[LoggerMergerNoPatterns]
+other = "No patterns to merge"
+
+[LoggerMergerFoundPatterns]
+other = "Found patterns to merge"
+
+[LoggerMergerAIComplete]
+other = "AI merge completed"
+
+[LoggerMergerDryRun]
+other = "Dry run mode, not executing actual merge"
+
+[LoggerMergerComplete]
+other = "Merge completed"
+
+[LoggerMergerDeleteOldFailed]
+other = "Failed to delete old pattern"
+
+[LoggerMergerSaveMergedFailed]
+other = "Failed to save merged pattern"
+
+[LoggerMergerPatternSaved]
+other = "Pattern saved"
+
+# 日志 - 代理
+[LoggerAgentClaudeCallFailed]
+other = "Claude CLI call failed"
+
+[LoggerAgentNoValidJSON]
+other = "No valid JSON found"
+
+[LoggerAgentAnalyzeCodebaseFailed]
+other = "AI codebase analysis failed, returning empty result"
+
+[LoggerAgentParseResultFailed]
+other = "Failed to parse AI result, returning empty result"
+
+[LoggerAgentAnalyzeCodeFallback]
+other = "AI code analysis failed, returning empty result"
+
+[LoggerAgentExtractJSONFallback]
+other = "JSON extraction failed, returning empty result"
+
+[LoggerAgentPromptRenderFailed]
+other = "Prompt template rendering failed"
+
+[LoggerAgentClaudeCallFailedNonFallback]
+other = "Claude CLI call failed"
+
+[LoggerAgentParseResultFallback]
+other = "Failed to parse result, returning empty result"
+
+[LoggerAgentParseResultFailedNonFallback]
+other = "Failed to parse result"
+
+[LoggerAgentSkillsSummaryEmptyPrompt]
+other = "Prompt is empty, skipping skills summary generation"
+
+[LoggerAgentSkillsSummaryCallFailed]
+other = "Skills summary generation call failed"
+
+[LoggerAgentSkillsSummaryParseFallback]
+other = "Skills summary parsing failed, returning empty result"
+
+[LoggerAgentMergePatternsCallFailed]
+other = "Pattern merge call failed"
+
+[LoggerAgentMergePatternsParseFallback]
+other = "Pattern merge result parsing failed, returning empty result"
+
+[LoggerAgentProjectPromptRenderFailed]
+other = "Project analysis prompt template rendering failed"
+
+[LoggerAgentRateLimitRetry]
+other = "API rate limit hit, waiting before retry"
+
+[LoggerAgentRateLimitExhausted]
+other = "API rate limit retry attempts exhausted"
+
+[LoggerRuntimeInitialized]
+other = "Runtime logger initialized"
+
+[LoggerRuntimeClosing]
+other = "Runtime logger closing"
+
+[LoggerDiagnosticOperationStart]
+other = "Diagnostic operation started"
+
+[LoggerDiagnosticOperationComplete]
+other = "Diagnostic operation completed"
+
+[LoggerDiagnosticOperationFailed]
+other = "Diagnostic operation failed"
+
+[LoggerDiagnosticPromptRendered]
+other = "Prompt rendered"
+
+[LoggerDiagnosticAgentCallStart]
+other = "Agent call started"
+
+[LoggerDiagnosticAgentCallComplete]
+other = "Agent call completed"
+
+[LoggerDiagnosticAgentTokenUsage]
+other = "Agent token usage"
+
+[AgentTokenUsageConsole]
+other = "Token usage: {{.Agent}}/{{.Operation}} current {{.Current}} ({{.Detail}}), cumulative {{.Cumulative}}{{.Cost}}"
+
+[AgentTokenUsageSummaryConsole]
+other = "Token usage summary: cumulative {{.Total}} ({{.Detail}}){{.Cost}}"
+
+[AgentTokenUsageInputDetail]
+other = "input {{.Value}}"
+
+[AgentTokenUsageOutputDetail]
+other = "output {{.Value}}"
+
+[AgentTokenUsageCacheReadDetail]
+other = "cache read {{.Value}}"
+
+[AgentTokenUsageCacheWriteDetail]
+other = "cache write {{.Value}}"
+
+[AgentTokenUsageReasoningDetail]
+other = "reasoning {{.Value}}"
+
+[AgentTokenUsageDetailSeparator]
+other = ", "
+
+[AgentTokenUsageCostSuffix]
+other = ", cost {{.CurrentCost}}, cumulative cost {{.CumulativeCost}}"
+
+[AgentTokenUsageSummaryCostSuffix]
+other = ", cost {{.Cost}}"
+
+[LoggerDiagnosticAgentParseComplete]
+other = "Agent output parsed"
+
+# 日志 - 事件
+[LoggerEventTriggered]
+other = "Event triggered"
+
+[LoggerEventHandlerFailed]
+other = "Event handler execution failed"
+
+[LoggerEventSubscribed]
+other = "Event subscribed"
+
+[LoggerEventUnsubscribed]
+other = "Event unsubscribed"
+
+[LoggerEventNoSubscribers]
+other = "No event subscribers"
+
+[LoggerEventPublishedAsync]
+other = "Event published asynchronously"
+
+[LoggerEventPublishedSync]
+other = "Event published synchronously"
+
+[LoggerEventStatsUpdated]
+other = "Event statistics updated"
+
+# ==================== 查看命令 ====================
+[ViewSeparatorLine]
+other = "------------------------------------------------------------"
+
+[ViewDoubleLine]
+other = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+[ViewCategoryHeader]
+other = "{{.Category}} ({{.Count}} patterns, avg confidence: {{.Confidence}}%)"
+
+[ViewPatternName]
+other = "{{.Index}}. {{.Name}}"
+
+[ViewPatternDesc]
+other = "   {{.Description}}"
+
+[ViewRuleName]
+other = "{{.Index}}. {{.Name}} [{{.Category}}]"
+
+# ==================== 学习子命令 ====================
+[LearnCurrentShort]
+other = "Learn from current codebase"
+
+[LearnCurrentLongDesc]
+other = "Analyze current codebase and extract coding patterns, business methods, best practices, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/memory/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate-skills\n\nExamples:\n  # Learn from current code\n  skills-seed learn current\n\n  # Specify language\n  skills-seed learn current --language=go\n\n  # Learn only from a specific directory and auto-decide profile refresh\n  skills-seed learn current -f internal/agent"
+
+[LearnHistoryShort]
+other = "Learn from Git history"
+
+[LearnHistoryLongDesc]
+other = "Learn coding patterns from Git commit history.\n\nThis command will:\n  • Analyze Git commit history\n  • Use configured AI agent to extract coding patterns\n  • Extract business methods and tools\n  • Save learned patterns to database\n\nExamples:\n  # Learn from last 50 commits\n  skills-seed learn history --limit=50\n\n  # Learn from commits in last 30 days\n  skills-seed learn history --since=30d"
+
+[LearnFlagLimit]
+other = "Number of commits to analyze"
+
+[LearnFlagSince]
+other = "Time range (e.g., 7d, 30d, 6m, 1y)"
+
+[LearnFlagBatchSize]
+other = "Number of commits to process in each batch"
+
+[LearnFlagLanguage]
+other = "Primary programming language of the project"
+
+[LearnFlagFocus]
+other = "Directory or file to scan for learning; may be repeated"
+
+[LearnFlagProfile]
+other = "Project profile refresh strategy: auto, skip, or refresh"
+
+# 当前学习命令消息
+[LearnCurrentStart]
+other = "Starting to learn from current codebase"
+
+[LearnCurrentInfo]
+other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}"
+
+[LearnCurrentFocusInfo]
+other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMode}}"
+
+[LearnCurrentResult]
+other = "Analysis completed:\n  • Patterns: {{.PatternsCount}}\n  • Business rules: {{.BusinessRulesCount}}\n  • Best practices: {{.BestPracticesCount}}"
+
+[LearnCurrentSavePatternFailed]
+other = "Failed to save pattern [{{.ID}}]: {{.Error}}"
+
+[LearnCurrentPatternsSaved]
+other = "Saved {{.Count}} patterns"
+
+[LearnCurrentProfileSaved]
+other = "Saved project profile"
+
+[LearnCurrentProfileSkipped]
+other = "Skipped project profile refresh"
+
+[LearnCurrentProfileFailed]
+other = "Failed to generate project profile: {{.Error}}"
+
+[LearnCurrentComplete]
+other = "Current codebase learning completed"
+
+[LearnCurrentNextSteps]
+other = "Next commands:"
+
+[LearnCurrentNextViewPatterns]
+other = "  1. View learned patterns: skills-seed view patterns"
+
+[LearnCurrentNextGenerateSkills]
+other = "  2. Generate skills: skills-seed generate-skills"
+
+[LearnCurrentNextGenerateMergedSkills]
+other = "  3. Merge similar patterns: skills-seed patterns merge"
+
+[LearnCurrentNextCheck]
+other = "  4. Check code: skills-seed check"
+
+[LearnCurrentFailed]
+other = "Failed to learn from current codebase: {{.Error}}"
+
+# 历史学习命令消息
+[LearnHistoryStart]
+other = "Starting to learn from Git history"
+
+[LearnHistoryInfo]
+other = "Commit limit: {{.Limit}}\nTime range: {{.Since}}\nBatch size: {{.BatchSize}}"
+
+[LearnHistoryFailed]
+other = "Failed to learn from Git history: {{.Error}}"
+
+[LearnHistoryComplete]
+other = "Git history learning completed"
+
+[LearnHistoryTotalPatterns]
+other = "Total {{.Count}} patterns in database"
+
+# ==================== 命令错误消息 ====================
+[ErrNotInitialized]
+other = "skills-seed not initialized, run 'skills-seed init' first"
+
+[ErrManualFixRequired]
+other = "Manual fix required"
+
+[ErrInvalidAction]
+other = "Invalid action"
+
+[ErrFailedToGenerateFixes]
+other = "Failed to generate fixes: {{.Error}}"
+
+[ErrFailedToGetCurrentDir]
+other = "Failed to get current directory: {{.Error}}"
+
+[ErrFailedToAnalyzeCodebase]
+other = "Failed to analyze codebase: {{.Error}}"
+
+[ErrHookNotGitRepo]
+other = "Not a git repository"
+
+[ErrHookNotInitialized]
+other = "skills-seed not initialized, run 'skills-seed init' first"
+
+[ErrHookNotFound]
+other = "Pre-commit hook not found"
+
+[ErrHookCheckFailed]
+other = "Check failed: {{.Error}}"
+
+[ErrInitNotGitRepo]
+other = "Not a git repository: {{.Path}}"
+
+[ErrInitAlreadyInitialized]
+other = "skills-seed already initialized"

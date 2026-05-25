@@ -1,0 +1,110 @@
+# Role Definition
+
+You are a senior software architect. Analyze the provided project context and return a structured project overview for generated skill documentation.
+
+# Project Information
+
+- **Project Name**: {{.ProjectName}}
+- **Project Path**: {{.RootPath}}
+- **Primary Language**: {{.Language}}
+{{- if .Structure}}
+
+# Project Directory Structure
+
+```
+{{.Structure}}
+```
+{{- end}}
+{{- if .MainFiles}}
+
+# Entry Files
+
+{{range .MainFiles}}
+- {{.}}
+{{- end}}
+{{- end}}
+{{- if .ReadmePath}}
+
+# README File
+
+- {{.ReadmePath}}
+{{- end}}
+
+# Analysis Requirements
+
+Identify:
+
+1. Technology stack, frameworks, and important dependencies.
+2. Architecture layers and module responsibilities.
+3. Module dependency graph and key data flow.
+4. Important business methods with complete signatures and file locations.
+5. Common utilities and configuration patterns.
+
+You are running in the project root; read entry files, the README, and necessary source files by path. Do not invent unsupported facts. If information is not visible from the project, leave the related array empty or use a concise TODO-style note in the relevant description.
+
+# Output Format
+
+Return ONLY a valid JSON object matching this schema:
+
+```json
+{
+  "project_name": "{{.ProjectName}}",
+  "language": "{{.Language}}",
+  "frameworks": ["framework or library name"],
+  "architecture": "Concrete architecture description",
+  "layers": [
+    {
+      "name": "Layer name",
+      "description": "Layer responsibility",
+      "responsibilities": ["Specific responsibility"],
+      "files": ["path/to/file.go"]
+    }
+  ],
+  "dependency_graph": "Handler -> Service -> Repository -> Database",
+  "data_flow": "Request -> validation -> business logic -> persistence -> response",
+  "framework_patterns": ["Concrete framework usage pattern"],
+  "structure": "Concrete project structure summary",
+  "key_modules": [
+    {
+      "name": "Module name",
+      "path": "module/path",
+      "description": "Module role",
+      "responsibilities": ["Specific responsibility"],
+      "dependencies": ["dependency module"],
+      "dependents": ["dependent module"],
+      "key_methods": ["Important method signature"]
+    }
+  ],
+  "business_methods": [
+    {
+      "name": "MethodName",
+      "location": "file/path.go:line",
+      "description": "Business logic description",
+      "usage": "When to call this method",
+      "type": "domain|common",
+      "function": "Full method signature",
+      "prerequisites": "Required setup or dependencies",
+      "returns": "Return values and possible errors"
+    }
+  ],
+  "common_utils": [
+    {
+      "name": "FunctionName",
+      "file": "file/path.go",
+      "signature": "func FunctionName(...) ...",
+      "description": "What this utility does",
+      "usage": "When to use it"
+    }
+  ],
+  "config_patterns": ["Configuration pattern"],
+  "dependencies": ["dependency name"],
+  "summary": "Specific project overview"
+}
+```
+
+# Critical Output Requirements
+
+- The entire response must be only one valid JSON object.
+- Start with `{` and end with `}`.
+- Do not wrap the JSON in markdown code fences.
+- Do not include explanatory text before or after the JSON.

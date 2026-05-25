@@ -1,0 +1,1549 @@
+[InitShort]
+other = "初始化 skills-seed 项目"
+
+[RootShort]
+other = "为 AI 助手培育项目技能"
+
+[RootLong]
+other = "一个从 Git 历史中学习的项目级技能，\n帮助 AI 助手更好地理解你的代码库。\n\n此工具可集成配置的 AI Agent 进行深度代码分析，\n并自动学习你团队的编码模式。"
+
+[InitLongDesc]
+other = "在当前项目中初始化 skills-seed。\n\n此命令将：\n  • 创建 .skills-seed/ 目录\n  • 生成默认配置文件 (config.yaml)\n  • 初始化 BoltDB 数据库\n  • 准备跨 Agent 兼容的 prompt 与 skills 模板\n\n请在 Git 仓库根目录运行此命令。\n\n示例：\n  # 在当前项目初始化\n  skills-seed init"
+
+[InitStart]
+other = "初始化 skills-seed"
+
+[InitSuccess]
+other = "初始化成功"
+
+[InitFailed]
+other = "初始化失败: {{.Error}}"
+
+[InitSkillLocation]
+other = "skills-seed 位置: {{.Path}}"
+
+[InitNextSteps]
+other = "后续步骤:"
+
+[InitStepLearn]
+other = "  1. 分析当前代码并生成项目画像: skills-seed learn current"
+
+[InitStepWatch]
+other = "  2. 生成 skills 文档: skills-seed generate-skills"
+
+[InitStepPatterns]
+other = "  3. 查看学到的模式: skills-seed view patterns"
+
+[InitStepRules]
+other = "  4. 可选安装 hook: skills-seed hook install"
+
+[InitAnalyzingProject]
+other = "正在分析项目..."
+
+[InitAnalysisStep1]
+other = "步骤 1/5: 获取项目结构..."
+
+[InitAnalysisStep2]
+other = "步骤 2/5: 读取 README 文件..."
+
+[InitAnalysisStep3]
+other = "步骤 3/5: 查找主要入口文件..."
+
+[InitAnalysisStep4]
+other = "步骤 4/5: 调用 AI 分析项目..."
+
+[InitAnalysisStep5]
+other = "步骤 5/5: 生成项目概览文档..."
+
+[InitAnalysisClaudeOutput]
+other = "Claude 原始输出:\n{{.Output}}"
+
+[InitAnalysisClaudeOutputTruncated]
+other = "Claude 原始输出 (前500字符):\n{{.Output}}"
+
+[InitAnalysisExtractedJSON]
+other = "提取的 JSON:\n{{.JSON}}"
+
+[InitAnalysisParseResult]
+other = "解析结果: 项目名={{.ProjectName}}, 语言={{.Language}}, 框架={{.Frameworks}}"
+
+[InitAnalysisWarning]
+other = "警告: 项目分析失败: {{.Error}}"
+
+[InitAnalysisSkip]
+other = "跳过项目分析，您可以稍后手动运行 'skills-seed learn current' 来学习项目模式"
+
+[InitAnalysisSuccess]
+other = "项目分析完成，已生成 skills-seed 项目概览文档"
+
+# 初始化命令 - 日志消息
+[InitSetProjectNameFailed]
+other = "设置项目名称失败"
+
+[InitSetRootPathFailed]
+other = "设置项目根路径失败"
+
+[InitCreateProjectPromptsFailed]
+other = "初始化项目 prompts 失败"
+
+[InitCreateContainerFailed]
+other = "创建容器失败"
+
+[InitLocaleInvalid]
+other = "--locale 只能是 'zh-CN' 或 'en-US'"
+
+[InitI18nInitFailed]
+other = "初始化 i18n 失败"
+
+[InitGetCurrentDirFailed]
+other = "获取当前目录失败"
+
+[InitCreateDirFailed]
+other = "创建目录失败: {{.Path}}"
+
+[InitCreateConfigFailed]
+other = "创建配置失败"
+
+[InitSetLocaleFailed]
+other = "设置 locale 失败"
+
+[InitLoggerInitFailed]
+other = "初始化日志失败"
+
+[PromptCreateDirFailed]
+other = "创建 prompt 目录失败: {{.Path}}"
+
+[AgentProviderUnsupported]
+other = "不支持的 Agent 提供方: {{.Provider}}"
+
+[AgentRenderAnalyzePromptFailed]
+other = "渲染 analyze prompt 失败"
+
+[AgentRenderBatchLearnPromptFailed]
+other = "渲染 batch-learn prompt 失败"
+
+[AgentRenderGenerateFixesPromptFailed]
+other = "渲染 generate_fixes prompt 失败"
+
+[AgentRenderGenerateSkillsPromptFailed]
+other = "渲染 generate_skills_summary prompt 失败"
+
+[AgentRenderMergePatternsPromptFailed]
+other = "渲染 merge-patterns prompt 失败"
+
+[AgentRenderProjectAnalysisPromptFailed]
+other = "渲染 project-analysis prompt 失败"
+
+[AgentRenderInitSkillsPromptFailed]
+other = "渲染 init-skills prompt 失败"
+
+[AgentCodexAnalyzeFailed]
+other = "Codex 分析代码失败"
+
+[AgentCodexLearnFailed]
+other = "Codex 学习提交失败"
+
+[AgentCodexBatchLearnFailed]
+other = "Codex 批量学习失败"
+
+[AgentCodexGenerateFixesFailed]
+other = "Codex 生成修复失败"
+
+[AgentCodexGenerateSkillsFailed]
+other = "Codex 生成技能摘要失败"
+
+[AgentCodexMergePatternsFailed]
+other = "Codex 合并模式失败"
+
+[AgentCodexProjectAnalysisFailed]
+other = "Codex 项目分析失败"
+
+[AgentCodexCodebaseAnalysisFailed]
+other = "Codex 代码库分析失败"
+
+[AgentCodexCLIFailed]
+other = "Codex CLI 调用失败"
+
+[AgentCodexPrepareWorkDirFailed]
+other = "准备 Codex 临时工作目录失败"
+
+[AgentCodexExtractFinalContentWarn]
+other = "提取 Codex 最终输出失败"
+
+[AgentCodexNoFinalMessage]
+other = "未找到 Codex 最终消息"
+
+[BootstrapI18nInitWarn]
+other = "警告: 初始化 i18n 失败"
+
+[BootstrapLoggerInitWarn]
+other = "警告: 初始化日志失败"
+
+[CliFatalError]
+other = "错误"
+
+[ContainerLoadConfigFailed]
+other = "加载配置失败"
+
+[ContainerI18nInitFailed]
+other = "初始化 i18n 失败"
+
+[ContainerCreatePatternRepoFailed]
+other = "创建模式仓储失败"
+
+[ContainerSubscribeLoggingFailed]
+other = "订阅日志处理器失败"
+
+[ContainerSubscribeStatsFailed]
+other = "订阅统计处理器失败"
+
+[UtilsReadConfigFailed]
+other = "读取配置文件失败"
+
+[UtilsParseConfigFailed]
+other = "解析配置文件失败"
+
+[HookCreateDirFailed]
+other = "创建 hooks 目录失败"
+
+[HookWriteFileFailed]
+other = "写入 hook 文件失败"
+
+[HookRemoveFileFailed]
+other = "删除 hook 文件失败"
+
+[HookGetStagedFilesFailed]
+other = "获取暂存文件失败"
+
+[GeneratorMarshalPatternsFailed]
+other = "序列化模式失败"
+
+[GeneratorGenerateSummaryFailed]
+other = "生成技能摘要失败"
+
+[GeneratorRenderPatternTemplateFailed]
+other = "渲染分类模式模板失败"
+
+[AnalyzerCreateSkillsDirFailed]
+other = "创建 skills 目录失败"
+
+[AnalyzerCreateReferencesDirFailed]
+other = "创建 references 目录失败"
+
+[AnalyzerWriteOverviewFailed]
+other = "写入项目概览失败"
+
+[AnalyzerAnalyzePatternsFailed]
+other = "AI 分析失败"
+
+[AnalyzerAnalyzeProjectFailed]
+other = "项目分析失败"
+
+[AnalyzerAnalyzeCodebaseFailed]
+other = "代码库分析失败"
+
+[ConfigReadFailed]
+other = "读取配置失败"
+
+[ConfigParseFailed]
+other = "解析配置失败"
+
+[ConfigCreateDirFailed]
+other = "创建配置目录失败"
+
+[ConfigWriteFailed]
+other = "写入配置失败"
+
+[ConfigMarshalFailed]
+other = "序列化配置失败"
+
+[GitLogFailed]
+other = "读取 Git 提交历史失败"
+
+[GitShowFailed]
+other = "读取 Git 提交详情失败"
+
+[GitDiffCachedFailed]
+other = "读取 Git 暂存区差异失败"
+
+[GitListFilesFailed]
+other = "读取 Git 文件列表失败"
+
+[GitRevParseFailed]
+other = "读取当前 Git 分支失败"
+
+[GitStashFailed]
+other = "执行 Git stash 失败"
+
+[GitCreateBranchFailed]
+other = "创建 Git 分支失败"
+
+[GitCheckoutFailed]
+other = "切换 Git 分支失败"
+
+[AgentClaudeAnalyzeFailed]
+other = "Claude 分析代码失败"
+
+[AgentClaudeLearnFailed]
+other = "Claude 学习提交失败"
+
+[AgentClaudeBatchLearnFailed]
+other = "Claude 批量学习失败"
+
+[AgentClaudeGenerateFixesFailed]
+other = "Claude 生成修复失败"
+
+[AgentClaudeGenerateSkillsFailed]
+other = "Claude 生成技能摘要失败"
+
+[AgentClaudeMergePatternsFailed]
+other = "Claude 合并模式失败"
+
+[AgentClaudeProjectAnalysisFailed]
+other = "Claude 项目分析失败"
+
+[AgentClaudeCLIFailed]
+other = "Claude CLI 调用失败"
+
+[AgentClaudeRateLimited]
+other = "Claude 触发速率限制"
+
+[AgentClaudeRateLimitExhausted]
+other = "Claude 速率限制重试已耗尽"
+
+[AgentParseResultFailed]
+other = "解析 AI 结果失败"
+
+[AgentJSONUnmarshalSimpleFailed]
+other = "解析 JSON 失败"
+
+[AgentEmptyAIOutput]
+other = "AI 输出为空"
+
+[AgentEmptyAIOutputHint]
+other = "AI 返回了空响应"
+
+[AgentEmptyAIResponse]
+other = "AI 返回了空响应"
+
+[AgentNoJSONFound]
+other = "未找到 JSON"
+
+[AgentNoJSONFoundHint]
+other = "未找到 JSON 起始括号"
+
+[AgentNoJSONObjectFound]
+other = "AI 响应中未找到 JSON 对象"
+
+[AgentUnmatchedBraces]
+other = "JSON 括号不匹配"
+
+[AgentUnmatchedJSONBraces]
+other = "AI 响应中的 JSON 括号不匹配"
+
+[AgentInvalidJSON]
+other = "JSON 无效"
+
+[AgentInvalidJSONError]
+other = "JSON 无效"
+
+[AgentNoValidJSONFound]
+other = "输出中未找到有效 JSON"
+
+[AgentExtractJSONError]
+other = "提取 JSON 失败"
+
+[AgentAnalyzeCodebaseFailedSummary]
+other = "代码库分析失败"
+
+[AgentParseAnalysisResultFailedSummary]
+other = "分析结果解析失败"
+
+[AgentClaudeCallSucceeded]
+other = "Claude CLI 调用成功"
+
+[LearnerMarshalKnownPatternsFailed]
+other = "序列化已知模式失败"
+
+[LearnerGetCommitsFailed]
+other = "获取 Git 提交失败"
+
+[LearnerGetCommitFilesFailed]
+other = "获取提交变更文件失败"
+
+[LearnerAILearnFailed]
+other = "AI 学习失败"
+
+[InitSkipProjectAnalysisNoContainer]
+other = "跳过项目分析（容器未创建）"
+
+[InitAnalyzingCurrentCodebase]
+other = "正在分析当前代码库..."
+
+[InitAnalyzeCodebaseFailed]
+other = "分析代码库失败"
+
+[InitSkipCodebaseAnalysis]
+other = "跳过代码库分析，可以稍后运行 'skills-seed learn current' 学习编码模式"
+
+[InitSkipCodebaseAnalysisNoContainer]
+other = "跳过代码库分析（容器未创建）"
+
+[InitProjectAnalysisStart]
+other = "开始项目分析"
+
+[InitGetProjectStructure]
+other = "获取项目结构"
+
+[InitGetProjectStructureFailed]
+other = "获取项目结构失败"
+
+[InitProjectStructureSuccess]
+other = "项目结构获取成功"
+
+[InitReadmeReadSuccess]
+other = "README 读取成功"
+
+[InitReadmeNotExistOrFailed]
+other = "README 文件不存在或读取失败"
+
+[InitFoundMainFiles]
+other = "找到入口文件"
+
+[InitCallingAIAnalyzeProject]
+other = "调用 AI 分析项目"
+
+[InitAIAnalyzeFailed]
+other = "AI 分析失败"
+
+[InitAIAnalyzeComplete]
+other = "AI 分析完成"
+
+[InitGenerateOverviewFailed]
+other = "生成项目概览失败"
+
+[InitProjectAnalysisComplete]
+other = "项目分析完成"
+
+[InitCodebaseAnalysisStart]
+other = "开始分析代码库"
+
+[InitCallingAIAnalyzeCodebase]
+other = "调用 AI 分析代码库"
+
+[InitAIAnalyzeCodebaseComplete]
+other = "AI 分析完成"
+
+[InitSavePatternFailed]
+other = "保存模式失败"
+
+[InitSavePatternsToDatabase]
+other = "保存模式到数据库"
+
+[InitCodebaseAnalysisComplete]
+other = "代码库分析完成"
+
+[LearnShort]
+other = "从 Git 历史学习"
+
+[LearnNotInitialized]
+other = "skills-seed 未初始化"
+
+[LearnRunInitFirst]
+other = "请先运行 'skills-seed init' 初始化项目"
+
+[LearnLongDesc]
+other = "从 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析最近的 Git 提交\n  • 使用 配置的 AI Agent 提取编码模式\n  • 保存学到的模式到数据库\n  • 自动生成代码规则\n\n学习完成后，可以使用 'skills-seed check' 来检查代码质量。\n\n示例：\n  # 学习最近 50 个提交\n  skills-seed learn history --limit=50\n\n  # 学习最近 30 天的提交\n  skills-seed learn history --since=30d"
+
+[LearnFromHistory]
+other = "从 Git 历史学习中"
+
+[LearnAnalyzingCommits]
+other = "正在分析 {{.Count}} 个提交..."
+
+[CheckShort]
+other = "检查暂存的文件"
+
+[CheckNotInitialized]
+other = "skills-seed 未初始化"
+
+[CheckRunInitFirst]
+other = "请先运行 'skills-seed init' 初始化项目"
+
+[CheckLongDesc]
+other = "检查暂存的文件是否符合编码规范。\n\n此命令将：\n  • 获取 Git 暂存的文件\n  • 使用 配置的 AI Agent 分析代码\n  • 基于学到的模式发现问题\n  • 提供修复建议\n\n通常通过 Git pre-commit hook 自动运行。\n\n示例：\n  # 检查暂存的文件\n  skills-seed check\n\n  # 检查所有文件\n  skills-seed check --all"
+
+[GenerateShort]
+other = "生成 AI Agent skills"
+
+[GenerateNotInitialized]
+other = "skills-seed 未初始化"
+
+[GenerateRunInitFirst]
+other = "请先运行 'skills-seed init' 初始化项目"
+
+[GenerateLongDesc]
+other = "从学到的 patterns 和项目画像生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取学到的 patterns\n  • 读取 learn current/profile refresh 保存的项目画像\n  • 根据 agent.provider 选择对应 provider 的模板目录\n  • 生成 SKILL.md 与 references/ 文档\n  • 当模板提供 agents/openai.yaml 时自动生成对应元数据\n\n生成前请先运行 'skills-seed learn current' 或 'skills-seed profile refresh'。\n\n示例：\n  # 生成 skills 到当前 provider 的默认位置\n  skills-seed generate-skills\n\n  # 指定输出目录\n  skills-seed generate-skills --output <skills-output-dir>"
+
+[GenerateGenerating]
+other = "生成 AI Agent skills..."
+
+[GenerateSuccess]
+other = "Skills 生成成功"
+
+[GenerateOutputLocation]
+other = "已生成到: {{.Path}}"
+
+[HookShort]
+other = "管理 Git hooks"
+
+[HookLongDesc]
+other = "管理 Git pre-commit hooks。\n\n此命令可以：\n  • 安装 pre-commit hook\n  • 卸载 pre-commit hook\n  • 手动运行 hook 检查\n\n安装后，每次 git commit 前会自动运行 'skills-seed check'。\n\n示例：\n  # 安装 hook\n  skills-seed hook install\n\n  # 卸载 hook\n  skills-seed hook uninstall\n\n  # 手动运行\n  skills-seed hook run"
+
+[HookFlagInstall]
+other = "安装 Git pre-commit hook"
+
+[HookFlagUninstall]
+other = "卸载 Git pre-commit hook"
+
+[HookInstallShort]
+other = "安装 Git pre-commit hook"
+
+[HookUninstallShort]
+other = "卸载 Git pre-commit hook"
+
+[HookRunShort]
+other = "手动运行 pre-commit hook"
+
+[HookInstallSuccess]
+other = "Hook 已安装"
+
+[HookUninstallSuccess]
+other = "Hook 已卸载"
+
+[AnalyzeShort]
+other = "分析指定的文件"
+
+[AnalyzeNotInitialized]
+other = "skills-seed 未初始化"
+
+[AnalyzeRunInitFirst]
+other = "请先运行 'skills-seed init' 初始化项目"
+
+[AnalyzeLongDesc]
+other = "分析指定的文件或目录。\n\n此命令将：\n  • 分析指定的文件\n  • 使用 配置的 AI Agent 检查代码\n  • 不依赖 Git 状态\n\n适用于：\n  • 在暂存前分析文件\n  • 检查其他分支的文件\n  • 快速分析无需 Git 上下文\n\n示例：\n  # 分析单个文件\n  skills-seed analyze main.go\n\n  # 分析目录\n  skills-seed analyze src/\n\n  # 分析多个文件\n  skills-seed analyze *.go"
+
+[ViewShort]
+other = "查看学习内容"
+
+[ViewNotInitialized]
+other = "skills-seed 未初始化"
+
+[ViewRunInitFirst]
+other = "请先运行 'skills-seed init' 初始化项目"
+
+[ViewLongDesc]
+other = "查看学习到的模式和生成的规则。\n\n子命令：\n  patterns  - 查看所有学到的模式\n  rules     - 查看所有生成的规则\n\n示例：\n  # 查看模式\n  skills-seed view patterns\n\n  # 查看规则\n  skills-seed view rules"
+
+[ScanShort]
+other = "扫描并分析项目"
+
+[ScanNotInitialized]
+other = "skills-seed 未初始化"
+
+[ScanRunInitFirst]
+other = "请先运行 'skills-seed init' 初始化项目"
+
+[ScanLongDesc]
+other = "扫描并分析整个项目。\n\n此命令将：\n  • 扫描项目中的所有文件\n  • 使用 配置的 AI Agent 分析代码\n  • 学习当前的代码库状态\n  • 可选生成 AI Agent skills\n\n适用于：\n  • 新项目初始化后\n  • 需要全面分析代码库\n  • 生成项目的 skills\n\n示例：\n  # 扫描项目\n  skills-seed scan\n\n  # 扫描并生成 skills\n  skills-seed scan --generate-skills\n\n  # 扫描所有文件类型\n  skills-seed scan --all"
+
+[ScanAnalyzingProject]
+other = "正在分析当前项目..."
+
+[ScanNoFiles]
+other = "未找到可分析的文件"
+
+[ScanFoundFiles]
+other = "找到 {{.Count}} 个文件"
+
+[ScanCompleted]
+other = "项目扫描完成"
+
+# 查看模式
+[ViewPatternsShort]
+other = "查看所有学到的模式"
+
+[ViewPatternsLong]
+other = "查看从 Git 历史中学到的所有模式。"
+
+[ViewNoPatterns]
+other = "还没有学习到任何模式。"
+
+[ViewPatternsTotal]
+other = "学到的模式 (共 {{.Count}} 个):"
+
+[ViewPatternConfidence]
+other = "   置信度: {{.Confidence}} | 频率: {{.Frequency}}"
+
+[ViewPatternDescription]
+other = "   描述: {{.Description}}"
+
+# 查看规则
+[ViewRulesShort]
+other = "查看所有生成的规则"
+
+[ViewRulesLong]
+other = "查看从模式生成的所有规则。"
+
+[ViewNoRules]
+other = "还没有生成任何规则。"
+
+[ViewRulesTotal]
+other = "生成的规则 (共 {{.Count}} 个):"
+
+[ViewRuleDescription]
+other = "   描述: {{.Description}}"
+
+[ViewRulePatterns]
+other = "   模式: {{.Count}}"
+
+[ViewFailed]
+other = "失败: {{.Error}}"
+
+# 分析
+[AnalyzeNoFiles]
+other = "错误: 没有提供文件"
+
+[AnalyzeGetRootFailed]
+other = "获取项目根目录失败: {{.Error}}"
+
+[AnalyzeAnalyzing]
+other = "正在分析 {{.Count}} 个文件..."
+
+[AnalyzeFile]
+other = "  - {{.File}}"
+
+# 钩子
+[HookBothFlagsError]
+other = "错误: 不能同时使用 --install 和 --uninstall"
+
+[HookInstallFailed]
+other = "Hook 安装失败: {{.Error}}"
+
+[HookUninstallFailed]
+other = "Hook 卸载失败: {{.Error}}"
+
+[HookRunFailed]
+other = "Hook 运行失败: {{.Error}}"
+
+[HookNoStagedFiles]
+other = "没有暂存的文件需要检查"
+
+[HookCheckingFiles]
+other = "正在检查 {{.Count}} 个文件..."
+
+[HookCheckPassed]
+other = "检查通过"
+
+# 扫描
+[ScanProjectRoot]
+other = "  项目根目录: {{.Path}}"
+
+# 学习
+[LearnStarting]
+other = "开始从 Git 历史学习..."
+
+[LearnAnalyzingCommitsCount]
+other = "分析最多 {{.Count}} 个提交"
+
+[LearnFlagMerge]
+other = "学习后使用 AI 合并相似模式"
+
+[LearnNoCommits]
+other = "没有新的提交需要学习"
+
+[LearnBatchStarting]
+other = "正在批量学习提交..."
+
+[LearnBatchProgress]
+other = "正在批量学习提交 {{.Current}}/{{.Total}} 个"
+
+[ProgressLearnCurrentPrepareProject]
+other = "准备项目上下文"
+
+[ProgressLearnCurrentAnalyzeCodebase]
+other = "分析当前代码库"
+
+[ProgressLearnCurrentSavePatterns]
+other = "保存学习到的模式"
+
+[ProgressLearnCurrentSaveProfile]
+other = "分析并保存项目画像"
+
+[ProgressLearnCurrentSkipProfile]
+other = "跳过项目画像刷新"
+
+[ProgressLearnHistoryBatch]
+other = "分析批次 {{.Current}}/{{.Total}}（提交 {{.Start}}-{{.End}}/{{.CommitTotal}}）"
+
+[ProgressMergePatternsAI]
+other = "AI 合并相似模式"
+
+[LearnFailed]
+other = "学习失败: {{.Error}}"
+
+[LearnCompleted]
+other = "学习完成！"
+
+[LearnTotalPatterns]
+other = "总共学习的模式数: {{.Count}}"
+
+# 生成
+[GenerateStarting]
+other = "生成 AI Agent skills..."
+
+[GenerateCountFailed]
+other = "统计模式失败: {{.Error}}"
+
+[GenerateNoPatterns]
+other = "还没有学习任何模式。请先运行 'skills-seed learn current'。"
+
+[GenerateFoundPatterns]
+other = "找到 {{.Count}} 个模式"
+
+[ProgressGenerateCountPatterns]
+other = "统计已学习模式"
+
+[ProgressGenerateWriteSkills]
+other = "写入技能文件"
+
+[GenerateFailed]
+other = "生成 skills 失败: {{.Error}}"
+
+[GenerateSuccessMsg]
+other = "Skills 生成成功！"
+
+[GenerateOutputPath]
+other = "输出路径: {{.Path}}"
+
+[GenerateProjectProfileMissing]
+other = "缺少项目画像，无法生成项目概览。请先运行 'skills-seed learn current' 或 'skills-seed profile refresh'。"
+
+# 生成合并
+[GenerateFlagMerge]
+other = "生成前合并相似模式（已不推荐，改用 patterns merge）"
+
+[GenerateMergeStarting]
+other = "开始合并相似模式..."
+
+[GenerateMergeDeprecated]
+other = "'generate-skills --merge' 已不推荐使用；请改用 'skills-seed patterns merge' 后再运行 'skills-seed generate-skills'。"
+
+[GenerateMergeFailed]
+other = "合并失败: {{.Error}}"
+
+[GenerateMergeCompleted]
+other = "合并完成"
+
+[GenerateMergedCount]
+other = "合并后模式数: {{.Count}}"
+
+# 模式
+[PatternsShort]
+other = "管理已学习的 patterns"
+
+[PatternsLongDesc]
+other = "管理已学习的代码模式，包括显式合并相似模式。"
+
+[PatternsMergeShort]
+other = "合并相似 patterns"
+
+[PatternsMergeFlagCategory]
+other = "只合并指定分类"
+
+[PatternsMergeFlagDryRun]
+other = "只预览合并结果，不写入数据库"
+
+[PatternsMergeComplete]
+other = "Patterns 合并完成: 输入 {{.TotalInput}}，合并后 {{.TotalMerged}}，未变更 {{.TotalUnchanged}}，合并操作 {{.MergeCount}}"
+
+# 画像
+[ProfileShort]
+other = "查看或刷新项目画像"
+
+[ProfileLongDesc]
+other = "查看或刷新由 learn current 生成的项目画像。项目画像用于生成 references/project-overview.md。"
+
+[ProfileShowShort]
+other = "显示当前项目画像摘要"
+
+[ProfileRefreshShort]
+other = "重新分析项目并保存项目画像"
+
+[ProfileMissing]
+other = "项目画像不存在。请先运行 'skills-seed learn current' 或 'skills-seed profile refresh'。"
+
+[ProfileShowHeader]
+other = "项目画像: {{.ProjectName}} ({{.Language}})\n生成时间: {{.GeneratedAt}}"
+
+[ProfileShowStats]
+other = "统计: 框架 {{.Frameworks}}，依赖 {{.Dependencies}}，模块 {{.Modules}}，业务方法 {{.BusinessMethods}}"
+
+[ProfileRefreshStarting]
+other = "刷新项目画像: {{.ProjectName}}\n项目根路径: {{.ProjectRoot}}\n语言: {{.Language}}"
+
+[ProfileRefreshComplete]
+other = "项目画像刷新完成"
+
+# 检查
+[CheckStarting]
+other = "检查代码质量..."
+
+[CheckAllFiles]
+other = "检查所有文件..."
+
+[CheckStagedFiles]
+other = "检查暂存的文件..."
+
+[CheckFailed]
+other = "检查失败: {{.Error}}"
+
+[CheckNoIssues]
+other = "未发现问题！"
+
+[CheckFoundIssues]
+other = "发现 {{.Count}} 个问题:"
+
+[CheckSuggestion]
+other = "   建议: {{.Suggestion}}"
+
+
+# 交互式检查选项
+[InteractiveFoundIssues]
+other = "发现 {{.Count}} 个问题"
+
+[InteractiveSelectAction]
+other = "请选择如何处理这些问题："
+
+[InteractiveAutoFix]
+other = "自动修复并提交"
+
+[InteractiveAutoFixDesc]
+other = "先提交用户修改，再应用自动修复（修复内容不提交）"
+
+[InteractiveManualFix]
+other = "手动修复"
+
+[InteractiveManualFixDesc]
+other = "退出并手动修复这些问题"
+
+[InteractiveLearnAndCommit]
+other = "学习并继续提交"
+
+[InteractiveLearnAndCommitDesc]
+other = "将当前代码作为新模式学习，然后继续提交"
+
+[InteractiveAutoFixing]
+other = "正在自动修复..."
+
+[InteractiveManualFixHint]
+other = "请手动修复上述问题后重新提交"
+
+[InteractiveLearning]
+other = "正在学习..."
+
+[InteractiveLearningFailed]
+other = "学习失败: {{.Error}}"
+
+[InteractiveLearningSuccess]
+other = "学习完成，继续提交"
+
+# 策略选择
+[InteractiveSelectStrategy]
+other = "选择自动修复策略"
+
+[InteractiveSelectStrategyHint]
+other = "请选择如何应用自动修复："
+
+[StrategyPatch]
+other = "Patch 补丁模式"
+
+[StrategyPatchDesc]
+other = "生成 .patch 补丁文件，可审查后手动应用（推荐）"
+
+[StrategyBackup]
+other = "Backup 备份模式"
+
+[StrategyBackupDesc]
+other = "备份原文件后直接修改，可随时恢复"
+
+[StrategyStash]
+other = "Stash 暂存模式"
+
+[StrategyStashDesc]
+other = "使用 git stash 暂存修复，可随时弹出"
+
+[StrategyBranch]
+other = "Branch 分支模式"
+
+[StrategyBranchDesc]
+other = "在新分支上应用修复，原分支保持不变"
+
+# 自动修复
+[AutoFixPatchCreated]
+other = "已创建补丁文件: {{.Path}}\n使用 'git apply {{.Path}}' 应用补丁"
+
+[AutoFixBackupCreated]
+other = "已创建备份: {{.Path}}\n文件已修改，如需回退请从备份恢复"
+
+[AutoFixDirectApplied]
+other = "修复已直接应用（无备份）"
+
+[AutoFixStashCreated]
+other = "已创建 stash: {{.Message}}\n使用 'git stash pop' 恢复修复"
+
+[AutoFixBranchCreated]
+other = "已创建新分支: {{.BranchName}}\n在新分支上应用了修复，原分支未修改"
+
+# 模式合并
+[LearnMergeStarting]
+other = "开始 AI 模式汇总..."
+
+[LearnMergeFailed]
+other = "模式汇总失败: {{.Error}}"
+
+[LearnMergeCompleted]
+other = "模式汇总完成"
+
+[LearnMergeCategory]
+other = "正在汇总分类 {{.Category}} ({{.Count}} 个模式)..."
+
+[LearnMergeWarning]
+other = "警告: 汇总分类 {{.Category}} 失败: {{.Error}}"
+
+[LearnMergePatternMerged]
+other = "  合并模式: {{.Name}} (从 {{.Count}} 个模式合并)"
+
+[LearnMergeDeleteFailed]
+other = "警告: 删除旧模式失败 {{.ID}}: {{.Error}}"
+
+[LearnMergeSaveFailed]
+other = "警告: 保存合并模式失败 {{.Name}}: {{.Error}}"
+
+[LearnMergeNoPatterns]
+other = "没有模式需要汇总"
+
+[LearnMergeCategoryComplete]
+other = "分类 {{.Category}} 汇总完成: 输入 {{.Input}} 个, 合并 {{.Merged}} 个, 保留 {{.Unchanged}} 个"
+
+# 查看分类
+[ViewCategoryBusiness]
+other = "业务逻辑模式"
+
+[ViewCategoryDatabase]
+other = "数据库操作模式"
+
+[ViewCategoryAPI]
+other = "API设计模式"
+
+[ViewCategoryNaming]
+other = "命名模式"
+
+[ViewCategoryError]
+other = "错误处理模式"
+
+[ViewCategoryStructure]
+other = "代码结构模式"
+
+[ViewCategoryConcurrency]
+other = "并发模式"
+
+[ViewCategoryTesting]
+other = "测试模式"
+
+[ViewCategoryUtils]
+other = "工具方法模式"
+
+[ViewCategoryMiddleware]
+other = "中间件模式"
+
+[ViewCategoryConfig]
+other = "配置管理模式"
+
+[ViewCategoryUnknown]
+other = "其他模式"
+
+[ViewCategoryPatternCount]
+other = "{{.Count}} 个模式, 平均置信度: {{.Confidence}}%"
+
+[ViewPatternFrequency]
+other = "置信度: {{.Confidence}}% | 频率: {{.Frequency}} 次"
+
+[ViewStatsSummary]
+other = "统计摘要:"
+
+[ViewStatsCategoryLine]
+other = "{{.Category}}: {{.Count}} 个"
+
+[ViewNoPatternsInCategory]
+other = "未找到分类为 '{{.Category}}' 的模式"
+
+# 生成服务
+[GeneratorNoPatterns]
+other = "没有学习到任何模式，跳过 skills 生成"
+
+[GeneratorAnalyzingPatterns]
+other = "正在使用 AI 分析 {{.Count}} 个模式..."
+
+[GeneratorAIFailed]
+other = "AI 生成技能总结失败: {{.Error}}"
+
+[GeneratorCompleted]
+other = "Skills 生成完成"
+
+[LoggerGeneratorSkipEmptyCategoryPattern]
+other = "跳过空分类模式生成"
+
+[LoggerGeneratorGeneratingPatternFile]
+other = "正在生成模式文件"
+
+[LoggerAnalyzerSampleFileCollected]
+other = "收集示例文件"
+
+# 代理消息
+[AgentParsingOutputLength]
+other = "正在解析 AI 输出"
+
+[AgentExtractJSONFailed]
+other = "从 AI 输出中提取 JSON 失败"
+
+[AgentOriginalOutput]
+other = "AI 原始输出"
+
+[AgentExtractedJSON]
+other = "成功提取 JSON"
+
+[AgentJSONUnmarshalFailed]
+other = "JSON 解析失败"
+
+[AgentJSONContent]
+other = "JSON 内容"
+
+[AgentLanguageFieldEmpty]
+other = "AI 返回的语言字段为空，使用默认值"
+
+[AgentSummaryFieldEmpty]
+other = "AI 返回的摘要字段为空，使用默认值"
+
+[AgentNoProjectSummary]
+other = "无项目摘要"
+
+[AgentArchitectureFieldEmpty]
+other = "AI 返回的架构字段为空，使用默认值"
+
+[AgentUnknownArchitecture]
+other = "未知架构"
+
+[AgentParseSuccess]
+other = "AI 输出解析成功"
+
+[AgentParsingFailedSummary]
+other = "项目分析完成但解析失败。原始输出长度: {{.Length}} 字符"
+
+# 更新服务
+[UpdaterSummaryTemplate]
+other = "从 {{.Count}} 个模式中总结的 {{.Category}} 规范"
+
+# 事件统计
+[EventStatsTitle]
+other = "\n=== 事件统计 ==="
+
+[EventStatsLine]
+other = "{{.EventType}}: {{.Count}}"
+
+# ==================== 日志消息 ====================
+
+# 日志 - 检查命令
+[LoggerCheckIssueFormat]
+other = "%d. %s %s:%d"
+
+[LoggerCheckIssueMessage]
+other = "   %s"
+
+[LoggerCheckSelectorError]
+other = "选择器错误: {{.Error}}"
+
+[LoggerCheckStrategyError]
+other = "策略选择错误: {{.Error}}"
+
+[LoggerCheckAutoFixApplying]
+other = "正在应用自动修复..."
+
+[LoggerCheckAutoFixFailed]
+other = "自动修复失败: {{.Error}}"
+
+[LoggerCheckUsingStrategy]
+other = "使用策略: {{.Strategy}}"
+
+[LoggerCheckNoFixGenerated]
+other = "未能生成任何修复"
+
+[LoggerCheckFixCount]
+other = "生成了 {{.Count}} 个文件的修复"
+
+[LoggerCheckReviewPatch]
+other = "\n审查补丁:"
+
+[LoggerCheckCatPatch]
+other = "  cat {{.Path}}"
+
+[LoggerCheckApplyPatch]
+other = "\n应用补丁:"
+
+[LoggerCheckGitApply]
+other = "  git apply {{.Path}}"
+
+[LoggerCheckReversePatch]
+other = "\n撤回补丁:"
+
+[LoggerCheckGitApplyReverse]
+other = "  git apply --reverse {{.Path}}"
+
+[LoggerCheckRestoreNeeded]
+other = "\n如需恢复:"
+
+[LoggerCheckCpBackup]
+other = "  cp -r {{.Path}}/* ."
+
+[LoggerCheckRestoreFix]
+other = "\n恢复修复:"
+
+[LoggerCheckGitStashPop]
+other = "  git stash pop"
+
+[LoggerCheckViewFix]
+other = "\n查看修复:"
+
+[LoggerCheckGitDiffMain]
+other = "  git diff main"
+
+[LoggerCheckCreatePR]
+other = "\n创建 PR:"
+
+[LoggerCheckGhPRCreate]
+other = "  gh pr create --base main --head {{.Branch}}"
+
+[LoggerCheckFileReadError]
+other = "无法读取文件 {{.File}}: {{.Error}}"
+
+[LoggerCheckConfidence]
+other = "修复置信度: {{.Confidence}}%"
+
+# 日志 - 学习服务
+[LoggerLearnerStart]
+other = "开始学习"
+
+[LoggerLearnerInvalidBatchSize]
+other = "批次大小无效，使用 1"
+
+[LoggerLearnerNoCommits]
+other = "没有待学习的提交"
+
+[LoggerLearnerCheckCommitStatusFailed]
+other = "无法检查commit状态"
+
+[LoggerLearnerCommitsToLearn]
+other = "待学习提交"
+
+[LoggerLearnerBatchStart]
+other = "批量学习"
+
+[LoggerLearnerBatchFailed]
+other = "批量学习失败"
+
+[LoggerLearnerBatchComplete]
+other = "批量学习完成"
+
+[LoggerLearnerSaveMergedFailed]
+other = "保存合并模式失败"
+
+[LoggerLearnerMergedPattern]
+other = "合并模式"
+
+[LoggerLearnerSaveNewFailed]
+other = "保存新模式失败"
+
+[LoggerLearnerNewPattern]
+other = "新增模式"
+
+[LoggerLearnerMarkAnalyzedFailed]
+other = "标记commit为已分析失败"
+
+[LoggerLearnerComplete]
+other = "学习完成"
+
+[LoggerLearnerMergeStart]
+other = "开始合并模式"
+
+[LoggerLearnerProcessingCategory]
+other = "处理分类"
+
+[LoggerLearnerCategoryMergeFailed]
+other = "分类合并失败"
+
+[LoggerLearnerPatternMergedSuccess]
+other = "模式合并成功"
+
+[LoggerLearnerCategoryMergeComplete]
+other = "分类合并完成"
+
+[LoggerLearnerAllCategoriesComplete]
+other = "所有分类合并完成"
+
+[LoggerLearnerDeleteOldFailed]
+other = "删除旧模式失败"
+
+# 日志 - 更新服务
+[LoggerUpdaterStart]
+other = "开始更新 Skills 文档"
+
+[LoggerUpdaterNoPatterns]
+other = "没有模式，跳过更新"
+
+[LoggerUpdaterPatternsLoaded]
+other = "获取模式完成"
+
+[LoggerUpdaterMainSkillComplete]
+other = "主 SKILL.md 生成完成"
+
+[LoggerUpdaterComplete]
+other = "Skills 文档更新完成"
+
+[LoggerUpdaterCreateDirFailed]
+other = "创建分类目录失败"
+
+[LoggerUpdaterRenderTemplateFailed]
+other = "渲染分类模板失败"
+
+[LoggerUpdaterWriteFileFailed]
+other = "写入分类文档失败"
+
+# 日志 - 合并服务
+[LoggerMergerStart]
+other = "开始合并模式"
+
+[LoggerMergerNoPatterns]
+other = "没有模式需要合并"
+
+[LoggerMergerFoundPatterns]
+other = "找到待合并模式"
+
+[LoggerMergerAIComplete]
+other = "AI 合并完成"
+
+[LoggerMergerDryRun]
+other = "预览模式，不执行实际合并"
+
+[LoggerMergerComplete]
+other = "合并完成"
+
+[LoggerMergerDeleteOldFailed]
+other = "删除旧模式失败"
+
+[LoggerMergerSaveMergedFailed]
+other = "保存合并模式失败"
+
+[LoggerMergerPatternSaved]
+other = "保存合并模式"
+
+# 日志 - 代理
+[LoggerAgentClaudeCallFailed]
+other = "Claude CLI 调用失败"
+
+[LoggerAgentNoValidJSON]
+other = "未找到有效的 JSON"
+
+[LoggerAgentAnalyzeCodebaseFailed]
+other = "AI 分析代码库失败，返回空结果"
+
+[LoggerAgentParseResultFailed]
+other = "解析 AI 结果失败，返回空结果"
+
+[LoggerAgentAnalyzeCodeFallback]
+other = "AI 代码分析失败，返回空结果"
+
+[LoggerAgentExtractJSONFallback]
+other = "JSON 提取失败，返回空结果"
+
+[LoggerAgentPromptRenderFailed]
+other = "提示词模板渲染失败"
+
+[LoggerAgentClaudeCallFailedNonFallback]
+other = "Claude CLI 调用失败"
+
+[LoggerAgentParseResultFallback]
+other = "解析结果失败，返回空结果"
+
+[LoggerAgentParseResultFailedNonFallback]
+other = "解析结果失败"
+
+[LoggerAgentSkillsSummaryEmptyPrompt]
+other = "提示词为空，跳过 Skills 摘要生成"
+
+[LoggerAgentSkillsSummaryCallFailed]
+other = "Skills 摘要生成调用失败"
+
+[LoggerAgentSkillsSummaryParseFallback]
+other = "Skills 摘要解析失败，返回空结果"
+
+[LoggerAgentMergePatternsCallFailed]
+other = "模式合并调用失败"
+
+[LoggerAgentMergePatternsParseFallback]
+other = "模式合并结果解析失败，返回空结果"
+
+[LoggerAgentProjectPromptRenderFailed]
+other = "项目分析提示词模板渲染失败"
+
+[LoggerAgentRateLimitRetry]
+other = "触发 API 速率限制，等待后重试"
+
+[LoggerAgentRateLimitExhausted]
+other = "API 速率限制重试次数已耗尽"
+
+[LoggerRuntimeInitialized]
+other = "运行时日志已初始化"
+
+[LoggerRuntimeClosing]
+other = "运行时日志即将关闭"
+
+[LoggerDiagnosticOperationStart]
+other = "诊断阶段开始"
+
+[LoggerDiagnosticOperationComplete]
+other = "诊断阶段完成"
+
+[LoggerDiagnosticOperationFailed]
+other = "诊断阶段失败"
+
+[LoggerDiagnosticPromptRendered]
+other = "提示词渲染完成"
+
+[LoggerDiagnosticAgentCallStart]
+other = "Agent 调用开始"
+
+[LoggerDiagnosticAgentCallComplete]
+other = "Agent 调用完成"
+
+[LoggerDiagnosticAgentTokenUsage]
+other = "Agent token 消耗统计"
+
+[AgentTokenUsageConsole]
+other = "Token 消耗: {{.Agent}}/{{.Operation}} 本次 {{.Current}}（{{.Detail}}），累计 {{.Cumulative}}{{.Cost}}"
+
+[AgentTokenUsageSummaryConsole]
+other = "Token 消耗汇总: 累计 {{.Total}}（{{.Detail}}）{{.Cost}}"
+
+[AgentTokenUsageInputDetail]
+other = "输入 {{.Value}}"
+
+[AgentTokenUsageOutputDetail]
+other = "输出 {{.Value}}"
+
+[AgentTokenUsageCacheReadDetail]
+other = "缓存读 {{.Value}}"
+
+[AgentTokenUsageCacheWriteDetail]
+other = "缓存写 {{.Value}}"
+
+[AgentTokenUsageReasoningDetail]
+other = "推理 {{.Value}}"
+
+[AgentTokenUsageDetailSeparator]
+other = "，"
+
+[AgentTokenUsageCostSuffix]
+other = "，费用 {{.CurrentCost}}，累计费用 {{.CumulativeCost}}"
+
+[AgentTokenUsageSummaryCostSuffix]
+other = "，费用 {{.Cost}}"
+
+[LoggerDiagnosticAgentParseComplete]
+other = "Agent 输出解析完成"
+
+# 日志 - 事件
+[LoggerEventTriggered]
+other = "事件触发"
+
+[LoggerEventHandlerFailed]
+other = "事件处理器执行失败"
+
+[LoggerEventSubscribed]
+other = "事件订阅成功"
+
+[LoggerEventUnsubscribed]
+other = "取消事件订阅"
+
+[LoggerEventNoSubscribers]
+other = "没有订阅者"
+
+[LoggerEventPublishedAsync]
+other = "事件已发布（异步）"
+
+[LoggerEventPublishedSync]
+other = "事件已发布（同步）"
+
+[LoggerEventStatsUpdated]
+other = "事件统计"
+
+# ==================== 查看命令 ====================
+[ViewSeparatorLine]
+other = "------------------------------------------------------------"
+
+[ViewDoubleLine]
+other = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+[ViewCategoryHeader]
+other = "{{.Category}} ({{.Count}} 个模式, 平均置信度: {{.Confidence}}%)"
+
+[ViewPatternName]
+other = "{{.Index}}. {{.Name}}"
+
+[ViewPatternDesc]
+other = "   {{.Description}}"
+
+[ViewRuleName]
+other = "{{.Index}}. {{.Name}} [{{.Category}}]"
+
+# 学习命令 - 子命令
+[LearnCurrentShort]
+other = "从当前代码学习"
+
+[LearnCurrentLongDesc]
+other = "分析当前代码库，提取编码模式、业务方法、最佳实践与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/memory/project-profile.json\n  • 为 generate-skills 准备完整 project-overview 输入\n\n示例：\n  # 从当前代码学习\n  skills-seed learn current\n\n  # 指定语言\n  skills-seed learn current --language=go\n\n  # 只扫描指定目录，并自动判断是否刷新项目画像\n  skills-seed learn current -f internal/agent"
+
+[LearnHistoryShort]
+other = "从 Git 历史学习"
+
+[LearnHistoryLongDesc]
+other = "从 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析 Git 提交历史\n  • 使用配置的 AI Agent 提取编码模式\n  • 提取业务方法和工具\n  • 保存学到的 patterns 到数据库\n\n学习完成后，可以使用 'skills-seed check' 来检查代码质量。\n\n示例：\n  # 学习最近 50 个提交\n  skills-seed learn history --limit=50\n\n  # 学习最近 30 天的提交\n  skills-seed learn history --since=30d"
+
+[LearnFlagLimit]
+other = "要分析的提交数量"
+
+[LearnFlagSince]
+other = "时间范围（如 7d, 30d, 6m, 1y）"
+
+[LearnFlagBatchSize]
+other = "批量处理的提交数量"
+
+[LearnFlagLanguage]
+other = "项目主要编程语言"
+
+[LearnFlagFocus]
+other = "指定要扫描学习的目录或文件，可重复使用"
+
+[LearnFlagProfile]
+other = "项目画像刷新策略：auto、skip、refresh"
+
+# 当前学习命令消息
+[LearnCurrentStart]
+other = "开始从当前代码学习"
+
+[LearnCurrentInfo]
+other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}"
+
+[LearnCurrentFocusInfo]
+other = "指定扫描范围: {{.Focus}}\n项目画像策略: {{.ProfileMode}}"
+
+[LearnCurrentResult]
+other = "分析完成:\n  • 模式数量: {{.PatternsCount}}\n  • 业务规则: {{.BusinessRulesCount}}\n  • 最佳实践: {{.BestPracticesCount}}"
+
+[LearnCurrentSavePatternFailed]
+other = "保存模式失败 [{{.ID}}]: {{.Error}}"
+
+[LearnCurrentPatternsSaved]
+other = "已保存 {{.Count}} 个模式"
+
+[LearnCurrentProfileSaved]
+other = "已保存项目画像"
+
+[LearnCurrentProfileSkipped]
+other = "已跳过项目画像刷新"
+
+[LearnCurrentProfileFailed]
+other = "生成项目画像失败: {{.Error}}"
+
+[LearnCurrentComplete]
+other = "当前代码学习完成"
+
+[LearnCurrentNextSteps]
+other = "后续可执行:"
+
+[LearnCurrentNextViewPatterns]
+other = "  1. 查看模式: skills-seed view patterns"
+
+[LearnCurrentNextGenerateSkills]
+other = "  2. 生成 skills: skills-seed generate-skills"
+
+[LearnCurrentNextGenerateMergedSkills]
+other = "  3. 合并相似模式: skills-seed patterns merge"
+
+[LearnCurrentNextCheck]
+other = "  4. 检查代码: skills-seed check"
+
+[LearnCurrentFailed]
+other = "从当前代码学习失败: {{.Error}}"
+
+# 历史学习命令消息
+[LearnHistoryStart]
+other = "开始从 Git 历史学习"
+
+[LearnHistoryInfo]
+other = "提交数量: {{.Limit}}\n时间范围: {{.Since}}\n批量大小: {{.BatchSize}}"
+
+[LearnHistoryFailed]
+other = "从 Git 历史学习失败: {{.Error}}"
+
+[LearnHistoryComplete]
+other = "Git 历史学习完成"
+
+[LearnHistoryTotalPatterns]
+other = "数据库中共有 {{.Count}} 个模式"
+
+# ==================== 命令错误消息 ====================
+[ErrNotInitialized]
+other = "skills-seed 未初始化，请先运行 'skills-seed init'"
+
+[ErrManualFixRequired]
+other = "需要手动修复"
+
+[ErrInvalidAction]
+other = "无效的操作"
+
+[ErrFailedToGenerateFixes]
+other = "生成修复失败: {{.Error}}"
+
+[ErrFailedToGetCurrentDir]
+other = "获取当前目录失败: {{.Error}}"
+
+[ErrFailedToAnalyzeCodebase]
+other = "分析代码库失败: {{.Error}}"
+
+[ErrHookNotGitRepo]
+other = "不是 Git 仓库"
+
+[ErrHookNotInitialized]
+other = "skills-seed 未初始化，请先运行 'skills-seed init'"
+
+[ErrHookNotFound]
+other = "未找到 pre-commit hook"
+
+[ErrHookCheckFailed]
+other = "检查失败: {{.Error}}"
+
+[ErrInitNotGitRepo]
+other = "不是 Git 仓库: {{.Path}}"
+
+[ErrInitAlreadyInitialized]
+other = "skills-seed 已经初始化"

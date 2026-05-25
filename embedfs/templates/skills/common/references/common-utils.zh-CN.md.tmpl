@@ -1,0 +1,21 @@
+# {{.ProjectName}} 通用工具
+
+本文件记录项目画像中提取的通用工具方法。新增工具函数或处理重复逻辑前，优先检查这里是否已有可复用实现。
+
+{{if .CommonUtils}}
+{{range .CommonUtils}}
+## {{.Name}}
+
+- **位置**: `{{.File}}`
+- **签名**: `{{.Signature}}`
+- **描述**: {{.Description}}
+{{if .Usage}}- **使用场景**: {{.Usage}}{{end}}
+
+{{end}}
+{{else}}
+*通用工具信息尚未提取*
+{{end}}
+
+---
+
+*此文档由 skills-seed 自动生成*

@@ -1,0 +1,120 @@
+package generate
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
+	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
+	"github.com/silaswei-io/skills-seed/internal/service/merger"
+	"github.com/spf13/cobra"
+)
+
+var (
+	outputPath string
+	merge      bool // 是否在生成前合并模式
+)
+
+// Cmd 返回 generate 命令
+func Cmd(cont *container.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "generate-skills",
+		Short: i18n.Get("GenerateShort"),
+		Long:  i18n.Get("GenerateLongDesc"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// 检查 container 是否初始化
+			if cont == nil {
+				logger.Error(i18n.Get("GenerateNotInitialized"))
+				logger.Debug(i18n.Get("GenerateRunInitFirst"))
+				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+			}
+			return runGenerate(cont, cmd)
+		},
+	}
+
+	// 添加 flags
+	defaultOutputPath := ""
+	if cont != nil {
+		defaultOutputPath = config.EffectiveSkillsPath(
+			cont.ConfigRepo.GetAgentConfig().Provider,
+			cont.ConfigRepo.GetOutputConfig(),
+		)
+	}
+	cmd.Flags().StringVarP(&outputPath, "output", "o", defaultOutputPath, "Output path for generated skills")
+	cmd.Flags().BoolVarP(&merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
+
+	return cmd
+}
+
+func runGenerate(cont *container.Container, cmd *cobra.Command) error {
+	ctx := context.Background()
+	tracker := progress.New(2)
+
+	logger.Info(i18n.Get("GenerateStarting"))
+
+	// 获取模式数量
+	var count int
+	if err := tracker.RunStep(i18n.Get("ProgressGenerateCountPatterns"), func() error {
+		var countErr error
+		count, countErr = cont.PatternRepo.Count(ctx)
+		return countErr
+	}); err != nil {
+		logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
+		return err
+	}
+
+	if count == 0 {
+		logger.Warn(i18n.Get("GenerateNoPatterns"))
+		return nil
+	}
+	if err := commandutil.RequireAgentAvailable(cont); err != nil {
+		return err
+	}
+
+	logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
+
+	effectiveOutputPath := outputPath
+	if !cmd.Flags().Changed("output") {
+		effectiveOutputPath = config.EffectiveSkillsPath(
+			cont.ConfigRepo.GetAgentConfig().Provider,
+			cont.ConfigRepo.GetOutputConfig(),
+		)
+	}
+
+	// 如果指定了 --merge 标志，先合并模式
+	if merge {
+		logger.Warn(i18n.Get("GenerateMergeDeprecated"))
+		logger.Info(i18n.Get("GenerateMergeStarting"))
+		if _, err := cont.MergerSvc.MergePatterns(ctx, &merger.MergePatternsRequest{}); err != nil {
+			logger.Error(i18n.GetWithParams("GenerateMergeFailed", map[string]interface{}{"Error": err.Error()}))
+			return err
+		}
+		logger.Info(i18n.Get("GenerateMergeCompleted"))
+
+		// 重新获取合并后的模式数量
+		var err error
+		count, err = cont.PatternRepo.Count(ctx)
+		if err != nil {
+			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
+			return err
+		}
+		logger.Info(i18n.GetWithParams("GenerateMergedCount", map[string]interface{}{"Count": count}))
+	}
+
+	// 生成 Skills
+	if err := tracker.RunStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
+		return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
+	}); err != nil {
+		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
+		return err
+	}
+
+	logger.Info(i18n.Get("GenerateSuccessMsg"))
+	logger.Info(i18n.GetWithParams("GenerateOutputPath", map[string]interface{}{"Path": effectiveOutputPath}))
+
+	return nil
+}

@@ -1,0 +1,166 @@
+# golangci-lint 配置文件
+# 文档：https://golangci-lint.run/usage/configuration/
+
+run:
+  # 分析超时
+  timeout: 5m
+
+  # 包含测试文件
+  tests: true
+
+  # 跳过的目录
+  skip-dirs:
+    - vendor
+    - embedfs
+    - node_modules
+
+  # 跳过的文件
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*\\.gen\\.go$"
+
+# 输出配置
+output:
+  # 输出格式：colored-line-number|line-number|json|tab|checkstyle|code-climate
+  format: colored-line-number
+
+  # 打印检查的 linter 名称
+  print-linter-name: true
+
+  # 排序结果
+  sort-results: true
+
+# Linter 配置
+linters:
+  # 启用的 linters
+  enable:
+    # 默认 linters
+    - errcheck      # 检查未处理的错误
+    - gosimple      # 简化代码
+    # - govet         # Go vet 检查（暂时禁用，避免与 typecheck 冲突）
+    - ineffassign   # 检测无效赋值
+    - staticcheck   # 静态分析
+    # - typecheck     # 类型检查（暂时禁用，与编译器不一致）
+    - unused        # 未使用的代码
+
+    # 额外的 linters
+    - gofmt         # 格式化检查
+    - goimports     # import 排序
+    - goconst       # 检测可以替换为常量的重复字符串
+    - gocyclo       # 圈复杂度检查
+    - dupl          # 重复代码检测
+    - misspell      # 拼写检查
+    - lll           # 行长度检查
+    - prealloc      # 检测可以预分配的 slice
+    - revive        # 代码风格检查（替代 golint）
+    - exportloopref # 检测循环变量指针引用
+
+  # 禁用的 linters
+  disable:
+    - funlen        # 函数长度（暂时禁用）
+    - gocognit      # 认知复杂度（暂时禁用）
+    - godox         # TODO/FIXME 检查（暂时禁用）
+    - wsl           # 空行规则（太严格）
+    - typecheck     # 类型检查（与编译器不一致）
+
+# Linter 设置
+linters-settings:
+  errcheck:
+    # 检查类型断言
+    check-type-assertions: true
+    # 检查空白赋值
+    check-blank: false
+
+  govet:
+    # 检查 shadow 变量
+    check-shadowing: true
+
+  gofmt:
+    # 简化代码
+    simplify: true
+
+  goimports:
+    # 本地 import 分组前缀
+    local-prefixes: github.com/silaswei-io/skills-seed
+
+  gocyclo:
+    # 最小圈复杂度
+    min-complexity: 15
+
+  dupl:
+    # 重复代码阈值（token 数量）
+    threshold: 100
+
+  goconst:
+    # 最小重复次数
+    min-len: 3
+    min-occurrences: 3
+
+  misspell:
+    # 语言
+    locale: US
+
+  lll:
+    # 行长度限制
+    line-length: 120
+    # 跳过 tab 宽度
+    tab-width: 4
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  prealloc:
+    # 简单循环：true（更严格）
+    simple: true
+    range-loops: true
+    for-loops: false
+
+# 问题配置
+issues:
+  # 显示所有问题（不过滤重复）
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # 排除规则
+  exclude-rules:
+    # 测试文件允许使用 fmt.Sprintf
+    - path: _test\.go
+      linters:
+        - lll
+
+    # 生成的文件跳过检查
+    - path: '.*\.gen\.go'
+      linters:
+        - all
+
+    # embedfs 目录跳过检查
+    - path: embedfs/
+      linters:
+        - all
+
+  # 排除默认排除规则
+  exclude-use-default: false
