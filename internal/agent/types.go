@@ -157,12 +157,14 @@ type MergeSummary struct {
 
 // AnalyzeProjectRequest 项目分析请求
 type AnalyzeProjectRequest struct {
-	ProjectName string   // 项目名称
-	RootPath    string   // 项目根路径
-	Language    string   // 主要语言
-	Structure   string   // 目录结构（tree 输出）
-	ReadmePath  string   // README 文件路径（如果存在）
-	MainFiles   []string // 主要入口文件路径
+	ProjectName         string   // 项目名称
+	RootPath            string   // 项目根路径
+	Language            string   // 主要语言
+	Structure           string   // 目录结构（tree 输出）
+	ReadmePath          string   // README 文件路径（如果存在）
+	MainFiles           []string // 主要入口文件路径
+	ExistingProfileJSON string   // 已有项目画像 JSON
+	FocusPaths          []string // 指定增量分析范围
 }
 
 // AnalyzeProjectResult 项目分析结果

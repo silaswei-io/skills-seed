@@ -29,6 +29,24 @@ You are a senior software architect. Analyze the provided project context and re
 
 - {{.ReadmePath}}
 {{- end}}
+{{- if .ExistingProfileJSON}}
+
+# Existing Project Profile
+
+Treat this run as an incremental refresh. Use the existing profile as the baseline, inspect only focused paths and directly related files when focus paths are provided, and return one complete merged profile JSON
+
+```json
+{{.ExistingProfileJSON}}
+```
+{{- end}}
+{{- if .FocusPaths}}
+
+# Changed Or Focused Paths
+
+{{range .FocusPaths}}
+- {{.}}
+{{- end}}
+{{- end}}
 
 # Analysis Requirements
 
@@ -40,7 +58,9 @@ Identify:
 4. Important business methods with complete signatures and file locations.
 5. Common utilities and configuration patterns.
 
-You are running in the project root; read entry files, the README, and necessary source files by path. Do not invent unsupported facts. If information is not visible from the project, leave the related array empty or use a concise TODO-style note in the relevant description.
+You are running in the project root; read entry files, the README, and necessary source files by path. Do not invent unsupported facts. If information is not visible from the project, leave the related array empty or use a concise TODO-style note in the relevant description
+
+If an existing project profile is provided, preserve unchanged modules, utilities, business methods, dependencies, and architecture details from it. Update, add, or remove profile entries only when the focused paths or directly related files provide clear evidence. The output must still be a complete project profile, not a partial patch
 
 # Output Format
 
@@ -104,7 +124,7 @@ Return ONLY a valid JSON object matching this schema:
 
 # Critical Output Requirements
 
-- The entire response must be only one valid JSON object.
-- Start with `{` and end with `}`.
-- Do not wrap the JSON in markdown code fences.
-- Do not include explanatory text before or after the JSON.
+- The entire response must be only one valid JSON object
+- Start with `{` and end with `}`
+- Do not wrap the JSON in markdown code fences
+- Do not include explanatory text before or after the JSON

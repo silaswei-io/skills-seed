@@ -11,7 +11,7 @@ import (
 
 const (
 	// ProgramVersion is the CLI version shown by `skills-seed --version`
-	ProgramVersion = "v0.0.1"
+	ProgramVersion = "v0.0.2"
 
 	UnavailableHash = "unavailable"
 

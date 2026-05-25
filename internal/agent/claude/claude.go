@@ -631,12 +631,14 @@ func (c *ClaudeAgent) MergePatterns(ctx context.Context, req *agent.MergePattern
 func (c *ClaudeAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 	// 1. 准备模板数据
 	data := map[string]interface{}{
-		"ProjectName": req.ProjectName,
-		"RootPath":    req.RootPath,
-		"Language":    req.Language,
-		"Structure":   req.Structure,
-		"ReadmePath":  req.ReadmePath,
-		"MainFiles":   req.MainFiles,
+		"ProjectName":         req.ProjectName,
+		"RootPath":            req.RootPath,
+		"Language":            req.Language,
+		"Structure":           req.Structure,
+		"ReadmePath":          req.ReadmePath,
+		"MainFiles":           req.MainFiles,
+		"ExistingProfileJSON": req.ExistingProfileJSON,
+		"FocusPaths":          req.FocusPaths,
 	}
 
 	// 2. 渲染提示词

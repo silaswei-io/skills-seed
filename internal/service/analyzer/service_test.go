@@ -324,3 +324,38 @@ func TestAnalyzeProjectFull_PassesReadmePathWithoutContent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "README.md", received.ReadmePath)
 }
+
+func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "service", "service.go"), []byte("package service\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "agent", "agent.go"), []byte("package agent\n"), 0644))
+
+	var received agent.AnalyzeProjectRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			received = *req
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+	existingProfile := &domain.ProjectProfile{
+		ProjectName:  "test-project",
+		Language:     "go",
+		Architecture: "Clean Architecture",
+		KeyModules:   []domain.ModuleInfo{{Name: "service", Path: "internal/service"}},
+	}
+
+	_, err := svc.AnalyzeProjectFullWithOptions(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
+		ExistingProfile: existingProfile,
+		FocusPaths:      []string{filepath.Join(tmpDir, "internal", "service")},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"internal/service"}, received.FocusPaths)
+	assert.Contains(t, received.ExistingProfileJSON, `"architecture": "Clean Architecture"`)
+	assert.Contains(t, received.Structure, "Focused scan paths")
+	assert.Contains(t, received.Structure, "internal/service")
+}

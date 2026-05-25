@@ -23,7 +23,7 @@ other = "Initialization failed: {{.Error}}"
 other = "skills-seed location: {{.Path}}"
 
 [InitNextSteps]
-other = "Next steps:"
+other = "Optional next steps:"
 
 [InitStepLearn]
 other = "  1. Analyze current code and create project profile: skills-seed learn current"

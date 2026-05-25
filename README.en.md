@@ -90,6 +90,29 @@ skills-seed profile refresh
 
 `learn current` only saves patterns and the project profile. It does not generate `SKILL.md` or `references/`; run `skills-seed generate-skills` when you want documentation output
 
+### Focused Learning And Project Profile Refresh
+
+```bash
+# First learning run, creates the full project profile
+skills-seed learn current
+
+# Learn code patterns only from one directory, suitable for normal local changes
+skills-seed learn current --focus internal/service --profile skip
+
+# When architecture changed, refresh the profile incrementally from the existing profile and focus path
+skills-seed learn current --focus internal/service --profile refresh
+
+# Learn multiple directories together
+skills-seed learn current --focus internal/service --focus internal/domain --profile refresh
+
+# Regenerate the full project profile only, without learning patterns
+skills-seed profile refresh
+```
+
+When no project profile exists, `learn current` performs a full project profile analysis; later, if `--focus` is provided and the profile needs refresh, Skills Seed uses the existing profile as the baseline, analyzes only focused paths and directly related files, then saves one complete merged profile
+
+Use `--profile skip` for local code style or implementation-only changes; use `--profile refresh` when directory structure, module responsibilities, dependencies, entry flow, or business methods changed; use `skills-seed profile refresh` for large refactors or framework migrations that need a full profile rebuild
+
 ### Check Code
 
 ```bash

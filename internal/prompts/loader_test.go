@@ -130,6 +130,21 @@ func TestRenderProjectAnalysisListsReadmePathWithoutEmbeddedContent(t *testing.T
 	require.NotContains(t, prompt, "secret readme content")
 }
 
+func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
+	loader := NewLoader("codex", "zh-CN", "")
+	data := sampleProjectAnalysisData()
+	data["ExistingProfileJSON"] = `{"architecture":"Clean Architecture"}`
+	data["FocusPaths"] = []string{"internal/service"}
+
+	prompt, err := loader.Render("project-analysis", data)
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "已有项目画像")
+	require.Contains(t, prompt, "internal/service")
+	require.Contains(t, prompt, "Clean Architecture")
+	require.Contains(t, prompt, "完整项目画像")
+}
+
 func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *testing.T) {
 	tests := []struct {
 		locale       string
@@ -348,12 +363,14 @@ func sampleMergePatternsData() map[string]interface{} {
 
 func sampleProjectAnalysisData() map[string]interface{} {
 	return map[string]interface{}{
-		"ProjectName": "demo",
-		"RootPath":    "/tmp/demo",
-		"Language":    "go",
-		"Structure":   "cmd/demo/main.go",
-		"ReadmePath":  "README.md",
-		"MainFiles":   []string{"cmd/demo/main.go"},
+		"ProjectName":         "demo",
+		"RootPath":            "/tmp/demo",
+		"Language":            "go",
+		"Structure":           "cmd/demo/main.go",
+		"ReadmePath":          "README.md",
+		"MainFiles":           []string{"cmd/demo/main.go"},
+		"ExistingProfileJSON": "",
+		"FocusPaths":          []string{},
 	}
 }
 

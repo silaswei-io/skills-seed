@@ -239,12 +239,14 @@ func (c *CodexAgent) MergePatterns(ctx context.Context, req *agent.MergePatterns
 // AnalyzeProject 分析项目结构
 func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 	data := map[string]interface{}{
-		"ProjectName": req.ProjectName,
-		"RootPath":    req.RootPath,
-		"Language":    req.Language,
-		"Structure":   req.Structure,
-		"ReadmePath":  req.ReadmePath,
-		"MainFiles":   req.MainFiles,
+		"ProjectName":         req.ProjectName,
+		"RootPath":            req.RootPath,
+		"Language":            req.Language,
+		"Structure":           req.Structure,
+		"ReadmePath":          req.ReadmePath,
+		"MainFiles":           req.MainFiles,
+		"ExistingProfileJSON": req.ExistingProfileJSON,
+		"FocusPaths":          req.FocusPaths,
 	}
 	prompt, err := c.promptLoader.Render("project-analysis", data)
 	if err != nil || prompt == "" {

@@ -90,6 +90,29 @@ skills-seed profile refresh
 
 `learn current` 只保存 patterns 和项目画像，不会直接生成 `SKILL.md` 或 `references/`。需要生成技能文档时请继续运行 `skills-seed generate-skills`
 
+### 精准学习与项目画像刷新
+
+```bash
+# 首次学习当前项目，会生成完整项目画像
+skills-seed learn current
+
+# 只学习某个目录的代码模式，适合普通局部改动
+skills-seed learn current --focus internal/service --profile skip
+
+# 明确发生架构相关改动时，基于已有项目画像和 focus 路径做增量画像刷新
+skills-seed learn current --focus internal/service --profile refresh
+
+# 多个目录一起学习
+skills-seed learn current --focus internal/service --focus internal/domain --profile refresh
+
+# 只重新生成完整项目画像，不学习 patterns
+skills-seed profile refresh
+```
+
+首次没有项目画像时，`learn current` 会执行全量项目画像分析；后续如果提供 `--focus` 且需要刷新画像，会把已有画像作为基线，只分析 focus 路径和直接相关文件，然后保存完整合并后的新画像
+
+当只是局部代码风格或实现细节变化时，建议使用 `--profile skip`；当目录结构、模块职责、依赖关系、入口流程或业务方法有变化时，使用 `--profile refresh`；如果发生大规模重构或框架迁移，使用 `skills-seed profile refresh` 做全量画像重建
+
 ### 检查代码
 
 ```bash

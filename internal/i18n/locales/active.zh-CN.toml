@@ -23,7 +23,7 @@ other = "初始化失败: {{.Error}}"
 other = "skills-seed 位置: {{.Path}}"
 
 [InitNextSteps]
-other = "后续步骤:"
+other = "可选后续步骤:"
 
 [InitStepLearn]
 other = "  1. 分析当前代码并生成项目画像: skills-seed learn current"

@@ -114,6 +114,7 @@ func runLearnCurrent(cont *container.Container) error {
 	var currentLanguage string
 	var resolvedFocusPaths []string
 	var refreshProfile bool
+	var existingProfile *domain.ProjectProfile
 
 	logger.Info(i18n.Get("LearnCurrentStart"))
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
@@ -156,7 +157,8 @@ func runLearnCurrent(cont *container.Container) error {
 		}
 		profileExists := false
 		if cont.ProfileRepo != nil {
-			if _, getErr := cont.ProfileRepo.Get(ctx); getErr == nil {
+			if profile, getErr := cont.ProfileRepo.Get(ctx); getErr == nil {
+				existingProfile = profile
 				profileExists = true
 			}
 		}
@@ -266,7 +268,12 @@ func runLearnCurrent(cont *container.Container) error {
 	profileStartedAt := time.Now()
 	if refreshProfile {
 		if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentSaveProfile"), func() error {
-			result, err := cont.AnalyzerSvc.AnalyzeProjectFullWithLanguage(ctx, projectRoot, projectName, currentLanguage)
+			projectOptions := analyzer.AnalyzeProjectOptions{}
+			if existingProfile != nil && len(resolvedFocusPaths) > 0 {
+				projectOptions.ExistingProfile = existingProfile
+				projectOptions.FocusPaths = resolvedFocusPaths
+			}
+			result, err := cont.AnalyzerSvc.AnalyzeProjectFullWithOptions(ctx, projectRoot, projectName, currentLanguage, projectOptions)
 			if err != nil {
 				return err
 			}
@@ -284,6 +291,7 @@ func runLearnCurrent(cont *container.Container) error {
 			"operation", "command.learn_current.save_project_profile",
 			"duration", time.Since(profileStartedAt),
 			"profile_mode", learnCurrentProfileOpt,
+			"incremental_profile", existingProfile != nil && len(resolvedFocusPaths) > 0,
 		)
 		logger.Info(i18n.Get("LearnCurrentProfileSaved"))
 	} else {

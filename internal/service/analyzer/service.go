@@ -13,6 +13,7 @@ package analyzer
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -120,12 +121,14 @@ func (s *AnalyzerService) AnalyzePatterns(ctx context.Context, req *AnalyzePatte
 
 // AnalyzeProjectRequest 项目分析请求
 type AnalyzeProjectRequest struct {
-	ProjectName string
-	RootPath    string
-	Language    string
-	Structure   string
-	ReadmePath  string
-	MainFiles   []string
+	ProjectName         string
+	RootPath            string
+	Language            string
+	Structure           string
+	ReadmePath          string
+	MainFiles           []string
+	ExistingProfileJSON string
+	FocusPaths          []string
 }
 
 // AnalyzeProjectResult 项目分析结果
@@ -157,15 +160,20 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 		"structure_length", len(req.Structure),
 		"readme_path", req.ReadmePath,
 		"main_files_count", len(req.MainFiles),
+		"has_existing_profile", req.ExistingProfileJSON != "",
+		"existing_profile_bytes", len(req.ExistingProfileJSON),
+		"focus_paths_count", len(req.FocusPaths),
 	)
 
 	agentReq := &agent.AnalyzeProjectRequest{
-		ProjectName: req.ProjectName,
-		RootPath:    req.RootPath,
-		Language:    req.Language,
-		Structure:   req.Structure,
-		ReadmePath:  req.ReadmePath,
-		MainFiles:   req.MainFiles,
+		ProjectName:         req.ProjectName,
+		RootPath:            req.RootPath,
+		Language:            req.Language,
+		Structure:           req.Structure,
+		ReadmePath:          req.ReadmePath,
+		MainFiles:           req.MainFiles,
+		ExistingProfileJSON: req.ExistingProfileJSON,
+		FocusPaths:          req.FocusPaths,
 	}
 
 	result, err := s.agent.AnalyzeProject(ctx, agentReq)
@@ -436,11 +444,30 @@ func (s *AnalyzerService) AnalyzeProjectFull(ctx context.Context, projectRoot, p
 
 // AnalyzeProjectFullWithLanguage 完整项目分析，可由命令行显式指定语言覆盖配置
 func (s *AnalyzerService) AnalyzeProjectFullWithLanguage(ctx context.Context, projectRoot, projectName, requestedLanguage string) (*AnalyzeProjectResult, error) {
+	return s.AnalyzeProjectFullWithOptions(ctx, projectRoot, projectName, requestedLanguage, AnalyzeProjectOptions{})
+}
+
+// AnalyzeProjectOptions 控制 AnalyzeProjectFullWithOptions 的项目画像分析上下文
+type AnalyzeProjectOptions struct {
+	ExistingProfile *domain.ProjectProfile
+	FocusPaths      []string
+}
+
+// AnalyzeProjectFullWithOptions 完整项目分析，支持基于已有画像和指定路径做增量刷新
+func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, projectRoot, projectName, requestedLanguage string, opts AnalyzeProjectOptions) (*AnalyzeProjectResult, error) {
 	startedAt := time.Now()
+	focusPaths := relativeFocusPaths(projectRoot, opts.FocusPaths)
+	existingProfileJSON := ""
+	if len(focusPaths) > 0 {
+		existingProfileJSON = marshalProjectProfile(opts.ExistingProfile)
+	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "analyzer.analyze_project_full",
 		"project_root", projectRoot,
 		"project_name", projectName,
+		"has_existing_profile", existingProfileJSON != "",
+		"existing_profile_bytes", len(existingProfileJSON),
+		"focus_paths_count", len(opts.FocusPaths),
 	)
 
 	// 获取项目语言
@@ -454,15 +481,20 @@ func (s *AnalyzerService) AnalyzeProjectFullWithLanguage(ctx context.Context, pr
 		language = "unknown"
 	}
 	structure, _ := s.GetProjectStructure(projectRoot)
+	if len(focusPaths) > 0 {
+		structure = focusedStructure(structure, focusPaths)
+	}
 
 	// 调用 Agent 分析项目（Agent 会自己探索项目结构）
 	req := &AnalyzeProjectRequest{
-		ProjectName: projectName,
-		RootPath:    projectRoot,
-		Language:    language,
-		Structure:   structure,
-		ReadmePath:  s.FindReadmePath(projectRoot),
-		MainFiles:   s.FindMainFiles(projectRoot),
+		ProjectName:         projectName,
+		RootPath:            projectRoot,
+		Language:            language,
+		Structure:           structure,
+		ReadmePath:          s.FindReadmePath(projectRoot),
+		MainFiles:           s.FindMainFiles(projectRoot),
+		ExistingProfileJSON: existingProfileJSON,
+		FocusPaths:          focusPaths,
 	}
 
 	result, err := s.AnalyzeProject(ctx, req)
@@ -483,8 +515,21 @@ func (s *AnalyzerService) AnalyzeProjectFullWithLanguage(ctx context.Context, pr
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.analyze_project_full",
 		"duration", time.Since(startedAt),
+		"incremental_profile", existingProfileJSON != "" && len(focusPaths) > 0,
 	)
 	return result, nil
+}
+
+func marshalProjectProfile(profile *domain.ProjectProfile) string {
+	if profile == nil {
+		return ""
+	}
+	data, err := json.MarshalIndent(profile, "", "  ")
+	if err != nil {
+		logger.Warn("marshal project profile failed", "error", err)
+		return ""
+	}
+	return string(data)
 }
 
 // NewProjectProfile converts an analysis result into the durable project profile format
