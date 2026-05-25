@@ -69,6 +69,7 @@ type OutputConfig struct {
 	SkillsPaths map[string]string `yaml:"skills_paths"` // provider -> Skills 输出路径
 }
 
+// EffectiveSkillsPath 获取指定 provider 的 Skills 输出路径
 func EffectiveSkillsPath(provider string, output OutputConfig) string {
 	if provider != "" && output.SkillsPaths != nil {
 		return output.SkillsPaths[provider]

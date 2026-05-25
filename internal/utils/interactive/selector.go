@@ -49,14 +49,17 @@ type item struct {
 	choice Choice
 }
 
+// FilterValue 返回筛选文本
 func (i item) FilterValue() string {
 	return i.choice.TitleText
 }
 
+// Title 返回标题文本
 func (i item) Title() string {
 	return i.choice.TitleText
 }
 
+// Description 返回描述文本
 func (i item) Description() string {
 	return i.choice.DescriptionText
 }
@@ -68,10 +71,12 @@ type model struct {
 	quitting bool
 }
 
+// Init 初始化选择器模型
 func (m model) Init() tea.Cmd {
 	return nil
 }
 
+// Update 处理选择器消息
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -95,6 +100,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// View 渲染选择器视图
 func (m model) View() string {
 	if m.quitting {
 		return ""
@@ -200,14 +206,17 @@ type strategyItem struct {
 	choice StrategyChoice
 }
 
+// FilterValue 返回策略筛选文本
 func (i strategyItem) FilterValue() string {
 	return i.choice.TitleText
 }
 
+// Title 返回策略标题文本
 func (i strategyItem) Title() string {
 	return i.choice.TitleText
 }
 
+// Description 返回策略描述文本
 func (i strategyItem) Description() string {
 	return i.choice.DescriptionText
 }
@@ -219,10 +228,12 @@ type strategyModel struct {
 	quitting bool
 }
 
+// Init 初始化策略选择器模型
 func (m strategyModel) Init() tea.Cmd {
 	return nil
 }
 
+// Update 处理策略选择器消息
 func (m strategyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -246,6 +257,7 @@ func (m strategyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// View 渲染策略选择器视图
 func (m strategyModel) View() string {
 	if m.quitting {
 		return ""

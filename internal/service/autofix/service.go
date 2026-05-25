@@ -30,7 +30,7 @@ type FixResult struct {
 	Message    string
 }
 
-// Service 自动修复服务
+// AutofixService 自动修复服务
 type AutofixService struct {
 	strategy  Strategy
 	backupDir string

@@ -1,6 +1,6 @@
 ---
 name: {{.SkillName}}
-description: Use when modifying, reviewing, or extending {{.ProjectName}} {{.Language}} code, especially architecture, module boundaries, business flows, utilities, generated layers, or repository conventions.
+description: Use when modifying, reviewing, or extending {{.ProjectName}} {{.Language}} code, especially architecture, module boundaries, business flows, utilities, generated layers, or repository conventions
 ---
 
 <!-- generated-by: skills-seed {{.ProgramVersion}} -->
@@ -17,11 +17,11 @@ description: Use when modifying, reviewing, or extending {{.ProjectName}} {{.Lan
 
 ## How To Use This Skill
 
-Before changing code in this project:
-1. Read **[Project Overview](./references/project-overview.md)** for architecture, module boundaries, and key methods.
-2. Open only the pattern reference files relevant to the task.
-3. Prefer high-confidence patterns as conventions; treat medium-confidence patterns as guidance.
-4. If required behavior or implementation detail is not available, write an explicit `TODO` note instead of inventing details.
+Before changing code in this project
+1. Read **[Project Overview](./references/project-overview.md)** for architecture, module boundaries, and key methods
+2. Open only the pattern reference files relevant to the task
+3. Prefer high-confidence patterns as conventions; treat medium-confidence patterns as guidance
+4. If required behavior or implementation detail is not available, write an explicit `TODO` note instead of inventing details
 
 ---
 
@@ -52,10 +52,10 @@ Before changing code in this project:
 
 ## Project Rules
 
-- Check nearby code before introducing a new pattern or abstraction.
-- Respect module dependencies and ownership described in project overview.
-- Use project-specific business methods and utilities from the references when they exist.
-- Keep generated or incomplete sections explicit with `TODO`; do not silently skip missing content.
+- Check nearby code before introducing a new pattern or abstraction
+- Respect module dependencies and ownership described in project overview
+- Use project-specific business methods and utilities from the references when they exist
+- Keep generated or incomplete sections explicit with `TODO`; do not silently skip missing content
 
 ### Pattern Confidence Levels
 ```
@@ -74,7 +74,7 @@ New (30%) -> Forming (50%) -> Established (70%) -> Convention (90%)
 
 ## Continuous Learning
 
-Update patterns by analyzing recent commits:
+Update patterns by analyzing recent commits
 ```bash
 # Learn from recent commits
 skills-seed learn history --since=7d

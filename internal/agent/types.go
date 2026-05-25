@@ -39,7 +39,7 @@ type LearnRequest struct {
 	KnownPatternsCount int               // 已知模式数量（快速参考）
 }
 
-// CommitFileChange pairs commit metadata with changed file paths.
+// CommitFileChange pairs commit metadata with changed file paths
 type CommitFileChange struct {
 	Commit domain.CommitInfo
 	Files  []string

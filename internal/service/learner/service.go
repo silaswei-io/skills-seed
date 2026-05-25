@@ -1,17 +1,17 @@
 // Package learner 提供学习服务（流程编排层）
 //
-// 本包实现从 Git 历史学习编码模式的流程编排：
+// 本包实现从 Git 历史学习编码模式的流程编排
 //   - Learn: 批量学习 Git 提交历史
 //   - MergePatterns: AI 汇总合并相似模式
 //   - LearnFromCommit: 从单个提交学习
 //   - LearnFromStaged: 从暂存文件路径学习
 //
-// 服务职责：
+// 服务职责
 //   - 流程编排：协调 Git、Agent、Repository 完成学习
 //   - 增量学习：只处理未分析的提交
 //   - 模式合并：自动合并相似模式
 //
-// 不负责：
+// 不负责
 //   - AI 分析（由 Agent 负责）
 //   - 数据持久化（由 Repository 负责）
 package learner
@@ -30,7 +30,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
 )
 
-// Service 学习服务 - 流程编排层
+// LearnerService 学习服务 - 流程编排层
 // 职责：协调 Git、Analyzer、Merger 完成学习流程
 type LearnerService struct {
 	agent         agent.Agent
@@ -144,7 +144,7 @@ func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, oper
 	return true
 }
 
-// SavePatterns 保存多个模式，并通过已有相似模式自动合并。
+// SavePatterns 保存多个模式，并通过已有相似模式自动合并
 func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pattern, operation string) int {
 	savedCount := 0
 	for _, p := range patterns {
@@ -157,16 +157,16 @@ func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pat
 
 // Learn 从 Git 历史学习模式（流程编排）
 //
-// 参数：
+// 参数
 //   - ctx: 上下文
 //   - limit: 最大提交数量
 //   - since: 时间范围（如 "30d", "7d"）
 //   - batchSize: 批量大小
 //
-// 返回：
+// 返回
 //   - 成功返回 nil，失败返回错误
 //
-// 工作流程：
+// 工作流程
 //  1. 获取 Git 提交历史
 //  2. 过滤掉已分析的提交（增量学习）
 //  3. 批量处理提交（batchSize 个一批）
@@ -175,11 +175,11 @@ func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pat
 //  6. 标记提交为已分析
 //  7. 发布学习完成事件
 //
-// 增量学习：
+// 增量学习
 //   - 使用 patternRepo.IsCommitAnalyzed() 检查提交是否已分析
 //   - 使用 patternRepo.MarkCommitAnalyzed() 标记已分析
 //
-// 模式合并：
+// 模式合并
 //   - 使用 patternRepo.FindSimilar() 查找相似模式
 //   - 使用 existing.Merge() 合并模式
 //   - 更新置信度：加权平均（基于频率）
@@ -348,7 +348,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 			"End":         end,
 			"CommitTotal": len(unanalyzedCommits),
 		})
-		// 单个批次的 AI 调用可能持续较久，使用动态进度提示避免终端长时间无输出。
+		// 单个批次的 AI 调用可能持续较久，使用动态进度提示避免终端长时间无输出
 		err := batchProgress.RunStep(progressLabel, func() error {
 			var callErr error
 			result, callErr = s.agent.BatchLearnFromCommits(ctx, req)
@@ -498,7 +498,7 @@ func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInf
 	return nil
 }
 
-// LearnFromStaged 从暂存文件路径学习。
+// LearnFromStaged 从暂存文件路径学习
 func (s *LearnerService) LearnFromStaged(ctx context.Context, commitInfo domain.CommitInfo) error {
 	knownPatternsJSON, knownPatternsCount := s.marshalKnownPatterns(ctx)
 	stagedFiles, err := s.gitRepo.GetStagedFiles(ctx)

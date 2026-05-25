@@ -29,12 +29,12 @@
 
 **描述**: {{.Description}}
 
-**职责**:
+**职责**
 {{range .Responsibilities}}
 - {{.}}
 {{end}}
 
-**主要文件**:
+**主要文件**
 {{range .Files}}
 - `{{.}}`
 {{end}}
@@ -103,7 +103,7 @@
 ## 关键模块
 
 {{if .KeyModules}}
-已提取 {{len .KeyModules}} 个关键模块，完整职责、依赖和关键方法见 [关键模块](./modules.md)。
+已提取 {{len .KeyModules}} 个关键模块，完整职责、依赖和关键方法见 [关键模块](./modules.md)
 {{else}}
 *关键模块信息尚未提取*
 {{end}}
@@ -111,7 +111,7 @@
 ## 强业务方法
 
 {{if .BusinessMethods}}
-已提取 {{len .BusinessMethods}} 个强业务方法，完整方法签名、前置条件和使用场景见 [强业务方法](./business-methods.md)。
+已提取 {{len .BusinessMethods}} 个强业务方法，完整方法签名、前置条件和使用场景见 [强业务方法](./business-methods.md)
 {{else}}
 *业务方法信息尚未提取*
 {{end}}
@@ -119,7 +119,7 @@
 ## 通用工具
 
 {{if .CommonUtils}}
-已提取 {{len .CommonUtils}} 个通用工具方法，完整签名和使用场景见 [通用工具](./common-utils.md)。
+已提取 {{len .CommonUtils}} 个通用工具方法，完整签名和使用场景见 [通用工具](./common-utils.md)
 {{else}}
 *通用工具信息尚未提取*
 {{end}}

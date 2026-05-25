@@ -9,6 +9,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
 )
 
+// CheckerService 代码检查服务
 type CheckerService struct {
 	agent       agent.Agent
 	gitRepo     domain.GitRepository
@@ -16,6 +17,7 @@ type CheckerService struct {
 	configRepo  config.Reader
 }
 
+// NewCheckerService 创建代码检查服务
 func NewCheckerService(
 	ag agent.Agent,
 	gitRepo domain.GitRepository,
@@ -30,6 +32,7 @@ func NewCheckerService(
 	}
 }
 
+// Check 检查暂存文件
 func (s *CheckerService) Check(ctx context.Context) ([]domain.Issue, error) {
 	files, err := s.gitRepo.GetStagedFiles(ctx)
 	if err != nil {
@@ -39,6 +42,7 @@ func (s *CheckerService) Check(ctx context.Context) ([]domain.Issue, error) {
 	return s.CheckFiles(ctx, files)
 }
 
+// CheckAll 检查所有文件
 func (s *CheckerService) CheckAll(ctx context.Context) ([]domain.Issue, error) {
 	files, err := s.gitRepo.GetAllFiles(ctx)
 	if err != nil {
@@ -48,6 +52,7 @@ func (s *CheckerService) CheckAll(ctx context.Context) ([]domain.Issue, error) {
 	return s.CheckFiles(ctx, files)
 }
 
+// CheckFiles 检查指定文件
 func (s *CheckerService) CheckFiles(ctx context.Context, files []domain.FileInfo) ([]domain.Issue, error) {
 	if len(files) == 0 {
 		return nil, nil
@@ -109,14 +114,17 @@ func (s *CheckerService) getProjectContext() agent.ProjectContext {
 	return projectContext
 }
 
+// GetPatterns 获取全部模式
 func (s *CheckerService) GetPatterns(ctx context.Context) ([]domain.Pattern, error) {
 	return s.patternRepo.GetAll(ctx)
 }
 
+// GetHighConfidencePatterns 获取高置信度模式
 func (s *CheckerService) GetHighConfidencePatterns(ctx context.Context, threshold float64) ([]domain.Pattern, error) {
 	return s.patternRepo.GetHighConfidence(ctx, threshold)
 }
 
+// AnalyzeFiles 分析指定绝对路径文件
 func (s *CheckerService) AnalyzeFiles(ctx context.Context, absPaths []string) error {
 	files := make([]domain.FileInfo, 0, len(absPaths))
 	for _, path := range absPaths {

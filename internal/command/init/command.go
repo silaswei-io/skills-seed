@@ -18,6 +18,7 @@ var (
 	localeFlag string // locale 参数
 )
 
+// Cmd 返回 init 命令
 func Cmd() *cobra.Command {
 	initCmd := &cobra.Command{
 		Use:   "init",

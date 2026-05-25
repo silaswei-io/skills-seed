@@ -14,7 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
-// Loader loads built-in templates and overlays project/custom prompt fragments.
+// Loader loads built-in templates and overlays project/custom prompt fragments
 type Loader struct {
 	agentName string
 	locale    string
@@ -22,6 +22,7 @@ type Loader struct {
 	templates map[string]*template.Template
 }
 
+// NewLoader 创建提示词模板加载器
 func NewLoader(agentName, locale, seedPath string) *Loader {
 	if locale == "" {
 		locale = "en-US"
@@ -35,6 +36,7 @@ func NewLoader(agentName, locale, seedPath string) *Loader {
 	}
 }
 
+// Load 加载指定提示词模板
 func (l *Loader) Load(name string) error {
 	data, err := l.readEmbeddedTemplate(name)
 	if err != nil {
@@ -72,6 +74,7 @@ func (l *Loader) templateAgentNames() []string {
 	return metadata.TemplateProviderFallbacks(l.agentName)
 }
 
+// Render 渲染指定提示词模板
 func (l *Loader) Render(name string, data interface{}) (string, error) {
 	if _, ok := l.templates[name]; !ok {
 		if err := l.Load(name); err != nil {
@@ -151,10 +154,12 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	return rendered, nil
 }
 
+// Clear 清空已加载的提示词模板缓存
 func (l *Loader) Clear() {
 	l.templates = make(map[string]*template.Template)
 }
 
+// Preload 预加载多个提示词模板
 func (l *Loader) Preload(names []string) error {
 	for _, name := range names {
 		if err := l.Load(name); err != nil {

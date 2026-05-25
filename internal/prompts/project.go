@@ -22,6 +22,7 @@ var projectPromptNames = []string{
 	"merge-patterns",
 }
 
+// ProjectPromptData 渲染项目提示词模板的数据
 type ProjectPromptData struct {
 	ProgramVersion      string
 	PromptTemplatesHash string
@@ -34,6 +35,7 @@ type ProjectPromptData struct {
 	Locale              string
 }
 
+// EnsureProjectPrompts 初始化项目级提示词文件
 func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 	if data.ProgramVersion == "" {
 		data.ProgramVersion = metadata.ProgramVersion

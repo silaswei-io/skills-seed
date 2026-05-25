@@ -15,12 +15,12 @@
 
 ## 📖 Introduction
 
-Skills Seed is an intelligent code pattern learning tool that automatically learns coding patterns and best practices from Git commit history and generates structured Claude Code / Codex-compatible skill documentation. It helps teams document coding standards, improve code quality, and accelerate onboarding for new team members.
+Skills Seed is an intelligent code pattern learning tool that automatically learns coding patterns and best practices from Git commit history and generates structured Claude Code / Codex-compatible skill documentation. It helps teams document coding standards, improve code quality, and accelerate onboarding for new team members
 
 ## ✨ Key Features
 
 - 🔍 **Smart Pattern Learning** - Automatically extract coding patterns and best practices from Git commit history
-- 🤖 **AI-Powered Analysis** - Deep analysis of code changes using AI to identify naming conventions, error handling, architectural patterns, etc.
+- 🤖 **AI-Powered Analysis** - Deep analysis of code changes using AI to identify naming conventions, error handling, architectural patterns, etc
 - 📚 **Auto Documentation Generation** - Generate structured Claude Code / Codex-compatible skill documentation with examples and best practices
 - ✅ **Code Checking** - Check code issues based on learned patterns with fix suggestions
 - 🔧 **Auto Fix** - Support interactive and automated code fixes
@@ -31,16 +31,16 @@ Skills Seed is an intelligent code pattern learning tool that automatically lear
 
 ### Installation
 
-Install the CLI directly with Go:
+Install the CLI directly with Go
 
 ```bash
 go install github.com/silaswei-io/skills-seed/cmd/skills-seed@latest
 skills-seed --help
 ```
 
-If the command is not found, make sure `$GOPATH/bin` or `$GOBIN` is in your `PATH`.
+If the command is not found, make sure `$GOPATH/bin` or `$GOBIN` is in your `PATH`
 
-You can also build from source:
+You can also build from source
 
 ```bash
 # Clone the repository
@@ -66,7 +66,7 @@ skills-seed init --locale en-US  # English
 skills-seed init --locale zh-CN  # Chinese
 ```
 
-Initialization will:
+Initialization will
 
 - Create `.skills-seed` directory
 - Generate configuration, database, and project-specific prompts
@@ -88,7 +88,7 @@ skills-seed learn history --since=30d
 skills-seed profile refresh
 ```
 
-`learn current` only saves patterns and the project profile. It does not generate `SKILL.md` or `references/`; run `skills-seed generate-skills` when you want documentation output.
+`learn current` only saves patterns and the project profile. It does not generate `SKILL.md` or `references/`; run `skills-seed generate-skills` when you want documentation output
 
 ### Check Code
 
@@ -150,7 +150,7 @@ your-project/
 
 ## 🏗️ Architecture
 
-Skills Seed adopts Domain-Driven Design (DDD) and clean layered architecture:
+Skills Seed adopts Domain-Driven Design (DDD) and clean layered architecture
 
 ```text
 internal/
@@ -165,7 +165,7 @@ internal/
 └── utils/           # Utility functions
 ```
 
-**Core Domain Models**:
+**Core Domain Models**
 
 - **Pattern** - Code pattern (naming, error handling, architecture, etc.)
 - **Issue** - Code issue
@@ -175,7 +175,7 @@ internal/
 
 ## ⚙️ Configuration
 
-Configuration file located at `.skills-seed/config.yaml`:
+Configuration file located at `.skills-seed/config.yaml`
 
 ```yaml
 project:
@@ -205,7 +205,7 @@ autofix:
 
 ## 🔌 Git Hook Integration
 
-Skills Seed can integrate with Git hooks to automatically check code before commits:
+Skills Seed can integrate with Git hooks to automatically check code before commits
 
 ```bash
 # Install pre-commit hook
@@ -252,7 +252,7 @@ go build -o skills-seed ./cmd/skills-seed
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please check [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for details.
+Contributions are welcome! Please check [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for details
 
 1. Fork this repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -262,15 +262,15 @@ Contributions are welcome! Please check [CONTRIBUTING.en.md](CONTRIBUTING.en.md)
 
 ## 📝 Changelog
 
-See [CHANGELOG.en.md](CHANGELOG.en.md) for version history.
+See [CHANGELOG.en.md](CHANGELOG.en.md) for version history
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
 
 ## 🙏 Acknowledgments
 
-Thanks to the following open source projects:
+Thanks to the following open source projects
 
 - [Cobra](https://github.com/spf13/cobra) - Powerful CLI framework
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Elegant terminal UI

@@ -379,7 +379,7 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string) (s
 
 func codexExecArgs(allowUserPlugins bool) []string {
 	// 已经把需要分析的结构和样例代码放进提示词。这里让模型以一次性、
-	// 只读、非交互模式在当前目录运行，避免写入文件或等待工具审批。
+	// 只读、非交互模式在当前目录运行，避免写入文件或等待工具审批
 	args := []string{
 		"--ask-for-approval", "never",
 		"exec",

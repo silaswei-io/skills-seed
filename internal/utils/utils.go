@@ -61,7 +61,7 @@ func LoadConfig(seedPath string) (*config.Config, error) {
 	return &cfg, nil
 }
 
-// ResolvePath resolves output/config paths relative to project root and expands "~".
+// ResolvePath resolves output/config paths relative to project root and expands "~"
 func ResolvePath(projectRoot, path string) (string, error) {
 	if path == "" {
 		return projectRoot, nil

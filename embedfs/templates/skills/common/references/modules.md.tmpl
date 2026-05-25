@@ -1,6 +1,6 @@
 # {{.ProjectName}} Key Modules
 
-This file documents key modules, ownership boundaries, dependencies, and entry methods extracted into the project profile. Check it before changing module structure or adding feature entry points.
+This file documents key modules, ownership boundaries, dependencies, and entry methods extracted into the project profile. Check it before changing module structure or adding feature entry points
 
 {{if .KeyModules}}
 {{range .KeyModules}}
@@ -11,25 +11,25 @@ This file documents key modules, ownership boundaries, dependencies, and entry m
 - **Description**: {{.Description}}
 {{end}}
 {{if .Responsibilities}}
-- **Responsibilities**:
+- **Responsibilities**
 {{range .Responsibilities}}
   - {{.}}
 {{end}}
 {{end}}
 {{if .Dependencies}}
-- **Dependencies**:
+- **Dependencies**
 {{range .Dependencies}}
   - {{.}}
 {{end}}
 {{end}}
 {{if .Dependents}}
-- **Dependents**:
+- **Dependents**
 {{range .Dependents}}
   - {{.}}
 {{end}}
 {{end}}
 {{if .KeyMethods}}
-- **Key Methods**:
+- **Key Methods**
 {{range .KeyMethods}}
   - `{{.}}`
 {{end}}

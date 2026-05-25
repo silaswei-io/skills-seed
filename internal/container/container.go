@@ -42,6 +42,7 @@ type Container struct {
 	SkillsLoader *skills.Loader
 }
 
+// AgentFactory 创建指定 provider 的 Agent
 type AgentFactory func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent
 
 var agentFactories = map[string]AgentFactory{
@@ -53,6 +54,7 @@ var agentFactories = map[string]AgentFactory{
 	},
 }
 
+// RegisterAgentFactory 注册自定义 Agent 工厂
 func RegisterAgentFactory(provider string, factory AgentFactory) {
 	if provider == "" || factory == nil {
 		return

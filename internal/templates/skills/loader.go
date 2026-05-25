@@ -27,14 +27,14 @@ type RenderedFile struct {
 	Content string
 }
 
-// ReferenceItem describes one generated reference file linked from SKILL.md.
+// ReferenceItem describes one generated reference file linked from SKILL.md
 type ReferenceItem struct {
 	Title       string
 	Description string
 	Path        string
 }
 
-// ReferenceGroup groups related pattern reference files for the main skill.
+// ReferenceGroup groups related pattern reference files for the main skill
 type ReferenceGroup struct {
 	Title string
 	Items []ReferenceItem
@@ -91,7 +91,7 @@ func (l *Loader) LoadProjectOverview() (*template.Template, error) {
 	return l.loadTemplate(key, "references/project-overview", metadata.SkillsTemplateExt)
 }
 
-// LoadReferenceFile loads a standalone template under references/.
+// LoadReferenceFile loads a standalone template under references/
 func (l *Loader) LoadReferenceFile(name string) (*template.Template, error) {
 	key := "reference-file/" + name
 	return l.loadTemplate(key, "references/"+name, metadata.SkillsTemplateExt)
@@ -149,7 +149,7 @@ func (l *Loader) RenderProjectOverview(data interface{}) (string, error) {
 	return normalizeMarkdown(buf.String()), nil
 }
 
-// RenderReferenceFile renders a standalone references/{name}.md template.
+// RenderReferenceFile renders a standalone references/{name}.md template
 func (l *Loader) RenderReferenceFile(name string, data interface{}) (string, error) {
 	tmpl, err := l.LoadReferenceFile(name)
 	if err != nil {

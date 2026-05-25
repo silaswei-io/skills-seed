@@ -6,7 +6,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 )
 
-// RequireAgentAvailable fails before commands invoke an unavailable AI agent.
+// RequireAgentAvailable fails before commands invoke an unavailable AI agent
 func RequireAgentAvailable(cont *container.Container) error {
 	if cont == nil || cont.Agent == nil {
 		return nil

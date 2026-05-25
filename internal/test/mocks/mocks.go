@@ -23,9 +23,13 @@ type MockAgent struct {
 	AnalyzeCurrentCodebaseFn func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
 }
 
-func (m *MockAgent) Name() string      { return m.NameVal }
+// Name 返回模拟 Agent 名称
+func (m *MockAgent) Name() string { return m.NameVal }
+
+// IsAvailable 返回模拟 Agent 是否可用
 func (m *MockAgent) IsAvailable() bool { return m.AvailableVal }
 
+// AnalyzeCode 模拟代码分析
 func (m *MockAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
 	if m.AnalyzeCodeFn != nil {
 		return m.AnalyzeCodeFn(ctx, req)
@@ -33,6 +37,7 @@ func (m *MockAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest) 
 	return &agent.AnalyzeResult{Issues: []domain.Issue{}, Confidence: 0.5}, nil
 }
 
+// LearnFromCommit 模拟单提交学习
 func (m *MockAgent) LearnFromCommit(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error) {
 	if m.LearnFromCommitFn != nil {
 		return m.LearnFromCommitFn(ctx, req)
@@ -40,6 +45,7 @@ func (m *MockAgent) LearnFromCommit(ctx context.Context, req *agent.LearnRequest
 	return &agent.LearnResult{Patterns: []domain.Pattern{}, LearnedAt: time.Now()}, nil
 }
 
+// BatchLearnFromCommits 模拟批量提交学习
 func (m *MockAgent) BatchLearnFromCommits(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
 	if m.BatchLearnFromCommitsFn != nil {
 		return m.BatchLearnFromCommitsFn(ctx, req)
@@ -47,6 +53,7 @@ func (m *MockAgent) BatchLearnFromCommits(ctx context.Context, req *agent.BatchL
 	return &agent.BatchLearnResult{Patterns: []domain.Pattern{}, LearnedAt: time.Now()}, nil
 }
 
+// GenerateFixes 模拟生成修复
 func (m *MockAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error) {
 	if m.GenerateFixesFn != nil {
 		return m.GenerateFixesFn(ctx, req)
@@ -54,6 +61,7 @@ func (m *MockAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixesR
 	return &agent.GenerateFixesResult{Fixes: map[string]string{}, Confidence: 0.8}, nil
 }
 
+// GenerateSkillsSummary 模拟生成 Skills 摘要
 func (m *MockAgent) GenerateSkillsSummary(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
 	if m.GenerateSkillsSummaryFn != nil {
 		return m.GenerateSkillsSummaryFn(ctx, req)
@@ -67,6 +75,7 @@ func (m *MockAgent) GenerateSkillsSummary(ctx context.Context, req *agent.Genera
 	}, nil
 }
 
+// MergePatterns 模拟模式合并
 func (m *MockAgent) MergePatterns(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error) {
 	if m.MergePatternsFn != nil {
 		return m.MergePatternsFn(ctx, req)
@@ -78,6 +87,7 @@ func (m *MockAgent) MergePatterns(ctx context.Context, req *agent.MergePatternsR
 	}, nil
 }
 
+// AnalyzeProject 模拟项目分析
 func (m *MockAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 	if m.AnalyzeProjectFn != nil {
 		return m.AnalyzeProjectFn(ctx, req)
@@ -85,6 +95,7 @@ func (m *MockAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjec
 	return &agent.AnalyzeProjectResult{}, nil
 }
 
+// AnalyzeCurrentCodebase 模拟当前代码库分析
 func (m *MockAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 	if m.AnalyzeCurrentCodebaseFn != nil {
 		return m.AnalyzeCurrentCodebaseFn(ctx, req)
@@ -105,6 +116,7 @@ type MockGitRepository struct {
 	CheckoutFn      func(ctx context.Context, name string) error
 }
 
+// GetCommits 模拟获取提交历史
 func (m *MockGitRepository) GetCommits(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error) {
 	if m.CommitsFn != nil {
 		return m.CommitsFn(ctx, limit, since)
@@ -112,6 +124,7 @@ func (m *MockGitRepository) GetCommits(ctx context.Context, limit int, since str
 	return []domain.CommitInfo{}, nil
 }
 
+// GetChangedFiles 模拟获取变更文件
 func (m *MockGitRepository) GetChangedFiles(ctx context.Context, hash string) ([]string, error) {
 	if m.ChangedFilesFn != nil {
 		return m.ChangedFilesFn(ctx, hash)
@@ -119,6 +132,7 @@ func (m *MockGitRepository) GetChangedFiles(ctx context.Context, hash string) ([
 	return []string{}, nil
 }
 
+// GetStagedFiles 模拟获取暂存文件
 func (m *MockGitRepository) GetStagedFiles(ctx context.Context) ([]domain.FileInfo, error) {
 	if m.StagedFilesFn != nil {
 		return m.StagedFilesFn(ctx)
@@ -126,6 +140,7 @@ func (m *MockGitRepository) GetStagedFiles(ctx context.Context) ([]domain.FileIn
 	return []domain.FileInfo{}, nil
 }
 
+// GetAllFiles 模拟获取所有文件
 func (m *MockGitRepository) GetAllFiles(ctx context.Context) ([]domain.FileInfo, error) {
 	if m.AllFilesFn != nil {
 		return m.AllFilesFn(ctx)
@@ -133,6 +148,7 @@ func (m *MockGitRepository) GetAllFiles(ctx context.Context) ([]domain.FileInfo,
 	return []domain.FileInfo{}, nil
 }
 
+// GetCurrentBranch 模拟获取当前分支
 func (m *MockGitRepository) GetCurrentBranch(ctx context.Context) (string, error) {
 	if m.CurrentBranchFn != nil {
 		return m.CurrentBranchFn(ctx)
@@ -140,6 +156,7 @@ func (m *MockGitRepository) GetCurrentBranch(ctx context.Context) (string, error
 	return "main", nil
 }
 
+// GetProjectRoot 模拟获取项目根目录
 func (m *MockGitRepository) GetProjectRoot(ctx context.Context) (string, error) {
 	if m.ProjectRootFn != nil {
 		return m.ProjectRootFn(ctx)
@@ -147,6 +164,7 @@ func (m *MockGitRepository) GetProjectRoot(ctx context.Context) (string, error) 
 	return "/tmp/project", nil
 }
 
+// Stash 模拟保存 stash
 func (m *MockGitRepository) Stash(ctx context.Context, message string) error {
 	if m.StashFn != nil {
 		return m.StashFn(ctx, message)
@@ -154,6 +172,7 @@ func (m *MockGitRepository) Stash(ctx context.Context, message string) error {
 	return nil
 }
 
+// CreateBranch 模拟创建分支
 func (m *MockGitRepository) CreateBranch(ctx context.Context, name string) error {
 	if m.CreateBranchFn != nil {
 		return m.CreateBranchFn(ctx, name)
@@ -161,6 +180,7 @@ func (m *MockGitRepository) CreateBranch(ctx context.Context, name string) error
 	return nil
 }
 
+// Checkout 模拟切换分支
 func (m *MockGitRepository) Checkout(ctx context.Context, name string) error {
 	if m.CheckoutFn != nil {
 		return m.CheckoutFn(ctx, name)
@@ -180,6 +200,7 @@ type MockPatternRepository struct {
 	CountFn             func(ctx context.Context) (int, error)
 }
 
+// Get 模拟按 ID 获取模式
 func (m *MockPatternRepository) Get(ctx context.Context, id string) (*domain.Pattern, error) {
 	if m.GetFn != nil {
 		return m.GetFn(ctx, id)
@@ -187,6 +208,7 @@ func (m *MockPatternRepository) Get(ctx context.Context, id string) (*domain.Pat
 	return nil, nil
 }
 
+// GetAll 模拟获取全部模式
 func (m *MockPatternRepository) GetAll(ctx context.Context) ([]domain.Pattern, error) {
 	if m.GetAllFn != nil {
 		return m.GetAllFn(ctx)
@@ -194,6 +216,7 @@ func (m *MockPatternRepository) GetAll(ctx context.Context) ([]domain.Pattern, e
 	return []domain.Pattern{}, nil
 }
 
+// GetByCategory 模拟按分类获取模式
 func (m *MockPatternRepository) GetByCategory(ctx context.Context, category domain.Category) ([]domain.Pattern, error) {
 	if m.GetByCategoryFn != nil {
 		return m.GetByCategoryFn(ctx, category)
@@ -201,6 +224,7 @@ func (m *MockPatternRepository) GetByCategory(ctx context.Context, category doma
 	return []domain.Pattern{}, nil
 }
 
+// GetHighConfidence 模拟获取高置信度模式
 func (m *MockPatternRepository) GetHighConfidence(ctx context.Context, threshold float64) ([]domain.Pattern, error) {
 	if m.GetHighConfidenceFn != nil {
 		return m.GetHighConfidenceFn(ctx, threshold)
@@ -208,6 +232,7 @@ func (m *MockPatternRepository) GetHighConfidence(ctx context.Context, threshold
 	return []domain.Pattern{}, nil
 }
 
+// Save 模拟保存模式
 func (m *MockPatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
 	if m.SaveFn != nil {
 		return m.SaveFn(ctx, p)
@@ -215,6 +240,7 @@ func (m *MockPatternRepository) Save(ctx context.Context, p *domain.Pattern) err
 	return nil
 }
 
+// FindSimilar 模拟查找相似模式
 func (m *MockPatternRepository) FindSimilar(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error) {
 	if m.FindSimilarFn != nil {
 		return m.FindSimilarFn(ctx, pattern)
@@ -222,6 +248,7 @@ func (m *MockPatternRepository) FindSimilar(ctx context.Context, pattern *domain
 	return nil, nil
 }
 
+// Delete 模拟删除模式
 func (m *MockPatternRepository) Delete(ctx context.Context, id string) error {
 	if m.DeleteFn != nil {
 		return m.DeleteFn(ctx, id)
@@ -229,6 +256,7 @@ func (m *MockPatternRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// Count 模拟统计模式数量
 func (m *MockPatternRepository) Count(ctx context.Context) (int, error) {
 	if m.CountFn != nil {
 		return m.CountFn(ctx)
@@ -242,6 +270,7 @@ type MockProjectProfileRepository struct {
 	SaveFn func(ctx context.Context, profile *domain.ProjectProfile) error
 }
 
+// Get 模拟获取项目画像
 func (m *MockProjectProfileRepository) Get(ctx context.Context) (*domain.ProjectProfile, error) {
 	if m.GetFn != nil {
 		return m.GetFn(ctx)
@@ -254,6 +283,7 @@ func (m *MockProjectProfileRepository) Get(ctx context.Context) (*domain.Project
 	}, nil
 }
 
+// Save 模拟保存项目画像
 func (m *MockProjectProfileRepository) Save(ctx context.Context, profile *domain.ProjectProfile) error {
 	if m.SaveFn != nil {
 		return m.SaveFn(ctx, profile)
@@ -268,6 +298,7 @@ type MockCommitTracker struct {
 	GetAnalyzedFn  func(ctx context.Context) ([]string, error)
 }
 
+// MarkCommitAnalyzed 模拟标记提交已分析
 func (m *MockCommitTracker) MarkCommitAnalyzed(ctx context.Context, hash string) error {
 	if m.MarkAnalyzedFn != nil {
 		return m.MarkAnalyzedFn(ctx, hash)
@@ -275,6 +306,7 @@ func (m *MockCommitTracker) MarkCommitAnalyzed(ctx context.Context, hash string)
 	return nil
 }
 
+// IsCommitAnalyzed 模拟判断提交是否已分析
 func (m *MockCommitTracker) IsCommitAnalyzed(ctx context.Context, hash string) (bool, error) {
 	if m.IsAnalyzedFn != nil {
 		return m.IsAnalyzedFn(ctx, hash)
@@ -282,6 +314,7 @@ func (m *MockCommitTracker) IsCommitAnalyzed(ctx context.Context, hash string) (
 	return false, nil
 }
 
+// GetAnalyzedCommits 模拟获取已分析提交
 func (m *MockCommitTracker) GetAnalyzedCommits(ctx context.Context) ([]string, error) {
 	if m.GetAnalyzedFn != nil {
 		return m.GetAnalyzedFn(ctx)
@@ -300,10 +333,23 @@ type MockConfigReader struct {
 	Exclude     []string
 }
 
-func (m *MockConfigReader) GetProjectConfig() config.ProjectConfig   { return m.ProjectCfg }
-func (m *MockConfigReader) GetAgentConfig() config.AgentConfig       { return m.AgentCfg }
+// GetProjectConfig 模拟获取项目配置
+func (m *MockConfigReader) GetProjectConfig() config.ProjectConfig { return m.ProjectCfg }
+
+// GetAgentConfig 模拟获取 Agent 配置
+func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentCfg }
+
+// GetLearningConfig 模拟获取学习配置
 func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.LearningCfg }
-func (m *MockConfigReader) GetAutoFixConfig() config.AutoFixConfig   { return m.AutoFixCfg }
-func (m *MockConfigReader) GetOutputConfig() config.OutputConfig     { return m.OutputCfg }
-func (m *MockConfigReader) GetLoggingConfig() config.LoggingConfig   { return m.LoggingCfg }
-func (m *MockConfigReader) GetExclude() []string                     { return m.Exclude }
+
+// GetAutoFixConfig 模拟获取自动修复配置
+func (m *MockConfigReader) GetAutoFixConfig() config.AutoFixConfig { return m.AutoFixCfg }
+
+// GetOutputConfig 模拟获取输出配置
+func (m *MockConfigReader) GetOutputConfig() config.OutputConfig { return m.OutputCfg }
+
+// GetLoggingConfig 模拟获取日志配置
+func (m *MockConfigReader) GetLoggingConfig() config.LoggingConfig { return m.LoggingCfg }
+
+// GetExclude 模拟获取排除配置
+func (m *MockConfigReader) GetExclude() []string { return m.Exclude }

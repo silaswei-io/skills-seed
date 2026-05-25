@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupTestDB creates a fresh PatternRepository for testing.
-// The database is stored in a temporary directory that is cleaned up after the test.
+// setupTestDB creates a fresh PatternRepository for testing
+// The database is stored in a temporary directory that is cleaned up after the test
 func setupTestDB(t *testing.T) *PatternRepository {
 	t.Helper()
 
@@ -24,7 +24,7 @@ func setupTestDB(t *testing.T) *PatternRepository {
 	return patternRepo
 }
 
-// newTestPattern creates a valid Pattern for testing.
+// newTestPattern creates a valid Pattern for testing
 func newTestPattern(id, name string, category domain.Category, confidence float64) *domain.Pattern {
 	p := domain.NewPattern(id, name, category)
 	p.Confidence = confidence

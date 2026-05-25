@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Cmd 返回 patterns 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	patternsCmd := &cobra.Command{
 		Use:   "patterns",

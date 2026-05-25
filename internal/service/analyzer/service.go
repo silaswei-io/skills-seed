@@ -1,11 +1,11 @@
 // Package analyzer 提供代码分析服务
 //
-// 本包实现代码模式分析、项目结构分析和代码库分析功能：
+// 本包实现代码模式分析、项目结构分析和代码库分析功能
 //   - AnalyzePatterns: 分析代码模式，发现问题
 //   - AnalyzeProject: 分析项目结构和特点
 //   - AnalyzeCurrentCodebase: 分析现有代码库（不依赖 commit 历史）
 //
-// 服务职责：
+// 服务职责
 //   - 调用 AI Agent 进行代码分析
 //   - 转换领域模型和 Agent 模型
 //   - 包装错误为领域错误
@@ -27,7 +27,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
 )
 
-// Service 代码分析服务
+// AnalyzerService 代码分析服务
 // 职责：分析代码、提取模式、分析项目结构
 type AnalyzerService struct {
 	agent      agent.Agent
@@ -420,6 +420,7 @@ func (s *AnalyzerService) FindMainFiles(projectRoot string) []string {
 	return mainFiles
 }
 
+// FindReadmePath 查找项目 README 文件路径
 func (s *AnalyzerService) FindReadmePath(projectRoot string) string {
 	readmePath := filepath.Join(projectRoot, "README.md")
 	if _, err := os.Stat(readmePath); err != nil {
@@ -433,7 +434,7 @@ func (s *AnalyzerService) AnalyzeProjectFull(ctx context.Context, projectRoot, p
 	return s.AnalyzeProjectFullWithLanguage(ctx, projectRoot, projectName, "")
 }
 
-// AnalyzeProjectFullWithLanguage 完整项目分析，可由命令行显式指定语言覆盖配置。
+// AnalyzeProjectFullWithLanguage 完整项目分析，可由命令行显式指定语言覆盖配置
 func (s *AnalyzerService) AnalyzeProjectFullWithLanguage(ctx context.Context, projectRoot, projectName, requestedLanguage string) (*AnalyzeProjectResult, error) {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
@@ -486,7 +487,7 @@ func (s *AnalyzerService) AnalyzeProjectFullWithLanguage(ctx context.Context, pr
 	return result, nil
 }
 
-// NewProjectProfile converts an analysis result into the durable project profile format.
+// NewProjectProfile converts an analysis result into the durable project profile format
 func NewProjectProfile(result *AnalyzeProjectResult, projectName, language string) *domain.ProjectProfile {
 	if result == nil {
 		return nil
@@ -518,7 +519,7 @@ func NewProjectProfile(result *AnalyzeProjectResult, projectName, language strin
 	}
 }
 
-// AnalyzeCodebaseOptions controls how current-code learning collects context.
+// AnalyzeCodebaseOptions controls how current-code learning collects context
 type AnalyzeCodebaseOptions struct {
 	FocusPaths []string
 }
@@ -528,7 +529,7 @@ func (s *AnalyzerService) AnalyzeCodebaseFull(ctx context.Context, projectRoot, 
 	return s.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, language, AnalyzeCodebaseOptions{})
 }
 
-// AnalyzeCodebaseFullWithOptions 完整代码库分析，支持指定扫描范围。
+// AnalyzeCodebaseFullWithOptions 完整代码库分析，支持指定扫描范围
 func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCodebaseOptions) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),

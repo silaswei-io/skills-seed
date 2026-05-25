@@ -135,7 +135,7 @@ func TestPattern_UpdateConfidence(t *testing.T) {
 
 	p.UpdateConfidence(0.9)
 
-	// Weighted average: (0.8*2 + 0.9) / 3 = 2.5/3 = 0.8333...
+	// Weighted average: (0.8*2 + 0.9) / 3 = 2.5/3 = 0.8333
 	expectedConfidence := (0.8*2 + 0.9) / 3
 	assert.InDelta(t, expectedConfidence, p.Confidence, 0.0001, "Confidence should be weighted average")
 	assert.Equal(t, 3, p.Frequency, "Frequency should be incremented")
@@ -206,7 +206,7 @@ func TestPattern_Merge(t *testing.T) {
 		// Should not overwrite existing examples
 		assert.Equal(t, "existing good", p.GoodExample, "Should keep current GoodExample")
 		assert.Equal(t, "existing bad", p.BadExample, "Should keep current BadExample")
-		// Weighted average: (0.8*4 + 0.6*2) / (4+2) = 4.4/6 = 0.7333...
+		// Weighted average: (0.8*4 + 0.6*2) / (4+2) = 4.4/6 = 0.7333
 		expectedConfidence := (0.8*4 + 0.6*2) / 6.0
 		assert.InDelta(t, expectedConfidence, p.Confidence, 0.0001, "Confidence should be weighted average")
 		assert.Equal(t, 6, p.Frequency, "Frequency should be sum of both")
@@ -910,7 +910,7 @@ func TestDetectLanguage_FileWithDirectoryPath(t *testing.T) {
 
 func TestDetectLanguage_FileWithDirectoryPath_NoExt(t *testing.T) {
 	// "cmd/server/Makefile" does not match the exact string "Makefile" check,
-	// so detectLanguage returns empty string. Only bare "Makefile" matches.
+	// so detectLanguage returns empty string. Only bare "Makefile" matches
 	fi := NewFileInfo("cmd/server/Makefile", "")
 	assert.Equal(t, "", fi.Language, "Makefile with directory prefix does not match special filename check")
 }

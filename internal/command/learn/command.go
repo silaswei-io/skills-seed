@@ -122,7 +122,7 @@ func runLearnCurrent(cont *container.Container) error {
 		"seed_path", cont.SeedPath,
 	)
 
-	// 解析项目上下文可能访问 Git 和配置文件，单独作为第一步展示，避免用户以为命令无响应。
+	// 解析项目上下文可能访问 Git 和配置文件，单独作为第一步展示，避免用户以为命令无响应
 	prepareStartedAt := time.Now()
 	if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentPrepareProject"), func() error {
 		var err error
@@ -200,7 +200,7 @@ func runLearnCurrent(cont *container.Container) error {
 	var bestPracticesCount int
 	var commonPatternsCount int
 
-	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时。
+	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
 	analyzeStartedAt := time.Now()
 	if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error {
 		analyzeResult, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeCodebaseOptions{

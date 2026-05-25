@@ -1,6 +1,6 @@
 # {{.ProjectName}} 关键模块
 
-本文件记录项目画像中提取的关键模块、职责边界、依赖关系和入口方法。调整模块结构或新增功能入口前，优先检查对应模块边界。
+本文件记录项目画像中提取的关键模块、职责边界、依赖关系和入口方法。调整模块结构或新增功能入口前，优先检查对应模块边界
 
 {{if .KeyModules}}
 {{range .KeyModules}}
@@ -11,25 +11,25 @@
 - **描述**: {{.Description}}
 {{end}}
 {{if .Responsibilities}}
-- **职责**:
+- **职责**
 {{range .Responsibilities}}
   - {{.}}
 {{end}}
 {{end}}
 {{if .Dependencies}}
-- **依赖**:
+- **依赖**
 {{range .Dependencies}}
   - {{.}}
 {{end}}
 {{end}}
 {{if .Dependents}}
-- **被依赖**:
+- **被依赖**
 {{range .Dependents}}
   - {{.}}
 {{end}}
 {{end}}
 {{if .KeyMethods}}
-- **关键方法**:
+- **关键方法**
 {{range .KeyMethods}}
   - `{{.}}`
 {{end}}

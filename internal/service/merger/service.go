@@ -1,10 +1,10 @@
 // Package merger 提供模式合并服务
 //
-// 本包实现模式合并和去重功能：
+// 本包实现模式合并和去重功能
 //   - MergePatterns: 使用 AI 合并相似模式
 //   - applyMerge: 应用合并结果到数据库
 //
-// 合并策略：
+// 合并策略
 //   - 支持 dry-run 模式（只预览不执行）
 //   - 删除被合并的旧模式
 //   - 保存合并后的新模式
@@ -21,7 +21,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 )
 
-// Service 模式合并服务
+// MergerService 模式合并服务
 // 职责：合并相似模式，去重，优化模式库
 type MergerService struct {
 	agent       agent.Agent
@@ -52,16 +52,16 @@ type MergePatternsResult struct {
 // MergePatterns 合并相似模式
 // 使用 AI 分析相似模式并合并，减少冗余
 //
-// 参数：
+// 参数
 //   - ctx: 上下文
 //   - req: 合并请求（Category: 要合并的分类，空 = 所有分类；DryRun: 是否只预览不执行）
 //
-// 返回：
+// 返回
 //   - MergedPatterns: 合并后的新模式
 //   - UnchangedPatterns: 未改变的模式
 //   - Summary: 合并统计信息
 //
-// 工作流程：
+// 工作流程
 //  1. 获取指定分类或所有模式
 //  2. 调用 AI 分析并合并相似模式
 //  3. 如果是 dry-run，只返回结果不执行
@@ -123,7 +123,7 @@ func (s *MergerService) MergePatterns(ctx context.Context, req *MergePatternsReq
 
 	var result *agent.MergePatternsResult
 	mergeProgress := progress.New(1)
-	// AI 合并需要读取所有候选模式，数据量大时耗时明显，用进度行显示当前阶段。
+	// AI 合并需要读取所有候选模式，数据量大时耗时明显，用进度行显示当前阶段
 	err = mergeProgress.RunStep(i18n.Get("ProgressMergePatternsAI"), func() error {
 		var callErr error
 		result, callErr = s.agent.MergePatterns(ctx, agentReq)

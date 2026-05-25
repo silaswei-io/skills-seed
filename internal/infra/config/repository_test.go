@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupTestConfig creates a temporary config repository for testing.
+// setupTestConfig creates a temporary config repository for testing
 func setupTestConfig(t *testing.T) *Repository {
 	t.Helper()
 	seedPath := t.TempDir()

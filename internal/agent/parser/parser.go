@@ -1,7 +1,7 @@
 // Package parser 提供 AI 输出的 JSON 提取和解析功能
 //
 // 从 Claude/Codex 等 AI Agent 的文本输出中提取结构化 JSON 数据，
-// 并解析为具体的领域模型。
+// 并解析为具体的领域模型
 package parser
 
 import (

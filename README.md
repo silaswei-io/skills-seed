@@ -15,7 +15,7 @@
 
 ## 📖 项目简介
 
-Skills Seed 是一个智能的代码模式学习工具，通过分析 Git 提交历史自动学习项目的编码模式和最佳实践，并生成结构化的 Claude Code / Codex 兼容技能文档。它帮助团队沉淀编码规范，提升代码质量，并加速新成员的上手过程。
+Skills Seed 是一个智能的代码模式学习工具，通过分析 Git 提交历史自动学习项目的编码模式和最佳实践，并生成结构化的 Claude Code / Codex 兼容技能文档。它帮助团队沉淀编码规范，提升代码质量，并加速新成员的上手过程
 
 ## ✨ 核心特性
 
@@ -31,16 +31,16 @@ Skills Seed 是一个智能的代码模式学习工具，通过分析 Git 提交
 
 ### 安装
 
-推荐直接通过 Go 安装 CLI：
+推荐直接通过 Go 安装 CLI
 
 ```bash
 go install github.com/silaswei-io/skills-seed/cmd/skills-seed@latest
 skills-seed --help
 ```
 
-如果命令不可用，请确认 `$GOPATH/bin` 或 `$GOBIN` 已加入 `PATH`。
+如果命令不可用，请确认 `$GOPATH/bin` 或 `$GOBIN` 已加入 `PATH`
 
-也可以从源码构建：
+也可以从源码构建
 
 ```bash
 # 克隆仓库
@@ -66,7 +66,7 @@ skills-seed init --locale zh-CN  # 中文
 skills-seed init --locale en-US  # 英文
 ```
 
-初始化会：
+初始化会
 
 - 创建 `.skills-seed` 目录
 - 生成配置、数据库和项目专属 prompts
@@ -88,7 +88,7 @@ skills-seed learn history --since=30d
 skills-seed profile refresh
 ```
 
-`learn current` 只保存 patterns 和项目画像，不会直接生成 `SKILL.md` 或 `references/`。需要生成技能文档时请继续运行 `skills-seed generate-skills`。
+`learn current` 只保存 patterns 和项目画像，不会直接生成 `SKILL.md` 或 `references/`。需要生成技能文档时请继续运行 `skills-seed generate-skills`
 
 ### 检查代码
 
@@ -150,7 +150,7 @@ your-project/
 
 ## 🏗️ 架构设计
 
-Skills Seed 采用领域驱动设计（DDD）和清晰的分层架构：
+Skills Seed 采用领域驱动设计（DDD）和清晰的分层架构
 
 ```text
 internal/
@@ -165,7 +165,7 @@ internal/
 └── utils/           # 工具函数
 ```
 
-**核心领域模型**：
+**核心领域模型**
 
 - **Pattern** - 代码模式（命名、错误处理、架构等）
 - **Issue** - 代码问题
@@ -175,7 +175,7 @@ internal/
 
 ## ⚙️ 配置说明
 
-配置文件位于 `.skills-seed/config.yaml`：
+配置文件位于 `.skills-seed/config.yaml`
 
 ```yaml
 project:
@@ -205,7 +205,7 @@ autofix:
 
 ## 🔌 Git 钩子集成
 
-Skills Seed 可以与 Git 钩子集成，在提交前自动检查代码：
+Skills Seed 可以与 Git 钩子集成，在提交前自动检查代码
 
 ```bash
 # 安装 pre-commit 钩子
@@ -252,7 +252,7 @@ go build -o skills-seed ./cmd/skills-seed
 
 ## 🤝 贡献指南
 
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情。
+欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情
 
 1. Fork 本仓库
 2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
@@ -262,15 +262,15 @@ go build -o skills-seed ./cmd/skills-seed
 
 ## 📝 更新日志
 
-查看 [CHANGELOG.md](CHANGELOG.md) 了解版本更新历史。
+查看 [CHANGELOG.md](CHANGELOG.md) 了解版本更新历史
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
 ## 🙏 致谢
 
-感谢以下开源项目：
+感谢以下开源项目
 
 - [Cobra](https://github.com/spf13/cobra) - 强大的 CLI 框架
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - 优雅的终端 UI

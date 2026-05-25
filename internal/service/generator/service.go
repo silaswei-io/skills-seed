@@ -101,7 +101,7 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 		return nil
 	}
 
-	// 2. 序列化模式摘要为 JSON，不把代码示例直接发送给 Agent。
+	// 2. 序列化模式摘要为 JSON，不把代码示例直接发送给 Agent
 	patternsJSONBytes, err := json.MarshalIndent(summarizePatternsForAgent(patterns), "", "  ")
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -114,7 +114,7 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 	}
 	patternsJSON := string(patternsJSONBytes)
 
-	// 3. 记录现有 SKILL.md 路径，由 Agent 按需自行读取。
+	// 3. 记录现有 SKILL.md 路径，由 Agent 按需自行读取
 	existingSkillsPath := ""
 	skillPath := filepath.Join(resolvedOutputPath, "SKILL.md")
 	if _, err := os.Stat(skillPath); err == nil {

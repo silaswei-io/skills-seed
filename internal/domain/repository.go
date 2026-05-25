@@ -41,12 +41,12 @@ type CommitAnalysisTracker interface {
 	GetAnalyzedCommits(ctx context.Context) ([]string, error)
 }
 
-// ProjectProfileRepository stores the durable project profile used for generated references.
+// ProjectProfileRepository stores the durable project profile used for generated references
 type ProjectProfileRepository interface {
-	// Get returns the latest project profile.
+	// Get returns the latest project profile
 	Get(ctx context.Context) (*ProjectProfile, error)
 
-	// Save stores the latest project profile.
+	// Save stores the latest project profile
 	Save(ctx context.Context, profile *ProjectProfile) error
 }
 

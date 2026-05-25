@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// ProgramVersion is the CLI version shown by `skills-seed --version`.
+	// ProgramVersion is the CLI version shown by `skills-seed --version`
 	ProgramVersion = "v0.0.1"
 
 	UnavailableHash = "unavailable"
@@ -27,7 +27,7 @@ const (
 	GenericTemplateExt       = ".tmpl"
 )
 
-// TemplateProviderFallbacks returns provider-specific lookup order.
+// TemplateProviderFallbacks returns provider-specific lookup order
 func TemplateProviderFallbacks(provider string) []string {
 	var providers []string
 	seen := make(map[string]bool)
@@ -45,6 +45,7 @@ func TemplateProviderFallbacks(provider string) []string {
 	return providers
 }
 
+// PromptTemplatePath 返回提示词模板路径
 func PromptTemplatePath(provider, name, locale string) string {
 	fileName := name + PromptTemplateExt
 	if locale != "" {
@@ -53,6 +54,7 @@ func PromptTemplatePath(provider, name, locale string) string {
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, provider, fileName))
 }
 
+// ProjectPromptTemplatePath 返回项目提示词模板路径
 func ProjectPromptTemplatePath(name, locale string) string {
 	fileName := name + ProjectPromptTemplateExt
 	if locale != "" {
@@ -61,6 +63,7 @@ func ProjectPromptTemplatePath(name, locale string) string {
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, ProjectTemplateProvider, fileName))
 }
 
+// SkillsTemplatePath 返回 Skills 模板路径
 func SkillsTemplatePath(provider, relativeName, locale, ext string) string {
 	if ext == "" {
 		ext = SkillsTemplateExt
@@ -72,18 +75,22 @@ func SkillsTemplatePath(provider, relativeName, locale, ext string) string {
 	return filepath.ToSlash(filepath.Join(SkillsTemplatesRoot, provider, fileName))
 }
 
+// SkillsAgentMetadataDir 返回 Agent 元数据模板目录
 func SkillsAgentMetadataDir(provider string) string {
 	return filepath.ToSlash(filepath.Join(SkillsTemplatesRoot, provider, "agents"))
 }
 
+// PromptTemplatesHash 计算提示词模板树哈希
 func PromptTemplatesHash(fsys fs.FS) (string, error) {
 	return EmbeddedTreeHash(fsys, PromptTemplatesRoot)
 }
 
+// SkillsTemplatesHash 计算 Skills 模板树哈希
 func SkillsTemplatesHash(fsys fs.FS) (string, error) {
 	return EmbeddedTreeHash(fsys, SkillsTemplatesRoot)
 }
 
+// EmbeddedTreeHash 计算嵌入文件树哈希
 func EmbeddedTreeHash(fsys fs.FS, root string) (string, error) {
 	var paths []string
 	if err := fs.WalkDir(fsys, root, func(path string, entry fs.DirEntry, err error) error {
@@ -116,6 +123,7 @@ func EmbeddedTreeHash(fsys fs.FS, root string) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
+// HashOrUnavailable 返回哈希或不可用占位值
 func HashOrUnavailable(hash string, err error) string {
 	if err != nil || hash == "" {
 		return UnavailableHash

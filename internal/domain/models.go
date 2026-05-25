@@ -1,13 +1,13 @@
 // Package domain 提供核心领域模型和业务规则
 //
-// 本包定义了 skills-seed 项目的核心领域对象：
+// 本包定义了 skills-seed 项目的核心领域对象
 //   - Pattern: 代码模式聚合根
 //   - Category: 模式分类
 //   - Source: 模式来源
 //   - CommitInfo: Git 提交信息
 //   - FileInfo: 文件信息
 //
-// 遵循领域驱动设计（DDD）原则，所有领域对象都是不可变的（通过方法修改）。
+// 遵循领域驱动设计（DDD）原则，所有领域对象都是不可变的（通过方法修改）
 package domain
 
 import "time"

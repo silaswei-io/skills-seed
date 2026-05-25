@@ -11,23 +11,27 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
+// ErrProfileNotFound 表示项目画像不存在
 var ErrProfileNotFound = errors.New("project profile not found")
 
-// Repository stores the project profile as a readable JSON document under .skills-seed.
+// Repository stores the project profile as a readable JSON document under .skills-seed
 type Repository struct {
 	path string
 }
 
+// NewRepository 创建项目画像仓储
 func NewRepository(seedPath string) *Repository {
 	return &Repository{
 		path: filepath.Join(seedPath, "memory", "project-profile.json"),
 	}
 }
 
+// Path 返回项目画像文件路径
 func (r *Repository) Path() string {
 	return r.path
 }
 
+// Get 读取项目画像
 func (r *Repository) Get(ctx context.Context) (*domain.ProjectProfile, error) {
 	select {
 	case <-ctx.Done():
@@ -50,6 +54,7 @@ func (r *Repository) Get(ctx context.Context) (*domain.ProjectProfile, error) {
 	return &profile, nil
 }
 
+// Save 保存项目画像
 func (r *Repository) Save(ctx context.Context, projectProfile *domain.ProjectProfile) error {
 	select {
 	case <-ctx.Done():
