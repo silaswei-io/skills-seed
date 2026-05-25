@@ -2,6 +2,23 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.2]
+
+### 功能
+
+- 支持 `learn current --focus ... --profile refresh` 基于已有项目画像和聚焦路径做增量项目画像刷新
+- 项目画像分析 prompt 支持保留旧画像中的未变更模块、工具方法、业务方法、依赖和架构信息
+- `learn current` 日志增加增量画像相关诊断信息，便于确认是否走增量刷新
+
+### 文档
+
+- README 增加精准学习、局部学习和项目画像刷新命令示例
+- 整理中英文 Markdown 文档与 Go 注释风格
+
+### 体验
+
+- 初始化完成后的后续步骤提示改为可选后续步骤
+
 ## [v0.0.1]
 
 Skills Seed 的首个公开版本

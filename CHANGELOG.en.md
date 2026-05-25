@@ -2,6 +2,23 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.2]
+
+### Features
+
+- Support incremental project profile refresh with `learn current --focus ... --profile refresh` using the existing project profile and focused paths
+- Update the project profile analysis prompt to preserve unchanged modules, utilities, business methods, dependencies, and architecture details from the existing profile
+- Add diagnostic logs for incremental project profile refresh so users can confirm whether the incremental path was used
+
+### Documentation
+
+- Add README examples for focused learning, local pattern learning, and project profile refresh commands
+- Normalize Chinese and English Markdown documentation and Go comment style
+
+### Experience
+
+- Change init completion follow-up wording to optional next steps
+
 ## [v0.0.1]
 
 Initial public release of Skills Seed
