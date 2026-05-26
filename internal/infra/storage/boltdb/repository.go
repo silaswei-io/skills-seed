@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,9 +19,10 @@ type PatternRepository struct {
 }
 
 var (
-	bucketPatterns     = []byte("patterns")
-	bucketMetadata     = []byte("metadata")
-	keyAnalyzedCommits = []byte("analyzed_commits")
+	bucketPatterns      = []byte("patterns")
+	bucketMetadata      = []byte("metadata")
+	bucketAnalyzedFiles = []byte("analyzed_files")
+	keyAnalyzedCommits  = []byte("analyzed_commits")
 )
 
 // NewPatternRepository 创建 Pattern 仓储
@@ -45,6 +47,11 @@ func NewPatternRepository(dbPath string) (*PatternRepository, error) {
 		// 创建 metadata bucket（用于存储已分析的commit等）
 		if _, err := tx.CreateBucketIfNotExists(bucketMetadata); err != nil {
 			return fmt.Errorf("failed to create bucket %s: %w", bucketMetadata, err)
+		}
+
+		// 创建 analyzed_files bucket（用于保存 learn current 文件指纹）
+		if _, err := tx.CreateBucketIfNotExists(bucketAnalyzedFiles); err != nil {
+			return fmt.Errorf("failed to create bucket %s: %w", bucketAnalyzedFiles, err)
 		}
 
 		return nil
@@ -358,6 +365,84 @@ func (r *PatternRepository) GetAnalyzedCommits(ctx context.Context) ([]string, e
 	})
 
 	return commits, err
+}
+
+// GetAnalyzedFile 获取指定文件最近一次成功分析记录
+func (r *PatternRepository) GetAnalyzedFile(ctx context.Context, scope domain.FileAnalysisScope, path string) (*domain.FileAnalysisRecord, error) {
+	var record *domain.FileAnalysisRecord
+
+	err := r.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketAnalyzedFiles)
+		data := bucket.Get([]byte(scope.KeyForPath(path)))
+		if data == nil {
+			return nil
+		}
+
+		var found domain.FileAnalysisRecord
+		if err := json.Unmarshal(data, &found); err != nil {
+			return err
+		}
+		record = &found
+		return nil
+	})
+
+	return record, err
+}
+
+// ListAnalyzedFiles 获取指定范围内的全部文件分析记录
+func (r *PatternRepository) ListAnalyzedFiles(ctx context.Context, scope domain.FileAnalysisScope) ([]domain.FileAnalysisRecord, error) {
+	records := make([]domain.FileAnalysisRecord, 0)
+	prefix := []byte(scope.KeyPrefix())
+
+	err := r.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketAnalyzedFiles)
+		return bucket.ForEach(func(k, v []byte) error {
+			if !bytes.HasPrefix(k, prefix) {
+				return nil
+			}
+
+			var record domain.FileAnalysisRecord
+			if err := json.Unmarshal(v, &record); err != nil {
+				return err
+			}
+			records = append(records, record)
+			return nil
+		})
+	})
+
+	return records, err
+}
+
+// SaveAnalyzedFiles 保存一批文件分析记录
+func (r *PatternRepository) SaveAnalyzedFiles(ctx context.Context, records []domain.FileAnalysisRecord) error {
+	return r.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketAnalyzedFiles)
+		for _, record := range records {
+			scope := domain.FileAnalysisScope{ProjectID: record.ProjectID, ScopePath: record.ScopePath}
+			record.Path = filepath.ToSlash(filepath.Clean(record.Path))
+			data, err := json.Marshal(record)
+			if err != nil {
+				return err
+			}
+			if err := bucket.Put([]byte(scope.KeyForPath(record.Path)), data); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// DeleteAnalyzedFiles 删除指定范围内的文件分析记录
+func (r *PatternRepository) DeleteAnalyzedFiles(ctx context.Context, scope domain.FileAnalysisScope, paths []string) error {
+	return r.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketAnalyzedFiles)
+		for _, path := range paths {
+			if err := bucket.Delete([]byte(scope.KeyForPath(path))); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // Close 关闭数据库

@@ -298,3 +298,59 @@ func TestPatternRepository_CommitTracking(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, commits, 2) // Still 2, not 3
 }
+
+func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+	scope := domain.FileAnalysisScope{ProjectID: "backend", ScopePath: "backend"}
+
+	records := []domain.FileAnalysisRecord{
+		{
+			ProjectID:      "backend",
+			ScopePath:      "backend",
+			Path:           "internal/app.go",
+			Hash:           "abc",
+			HashAlgorithm:  domain.FileAnalysisHashMD5,
+			Size:           12,
+			ModTime:        "2026-05-26T00:00:00Z",
+			Source:         domain.FileAnalysisSourceCurrentCode,
+			LastAnalyzedAt: "2026-05-26T00:00:01Z",
+		},
+	}
+
+	require.NoError(t, repo.SaveAnalyzedFiles(ctx, records))
+
+	got, err := repo.GetAnalyzedFile(ctx, scope, "internal/app.go")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "abc", got.Hash)
+
+	list, err := repo.ListAnalyzedFiles(ctx, scope)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+
+	require.NoError(t, repo.DeleteAnalyzedFiles(ctx, scope, []string{"internal/app.go"}))
+	got, err = repo.GetAnalyzedFile(ctx, scope, "internal/app.go")
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
+func TestPatternRepository_FileAnalysisTrackingScopesRecords(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	require.NoError(t, repo.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{
+		{ProjectID: "backend", ScopePath: "backend", Path: "main.go", Hash: "backend", HashAlgorithm: domain.FileAnalysisHashMD5},
+		{ProjectID: "frontend", ScopePath: "frontend", Path: "main.go", Hash: "frontend", HashAlgorithm: domain.FileAnalysisHashMD5},
+	}))
+
+	backend, err := repo.GetAnalyzedFile(ctx, domain.FileAnalysisScope{ProjectID: "backend", ScopePath: "backend"}, "main.go")
+	require.NoError(t, err)
+	require.NotNil(t, backend)
+	assert.Equal(t, "backend", backend.Hash)
+
+	frontend, err := repo.GetAnalyzedFile(ctx, domain.FileAnalysisScope{ProjectID: "frontend", ScopePath: "frontend"}, "main.go")
+	require.NoError(t, err)
+	require.NotNil(t, frontend)
+	assert.Equal(t, "frontend", frontend.Hash)
+}
