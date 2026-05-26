@@ -1629,6 +1629,9 @@ other = "Child project {{.ProjectName}} saved {{.Count}} patterns"
 [LearnWorkspaceProjectPatternsSkipped]
 other = "Child project {{.ProjectName}} extracted no patterns; skipped saving patterns"
 
+[LearnWorkspaceProjectNoFileChanges]
+other = "Child project {{.ProjectName}} has no learnable file changes; skipped"
+
 [LearnWorkspaceProjectProfileSaved]
 other = "Child project {{.ProjectName}} saved project profile"
 

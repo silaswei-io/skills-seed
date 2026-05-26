@@ -210,6 +210,53 @@ func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
 	require.Equal(t, []string{"main.go"}, profileFocus)
 }
 
+func TestRunLearnWorkspaceCurrentSkipsUnchangedChildProject(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "backend/main.go", "package main\n")
+	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+
+	require.NoError(t, runLearnCurrent(cont))
+
+	analyzeCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont))
+	})
+
+	require.Zero(t, analyzeCalls)
+	require.Contains(t, output, "子项目 backend 未检测到可学习文件变化")
+}
+
+func TestRunLearnWorkspaceCurrentScopesEqualRelativePaths(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "worker", Path: "worker", Type: "backend", Language: "go"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "backend/main.go", "package main\n")
+	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "worker/main.go", "package main\n")
+	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+
+	require.NoError(t, runLearnCurrent(cont))
+
+	recordsBackend, err := cont.FileTracker.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{ProjectID: "backend", ScopePath: "backend"})
+	require.NoError(t, err)
+	require.Len(t, recordsBackend, 1)
+
+	recordsWorker, err := cont.FileTracker.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{ProjectID: "worker", ScopePath: "worker"})
+	require.NoError(t, err)
+	require.Len(t, recordsWorker, 1)
+}
+
 func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.WorkspaceProjectConfig) *container.Container {
 	t.Helper()
 

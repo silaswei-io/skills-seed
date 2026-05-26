@@ -1630,6 +1630,9 @@ other = "子项目 {{.ProjectName}} 已保存 {{.Count}} 个模式"
 [LearnWorkspaceProjectPatternsSkipped]
 other = "子项目 {{.ProjectName}} 未提取到模式，跳过保存模式"
 
+[LearnWorkspaceProjectNoFileChanges]
+other = "子项目 {{.ProjectName}} 未检测到可学习文件变化，已跳过"
+
 [LearnWorkspaceProjectProfileSaved]
 other = "子项目 {{.ProjectName}} 已保存项目画像"
 

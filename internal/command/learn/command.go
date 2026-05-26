@@ -476,7 +476,24 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			"Path":        project.Path,
 		})
 
-		result, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(projectCtx, projectRootPath, project.ID, project.Language, analyzer.AnalyzeCodebaseOptions{})
+		scope := domain.FileAnalysisScope{ProjectID: project.ID, ScopePath: project.Path}
+		incrementalChanges, err := prepareIncrementalFileChanges(projectCtx, cont.FileTracker, cont.ConfigRepo, projectRoot, projectRootPath, scope, nil)
+		if err != nil {
+			finishProjectLog(projectCtx, "LearnWorkspaceProjectFailed", map[string]interface{}{
+				"ProjectName": project.ID,
+				"Error":       err.Error(),
+			})
+			return err
+		}
+		if !incrementalChanges.HasChanges() {
+			finishProjectLog(projectCtx, "LearnWorkspaceProjectNoFileChanges", map[string]interface{}{"ProjectName": project.ID})
+			return nil
+		}
+		effectiveFocusPaths := resolveIncrementalFocusPaths(projectRootPath, incrementalChanges.FocusPaths())
+
+		result, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(projectCtx, projectRootPath, project.ID, project.Language, analyzer.AnalyzeCodebaseOptions{
+			FocusPaths: effectiveFocusPaths,
+		})
 		if err != nil {
 			finishProjectLog(projectCtx, "LearnWorkspaceProjectFailed", map[string]interface{}{
 				"ProjectName": project.ID,
@@ -513,7 +530,13 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			Language: project.Language,
 			Summary:  result.Summary,
 		}, project.ID, project.Language)
-		projectAnalysis, err := cont.AnalyzerSvc.AnalyzeProjectFullWithLanguage(projectCtx, projectRootPath, project.ID, project.Language)
+		projectOptions := analyzer.AnalyzeProjectOptions{FocusPaths: effectiveFocusPaths}
+		if cont.ProfileRepo != nil {
+			if existing, getErr := cont.ProfileRepo.GetForProject(projectCtx, project.ID); getErr == nil {
+				projectOptions.ExistingProfile = existing
+			}
+		}
+		projectAnalysis, err := cont.AnalyzerSvc.AnalyzeProjectFullWithOptions(projectCtx, projectRootPath, project.ID, project.Language, projectOptions)
 		if err == nil {
 			projectProfile = analyzer.NewProjectProfile(projectAnalysis, project.ID, project.Language)
 		} else {
@@ -537,6 +560,9 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			finishProjectLog(projectCtx, "LearnWorkspaceProjectProfileSkipped", map[string]interface{}{
 				"ProjectName": project.ID,
 			})
+		}
+		if err := commitIncrementalFileChanges(projectCtx, cont.FileTracker, incrementalChanges); err != nil {
+			return err
 		}
 
 		mu.Lock()
