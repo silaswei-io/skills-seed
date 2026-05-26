@@ -41,6 +41,21 @@ type CommitAnalysisTracker interface {
 	GetAnalyzedCommits(ctx context.Context) ([]string, error)
 }
 
+// FileAnalysisTracker 文件分析追踪接口
+type FileAnalysisTracker interface {
+	// GetAnalyzedFile 获取指定文件最近一次成功分析记录
+	GetAnalyzedFile(ctx context.Context, scope FileAnalysisScope, path string) (*FileAnalysisRecord, error)
+
+	// ListAnalyzedFiles 获取指定范围内的全部文件分析记录
+	ListAnalyzedFiles(ctx context.Context, scope FileAnalysisScope) ([]FileAnalysisRecord, error)
+
+	// SaveAnalyzedFiles 保存一批文件分析记录
+	SaveAnalyzedFiles(ctx context.Context, records []FileAnalysisRecord) error
+
+	// DeleteAnalyzedFiles 删除指定范围内的文件分析记录
+	DeleteAnalyzedFiles(ctx context.Context, scope FileAnalysisScope, paths []string) error
+}
+
 // ProjectProfileRepository stores the durable project profile used for generated references
 type ProjectProfileRepository interface {
 	// Get returns the latest project profile

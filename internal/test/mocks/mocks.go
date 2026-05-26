@@ -376,6 +376,42 @@ func (m *MockCommitTracker) GetAnalyzedCommits(ctx context.Context) ([]string, e
 	return []string{}, nil
 }
 
+// MockFileAnalysisTracker 模拟文件分析追踪器
+type MockFileAnalysisTracker struct {
+	GetAnalyzedFileFn     func(ctx context.Context, scope domain.FileAnalysisScope, path string) (*domain.FileAnalysisRecord, error)
+	ListAnalyzedFilesFn   func(ctx context.Context, scope domain.FileAnalysisScope) ([]domain.FileAnalysisRecord, error)
+	SaveAnalyzedFilesFn   func(ctx context.Context, records []domain.FileAnalysisRecord) error
+	DeleteAnalyzedFilesFn func(ctx context.Context, scope domain.FileAnalysisScope, paths []string) error
+}
+
+func (m *MockFileAnalysisTracker) GetAnalyzedFile(ctx context.Context, scope domain.FileAnalysisScope, path string) (*domain.FileAnalysisRecord, error) {
+	if m.GetAnalyzedFileFn != nil {
+		return m.GetAnalyzedFileFn(ctx, scope, path)
+	}
+	return nil, nil
+}
+
+func (m *MockFileAnalysisTracker) ListAnalyzedFiles(ctx context.Context, scope domain.FileAnalysisScope) ([]domain.FileAnalysisRecord, error) {
+	if m.ListAnalyzedFilesFn != nil {
+		return m.ListAnalyzedFilesFn(ctx, scope)
+	}
+	return []domain.FileAnalysisRecord{}, nil
+}
+
+func (m *MockFileAnalysisTracker) SaveAnalyzedFiles(ctx context.Context, records []domain.FileAnalysisRecord) error {
+	if m.SaveAnalyzedFilesFn != nil {
+		return m.SaveAnalyzedFilesFn(ctx, records)
+	}
+	return nil
+}
+
+func (m *MockFileAnalysisTracker) DeleteAnalyzedFiles(ctx context.Context, scope domain.FileAnalysisScope, paths []string) error {
+	if m.DeleteAnalyzedFilesFn != nil {
+		return m.DeleteAnalyzedFilesFn(ctx, scope, paths)
+	}
+	return nil
+}
+
 // MockConfigReader 模拟配置读取
 type MockConfigReader struct {
 	ProjectCfg   config.ProjectConfig
