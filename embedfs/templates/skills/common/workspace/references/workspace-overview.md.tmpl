@@ -1,57 +1,86 @@
 # Workspace Overview
 
-This file describes workspace-level entry points and routing. For a child project's internal architecture, business methods, utilities, and project rules, read that child skill's `references/project-spec.md` and `references/project-overview.md`.
+This file is the workspace map. It describes entry points, paths, and coordination scope only. For child project architecture, business methods, utilities, and executable rules, read that child skill's `references/project-spec.md` and `references/project-overview.md`.
 
-## Projects
+## Child Projects
 
 {{range .Projects}}
-- `{{.ID}}`: `{{.Path}}`, type `{{.Type}}`, language `{{.Language}}`
-  - Skill: `{{.Path}}/.agents/skills/{{.SkillName}}/SKILL.md` or `{{.Path}}/.claude/skills/{{.SkillName}}/SKILL.md`
-  - Project spec: `{{.Path}}/.agents/skills/{{.SkillName}}/references/project-spec.md` or `{{.Path}}/.claude/skills/{{.SkillName}}/references/project-spec.md`
+### {{.ID}}
+
+- Path: `{{.Path}}`
+- Type: `{{.Type}}`
+- Language: `{{.Language}}`
+{{if .SelfManaged}}
+- Management: child project has its own skills-seed
+- Child config: `{{.SelfManagedConfigPath}}`
+- Skill: `{{.SkillPath}}`
+- Project spec: `{{.ProjectSpecPath}}`
 {{else}}
-- No child projects configured.
+- Skill: `{{.SkillPath}}`
+- Project spec: `{{.ProjectSpecPath}}`
 {{end}}
-
-{{if .Shared}}
-## Shared Paths
-
-{{range .Shared}}
-- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
-  - After changes, check every child project that imports, packages, or generates this shared content.
-{{end}}
-{{end}}
-
-{{if .Contracts}}
-## Contract Paths
-
-{{range .Contracts}}
-- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
-  - After changes, check producers, consumers, generated clients, server handlers, middleware adapters, and tests.
-{{end}}
-{{end}}
-
-{{if .Infra}}
-## Infra Paths
-
-{{range .Infra}}
-- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
-  - After changes, check child projects affected by deployment targets, environment variables, gateway rules, or middleware config.
-{{end}}
+- Default write boundary: `{{.Path}}/**`
+{{else}}
+No child projects are configured. Check `.skills-seed/config.yaml` `workspace.projects` first.
 {{end}}
 
 ## Routing Table
 
-| Path Pattern | Child Project | What To Read |
-| --- | --- | --- |
+| Path Pattern | Child Project | What To Read | Default Write Boundary |
+| --- | --- | --- | --- |
 {{range .Projects}}
-| `{{.Path}}/**` | `{{.ID}}` | child `SKILL.md` and `references/project-spec.md` |
+{{if .SelfManaged}}
+| `{{.Path}}/**` | `{{.ID}}` | `{{.SelfManagedConfigPath}}`, `{{.SkillPath}}`, and `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
+{{else}}
+| `{{.Path}}/**` | `{{.ID}}` | `{{.SkillPath}}` and `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
 {{end}}
-{{if .Contracts}}
-| `contracts/**` or configured contract paths | related producers and consumers | all contract-affected child project skills |
 {{end}}
-{{if .Shared}}
-| `shared/**` or configured shared paths | all consumers | all child skills that import shared content |
+
+## Special Paths
+
+### Contract Paths
+
+{{if .HasContracts}}
+{{range .Contracts}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - After changes, check producers, consumers, generated clients, server handlers, middleware adapters, and tests.
 {{end}}
-{{if .Infra}}
-| `infra/**` or configured infra paths | deployment-affected projects | runtime service, middleware, and deployment target skills |
+{{else}}
+- No contract paths are explicitly configured.
+- Treat `api`, `proto`, `openapi`, `swagger`, `schema`, `types`, `sdk`, and `client` paths or filenames as contract changes.
+- Contract changes usually affect at least one producer and one consumer; do not update only one side.
 {{end}}
+
+### Shared Paths
+
+{{if .HasShared}}
+{{range .Shared}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - After changes, check every child project that imports, packages, or generates this shared content.
+{{end}}
+{{else}}
+- No shared paths are explicitly configured.
+- When touching `pkg`, `common`, `shared`, `lib`, `utils`, or `components`, identify importers or packagers first.
+- Stabilize shared APIs before consumer child projects follow.
+{{end}}
+
+### Infrastructure Paths
+
+{{if .HasInfra}}
+{{range .Infra}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - After changes, check child projects affected by deployment targets, environment variables, gateway rules, or middleware config.
+{{end}}
+{{else}}
+- No infrastructure paths are explicitly configured.
+- When touching `deploy`, `docker`, `k8s`, `helm`, `terraform`, `nginx`, `gateway`, `env`, or `config`, evaluate runtime impact first.
+- Infrastructure changes should check startup commands, ports, environment variables, health checks, gateway routes, and CI together.
+{{end}}
+
+## Decision Rules
+
+- Path matches one child project only: read that child skill and keep writes inside that child project path.
+- Path matches special paths or root scripts: identify covered child projects, then read every affected child skill.
+- Filename or content represents interfaces, types, error codes, events, messages, or generation inputs: treat as a contract change.
+- Filename or content represents deployment, runtime config, gateway, or middleware: treat as an infrastructure change.
+- If ownership is unclear, stop and inspect config before assigning responsibility.

@@ -99,6 +99,98 @@ func TestAnalyzeProject(t *testing.T) {
 	assert.Contains(t, result.Frameworks, "gin")
 }
 
+func TestAnalyzeProjectAddsCodeGraphContext(t *testing.T) {
+	tmpDir := t.TempDir()
+	var received agent.AnalyzeProjectRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			received = *req
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		AnalysisCfg: config.AnalysisConfig{
+			CodeGraph: config.CodeGraphConfig{
+				Enabled:  true,
+				Required: false,
+				Command:  "codegraph",
+			},
+		},
+	})
+	svc.codeGraphCollector = fakeCodeGraphCollector{
+		context: "## CodeGraph Context\n- main calls service",
+	}
+
+	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, received.StructuralContext, "main calls service")
+}
+
+func TestAnalyzeProjectSkipsUnavailableOptionalCodeGraph(t *testing.T) {
+	tmpDir := t.TempDir()
+	var received agent.AnalyzeProjectRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			received = *req
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		AnalysisCfg: config.AnalysisConfig{
+			CodeGraph: config.CodeGraphConfig{
+				Enabled:  true,
+				Required: false,
+				Command:  "missing-codegraph",
+			},
+		},
+	})
+	svc.codeGraphCollector = fakeCodeGraphCollector{
+		err: errCodeGraphUnavailable,
+	}
+
+	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, received.StructuralContext)
+}
+
+func TestAnalyzeProjectFailsWhenRequiredCodeGraphUnavailable(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		AnalysisCfg: config.AnalysisConfig{
+			CodeGraph: config.CodeGraphConfig{
+				Enabled:  true,
+				Required: true,
+				Command:  "missing-codegraph",
+			},
+		},
+	})
+	svc.codeGraphCollector = fakeCodeGraphCollector{
+		err: errCodeGraphUnavailable,
+	}
+
+	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "CodeGraph")
+}
+
 func TestAnalyzeProject_AIError(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
@@ -135,6 +227,38 @@ func TestAnalyzeCurrentCodebase(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, result.Patterns, 1)
 	assert.Contains(t, result.BusinessRules, "Always wrap errors")
+}
+
+func TestAnalyzeCurrentCodebaseAddsCodeGraphContext(t *testing.T) {
+	tmpDir := t.TempDir()
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		AnalysisCfg: config.AnalysisConfig{
+			CodeGraph: config.CodeGraphConfig{
+				Enabled: true,
+				Command: "codegraph",
+			},
+		},
+	})
+	svc.codeGraphCollector = fakeCodeGraphCollector{
+		context: "## CodeGraph Context\n- service has 3 callers",
+	}
+
+	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, received.StructuralContext, "service has 3 callers")
 }
 
 func TestAnalyzeCurrentCodebase_AIError(t *testing.T) {
@@ -358,4 +482,13 @@ func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testin
 	assert.Contains(t, received.ExistingProfileJSON, `"architecture": "Clean Architecture"`)
 	assert.Contains(t, received.Structure, "Focused scan paths")
 	assert.Contains(t, received.Structure, "internal/service")
+}
+
+type fakeCodeGraphCollector struct {
+	context string
+	err     error
+}
+
+func (f fakeCodeGraphCollector) Collect(ctx context.Context, projectRoot string, req codeGraphContextRequest) (string, error) {
+	return f.context, f.err
 }

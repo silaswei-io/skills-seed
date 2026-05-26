@@ -114,22 +114,29 @@ func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
 func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 	loader := NewLoaderForAgent("codex", "zh-CN")
 	data := map[string]interface{}{
-		"ProgramVersion":      "v0.0.3",
+		"ProgramVersion":      "v0.0.4",
 		"SkillsTemplatesHash": "hash",
 		"SkillName":           "demo-workspace",
 		"WorkspaceName":       "demo",
-		"Projects": []map[string]string{
+		"ProjectCount":        1,
+		"Projects": []map[string]interface{}{
 			{
-				"ID":        "backend",
-				"Path":      "backend",
-				"Type":      "backend",
-				"Language":  "go",
-				"SkillName": "backend-dev",
+				"ID":              "backend",
+				"Path":            "backend",
+				"Type":            "backend",
+				"Language":        "go",
+				"SkillName":       "backend-dev",
+				"SkillPath":       "backend/.agents/skills/backend-dev/SKILL.md",
+				"ProjectSpecPath": "backend/.agents/skills/backend-dev/references/project-spec.md",
+				"SelfManaged":     false,
 			},
 		},
-		"Shared":    []map[string]string{},
-		"Contracts": []map[string]string{{"Path": "proto"}},
-		"Infra":     []map[string]string{},
+		"Shared":       []map[string]string{},
+		"Contracts":    []map[string]string{{"Path": "proto"}},
+		"Infra":        []map[string]string{},
+		"HasShared":    false,
+		"HasContracts": true,
+		"HasInfra":     false,
 	}
 
 	content, err := loader.RenderRelative("workspace/SKILL", data)
@@ -137,6 +144,8 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 
 	require.Contains(t, content, "description: 修改、审查或扩展 demo 工作区代码时使用")
 	require.Contains(t, content, "backend/.agents/skills/backend-dev/SKILL.md")
+	require.Contains(t, content, "影响范围判断")
+	require.Contains(t, content, "写入边界")
 	require.NotContains(t, content, "Use when modifying")
 }
 

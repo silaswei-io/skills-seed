@@ -51,7 +51,7 @@ func Cmd() *cobra.Command {
 	}
 
 	// 添加 --locale 参数
-	initCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", "Configuration file language: zh-CN (Chinese) or en-US (English). Auto-detected if not specified.")
+	initCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
 	initCmd.Flags().StringVar(&modeFlag, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	initCmd.Flags().BoolVar(&workspaceFlag, "workspace", false, i18n.Get("InitFlagWorkspace"))
 
@@ -74,7 +74,7 @@ func ResetCmd() *cobra.Command {
 			}
 		},
 	}
-	resetCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", "Configuration file language: zh-CN (Chinese) or en-US (English). Auto-detected if not specified.")
+	resetCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
 	resetCmd.Flags().StringVar(&modeFlag, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	resetCmd.Flags().BoolVar(&workspaceFlag, "workspace", false, i18n.Get("InitFlagWorkspace"))
 	return resetCmd

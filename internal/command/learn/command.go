@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -111,7 +112,7 @@ func runLearnCurrent(cont *container.Container) error {
 		return runLearnWorkspaceCurrent(cont)
 	}
 
-	ctx := context.Background()
+	ctx := agent.WithTokenUsageScope(context.Background(), "")
 	startedAt := time.Now()
 	tracker := progress.New(4)
 
@@ -187,7 +188,7 @@ func runLearnCurrent(cont *container.Container) error {
 		"project_root", projectRoot,
 		"project_name", projectName,
 		"language", currentLanguage,
-		"focus_paths", strings.Join(relativeFocusPaths(projectRoot, resolvedFocusPaths), ","),
+		"focus_paths", strings.Join(utils.RelativePaths(projectRoot, resolvedFocusPaths), ","),
 		"profile_mode", learnCurrentProfileOpt,
 		"refresh_profile", refreshProfile,
 	)
@@ -198,7 +199,7 @@ func runLearnCurrent(cont *container.Container) error {
 	}))
 	if len(resolvedFocusPaths) > 0 {
 		logger.Info(i18n.GetWithParams("LearnCurrentFocusInfo", map[string]interface{}{
-			"Focus":       strings.Join(relativeFocusPaths(projectRoot, resolvedFocusPaths), ", "),
+			"Focus":       strings.Join(utils.RelativePaths(projectRoot, resolvedFocusPaths), ", "),
 			"ProfileMode": learnCurrentProfileOpt,
 		}))
 	}
@@ -313,11 +314,7 @@ func runLearnCurrent(cont *container.Container) error {
 	}
 
 	logger.Info(i18n.Get("LearnCurrentComplete"))
-	logger.Info(i18n.Get("LearnCurrentNextSteps"))
-	logger.Info(i18n.Get("LearnCurrentNextViewPatterns"))
-	logger.Info(i18n.Get("LearnCurrentNextGenerateSkills"))
-	logger.Info(i18n.Get("LearnCurrentNextGenerateMergedSkills"))
-	logger.Info(i18n.Get("LearnCurrentNextCheck"))
+	logLearnCurrentNextSteps()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current",
 		"duration", time.Since(startedAt),
@@ -327,8 +324,17 @@ func runLearnCurrent(cont *container.Container) error {
 	if err := commandutil.MarkLearned(ctx, cont); err != nil {
 		return err
 	}
+	agent.FlushTokenUsageScope(ctx)
 
 	return nil
+}
+
+func logLearnCurrentNextSteps() {
+	logger.Info(i18n.Get("LearnCurrentNextSteps"))
+	logger.Info(i18n.Get("LearnCurrentNextViewPatterns"))
+	logger.Info(i18n.Get("LearnCurrentNextGenerateSkills"))
+	logger.Info(i18n.Get("LearnCurrentNextGenerateMergedSkills"))
+	logger.Info(i18n.Get("LearnCurrentNextCheck"))
 }
 
 func runLearnWorkspaceCurrent(cont *container.Container) error {
@@ -369,13 +375,52 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 	logger.Info(i18n.Get("LearnWorkspaceStart"), "projects", len(workspaceConfig.Projects), "parallelism", parallelism)
 
 	var mu sync.Mutex
+	logProjectInfo := func(message string, params map[string]interface{}) {
+		mu.Lock()
+		defer mu.Unlock()
+		logger.Info(i18n.GetWithParams(message, params))
+	}
+	finishProjectLog := func(tokenCtx context.Context, message string, params map[string]interface{}) {
+		mu.Lock()
+		defer mu.Unlock()
+		logger.Info(i18n.GetWithParams(message, params))
+		agent.FlushTokenUsageScope(tokenCtx)
+	}
 	totalPatterns := 0
 	totalSaved := 0
 	err := workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
+		tokenScope := project.ID
+		if tokenScope == "" {
+			tokenScope = project.Path
+		}
+		projectCtx := agent.WithTokenUsageScope(ctx, tokenScope)
+
 		projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
-		result, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRootPath, project.ID, project.Language, analyzer.AnalyzeCodebaseOptions{})
+		logProjectInfo("LearnWorkspaceProjectInfo", map[string]interface{}{
+			"ProjectRoot": projectRootPath,
+			"ProjectName": project.ID,
+			"Language":    project.Language,
+			"Path":        project.Path,
+		})
+
+		result, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(projectCtx, projectRootPath, project.ID, project.Language, analyzer.AnalyzeCodebaseOptions{})
 		if err != nil {
+			finishProjectLog(projectCtx, "LearnWorkspaceProjectFailed", map[string]interface{}{
+				"ProjectName": project.ID,
+				"Error":       err.Error(),
+			})
 			return err
+		}
+		logProjectInfo("LearnWorkspaceProjectResult", map[string]interface{}{
+			"ProjectName":        project.ID,
+			"PatternsCount":      len(learnedPatterns),
+			"BusinessRulesCount": len(result.BusinessRules),
+			"BestPracticesCount": len(result.BestPractices),
+		})
+		if len(learnedPatterns) == 0 {
+			logProjectInfo("LearnWorkspaceProjectPatternsSkipped", map[string]interface{}{
+				"ProjectName": project.ID,
+			})
 		}
 
 		for i := range learnedPatterns {
@@ -383,20 +428,42 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			learnedPatterns[i].ScopePath = project.Path
 			learnedPatterns[i].WorkspaceRole = project.Type
 		}
-		saved := cont.LearnerSvc.SavePatterns(ctx, learnedPatterns, "learn_workspace_current:"+project.ID)
+		saved := cont.LearnerSvc.SavePatterns(projectCtx, learnedPatterns, "learn_workspace_current:"+project.ID)
+		if len(learnedPatterns) > 0 {
+			logProjectInfo("LearnWorkspaceProjectPatternsSaved", map[string]interface{}{
+				"ProjectName": project.ID,
+				"Count":       saved,
+			})
+		}
 
 		projectProfile := analyzer.NewProjectProfile(&analyzer.AnalyzeProjectResult{
 			Language: project.Language,
 			Summary:  result.Summary,
 		}, project.ID, project.Language)
-		projectAnalysis, err := cont.AnalyzerSvc.AnalyzeProjectFullWithLanguage(ctx, projectRootPath, project.ID, project.Language)
+		projectAnalysis, err := cont.AnalyzerSvc.AnalyzeProjectFullWithLanguage(projectCtx, projectRootPath, project.ID, project.Language)
 		if err == nil {
 			projectProfile = analyzer.NewProjectProfile(projectAnalysis, project.ID, project.Language)
+		} else {
+			logProjectInfo("LearnWorkspaceProjectProfileFallback", map[string]interface{}{
+				"ProjectName": project.ID,
+				"Error":       err.Error(),
+			})
 		}
 		if cont.ProfileRepo != nil {
-			if err := cont.ProfileRepo.SaveForProject(ctx, project.ID, projectProfile); err != nil {
+			if err := cont.ProfileRepo.SaveForProject(projectCtx, project.ID, projectProfile); err != nil {
+				finishProjectLog(projectCtx, "LearnWorkspaceProjectFailed", map[string]interface{}{
+					"ProjectName": project.ID,
+					"Error":       err.Error(),
+				})
 				return err
 			}
+			finishProjectLog(projectCtx, "LearnWorkspaceProjectProfileSaved", map[string]interface{}{
+				"ProjectName": project.ID,
+			})
+		} else {
+			finishProjectLog(projectCtx, "LearnWorkspaceProjectProfileSkipped", map[string]interface{}{
+				"ProjectName": project.ID,
+			})
 		}
 
 		mu.Lock()
@@ -510,7 +577,7 @@ func hasRootFocus(projectRoot string, focusPaths []string) bool {
 }
 
 func hasCriticalFocus(projectRoot string, focusPaths []string) bool {
-	for _, relPath := range relativeFocusPaths(projectRoot, focusPaths) {
+	for _, relPath := range utils.RelativePaths(projectRoot, focusPaths) {
 		if isCriticalFocusPath(relPath) {
 			return true
 		}
@@ -537,7 +604,7 @@ func isCriticalFocusPath(relPath string) bool {
 
 func focusModuleCount(projectRoot string, focusPaths []string) int {
 	modules := make(map[string]bool)
-	for _, relPath := range relativeFocusPaths(projectRoot, focusPaths) {
+	for _, relPath := range utils.RelativePaths(projectRoot, focusPaths) {
 		key := focusModuleKey(relPath)
 		if key != "" {
 			modules[key] = true
@@ -556,21 +623,6 @@ func focusModuleKey(relPath string) string {
 		return parts[0] + "/" + parts[1]
 	}
 	return parts[0]
-}
-
-func relativeFocusPaths(projectRoot string, paths []string) []string {
-	if len(paths) == 0 {
-		return nil
-	}
-	relPaths := make([]string, 0, len(paths))
-	for _, path := range paths {
-		relPath, err := filepath.Rel(projectRoot, path)
-		if err != nil {
-			continue
-		}
-		relPaths = append(relPaths, filepath.ToSlash(relPath))
-	}
-	return relPaths
 }
 
 // runLearnHistory 从 Git 历史提交学习

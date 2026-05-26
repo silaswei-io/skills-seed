@@ -116,6 +116,9 @@ other = "Failed to create prompt directory: {{.Path}}"
 [AgentProviderUnsupported]
 other = "Unsupported agent provider: {{.Provider}}"
 
+[AgentNotAvailable]
+other = "Agent {{.Agent}} is not available; check agent command configuration"
+
 [AgentRenderAnalyzePromptFailed]
 other = "Failed to render analyze prompt"
 
@@ -241,6 +244,15 @@ other = "Project analysis failed"
 
 [AnalyzerAnalyzeCodebaseFailed]
 other = "Codebase analysis failed"
+
+[AnalyzerCodeGraphCommandUnavailable]
+other = "CodeGraph analysis enhancement is enabled, but the codegraph command was not found. Skipping structural index analysis and continuing with normal file analysis. Install with: npm install -g @colbymchenry/codegraph"
+
+[AnalyzerCodeGraphIndexMissing]
+other = "CodeGraph analysis enhancement is enabled, but the target project has no .codegraph index. Skipping structural index analysis and continuing with normal file analysis. Run in the target project: codegraph init -i"
+
+[AnalyzerCodeGraphCollectFailed]
+other = "CodeGraph analysis enhancement failed. Skipping structural index analysis and continuing with normal file analysis."
 
 [ConfigReadFailed]
 other = "Failed to read config"
@@ -473,6 +485,12 @@ other = "Please run 'skills-seed init' first"
 [CheckLongDesc]
 other = "Check if staged files comply with coding standards.\n\nThis command will:\n  • Get Git staged files\n  • Analyze code using configured AI agent\n  • Find issues based on learned patterns\n  • Provide fix suggestions\n\nUsually runs automatically via Git pre-commit hook.\n\nExamples:\n  # Check staged files\n  skills-seed check\n\n  # Check all files\n  skills-seed check --all"
 
+[CheckFlagInteractive]
+other = "Enable interactive fix confirmation"
+
+[CheckFlagAll]
+other = "Check all files instead of only staged files"
+
 [GenerateShort]
 other = "Generate AI Agent skills"
 
@@ -544,6 +562,9 @@ other = "Please run 'skills-seed init' first"
 
 [ViewLongDesc]
 other = "View learned patterns and generated rules.\n\nSubcommands:\n  patterns  - View all learned patterns\n  rules     - View all generated rules\n\nExamples:\n  # View patterns\n  skills-seed view patterns\n\n  # View rules\n  skills-seed view rules"
+
+[ViewFlagCategory]
+other = "Filter by category: naming/error/structure/concurrency/testing/business/api/database/utils/middleware/config"
 
 [ScanShort]
 other = "Scan and analyze project"
@@ -728,6 +749,27 @@ other = "Output: {{.Path}}"
 
 [GenerateProjectProfileMissing]
 other = "Project profile is missing, so project overview cannot be generated. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
+
+[GenerateFlagOutput]
+other = "Skills output directory (defaults to output.skills_paths for the current provider)"
+
+[GenerateFlagOverwrite]
+other = "Overwrite existing child-project skills at their resolved config paths in workspace mode"
+
+[GenerateFlagRootOnly]
+other = "Generate only the root workspace skill and skip child-project skills"
+
+[GenerateWorkspacePolicyFlagsConflict]
+other = "Cannot use --overwrite and --root-only together"
+
+[GenerateWorkspaceChildSkillSkippedExisting]
+other = "Skipped existing child skill: {{.Project}} ({{.Path}})"
+
+[GenerateWorkspaceChildSkillSkippedSelfManaged]
+other = "Skipped independently initialized child project: {{.Project}} ({{.Path}})"
+
+[GenerateWorkspaceChildSkillsSkippedRootOnly]
+other = "root_only is enabled; skipped {{.Count}} child-project skills"
 
 # 生成合并
 [GenerateFlagMerge]
@@ -1415,6 +1457,9 @@ other = "Agent token usage"
 [AgentTokenUsageConsole]
 other = "Token usage: {{.Agent}}/{{.Operation}} current {{.Current}} ({{.Detail}}), cumulative {{.Cumulative}}{{.Cost}}"
 
+[AgentTokenUsageConsoleScoped]
+other = "Token usage: child project {{.Scope}} {{.Agent}}/{{.Operation}} current {{.Current}} ({{.Detail}}), cumulative {{.Cumulative}}{{.Cost}}"
+
 [AgentTokenUsageSummaryConsole]
 other = "Token usage summary: cumulative {{.Total}} ({{.Detail}}){{.Cost}}"
 
@@ -1560,6 +1605,30 @@ other = "Failed to generate project profile: {{.Error}}"
 [LearnWorkspaceStart]
 other = "Starting workspace project learning"
 
+[LearnWorkspaceProjectInfo]
+other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}\nChild project path: {{.Path}}"
+
+[LearnWorkspaceProjectResult]
+other = "Child project {{.ProjectName}} analysis completed:\n  • Patterns: {{.PatternsCount}}\n  • Business rules: {{.BusinessRulesCount}}\n  • Best practices: {{.BestPracticesCount}}"
+
+[LearnWorkspaceProjectPatternsSaved]
+other = "Child project {{.ProjectName}} saved {{.Count}} patterns"
+
+[LearnWorkspaceProjectPatternsSkipped]
+other = "Child project {{.ProjectName}} extracted no patterns; skipped saving patterns"
+
+[LearnWorkspaceProjectProfileSaved]
+other = "Child project {{.ProjectName}} saved project profile"
+
+[LearnWorkspaceProjectProfileSkipped]
+other = "Child project {{.ProjectName}} skipped saving project profile"
+
+[LearnWorkspaceProjectProfileFallback]
+other = "Child project {{.ProjectName}} profile analysis failed; using code analysis summary for the profile: {{.Error}}"
+
+[LearnWorkspaceProjectFailed]
+other = "Child project {{.ProjectName}} learning failed: {{.Error}}"
+
 [LearnWorkspaceComplete]
 other = "Workspace learning completed"
 
@@ -1645,6 +1714,9 @@ other = "skills-seed already initialized"
 
 [InitFlagMode]
 other = "Initialization mode: project or workspace"
+
+[InitFlagLocale]
+other = "Configuration file language: zh-CN or en-US; auto-detected when omitted"
 
 [InitFlagWorkspace]
 other = "Initialize as workspace mode, equivalent to --mode workspace"

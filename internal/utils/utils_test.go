@@ -89,3 +89,15 @@ logging:
 		assert.Error(t, err)
 	})
 }
+
+func TestRelativePaths(t *testing.T) {
+	projectRoot := filepath.Join("tmp", "project")
+	paths := []string{
+		filepath.Join(projectRoot, "internal", "service"),
+		filepath.Join(projectRoot, "cmd", "skills-seed"),
+	}
+
+	result := RelativePaths(projectRoot, paths)
+
+	assert.Equal(t, []string{"internal/service", "cmd/skills-seed"}, result)
+}

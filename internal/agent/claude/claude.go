@@ -351,7 +351,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 	}
 	callCompleteFields = append(callCompleteFields, tokenusage.Fields(usage, "")...)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
-	agent.LogTokenUsage(c.Name(), operation, usage)
+	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
 	logger.Debug("Claude 模型回复预览",
 		"agent", c.Name(),

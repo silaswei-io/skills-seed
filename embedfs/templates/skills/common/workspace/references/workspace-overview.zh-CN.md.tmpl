@@ -1,57 +1,86 @@
 # 工作区概览
 
-本文件描述工作区级入口和路由信息。子项目内部架构、业务方法、工具方法和项目规范，请读取对应子项目 skill 的 `references/project-spec.md` 与 `references/project-overview.md`。
+本文件是工作区地图。它只描述入口、路径和协作范围；子项目内部架构、业务方法、工具方法和项目规范必须读取对应子项目 skill 的 `references/project-spec.md` 与 `references/project-overview.md`。
 
 ## 子项目
 
 {{range .Projects}}
-- `{{.ID}}`: `{{.Path}}`，类型 `{{.Type}}`，语言 `{{.Language}}`
-  - Skill: `{{.Path}}/.agents/skills/{{.SkillName}}/SKILL.md` 或 `{{.Path}}/.claude/skills/{{.SkillName}}/SKILL.md`
-  - Project spec: `{{.Path}}/.agents/skills/{{.SkillName}}/references/project-spec.md` 或 `{{.Path}}/.claude/skills/{{.SkillName}}/references/project-spec.md`
+### {{.ID}}
+
+- 路径：`{{.Path}}`
+- 类型：`{{.Type}}`
+- 语言：`{{.Language}}`
+{{if .SelfManaged}}
+- 管理方式：子项目自带 skills-seed
+- 子项目配置：`{{.SelfManagedConfigPath}}`
+- Skill：`{{.SkillPath}}`
+- Project spec：`{{.ProjectSpecPath}}`
 {{else}}
-- 暂未配置子项目。
+- Skill：`{{.SkillPath}}`
+- Project spec：`{{.ProjectSpecPath}}`
 {{end}}
-
-{{if .Shared}}
-## 共享路径
-
-{{range .Shared}}
-- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
-  - 变更后检查所有导入、打包或生成该共享内容的子项目。
-{{end}}
-{{end}}
-
-{{if .Contracts}}
-## 契约路径
-
-{{range .Contracts}}
-- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
-  - 变更后检查契约生产者、消费者、生成客户端、服务端处理器、中间件适配器和测试。
-{{end}}
-{{end}}
-
-{{if .Infra}}
-## 基础设施路径
-
-{{range .Infra}}
-- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
-  - 变更后检查部署目标、环境变量、网关或中间件配置影响到的子项目。
-{{end}}
+- 默认写入边界：`{{.Path}}/**`
+{{else}}
+暂未配置子项目。请先检查 `.skills-seed/config.yaml` 的 `workspace.projects`。
 {{end}}
 
 ## 路由表
 
-| 路径模式 | 子项目 | 读取内容 |
-| --- | --- | --- |
+| 路径模式 | 子项目 | 读取内容 | 默认写入边界 |
+| --- | --- | --- | --- |
 {{range .Projects}}
-| `{{.Path}}/**` | `{{.ID}}` | 子项目 `SKILL.md` 和 `references/project-spec.md` |
+{{if .SelfManaged}}
+| `{{.Path}}/**` | `{{.ID}}` | `{{.SelfManagedConfigPath}}`、`{{.SkillPath}}` 和 `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
+{{else}}
+| `{{.Path}}/**` | `{{.ID}}` | `{{.SkillPath}}` 和 `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
 {{end}}
-{{if .Contracts}}
-| `contracts/**` 或已配置契约路径 | 相关生产者和消费者 | 所有受契约影响的子项目 skill |
 {{end}}
-{{if .Shared}}
-| `shared/**` 或已配置共享路径 | 所有消费者 | 所有导入共享内容的子项目 skill |
+
+## 特殊路径
+
+### 契约路径
+
+{{if .HasContracts}}
+{{range .Contracts}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - 变更后检查生产者、消费者、生成客户端、服务端处理器、中间件适配器和测试。
 {{end}}
-{{if .Infra}}
-| `infra/**` 或已配置基础设施路径 | 受部署影响项目 | 运行服务、中间件和部署目标相关 skill |
+{{else}}
+- 未显式配置契约路径。
+- 遇到 `api`、`proto`、`openapi`、`swagger`、`schema`、`types`、`sdk`、`client` 等路径或文件名时，按契约变更处理。
+- 契约变更通常至少影响一个生产者和一个消费者；不要只改单端。
 {{end}}
+
+### 共享路径
+
+{{if .HasShared}}
+{{range .Shared}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - 变更后检查所有导入、打包或生成该共享内容的子项目。
+{{end}}
+{{else}}
+- 未显式配置共享路径。
+- 遇到 `pkg`、`common`、`shared`、`lib`、`utils`、`components` 等路径时，先查找导入方或打包方。
+- 共享代码先稳定公共 API，再让消费者子项目跟进。
+{{end}}
+
+### 基础设施路径
+
+{{if .HasInfra}}
+{{range .Infra}}
+- `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  - 变更后检查部署目标、环境变量、网关或中间件配置影响到的子项目。
+{{end}}
+{{else}}
+- 未显式配置基础设施路径。
+- 遇到 `deploy`、`docker`、`k8s`、`helm`、`terraform`、`nginx`、`gateway`、`env`、`config` 等路径时，先判断运行时影响。
+- 基础设施改动需要同步检查启动命令、端口、环境变量、健康检查、网关路由和 CI。
+{{end}}
+
+## 决策规则
+
+- 路径只命中一个子项目：读取该子项目 skill，并将写入限制在该子项目路径。
+- 路径命中特殊路径或根目录脚本：先判断覆盖哪些子项目，再读取所有受影响子项目 skill。
+- 文件名或内容体现接口、类型、错误码、事件、消息或生成输入：按契约变更处理。
+- 文件名或内容体现部署、运行时配置、网关或中间件：按基础设施变更处理。
+- 无法判断归属时，先停止并检查配置，不要凭名称猜测。

@@ -31,6 +31,14 @@ Based on the provided project information, analyze the project to identify:
 {{.Structure}}
 ```
 {{- end}}
+{{- if .StructuralContext}}
+
+# CodeGraph Structural Context
+
+The following context was produced from the target project's CodeGraph index. Treat it as structured evidence for symbols, call relationships, entry points, module dependencies, and impact radius. Use it to prioritize files and relationships, but still read source files when detailed business behavior or exact examples are needed.
+
+{{.StructuralContext}}
+{{- end}}
 {{- if .MainFiles}}
 
 # Entry Files

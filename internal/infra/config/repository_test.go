@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // setupTestConfig creates a temporary config repository for testing
@@ -76,6 +78,14 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
 	assert.False(t, cfg.Agent.AllowUserPlugins)
+	assert.True(t, cfg.Analysis.CodeGraph.Enabled)
+	assert.False(t, cfg.Analysis.CodeGraph.Required)
+	assert.Equal(t, "codegraph", cfg.Analysis.CodeGraph.Command)
+	assert.False(t, cfg.Analysis.CodeGraph.AutoInit)
+	assert.True(t, cfg.Analysis.CodeGraph.AutoSync)
+	assert.Equal(t, 30, cfg.Analysis.CodeGraph.MaxNodes)
+	assert.Equal(t, 0, cfg.Analysis.CodeGraph.MaxCode)
+	assert.Equal(t, WorkspaceChildSkillPolicySkipExisting, cfg.Workspace.ChildSkillPolicy)
 	assert.Equal(t, 50, cfg.Learning.MaxCommits)
 	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
 	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Output.SkillsPaths["claude"])
@@ -101,6 +111,7 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 
 	cfg := repo.Get()
 	cfg.Project.Mode = "workspace"
+	cfg.Workspace.ChildSkillPolicy = WorkspaceChildSkillPolicyOverwrite
 	cfg.Workspace.Projects = []WorkspaceProjectConfig{
 		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
@@ -110,14 +121,147 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 
 	content, err := os.ReadFile(filepath.Join(seedPath, "config.yaml"))
 	require.NoError(t, err)
-	require.Contains(t, string(content), `id: frontend`)
-	require.Contains(t, string(content), `path: proto`)
+	contentText := string(content)
+	require.Contains(t, contentText, "# 工作区配置")
+	require.Contains(t, contentText, `child_skill_policy: "overwrite"`)
+	require.Contains(t, contentText, `id: "frontend"`)
+	require.Contains(t, contentText, `path: "proto"`)
+	require.Contains(t, contentText, `description: "API contracts"`)
+	require.Contains(t, contentText, `shared: []`)
+	require.NotContains(t, contentText, `'**/*.pb.go'`)
 
 	reloaded, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 2)
+	require.Equal(t, WorkspaceChildSkillPolicyOverwrite, reloaded.GetWorkspaceConfig().ChildSkillPolicy)
 	require.Equal(t, "backend", reloaded.GetWorkspaceConfig().Projects[1].ID)
 	require.Equal(t, "API contracts", reloaded.GetWorkspaceConfig().Contracts[0].Description)
+}
+
+func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
+	templateData, err := embedfs.FS.ReadFile("templates/config/config.yaml.zh-CN.tmpl")
+	require.NoError(t, err)
+
+	repo := &Repository{}
+	cfg := &Config{
+		Project: ProjectConfig{
+			Name:          "demo-workspace",
+			Mode:          "workspace",
+			Language:      "go",
+			Locale:        "zh-CN",
+			InitializedAt: "2026-05-26 12:00:00",
+		},
+		Workspace: WorkspaceConfig{
+			ChildSkillPolicy: WorkspaceChildSkillPolicyRootOnly,
+			Projects: []WorkspaceProjectConfig{
+				{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+			},
+			Contracts: []WorkspacePathConfig{{Path: "proto", Description: "API contracts"}},
+		},
+		Agent: AgentConfig{
+			Provider: "claude",
+			Commands: map[string]string{
+				"claude": "claude",
+				"codex":  "codex",
+			},
+			Timeout: 1800,
+		},
+		Learning: LearningConfig{MaxCommits: 50, BatchSize: 5},
+		AutoFix:  AutoFixConfig{Strategy: "patch", BackupPath: "backups"},
+		Output: OutputConfig{SkillsPaths: map[string]string{
+			"claude": ".claude/skills/skills-seed-skills",
+			"codex":  ".agents/skills/skills-seed-skills",
+		}},
+		Logging: LoggingConfig{Level: "DEBUG", LogsPath: "logs", MaxLogFiles: 30},
+	}
+
+	content := repo.replaceConfigValues(string(templateData), cfg)
+	var parsed Config
+	require.NoError(t, yaml.Unmarshal([]byte(content), &parsed), content)
+	require.Contains(t, content, "# 工作区配置")
+	require.Contains(t, content, `child_skill_policy: "root_only"`)
+	require.Contains(t, content, `id: "backend"`)
+	require.Contains(t, content, `description: "API contracts"`)
+	require.Contains(t, content, `- "**/*.pb.go"`)
+	require.Contains(t, content, `analysis:`)
+	require.Contains(t, content, `enabled: false`)
+}
+
+func TestRepository_NormalizeAnalysisCodeGraphDefaults(t *testing.T) {
+	seedPath := t.TempDir()
+	configPath := filepath.Join(seedPath, "config.yaml")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+project:
+  language: "go"
+  locale: "zh-CN"
+agent:
+  provider: "claude"
+learning:
+  max_commits: 50
+autofix:
+  strategy: "patch"
+output:
+  skills_paths: {}
+logging:
+  level: "DEBUG"
+exclude: []
+`), 0644))
+
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	cfg := repo.GetAnalysisConfig().CodeGraph
+	require.True(t, cfg.Enabled)
+	require.False(t, cfg.Required)
+	require.Equal(t, "codegraph", cfg.Command)
+	require.False(t, cfg.AutoInit)
+	require.True(t, cfg.AutoSync)
+	require.Equal(t, 30, cfg.MaxNodes)
+	require.Equal(t, 0, cfg.MaxCode)
+}
+
+func TestRepository_PreservesExplicitCodeGraphDisabled(t *testing.T) {
+	seedPath := t.TempDir()
+	configPath := filepath.Join(seedPath, "config.yaml")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+project:
+  language: "go"
+  locale: "zh-CN"
+analysis:
+  codegraph:
+    enabled: false
+    required: false
+    command: "custom-codegraph"
+    auto_init: true
+    auto_sync: false
+    max_nodes: 12
+    max_code: 3
+agent:
+  provider: "claude"
+learning:
+  max_commits: 50
+autofix:
+  strategy: "patch"
+output:
+  skills_paths: {}
+logging:
+  level: "DEBUG"
+exclude: []
+`), 0644))
+
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	cfg := repo.GetAnalysisConfig().CodeGraph
+	require.False(t, cfg.Enabled)
+	require.False(t, cfg.Required)
+	require.Equal(t, "custom-codegraph", cfg.Command)
+	require.True(t, cfg.AutoInit)
+	require.False(t, cfg.AutoSync)
+	require.Equal(t, 12, cfg.MaxNodes)
+	require.Equal(t, 3, cfg.MaxCode)
 }
 
 func TestRepository_GetAgentConfig(t *testing.T) {

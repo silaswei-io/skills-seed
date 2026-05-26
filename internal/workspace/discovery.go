@@ -24,43 +24,115 @@ var ignoredDirs = map[string]bool{
 	"coverage":     true,
 }
 
-// DiscoverProjects 从仓库根目录自动发现工作区子项目候选
-func DiscoverProjects(root string) []config.WorkspaceProjectConfig {
-	candidates := map[string]config.WorkspaceProjectConfig{}
+var projectMarkerFiles = []string{
+	"package.json",
+	"pnpm-workspace.yaml",
+	"pnpm-lock.yaml",
+	"yarn.lock",
+	"package-lock.json",
+	"bun.lock",
+	"bun.lockb",
+	"deno.json",
+	"deno.jsonc",
+	"tsconfig.json",
+	"vite.config.ts",
+	"vite.config.js",
+	"next.config.js",
+	"nuxt.config.ts",
+	"go.mod",
+	"go.work",
+	"pyproject.toml",
+	"requirements.txt",
+	"setup.py",
+	"setup.cfg",
+	"Pipfile",
+	"poetry.lock",
+	"uv.lock",
+	"Cargo.toml",
+	"pom.xml",
+	"mvnw",
+	"build.gradle",
+	"build.gradle.kts",
+	"settings.gradle",
+	"settings.gradle.kts",
+	"gradlew",
+	"build.sbt",
+	"composer.json",
+	"Gemfile",
+	"mix.exs",
+	"CMakeLists.txt",
+	"Dockerfile",
+	"docker-compose.yml",
+	"docker-compose.yaml",
+	"compose.yml",
+	"compose.yaml",
+	"buf.yaml",
+	"buf.work.yaml",
+	"openapi.yaml",
+	"openapi.yml",
+	"Chart.yaml",
+	"kustomization.yaml",
+	"main.tf",
+}
 
-	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
+var projectMarkerExtensions = []string{
+	".csproj",
+	".fsproj",
+	".vbproj",
+	".sln",
+}
+
+var markerGroups = map[string][]string{
+	"node": {
+		"package.json",
+		"pnpm-workspace.yaml",
+		"pnpm-lock.yaml",
+		"yarn.lock",
+		"package-lock.json",
+		"bun.lock",
+		"bun.lockb",
+		"deno.json",
+		"deno.jsonc",
+		"tsconfig.json",
+		"vite.config.ts",
+		"vite.config.js",
+		"next.config.js",
+		"nuxt.config.ts",
+	},
+	"go":        {"go.mod", "go.work"},
+	"python":    {"pyproject.toml", "requirements.txt", "setup.py", "setup.cfg", "Pipfile", "poetry.lock", "uv.lock"},
+	"java":      {"pom.xml", "mvnw", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradlew"},
+	"dotnet":    {".csproj", ".fsproj", ".vbproj", ".sln"},
+	"contracts": {"buf.yaml", "buf.work.yaml", "openapi.yaml", "openapi.yml"},
+	"infra":     {"Chart.yaml", "kustomization.yaml", "main.tf"},
+	"container": {"Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"},
+}
+
+// DiscoverProjects 从工作区根目录的第一层目录自动发现子项目候选
+func DiscoverProjects(root string) []config.WorkspaceProjectConfig {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+
+	projects := make([]config.WorkspaceProjectConfig, 0, len(entries))
+	for _, entry := range entries {
 		if !entry.IsDir() {
-			return nil
+			continue
 		}
 
 		name := entry.Name()
 		if ignoredDirs[name] {
-			return filepath.SkipDir
+			continue
 		}
 
-		rel, err := filepath.Rel(root, path)
-		if err != nil || rel == "." {
-			return nil
-		}
-		if strings.Count(rel, string(filepath.Separator)) > 2 {
-			return filepath.SkipDir
-		}
-
-		project, ok := detectProject(root, rel)
+		project, ok := detectProject(root, name)
 		if !ok {
-			return nil
+			continue
 		}
-		candidates[project.Path] = project
-		return filepath.SkipDir
-	})
-
-	projects := make([]config.WorkspaceProjectConfig, 0, len(candidates))
-	for _, project := range candidates {
 		projects = append(projects, project)
 	}
+
 	sort.Slice(projects, func(i, j int) bool {
 		return projects[i].Path < projects[j].Path
 	})
@@ -69,24 +141,7 @@ func DiscoverProjects(root string) []config.WorkspaceProjectConfig {
 
 func detectProject(root, rel string) (config.WorkspaceProjectConfig, bool) {
 	abs := filepath.Join(root, rel)
-	markers := map[string]bool{}
-	for _, marker := range []string{
-		"package.json",
-		"go.mod",
-		"pyproject.toml",
-		"requirements.txt",
-		"Cargo.toml",
-		"pom.xml",
-		"build.gradle",
-		"Dockerfile",
-		"buf.yaml",
-		"openapi.yaml",
-		"openapi.yml",
-	} {
-		if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
-			markers[marker] = true
-		}
-	}
+	markers := collectProjectMarkers(abs)
 	if len(markers) == 0 {
 		return config.WorkspaceProjectConfig{}, false
 	}
@@ -104,29 +159,88 @@ func detectProject(root, rel string) (config.WorkspaceProjectConfig, bool) {
 	}, true
 }
 
+func collectProjectMarkers(abs string) map[string]bool {
+	markers := map[string]bool{}
+	for _, marker := range projectMarkerFiles {
+		if pathExists(filepath.Join(abs, marker)) {
+			markers[marker] = true
+		}
+	}
+
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return markers
+	}
+	for _, entry := range entries {
+		name := strings.ToLower(entry.Name())
+		for _, ext := range projectMarkerExtensions {
+			if strings.HasSuffix(name, ext) {
+				markers[ext] = true
+			}
+		}
+	}
+	return markers
+}
+
 func inferTypeAndLanguage(abs string, markers map[string]bool) (string, string) {
-	if markers["package.json"] {
+	if hasAnyMarker(markers, markerGroups["node"]) {
 		if isFrontendPackage(filepath.Join(abs, "package.json")) {
 			return "frontend", "typescript"
 		}
 		return "backend", "typescript"
 	}
-	if markers["go.mod"] {
+	if hasAnyMarker(markers, markerGroups["go"]) {
 		if pathExists(filepath.Join(abs, "cmd")) || pathExists(filepath.Join(abs, "internal")) {
 			return "backend", "go"
 		}
 		return "library", "go"
 	}
-	if markers["pyproject.toml"] || markers["requirements.txt"] {
+	if hasAnyMarker(markers, markerGroups["python"]) {
 		return "backend", "python"
 	}
-	if markers["buf.yaml"] || markers["openapi.yaml"] || markers["openapi.yml"] {
+	if markers["Cargo.toml"] {
+		return "service", "rust"
+	}
+	if hasAnyMarker(markers, markerGroups["java"]) {
+		return "backend", "java"
+	}
+	if markers["build.sbt"] {
+		return "backend", "scala"
+	}
+	if markers["composer.json"] {
+		return "backend", "php"
+	}
+	if markers["Gemfile"] {
+		return "backend", "ruby"
+	}
+	if markers["mix.exs"] {
+		return "backend", "elixir"
+	}
+	if markers["CMakeLists.txt"] {
+		return "library", "cpp"
+	}
+	if hasAnyMarker(markers, markerGroups["dotnet"]) {
+		return "backend", "csharp"
+	}
+	if hasAnyMarker(markers, markerGroups["contracts"]) {
 		return "contracts", "unknown"
 	}
-	if markers["Dockerfile"] {
+	if hasAnyMarker(markers, markerGroups["infra"]) {
+		return "infra", "unknown"
+	}
+	if hasAnyMarker(markers, markerGroups["container"]) {
 		return "service", "unknown"
 	}
 	return "project", "unknown"
+}
+
+func hasAnyMarker(markers map[string]bool, names []string) bool {
+	for _, name := range names {
+		if markers[name] {
+			return true
+		}
+	}
+	return false
 }
 
 func isFrontendPackage(path string) bool {

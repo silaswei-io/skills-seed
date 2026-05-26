@@ -2,6 +2,38 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.4]
+
+### Features
+
+- Limit workspace initialization discovery to first-level directories and expand common project marker support
+- Generate the root workspace skill and child-project skills for the current `agent.provider`
+- Make root workspace routing point only to child skills for the current provider, so Claude generation no longer also writes Codex output
+- Generate provider metadata for the root workspace skill, including standard `agents/openai.yaml` for Codex output
+- Add `workspace.child_skill_policy` with `skip_existing`, `overwrite`, and `root_only` for child-project skill generation
+- Add `generate-skills --overwrite` and `--root-only` to override the workspace child-skill policy for one run
+- Treat child projects with `.skills-seed/config.yaml` as independently initialized, so the workspace root does not generate or overwrite their child skills
+
+### Templates
+
+- Expand the workspace root skill with a workspace map, impact-radius decisions, cross-project order, default special-path detection, and parallel write boundaries
+- Expand `workspace-overview.md` and `cross-project-rules.md` so they provide default detection rules even when contracts/shared/infra paths are not configured
+- Mark independently initialized child projects in the root workspace skill and overview, with instructions to use the child project's own `.skills-seed/config.yaml`
+
+### Experience
+
+- Keep template comments and double-quoted style when saving workspace config, avoiding full-file YAML marshal fallback
+- Skip existing child-project skills for the current provider by default while still generating the root workspace skill
+- Add i18n text for CLI flag help and workspace generation logs
+- Align workspace child-project learning logs with single-project mode, including child start, analysis result, saved patterns, saved profile, and skip reasons
+- Defer workspace child-project token usage output to the end of that child-project log block and include the child project name
+- Make `learn current` token usage the final learning log line in project mode, and print workspace token usage after each child project's completion log to avoid concurrent log ordering drift
+
+### Documentation
+
+- Rewrite the README structure with single-project and workspace quick starts, mode locking, configuration, and common commands
+- Update `docs/` architecture and generation pipeline documents, including matching English documents
+
 ## [v0.0.3]
 
 ### Features

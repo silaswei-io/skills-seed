@@ -351,7 +351,7 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string) (s
 	}
 	callCompleteFields = append(callCompleteFields, tokenusage.Fields(usage, "")...)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
-	agent.LogTokenUsage(c.Name(), operation, usage)
+	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
 	content, err := extractFinalContent(rawOutput)
 	if err != nil {

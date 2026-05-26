@@ -116,6 +116,9 @@ other = "创建 prompt 目录失败: {{.Path}}"
 [AgentProviderUnsupported]
 other = "不支持的 Agent 提供方: {{.Provider}}"
 
+[AgentNotAvailable]
+other = "Agent {{.Agent}} 不可用，请检查 agent 命令配置"
+
 [AgentRenderAnalyzePromptFailed]
 other = "渲染 analyze prompt 失败"
 
@@ -241,6 +244,15 @@ other = "项目分析失败"
 
 [AnalyzerAnalyzeCodebaseFailed]
 other = "代码库分析失败"
+
+[AnalyzerCodeGraphCommandUnavailable]
+other = "CodeGraph 分析增强已启用，但未找到 codegraph 命令。将跳过结构化索引分析并继续使用普通文件分析。安装方式：npm install -g @colbymchenry/codegraph"
+
+[AnalyzerCodeGraphIndexMissing]
+other = "CodeGraph 分析增强已启用，但目标项目没有 .codegraph 索引。将跳过结构化索引分析并继续使用普通文件分析。可在目标项目执行：codegraph init -i"
+
+[AnalyzerCodeGraphCollectFailed]
+other = "CodeGraph 分析增强失败，将跳过结构化索引分析并继续使用普通文件分析。"
 
 [ConfigReadFailed]
 other = "读取配置失败"
@@ -473,6 +485,12 @@ other = "请先运行 'skills-seed init' 初始化项目"
 [CheckLongDesc]
 other = "检查暂存的文件是否符合编码规范。\n\n此命令将：\n  • 获取 Git 暂存的文件\n  • 使用 配置的 AI Agent 分析代码\n  • 基于学到的模式发现问题\n  • 提供修复建议\n\n通常通过 Git pre-commit hook 自动运行。\n\n示例：\n  # 检查暂存的文件\n  skills-seed check\n\n  # 检查所有文件\n  skills-seed check --all"
 
+[CheckFlagInteractive]
+other = "启用交互式修复确认"
+
+[CheckFlagAll]
+other = "检查所有文件，而不是只检查暂存文件"
+
 [GenerateShort]
 other = "生成 AI Agent skills"
 
@@ -544,6 +562,9 @@ other = "请先运行 'skills-seed init' 初始化项目"
 
 [ViewLongDesc]
 other = "查看学习到的模式和生成的规则。\n\n子命令：\n  patterns  - 查看所有学到的模式\n  rules     - 查看所有生成的规则\n\n示例：\n  # 查看模式\n  skills-seed view patterns\n\n  # 查看规则\n  skills-seed view rules"
+
+[ViewFlagCategory]
+other = "按分类过滤: naming/error/structure/concurrency/testing/business/api/database/utils/middleware/config"
 
 [ScanShort]
 other = "扫描并分析项目"
@@ -728,6 +749,27 @@ other = "输出路径: {{.Path}}"
 
 [GenerateProjectProfileMissing]
 other = "缺少项目画像，无法生成项目概览。请先运行 'skills-seed learn current' 或 'skills-seed profile refresh'。"
+
+[GenerateFlagOutput]
+other = "skills 输出目录（默认使用当前 provider 的 output.skills_paths）"
+
+[GenerateFlagOverwrite]
+other = "workspace 模式下覆盖子项目实际配置路径下的已有 skills"
+
+[GenerateFlagRootOnly]
+other = "workspace 模式下只生成根 skill，不生成子项目 skills"
+
+[GenerateWorkspacePolicyFlagsConflict]
+other = "不能同时使用 --overwrite 和 --root-only"
+
+[GenerateWorkspaceChildSkillSkippedExisting]
+other = "跳过已有子项目 skill: {{.Project}} ({{.Path}})"
+
+[GenerateWorkspaceChildSkillSkippedSelfManaged]
+other = "跳过独立初始化的子项目: {{.Project}} ({{.Path}})"
+
+[GenerateWorkspaceChildSkillsSkippedRootOnly]
+other = "已启用 root_only，跳过 {{.Count}} 个子项目 skill"
 
 # 生成合并
 [GenerateFlagMerge]
@@ -1416,6 +1458,9 @@ other = "Agent token 消耗统计"
 [AgentTokenUsageConsole]
 other = "Token 消耗: {{.Agent}}/{{.Operation}} 本次 {{.Current}}（{{.Detail}}），累计 {{.Cumulative}}{{.Cost}}"
 
+[AgentTokenUsageConsoleScoped]
+other = "Token 消耗: 子项目 {{.Scope}} {{.Agent}}/{{.Operation}} 本次 {{.Current}}（{{.Detail}}），累计 {{.Cumulative}}{{.Cost}}"
+
 [AgentTokenUsageSummaryConsole]
 other = "Token 消耗汇总: 累计 {{.Total}}（{{.Detail}}）{{.Cost}}"
 
@@ -1561,6 +1606,30 @@ other = "生成项目画像失败: {{.Error}}"
 [LearnWorkspaceStart]
 other = "开始学习工作区子项目"
 
+[LearnWorkspaceProjectInfo]
+other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}\n子项目路径: {{.Path}}"
+
+[LearnWorkspaceProjectResult]
+other = "子项目 {{.ProjectName}} 分析完成:\n  • 模式数量: {{.PatternsCount}}\n  • 业务规则: {{.BusinessRulesCount}}\n  • 最佳实践: {{.BestPracticesCount}}"
+
+[LearnWorkspaceProjectPatternsSaved]
+other = "子项目 {{.ProjectName}} 已保存 {{.Count}} 个模式"
+
+[LearnWorkspaceProjectPatternsSkipped]
+other = "子项目 {{.ProjectName}} 未提取到模式，跳过保存模式"
+
+[LearnWorkspaceProjectProfileSaved]
+other = "子项目 {{.ProjectName}} 已保存项目画像"
+
+[LearnWorkspaceProjectProfileSkipped]
+other = "子项目 {{.ProjectName}} 跳过项目画像保存"
+
+[LearnWorkspaceProjectProfileFallback]
+other = "子项目 {{.ProjectName}} 项目画像分析失败，使用代码分析摘要生成画像: {{.Error}}"
+
+[LearnWorkspaceProjectFailed]
+other = "子项目 {{.ProjectName}} 学习失败: {{.Error}}"
+
 [LearnWorkspaceComplete]
 other = "工作区学习完成"
 
@@ -1646,6 +1715,9 @@ other = "skills-seed 已经初始化"
 
 [InitFlagMode]
 other = "初始化模式：project 或 workspace"
+
+[InitFlagLocale]
+other = "配置文件语言：zh-CN 或 en-US；不指定时自动检测"
 
 [InitFlagWorkspace]
 other = "按 workspace 模式初始化，等价于 --mode workspace"

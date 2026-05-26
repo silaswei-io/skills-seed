@@ -161,6 +161,7 @@ type AnalyzeProjectRequest struct {
 	RootPath            string   // 项目根路径
 	Language            string   // 主要语言
 	Structure           string   // 目录结构（tree 输出）
+	StructuralContext   string   // CodeGraph 等结构化分析上下文
 	ReadmePath          string   // README 文件路径（如果存在）
 	MainFiles           []string // 主要入口文件路径
 	ExistingProfileJSON string   // 已有项目画像 JSON
@@ -193,15 +194,16 @@ type SampleFile struct {
 
 // AnalyzeCurrentCodebaseRequest 分析当前代码库请求
 type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName string       // 项目名称
-	RootPath    string       // 项目根路径
-	Language    string       // 主要语言
-	FocusPaths  []string     // 指定扫描范围（相对项目根）
-	Structure   string       // 目录结构
-	MainFiles   []string     // 主要入口文件路径
-	SampleFiles []SampleFile // 示例文件路径
-	FileCount   int          // 文件总数
-	DirCount    int          // 目录总数
+	ProjectName       string       // 项目名称
+	RootPath          string       // 项目根路径
+	Language          string       // 主要语言
+	FocusPaths        []string     // 指定扫描范围（相对项目根）
+	Structure         string       // 目录结构
+	StructuralContext string       // CodeGraph 等结构化分析上下文
+	MainFiles         []string     // 主要入口文件路径
+	SampleFiles       []SampleFile // 示例文件路径
+	FileCount         int          // 文件总数
+	DirCount          int          // 目录总数
 }
 
 // AnalyzeCurrentCodebaseResult 分析当前代码库结果

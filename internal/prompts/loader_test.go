@@ -145,6 +145,32 @@ func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	require.Contains(t, prompt, "完整项目画像")
 }
 
+func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
+	loader := NewLoader("codex", "zh-CN", "")
+	data := sampleProjectAnalysisData()
+	data["StructuralContext"] = "## CodeGraph Structural Context\n- handler calls service"
+
+	prompt, err := loader.Render("project-analysis", data)
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "CodeGraph")
+	require.Contains(t, prompt, "handler calls service")
+	require.Contains(t, prompt, "结构化")
+}
+
+func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
+	loader := NewLoader("codex", "zh-CN", "")
+	req := sampleAnalyzeCurrentCodebaseRequest()
+	req.StructuralContext = "## CodeGraph Structural Context\n- service has callers"
+
+	prompt, err := loader.Render("init-skills", req)
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "CodeGraph")
+	require.Contains(t, prompt, "service has callers")
+	require.Contains(t, prompt, "结构化")
+}
+
 func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *testing.T) {
 	tests := []struct {
 		locale       string
@@ -367,6 +393,7 @@ func sampleProjectAnalysisData() map[string]interface{} {
 		"RootPath":            "/tmp/demo",
 		"Language":            "go",
 		"Structure":           "cmd/demo/main.go",
+		"StructuralContext":   "",
 		"ReadmePath":          "README.md",
 		"MainFiles":           []string{"cmd/demo/main.go"},
 		"ExistingProfileJSON": "",

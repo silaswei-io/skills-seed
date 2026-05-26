@@ -380,6 +380,7 @@ func (m *MockCommitTracker) GetAnalyzedCommits(ctx context.Context) ([]string, e
 type MockConfigReader struct {
 	ProjectCfg   config.ProjectConfig
 	WorkspaceCfg config.WorkspaceConfig
+	AnalysisCfg  config.AnalysisConfig
 	AgentCfg     config.AgentConfig
 	LearningCfg  config.LearningConfig
 	AutoFixCfg   config.AutoFixConfig
@@ -393,6 +394,9 @@ func (m *MockConfigReader) GetProjectConfig() config.ProjectConfig { return m.Pr
 
 // GetWorkspaceConfig 模拟获取工作区配置
 func (m *MockConfigReader) GetWorkspaceConfig() config.WorkspaceConfig { return m.WorkspaceCfg }
+
+// GetAnalysisConfig 模拟获取分析增强配置
+func (m *MockConfigReader) GetAnalysisConfig() config.AnalysisConfig { return m.AnalysisCfg }
 
 // GetAgentConfig 模拟获取 Agent 配置
 func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentCfg }

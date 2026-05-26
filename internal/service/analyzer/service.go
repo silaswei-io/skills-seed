@@ -14,6 +14,8 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,22 +27,73 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/utils"
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
 )
 
 // AnalyzerService 代码分析服务
 // 职责：分析代码、提取模式、分析项目结构
 type AnalyzerService struct {
-	agent      agent.Agent
-	configRepo config.Reader
+	agent              agent.Agent
+	configRepo         config.Reader
+	codeGraphCollector codeGraphCollector
 }
 
 // NewAnalyzerService 创建分析服务
 func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerService {
-	return &AnalyzerService{
+	svc := &AnalyzerService{
 		agent:      ag,
 		configRepo: configRepo,
 	}
+	if configRepo != nil {
+		cfg := configRepo.GetAnalysisConfig().CodeGraph
+		if cfg.Enabled {
+			svc.codeGraphCollector = newCodeGraphCollector(cfg)
+		}
+	}
+	return svc
+}
+
+func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectRoot string, req codeGraphContextRequest) (string, error) {
+	if s.configRepo == nil || s.codeGraphCollector == nil || projectRoot == "" {
+		return "", nil
+	}
+
+	cfg := s.configRepo.GetAnalysisConfig().CodeGraph
+	if !cfg.Enabled {
+		return "", nil
+	}
+	if req.MaxNodes <= 0 {
+		req.MaxNodes = cfg.MaxNodes
+	}
+	if req.MaxCode == 0 {
+		req.MaxCode = cfg.MaxCode
+	}
+
+	contextText, err := s.codeGraphCollector.Collect(ctx, projectRoot, req)
+	if err == nil {
+		return contextText, nil
+	}
+
+	if cfg.Required {
+		return "", fmt.Errorf("CodeGraph analysis is required but unavailable: %w", err)
+	}
+
+	switch {
+	case errors.Is(err, errCodeGraphUnavailable):
+		logger.Warn(i18n.Get("AnalyzerCodeGraphCommandUnavailable"))
+	case errors.Is(err, errCodeGraphNotInitialized):
+		logger.Warn(i18n.Get("AnalyzerCodeGraphIndexMissing"))
+	default:
+		logger.Warn(i18n.Get("AnalyzerCodeGraphCollectFailed"))
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		"operation", "analyzer.codegraph_collect",
+		"project_root", projectRoot,
+		"error", err,
+		"required", cfg.Required,
+	)
+	return "", nil
 }
 
 // AnalyzePatternsRequest 分析模式请求
@@ -125,6 +178,7 @@ type AnalyzeProjectRequest struct {
 	RootPath            string
 	Language            string
 	Structure           string
+	StructuralContext   string
 	ReadmePath          string
 	MainFiles           []string
 	ExistingProfileJSON string
@@ -165,11 +219,25 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 		"focus_paths_count", len(req.FocusPaths),
 	)
 
+	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, codeGraphContextRequest{
+		ProjectName: req.ProjectName,
+		Language:    req.Language,
+		Purpose:     "project profile analysis",
+		FocusPaths:  req.FocusPaths,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if req.StructuralContext != "" {
+		structuralContext = req.StructuralContext
+	}
+
 	agentReq := &agent.AnalyzeProjectRequest{
 		ProjectName:         req.ProjectName,
 		RootPath:            req.RootPath,
 		Language:            req.Language,
 		Structure:           req.Structure,
+		StructuralContext:   structuralContext,
 		ReadmePath:          req.ReadmePath,
 		MainFiles:           req.MainFiles,
 		ExistingProfileJSON: req.ExistingProfileJSON,
@@ -219,13 +287,14 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 
 // AnalyzeCurrentCodebaseRequest 当前代码库分析请求
 type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName string
-	RootPath    string
-	Language    string
-	FocusPaths  []string
-	Structure   string
-	MainFiles   []string
-	SampleFiles []agent.SampleFile
+	ProjectName       string
+	RootPath          string
+	Language          string
+	FocusPaths        []string
+	Structure         string
+	StructuralContext string
+	MainFiles         []string
+	SampleFiles       []agent.SampleFile
 }
 
 // AnalyzeCurrentCodebaseResult 当前代码库分析结果
@@ -250,17 +319,30 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		"structure_length", len(req.Structure),
 		"main_files_count", len(req.MainFiles),
 		"sample_files_count", len(req.SampleFiles),
-		"sample_content_bytes", sampleFilesContentBytes(req.SampleFiles),
 	)
 
-	agentReq := &agent.AnalyzeCurrentCodebaseRequest{
+	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, codeGraphContextRequest{
 		ProjectName: req.ProjectName,
-		RootPath:    req.RootPath,
 		Language:    req.Language,
+		Purpose:     "current codebase pattern extraction",
 		FocusPaths:  req.FocusPaths,
-		Structure:   req.Structure,
-		MainFiles:   req.MainFiles,
-		SampleFiles: req.SampleFiles,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if req.StructuralContext != "" {
+		structuralContext = req.StructuralContext
+	}
+
+	agentReq := &agent.AnalyzeCurrentCodebaseRequest{
+		ProjectName:       req.ProjectName,
+		RootPath:          req.RootPath,
+		Language:          req.Language,
+		FocusPaths:        req.FocusPaths,
+		Structure:         req.Structure,
+		StructuralContext: structuralContext,
+		MainFiles:         req.MainFiles,
+		SampleFiles:       req.SampleFiles,
 	}
 
 	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
@@ -456,7 +538,7 @@ type AnalyzeProjectOptions struct {
 // AnalyzeProjectFullWithOptions 完整项目分析，支持基于已有画像和指定路径做增量刷新
 func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, projectRoot, projectName, requestedLanguage string, opts AnalyzeProjectOptions) (*AnalyzeProjectResult, error) {
 	startedAt := time.Now()
-	focusPaths := relativeFocusPaths(projectRoot, opts.FocusPaths)
+	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
 	existingProfileJSON := ""
 	if len(focusPaths) > 0 {
 		existingProfileJSON = marshalProjectProfile(opts.ExistingProfile)
@@ -587,7 +669,7 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 
 	// 预收集项目数据
 	structure, _ := s.GetProjectStructure(projectRoot)
-	focusPaths := relativeFocusPaths(projectRoot, opts.FocusPaths)
+	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
 	if len(focusPaths) > 0 {
 		structure = focusedStructure(structure, focusPaths)
 	}
@@ -600,7 +682,6 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		"focus_paths_count", len(focusPaths),
 		"main_files_count", len(mainFiles),
 		"sample_files_count", len(sampleFiles),
-		"sample_content_bytes", sampleFilesContentBytes(sampleFiles),
 	)
 
 	req := &AnalyzeCurrentCodebaseRequest{
@@ -748,25 +829,9 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 		"scan_roots_count", len(scanRoots),
 		"duration", time.Since(startedAt),
 		"sample_files_count", len(files),
-		"sample_content_bytes", sampleFilesContentBytes(files),
 	)
 
 	return files
-}
-
-func relativeFocusPaths(projectRoot string, paths []string) []string {
-	if len(paths) == 0 {
-		return nil
-	}
-	focusPaths := make([]string, 0, len(paths))
-	for _, path := range paths {
-		rel, err := filepath.Rel(projectRoot, path)
-		if err != nil {
-			continue
-		}
-		focusPaths = append(focusPaths, filepath.ToSlash(rel))
-	}
-	return focusPaths
 }
 
 func focusedStructure(projectStructure string, focusPaths []string) string {
@@ -782,8 +847,4 @@ func focusedStructure(projectStructure string, focusPaths []string) string {
 		b.WriteString(projectStructure)
 	}
 	return b.String()
-}
-
-func sampleFilesContentBytes(files []agent.SampleFile) int {
-	return 0
 }

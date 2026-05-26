@@ -14,10 +14,24 @@ project:
 # 工作区配置
 # ========================================
 workspace:
+  child_skill_policy: "skip_existing" # 子项目 skills 生成策略: skip_existing(已有则跳过), overwrite(覆盖), root_only(只生成工作区根 skill)
   projects: []               # 子项目列表，例如: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   shared: []                 # 公共库或共享代码目录，例如: [{path: "pkg"}]
   contracts: []              # 接口契约目录，例如: [{path: "proto"}]
   infra: []                  # 部署/运维目录，例如: [{path: "deploy"}]
+
+# ========================================
+# 分析增强配置
+# ========================================
+analysis:
+  codegraph:
+    enabled: true             # 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级
+    required: false           # true 表示 CodeGraph 不可用时直接失败；false 表示继续普通分析
+    command: "codegraph"      # codegraph 命令路径
+    auto_init: false          # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
+    auto_sync: true           # 目标项目已有索引时是否在分析前执行 codegraph sync
+    max_nodes: 30             # 传给 codegraph context 的最大符号节点数
+    max_code: 0               # 传给 codegraph context 的最大代码块数；0 表示只提供结构摘要
 
 # ========================================
 # AI Agent 配置

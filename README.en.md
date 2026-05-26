@@ -1,309 +1,284 @@
 # Skills Seed
 
-<div align="center">
-
-**Intelligent code pattern learning and skill documentation generation tool**
-
-[![Go Version](https://img.shields.io/badge/Go-1.25.6+-00ADD8?style=flat&logo=go)](https://golang.org)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+**Learn project conventions from a codebase and generate local skills for Claude Code / Codex.**
 
 [简体中文](README.md) | [English](README.en.md)
 
-</div>
+Skills Seed analyzes current code, Git history, and project structure, turns existing team practices into local knowledge assets, then renders them to `.claude/skills` or `.agents/skills` for the current `agent.provider`. Data is stored locally under `.skills-seed` by default.
 
----
+## Features
 
-## 📖 Introduction
+- Learn patterns, business methods, utilities, and best practices from the current codebase
+- Learn incrementally from Git history and skip already analyzed commits
+- Generate `project-profile.json` and `project-spec.json`
+- Generate Claude Code / Codex skills with `SKILL.md` and `references/`
+- Support single-project mode and multi-project workspace mode
+- Generate a workspace root skill plus child-project skills so AI agents can route by path
+- Support `check`, interactive fixes, and a pre-commit hook
+- Support Chinese and English templates, prompts, config, and terminal output
 
-Skills Seed is an intelligent code pattern learning tool that automatically learns coding patterns and best practices from Git commit history and generates structured Claude Code / Codex-compatible skill documentation. It helps teams document coding standards, improve code quality, and accelerate onboarding for new team members
-
-## ✨ Key Features
-
-- 🔍 **Smart Pattern Learning** - Automatically extract coding patterns and best practices from Git commit history
-- 🤖 **AI-Powered Analysis** - Deep analysis of code changes using AI to identify naming conventions, error handling, architectural patterns, etc
-- 📚 **Auto Documentation Generation** - Generate structured Claude Code / Codex-compatible skill documentation with examples and best practices
-- ✅ **Code Checking** - Check code issues based on learned patterns with fix suggestions
-- 🔧 **Auto Fix** - Support interactive and automated code fixes
-- 🌐 **Multi-Language Support** - Support for Chinese and English with automatic system language detection
-- 💾 **Local Storage** - All data stored locally to protect code privacy
-
-## 🚀 Quick Start
-
-### Installation
-
-Install the CLI directly with Go
+## Install
 
 ```bash
 go install github.com/silaswei-io/skills-seed/cmd/skills-seed@latest
 skills-seed --help
 ```
 
-If the command is not found, make sure `$GOPATH/bin` or `$GOBIN` is in your `PATH`
+If the command is not found, add `$GOPATH/bin` or `$GOBIN` to `PATH`.
 
-You can also build from source
+Build from source:
 
 ```bash
-# Clone the repository
 git clone https://github.com/silaswei-io/skills-seed.git
 cd skills-seed
-
-# Build
 go build -o skills-seed ./cmd/skills-seed
-
-# Install the local version (optional)
-go install ./cmd/skills-seed
 ```
 
-### Initialize Project
+## Requirements
+
+- Go 1.25.6+
+- A Git repository
+- An available AI Agent CLI: default is `claude`; `codex` can be selected in config
+
+## Quick Start: Single Project
 
 ```bash
-# Run in your project root
 cd your-project
-skills-seed init
-
-# Specify language (optional)
-skills-seed init --locale en-US  # English
-skills-seed init --locale zh-CN  # Chinese
+skills-seed init --mode project --locale en-US
+skills-seed learn current
+skills-seed generate-skills
 ```
 
-Initialization will
+The default provider is `claude`, so output is:
 
-- Create `.skills-seed` directory
-- Generate configuration, database, and project-specific prompts
-- Record project root and default output settings
-
-### Learn Coding Patterns
-
-```bash
-# Analyze current codebase
-skills-seed learn current
-
-# Learn from last 50 commits
-skills-seed learn history --limit=50
-
-# Learn from last 30 days
-skills-seed learn history --since=30d
-
-# Refresh only the project profile (used to regenerate project overview)
-skills-seed profile refresh
+```text
+your-project/
+├── .skills-seed/
+│   ├── config.yaml
+│   ├── memory/
+│   │   ├── project.db
+│   │   ├── project-profile.json
+│   │   └── project-spec.json
+│   └── logs/
+└── .claude/skills/skills-seed-skills/
 ```
 
-`learn current` only saves patterns and the project profile. It does not generate `SKILL.md` or `references/`; run `skills-seed generate-skills` when you want documentation output
+After changing `agent.provider` to `codex` in `.skills-seed/config.yaml`, output goes to `.agents/skills/...`.
 
-### Focused Learning And Project Profile Refresh
+## Quick Start: Workspace
+
+Use workspace mode when one Git repository contains multiple child projects such as `frontend/`, `backend/`, `gateway/`, and `deploy/`.
 
 ```bash
-# First learning run, creates the full project profile
+cd your-workspace
+skills-seed init --mode workspace --locale en-US
+# Or: skills-seed init --workspace
+```
+
+Initialization scans only first-level folders under the workspace root and identifies child projects by common markers such as `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `build.gradle`, `composer.json`, `Gemfile`, `Chart.yaml`, `Dockerfile`, and `openapi.yaml`. Review and adjust `.skills-seed/config.yaml`:
+
+```yaml
+project:
+  mode: "workspace"
+
+workspace:
+  child_skill_policy: "skip_existing" # skip_existing | overwrite | root_only
+  projects:
+    - {id: "frontend", path: "frontend", type: "frontend", language: "typescript"}
+    - {id: "backend", path: "backend", type: "backend", language: "go"}
+  shared:
+    - {path: "pkg"}
+  contracts:
+    - {path: "proto"}
+  infra:
+    - {path: "deploy"}
+
+agent:
+  parallelism: 0   # 0 means automatic: project=1, workspace=project count with a cap
+```
+
+Then run:
+
+```bash
+skills-seed learn current
+skills-seed generate-skills
+```
+
+Workspace mode generates:
+
+- Root skill for the current provider: workspace routing, cross-project rules, and impact radius
+- Child-project skills: project spec, profile, and patterns for each project. If a child has its own `.skills-seed/config.yaml`, its provider and output path come from that child config
+- `.skills-seed/memory/workspace-profile.json`
+- `.skills-seed/memory/projects/<project-id>/project-profile.json`
+- `.skills-seed/memory/projects/<project-id>/project-spec.json`
+
+If a child project has its own `.skills-seed/config.yaml`, the workspace reads that child config's `agent.provider` and `output.skills_paths` to resolve the child skill path; otherwise it uses the workspace root config.
+
+The default `child_skill_policy: "skip_existing"` keeps an existing `SKILL.md` at the path resolved from the child project's effective config; only the root workspace skill is generated/refreshed. Override it in config or for one run:
+
+```bash
+skills-seed generate-skills --overwrite # overwrite child-project skills at their resolved config paths
+skills-seed generate-skills --root-only # generate only the root workspace skill
+```
+
+## Daily Commands
+
+### Learn
+
+```bash
+# Learn from current code and create or refresh the project profile when needed
 skills-seed learn current
 
-# Learn code patterns only from one directory, suitable for normal local changes
+# Learn only from a focused directory, without refreshing the profile
 skills-seed learn current --focus internal/service --profile skip
 
-# When architecture changed, refresh the profile incrementally from the existing profile and focus path
+# Focused learning with incremental profile refresh from the existing profile
 skills-seed learn current --focus internal/service --profile refresh
 
-# Learn multiple directories together
-skills-seed learn current --focus internal/service --focus internal/domain --profile refresh
+# Learn from Git history; already learned commits are skipped
+skills-seed learn history --limit=50
+skills-seed learn history --since=30d
+```
 
-# Regenerate the full project profile only, without learning patterns
+`--profile` values:
+
+- `auto`: default. Refreshes for first/full learning; skips narrow changes when possible
+- `skip`: learn patterns only
+- `refresh`: refresh the profile from the current input
+
+`learn current` prints token usage after the learning log. In workspace mode, token usage is printed at the end of each child-project log block so concurrent learning does not interleave it with other projects.
+
+### Profile And Spec
+
+```bash
+skills-seed profile show
 skills-seed profile refresh
 ```
 
-When no project profile exists, `learn current` performs a full project profile analysis; later, if `--focus` is provided and the profile needs refresh, Skills Seed uses the existing profile as the baseline, analyzes only focused paths and directly related files, then saves one complete merged profile
+`profile refresh` rebuilds the project profile only. `project-spec.json` is generated by `generate-skills` from the profile and learned patterns.
 
-Use `--profile skip` for local code style or implementation-only changes; use `--profile refresh` when directory structure, module responsibilities, dependencies, entry flow, or business methods changed; use `skills-seed profile refresh` for large refactors or framework migrations that need a full profile rebuild
-
-### Check Code
+### Generate Skills
 
 ```bash
-# Check staged files
-skills-seed check
-
-# Interactive check (with auto-fix support)
-skills-seed check --interactive
-```
-
-### Generate Skill Documentation
-
-```bash
-# Generate skill documentation
 skills-seed generate-skills
 
 # Merge similar patterns explicitly when needed
 skills-seed patterns merge
 skills-seed generate-skills
 
-# Specify Claude output path
-skills-seed generate-skills --output ~/.claude/skills/my-project-skills
+# Temporarily override output path
+skills-seed generate-skills --output .agents/skills/my-project
 
-# Specify Codex output path
-skills-seed generate-skills --output .agents/skills/my-project-skills
+# workspace: overwrite existing child-project skills
+skills-seed generate-skills --overwrite
+
+# workspace: refresh only the root workspace skill
+skills-seed generate-skills --root-only
 ```
 
-## 📁 Project Structure
+Generated content:
 
 ```text
-your-project/
-├── .skills-seed/              # Skills Seed data directory
-│   ├── config.yaml            # Configuration file
-│   ├── patterns.db            # Pattern database (BoltDB)
-│   ├── memory/                # Memory files
-│   └── logs/                  # Log files
-├── .claude/
-│   └── skills/
-│       └── skills-seed-skills/  # Claude Code skill documentation
-└── .agents/
-    └── skills/
-        └── skills-seed-skills/  # Codex-compatible skill documentation
-            ├── SKILL.md
-            ├── agents/
-            │   └── openai.yaml
-            └── references/
-                ├── patterns/
-                └── examples/
+SKILL.md
+agents/
+references/
+  project-overview.md
+  project-spec.md
+  patterns/*.md
+  examples/*.md
 ```
 
-## 🎯 Use Cases
+### Check And Hook
 
-1. **Team Collaboration** - Document team coding standards and best practices
-2. **Code Review** - Automatically check if code follows project conventions
-3. **Onboarding** - Quickly understand project coding patterns and architectural styles
-4. **Continuous Improvement** - Continuously learn and improve from high-quality commits
-5. **AI-Assisted Development** - Generated skill documentation helps Claude Code, Codex, and compatible clients better understand the project
+```bash
+# Check staged files by default
+skills-seed check
 
-## 🏗️ Architecture
+# Check all Git-tracked files
+skills-seed check --all
 
-Skills Seed adopts Domain-Driven Design (DDD) and clean layered architecture
-
-```text
-internal/
-├── domain/          # Domain layer: core business models and rules
-├── service/         # Application layer: business use cases and orchestration
-├── infra/           # Infrastructure layer: data storage, Git operations, etc.
-├── agent/           # AI agent: interacts with Claude API
-├── command/         # Command layer: CLI command implementations
-├── container/       # Dependency injection container
-├── i18n/            # Internationalization support
-├── templates/       # Template engine
-└── utils/           # Utility functions
+# Install pre-commit hook
+skills-seed hook install
 ```
 
-**Core Domain Models**
+## Initialization Mode And Locking
 
-- **Pattern** - Code pattern (naming, error handling, architecture, etc.)
-- **Issue** - Code issue
-- **Rule** - Coding rule
-- **CommitInfo** - Git commit information
-- **FileInfo** - File information
+Choose one mode at initialization:
 
-## ⚙️ Configuration
+```bash
+skills-seed init --mode project
+skills-seed init --mode workspace
+```
 
-Configuration file located at `.skills-seed/config.yaml`
+After learning or skill generation starts, `project.mode` is locked and cannot be switched directly between `project` and `workspace`. To reinitialize:
+
+```bash
+skills-seed reset --mode workspace
+```
+
+`reset` backs up the old `.skills-seed` to `.skills-seed.backup/<timestamp>`.
+
+## Configuration
+
+Config file: `.skills-seed/config.yaml`. Common fields:
 
 ```yaml
 project:
   name: "your-project"
+  mode: "project"      # project or workspace
   language: "go"
-  locale: "en-US"  # or zh-CN
+  locale: "en-US"
+
+analysis:
+  codegraph:
+    enabled: true       # Enable structural analysis by default; warn and fall back if codegraph is missing
+    required: false     # true fails when CodeGraph is unavailable
+    command: "codegraph"
+    auto_init: false    # Run codegraph init -i automatically when the target project has no .codegraph
+    auto_sync: true
+    max_nodes: 30
+    max_code: 0
+
+agent:
+  provider: "claude"
+  commands:
+    claude: "claude"
+    codex: "codex"
+  timeout: 1800
+  allow_user_plugins: false
+  parallelism: 0
 
 learning:
-  max_commits: 50        # Maximum commits to learn each time
-  batch_size: 10         # Batch processing size
-  confidence_threshold: 0.7  # Confidence threshold
+  max_commits: 50
+  batch_size: 5
 
 output:
-  skills_path: ".claude/skills/skills-seed-skills"  # Legacy fallback
   skills_paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
 logging:
-  level: "info"          # Log level: debug, info, warn, error
-  logs_path: "logs"      # Log directory
-
-autofix:
-  strategy: "patch"      # Fix strategy: patch, direct, preview
-  backup_path: "backups" # Backup directory
+  level: "DEBUG"
+  logs_path: "logs"
+  max_log_files: 30
 ```
 
-## 🔌 Git Hook Integration
+`analysis.codegraph.enabled` defaults to `true`. If `codegraph` is not installed, or the target project has no `.codegraph/` index, `required: false` makes `skills-seed` print a warning and continue with normal file-based analysis. Teams that require CodeGraph in CI can set `required` to `true`.
 
-Skills Seed can integrate with Git hooks to automatically check code before commits
+## Documentation
 
-```bash
-# Install pre-commit hook
-skills-seed hook install pre-commit
+- [Project Architecture](docs/project-architecture.en.md)
+- [Generation Pipeline](docs/project-generation-guide.en.md)
+- [Changelog](CHANGELOG.en.md)
 
-# The hook will automatically run before git commit:
-# skills-seed check --interactive
-```
-
-## 🛠️ Development
-
-### Requirements
-
-- Go 1.25.6+
-- Git
-
-### Local Development
+## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/silaswei-io/skills-seed.git
-cd skills-seed
-
-# Install dependencies
-go mod download
-
-# Run tests
 go test ./...
-
-# Build
+go vet ./...
 go build -o skills-seed ./cmd/skills-seed
-
-# Run
-./skills-seed --help
 ```
 
-### Code Standards
+## License
 
-- Follow [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
-- Format code with `gofmt`
-- Check code with `golint` and `go vet`
-- Keep functions concise with single responsibility
-- Write unit tests with ≥ 80% coverage
-
-## 🤝 Contributing
-
-Contributions are welcome! Please check [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for details
-
-1. Fork this repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Create a Pull Request
-
-## 📝 Changelog
-
-See [CHANGELOG.en.md](CHANGELOG.en.md) for version history
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
-
-## 🙏 Acknowledgments
-
-Thanks to the following open source projects
-
-- [Cobra](https://github.com/spf13/cobra) - Powerful CLI framework
-- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Elegant terminal UI
-- [BoltDB](https://github.com/etcd-io/bbolt) - High-performance embedded database
-- [go-i18n](https://github.com/nicksnyder/go-i18n) - Internationalization support
-
----
-
-<div align="center">
-
-**Made with ❤️ by [silaswei-io](https://github.com/silaswei-io)**
-
-</div>
+[MIT](LICENSE)

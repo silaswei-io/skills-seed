@@ -1,12 +1,26 @@
 package learn
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/git"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
+	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
+	"github.com/silaswei-io/skills-seed/internal/service/merger"
+	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
 
@@ -91,4 +105,158 @@ func TestShouldRefreshProfile(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestRunLearnCurrentPrintsTokenUsageLast(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont))
+	})
+
+	require.Contains(t, output, "当前代码学习完成")
+	require.Contains(t, output, "Token 消耗:")
+	require.Contains(t, lastNonEmptyLine(output), "Token 消耗:")
+	require.NotContains(t, lastNonEmptyLine(output), "子项目")
+}
+
+func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+
+	project := config.WorkspaceProjectConfig{
+		ID:       "backend",
+		Path:     "backend",
+		Type:     "backend",
+		Language: "go",
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	require.NoError(t, os.MkdirAll(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend", "main.go"), []byte("package main\n"), 0644))
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont))
+	})
+
+	profileSavedIndex := strings.LastIndex(output, "子项目 backend 已保存项目画像")
+	tokenIndex := strings.LastIndex(output, "Token 消耗: 子项目 backend")
+	require.NotEqual(t, -1, profileSavedIndex)
+	require.NotEqual(t, -1, tokenIndex)
+	require.Greater(t, tokenIndex, profileSavedIndex)
+}
+
+func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.WorkspaceProjectConfig) *container.Container {
+	t.Helper()
+
+	projectRoot := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "main.go"), []byte("package main\n"), 0644))
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = mode
+	cfg.Project.Language = "go"
+	cfg.Project.RootPath = projectRoot
+	cfg.Project.Locale = "zh-CN"
+	cfg.Agent.Provider = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Workspace.Projects = projects
+	require.NoError(t, configRepo.Update(cfg))
+
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, patternRepo.Close()) })
+
+	mockAgent := &mocks.MockAgent{
+		NameVal:      "mock",
+		AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			agent.LogTokenUsageForContext(ctx, "mock", "AnalyzeCurrentCodebase", tokenusage.Usage{
+				InputTokens:  100,
+				OutputTokens: 20,
+			})
+			pattern := domain.NewPattern("p1", "Error Handling", domain.CategoryError)
+			return &agent.AnalyzeCurrentCodebaseResult{
+				Patterns: []domain.Pattern{*pattern},
+				Summary:  "summary",
+			}, nil
+		},
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			agent.LogTokenUsageForContext(ctx, "mock", "AnalyzeProject", tokenusage.Usage{
+				InputTokens:  50,
+				OutputTokens: 10,
+			})
+			return &agent.AnalyzeProjectResult{
+				Language: "go",
+				Summary:  "profile",
+			}, nil
+		},
+	}
+	gitRepo := git.NewRepository(projectRoot)
+	mergerSvc := merger.NewMergerService(mockAgent, patternRepo)
+
+	return &container.Container{
+		SeedPath:    seedPath,
+		Config:      configRepo.Get(),
+		ConfigRepo:  configRepo,
+		GitRepo:     gitRepo,
+		PatternRepo: patternRepo,
+		ProfileRepo: profilestore.NewRepository(seedPath),
+		StateRepo:   statestore.NewRepository(seedPath),
+		Agent:       mockAgent,
+		AnalyzerSvc: analyzer.NewAnalyzerService(mockAgent, configRepo),
+		LearnerSvc:  servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, mergerSvc),
+		MergerSvc:   mergerSvc,
+	}
+}
+
+func setLearnCurrentFlagsForTest(testLanguage string, testFocusPaths []string, testProfileOpt string) func() {
+	previousLanguage := language
+	previousFocusPaths := focusPaths
+	previousProfileOpt := learnCurrentProfileOpt
+	language = testLanguage
+	focusPaths = testFocusPaths
+	learnCurrentProfileOpt = testProfileOpt
+	return func() {
+		language = previousLanguage
+		focusPaths = previousFocusPaths
+		learnCurrentProfileOpt = previousProfileOpt
+	}
+}
+
+func captureLearnStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	tempFile, err := os.CreateTemp(t.TempDir(), "stdout")
+	require.NoError(t, err)
+
+	originalStdout := os.Stdout
+	os.Stdout = tempFile
+	defer func() {
+		os.Stdout = originalStdout
+	}()
+
+	fn()
+
+	require.NoError(t, tempFile.Close())
+	data, err := os.ReadFile(tempFile.Name())
+	require.NoError(t, err)
+	return string(data)
+}
+
+func lastNonEmptyLine(output string) string {
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if line := strings.TrimSpace(lines[i]); line != "" {
+			return line
+		}
+	}
+	return ""
 }

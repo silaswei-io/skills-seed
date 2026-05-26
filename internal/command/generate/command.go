@@ -6,10 +6,12 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
+	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	"github.com/spf13/cobra"
 )
@@ -17,6 +19,8 @@ import (
 var (
 	outputPath string
 	merge      bool // 是否在生成前合并模式
+	overwrite  bool // 是否覆盖已有子项目 skills
+	rootOnly   bool // 是否只生成 workspace 根 skill
 )
 
 // Cmd 返回 generate 命令
@@ -44,8 +48,10 @@ func Cmd(cont *container.Container) *cobra.Command {
 			cont.ConfigRepo.GetOutputConfig(),
 		)
 	}
-	cmd.Flags().StringVarP(&outputPath, "output", "o", defaultOutputPath, "Output path for generated skills")
+	cmd.Flags().StringVarP(&outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
 	cmd.Flags().BoolVarP(&merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
+	cmd.Flags().BoolVar(&overwrite, "overwrite", false, i18n.Get("GenerateFlagOverwrite"))
+	cmd.Flags().BoolVar(&rootOnly, "root-only", false, i18n.Get("GenerateFlagRootOnly"))
 
 	return cmd
 }
@@ -53,6 +59,10 @@ func Cmd(cont *container.Container) *cobra.Command {
 func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 	ctx := context.Background()
 	tracker := progress.New(2)
+
+	if overwrite && rootOnly {
+		return fmt.Errorf("%s", i18n.Get("GenerateWorkspacePolicyFlagsConflict"))
+	}
 
 	logger.Info(i18n.Get("GenerateStarting"))
 	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
@@ -70,12 +80,15 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 		return err
 	}
 
-	if count == 0 {
+	isWorkspaceMode := cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace
+	if count == 0 && !isWorkspaceMode {
 		logger.Warn(i18n.Get("GenerateNoPatterns"))
 		return nil
 	}
-	if err := commandutil.RequireAgentAvailable(cont); err != nil {
-		return err
+	if !isWorkspaceMode || merge {
+		if err := commandutil.RequireAgentAvailable(cont); err != nil {
+			return err
+		}
 	}
 
 	logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
@@ -108,9 +121,20 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 		logger.Info(i18n.GetWithParams("GenerateMergedCount", map[string]interface{}{"Count": count}))
 	}
 
+	generateOptions := []generator.GenerateOption{}
+	if overwrite {
+		generateOptions = append(generateOptions, generator.WithWorkspaceChildSkillPolicy(config.WorkspaceChildSkillPolicyOverwrite))
+	}
+	if rootOnly {
+		generateOptions = append(generateOptions, generator.WithWorkspaceChildSkillPolicy(config.WorkspaceChildSkillPolicyRootOnly))
+	}
+
 	// 生成 Skills
 	if err := tracker.RunStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
-		return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
+		if len(generateOptions) == 0 {
+			return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
+		}
+		return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath, generateOptions...)
 	}); err != nil {
 		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 		return err

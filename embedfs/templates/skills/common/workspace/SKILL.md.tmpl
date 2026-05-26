@@ -1,6 +1,6 @@
 ---
 name: {{.SkillName}}
-description: Use when modifying, reviewing, or extending {{.WorkspaceName}} workspace code, especially cross-project changes, contracts, shared code, or deployment config
+description: Use when modifying, reviewing, or extending {{.WorkspaceName}} workspace code; routes impact, selects child skills, and plans cross-project order and parallel boundaries
 ---
 
 <!-- generated-by: skills-seed {{.ProgramVersion}} -->
@@ -8,38 +8,65 @@ description: Use when modifying, reviewing, or extending {{.WorkspaceName}} work
 
 # {{.WorkspaceName}} Workspace Development Skill
 
-The root skill handles workspace-level routing, cross-project coordination, and impact radius. Child project implementation details, coding style, business methods, and project rules must be read from the corresponding child skill and `references/project-spec.md`.
+This is the workspace entry skill. It handles routing, impact radius, and cross-project coordination only. Child project architecture, coding conventions, business methods, and executable rules must be read from the affected child project skill before implementation decisions.
 
-## Workflow
+## Entry Flow
 
-1. Classify the task scope by path: single child project, contracts, shared code, infra, or cross-project flow.
-2. Read [Workspace Overview](./references/workspace-overview.md) and [Cross-Project Rules](./references/cross-project-rules.md).
-3. Load affected child project `SKILL.md` files, then load each child project's `references/project-spec.md` as needed.
-4. For cross-project work, settle the contract or shared interface before splitting implementation boundaries.
-5. Do not promote one child project's internal convention into a workspace rule; child details belong to child skills.
+1. Classify the task by path: single child project, cross-project change, contract, shared code, infrastructure, or unknown scope.
+2. Read [Workspace Overview](./references/workspace-overview.md) to confirm child projects, paths, and skill locations.
+3. Read each affected child project's `SKILL.md`; before editing code, read that child project's `references/project-spec.md`.
+4. For multi-project work, read [Cross-Project Rules](./references/cross-project-rules.md), stabilize the contract or shared interface first, then handle child implementations.
+5. If no path matches a configured child project, inspect `.skills-seed/config.yaml` `workspace.projects` before assigning ownership.
+
+## Workspace Map
+
+- Child projects: {{.ProjectCount}}
+{{range .Projects}}
+- `{{.ID}}`: `{{.Path}}/**`, role `{{.Type}}`, language `{{.Language}}`
+  {{if .SelfManaged}}- Management: child project has its own skills-seed; resolve the skill path from provider and output path in `{{.SelfManagedConfigPath}}`{{end}}
+{{end}}
+{{if .HasContracts}}- Configured contract paths: see [Workspace Overview](./references/workspace-overview.md){{else}}- No contract paths configured; still treat `api`, `proto`, `openapi`, `swagger`, `types`, `schema`, `sdk`, and `client` paths or filenames as contract changes{{end}}
+{{if .HasShared}}- Configured shared paths: see [Workspace Overview](./references/workspace-overview.md){{else}}- No shared paths configured; when touching `pkg`, `common`, `shared`, `lib`, `utils`, or `components`, identify consumers before editing{{end}}
+{{if .HasInfra}}- Configured infra paths: see [Workspace Overview](./references/workspace-overview.md){{else}}- No infra paths configured; when touching `deploy`, `docker`, `k8s`, `helm`, `terraform`, `nginx`, `gateway`, `env`, or `config`, evaluate runtime impact{{end}}
 
 ## Routing Rules
 
 {{range .Projects}}
-- `{{.Path}}/**` -> read `{{.Path}}/.agents/skills/{{.SkillName}}/SKILL.md` or `{{.Path}}/.claude/skills/{{.SkillName}}/SKILL.md`, then read `{{.Path}}/.agents/skills/{{.SkillName}}/references/project-spec.md` as needed
+- `{{.Path}}/**`
+  {{if .SelfManaged}}
+  - Child project has its own skills-seed: read `{{.SelfManagedConfigPath}}`; the resolved skill is `{{.SkillPath}}`.
+  - Then read: `{{.ProjectSpecPath}}`
+  {{else}}
+  - Read first: `{{.SkillPath}}`
+  - Then read: `{{.ProjectSpecPath}}`
+  {{end}}
+  - Write boundary: default to `{{.Path}}/**` only, unless the task explicitly requires contract, shared-code, or deployment changes.
 {{end}}
-{{if .Contracts}}
-- When contract paths change, read producer and consumer child project skills together; do not update only one side.
-{{end}}
-{{if .Shared}}
-- When shared paths change, read every child project skill that imports, packages, or generates the shared content.
-{{end}}
-{{if .Infra}}
-- When infra paths change, read child project skills affected by deployment, config, gateway, or middleware rules.
-{{end}}
+
+## Impact Radius
+
+- Internal implementation in one child project: read that child skill only; do not read or edit other child projects.
+- API, request/response types, generation inputs, SDKs, error codes, events, or message formats: read producer and consumer child skills together.
+- Shared utilities, shared types, common components, or shared config: identify all importers or packagers before editing, then read their child skills.
+- Dockerfiles, deployment scripts, environment variables, gateway rules, reverse proxies, middleware, CI, or release config: read every runtime-affected child skill.
+- Root config, workspace scripts, or batch commands: identify which child projects the command covers, then load skills by that scope.
+
+## Cross-Project Order
+
+1. Stabilize the contract or shared interface: update interface definitions, schemas, public types, or shared function signatures first.
+2. Update producers: backend, server, generation source, or shared-library implementation.
+3. Update consumers: frontend, clients, SDKs, callers, adapters, and tests.
+4. Update runtime: deployment config, environment variables, gateway rules, middleware, and CI.
+5. Verify consistency: generated artifacts, error codes, types, config keys, build commands, and test scope must match.
+
+## Parallel Boundaries
+
+- Safe to parallelize: non-overlapping internal child-project changes where each agent writes only its assigned child project path.
+- Keep serial: contracts, shared code, infrastructure, root config, workspace scripts, and any file that changes inputs for multiple child projects.
+- Before parallel work, list each agent's write paths; after parallel work, verify interfaces, generated artifacts, config, and tests together.
+- If a task includes both shared interfaces and child implementations, one agent stabilizes the shared interface first, then child projects can proceed in parallel.
 
 ## References
 
 - [Workspace Overview](./references/workspace-overview.md)
 - [Cross-Project Rules](./references/cross-project-rules.md)
-
-## Parallel Work
-
-- Distinct child project paths may be handled by multiple agents in parallel when each agent writes only within its child project.
-- The same file or path under `contracts`, `shared`, or `infra` should be handled serially; stabilize the contract or shared interface before child projects proceed in parallel.
-- Before parallel work, list affected projects and write boundaries. After parallel work, verify interface, generated artifacts, config, and tests stay consistent.

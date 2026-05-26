@@ -20,12 +20,56 @@ import (
 type Config struct {
 	Project   ProjectConfig   `yaml:"project"`
 	Workspace WorkspaceConfig `yaml:"workspace"`
+	Analysis  AnalysisConfig  `yaml:"analysis"`
 	Agent     AgentConfig     `yaml:"agent"`
 	Learning  LearningConfig  `yaml:"learning"`
 	AutoFix   AutoFixConfig   `yaml:"autofix"`
 	Output    OutputConfig    `yaml:"output"`
 	Logging   LoggingConfig   `yaml:"logging"`
 	Exclude   []string        `yaml:"exclude"` // 全局排除配置
+}
+
+// AnalysisConfig 分析增强配置
+type AnalysisConfig struct {
+	CodeGraph CodeGraphConfig `yaml:"codegraph"`
+}
+
+// CodeGraphConfig CodeGraph 结构化分析增强配置
+type CodeGraphConfig struct {
+	Enabled  bool   `yaml:"enabled"`   // 是否启用 CodeGraph 增强分析
+	Required bool   `yaml:"required"`  // 是否要求 CodeGraph 必须可用
+	Command  string `yaml:"command"`   // codegraph 命令路径
+	AutoInit bool   `yaml:"auto_init"` // 目标项目未初始化时是否自动执行 init -i
+	AutoSync bool   `yaml:"auto_sync"` // 目标项目已有索引时是否自动 sync
+	MaxNodes int    `yaml:"max_nodes"` // context 最大符号节点数
+	MaxCode  int    `yaml:"max_code"`  // context 最大代码块数；0 表示不包含代码块
+
+	defaultsApplied bool `yaml:"-"`
+}
+
+func defaultCodeGraphConfig() CodeGraphConfig {
+	return CodeGraphConfig{
+		Enabled:         true,
+		Required:        false,
+		Command:         "codegraph",
+		AutoInit:        false,
+		AutoSync:        true,
+		MaxNodes:        30,
+		MaxCode:         0,
+		defaultsApplied: true,
+	}
+}
+
+// UnmarshalYAML applies defaults while still preserving explicit false values.
+func (c *CodeGraphConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawCodeGraphConfig CodeGraphConfig
+	defaults := rawCodeGraphConfig(defaultCodeGraphConfig())
+	if err := value.Decode(&defaults); err != nil {
+		return err
+	}
+	*c = CodeGraphConfig(defaults)
+	c.defaultsApplied = true
+	return nil
 }
 
 // ProjectConfig 项目配置
@@ -50,11 +94,18 @@ type AgentConfig struct {
 
 // WorkspaceConfig 工作区配置
 type WorkspaceConfig struct {
-	Projects  []WorkspaceProjectConfig `yaml:"projects"`
-	Shared    []WorkspacePathConfig    `yaml:"shared"`
-	Contracts []WorkspacePathConfig    `yaml:"contracts"`
-	Infra     []WorkspacePathConfig    `yaml:"infra"`
+	ChildSkillPolicy string                   `yaml:"child_skill_policy"` // 子项目 skill 生成策略
+	Projects         []WorkspaceProjectConfig `yaml:"projects"`
+	Shared           []WorkspacePathConfig    `yaml:"shared"`
+	Contracts        []WorkspacePathConfig    `yaml:"contracts"`
+	Infra            []WorkspacePathConfig    `yaml:"infra"`
 }
+
+const (
+	WorkspaceChildSkillPolicySkipExisting = "skip_existing"
+	WorkspaceChildSkillPolicyOverwrite    = "overwrite"
+	WorkspaceChildSkillPolicyRootOnly     = "root_only"
+)
 
 // WorkspaceProjectConfig 工作区子项目配置
 type WorkspaceProjectConfig struct {
@@ -100,6 +151,18 @@ func EffectiveSkillsPath(provider string, output OutputConfig) string {
 		return output.SkillsPaths[provider]
 	}
 	return ""
+}
+
+// NormalizeWorkspaceChildSkillPolicy 规范化子项目 skill 生成策略
+func NormalizeWorkspaceChildSkillPolicy(policy string) string {
+	switch strings.ToLower(strings.TrimSpace(policy)) {
+	case WorkspaceChildSkillPolicyOverwrite:
+		return WorkspaceChildSkillPolicyOverwrite
+	case WorkspaceChildSkillPolicyRootOnly:
+		return WorkspaceChildSkillPolicyRootOnly
+	default:
+		return WorkspaceChildSkillPolicySkipExisting
+	}
 }
 
 // Repository 配置仓储
@@ -240,6 +303,15 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	// 工作区配置
 	content = replaceYAMLWorkspaceConfig(content, cfg.Workspace)
 
+	// 分析增强配置
+	content = replaceYAMLValueInSection(content, "codegraph:", "enabled:", cfg.Analysis.CodeGraph.Enabled)
+	content = replaceYAMLValueInSection(content, "codegraph:", "required:", cfg.Analysis.CodeGraph.Required)
+	content = replaceYAMLValueInSection(content, "codegraph:", "command:", cfg.Analysis.CodeGraph.Command)
+	content = replaceYAMLValueInSection(content, "codegraph:", "auto_init:", cfg.Analysis.CodeGraph.AutoInit)
+	content = replaceYAMLValueInSection(content, "codegraph:", "auto_sync:", cfg.Analysis.CodeGraph.AutoSync)
+	content = replaceYAMLValueInSection(content, "codegraph:", "max_nodes:", cfg.Analysis.CodeGraph.MaxNodes)
+	content = replaceYAMLValueInSection(content, "codegraph:", "max_code:", cfg.Analysis.CodeGraph.MaxCode)
+
 	// Agent 配置
 	content = replaceYAMLValueInSection(content, "agent:", "provider:", cfg.Agent.Provider)
 	content = replaceYAMLStringMapInSection(content, "agent:", "commands:", cfg.Agent.Commands)
@@ -311,11 +383,7 @@ func replaceYAMLValue(content, key string, value interface{}) string {
 			var valueStr string
 			switch v := value.(type) {
 			case string:
-				if v == "" {
-					valueStr = "\"\""
-				} else {
-					valueStr = fmt.Sprintf("\"%s\"", v)
-				}
+				valueStr = quoteYAMLString(v)
 			case bool:
 				valueStr = fmt.Sprintf("%v", v)
 			case int:
@@ -425,7 +493,7 @@ func replaceYAMLStringMapInSection(content, section, key string, values map[stri
 		childIndent := strings.Repeat(" ", keyIndent+2)
 		replacement := []string{strings.Repeat(" ", keyIndent) + key}
 		for _, mapKey := range sortedStringKeys(values) {
-			replacement = append(replacement, fmt.Sprintf("%s%s: %q", childIndent, mapKey, values[mapKey]))
+			replacement = append(replacement, fmt.Sprintf("%s%s: %s", childIndent, mapKey, quoteYAMLString(values[mapKey])))
 		}
 
 		end := i + 1
@@ -443,11 +511,15 @@ func replaceYAMLStringMapInSection(content, section, key string, values map[stri
 			end++
 		}
 
-		lines = append(lines[:i], append(replacement, lines[end:]...)...)
+		lines = spliceYAMLLines(lines, i, end, replacement)
 		break
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func quoteYAMLString(value string) string {
+	return fmt.Sprintf("%q", value)
 }
 
 func sortedStringKeys(values map[string]string) []string {
@@ -479,21 +551,116 @@ func replaceYAMLWorkspaceConfig(content string, workspace WorkspaceConfig) strin
 	end := start + 1
 	for end < len(lines) {
 		line := lines[end]
-		trimmed := strings.TrimSpace(line)
 		indent := len(line) - len(strings.TrimLeft(line, " "))
-		if indent == 0 && trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+		if indent == 0 {
 			break
 		}
 		end++
 	}
 
-	data, err := yaml.Marshal(map[string]WorkspaceConfig{"workspace": workspace})
-	if err != nil {
-		return content
-	}
-	replacement := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	comments := workspaceKeyComments(lines[start:end])
+	replacement := renderWorkspaceConfig(workspace, comments)
 
-	return strings.Join(append(append(lines[:start], replacement...), lines[end:]...), "\n")
+	return strings.Join(spliceYAMLLines(lines, start, end, replacement), "\n")
+}
+
+func spliceYAMLLines(lines []string, start, end int, replacement []string) []string {
+	result := make([]string, 0, len(lines)-end+start+len(replacement))
+	result = append(result, lines[:start]...)
+	result = append(result, replacement...)
+	result = append(result, lines[end:]...)
+	return result
+}
+
+type yamlLineComment struct {
+	text   string
+	column int
+}
+
+func workspaceKeyComments(lines []string) map[string]yamlLineComment {
+	comments := map[string]yamlLineComment{}
+	keys := map[string]string{
+		"child_skill_policy:": "child_skill_policy",
+		"projects:":           "projects",
+		"shared:":             "shared",
+		"contracts:":          "contracts",
+		"infra:":              "infra",
+	}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		for yamlKey, commentKey := range keys {
+			if !strings.HasPrefix(trimmed, yamlKey) {
+				continue
+			}
+			commentIdx := strings.Index(line, " #")
+			if commentIdx < 0 {
+				continue
+			}
+			comments[commentKey] = yamlLineComment{
+				text:   line[commentIdx+1:],
+				column: commentIdx + 1,
+			}
+		}
+	}
+
+	return comments
+}
+
+func renderWorkspaceConfig(workspace WorkspaceConfig, comments map[string]yamlLineComment) []string {
+	lines := []string{"workspace:"}
+	lines = append(lines, appendYAMLLineComment(
+		fmt.Sprintf("  child_skill_policy: %s", quoteYAMLString(NormalizeWorkspaceChildSkillPolicy(workspace.ChildSkillPolicy))),
+		comments["child_skill_policy"],
+	))
+	lines = append(lines, renderWorkspaceProjects(workspace.Projects, comments["projects"])...)
+	lines = append(lines, renderWorkspacePathList("shared", workspace.Shared, comments["shared"])...)
+	lines = append(lines, renderWorkspacePathList("contracts", workspace.Contracts, comments["contracts"])...)
+	lines = append(lines, renderWorkspacePathList("infra", workspace.Infra, comments["infra"])...)
+	return lines
+}
+
+func renderWorkspaceProjects(projects []WorkspaceProjectConfig, comment yamlLineComment) []string {
+	if len(projects) == 0 {
+		return []string{appendYAMLLineComment("  projects: []", comment)}
+	}
+
+	lines := []string{appendYAMLLineComment("  projects:", comment)}
+	for _, project := range projects {
+		lines = append(lines,
+			fmt.Sprintf("    - id: %s", quoteYAMLString(project.ID)),
+			fmt.Sprintf("      path: %s", quoteYAMLString(project.Path)),
+			fmt.Sprintf("      type: %s", quoteYAMLString(project.Type)),
+			fmt.Sprintf("      language: %s", quoteYAMLString(project.Language)),
+		)
+	}
+	return lines
+}
+
+func renderWorkspacePathList(key string, paths []WorkspacePathConfig, comment yamlLineComment) []string {
+	if len(paths) == 0 {
+		return []string{appendYAMLLineComment(fmt.Sprintf("  %s: []", key), comment)}
+	}
+
+	lines := []string{appendYAMLLineComment(fmt.Sprintf("  %s:", key), comment)}
+	for _, path := range paths {
+		lines = append(lines, fmt.Sprintf("    - path: %s", quoteYAMLString(path.Path)))
+		if path.Description != "" {
+			lines = append(lines, fmt.Sprintf("      description: %s", quoteYAMLString(path.Description)))
+		}
+	}
+	return lines
+}
+
+func appendYAMLLineComment(code string, comment yamlLineComment) string {
+	if comment.text == "" {
+		return code
+	}
+	spaces := 1
+	if len(code) < comment.column {
+		spaces = comment.column - len(code)
+	}
+	return code + strings.Repeat(" ", spaces) + comment.text
 }
 
 // defaultConfig 默认配置
@@ -539,6 +706,19 @@ func (r *Repository) defaultConfig(locale string) *Config {
 }
 
 func (r *Repository) normalizeConfig(cfg *Config) {
+	if !cfg.Analysis.CodeGraph.defaultsApplied {
+		cfg.Analysis.CodeGraph = defaultCodeGraphConfig()
+	}
+	if cfg.Analysis.CodeGraph.Command == "" {
+		cfg.Analysis.CodeGraph.Command = "codegraph"
+	}
+	if cfg.Analysis.CodeGraph.MaxNodes <= 0 {
+		cfg.Analysis.CodeGraph.MaxNodes = 30
+	}
+	if cfg.Analysis.CodeGraph.MaxCode < 0 {
+		cfg.Analysis.CodeGraph.MaxCode = 0
+	}
+
 	if cfg.Agent.Commands == nil {
 		cfg.Agent.Commands = map[string]string{}
 	}
@@ -569,6 +749,7 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Output.SkillsPaths == nil {
 		cfg.Output.SkillsPaths = map[string]string{}
 	}
+	cfg.Workspace.ChildSkillPolicy = NormalizeWorkspaceChildSkillPolicy(cfg.Workspace.ChildSkillPolicy)
 }
 
 // detectSystemLocale 检测系统语言
@@ -623,6 +804,9 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			AllowUserPlugins: false,
 			Parallelism:      0,
 		},
+		Analysis: AnalysisConfig{
+			CodeGraph: defaultCodeGraphConfig(),
+		},
 		Learning: LearningConfig{
 			MaxCommits: 50,
 			BatchSize:  5,
@@ -635,6 +819,9 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			SkillsPaths: map[string]string{
 				"agent": ".skills/skills-seed-skills",
 			},
+		},
+		Workspace: WorkspaceConfig{
+			ChildSkillPolicy: WorkspaceChildSkillPolicySkipExisting,
 		},
 		Logging: LoggingConfig{
 			Level:       "DEBUG",
@@ -656,6 +843,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 type Reader interface {
 	GetProjectConfig() ProjectConfig
 	GetWorkspaceConfig() WorkspaceConfig
+	GetAnalysisConfig() AnalysisConfig
 	GetAgentConfig() AgentConfig
 	GetLearningConfig() LearningConfig
 	GetAutoFixConfig() AutoFixConfig
@@ -672,6 +860,11 @@ func (r *Repository) GetProjectConfig() ProjectConfig {
 // GetWorkspaceConfig 获取工作区配置
 func (r *Repository) GetWorkspaceConfig() WorkspaceConfig {
 	return r.config.Workspace
+}
+
+// GetAnalysisConfig 获取分析增强配置
+func (r *Repository) GetAnalysisConfig() AnalysisConfig {
+	return r.config.Analysis
 }
 
 // GetAgentConfig 获取 Agent 配置

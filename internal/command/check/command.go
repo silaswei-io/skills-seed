@@ -40,8 +40,8 @@ func Cmd(cont *container.Container) *cobra.Command {
 	}
 
 	// 添加 flags
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", true, "Interactive mode")
-	cmd.Flags().BoolVarP(&checkAll, "all", "a", false, "Check all files (not just staged)")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", true, i18n.Get("CheckFlagInteractive"))
+	cmd.Flags().BoolVarP(&checkAll, "all", "a", false, i18n.Get("CheckFlagAll"))
 
 	return cmd
 }

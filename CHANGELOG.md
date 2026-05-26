@@ -2,6 +2,38 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.4]
+
+### 功能
+
+- workspace 初始化只扫描第一层目录，并扩展常见项目标记识别范围
+- workspace 模式下按当前 `agent.provider` 生成根入口 skill，并为子项目生成各自 skill
+- workspace 根 skill 路由只引用当前 provider 的子项目 skill，避免 Claude 生成时同时落出 Codex 目录
+- workspace 根 skill 也生成 provider 元数据，Codex 输出时包含标准 `agents/openai.yaml`
+- 新增 `workspace.child_skill_policy`，支持 `skip_existing`、`overwrite`、`root_only` 控制子项目 skill 生成
+- `generate-skills` 新增 `--overwrite` 和 `--root-only`，可在本次生成中覆盖 workspace 子项目 skill 策略
+- workspace 子项目存在 `.skills-seed/config.yaml` 时视为独立初始化，外层 workspace 不生成或覆盖该子项目 skill
+
+### 模板
+
+- 强化 workspace 根 skill 内容，补充工作区地图、影响范围判断、跨项目执行顺序、默认特殊路径识别和并发写入边界
+- 强化 `workspace-overview.md` 和 `cross-project-rules.md`，未配置 contracts/shared/infra 时也会给出默认识别规则
+- workspace 根 skill 和概览会标记独立初始化子项目，并提示按子项目自己的 `.skills-seed/config.yaml` 查找 provider 与 skill 路径
+
+### 体验
+
+- workspace 配置保存保持模板注释与双引号风格，避免回退到全文件 YAML marshal
+- workspace 默认跳过当前 provider 已存在的子项目 skill，只补齐/刷新根 workspace skill，避免覆盖子仓已有 agent 配置
+- CLI flag 帮助和 workspace 生成日志补充 i18n 文案
+- workspace 子项目学习日志对齐单项目模式，补充子项目开始、分析结果、保存模式、保存画像和跳过原因输出
+- workspace 子项目学习的 Token 消耗延迟到子项目日志末尾输出，并标明对应子项目
+- `learn current` 单项目模式下 Token 消耗固定作为学习输出最后一条日志，workspace 模式下按子项目完成顺序输出，避免并发日志错位
+
+### 文档
+
+- 重写 README 结构，补充单项目和 workspace 快速开始、初始化锁定、配置和常用命令
+- 更新 `docs/` 架构与生成链路文档，并补充对应英文文档
+
 ## [v0.0.3]
 
 ### 功能

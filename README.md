@@ -1,309 +1,284 @@
 # Skills Seed
 
-<div align="center">
-
-**智能代码模式学习与技能文档生成工具**
-
-[![Go Version](https://img.shields.io/badge/Go-1.25.6+-00ADD8?style=flat&logo=go)](https://golang.org)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+**从代码库学习项目规范，并生成 Claude Code / Codex 可用的本地 skills。**
 
 [简体中文](README.md) | [English](README.en.md)
 
-</div>
+Skills Seed 会分析当前代码、Git 历史和项目结构，把团队已有的写法沉淀为本地知识资产，再按当前 `agent.provider` 渲染到 `.claude/skills` 或 `.agents/skills`。所有数据默认保存在当前仓库的 `.skills-seed` 目录中。
 
----
+## 功能
 
-## 📖 项目简介
+- 从当前代码库学习 patterns、业务方法、工具方法和最佳实践
+- 从 Git 历史增量学习，并跳过已分析的 commit
+- 生成项目画像 `project-profile.json` 和项目规范 `project-spec.json`
+- 生成 Claude Code / Codex skills，包括 `SKILL.md` 与 `references/`
+- 支持单项目模式和多子项目 workspace 模式
+- 支持 workspace 根 skill 与子项目 skill，方便 AI 在改代码时按路径读取对应上下文
+- 支持 `check`、交互式修复、pre-commit hook
+- 支持中文和英文模板、提示词、配置与终端输出
 
-Skills Seed 是一个智能的代码模式学习工具，通过分析 Git 提交历史自动学习项目的编码模式和最佳实践，并生成结构化的 Claude Code / Codex 兼容技能文档。它帮助团队沉淀编码规范，提升代码质量，并加速新成员的上手过程
-
-## ✨ 核心特性
-
-- 🔍 **智能模式学习** - 从 Git 提交历史中自动提取编码模式和最佳实践
-- 🤖 **AI 驱动分析** - 使用 AI 深度分析代码变更，识别命名规范、错误处理、架构模式等
-- 📚 **自动文档生成** - 生成结构化的 Claude Code / Codex 兼容技能文档，包含示例和最佳实践
-- ✅ **代码检查** - 基于学习的模式检查代码问题，提供修复建议
-- 🔧 **自动修复** - 支持交互式和自动化的代码修复
-- 🌐 **多语言支持** - 支持中文和英文，自动检测系统语言
-- 💾 **本地存储** - 所有数据存储在本地，保护代码隐私
-
-## 🚀 快速开始
-
-### 安装
-
-推荐直接通过 Go 安装 CLI
+## 安装
 
 ```bash
 go install github.com/silaswei-io/skills-seed/cmd/skills-seed@latest
 skills-seed --help
 ```
 
-如果命令不可用，请确认 `$GOPATH/bin` 或 `$GOBIN` 已加入 `PATH`
+如果命令不可用，请把 `$GOPATH/bin` 或 `$GOBIN` 加入 `PATH`。
 
-也可以从源码构建
+源码构建：
 
 ```bash
-# 克隆仓库
 git clone https://github.com/silaswei-io/skills-seed.git
 cd skills-seed
-
-# 构建
 go build -o skills-seed ./cmd/skills-seed
-
-# 安装本地版本（可选）
-go install ./cmd/skills-seed
 ```
 
-### 初始化项目
+## 前置要求
+
+- Go 1.25.6+
+- Git 仓库
+- 可用的 AI Agent CLI：默认是 `claude`，也可在配置中切换到 `codex`
+
+## 快速开始：单项目
 
 ```bash
-# 在你的项目根目录执行
 cd your-project
-skills-seed init
-
-# 指定语言（可选）
-skills-seed init --locale zh-CN  # 中文
-skills-seed init --locale en-US  # 英文
-```
-
-初始化会
-
-- 创建 `.skills-seed` 目录
-- 生成配置、数据库和项目专属 prompts
-- 记录项目根路径和默认输出配置
-
-### 学习编码模式
-
-```bash
-# 分析当前代码库
+skills-seed init --mode project --locale zh-CN
 skills-seed learn current
-
-# 学习最近 50 次提交
-skills-seed learn history --limit=50
-
-# 学习最近 30 天的提交
-skills-seed learn history --since=30d
-
-# 只刷新项目画像（用于重新生成项目概览）
-skills-seed profile refresh
-```
-
-`learn current` 只保存 patterns 和项目画像，不会直接生成 `SKILL.md` 或 `references/`。需要生成技能文档时请继续运行 `skills-seed generate-skills`
-
-### 精准学习与项目画像刷新
-
-```bash
-# 首次学习当前项目，会生成完整项目画像
-skills-seed learn current
-
-# 只学习某个目录的代码模式，适合普通局部改动
-skills-seed learn current --focus internal/service --profile skip
-
-# 明确发生架构相关改动时，基于已有项目画像和 focus 路径做增量画像刷新
-skills-seed learn current --focus internal/service --profile refresh
-
-# 多个目录一起学习
-skills-seed learn current --focus internal/service --focus internal/domain --profile refresh
-
-# 只重新生成完整项目画像，不学习 patterns
-skills-seed profile refresh
-```
-
-首次没有项目画像时，`learn current` 会执行全量项目画像分析；后续如果提供 `--focus` 且需要刷新画像，会把已有画像作为基线，只分析 focus 路径和直接相关文件，然后保存完整合并后的新画像
-
-当只是局部代码风格或实现细节变化时，建议使用 `--profile skip`；当目录结构、模块职责、依赖关系、入口流程或业务方法有变化时，使用 `--profile refresh`；如果发生大规模重构或框架迁移，使用 `skills-seed profile refresh` 做全量画像重建
-
-### 检查代码
-
-```bash
-# 检查暂存区的代码
-skills-seed check
-
-# 交互式检查（支持自动修复）
-skills-seed check --interactive
-```
-
-### 生成技能文档
-
-```bash
-# 生成技能文档
 skills-seed generate-skills
-
-# 需要先合并相似模式时，显式执行
-skills-seed patterns merge
-skills-seed generate-skills
-
-# 指定 Claude 输出路径
-skills-seed generate-skills --output ~/.claude/skills/my-project-skills
-
-# 指定 Codex 输出路径
-skills-seed generate-skills --output .agents/skills/my-project-skills
 ```
 
-## 📁 项目结构
+默认 provider 为 `claude`，输出：
 
 ```text
 your-project/
-├── .skills-seed/              # Skills Seed 数据目录
-│   ├── config.yaml            # 配置文件
-│   ├── patterns.db            # 模式数据库（BoltDB）
-│   ├── memory/                # 内存文件
-│   └── logs/                  # 日志文件
-├── .claude/
-│   └── skills/
-│       └── skills-seed-skills/  # Claude Code 技能文档
-└── .agents/
-    └── skills/
-        └── skills-seed-skills/  # Codex 兼容技能文档
-            ├── SKILL.md
-            ├── agents/
-            │   └── openai.yaml
-            └── references/
-                ├── patterns/
-                └── examples/
+├── .skills-seed/
+│   ├── config.yaml
+│   ├── memory/
+│   │   ├── project.db
+│   │   ├── project-profile.json
+│   │   └── project-spec.json
+│   └── logs/
+└── .claude/skills/skills-seed-skills/
 ```
 
-## 🎯 使用场景
+把 `.skills-seed/config.yaml` 中的 `agent.provider` 改为 `codex` 后，会输出到 `.agents/skills/...`。
 
-1. **团队协作** - 沉淀团队的编码规范和最佳实践
-2. **代码审查** - 自动检查代码是否符合项目规范
-3. **新人上手** - 快速了解项目的编码模式和架构风格
-4. **持续改进** - 从高质量的提交中不断学习和改进
-5. **AI 辅助开发** - 生成的技能文档可以帮助 Claude Code、Codex 等客户端更好地理解项目
+## 快速开始：Workspace
 
-## 🏗️ 架构设计
+适合一个 Git 仓库下包含多个子项目，例如 `frontend/`、`backend/`、`gateway/`、`deploy/`。
 
-Skills Seed 采用领域驱动设计（DDD）和清晰的分层架构
+```bash
+cd your-workspace
+skills-seed init --mode workspace --locale zh-CN
+# 或：skills-seed init --workspace
+```
+
+初始化只扫描 workspace 根目录的第一层文件夹，并按常见项目标记识别子项目，如 `package.json`、`go.mod`、`pyproject.toml`、`Cargo.toml`、`pom.xml`、`build.gradle`、`composer.json`、`Gemfile`、`Chart.yaml`、`Dockerfile`、`openapi.yaml`。检查并按需修改 `.skills-seed/config.yaml`：
+
+```yaml
+project:
+  mode: "workspace"
+
+workspace:
+  child_skill_policy: "skip_existing" # skip_existing | overwrite | root_only
+  projects:
+    - {id: "frontend", path: "frontend", type: "frontend", language: "typescript"}
+    - {id: "backend", path: "backend", type: "backend", language: "go"}
+  shared:
+    - {path: "pkg"}
+  contracts:
+    - {path: "proto"}
+  infra:
+    - {path: "deploy"}
+
+agent:
+  parallelism: 0   # 0 表示自动：project=1，workspace=子项目数并带上限
+```
+
+然后执行：
+
+```bash
+skills-seed learn current
+skills-seed generate-skills
+```
+
+workspace 模式会生成：
+
+- 当前 provider 的根目录 skill：负责 workspace 路由、跨项目规则和影响范围
+- 子项目 skill：负责子项目规范、画像和 patterns；子项目有自己的 `.skills-seed/config.yaml` 时，provider 和输出路径按子项目配置解析
+- `.skills-seed/memory/workspace-profile.json`
+- `.skills-seed/memory/projects/<project-id>/project-profile.json`
+- `.skills-seed/memory/projects/<project-id>/project-spec.json`
+
+如果子项目存在自己的 `.skills-seed/config.yaml`，workspace 会读取子项目配置中的 `agent.provider` 和 `output.skills_paths` 来确定子项目 skill 路径；否则使用 workspace 根配置。
+
+默认 `child_skill_policy: "skip_existing"`：如果按子项目实际配置解析出的 `SKILL.md` 已存在，只生成/刷新 workspace 根 skill，不覆盖子项目 skill。可改配置，也可单次执行：
+
+```bash
+skills-seed generate-skills --overwrite # 覆盖子项目实际配置路径下的 skills
+skills-seed generate-skills --root-only # 只生成 workspace 根 skill
+```
+
+## 日常命令
+
+### 学习
+
+```bash
+# 从当前代码学习，并按需要生成或刷新项目画像
+skills-seed learn current
+
+# 只学习局部目录，不刷新项目画像
+skills-seed learn current --focus internal/service --profile skip
+
+# 局部学习，并基于已有画像做增量画像刷新
+skills-seed learn current --focus internal/service --profile refresh
+
+# 从 Git 历史学习，已学习 commit 会跳过
+skills-seed learn history --limit=50
+skills-seed learn history --since=30d
+```
+
+`--profile` 可选值：
+
+- `auto`：默认值。首次或全量学习会刷新画像；窄范围改动会尽量跳过
+- `skip`：只学习 patterns，不更新画像
+- `refresh`：基于当前输入刷新画像
+
+`learn current` 会在学习日志结束后输出 Token 消耗。workspace 模式会在每个子项目学习日志末尾输出该子项目的 Token 消耗，避免并发学习时混入其他子项目日志。
+
+### 画像与规范
+
+```bash
+skills-seed profile show
+skills-seed profile refresh
+```
+
+`profile refresh` 只重建项目画像，不学习 patterns。`project-spec.json` 会在 `generate-skills` 时由画像和 patterns 生成。
+
+### 生成 Skills
+
+```bash
+skills-seed generate-skills
+
+# 需要先合并相似 patterns 时显式执行
+skills-seed patterns merge
+skills-seed generate-skills
+
+# 临时指定输出路径
+skills-seed generate-skills --output .agents/skills/my-project
+
+# workspace: 覆盖已有子项目 skills
+skills-seed generate-skills --overwrite
+
+# workspace: 只刷新根 workspace skill
+skills-seed generate-skills --root-only
+```
+
+生成内容包括：
 
 ```text
-internal/
-├── domain/          # 领域层：核心业务模型和规则
-├── service/         # 应用层：业务用例和流程编排
-├── infra/           # 基础设施层：数据存储、Git 操作等
-├── agent/           # AI 代理：与 Claude API 交互
-├── command/         # 命令层：CLI 命令实现
-├── container/       # 依赖注入容器
-├── i18n/            # 国际化支持
-├── templates/       # 模板引擎
-└── utils/           # 工具函数
+SKILL.md
+agents/
+references/
+  project-overview.md
+  project-spec.md
+  patterns/*.md
+  examples/*.md
 ```
 
-**核心领域模型**
+### 检查与 Hook
 
-- **Pattern** - 代码模式（命名、错误处理、架构等）
-- **Issue** - 代码问题
-- **Rule** - 编码规则
-- **CommitInfo** - Git 提交信息
-- **FileInfo** - 文件信息
+```bash
+# 默认检查暂存区
+skills-seed check
 
-## ⚙️ 配置说明
+# 检查所有 Git 跟踪文件
+skills-seed check --all
 
-配置文件位于 `.skills-seed/config.yaml`
+# 安装 pre-commit hook
+skills-seed hook install
+```
+
+## 初始化模式和锁定
+
+初始化时必须选择一种模式：
+
+```bash
+skills-seed init --mode project
+skills-seed init --mode workspace
+```
+
+开始学习或生成 skills 后，`project.mode` 会被锁定，不能直接在 `project` 和 `workspace` 之间切换。需要重新初始化时使用：
+
+```bash
+skills-seed reset --mode workspace
+```
+
+`reset` 会把旧 `.skills-seed` 备份到 `.skills-seed.backup/<timestamp>`。
+
+## 配置
+
+配置文件位于 `.skills-seed/config.yaml`。常用字段：
 
 ```yaml
 project:
   name: "your-project"
+  mode: "project"      # project 或 workspace
   language: "go"
-  locale: "zh-CN"  # 或 en-US
+  locale: "zh-CN"
+
+analysis:
+  codegraph:
+    enabled: true       # 默认启用结构化分析增强；未安装 codegraph 时提醒并降级
+    required: false     # true 表示 CodeGraph 不可用时直接失败
+    command: "codegraph"
+    auto_init: false    # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
+    auto_sync: true
+    max_nodes: 30
+    max_code: 0
+
+agent:
+  provider: "claude"
+  commands:
+    claude: "claude"
+    codex: "codex"
+  timeout: 1800
+  allow_user_plugins: false
+  parallelism: 0
 
 learning:
-  max_commits: 50        # 每次学习的最大提交数
-  batch_size: 10         # 批量处理大小
-  confidence_threshold: 0.7  # 置信度阈值
+  max_commits: 50
+  batch_size: 5
 
 output:
-  skills_path: ".claude/skills/skills-seed-skills"  # 兼容旧字段
   skills_paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
 logging:
-  level: "info"          # 日志级别：debug, info, warn, error
-  logs_path: "logs"      # 日志目录
-
-autofix:
-  strategy: "patch"      # 修复策略：patch, direct, preview
-  backup_path: "backups" # 备份目录
+  level: "DEBUG"
+  logs_path: "logs"
+  max_log_files: 30
 ```
 
-## 🔌 Git 钩子集成
+`analysis.codegraph.enabled` 默认为 `true`。如果机器未安装 `codegraph`，或目标项目还没有 `.codegraph/` 索引，`required: false` 会让 `skills-seed` 打印提醒并继续使用普通文件分析。需要强制使用 CodeGraph 的团队环境可把 `required` 改为 `true`。
 
-Skills Seed 可以与 Git 钩子集成，在提交前自动检查代码
+## 文档
 
-```bash
-# 安装 pre-commit 钩子
-skills-seed hook install pre-commit
+- [项目架构](docs/project-architecture.md)
+- [生成链路说明](docs/project-generation-guide.md)
+- [Changelog](CHANGELOG.md)
 
-# 钩子会在 git commit 前自动运行：
-# skills-seed check --interactive
-```
-
-## 🛠️ 开发指南
-
-### 环境要求
-
-- Go 1.25.6+
-- Git
-
-### 本地开发
+## 开发
 
 ```bash
-# 克隆仓库
-git clone https://github.com/silaswei-io/skills-seed.git
-cd skills-seed
-
-# 安装依赖
-go mod download
-
-# 运行测试
 go test ./...
-
-# 构建
+go vet ./...
 go build -o skills-seed ./cmd/skills-seed
-
-# 运行
-./skills-seed --help
 ```
 
-### 代码规范
+## License
 
-- 遵循 [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
-- 使用 `gofmt` 格式化代码
-- 使用 `golint` 和 `go vet` 检查代码
-- 保持函数简洁，单一职责
-- 编写单元测试，覆盖率 ≥ 80%
-
-## 🤝 贡献指南
-
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'feat: add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
-
-## 📝 更新日志
-
-查看 [CHANGELOG.md](CHANGELOG.md) 了解版本更新历史
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
-
-## 🙏 致谢
-
-感谢以下开源项目
-
-- [Cobra](https://github.com/spf13/cobra) - 强大的 CLI 框架
-- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - 优雅的终端 UI
-- [BoltDB](https://github.com/etcd-io/bbolt) - 高性能嵌入式数据库
-- [go-i18n](https://github.com/nicksnyder/go-i18n) - 国际化支持
-
----
-
-<div align="center">
-
-**Made with ❤️ by [silaswei-io](https://github.com/silaswei-io)**
-
-</div>
+[MIT](LICENSE)

@@ -39,7 +39,7 @@ func patternsCmd(cont *container.Container) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&categoryFilter, "category", "c", "", "Filter by category (naming/error/structure/concurrency/testing/business/api/database/utils/middleware/config)")
+	cmd.Flags().StringVarP(&categoryFilter, "category", "c", "", i18n.Get("ViewFlagCategory"))
 
 	return cmd
 }

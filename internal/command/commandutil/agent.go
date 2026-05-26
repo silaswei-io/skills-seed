@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 // RequireAgentAvailable fails before commands invoke an unavailable AI agent
@@ -14,5 +15,5 @@ func RequireAgentAvailable(cont *container.Container) error {
 	if cont.Agent.IsAvailable() {
 		return nil
 	}
-	return fmt.Errorf("agent %q is not available; check agent command configuration", cont.Agent.Name())
+	return fmt.Errorf("%s", i18n.GetWithParams("AgentNotAvailable", map[string]interface{}{"Agent": cont.Agent.Name()}))
 }

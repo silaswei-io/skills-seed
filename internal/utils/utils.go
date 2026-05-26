@@ -84,3 +84,19 @@ func ResolvePath(projectRoot, path string) (string, error) {
 
 	return filepath.Join(projectRoot, path), nil
 }
+
+// RelativePaths returns slash-separated paths relative to projectRoot.
+func RelativePaths(projectRoot string, paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+	relPaths := make([]string, 0, len(paths))
+	for _, path := range paths {
+		relPath, err := filepath.Rel(projectRoot, path)
+		if err != nil {
+			continue
+		}
+		relPaths = append(relPaths, filepath.ToSlash(relPath))
+	}
+	return relPaths
+}
