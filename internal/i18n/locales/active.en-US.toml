@@ -692,6 +692,9 @@ other = "Batch learning commits {{.Current}}/{{.Total}}"
 [ProgressLearnCurrentPrepareProject]
 other = "Preparing project context"
 
+[ProgressLearnCurrentDetectChanges]
+other = "Detecting incremental file changes"
+
 [ProgressLearnCurrentAnalyzeCodebase]
 other = "Analyzing current codebase"
 
@@ -1574,6 +1577,15 @@ other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguag
 
 [LearnCurrentFocusInfo]
 other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMode}}"
+
+[LearnCurrentIncrementalSummary]
+other = "Incremental file changes:\n  • added or modified: {{.Changed}}\n  • deleted: {{.Deleted}}\n  • unchanged skipped: {{.Unchanged}}\n  • excluded: {{.Skipped}}"
+
+[LearnCurrentNoFileChanges]
+other = "No learnable file changes detected; skipped pattern learning and project profile refresh"
+
+[LearnCurrentGeneratedSkillsExcluded]
+other = "Excluded generated skills directories: {{.Paths}}"
 
 [LearnCurrentFocusOutsideRoot]
 other = "Focus path {{.Path}} is outside the project root"

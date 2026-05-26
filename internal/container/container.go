@@ -33,6 +33,7 @@ type Container struct {
 	ConfigRepo           *config.Repository
 	GitRepo              *git.Repository
 	PatternRepo          *boltdb.PatternRepository
+	FileTracker          domain.FileAnalysisTracker
 	ProfileRepo          *profilestore.Repository
 	StateRepo            *statestore.Repository
 	WorkspaceProfileRepo *workspacestore.ProfileRepository
@@ -127,6 +128,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		ConfigRepo:           configRepo,
 		GitRepo:              gitRepo,
 		PatternRepo:          patternRepo,
+		FileTracker:          patternRepo,
 		ProfileRepo:          profileRepo,
 		StateRepo:            stateRepo,
 		WorkspaceProfileRepo: workspaceProfileRepo,

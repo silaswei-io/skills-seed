@@ -114,7 +114,7 @@ func runLearnCurrent(cont *container.Container) error {
 
 	ctx := agent.WithTokenUsageScope(context.Background(), "")
 	startedAt := time.Now()
-	tracker := progress.New(4)
+	tracker := progress.New(5)
 
 	var projectRoot string
 	var projectName string
@@ -204,16 +204,77 @@ func runLearnCurrent(cont *container.Container) error {
 		}))
 	}
 
+	var incrementalChanges *incrementalFileChanges
+	var effectiveFocusPaths []string
+	detectStartedAt := time.Now()
+	if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentDetectChanges"), func() error {
+		var err error
+		incrementalChanges, err = prepareIncrementalFileChanges(ctx, cont.FileTracker, cont.ConfigRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, resolvedFocusPaths)
+		if err != nil {
+			return err
+		}
+		effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, incrementalChanges.FocusPaths())
+		return nil
+	}); err != nil {
+		return err
+	}
+	logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{
+		"Changed":   len(incrementalChanges.AddedOrModified),
+		"Deleted":   len(incrementalChanges.Deleted),
+		"Unchanged": len(incrementalChanges.Unchanged),
+		"Skipped":   len(incrementalChanges.Skipped),
+	}))
+	if len(incrementalChanges.ExcludedGeneratedSkillDirs) > 0 {
+		logger.Info(i18n.GetWithParams("LearnCurrentGeneratedSkillsExcluded", map[string]interface{}{
+			"Paths": strings.Join(incrementalChanges.ExcludedGeneratedSkillDirs, ", "),
+		}))
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "command.learn_current.detect_changes",
+		"duration", time.Since(detectStartedAt),
+		"changed_count", len(incrementalChanges.AddedOrModified),
+		"deleted_count", len(incrementalChanges.Deleted),
+		"unchanged_count", len(incrementalChanges.Unchanged),
+		"skipped_count", len(incrementalChanges.Skipped),
+	)
+	if learnCurrentProfileOpt != learnCurrentProfileSkip && incrementalChanges.HasChanges() {
+		refreshProfile = true
+	}
+
 	var patterns []domain.Pattern
 	var businessRulesCount int
 	var bestPracticesCount int
 	var commonPatternsCount int
 
+	if !incrementalChanges.HasChanges() {
+		logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
+		if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
+			return err
+		}
+		if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error { return nil }); err != nil {
+			return err
+		}
+		if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentSkipProfile"), func() error { return nil }); err != nil {
+			return err
+		}
+		logger.Info(i18n.Get("LearnCurrentComplete"))
+		logLearnCurrentNextSteps()
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+			"operation", "command.learn_current",
+			"duration", time.Since(startedAt),
+			"patterns_count", 0,
+			"saved_count", 0,
+			"skipped", true,
+		)
+		agent.FlushTokenUsageScope(ctx)
+		return nil
+	}
+
 	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
 	analyzeStartedAt := time.Now()
 	if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error {
 		analyzeResult, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeCodebaseOptions{
-			FocusPaths: resolvedFocusPaths,
+			FocusPaths: effectiveFocusPaths,
 		})
 		if err != nil {
 			return err
@@ -276,9 +337,9 @@ func runLearnCurrent(cont *container.Container) error {
 	if refreshProfile {
 		if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentSaveProfile"), func() error {
 			projectOptions := analyzer.AnalyzeProjectOptions{}
-			if existingProfile != nil && len(resolvedFocusPaths) > 0 {
+			if existingProfile != nil && len(effectiveFocusPaths) > 0 {
 				projectOptions.ExistingProfile = existingProfile
-				projectOptions.FocusPaths = resolvedFocusPaths
+				projectOptions.FocusPaths = effectiveFocusPaths
 			}
 			result, err := cont.AnalyzerSvc.AnalyzeProjectFullWithOptions(ctx, projectRoot, projectName, currentLanguage, projectOptions)
 			if err != nil {
@@ -313,6 +374,10 @@ func runLearnCurrent(cont *container.Container) error {
 		logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
 	}
 
+	if err := commitIncrementalFileChanges(ctx, cont.FileTracker, incrementalChanges); err != nil {
+		return err
+	}
+
 	logger.Info(i18n.Get("LearnCurrentComplete"))
 	logLearnCurrentNextSteps()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -335,6 +400,14 @@ func logLearnCurrentNextSteps() {
 	logger.Info(i18n.Get("LearnCurrentNextGenerateSkills"))
 	logger.Info(i18n.Get("LearnCurrentNextGenerateMergedSkills"))
 	logger.Info(i18n.Get("LearnCurrentNextCheck"))
+}
+
+func resolveIncrementalFocusPaths(projectRoot string, relPaths []string) []string {
+	paths := make([]string, 0, len(relPaths))
+	for _, relPath := range relPaths {
+		paths = append(paths, filepath.Join(projectRoot, filepath.FromSlash(relPath)))
+	}
+	return paths
 }
 
 func runLearnWorkspaceCurrent(cont *container.Container) error {

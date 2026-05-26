@@ -138,6 +138,7 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
 	require.NoError(t, os.MkdirAll(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend", "main.go"), []byte("package main\n"), 0644))
+	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
 
 	output := captureLearnStdout(t, func() {
 		require.NoError(t, runLearnCurrent(cont))
@@ -150,11 +151,71 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 	require.Greater(t, tokenIndex, profileSavedIndex)
 }
 
+func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileAuto)
+	defer restoreLearnFlags()
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	require.NoError(t, runLearnCurrent(cont))
+
+	analyzeCalls := 0
+	profileCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeProjectFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont))
+	})
+
+	require.Zero(t, analyzeCalls)
+	require.Zero(t, profileCalls)
+	require.Contains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileAuto)
+	defer restoreLearnFlags()
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	require.NoError(t, runLearnCurrent(cont))
+
+	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "main.go", "package main\nconst changed = true\n")
+	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+
+	var patternFocus []string
+	var profileFocus []string
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		patternFocus = append([]string{}, req.FocusPaths...)
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeProjectFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileFocus = append([]string{}, req.FocusPaths...)
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
+	}
+
+	require.NoError(t, runLearnCurrent(cont))
+
+	require.Equal(t, []string{"main.go"}, patternFocus)
+	require.Equal(t, []string{"main.go"}, profileFocus)
+}
+
 func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.WorkspaceProjectConfig) *container.Container {
 	t.Helper()
 
-	projectRoot := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "main.go"), []byte("package main\n"), 0644))
+	projectRoot := initLearnGitRepo(t)
+	writeLearnFile(t, projectRoot, "main.go", "package main\n")
+	gitAddAll(t, projectRoot)
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	configRepo, err := config.NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
@@ -213,6 +274,7 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		Agent:       mockAgent,
 		AnalyzerSvc: analyzer.NewAnalyzerService(mockAgent, configRepo),
 		LearnerSvc:  servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, mergerSvc),
+		FileTracker: patternRepo,
 		MergerSvc:   mergerSvc,
 	}
 }

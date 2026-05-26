@@ -158,6 +158,11 @@ func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pat
 	return savedCount
 }
 
+// KnownPatternsSnapshot 返回给当前代码学习使用的已知模式摘要。
+func (s *LearnerService) KnownPatternsSnapshot(ctx context.Context) (string, int) {
+	return s.marshalKnownPatterns(ctx)
+}
+
 // Learn 从 Git 历史学习模式（流程编排）
 //
 // 参数
