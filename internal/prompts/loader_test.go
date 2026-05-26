@@ -171,6 +171,30 @@ func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
 	require.Contains(t, prompt, "结构化")
 }
 
+func TestRenderInitSkillsIncludesKnownPatterns(t *testing.T) {
+	tests := []struct {
+		locale string
+		label  string
+	}{
+		{locale: "zh-CN", label: "已有模式"},
+		{locale: "en-US", label: "Existing Patterns"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("codex", tt.locale, "")
+			req := sampleAnalyzeCurrentCodebaseRequest()
+			req.KnownPatternsJSON = `[{"id":"known","name":"Known Pattern","category":"api"}]`
+			req.KnownPatternsCount = 1
+
+			prompt, err := loader.Render("init-skills", req)
+
+			require.NoError(t, err)
+			require.Contains(t, prompt, tt.label)
+			require.Contains(t, prompt, `"name":"Known Pattern"`)
+		})
+	}
+}
+
 func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *testing.T) {
 	tests := []struct {
 		locale       string

@@ -57,6 +57,14 @@ The following are representative code file paths selected from the project. You 
 - {{.Path}}
 {{- end}}
 {{- end}}
+{{- if .KnownPatternsJSON}}
+
+# Existing Patterns ({{.KnownPatternsCount}})
+
+The following patterns already exist in project memory. Do not re-emit the same rule under a new name. If changed code adds evidence to an existing pattern, reuse the existing concept and output only materially new information.
+
+{{.KnownPatternsJSON}}
+{{- end}}
 
 # Analysis Requirements
 

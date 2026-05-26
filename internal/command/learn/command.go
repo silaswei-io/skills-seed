@@ -273,8 +273,11 @@ func runLearnCurrent(cont *container.Container) error {
 	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
 	analyzeStartedAt := time.Now()
 	if err := tracker.RunStep(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error {
+		knownPatternsJSON, knownPatternsCount := cont.LearnerSvc.KnownPatternsSnapshot(ctx)
 		analyzeResult, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeCodebaseOptions{
-			FocusPaths: effectiveFocusPaths,
+			FocusPaths:         effectiveFocusPaths,
+			KnownPatternsJSON:  knownPatternsJSON,
+			KnownPatternsCount: knownPatternsCount,
 		})
 		if err != nil {
 			return err
@@ -491,8 +494,11 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 		}
 		effectiveFocusPaths := resolveIncrementalFocusPaths(projectRootPath, incrementalChanges.FocusPaths())
 
+		knownPatternsJSON, knownPatternsCount := cont.LearnerSvc.KnownPatternsSnapshot(projectCtx)
 		result, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(projectCtx, projectRootPath, project.ID, project.Language, analyzer.AnalyzeCodebaseOptions{
-			FocusPaths: effectiveFocusPaths,
+			FocusPaths:         effectiveFocusPaths,
+			KnownPatternsJSON:  knownPatternsJSON,
+			KnownPatternsCount: knownPatternsCount,
 		})
 		if err != nil {
 			finishProjectLog(projectCtx, "LearnWorkspaceProjectFailed", map[string]interface{}{

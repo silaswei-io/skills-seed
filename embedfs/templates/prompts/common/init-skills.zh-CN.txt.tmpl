@@ -57,6 +57,14 @@
 - {{.Path}}
 {{- end}}
 {{- end}}
+{{- if .KnownPatternsJSON}}
+
+# 已有模式 ({{.KnownPatternsCount}})
+
+以下模式已经存在于项目记忆中。分析变更文件时不要把同一规则换名重复输出；如果变更代码补充了已有模式的证据，请复用已有语义并只输出有实质新增的信息。
+
+{{.KnownPatternsJSON}}
+{{- end}}
 
 # 分析要求
 

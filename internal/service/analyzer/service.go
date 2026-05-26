@@ -287,14 +287,16 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 
 // AnalyzeCurrentCodebaseRequest 当前代码库分析请求
 type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName       string
-	RootPath          string
-	Language          string
-	FocusPaths        []string
-	Structure         string
-	StructuralContext string
-	MainFiles         []string
-	SampleFiles       []agent.SampleFile
+	ProjectName        string
+	RootPath           string
+	Language           string
+	FocusPaths         []string
+	Structure          string
+	StructuralContext  string
+	MainFiles          []string
+	SampleFiles        []agent.SampleFile
+	KnownPatternsJSON  string
+	KnownPatternsCount int
 }
 
 // AnalyzeCurrentCodebaseResult 当前代码库分析结果
@@ -335,14 +337,16 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 	}
 
 	agentReq := &agent.AnalyzeCurrentCodebaseRequest{
-		ProjectName:       req.ProjectName,
-		RootPath:          req.RootPath,
-		Language:          req.Language,
-		FocusPaths:        req.FocusPaths,
-		Structure:         req.Structure,
-		StructuralContext: structuralContext,
-		MainFiles:         req.MainFiles,
-		SampleFiles:       req.SampleFiles,
+		ProjectName:        req.ProjectName,
+		RootPath:           req.RootPath,
+		Language:           req.Language,
+		FocusPaths:         req.FocusPaths,
+		Structure:          req.Structure,
+		StructuralContext:  structuralContext,
+		MainFiles:          req.MainFiles,
+		SampleFiles:        req.SampleFiles,
+		KnownPatternsJSON:  req.KnownPatternsJSON,
+		KnownPatternsCount: req.KnownPatternsCount,
 	}
 
 	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
@@ -648,7 +652,9 @@ func NewProjectProfile(result *AnalyzeProjectResult, projectName, language strin
 
 // AnalyzeCodebaseOptions controls how current-code learning collects context
 type AnalyzeCodebaseOptions struct {
-	FocusPaths []string
+	FocusPaths         []string
+	KnownPatternsJSON  string
+	KnownPatternsCount int
 }
 
 // AnalyzeCodebaseFull 完整代码库分析（提取模式并转换为 domain.Pattern）
@@ -685,13 +691,15 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 	)
 
 	req := &AnalyzeCurrentCodebaseRequest{
-		ProjectName: projectName,
-		RootPath:    projectRoot,
-		Language:    language,
-		FocusPaths:  focusPaths,
-		Structure:   structure,
-		MainFiles:   mainFiles,
-		SampleFiles: sampleFiles,
+		ProjectName:        projectName,
+		RootPath:           projectRoot,
+		Language:           language,
+		FocusPaths:         focusPaths,
+		Structure:          structure,
+		MainFiles:          mainFiles,
+		SampleFiles:        sampleFiles,
+		KnownPatternsJSON:  opts.KnownPatternsJSON,
+		KnownPatternsCount: opts.KnownPatternsCount,
 	}
 
 	result, err := s.AnalyzeCurrentCodebase(ctx, req)

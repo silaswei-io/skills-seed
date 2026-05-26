@@ -332,6 +332,30 @@ func TestAnalyzeCodebaseFullWithFocusPathsOnlySendsFocusedSamples(t *testing.T) 
 	}
 }
 
+func TestAnalyzeCodebaseFullPassesKnownPatterns(t *testing.T) {
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal:      "mock",
+		AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n"), 0644))
+
+	_, _, err := svc.AnalyzeCodebaseFullWithOptions(context.Background(), tmpDir, "demo", "go", AnalyzeCodebaseOptions{
+		KnownPatternsJSON:  `[{"id":"known"}]`,
+		KnownPatternsCount: 1,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, `[{"id":"known"}]`, received.KnownPatternsJSON)
+	require.Equal(t, 1, received.KnownPatternsCount)
+}
+
 func TestCollectSampleFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
