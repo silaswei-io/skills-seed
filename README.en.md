@@ -146,6 +146,10 @@ skills-seed learn history --since=30d
 - `skip`: learn patterns only
 - `refresh`: refresh the profile from the current input
 
+After the first successful `learn current`, Skills Seed records md5 fingerprints for analyzed files. Later runs compare those fingerprints first: when no learnable files changed, both pattern learning and project profile refresh are skipped; when files changed, only added, modified, or deleted paths drive incremental learning. Workspace mode scopes records per child project, so one child project's change does not re-learn the others.
+
+Generated skills directories are excluded from learning by default, including configured `output.skills_paths`, `.claude/skills/**`, and `.agents/skills/**`. This prevents generated `SKILL.md` and `references/` files from feeding back into future learning.
+
 `learn current` prints token usage after the learning log. In workspace mode, token usage is printed at the end of each child-project log block so concurrent learning does not interleave it with other projects.
 
 ### Profile And Spec

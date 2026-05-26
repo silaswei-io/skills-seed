@@ -2,6 +2,25 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.5]
+
+### Features
+
+- Add md5-based incremental file learning to `learn current`, recording fingerprints after successful current-code learning
+- Skip both pattern learning and project profile refresh when no learnable files changed
+- Scope file fingerprints per workspace child project so equal relative paths do not collide
+- Refresh the existing profile for deleted-file-only runs without running pattern extraction
+
+### Experience
+
+- Exclude configured skills output paths plus `.claude/skills/**` and `.agents/skills/**` by default to prevent generated content from feeding back into learning
+- Pass existing pattern summaries into current-code learning prompts to reduce duplicate rules under new names
+- Add incremental file statistics and generated-skills exclusion messages to learning output
+
+### Documentation
+
+- Update README, generation pipeline docs, and config templates for md5 incremental learning, workspace child-project scoping, and generated-skills exclusion
+
 ## [v0.0.4]
 
 ### Features

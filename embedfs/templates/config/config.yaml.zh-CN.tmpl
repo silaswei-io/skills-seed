@@ -79,6 +79,7 @@ logging:
 # 全局排除配置
 # ========================================
 exclude:                     # 所有学习和分析都不包含的文件/目录
+  # 生成的 skills 输出目录会自动排除，包括 output.skills_paths、.claude/skills/** 和 .agents/skills/**
   - "vendor/**"              # Go 依赖目录
   - "node_modules/**"        # Node.js 依赖目录
   - "**/*.pb.go"             # Protobuf 生成文件

@@ -146,6 +146,10 @@ skills-seed learn history --since=30d
 - `skip`：只学习 patterns，不更新画像
 - `refresh`：基于当前输入刷新画像
 
+`learn current` 首次成功后会记录已分析文件的 md5。后续执行会先比较文件指纹：没有可学习文件变化时会同时跳过 patterns 学习和项目画像刷新；有变化时只围绕新增、修改或删除的文件做增量学习。workspace 模式按子项目隔离记录，一个子项目的变更不会触发其他子项目重新学习。
+
+生成的 skills 目录默认不会参与学习，包括配置中的 `output.skills_paths`，以及 `.claude/skills/**`、`.agents/skills/**`。这可以避免 `SKILL.md` 和 `references/` 被下一轮学习当作普通项目文件。
+
 `learn current` 会在学习日志结束后输出 Token 消耗。workspace 模式会在每个子项目学习日志末尾输出该子项目的 Token 消耗，避免并发学习时混入其他子项目日志。
 
 ### 画像与规范

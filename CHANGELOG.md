@@ -2,6 +2,25 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.5]
+
+### 功能
+
+- `learn current` 新增文件 md5 增量学习，成功学习后记录普通项目文件指纹
+- 未检测到可学习文件变化时，同时跳过 patterns 学习和项目画像刷新
+- workspace 模式按子项目隔离文件指纹，同名相对路径不会互相影响
+- 删除文件只触发基于已有画像的增量画像刷新，不再无意义提取 patterns
+
+### 体验
+
+- 默认排除配置的 skills 输出目录以及 `.claude/skills/**`、`.agents/skills/**`，避免生成内容回流到下一轮学习
+- 当前代码学习会把已有 patterns 摘要传给 Agent，降低同一规则换名重复输出的概率
+- 学习日志补充增量文件统计和 generated skills 排除提示
+
+### 文档
+
+- 更新 README、生成链路文档和配置模板，说明 md5 增量学习、workspace 子项目隔离和 generated skills 默认排除
+
 ## [v0.0.4]
 
 ### 功能

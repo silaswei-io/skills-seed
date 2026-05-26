@@ -79,6 +79,7 @@ logging:
 # Global Exclusion Configuration
 # ========================================
 exclude:                     # Files/directories to exclude from all learning and analysis
+  # Generated skills output directories are excluded automatically, including output.skills_paths, .claude/skills/**, and .agents/skills/**
   - "vendor/**"              # Go dependencies directory
   - "node_modules/**"        # Node.js dependencies directory
   - "**/*.pb.go"             # Protobuf generated files

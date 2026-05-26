@@ -80,12 +80,21 @@ project 模式流程：
 ```text
 runLearnCurrent
   -> 解析项目根目录、语言、focus 参数
+  -> 比较普通项目文件 md5，生成增量 focus paths
   -> AnalyzerService.AnalyzeCodebaseFullWithOptions
   -> Agent.AnalyzeCurrentCodebase
   -> 保存 patterns
   -> 按 --profile 策略生成或刷新 project-profile.json
   -> 输出后续步骤和 Token 消耗
 ```
+
+`learn current` 会在成功分析后把普通项目文件的 md5 写入 `.skills-seed/memory/project.db`。下一次执行会先比较文件指纹：
+
+- 没有新增、修改或删除的可学习文件：跳过 patterns 学习和项目画像刷新
+- 有新增或修改文件：只把这些文件作为增量 focus paths
+- 只有删除文件：跳过 patterns 学习，并在已有画像基础上刷新项目画像
+
+生成的 skills 输出目录默认排除，不需要手动写入 `exclude`。
 
 `--profile`：
 
