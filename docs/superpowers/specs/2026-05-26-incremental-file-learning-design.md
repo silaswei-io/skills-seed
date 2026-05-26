@@ -14,6 +14,7 @@ That means unchanged files can be analyzed repeatedly, profile refreshes can rep
 - Avoid learning from generated skills output and project memory.
 - Reduce duplicate patterns by giving current-code learning the same known-pattern context used by history learning.
 - Update user-facing documentation for the new behavior and generated-skill exclusions.
+- Keep new or changed code comments in Chinese to match the existing codebase style.
 
 ## Non-Goals
 
@@ -194,3 +195,4 @@ The docs should explain:
 
 - Do not add a `learn current --full` flag in the initial implementation. Users can force a full current-code learning pass by clearing project memory or deleting the file tracker state.
 - Keep generated-skill exclusion built in for the initial implementation. Document the behavior instead of adding new config.
+- Write implementation comments in Chinese. Public names and identifiers can stay English, but explanatory comments should follow the surrounding Chinese documentation style.
