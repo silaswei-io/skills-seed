@@ -74,7 +74,12 @@ func TestGenerateSkills_AIError(t *testing.T) {
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
+		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeAI},
+	}
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 	assert.Error(t, err)
@@ -131,9 +136,14 @@ func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
+		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeAI},
+	}
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("const secretExistingSkillContent = true"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("<!-- generated-by: skills-seed v0.0.4 -->\nconst secretExistingSkillContent = true"), 0644))
 
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 
@@ -142,6 +152,126 @@ func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t
 	assert.NotContains(t, received.PatternsJSON, "secretGoodExample")
 	assert.NotContains(t, received.PatternsJSON, "secretBadExample")
 	assert.Equal(t, filepath.Join(tmpDir, "SKILL.md"), received.ExistingSkillsPath)
+}
+
+func TestGenerateSkills_TemplateModeDoesNotCallAgent(t *testing.T) {
+	pattern := domain.NewPattern("p1", "Template Rule", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("template mode rule")
+	pattern.SetRule("render directly from learned data")
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			return nil, errors.New("agent should not be called in template mode")
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
+		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeTemplate},
+	}
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	businessPattern := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, businessPattern, "Template Rule")
+	require.FileExists(t, filepath.Join(tmpDir, "references", "project-spec.md"))
+}
+
+func TestGenerateSkills_AIModeCallsAgentSummary(t *testing.T) {
+	pattern := domain.NewPattern("p1", "AI Rule", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("ai mode rule")
+	pattern.SetRule("ask agent for category summary")
+
+	called := false
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			called = true
+			return &agent.GenerateSkillsResult{
+				CategorySummaries: map[string]agent.CategorySummary{
+					"business": {
+						Category: "business",
+						Summary:  "AI generated business summary",
+						Patterns: []string{"AI Rule"},
+					},
+				},
+			}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
+		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeAI},
+	}
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	assert.True(t, called)
+	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "AI generated business summary")
+}
+
+func TestGenerateSkills_DoesNotOverwriteManualSkill(t *testing.T) {
+	pattern := domain.NewPattern("p1", "Manual Rule", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("manual skill rule")
+	pattern.SetRule("do not overwrite manual skill")
+
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	svc := newTestService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, mockPattern)
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("# Manual Skill\n"), 0644))
+
+	err := svc.GenerateSkills(context.Background(), tmpDir)
+
+	require.Error(t, err)
+	var manualErr *ManualSkillExistsError
+	require.ErrorAs(t, err, &manualErr)
+	assert.Equal(t, filepath.Join(tmpDir, "SKILL.md"), manualErr.Path)
+	assert.Equal(t, "# Manual Skill\n", readGeneratedFile(t, tmpDir, "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "project-spec.md"))
+}
+
+func TestGenerateSkills_OverwritesGeneratedSkill(t *testing.T) {
+	pattern := domain.NewPattern("p1", "Generated Rule", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("generated skill rule")
+	pattern.SetRule("overwrite generated skill")
+
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	svc := newTestService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, mockPattern)
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("<!-- generated-by: skills-seed v0.0.4 -->\nold generated skill\n"), 0644))
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	businessPattern := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, businessPattern, "Generated Rule")
+	assert.NotContains(t, readGeneratedFile(t, tmpDir, "SKILL.md"), "old generated skill")
 }
 
 func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
@@ -365,43 +495,20 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	assertNoBrokenMarkdownLinks(t, tmpDir)
 }
 
-func TestGenerateWorkspaceSkills_RendersChildProjectSpec(t *testing.T) {
+func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
-	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
-	pattern.ProjectID = "backend"
-	pattern.ScopePath = "backend"
-	pattern.WorkspaceRole = "backend"
-	pattern.Confidence = 0.95
-	pattern.Frequency = 3
-	pattern.SetDescription("wrap backend errors")
-	pattern.SetRule("use fmt.Errorf with %w")
-
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
+			require.Fail(t, "workspace root generation should not read centralized patterns")
+			return nil, nil
 		},
 	}
-	var savedSpec *domain.ProjectSpec
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-			require.Equal(t, "backend", projectID)
-			return &domain.ProjectProfile{
-				ProjectName:    "backend",
-				Language:       "go",
-				Summary:        "backend service",
-				GeneratedAt:    "2026-05-19 12:00:00",
-				KeyModules:     []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer"}},
-				CommonUtils:    []domain.UtilityFunction{{Name: "Normalize", File: "internal/pkg/normalize.go", Description: "normalize values"}},
-				ConfigPatterns: []string{"yaml config"},
-			}, nil
-		},
-		SaveSpecForProjectFn: func(ctx context.Context, projectID string, spec *domain.ProjectSpec) error {
-			require.Equal(t, "backend", projectID)
-			copied := *spec
-			savedSpec = &copied
-			return nil
+			require.Fail(t, "workspace root generation should not read child profiles")
+			return nil, nil
 		},
 	}
 	loader := skills.NewLoaderForAgent("codex", "zh-CN")
@@ -415,44 +522,27 @@ func TestGenerateWorkspaceSkills_RendersChildProjectSpec(t *testing.T) {
 	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg)
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
-	require.NotNil(t, savedSpec)
-	assert.Equal(t, "backend", savedSpec.ProjectID)
-	assert.Equal(t, "backend", savedSpec.ScopePath)
-	require.Len(t, savedSpec.PatternRules, 1)
-	assert.Equal(t, "Error Wrapping", savedSpec.PatternRules[0].Name)
 
-	specContent := readGeneratedFile(t, projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md")
-	assert.Contains(t, specContent, "backend service")
-	assert.Contains(t, specContent, "Error Wrapping")
-
-	childSkill := readGeneratedFile(t, projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md")
-	assert.Contains(t, childSkill, "./references/project-spec.md")
-	assertNoBrokenMarkdownLinks(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills"))
+	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
+	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md"))
+	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
 }
 
 func TestGenerateWorkspaceSkills_UsesConfiguredProviderOnly(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
-	pattern := domain.NewPattern("p1", "Backend Rule", domain.CategoryBusiness)
-	pattern.ProjectID = "backend"
-	pattern.Confidence = 0.9
-	pattern.SetDescription("backend pattern")
-	pattern.SetRule("follow backend rule")
-
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
+			require.Fail(t, "workspace root generation should not read centralized patterns")
+			return nil, nil
 		},
 	}
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-			return &domain.ProjectProfile{
-				ProjectName: projectID,
-				Language:    "go",
-				Summary:     "backend service",
-				GeneratedAt: "2026-05-19 12:00:00",
-			}, nil
+			require.Fail(t, "workspace root generation should not read child profiles")
+			return nil, nil
 		},
 	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
@@ -471,8 +561,8 @@ func TestGenerateWorkspaceSkills_UsesConfiguredProviderOnly(t *testing.T) {
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
-	require.FileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"))
 
 	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md")
@@ -483,132 +573,6 @@ func TestGenerateWorkspaceSkills_UsesConfiguredProviderOnly(t *testing.T) {
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
 	require.Contains(t, overview, "未显式配置契约路径")
 	require.Contains(t, overview, "默认写入边界")
-}
-
-func TestGenerateWorkspaceSkills_SkipsExistingCurrentProviderChildSkill(t *testing.T) {
-	projectRoot := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills"), 0755))
-	existingSkillPath := filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md")
-	require.NoError(t, os.WriteFile(existingSkillPath, []byte("existing child skill"), 0644))
-
-	pattern := domain.NewPattern("p1", "Backend Rule", domain.CategoryBusiness)
-	pattern.ProjectID = "backend"
-	pattern.Confidence = 0.9
-	pattern.SetDescription("backend pattern")
-	pattern.SetRule("follow backend rule")
-
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
-		},
-	}
-	mockProfile := &mocks.MockProjectProfileRepository{
-		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-			require.Fail(t, "existing child skill should skip profile loading")
-			return nil, nil
-		},
-	}
-	loader := skills.NewLoaderForAgent("claude", "zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
-		WorkspaceCfg: config.WorkspaceConfig{
-			ChildSkillPolicy: config.WorkspaceChildSkillPolicySkipExisting,
-			Projects:         []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
-		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
-	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
-
-	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
-	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
-	assert.Equal(t, "existing child skill", readGeneratedFile(t, projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
-	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "references", "project-spec.md"))
-}
-
-func TestGenerateWorkspaceSkills_SkipExistingIsProviderSpecific(t *testing.T) {
-	projectRoot := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"), []byte("codex skill"), 0644))
-
-	pattern := domain.NewPattern("p1", "Backend Rule", domain.CategoryBusiness)
-	pattern.ProjectID = "backend"
-	pattern.Confidence = 0.9
-	pattern.SetDescription("backend pattern")
-	pattern.SetRule("follow backend rule")
-
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
-		},
-	}
-	mockProfile := &mocks.MockProjectProfileRepository{
-		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-			return &domain.ProjectProfile{
-				ProjectName: projectID,
-				Language:    "go",
-				Summary:     "backend service",
-				GeneratedAt: "2026-05-19 12:00:00",
-			}, nil
-		},
-	}
-	loader := skills.NewLoaderForAgent("claude", "zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
-		WorkspaceCfg: config.WorkspaceConfig{
-			ChildSkillPolicy: config.WorkspaceChildSkillPolicySkipExisting,
-			Projects:         []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
-		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
-	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
-
-	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
-	require.FileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
-	assert.Equal(t, "codex skill", readGeneratedFile(t, projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"))
-}
-
-func TestGenerateWorkspaceSkills_OverwriteExistingChildSkill(t *testing.T) {
-	projectRoot := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"), []byte("old child skill"), 0644))
-
-	pattern := domain.NewPattern("p1", "Backend Rule", domain.CategoryBusiness)
-	pattern.ProjectID = "backend"
-	pattern.Confidence = 0.9
-	pattern.SetDescription("backend pattern")
-	pattern.SetRule("follow backend rule")
-
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
-		},
-	}
-	mockProfile := &mocks.MockProjectProfileRepository{
-		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-			return &domain.ProjectProfile{
-				ProjectName: projectID,
-				Language:    "go",
-				Summary:     "backend service",
-				GeneratedAt: "2026-05-19 12:00:00",
-			}, nil
-		},
-	}
-	loader := skills.NewLoaderForAgent("claude", "zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
-		WorkspaceCfg: config.WorkspaceConfig{
-			ChildSkillPolicy: config.WorkspaceChildSkillPolicySkipExisting,
-			Projects:         []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
-		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
-	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
-
-	require.NoError(t, svc.GenerateSkills(context.Background(), "", WithWorkspaceChildSkillPolicy(config.WorkspaceChildSkillPolicyOverwrite)))
-	childSkill := readGeneratedFile(t, projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md")
-	assert.NotContains(t, childSkill, "old child skill")
-	assert.Contains(t, childSkill, "backend")
-	require.FileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "references", "project-spec.md"))
 }
 
 func TestGenerateWorkspaceSkills_UsesChildProjectConfigPath(t *testing.T) {
@@ -631,42 +595,31 @@ output:
 `
 	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".skills-seed", "config.yaml"), []byte(childConfig), 0644))
 
-	pattern := domain.NewPattern("p1", "Backend Rule", domain.CategoryBusiness)
-	pattern.ProjectID = "backend"
-	pattern.Confidence = 0.9
-	pattern.SetDescription("backend pattern")
-	pattern.SetRule("follow backend rule")
-
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
+			require.Fail(t, "workspace root generation should not read centralized patterns")
+			return nil, nil
 		},
 	}
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-			return &domain.ProjectProfile{
-				ProjectName: projectID,
-				Language:    "go",
-				Summary:     "backend service",
-				GeneratedAt: "2026-05-19 12:00:00",
-			}, nil
+			require.Fail(t, "workspace root generation should not read child profiles")
+			return nil, nil
 		},
 	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
 		WorkspaceCfg: config.WorkspaceConfig{
-			ChildSkillPolicy: config.WorkspaceChildSkillPolicySkipExisting,
-			Projects:         []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
 		},
 		AgentCfg: config.AgentConfig{Provider: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
 
-	require.NoError(t, svc.GenerateSkills(context.Background(), "", WithWorkspaceChildSkillPolicy(config.WorkspaceChildSkillPolicyOverwrite)))
+	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
-	require.FileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "custom-child-skill", "SKILL.md"))
-	require.FileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "custom-child-skill", "references", "project-spec.md"))
+	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "custom-child-skill", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
 
 	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md")
@@ -677,44 +630,6 @@ output:
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
 	assert.Contains(t, overview, "子项目配置：`backend/.skills-seed/config.yaml`")
 	assert.Contains(t, overview, "backend/.agents/skills/custom-child-skill/SKILL.md")
-}
-
-func TestGenerateWorkspaceSkills_RootOnlySkipsChildSkills(t *testing.T) {
-	projectRoot := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
-
-	pattern := domain.NewPattern("p1", "Backend Rule", domain.CategoryBusiness)
-	pattern.ProjectID = "backend"
-	pattern.Confidence = 0.9
-	pattern.SetDescription("backend pattern")
-	pattern.SetRule("follow backend rule")
-
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "root_only should skip loading patterns")
-			return []domain.Pattern{*pattern}, nil
-		},
-	}
-	mockProfile := &mocks.MockProjectProfileRepository{
-		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-			require.Fail(t, "root_only should skip profile loading")
-			return nil, nil
-		},
-	}
-	loader := skills.NewLoaderForAgent("claude", "zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
-		WorkspaceCfg: config.WorkspaceConfig{
-			ChildSkillPolicy: config.WorkspaceChildSkillPolicySkipExisting,
-			Projects:         []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
-		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
-	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
-
-	require.NoError(t, svc.GenerateSkills(context.Background(), "", WithWorkspaceChildSkillPolicy(config.WorkspaceChildSkillPolicyRootOnly)))
-	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
-	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
 }
 
 func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {

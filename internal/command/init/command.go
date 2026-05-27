@@ -32,7 +32,7 @@ func Cmd() *cobra.Command {
 		Long:  i18n.Get("InitLongDesc"),
 		Run: func(cmd *cobra.Command, args []string) {
 			// 验证 locale 参数
-			if localeFlag != "" && localeFlag != "zh-CN" && localeFlag != "en-US" {
+			if !isValidLocale(localeFlag) {
 				fmt.Fprintln(os.Stderr, i18n.Get("InitLocaleInvalid"))
 				os.Exit(1)
 			}
@@ -54,8 +54,32 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
 	initCmd.Flags().StringVar(&modeFlag, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	initCmd.Flags().BoolVar(&workspaceFlag, "workspace", false, i18n.Get("InitFlagWorkspace"))
+	initCmd.AddCommand(childrenCmd())
 
 	return initCmd
+}
+
+func childrenCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "children",
+		Short: i18n.Get("InitChildrenShort"),
+		Run: func(cmd *cobra.Command, args []string) {
+			if !isValidLocale(localeFlag) {
+				fmt.Fprintln(os.Stderr, i18n.Get("InitLocaleInvalid"))
+				os.Exit(1)
+			}
+			if err := initializeWorkspaceChildren(localeFlag); err != nil {
+				fmt.Fprintln(os.Stderr, i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
+				os.Exit(1)
+			}
+		},
+	}
+	cmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
+	return cmd
+}
+
+func isValidLocale(locale string) bool {
+	return locale == "" || locale == "zh-CN" || locale == "en-US"
 }
 
 // ResetCmd 返回 reset 命令
@@ -81,18 +105,33 @@ func ResetCmd() *cobra.Command {
 }
 
 func initializeSkill(locale, mode string) error {
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
+	}
+	return initializeSkillAt(projectRoot, locale, mode)
+}
+
+type initializeSkillOptions struct {
+	initLogger      bool
+	showUserSummary bool
+	language        string
+}
+
+func initializeSkillAt(projectRoot, locale, mode string) error {
+	return initializeSkillWithOptions(projectRoot, locale, mode, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+	})
+}
+
+func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializeSkillOptions) error {
 	mode = normalizeInitMode(mode)
 	// 如果指定了 locale，先初始化 i18n
 	if locale != "" {
 		if err := i18n.Init(locale); err != nil {
 			return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
 		}
-	}
-
-	// 获取项目根目录
-	projectRoot, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
 	}
 
 	// 检查是否是 Git 仓库
@@ -150,18 +189,20 @@ func initializeSkill(locale, mode string) error {
 		}
 	}
 
-	// 初始化日志
-	loggingConfig := configRepo.GetLoggingConfig()
-	// 配置中的路径是相对于 .skills-seed 目录的
-	logDir := filepath.Join(seedPath, loggingConfig.LogsPath)
-	logLevel := logger.ParseLevel(loggingConfig.Level)
+	if opts.initLogger {
+		loggingConfig := configRepo.GetLoggingConfig()
+		logDir := filepath.Join(seedPath, loggingConfig.LogsPath)
+		logLevel := logger.ParseLevel(loggingConfig.Level)
 
-	if err := logger.InitWithRetention(logDir, "init", logLevel, loggingConfig.MaxLogFiles); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("InitLoggerInitFailed"), err)
+		if err := logger.InitWithRetention(logDir, "init", logLevel, loggingConfig.MaxLogFiles); err != nil {
+			return fmt.Errorf("%s: %w", i18n.Get("InitLoggerInitFailed"), err)
+		}
+		defer logger.Close()
 	}
-	defer logger.Close()
 
-	logger.Info(i18n.Get("InitStart"))
+	if opts.showUserSummary {
+		logger.Info(i18n.Get("InitStart"))
+	}
 
 	// 获取项目名称（从目录名）
 	projectName := filepath.Base(projectRoot)
@@ -176,6 +217,11 @@ func initializeSkill(locale, mode string) error {
 	if err := configRepo.SetRootPath(projectRoot); err != nil {
 		logger.Error(i18n.Get("InitSetRootPathFailed"), "error", err)
 		return err
+	}
+	if opts.language != "" {
+		if err := configRepo.SetProjectLanguage(opts.language); err != nil {
+			return err
+		}
 	}
 
 	projectLanguage := configRepo.Get().Project.Language
@@ -224,15 +270,127 @@ func initializeSkill(locale, mode string) error {
 		return err
 	}
 
-	logger.Info(i18n.Get("InitSuccess"))
-	logger.Info(i18n.GetWithParams("InitSkillLocation", map[string]interface{}{"Path": seedPath}))
+	if opts.showUserSummary {
+		logger.Info(i18n.Get("InitSuccess"))
+		logger.Info(i18n.GetWithParams("InitSkillLocation", map[string]interface{}{"Path": seedPath}))
 
-	logger.Info(i18n.Get("InitNextSteps"))
-	logger.Info(i18n.Get("InitStepLearn"))
-	logger.Info(i18n.Get("InitStepWatch"))
-	logger.Info(i18n.Get("InitStepPatterns"))
-	logger.Info(i18n.Get("InitStepRules"))
+		logger.Info(i18n.Get("InitNextSteps"))
+		logger.Info(i18n.Get("InitStepLearn"))
+		logger.Info(i18n.Get("InitStepWatch"))
+		logger.Info(i18n.Get("InitStepPatterns"))
+		logger.Info(i18n.Get("InitStepRules"))
+	}
 
+	return nil
+}
+
+func initializeWorkspaceChildren(locale string) error {
+	workspaceRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
+	}
+	return initializeWorkspaceChildrenAt(workspaceRoot, locale)
+}
+
+func initializeWorkspaceChildrenAt(workspaceRoot, locale string) error {
+	rootSeedPath := filepath.Join(workspaceRoot, ".skills-seed")
+	rootConfigPath := filepath.Join(rootSeedPath, "config.yaml")
+	if _, err := os.Stat(rootConfigPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+		}
+		return err
+	}
+
+	rootConfigRepo, err := config.NewRepository(rootSeedPath, locale)
+	if err != nil {
+		return err
+	}
+	configLocale := locale
+	if configLocale == "" {
+		configLocale = rootConfigRepo.GetProjectConfig().Locale
+	}
+	if configLocale == "" {
+		configLocale = domain.DefaultLocale
+	}
+	if err := i18n.Init(configLocale); err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
+	}
+
+	if rootConfigRepo.GetProjectConfig().Mode != domain.ModeWorkspace {
+		return fmt.Errorf("%s", i18n.Get("InitChildrenRequireWorkspaceMode"))
+	}
+	workspaceConfig := rootConfigRepo.GetWorkspaceConfig()
+	if len(workspaceConfig.Projects) == 0 {
+		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
+	}
+
+	for _, project := range workspaceConfig.Projects {
+		if err := initializeWorkspaceChildAt(workspaceRoot, project, rootConfigRepo, configLocale); err != nil {
+			return err
+		}
+	}
+	logger.Info(i18n.Get("InitChildrenComplete"))
+	return nil
+}
+
+func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspaceProjectConfig, rootConfigRepo *config.Repository, locale string) error {
+	projectRootPath := workspacediscovery.ProjectRoot(workspaceRoot, project)
+	childSeedPath := filepath.Join(projectRootPath, ".skills-seed")
+	childConfigPath := filepath.Join(childSeedPath, "config.yaml")
+
+	if _, err := os.Stat(childSeedPath); err == nil {
+		return reportExistingWorkspaceChild(project, childSeedPath, childConfigPath, rootConfigRepo)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	logger.Info(i18n.GetWithParams("InitChildrenProjectInitializing", map[string]interface{}{
+		"ProjectName": project.ID,
+		"Path":        projectRootPath,
+	}))
+	if err := initializeSkillWithOptions(projectRootPath, locale, domain.ModeProject, initializeSkillOptions{
+		initLogger:      false,
+		showUserSummary: false,
+		language:        project.Language,
+	}); err != nil {
+		return err
+	}
+	logger.Info(i18n.GetWithParams("InitChildrenProjectInitialized", map[string]interface{}{
+		"ProjectName": project.ID,
+		"Path":        projectRootPath,
+	}))
+	return nil
+}
+
+func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSeedPath, childConfigPath string, rootConfigRepo *config.Repository) error {
+	if _, err := os.Stat(childConfigPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s", i18n.GetWithParams("InitChildrenProjectSeedWithoutConfig", map[string]interface{}{
+				"ProjectName": project.ID,
+				"Path":        childSeedPath,
+			}))
+		}
+		return err
+	}
+
+	childConfigRepo, err := config.NewRepository(childSeedPath, rootConfigRepo.GetProjectConfig().Locale)
+	if err != nil {
+		return err
+	}
+	rootAgent := rootConfigRepo.GetAgentConfig().Provider
+	childAgent := childConfigRepo.GetAgentConfig().Provider
+	params := map[string]interface{}{
+		"ProjectName": project.ID,
+		"Path":        childSeedPath,
+		"RootAgent":   rootAgent,
+		"ChildAgent":  childAgent,
+	}
+	if rootAgent == childAgent {
+		logger.Info(i18n.GetWithParams("InitChildrenProjectAlreadyInitializedSameAgent", params))
+		return nil
+	}
+	logger.Warn(i18n.GetWithParams("InitChildrenProjectAlreadyInitializedDifferentAgent", params))
 	return nil
 }
 
@@ -253,7 +411,7 @@ func resetSkill(locale, mode string) error {
 			return fmt.Errorf("%s: %w", i18n.Get("ResetBackupFailed"), err)
 		}
 	}
-	return initializeSkill(locale, mode)
+	return initializeSkillAt(projectRoot, locale, mode)
 }
 
 func normalizeInitMode(mode string) string {
@@ -277,21 +435,6 @@ func ensureWorkspacePromptFiles(seedPath, projectRoot, projectName string, confi
 			Type:     project.Type,
 			Language: project.Language,
 		})
-
-		projectRootPath := filepath.Join(projectRoot, filepath.FromSlash(project.Path))
-		analyzerSvc := analyzer.NewAnalyzerService(nil, configRepo)
-		structure, _ := analyzerSvc.GetProjectStructure(projectRootPath)
-		mainFiles := analyzerSvc.FindMainFiles(projectRootPath)
-		if err := prompts.EnsureProjectPromptsAt(filepath.Join(seedPath, "prompts", "projects", project.ID), prompts.ProjectPromptData{
-			ProjectName: project.ID,
-			Language:    project.Language,
-			ProjectRoot: projectRootPath,
-			Structure:   structure,
-			MainFiles:   mainFiles,
-			Locale:      configRepo.GetProjectConfig().Locale,
-		}); err != nil {
-			return err
-		}
 	}
 
 	return prompts.EnsureWorkspacePrompts(seedPath, prompts.WorkspacePromptData{

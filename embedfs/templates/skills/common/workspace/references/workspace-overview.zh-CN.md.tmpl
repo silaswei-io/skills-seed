@@ -19,6 +19,7 @@
 - Skill：`{{.SkillPath}}`
 - Project spec：`{{.ProjectSpecPath}}`
 {{end}}
+{{if .SkillSummary}}- Skill 摘要：{{.SkillSummary}}{{end}}
 - 默认写入边界：`{{.Path}}/**`
 {{else}}
 暂未配置子项目。请先检查 `.skills-seed/config.yaml` 的 `workspace.projects`。

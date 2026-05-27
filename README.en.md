@@ -13,7 +13,7 @@ Skills Seed analyzes current code, Git history, and project structure, turns exi
 - Generate `project-profile.json` and `project-spec.json`
 - Generate Claude Code / Codex skills with `SKILL.md` and `references/`
 - Support single-project mode and multi-project workspace mode
-- Generate a workspace root skill plus child-project skills so AI agents can route by path
+- Keep workspace root skills focused on routing and cross-project relationships while child repos learn and generate their own skills
 - Support `check`, interactive fixes, and a pre-commit hook
 - Support Chinese and English templates, prompts, config, and terminal output
 
@@ -82,7 +82,6 @@ project:
   mode: "workspace"
 
 workspace:
-  child_skill_policy: "skip_existing" # skip_existing | overwrite | root_only
   projects:
     - {id: "frontend", path: "frontend", type: "frontend", language: "typescript"}
     - {id: "backend", path: "backend", type: "backend", language: "go"}
@@ -100,26 +99,21 @@ agent:
 Then run:
 
 ```bash
+cd frontend && skills-seed init --mode project --locale en-US && cd ..
+cd backend && skills-seed init --mode project --locale en-US && cd ..
 skills-seed learn current
 skills-seed generate-skills
 ```
 
+The workspace root requires each child project to be an independent Git repository initialized with `skills-seed init --mode project` from that child directory. `learn current` enters each child project's own `.skills-seed` for incremental learning; `generate-skills` generates each child skill from that child's own config first, then generates the workspace root skill. Both commands process child projects concurrently according to `agent.parallelism`.
+
 Workspace mode generates:
 
 - Root skill for the current provider: workspace routing, cross-project rules, and impact radius
-- Child-project skills: project spec, profile, and patterns for each project. If a child has its own `.skills-seed/config.yaml`, its provider and output path come from that child config
 - `.skills-seed/memory/workspace-profile.json`
-- `.skills-seed/memory/projects/<project-id>/project-profile.json`
-- `.skills-seed/memory/projects/<project-id>/project-spec.json`
+- `.skills-seed/memory/workspace-spec.json`
 
-If a child project has its own `.skills-seed/config.yaml`, the workspace reads that child config's `agent.provider` and `output.skills_paths` to resolve the child skill path; otherwise it uses the workspace root config.
-
-The default `child_skill_policy: "skip_existing"` keeps an existing `SKILL.md` at the path resolved from the child project's effective config; only the root workspace skill is generated/refreshed. Override it in config or for one run:
-
-```bash
-skills-seed generate-skills --overwrite # overwrite child-project skills at their resolved config paths
-skills-seed generate-skills --root-only # generate only the root workspace skill
-```
+Child skills, child project profiles, patterns, and md5 file fingerprints are stored in each child project's own `.skills-seed`. The root skill reads child `agent.provider`, `output.skills_paths`, and generated skill summaries to point to child skills. A manual child `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 
 ## Daily Commands
 
@@ -150,7 +144,7 @@ After the first successful `learn current`, Skills Seed records md5 fingerprints
 
 Generated skills directories are excluded from learning by default, including configured `output.skills_paths`, `.claude/skills/**`, and `.agents/skills/**`. This prevents generated `SKILL.md` and `references/` files from feeding back into future learning.
 
-`learn current` prints token usage after the learning log. In workspace mode, token usage is printed at the end of each child-project log block so concurrent learning does not interleave it with other projects.
+`learn current` prints token usage after the learning log. In workspace mode, token usage is printed at the end of each child-project log block. When multiple child projects run concurrently, the terminal shows only child start, summary, token usage, and completion lines; it suppresses each child's 5-step progress and follow-up command hints to avoid interleaved logs.
 
 ### Profile And Spec
 
@@ -172,13 +166,9 @@ skills-seed generate-skills
 
 # Temporarily override output path
 skills-seed generate-skills --output .agents/skills/my-project
-
-# workspace: overwrite existing child-project skills
-skills-seed generate-skills --overwrite
-
-# workspace: refresh only the root workspace skill
-skills-seed generate-skills --root-only
 ```
+
+The default `generation.mode: "template"` renders from learned patterns, the project profile, and templates without an extra AI call. Set `generation.mode: "ai"` when you want AI summary merging or polishing before rendering.
 
 Generated content:
 
@@ -255,6 +245,9 @@ agent:
 learning:
   max_commits: 50
   batch_size: 5
+
+generation:
+  mode: "template"    # template avoids AI during generation; ai calls the agent for summary merging first
 
 output:
   skills_paths:

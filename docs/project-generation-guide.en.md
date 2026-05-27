@@ -31,8 +31,7 @@ Workspace mode also has:
 
 ```text
 .skills-seed/memory/workspace-profile.json
-.skills-seed/memory/projects/<project-id>/project-profile.json
-.skills-seed/memory/projects/<project-id>/project-spec.json
+.skills-seed/memory/workspace-spec.json
 ```
 
 ### Generated Skills
@@ -185,7 +184,7 @@ references/project-spec.md
 - Change touchpoints
 - Workspace child-project scope
 
-Workspace child projects also have their own `project-spec.json` and `references/project-spec.md`.
+Workspace child projects keep their own `project-spec.json` and `references/project-spec.md` in each child repo's `.skills-seed`.
 
 ## Generate Skills
 
@@ -200,7 +199,8 @@ GeneratorService.GenerateSkills
   -> Resolve output.skills_paths[agent.provider]
   -> Read patterns
   -> Read project-profile.json
-  -> Call Agent.GenerateSkillsSummary
+  -> In generation.mode=template, build summaries directly from learned data
+  -> In generation.mode=ai, call Agent.GenerateSkillsSummary for summary merging
   -> Generate project-spec.json
   -> Render SKILL.md
   -> Render references/
@@ -208,22 +208,25 @@ GeneratorService.GenerateSkills
 
 If there are no patterns, generation is skipped. If the project profile is missing, the command asks you to run `learn current` or `profile refresh` first.
 
+`generation.mode` defaults to `template`, so generation does not make an extra AI call. The learning stage has already produced patterns, the project profile, and the project spec, making template mode better for stable batch generation and workspace child repos. Set this when you want AI to compress or polish a large pattern set before rendering:
+
+```yaml
+generation:
+  mode: "ai"
+```
+
 ## Workspace Generation
 
 Workspace mode flow:
 
 ```text
-GeneratorService.GenerateWorkspaceSkills
-  -> Generate workspace root skill for agent.provider
-  -> Read workspace.child_skill_policy
-  -> Stop on root_only without writing child skills
-  -> Read all patterns
-  -> Group by project_id
-  -> Read child provider and output.skills_paths when the child has .skills-seed/config.yaml
-  -> Skip children that already have a resolved SKILL.md on skip_existing
-  -> Read each child project profile
-  -> Generate child project-spec.json
-  -> Output child project skills to each child's effective config path
+skills-seed generate-skills
+  -> Enter each independent Git child repo listed in workspace.projects
+  -> Generate each child skill using that child's own .skills-seed/config.yaml
+  -> If a child target SKILL.md has no generated-by marker, treat it as manual and skip overwrite
+  -> Return to the workspace root and generate the root skill
+  -> Read child provider, output.skills_paths, and generated skill summary
+  -> Generate workspace-overview.md and cross-project-rules.md
 ```
 
 Root skill responsibilities:
@@ -239,19 +242,7 @@ Child skill responsibilities:
 - Describe project boundaries and rules
 - Provide project patterns and examples
 
-Child skill policies:
-
-- Child project has `.skills-seed/config.yaml`: read the child project's own `agent.provider` and `output.skills_paths` to resolve its skill path
-- `skip_existing`: default. Skip a child project when `SKILL.md` already exists at the path resolved from the child's effective config, while still generating the root workspace skill
-- `overwrite`: overwrite child-project skills at their resolved config paths
-- `root_only`: generate only the root workspace skill
-
-CLI flags can override the config for one run:
-
-```bash
-skills-seed generate-skills --overwrite
-skills-seed generate-skills --root-only
-```
+Child skills are generated from each child repo's own config and data. You can run `skills-seed learn current` and `skills-seed generate-skills` inside a child repo, or run `skills-seed generate-skills` from the workspace root to orchestrate every child first. Child profiles, patterns, md5 file fingerprints, and skills stay in each child's own `.skills-seed`; the workspace root only reads child config and generated skill content at the end to build routing.
 
 ## Template Selection
 

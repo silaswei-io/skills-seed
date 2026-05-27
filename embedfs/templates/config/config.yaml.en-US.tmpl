@@ -14,7 +14,6 @@ project:
 # Workspace Configuration
 # ========================================
 workspace:
-  child_skill_policy: "skip_existing" # Child skills policy: skip_existing(skip existing), overwrite, root_only(root workspace skill only)
   projects: []               # Child projects, for example: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   shared: []                 # Shared libraries or shared code paths, for example: [{path: "pkg"}]
   contracts: []              # API contract paths, for example: [{path: "proto"}]
@@ -51,6 +50,12 @@ agent:
 learning:
   max_commits: 50            # Default number of Git commits to analyze
   batch_size: 5              # Number of commits to analyze per AI call in batch mode
+
+# ========================================
+# Skills Generation Configuration
+# ========================================
+generation:
+  mode: "template"           # Generation mode: template=render from learned data and templates only (default, no AI); ai=call AI for summary merging before rendering
 
 # ========================================
 # Auto-Fix Configuration (check --fix)

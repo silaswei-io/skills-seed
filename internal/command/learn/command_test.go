@@ -3,9 +3,13 @@ package learn
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/container"
@@ -17,6 +21,7 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
+	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
@@ -128,6 +133,10 @@ func TestRunLearnCurrentPrintsTokenUsageLast(t *testing.T) {
 func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
 
 	project := config.WorkspaceProjectConfig{
 		ID:       "backend",
@@ -136,19 +145,28 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 		Language: "go",
 	}
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
-	require.NoError(t, os.MkdirAll(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend", "main.go"), []byte("package main\n"), 0644))
-	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 
 	output := captureLearnStdout(t, func() {
 		require.NoError(t, runLearnCurrent(cont))
 	})
 
-	profileSavedIndex := strings.LastIndex(output, "子项目 backend 已保存项目画像")
+	profileSavedIndex := strings.LastIndex(output, "已跳过项目画像刷新")
 	tokenIndex := strings.LastIndex(output, "Token 消耗: 子项目 backend")
 	require.NotEqual(t, -1, profileSavedIndex)
 	require.NotEqual(t, -1, tokenIndex)
 	require.Greater(t, tokenIndex, profileSavedIndex)
+
+	rootRecords, err := cont.FileTracker.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{})
+	require.NoError(t, err)
+	require.Empty(t, rootRecords)
+
+	childRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	require.NoError(t, err)
+	defer func() { require.NoError(t, childRepo.Close()) }()
+	childRecords, err := childRepo.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{})
+	require.NoError(t, err)
+	require.Len(t, childRecords, 1)
 }
 
 func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
@@ -210,51 +228,159 @@ func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
 	require.Equal(t, []string{"main.go"}, profileFocus)
 }
 
-func TestRunLearnWorkspaceCurrentSkipsUnchangedChildProject(t *testing.T) {
+func TestRunLearnWorkspaceCurrentDelegatesIncrementalSkipToChildProject(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
 
 	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
-	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "backend/main.go", "package main\n")
-	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 
 	require.NoError(t, runLearnCurrent(cont))
 
-	analyzeCalls := 0
-	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-		analyzeCalls++
-		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont))
+	})
+
+	require.Zero(t, atomic.LoadInt32(&learnWorkspaceMockAnalyzeCalls))
+	require.Contains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnWorkspaceCurrentUsesConfiguredParallelism(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
+
+	var active int32
+	var maxActive int32
+	provider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		current := atomic.AddInt32(&active, 1)
+		for {
+			previous := atomic.LoadInt32(&maxActive)
+			if current <= previous || atomic.CompareAndSwapInt32(&maxActive, previous, current) {
+				break
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		pattern := domain.NewPattern(req.ProjectName+"-pattern", "Error Handling", domain.CategoryError)
+		pattern.Confidence = 0.9
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}, Summary: "summary"}, nil
+	})
+
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", provider)
+	}
+
+	require.NoError(t, runLearnCurrent(cont))
+
+	require.GreaterOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
+}
+
+func TestRunLearnWorkspaceCurrentSuppressesChildNextSteps(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont))
+	})
+
+	require.NotContains(t, output, "后续可执行:")
+	require.NotContains(t, output, "查看模式: skills-seed view patterns")
+}
+
+func TestRunLearnWorkspaceCurrentParallelModeSuppressesChildProgress(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
+
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 	}
 
 	output := captureLearnStdout(t, func() {
 		require.NoError(t, runLearnCurrent(cont))
 	})
 
-	require.Zero(t, analyzeCalls)
-	require.Contains(t, output, "子项目 backend 未检测到可学习文件变化")
+	require.NotContains(t, output, "准备项目上下文")
+	require.NotContains(t, output, "检测增量文件变化")
+	require.NotContains(t, output, "后续可执行:")
+	require.Contains(t, output, "子项目 backend 独立学习完成")
+	require.Contains(t, output, "子项目 frontend 独立学习完成")
 }
 
-func TestRunLearnWorkspaceCurrentScopesEqualRelativePaths(t *testing.T) {
+func TestRunLearnWorkspaceCurrentRequiresInitializedChildProject(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
-	projects := []config.WorkspaceProjectConfig{
-		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
-		{ID: "worker", Path: "worker", Type: "backend", Language: "go"},
-	}
-	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
-	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "backend/main.go", "package main\n")
-	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "worker/main.go", "package main\n")
-	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+	tokenusage.Reset()
 
-	require.NoError(t, runLearnCurrent(cont))
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend")
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
 
-	recordsBackend, err := cont.FileTracker.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{ProjectID: "backend", ScopePath: "backend"})
+	err := runLearnCurrent(cont)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "backend")
+	require.Contains(t, err.Error(), "skills-seed init --mode project")
+	require.Contains(t, err.Error(), childRoot)
+}
+
+func TestRunLearnWorkspaceCurrentRequiresChildGitRepository(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend")
+	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, ".skills-seed"), 0755))
+	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
-	require.Len(t, recordsBackend, 1)
+	cfg := childConfigRepo.Get()
+	cfg.Project.Mode = domain.ModeProject
+	require.NoError(t, childConfigRepo.Update(cfg))
 
-	recordsWorker, err := cont.FileTracker.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{ProjectID: "worker", ScopePath: "worker"})
-	require.NoError(t, err)
-	require.Len(t, recordsWorker, 1)
+	err = runLearnCurrent(cont)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "backend")
+	require.Contains(t, err.Error(), "不是独立 Git 仓库")
+	require.Contains(t, err.Error(), childRoot)
 }
 
 func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.WorkspaceProjectConfig) *container.Container {
@@ -324,6 +450,95 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		FileTracker: patternRepo,
 		MergerSvc:   mergerSvc,
 	}
+}
+
+var learnWorkspaceMockAnalyzeCalls int32
+var learnWorkspaceFactoryMu sync.Mutex
+
+func registerLearnWorkspaceMockAgentFactory(t *testing.T) func() {
+	t.Helper()
+
+	registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, nil)
+	return func() {
+		atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	}
+}
+
+func registerLearnWorkspaceMockAgentFactoryWithAnalyze(t *testing.T, analyzeFn func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)) string {
+	t.Helper()
+
+	provider := "mock-workspace-learn-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
+	learnWorkspaceFactoryMu.Lock()
+	container.RegisterAgentFactory(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent {
+		return &mocks.MockAgent{
+			NameVal:      provider,
+			AvailableVal: true,
+			AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+				if analyzeFn != nil {
+					return analyzeFn(ctx, req)
+				}
+				atomic.AddInt32(&learnWorkspaceMockAnalyzeCalls, 1)
+				agent.LogTokenUsageForContext(ctx, provider, "AnalyzeCurrentCodebase", tokenusage.Usage{
+					InputTokens:  100,
+					OutputTokens: 20,
+				})
+				pattern := domain.NewPattern("p1", "Error Handling", domain.CategoryError)
+				pattern.Confidence = 0.9
+				return &agent.AnalyzeCurrentCodebaseResult{
+					Patterns: []domain.Pattern{*pattern},
+					Summary:  "summary",
+				}, nil
+			},
+			AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+				agent.LogTokenUsageForContext(ctx, provider, "AnalyzeProject", tokenusage.Usage{
+					InputTokens:  50,
+					OutputTokens: 10,
+				})
+				return &agent.AnalyzeProjectResult{
+					Language: "go",
+					Summary:  "profile",
+				}, nil
+			},
+		}
+	})
+	learnWorkspaceFactoryMu.Unlock()
+	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	t.Cleanup(func() {
+		atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	})
+	return provider
+}
+
+func initLearnWorkspaceChildProject(t *testing.T, workspaceRoot string, project config.WorkspaceProjectConfig, mainContent string) string {
+	t.Helper()
+	return initLearnWorkspaceChildProjectWithProvider(t, workspaceRoot, project, mainContent, "mock-workspace-learn-"+strings.NewReplacer("/", "-", " ", "-").Replace(t.Name()))
+}
+
+func initLearnWorkspaceChildProjectWithProvider(t *testing.T, workspaceRoot string, project config.WorkspaceProjectConfig, mainContent string, provider string) string {
+	t.Helper()
+
+	childRoot := filepath.Join(workspaceRoot, filepath.FromSlash(project.Path))
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
+	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.email", "test@example.com").Run())
+	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.name", "Test User").Run())
+	writeLearnFile(t, childRoot, "main.go", mainContent)
+	gitAddAll(t, childRoot)
+
+	childSeedPath := filepath.Join(childRoot, ".skills-seed")
+	childConfigRepo, err := config.NewRepository(childSeedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := childConfigRepo.Get()
+	cfg.Project.Name = project.ID
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Language = project.Language
+	cfg.Project.RootPath = childRoot
+	cfg.Project.Locale = "zh-CN"
+	cfg.Agent.Provider = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Analysis.CodeGraph.Enabled = false
+	require.NoError(t, childConfigRepo.Update(cfg))
+	return childRoot
 }
 
 func setLearnCurrentFlagsForTest(testLanguage string, testFocusPaths []string, testProfileOpt string) func() {

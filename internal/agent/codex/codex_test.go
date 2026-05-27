@@ -1,11 +1,16 @@
 package codex
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +62,46 @@ enabled = true
 	require.NotContains(t, args, `plugins."superpowers@openai-curated".enabled=false`)
 }
 
+func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
+	loader := prompts.NewLoader("codex", "zh-CN", "")
+	ag := New("__skills_seed_missing_codex__", time.Second, loader)
+
+	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
+		ProjectName:       "demo",
+		RootPath:          t.TempDir(),
+		Language:          "go",
+		Structure:         "main.go",
+		StructuralContext: "## CodeGraph\n- handler calls service",
+		MainFiles:         []string{"main.go"},
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "__skills_seed_missing_codex__")
+	require.NotContains(t, err.Error(), "StructuralContext")
+	require.NotContains(t, err.Error(), "project-analysis prompt")
+}
+
+func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
+	renderErr := fmt.Errorf("template: project-analysis:18:7: missing StructuralContext")
+	ag := &CodexAgent{
+		commandPath:  "__skills_seed_missing_codex__",
+		timeout:      time.Second,
+		promptLoader: failingPromptRenderer{err: renderErr},
+	}
+
+	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
+		ProjectName: "demo",
+		RootPath:    t.TempDir(),
+		Language:    "go",
+		Structure:   "main.go",
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "渲染 project-analysis prompt 失败")
+	require.Contains(t, err.Error(), "template:")
+	require.ErrorIs(t, err, renderErr)
+}
+
 func TestExtractFinalContent_NoFinalMessage(t *testing.T) {
 	_, err := extractFinalContent(`{"msg_type":"task_started"}`)
 	require.Error(t, err)
@@ -87,4 +132,12 @@ func TestCodexReplyPreview_TruncatesAt1000Chars(t *testing.T) {
 
 	require.Len(t, preview, 1003)
 	require.True(t, strings.HasSuffix(preview, "..."))
+}
+
+type failingPromptRenderer struct {
+	err error
+}
+
+func (f failingPromptRenderer) Render(string, interface{}) (string, error) {
+	return "", f.err
 }

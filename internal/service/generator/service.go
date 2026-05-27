@@ -71,6 +71,7 @@ type workspaceProjectTemplateData struct {
 	SkillName             string
 	SkillPath             string
 	ProjectSpecPath       string
+	SkillSummary          string
 	SelfManaged           bool
 	SelfManagedConfigPath string
 	UsesChildConfig       bool
@@ -83,18 +84,13 @@ type childSkillTarget struct {
 	ConfigPath      string
 }
 
-type generateOptions struct {
-	workspaceChildSkillPolicy string
+// ManualSkillExistsError 表示目标目录已有非 skills-seed 生成的 SKILL.md
+type ManualSkillExistsError struct {
+	Path string
 }
 
-// GenerateOption 配置单次生成行为
-type GenerateOption func(*generateOptions)
-
-// WithWorkspaceChildSkillPolicy 覆盖本次 workspace 子项目 skill 生成策略
-func WithWorkspaceChildSkillPolicy(policy string) GenerateOption {
-	return func(options *generateOptions) {
-		options.workspaceChildSkillPolicy = config.NormalizeWorkspaceChildSkillPolicy(policy)
-	}
+func (e *ManualSkillExistsError) Error() string {
+	return i18n.GetWithParams("GenerateManualSkillExists", map[string]interface{}{"Path": e.Path})
 }
 
 // NewGeneratorService 创建生成服务
@@ -121,10 +117,9 @@ func NewGeneratorService(
 }
 
 // GenerateSkills 生成 Skills 文件夹
-func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string, options ...GenerateOption) error {
-	generateOpts := newGenerateOptions(options...)
+func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string) error {
 	if s.configRepo != nil && s.configRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
-		return s.generateWorkspaceSkills(ctx, generateOpts)
+		return s.generateWorkspaceSkills(ctx)
 	}
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
@@ -165,47 +160,9 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 		return nil
 	}
 
-	// 2. 序列化模式摘要为 JSON，不把代码示例直接发送给 Agent
-	patternsJSONBytes, err := json.MarshalIndent(summarizePatternsForAgent(patterns), "", "  ")
+	summaryResult, err := s.generateSkillsSummary(ctx, patterns, resolvedOutputPath, startedAt)
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.marshal_patterns",
-			"duration", time.Since(startedAt),
-			"patterns_count", len(patterns),
-			"error", err,
-		)
-		return fmt.Errorf("%s: %w", i18n.Get("GeneratorMarshalPatternsFailed"), err)
-	}
-	patternsJSON := string(patternsJSONBytes)
-
-	// 3. 记录现有 SKILL.md 路径，由 Agent 按需自行读取
-	existingSkillsPath := ""
-	skillPath := filepath.Join(resolvedOutputPath, "SKILL.md")
-	if _, err := os.Stat(skillPath); err == nil {
-		existingSkillsPath = skillPath
-	}
-
-	// 4. 准备请求
-	summaryReq := &agent.GenerateSkillsRequest{
-		PatternsJSON:       patternsJSON,
-		PatternsCount:      len(patterns),
-		ExistingSkillsPath: existingSkillsPath,
-		ProjectName:        s.configRepo.GetProjectConfig().Name,
-		Language:           s.configRepo.GetProjectConfig().Language,
-	}
-
-	// 5. 调用 AI
-	summaryResult, err := s.agent.GenerateSkillsSummary(ctx, summaryReq)
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.generate_summary",
-			"duration", time.Since(startedAt),
-			"patterns_count", len(patterns),
-			"patterns_json_length", len(patternsJSON),
-			"existing_skills_path", existingSkillsPath,
-			"error", err,
-		)
-		return fmt.Errorf("%s: %w", i18n.Get("GeneratorGenerateSummaryFailed"), err)
+		return err
 	}
 
 	// 6. 计算统计信息（用于 writeSkillsOutput）
@@ -243,19 +200,96 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 	return nil
 }
 
-// GenerateWorkspaceSkills 生成工作区根 skills 和各子项目 skills
-func (s *GeneratorService) GenerateWorkspaceSkills(ctx context.Context, options ...GenerateOption) error {
-	return s.generateWorkspaceSkills(ctx, newGenerateOptions(options...))
+func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns []domain.Pattern, resolvedOutputPath string, startedAt time.Time) (*agent.GenerateSkillsResult, error) {
+	if config.NormalizeGenerationMode(s.configRepo.GetGenerationConfig().Mode) != config.GenerationModeAI {
+		return s.templateSkillsSummary(patterns), nil
+	}
+
+	// 序列化模式摘要为 JSON，不把代码示例直接发送给 Agent
+	patternsJSONBytes, err := json.MarshalIndent(summarizePatternsForAgent(patterns), "", "  ")
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "generator.marshal_patterns",
+			"duration", time.Since(startedAt),
+			"patterns_count", len(patterns),
+			"error", err,
+		)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("GeneratorMarshalPatternsFailed"), err)
+	}
+	patternsJSON := string(patternsJSONBytes)
+
+	// 记录现有 SKILL.md 路径，由 Agent 按需自行读取
+	existingSkillsPath := ""
+	skillPath := filepath.Join(resolvedOutputPath, "SKILL.md")
+	if _, err := os.Stat(skillPath); err == nil {
+		existingSkillsPath = skillPath
+	}
+
+	summaryReq := &agent.GenerateSkillsRequest{
+		PatternsJSON:       patternsJSON,
+		PatternsCount:      len(patterns),
+		ExistingSkillsPath: existingSkillsPath,
+		ProjectName:        s.configRepo.GetProjectConfig().Name,
+		Language:           s.configRepo.GetProjectConfig().Language,
+	}
+
+	summaryResult, err := s.agent.GenerateSkillsSummary(ctx, summaryReq)
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "generator.generate_summary",
+			"duration", time.Since(startedAt),
+			"patterns_count", len(patterns),
+			"patterns_json_length", len(patternsJSON),
+			"existing_skills_path", existingSkillsPath,
+			"error", err,
+		)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("GeneratorGenerateSummaryFailed"), err)
+	}
+	return summaryResult, nil
 }
 
-func (s *GeneratorService) generateWorkspaceSkills(ctx context.Context, options generateOptions) error {
+func (s *GeneratorService) templateSkillsSummary(patterns []domain.Pattern) *agent.GenerateSkillsResult {
+	summaries := s.ensureCategorySummaries(patterns, nil)
+	keyPatterns := make([]agent.PatternSummary, 0, len(patterns))
+	for _, pattern := range strongestPatterns(patterns, 12) {
+		keyPatterns = append(keyPatterns, agent.PatternSummary{
+			Name:       pattern.Name,
+			Category:   string(pattern.Category),
+			Importance: patternImportance(pattern.Confidence),
+			Summary:    pattern.Description,
+			WhenToUse:  pattern.Rule,
+		})
+	}
+	return &agent.GenerateSkillsResult{
+		CategorySummaries: summaries,
+		KeyPatterns:       keyPatterns,
+	}
+}
+
+func patternImportance(confidence float64) string {
+	switch {
+	case confidence >= 0.85:
+		return "high"
+	case confidence >= 0.6:
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+// GenerateWorkspaceSkills 只生成工作区根 skill，子项目 skill 由各子仓自己生成
+func (s *GeneratorService) GenerateWorkspaceSkills(ctx context.Context) error {
+	return s.generateWorkspaceSkills(ctx)
+}
+
+func (s *GeneratorService) generateWorkspaceSkills(ctx context.Context) error {
 	startedAt := time.Now()
 	projectConfig := s.configRepo.GetProjectConfig()
 	workspaceConfig := s.configRepo.GetWorkspaceConfig()
-	childSkillPolicy := s.effectiveWorkspaceChildSkillPolicy(workspaceConfig, options)
 	if len(workspaceConfig.Projects) == 0 {
 		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
 	}
+	_ = ctx
 
 	projectRoot := projectConfig.RootPath
 	rootOutputPath, err := s.workspaceRootOutputPath(projectRoot, projectConfig.Name)
@@ -265,94 +299,13 @@ func (s *GeneratorService) generateWorkspaceSkills(ctx context.Context, options 
 	if err := s.writeWorkspaceRootSkill(rootOutputPath, projectConfig, workspaceConfig); err != nil {
 		return err
 	}
-	if childSkillPolicy == config.WorkspaceChildSkillPolicyRootOnly {
-		logger.Info(i18n.GetWithParams("GenerateWorkspaceChildSkillsSkippedRootOnly", map[string]interface{}{"Count": len(workspaceConfig.Projects)}))
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "generator.generate_workspace_skills",
-			"duration", time.Since(startedAt),
-			"projects_count", len(workspaceConfig.Projects),
-			"child_skill_policy", childSkillPolicy,
-			"children_skipped", len(workspaceConfig.Projects),
-		)
-		return nil
-	}
-
-	allPatterns, err := s.patternRepo.GetAll(ctx)
-	if err != nil {
-		return err
-	}
-	for _, project := range workspaceConfig.Projects {
-		projectPatterns := patternsForProject(allPatterns, project.ID)
-		if len(projectPatterns) == 0 {
-			continue
-		}
-		target, err := s.childSkillTarget(projectRoot, project)
-		if err != nil {
-			return err
-		}
-		if childSkillPolicy == config.WorkspaceChildSkillPolicySkipExisting && s.workspaceChildSkillExists(target.OutputPath) {
-			logger.Info(i18n.GetWithParams("GenerateWorkspaceChildSkillSkippedExisting", map[string]interface{}{
-				"Project": project.ID,
-				"Path":    filepath.Join(target.OutputPath, "SKILL.md"),
-			}))
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-				"operation", "generator.skip_workspace_child_skill",
-				"project_id", project.ID,
-				"child_skill_policy", childSkillPolicy,
-				"output_path", target.OutputPath,
-			)
-			continue
-		}
-		profile, err := s.loadProjectProfileForWorkspace(ctx, project)
-		if err != nil {
-			return err
-		}
-		spec := s.projectSpecFromProfileAndPatterns(profile, projectPatterns, project)
-		if s.scopedSpecRepo != nil {
-			if err := s.scopedSpecRepo.SaveSpecForProject(ctx, project.ID, spec); err != nil {
-				return err
-			}
-		}
-		summary := s.ensureCategorySummaries(projectPatterns, nil)
-		stats := s.calculateStats(projectPatterns)
-		result := &agent.GenerateSkillsResult{CategorySummaries: summary}
-		if err := s.writeChildSkillsOutput(ctx, target, project, projectPatterns, result, stats, profile, spec); err != nil {
-			return err
-		}
-	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.generate_workspace_skills",
 		"duration", time.Since(startedAt),
 		"projects_count", len(workspaceConfig.Projects),
-		"child_skill_policy", childSkillPolicy,
 	)
 	return nil
-}
-
-func newGenerateOptions(options ...GenerateOption) generateOptions {
-	var result generateOptions
-	for _, apply := range options {
-		if apply != nil {
-			apply(&result)
-		}
-	}
-	return result
-}
-
-func (s *GeneratorService) effectiveWorkspaceChildSkillPolicy(workspaceConfig config.WorkspaceConfig, options generateOptions) string {
-	if options.workspaceChildSkillPolicy != "" {
-		return config.NormalizeWorkspaceChildSkillPolicy(options.workspaceChildSkillPolicy)
-	}
-	return config.NormalizeWorkspaceChildSkillPolicy(workspaceConfig.ChildSkillPolicy)
-}
-
-func (s *GeneratorService) workspaceChildSkillExists(outputPath string) bool {
-	if outputPath == "" {
-		return false
-	}
-	_, err := os.Stat(filepath.Join(outputPath, "SKILL.md"))
-	return err == nil
 }
 
 func (s *GeneratorService) workspaceChildConfig(projectRoot string, project config.WorkspaceProjectConfig) (config.Reader, bool, string, error) {
@@ -420,6 +373,11 @@ func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath str
 	}
 	summaryResult.CategorySummaries = s.ensureCategorySummaries(patterns, summaryResult.CategorySummaries)
 
+	mainPath := filepath.Join(outputPath, "SKILL.md")
+	if err := s.ensureSkillWritable(mainPath); err != nil {
+		return err
+	}
+
 	// 5. 确保输出目录存在
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -481,7 +439,6 @@ func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath str
 		return err
 	}
 
-	mainPath := filepath.Join(outputPath, "SKILL.md")
 	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.write_skill_file",
@@ -524,6 +481,20 @@ func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath str
 	return nil
 }
 
+func (s *GeneratorService) ensureSkillWritable(skillPath string) error {
+	content, err := os.ReadFile(skillPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if strings.Contains(string(content), "generated-by: skills-seed") {
+		return nil
+	}
+	return &ManualSkillExistsError{Path: skillPath}
+}
+
 func (s *GeneratorService) loadProjectProfile(ctx context.Context) (*domain.ProjectProfile, error) {
 	if s.profileRepo == nil {
 		return nil, fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
@@ -537,22 +508,6 @@ func (s *GeneratorService) loadProjectProfile(ctx context.Context) (*domain.Proj
 		return nil, err
 	}
 	return profile, nil
-}
-
-func (s *GeneratorService) loadProjectProfileForWorkspace(ctx context.Context, project config.WorkspaceProjectConfig) (*domain.ProjectProfile, error) {
-	if s.scopedProfileRepo == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
-	}
-	profile, err := s.scopedProfileRepo.GetForProject(ctx, project.ID)
-	if err == nil {
-		return profile, nil
-	}
-	return &domain.ProjectProfile{
-		ProjectName: project.ID,
-		Language:    project.Language,
-		Summary:     project.Type,
-		GeneratedAt: time.Now().Format("2006-01-02 15:04:05"),
-	}, nil
 }
 
 func (s *GeneratorService) generateAgentMetadata(outputPath string, data interface{}) error {
@@ -888,16 +843,6 @@ func generatedSkillName(projectName string) string {
 	return name
 }
 
-func patternsForProject(patterns []domain.Pattern, projectID string) []domain.Pattern {
-	filtered := make([]domain.Pattern, 0)
-	for _, pattern := range patterns {
-		if pattern.ProjectID == projectID || pattern.ProjectID == "" {
-			filtered = append(filtered, pattern)
-		}
-	}
-	return filtered
-}
-
 func (s *GeneratorService) projectSpecFromProfileAndPatterns(profile *domain.ProjectProfile, patterns []domain.Pattern, project config.WorkspaceProjectConfig) *domain.ProjectSpec {
 	if profile == nil {
 		return nil
@@ -1054,38 +999,6 @@ func configuredSkillOutputPath(projectRoot string, configRepo config.Reader) (st
 	return utils.ResolvePath(projectRoot, outputPath)
 }
 
-func (s *GeneratorService) writeChildSkillsOutput(
-	ctx context.Context,
-	target childSkillTarget,
-	project config.WorkspaceProjectConfig,
-	patterns []domain.Pattern,
-	summaryResult *agent.GenerateSkillsResult,
-	stats *Stats,
-	profile *domain.ProjectProfile,
-	spec *domain.ProjectSpec,
-) error {
-	if !target.UsesChildConfig {
-		return s.writeSkillsOutput(ctx, target.OutputPath, patterns, summaryResult, stats, profile, spec, generatedSkillName(project.ID))
-	}
-	childLoader := s.skillsLoaderForConfig(target.ConfigRepo)
-	childService := *s
-	childService.configRepo = target.ConfigRepo
-	childService.skillsLoader = childLoader
-	return childService.writeSkillsOutput(ctx, target.OutputPath, patterns, summaryResult, stats, profile, spec, generatedSkillName(project.ID))
-}
-
-func (s *GeneratorService) skillsLoaderForConfig(configRepo config.Reader) *skills.Loader {
-	if configRepo == nil {
-		return s.skillsLoader
-	}
-	provider := configRepo.GetAgentConfig().Provider
-	locale := configRepo.GetProjectConfig().Locale
-	if locale == "" && s.skillsLoader != nil {
-		locale = s.skillsLoader.GetLocale()
-	}
-	return skills.NewLoaderForAgent(provider, locale)
-}
-
 func (s *GeneratorService) providerSkillOutputPath(projectRoot, skillName string) (string, error) {
 	provider := ""
 	outputPath := ""
@@ -1159,12 +1072,14 @@ func (s *GeneratorService) workspaceTemplateData(projectConfig config.ProjectCon
 			return workspaceSkillTemplateData{}, err
 		}
 		childSkillDir := relativeWorkspacePath(projectConfig.RootPath, target.OutputPath)
+		skillPath := filepath.ToSlash(filepath.Join(childSkillDir, "SKILL.md"))
 		selfManagedConfigPath := filepath.ToSlash(filepath.Join(project.Path, ".skills-seed", "config.yaml"))
 		projects = append(projects, workspaceProjectTemplateData{
 			WorkspaceProjectConfig: project,
 			SkillName:              generatedSkillName(project.ID),
-			SkillPath:              filepath.ToSlash(filepath.Join(childSkillDir, "SKILL.md")),
+			SkillPath:              skillPath,
 			ProjectSpecPath:        filepath.ToSlash(filepath.Join(childSkillDir, "references", "project-spec.md")),
+			SkillSummary:           childSkillSummary(filepath.Join(target.OutputPath, "SKILL.md")),
 			SelfManaged:            target.UsesChildConfig,
 			SelfManagedConfigPath:  selfManagedConfigPath,
 			UsesChildConfig:        target.UsesChildConfig,
@@ -1196,6 +1111,20 @@ func relativeWorkspacePath(workspaceRoot, path string) string {
 		return path
 	}
 	return rel
+}
+
+func childSkillSummary(skillPath string) string {
+	content, err := os.ReadFile(skillPath)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "# ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "# "))
+		}
+	}
+	return ""
 }
 
 // generateReferenceFiles 生成所有参考文档

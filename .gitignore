@@ -34,3 +34,8 @@ Thumbs.db
 
 # Go modules cache
 pkg/mod/
+
+# Ai output
+.cursor
+
+.codegraph

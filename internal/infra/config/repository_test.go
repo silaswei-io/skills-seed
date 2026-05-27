@@ -85,7 +85,7 @@ func TestRepository_Get(t *testing.T) {
 	assert.True(t, cfg.Analysis.CodeGraph.AutoSync)
 	assert.Equal(t, 30, cfg.Analysis.CodeGraph.MaxNodes)
 	assert.Equal(t, 0, cfg.Analysis.CodeGraph.MaxCode)
-	assert.Equal(t, WorkspaceChildSkillPolicySkipExisting, cfg.Workspace.ChildSkillPolicy)
+	assert.Equal(t, GenerationModeTemplate, cfg.Generation.Mode)
 	assert.Equal(t, 50, cfg.Learning.MaxCommits)
 	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
 	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Output.SkillsPaths["claude"])
@@ -111,7 +111,6 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 
 	cfg := repo.Get()
 	cfg.Project.Mode = "workspace"
-	cfg.Workspace.ChildSkillPolicy = WorkspaceChildSkillPolicyOverwrite
 	cfg.Workspace.Projects = []WorkspaceProjectConfig{
 		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
@@ -123,7 +122,7 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 	require.NoError(t, err)
 	contentText := string(content)
 	require.Contains(t, contentText, "# 工作区配置")
-	require.Contains(t, contentText, `child_skill_policy: "overwrite"`)
+	require.NotContains(t, contentText, `child_skill_policy`)
 	require.Contains(t, contentText, `id: "frontend"`)
 	require.Contains(t, contentText, `path: "proto"`)
 	require.Contains(t, contentText, `description: "API contracts"`)
@@ -133,7 +132,6 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 	reloaded, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 2)
-	require.Equal(t, WorkspaceChildSkillPolicyOverwrite, reloaded.GetWorkspaceConfig().ChildSkillPolicy)
 	require.Equal(t, "backend", reloaded.GetWorkspaceConfig().Projects[1].ID)
 	require.Equal(t, "API contracts", reloaded.GetWorkspaceConfig().Contracts[0].Description)
 }
@@ -152,7 +150,6 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			InitializedAt: "2026-05-26 12:00:00",
 		},
 		Workspace: WorkspaceConfig{
-			ChildSkillPolicy: WorkspaceChildSkillPolicyRootOnly,
 			Projects: []WorkspaceProjectConfig{
 				{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 			},
@@ -179,7 +176,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	var parsed Config
 	require.NoError(t, yaml.Unmarshal([]byte(content), &parsed), content)
 	require.Contains(t, content, "# 工作区配置")
-	require.Contains(t, content, `child_skill_policy: "root_only"`)
+	require.NotContains(t, content, `child_skill_policy`)
 	require.Contains(t, content, `id: "backend"`)
 	require.Contains(t, content, `description: "API contracts"`)
 	require.Contains(t, content, `- "**/*.pb.go"`)

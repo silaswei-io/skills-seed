@@ -19,6 +19,7 @@ This file is the workspace map. It describes entry points, paths, and coordinati
 - Skill: `{{.SkillPath}}`
 - Project spec: `{{.ProjectSpecPath}}`
 {{end}}
+{{if .SkillSummary}}- Skill summary: {{.SkillSummary}}{{end}}
 - Default write boundary: `{{.Path}}/**`
 {{else}}
 No child projects are configured. Check `.skills-seed/config.yaml` `workspace.projects` first.

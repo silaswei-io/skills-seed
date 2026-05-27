@@ -3,6 +3,7 @@ package claude
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,46 @@ func TestAnalyzeCodeReturnsErrorWhenClaudeCommandMissing(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
+	loader := prompts.NewLoader("claude", "zh-CN", "")
+	ag := New("__skills_seed_missing_claude__", time.Second, loader)
+
+	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
+		ProjectName:       "demo",
+		RootPath:          t.TempDir(),
+		Language:          "go",
+		Structure:         "main.go",
+		StructuralContext: "## CodeGraph\n- handler calls service",
+		MainFiles:         []string{"main.go"},
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "__skills_seed_missing_claude__")
+	require.NotContains(t, err.Error(), "StructuralContext")
+	require.NotContains(t, err.Error(), "project-analysis prompt")
+}
+
+func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
+	renderErr := fmt.Errorf("template: project-analysis:18:7: missing StructuralContext")
+	ag := &ClaudeAgent{
+		commandPath:  "__skills_seed_missing_claude__",
+		timeout:      time.Second,
+		promptLoader: failingPromptRenderer{err: renderErr},
+	}
+
+	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
+		ProjectName: "demo",
+		RootPath:    t.TempDir(),
+		Language:    "go",
+		Structure:   "main.go",
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "渲染 project-analysis prompt 失败")
+	require.Contains(t, err.Error(), "template:")
+	require.ErrorIs(t, err, renderErr)
+}
+
 func TestClaudeReplyPreview_TruncatesAt1000Chars(t *testing.T) {
 	preview := claudeReplyPreview(strings.Repeat("a", 1001))
 
@@ -131,4 +172,12 @@ func requireArgValue(t *testing.T, args []string, name string) string {
 	}
 	t.Fatalf("missing arg %s in %#v", name, args)
 	return ""
+}
+
+type failingPromptRenderer struct {
+	err error
+}
+
+func (f failingPromptRenderer) Render(string, interface{}) (string, error) {
+	return "", f.err
 }

@@ -110,6 +110,30 @@ other = "Failed to set locale"
 [InitLoggerInitFailed]
 other = "Failed to initialize logger"
 
+[InitChildrenShort]
+other = "Initialize child projects from root workspace.projects"
+
+[InitChildrenRequireWorkspaceMode]
+other = "init children can only run in a workspace-mode root repository"
+
+[InitChildrenProjectInitializing]
+other = "Initializing child project {{.ProjectName}}: {{.Path}}"
+
+[InitChildrenProjectInitialized]
+other = "Child project {{.ProjectName}} initialized: {{.Path}}"
+
+[InitChildrenProjectAlreadyInitializedSameAgent]
+other = "Child project {{.ProjectName}} is already initialized with the same agent ({{.ChildAgent}}); skipping: {{.Path}}"
+
+[InitChildrenProjectAlreadyInitializedDifferentAgent]
+other = "Child project {{.ProjectName}} is already initialized with a different agent: root {{.RootAgent}}, child {{.ChildAgent}}; skipping: {{.Path}}"
+
+[InitChildrenProjectSeedWithoutConfig]
+other = "Child project {{.ProjectName}} already has .skills-seed but config.yaml is missing: {{.Path}}"
+
+[InitChildrenComplete]
+other = "Child project initialization check completed"
+
 [PromptCreateDirFailed]
 other = "Failed to create prompt directory: {{.Path}}"
 
@@ -753,26 +777,29 @@ other = "Output: {{.Path}}"
 [GenerateProjectProfileMissing]
 other = "Project profile is missing, so project overview cannot be generated. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
 
+[GenerateManualSkillExists]
+other = "A non skills-seed generated SKILL.md already exists and will not be overwritten by default: {{.Path}}"
+
+[GenerateWorkspaceChildGenerating]
+other = "Generating skills for child project {{.ProjectName}}"
+
+[GenerateWorkspaceChildGenerated]
+other = "Generated skills for child project {{.ProjectName}}"
+
+[GenerateWorkspaceChildManualSkillSkipped]
+other = "Child project {{.ProjectName}} has a manual SKILL.md; skipping overwrite: {{.Path}}"
+
+[GenerateWorkspaceChildNotInitialized]
+other = "Child project {{.ProjectName}} is not initialized. Run: cd {{.Path}} && skills-seed init --mode project"
+
+[GenerateWorkspaceChildNotGitRepo]
+other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
+
+[GenerateWorkspaceChildModeInvalid]
+other = "Child project {{.ProjectName}} must use project mode, current mode is {{.Mode}}"
+
 [GenerateFlagOutput]
 other = "Skills output directory (defaults to output.skills_paths for the current provider)"
-
-[GenerateFlagOverwrite]
-other = "Overwrite existing child-project skills at their resolved config paths in workspace mode"
-
-[GenerateFlagRootOnly]
-other = "Generate only the root workspace skill and skip child-project skills"
-
-[GenerateWorkspacePolicyFlagsConflict]
-other = "Cannot use --overwrite and --root-only together"
-
-[GenerateWorkspaceChildSkillSkippedExisting]
-other = "Skipped existing child skill: {{.Project}} ({{.Path}})"
-
-[GenerateWorkspaceChildSkillSkippedSelfManaged]
-other = "Skipped independently initialized child project: {{.Project}} ({{.Path}})"
-
-[GenerateWorkspaceChildSkillsSkippedRootOnly]
-other = "root_only is enabled; skipped {{.Count}} child-project skills"
 
 # 生成合并
 [GenerateFlagMerge]
@@ -1615,34 +1642,31 @@ other = "Skipped project profile refresh"
 other = "Failed to generate project profile: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "Starting workspace project learning"
+other = "Starting workspace project learning: {{.Projects}} projects, parallelism {{.Parallelism}}"
 
 [LearnWorkspaceProjectInfo]
 other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}\nChild project path: {{.Path}}"
 
-[LearnWorkspaceProjectResult]
-other = "Child project {{.ProjectName}} analysis completed:\n  • Patterns: {{.PatternsCount}}\n  • Business rules: {{.BusinessRulesCount}}\n  • Best practices: {{.BestPracticesCount}}"
+[LearnWorkspaceProjectStarted]
+other = "Starting child project {{.ProjectName}}"
 
-[LearnWorkspaceProjectPatternsSaved]
-other = "Child project {{.ProjectName}} saved {{.Count}} patterns"
-
-[LearnWorkspaceProjectPatternsSkipped]
-other = "Child project {{.ProjectName}} extracted no patterns; skipped saving patterns"
+[LearnWorkspaceProjectSummary]
+other = "Child project {{.ProjectName}} learning completed: changed {{.Changed}}, deleted {{.Deleted}}, excluded {{.Skipped}}, patterns {{.Patterns}}, saved {{.Saved}}, duration {{.Duration}}"
 
 [LearnWorkspaceProjectNoFileChanges]
-other = "Child project {{.ProjectName}} has no learnable file changes; skipped"
+other = "Child project {{.ProjectName}} has no learnable file changes; skipped, duration {{.Duration}}"
 
-[LearnWorkspaceProjectProfileSaved]
-other = "Child project {{.ProjectName}} saved project profile"
+[LearnWorkspaceProjectDelegated]
+other = "Child project {{.ProjectName}} completed independent learning"
 
-[LearnWorkspaceProjectProfileSkipped]
-other = "Child project {{.ProjectName}} skipped saving project profile"
+[LearnWorkspaceChildNotInitialized]
+other = "Child project {{.ProjectName}} is not initialized; run: cd {{.Path}} && skills-seed init --mode project"
 
-[LearnWorkspaceProjectProfileFallback]
-other = "Child project {{.ProjectName}} profile analysis failed; using code analysis summary for the profile: {{.Error}}"
+[LearnWorkspaceChildNotGitRepo]
+other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
 
-[LearnWorkspaceProjectFailed]
-other = "Child project {{.ProjectName}} learning failed: {{.Error}}"
+[LearnWorkspaceChildModeInvalid]
+other = "Child project {{.ProjectName}} must use project mode; current mode is {{.Mode}}"
 
 [LearnWorkspaceComplete]
 other = "Workspace learning completed"

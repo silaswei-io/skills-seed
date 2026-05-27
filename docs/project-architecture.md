@@ -77,7 +77,6 @@ project:
   mode: "workspace"
 
 workspace:
-  child_skill_policy: "skip_existing"
   projects:
     - {id: "frontend", path: "frontend", type: "frontend", language: "typescript"}
     - {id: "backend", path: "backend", type: "backend", language: "go"}
@@ -94,17 +93,13 @@ workspace 模式额外产物：
 ```text
 .skills-seed/memory/
   workspace-profile.json
-  projects/<project-id>/
-    project-profile.json
-    project-spec.json
+  workspace-spec.json
 
 <workspace-root>/<provider-skill-path>/<workspace-skill>/
 <child-project>/<provider-skill-path>/<project-skill>/
 ```
 
-根 skill 的 `provider-skill-path` 来自 workspace 根配置中当前 `agent.provider` 对应的 `output.skills_paths`。子项目 skill 路径优先来自子项目自己的 `.skills-seed/config.yaml`；没有子项目配置时才使用 workspace 根配置。根 skill 负责路由、跨项目规则和影响范围；子项目 skill 负责该子项目的规范、画像和 patterns。
-
-`workspace.child_skill_policy` 控制子项目 skill 写入：`skip_existing` 默认跳过按子项目实际配置解析后已存在 `SKILL.md` 的子项目，`overwrite` 强制覆盖该路径，`root_only` 只生成 workspace 根 skill。
+根 skill 的 `provider-skill-path` 来自 workspace 根配置中当前 `agent.provider` 对应的 `output.skills_paths`。子项目 skill 路径来自子项目自己的 `.skills-seed/config.yaml`。根 skill 负责路由、跨项目规则和影响范围；子项目 skill、子项目画像、patterns 和文件 md5 指纹都由子仓自己的 `.skills-seed` 管理。
 
 ## 初始化锁定
 
@@ -217,6 +212,7 @@ service -> prompts/templates
 - 生成或增量刷新项目画像
 - 支持 `learn current --focus ... --profile ...`
 - `learn current` 使用 Agent token 作用域延迟输出 Token 消耗：project 模式在后续步骤之后刷新；workspace 模式在每个子项目完成日志之后刷新，并标明子项目
+- workspace 并发学习时，子项目内部进度和后续命令提示不输出到终端，只保留子项目开始、摘要、Token 和完成日志
 
 ### `service/learner`
 
@@ -236,13 +232,14 @@ service -> prompts/templates
 1. 读取 patterns
 2. 读取项目画像
 3. 生成 `ProjectSpec`
-4. 渲染 `SKILL.md`
-5. 渲染 `references/project-overview.md`
-6. 渲染 `references/project-spec.md`
-7. 渲染分类 patterns 和 examples
-8. 渲染可选 Agent 元数据
+4. 按 `generation.mode` 选择 template 摘要或 AI 摘要
+5. 渲染 `SKILL.md`
+6. 渲染 `references/project-overview.md`
+7. 渲染 `references/project-spec.md`
+8. 渲染分类 patterns 和 examples
+9. 渲染可选 Agent 元数据
 
-workspace 模式下还会生成根 workspace skill，并按子项目分别输出 child skills。
+workspace 命令层会先进入每个独立 Git 子仓，调用子仓自己的 `GeneratorService` 生成子仓 skill；遇到没有 `generated-by: skills-seed` 标记的手写 `SKILL.md` 时跳过覆盖。所有子仓处理完后，根仓再生成 workspace 根 skill 和跨项目引用。
 
 ### `service/checker`
 
@@ -267,9 +264,7 @@ skills-seed patterns merge
     project-profile.json
     project-spec.json
     workspace-profile.json
-    projects/<project-id>/
-      project-profile.json
-      project-spec.json
+    workspace-spec.json
   logs/*.log
 ```
 
@@ -318,6 +313,6 @@ embedfs/templates/skills/codex/
 - project 模式默认 `1`
 - workspace 模式默认按子项目数计算，并有上限
 
-workspace `learn current` 会按子项目并发执行，每个子项目的 patterns 会写入项目范围字段。
+workspace `learn current` 和 `generate-skills` 会按子项目并发执行；`learn current` 的每个子项目 patterns、画像和文件指纹都写入对应子仓自己的 `.skills-seed`。
 
 并发学习时，Agent 层会先记录 token 统计并缓存控制台输出，命令层在子项目最终日志输出后再刷新对应 token 作用域，避免 Token 消耗日志插入其他子项目的进度或完成信息之间。

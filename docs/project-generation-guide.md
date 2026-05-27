@@ -31,8 +31,7 @@ workspace 模式额外包含：
 
 ```text
 .skills-seed/memory/workspace-profile.json
-.skills-seed/memory/projects/<project-id>/project-profile.json
-.skills-seed/memory/projects/<project-id>/project-spec.json
+.skills-seed/memory/workspace-spec.json
 ```
 
 ### 外部 skills 产物
@@ -185,7 +184,7 @@ references/project-spec.md
 - 改动触点
 - workspace 子项目范围信息
 
-workspace 子项目也有自己的 `project-spec.json` 和 `references/project-spec.md`。
+workspace 子项目在各自子仓的 `.skills-seed` 中保存自己的 `project-spec.json` 和 `references/project-spec.md`。
 
 ## 生成 Skills
 
@@ -200,7 +199,8 @@ GeneratorService.GenerateSkills
   -> 解析 output.skills_paths[agent.provider]
   -> 读取 patterns
   -> 读取 project-profile.json
-  -> 调用 Agent.GenerateSkillsSummary
+  -> generation.mode=template 时直接从已学习数据生成摘要
+  -> generation.mode=ai 时调用 Agent.GenerateSkillsSummary 做摘要合并
   -> 生成 project-spec.json
   -> 渲染 SKILL.md
   -> 渲染 references/
@@ -208,22 +208,25 @@ GeneratorService.GenerateSkills
 
 如果没有 patterns，命令会跳过生成。如果缺少项目画像，命令会提示先运行 `learn current` 或 `profile refresh`。
 
+`generation.mode` 默认是 `template`，生成阶段不额外调用 AI。因为 patterns、项目画像和项目规范已经由学习阶段产生，template 模式更适合稳定批量生成和 workspace 多子仓场景。需要让 AI 对大量 patterns 做摘要润色或压缩时，可在 `.skills-seed/config.yaml` 中改为：
+
+```yaml
+generation:
+  mode: "ai"
+```
+
 ## Workspace 生成
 
 workspace 模式流程：
 
 ```text
-GeneratorService.GenerateWorkspaceSkills
-  -> 按 agent.provider 生成 workspace 根 skill
-  -> 读取 workspace.child_skill_policy
-  -> root_only 时停止，不写子项目 skill
-  -> 读取所有 patterns
-  -> 按 project_id 分组
-  -> 子项目存在 .skills-seed/config.yaml 时读取子项目 provider 和 output.skills_paths
-  -> skip_existing 时跳过已存在解析后 SKILL.md 的子项目
-  -> 为每个子项目读取 project-profile.json
-  -> 生成子项目 project-spec.json
-  -> 按子项目实际配置路径输出子项目 skills
+skills-seed generate-skills
+  -> 逐个进入 workspace.projects 中的独立 Git 子仓
+  -> 使用子仓自己的 .skills-seed/config.yaml 生成子仓 skill
+  -> 如果子仓目标 SKILL.md 没有 generated-by 标记，视为手写 skill 并跳过覆盖
+  -> 回到 workspace 根仓生成根 skill
+  -> 根 skill 读取子仓 provider、output.skills_paths 和已生成 skill 摘要
+  -> 生成 workspace-overview.md 和 cross-project-rules.md
 ```
 
 根 skill 的职责：
@@ -239,19 +242,7 @@ GeneratorService.GenerateWorkspaceSkills
 - 描述本项目边界和 rules
 - 提供本项目 patterns 和 examples
 
-子项目 skill 生成策略：
-
-- 子项目有 `.skills-seed/config.yaml`：读取子项目自己的 `agent.provider` 与 `output.skills_paths` 来确定 skill 路径
-- `skip_existing`：默认值。按子项目实际配置解析出的 `SKILL.md` 已存在时跳过，仍生成 workspace 根 skill
-- `overwrite`：覆盖子项目实际配置路径下的 skill
-- `root_only`：只生成 workspace 根 skill
-
-CLI 可临时覆盖配置：
-
-```bash
-skills-seed generate-skills --overwrite
-skills-seed generate-skills --root-only
-```
+子项目 skill 由子仓自己的配置和数据生成。可以在子仓目录单独执行 `skills-seed learn current` 和 `skills-seed generate-skills`，也可以在 workspace 根仓执行 `skills-seed generate-skills` 统一编排所有子仓。子项目画像、patterns、文件 md5 指纹和 skill 都保存在子仓自己的 `.skills-seed` 中；workspace 根仓只在最后读取子项目配置和已生成的 skill 内容来生成路由。
 
 ## 模板选择
 

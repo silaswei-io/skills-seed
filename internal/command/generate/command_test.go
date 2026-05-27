@@ -1,0 +1,267 @@
+package generate
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	"github.com/silaswei-io/skills-seed/internal/prompts"
+	"github.com/silaswei-io/skills-seed/internal/test/mocks"
+	"github.com/stretchr/testify/require"
+)
+
+func TestCmdDoesNotExposeWorkspaceChildSkillPolicyFlags(t *testing.T) {
+	cmd := Cmd(&container.Container{})
+
+	require.Nil(t, cmd.Flags().Lookup("overwrite"))
+	require.Nil(t, cmd.Flags().Lookup("root-only"))
+}
+
+func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
+	resetGenerateFlagsForTest(t)
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	workspaceRoot := t.TempDir()
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+
+	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+	seedGenerateChildMemory(t, childRoot, "Backend Rule")
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
+	defer cont.Close()
+
+	cmd := Cmd(cont)
+	require.NoError(t, runGenerate(cont, cmd))
+
+	require.FileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
+	rootOverview := readGenerateFile(t, workspaceRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md")
+	require.Contains(t, rootOverview, "backend/.agents/skills/backend-dev/SKILL.md")
+	require.Contains(t, rootOverview, "backend 开发技能")
+}
+
+func TestRunGenerateWorkspaceSkipsManualChildSkillAndKeepsRootGenerated(t *testing.T) {
+	resetGenerateFlagsForTest(t)
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	workspaceRoot := t.TempDir()
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+
+	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+	seedGenerateChildMemory(t, childRoot, "Backend Rule")
+	manualSkillDir := filepath.Join(childRoot, ".agents", "skills", "backend-dev")
+	require.NoError(t, os.MkdirAll(manualSkillDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(manualSkillDir, "SKILL.md"), []byte("# Manual Backend Skill\n"), 0644))
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
+	defer cont.Close()
+
+	cmd := Cmd(cont)
+	require.NoError(t, runGenerate(cont, cmd))
+
+	require.Equal(t, "# Manual Backend Skill\n", readGenerateFile(t, childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "references", "project-spec.md"))
+	rootOverview := readGenerateFile(t, workspaceRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md")
+	require.Contains(t, rootOverview, "Manual Backend Skill")
+}
+
+func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
+	resetGenerateFlagsForTest(t)
+	var active int32
+	var maxActive int32
+	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+		current := atomic.AddInt32(&active, 1)
+		for {
+			previous := atomic.LoadInt32(&maxActive)
+			if current <= previous || atomic.CompareAndSwapInt32(&maxActive, previous, current) {
+				break
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		return &agent.GenerateSkillsResult{}, nil
+	})
+
+	workspaceRoot := t.TempDir()
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+	}
+	for _, project := range projects {
+		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		setGenerateChildOutputPath(t, childRoot, provider, filepath.Join(".agents", "skills", project.ID+"-dev"))
+		setGenerateChildMode(t, childRoot, config.GenerationModeAI)
+		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
+	}
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
+	defer cont.Close()
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+
+	require.NoError(t, generateWorkspaceChildSkills(context.Background(), cont))
+
+	require.GreaterOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
+}
+
+func TestRunGenerateProjectTemplateModeDoesNotRequireAvailableAgent(t *testing.T) {
+	resetGenerateFlagsForTest(t)
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Agent.Provider = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Generation.Mode = config.GenerationModeTemplate
+	require.NoError(t, configRepo.Update(cfg))
+
+	cont := &container.Container{
+		ConfigRepo: configRepo,
+		Agent:      &mocks.MockAgent{NameVal: "mock", AvailableVal: false},
+	}
+
+	err = requireAgentForGenerate(cont, false)
+	require.NoError(t, err)
+}
+
+func resetGenerateFlagsForTest(t *testing.T) {
+	t.Helper()
+	previousOutputPath := outputPath
+	previousMerge := merge
+	outputPath = ""
+	merge = false
+	t.Cleanup(func() {
+		outputPath = previousOutputPath
+		merge = previousMerge
+	})
+}
+
+func registerGenerateWorkspaceMockAgentFactory(t *testing.T) string {
+	t.Helper()
+	return registerGenerateWorkspaceMockAgentFactoryWithSummary(t, nil)
+}
+
+var generateWorkspaceFactoryMu sync.Mutex
+
+func registerGenerateWorkspaceMockAgentFactoryWithSummary(t *testing.T, summaryFn func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)) string {
+	t.Helper()
+	provider := "mock-generate-workspace-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
+	generateWorkspaceFactoryMu.Lock()
+	container.RegisterAgentFactory(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent {
+		return &mocks.MockAgent{
+			NameVal:      provider,
+			AvailableVal: true,
+			GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+				if summaryFn != nil {
+					return summaryFn(ctx, req)
+				}
+				return &agent.GenerateSkillsResult{}, nil
+			},
+		}
+	})
+	generateWorkspaceFactoryMu.Unlock()
+	return provider
+}
+
+func initGenerateWorkspaceRootContainer(t *testing.T, workspaceRoot, provider string, projects []config.WorkspaceProjectConfig) *container.Container {
+	t.Helper()
+
+	seedPath := filepath.Join(workspaceRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = domain.ModeWorkspace
+	cfg.Project.Language = "go"
+	cfg.Project.Locale = "zh-CN"
+	cfg.Project.RootPath = workspaceRoot
+	cfg.Agent.Provider = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Output.SkillsPaths = map[string]string{provider: ".agents/skills/skills-seed-skills"}
+	cfg.Workspace.Projects = projects
+	cfg.Generation.Mode = config.GenerationModeTemplate
+	require.NoError(t, configRepo.Update(cfg))
+
+	cont, err := container.NewContainer(context.Background(), seedPath)
+	require.NoError(t, err)
+	return cont
+}
+
+func initGenerateWorkspaceChildProject(t *testing.T, workspaceRoot string, project config.WorkspaceProjectConfig, provider string) string {
+	t.Helper()
+
+	childRoot := filepath.Join(workspaceRoot, filepath.FromSlash(project.Path))
+	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, ".git"), 0755))
+
+	childSeedPath := filepath.Join(childRoot, ".skills-seed")
+	childConfigRepo, err := config.NewRepository(childSeedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := childConfigRepo.Get()
+	cfg.Project.Name = project.ID
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Language = project.Language
+	cfg.Project.Locale = "zh-CN"
+	cfg.Project.RootPath = childRoot
+	cfg.Agent.Provider = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Output.SkillsPaths = map[string]string{provider: ".agents/skills/backend-dev"}
+	cfg.Generation.Mode = config.GenerationModeTemplate
+	require.NoError(t, childConfigRepo.Update(cfg))
+	return childRoot
+}
+
+func setGenerateChildMode(t *testing.T, childRoot, mode string) {
+	t.Helper()
+	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	cfg := childConfigRepo.Get()
+	cfg.Generation.Mode = mode
+	require.NoError(t, childConfigRepo.Update(cfg))
+}
+
+func setGenerateChildOutputPath(t *testing.T, childRoot, provider, outputPath string) {
+	t.Helper()
+	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	cfg := childConfigRepo.Get()
+	cfg.Output.SkillsPaths = map[string]string{provider: outputPath}
+	require.NoError(t, childConfigRepo.Update(cfg))
+}
+
+func seedGenerateChildMemory(t *testing.T, childRoot, patternName string) {
+	t.Helper()
+	ctx := context.Background()
+	seedPath := filepath.Join(childRoot, ".skills-seed")
+
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+
+	pattern := domain.NewPattern("p1", patternName, domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("workspace child pattern")
+	pattern.SetRule("render child skills before root skills")
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+
+	profileRepo := profilestore.NewRepository(seedPath)
+	require.NoError(t, profileRepo.Save(ctx, &domain.ProjectProfile{
+		ProjectName: "backend",
+		Language:    "go",
+		Summary:     "backend service profile",
+		GeneratedAt: "2026-05-27 00:00:00",
+	}))
+}
+
+func readGenerateFile(t *testing.T, root string, parts ...string) string {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join(append([]string{root}, parts...)...))
+	require.NoError(t, err)
+	return string(content)
+}

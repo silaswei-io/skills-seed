@@ -27,8 +27,13 @@ import (
 type CodexAgent struct {
 	commandPath      string
 	timeout          time.Duration
-	promptLoader     *prompts.Loader
+	promptLoader     promptRenderer
 	allowUserPlugins bool
+}
+
+// promptRenderer 是 Agent 依赖的最小提示词渲染能力，便于测试渲染错误链路
+type promptRenderer interface {
+	Render(name string, data interface{}) (string, error)
 }
 
 // New 创建代理
@@ -243,6 +248,7 @@ func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProje
 		"RootPath":            req.RootPath,
 		"Language":            req.Language,
 		"Structure":           req.Structure,
+		"StructuralContext":   req.StructuralContext,
 		"ReadmePath":          req.ReadmePath,
 		"MainFiles":           req.MainFiles,
 		"ExistingProfileJSON": req.ExistingProfileJSON,
@@ -250,7 +256,15 @@ func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProje
 	}
 	prompt, err := c.promptLoader.Render("project-analysis", data)
 	if err != nil || prompt == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
+		logger.Error(i18n.Get("LoggerAgentProjectPromptRenderFailed"),
+			"project", req.ProjectName,
+			"error", err,
+			"prompt_empty", prompt == "",
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", i18n.Get("AgentRenderProjectAnalysisPromptFailed"), err)
+		}
+		return nil, fmt.Errorf("%s: prompt is empty", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
 	output, err := c.callCodex(ctx, "AnalyzeProject", prompt)

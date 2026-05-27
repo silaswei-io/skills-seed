@@ -18,15 +18,49 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Project   ProjectConfig   `yaml:"project"`
-	Workspace WorkspaceConfig `yaml:"workspace"`
-	Analysis  AnalysisConfig  `yaml:"analysis"`
-	Agent     AgentConfig     `yaml:"agent"`
-	Learning  LearningConfig  `yaml:"learning"`
-	AutoFix   AutoFixConfig   `yaml:"autofix"`
-	Output    OutputConfig    `yaml:"output"`
-	Logging   LoggingConfig   `yaml:"logging"`
-	Exclude   []string        `yaml:"exclude"` // 全局排除配置
+	Project    ProjectConfig    `yaml:"project"`
+	Workspace  WorkspaceConfig  `yaml:"workspace"`
+	Analysis   AnalysisConfig   `yaml:"analysis"`
+	Agent      AgentConfig      `yaml:"agent"`
+	Learning   LearningConfig   `yaml:"learning"`
+	Generation GenerationConfig `yaml:"generation"`
+	AutoFix    AutoFixConfig    `yaml:"autofix"`
+	Output     OutputConfig     `yaml:"output"`
+	Logging    LoggingConfig    `yaml:"logging"`
+	Exclude    []string         `yaml:"exclude"` // 全局排除配置
+}
+
+// ProjectConfig 项目配置
+type ProjectConfig struct {
+	Name          string `yaml:"name"`
+	Mode          string `yaml:"mode"` // 初始化模式：project 或 workspace
+	Language      string `yaml:"language"`
+	InitializedAt string `yaml:"initialized_at"` // 改用字符串存储，更易读
+	GitRemote     string `yaml:"git_remote"`
+	RootPath      string `yaml:"root_path"`
+	Locale        string `yaml:"locale"` // 语言设置：zh-CN, en-US
+}
+
+// WorkspaceConfig 工作区配置
+type WorkspaceConfig struct {
+	Projects  []WorkspaceProjectConfig `yaml:"projects"`
+	Shared    []WorkspacePathConfig    `yaml:"shared"`
+	Contracts []WorkspacePathConfig    `yaml:"contracts"`
+	Infra     []WorkspacePathConfig    `yaml:"infra"`
+}
+
+// WorkspaceProjectConfig 工作区子项目配置
+type WorkspaceProjectConfig struct {
+	ID       string `yaml:"id"`
+	Path     string `yaml:"path"`
+	Type     string `yaml:"type"`
+	Language string `yaml:"language"`
+}
+
+// WorkspacePathConfig 工作区特殊路径配置
+type WorkspacePathConfig struct {
+	Path        string `yaml:"path"`
+	Description string `yaml:"description,omitempty"`
 }
 
 // AnalysisConfig 分析增强配置
@@ -72,17 +106,6 @@ func (c *CodeGraphConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// ProjectConfig 项目配置
-type ProjectConfig struct {
-	Name          string `yaml:"name"`
-	Mode          string `yaml:"mode"` // 初始化模式：project 或 workspace
-	Language      string `yaml:"language"`
-	InitializedAt string `yaml:"initialized_at"` // 改用字符串存储，更易读
-	GitRemote     string `yaml:"git_remote"`
-	RootPath      string `yaml:"root_path"`
-	Locale        string `yaml:"locale"` // 语言设置：zh-CN, en-US
-}
-
 // AgentConfig Agent 配置
 type AgentConfig struct {
 	Provider         string            `yaml:"provider"`           // Agent provider
@@ -92,39 +115,32 @@ type AgentConfig struct {
 	Parallelism      int               `yaml:"parallelism"`        // 并发 Agent 数，0 表示自动
 }
 
-// WorkspaceConfig 工作区配置
-type WorkspaceConfig struct {
-	ChildSkillPolicy string                   `yaml:"child_skill_policy"` // 子项目 skill 生成策略
-	Projects         []WorkspaceProjectConfig `yaml:"projects"`
-	Shared           []WorkspacePathConfig    `yaml:"shared"`
-	Contracts        []WorkspacePathConfig    `yaml:"contracts"`
-	Infra            []WorkspacePathConfig    `yaml:"infra"`
-}
-
-const (
-	WorkspaceChildSkillPolicySkipExisting = "skip_existing"
-	WorkspaceChildSkillPolicyOverwrite    = "overwrite"
-	WorkspaceChildSkillPolicyRootOnly     = "root_only"
-)
-
-// WorkspaceProjectConfig 工作区子项目配置
-type WorkspaceProjectConfig struct {
-	ID       string `yaml:"id"`
-	Path     string `yaml:"path"`
-	Type     string `yaml:"type"`
-	Language string `yaml:"language"`
-}
-
-// WorkspacePathConfig 工作区特殊路径配置
-type WorkspacePathConfig struct {
-	Path        string `yaml:"path"`
-	Description string `yaml:"description,omitempty"`
-}
-
 // LearningConfig 学习配置
 type LearningConfig struct {
 	MaxCommits int `yaml:"max_commits"` // 默认分析的提交数量
 	BatchSize  int `yaml:"batch_size"`  // 批量分析 commit 数量（默认10）
+}
+
+const (
+	// GenerationModeTemplate 表示直接使用已学习数据和模板生成 skills
+	GenerationModeTemplate = "template"
+	// GenerationModeAI 表示生成前调用 AI 对 patterns 做摘要合并
+	GenerationModeAI = "ai"
+)
+
+// GenerationConfig 控制 skills 生成阶段是否额外调用 AI
+type GenerationConfig struct {
+	Mode string `yaml:"mode"` // template 或 ai
+}
+
+// NormalizeGenerationMode 归一化 skills 生成模式
+func NormalizeGenerationMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case GenerationModeAI:
+		return GenerationModeAI
+	default:
+		return GenerationModeTemplate
+	}
 }
 
 // AutoFixConfig 自动修复配置
@@ -151,18 +167,6 @@ func EffectiveSkillsPath(provider string, output OutputConfig) string {
 		return output.SkillsPaths[provider]
 	}
 	return ""
-}
-
-// NormalizeWorkspaceChildSkillPolicy 规范化子项目 skill 生成策略
-func NormalizeWorkspaceChildSkillPolicy(policy string) string {
-	switch strings.ToLower(strings.TrimSpace(policy)) {
-	case WorkspaceChildSkillPolicyOverwrite:
-		return WorkspaceChildSkillPolicyOverwrite
-	case WorkspaceChildSkillPolicyRootOnly:
-		return WorkspaceChildSkillPolicyRootOnly
-	default:
-		return WorkspaceChildSkillPolicySkipExisting
-	}
 }
 
 // Repository 配置仓储
@@ -322,6 +326,9 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	// 学习配置
 	content = replaceYAMLValueInSection(content, "learning:", "max_commits:", cfg.Learning.MaxCommits)
 	content = replaceYAMLValueInSection(content, "learning:", "batch_size:", cfg.Learning.BatchSize)
+
+	// 生成配置
+	content = replaceYAMLValueInSection(content, "generation:", "mode:", cfg.Generation.Mode)
 
 	// 自动修复配置
 	content = replaceYAMLValueInSection(content, "autofix:", "strategy:", cfg.AutoFix.Strategy)
@@ -580,11 +587,10 @@ type yamlLineComment struct {
 func workspaceKeyComments(lines []string) map[string]yamlLineComment {
 	comments := map[string]yamlLineComment{}
 	keys := map[string]string{
-		"child_skill_policy:": "child_skill_policy",
-		"projects:":           "projects",
-		"shared:":             "shared",
-		"contracts:":          "contracts",
-		"infra:":              "infra",
+		"projects:":  "projects",
+		"shared:":    "shared",
+		"contracts:": "contracts",
+		"infra:":     "infra",
 	}
 
 	for _, line := range lines {
@@ -609,10 +615,6 @@ func workspaceKeyComments(lines []string) map[string]yamlLineComment {
 
 func renderWorkspaceConfig(workspace WorkspaceConfig, comments map[string]yamlLineComment) []string {
 	lines := []string{"workspace:"}
-	lines = append(lines, appendYAMLLineComment(
-		fmt.Sprintf("  child_skill_policy: %s", quoteYAMLString(NormalizeWorkspaceChildSkillPolicy(workspace.ChildSkillPolicy))),
-		comments["child_skill_policy"],
-	))
 	lines = append(lines, renderWorkspaceProjects(workspace.Projects, comments["projects"])...)
 	lines = append(lines, renderWorkspacePathList("shared", workspace.Shared, comments["shared"])...)
 	lines = append(lines, renderWorkspacePathList("contracts", workspace.Contracts, comments["contracts"])...)
@@ -738,6 +740,7 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Agent.Timeout == 0 {
 		cfg.Agent.Timeout = 1800
 	}
+	cfg.Generation.Mode = NormalizeGenerationMode(cfg.Generation.Mode)
 
 	if cfg.Project.Mode == "" {
 		cfg.Project.Mode = domain.ModeProject
@@ -749,7 +752,6 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Output.SkillsPaths == nil {
 		cfg.Output.SkillsPaths = map[string]string{}
 	}
-	cfg.Workspace.ChildSkillPolicy = NormalizeWorkspaceChildSkillPolicy(cfg.Workspace.ChildSkillPolicy)
 }
 
 // detectSystemLocale 检测系统语言
@@ -811,6 +813,9 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			MaxCommits: 50,
 			BatchSize:  5,
 		},
+		Generation: GenerationConfig{
+			Mode: GenerationModeTemplate,
+		},
 		AutoFix: AutoFixConfig{
 			Strategy:   "patch",
 			BackupPath: "backups",
@@ -820,9 +825,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 				"agent": ".skills/skills-seed-skills",
 			},
 		},
-		Workspace: WorkspaceConfig{
-			ChildSkillPolicy: WorkspaceChildSkillPolicySkipExisting,
-		},
+		Workspace: WorkspaceConfig{},
 		Logging: LoggingConfig{
 			Level:       "DEBUG",
 			LogsPath:    "logs",
@@ -845,6 +848,7 @@ type Reader interface {
 	GetWorkspaceConfig() WorkspaceConfig
 	GetAnalysisConfig() AnalysisConfig
 	GetAgentConfig() AgentConfig
+	GetGenerationConfig() GenerationConfig
 	GetLearningConfig() LearningConfig
 	GetAutoFixConfig() AutoFixConfig
 	GetOutputConfig() OutputConfig
@@ -870,6 +874,11 @@ func (r *Repository) GetAnalysisConfig() AnalysisConfig {
 // GetAgentConfig 获取 Agent 配置
 func (r *Repository) GetAgentConfig() AgentConfig {
 	return r.config.Agent
+}
+
+// GetGenerationConfig 获取 Skills 生成配置
+func (r *Repository) GetGenerationConfig() GenerationConfig {
+	return r.config.Generation
 }
 
 // GetLearningConfig 获取学习配置

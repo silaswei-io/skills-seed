@@ -8,29 +8,31 @@
 
 - `learn current` 新增文件 md5 增量学习，成功学习后记录普通项目文件指纹
 - 未检测到可学习文件变化时，同时跳过 patterns 学习和项目画像刷新
-- workspace 模式按子项目隔离文件指纹，同名相对路径不会互相影响
+- workspace 根仓 `learn current` 会进入各独立 Git 子仓，用子仓自己的 `.skills-seed` 执行增量学习
+- workspace 根仓只刷新工作区画像和跨项目关系，不保存子仓 patterns 或文件指纹
 - 删除文件只触发基于已有画像的增量画像刷新，不再无意义提取 patterns
+- `generate-skills` 新增 `generation.mode` 配置，默认 `template` 不额外调用 AI，`ai` 模式保留生成前摘要合并
+- workspace 根仓 `generate-skills` 会先进入各独立 Git 子仓，用子仓自己的 `.skills-seed` 生成子仓 skill，最后再生成根 workspace skill
 
 ### 体验
 
 - 默认排除配置的 skills 输出目录以及 `.claude/skills/**`、`.agents/skills/**`，避免生成内容回流到下一轮学习
 - 当前代码学习会把已有 patterns 摘要传给 Agent，降低同一规则换名重复输出的概率
 - 学习日志补充增量文件统计和 generated skills 排除提示
+- 已有手写 `SKILL.md` 没有 `generated-by: skills-seed` 标记时默认不覆盖；workspace 生成会跳过该子仓 skill 并继续生成根 skill
 
 ### 文档
 
-- 更新 README、生成链路文档和配置模板，说明 md5 增量学习、workspace 子项目隔离和 generated skills 默认排除
+- 更新 README、生成链路文档和配置模板，说明 md5 增量学习、workspace/子仓解耦、生成模式配置和 generated skills 默认排除
 
 ## [v0.0.4]
 
 ### 功能
 
 - workspace 初始化只扫描第一层目录，并扩展常见项目标记识别范围
-- workspace 模式下按当前 `agent.provider` 生成根入口 skill，并为子项目生成各自 skill
-- workspace 根 skill 路由只引用当前 provider 的子项目 skill，避免 Claude 生成时同时落出 Codex 目录
+- workspace 模式下按当前 `agent.provider` 生成根入口 skill，子项目 skill 由子仓自己生成
+- workspace 根 skill 路由引用子项目独立 skill 路径，避免根仓写入子仓输出目录
 - workspace 根 skill 也生成 provider 元数据，Codex 输出时包含标准 `agents/openai.yaml`
-- 新增 `workspace.child_skill_policy`，支持 `skip_existing`、`overwrite`、`root_only` 控制子项目 skill 生成
-- `generate-skills` 新增 `--overwrite` 和 `--root-only`，可在本次生成中覆盖 workspace 子项目 skill 策略
 - workspace 子项目存在 `.skills-seed/config.yaml` 时视为独立初始化，外层 workspace 不生成或覆盖该子项目 skill
 
 ### 模板
@@ -42,8 +44,7 @@
 ### 体验
 
 - workspace 配置保存保持模板注释与双引号风格，避免回退到全文件 YAML marshal
-- workspace 默认跳过当前 provider 已存在的子项目 skill，只补齐/刷新根 workspace skill，避免覆盖子仓已有 agent 配置
-- CLI flag 帮助和 workspace 生成日志补充 i18n 文案
+- workspace 根仓只补齐/刷新根 workspace skill，避免覆盖子仓已有 agent 配置
 - workspace 子项目学习日志对齐单项目模式，补充子项目开始、分析结果、保存模式、保存画像和跳过原因输出
 - workspace 子项目学习的 Token 消耗延迟到子项目日志末尾输出，并标明对应子项目
 - `learn current` 单项目模式下 Token 消耗固定作为学习输出最后一条日志，workspace 模式下按子项目完成顺序输出，避免并发日志错位
