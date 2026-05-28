@@ -130,6 +130,10 @@ go vet ./...
 go build -o skills-seed ./cmd/skills-seed
 ```
 
-## License
+---
 
-[MIT](LICENSE)
+<div align="center">
+
+基于 [MIT License](LICENSE) 发布。
+
+</div>
