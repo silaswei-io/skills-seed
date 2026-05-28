@@ -19,9 +19,10 @@ import (
 // Cmd 返回 profile 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	profileCmd := &cobra.Command{
-		Use:   "profile",
-		Short: i18n.Get("ProfileShort"),
-		Long:  i18n.Get("ProfileLongDesc"),
+		Use:     "profile",
+		Short:   i18n.Get("ProfileShort"),
+		Long:    i18n.Get("ProfileLongDesc"),
+		Example: i18n.Get("ProfileExample"),
 	}
 
 	profileCmd.AddCommand(showCmd(cont))
@@ -32,8 +33,10 @@ func Cmd(cont *container.Container) *cobra.Command {
 
 func showCmd(cont *container.Container) *cobra.Command {
 	return &cobra.Command{
-		Use:   "show",
-		Short: i18n.Get("ProfileShowShort"),
+		Use:     "show",
+		Short:   i18n.Get("ProfileShowShort"),
+		Long:    i18n.Get("ProfileShowLongDesc"),
+		Example: i18n.Get("ProfileShowExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
@@ -47,8 +50,10 @@ func refreshCmd(cont *container.Container) *cobra.Command {
 	var language string
 
 	cmd := &cobra.Command{
-		Use:   "refresh",
-		Short: i18n.Get("ProfileRefreshShort"),
+		Use:     "refresh",
+		Short:   i18n.Get("ProfileRefreshShort"),
+		Long:    i18n.Get("ProfileRefreshLongDesc"),
+		Example: i18n.Get("ProfileRefreshExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))

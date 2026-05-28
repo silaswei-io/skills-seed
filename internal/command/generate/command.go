@@ -30,9 +30,10 @@ var (
 // Cmd 返回 generate 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "generate-skills",
-		Short: i18n.Get("GenerateShort"),
-		Long:  i18n.Get("GenerateLongDesc"),
+		Use:     "generate-skills",
+		Short:   i18n.Get("GenerateShort"),
+		Long:    i18n.Get("GenerateLongDesc"),
+		Example: i18n.Get("GenerateExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 检查 container 是否初始化
 			if cont == nil {

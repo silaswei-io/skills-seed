@@ -121,6 +121,7 @@ func createRootCmd() *cobra.Command {
 		Use:     "skills-seed",
 		Short:   i18n.Get("RootShort"),
 		Long:    i18n.Get("RootLong"),
+		Example: i18n.Get("RootExample"),
 		Version: metadata.ProgramVersion,
 	}
 	cmd.SetVersionTemplate("{{.Name}} version {{.Version}}\nprompt-templates-sha256: " + promptTemplatesHash + "\nskills-templates-sha256: " + skillsTemplatesHash + "\n")

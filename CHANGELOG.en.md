@@ -2,6 +2,29 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.8]
+
+### Documentation
+
+- Simplify README and move the full command reference to `docs/COMMANDS.md` / `docs/COMMANDS.EN.md`
+- Add configuration reference documents at `docs/CONFIGURATION.md` / `docs/CONFIGURATION.EN.md`, covering config fields, defaults, path semantics, and related behavior
+- Organize the command reference by top-level command with standard sections such as command overview, command forms, flags, subcommand flags, and notes
+- Document every command, subcommand, and flag, including `help`, `completion`, `--context`, `--profile`, workspace, hook, patterns, and profile usage
+- Rework README as an overview page focused on capabilities, workflow, Agent support, and quick start, with detailed command and configuration references linked at the end
+- Add a centered README header that highlights positioning, language links, supported Agents, and key documentation entry points
+
+### Experience
+
+- Add `Long`, `Example`, and flag help for all business subcommands so `skills-seed <command> --help` shows complete usage
+- Shorten the root command help intro to reduce noise in `skills-seed help`
+- Add bilingual help coverage tests to prevent missing help text or unresolved i18n keys in new commands
+- Change successful `init` output to print the relative `.skills-seed` path on the success line and show the README URL for the current version tag
+- Remove optional follow-up command hints from `init` and `learn current` output
+- Add `--agent` to `init` so project and workspace initialization can directly set providers such as `claude` or `codex`
+- Add `skills-seed init --workspace --children` so workspace initialization can also initialize child projects from `workspace.projects` when `.skills-seed` is missing
+- Add `workspace.init_children`, default `false`; when enabled, `learn current` initializes missing child `.skills-seed` directories before learning
+- Newly initialized workspace child projects inherit root `agent.provider`, `agent.commands`, and `output.skills_paths`; children that already use a different agent are reported and preserved
+
 ## [v0.0.7]
 
 ### Changes

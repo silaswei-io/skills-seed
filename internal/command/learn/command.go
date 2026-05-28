@@ -11,6 +11,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
+	initcmd "github.com/silaswei-io/skills-seed/internal/command/init"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -47,17 +48,19 @@ var (
 // Cmd 返回 learn 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	learnCmd := &cobra.Command{
-		Use:   "learn",
-		Short: i18n.Get("LearnShort"),
-		Long:  i18n.Get("LearnLongDesc"),
+		Use:     "learn",
+		Short:   i18n.Get("LearnShort"),
+		Long:    i18n.Get("LearnLongDesc"),
+		Example: i18n.Get("LearnExample"),
 	}
 	defaultLimit, defaultBatchSize := historyDefaults(cont)
 
 	// learn current 子命令
 	currentCmd := &cobra.Command{
-		Use:   "current",
-		Short: i18n.Get("LearnCurrentShort"),
-		Long:  i18n.Get("LearnCurrentLongDesc"),
+		Use:     "current",
+		Short:   i18n.Get("LearnCurrentShort"),
+		Long:    i18n.Get("LearnCurrentLongDesc"),
+		Example: i18n.Get("LearnCurrentExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
@@ -73,9 +76,10 @@ func Cmd(cont *container.Container) *cobra.Command {
 
 	// learn history 子命令
 	historyCmd := &cobra.Command{
-		Use:   "history",
-		Short: i18n.Get("LearnHistoryShort"),
-		Long:  i18n.Get("LearnHistoryLongDesc"),
+		Use:     "history",
+		Short:   i18n.Get("LearnHistoryShort"),
+		Long:    i18n.Get("LearnHistoryLongDesc"),
+		Example: i18n.Get("LearnHistoryExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
@@ -124,7 +128,6 @@ func runLearnCurrentProject(cont *container.Container) error {
 	_, err = runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
 		showProgress:     true,
 		showDetailedLogs: true,
-		showNextSteps:    true,
 		userContext:      userContext,
 	})
 	return err
@@ -134,7 +137,6 @@ type learnCurrentProjectOptions struct {
 	tokenScope       string
 	showProgress     bool
 	showDetailedLogs bool
-	showNextSteps    bool
 	userContext      string
 }
 
@@ -318,9 +320,6 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		}
 		if opts.showDetailedLogs {
 			logger.Info(i18n.Get("LearnCurrentComplete"))
-			if opts.showNextSteps {
-				logLearnCurrentNextSteps()
-			}
 		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current",
@@ -463,9 +462,6 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 
 	if opts.showDetailedLogs {
 		logger.Info(i18n.Get("LearnCurrentComplete"))
-		if opts.showNextSteps {
-			logLearnCurrentNextSteps()
-		}
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current",
@@ -491,14 +487,6 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		agent.FlushTokenUsageScope(ctx)
 	}
 	return result, nil
-}
-
-func logLearnCurrentNextSteps() {
-	logger.Info(i18n.Get("LearnCurrentNextSteps"))
-	logger.Info(i18n.Get("LearnCurrentNextViewPatterns"))
-	logger.Info(i18n.Get("LearnCurrentNextGenerateSkills"))
-	logger.Info(i18n.Get("LearnCurrentNextGenerateMergedSkills"))
-	logger.Info(i18n.Get("LearnCurrentNextCheck"))
 }
 
 func logLearnWorkspaceProjectSummary(projectName string, result *learnCurrentProjectResult) {
@@ -587,6 +575,11 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectStarted", map[string]interface{}{"ProjectName": project.ID}))
 			consoleMu.Unlock()
 		}
+		if workspaceConfig.InitChildren {
+			if err := initcmd.EnsureWorkspaceChildInitializedAt(projectRoot, project, cont.ConfigRepo, projectConfig.Locale); err != nil {
+				return err
+			}
+		}
 		childCont, err := commandutil.OpenWorkspaceChildContainer(ctx, projectRootPath, project, commandutil.WorkspaceChildErrorKeys{
 			NotInitialized: "LearnWorkspaceChildNotInitialized",
 			NotGitRepo:     "LearnWorkspaceChildNotGitRepo",
@@ -605,7 +598,6 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			tokenScope:       scope,
 			showProgress:     showChildDetails,
 			showDetailedLogs: showChildDetails,
-			showNextSteps:    false,
 		})
 		if err != nil {
 			return err

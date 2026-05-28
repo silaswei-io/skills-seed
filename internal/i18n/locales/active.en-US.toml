@@ -5,37 +5,28 @@ other = "Initialize skills-seed project"
 other = "Growing project skills for AI agents"
 
 [RootLong]
-other = "A project-level skill that learns from Git history\nto help AI agents understand your codebase better.\n\nThis tool integrates with the configured AI agent for deep code analysis\nand learns your team's coding patterns automatically."
+other = "Learn project conventions from a codebase and generate AI Agent skills."
+
+[RootExample]
+other = "  skills-seed init --mode project --agent codex --locale en-US"
 
 [InitLongDesc]
-other = "Initialize skills-seed in your project.\n\nThis command will:\n  • Create .skills-seed/ directory\n  • Generate default configuration (config.yaml)\n  • Initialize BoltDB database\n  • Prepare cross-agent compatible prompt and skills templates\n\nPlease run this command in the root directory of a Git repository.\n\nExamples:\n  # Initialize in current project\n  skills-seed init"
+other = "Initialize skills-seed in your project.\n\nThis command will:\n  • Create .skills-seed/ directory\n  • Generate default configuration (config.yaml)\n  • Initialize BoltDB database\n  • Prepare cross-agent compatible prompt and skills templates\n\nPlease run this command in the root directory of a Git repository."
+
+[InitExample]
+other = "  # Initialize a single-project repository with an Agent\n  skills-seed init --mode project --agent codex --locale en-US\n\n  # Initialize a workspace root and missing child .skills-seed directories\n  skills-seed init --workspace --children --agent codex --locale en-US"
 
 [InitStart]
 other = "Initialize skills-seed"
 
 [InitSuccess]
-other = "initialized successfully"
+other = "Initialized successfully: {{.Path}}"
 
 [InitFailed]
 other = "Initialization failed: {{.Error}}"
 
-[InitSkillLocation]
-other = "skills-seed location: {{.Path}}"
-
-[InitNextSteps]
-other = "Optional next steps:"
-
-[InitStepLearn]
-other = "  1. Analyze current code and create project profile: skills-seed learn current"
-
-[InitStepWatch]
-other = "  2. Generate skills documentation: skills-seed generate-skills"
-
-[InitStepPatterns]
-other = "  3. View learned patterns: skills-seed view patterns"
-
-[InitStepRules]
-other = "  4. Optionally install the hook: skills-seed hook install"
+[InitDocumentation]
+other = "Documentation: {{.URL}}"
 
 [InitAnalyzingProject]
 other = "Analyzing project..."
@@ -112,6 +103,12 @@ other = "Failed to initialize logger"
 
 [InitChildrenShort]
 other = "Initialize child projects from root workspace.projects"
+
+[InitChildrenLongDesc]
+other = "Read workspace.projects from the workspace root .skills-seed/config.yaml, enter each child project, and initialize it in project mode.\n\nThis command only works from a workspace-mode root repository. Each child project must be an independent Git repository. Already initialized child projects are reported and skipped, including whether their agent.provider matches the root."
+
+[InitChildrenExample]
+other = "  # Initialize every configured child project from the workspace root\n  skills-seed init children\n\n  # Specify child project config language\n  skills-seed init children --locale en-US"
 
 [InitChildrenRequireWorkspaceMode]
 other = "init children can only run in a workspace-mode root repository"
@@ -489,7 +486,10 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [LearnLongDesc]
-other = "Learn coding patterns from Git commit history.\n\nThis command will:\n  • Analyze recent Git commits\n  • Extract coding patterns using configured AI agent\n  • Save learned patterns to database\n  • Auto-generate code rules\n\nAfter learning, use 'skills-seed check' to check code quality.\n\nExamples:\n  # Learn from last 50 commits\n  skills-seed learn history --limit=50\n\n  # Learn from commits in last 30 days\n  skills-seed learn history --since=30d"
+other = "Learn coding patterns from current code or Git commit history.\n\nThis command will:\n  • Analyze current code or recent Git commits\n  • Extract coding patterns using the configured AI agent\n  • Save learned patterns to the database\n  • Provide project convention input for check and generate-skills"
+
+[LearnExample]
+other = "  # Learn from current code\n  skills-seed learn current\n\n  # Learn from Git history\n  skills-seed learn history --limit=50\n\n  # Learn only from a focused directory\n  skills-seed learn current --focus internal/service --profile skip"
 
 [LearnFromHistory]
 other = "Learning from Git history"
@@ -507,13 +507,16 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [CheckLongDesc]
-other = "Check if staged files comply with coding standards.\n\nThis command will:\n  • Get Git staged files\n  • Analyze code using configured AI agent\n  • Find issues based on learned patterns\n  • Provide fix suggestions\n\nUsually runs automatically via Git pre-commit hook.\n\nExamples:\n  # Check staged files\n  skills-seed check\n\n  # Check all files\n  skills-seed check --all"
+other = "Check whether staged files comply with learned coding standards.\n\nThis command will:\n  • Get Git staged files, or check all Git-tracked files when --all is set\n  • Analyze code using the configured AI agent\n  • Find issues based on learned patterns\n  • Provide fix suggestions\n\nUsually runs automatically via Git pre-commit hook."
 
 [CheckFlagInteractive]
-other = "Enable interactive fix confirmation"
+other = "Enable interactive fix confirmation (default true; hooks usually use --interactive=false)"
 
 [CheckFlagAll]
 other = "Check all files instead of only staged files"
+
+[CheckExample]
+other = "  # Check staged files and enter interactive handling when issues are found\n  skills-seed check\n\n  # Check all Git-tracked files\n  skills-seed check --all\n\n  # Disable interactivity for scripts or hooks\n  skills-seed check --interactive=false"
 
 [GenerateShort]
 other = "Generate AI Agent skills"
@@ -525,7 +528,10 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [GenerateLongDesc]
-other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read the project profile saved by learn current/profile refresh\n  • Select the provider-specific template directory from agent.provider\n  • Generate SKILL.md and references/ documentation\n  • Generate metadata such as agents/openai.yaml when the template provides it\n\nRun 'skills-seed learn current' or 'skills-seed profile refresh' before generating.\n\nExamples:\n  # Generate skills to the current provider default location\n  skills-seed generate-skills\n\n  # Specify output directory\n  skills-seed generate-skills --output <skills-output-dir>"
+other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read the project profile saved by learn current/profile refresh\n  • Select the provider-specific template directory from agent.provider\n  • Generate SKILL.md and references/ documentation\n  • Generate metadata such as agents/openai.yaml when the template provides it\n\nRun 'skills-seed learn current' or 'skills-seed profile refresh' before generating."
+
+[GenerateExample]
+other = "  # Generate to output.skills_paths for the current provider\n  skills-seed generate-skills\n\n  # Temporarily specify the output directory\n  skills-seed generate-skills --output .agents/skills/my-project\n\n  # Add guidance for this generate run\n  skills-seed generate-skills --context \"Preserve API compatibility constraints\""
 
 [GenerateGenerating]
 other = "Generating AI Agent skills..."
@@ -540,22 +546,43 @@ other = "Generated to: {{.Path}}"
 other = "Manage Git hooks"
 
 [HookLongDesc]
-other = "Manage Git pre-commit hooks.\n\nThis command can:\n  • Install pre-commit hook\n  • Uninstall pre-commit hook\n  • Manually run hook check\n\nAfter installation, 'skills-seed check' will run automatically before each git commit.\n\nExamples:\n  # Install hook\n  skills-seed hook install\n\n  # Uninstall hook\n  skills-seed hook uninstall\n\n  # Run manually\n  skills-seed hook run"
+other = "Manage Git pre-commit hooks.\n\nThis command can:\n  • Install pre-commit hook\n  • Uninstall pre-commit hook\n  • Manually run hook check\n\nAfter installation, 'skills-seed check --interactive=false' runs automatically before each git commit."
+
+[HookExample]
+other = "  # Recommended: install the pre-commit hook\n  skills-seed hook install\n\n  # Compatible legacy form: install by flag\n  skills-seed hook --install\n\n  # Run the hook check manually\n  skills-seed hook run"
 
 [HookFlagInstall]
-other = "Install Git pre-commit hook"
+other = "Install Git pre-commit hook (legacy-compatible; prefer hook install)"
 
 [HookFlagUninstall]
-other = "Uninstall Git pre-commit hook"
+other = "Uninstall Git pre-commit hook (legacy-compatible; prefer hook uninstall)"
 
 [HookInstallShort]
 other = "Install Git pre-commit hook"
 
+[HookInstallLongDesc]
+other = "Write .git/hooks/pre-commit in the current Git repository. The generated hook runs skills-seed check --interactive=false before each commit to check staged files against learned patterns."
+
+[HookInstallExample]
+other = "  # Install the hook in a repository initialized by skills-seed\n  skills-seed hook install"
+
 [HookUninstallShort]
 other = "Uninstall Git pre-commit hook"
 
+[HookUninstallLongDesc]
+other = "Remove .git/hooks/pre-commit from the current Git repository. This only removes the hook file managed by skills-seed; it does not remove .skills-seed data."
+
+[HookUninstallExample]
+other = "  # Uninstall the pre-commit hook\n  skills-seed hook uninstall"
+
 [HookRunShort]
 other = "Run the pre-commit hook manually"
+
+[HookRunLongDesc]
+other = "Run the same check logic used by the pre-commit hook against the current staged files. The command exits successfully when there are no staged Go files; it returns non-zero when checks fail."
+
+[HookRunExample]
+other = "  # Run one hook check manually\n  skills-seed hook run"
 
 [HookInstallSuccess]
 other = "Hook installed"
@@ -585,10 +612,13 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [ViewLongDesc]
-other = "View learned patterns and generated rules.\n\nSubcommands:\n  patterns  - View all learned patterns\n  rules     - View all generated rules\n\nExamples:\n  # View patterns\n  skills-seed view patterns\n\n  # View rules\n  skills-seed view rules"
+other = "View content learned and stored by skills-seed.\n\nCurrently supported:\n  patterns  - View all learned patterns, optionally filtered by category"
 
 [ViewFlagCategory]
 other = "Filter by category: naming/error/structure/concurrency/testing/business/api/database/utils/middleware/config"
+
+[ViewExample]
+other = "  # View learned patterns\n  skills-seed view patterns\n\n  # Filter by category\n  skills-seed view patterns --category api"
 
 [ScanShort]
 other = "Scan and analyze project"
@@ -619,7 +649,10 @@ other = "Project scan completed"
 other = "View all learned patterns"
 
 [ViewPatternsLong]
-other = "View all learned patterns from Git history."
+other = "List patterns stored in the database, grouped by category, including name, description, confidence, and frequency. Use --category to show only one category."
+
+[ViewPatternsExample]
+other = "  # View all patterns\n  skills-seed view patterns\n\n  # View only testing patterns\n  skills-seed view patterns --category testing"
 
 [ViewNoPatterns]
 other = "No patterns learned yet."
@@ -790,7 +823,7 @@ other = "Generated skills for child project {{.ProjectName}}"
 other = "Child project {{.ProjectName}} has a manual SKILL.md; skipping overwrite: {{.Path}}"
 
 [GenerateWorkspaceChildNotInitialized]
-other = "Child project {{.ProjectName}} is not initialized. Run: cd {{.Path}} && skills-seed init --mode project"
+other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed init children"
 
 [GenerateWorkspaceChildNotGitRepo]
 other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
@@ -799,17 +832,17 @@ other = "Child project {{.ProjectName}} is not an independent Git repository: {{
 other = "Child project {{.ProjectName}} must use project mode, current mode is {{.Mode}}"
 
 [GenerateFlagOutput]
-other = "Skills output directory (defaults to output.skills_paths for the current provider)"
+other = "Skills output directory (defaults to output.skills_paths for the current provider, such as .claude/skills/... or .agents/skills/...)"
 
 # 生成合并
 [GenerateFlagMerge]
 other = "Merge similar patterns before generating (deprecated; use patterns merge)"
 
 [GenerateFlagContext]
-other = "Additional guidance for this generate run"
+other = "Additional guidance for this generate run, passed to the AI agent as extra constraints"
 
 [GenerateFlagContextFile]
-other = "Read additional guidance for this generate run from a file"
+other = "Read additional guidance for this generate run from a file; useful for longer constraints"
 
 [GenerateMergeStarting]
 other = "Starting to merge similar patterns..."
@@ -831,13 +864,22 @@ other = "Merged pattern count: {{.Count}}"
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns, including explicit merging of similar patterns."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  merge  - Ask the current agent to merge semantically similar patterns and reduce duplicate rules.\n\nBefore merging, consider running 'skills-seed view patterns' to inspect existing content."
+
+[PatternsExample]
+other = "  # Merge similar patterns in all categories\n  skills-seed patterns merge\n\n  # Preview merging only the business category\n  skills-seed patterns merge --category business --dry-run"
 
 [PatternsMergeShort]
 other = "Merge similar patterns"
 
+[PatternsMergeLongDesc]
+other = "Use the configured AI agent to analyze learned patterns and merge semantically duplicate or highly similar entries into fewer, clearer patterns.\n\nBy default this writes back to the database. Use --dry-run to preview the merge summary only. Use --category to limit the merge to one category."
+
+[PatternsMergeExample]
+other = "  # Merge all similar patterns and write back to the database\n  skills-seed patterns merge\n\n  # Merge only the api category\n  skills-seed patterns merge --category api\n\n  # Preview merge results without writing\n  skills-seed patterns merge --dry-run"
+
 [PatternsMergeFlagCategory]
-other = "Only merge the specified category"
+other = "Only merge the specified category, such as business, api, or testing; empty means all categories"
 
 [PatternsMergeFlagDryRun]
 other = "Preview merge results without writing to the database"
@@ -850,13 +892,28 @@ other = "Patterns merged: input {{.TotalInput}}, merged output {{.TotalMerged}},
 other = "Show or refresh the project profile"
 
 [ProfileLongDesc]
-other = "Show or refresh the project profile generated by learn current. The profile is used to render references/project-overview.md."
+other = "Show or refresh the project profile generated by learn current.\n\nThe profile is stored at .skills-seed/memory/project-profile.json. It is used to render references/project-overview.md and gives generate-skills project structure, dependency, key module, and business method context."
+
+[ProfileExample]
+other = "  # Show the current project profile summary\n  skills-seed profile show\n\n  # Re-analyze the project and refresh the profile\n  skills-seed profile refresh"
 
 [ProfileShowShort]
 other = "Show the current project profile summary"
 
+[ProfileShowLongDesc]
+other = "Read .skills-seed/memory/project-profile.json and print project name, language, generated time, summary, and statistics. This command does not call the AI agent and does not modify the database."
+
+[ProfileShowExample]
+other = "  # Show the current project profile summary\n  skills-seed profile show"
+
 [ProfileRefreshShort]
 other = "Re-analyze the project and save the project profile"
+
+[ProfileRefreshLongDesc]
+other = "Re-analyze the current project and overwrite the saved project profile without learning patterns.\n\nUse this when project structure, dependencies, or key modules changed but you do not need to re-learn code patterns. The CLI configured by agent.provider must be available."
+
+[ProfileRefreshExample]
+other = "  # Refresh the profile using the configured project language\n  skills-seed profile refresh\n\n  # Temporarily specify the language\n  skills-seed profile refresh --language go"
 
 [ProfileMissing]
 other = "Project profile does not exist. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
@@ -1575,37 +1632,43 @@ other = "{{.Index}}. {{.Name}} [{{.Category}}]"
 other = "Learn from current codebase"
 
 [LearnCurrentLongDesc]
-other = "Analyze current codebase and extract coding patterns, business methods, best practices, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/memory/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate-skills\n\nExamples:\n  # Learn from current code\n  skills-seed learn current\n\n  # Specify language\n  skills-seed learn current --language=go\n\n  # Learn only from a specific directory and auto-decide profile refresh\n  skills-seed learn current -f internal/agent"
+other = "Analyze current codebase and extract coding patterns, business methods, best practices, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/memory/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate-skills"
+
+[LearnCurrentExample]
+other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip profile refresh\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance for this run from a file\n  skills-seed learn current --context-file .skills-seed/context.md"
 
 [LearnHistoryShort]
 other = "Learn from Git history"
 
 [LearnHistoryLongDesc]
-other = "Learn coding patterns from Git commit history.\n\nThis command will:\n  • Analyze Git commit history\n  • Use configured AI agent to extract coding patterns\n  • Extract business methods and tools\n  • Save learned patterns to database\n\nExamples:\n  # Learn from last 50 commits\n  skills-seed learn history --limit=50\n\n  # Learn from commits in last 30 days\n  skills-seed learn history --since=30d"
+other = "Learn coding patterns from Git commit history.\n\nThis command will:\n  • Analyze Git commit history\n  • Use configured AI agent to extract coding patterns\n  • Extract business methods and tools\n  • Save learned patterns to database"
+
+[LearnHistoryExample]
+other = "  # Learn from the last 50 commits\n  skills-seed learn history --limit 50\n\n  # Learn from commits in the last 30 days\n  skills-seed learn history --since 30d\n\n  # Call the agent once per batch of 5 commits\n  skills-seed learn history --limit 40 --batch-size 5"
 
 [LearnFlagLimit]
-other = "Number of commits to analyze"
+other = "Number of commits to analyze; already learned commits are skipped"
 
 [LearnFlagSince]
 other = "Time range (e.g., 7d, 30d, 6m, 1y)"
 
 [LearnFlagBatchSize]
-other = "Number of commits to process in each batch"
+other = "Number of commits per batch; each batch is merged into one agent call"
 
 [LearnFlagLanguage]
-other = "Primary programming language of the project"
+other = "Primary programming language of the project; empty uses config or auto-detection"
 
 [LearnFlagFocus]
-other = "Directory or file to scan for learning; may be repeated"
+other = "Directory or file to scan for learning; may be repeated; paths must stay under the project root"
 
 [LearnFlagProfile]
-other = "Project profile refresh strategy: auto, skip, or refresh"
+other = "Project profile refresh strategy: auto for first/full runs, skip to omit, refresh to force"
 
 [LearnFlagContext]
-other = "Additional guidance for this learn run"
+other = "Additional guidance for this learn run, passed to the AI agent as extra constraints"
 
 [LearnFlagContextFile]
-other = "Read additional guidance for this learn run from a file"
+other = "Read additional guidance for this learn run from a file; useful for longer constraints"
 
 # 当前学习命令消息
 [LearnCurrentStart]
@@ -1672,7 +1735,7 @@ other = "Child project {{.ProjectName}} has no learnable file changes; skipped, 
 other = "Child project {{.ProjectName}} completed independent learning"
 
 [LearnWorkspaceChildNotInitialized]
-other = "Child project {{.ProjectName}} is not initialized; run: cd {{.Path}} && skills-seed init --mode project"
+other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed init children; or set workspace.init_children: true and run again"
 
 [LearnWorkspaceChildNotGitRepo]
 other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
@@ -1691,21 +1754,6 @@ other = "Initialization mode is locked and cannot change from {{.LockedMode}} to
 
 [LearnCurrentComplete]
 other = "Current codebase learning completed"
-
-[LearnCurrentNextSteps]
-other = "Next commands:"
-
-[LearnCurrentNextViewPatterns]
-other = "  1. View learned patterns: skills-seed view patterns"
-
-[LearnCurrentNextGenerateSkills]
-other = "  2. Generate skills: skills-seed generate-skills"
-
-[LearnCurrentNextGenerateMergedSkills]
-other = "  3. Merge similar patterns: skills-seed patterns merge"
-
-[LearnCurrentNextCheck]
-other = "  4. Check code: skills-seed check"
 
 [LearnCurrentFailed]
 other = "Failed to learn from current codebase: {{.Error}}"
@@ -1764,16 +1812,28 @@ other = "Not a git repository: {{.Path}}"
 other = "skills-seed already initialized"
 
 [InitFlagMode]
-other = "Initialization mode: project or workspace"
+other = "Initialization mode: project for a single project or workspace for a multi-project root"
 
 [InitFlagLocale]
 other = "Configuration file language: zh-CN or en-US; auto-detected when omitted"
 
+[InitFlagAgent]
+other = "Agent provider to write during initialization, for example claude or codex"
+
 [InitFlagWorkspace]
 other = "Initialize as workspace mode, equivalent to --mode workspace"
 
+[InitFlagChildren]
+other = "After workspace initialization, initialize child projects from workspace.projects when .skills-seed is missing"
+
 [ResetShort]
 other = "Back up and reset skills-seed initialization state"
+
+[ResetLongDesc]
+other = "Reset the skills-seed initialization state in the current repository.\n\nThis command first backs up the existing .skills-seed directory to .skills-seed.backup/<timestamp>, then recreates config and directories for the requested mode. Use it when switching between project and workspace modes."
+
+[ResetExample]
+other = "  # Reset to single-project mode\n  skills-seed reset --mode project\n\n  # Reset to workspace mode\n  skills-seed reset --mode workspace\n\n  # Workspace shortcut\n  skills-seed reset --workspace"
 
 [ResetBackupFailed]
 other = "Failed to back up .skills-seed"

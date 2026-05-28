@@ -15,9 +15,10 @@ import (
 // Cmd 返回 patterns 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	patternsCmd := &cobra.Command{
-		Use:   "patterns",
-		Short: i18n.Get("PatternsShort"),
-		Long:  i18n.Get("PatternsLongDesc"),
+		Use:     "patterns",
+		Short:   i18n.Get("PatternsShort"),
+		Long:    i18n.Get("PatternsLongDesc"),
+		Example: i18n.Get("PatternsExample"),
 	}
 
 	patternsCmd.AddCommand(mergeCmd(cont))
@@ -29,8 +30,10 @@ func mergeCmd(cont *container.Container) *cobra.Command {
 	var dryRun bool
 
 	cmd := &cobra.Command{
-		Use:   "merge",
-		Short: i18n.Get("PatternsMergeShort"),
+		Use:     "merge",
+		Short:   i18n.Get("PatternsMergeShort"),
+		Long:    i18n.Get("PatternsMergeLongDesc"),
+		Example: i18n.Get("PatternsMergeExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))

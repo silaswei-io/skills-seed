@@ -31,6 +31,69 @@ func TestInitializeWorkspaceDoesNotInitializeChildProjects(t *testing.T) {
 	require.Equal(t, "backend", configRepo.GetWorkspaceConfig().Projects[0].Path)
 }
 
+func TestInitializeProjectWithAgentSetsProvider(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+		agentProvider:   "codex",
+	}))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeProject, configRepo.GetProjectConfig().Mode)
+	require.Equal(t, "codex", configRepo.GetAgentConfig().Provider)
+}
+
+func TestInitializeProjectSummaryUsesRelativeSeedPathAndDocumentationLink(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+
+	output := captureInitStdout(t, func() {
+		require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+			initLogger:      false,
+			showUserSummary: true,
+		}))
+	})
+
+	require.Contains(t, output, "初始化成功: .skills-seed")
+	require.Contains(t, output, "文档参考: https://github.com/silaswei-io/skills-seed/blob/v0.0.8/README.md")
+	require.NotContains(t, output, projectRoot)
+	require.NotContains(t, output, "可选后续步骤")
+	require.NotContains(t, output, "skills-seed learn current")
+}
+
+func TestInitializeWorkspaceWithChildrenInitializesChildProjects(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	initGitDir(t, workspaceRoot)
+	childRoot := filepath.Join(workspaceRoot, "backend")
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "go.mod"), []byte("module backend\n"), 0644))
+	initGitDir(t, childRoot)
+
+	require.NoError(t, initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
+		initLogger:            true,
+		showUserSummary:       true,
+		initWorkspaceChildren: true,
+		agentProvider:         "codex",
+	}))
+
+	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeWorkspace, rootConfig.GetProjectConfig().Mode)
+	require.Equal(t, "codex", rootConfig.GetAgentConfig().Provider)
+
+	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeProject, childConfig.GetProjectConfig().Mode)
+	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
+	require.Equal(t, "go", childConfig.GetProjectConfig().Language)
+	require.Equal(t, childRoot, childConfig.GetProjectConfig().RootPath)
+	require.Equal(t, "codex", childConfig.GetAgentConfig().Provider)
+}
+
 func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	initGitDir(t, workspaceRoot)

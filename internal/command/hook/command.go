@@ -17,9 +17,10 @@ func Cmd() *cobra.Command {
 	var uninstall bool
 
 	hookCmd := &cobra.Command{
-		Use:   "hook",
-		Short: i18n.Get("HookShort"),
-		Long:  i18n.Get("HookLongDesc"),
+		Use:     "hook",
+		Short:   i18n.Get("HookShort"),
+		Long:    i18n.Get("HookLongDesc"),
+		Example: i18n.Get("HookExample"),
 		Run: func(cmd *cobra.Command, args []string) {
 			if install && uninstall {
 				fmt.Println(i18n.Get("HookBothFlagsError"))
@@ -50,17 +51,19 @@ func Cmd() *cobra.Command {
 
 	hookCmd.Flags().BoolVarP(&install, "install", "i", false, i18n.Get("HookFlagInstall"))
 	hookCmd.Flags().BoolVarP(&uninstall, "uninstall", "u", false, i18n.Get("HookFlagUninstall"))
-	hookCmd.AddCommand(hookActionCmd("install", i18n.Get("HookInstallShort"), installHook, i18n.Get("HookInstallSuccess")))
-	hookCmd.AddCommand(hookActionCmd("uninstall", i18n.Get("HookUninstallShort"), uninstallHook, i18n.Get("HookUninstallSuccess")))
-	hookCmd.AddCommand(hookActionCmd("run", i18n.Get("HookRunShort"), runPreCommitHook, ""))
+	hookCmd.AddCommand(hookActionCmd("install", i18n.Get("HookInstallShort"), i18n.Get("HookInstallLongDesc"), i18n.Get("HookInstallExample"), installHook, i18n.Get("HookInstallSuccess")))
+	hookCmd.AddCommand(hookActionCmd("uninstall", i18n.Get("HookUninstallShort"), i18n.Get("HookUninstallLongDesc"), i18n.Get("HookUninstallExample"), uninstallHook, i18n.Get("HookUninstallSuccess")))
+	hookCmd.AddCommand(hookActionCmd("run", i18n.Get("HookRunShort"), i18n.Get("HookRunLongDesc"), i18n.Get("HookRunExample"), runPreCommitHook, ""))
 
 	return hookCmd
 }
 
-func hookActionCmd(use, short string, action func() error, successMessage string) *cobra.Command {
+func hookActionCmd(use, short, long, example string, action func() error, successMessage string) *cobra.Command {
 	return &cobra.Command{
-		Use:   use,
-		Short: short,
+		Use:     use,
+		Short:   short,
+		Long:    long,
+		Example: example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := action(); err != nil {
 				fmt.Println(err.Error())

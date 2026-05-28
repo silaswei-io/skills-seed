@@ -1,21 +1,55 @@
+<div align="center">
+
 # Skills Seed
 
 **Learn project conventions from a codebase and generate local skills for Claude Code / Codex.**
 
-[简体中文](README.md) | [English](README.en.md)
+[简体中文](README.md) · [English](README.en.md)
 
-Skills Seed analyzes current code, Git history, and project structure, turns existing team practices into local knowledge assets, then renders them to `.claude/skills` or `.agents/skills` for the current `agent.provider`. Data is stored locally under `.skills-seed` by default.
+`Claude Code` · `Codex` · `Project Skills` · `Workspace`
 
-## Features
+[Quick Start](#quick-start) · [Agent Support](#agent-support) · [Command Reference](docs/COMMANDS.EN.md) · [Configuration Reference](docs/CONFIGURATION.EN.md)
 
-- Learn patterns, business methods, utilities, and best practices from the current codebase
-- Learn incrementally from Git history and skip already analyzed commits
-- Generate `project-profile.json` and `project-spec.json`
-- Generate Claude Code / Codex skills with `SKILL.md` and `references/`
-- Support single-project mode and multi-project workspace mode
-- Keep workspace root skills focused on routing and cross-project relationships while child repos learn and generate their own skills
-- Support `check`, interactive fixes, and a pre-commit hook
-- Support Chinese and English templates, prompts, config, and terminal output
+</div>
+
+Skills Seed is built for existing projects. It reads current code, Git history, and project structure, then turns real team practices into local knowledge: naming, error handling, directory layout, business methods, utilities, testing habits, and API conventions.
+
+Learning data is stored locally under `.skills-seed` by default. Generated skills are rendered to `.claude/skills` or `.agents/skills` for the current `agent.provider`, so your AI assistant can load project-specific guidance without relying on a remote knowledge base.
+
+## Capabilities
+
+Skills Seed focuses on helping an AI assistant understand how this project should be changed:
+
+1. Learn project conventions from current code, including patterns, business methods, utilities, and best practices.
+2. Learn incrementally from Git history while skipping commits that were already analyzed.
+3. Generate project profiles and project specs so the assistant understands module roles, dependencies, business boundaries, and change constraints.
+4. Generate Claude Code / Codex skills with `SKILL.md`, project overviews, specs, patterns, and examples.
+5. Support workspace roots where child projects learn and generate independently while the root skill handles routing and cross-project impact.
+6. Support `check` and pre-commit hooks to apply learned rules to staged files or all Git-tracked files.
+
+## Workflow
+
+```text
+init -> learn current / learn history -> generate-skills -> check
+```
+
+`init` creates `.skills-seed` and the default config. `learn` extracts project rules from code or commit history. `generate-skills` renders profiles and patterns into skills for the current Agent. `check` uses those rules to review future changes.
+
+## Agent Support
+
+Skills Seed currently includes two built-in providers:
+
+- `claude`: the default Agent. Skills are generated to `.claude/skills/skills-seed-skills` for Claude Code.
+- `codex`: skills are generated to `.agents/skills/skills-seed-skills` for Codex.
+
+Choose the Agent during initialization:
+
+```bash
+skills-seed init --mode project --agent codex --locale en-US
+skills-seed init --workspace --children --agent codex --locale en-US
+```
+
+`--agent` writes `agent.provider` and ensures matching entries exist in `agent.commands` and `output.skills_paths`. When initializing workspace children, newly created child projects inherit the root Agent config; existing child configs are preserved.
 
 ## Install
 
@@ -38,231 +72,54 @@ go build -o skills-seed ./cmd/skills-seed
 
 - Go 1.25.6+
 - A Git repository
-- An available AI Agent CLI: default is `claude`; `codex` can be selected in config
+- An available AI Agent CLI: default `claude`; use `--agent codex` to switch to Codex
 
-## Quick Start: Single Project
+## Quick Start
+
+Single project:
 
 ```bash
 cd your-project
-skills-seed init --mode project --locale en-US
+skills-seed init --mode project --agent codex --locale en-US
 skills-seed learn current
 skills-seed generate-skills
 ```
 
-The default provider is `claude`, so output is:
-
-```text
-your-project/
-├── .skills-seed/
-│   ├── config.yaml
-│   ├── memory/
-│   │   ├── project.db
-│   │   ├── project-profile.json
-│   │   └── project-spec.json
-│   └── logs/
-└── .claude/skills/skills-seed-skills/
-```
-
-After changing `agent.provider` to `codex` in `.skills-seed/config.yaml`, output goes to `.agents/skills/...`.
-
-## Quick Start: Workspace
-
-Use workspace mode when one Git repository contains multiple child projects such as `frontend/`, `backend/`, `gateway/`, and `deploy/`.
+Workspace:
 
 ```bash
 cd your-workspace
-skills-seed init --mode workspace --locale en-US
-# Or: skills-seed init --workspace
-```
-
-Initialization scans only first-level folders under the workspace root and identifies child projects by common markers such as `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `build.gradle`, `composer.json`, `Gemfile`, `Chart.yaml`, `Dockerfile`, and `openapi.yaml`. Review and adjust `.skills-seed/config.yaml`:
-
-```yaml
-project:
-  mode: "workspace"
-
-workspace:
-  projects:
-    - {id: "frontend", path: "frontend", type: "frontend", language: "typescript"}
-    - {id: "backend", path: "backend", type: "backend", language: "go"}
-  shared:
-    - {path: "pkg"}
-  contracts:
-    - {path: "proto"}
-  infra:
-    - {path: "deploy"}
-
-agent:
-  parallelism: 0   # 0 means automatic: project=1, workspace=project count with a cap
-```
-
-Then run:
-
-```bash
-cd frontend && skills-seed init --mode project --locale en-US && cd ..
-cd backend && skills-seed init --mode project --locale en-US && cd ..
+skills-seed init --workspace --children --agent codex --locale en-US
 skills-seed learn current
 skills-seed generate-skills
 ```
 
-The workspace root requires each child project to be an independent Git repository initialized with `skills-seed init --mode project` from that child directory. `learn current` enters each child project's own `.skills-seed` for incremental learning; `generate-skills` generates each child skill from that child's own config first, then generates the workspace root skill. Both commands process child projects concurrently according to `agent.parallelism`.
-
-Workspace mode generates:
-
-- Root skill for the current provider: workspace routing, cross-project rules, and impact radius
-- `.skills-seed/memory/workspace-profile.json`
-- `.skills-seed/memory/workspace-spec.json`
-
-Child skills, child project profiles, patterns, and md5 file fingerprints are stored in each child project's own `.skills-seed`. The root skill reads child `agent.provider`, `output.skills_paths`, and generated skill summaries to point to child skills. A manual child `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
-
-## Daily Commands
-
-### Learn
+Common commands:
 
 ```bash
-# Learn from current code and create or refresh the project profile when needed
-skills-seed learn current
-
-# Learn only from a focused directory, without refreshing the profile
-skills-seed learn current --focus internal/service --profile skip
-
-# Focused learning with incremental profile refresh from the existing profile
-skills-seed learn current --focus internal/service --profile refresh
-
-# Learn from Git history; already learned commits are skipped
-skills-seed learn history --limit=50
-skills-seed learn history --since=30d
-```
-
-`--profile` values:
-
-- `auto`: default. Refreshes for first/full learning; skips narrow changes when possible
-- `skip`: learn patterns only
-- `refresh`: refresh the profile from the current input
-
-After the first successful `learn current`, Skills Seed records md5 fingerprints for analyzed files. Later runs compare those fingerprints first: when no learnable files changed, both pattern learning and project profile refresh are skipped; when files changed, only added, modified, or deleted paths drive incremental learning. Workspace mode scopes records per child project, so one child project's change does not re-learn the others.
-
-Generated skills directories are excluded from learning by default, including configured `output.skills_paths`, `.claude/skills/**`, and `.agents/skills/**`. This prevents generated `SKILL.md` and `references/` files from feeding back into future learning.
-
-`learn current` prints token usage after the learning log. In workspace mode, token usage is printed at the end of each child-project log block. When multiple child projects run concurrently, the terminal shows only child start, summary, token usage, and completion lines; it suppresses each child's 5-step progress and follow-up command hints to avoid interleaved logs.
-
-### Profile And Spec
-
-```bash
-skills-seed profile show
-skills-seed profile refresh
-```
-
-`profile refresh` rebuilds the project profile only. `project-spec.json` is generated by `generate-skills` from the profile and learned patterns.
-
-### Generate Skills
-
-```bash
-skills-seed generate-skills
-
-# Merge similar patterns explicitly when needed
-skills-seed patterns merge
-skills-seed generate-skills
-
-# Temporarily override output path
-skills-seed generate-skills --output .agents/skills/my-project
-```
-
-Generation always calls the current Agent for summary merging and polishing before rendering templates, so make sure the CLI for `agent.provider` is available before running `generate-skills`.
-
-Generated content:
-
-```text
-SKILL.md
-agents/
-references/
-  project-overview.md
-  project-spec.md
-  patterns/*.md
-  examples/*.md
-```
-
-### Check And Hook
-
-```bash
-# Check staged files by default
 skills-seed check
-
-# Check all Git-tracked files
-skills-seed check --all
-
-# Install pre-commit hook
+skills-seed profile show
+skills-seed patterns merge --dry-run
 skills-seed hook install
 ```
 
-## Initialization Mode And Locking
+## Defaults
 
-Choose one mode at initialization:
+- Init mode is `project`.
+- Default Agent is `claude`.
+- Default data directory is `.skills-seed`.
+- Claude output is `.claude/skills/skills-seed-skills`.
+- Codex output is `.agents/skills/skills-seed-skills`.
+- Workspace init scans only first-level child projects.
+- `workspace.init_children` defaults to `false`; use `--children` or enable the config to initialize missing child projects.
+- `agent.parallelism` defaults to `0`, meaning automatic concurrency: project=1, workspace=child project count capped at 6.
 
-```bash
-skills-seed init --mode project
-skills-seed init --mode workspace
-```
-
-After learning or skill generation starts, `project.mode` is locked and cannot be switched directly between `project` and `workspace`. To reinitialize:
-
-```bash
-skills-seed reset --mode workspace
-```
-
-`reset` backs up the old `.skills-seed` to `.skills-seed.backup/<timestamp>`.
-
-## Configuration
-
-Config file: `.skills-seed/config.yaml`. Common fields:
-
-```yaml
-project:
-  name: "your-project"
-  mode: "project"      # project or workspace
-  language: "go"
-  locale: "en-US"
-
-analysis:
-  codegraph:
-    enabled: true       # Enable structural analysis by default; warn and fall back if codegraph is missing
-    required: false     # true fails when CodeGraph is unavailable
-    command: "codegraph"
-    auto_init: true     # Run codegraph init -i automatically when the target project has no .codegraph
-    auto_sync: true
-    max_nodes: 30
-    max_code: 0
-
-agent:
-  provider: "claude"
-  commands:
-    claude: "claude"
-    codex: "codex"
-  timeout: 1800
-  allow_user_plugins: false
-  parallelism: 0
-
-learning:
-  max_commits: 50
-  batch_size: 5
-
-output:
-  skills_paths:
-    claude: ".claude/skills/skills-seed-skills"
-    codex: ".agents/skills/skills-seed-skills"
-
-logging:
-  level: "DEBUG"
-  logs_path: "logs"
-  max_log_files: 30
-```
-
-`analysis.codegraph.enabled` defaults to `true`. If `codegraph` is not installed, or the target project has no `.codegraph/` index, `required: false` makes `skills-seed` print a warning and continue with normal file-based analysis. Teams that require CodeGraph in CI can set `required` to `true`.
+Existing child `.skills-seed/config.yaml` files are not overwritten. If a child project uses a different agent from the workspace root, it is reported and preserved.
 
 ## Documentation
 
-- [Project Architecture](docs/project-architecture.en.md)
-- [Generation Pipeline](docs/project-generation-guide.en.md)
+- [Command Reference](docs/COMMANDS.EN.md)
+- [Configuration Reference](docs/CONFIGURATION.EN.md)
 - [Changelog](CHANGELOG.en.md)
 
 ## Development

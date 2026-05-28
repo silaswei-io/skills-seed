@@ -42,10 +42,11 @@ type ProjectConfig struct {
 
 // WorkspaceConfig 工作区配置
 type WorkspaceConfig struct {
-	Projects  []WorkspaceProjectConfig `yaml:"projects"`
-	Shared    []WorkspacePathConfig    `yaml:"shared"`
-	Contracts []WorkspacePathConfig    `yaml:"contracts"`
-	Infra     []WorkspacePathConfig    `yaml:"infra"`
+	InitChildren bool                     `yaml:"init_children"`
+	Projects     []WorkspaceProjectConfig `yaml:"projects"`
+	Shared       []WorkspacePathConfig    `yaml:"shared"`
+	Contracts    []WorkspacePathConfig    `yaml:"contracts"`
+	Infra        []WorkspacePathConfig    `yaml:"infra"`
 }
 
 // WorkspaceProjectConfig 工作区子项目配置
@@ -144,6 +145,17 @@ func EffectiveSkillsPath(provider string, output OutputConfig) string {
 		return output.SkillsPaths[provider]
 	}
 	return ""
+}
+
+func DefaultSkillsPathForProvider(provider string) string {
+	switch provider {
+	case "claude":
+		return ".claude/skills/skills-seed-skills"
+	case "codex":
+		return ".agents/skills/skills-seed-skills"
+	default:
+		return ".skills/skills-seed-skills"
+	}
 }
 
 // Repository 配置仓储
@@ -561,10 +573,11 @@ type yamlLineComment struct {
 func workspaceKeyComments(lines []string) map[string]yamlLineComment {
 	comments := map[string]yamlLineComment{}
 	keys := map[string]string{
-		"projects:":  "projects",
-		"shared:":    "shared",
-		"contracts:": "contracts",
-		"infra:":     "infra",
+		"init_children:": "init_children",
+		"projects:":      "projects",
+		"shared:":        "shared",
+		"contracts:":     "contracts",
+		"infra:":         "infra",
 	}
 
 	for _, line := range lines {
@@ -589,6 +602,7 @@ func workspaceKeyComments(lines []string) map[string]yamlLineComment {
 
 func renderWorkspaceConfig(workspace WorkspaceConfig, comments map[string]yamlLineComment) []string {
 	lines := []string{"workspace:"}
+	lines = append(lines, appendYAMLLineComment(fmt.Sprintf("  init_children: %v", workspace.InitChildren), comments["init_children"]))
 	lines = append(lines, renderWorkspaceProjects(workspace.Projects, comments["projects"])...)
 	lines = append(lines, renderWorkspacePathList("shared", workspace.Shared, comments["shared"])...)
 	lines = append(lines, renderWorkspacePathList("contracts", workspace.Contracts, comments["contracts"])...)

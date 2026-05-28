@@ -26,9 +26,10 @@ type checkOptions struct {
 func Cmd(cont *container.Container) *cobra.Command {
 	opts := checkOptions{interactive: true}
 	cmd := &cobra.Command{
-		Use:   "check",
-		Short: i18n.Get("CheckShort"),
-		Long:  i18n.Get("CheckLongDesc"),
+		Use:     "check",
+		Short:   i18n.Get("CheckShort"),
+		Long:    i18n.Get("CheckLongDesc"),
+		Example: i18n.Get("CheckExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 检查 container 是否初始化
 			if cont == nil {

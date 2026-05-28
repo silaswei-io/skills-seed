@@ -2,6 +2,29 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.8]
+
+### 文档
+
+- 精简 README，把完整命令参考迁移到 `docs/COMMANDS.md` / `docs/COMMANDS.EN.md`
+- 新增配置参考文档 `docs/CONFIGURATION.md` / `docs/CONFIGURATION.EN.md`，集中说明配置字段、默认值、路径语义和联动行为
+- 命令参考按顶层命令组织，使用“命令概述 / 命令形式 / 参数 / 子命令参数 / 注意事项”等标准结构
+- 补齐所有命令、子命令和参数说明，包括 `help`、`completion`、`--context`、`--profile`、workspace、hook、patterns 和 profile 等用法
+- README 改为介绍页，重点说明核心能力、工作方式、Agent 支持和快速入门；文档入口指向独立命令参考和配置参考
+- README 顶部改为居中展示区，集中展示项目定位、语言切换、支持的 Agent 和核心文档入口
+
+### 体验
+
+- 补齐所有业务子命令的 `Long`、`Example` 和参数 help，`skills-seed <command> --help` 可直接查看完整用法
+- 精简根命令 help 顶部介绍，减少 `skills-seed help` 的冗余说明
+- 增加双语 help 覆盖测试，防止新增命令缺失 help 或泄漏未翻译 i18n key
+- `init` 成功输出改为同一行显示相对 `.skills-seed` 路径，并输出当前版本 tag 对应的 README 文档地址
+- 移除 `init` 和 `learn current` 末尾的可选后续步骤提示，避免命令输出过长
+- `init` 新增 `--agent` 参数，单项目和 workspace 根仓初始化时可直接指定 `claude`、`codex` 等 provider
+- 新增 `skills-seed init --workspace --children`，根仓初始化后可同步初始化 `workspace.projects` 中缺失 `.skills-seed` 的子项目
+- 新增 `workspace.init_children` 配置，默认 `false`；开启后 `learn current` 会在学习前补初始化缺失 `.skills-seed` 的子项目
+- 新初始化的 workspace 子项目会继承根仓 `agent.provider`、`agent.commands` 和 `output.skills_paths`；已有不同 agent 的子仓只提示并跳过
+
 ## [v0.0.7]
 
 ### 变更

@@ -14,9 +14,10 @@ import (
 // Cmd 返回 view 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	viewCmd := &cobra.Command{
-		Use:   "view",
-		Short: i18n.Get("ViewShort"),
-		Long:  i18n.Get("ViewLongDesc"),
+		Use:     "view",
+		Short:   i18n.Get("ViewShort"),
+		Long:    i18n.Get("ViewLongDesc"),
+		Example: i18n.Get("ViewExample"),
 	}
 
 	viewCmd.AddCommand(patternsCmd(cont))
@@ -28,9 +29,10 @@ func patternsCmd(cont *container.Container) *cobra.Command {
 	var categoryFilter string
 
 	cmd := &cobra.Command{
-		Use:   "patterns",
-		Short: i18n.Get("ViewPatternsShort"),
-		Long:  i18n.Get("ViewPatternsLong"),
+		Use:     "patterns",
+		Short:   i18n.Get("ViewPatternsShort"),
+		Long:    i18n.Get("ViewPatternsLong"),
+		Example: i18n.Get("ViewPatternsExample"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))

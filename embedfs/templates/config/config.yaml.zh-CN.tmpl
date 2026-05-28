@@ -10,6 +10,7 @@ project:
 
 # 工作区
 workspace:
+  init_children: false      # learn current 时是否自动初始化缺失 .skills-seed 的子项目
   projects: []               # 子项目列表，例如: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   shared: []                 # 公共库或共享代码目录，例如: [{path: "pkg"}]
   contracts: []              # 接口契约目录，例如: [{path: "proto"}]

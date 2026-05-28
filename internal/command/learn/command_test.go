@@ -134,6 +134,7 @@ func TestRunLearnCurrentPrintsTokenUsageLast(t *testing.T) {
 	require.Contains(t, output, "Token 消耗:")
 	require.Contains(t, lastNonEmptyLine(output), "Token 消耗:")
 	require.NotContains(t, lastNonEmptyLine(output), "子项目")
+	require.NotContains(t, output, "后续可执行:")
 }
 
 func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *testing.T) {
@@ -363,8 +364,67 @@ func TestRunLearnWorkspaceCurrentRequiresInitializedChildProject(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backend")
-	require.Contains(t, err.Error(), "skills-seed init --mode project")
-	require.Contains(t, err.Error(), childRoot)
+	require.Contains(t, err.Error(), "skills-seed init children")
+	require.Contains(t, err.Error(), "workspace.init_children")
+}
+
+func TestRunLearnWorkspaceCurrentAutoInitializesMissingChildProjectWhenEnabled(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
+
+	provider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, nil)
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	cfg := cont.ConfigRepo.Get()
+	cfg.Workspace.InitChildren = true
+	cfg.Agent.Provider = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+
+	childRoot := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend")
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
+	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.email", "test@example.com").Run())
+	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.name", "Test User").Run())
+	writeLearnFile(t, childRoot, "main.go", "package main\n")
+	gitAddAll(t, childRoot)
+
+	require.NoError(t, runLearnCurrent(cont))
+
+	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeProject, childConfig.GetProjectConfig().Mode)
+	require.Equal(t, project.ID, childConfig.GetProjectConfig().Name)
+	require.Equal(t, project.Language, childConfig.GetProjectConfig().Language)
+	require.Equal(t, provider, childConfig.GetAgentConfig().Provider)
+}
+
+func TestRunLearnWorkspaceCurrentAutoInitPreservesExistingDifferentAgentChildProject(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+
+	childProvider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, nil)
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	cfg := cont.ConfigRepo.Get()
+	cfg.Workspace.InitChildren = true
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+
+	childRoot := initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", childProvider)
+	rootProvider := cont.ConfigRepo.GetAgentConfig().Provider
+	require.NotEqual(t, rootProvider, childProvider)
+
+	require.NoError(t, runLearnCurrent(cont))
+
+	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, childProvider, childConfig.GetAgentConfig().Provider)
 }
 
 func TestRunLearnWorkspaceCurrentRequiresChildGitRepository(t *testing.T) {
