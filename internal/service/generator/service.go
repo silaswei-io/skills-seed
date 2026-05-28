@@ -28,6 +28,7 @@ import (
 // GeneratorService 生成服务
 type GeneratorService struct {
 	patternRepo       domain.PatternRepository
+	patternStatsRepo  domain.PatternStatsRepository
 	profileRepo       domain.ProjectProfileRepository
 	scopedProfileRepo domain.ScopedProjectProfileRepository
 	projectSpecRepo   domain.ProjectSpecRepository
@@ -50,6 +51,12 @@ type categoryReferenceMeta struct {
 	Group       string
 	Title       string
 	Description string
+}
+
+type patternGenerationInsight struct {
+	HitCount       int
+	LastHitAt      time.Time
+	GenerationRank float64
 }
 
 type workspaceSkillTemplateData struct {
@@ -148,8 +155,10 @@ func NewGeneratorService(
 	scopedProfileRepo, _ := profileRepo.(domain.ScopedProjectProfileRepository)
 	projectSpecRepo, _ := profileRepo.(domain.ProjectSpecRepository)
 	scopedSpecRepo, _ := profileRepo.(domain.ScopedProjectSpecRepository)
+	patternStatsRepo, _ := patternRepo.(domain.PatternStatsRepository)
 	return &GeneratorService{
 		patternRepo:       patternRepo,
+		patternStatsRepo:  patternStatsRepo,
 		profileRepo:       profileRepo,
 		scopedProfileRepo: scopedProfileRepo,
 		projectSpecRepo:   projectSpecRepo,
@@ -204,7 +213,13 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 		return nil
 	}
 
-	summaryResult, err := s.generateSkillsSummary(ctx, patterns, resolvedOutputPath, startedAt)
+	patternInsights, err := s.patternGenerationInsights(ctx, patterns)
+	if err != nil {
+		return err
+	}
+	rankedPatterns := rankPatternsForGeneration(patterns, patternInsights)
+
+	summaryResult, err := s.generateSkillsSummary(ctx, rankedPatterns, patternInsights, resolvedOutputPath, startedAt)
 	if err != nil {
 		return err
 	}
@@ -217,13 +232,13 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 		return err
 	}
 	profile = cleanProjectProfile(profile)
-	spec := s.projectSpecFromProfileAndPatterns(profile, patterns, config.WorkspaceProjectConfig{})
+	spec := s.projectSpecFromProfileAndPatterns(profile, rankedPatterns, config.WorkspaceProjectConfig{})
 	if s.projectSpecRepo != nil {
 		if err := s.projectSpecRepo.SaveSpec(ctx, spec); err != nil {
 			return err
 		}
 	}
-	if err := s.writeSkillsOutput(ctx, resolvedOutputPath, patterns, summaryResult, stats, profile, spec, generatedSkillName(s.configRepo.GetProjectConfig().Name)); err != nil {
+	if err := s.writeSkillsOutput(ctx, resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, generatedSkillName(s.configRepo.GetProjectConfig().Name)); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.generate_skills",
 			"duration", time.Since(startedAt),
@@ -244,11 +259,11 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 	return nil
 }
 
-func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns []domain.Pattern, resolvedOutputPath string, startedAt time.Time) (*agent.GenerateSkillsResult, error) {
+func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns []domain.Pattern, insights map[string]patternGenerationInsight, resolvedOutputPath string, startedAt time.Time) (*agent.GenerateSkillsResult, error) {
 	userContext := runtimecontext.UserContext(ctx)
 
 	// 序列化模式摘要为 JSON，不把代码示例直接发送给 Agent
-	patternsJSONBytes, err := json.MarshalIndent(summarizePatternsForAgent(patterns), "", "  ")
+	patternsJSONBytes, err := json.MarshalIndent(summarizePatternsForAgent(patterns, insights), "", "  ")
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.marshal_patterns",
@@ -651,9 +666,14 @@ func (s *GeneratorService) workspaceChildConfig(projectRoot string, project conf
 	return repo, true, configPath, nil
 }
 
-func summarizePatternsForAgent(patterns []domain.Pattern) []map[string]interface{} {
+func summarizePatternsForAgent(patterns []domain.Pattern, insights map[string]patternGenerationInsight) []map[string]interface{} {
 	summary := make([]map[string]interface{}, 0, len(patterns))
 	for _, p := range patterns {
+		insight := insights[p.ID]
+		lastHitAt := ""
+		if !insight.LastHitAt.IsZero() {
+			lastHitAt = insight.LastHitAt.Format(time.RFC3339)
+		}
 		summary = append(summary, map[string]interface{}{
 			"id":              p.ID,
 			"name":            p.Name,
@@ -664,9 +684,83 @@ func summarizePatternsForAgent(patterns []domain.Pattern) []map[string]interface
 			"frequency":       p.Frequency,
 			"source":          string(p.Source),
 			"business_method": p.BusinessMethod,
+			"metrics":         p.Metrics,
+			"hit_count":       insight.HitCount,
+			"last_hit_at":     lastHitAt,
+			"generation_rank": insight.GenerationRank,
 		})
 	}
 	return summary
+}
+
+func (s *GeneratorService) patternGenerationInsights(ctx context.Context, patterns []domain.Pattern) (map[string]patternGenerationInsight, error) {
+	insights := make(map[string]patternGenerationInsight, len(patterns))
+	for _, pattern := range patterns {
+		insights[pattern.ID] = patternGenerationInsight{}
+	}
+	if s.patternStatsRepo == nil {
+		return insights, nil
+	}
+
+	stats, err := s.patternStatsRepo.GetPatternHitStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, stat := range stats {
+		if _, ok := insights[stat.Pattern.ID]; !ok {
+			continue
+		}
+		insights[stat.Pattern.ID] = patternGenerationInsight{
+			HitCount:  stat.HitCount,
+			LastHitAt: stat.LastHitAt,
+		}
+	}
+	return insights, nil
+}
+
+func rankPatternsForGeneration(patterns []domain.Pattern, insights map[string]patternGenerationInsight) []domain.Pattern {
+	ranked := append([]domain.Pattern(nil), patterns...)
+	maxHits := 0
+	for _, insight := range insights {
+		if insight.HitCount > maxHits {
+			maxHits = insight.HitCount
+		}
+	}
+	for _, pattern := range ranked {
+		insight := insights[pattern.ID]
+		insight.GenerationRank = patternGenerationRank(pattern, insight.HitCount, maxHits)
+		insights[pattern.ID] = insight
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		left := insights[ranked[i].ID].GenerationRank
+		right := insights[ranked[j].ID].GenerationRank
+		if left != right {
+			return left > right
+		}
+		if ranked[i].Metrics.EffectiveScore != ranked[j].Metrics.EffectiveScore {
+			return ranked[i].Metrics.EffectiveScore > ranked[j].Metrics.EffectiveScore
+		}
+		if insights[ranked[i].ID].HitCount != insights[ranked[j].ID].HitCount {
+			return insights[ranked[i].ID].HitCount > insights[ranked[j].ID].HitCount
+		}
+		if ranked[i].Confidence != ranked[j].Confidence {
+			return ranked[i].Confidence > ranked[j].Confidence
+		}
+		return ranked[i].ID < ranked[j].ID
+	})
+	return ranked
+}
+
+func patternGenerationRank(pattern domain.Pattern, hitCount, maxHits int) float64 {
+	normalizedHits := 0.0
+	if maxHits > 0 {
+		normalizedHits = float64(hitCount) / float64(maxHits)
+	}
+	return roundFloat(pattern.Metrics.EffectiveScore*0.6 + normalizedHits*0.3 + pattern.Confidence*0.1)
+}
+
+func roundFloat(v float64) float64 {
+	return float64(int(v*100+0.5)) / 100
 }
 
 func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error {

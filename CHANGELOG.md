@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.9]
+
+### 功能
+
+- 新增 pattern 质量指标，保存和合并模式时自动计算项目特有性、证据数量、泛化惩罚和综合分
+- `check` 会记录带 `PatternID` 的问题命中，沉淀每条模式是否在后续检查中真正被使用
+- 新增 `skills-seed patterns stats`，展示模式分类、特有性、置信度、综合分、命中次数和最近命中时间
+- 新增 `skills-seed review import --from-file` 和 `skills-seed review stats`，可导入本地评审评论并按文件与行号窗口统计已有模式命中的防漏效果
+
+### 体验
+
+- 已知 patterns 快照增加质量指标，后续学习可参考已有规则质量，降低泛化规则继续放大的概率
+- 模式统计按命中次数和综合分排序，便于识别高价值规则和长期未命中的规则
+- `generate-skills` 会按 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1` 对 patterns 排序，并把质量指标与命中统计传给 Agent，优先沉淀项目特有且被实际命中的规则
+- 评审评论统计默认使用 `±3` 行匹配窗口，并展示总评论数、已预防评论数、遗漏评论数和命中模式计数
+
+### 文档
+
+- 更新 README 和命令参考，说明 pattern 质量指标、`patterns stats`、review 评论导入统计，以及 `generate-skills` 的质量排序策略
+
 ## [v0.0.8]
 
 ### 文档

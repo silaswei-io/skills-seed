@@ -23,9 +23,10 @@ Skills Seed focuses on helping an AI assistant understand how this project shoul
 1. Learn project conventions from current code, including patterns, business methods, utilities, and best practices.
 2. Learn incrementally from Git history while skipping commits that were already analyzed.
 3. Generate project profiles and project specs so the assistant understands module roles, dependencies, business boundaries, and change constraints.
-4. Generate Claude Code / Codex skills with `SKILL.md`, project overviews, specs, patterns, and examples.
+4. Generate Claude Code / Codex skills with `SKILL.md`, project overviews, specs, patterns, and examples; generation prioritizes rules with higher effective score, more check hits, and higher confidence.
 5. Support workspace roots where child projects learn and generate independently while the root skill handles routing and cross-project impact.
-6. Support `check` and pre-commit hooks to apply learned rules to staged files or all Git-tracked files.
+6. Support `check` and pre-commit hooks to apply learned rules to staged files or all Git-tracked files, recording hits for issues with `PatternID`.
+7. Support local review comment import and statistics, using existing pattern hits to measure which review comments were already covered by rules.
 
 ## Workflow
 
@@ -33,7 +34,7 @@ Skills Seed focuses on helping an AI assistant understand how this project shoul
 init -> learn current / learn history -> generate-skills -> check
 ```
 
-`init` creates `.skills-seed` and the default config. `learn` extracts project rules from code or commit history. `generate-skills` renders profiles and patterns into skills for the current Agent. `check` uses those rules to review future changes.
+`init` creates `.skills-seed` and the default config. `learn` extracts project rules from code or commit history. `generate-skills` renders profiles and patterns into skills for the current Agent, ranked by quality metrics and hit statistics. `check` uses those rules to review future changes and records hit data.
 
 ## Agent Support
 
@@ -100,6 +101,9 @@ Common commands:
 skills-seed check
 skills-seed profile show
 skills-seed patterns merge --dry-run
+skills-seed patterns stats
+skills-seed review import --from-file review-comments.json
+skills-seed review stats
 skills-seed hook install
 ```
 

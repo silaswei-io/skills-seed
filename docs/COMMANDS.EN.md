@@ -198,7 +198,7 @@ skills-seed learn history --limit 40 --batch-size 5
 
 #### Command Overview
 
-Generate skills for the current provider from the project profile and learned patterns. Generation calls the CLI configured by `agent.provider` for summary merging and polishing.
+Generate skills for the current provider from the project profile and learned patterns. Generation calls the CLI configured by `agent.provider` for summary merging and polishing, and prioritizes patterns with high effective score, more check hits, and higher confidence.
 
 #### Command Forms
 
@@ -242,18 +242,20 @@ references/
 1. Workspace mode generates each child skill using that child's own config first, then generates the workspace root skill.
 2. A manual `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 3. `--merge` is kept for compatibility. Prefer running `skills-seed patterns merge` explicitly.
+4. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
 
 ### `skills-seed patterns`
 
 #### Command Overview
 
-Manage learned patterns. Currently this is mainly used to merge semantically similar patterns and reduce duplicate rules.
+Manage learned patterns. This is used to merge semantically similar patterns and inspect pattern quality and check-hit statistics.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed patterns merge` | Ask the current agent to merge similar patterns | `skills-seed patterns merge --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
+| `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
 
 #### `patterns` Flags
 
@@ -269,18 +271,88 @@ Manage learned patterns. Currently this is mainly used to merge semantically sim
 | `--dry-run` | `false` | Preview merge results without writing to the database |
 | `--help`, `-h` | `false` | Show `patterns merge` help |
 
+#### `patterns stats` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--help`, `-h` | `false` | Show `patterns stats` help |
+
 #### Common Examples
 
 ```bash
 skills-seed patterns merge
 skills-seed patterns merge --category api
 skills-seed patterns merge --category business --dry-run
+skills-seed patterns stats
 ```
 
 #### Notes
 
 1. Merge runs call the CLI configured by the current `agent.provider`.
 2. Use `--dry-run` first when you want to inspect the merge result.
+3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
+
+### `skills-seed review`
+
+#### Command Overview
+
+Import local code review comments and compare them with recorded pattern hits by file and line window to measure which comments may already be covered by existing patterns.
+
+#### Command Forms
+
+| Command Form | Description | Common Example | Notes |
+|---|---|---|---|
+| `skills-seed review import --from-file <file>` | Import a JSON array of review comments | `skills-seed review import --from-file review-comments.json` | Saved by comment `id`; importing the same comment again does not duplicate counts |
+| `skills-seed review stats` | Show review comment prevention statistics | `skills-seed review stats --line-window 3` | Does not call the AI agent or modify the database |
+
+#### `review` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--help`, `-h` | `false` | Show `review` help |
+
+#### `review import` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--from-file` | required | JSON file containing a review comment array |
+| `--help`, `-h` | `false` | Show `review import` help |
+
+#### `review stats` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--line-window` | `3` | Allowed line distance when matching a review comment to an existing pattern hit |
+| `--help`, `-h` | `false` | Show `review stats` help |
+
+#### Import JSON Fields
+
+| Field | Description |
+|---|---|
+| `id` | Unique comment ID |
+| `provider` | Source, such as `local`, `github`, or `gitlab` |
+| `review_id` | Review ID |
+| `commit` | Related commit |
+| `file` | File path |
+| `line` | Comment line number |
+| `author` | Comment author |
+| `body` | Comment body |
+| `resolved` | Whether the comment is resolved |
+| `created_at` | RFC3339 timestamp, such as `2026-05-28T09:02:00Z` |
+
+#### Common Examples
+
+```bash
+skills-seed review import --from-file review-comments.json
+skills-seed review stats
+skills-seed review stats --line-window 5
+```
+
+#### Notes
+
+1. The MVP supports local JSON import only; it does not connect to GitHub or GitLab directly.
+2. `review stats` depends on existing `check` hit records. Without pattern hits, imported comments are counted as missed.
+3. Matching requires the same file path and a line distance within `--line-window`.
 
 ### `skills-seed profile`
 

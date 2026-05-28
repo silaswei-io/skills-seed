@@ -15,6 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/command/learn"
 	patternscmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
+	reviewcmd "github.com/silaswei-io/skills-seed/internal/command/review"
 	"github.com/silaswei-io/skills-seed/internal/command/view"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -135,6 +136,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(check.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
 	rootCmd.AddCommand(patternscmd.Cmd(cont))
+	rootCmd.AddCommand(reviewcmd.Cmd(cont))
 	rootCmd.AddCommand(profilecmd.Cmd(cont))
 	rootCmd.AddCommand(view.Cmd(cont))
 	rootCmd.AddCommand(hook.Cmd())

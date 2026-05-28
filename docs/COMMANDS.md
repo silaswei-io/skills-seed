@@ -198,7 +198,7 @@ skills-seed learn history --limit 40 --batch-size 5
 
 #### 命令概述
 
-从项目画像和 patterns 生成当前 provider 的 skills。生成阶段会调用 `agent.provider` 对应的 CLI 做摘要合并和润色。
+从项目画像和 patterns 生成当前 provider 的 skills。生成阶段会调用 `agent.provider` 对应的 CLI 做摘要合并和润色，并优先使用综合分高、check 命中多、置信度高的 patterns。
 
 #### 命令形式
 
@@ -242,18 +242,20 @@ references/
 1. workspace 模式会先用每个子项目自己的配置生成子项目 skill，再生成根仓 workspace skill。
 2. 已有手写 `SKILL.md` 没有 `generated-by: skills-seed` 标记时默认不会被覆盖。
 3. `--merge` 是兼容旧用法，推荐先单独执行 `skills-seed patterns merge`。
+4. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
 
 ### `skills-seed patterns`
 
 #### 命令概述
 
-管理已学习的 patterns。目前主要用于合并语义相近的 patterns，减少重复规则。
+管理已学习的 patterns。目前用于合并语义相近的 patterns、查看模式质量和 check 命中统计。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
 | `skills-seed patterns merge` | 调用当前 Agent 合并相似 patterns | `skills-seed patterns merge --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
+| `skills-seed patterns stats` | 查看模式质量和 check 命中统计 | `skills-seed patterns stats` | 不调用 AI Agent，不修改数据库 |
 
 #### `patterns` 参数
 
@@ -269,18 +271,88 @@ references/
 | `--dry-run` | `false` | 只预览合并结果，不写入数据库 |
 | `--help`, `-h` | `false` | 查看 `patterns merge` 帮助 |
 
+#### `patterns stats` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--help`, `-h` | `false` | 查看 `patterns stats` 帮助 |
+
 #### 常用示例
 
 ```bash
 skills-seed patterns merge
 skills-seed patterns merge --category api
 skills-seed patterns merge --category business --dry-run
+skills-seed patterns stats
 ```
 
 #### 注意事项
 
 1. 合并会调用当前 `agent.provider` 对应的 CLI。
 2. 不确定合并结果时先使用 `--dry-run`。
+3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
+
+### `skills-seed review`
+
+#### 命令概述
+
+导入本地代码评审评论，并与已记录的 pattern hits 做文件和行号窗口匹配，统计哪些评论可能已被现有模式提前发现。
+
+#### 命令形式
+
+| 命令形式 | 说明 | 常用示例 | 注意事项 |
+|---|---|---|---|
+| `skills-seed review import --from-file <file>` | 从 JSON 文件导入评审评论数组 | `skills-seed review import --from-file review-comments.json` | 按评论 `id` 覆盖保存，重复导入同一评论不会重复计数 |
+| `skills-seed review stats` | 查看评审评论防漏统计 | `skills-seed review stats --line-window 3` | 不调用 AI Agent，不修改数据库 |
+
+#### `review` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--help`, `-h` | `false` | 查看 `review` 帮助 |
+
+#### `review import` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--from-file` | 必填 | 包含评审评论数组的 JSON 文件 |
+| `--help`, `-h` | `false` | 查看 `review import` 帮助 |
+
+#### `review stats` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--line-window` | `3` | 匹配已有 pattern hit 时允许的行号距离 |
+| `--help`, `-h` | `false` | 查看 `review stats` 帮助 |
+
+#### 导入 JSON 字段
+
+| 字段 | 说明 |
+|---|---|
+| `id` | 评论唯一 ID |
+| `provider` | 来源，如 `local`、`github` 或 `gitlab` |
+| `review_id` | 所属评审 ID |
+| `commit` | 对应提交 |
+| `file` | 文件路径 |
+| `line` | 评论行号 |
+| `author` | 评论作者 |
+| `body` | 评论正文 |
+| `resolved` | 评论是否已解决 |
+| `created_at` | RFC3339 时间，如 `2026-05-28T09:02:00Z` |
+
+#### 常用示例
+
+```bash
+skills-seed review import --from-file review-comments.json
+skills-seed review stats
+skills-seed review stats --line-window 5
+```
+
+#### 注意事项
+
+1. MVP 只支持本地 JSON 导入，不直接连接 GitHub 或 GitLab。
+2. `review stats` 依赖已有 `check` 命中记录；没有 pattern hits 时导入评论都会计为遗漏。
+3. 匹配规则是相同文件路径且行号距离不超过 `--line-window`。
 
 ### `skills-seed profile`
 

@@ -208,14 +208,16 @@ func (m *MockGitRepository) Checkout(ctx context.Context, name string) error {
 
 // MockPatternRepository 模拟模式仓储
 type MockPatternRepository struct {
-	GetFn               func(ctx context.Context, id string) (*domain.Pattern, error)
-	GetAllFn            func(ctx context.Context) ([]domain.Pattern, error)
-	GetByCategoryFn     func(ctx context.Context, category domain.Category) ([]domain.Pattern, error)
-	GetHighConfidenceFn func(ctx context.Context, threshold float64) ([]domain.Pattern, error)
-	SaveFn              func(ctx context.Context, p *domain.Pattern) error
-	FindSimilarFn       func(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error)
-	DeleteFn            func(ctx context.Context, id string) error
-	CountFn             func(ctx context.Context) (int, error)
+	GetFn                func(ctx context.Context, id string) (*domain.Pattern, error)
+	GetAllFn             func(ctx context.Context) ([]domain.Pattern, error)
+	GetByCategoryFn      func(ctx context.Context, category domain.Category) ([]domain.Pattern, error)
+	GetHighConfidenceFn  func(ctx context.Context, threshold float64) ([]domain.Pattern, error)
+	SaveFn               func(ctx context.Context, p *domain.Pattern) error
+	FindSimilarFn        func(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error)
+	DeleteFn             func(ctx context.Context, id string) error
+	CountFn              func(ctx context.Context) (int, error)
+	RecordPatternHitsFn  func(ctx context.Context, hits []domain.PatternHit) error
+	GetPatternHitStatsFn func(ctx context.Context) ([]domain.PatternHitStats, error)
 }
 
 // Get 模拟按 ID 获取模式
@@ -280,6 +282,54 @@ func (m *MockPatternRepository) Count(ctx context.Context) (int, error) {
 		return m.CountFn(ctx)
 	}
 	return 0, nil
+}
+
+// RecordPatternHits 模拟保存模式命中记录。
+func (m *MockPatternRepository) RecordPatternHits(ctx context.Context, hits []domain.PatternHit) error {
+	if m.RecordPatternHitsFn != nil {
+		return m.RecordPatternHitsFn(ctx, hits)
+	}
+	return nil
+}
+
+// GetPatternHitStats 模拟获取模式命中统计。
+func (m *MockPatternRepository) GetPatternHitStats(ctx context.Context) ([]domain.PatternHitStats, error) {
+	if m.GetPatternHitStatsFn != nil {
+		return m.GetPatternHitStatsFn(ctx)
+	}
+	return []domain.PatternHitStats{}, nil
+}
+
+// MockPatternStatsRepository 模拟模式统计仓储。
+type MockPatternStatsRepository struct {
+	GetPatternHitStatsFn func(ctx context.Context) ([]domain.PatternHitStats, error)
+}
+
+func (m *MockPatternStatsRepository) GetPatternHitStats(ctx context.Context) ([]domain.PatternHitStats, error) {
+	if m.GetPatternHitStatsFn != nil {
+		return m.GetPatternHitStatsFn(ctx)
+	}
+	return []domain.PatternHitStats{}, nil
+}
+
+// MockReviewRepository 模拟评审评论仓储。
+type MockReviewRepository struct {
+	ImportReviewCommentsFn func(ctx context.Context, comments []domain.ReviewComment) error
+	GetReviewStatsFn       func(ctx context.Context, lineWindow int) (domain.ReviewStats, error)
+}
+
+func (m *MockReviewRepository) ImportReviewComments(ctx context.Context, comments []domain.ReviewComment) error {
+	if m.ImportReviewCommentsFn != nil {
+		return m.ImportReviewCommentsFn(ctx, comments)
+	}
+	return nil
+}
+
+func (m *MockReviewRepository) GetReviewStats(ctx context.Context, lineWindow int) (domain.ReviewStats, error) {
+	if m.GetReviewStatsFn != nil {
+		return m.GetReviewStatsFn(ctx, lineWindow)
+	}
+	return domain.ReviewStats{}, nil
 }
 
 // MockProjectProfileRepository 模拟项目画像仓储

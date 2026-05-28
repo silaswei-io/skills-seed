@@ -2,6 +2,8 @@ package checker
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -13,15 +15,21 @@ import (
 type CheckerService struct {
 	agent       agent.Agent
 	gitRepo     domain.GitRepository
-	patternRepo domain.PatternRepository
-	configRepo  config.Reader
+	patternRepo interface {
+		domain.PatternRepository
+		domain.PatternHitRecorder
+	}
+	configRepo config.Reader
 }
 
 // NewCheckerService 创建代码检查服务
 func NewCheckerService(
 	ag agent.Agent,
 	gitRepo domain.GitRepository,
-	patternRepo domain.PatternRepository,
+	patternRepo interface {
+		domain.PatternRepository
+		domain.PatternHitRecorder
+	},
 	configRepo config.Reader,
 ) *CheckerService {
 	return &CheckerService{
@@ -83,7 +91,35 @@ func (s *CheckerService) CheckFiles(ctx context.Context, files []domain.FileInfo
 		return nil, domain.NewDomainError(domain.ErrAIService, "AI 分析失败", err).WithContext("files_count", len(files))
 	}
 
+	if err := s.recordPatternHits(ctx, result.Issues); err != nil {
+		return nil, domain.NewDomainError(domain.ErrDatabase, "保存模式命中记录失败", err)
+	}
+
 	return result.Issues, nil
+}
+
+func (s *CheckerService) recordPatternHits(ctx context.Context, issues []domain.Issue) error {
+	hits := make([]domain.PatternHit, 0, len(issues))
+	now := time.Now()
+	checkRunID := fmt.Sprintf("check-%d", now.UnixNano())
+	for _, issue := range issues {
+		if issue.PatternID == "" {
+			continue
+		}
+		hits = append(hits, domain.PatternHit{
+			PatternID:  issue.PatternID,
+			File:       issue.File,
+			Line:       issue.Line,
+			Severity:   issue.Severity,
+			Confidence: issue.Confidence,
+			CheckRunID: checkRunID,
+			CreatedAt:  now,
+		})
+	}
+	if len(hits) == 0 {
+		return nil
+	}
+	return s.patternRepo.RecordPatternHits(ctx, hits)
 }
 
 func (s *CheckerService) filterExcluded(files []domain.FileInfo) []domain.FileInfo {

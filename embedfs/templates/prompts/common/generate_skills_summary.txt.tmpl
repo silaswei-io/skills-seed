@@ -19,7 +19,9 @@ User-provided context for this generate run is available at `{{.USER_CONTEXT_PAT
 
 Pattern data is available at `{{.PATTERNS_PATH}}`.
 
-Each pattern includes: ID, name, category, confidence, frequency, description, rule, business method info.
+Each pattern includes: ID, name, category, confidence, frequency, description, rule, business method info, quality metrics, check hit count, last hit time, and generation rank.
+
+The pattern array is already sorted by generation rank. Treat earlier items as stronger signals. `generation_rank` combines effective score, real check hit count, and confidence. Prefer patterns with high `metrics.EffectiveScore`, high `hit_count`, and low `metrics.GenericPenalty`; do not let generic high-confidence patterns dominate more project-specific rules.
 
 ## Step 2: Check Existing Skills (Optional)
 
@@ -41,6 +43,7 @@ Actions:
 - Merge similar patterns, remove duplicates
 - Extract project-specific business methods (type: `domain` for project-specific, `common` for generic)
 - Create actionable summaries and identify key patterns
+- Prefer patterns with higher generation rank when selecting key patterns, category summaries, business rules, and best practices
 - **IMPORTANT**: Provide detailed, specific content - NOT generic placeholders
 - Each category summary must be 2-3 substantive sentences with concrete details
 - Each usage scenario must be specific and actionable

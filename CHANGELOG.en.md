@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.9]
+
+### Features
+
+- Add pattern quality metrics that are recalculated when patterns are saved or merged, including specificity, evidence count, generic penalty, and effective score
+- Record `check` issues with `PatternID` as pattern hits, preserving whether each learned rule is actually used by later checks
+- Add `skills-seed patterns stats` to show pattern category, specificity, confidence, effective score, hit count, and last hit time
+- Add `skills-seed review import --from-file` and `skills-seed review stats` to import local review comments and measure prevention against existing pattern hits by file and line window
+
+### Experience
+
+- Include quality metrics in known-pattern snapshots so later learning can account for existing rule quality and avoid amplifying generic rules
+- Sort pattern stats by hit count and effective score, making high-value rules and never-hit rules easier to identify
+- `generate-skills` now ranks patterns by `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`, passing quality metrics and hit stats to the Agent so project-specific rules with actual usage are prioritized
+- Review stats use a default `±3` line matching window and show total comments, prevented comments, missed comments, and matched pattern counts
+
+### Documentation
+
+- Update README and command references for pattern quality metrics, `patterns stats`, review comment import/statistics, and `generate-skills` quality ranking
+
 ## [v0.0.8]
 
 ### Documentation

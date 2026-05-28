@@ -49,6 +49,8 @@ func TestPatternRepository_SaveAndGet(t *testing.T) {
 	ctx := context.Background()
 
 	original := newTestPattern("p-001", "camelCase naming", domain.CategoryNaming, 0.9)
+	original.Description = "Use ProjectConfig.Name from internal/infra/config/repository.go when building config defaults."
+	original.Rule = "Config defaults must preserve project provider mappings."
 	err := repo.Save(ctx, original)
 	require.NoError(t, err)
 
@@ -59,12 +61,127 @@ func TestPatternRepository_SaveAndGet(t *testing.T) {
 	assert.Equal(t, "p-001", got.ID)
 	assert.Equal(t, "camelCase naming", got.Name)
 	assert.Equal(t, domain.CategoryNaming, got.Category)
-	assert.Equal(t, "Test pattern: camelCase naming", got.Description)
+	assert.Equal(t, "Use ProjectConfig.Name from internal/infra/config/repository.go when building config defaults.", got.Description)
 	assert.Equal(t, "good example", got.GoodExample)
 	assert.Equal(t, "bad example", got.BadExample)
-	assert.Equal(t, "Follow the camelCase naming convention", got.Rule)
+	assert.Equal(t, "Config defaults must preserve project provider mappings.", got.Rule)
 	assert.Equal(t, 0.9, got.Confidence)
+	assert.Greater(t, got.Metrics.SpecificityScore, 0.0)
+	assert.Greater(t, got.Metrics.EffectiveScore, 0.0)
 	assert.WithinDuration(t, original.CreatedAt, got.CreatedAt, time.Second)
+}
+
+func TestPatternRepository_RecordPatternHitsAndStats(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	p1 := newTestPattern("p-001", "specific check", domain.CategoryError, 0.9)
+	p1.Description = "Wrap errors from internal/service/checker/service.go with domain.NewDomainError."
+	p2 := newTestPattern("p-002", "unused check", domain.CategoryTesting, 0.7)
+	require.NoError(t, repo.Save(ctx, p1))
+	require.NoError(t, repo.Save(ctx, p2))
+
+	now := time.Now().UTC()
+	require.NoError(t, repo.RecordPatternHits(ctx, []domain.PatternHit{
+		{
+			PatternID:  "p-001",
+			File:       "internal/service/checker/service.go",
+			Line:       81,
+			Severity:   domain.SeverityWarning,
+			Confidence: 0.82,
+			CheckRunID: "run-1",
+			CreatedAt:  now,
+		},
+		{
+			PatternID:  "p-001",
+			File:       "internal/service/checker/service.go",
+			Line:       83,
+			Severity:   domain.SeverityError,
+			Confidence: 0.9,
+			CheckRunID: "run-2",
+			CreatedAt:  now.Add(time.Minute),
+		},
+		{
+			PatternID: "",
+			File:      "ignored.go",
+		},
+	}))
+
+	stats, err := repo.GetPatternHitStats(ctx)
+	require.NoError(t, err)
+	require.Len(t, stats, 2)
+
+	assert.Equal(t, "p-001", stats[0].Pattern.ID)
+	assert.Equal(t, 2, stats[0].HitCount)
+	assert.WithinDuration(t, now.Add(time.Minute), stats[0].LastHitAt, time.Second)
+	assert.Equal(t, "p-002", stats[1].Pattern.ID)
+	assert.Equal(t, 0, stats[1].HitCount)
+	assert.True(t, stats[1].LastHitAt.IsZero())
+}
+
+func TestPatternRepository_ImportReviewCommentsAndStats(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	now := time.Date(2026, 5, 28, 9, 0, 0, 0, time.UTC)
+	require.NoError(t, repo.RecordPatternHits(ctx, []domain.PatternHit{
+		{
+			PatternID:  "p-error-wrap",
+			File:       "internal/service/checker/service.go",
+			Line:       82,
+			Severity:   domain.SeverityWarning,
+			Confidence: 0.86,
+			CheckRunID: "run-1",
+			CreatedAt:  now,
+		},
+		{
+			PatternID:  "p-naming",
+			File:       "internal/domain/models.go",
+			Line:       44,
+			Severity:   domain.SeverityInfo,
+			Confidence: 0.71,
+			CheckRunID: "run-2",
+			CreatedAt:  now.Add(time.Minute),
+		},
+	}))
+
+	comments := []domain.ReviewComment{
+		{
+			ID:        "c-1",
+			Provider:  "local",
+			ReviewID:  "review-1",
+			Commit:    "abc123",
+			File:      "internal/service/checker/service.go",
+			Line:      84,
+			Author:    "reviewer",
+			Body:      "wrap checker errors",
+			Resolved:  true,
+			CreatedAt: now.Add(2 * time.Minute),
+		},
+		{
+			ID:        "c-2",
+			Provider:  "local",
+			ReviewID:  "review-1",
+			Commit:    "abc123",
+			File:      "internal/service/generator/service.go",
+			Line:      20,
+			Author:    "reviewer",
+			Body:      "new uncovered feedback",
+			Resolved:  false,
+			CreatedAt: now.Add(3 * time.Minute),
+		},
+	}
+
+	require.NoError(t, repo.ImportReviewComments(ctx, comments))
+
+	stats, err := repo.GetReviewStats(ctx, 3)
+	require.NoError(t, err)
+	assert.Equal(t, 2, stats.TotalComments)
+	assert.Equal(t, 1, stats.PreventedComments)
+	assert.Equal(t, 1, stats.MissedComments)
+	require.Len(t, stats.MatchedPatterns, 1)
+	assert.Equal(t, "p-error-wrap", stats.MatchedPatterns[0].PatternID)
+	assert.Equal(t, 1, stats.MatchedPatterns[0].CommentCount)
 }
 
 func TestPatternRepository_Get_NotFound(t *testing.T) {

@@ -274,6 +274,33 @@ func TestPattern_SetBusinessMethod(t *testing.T) {
 	assert.True(t, p.UpdatedAt.After(beforeUpdate), "UpdatedAt should be updated")
 }
 
+func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *testing.T) {
+	specific := NewPattern("generator-write-output", "生成器写入技能输出", CategoryBusiness)
+	specific.Confidence = 0.8
+	specific.Description = "GeneratorService.writeSkillsOutput 在 internal/service/generator/service.go:672 写入 SKILL.md、agents metadata 和 references。"
+	specific.Rule = "修改生成流程时必须保持 generated-by 标记，并继续生成 references/project-spec.md。"
+	specific.GoodExample = "func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error"
+	specific.BusinessMethod = &BusinessMethod{
+		Name:     "GeneratorService.writeSkillsOutput",
+		Location: "internal/service/generator/service.go:672",
+		Function: "func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error",
+		Type:     "domain",
+	}
+
+	generic := NewPattern("layered-architecture", "使用分层架构", CategoryStructure)
+	generic.Confidence = 0.95
+	generic.Description = "项目使用分层架构，注意错误处理和最佳实践。"
+	generic.Rule = "开发时遵守分层架构。"
+
+	specific.RefreshMetrics()
+	generic.RefreshMetrics()
+
+	assert.Greater(t, specific.Metrics.SpecificityScore, generic.Metrics.SpecificityScore)
+	assert.Greater(t, specific.Metrics.EvidenceCount, generic.Metrics.EvidenceCount)
+	assert.Greater(t, generic.Metrics.GenericPenalty, specific.Metrics.GenericPenalty)
+	assert.Greater(t, specific.Metrics.EffectiveScore, generic.Metrics.EffectiveScore)
+}
+
 // ==================== Issue 测试 ====================
 
 func TestNewIssue(t *testing.T) {

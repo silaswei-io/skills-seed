@@ -8,6 +8,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +60,7 @@ func TestInitializeProjectSummaryUsesRelativeSeedPathAndDocumentationLink(t *tes
 	})
 
 	require.Contains(t, output, "初始化成功: .skills-seed")
-	require.Contains(t, output, "文档参考: https://github.com/silaswei-io/skills-seed/blob/v0.0.8/README.md")
+	require.Contains(t, output, "文档参考: https://github.com/silaswei-io/skills-seed/blob/"+metadata.ProgramVersion+"/README.md")
 	require.NotContains(t, output, projectRoot)
 	require.NotContains(t, output, "可选后续步骤")
 	require.NotContains(t, output, "skills-seed learn current")

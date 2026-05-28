@@ -1688,7 +1688,7 @@ other = "增量文件变化:\n  • 新增或修改: {{.Changed}}\n  • 删除:
 other = "未检测到可学习文件变化，已跳过 patterns 学习和项目画像刷新"
 
 [LearnCurrentGeneratedSkillsExcluded]
-other = "已排除生成的 skills 目录: {{.Paths}}"
+other = "已排除生成的 skills 目录:\n {{.Paths}}"
 
 [LearnCurrentFocusOutsideRoot]
 other = "focus 路径 {{.Path}} 位于项目根目录之外"

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -19,10 +20,12 @@ type PatternRepository struct {
 }
 
 var (
-	bucketPatterns      = []byte("patterns")
-	bucketMetadata      = []byte("metadata")
-	bucketAnalyzedFiles = []byte("analyzed_files")
-	keyAnalyzedCommits  = []byte("analyzed_commits")
+	bucketPatterns       = []byte("patterns")
+	bucketMetadata       = []byte("metadata")
+	bucketAnalyzedFiles  = []byte("analyzed_files")
+	bucketPatternHits    = []byte("pattern_hits")
+	bucketReviewComments = []byte("review_comments")
+	keyAnalyzedCommits   = []byte("analyzed_commits")
 )
 
 // NewPatternRepository 创建 Pattern 仓储
@@ -52,6 +55,12 @@ func NewPatternRepository(dbPath string) (*PatternRepository, error) {
 		// 创建 analyzed_files bucket（用于保存 learn current 文件指纹）
 		if _, err := tx.CreateBucketIfNotExists(bucketAnalyzedFiles); err != nil {
 			return fmt.Errorf("failed to create bucket %s: %w", bucketAnalyzedFiles, err)
+		}
+		if _, err := tx.CreateBucketIfNotExists(bucketPatternHits); err != nil {
+			return fmt.Errorf("failed to create bucket %s: %w", bucketPatternHits, err)
+		}
+		if _, err := tx.CreateBucketIfNotExists(bucketReviewComments); err != nil {
+			return fmt.Errorf("failed to create bucket %s: %w", bucketReviewComments, err)
 		}
 
 		return nil
@@ -187,6 +196,7 @@ func (r *PatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
 	if !p.IsValid() {
 		return fmt.Errorf("invalid pattern")
 	}
+	p.RefreshMetrics()
 
 	return r.db.Update(func(tx *bolt.Tx) error {
 		mainBucket := tx.Bucket(bucketPatterns)
@@ -205,6 +215,216 @@ func (r *PatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
 		}
 		return categoryBucket.Put([]byte(p.ID), data)
 	})
+}
+
+// RecordPatternHits 保存 check 命中记录。
+func (r *PatternRepository) RecordPatternHits(ctx context.Context, hits []domain.PatternHit) error {
+	return r.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketPatternHits)
+		for _, hit := range hits {
+			if hit.PatternID == "" {
+				continue
+			}
+			if hit.CreatedAt.IsZero() {
+				hit.CreatedAt = time.Now()
+			}
+			if hit.CheckRunID == "" {
+				hit.CheckRunID = fmt.Sprintf("check-%d", hit.CreatedAt.UnixNano())
+			}
+			data, err := json.Marshal(hit)
+			if err != nil {
+				return err
+			}
+			key := []byte(fmt.Sprintf("%s/%020d/%s/%d", hit.PatternID, hit.CreatedAt.UnixNano(), filepath.ToSlash(hit.File), hit.Line))
+			if err := bucket.Put(key, data); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// GetPatternHitStats 返回所有模式的质量指标和 check 命中统计。
+func (r *PatternRepository) GetPatternHitStats(ctx context.Context) ([]domain.PatternHitStats, error) {
+	patterns, err := r.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	statsByPattern := make(map[string]*domain.PatternHitStats, len(patterns))
+	for _, p := range patterns {
+		pattern := p
+		statsByPattern[p.ID] = &domain.PatternHitStats{Pattern: pattern}
+	}
+
+	err = r.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketPatternHits)
+		if bucket == nil {
+			return nil
+		}
+		return bucket.ForEach(func(k, v []byte) error {
+			var hit domain.PatternHit
+			if err := json.Unmarshal(v, &hit); err != nil {
+				return err
+			}
+			stat, ok := statsByPattern[hit.PatternID]
+			if !ok {
+				return nil
+			}
+			stat.HitCount++
+			if stat.LastHitAt.IsZero() || hit.CreatedAt.After(stat.LastHitAt) {
+				stat.LastHitAt = hit.CreatedAt
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	stats := make([]domain.PatternHitStats, 0, len(statsByPattern))
+	for _, stat := range statsByPattern {
+		stats = append(stats, *stat)
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].HitCount != stats[j].HitCount {
+			return stats[i].HitCount > stats[j].HitCount
+		}
+		if stats[i].Pattern.Metrics.EffectiveScore != stats[j].Pattern.Metrics.EffectiveScore {
+			return stats[i].Pattern.Metrics.EffectiveScore > stats[j].Pattern.Metrics.EffectiveScore
+		}
+		return stats[i].Pattern.ID < stats[j].Pattern.ID
+	})
+	return stats, nil
+}
+
+// ImportReviewComments 保存导入的代码评审评论。
+func (r *PatternRepository) ImportReviewComments(ctx context.Context, comments []domain.ReviewComment) error {
+	return r.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketReviewComments)
+		for _, comment := range comments {
+			if comment.ID == "" {
+				continue
+			}
+			data, err := json.Marshal(comment)
+			if err != nil {
+				return err
+			}
+			if err := bucket.Put([]byte(comment.ID), data); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// GetReviewStats 返回评审评论与已有 check 命中的匹配统计。
+func (r *PatternRepository) GetReviewStats(ctx context.Context, lineWindow int) (domain.ReviewStats, error) {
+	if lineWindow < 0 {
+		lineWindow = 0
+	}
+
+	comments, err := r.listReviewComments(ctx)
+	if err != nil {
+		return domain.ReviewStats{}, err
+	}
+	hits, err := r.listPatternHits(ctx)
+	if err != nil {
+		return domain.ReviewStats{}, err
+	}
+
+	stats := domain.ReviewStats{TotalComments: len(comments)}
+	matchedByPattern := make(map[string]int)
+	for _, comment := range comments {
+		match := findReviewCommentHit(comment, hits, lineWindow)
+		if match == nil {
+			stats.MissedComments++
+			continue
+		}
+		stats.PreventedComments++
+		matchedByPattern[match.PatternID]++
+	}
+
+	stats.MatchedPatterns = make([]domain.ReviewMatchedPatternStats, 0, len(matchedByPattern))
+	for patternID, count := range matchedByPattern {
+		stats.MatchedPatterns = append(stats.MatchedPatterns, domain.ReviewMatchedPatternStats{
+			PatternID:    patternID,
+			CommentCount: count,
+		})
+	}
+	sort.Slice(stats.MatchedPatterns, func(i, j int) bool {
+		if stats.MatchedPatterns[i].CommentCount != stats.MatchedPatterns[j].CommentCount {
+			return stats.MatchedPatterns[i].CommentCount > stats.MatchedPatterns[j].CommentCount
+		}
+		return stats.MatchedPatterns[i].PatternID < stats.MatchedPatterns[j].PatternID
+	})
+
+	return stats, nil
+}
+
+func (r *PatternRepository) listReviewComments(ctx context.Context) ([]domain.ReviewComment, error) {
+	var comments []domain.ReviewComment
+	err := r.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketReviewComments)
+		if bucket == nil {
+			return nil
+		}
+		return bucket.ForEach(func(k, v []byte) error {
+			var comment domain.ReviewComment
+			if err := json.Unmarshal(v, &comment); err != nil {
+				return err
+			}
+			comments = append(comments, comment)
+			return nil
+		})
+	})
+	return comments, err
+}
+
+func (r *PatternRepository) listPatternHits(ctx context.Context) ([]domain.PatternHit, error) {
+	var hits []domain.PatternHit
+	err := r.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketPatternHits)
+		if bucket == nil {
+			return nil
+		}
+		return bucket.ForEach(func(k, v []byte) error {
+			var hit domain.PatternHit
+			if err := json.Unmarshal(v, &hit); err != nil {
+				return err
+			}
+			if hit.PatternID != "" {
+				hits = append(hits, hit)
+			}
+			return nil
+		})
+	})
+	return hits, err
+}
+
+func findReviewCommentHit(comment domain.ReviewComment, hits []domain.PatternHit, lineWindow int) *domain.PatternHit {
+	commentFile := normalizeReviewPath(comment.File)
+	for i := range hits {
+		hit := &hits[i]
+		if normalizeReviewPath(hit.File) != commentFile {
+			continue
+		}
+		if absInt(hit.Line-comment.Line) <= lineWindow {
+			return hit
+		}
+	}
+	return nil
+}
+
+func normalizeReviewPath(path string) string {
+	return filepath.ToSlash(path)
+}
+
+func absInt(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
 
 // FindSimilar 查找相似的模式

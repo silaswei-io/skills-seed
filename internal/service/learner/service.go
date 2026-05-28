@@ -77,6 +77,7 @@ func (s *LearnerService) marshalKnownPatterns(ctx context.Context) (string, int)
 			"rule":            p.Rule,
 			"confidence":      p.Confidence,
 			"frequency":       p.Frequency,
+			"metrics":         p.Metrics,
 			"source":          string(p.Source),
 			"business_method": p.BusinessMethod,
 		}

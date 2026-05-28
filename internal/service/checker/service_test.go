@@ -10,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestService(mockAgent *mocks.MockAgent, mockGit *mocks.MockGitRepository, mockPattern *mocks.MockPatternRepository) *CheckerService {
@@ -180,6 +181,65 @@ func TestCheckFiles_EmptySkipsAgent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, issues)
 	assert.False(t, called)
+}
+
+func TestCheckFiles_RecordsPatternHits(t *testing.T) {
+	recorded := []domain.PatternHit{}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCodeFn: func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
+			return &agent.AnalyzeResult{
+				Issues: []domain.Issue{
+					{
+						File:       "internal/service/checker/service.go",
+						Line:       81,
+						Severity:   domain.SeverityWarning,
+						Message:    "use domain error",
+						PatternID:  "domain-error-wrap",
+						Confidence: 0.86,
+					},
+					{
+						File:      "internal/service/checker/service.go",
+						Line:      82,
+						Severity:  domain.SeverityInfo,
+						Message:   "no pattern id",
+						PatternID: "",
+					},
+				},
+				Confidence: 0.8,
+			}, nil
+		},
+	}
+	mockGit := &mocks.MockGitRepository{
+		CommitsFn: func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error) {
+			return []domain.CommitInfo{}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{}, nil
+		},
+		RecordPatternHitsFn: func(ctx context.Context, hits []domain.PatternHit) error {
+			recorded = append(recorded, hits...)
+			return nil
+		},
+	}
+
+	svc := newTestService(mockAgent, mockGit, mockPattern)
+	issues, err := svc.CheckFiles(context.Background(), []domain.FileInfo{
+		{Path: "internal/service/checker/service.go", Content: "package checker"},
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, issues, 2)
+	require.Len(t, recorded, 1)
+	assert.Equal(t, "domain-error-wrap", recorded[0].PatternID)
+	assert.Equal(t, "internal/service/checker/service.go", recorded[0].File)
+	assert.Equal(t, 81, recorded[0].Line)
+	assert.Equal(t, domain.SeverityWarning, recorded[0].Severity)
+	assert.Equal(t, 0.86, recorded[0].Confidence)
+	assert.NotEmpty(t, recorded[0].CheckRunID)
+	assert.False(t, recorded[0].CreatedAt.IsZero())
 }
 
 func TestGetPatterns(t *testing.T) {

@@ -23,9 +23,10 @@ Skills Seed 关注的是“让 AI 助手理解这个项目应该怎么写”：
 1. 从当前代码学习项目规范，提取 patterns、业务方法、工具方法和最佳实践。
 2. 从 Git 历史增量学习，跳过已分析过的 commit，保留团队长期演进出的写法。
 3. 生成项目画像和项目规范，让 AI 助手理解模块职责、核心依赖、业务边界和改动约束。
-4. 生成 Claude Code / Codex skills，包括 `SKILL.md`、项目概览、规范、patterns 和示例。
+4. 生成 Claude Code / Codex skills，包括 `SKILL.md`、项目概览、规范、patterns 和示例；生成时会优先沉淀综合分高、check 命中多、置信度高的规则。
 5. 支持 workspace 根仓，子项目可以独立学习和生成，根 skill 负责路由、跨项目关系和影响范围。
-6. 支持 `check` 和 pre-commit hook，用已学习的规则检查暂存区或整个 Git 跟踪文件集合。
+6. 支持 `check` 和 pre-commit hook，用已学习的规则检查暂存区或整个 Git 跟踪文件集合，并记录带 `PatternID` 的命中。
+7. 支持本地评审评论导入和统计，用已有 pattern hits 衡量哪些 review comment 已被规则提前覆盖。
 
 ## 工作方式
 
@@ -33,7 +34,7 @@ Skills Seed 关注的是“让 AI 助手理解这个项目应该怎么写”：
 init -> learn current / learn history -> generate-skills -> check
 ```
 
-`init` 创建 `.skills-seed` 和默认配置。`learn` 从代码或历史提交中学习项目规则。`generate-skills` 把项目画像和 patterns 渲染为当前 Agent 可用的 skills。`check` 用这些规则检查后续改动。
+`init` 创建 `.skills-seed` 和默认配置。`learn` 从代码或历史提交中学习项目规则。`generate-skills` 把项目画像和 patterns 渲染为当前 Agent 可用的 skills，并按质量指标与命中统计排序。`check` 用这些规则检查后续改动并沉淀命中数据。
 
 ## Agent 支持
 
@@ -100,6 +101,9 @@ skills-seed generate-skills
 skills-seed check
 skills-seed profile show
 skills-seed patterns merge --dry-run
+skills-seed patterns stats
+skills-seed review import --from-file review-comments.json
+skills-seed review stats
 skills-seed hook install
 ```
 

@@ -10,7 +10,11 @@
 // 遵循领域驱动设计（DDD）原则，所有领域对象都是不可变的（通过方法修改）
 package domain
 
-import "time"
+import (
+	"regexp"
+	"strings"
+	"time"
+)
 
 // DefaultLocale 默认语言设置
 const DefaultLocale = "zh-CN"
@@ -62,6 +66,14 @@ type BusinessMethod struct {
 	Returns       string // 返回值说明（包括可能的错误情况）
 }
 
+// PatternMetrics 描述一条模式的质量和可排序性。
+type PatternMetrics struct {
+	SpecificityScore float64 // 项目特有性，0.0-1.0
+	EvidenceCount    int     // 代码路径、方法签名、项目符号等证据数量
+	GenericPenalty   float64 // 泛化/模板化惩罚，0.0-1.0
+	EffectiveScore   float64 // 综合排序分，0.0-1.0
+}
+
 // Pattern 代码模式聚合根
 type Pattern struct {
 	ID             string
@@ -73,6 +85,7 @@ type Pattern struct {
 	Rule           string
 	Confidence     float64
 	Frequency      int
+	Metrics        PatternMetrics
 	Source         Source
 	Merged         bool            // 是否已被汇总
 	MergedFrom     []string        // 从哪些模式ID汇总而来
@@ -107,6 +120,7 @@ func NewPattern(id, name string, category Category) *Pattern {
 func (p *Pattern) SetBusinessMethod(method *BusinessMethod) {
 	p.BusinessMethod = method
 	p.UpdatedAt = time.Now()
+	p.RefreshMetrics()
 }
 
 // IsValid 验证模式是否有效
@@ -122,6 +136,7 @@ func (p *Pattern) IsValid() bool {
 func (p *Pattern) UpdateConfidence(newConfidence float64) {
 	p.Confidence = (p.Confidence*float64(p.Frequency) + newConfidence) / float64(p.Frequency+1)
 	p.Frequency++
+	p.RefreshMetrics()
 }
 
 // SetExamples 设置示例
@@ -163,6 +178,120 @@ func (p *Pattern) Merge(other *Pattern) {
 		p.Confidence = (p.Confidence*float64(p.Frequency) + other.Confidence*float64(other.Frequency)) / float64(totalFrequency)
 	}
 	p.Frequency = totalFrequency
+	p.RefreshMetrics()
+}
+
+// RefreshMetrics 使用确定性启发式刷新模式质量指标。
+func (p *Pattern) RefreshMetrics() {
+	evidence := p.evidenceCount()
+	genericPenalty := p.genericPenalty()
+	specificity := clamp01(float64(evidence)/6.0 + categorySpecificityBonus(p) - genericPenalty*0.35)
+	effective := clamp01(specificity*0.6 + p.Confidence*0.3 - genericPenalty*0.1)
+
+	p.Metrics = PatternMetrics{
+		SpecificityScore: roundScore(specificity),
+		EvidenceCount:    evidence,
+		GenericPenalty:   roundScore(genericPenalty),
+		EffectiveScore:   roundScore(effective),
+	}
+	p.UpdatedAt = time.Now()
+}
+
+func (p *Pattern) evidenceCount() int {
+	text := strings.Join([]string{
+		p.ID,
+		p.Name,
+		p.Description,
+		p.Rule,
+		p.GoodExample,
+		p.BadExample,
+		p.ProjectID,
+		p.ScopePath,
+		p.WorkspaceRole,
+	}, "\n")
+
+	count := 0
+	count += countMatches(text, regexp.MustCompile(`(?:^|[\s"'])[\w./-]+\.go(?::\d+)?(?:[\s"',)]|$)`))
+	count += countMatches(text, regexp.MustCompile(`\b(?:internal|cmd|pkg|api|service|repository|handler|domain)/[\w./-]+`))
+	count += countMatches(text, regexp.MustCompile(`\b[A-Z][A-Za-z0-9_]*\.[A-Za-z0-9_]+\b`))
+	count += countMatches(text, regexp.MustCompile(`\bfunc\s+(?:\([^)]*\)\s*)?[A-Za-z0-9_]+\s*\(`))
+	count += countMatches(text, regexp.MustCompile("`[^`]+`"))
+
+	if p.BusinessMethod != nil {
+		count++
+		if p.BusinessMethod.Location != "" {
+			count++
+		}
+		if p.BusinessMethod.Function != "" {
+			count++
+		}
+		if p.BusinessMethod.Type == "domain" {
+			count++
+		}
+	}
+	if p.ProjectID != "" {
+		count++
+	}
+	if p.ScopePath != "" {
+		count++
+	}
+	return count
+}
+
+func (p *Pattern) genericPenalty() float64 {
+	text := strings.ToLower(strings.Join([]string{p.Name, p.Description, p.Rule}, " "))
+	terms := []string{
+		"best practice", "clean architecture", "layered architecture", "repository pattern",
+		"最佳实践", "分层架构", "注意错误处理", "代码规范", "保持一致", "遵守规范", "合理命名",
+	}
+	hits := 0
+	for _, term := range terms {
+		if strings.Contains(text, strings.ToLower(term)) {
+			hits++
+		}
+	}
+	if len([]rune(strings.TrimSpace(p.Description))) < 24 {
+		hits++
+	}
+	if len([]rune(strings.TrimSpace(p.Rule))) < 16 {
+		hits++
+	}
+	return clamp01(float64(hits) * 0.18)
+}
+
+func categorySpecificityBonus(p *Pattern) float64 {
+	switch p.Category {
+	case CategoryBusiness:
+		if p.BusinessMethod != nil {
+			return 0.18
+		}
+		return 0.08
+	case CategoryUtils:
+		if p.BusinessMethod != nil {
+			return 0.12
+		}
+	case CategoryAPI, CategoryDatabase:
+		return 0.05
+	}
+	return 0
+}
+
+func countMatches(text string, re *regexp.Regexp) int {
+	return len(re.FindAllString(text, -1))
+}
+
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+func roundScore(v float64) float64 {
+	return float64(int(v*100+0.5)) / 100
 }
 
 // IsSimilar 判断两个模式是否相似
@@ -195,6 +324,52 @@ type Issue struct {
 	Suggestion string   // 修复建议
 	PatternID  string   // 关联的模式ID
 	Confidence float64  // 置信度（0.0-1.0）
+}
+
+// PatternHit 表示一次 check 对某条模式的命中。
+type PatternHit struct {
+	PatternID  string
+	File       string
+	Line       int
+	Severity   Severity
+	Confidence float64
+	CheckRunID string
+	CreatedAt  time.Time
+}
+
+// PatternHitStats 表示模式质量指标与 check 命中统计的聚合视图。
+type PatternHitStats struct {
+	Pattern   Pattern
+	HitCount  int
+	LastHitAt time.Time
+}
+
+// ReviewComment 表示导入的代码评审评论。
+type ReviewComment struct {
+	ID        string    `json:"id"`
+	Provider  string    `json:"provider"`
+	ReviewID  string    `json:"review_id"`
+	Commit    string    `json:"commit"`
+	File      string    `json:"file"`
+	Line      int       `json:"line"`
+	Author    string    `json:"author"`
+	Body      string    `json:"body"`
+	Resolved  bool      `json:"resolved"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ReviewMatchedPatternStats 表示评审评论命中的模式统计。
+type ReviewMatchedPatternStats struct {
+	PatternID    string
+	CommentCount int
+}
+
+// ReviewStats 表示评审评论与 check 命中的匹配统计。
+type ReviewStats struct {
+	TotalComments     int
+	PreventedComments int
+	MissedComments    int
+	MatchedPatterns   []ReviewMatchedPatternStats
 }
 
 // NewIssue 创建新问题

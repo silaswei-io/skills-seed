@@ -29,6 +29,22 @@ type PatternRepository interface {
 	Count(ctx context.Context) (int, error)
 }
 
+// PatternHitRecorder 保存 check 命中记录。
+type PatternHitRecorder interface {
+	RecordPatternHits(ctx context.Context, hits []PatternHit) error
+}
+
+// PatternStatsRepository 查询 pattern 质量和命中统计。
+type PatternStatsRepository interface {
+	GetPatternHitStats(ctx context.Context) ([]PatternHitStats, error)
+}
+
+// ReviewRepository 导入并统计代码评审评论。
+type ReviewRepository interface {
+	ImportReviewComments(ctx context.Context, comments []ReviewComment) error
+	GetReviewStats(ctx context.Context, lineWindow int) (ReviewStats, error)
+}
+
 // CommitAnalysisTracker 提交分析追踪接口
 type CommitAnalysisTracker interface {
 	// MarkCommitAnalyzed 标记commit已被分析
