@@ -56,12 +56,12 @@ type FileAnalysisTracker interface {
 	DeleteAnalyzedFiles(ctx context.Context, scope FileAnalysisScope, paths []string) error
 }
 
-// ProjectProfileRepository stores the durable project profile used for generated references
+// ProjectProfileRepository 保存用于生成参考文档的持久化项目画像
 type ProjectProfileRepository interface {
-	// Get returns the latest project profile
+	// Get 返回最新项目画像
 	Get(ctx context.Context) (*ProjectProfile, error)
 
-	// Save stores the latest project profile
+	// Save 保存最新项目画像
 	Save(ctx context.Context, profile *ProjectProfile) error
 }
 

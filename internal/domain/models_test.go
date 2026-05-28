@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// ==================== Pattern Tests ====================
+// ==================== Pattern 测试 ====================
 
 func TestNewPattern(t *testing.T) {
 	beforeCreate := time.Now()
@@ -135,7 +135,7 @@ func TestPattern_UpdateConfidence(t *testing.T) {
 
 	p.UpdateConfidence(0.9)
 
-	// Weighted average: (0.8*2 + 0.9) / 3 = 2.5/3 = 0.8333
+	// 加权平均值：(0.8*2 + 0.9) / 3 = 2.5/3 = 0.8333
 	expectedConfidence := (0.8*2 + 0.9) / 3
 	assert.InDelta(t, expectedConfidence, p.Confidence, 0.0001, "Confidence should be weighted average")
 	assert.Equal(t, 3, p.Frequency, "Frequency should be incremented")
@@ -203,10 +203,10 @@ func TestPattern_Merge(t *testing.T) {
 
 		p.Merge(other)
 
-		// Should not overwrite existing examples
+		// 不应覆盖已有示例。
 		assert.Equal(t, "existing good", p.GoodExample, "Should keep current GoodExample")
 		assert.Equal(t, "existing bad", p.BadExample, "Should keep current BadExample")
-		// Weighted average: (0.8*4 + 0.6*2) / (4+2) = 4.4/6 = 0.7333
+		// 加权平均值：(0.8*4 + 0.6*2) / (4+2) = 4.4/6 = 0.7333
 		expectedConfidence := (0.8*4 + 0.6*2) / 6.0
 		assert.InDelta(t, expectedConfidence, p.Confidence, 0.0001, "Confidence should be weighted average")
 		assert.Equal(t, 6, p.Frequency, "Frequency should be sum of both")
@@ -265,7 +265,7 @@ func TestPattern_SetBusinessMethod(t *testing.T) {
 		Type:        "common",
 	}
 
-	// Small sleep to ensure UpdatedAt changes
+	// 短暂等待，确保 UpdatedAt 会发生变化。
 	time.Sleep(time.Millisecond)
 
 	p.SetBusinessMethod(method)
@@ -274,7 +274,7 @@ func TestPattern_SetBusinessMethod(t *testing.T) {
 	assert.True(t, p.UpdatedAt.After(beforeUpdate), "UpdatedAt should be updated")
 }
 
-// ==================== Issue Tests ====================
+// ==================== Issue 测试 ====================
 
 func TestNewIssue(t *testing.T) {
 	issue := NewIssue("main.go", 42, SeverityError, "unused variable")
@@ -367,7 +367,7 @@ func TestIssue_SetPatternID(t *testing.T) {
 	assert.Equal(t, "pattern-123", issue.PatternID, "PatternID should be set")
 }
 
-// ==================== CommitInfo Tests ====================
+// ==================== CommitInfo 测试 ====================
 
 func TestNewCommitInfo(t *testing.T) {
 	date := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
@@ -471,7 +471,7 @@ func TestCommitInfo_Summary(t *testing.T) {
 	}
 }
 
-// ==================== FileInfo Tests ====================
+// ==================== FileInfo 测试 ====================
 
 func TestNewFileInfo(t *testing.T) {
 	fi := NewFileInfo("main.go", "package main")
@@ -610,7 +610,7 @@ func TestFileInfo_LineCount(t *testing.T) {
 	}
 }
 
-// ==================== detectLanguage Tests (via NewFileInfo) ====================
+// ==================== detectLanguage 测试（通过 NewFileInfo） ====================
 
 func TestDetectLanguage(t *testing.T) {
 	tests := []struct {
@@ -778,7 +778,7 @@ func TestDetectLanguage(t *testing.T) {
 	}
 }
 
-// ==================== Edge Case Tests ====================
+// ==================== 边界场景测试 ====================
 
 func TestPattern_Merge_EdgeCases(t *testing.T) {
 	t.Run("merge with both having empty examples", func(t *testing.T) {
@@ -915,8 +915,8 @@ func TestDetectLanguage_FileWithDirectoryPath(t *testing.T) {
 }
 
 func TestDetectLanguage_FileWithDirectoryPath_NoExt(t *testing.T) {
-	// "cmd/server/Makefile" does not match the exact string "Makefile" check,
-	// so detectLanguage returns empty string. Only bare "Makefile" matches
+	// "cmd/server/Makefile" 不满足精确字符串 "Makefile" 判断，
+	// 所以 detectLanguage 返回空字符串，只有裸 "Makefile" 会命中。
 	fi := NewFileInfo("cmd/server/Makefile", "")
 	assert.Equal(t, "", fi.Language, "Makefile with directory prefix does not match special filename check")
 }

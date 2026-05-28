@@ -1,6 +1,4 @@
-# ========================================
-# 项目信息
-# ========================================
+# 项目
 project:
   name: ""                   # 项目名称(init 时自动填充)
   mode: "project"            # 初始化模式: project(单项目) 或 workspace(多子项目工作区)。开始学习或生成后不可切换
@@ -10,31 +8,25 @@ project:
   root_path: ""              # 项目根目录绝对路径(init 时自动填充)
   initialized_at: ""         # 项目初始化时间(init 时自动填充)
 
-# ========================================
-# 工作区配置
-# ========================================
+# 工作区
 workspace:
   projects: []               # 子项目列表，例如: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   shared: []                 # 公共库或共享代码目录，例如: [{path: "pkg"}]
   contracts: []              # 接口契约目录，例如: [{path: "proto"}]
   infra: []                  # 部署/运维目录，例如: [{path: "deploy"}]
 
-# ========================================
-# 分析增强配置
-# ========================================
+# 分析增强
 analysis:
   codegraph:
     enabled: true             # 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级
     required: false           # true 表示 CodeGraph 不可用时直接失败；false 表示继续普通分析
     command: "codegraph"      # codegraph 命令路径
-    auto_init: false          # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
+    auto_init: true           # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
     auto_sync: true           # 目标项目已有索引时是否在分析前执行 codegraph sync
     max_nodes: 30             # 传给 codegraph context 的最大符号节点数
     max_code: 0               # 传给 codegraph context 的最大代码块数；0 表示只提供结构摘要
 
-# ========================================
-# AI Agent 配置
-# ========================================
+# Agent
 agent:
   provider: "claude"         # 当前 Agent 提供方，对应 commands 和 output.skills_paths 的 key
   commands:                  # provider -> CLI 命令路径，新增 provider 时在这里增加 key
@@ -44,47 +36,31 @@ agent:
   allow_user_plugins: false  # 是否允许 Agent 加载用户插件；默认关闭以避免批处理被插件干扰
   parallelism: 0             # 并发 Agent 数；0 表示自动(project=1, workspace=子项目数并带上限)
 
-# ========================================
-# 学习配置
-# ========================================
+# 学习
 learning:
   max_commits: 50            # 默认分析的 Git 提交数量
   batch_size: 5              # 批量分析时,单次 AI 调用分析的 commit 数量
 
-# ========================================
-# Skills 生成配置
-# ========================================
-generation:
-  mode: "template"           # 生成模式: template=仅用已学习数据和模板生成(默认,不调用 AI); ai=生成前调用 AI 做摘要合并
-
-# ========================================
-# 自动修复配置(check --fix)
-# ========================================
+# 自动修复(check --fix)
 autofix:
   strategy: "patch"          # 修复策略: patch: 生成 .patch 文件(推荐,安全); backup: 备份原文件后修改; stash: 应用修复后 git stash; branch: 创建新分支应用修复
   backup_path: "backups"     # 备份路径(相对于 .skills-seed 目录)
 
-# ========================================
-# 输出配置
-# ========================================
+# 输出
 output:
   skills_paths:                   # provider -> Skills 输出路径，新增 provider 时在这里增加 key
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
-# ========================================
-# 日志配置
-# ========================================
+# 日志
 logging:
   level: "DEBUG"             # 日志级别: DEBUG, INFO, WARN, ERROR
   logs_path: "logs"          # 日志路径(相对于 .skills-seed 目录)
   max_log_files: 30          # 日志文件最大数量(自动清理旧日志)
 
-# ========================================
-# 全局排除配置
-# ========================================
-exclude:                     # 所有学习和分析都不包含的文件/目录
-  # 生成的 skills 输出目录会自动排除，包括 output.skills_paths、.claude/skills/** 和 .agents/skills/**
+# 全局排除
+exclude:                     # glob 风格匹配（不是正则），所有学习和分析都不包含
+  - ".*"                     # 点号开头的文件和目录，如 .github、.cursor、.codegraph、.env
   - "vendor/**"              # Go 依赖目录
   - "node_modules/**"        # Node.js 依赖目录
   - "**/*.pb.go"             # Protobuf 生成文件

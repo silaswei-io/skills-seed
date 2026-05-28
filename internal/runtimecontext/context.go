@@ -8,7 +8,7 @@ import (
 type userContextKey struct{}
 type seedPathKey struct{}
 
-// WithUserContext stores one-shot user context for the current learn/generate run.
+// WithUserContext 保存当前 learn/generate 运行的一次性用户上下文。
 func WithUserContext(ctx context.Context, text string) context.Context {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -17,7 +17,7 @@ func WithUserContext(ctx context.Context, text string) context.Context {
 	return context.WithValue(ctx, userContextKey{}, text)
 }
 
-// WithoutUserContext masks user context on derived operations.
+// WithoutUserContext 在派生操作中屏蔽用户上下文。
 func WithoutUserContext(ctx context.Context) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -25,7 +25,7 @@ func WithoutUserContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, userContextKey{}, "")
 }
 
-// UserContext returns the one-shot user context attached to ctx.
+// UserContext 返回附加到 ctx 的一次性用户上下文。
 func UserContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
@@ -34,7 +34,7 @@ func UserContext(ctx context.Context) string {
 	return strings.TrimSpace(text)
 }
 
-// WithSeedPath stores the current .skills-seed path for one-shot runtime inputs.
+// WithSeedPath 保存当前 .skills-seed 路径，用于一次性运行时输入文件。
 func WithSeedPath(ctx context.Context, seedPath string) context.Context {
 	seedPath = strings.TrimSpace(seedPath)
 	if seedPath == "" {
@@ -46,7 +46,7 @@ func WithSeedPath(ctx context.Context, seedPath string) context.Context {
 	return context.WithValue(ctx, seedPathKey{}, seedPath)
 }
 
-// SeedPath returns the current .skills-seed path attached to ctx.
+// SeedPath 返回附加到 ctx 的当前 .skills-seed 路径。
 func SeedPath(ctx context.Context) string {
 	if ctx == nil {
 		return ""

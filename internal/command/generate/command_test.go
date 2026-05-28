@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -99,7 +100,6 @@ func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
 	for _, project := range projects {
 		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
 		setGenerateChildOutputPath(t, childRoot, provider, filepath.Join(".agents", "skills", project.ID+"-dev"))
-		setGenerateChildMode(t, childRoot, config.GenerationModeAI)
 		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
 	}
 	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
@@ -127,7 +127,6 @@ func TestGenerateWorkspaceChildSkillsDoesNotPassWorkspaceContextToChildren(t *te
 	workspaceRoot := t.TempDir()
 	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
 	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
-	setGenerateChildMode(t, childRoot, config.GenerationModeAI)
 	seedGenerateChildMemory(t, childRoot, "Backend Rule")
 	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
 	defer cont.Close()
@@ -138,7 +137,7 @@ func TestGenerateWorkspaceChildSkillsDoesNotPassWorkspaceContextToChildren(t *te
 	require.Equal(t, []string{""}, seenContexts)
 }
 
-func TestRunGenerateProjectTemplateModeDoesNotRequireAvailableAgent(t *testing.T) {
+func TestRunGenerateProjectRequiresAvailableAgent(t *testing.T) {
 	resetGenerateFlagsForTest(t)
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	configRepo, err := config.NewRepository(seedPath, "zh-CN")
@@ -147,7 +146,6 @@ func TestRunGenerateProjectTemplateModeDoesNotRequireAvailableAgent(t *testing.T
 	cfg.Project.Mode = domain.ModeProject
 	cfg.Agent.Provider = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Generation.Mode = config.GenerationModeTemplate
 	require.NoError(t, configRepo.Update(cfg))
 
 	cont := &container.Container{
@@ -155,14 +153,11 @@ func TestRunGenerateProjectTemplateModeDoesNotRequireAvailableAgent(t *testing.T
 		Agent:      &mocks.MockAgent{NameVal: "mock", AvailableVal: false},
 	}
 
-	err = requireAgentForGenerate(cont, false, "")
-	require.NoError(t, err)
-
-	err = requireAgentForGenerate(cont, false, "本次生成补充说明")
+	err = commandutil.RequireAgentAvailable(cont)
 	require.Error(t, err)
 }
 
-func TestRunGenerateWorkspaceTemplateModeRequiresAgentWhenContextProvided(t *testing.T) {
+func TestRunGenerateWorkspaceRequiresAvailableAgent(t *testing.T) {
 	resetGenerateFlagsForTest(t)
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	configRepo, err := config.NewRepository(seedPath, "zh-CN")
@@ -171,7 +166,6 @@ func TestRunGenerateWorkspaceTemplateModeRequiresAgentWhenContextProvided(t *tes
 	cfg.Project.Mode = domain.ModeWorkspace
 	cfg.Agent.Provider = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Generation.Mode = config.GenerationModeTemplate
 	require.NoError(t, configRepo.Update(cfg))
 
 	cont := &container.Container{
@@ -179,10 +173,7 @@ func TestRunGenerateWorkspaceTemplateModeRequiresAgentWhenContextProvided(t *tes
 		Agent:      &mocks.MockAgent{NameVal: "mock", AvailableVal: false},
 	}
 
-	err = requireAgentForGenerate(cont, true, "")
-	require.NoError(t, err)
-
-	err = requireAgentForGenerate(cont, true, "workspace 生成补充说明")
+	err = commandutil.RequireAgentAvailable(cont)
 	require.Error(t, err)
 }
 
@@ -247,7 +238,6 @@ func initGenerateWorkspaceRootContainer(t *testing.T, workspaceRoot, provider st
 	cfg.Agent.Commands = map[string]string{provider: provider}
 	cfg.Output.SkillsPaths = map[string]string{provider: ".agents/skills/skills-seed-skills"}
 	cfg.Workspace.Projects = projects
-	cfg.Generation.Mode = config.GenerationModeTemplate
 	require.NoError(t, configRepo.Update(cfg))
 
 	cont, err := container.NewContainer(context.Background(), seedPath)
@@ -273,18 +263,8 @@ func initGenerateWorkspaceChildProject(t *testing.T, workspaceRoot string, proje
 	cfg.Agent.Provider = provider
 	cfg.Agent.Commands = map[string]string{provider: provider}
 	cfg.Output.SkillsPaths = map[string]string{provider: ".agents/skills/backend-dev"}
-	cfg.Generation.Mode = config.GenerationModeTemplate
 	require.NoError(t, childConfigRepo.Update(cfg))
 	return childRoot
-}
-
-func setGenerateChildMode(t *testing.T, childRoot, mode string) {
-	t.Helper()
-	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
-	require.NoError(t, err)
-	cfg := childConfigRepo.Get()
-	cfg.Generation.Mode = mode
-	require.NoError(t, childConfigRepo.Update(cfg))
 }
 
 func setGenerateChildOutputPath(t *testing.T, childRoot, provider, outputPath string) {

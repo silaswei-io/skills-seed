@@ -10,17 +10,15 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 )
 
-// PromptInputSession owns temporary files used to keep large prompt inputs out
-// of rendered prompt text.
+// PromptInputSession 管理单次 Agent 调用的临时输入文件，避免大块输入直接进入渲染后的提示词正文。
 type PromptInputSession = promptfiles.Session
 
-// NewPromptInputSession creates a temporary prompt input file session.
+// NewPromptInputSession 创建临时提示词输入文件会话。
 func NewPromptInputSession(prefix string) (*PromptInputSession, error) {
 	return promptfiles.New(prefix)
 }
 
-// NewPromptInputSessionForContext creates prompt input files under
-// .skills-seed/memory/runtime when the current seed path is known.
+// NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/memory/runtime 下。
 func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*PromptInputSession, error) {
 	seedPath := runtimecontext.SeedPath(ctx)
 	if seedPath == "" {
@@ -29,7 +27,7 @@ func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*Promp
 	return promptfiles.NewIn(filepath.Join(seedPath, "memory", "runtime"), prefix)
 }
 
-// BatchLearnPromptData returns prompt data for commit learning.
+// BatchLearnPromptData 返回提交学习所需的提示词数据。
 func BatchLearnPromptData(session *PromptInputSession, commits []domain.CommitInfo, commitFiles []CommitFileChange, knownPatternsJSON, knownPatternsPath string, knownPatternsCount int) (map[string]interface{}, error) {
 	path, err := session.UsePathOrWrite(knownPatternsPath, "known-patterns.json", knownPatternsJSON)
 	if err != nil {
@@ -43,7 +41,7 @@ func BatchLearnPromptData(session *PromptInputSession, commits []domain.CommitIn
 	}, nil
 }
 
-// GenerateSkillsPromptData returns prompt data for AI skill summary generation.
+// GenerateSkillsPromptData 返回 AI 汇总生成 skills 所需的提示词数据。
 func GenerateSkillsPromptData(session *PromptInputSession, req *GenerateSkillsRequest) (map[string]interface{}, error) {
 	patternsPath, err := session.UsePathOrWrite(req.PatternsPath, "patterns.json", req.PatternsJSON)
 	if err != nil {
@@ -63,7 +61,7 @@ func GenerateSkillsPromptData(session *PromptInputSession, req *GenerateSkillsRe
 	}, nil
 }
 
-// AnalyzeProjectPromptData returns prompt data for project profile analysis.
+// AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
 func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRequest) (map[string]interface{}, error) {
 	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", req.Structure)
 	if err != nil {
@@ -95,7 +93,7 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 	}, nil
 }
 
-// AnalyzeCurrentCodebasePromptData returns prompt data for current codebase analysis.
+// AnalyzeCurrentCodebasePromptData 返回当前代码库分析所需的提示词数据。
 func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeCurrentCodebaseRequest) (map[string]interface{}, error) {
 	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", req.Structure)
 	if err != nil {

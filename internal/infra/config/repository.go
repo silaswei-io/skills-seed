@@ -18,16 +18,15 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Project    ProjectConfig    `yaml:"project"`
-	Workspace  WorkspaceConfig  `yaml:"workspace"`
-	Analysis   AnalysisConfig   `yaml:"analysis"`
-	Agent      AgentConfig      `yaml:"agent"`
-	Learning   LearningConfig   `yaml:"learning"`
-	Generation GenerationConfig `yaml:"generation"`
-	AutoFix    AutoFixConfig    `yaml:"autofix"`
-	Output     OutputConfig     `yaml:"output"`
-	Logging    LoggingConfig    `yaml:"logging"`
-	Exclude    []string         `yaml:"exclude"` // 全局排除配置
+	Project   ProjectConfig   `yaml:"project"`
+	Workspace WorkspaceConfig `yaml:"workspace"`
+	Analysis  AnalysisConfig  `yaml:"analysis"`
+	Agent     AgentConfig     `yaml:"agent"`
+	Learning  LearningConfig  `yaml:"learning"`
+	AutoFix   AutoFixConfig   `yaml:"autofix"`
+	Output    OutputConfig    `yaml:"output"`
+	Logging   LoggingConfig   `yaml:"logging"`
+	Exclude   []string        `yaml:"exclude"` // 全局排除配置
 }
 
 // ProjectConfig 项目配置
@@ -86,7 +85,7 @@ func defaultCodeGraphConfig() CodeGraphConfig {
 		Enabled:         true,
 		Required:        false,
 		Command:         "codegraph",
-		AutoInit:        false,
+		AutoInit:        true,
 		AutoSync:        true,
 		MaxNodes:        30,
 		MaxCode:         0,
@@ -94,7 +93,7 @@ func defaultCodeGraphConfig() CodeGraphConfig {
 	}
 }
 
-// UnmarshalYAML applies defaults while still preserving explicit false values.
+// UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
 func (c *CodeGraphConfig) UnmarshalYAML(value *yaml.Node) error {
 	type rawCodeGraphConfig CodeGraphConfig
 	defaults := rawCodeGraphConfig(defaultCodeGraphConfig())
@@ -119,28 +118,6 @@ type AgentConfig struct {
 type LearningConfig struct {
 	MaxCommits int `yaml:"max_commits"` // 默认分析的提交数量
 	BatchSize  int `yaml:"batch_size"`  // 批量分析 commit 数量（默认10）
-}
-
-const (
-	// GenerationModeTemplate 表示直接使用已学习数据和模板生成 skills
-	GenerationModeTemplate = "template"
-	// GenerationModeAI 表示生成前调用 AI 对 patterns 做摘要合并
-	GenerationModeAI = "ai"
-)
-
-// GenerationConfig 控制 skills 生成阶段是否额外调用 AI
-type GenerationConfig struct {
-	Mode string `yaml:"mode"` // template 或 ai
-}
-
-// NormalizeGenerationMode 归一化 skills 生成模式
-func NormalizeGenerationMode(mode string) string {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case GenerationModeAI:
-		return GenerationModeAI
-	default:
-		return GenerationModeTemplate
-	}
 }
 
 // AutoFixConfig 自动修复配置
@@ -326,9 +303,6 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	// 学习配置
 	content = replaceYAMLValueInSection(content, "learning:", "max_commits:", cfg.Learning.MaxCommits)
 	content = replaceYAMLValueInSection(content, "learning:", "batch_size:", cfg.Learning.BatchSize)
-
-	// 生成配置
-	content = replaceYAMLValueInSection(content, "generation:", "mode:", cfg.Generation.Mode)
 
 	// 自动修复配置
 	content = replaceYAMLValueInSection(content, "autofix:", "strategy:", cfg.AutoFix.Strategy)
@@ -740,7 +714,6 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Agent.Timeout == 0 {
 		cfg.Agent.Timeout = 1800
 	}
-	cfg.Generation.Mode = NormalizeGenerationMode(cfg.Generation.Mode)
 
 	if cfg.Project.Mode == "" {
 		cfg.Project.Mode = domain.ModeProject
@@ -813,9 +786,6 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			MaxCommits: 50,
 			BatchSize:  5,
 		},
-		Generation: GenerationConfig{
-			Mode: GenerationModeTemplate,
-		},
 		AutoFix: AutoFixConfig{
 			Strategy:   "patch",
 			BackupPath: "backups",
@@ -832,6 +802,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			MaxLogFiles: 30,
 		},
 		Exclude: []string{
+			".*",
 			"vendor/**",
 			"node_modules/**",
 			"**/*.pb.go",
@@ -848,7 +819,6 @@ type Reader interface {
 	GetWorkspaceConfig() WorkspaceConfig
 	GetAnalysisConfig() AnalysisConfig
 	GetAgentConfig() AgentConfig
-	GetGenerationConfig() GenerationConfig
 	GetLearningConfig() LearningConfig
 	GetAutoFixConfig() AutoFixConfig
 	GetOutputConfig() OutputConfig
@@ -874,11 +844,6 @@ func (r *Repository) GetAnalysisConfig() AnalysisConfig {
 // GetAgentConfig 获取 Agent 配置
 func (r *Repository) GetAgentConfig() AgentConfig {
 	return r.config.Agent
-}
-
-// GetGenerationConfig 获取 Skills 生成配置
-func (r *Repository) GetGenerationConfig() GenerationConfig {
-	return r.config.Generation
 }
 
 // GetLearningConfig 获取学习配置

@@ -15,7 +15,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// ==================== ExtractJSON tests ====================
+// ==================== ExtractJSON 测试 ====================
 
 func TestExtractJSON_PlainJSON(t *testing.T) {
 	input := `{"key": "value"}`
@@ -205,7 +205,7 @@ func TestParseBatchLearnResultReturnsErrorWhenJSONMissing(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-// ==================== findMatchingBrace tests ====================
+// ==================== findMatchingBrace 测试 ====================
 
 func TestFindMatchingBrace_Simple(t *testing.T) {
 	input := `{"a":1}`

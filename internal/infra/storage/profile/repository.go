@@ -18,7 +18,7 @@ var ErrProfileNotFound = errors.New("project profile not found")
 // ErrSpecNotFound 表示项目开发规范不存在
 var ErrSpecNotFound = errors.New("project spec not found")
 
-// Repository stores the project profile as a readable JSON document under .skills-seed
+// Repository 将项目画像以可读 JSON 文档保存到 .skills-seed 下
 type Repository struct {
 	path string
 }

@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupTestDB creates a fresh PatternRepository for testing
-// The database is stored in a temporary directory that is cleaned up after the test
+// setupTestDB 创建测试用的全新 PatternRepository。
+// 数据库保存在测试结束后会被清理的临时目录中。
 func setupTestDB(t *testing.T) *PatternRepository {
 	t.Helper()
 
@@ -24,7 +24,7 @@ func setupTestDB(t *testing.T) *PatternRepository {
 	return patternRepo
 }
 
-// newTestPattern creates a valid Pattern for testing
+// newTestPattern 创建测试用的有效 Pattern。
 func newTestPattern(id, name string, category domain.Category, confidence float64) *domain.Pattern {
 	p := domain.NewPattern(id, name, category)
 	p.Confidence = confidence
@@ -34,7 +34,7 @@ func newTestPattern(id, name string, category domain.Category, confidence float6
 	return p
 }
 
-// ==================== PatternRepository tests ====================
+// ==================== PatternRepository 测试 ====================
 
 func TestNewPatternRepository(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
@@ -118,7 +118,7 @@ func TestPatternRepository_GetByCategory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, patterns, 2)
 
-	// Verify all returned patterns belong to the requested category
+	// 确认所有返回的模式都属于请求的分类。
 	for _, p := range patterns {
 		assert.Equal(t, domain.CategoryNaming, p.Category)
 	}
@@ -166,7 +166,7 @@ func TestPatternRepository_FindSimilar(t *testing.T) {
 	original := newTestPattern("p-001", "error-wrap", domain.CategoryError, 0.9)
 	require.NoError(t, repo.Save(ctx, original))
 
-	// Search for a pattern with the same name and category
+	// 查找名称和分类都相同的模式。
 	search := &domain.Pattern{
 		Name:     "error-wrap",
 		Category: domain.CategoryError,
@@ -186,7 +186,7 @@ func TestPatternRepository_FindSimilar_NotFound(t *testing.T) {
 	p1 := newTestPattern("p-001", "error-wrap", domain.CategoryError, 0.9)
 	require.NoError(t, repo.Save(ctx, p1))
 
-	// Search for a pattern with a different name
+	// 查找名称不同的模式。
 	search := &domain.Pattern{
 		Name:     "non-matching-name",
 		Category: domain.CategoryError,
@@ -204,16 +204,16 @@ func TestPatternRepository_Delete(t *testing.T) {
 	p := newTestPattern("p-001", "to-delete", domain.CategoryNaming, 0.9)
 	require.NoError(t, repo.Save(ctx, p))
 
-	// Verify it exists
+	// 确认模式存在。
 	got, err := repo.Get(ctx, "p-001")
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
-	// Delete it
+	// 删除模式。
 	err = repo.Delete(ctx, "p-001")
 	require.NoError(t, err)
 
-	// Verify it no longer exists
+	// 确认模式已不存在。
 	_, err = repo.Get(ctx, "p-001")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "pattern not found")
@@ -223,7 +223,7 @@ func TestPatternRepository_Count(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
 
-	// Initially zero
+	// 初始数量为 0。
 	count, err := repo.Count(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)
@@ -245,7 +245,7 @@ func TestPatternRepository_Save_Invalid(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
 
-	// Pattern with empty ID is invalid
+	// 空 ID 的 Pattern 无效。
 	invalidPattern := &domain.Pattern{
 		ID:         "",
 		Name:       "some-name",
@@ -262,7 +262,7 @@ func TestPatternRepository_CommitTracking(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
 
-	// Initially no commits are analyzed
+	// 初始状态下没有已分析提交。
 	analyzed, err := repo.IsCommitAnalyzed(ctx, "abc123")
 	require.NoError(t, err)
 	assert.False(t, analyzed)
@@ -271,16 +271,16 @@ func TestPatternRepository_CommitTracking(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, commits)
 
-	// Mark a commit as analyzed
+	// 标记一个提交为已分析。
 	err = repo.MarkCommitAnalyzed(ctx, "abc123")
 	require.NoError(t, err)
 
-	// Now it should be analyzed
+	// 此时该提交应为已分析。
 	analyzed, err = repo.IsCommitAnalyzed(ctx, "abc123")
 	require.NoError(t, err)
 	assert.True(t, analyzed)
 
-	// Mark another commit
+	// 标记另一个提交。
 	err = repo.MarkCommitAnalyzed(ctx, "def456")
 	require.NoError(t, err)
 
@@ -290,13 +290,13 @@ func TestPatternRepository_CommitTracking(t *testing.T) {
 	assert.Contains(t, commits, "abc123")
 	assert.Contains(t, commits, "def456")
 
-	// Marking the same commit again should be idempotent
+	// 重复标记同一提交应保持幂等。
 	err = repo.MarkCommitAnalyzed(ctx, "abc123")
 	require.NoError(t, err)
 
 	commits, err = repo.GetAnalyzedCommits(ctx)
 	require.NoError(t, err)
-	assert.Len(t, commits, 2) // Still 2, not 3
+	assert.Len(t, commits, 2) // 仍为 2，不应变成 3
 }
 
 func TestPatternRepository_FileAnalysisTracking(t *testing.T) {

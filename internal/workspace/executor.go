@@ -74,7 +74,15 @@ func RunProjectTasks(ctx context.Context, projects []config.WorkspaceProjectConf
 	for _, project := range ordered {
 		select {
 		case <-ctx.Done():
-			break
+			close(jobs)
+			wg.Wait()
+			close(errs)
+			for err := range errs {
+				if err != nil {
+					return err
+				}
+			}
+			return ctx.Err()
 		case jobs <- project:
 		}
 	}

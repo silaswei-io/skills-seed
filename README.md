@@ -168,7 +168,7 @@ skills-seed generate-skills
 skills-seed generate-skills --output .agents/skills/my-project
 ```
 
-默认 `generation.mode: "template"`，生成阶段直接使用已学习 patterns、项目画像和模板，不额外调用 AI。需要让 AI 在生成前做摘要合并或润色时，可以把配置改为 `generation.mode: "ai"`。
+生成阶段固定调用当前 Agent 做摘要合并和润色，再把结果写入模板；因此执行 `generate-skills` 前需要确保 `agent.provider` 对应的 CLI 可用。
 
 生成内容包括：
 
@@ -228,7 +228,7 @@ analysis:
     enabled: true       # 默认启用结构化分析增强；未安装 codegraph 时提醒并降级
     required: false     # true 表示 CodeGraph 不可用时直接失败
     command: "codegraph"
-    auto_init: false    # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
+    auto_init: true     # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
     auto_sync: true
     max_nodes: 30
     max_code: 0
@@ -245,9 +245,6 @@ agent:
 learning:
   max_commits: 50
   batch_size: 5
-
-generation:
-  mode: "template"    # template 默认不调用 AI；ai 会在生成前调用 Agent 做摘要合并
 
 output:
   skills_paths:

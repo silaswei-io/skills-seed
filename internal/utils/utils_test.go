@@ -22,7 +22,7 @@ func TestGetSeedPath(t *testing.T) {
 
 		result, err := GetSeedPath()
 		assert.NoError(t, err)
-		// macOS /var is symlink to /private/var, resolve both
+		// macOS 中 /var 是 /private/var 的符号链接，这里同时解析两边。
 		expectedResolved, _ := filepath.EvalSymlinks(seedDir)
 		resultResolved, _ := filepath.EvalSymlinks(result)
 		assert.Equal(t, expectedResolved, resultResolved)

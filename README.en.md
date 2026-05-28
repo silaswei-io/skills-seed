@@ -168,7 +168,7 @@ skills-seed generate-skills
 skills-seed generate-skills --output .agents/skills/my-project
 ```
 
-The default `generation.mode: "template"` renders from learned patterns, the project profile, and templates without an extra AI call. Set `generation.mode: "ai"` when you want AI summary merging or polishing before rendering.
+Generation always calls the current Agent for summary merging and polishing before rendering templates, so make sure the CLI for `agent.provider` is available before running `generate-skills`.
 
 Generated content:
 
@@ -228,7 +228,7 @@ analysis:
     enabled: true       # Enable structural analysis by default; warn and fall back if codegraph is missing
     required: false     # true fails when CodeGraph is unavailable
     command: "codegraph"
-    auto_init: false    # Run codegraph init -i automatically when the target project has no .codegraph
+    auto_init: true     # Run codegraph init -i automatically when the target project has no .codegraph
     auto_sync: true
     max_nodes: 30
     max_code: 0
@@ -245,9 +245,6 @@ agent:
 learning:
   max_commits: 50
   batch_size: 5
-
-generation:
-  mode: "template"    # template avoids AI during generation; ai calls the agent for summary merging first
 
 output:
   skills_paths:

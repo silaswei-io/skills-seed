@@ -66,6 +66,21 @@ func TestPrepareIncrementalFileChangesExcludesGeneratedSkills(t *testing.T) {
 	require.ElementsMatch(t, []string{".agents/skills/skills-seed-skills", ".claude/skills/skills-seed-skills"}, changes.ExcludedGeneratedSkillDirs)
 }
 
+func TestConfiguredLearnExcludesSeparatesBuiltinsFromConfigDefaults(t *testing.T) {
+	projectRoot := t.TempDir()
+	configRepo := newIncrementalConfig(t, projectRoot)
+
+	excludes := configuredLearnExcludes(configRepo, projectRoot)
+
+	require.Contains(t, excludes, ".git/**")
+	require.Contains(t, excludes, ".skills-seed/**")
+	require.Contains(t, excludes, ".claude/**")
+	require.Contains(t, excludes, ".agents/**")
+	require.Contains(t, excludes, ".*")
+	require.Contains(t, excludes, "vendor/**")
+	require.Contains(t, excludes, "node_modules/**")
+}
+
 func initLearnGitRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

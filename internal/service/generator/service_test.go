@@ -77,8 +77,7 @@ func TestGenerateSkills_AIError(t *testing.T) {
 
 	loader := skills.NewLoader("zh-CN")
 	cfg := &mocks.MockConfigReader{
-		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
-		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeAI},
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	tmpDir := t.TempDir()
@@ -139,8 +138,7 @@ func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t
 
 	loader := skills.NewLoader("zh-CN")
 	cfg := &mocks.MockConfigReader{
-		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
-		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeAI},
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	tmpDir := t.TempDir()
@@ -178,8 +176,7 @@ func TestGenerateSkills_PassesRuntimeUserContextToAISummary(t *testing.T) {
 
 	loader := skills.NewLoader("zh-CN")
 	cfg := &mocks.MockConfigReader{
-		ProjectCfg:    config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
-		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeAI},
+		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。")
@@ -190,7 +187,7 @@ func TestGenerateSkills_PassesRuntimeUserContextToAISummary(t *testing.T) {
 	assert.Equal(t, "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。", received.UserContext)
 }
 
-func TestGenerateSkills_RuntimeContextUsesAISummaryInTemplateMode(t *testing.T) {
+func TestGenerateSkills_AlwaysUsesAISummary(t *testing.T) {
 	pattern := domain.NewPattern("p1", "HSM Delivery Boundary", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("HSM 私有化交付边界")
@@ -220,8 +217,7 @@ func TestGenerateSkills_RuntimeContextUsesAISummaryInTemplateMode(t *testing.T) 
 	}
 	loader := skills.NewLoader("zh-CN")
 	cfg := &mocks.MockConfigReader{
-		ProjectCfg:    config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
-		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeTemplate},
+		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。")
@@ -231,38 +227,6 @@ func TestGenerateSkills_RuntimeContextUsesAISummaryInTemplateMode(t *testing.T) 
 
 	require.True(t, called)
 	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "AI 根据用户说明生成的业务边界摘要")
-}
-
-func TestGenerateSkills_TemplateModeDoesNotCallAgent(t *testing.T) {
-	pattern := domain.NewPattern("p1", "Template Rule", domain.CategoryBusiness)
-	pattern.Confidence = 0.9
-	pattern.SetDescription("template mode rule")
-	pattern.SetRule("render directly from learned data")
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return nil, errors.New("agent should not be called in template mode")
-		},
-	}
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
-		},
-	}
-	loader := skills.NewLoader("zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
-		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeTemplate},
-	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
-
-	tmpDir := t.TempDir()
-	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
-
-	businessPattern := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	assert.Contains(t, businessPattern, "Template Rule")
-	require.FileExists(t, filepath.Join(tmpDir, "references", "project-spec.md"))
 }
 
 func TestGenerateSkills_AIModeCallsAgentSummary(t *testing.T) {
@@ -294,8 +258,7 @@ func TestGenerateSkills_AIModeCallsAgentSummary(t *testing.T) {
 	}
 	loader := skills.NewLoader("zh-CN")
 	cfg := &mocks.MockConfigReader{
-		ProjectCfg:    config.ProjectConfig{Name: "test", Language: "go"},
-		GenerationCfg: config.GenerationConfig{Mode: config.GenerationModeAI},
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 
@@ -736,9 +699,6 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 			},
 		},
 		AgentCfg: config.AgentConfig{Provider: "claude"},
-		GenerationCfg: config.GenerationConfig{
-			Mode: config.GenerationModeTemplate,
-		},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 为主后端，它调用 kmip-go 实现 KMIP 的能力。")

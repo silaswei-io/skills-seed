@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// ==================== DomainError Tests ====================
+// ==================== DomainError 测试 ====================
 
 func TestNewDomainError(t *testing.T) {
 	cause := errors.New("underlying error")
@@ -95,12 +95,12 @@ func TestDomainError_WithContext_NilMap(t *testing.T) {
 func TestDomainError_WithContext_Chaining(t *testing.T) {
 	err := NewDomainError(ErrConflict, "duplicate entry", nil)
 
-	// WithContext returns the same pointer, enabling chaining
+	// WithContext 返回同一个指针，便于链式调用。
 	result := err.WithContext("user_id", "abc123")
 	assert.Same(t, err, result, "WithContext should return the same error pointer for chaining")
 }
 
-// ==================== Error Type Check Functions ====================
+// ==================== 错误类型检查函数测试 ====================
 
 func TestIsNotFound(t *testing.T) {
 	tests := []struct {
@@ -312,7 +312,7 @@ func TestIsAIServiceError(t *testing.T) {
 	}
 }
 
-// ==================== Utility Function Tests ====================
+// ==================== 工具函数测试 ====================
 
 func TestGetErrorCode(t *testing.T) {
 	tests := []struct {
@@ -377,7 +377,7 @@ func TestGetErrorContext(t *testing.T) {
 	})
 }
 
-// ==================== Edge Case Tests ====================
+// ==================== 边界场景测试 ====================
 
 func TestDomainError_Error_AllErrorCodes(t *testing.T) {
 	codes := []ErrorCode{

@@ -66,8 +66,8 @@ func (l *Loader) Load(name string) (*template.Template, error) {
 }
 
 // LoadReference 加载 references 目录下的模板
-// dir: 目录名（如 "patterns" 或 "examples"）
-// category: 分类名（如 "api", "business"）
+// dir 表示目录名（如 "patterns" 或 "examples"）
+// category 表示分类名（如 "api", "business"）
 func (l *Loader) LoadReference(dir, category string) (*template.Template, error) {
 	key := dir + "/" + category
 	tmpl, err := l.loadTemplate(key, "references/"+dir+"/"+category, metadata.SkillsTemplateExt)
@@ -91,7 +91,7 @@ func (l *Loader) LoadProjectOverview() (*template.Template, error) {
 	return l.loadTemplate(key, "references/project-overview", metadata.SkillsTemplateExt)
 }
 
-// LoadReferenceFile loads a standalone template under references/
+// LoadReferenceFile 加载 references/ 下的独立模板。
 func (l *Loader) LoadReferenceFile(name string) (*template.Template, error) {
 	key := "reference-file/" + name
 	return l.loadTemplate(key, "references/"+name, metadata.SkillsTemplateExt)
@@ -113,8 +113,8 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 }
 
 // RenderReference 渲染 references 模板
-// dir: 目录名（如 "patterns" 或 "examples"）
-// category: 分类名（如 "api", "business"）
+// dir 表示目录名（如 "patterns" 或 "examples"）
+// category 表示分类名（如 "api", "business"）
 func (l *Loader) RenderReference(dir, category string, data interface{}) (string, error) {
 	tmpl, err := l.LoadReference(dir, category)
 	if err != nil {
@@ -149,7 +149,7 @@ func (l *Loader) RenderProjectOverview(data interface{}) (string, error) {
 	return normalizeMarkdown(buf.String()), nil
 }
 
-// RenderReferenceFile renders a standalone references/{name}.md template
+// RenderReferenceFile 渲染独立的 references/{name}.md 模板。
 func (l *Loader) RenderReferenceFile(name string, data interface{}) (string, error) {
 	tmpl, err := l.LoadReferenceFile(name)
 	if err != nil {

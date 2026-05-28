@@ -16,7 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
-// Loader loads built-in templates and overlays project/custom prompt fragments
+// Loader 加载内置模板，并叠加项目/自定义提示词片段。
 type Loader struct {
 	agentName string
 	locale    string

@@ -306,7 +306,7 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 			return []domain.Pattern{*existingPattern}, nil
 		},
 		FindSimilarFn: func(ctx context.Context, p *domain.Pattern) (*domain.Pattern, error) {
-			// Simulate finding a similar pattern
+			// 模拟找到相似模式。
 			pCopy := *existingPattern
 			return &pCopy, nil
 		},
@@ -333,7 +333,7 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 	err := svc.LearnFromCommit(context.Background(), domain.CommitInfo{Hash: "abc123"})
 	require.NoError(t, err)
 	assert.Len(t, mergedPatterns, 1)
-	// Should be merged into existing pattern
+	// 应合并到已有模式。
 	assert.Equal(t, "e1", mergedPatterns[0].ID)
 }
 

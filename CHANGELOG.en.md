@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.7]
+
+### Changes
+
+- Make `generate-skills` always call the current Agent for summary merging and remove the `generation.mode` config field
+- Enable CodeGraph `auto_init` by default so missing indexes are initialized automatically
+- Simplify default `config.yaml` section headings for easier reading
+- Fix workspace child-project task cancellation and share child container validation between learn/generate
+- Consolidate learn-current excludes: built-in code now only protects `.git/**`, `.skills-seed/**`, `.claude/**`, and `.agents/**`; optional tool/project artifacts live in default `exclude`
+- Use the glob-style `.*` default `exclude` to skip dot-prefixed files/directories at any depth, covering `.github`, `.cursor`, `.codegraph`, `.env`, and similar local/tool artifacts
+- Translate English explanatory comments in source code and the Chinese config template while preserving required identifiers, command names, and English templates
+
 ## [v0.0.6]
 
 ### Features

@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// setupTestConfig creates a temporary config repository for testing
+// setupTestConfig 创建测试用临时配置仓储。
 func setupTestConfig(t *testing.T) *Repository {
 	t.Helper()
 	seedPath := t.TempDir()
@@ -25,7 +25,7 @@ func TestNewRepository(t *testing.T) {
 		seedPath := t.TempDir()
 		configPath := filepath.Join(seedPath, "config.yaml")
 
-		// Verify config file does not exist before
+		// 确认配置文件初始不存在。
 		_, err := os.Stat(configPath)
 		require.True(t, os.IsNotExist(err))
 
@@ -33,7 +33,7 @@ func TestNewRepository(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, repo)
 
-		// Verify config file was created
+		// 确认配置文件已创建。
 		_, err = os.Stat(configPath)
 		assert.NoError(t, err, "config file should be created")
 	})
@@ -57,7 +57,7 @@ func TestNewRepository(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid path", func(t *testing.T) {
-		// Use a path that cannot be written to
+		// 使用不可写路径触发错误。
 		repo, err := NewRepository("/proc/nonexistent/path/that/cannot/be/created", "zh-CN")
 		assert.Error(t, err)
 		assert.Nil(t, repo)
@@ -70,7 +70,7 @@ func TestRepository_Get(t *testing.T) {
 
 	require.NotNil(t, cfg, "Get() should return non-nil config")
 
-	// Verify default values from embedded template or hardcoded defaults
+	// 校验来自嵌入模板或硬编码 fallback 的默认值。
 	assert.Equal(t, "go", cfg.Project.Language)
 	assert.Equal(t, "zh-CN", cfg.Project.Locale)
 	assert.Equal(t, "claude", cfg.Agent.Provider)
@@ -81,11 +81,10 @@ func TestRepository_Get(t *testing.T) {
 	assert.True(t, cfg.Analysis.CodeGraph.Enabled)
 	assert.False(t, cfg.Analysis.CodeGraph.Required)
 	assert.Equal(t, "codegraph", cfg.Analysis.CodeGraph.Command)
-	assert.False(t, cfg.Analysis.CodeGraph.AutoInit)
+	assert.True(t, cfg.Analysis.CodeGraph.AutoInit)
 	assert.True(t, cfg.Analysis.CodeGraph.AutoSync)
 	assert.Equal(t, 30, cfg.Analysis.CodeGraph.MaxNodes)
 	assert.Equal(t, 0, cfg.Analysis.CodeGraph.MaxCode)
-	assert.Equal(t, GenerationModeTemplate, cfg.Generation.Mode)
 	assert.Equal(t, 50, cfg.Learning.MaxCommits)
 	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
 	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Output.SkillsPaths["claude"])
@@ -121,12 +120,13 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(seedPath, "config.yaml"))
 	require.NoError(t, err)
 	contentText := string(content)
-	require.Contains(t, contentText, "# 工作区配置")
+	require.Contains(t, contentText, "# 工作区")
 	require.NotContains(t, contentText, `child_skill_policy`)
 	require.Contains(t, contentText, `id: "frontend"`)
 	require.Contains(t, contentText, `path: "proto"`)
 	require.Contains(t, contentText, `description: "API contracts"`)
 	require.Contains(t, contentText, `shared: []`)
+	require.NotContains(t, contentText, `generation:`)
 	require.NotContains(t, contentText, `'**/*.pb.go'`)
 
 	reloaded, err := NewRepository(seedPath, "zh-CN")
@@ -175,13 +175,15 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	content := repo.replaceConfigValues(string(templateData), cfg)
 	var parsed Config
 	require.NoError(t, yaml.Unmarshal([]byte(content), &parsed), content)
-	require.Contains(t, content, "# 工作区配置")
+	require.Contains(t, content, "# 工作区")
 	require.NotContains(t, content, `child_skill_policy`)
 	require.Contains(t, content, `id: "backend"`)
 	require.Contains(t, content, `description: "API contracts"`)
 	require.Contains(t, content, `- "**/*.pb.go"`)
+	require.Contains(t, content, `- ".*"`)
 	require.Contains(t, content, `analysis:`)
 	require.Contains(t, content, `enabled: false`)
+	require.NotContains(t, content, `generation:`)
 }
 
 func TestRepository_NormalizeAnalysisCodeGraphDefaults(t *testing.T) {
@@ -212,7 +214,7 @@ exclude: []
 	require.True(t, cfg.Enabled)
 	require.False(t, cfg.Required)
 	require.Equal(t, "codegraph", cfg.Command)
-	require.False(t, cfg.AutoInit)
+	require.True(t, cfg.AutoInit)
 	require.True(t, cfg.AutoSync)
 	require.Equal(t, 30, cfg.MaxNodes)
 	require.Equal(t, 0, cfg.MaxCode)
@@ -302,10 +304,10 @@ func TestRepository_SetProjectName(t *testing.T) {
 	err = repo.SetProjectName("my-test-project")
 	require.NoError(t, err)
 
-	// Verify in-memory value
+	// 校验内存中的值。
 	assert.Equal(t, "my-test-project", repo.Get().Project.Name)
 
-	// Verify persisted by re-reading from disk
+	// 重新读取磁盘，校验已持久化。
 	repo2, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 	assert.Equal(t, "my-test-project", repo2.Get().Project.Name)
@@ -319,10 +321,10 @@ func TestRepository_SetLocale(t *testing.T) {
 	err = repo.SetLocale("en-US")
 	require.NoError(t, err)
 
-	// Verify in-memory value
+	// 校验内存中的值。
 	assert.Equal(t, "en-US", repo.Get().Project.Locale)
 
-	// Verify persisted by re-reading from disk
+	// 重新读取磁盘，校验已持久化。
 	repo2, err := NewRepository(seedPath, "en-US")
 	require.NoError(t, err)
 	assert.Equal(t, "en-US", repo2.Get().Project.Locale)
@@ -336,10 +338,10 @@ func TestRepository_SetAutoFixStrategy(t *testing.T) {
 	err = repo.SetAutoFixStrategy("backup")
 	require.NoError(t, err)
 
-	// Verify in-memory value
+	// 校验内存中的值。
 	assert.Equal(t, "backup", repo.Get().AutoFix.Strategy)
 
-	// Verify persisted by re-reading from disk
+	// 重新读取磁盘，校验已持久化。
 	repo2, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 	assert.Equal(t, "backup", repo2.Get().AutoFix.Strategy)
@@ -374,15 +376,9 @@ func TestRepository_GetExclude(t *testing.T) {
 	exclude := repo.GetExclude()
 
 	assert.NotEmpty(t, exclude, "exclude list should not be empty")
-	// Verify common exclusions are present
-	found := false
-	for _, pattern := range exclude {
-		if pattern == "vendor/**" {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "exclude list should contain vendor/**")
+	assert.Contains(t, exclude, ".*")
+	assert.Contains(t, exclude, "vendor/**")
+	assert.Contains(t, exclude, "node_modules/**")
 }
 
 func TestRepository_Update(t *testing.T) {
@@ -435,13 +431,13 @@ func TestRepository_SetRootPath(t *testing.T) {
 
 func TestNewRepository_DefaultLocale(t *testing.T) {
 	seedPath := t.TempDir()
-	// Pass empty locale - should use detected system locale or default
+	// 传入空 locale 时，应使用检测到的系统语言或默认语言。
 	repo, err := NewRepository(seedPath, "")
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 
 	cfg := repo.Get()
-	// Locale should be set to something (not empty)
+	// locale 应该被设置为非空值。
 	assert.NotEmpty(t, cfg.Project.Locale)
 }
 

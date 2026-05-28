@@ -432,16 +432,15 @@ func (m *MockFileAnalysisTracker) DeleteAnalyzedFiles(ctx context.Context, scope
 
 // MockConfigReader 模拟配置读取
 type MockConfigReader struct {
-	ProjectCfg    config.ProjectConfig
-	WorkspaceCfg  config.WorkspaceConfig
-	AnalysisCfg   config.AnalysisConfig
-	AgentCfg      config.AgentConfig
-	GenerationCfg config.GenerationConfig
-	LearningCfg   config.LearningConfig
-	AutoFixCfg    config.AutoFixConfig
-	OutputCfg     config.OutputConfig
-	LoggingCfg    config.LoggingConfig
-	Exclude       []string
+	ProjectCfg   config.ProjectConfig
+	WorkspaceCfg config.WorkspaceConfig
+	AnalysisCfg  config.AnalysisConfig
+	AgentCfg     config.AgentConfig
+	LearningCfg  config.LearningConfig
+	AutoFixCfg   config.AutoFixConfig
+	OutputCfg    config.OutputConfig
+	LoggingCfg   config.LoggingConfig
+	Exclude      []string
 }
 
 // GetProjectConfig 模拟获取项目配置
@@ -455,9 +454,6 @@ func (m *MockConfigReader) GetAnalysisConfig() config.AnalysisConfig { return m.
 
 // GetAgentConfig 模拟获取 Agent 配置
 func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentCfg }
-
-// GetGenerationConfig 模拟获取 Skills 生成配置
-func (m *MockConfigReader) GetGenerationConfig() config.GenerationConfig { return m.GenerationCfg }
 
 // GetLearningConfig 模拟获取学习配置
 func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.LearningCfg }

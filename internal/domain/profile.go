@@ -1,7 +1,7 @@
 package domain
 
-// ProjectProfile is the durable project-level knowledge captured by learning
-// Generated reference documents are rendered from this profile
+// ProjectProfile 是学习阶段沉淀的持久化项目级知识。
+// 生成的参考文档会基于该画像渲染。
 type ProjectProfile struct {
 	ProjectName       string              `json:"project_name"`
 	Language          string              `json:"language"`
@@ -64,7 +64,7 @@ type ProjectSpecTouchpoint struct {
 	Description string `json:"description,omitempty"`
 }
 
-// ArchitectureLayer describes one logical layer in the project
+// ArchitectureLayer 描述项目中的一个逻辑分层
 type ArchitectureLayer struct {
 	Name             string   `json:"name"`
 	Description      string   `json:"description"`
@@ -72,7 +72,7 @@ type ArchitectureLayer struct {
 	Files            []string `json:"files"`
 }
 
-// UtilityFunction describes a common utility function used by the project
+// UtilityFunction 描述项目中常用的工具函数
 type UtilityFunction struct {
 	Name        string `json:"name"`
 	File        string `json:"file"`
@@ -81,7 +81,7 @@ type UtilityFunction struct {
 	Usage       string `json:"usage"`
 }
 
-// ModuleInfo describes a key project module
+// ModuleInfo 描述项目中的关键模块
 type ModuleInfo struct {
 	Name             string   `json:"name"`
 	Path             string   `json:"path"`

@@ -79,7 +79,7 @@ func TestMergePatterns_DryRun(t *testing.T) {
 	result, err := svc.MergePatterns(context.Background(), &MergePatternsRequest{DryRun: true})
 	assert.NoError(t, err)
 	assert.Len(t, result.MergedPatterns, 1)
-	// Dry run should NOT delete or save
+	// dry run 不应删除或保存数据。
 	assert.Empty(t, deleted)
 	assert.Empty(t, saved)
 }

@@ -624,7 +624,7 @@ func marshalProjectProfile(profile *domain.ProjectProfile) string {
 	return string(data)
 }
 
-// NewProjectProfile converts an analysis result into the durable project profile format
+// NewProjectProfile 将分析结果转换为持久化项目画像格式。
 func NewProjectProfile(result *AnalyzeProjectResult, projectName, language string) *domain.ProjectProfile {
 	if result == nil {
 		return nil
@@ -656,7 +656,7 @@ func NewProjectProfile(result *AnalyzeProjectResult, projectName, language strin
 	}
 }
 
-// AnalyzeCodebaseOptions controls how current-code learning collects context
+// AnalyzeCodebaseOptions 控制当前代码学习如何收集上下文。
 type AnalyzeCodebaseOptions struct {
 	FocusPaths         []string
 	KnownPatternsJSON  string

@@ -61,7 +61,7 @@ func LoadConfig(seedPath string) (*config.Config, error) {
 	return &cfg, nil
 }
 
-// ResolvePath resolves output/config paths relative to project root and expands "~"
+// ResolvePath 按项目根目录解析输出/配置路径，并展开 "~"。
 func ResolvePath(projectRoot, path string) (string, error) {
 	if path == "" {
 		return projectRoot, nil
@@ -85,7 +85,7 @@ func ResolvePath(projectRoot, path string) (string, error) {
 	return filepath.Join(projectRoot, path), nil
 }
 
-// RelativePaths returns slash-separated paths relative to projectRoot.
+// RelativePaths 返回相对于 projectRoot 的斜杠分隔路径。
 func RelativePaths(projectRoot string, paths []string) []string {
 	if len(paths) == 0 {
 		return nil

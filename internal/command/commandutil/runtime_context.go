@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// ResolveRuntimeContext combines one-shot user context flags for learn/generate.
-// Inline context wins over context-file because it is the most explicit input.
+// ResolveRuntimeContext 合并 learn/generate 的一次性用户上下文参数。
+// 行内上下文优先于 context-file，因为它是最明确的输入。
 func ResolveRuntimeContext(inline, filePath string) (string, error) {
 	inline = strings.TrimSpace(inline)
 	if inline != "" {

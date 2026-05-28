@@ -270,7 +270,7 @@ func TestAnalyzeCurrentCodebase_AIError(t *testing.T) {
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, nil)
-	// AnalyzeCurrentCodebase returns domain error on AI failure
+	// AnalyzeCurrentCodebase 在 AI 失败时返回领域错误。
 	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{})
 	assert.Error(t, err)
 }
@@ -362,13 +362,13 @@ func TestCollectSampleFiles(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "service", "user.go"), []byte("package service"), 0644))
-	// Test file should be excluded
+	// 测试文件应被排除。
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main_test.go"), []byte("package main"), 0644))
 
 	svc := &AnalyzerService{}
 	files := svc.collectSampleFiles(tmpDir, "go")
 	assert.NotEmpty(t, files)
-	// Should not contain test files
+	// 结果不应包含测试文件。
 	for _, f := range files {
 		assert.NotContains(t, f.Path, "_test.go")
 	}

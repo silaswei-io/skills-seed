@@ -17,13 +17,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
+type checkOptions struct {
 	interactive bool
 	checkAll    bool
-)
+}
 
 // Cmd 返回 check 命令
 func Cmd(cont *container.Container) *cobra.Command {
+	opts := checkOptions{interactive: true}
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: i18n.Get("CheckShort"),
@@ -35,18 +36,18 @@ func Cmd(cont *container.Container) *cobra.Command {
 				logger.Debug(i18n.Get("CheckRunInitFirst") + "\n")
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			return runCheck(cont, cmd)
+			return runCheck(cont, opts)
 		},
 	}
 
 	// 添加 flags
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", true, i18n.Get("CheckFlagInteractive"))
-	cmd.Flags().BoolVarP(&checkAll, "all", "a", false, i18n.Get("CheckFlagAll"))
+	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", opts.interactive, i18n.Get("CheckFlagInteractive"))
+	cmd.Flags().BoolVarP(&opts.checkAll, "all", "a", opts.checkAll, i18n.Get("CheckFlagAll"))
 
 	return cmd
 }
 
-func runCheck(cont *container.Container, cmd *cobra.Command) error {
+func runCheck(cont *container.Container, opts checkOptions) error {
 	if err := commandutil.RequireAgentAvailable(cont); err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func runCheck(cont *container.Container, cmd *cobra.Command) error {
 	var err error
 
 	// 检查所有文件还是只检查暂存文件
-	if checkAll {
+	if opts.checkAll {
 		logger.Debug(i18n.Get("CheckAllFiles") + "\n")
 		issues, err = cont.CheckerSvc.CheckAll(ctx)
 	} else {
@@ -95,7 +96,7 @@ func runCheck(cont *container.Container, cmd *cobra.Command) error {
 	}
 
 	// 如果是交互模式，处理问题
-	if interactive {
+	if opts.interactive {
 		return handleIssuesInteractively(cont, issues, ctx)
 	}
 

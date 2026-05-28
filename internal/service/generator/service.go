@@ -246,9 +246,6 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 
 func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns []domain.Pattern, resolvedOutputPath string, startedAt time.Time) (*agent.GenerateSkillsResult, error) {
 	userContext := runtimecontext.UserContext(ctx)
-	if config.NormalizeGenerationMode(s.configRepo.GetGenerationConfig().Mode) != config.GenerationModeAI && userContext == "" {
-		return s.templateSkillsSummary(patterns), nil
-	}
 
 	// 序列化模式摘要为 JSON，不把代码示例直接发送给 Agent
 	patternsJSONBytes, err := json.MarshalIndent(summarizePatternsForAgent(patterns), "", "  ")
@@ -292,24 +289,6 @@ func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns [
 		return nil, fmt.Errorf("%s: %w", i18n.Get("GeneratorGenerateSummaryFailed"), err)
 	}
 	return summaryResult, nil
-}
-
-func (s *GeneratorService) templateSkillsSummary(patterns []domain.Pattern) *agent.GenerateSkillsResult {
-	summaries := s.ensureCategorySummaries(patterns, nil)
-	keyPatterns := make([]agent.PatternSummary, 0, len(patterns))
-	for _, pattern := range strongestPatterns(patterns, 12) {
-		keyPatterns = append(keyPatterns, agent.PatternSummary{
-			Name:       pattern.Name,
-			Category:   string(pattern.Category),
-			Importance: patternImportance(pattern.Confidence),
-			Summary:    pattern.Description,
-			WhenToUse:  pattern.Rule,
-		})
-	}
-	return &agent.GenerateSkillsResult{
-		CategorySummaries: summaries,
-		KeyPatterns:       keyPatterns,
-	}
 }
 
 func patternImportance(confidence float64) string {
@@ -359,9 +338,6 @@ func (s *GeneratorService) generateWorkspaceSkills(ctx context.Context) error {
 
 func (s *GeneratorService) analyzeWorkspaceForGenerate(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) (*domain.WorkspaceProfile, *domain.WorkspaceSpec, error) {
 	userContext := runtimecontext.UserContext(ctx)
-	if config.NormalizeGenerationMode(s.configRepo.GetGenerationConfig().Mode) != config.GenerationModeAI && userContext == "" {
-		return nil, nil, nil
-	}
 	if s.agent == nil {
 		return nil, nil, fmt.Errorf("%s", i18n.Get("GeneratorGenerateSummaryFailed"))
 	}

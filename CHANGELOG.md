@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.7]
+
+### 变更
+
+- `generate-skills` 固定调用当前 Agent 做摘要合并，移除 `generation.mode` 配置项
+- CodeGraph 默认开启 `auto_init`，目标项目缺少索引时会自动初始化
+- 精简默认 `config.yaml` 分区标题，降低配置文件阅读成本
+- 修复 workspace 子项目并发任务取消语义，并复用 learn/generate 的子项目容器校验逻辑
+- 收敛 learn current 排除规则：代码内置只保护 `.git/**`、`.skills-seed/**`、`.claude/**`、`.agents/**`，其他可选工具/项目产物放入默认 `exclude`
+- 默认 `exclude` 使用 glob 风格的 `.*` 屏蔽任意层级点号开头文件/目录，覆盖 `.github`、`.cursor`、`.codegraph`、`.env` 等本地或工具产物
+- 将源码和中文配置模板中的英文说明性注释改为中文，保留必要的代码标识、命令名和英文版模板内容
+
 ## [v0.0.6]
 
 ### 功能

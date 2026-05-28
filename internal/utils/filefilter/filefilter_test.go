@@ -9,6 +9,7 @@ import (
 
 func TestMatchExcludedSupportsDefaultPatterns(t *testing.T) {
 	patterns := []string{
+		".*",
 		"vendor/**",
 		"node_modules/**",
 		"**/*.pb.go",
@@ -18,6 +19,10 @@ func TestMatchExcludedSupportsDefaultPatterns(t *testing.T) {
 	}
 
 	for _, path := range []string{
+		".env",
+		".github/workflows/ci.yml",
+		".cursor/rules/codegraph.mdc",
+		"pkg/.cache/state.json",
 		"vendor/mod/file.go",
 		"node_modules/pkg/index.ts",
 		"api/user.pb.go",
