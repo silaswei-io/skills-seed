@@ -143,9 +143,10 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Contains(t, content, "description: 修改、审查或扩展 demo 工作区代码时使用")
-	require.Contains(t, content, "backend/.agents/skills/backend-dev/SKILL.md")
-	require.Contains(t, content, "影响范围判断")
-	require.Contains(t, content, "写入边界")
+	require.Contains(t, content, "[工作区概览](./references/workspace-overview.md)")
+	require.Contains(t, content, "[跨项目规则](./references/cross-project-rules.md)")
+	require.NotContains(t, content, "backend/.agents/skills/backend-dev/SKILL.md")
+	require.NotContains(t, content, "影响范围判断")
 	require.NotContains(t, content, "Use when modifying")
 }
 

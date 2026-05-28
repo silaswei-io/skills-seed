@@ -7,12 +7,19 @@
 
 Generate cross-project development rules for workspace `{{.WorkspaceName}}`.
 
-Projects:
+Workspace root:
+```text
+{{.WorkspaceRoot}}
+```
+
+Detected child projects:
 {{range .Projects}}
 - `{{.ID}}`: `{{.Path}}`, type `{{.Type}}`, language `{{.Language}}`
 {{else}}
-- No projects detected yet.
+- No child projects detected yet; prefer build files and directory boundaries when identifying candidates.
 {{end}}
+
+Runtime input file paths are provided by the base prompt. Do not write fixed input paths or one-shot user context content in this editable supplemental prompt.
 
 # Output Goal
 
@@ -49,4 +56,5 @@ Generate workspace rules that directly guide coding agents operating from the ro
 
 - Do not include single-project implementation details unless they affect cross-project coordination.
 - Do not promote one child project's local rule to a workspace-wide rule unless multiple projects depend on it.
+- The AI call is non-interactive; do not ask the user in the generated response. If an unconfirmed relationship affects execution, make the rule require asking the user during task execution.
 - Preserve paths, commands, config keys, environment variables, and code identifiers verbatim.

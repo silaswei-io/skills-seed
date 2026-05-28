@@ -1,6 +1,23 @@
 # 工作区概览
 
-本文件是工作区地图。它只描述入口、路径和协作范围；子项目内部架构、业务方法、工具方法和项目规范必须读取对应子项目 skill 的 `references/project-spec.md` 与 `references/project-overview.md`。
+本文件是工作区地图和 AI 接手说明。它描述入口、路径和协作范围。子项目内部架构、业务方法、工具方法和项目规范必须读取对应子项目 skill 的 `references/project-spec.md` 与 `references/project-overview.md`。
+
+{{if .HasUserContext}}
+## 用户提供的工作区说明
+
+{{.UserContext}}
+{{end}}
+
+{{if .HasWorkspaceFacts}}
+## 工作区事实
+
+{{.WorkspaceFacts}}
+{{end}}
+
+## 仍需确认的信息
+
+- 如果本文件和子项目 skill 无法确认产品边界、项目职责、交付模型、验证命令或跨项目依赖，先询问用户再继续。
+- 不要只凭路径名称编造工作区事实；优先使用仓库证据或用户提供的工作区说明。
 
 ## 子项目
 
@@ -10,6 +27,8 @@
 - 路径：`{{.Path}}`
 - 类型：`{{.Type}}`
 - 语言：`{{.Language}}`
+{{if .Responsibility}}- 职责：{{.Responsibility}}{{end}}
+{{if .HasFrameworks}}- 框架/运行时：{{range $i, $framework := .Frameworks}}{{if $i}}、{{end}}`{{$framework}}`{{end}}{{end}}
 {{if .SelfManaged}}
 - 管理方式：子项目自带 skills-seed
 - 子项目配置：`{{.SelfManagedConfigPath}}`
@@ -25,15 +44,33 @@
 暂未配置子项目。请先检查 `.skills-seed/config.yaml` 的 `workspace.projects`。
 {{end}}
 
+{{if .HasDependencies}}
+## 子项目依赖
+
+{{range .Dependencies}}
+- `{{.From}}` -> `{{.To}}`：{{.Reason}}
+{{end}}
+{{end}}
+
 ## 路由表
 
 | 路径模式 | 子项目 | 读取内容 | 默认写入边界 |
 | --- | --- | --- | --- |
-{{range .Projects}}
-{{if .SelfManaged}}
+{{range .Projects -}}
+{{if .SelfManaged -}}
 | `{{.Path}}/**` | `{{.ID}}` | `{{.SelfManagedConfigPath}}`、`{{.SkillPath}}` 和 `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
-{{else}}
+{{else -}}
 | `{{.Path}}/**` | `{{.ID}}` | `{{.SkillPath}}` 和 `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
+{{end -}}
+{{end}}
+
+{{if .HasImpactRoutes}}
+## AI 分析出的影响路由
+
+{{range .ImpactRoutes}}
+- `{{.PathPattern}}`
+  - 受影响项目：{{range $i, $id := .ProjectIDs}}{{if $i}}、{{end}}`{{$id}}`{{end}}
+  - 原因：{{.Reason}}
 {{end}}
 {{end}}
 
@@ -44,6 +81,8 @@
 {{if .HasContracts}}
 {{range .Contracts}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  {{if .Producers}}- 生产者：{{range $i, $id := .Producers}}{{if $i}}、{{end}}`{{$id}}`{{end}}{{end}}
+  {{if .Consumers}}- 消费者：{{range $i, $id := .Consumers}}{{if $i}}、{{end}}`{{$id}}`{{end}}{{end}}
   - 变更后检查生产者、消费者、生成客户端、服务端处理器、中间件适配器和测试。
 {{end}}
 {{else}}
@@ -57,6 +96,7 @@
 {{if .HasShared}}
 {{range .Shared}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  {{if .Consumers}}- 消费者：{{range $i, $id := .Consumers}}{{if $i}}、{{end}}`{{$id}}`{{end}}{{end}}
   - 变更后检查所有导入、打包或生成该共享内容的子项目。
 {{end}}
 {{else}}
@@ -70,6 +110,7 @@
 {{if .HasInfra}}
 {{range .Infra}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  {{if .AffectedProjects}}- 影响项目：{{range $i, $id := .AffectedProjects}}{{if $i}}、{{end}}`{{$id}}`{{end}}{{end}}
   - 变更后检查部署目标、环境变量、网关或中间件配置影响到的子项目。
 {{end}}
 {{else}}

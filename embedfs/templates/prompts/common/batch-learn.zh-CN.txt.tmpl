@@ -235,14 +235,12 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 5. 如不适用则保持`bad_example`为空
 6. 代码示例必须语法正确且可复制粘贴
 
-{{if .KnownPatternsJSON}}
+{{if .KnownPatternsPath}}
 # 已有模式 ({{.KnownPatternsCount}})
 
 专注于新模式或重大改进。
 
-```json
-{{.KnownPatternsJSON}}
-```
+已有模式位于 `{{.KnownPatternsPath}}`。请先按路径读取，再提取新模式。
 {{end}}
 
 现在仅返回JSON对象：

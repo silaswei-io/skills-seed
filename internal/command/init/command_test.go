@@ -113,6 +113,33 @@ func TestEnsureWorkspacePromptFilesDoesNotCreateChildProjectPrompts(t *testing.T
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
+func TestEnsureWorkspacePromptFilesDoesNotWriteRuntimePathPlaceholders(t *testing.T) {
+	seedPath := t.TempDir()
+	projectRoot := t.TempDir()
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	cfg := configRepo.Get()
+	cfg.Project.Mode = domain.ModeWorkspace
+	cfg.Project.Locale = "zh-CN"
+	cfg.Workspace.Projects = []config.WorkspaceProjectConfig{
+		{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"},
+	}
+	require.NoError(t, configRepo.Update(cfg))
+
+	require.NoError(t, ensureWorkspacePromptFiles(seedPath, projectRoot, "hsm-workspace", configRepo))
+
+	for _, name := range []string{"workspace-profile.md", "workspace-spec.md"} {
+		content, err := os.ReadFile(filepath.Join(seedPath, "prompts", "workspace", name))
+		require.NoError(t, err)
+		text := string(content)
+		require.Contains(t, text, "hsmwebapi")
+		require.NotContains(t, text, "<workspace-input-file>")
+		require.NotContains(t, text, "<workspace-profile-file>")
+		require.NotContains(t, text, "<user-context-file>")
+	}
+}
+
 func initGitDir(t *testing.T, root string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, ".git"), 0755))

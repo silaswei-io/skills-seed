@@ -805,6 +805,12 @@ other = "skills 输出目录（默认使用当前 provider 的 output.skills_pat
 [GenerateFlagMerge]
 other = "生成前合并相似模式（已不推荐，改用 patterns merge）"
 
+[GenerateFlagContext]
+other = "本次生成的补充说明"
+
+[GenerateFlagContextFile]
+other = "从文件读取本次生成的补充说明"
+
 [GenerateMergeStarting]
 other = "开始合并相似模式..."
 
@@ -1595,6 +1601,12 @@ other = "指定要扫描学习的目录或文件，可重复使用"
 
 [LearnFlagProfile]
 other = "项目画像刷新策略：auto、skip、refresh"
+
+[LearnFlagContext]
+other = "本次学习的补充说明"
+
+[LearnFlagContextFile]
+other = "从文件读取本次学习的补充说明"
 
 # 当前学习命令消息
 [LearnCurrentStart]

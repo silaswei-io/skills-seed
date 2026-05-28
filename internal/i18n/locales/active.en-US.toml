@@ -805,6 +805,12 @@ other = "Skills output directory (defaults to output.skills_paths for the curren
 [GenerateFlagMerge]
 other = "Merge similar patterns before generating (deprecated; use patterns merge)"
 
+[GenerateFlagContext]
+other = "Additional guidance for this generate run"
+
+[GenerateFlagContextFile]
+other = "Read additional guidance for this generate run from a file"
+
 [GenerateMergeStarting]
 other = "Starting to merge similar patterns..."
 
@@ -1594,6 +1600,12 @@ other = "Directory or file to scan for learning; may be repeated"
 
 [LearnFlagProfile]
 other = "Project profile refresh strategy: auto, skip, or refresh"
+
+[LearnFlagContext]
+other = "Additional guidance for this learn run"
+
+[LearnFlagContextFile]
+other = "Read additional guidance for this learn run from a file"
 
 # 当前学习命令消息
 [LearnCurrentStart]

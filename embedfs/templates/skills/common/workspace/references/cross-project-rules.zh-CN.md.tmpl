@@ -9,6 +9,25 @@
 - 修改契约、共享库或部署配置时，先识别生产者、消费者和运行时影响，再读取对应 skills。
 - 不要把单个子项目内部约定提升为全局规则，除非多个子项目共同依赖。
 - 未配置特殊路径时，使用文件名、目录名和导入关系判断契约、共享和基础设施影响。
+- 如果工作区概览或子项目 skill 无法确认关键边界，实际执行任务时必须先问用户。
+
+{{if .HasRules}}
+## 工作区特定规则
+
+{{range .Rules}}
+- **{{.Title}}**：{{.Description}}{{if .AppliesTo}}（适用：{{range $i, $id := .AppliesTo}}{{if $i}}、{{end}}`{{$id}}`{{end}}）{{end}}
+{{end}}
+{{end}}
+
+{{if .HasRouting}}
+## 工作区特定路由
+
+{{range .Routing}}
+- `{{.PathPattern}}`
+  - 读取项目：{{range $i, $id := .ProjectIDs}}{{if $i}}、{{end}}`{{$id}}`{{end}}
+  - 原因：{{.Reason}}
+{{end}}
+{{end}}
 
 ## 影响半径
 
@@ -40,6 +59,11 @@
 
 ## 改动顺序
 
+{{if .HasChangeOrder}}
+{{range $i, $step := .ChangeOrder}}
+{{add $i 1}}. {{$step}}
+{{end}}
+{{else}}
 1. 列出受影响路径和子项目。
 2. 读取工作区概览，确认所有子项目 skill 路径。
 3. 如果涉及契约或共享接口，先更新契约源、schema、公共类型或共享函数签名。
@@ -47,6 +71,7 @@
 5. 更新消费者调用、生成代码、适配层和测试。
 6. 更新基础设施、环境变量、网关、中间件或 CI。
 7. 汇总验证：生成物、接口形状、错误码、配置键、构建命令和测试范围必须一致。
+{{end}}
 
 ## 必须同时读取多个 skills 的场景
 
@@ -64,6 +89,11 @@
 {{if .HasInfra}}
 - 修改已配置基础设施路径时，同时读取受部署、配置、网关或中间件规则影响的子项目 skill。
 {{end}}
+{{if .HasLoadMultipleWhen}}
+{{range .LoadMultipleWhen}}
+- {{.Condition}}：同时读取 {{range $i, $id := .ProjectIDs}}{{if $i}}、{{end}}`{{$id}}`{{end}}；{{.Reason}}
+{{end}}
+{{end}}
 
 ## 并发 Agent 约束
 
@@ -72,6 +102,14 @@
 - 并发前必须明确每个 Agent 的读写边界和受影响子项目。
 - 契约或共享接口稳定前，消费者子项目不能并发实现。
 - 合并并发结果前，统一检查接口形状、错误码、环境变量、生成物、构建命令和测试是否一致。
+{{if .HasParallelGuidance}}
+
+### 工作区特定并发规则
+
+{{range .ParallelGuidance}}
+- `{{.Scope}}`：{{if .Allowed}}允许并发{{else}}不允许并发{{end}}。条件：{{.Condition}}
+{{end}}
+{{end}}
 
 ## 输出要求
 

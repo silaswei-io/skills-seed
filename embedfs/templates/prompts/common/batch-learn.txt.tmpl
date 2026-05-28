@@ -229,14 +229,12 @@ For EACH pattern, you MUST provide:
 5. Keep `bad_example` empty if not applicable
 6. Code examples must be syntactically correct and copy-pasteable
 
-{{if .KnownPatternsJSON}}
+{{if .KnownPatternsPath}}
 # Existing Patterns ({{.KnownPatternsCount}})
 
 Focus on NEW patterns or significant improvements.
 
-```json
-{{.KnownPatternsJSON}}
-```
+Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path before extracting new patterns.
 {{end}}
 
 Now return ONLY the JSON object:

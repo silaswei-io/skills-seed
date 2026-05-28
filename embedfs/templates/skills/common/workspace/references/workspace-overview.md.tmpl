@@ -1,6 +1,23 @@
 # Workspace Overview
 
-This file is the workspace map. It describes entry points, paths, and coordination scope only. For child project architecture, business methods, utilities, and executable rules, read that child skill's `references/project-spec.md` and `references/project-overview.md`.
+This file is the workspace map and AI handoff guide. It describes entry points, paths, and coordination scope. For child project architecture, business methods, utilities, and executable rules, read that child skill's `references/project-spec.md` and `references/project-overview.md`.
+
+{{if .HasUserContext}}
+## User-Provided Workspace Context
+
+{{.UserContext}}
+{{end}}
+
+{{if .HasWorkspaceFacts}}
+## Workspace Facts
+
+{{.WorkspaceFacts}}
+{{end}}
+
+## Gaps To Confirm
+
+- If this file and the child skills do not confirm product boundaries, project responsibility, delivery model, validation commands, or cross-project dependencies, ask the user before continuing.
+- Do not invent workspace facts from path names alone; use repository evidence or user-provided workspace context.
 
 ## Child Projects
 
@@ -10,6 +27,8 @@ This file is the workspace map. It describes entry points, paths, and coordinati
 - Path: `{{.Path}}`
 - Type: `{{.Type}}`
 - Language: `{{.Language}}`
+{{if .Responsibility}}- Responsibility: {{.Responsibility}}{{end}}
+{{if .HasFrameworks}}- Framework/runtime: {{range $i, $framework := .Frameworks}}{{if $i}}, {{end}}`{{$framework}}`{{end}}{{end}}
 {{if .SelfManaged}}
 - Management: child project has its own skills-seed
 - Child config: `{{.SelfManagedConfigPath}}`
@@ -25,15 +44,33 @@ This file is the workspace map. It describes entry points, paths, and coordinati
 No child projects are configured. Check `.skills-seed/config.yaml` `workspace.projects` first.
 {{end}}
 
+{{if .HasDependencies}}
+## Child Project Dependencies
+
+{{range .Dependencies}}
+- `{{.From}}` -> `{{.To}}`: {{.Reason}}
+{{end}}
+{{end}}
+
 ## Routing Table
 
 | Path Pattern | Child Project | What To Read | Default Write Boundary |
 | --- | --- | --- | --- |
-{{range .Projects}}
-{{if .SelfManaged}}
+{{range .Projects -}}
+{{if .SelfManaged -}}
 | `{{.Path}}/**` | `{{.ID}}` | `{{.SelfManagedConfigPath}}`, `{{.SkillPath}}`, and `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
-{{else}}
+{{else -}}
 | `{{.Path}}/**` | `{{.ID}}` | `{{.SkillPath}}` and `{{.ProjectSpecPath}}` | `{{.Path}}/**` |
+{{end -}}
+{{end}}
+
+{{if .HasImpactRoutes}}
+## AI-Analyzed Impact Routes
+
+{{range .ImpactRoutes}}
+- `{{.PathPattern}}`
+  - Affected projects: {{range $i, $id := .ProjectIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}}
+  - Reason: {{.Reason}}
 {{end}}
 {{end}}
 
@@ -44,6 +81,8 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 {{if .HasContracts}}
 {{range .Contracts}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  {{if .Producers}}- Producers: {{range $i, $id := .Producers}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
+  {{if .Consumers}}- Consumers: {{range $i, $id := .Consumers}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
   - After changes, check producers, consumers, generated clients, server handlers, middleware adapters, and tests.
 {{end}}
 {{else}}
@@ -57,6 +96,7 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 {{if .HasShared}}
 {{range .Shared}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  {{if .Consumers}}- Consumers: {{range $i, $id := .Consumers}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
   - After changes, check every child project that imports, packages, or generates this shared content.
 {{end}}
 {{else}}
@@ -70,6 +110,7 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 {{if .HasInfra}}
 {{range .Infra}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
+  {{if .AffectedProjects}}- Affected projects: {{range $i, $id := .AffectedProjects}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
   - After changes, check child projects affected by deployment targets, environment variables, gateway rules, or middleware config.
 {{end}}
 {{else}}

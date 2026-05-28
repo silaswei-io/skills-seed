@@ -23,21 +23,23 @@ Based on the provided project information, analyze the project to identify:
   - {{.}}
 {{- end}}
 {{- end}}
-{{- if .Structure}}
+{{- if .StructurePath}}
 
 # Project Directory Structure
 
-```
-{{.Structure}}
-```
+Project directory structure is available at `{{.StructurePath}}`. Read it by path.
 {{- end}}
-{{- if .StructuralContext}}
+{{- if .StructuralContextPath}}
 
 # CodeGraph Structural Context
 
-The following context was produced from the target project's CodeGraph index. Treat it as structured evidence for symbols, call relationships, entry points, module dependencies, and impact radius. Use it to prioritize files and relationships, but still read source files when detailed business behavior or exact examples are needed.
+CodeGraph structural context is available at `{{.StructuralContextPath}}`. Treat it as structured evidence for symbols, call relationships, entry points, module dependencies, and impact radius. Use it to prioritize files and relationships, but still read source files when detailed business behavior or exact examples are needed.
+{{- end}}
+{{- if .UserContextPath}}
 
-{{.StructuralContext}}
+# User-Provided Context
+
+User-provided context for this learn run is available at `{{.UserContextPath}}`. Read it by path and treat it as high-priority context about product, delivery, repository organization, or validation boundaries, but do not invent facts beyond it.
 {{- end}}
 {{- if .MainFiles}}
 
@@ -57,13 +59,11 @@ The following are representative code file paths selected from the project. You 
 - {{.Path}}
 {{- end}}
 {{- end}}
-{{- if .KnownPatternsJSON}}
+{{- if .KnownPatternsPath}}
 
 # Existing Patterns ({{.KnownPatternsCount}})
 
-The following patterns already exist in project memory. Do not re-emit the same rule under a new name. If changed code adds evidence to an existing pattern, reuse the existing concept and output only materially new information.
-
-{{.KnownPatternsJSON}}
+Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path. Do not re-emit the same rule under a new name. If changed code adds evidence to an existing pattern, reuse the existing concept and output only materially new information.
 {{- end}}
 
 # Analysis Requirements

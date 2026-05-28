@@ -9,6 +9,25 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 - When changing contracts, shared libraries, or deployment config, identify producers, consumers, and runtime impact before reading affected skills.
 - Do not promote a child project's local convention into a workspace-wide rule unless multiple projects depend on it.
 - When special paths are not configured, infer contract, shared, and infrastructure impact from filenames, directory names, and imports.
+- If the workspace overview or child skills cannot confirm an important boundary, ask the user during task execution.
+
+{{if .HasRules}}
+## Workspace-Specific Rules
+
+{{range .Rules}}
+- **{{.Title}}**: {{.Description}}{{if .AppliesTo}} (applies to {{range $i, $id := .AppliesTo}}{{if $i}}, {{end}}`{{$id}}`{{end}}){{end}}
+{{end}}
+{{end}}
+
+{{if .HasRouting}}
+## Workspace-Specific Routes
+
+{{range .Routing}}
+- `{{.PathPattern}}`
+  - Read projects: {{range $i, $id := .ProjectIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}}
+  - Reason: {{.Reason}}
+{{end}}
+{{end}}
 
 ## Impact Radius
 
@@ -40,6 +59,11 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 
 ## Change Order
 
+{{if .HasChangeOrder}}
+{{range $i, $step := .ChangeOrder}}
+{{add $i 1}}. {{$step}}
+{{end}}
+{{else}}
 1. List affected paths and child projects.
 2. Read the workspace overview to confirm child skill paths.
 3. If contracts or shared interfaces are involved, update the contract source, schema, public types, or shared signatures first.
@@ -47,6 +71,7 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 5. Update consumer calls, generated code, adapters, and tests.
 6. Update infrastructure, environment variables, gateway rules, middleware, or CI.
 7. Verify consistency across generated artifacts, interface shapes, error codes, config keys, build commands, and test scope.
+{{end}}
 
 ## Load Multiple Skills When
 
@@ -64,6 +89,11 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 {{if .HasInfra}}
 - A configured infrastructure path changes; read child skills affected by deployment, config, gateway, or middleware rules.
 {{end}}
+{{if .HasLoadMultipleWhen}}
+{{range .LoadMultipleWhen}}
+- {{.Condition}}: read {{range $i, $id := .ProjectIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}} together; {{.Reason}}
+{{end}}
+{{end}}
 
 ## Parallel Agent Constraints
 
@@ -72,6 +102,14 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 - Before parallel work, define each agent's read/write boundary and affected child projects.
 - Consumer projects must not proceed in parallel until the contract or shared interface is stable.
 - Before merging parallel results, verify interface shapes, error codes, environment variables, generated artifacts, build commands, and tests together.
+{{if .HasParallelGuidance}}
+
+### Workspace-Specific Parallel Rules
+
+{{range .ParallelGuidance}}
+- `{{.Scope}}`: {{if .Allowed}}parallel work is allowed{{else}}parallel work is not allowed{{end}}. Condition: {{.Condition}}
+{{end}}
+{{end}}
 
 ## Response Requirements
 

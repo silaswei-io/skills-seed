@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
@@ -14,6 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
@@ -21,8 +23,10 @@ import (
 )
 
 var (
-	outputPath string
-	merge      bool // 是否在生成前合并模式
+	outputPath  string
+	merge       bool // 是否在生成前合并模式
+	contextText string
+	contextFile string
 )
 
 // Cmd 返回 generate 命令
@@ -49,12 +53,19 @@ func Cmd(cont *container.Container) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
 	cmd.Flags().BoolVarP(&merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
+	cmd.Flags().StringVar(&contextText, "context", "", i18n.Get("GenerateFlagContext"))
+	cmd.Flags().StringVar(&contextFile, "context-file", "", i18n.Get("GenerateFlagContextFile"))
 
 	return cmd
 }
 
 func runGenerate(cont *container.Container, cmd *cobra.Command) error {
-	ctx := context.Background()
+	userContext, err := commandutil.ResolveRuntimeContext(contextText, contextFile)
+	if err != nil {
+		return err
+	}
+	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
+	ctx = runtimecontext.WithUserContext(ctx, userContext)
 	tracker := progress.New(2)
 
 	logger.Info(i18n.Get("GenerateStarting"))
@@ -78,7 +89,7 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 		logger.Warn(i18n.Get("GenerateNoPatterns"))
 		return nil
 	}
-	if err := requireAgentForGenerate(cont, isWorkspaceMode); err != nil {
+	if err := requireAgentForGenerate(cont, isWorkspaceMode, userContext); err != nil {
 		return err
 	}
 
@@ -160,13 +171,15 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 		if err := commandutil.LockConfiguredMode(ctx, childCont); err != nil {
 			return err
 		}
+		childCtx := runtimecontext.WithoutUserContext(ctx)
+		childCtx = runtimecontext.WithSeedPath(childCtx, childCont.SeedPath)
 		if generationModeRequiresAgent(childCont) {
 			if err := commandutil.RequireAgentAvailable(childCont); err != nil {
 				return err
 			}
 		}
 		childOutputPath := outputPathForCurrentProvider(childCont)
-		if err := childCont.GeneratorSvc.GenerateSkills(ctx, childOutputPath); err != nil {
+		if err := childCont.GeneratorSvc.GenerateSkills(childCtx, childOutputPath); err != nil {
 			var manualErr *generator.ManualSkillExistsError
 			if errors.As(err, &manualErr) {
 				logger.Warn(i18n.GetWithParams("GenerateWorkspaceChildManualSkillSkipped", map[string]interface{}{
@@ -182,14 +195,17 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 	})
 }
 
-func requireAgentForGenerate(cont *container.Container, isWorkspaceMode bool) error {
+func requireAgentForGenerate(cont *container.Container, isWorkspaceMode bool, userContext string) error {
 	if merge {
 		return commandutil.RequireAgentAvailable(cont)
 	}
 	if isWorkspaceMode {
+		if generationModeRequiresAgent(cont) || strings.TrimSpace(userContext) != "" {
+			return commandutil.RequireAgentAvailable(cont)
+		}
 		return nil
 	}
-	if generationModeRequiresAgent(cont) {
+	if generationModeRequiresAgent(cont) || strings.TrimSpace(userContext) != "" {
 		return commandutil.RequireAgentAvailable(cont)
 	}
 	return nil

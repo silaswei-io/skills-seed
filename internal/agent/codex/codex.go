@@ -94,11 +94,22 @@ func (c *CodexAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest)
 
 // LearnFromCommit 从提交中学习
 func (c *CodexAgent) LearnFromCommit(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error) {
-	data := map[string]interface{}{
-		"Commits":            []domain.CommitInfo{req.Commit},
-		"CommitFiles":        []agent.CommitFileChange{{Commit: req.Commit, Files: req.ChangedFiles}},
-		"KnownPatternsJSON":  req.KnownPatternsJSON,
-		"KnownPatternsCount": req.KnownPatternsCount,
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-learn")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.BatchLearnPromptData(
+		session,
+		[]domain.CommitInfo{req.Commit},
+		[]agent.CommitFileChange{{Commit: req.Commit, Files: req.ChangedFiles}},
+		req.KnownPatternsJSON,
+		req.KnownPatternsPath,
+		req.KnownPatternsCount,
+	)
+	if err != nil {
+		return nil, err
 	}
 	prompt, err := c.promptLoader.Render("batch-learn", data)
 	if err != nil || prompt == "" {
@@ -124,11 +135,15 @@ func (c *CodexAgent) LearnFromCommit(ctx context.Context, req *agent.LearnReques
 
 // BatchLearnFromCommits 批量从多个提交中学习
 func (c *CodexAgent) BatchLearnFromCommits(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
-	data := map[string]interface{}{
-		"Commits":            req.Commits,
-		"CommitFiles":        req.CommitFiles,
-		"KnownPatternsJSON":  req.KnownPatternsJSON,
-		"KnownPatternsCount": req.KnownPatternsCount,
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-batch-learn")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.BatchLearnPromptData(session, req.Commits, req.CommitFiles, req.KnownPatternsJSON, req.KnownPatternsPath, req.KnownPatternsCount)
+	if err != nil {
+		return nil, err
 	}
 	prompt, err := c.promptLoader.Render("batch-learn", data)
 	if err != nil || prompt == "" {
@@ -180,12 +195,15 @@ func (c *CodexAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixes
 
 // GenerateSkillsSummary 汇总生成技能内容
 func (c *CodexAgent) GenerateSkillsSummary(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-	data := map[string]interface{}{
-		"PROJECT_NAME":         req.ProjectName,
-		"LANGUAGE":             req.Language,
-		"PATTERNS_JSON":        req.PatternsJSON,
-		"PATTERNS_COUNT":       req.PatternsCount,
-		"EXISTING_SKILLS_PATH": req.ExistingSkillsPath,
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-generate")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.GenerateSkillsPromptData(session, req)
+	if err != nil {
+		return nil, err
 	}
 	prompt, err := c.promptLoader.Render("generate_skills_summary", data)
 	if err != nil || prompt == "" {
@@ -243,16 +261,15 @@ func (c *CodexAgent) MergePatterns(ctx context.Context, req *agent.MergePatterns
 
 // AnalyzeProject 分析项目结构
 func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-	data := map[string]interface{}{
-		"ProjectName":         req.ProjectName,
-		"RootPath":            req.RootPath,
-		"Language":            req.Language,
-		"Structure":           req.Structure,
-		"StructuralContext":   req.StructuralContext,
-		"ReadmePath":          req.ReadmePath,
-		"MainFiles":           req.MainFiles,
-		"ExistingProfileJSON": req.ExistingProfileJSON,
-		"FocusPaths":          req.FocusPaths,
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-project-analysis")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.AnalyzeProjectPromptData(session, req)
+	if err != nil {
+		return nil, err
 	}
 	prompt, err := c.promptLoader.Render("project-analysis", data)
 	if err != nil || prompt == "" {
@@ -288,7 +305,17 @@ func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProje
 
 // AnalyzeCurrentCodebase 分析当前代码库，提取初始模式
 func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-	prompt, err := c.promptLoader.Render("init-skills", req)
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-init-skills")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.AnalyzeCurrentCodebasePromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := c.promptLoader.Render("init-skills", data)
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
@@ -312,6 +339,73 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 		"common_patterns_count", len(result.CommonPatterns),
 	)
 	return result, nil
+}
+
+// AnalyzeWorkspaceProfile 分析工作区结构和跨项目关系
+func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+	prompt, err := c.promptLoader.Render("workspace-profile", workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
+	if err != nil || prompt == "" {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
+	}
+
+	output, err := c.callCodex(ctx, "AnalyzeWorkspaceProfile", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexProjectAnalysisFailed"), err)
+	}
+
+	result, err := parser.ParseWorkspaceProfile(output)
+	if err != nil {
+		return nil, err
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
+		"agent", c.Name(),
+		"operation", "AnalyzeWorkspaceProfile",
+		"projects_count", len(result.Projects),
+		"impact_routes_count", len(result.ImpactRoutes),
+	)
+	return result, nil
+}
+
+// AnalyzeWorkspaceSpec 生成工作区级开发规范
+func (c *CodexAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+	data := workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
+	prompt, err := c.promptLoader.Render("workspace-spec", data)
+	if err != nil || prompt == "" {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
+	}
+
+	output, err := c.callCodex(ctx, "AnalyzeWorkspaceSpec", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexProjectAnalysisFailed"), err)
+	}
+
+	result, err := parser.ParseWorkspaceSpec(output)
+	if err != nil {
+		return nil, err
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
+		"agent", c.Name(),
+		"operation", "AnalyzeWorkspaceSpec",
+		"routing_count", len(result.Routing),
+		"rules_count", len(result.Rules),
+	)
+	return result, nil
+}
+
+func workspacePromptData(workspaceName, workspaceRoot, workspaceInputPath, workspaceProfilePath, userContextPath string) map[string]interface{} {
+	return map[string]interface{}{
+		"WorkspaceName":        workspaceName,
+		"WorkspaceRoot":        workspaceRoot,
+		"WorkspaceInputPath":   workspaceInputPath,
+		"WorkspaceProfilePath": workspaceProfilePath,
+		"UserContextPath":      userContextPath,
+	}
 }
 
 func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string) (string, error) {

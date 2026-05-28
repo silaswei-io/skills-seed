@@ -20,7 +20,18 @@ You may receive:
 - Child project summaries: languages, frameworks, module responsibilities, and project spec summaries.
 - Learned patterns: possibly scoped by `project_id`, `scope_path`, and `workspace_role`.
 
+# Input Files
+
+- Workspace input: `{{.WorkspaceInputPath}}`
+- Workspace profile: `{{.WorkspaceProfilePath}}`
+{{- if .UserContextPath}}
+- User-provided context: `{{.UserContextPath}}`
+{{- end}}
+
+Read these files by path. Do not expect their contents to be embedded in this prompt. Use the workspace profile as the primary evidence for routes, rules, and change order.
+
 Prefer evidence that includes paths and project IDs. Do not invent relationships that cannot be confirmed.
+The AI call is non-interactive; do not ask the user outside the JSON. If an unconfirmed relationship affects execution, make the rule require asking the user during task execution.
 
 # Output Requirements
 

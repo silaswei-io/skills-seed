@@ -14,18 +14,31 @@ Separate these facts carefully:
 # Required Findings
 
 1. Project index: ID, path, responsibility, role, primary language, and key framework/runtime.
-2. Shared paths: code, config, SDKs, generated artifacts, or tooling consumed by multiple projects.
-3. Contract paths: OpenAPI, protobuf, GraphQL schemas, IDL, database schemas, event definitions, or generated-code inputs.
-4. Infrastructure paths: Docker, Kubernetes, Helm, CI/CD, deployment scripts, environment config, gateway, or middleware config.
-5. Dependency direction: frontend to backend, backend to shared library, middleware to service, contract to generated output, deployment config to runtime service.
-6. Impact radius: which paths affect multiple projects and which projects must be checked together.
-7. Routing hints: which child `.agents/.claude` skills must be read before editing each path family.
+2. Workspace context: product/business context, repository model, and delivery or validation boundaries. Only write facts supported by repository evidence.
+3. Shared paths: code, config, SDKs, generated artifacts, or tooling consumed by multiple projects.
+4. Contract paths: OpenAPI, protobuf, GraphQL schemas, IDL, database schemas, event definitions, or generated-code inputs.
+5. Infrastructure paths: Docker, Kubernetes, Helm, CI/CD, deployment scripts, environment config, gateway, or middleware config.
+6. Dependency direction: frontend to backend, backend to shared library, middleware to service, contract to generated output, deployment config to runtime service.
+7. Common tasks and validation: record only task entry points and commands confirmed by README files, scripts, CI, build files, or config.
+8. Impact radius: which paths affect multiple projects and which projects must be checked together.
+9. Routing hints: which child `.agents/.claude` skills must be read before editing each path family.
+10. Open questions: when product context, delivery model, common tasks, validation commands, or dependencies cannot be confirmed, briefly note in `summary` that the information must be confirmed during task execution instead of inventing details.
+
+# Input Files
+
+- Workspace input: `{{.WorkspaceInputPath}}`
+{{- if .UserContextPath}}
+- User-provided context: `{{.UserContextPath}}`
+{{- end}}
+
+Read these files by path. Do not expect their contents to be embedded in this prompt.
 
 # Rules
 
 - Do not describe the workspace as a single monolithic project.
 - Do not promote a local child-project convention to a workspace rule unless multiple projects depend on it.
-- If a relationship cannot be confirmed from repository structure, config, README, build files, or input context, use an empty array or a short TODO. Do not invent facts.
+- If a relationship cannot be confirmed from repository structure, config, README, build files, or input context, record the uncertainty in `summary` or use an empty array. Do not invent facts.
+- The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
 - Preserve paths, commands, config keys, environment variables, protocol names, and file names verbatim.
 
 # Output Format
@@ -36,6 +49,7 @@ Return only a valid JSON object with this structure:
 {
   "name": "workspace name",
   "root_path": "workspace root path",
+  "summary": "workspace-level factual summary; may include product context, repository model, delivery boundary, and still-unconfirmed information when supported by repository evidence",
   "projects": [
     {
       "id": "frontend",
@@ -81,8 +95,7 @@ Return only a valid JSON object with this structure:
       "project_ids": ["frontend", "backend"],
       "reason": "contract changes require generated clients and server handlers to be checked"
     }
-  ],
-  "summary": "workspace-level factual summary"
+  ]
 }
 ```
 

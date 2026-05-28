@@ -740,3 +740,67 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 		Summary:           result.Summary,
 	}, nil
 }
+
+// ParseWorkspaceProfile 解析工作区画像结果
+func ParseWorkspaceProfile(output string) (*domain.WorkspaceProfile, error) {
+	jsonStr, err := ExtractJSON(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
+	}
+
+	var profile domain.WorkspaceProfile
+	if err := json.Unmarshal([]byte(jsonStr), &profile); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+	if profile.Projects == nil {
+		profile.Projects = []domain.WorkspaceProject{}
+	}
+	if profile.Shared == nil {
+		profile.Shared = []domain.WorkspacePath{}
+	}
+	if profile.Contracts == nil {
+		profile.Contracts = []domain.WorkspacePath{}
+	}
+	if profile.Infra == nil {
+		profile.Infra = []domain.WorkspacePath{}
+	}
+	if profile.Dependencies == nil {
+		profile.Dependencies = []domain.WorkspaceDependency{}
+	}
+	if profile.ImpactRoutes == nil {
+		profile.ImpactRoutes = []domain.WorkspaceRoute{}
+	}
+	return &profile, nil
+}
+
+// ParseWorkspaceSpec 解析工作区开发规范结果
+func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
+	jsonStr, err := ExtractJSON(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
+	}
+
+	var spec domain.WorkspaceSpec
+	if err := json.Unmarshal([]byte(jsonStr), &spec); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+	if spec.Projects == nil {
+		spec.Projects = []domain.WorkspaceProject{}
+	}
+	if spec.Routing == nil {
+		spec.Routing = []domain.WorkspaceRoute{}
+	}
+	if spec.Rules == nil {
+		spec.Rules = []domain.WorkspaceRule{}
+	}
+	if spec.ChangeOrder == nil {
+		spec.ChangeOrder = []string{}
+	}
+	if spec.ParallelAgentGuidance == nil {
+		spec.ParallelAgentGuidance = []domain.WorkspaceParallelGuidance{}
+	}
+	if spec.LoadMultipleSkillsWhen == nil {
+		spec.LoadMultipleSkillsWhen = []domain.WorkspaceLoadMultipleSkill{}
+	}
+	return &spec, nil
+}

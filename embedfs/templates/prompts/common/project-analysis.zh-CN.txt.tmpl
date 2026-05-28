@@ -7,21 +7,23 @@
 - **项目名称**: {{.ProjectName}}
 - **项目路径**: {{.RootPath}}
 - **主要语言**: {{.Language}}
-{{- if .Structure}}
+{{- if .StructurePath}}
 
 # 项目目录结构
 
-```
-{{.Structure}}
-```
+项目目录结构位于 `{{.StructurePath}}`。请按路径读取。
 {{- end}}
-{{- if .StructuralContext}}
+{{- if .StructuralContextPath}}
 
 # CodeGraph 结构化上下文
 
-以下上下文来自目标项目的 CodeGraph 索引。请把它作为符号、调用关系、入口点、模块依赖和影响范围的结构化证据，用它来优先判断需要查看的文件和关系；涉及具体业务行为或代码示例时，仍需要按路径读取源码确认。
+CodeGraph 结构化上下文位于 `{{.StructuralContextPath}}`。请把它作为符号、调用关系、入口点、模块依赖和影响范围的结构化证据，用它来优先判断需要查看的文件和关系；涉及具体业务行为或代码示例时，仍需要按路径读取源码确认。
+{{- end}}
+{{- if .UserContextPath}}
 
-{{.StructuralContext}}
+# 用户提供的上下文
+
+用户为本次学习提供的业务、交付、仓库组织或验证说明位于 `{{.UserContextPath}}`。请按路径读取，并作为高优先级上下文使用；仍不要编造其中没有覆盖的事实。
 {{- end}}
 {{- if .MainFiles}}
 
@@ -37,15 +39,13 @@
 
 - {{.ReadmePath}}
 {{- end}}
-{{- if .ExistingProfileJSON}}
+{{- if .ExistingProfilePath}}
 
 # 已有项目画像
 
 本次是增量刷新。请以已有画像作为基线；如果提供了 focus 路径，只检查这些路径和直接相关文件；最终仍返回一份完整合并后的项目画像 JSON
 
-```json
-{{.ExistingProfileJSON}}
-```
+已有项目画像 JSON 位于 `{{.ExistingProfilePath}}`。请按路径读取。
 {{- end}}
 {{- if .FocusPaths}}
 

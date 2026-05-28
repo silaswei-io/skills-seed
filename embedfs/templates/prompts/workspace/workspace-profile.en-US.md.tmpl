@@ -12,12 +12,14 @@ Workspace root:
 {{.WorkspaceRoot}}
 ```
 
-Detected projects:
+Detected child projects:
 {{range .Projects}}
 - `{{.ID}}`: `{{.Path}}`, type `{{.Type}}`, language `{{.Language}}`
 {{else}}
-- No projects detected yet. Infer candidates from build files and directory boundaries first.
+- No child projects detected yet; prefer build files and directory boundaries when identifying candidates.
 {{end}}
+
+Runtime input file paths are provided by the base prompt. Do not write fixed input paths or one-shot user context content in this editable supplemental prompt.
 
 # Analysis Goal
 
@@ -26,10 +28,12 @@ Output workspace-level facts only. This prompt feeds the root `.claude/.agents` 
 Prioritize these facts:
 
 1. Child project responsibilities and boundaries: what each project owns, exposes, and depends on.
-2. Shared/contracts/infra path responsibilities: whether these paths are consumed by multiple projects and which projects must be checked after changes.
-3. Dependency direction across frontend, backend, middleware, shared libraries, contracts, and deployment config.
-4. Synchronization relationships among API contracts, generated code, SDKs, deployment config, environment variables, database schemas, and tests.
-5. Impact radius: paths that require multiple child project skills to be read together.
+2. Workspace context: product/business context, repository model, and delivery or validation boundaries. Only write facts confirmed from repository evidence.
+3. Shared/contracts/infra path responsibilities: whether these paths are consumed by multiple projects and which projects must be checked after changes.
+4. Common tasks and validation: record only task entry points and commands confirmed by README files, scripts, CI, build files, or config.
+5. Dependency direction across frontend, backend, middleware, shared libraries, contracts, and deployment config.
+6. Synchronization relationships among API contracts, generated code, SDKs, deployment config, environment variables, database schemas, and tests.
+7. Impact radius: paths that require multiple child project skills to be read together.
 
 # Routing Hints
 
@@ -42,5 +46,6 @@ Write routing as executable decisions, for example:
 # Constraints
 
 - Do not turn one child project's internal rules into workspace rules.
-- If a dependency cannot be confirmed, keep a TODO and name the evidence path that should be inspected.
+- If a dependency relationship, product context, delivery model, common task, or validation command cannot be confirmed, briefly record the point in `summary` and name the evidence path that should be inspected.
+- The AI call is non-interactive; do not ask the user in the generated response. Record which information must be confirmed during actual task execution.
 - Preserve paths, commands, config keys, environment variables, and code identifiers verbatim.

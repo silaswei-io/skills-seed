@@ -2,6 +2,32 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.6]
+
+### Features
+
+- Add `--context` / `--context-file` to `learn current` and `generate-skills` for one-shot user guidance during a single run
+- Make workspace root skill generation run extra workspace fact/profile and development-rule analysis when `generation.mode = ai` or runtime context is provided, then merge the result into root skill references
+- Add structured workspace analysis for project responsibilities, frameworks/runtimes, child-project dependencies, impact routes, workspace-specific rules, change order, and parallel-agent boundaries
+- Add Claude and Codex Agent support for workspace profile/spec analysis, parsed into `WorkspaceProfile` / `WorkspaceSpec`
+
+### Templates
+
+- Simplify the workspace root `SKILL.md` so it focuses on routing, child-skill selection, and cross-project rule decisions
+- Expand `workspace-overview.md` with user-provided guidance, AI-analyzed workspace facts, dependencies, impact routes, responsibilities, and framework information
+- Expand `cross-project-rules.md` with workspace-specific rules, routes, change order, multi-skill loading cases, and parallel-agent constraints
+- Update learning, profile, and generation prompts to read large inputs and one-shot user guidance through file paths
+
+### Experience
+
+- Write large Agent inputs to temporary files under `.skills-seed/memory/runtime`, reducing rendered prompt size
+- Mask root-level one-shot context while generating child-project skills from a workspace root, preventing workspace guidance from leaking into child skills
+- Require an available Agent when runtime context is provided, even in the default template generation mode, so the context can affect generated output
+
+### Documentation
+
+- Remove outdated project architecture, generation pipeline, and incremental-learning design/plan documents
+
 ## [v0.0.5]
 
 ### Features

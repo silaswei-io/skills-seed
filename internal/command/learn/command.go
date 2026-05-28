@@ -17,6 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
@@ -39,6 +40,8 @@ var (
 	language               string
 	focusPaths             []string
 	learnCurrentProfileOpt string
+	contextText            string
+	contextFile            string
 )
 
 // Cmd 返回 learn 命令
@@ -65,6 +68,8 @@ func Cmd(cont *container.Container) *cobra.Command {
 	currentCmd.Flags().StringVarP(&language, "language", "l", "", i18n.Get("LearnFlagLanguage"))
 	currentCmd.Flags().StringArrayVarP(&focusPaths, "focus", "f", nil, i18n.Get("LearnFlagFocus"))
 	currentCmd.Flags().StringVar(&learnCurrentProfileOpt, "profile", learnCurrentProfileAuto, i18n.Get("LearnFlagProfile"))
+	currentCmd.Flags().StringVar(&contextText, "context", "", i18n.Get("LearnFlagContext"))
+	currentCmd.Flags().StringVar(&contextFile, "context-file", "", i18n.Get("LearnFlagContextFile"))
 
 	// learn history 子命令
 	historyCmd := &cobra.Command{
@@ -112,10 +117,15 @@ func runLearnCurrent(cont *container.Container) error {
 }
 
 func runLearnCurrentProject(cont *container.Container) error {
-	_, err := runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
+	userContext, err := commandutil.ResolveRuntimeContext(contextText, contextFile)
+	if err != nil {
+		return err
+	}
+	_, err = runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
 		showProgress:     true,
 		showDetailedLogs: true,
 		showNextSteps:    true,
+		userContext:      userContext,
 	})
 	return err
 }
@@ -125,6 +135,7 @@ type learnCurrentProjectOptions struct {
 	showProgress     bool
 	showDetailedLogs bool
 	showNextSteps    bool
+	userContext      string
 }
 
 type learnCurrentProjectResult struct {
@@ -145,6 +156,8 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	}
 
 	ctx := agent.WithTokenUsageScope(context.Background(), opts.tokenScope)
+	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
+	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	startedAt := time.Now()
 	tracker := progress.New(5)
 	runStep := func(label string, fn func() error) error {
@@ -522,7 +535,12 @@ func resolveIncrementalFocusPaths(projectRoot string, relPaths []string) []strin
 }
 
 func runLearnWorkspaceCurrent(cont *container.Container) error {
-	ctx := context.Background()
+	userContext, err := commandutil.ResolveRuntimeContext(contextText, contextFile)
+	if err != nil {
+		return err
+	}
+	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
+	ctx = runtimecontext.WithUserContext(ctx, userContext)
 	startedAt := time.Now()
 	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
@@ -555,7 +573,7 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 		"Parallelism": parallelism,
 	}), "projects", len(workspaceConfig.Projects), "parallelism", parallelism)
 
-	err := workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
+	err = workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
 		projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
 		if showChildDetails {
 			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectInfo", map[string]interface{}{

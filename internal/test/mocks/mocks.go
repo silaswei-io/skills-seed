@@ -11,16 +11,18 @@ import (
 
 // MockAgent 模拟 AI Agent
 type MockAgent struct {
-	NameVal                  string
-	AvailableVal             bool
-	AnalyzeCodeFn            func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error)
-	LearnFromCommitFn        func(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error)
-	BatchLearnFromCommitsFn  func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error)
-	GenerateFixesFn          func(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error)
-	GenerateSkillsSummaryFn  func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)
-	MergePatternsFn          func(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error)
-	AnalyzeProjectFn         func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
-	AnalyzeCurrentCodebaseFn func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
+	NameVal                   string
+	AvailableVal              bool
+	AnalyzeCodeFn             func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error)
+	LearnFromCommitFn         func(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error)
+	BatchLearnFromCommitsFn   func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error)
+	GenerateFixesFn           func(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error)
+	GenerateSkillsSummaryFn   func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)
+	MergePatternsFn           func(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error)
+	AnalyzeProjectFn          func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
+	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
+	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
+	AnalyzeWorkspaceSpecFn    func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 }
 
 // Name 返回模拟 Agent 名称
@@ -101,6 +103,22 @@ func (m *MockAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Analy
 		return m.AnalyzeCurrentCodebaseFn(ctx, req)
 	}
 	return &agent.AnalyzeCurrentCodebaseResult{}, nil
+}
+
+// AnalyzeWorkspaceProfile 模拟工作区画像分析
+func (m *MockAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+	if m.AnalyzeWorkspaceProfileFn != nil {
+		return m.AnalyzeWorkspaceProfileFn(ctx, req)
+	}
+	return &domain.WorkspaceProfile{}, nil
+}
+
+// AnalyzeWorkspaceSpec 模拟工作区规范分析
+func (m *MockAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+	if m.AnalyzeWorkspaceSpecFn != nil {
+		return m.AnalyzeWorkspaceSpecFn(ctx, req)
+	}
+	return &domain.WorkspaceSpec{}, nil
 }
 
 // MockGitRepository 模拟 Git 仓储

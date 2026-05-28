@@ -12,6 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -506,6 +507,46 @@ func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testin
 	assert.Contains(t, received.ExistingProfileJSON, `"architecture": "Clean Architecture"`)
 	assert.Contains(t, received.Structure, "Focused scan paths")
 	assert.Contains(t, received.Structure, "internal/service")
+}
+
+func TestAnalyzeProjectFullWithOptions_PassesRuntimeUserContext(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	var received agent.AnalyzeProjectRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			received = *req
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+	ctx := runtimecontext.WithUserContext(context.Background(), "私有化 HSM 工作区，交付物是离线安装包。")
+
+	_, err := svc.AnalyzeProjectFullWithOptions(ctx, tmpDir, "test-project", "go", AnalyzeProjectOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, "私有化 HSM 工作区，交付物是离线安装包。", received.UserContext)
+}
+
+func TestAnalyzeCodebaseFullWithOptions_PassesRuntimeUserContext(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API，core-engine 是核心能力库。")
+
+	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test-project", "go", AnalyzeCodebaseOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, "hsmwebapi 是管理 API，core-engine 是核心能力库。", received.UserContext)
 }
 
 type fakeCodeGraphCollector struct {

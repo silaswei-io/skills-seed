@@ -17,6 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -26,6 +27,8 @@ func TestCmdDoesNotExposeWorkspaceChildSkillPolicyFlags(t *testing.T) {
 
 	require.Nil(t, cmd.Flags().Lookup("overwrite"))
 	require.Nil(t, cmd.Flags().Lookup("root-only"))
+	require.NotNil(t, cmd.Flags().Lookup("context"))
+	require.NotNil(t, cmd.Flags().Lookup("context-file"))
 }
 
 func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
@@ -110,6 +113,31 @@ func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
 	require.GreaterOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
 }
 
+func TestGenerateWorkspaceChildSkillsDoesNotPassWorkspaceContextToChildren(t *testing.T) {
+	resetGenerateFlagsForTest(t)
+	var seenContextsMu sync.Mutex
+	var seenContexts []string
+	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+		seenContextsMu.Lock()
+		defer seenContextsMu.Unlock()
+		seenContexts = append(seenContexts, req.UserContext)
+		return &agent.GenerateSkillsResult{}, nil
+	})
+
+	workspaceRoot := t.TempDir()
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+	setGenerateChildMode(t, childRoot, config.GenerationModeAI)
+	seedGenerateChildMemory(t, childRoot, "Backend Rule")
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
+	defer cont.Close()
+
+	ctx := runtimecontext.WithUserContext(context.Background(), "workspace 根说明不能透传给子项目")
+	require.NoError(t, generateWorkspaceChildSkills(ctx, cont))
+
+	require.Equal(t, []string{""}, seenContexts)
+}
+
 func TestRunGenerateProjectTemplateModeDoesNotRequireAvailableAgent(t *testing.T) {
 	resetGenerateFlagsForTest(t)
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
@@ -127,19 +155,52 @@ func TestRunGenerateProjectTemplateModeDoesNotRequireAvailableAgent(t *testing.T
 		Agent:      &mocks.MockAgent{NameVal: "mock", AvailableVal: false},
 	}
 
-	err = requireAgentForGenerate(cont, false)
+	err = requireAgentForGenerate(cont, false, "")
 	require.NoError(t, err)
+
+	err = requireAgentForGenerate(cont, false, "本次生成补充说明")
+	require.Error(t, err)
+}
+
+func TestRunGenerateWorkspaceTemplateModeRequiresAgentWhenContextProvided(t *testing.T) {
+	resetGenerateFlagsForTest(t)
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Mode = domain.ModeWorkspace
+	cfg.Agent.Provider = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Generation.Mode = config.GenerationModeTemplate
+	require.NoError(t, configRepo.Update(cfg))
+
+	cont := &container.Container{
+		ConfigRepo: configRepo,
+		Agent:      &mocks.MockAgent{NameVal: "mock", AvailableVal: false},
+	}
+
+	err = requireAgentForGenerate(cont, true, "")
+	require.NoError(t, err)
+
+	err = requireAgentForGenerate(cont, true, "workspace 生成补充说明")
+	require.Error(t, err)
 }
 
 func resetGenerateFlagsForTest(t *testing.T) {
 	t.Helper()
 	previousOutputPath := outputPath
 	previousMerge := merge
+	previousContextText := contextText
+	previousContextFile := contextFile
 	outputPath = ""
 	merge = false
+	contextText = ""
+	contextFile = ""
 	t.Cleanup(func() {
 		outputPath = previousOutputPath
 		merge = previousMerge
+		contextText = previousContextText
+		contextFile = previousContextFile
 	})
 }
 

@@ -19,8 +19,10 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/utils"
+	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
 // GeneratorService 生成服务
@@ -56,14 +58,32 @@ type workspaceSkillTemplateData struct {
 	SkillName           string
 	ProjectName         string
 	WorkspaceName       string
+	WorkspaceFacts      string
 	ProjectCount        int
 	Projects            []workspaceProjectTemplateData
-	Shared              []config.WorkspacePathConfig
-	Contracts           []config.WorkspacePathConfig
-	Infra               []config.WorkspacePathConfig
+	UserContext         string
+	HasUserContext      bool
+	Shared              []domain.WorkspacePath
+	Contracts           []domain.WorkspacePath
+	Infra               []domain.WorkspacePath
+	Dependencies        []domain.WorkspaceDependency
+	ImpactRoutes        []domain.WorkspaceRoute
+	Routing             []domain.WorkspaceRoute
+	Rules               []domain.WorkspaceRule
+	ChangeOrder         []string
+	ParallelGuidance    []domain.WorkspaceParallelGuidance
+	LoadMultipleWhen    []domain.WorkspaceLoadMultipleSkill
+	HasWorkspaceFacts   bool
 	HasShared           bool
 	HasContracts        bool
 	HasInfra            bool
+	HasDependencies     bool
+	HasImpactRoutes     bool
+	HasRouting          bool
+	HasRules            bool
+	HasChangeOrder      bool
+	HasParallelGuidance bool
+	HasLoadMultipleWhen bool
 }
 
 type workspaceProjectTemplateData struct {
@@ -72,9 +92,12 @@ type workspaceProjectTemplateData struct {
 	SkillPath             string
 	ProjectSpecPath       string
 	SkillSummary          string
+	Responsibility        string
+	Frameworks            []string
 	SelfManaged           bool
 	SelfManagedConfigPath string
 	UsesChildConfig       bool
+	HasFrameworks         bool
 }
 
 type childSkillTarget struct {
@@ -82,6 +105,27 @@ type childSkillTarget struct {
 	ConfigRepo      config.Reader
 	UsesChildConfig bool
 	ConfigPath      string
+}
+
+type workspaceGenerateInputData struct {
+	Name       string                          `json:"name"`
+	RootPath   string                          `json:"root_path"`
+	Projects   []workspaceGenerateInputProject `json:"projects"`
+	Shared     []config.WorkspacePathConfig    `json:"shared,omitempty"`
+	Contracts  []config.WorkspacePathConfig    `json:"contracts,omitempty"`
+	Infra      []config.WorkspacePathConfig    `json:"infra,omitempty"`
+	ConfigPath string                          `json:"config_path,omitempty"`
+}
+
+type workspaceGenerateInputProject struct {
+	ID              string `json:"id"`
+	Path            string `json:"path"`
+	Type            string `json:"type"`
+	Language        string `json:"language"`
+	SkillPath       string `json:"skill_path,omitempty"`
+	ProjectSpecPath string `json:"project_spec_path,omitempty"`
+	ConfigPath      string `json:"config_path,omitempty"`
+	SelfManaged     bool   `json:"self_managed,omitempty"`
 }
 
 // ManualSkillExistsError 表示目标目录已有非 skills-seed 生成的 SKILL.md
@@ -201,7 +245,8 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 }
 
 func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns []domain.Pattern, resolvedOutputPath string, startedAt time.Time) (*agent.GenerateSkillsResult, error) {
-	if config.NormalizeGenerationMode(s.configRepo.GetGenerationConfig().Mode) != config.GenerationModeAI {
+	userContext := runtimecontext.UserContext(ctx)
+	if config.NormalizeGenerationMode(s.configRepo.GetGenerationConfig().Mode) != config.GenerationModeAI && userContext == "" {
 		return s.templateSkillsSummary(patterns), nil
 	}
 
@@ -231,6 +276,7 @@ func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns [
 		ExistingSkillsPath: existingSkillsPath,
 		ProjectName:        s.configRepo.GetProjectConfig().Name,
 		Language:           s.configRepo.GetProjectConfig().Language,
+		UserContext:        userContext,
 	}
 
 	summaryResult, err := s.agent.GenerateSkillsSummary(ctx, summaryReq)
@@ -289,14 +335,17 @@ func (s *GeneratorService) generateWorkspaceSkills(ctx context.Context) error {
 	if len(workspaceConfig.Projects) == 0 {
 		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
 	}
-	_ = ctx
 
 	projectRoot := projectConfig.RootPath
 	rootOutputPath, err := s.workspaceRootOutputPath(projectRoot, projectConfig.Name)
 	if err != nil {
 		return err
 	}
-	if err := s.writeWorkspaceRootSkill(rootOutputPath, projectConfig, workspaceConfig); err != nil {
+	profile, spec, err := s.analyzeWorkspaceForGenerate(ctx, projectConfig, workspaceConfig)
+	if err != nil {
+		return err
+	}
+	if err := s.writeWorkspaceRootSkill(ctx, rootOutputPath, projectConfig, workspaceConfig, profile, spec); err != nil {
 		return err
 	}
 
@@ -306,6 +355,304 @@ func (s *GeneratorService) generateWorkspaceSkills(ctx context.Context) error {
 		"projects_count", len(workspaceConfig.Projects),
 	)
 	return nil
+}
+
+func (s *GeneratorService) analyzeWorkspaceForGenerate(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) (*domain.WorkspaceProfile, *domain.WorkspaceSpec, error) {
+	userContext := runtimecontext.UserContext(ctx)
+	if config.NormalizeGenerationMode(s.configRepo.GetGenerationConfig().Mode) != config.GenerationModeAI && userContext == "" {
+		return nil, nil, nil
+	}
+	if s.agent == nil {
+		return nil, nil, fmt.Errorf("%s", i18n.Get("GeneratorGenerateSummaryFailed"))
+	}
+
+	workspaceName := workspaceNameOrDefault(projectConfig.Name)
+	projectRoot := projectConfig.RootPath
+	workspaceInput, err := s.workspaceGenerateInput(projectConfig, workspaceConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	runtimeDir := filepath.Join(projectRoot, ".skills-seed", "memory", "runtime")
+	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
+		return nil, nil, err
+	}
+	tmpDir, err := os.MkdirTemp(runtimeDir, "skills-seed-workspace-*")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	inputPath, err := writeJSONFile(filepath.Join(tmpDir, "workspace-input.json"), workspaceInput)
+	if err != nil {
+		return nil, nil, err
+	}
+	userContextPath := ""
+	if userContext != "" {
+		userContextPath = filepath.Join(tmpDir, "user-context.md")
+		if err := os.WriteFile(userContextPath, []byte(userContext+"\n"), 0600); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	profile, err := s.agent.AnalyzeWorkspaceProfile(ctx, &agent.AnalyzeWorkspaceProfileRequest{
+		WorkspaceName:      workspaceName,
+		WorkspaceRoot:      projectRoot,
+		WorkspaceInputPath: inputPath,
+		UserContextPath:    userContextPath,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	profile = mergeWorkspaceProfile(workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig), profile)
+	profilePath, err := writeJSONFile(filepath.Join(tmpDir, "workspace-profile.json"), profile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	spec, err := s.agent.AnalyzeWorkspaceSpec(ctx, &agent.AnalyzeWorkspaceSpecRequest{
+		WorkspaceName:        workspaceName,
+		WorkspaceRoot:        projectRoot,
+		WorkspaceInputPath:   inputPath,
+		WorkspaceProfilePath: profilePath,
+		UserContextPath:      userContextPath,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	spec = mergeWorkspaceSpec(workspaceSpecFromProfile(profile), spec)
+	return profile, spec, nil
+}
+
+func (s *GeneratorService) workspaceGenerateInput(projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) (workspaceGenerateInputData, error) {
+	projectRoot := projectConfig.RootPath
+	input := workspaceGenerateInputData{
+		Name:       workspaceNameOrDefault(projectConfig.Name),
+		RootPath:   projectRoot,
+		Projects:   make([]workspaceGenerateInputProject, 0, len(workspaceConfig.Projects)),
+		Shared:     workspaceConfig.Shared,
+		Contracts:  workspaceConfig.Contracts,
+		Infra:      workspaceConfig.Infra,
+		ConfigPath: filepath.Join(projectRoot, ".skills-seed", "config.yaml"),
+	}
+	for _, project := range workspaceConfig.Projects {
+		target, err := s.childSkillTarget(projectRoot, project)
+		if err != nil {
+			return workspaceGenerateInputData{}, err
+		}
+		configPath := ""
+		if target.UsesChildConfig {
+			configPath = relativeWorkspacePath(projectRoot, target.ConfigPath)
+		}
+		input.Projects = append(input.Projects, workspaceGenerateInputProject{
+			ID:              project.ID,
+			Path:            project.Path,
+			Type:            project.Type,
+			Language:        project.Language,
+			SkillPath:       filepath.ToSlash(filepath.Join(relativeWorkspacePath(projectRoot, target.OutputPath), "SKILL.md")),
+			ProjectSpecPath: filepath.ToSlash(filepath.Join(relativeWorkspacePath(projectRoot, target.OutputPath), "references", "project-spec.md")),
+			ConfigPath:      filepath.ToSlash(configPath),
+			SelfManaged:     target.UsesChildConfig,
+		})
+	}
+	return input, nil
+}
+
+func writeJSONFile(path string, value interface{}) (string, error) {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func workspaceNameOrDefault(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "workspace"
+	}
+	return name
+}
+
+func mergeWorkspaceProfile(base, analyzed *domain.WorkspaceProfile) *domain.WorkspaceProfile {
+	if base == nil {
+		base = &domain.WorkspaceProfile{}
+	}
+	if analyzed == nil {
+		return base
+	}
+	if analyzed.Name != "" {
+		base.Name = analyzed.Name
+	}
+	if analyzed.RootPath != "" {
+		base.RootPath = analyzed.RootPath
+	}
+	base.Summary = analyzed.Summary
+	base.Projects = mergeWorkspaceProjects(base.Projects, analyzed.Projects)
+	base.Shared = chooseWorkspacePaths(base.Shared, analyzed.Shared)
+	base.Contracts = chooseWorkspacePaths(base.Contracts, analyzed.Contracts)
+	base.Infra = chooseWorkspacePaths(base.Infra, analyzed.Infra)
+	base.Dependencies = analyzed.Dependencies
+	base.ImpactRoutes = analyzed.ImpactRoutes
+	base.GeneratedAt = analyzed.GeneratedAt
+	return base
+}
+
+func mergeWorkspaceSpec(base, analyzed *domain.WorkspaceSpec) *domain.WorkspaceSpec {
+	if base == nil {
+		base = &domain.WorkspaceSpec{}
+	}
+	if analyzed == nil {
+		return base
+	}
+	if analyzed.Name != "" {
+		base.Name = analyzed.Name
+	}
+	if analyzed.RootPath != "" {
+		base.RootPath = analyzed.RootPath
+	}
+	if len(analyzed.Projects) > 0 {
+		base.Projects = analyzed.Projects
+	}
+	if len(analyzed.Routing) > 0 {
+		base.Routing = analyzed.Routing
+	}
+	if len(analyzed.Rules) > 0 {
+		base.Rules = analyzed.Rules
+	}
+	base.ChangeOrder = analyzed.ChangeOrder
+	base.ParallelAgentGuidance = analyzed.ParallelAgentGuidance
+	base.LoadMultipleSkillsWhen = analyzed.LoadMultipleSkillsWhen
+	if analyzed.GeneratedAt != "" {
+		base.GeneratedAt = analyzed.GeneratedAt
+	}
+	return base
+}
+
+func workspaceSpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
+	if profile == nil {
+		return &domain.WorkspaceSpec{}
+	}
+	routing := make([]domain.WorkspaceRoute, 0, len(profile.Projects)+len(profile.Shared)+len(profile.Contracts)+len(profile.Infra)+len(profile.ImpactRoutes))
+	for _, project := range profile.Projects {
+		routing = append(routing, domain.WorkspaceRoute{
+			PathPattern: filepath.ToSlash(filepath.Join(project.Path, "**")),
+			ProjectIDs:  []string{project.ID},
+			Reason:      "子项目路径只路由到该子项目的独立 skill",
+		})
+	}
+	for _, route := range profile.ImpactRoutes {
+		routing = append(routing, route)
+	}
+	projectIDs := workspaceProfileProjectIDs(profile.Projects)
+	for _, path := range profile.Contracts {
+		routing = append(routing, domain.WorkspaceRoute{
+			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
+			ProjectIDs:  nonEmptyStrings(append(append([]string{}, path.Producers...), path.Consumers...), projectIDs),
+			Reason:      firstNonEmpty(path.Description, "契约路径变更需要检查生产者、消费者和生成物"),
+		})
+	}
+	for _, path := range profile.Shared {
+		routing = append(routing, domain.WorkspaceRoute{
+			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
+			ProjectIDs:  nonEmptyStrings(path.Consumers, projectIDs),
+			Reason:      firstNonEmpty(path.Description, "共享代码变更需要检查所有导入方或复用方"),
+		})
+	}
+	for _, path := range profile.Infra {
+		routing = append(routing, domain.WorkspaceRoute{
+			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
+			ProjectIDs:  nonEmptyStrings(path.AffectedProjects, projectIDs),
+			Reason:      firstNonEmpty(path.Description, "基础设施变更需要检查受部署或运行时配置影响的子项目"),
+		})
+	}
+	return &domain.WorkspaceSpec{
+		Name:     profile.Name,
+		RootPath: profile.RootPath,
+		Projects: profile.Projects,
+		Routing:  routing,
+		Rules: []domain.WorkspaceRule{
+			{
+				Title:       "跨项目改动先定边界",
+				Description: "修改契约、共享代码或基础设施前，先确认受影响子项目并读取对应 skill。",
+				AppliesTo:   projectIDs,
+			},
+		},
+	}
+}
+
+func mergeWorkspaceProjects(base, analyzed []domain.WorkspaceProject) []domain.WorkspaceProject {
+	if len(base) == 0 {
+		return analyzed
+	}
+	byID := make(map[string]domain.WorkspaceProject, len(analyzed))
+	for _, project := range analyzed {
+		byID[project.ID] = project
+	}
+	result := make([]domain.WorkspaceProject, 0, len(base))
+	for _, project := range base {
+		if analyzedProject, ok := byID[project.ID]; ok {
+			if analyzedProject.Path != "" {
+				project.Path = analyzedProject.Path
+			}
+			if analyzedProject.Type != "" {
+				project.Type = analyzedProject.Type
+			}
+			if analyzedProject.Language != "" {
+				project.Language = analyzedProject.Language
+			}
+			project.Responsibility = analyzedProject.Responsibility
+			project.Frameworks = analyzedProject.Frameworks
+		}
+		result = append(result, project)
+	}
+	return result
+}
+
+func chooseWorkspacePaths(base, analyzed []domain.WorkspacePath) []domain.WorkspacePath {
+	if len(analyzed) > 0 {
+		return analyzed
+	}
+	return base
+}
+
+func workspaceProfileProjectIDs(projects []domain.WorkspaceProject) []string {
+	ids := make([]string, 0, len(projects))
+	for _, project := range projects {
+		if project.ID != "" {
+			ids = append(ids, project.ID)
+		}
+	}
+	return ids
+}
+
+func nonEmptyStrings(values, fallback []string) []string {
+	result := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	if len(result) > 0 {
+		return result
+	}
+	return fallback
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (s *GeneratorService) workspaceChildConfig(projectRoot string, project config.WorkspaceProjectConfig) (config.Reader, bool, string, error) {
@@ -1027,12 +1374,12 @@ func defaultProviderSkillPath(provider string) string {
 	}
 }
 
-func (s *GeneratorService) writeWorkspaceRootSkill(outputPath string, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) error {
+func (s *GeneratorService) writeWorkspaceRootSkill(ctx context.Context, outputPath string, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec) error {
 	if err := os.MkdirAll(filepath.Join(outputPath, "references"), 0755); err != nil {
 		return err
 	}
 
-	data, err := s.workspaceTemplateData(projectConfig, workspaceConfig)
+	data, err := s.workspaceTemplateData(ctx, projectConfig, workspaceConfig, profile, spec)
 	if err != nil {
 		return err
 	}
@@ -1060,17 +1407,15 @@ func (s *GeneratorService) writeWorkspaceRootSkill(outputPath string, projectCon
 	return os.WriteFile(filepath.Join(outputPath, "references", "cross-project-rules.md"), []byte(rules), 0644)
 }
 
-func (s *GeneratorService) workspaceTemplateData(projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) (workspaceSkillTemplateData, error) {
-	name := projectConfig.Name
-	if name == "" {
-		name = "workspace"
-	}
+func (s *GeneratorService) workspaceTemplateData(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec) (workspaceSkillTemplateData, error) {
+	name := workspaceNameOrDefault(projectConfig.Name)
 	projects := make([]workspaceProjectTemplateData, 0, len(workspaceConfig.Projects))
 	for _, project := range workspaceConfig.Projects {
 		target, err := s.childSkillTarget(projectConfig.RootPath, project)
 		if err != nil {
 			return workspaceSkillTemplateData{}, err
 		}
+		profileProject := workspaceProjectByID(profile, project.ID)
 		childSkillDir := relativeWorkspacePath(projectConfig.RootPath, target.OutputPath)
 		skillPath := filepath.ToSlash(filepath.Join(childSkillDir, "SKILL.md"))
 		selfManagedConfigPath := filepath.ToSlash(filepath.Join(project.Path, ".skills-seed", "config.yaml"))
@@ -1080,10 +1425,45 @@ func (s *GeneratorService) workspaceTemplateData(projectConfig config.ProjectCon
 			SkillPath:              skillPath,
 			ProjectSpecPath:        filepath.ToSlash(filepath.Join(childSkillDir, "references", "project-spec.md")),
 			SkillSummary:           childSkillSummary(filepath.Join(target.OutputPath, "SKILL.md")),
+			Responsibility:         profileProject.Responsibility,
+			Frameworks:             profileProject.Frameworks,
 			SelfManaged:            target.UsesChildConfig,
 			SelfManagedConfigPath:  selfManagedConfigPath,
 			UsesChildConfig:        target.UsesChildConfig,
+			HasFrameworks:          len(profileProject.Frameworks) > 0,
 		})
+	}
+	userContext := runtimecontext.UserContext(ctx)
+	shared := workspacePathsFromConfig(workspaceConfig.Shared)
+	contracts := workspacePathsFromConfig(workspaceConfig.Contracts)
+	infra := workspacePathsFromConfig(workspaceConfig.Infra)
+	var dependencies []domain.WorkspaceDependency
+	var impactRoutes []domain.WorkspaceRoute
+	if profile != nil {
+		if profile.Summary != "" {
+			name = firstNonEmpty(profile.Name, name)
+		}
+		shared = chooseWorkspacePaths(shared, profile.Shared)
+		contracts = chooseWorkspacePaths(contracts, profile.Contracts)
+		infra = chooseWorkspacePaths(infra, profile.Infra)
+		dependencies = profile.Dependencies
+		impactRoutes = profile.ImpactRoutes
+	}
+	var routing []domain.WorkspaceRoute
+	var rules []domain.WorkspaceRule
+	var changeOrder []string
+	var parallelGuidance []domain.WorkspaceParallelGuidance
+	var loadMultipleWhen []domain.WorkspaceLoadMultipleSkill
+	if spec != nil {
+		routing = spec.Routing
+		rules = spec.Rules
+		changeOrder = spec.ChangeOrder
+		parallelGuidance = spec.ParallelAgentGuidance
+		loadMultipleWhen = spec.LoadMultipleSkillsWhen
+	}
+	summary := ""
+	if profile != nil {
+		summary = profile.Summary
 	}
 	return workspaceSkillTemplateData{
 		ProgramVersion:      metadata.ProgramVersion,
@@ -1091,15 +1471,56 @@ func (s *GeneratorService) workspaceTemplateData(projectConfig config.ProjectCon
 		SkillName:           workspaceSkillName(name),
 		ProjectName:         name,
 		WorkspaceName:       name,
+		WorkspaceFacts:      summary,
 		ProjectCount:        len(projects),
 		Projects:            projects,
-		Shared:              workspaceConfig.Shared,
-		Contracts:           workspaceConfig.Contracts,
-		Infra:               workspaceConfig.Infra,
-		HasShared:           len(workspaceConfig.Shared) > 0,
-		HasContracts:        len(workspaceConfig.Contracts) > 0,
-		HasInfra:            len(workspaceConfig.Infra) > 0,
+		UserContext:         userContext,
+		HasUserContext:      userContext != "",
+		Shared:              shared,
+		Contracts:           contracts,
+		Infra:               infra,
+		Dependencies:        dependencies,
+		ImpactRoutes:        impactRoutes,
+		Routing:             routing,
+		Rules:               rules,
+		ChangeOrder:         changeOrder,
+		ParallelGuidance:    parallelGuidance,
+		LoadMultipleWhen:    loadMultipleWhen,
+		HasWorkspaceFacts:   summary != "",
+		HasShared:           len(shared) > 0,
+		HasContracts:        len(contracts) > 0,
+		HasInfra:            len(infra) > 0,
+		HasDependencies:     len(dependencies) > 0,
+		HasImpactRoutes:     len(impactRoutes) > 0,
+		HasRouting:          len(routing) > 0,
+		HasRules:            len(rules) > 0,
+		HasChangeOrder:      len(changeOrder) > 0,
+		HasParallelGuidance: len(parallelGuidance) > 0,
+		HasLoadMultipleWhen: len(loadMultipleWhen) > 0,
 	}, nil
+}
+
+func workspaceProjectByID(profile *domain.WorkspaceProfile, id string) domain.WorkspaceProject {
+	if profile == nil {
+		return domain.WorkspaceProject{}
+	}
+	for _, project := range profile.Projects {
+		if project.ID == id {
+			return project
+		}
+	}
+	return domain.WorkspaceProject{}
+}
+
+func workspacePathsFromConfig(paths []config.WorkspacePathConfig) []domain.WorkspacePath {
+	result := make([]domain.WorkspacePath, 0, len(paths))
+	for _, path := range paths {
+		result = append(result, domain.WorkspacePath{
+			Path:        path.Path,
+			Description: path.Description,
+		})
+	}
+	return result
 }
 
 func relativeWorkspacePath(workspaceRoot, path string) string {

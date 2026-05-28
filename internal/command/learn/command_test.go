@@ -63,6 +63,12 @@ func TestCmd_CurrentIncludesFocusAndProfileFlags(t *testing.T) {
 	profileFlag := currentCmd.Flags().Lookup("profile")
 	require.NotNil(t, profileFlag)
 	require.Equal(t, learnCurrentProfileAuto, profileFlag.DefValue)
+
+	contextFlag := currentCmd.Flags().Lookup("context")
+	require.NotNil(t, contextFlag)
+
+	contextFileFlag := currentCmd.Flags().Lookup("context-file")
+	require.NotNil(t, contextFileFlag)
 }
 
 func TestResolveFocusPaths(t *testing.T) {
@@ -545,13 +551,19 @@ func setLearnCurrentFlagsForTest(testLanguage string, testFocusPaths []string, t
 	previousLanguage := language
 	previousFocusPaths := focusPaths
 	previousProfileOpt := learnCurrentProfileOpt
+	previousContextText := contextText
+	previousContextFile := contextFile
 	language = testLanguage
 	focusPaths = testFocusPaths
 	learnCurrentProfileOpt = testProfileOpt
+	contextText = ""
+	contextFile = ""
 	return func() {
 		language = previousLanguage
 		focusPaths = previousFocusPaths
 		learnCurrentProfileOpt = previousProfileOpt
+		contextText = previousContextText
+		contextFile = previousContextFile
 	}
 }
 

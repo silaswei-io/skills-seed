@@ -381,6 +381,9 @@ func funcMap() template.FuncMap {
 		"upper": func(v interface{}) string {
 			return strings.ToUpper(fmt.Sprint(v))
 		},
+		"add": func(a, b interface{}) int {
+			return int(toFloat(a) + toFloat(b))
+		},
 	}
 }
 

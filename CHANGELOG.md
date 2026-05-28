@@ -2,6 +2,32 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.0.6]
+
+### 功能
+
+- `learn current` 和 `generate-skills` 新增 `--context` / `--context-file`，支持为单次学习或生成传入用户补充说明
+- workspace 根 skill 生成在 `generation.mode = ai` 或传入上下文时，会额外分析工作区事实画像和开发规范，再合并到根 skill references
+- workspace AI 分析新增结构化项目职责、框架/运行时、子项目依赖、影响路由、工作区特定规则、改动顺序和并发边界
+- Claude 和 Codex Agent 新增 workspace profile / spec 分析能力，并解析为 `WorkspaceProfile` / `WorkspaceSpec`
+
+### 模板
+
+- 精简 workspace 根 `SKILL.md`，将入口 skill 聚焦为路由、子项目 skill 选择和跨项目规则判断
+- 扩展 `workspace-overview.md`，写入用户补充说明、AI 分析出的工作区事实、依赖关系、影响路由、职责和框架信息
+- 扩展 `cross-project-rules.md`，写入工作区特定规则、路由、改动顺序、必须同时读取多个 skills 的场景和并发 Agent 约束
+- 更新学习、画像和生成提示词，改为通过文件路径读取大型输入和一次性用户上下文
+
+### 体验
+
+- Agent 调用的大型输入改为写入 `.skills-seed/memory/runtime` 下的临时文件，减少提示词正文体积
+- workspace 生成对子项目执行时会屏蔽根级一次性上下文，避免根 workspace 说明误注入子项目 skill
+- 当用户上下文存在时，即使默认模板生成模式也会要求可用 Agent，用于把上下文并入生成结果
+
+### 文档
+
+- 清理过期的项目架构、生成链路和增量学习设计/计划文档
+
 ## [v0.0.5]
 
 ### 功能

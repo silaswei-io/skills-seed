@@ -23,21 +23,23 @@
   - {{.}}
 {{- end}}
 {{- end}}
-{{- if .Structure}}
+{{- if .StructurePath}}
 
 # 项目目录结构
 
-```
-{{.Structure}}
-```
+项目目录结构位于 `{{.StructurePath}}`。请按路径读取。
 {{- end}}
-{{- if .StructuralContext}}
+{{- if .StructuralContextPath}}
 
 # CodeGraph 结构化上下文
 
-以下上下文来自目标项目的 CodeGraph 索引。请把它作为符号、调用关系、入口点、模块依赖和影响范围的结构化证据，用它来优先判断需要查看的文件和关系；涉及具体业务行为或代码示例时，仍需要按路径读取源码确认。
+CodeGraph 结构化上下文位于 `{{.StructuralContextPath}}`。请把它作为符号、调用关系、入口点、模块依赖和影响范围的结构化证据，用它来优先判断需要查看的文件和关系；涉及具体业务行为或代码示例时，仍需要按路径读取源码确认。
+{{- end}}
+{{- if .UserContextPath}}
 
-{{.StructuralContext}}
+# 用户提供的上下文
+
+用户为本次学习提供的业务、交付、仓库组织或验证说明位于 `{{.UserContextPath}}`。请按路径读取，并作为高优先级上下文使用；仍不要编造其中没有覆盖的事实。
 {{- end}}
 {{- if .MainFiles}}
 
@@ -57,13 +59,11 @@
 - {{.Path}}
 {{- end}}
 {{- end}}
-{{- if .KnownPatternsJSON}}
+{{- if .KnownPatternsPath}}
 
 # 已有模式 ({{.KnownPatternsCount}})
 
-以下模式已经存在于项目记忆中。分析变更文件时不要把同一规则换名重复输出；如果变更代码补充了已有模式的证据，请复用已有语义并只输出有实质新增的信息。
-
-{{.KnownPatternsJSON}}
+已有模式位于 `{{.KnownPatternsPath}}`。请按路径读取。分析变更文件时不要把同一规则换名重复输出；如果变更代码补充了已有模式的证据，请复用已有语义并只输出有实质新增的信息。
 {{- end}}
 
 # 分析要求

@@ -46,9 +46,11 @@ func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 	loader := NewLoader("claude", "en-US", "")
 
 	_, err := loader.Render("generate_skills_summary", map[string]interface{}{
-		"LANGUAGE":       "go",
-		"PATTERNS_JSON":  "[]",
-		"PATTERNS_COUNT": 0,
+		"LANGUAGE":             "go",
+		"PATTERNS_PATH":        "/tmp/skills-seed/patterns.json",
+		"PATTERNS_COUNT":       0,
+		"USER_CONTEXT_PATH":    "",
+		"EXISTING_SKILLS_PATH": "",
 	})
 
 	require.Error(t, err)
@@ -133,7 +135,7 @@ func TestRenderProjectAnalysisListsReadmePathWithoutEmbeddedContent(t *testing.T
 func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 	data := sampleProjectAnalysisData()
-	data["ExistingProfileJSON"] = `{"architecture":"Clean Architecture"}`
+	data["ExistingProfilePath"] = "/tmp/skills-seed/existing-profile.json"
 	data["FocusPaths"] = []string{"internal/service"}
 
 	prompt, err := loader.Render("project-analysis", data)
@@ -141,33 +143,36 @@ func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, prompt, "已有项目画像")
 	require.Contains(t, prompt, "internal/service")
-	require.Contains(t, prompt, "Clean Architecture")
+	require.Contains(t, prompt, "/tmp/skills-seed/existing-profile.json")
+	require.NotContains(t, prompt, "Clean Architecture")
 	require.Contains(t, prompt, "完整项目画像")
 }
 
 func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 	data := sampleProjectAnalysisData()
-	data["StructuralContext"] = "## CodeGraph Structural Context\n- handler calls service"
+	data["StructuralContextPath"] = "/tmp/skills-seed/structural-context.md"
 
 	prompt, err := loader.Render("project-analysis", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "CodeGraph")
-	require.Contains(t, prompt, "handler calls service")
+	require.Contains(t, prompt, "/tmp/skills-seed/structural-context.md")
+	require.NotContains(t, prompt, "handler calls service")
 	require.Contains(t, prompt, "结构化")
 }
 
 func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 	req := sampleAnalyzeCurrentCodebaseRequest()
-	req.StructuralContext = "## CodeGraph Structural Context\n- service has callers"
+	req.StructuralContextPath = "/tmp/skills-seed/structural-context.md"
 
 	prompt, err := loader.Render("init-skills", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "CodeGraph")
-	require.Contains(t, prompt, "service has callers")
+	require.Contains(t, prompt, "/tmp/skills-seed/structural-context.md")
+	require.NotContains(t, prompt, "service has callers")
 	require.Contains(t, prompt, "结构化")
 }
 
@@ -183,14 +188,15 @@ func TestRenderInitSkillsIncludesKnownPatterns(t *testing.T) {
 		t.Run(tt.locale, func(t *testing.T) {
 			loader := NewLoader("codex", tt.locale, "")
 			req := sampleAnalyzeCurrentCodebaseRequest()
-			req.KnownPatternsJSON = `[{"id":"known","name":"Known Pattern","category":"api"}]`
+			req.KnownPatternsPath = "/tmp/skills-seed/known-patterns.json"
 			req.KnownPatternsCount = 1
 
 			prompt, err := loader.Render("init-skills", req)
 
 			require.NoError(t, err)
 			require.Contains(t, prompt, tt.label)
-			require.Contains(t, prompt, `"name":"Known Pattern"`)
+			require.Contains(t, prompt, "/tmp/skills-seed/known-patterns.json")
+			require.NotContains(t, prompt, `"name":"Known Pattern"`)
 		})
 	}
 }
@@ -324,6 +330,38 @@ func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *t
 	require.Contains(t, prompt, "不要输出 “Repository pattern”")
 }
 
+func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
+	data := WorkspacePromptData{
+		WorkspaceName: "hsm-workspace",
+		WorkspaceRoot: "/tmp/hsm-workspace",
+		Projects: []WorkspacePromptProject{
+			{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"},
+		},
+		Locale: "zh-CN",
+	}
+
+	profile, err := renderWorkspaceTemplate("workspace-profile", "zh-CN", data)
+	require.NoError(t, err)
+	spec, err := renderWorkspaceTemplate("workspace-spec", "zh-CN", data)
+	require.NoError(t, err)
+
+	require.Contains(t, profile, "`hsmwebapi`: `hsmwebapi`")
+	require.NotContains(t, profile, "<workspace-input-file>")
+	require.NotContains(t, profile, "<workspace-profile-file>")
+	require.NotContains(t, profile, "<user-context-file>")
+	require.NotContains(t, profile, "workspace-input.json")
+	require.NotContains(t, profile, "workspace-profile.json")
+	require.NotContains(t, profile, "user-context.md")
+	require.NotContains(t, profile, "hsmwebapi 是主后端")
+	require.NotContains(t, spec, "<workspace-input-file>")
+	require.NotContains(t, spec, "<workspace-profile-file>")
+	require.NotContains(t, spec, "<user-context-file>")
+	require.NotContains(t, spec, "workspace-input.json")
+	require.NotContains(t, spec, "workspace-profile.json")
+	require.NotContains(t, spec, "user-context.md")
+	require.NotContains(t, spec, "kmip-go 提供 KMIP 能力")
+}
+
 func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
 	loader := NewLoader("common", "zh-CN", "")
 
@@ -333,7 +371,8 @@ func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
 	require.Contains(t, prompt, "abcdef123456")
 	require.NotContains(t, prompt, "diff --git a/internal/demo.go b/internal/demo.go")
 	require.NotContains(t, prompt, "func Demo() error")
-	require.Contains(t, prompt, `"name":"Known Pattern"`)
+	require.Contains(t, prompt, "/tmp/skills-seed/known-patterns.json")
+	require.NotContains(t, prompt, `"name":"Known Pattern"`)
 }
 
 func sampleAnalyzeRequest() *agent.AnalyzeRequest {
@@ -363,7 +402,7 @@ func sampleBatchLearnData() map[string]interface{} {
 				Files:  []string{"internal/demo.go"},
 			},
 		},
-		"KnownPatternsJSON":  `[{"id":"known","name":"Known Pattern","category":"api"}]`,
+		"KnownPatternsPath":  "/tmp/skills-seed/known-patterns.json",
 		"KnownPatternsCount": 1,
 	}
 }
@@ -387,20 +426,21 @@ func sampleGenerateSkillsData() map[string]interface{} {
 	return map[string]interface{}{
 		"PROJECT_NAME":         "demo",
 		"LANGUAGE":             "go",
-		"PATTERNS_JSON":        `[{"id":"p1","name":"Demo","category":"api"}]`,
+		"PATTERNS_PATH":        "/tmp/skills-seed/patterns.json",
 		"PATTERNS_COUNT":       1,
 		"EXISTING_SKILLS_PATH": "",
+		"USER_CONTEXT_PATH":    "",
 	}
 }
 
 func sampleAnalyzeCurrentCodebaseRequest() *agent.AnalyzeCurrentCodebaseRequest {
 	return &agent.AnalyzeCurrentCodebaseRequest{
-		ProjectName: "demo",
-		RootPath:    "/tmp/demo",
-		Language:    "go",
-		Structure:   "cmd/demo/main.go",
-		MainFiles:   []string{"cmd/demo/main.go"},
-		SampleFiles: []agent.SampleFile{{Path: "cmd/demo/main.go"}},
+		ProjectName:   "demo",
+		RootPath:      "/tmp/demo",
+		Language:      "go",
+		StructurePath: "/tmp/skills-seed/project-structure.txt",
+		MainFiles:     []string{"cmd/demo/main.go"},
+		SampleFiles:   []agent.SampleFile{{Path: "cmd/demo/main.go"}},
 	}
 }
 
@@ -413,15 +453,16 @@ func sampleMergePatternsData() map[string]interface{} {
 
 func sampleProjectAnalysisData() map[string]interface{} {
 	return map[string]interface{}{
-		"ProjectName":         "demo",
-		"RootPath":            "/tmp/demo",
-		"Language":            "go",
-		"Structure":           "cmd/demo/main.go",
-		"StructuralContext":   "",
-		"ReadmePath":          "README.md",
-		"MainFiles":           []string{"cmd/demo/main.go"},
-		"ExistingProfileJSON": "",
-		"FocusPaths":          []string{},
+		"ProjectName":           "demo",
+		"RootPath":              "/tmp/demo",
+		"Language":              "go",
+		"StructurePath":         "/tmp/skills-seed/project-structure.txt",
+		"StructuralContextPath": "",
+		"ReadmePath":            "README.md",
+		"MainFiles":             []string{"cmd/demo/main.go"},
+		"ExistingProfilePath":   "",
+		"FocusPaths":            []string{},
+		"UserContextPath":       "",
 	}
 }
 

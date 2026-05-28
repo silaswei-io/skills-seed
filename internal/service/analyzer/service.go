@@ -27,6 +27,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
 )
@@ -183,6 +184,7 @@ type AnalyzeProjectRequest struct {
 	MainFiles           []string
 	ExistingProfileJSON string
 	FocusPaths          []string
+	UserContext         string
 }
 
 // AnalyzeProjectResult 项目分析结果
@@ -242,6 +244,7 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 		MainFiles:           req.MainFiles,
 		ExistingProfileJSON: req.ExistingProfileJSON,
 		FocusPaths:          req.FocusPaths,
+		UserContext:         req.UserContext,
 	}
 
 	result, err := s.agent.AnalyzeProject(ctx, agentReq)
@@ -297,6 +300,7 @@ type AnalyzeCurrentCodebaseRequest struct {
 	SampleFiles        []agent.SampleFile
 	KnownPatternsJSON  string
 	KnownPatternsCount int
+	UserContext        string
 }
 
 // AnalyzeCurrentCodebaseResult 当前代码库分析结果
@@ -347,6 +351,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		SampleFiles:        req.SampleFiles,
 		KnownPatternsJSON:  req.KnownPatternsJSON,
 		KnownPatternsCount: req.KnownPatternsCount,
+		UserContext:        req.UserContext,
 	}
 
 	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
@@ -581,6 +586,7 @@ func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, pro
 		MainFiles:           s.FindMainFiles(projectRoot),
 		ExistingProfileJSON: existingProfileJSON,
 		FocusPaths:          focusPaths,
+		UserContext:         runtimecontext.UserContext(ctx),
 	}
 
 	result, err := s.AnalyzeProject(ctx, req)
@@ -700,6 +706,7 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		SampleFiles:        sampleFiles,
 		KnownPatternsJSON:  opts.KnownPatternsJSON,
 		KnownPatternsCount: opts.KnownPatternsCount,
+		UserContext:        runtimecontext.UserContext(ctx),
 	}
 
 	result, err := s.AnalyzeCurrentCodebase(ctx, req)

@@ -36,6 +36,7 @@ type LearnRequest struct {
 	Commit             domain.CommitInfo // 提交信息
 	ChangedFiles       []string          // 变更文件路径
 	KnownPatternsJSON  string            // 已知模式 JSON（不包含代码示例）
+	KnownPatternsPath  string            // 已知模式 JSON 文件路径
 	KnownPatternsCount int               // 已知模式数量（快速参考）
 }
 
@@ -56,6 +57,7 @@ type BatchLearnRequest struct {
 	Commits            []domain.CommitInfo // 批量提交信息
 	CommitFiles        []CommitFileChange  // 批量提交变更文件路径
 	KnownPatternsJSON  string              // 已知模式 JSON（不包含代码示例）
+	KnownPatternsPath  string              // 已知模式 JSON 文件路径
 	KnownPatternsCount int                 // 已知模式数量
 }
 
@@ -82,10 +84,13 @@ type GenerateFixesResult struct {
 // GenerateSkillsRequest AI汇总生成Skills的请求
 type GenerateSkillsRequest struct {
 	PatternsJSON       string // 模式 JSON（不包含代码示例）
+	PatternsPath       string // 模式 JSON 文件路径
 	PatternsCount      int    // 模式总数（快速参考）
 	ExistingSkillsPath string // 已有 skills 文件路径（如果有）
 	ProjectName        string // 项目名称
 	Language           string // 项目语言
+	UserContext        string // 本次生成传入的一次性用户上下文
+	UserContextPath    string // 本次生成的一次性用户上下文文件路径
 }
 
 // GenerateSkillsResult AI汇总生成Skills的结果
@@ -157,15 +162,20 @@ type MergeSummary struct {
 
 // AnalyzeProjectRequest 项目分析请求
 type AnalyzeProjectRequest struct {
-	ProjectName         string   // 项目名称
-	RootPath            string   // 项目根路径
-	Language            string   // 主要语言
-	Structure           string   // 目录结构（tree 输出）
-	StructuralContext   string   // CodeGraph 等结构化分析上下文
-	ReadmePath          string   // README 文件路径（如果存在）
-	MainFiles           []string // 主要入口文件路径
-	ExistingProfileJSON string   // 已有项目画像 JSON
-	FocusPaths          []string // 指定增量分析范围
+	ProjectName           string   // 项目名称
+	RootPath              string   // 项目根路径
+	Language              string   // 主要语言
+	Structure             string   // 目录结构（tree 输出）
+	StructurePath         string   // 目录结构文件路径
+	StructuralContext     string   // CodeGraph 等结构化分析上下文
+	StructuralContextPath string   // CodeGraph 等结构化分析上下文文件路径
+	ReadmePath            string   // README 文件路径（如果存在）
+	MainFiles             []string // 主要入口文件路径
+	ExistingProfileJSON   string   // 已有项目画像 JSON
+	ExistingProfilePath   string   // 已有项目画像 JSON 文件路径
+	FocusPaths            []string // 指定增量分析范围
+	UserContext           string   // 本次学习传入的一次性用户上下文
+	UserContextPath       string   // 本次学习传入的一次性用户上下文文件路径
 }
 
 // AnalyzeProjectResult 项目分析结果
@@ -194,18 +204,23 @@ type SampleFile struct {
 
 // AnalyzeCurrentCodebaseRequest 分析当前代码库请求
 type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName        string       // 项目名称
-	RootPath           string       // 项目根路径
-	Language           string       // 主要语言
-	FocusPaths         []string     // 指定扫描范围（相对项目根）
-	Structure          string       // 目录结构
-	StructuralContext  string       // CodeGraph 等结构化分析上下文
-	MainFiles          []string     // 主要入口文件路径
-	SampleFiles        []SampleFile // 示例文件路径
-	KnownPatternsJSON  string       // 已知模式 JSON（不包含代码示例）
-	KnownPatternsCount int          // 已知模式数量
-	FileCount          int          // 文件总数
-	DirCount           int          // 目录总数
+	ProjectName           string       // 项目名称
+	RootPath              string       // 项目根路径
+	Language              string       // 主要语言
+	FocusPaths            []string     // 指定扫描范围（相对项目根）
+	Structure             string       // 目录结构
+	StructurePath         string       // 目录结构文件路径
+	StructuralContext     string       // CodeGraph 等结构化分析上下文
+	StructuralContextPath string       // CodeGraph 等结构化分析上下文文件路径
+	MainFiles             []string     // 主要入口文件路径
+	SampleFiles           []SampleFile // 示例文件路径
+	KnownPatternsJSON     string       // 已知模式 JSON（不包含代码示例）
+	KnownPatternsPath     string       // 已知模式 JSON 文件路径
+	KnownPatternsCount    int          // 已知模式数量
+	FileCount             int          // 文件总数
+	DirCount              int          // 目录总数
+	UserContext           string       // 本次学习传入的一次性用户上下文
+	UserContextPath       string       // 本次学习传入的一次性用户上下文文件路径
 }
 
 // AnalyzeCurrentCodebaseResult 分析当前代码库结果
@@ -216,6 +231,23 @@ type AnalyzeCurrentCodebaseResult struct {
 	BestPractices     []string                   // 最佳实践
 	CommonPatterns    []string                   // 通用模式
 	Summary           string                     // 总结
+}
+
+// AnalyzeWorkspaceProfileRequest 请求生成工作区事实画像
+type AnalyzeWorkspaceProfileRequest struct {
+	WorkspaceName      string // 工作区名称
+	WorkspaceRoot      string // 工作区根路径
+	WorkspaceInputPath string // 本次工作区生成输入文件路径
+	UserContextPath    string // 本次用户补充说明文件路径
+}
+
+// AnalyzeWorkspaceSpecRequest 请求生成工作区开发规范
+type AnalyzeWorkspaceSpecRequest struct {
+	WorkspaceName        string // 工作区名称
+	WorkspaceRoot        string // 工作区根路径
+	WorkspaceInputPath   string // 本次工作区生成输入文件路径
+	WorkspaceProfilePath string // 本次工作区画像文件路径
+	UserContextPath      string // 本次用户补充说明文件路径
 }
 
 // CodeAnalyzer 代码分析接口
@@ -248,6 +280,8 @@ type PatternMerger interface {
 type ProjectAnalyzer interface {
 	AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
 	AnalyzeCurrentCodebase(ctx context.Context, req *AnalyzeCurrentCodebaseRequest) (*AnalyzeCurrentCodebaseResult, error)
+	AnalyzeWorkspaceProfile(ctx context.Context, req *AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
+	AnalyzeWorkspaceSpec(ctx context.Context, req *AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 }
 
 // Agent AI Agent 接口（组合所有子接口）
