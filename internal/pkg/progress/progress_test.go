@@ -46,7 +46,7 @@ func TestRenderOmitsPercentWhenStepCountsAreDisplayed(t *testing.T) {
 	}
 }
 
-func TestPrintConsoleLineClearsActiveProgressLineBeforeConsoleOutput(t *testing.T) {
+func TestPrintConsoleLineDefersActiveProgressLineConsoleOutput(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := New(1)
 		tracker.enabled = true
@@ -56,12 +56,20 @@ func TestPrintConsoleLineClearsActiveProgressLineBeforeConsoleOutput(t *testing.
 		tracker.CompleteStep("分析当前代码库")
 	})
 
-	if !strings.Contains(output, "\r\x1b[2KToken 消耗") {
-		t.Fatalf("expected active progress line to be cleared before console output, got %q", output)
+	completedIndex := strings.Index(output, "[############################] 1/1   分析当前代码库")
+	if completedIndex < 0 {
+		t.Fatalf("expected completed progress line, got %q", output)
+	}
+	tokenIndex := strings.Index(output, "Token 消耗: 本次 575.5k")
+	if tokenIndex < 0 {
+		t.Fatalf("expected deferred console output, got %q", output)
+	}
+	if tokenIndex < completedIndex {
+		t.Fatalf("expected console output after completed progress line, got %q", output)
 	}
 }
 
-func TestPrintConsoleLineClearsActiveProgressLine(t *testing.T) {
+func TestPrintConsoleLinePreservesActiveProgressLine(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := New(2)
 		tracker.enabled = true
@@ -72,14 +80,28 @@ func TestPrintConsoleLineClearsActiveProgressLine(t *testing.T) {
 		tracker.CompleteStep("写入技能文件")
 	})
 
-	if strings.Contains(output, "[##############--------------] 2/2 | 写入技能文件\n") {
-		t.Fatalf("expected active progress line to be cleared instead of preserved with newline, got %q", output)
-	}
-	if !strings.Contains(output, "[##############--------------] 2/2 | 写入技能文件\r\x1b[2KToken 消耗") {
-		t.Fatalf("expected console output to overwrite active progress line, got %q", output)
-	}
 	if !strings.Contains(output, "[############################] 2/2") {
 		t.Fatalf("expected completed progress line to still be printed, got %q", output)
+	}
+	completedIndex := strings.Index(output, "[############################] 2/2")
+	tokenIndex := strings.Index(output, "Token 消耗: 本次 120.1k")
+	if tokenIndex < completedIndex {
+		t.Fatalf("expected console output after completed progress line, got %q", output)
+	}
+}
+
+func TestPrintConsoleLineNowClearsActiveProgressLine(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := New(1)
+		tracker.enabled = true
+
+		tracker.StartStep("写入技能文件")
+		PrintConsoleLineNow("错误: 生成失败")
+		tracker.FailStep("写入技能文件")
+	})
+
+	if !strings.Contains(output, "\r\x1b[2K错误: 生成失败") {
+		t.Fatalf("expected immediate console output to clear active progress line, got %q", output)
 	}
 }
 

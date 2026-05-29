@@ -189,8 +189,20 @@ func (t *Tracker) renderLocked(newline bool) {
 	progressLineOpen = true
 }
 
-// PrintConsoleLine 输出普通控制台消息；如果当前有正在刷新的进度行，会先换行
+// PrintConsoleLine 输出普通控制台消息；如果当前有正在刷新的进度行，会延迟到步骤结束后输出
 func PrintConsoleLine(message string) {
+	consoleMu.Lock()
+	defer consoleMu.Unlock()
+
+	if progressActive {
+		pendingConsoleLines = append(pendingConsoleLines, message)
+		return
+	}
+	fmt.Fprintln(os.Stdout, message)
+}
+
+// PrintConsoleLineNow 立即输出普通控制台消息；如果当前有正在刷新的进度行，会先清除当前行
+func PrintConsoleLineNow(message string) {
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 

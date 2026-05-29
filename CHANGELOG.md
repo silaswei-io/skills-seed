@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.1.0]
+
+### 修复
+
+- 修复 `skills-seed init --workspace --children` 在子项目初始化失败后仍保留根目录 `.skills-seed` 的问题，避免下次重试时误报“已初始化”
+- 优化终端输出顺序：运行中的步骤先完整显示进度标题，普通日志和 Token 明细延迟到步骤完成后输出；workspace 子项目生成的 Token 明细会保留子项目归属
+
 ## [v0.0.9]
 
 ### 功能

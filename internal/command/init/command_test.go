@@ -95,6 +95,24 @@ func TestInitializeWorkspaceWithChildrenInitializesChildProjects(t *testing.T) {
 	require.Equal(t, "codex", childConfig.GetAgentConfig().Provider)
 }
 
+func TestInitializeWorkspaceWithChildrenRemovesRootSeedWhenChildInitializationFails(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	initGitDir(t, workspaceRoot)
+	childRoot := filepath.Join(workspaceRoot, "backend")
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "go.mod"), []byte("module backend\n"), 0644))
+
+	err := initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
+		initLogger:            true,
+		showUserSummary:       true,
+		initWorkspaceChildren: true,
+	})
+
+	require.Error(t, err)
+	require.NoDirExists(t, filepath.Join(workspaceRoot, ".skills-seed"))
+	require.NoDirExists(t, filepath.Join(childRoot, ".skills-seed"))
+}
+
 func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	initGitDir(t, workspaceRoot)

@@ -166,7 +166,16 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	if _, err := os.Stat(seedPath); err == nil {
 		return fmt.Errorf("%s", i18n.Get("ErrInitAlreadyInitialized"))
+	} else if !os.IsNotExist(err) {
+		return err
 	}
+	seedCreated := false
+	initSucceeded := false
+	defer func() {
+		if !initSucceeded && seedCreated {
+			_ = os.RemoveAll(seedPath)
+		}
+	}()
 
 	// 创建目录结构
 	dirs := []string{
@@ -178,6 +187,9 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("%s: %w", i18n.GetWithParams("InitCreateDirFailed", map[string]interface{}{"Path": dir}), err)
+		}
+		if dir == seedPath {
+			seedCreated = true
 		}
 	}
 
@@ -322,6 +334,7 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		logger.Info(i18n.GetWithParams("InitDocumentation", map[string]interface{}{"URL": versionedReadmeURL()}))
 	}
 
+	initSucceeded = true
 	return nil
 }
 

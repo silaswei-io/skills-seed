@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -174,7 +175,11 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 		if err := commandutil.LockConfiguredMode(ctx, childCont); err != nil {
 			return err
 		}
-		childCtx := runtimecontext.WithoutUserContext(ctx)
+		scope := project.ID
+		if scope == "" {
+			scope = project.Path
+		}
+		childCtx := agent.WithTokenUsageScope(runtimecontext.WithoutUserContext(ctx), scope)
 		childCtx = runtimecontext.WithSeedPath(childCtx, childCont.SeedPath)
 		if err := commandutil.RequireAgentAvailable(childCont); err != nil {
 			return err
@@ -192,6 +197,7 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 			return err
 		}
 		logger.Info(i18n.GetWithParams("GenerateWorkspaceChildGenerated", map[string]interface{}{"ProjectName": project.ID}))
+		agent.FlushTokenUsageScope(childCtx)
 		return nil
 	})
 }

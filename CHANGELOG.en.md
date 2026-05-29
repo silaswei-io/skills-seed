@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.1.0]
+
+### Fixes
+
+- Fix `skills-seed init --workspace --children` leaving the root `.skills-seed` behind when child project initialization fails, preventing the next retry from incorrectly reporting that initialization already completed
+- Improve terminal output ordering: active steps keep the progress title visible first, regular logs and token details are printed after the step completes, and workspace child generation token details keep their child-project scope
+
 ## [v0.0.9]
 
 ### Features

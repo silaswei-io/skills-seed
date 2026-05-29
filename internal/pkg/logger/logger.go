@@ -176,7 +176,7 @@ func Warn(msg string, args ...any) {
 // Error 记录错误信息，并同步写入控制台和文件
 func Error(msg string, args ...any) {
 	// 控制台红色输出（用户提示） - 只输出消息本身
-	progress.PrintConsoleLine(colorize(msg, colors.Red))
+	progress.PrintConsoleLineNow(colorize(msg, colors.Red))
 
 	// 写入日志文件（详细信息）
 	if logger != nil {

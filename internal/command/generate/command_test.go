@@ -14,9 +14,11 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
@@ -135,6 +137,44 @@ func TestGenerateWorkspaceChildSkillsDoesNotPassWorkspaceContextToChildren(t *te
 	require.NoError(t, generateWorkspaceChildSkills(ctx, cont))
 
 	require.Equal(t, []string{""}, seenContexts)
+}
+
+func TestRunGenerateWorkspacePrintsStepBeforeChildDetailsAndTokenUsage(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	resetGenerateFlagsForTest(t)
+	var provider string
+	provider = registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+		agent.LogTokenUsageForContext(ctx, provider, "GenerateSkillsSummary", tokenusage.Usage{
+			InputTokens:  1_000,
+			OutputTokens: 200,
+		})
+		return &agent.GenerateSkillsResult{}, nil
+	})
+	workspaceRoot := t.TempDir()
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+
+	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+	seedGenerateChildMemory(t, childRoot, "Backend Rule")
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
+	defer cont.Close()
+
+	output := captureGenerateStdout(t, func() {
+		cmd := Cmd(cont)
+		require.NoError(t, runGenerate(cont, cmd))
+	})
+
+	stepIndex := strings.Index(output, "写入技能文件")
+	startIndex := strings.Index(output, "子项目 backend 开始生成 skills")
+	doneIndex := strings.Index(output, "子项目 backend skills 生成完成")
+	tokenIndex := strings.Index(output, "Token 消耗: 子项目 backend")
+	require.NotEqual(t, -1, stepIndex, output)
+	require.NotEqual(t, -1, startIndex, output)
+	require.NotEqual(t, -1, doneIndex, output)
+	require.NotEqual(t, -1, tokenIndex, output)
+	require.Greater(t, startIndex, stepIndex)
+	require.Greater(t, doneIndex, stepIndex)
+	require.Greater(t, tokenIndex, doneIndex)
 }
 
 func TestRunGenerateProjectRequiresAvailableAgent(t *testing.T) {
@@ -305,4 +345,24 @@ func readGenerateFile(t *testing.T, root string, parts ...string) string {
 	content, err := os.ReadFile(filepath.Join(append([]string{root}, parts...)...))
 	require.NoError(t, err)
 	return string(content)
+}
+
+func captureGenerateStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	tempFile, err := os.CreateTemp(t.TempDir(), "stdout")
+	require.NoError(t, err)
+
+	originalStdout := os.Stdout
+	os.Stdout = tempFile
+	defer func() {
+		os.Stdout = originalStdout
+	}()
+
+	fn()
+
+	require.NoError(t, tempFile.Close())
+	data, err := os.ReadFile(tempFile.Name())
+	require.NoError(t, err)
+	return string(data)
 }
