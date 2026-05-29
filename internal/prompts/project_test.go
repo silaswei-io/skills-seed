@@ -46,9 +46,9 @@ func TestEnsureProjectPromptsUsesCommonProjectPrompt(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(commonContent), "prompt-type: common")
 
-	_, err = os.Stat(filepath.Join(seedPath, "prompts", "project", "analyze.project.md"))
+	_, err = os.Stat(filepath.Join(seedPath, "prompts", "project", "learn-analyze.project.md"))
 	require.ErrorIs(t, err, os.ErrNotExist)
 
-	_, err = os.Stat(filepath.Join(seedPath, "prompts", "custom", "analyze.override.md"))
+	_, err = os.Stat(filepath.Join(seedPath, "prompts", "custom", "learn-analyze.override.md"))
 	require.NoError(t, err)
 }

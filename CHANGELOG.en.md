@@ -2,6 +2,25 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.2.0]
+
+### Changes
+
+- Flip template locale convention: Chinese templates no longer carry the `.zh-CN` suffix (e.g., `learn-analyze.txt.tmpl`), while English templates are explicitly suffixed `.en-US` (e.g., `learn-analyze.en-US.txt.tmpl`); `zh-CN` is now the default locale for all template loading
+- Unify all prompt and skills template names to `domain-feature` kebab-case, replacing the previous snake_case / mixed naming:
+  `analyze` → `learn-analyze`, `batch-learn` → `learn-batch`, `generate_fixes` → `fix-generate`, `generate_skills_summary` → `skill-project-summary`, `merge-patterns` → `pattern-merge`, `project-analysis` → `project-analyze`, `init-skills` → `skill-project-init`, `workspace-profile` → `skill-workspace-profile`, `workspace-spec` → `skill-workspace-spec`, `skill` → `project-skill`, `workspace/SKILL` → `workspace-skill`
+- Introduce a centralized skills template catalog system: `TemplateEntry` declaratively maps template IDs to paths and provider allowlists, replacing the previous `fs.WalkDir` dynamic scan
+
+### Features
+
+- Extract `DefaultExcludePatterns()` as a standalone function; full static exclusion rules are now written to the config file during initialization
+- Expand default exclude patterns from 7 to 31 entries, covering common build outputs (`dist`, `build`, `out`, `target`), temporary files (`*.tmp`, `*.bak`, `*.swp`), archives (`*.zip`, `*.tar.gz`), images, and video assets
+- Add basename glob matching in file filter: patterns without `/` (e.g., `*.log`) now match against both the file basename and the full path
+
+### Documentation
+
+- Update the `exclude` defaults table in the configuration reference to reflect the expanded exclusion rules
+
 ## [v0.1.0]
 
 ### Fixes

@@ -22,13 +22,15 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 						name string
 						data interface{}
 					}{
-						{"analyze", sampleAnalyzeRequest()},
-						{"batch-learn", sampleBatchLearnData()},
-						{"generate_fixes", sampleGenerateFixesRequest()},
-						{"generate_skills_summary", sampleGenerateSkillsData()},
-						{"init-skills", sampleAnalyzeCurrentCodebaseRequest()},
-						{"merge-patterns", sampleMergePatternsData()},
-						{"project-analysis", sampleProjectAnalysisData()},
+						{"learn-analyze", sampleAnalyzeRequest()},
+						{"learn-batch", sampleBatchLearnData()},
+						{"fix-generate", sampleGenerateFixesRequest()},
+						{"skill-project-summary", sampleGenerateSkillsData()},
+						{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+						{"pattern-merge", sampleMergePatternsData()},
+						{"project-analyze", sampleProjectAnalysisData()},
+						{"skill-workspace-profile", workspacePromptData()},
+						{"skill-workspace-spec", workspaceSpecPromptData()},
 					} {
 						t.Run(tc.name, func(t *testing.T) {
 							prompt, err := loader.Render(tc.name, tc.data)
@@ -45,7 +47,7 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 	loader := NewLoader("claude", "en-US", "")
 
-	_, err := loader.Render("generate_skills_summary", map[string]interface{}{
+	_, err := loader.Render("skill-project-summary", map[string]interface{}{
 		"LANGUAGE":             "go",
 		"PATTERNS_PATH":        "/tmp/skills-seed/patterns.json",
 		"PATTERNS_COUNT":       0,
@@ -57,25 +59,35 @@ func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 	require.Contains(t, err.Error(), "PROJECT_NAME")
 }
 
+func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
+	loader := NewLoader("common", "", "")
+
+	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "你是一位专业的代码质量审查专家")
+	require.NotContains(t, prompt, "You are a professional code quality review expert")
+}
+
 func TestLoader_RenderAddsCommonProjectPromptAndLegacyPromptSpecificOverlay(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "project"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "custom"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"), []byte("PROJECT PROFILE"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "common.md"), []byte("COMMON PROJECT RULES"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "analyze.project.md"), []byte("LEGACY ANALYZE RULES"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "custom", "analyze.override.md"), []byte("CUSTOM ANALYZE OVERRIDE"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "learn-analyze.project.md"), []byte("LEARN ANALYZE RULES"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "custom", "learn-analyze.override.md"), []byte("CUSTOM LEARN ANALYZE OVERRIDE"), 0644))
 
 	loader := NewLoader("common", "zh-CN", seedPath)
-	prompt, err := loader.Render("analyze", sampleAnalyzeRequest())
+	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "PROJECT PROFILE")
 	require.Contains(t, prompt, "COMMON PROJECT RULES")
-	require.Contains(t, prompt, "LEGACY ANALYZE RULES")
-	require.Contains(t, prompt, "CUSTOM ANALYZE OVERRIDE")
-	require.Less(t, strings.Index(prompt, "COMMON PROJECT RULES"), strings.Index(prompt, "LEGACY ANALYZE RULES"))
-	require.Less(t, strings.Index(prompt, "LEGACY ANALYZE RULES"), strings.Index(prompt, "CUSTOM ANALYZE OVERRIDE"))
+	require.Contains(t, prompt, "LEARN ANALYZE RULES")
+	require.Contains(t, prompt, "CUSTOM LEARN ANALYZE OVERRIDE")
+	require.Less(t, strings.Index(prompt, "COMMON PROJECT RULES"), strings.Index(prompt, "LEARN ANALYZE RULES"))
+	require.Less(t, strings.Index(prompt, "LEARN ANALYZE RULES"), strings.Index(prompt, "CUSTOM LEARN ANALYZE OVERRIDE"))
 }
 
 func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {
@@ -85,7 +97,7 @@ func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {
 		Path: "webshell.go",
 	}}
 
-	prompt, err := loader.Render("init-skills", req)
+	prompt, err := loader.Render("skill-project-init", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "webshell.go")
@@ -99,7 +111,7 @@ func TestRenderAnalyzeListsFilePathsWithoutEmbeddedContent(t *testing.T) {
 	req.Patterns[0].GoodExample = "const secretGoodExample = true"
 	req.Patterns[0].BadExample = "const secretBadExample = true"
 
-	prompt, err := loader.Render("analyze", req)
+	prompt, err := loader.Render("learn-analyze", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "main.go")
@@ -113,7 +125,7 @@ func TestRenderGenerateFixesListsFilePathsWithoutEmbeddedContent(t *testing.T) {
 	req := sampleGenerateFixesRequest()
 	req.Files = []domain.FileInfo{domain.NewFileInfo("main.go", "package main\nconst secretFixContent = true\n")}
 
-	prompt, err := loader.Render("generate_fixes", req)
+	prompt, err := loader.Render("fix-generate", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "main.go")
@@ -125,7 +137,7 @@ func TestRenderProjectAnalysisListsReadmePathWithoutEmbeddedContent(t *testing.T
 	data := sampleProjectAnalysisData()
 	data["ReadmePath"] = "README.md"
 
-	prompt, err := loader.Render("project-analysis", data)
+	prompt, err := loader.Render("project-analyze", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "README.md")
@@ -138,7 +150,7 @@ func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	data["ExistingProfilePath"] = "/tmp/skills-seed/existing-profile.json"
 	data["FocusPaths"] = []string{"internal/service"}
 
-	prompt, err := loader.Render("project-analysis", data)
+	prompt, err := loader.Render("project-analyze", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "已有项目画像")
@@ -153,7 +165,7 @@ func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
 	data := sampleProjectAnalysisData()
 	data["StructuralContextPath"] = "/tmp/skills-seed/structural-context.md"
 
-	prompt, err := loader.Render("project-analysis", data)
+	prompt, err := loader.Render("project-analyze", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "CodeGraph")
@@ -167,7 +179,7 @@ func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
 	req := sampleAnalyzeCurrentCodebaseRequest()
 	req.StructuralContextPath = "/tmp/skills-seed/structural-context.md"
 
-	prompt, err := loader.Render("init-skills", req)
+	prompt, err := loader.Render("skill-project-init", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "CodeGraph")
@@ -191,7 +203,7 @@ func TestRenderInitSkillsIncludesKnownPatterns(t *testing.T) {
 			req.KnownPatternsPath = "/tmp/skills-seed/known-patterns.json"
 			req.KnownPatternsCount = 1
 
-			prompt, err := loader.Render("init-skills", req)
+			prompt, err := loader.Render("skill-project-init", req)
 
 			require.NoError(t, err)
 			require.Contains(t, prompt, tt.label)
@@ -233,8 +245,8 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 				name string
 				data interface{}
 			}{
-				{"init-skills", sampleAnalyzeCurrentCodebaseRequest()},
-				{"batch-learn", sampleBatchLearnData()},
+				{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+				{"learn-batch", sampleBatchLearnData()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					prompt, err := loader.Render(tc.name, tc.data)
@@ -288,8 +300,8 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 				name string
 				data interface{}
 			}{
-				{"init-skills", sampleAnalyzeCurrentCodebaseRequest()},
-				{"batch-learn", sampleBatchLearnData()},
+				{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+				{"learn-batch", sampleBatchLearnData()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					prompt, err := loader.Render(tc.name, tc.data)
@@ -311,7 +323,7 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 
-	prompt, err := loader.Render("project-analysis", sampleProjectAnalysisData())
+	prompt, err := loader.Render("project-analyze", sampleProjectAnalysisData())
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "所有面向用户阅读的自然语言字段必须使用简体中文")
@@ -322,7 +334,7 @@ func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing
 func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 
-	prompt, err := loader.Render("generate_skills_summary", sampleGenerateSkillsData())
+	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "所有面向用户阅读的自然语言字段必须使用简体中文")
@@ -365,7 +377,7 @@ func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
 func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
 	loader := NewLoader("common", "zh-CN", "")
 
-	prompt, err := loader.Render("batch-learn", sampleBatchLearnData())
+	prompt, err := loader.Render("learn-batch", sampleBatchLearnData())
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "abcdef123456")
@@ -463,6 +475,25 @@ func sampleProjectAnalysisData() map[string]interface{} {
 		"ExistingProfilePath":   "",
 		"FocusPaths":            []string{},
 		"UserContextPath":       "",
+	}
+}
+
+func workspacePromptData() map[string]interface{} {
+	return map[string]interface{}{
+		"WorkspaceName":      "demo-workspace",
+		"WorkspaceRoot":      "/tmp/demo-workspace",
+		"WorkspaceInputPath": "/tmp/skills-seed/workspace-input.json",
+		"UserContextPath":    "",
+	}
+}
+
+func workspaceSpecPromptData() map[string]interface{} {
+	return map[string]interface{}{
+		"WorkspaceName":        "demo-workspace",
+		"WorkspaceRoot":        "/tmp/demo-workspace",
+		"WorkspaceInputPath":   "/tmp/skills-seed/workspace-input.json",
+		"WorkspaceProfilePath": "/tmp/skills-seed/workspace-profile.json",
+		"UserContextPath":      "",
 	}
 }
 

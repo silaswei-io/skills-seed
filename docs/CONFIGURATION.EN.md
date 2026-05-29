@@ -66,10 +66,33 @@ exclude:
   - ".*"
   - "vendor/**"
   - "node_modules/**"
-  - "**/*.pb.go"
-  - "**/*.gen.go"
-  - "**/mocks/**"
-  - "**/testdata/**"
+  - "dist/**"
+  - "build/**"
+  - "out/**"
+  - "target/**"
+  - "coverage/**"
+  - ".cache/**"
+  - "tmp/**"
+  - "temp/**"
+  - "*.log"
+  - "*.tmp"
+  - "*.bak"
+  - "*.swp"
+  - "*.zip"
+  - "*.tar"
+  - "*.tar.gz"
+  - "*.tgz"
+  - "*.rar"
+  - "*.7z"
+  - "*.png"
+  - "*.jpg"
+  - "*.jpeg"
+  - "*.gif"
+  - "*.webp"
+  - "*.ico"
+  - "*.pdf"
+  - "*.mp4"
+  - "*.mov"
 ```
 
 ## Config Sections
@@ -255,15 +278,27 @@ Command flags affect only the current run and do not rewrite the config file.
 | Pattern | Description |
 |---|---|
 | `.*` | Dot-prefixed files and directories, such as `.github`, `.cursor`, `.codegraph`, `.env` |
-| `vendor/**` | Go dependency directory |
-| `node_modules/**` | Node.js dependency directory |
-| `**/*.pb.go` | Protobuf generated files |
-| `**/*.gen.go` | Generated code files |
-| `**/mocks/**` | Mock test files |
-| `**/testdata/**` | Test data directories |
+| `vendor/**` | Common dependency directory |
+| `node_modules/**` | Common dependency directory |
+| `dist/**` | Common build output directory |
+| `build/**` | Common build output directory |
+| `out/**` | Common output directory |
+| `target/**` | Common build output directory |
+| `coverage/**` | Coverage report directory |
+| `.cache/**` | Cache directory |
+| `tmp/**` | Temporary directory |
+| `temp/**` | Temporary directory |
+| `*.log` | Log files |
+| `*.tmp` | Temporary files |
+| `*.bak` | Backup files |
+| `*.swp` | Editor swap files |
+| `*.zip` / `*.tar` / `*.tar.gz` / `*.tgz` / `*.rar` / `*.7z` | Archives |
+| `*.png` / `*.jpg` / `*.jpeg` / `*.gif` / `*.webp` / `*.ico` | Image assets |
+| `*.pdf` | Document outputs |
+| `*.mp4` / `*.mov` | Video assets |
 
 #### Notes
 
-1. `exclude` uses glob-style patterns, not regular expressions.
+1. `exclude` uses glob-style patterns, not regular expressions. Patterns without `/` (e.g., `*.log`) match against both the file basename and the full path.
 2. Exclusion rules affect learning and analysis.
 3. Generated skill directories are also excluded by default, including configured `output.skills_paths`, `.claude/skills/**`, and `.agents/skills/**`.

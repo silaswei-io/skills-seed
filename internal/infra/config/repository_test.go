@@ -175,6 +175,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			"codex":  ".agents/skills/skills-seed-skills",
 		}},
 		Logging: LoggingConfig{Level: "DEBUG", LogsPath: "logs", MaxLogFiles: 30},
+		Exclude: []string{"dist/**", "*.log"},
 	}
 
 	content := repo.replaceConfigValues(string(templateData), cfg)
@@ -185,11 +186,29 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.Contains(t, content, `init_children: true`)
 	require.Contains(t, content, `id: "backend"`)
 	require.Contains(t, content, `description: "API contracts"`)
-	require.Contains(t, content, `- "**/*.pb.go"`)
-	require.Contains(t, content, `- ".*"`)
+	require.NotContains(t, content, `- "**/*.pb.go"`)
+	require.NotContains(t, content, `- "**/*.gen.go"`)
+	require.Contains(t, content, `- "dist/**"`)
+	require.Contains(t, content, `- "*.log"`)
 	require.Contains(t, content, `analysis:`)
 	require.Contains(t, content, `enabled: false`)
 	require.NotContains(t, content, `generation:`)
+}
+
+func TestNewRepositoryUsesDefaultExcludePatterns(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".skills-seed"), 0755))
+
+	repo, err := NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+
+	require.Equal(t, DefaultExcludePatterns(), repo.GetExclude())
+
+	content, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "config.yaml"))
+	require.NoError(t, err)
+	text := string(content)
+	require.Contains(t, text, `- "vendor/**"`)
+	require.Contains(t, text, `- "*.log"`)
 }
 
 func TestRepository_NormalizeAnalysisCodeGraphDefaults(t *testing.T) {
@@ -388,9 +407,13 @@ func TestRepository_GetExclude(t *testing.T) {
 	exclude := repo.GetExclude()
 
 	assert.NotEmpty(t, exclude, "exclude list should not be empty")
-	assert.Contains(t, exclude, ".*")
-	assert.Contains(t, exclude, "vendor/**")
-	assert.Contains(t, exclude, "node_modules/**")
+	for _, pattern := range DefaultExcludePatterns() {
+		assert.Contains(t, exclude, pattern)
+	}
+	assert.NotContains(t, exclude, "**/*.pb.go")
+	assert.NotContains(t, exclude, "**/*.gen.go")
+	assert.NotContains(t, exclude, "**/mocks/**")
+	assert.NotContains(t, exclude, "**/testdata/**")
 }
 
 func TestRepository_Update(t *testing.T) {

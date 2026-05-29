@@ -13,13 +13,15 @@ import (
 )
 
 var projectPromptNames = []string{
-	"init-skills",
-	"project-analysis",
-	"analyze",
-	"batch-learn",
-	"generate_skills_summary",
-	"generate_fixes",
-	"merge-patterns",
+	"skill-project-init",
+	"project-analyze",
+	"learn-analyze",
+	"learn-batch",
+	"skill-project-summary",
+	"fix-generate",
+	"pattern-merge",
+	"skill-workspace-profile",
+	"skill-workspace-spec",
 }
 
 // ProjectPromptData 渲染项目提示词模板的数据
@@ -192,7 +194,7 @@ func renderProjectTemplate(name, locale string, data ProjectPromptData) (string,
 
 func readProjectTemplate(name, locale string) ([]byte, error) {
 	if locale == "" {
-		locale = "en-US"
+		locale = "zh-CN"
 	}
 
 	localizedPath := metadata.ProjectPromptTemplatePath(name, locale)
@@ -225,7 +227,7 @@ func renderWorkspaceTemplate(name, locale string, data WorkspacePromptData) (str
 
 func readWorkspaceTemplate(name, locale string) ([]byte, error) {
 	if locale == "" {
-		locale = "en-US"
+		locale = "zh-CN"
 	}
 
 	localizedPath := metadata.WorkspacePromptTemplatePath(name, locale)

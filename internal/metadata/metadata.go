@@ -49,8 +49,8 @@ func TemplateProviderFallbacks(provider string) []string {
 // PromptTemplatePath 返回提示词模板路径
 func PromptTemplatePath(provider, name, locale string) string {
 	fileName := name + PromptTemplateExt
-	if locale != "" {
-		fileName = name + "." + locale + PromptTemplateExt
+	if templateLocaleSuffix(locale) != "" {
+		fileName = name + "." + templateLocaleSuffix(locale) + PromptTemplateExt
 	}
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, provider, fileName))
 }
@@ -58,8 +58,8 @@ func PromptTemplatePath(provider, name, locale string) string {
 // ProjectPromptTemplatePath 返回项目提示词模板路径
 func ProjectPromptTemplatePath(name, locale string) string {
 	fileName := name + ProjectPromptTemplateExt
-	if locale != "" {
-		fileName = name + "." + locale + ProjectPromptTemplateExt
+	if templateLocaleSuffix(locale) != "" {
+		fileName = name + "." + templateLocaleSuffix(locale) + ProjectPromptTemplateExt
 	}
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, ProjectTemplateProvider, fileName))
 }
@@ -67,8 +67,8 @@ func ProjectPromptTemplatePath(name, locale string) string {
 // WorkspacePromptTemplatePath 返回工作区提示词模板路径
 func WorkspacePromptTemplatePath(name, locale string) string {
 	fileName := name + ProjectPromptTemplateExt
-	if locale != "" {
-		fileName = name + "." + locale + ProjectPromptTemplateExt
+	if templateLocaleSuffix(locale) != "" {
+		fileName = name + "." + templateLocaleSuffix(locale) + ProjectPromptTemplateExt
 	}
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, WorkspaceTemplateProvider, fileName))
 }
@@ -79,10 +79,18 @@ func SkillsTemplatePath(provider, relativeName, locale, ext string) string {
 		ext = SkillsTemplateExt
 	}
 	fileName := relativeName + ext
-	if locale != "" {
-		fileName = relativeName + "." + locale + ext
+	if templateLocaleSuffix(locale) != "" {
+		fileName = relativeName + "." + templateLocaleSuffix(locale) + ext
 	}
 	return filepath.ToSlash(filepath.Join(SkillsTemplatesRoot, provider, fileName))
+}
+
+func templateLocaleSuffix(locale string) string {
+	locale = strings.TrimSpace(locale)
+	if locale == "" || strings.EqualFold(locale, "zh-CN") {
+		return ""
+	}
+	return locale
 }
 
 // SkillsAgentMetadataDir 返回 Agent 元数据模板目录

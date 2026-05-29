@@ -64,6 +64,12 @@ func matchPattern(filePath, pattern string) bool {
 		return strings.HasSuffix(filePath, strings.TrimPrefix(suffixPattern, "*"))
 	}
 
+	if !strings.Contains(pattern, "/") {
+		if ok, _ := path.Match(pattern, path.Base(filePath)); ok {
+			return true
+		}
+	}
+
 	if ok, _ := path.Match(pattern, filePath); ok {
 		return true
 	}

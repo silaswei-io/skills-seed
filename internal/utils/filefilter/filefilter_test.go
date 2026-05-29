@@ -12,10 +12,11 @@ func TestMatchExcludedSupportsDefaultPatterns(t *testing.T) {
 		".*",
 		"vendor/**",
 		"node_modules/**",
-		"**/*.pb.go",
-		"**/*.gen.go",
-		"**/mocks/**",
-		"**/testdata/**",
+		"dist/**",
+		"coverage/**",
+		"*.log",
+		"*.tar.gz",
+		"*.png",
 	}
 
 	for _, path := range []string{
@@ -25,10 +26,11 @@ func TestMatchExcludedSupportsDefaultPatterns(t *testing.T) {
 		"pkg/.cache/state.json",
 		"vendor/mod/file.go",
 		"node_modules/pkg/index.ts",
-		"api/user.pb.go",
-		"internal/api/user.gen.go",
-		"internal/service/mocks/repo.go",
-		"pkg/testdata/input.json",
+		"dist/app.js",
+		"coverage/index.html",
+		"logs/app.log",
+		"tmp/archive.tar.gz",
+		"assets/logo.png",
 	} {
 		require.True(t, MatchExcluded(path, patterns), path)
 	}
@@ -47,4 +49,10 @@ func TestFilterFilesRemovesExcludedPaths(t *testing.T) {
 
 	require.Len(t, filtered, 1)
 	require.Equal(t, "internal/service/user.go", filtered[0].Path)
+}
+
+func TestMatchExcludedMatchesBasenameForPatternsWithoutSlash(t *testing.T) {
+	require.True(t, MatchExcluded("logs/app.log", []string{"*.log"}))
+	require.True(t, MatchExcluded("tmp/archive.tar.gz", []string{"*.tar.gz"}))
+	require.False(t, MatchExcluded("logs/app.txt", []string{"*.log"}))
 }

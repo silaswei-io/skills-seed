@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"path/filepath"
-	"sort"
 	"strings"
 	"text/template"
 
@@ -51,7 +49,7 @@ func NewLoaderForAgent(agentName, locale string) *Loader {
 		agentName = metadata.CommonTemplateProvider
 	}
 	if locale == "" {
-		locale = "en-US" // 默认英文
+		locale = "zh-CN"
 	}
 	return &Loader{
 		agentName: strings.ToLower(agentName),
@@ -62,7 +60,11 @@ func NewLoaderForAgent(agentName, locale string) *Loader {
 
 // Load 加载指定名称的 Skills 模板
 func (l *Loader) Load(name string) (*template.Template, error) {
-	return l.loadTemplate(name, strings.ToUpper(name), metadata.SkillsTemplateExt)
+	entry, ok := TemplateCatalogEntry(name)
+	if !ok {
+		return nil, fs.ErrNotExist
+	}
+	return l.loadCatalogTemplate(entry)
 }
 
 // LoadReference 加载 references 目录下的模板
@@ -70,12 +72,12 @@ func (l *Loader) Load(name string) (*template.Template, error) {
 // category 表示分类名（如 "api", "business"）
 func (l *Loader) LoadReference(dir, category string) (*template.Template, error) {
 	key := dir + "/" + category
-	tmpl, err := l.loadTemplate(key, "references/"+dir+"/"+category, metadata.SkillsTemplateExt)
+	tmpl, err := l.loadTemplate(key, "project/references/"+dir+"/"+category, metadata.SkillsTemplateExt)
 	if err == nil {
 		return tmpl, nil
 	}
 	if dir == "patterns" && category != "default" && errors.Is(err, fs.ErrNotExist) {
-		return l.loadTemplate(dir+"/default", "references/"+dir+"/default", metadata.SkillsTemplateExt)
+		return l.loadTemplate(dir+"/default", "project/references/"+dir+"/default", metadata.SkillsTemplateExt)
 	}
 	return nil, err
 }
@@ -87,14 +89,12 @@ func (l *Loader) LoadPattern(category string) (*template.Template, error) {
 
 // LoadProjectOverview 加载项目概览模板（特殊处理）
 func (l *Loader) LoadProjectOverview() (*template.Template, error) {
-	key := "project-overview"
-	return l.loadTemplate(key, "references/project-overview", metadata.SkillsTemplateExt)
+	return l.Load("project-reference-overview")
 }
 
 // LoadReferenceFile 加载 references/ 下的独立模板。
 func (l *Loader) LoadReferenceFile(name string) (*template.Template, error) {
-	key := "reference-file/" + name
-	return l.loadTemplate(key, "references/"+name, metadata.SkillsTemplateExt)
+	return l.Load("project-reference-" + name)
 }
 
 // Render 渲染指定名称的模板
@@ -166,8 +166,7 @@ func (l *Loader) RenderReferenceFile(name string, data interface{}) (string, err
 
 // RenderRelative 渲染 skills 模板目录下的任意相对模板
 func (l *Loader) RenderRelative(relativeName string, data interface{}) (string, error) {
-	key := "relative/" + relativeName
-	tmpl, err := l.loadTemplate(key, relativeName, metadata.SkillsTemplateExt)
+	tmpl, err := l.loadTemplate("relative/"+relativeName, relativeName, metadata.SkillsTemplateExt)
 	if err != nil {
 		return "", err
 	}
@@ -182,29 +181,22 @@ func (l *Loader) RenderRelative(relativeName string, data interface{}) (string, 
 
 // RenderAgentMetadataFiles 渲染 agents/ 下所有可选元数据模板
 func (l *Loader) RenderAgentMetadataFiles(data interface{}) ([]RenderedFile, error) {
-	templatePaths, err := l.agentMetadataTemplatePaths()
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	files := make([]RenderedFile, 0, len(templatePaths))
-	outputPaths := make([]string, 0, len(templatePaths))
-	for outputPath := range templatePaths {
-		outputPaths = append(outputPaths, outputPath)
-	}
-	sort.Strings(outputPaths)
-
-	for _, outputPath := range outputPaths {
-		templatePath := templatePaths[outputPath]
+	entries := l.agentMetadataEntries()
+	files := make([]RenderedFile, 0, len(entries))
+	for _, entry := range entries {
+		templatePath, err := l.catalogTemplatePath(entry)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
 		templateData, err := embedfs.FS.ReadFile(templatePath)
 		if err != nil {
 			return nil, err
 		}
 
-		tmpl, err := template.New(outputPath).Option("missingkey=error").Funcs(funcMap()).Parse(string(templateData))
+		tmpl, err := template.New(entry.ID).Option("missingkey=error").Funcs(funcMap()).Parse(string(templateData))
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +207,7 @@ func (l *Loader) RenderAgentMetadataFiles(data interface{}) ([]RenderedFile, err
 		}
 
 		files = append(files, RenderedFile{
-			Path:    "agents/" + outputPath,
+			Path:    entry.OutputPath,
 			Content: buf.String(),
 		})
 	}
@@ -223,82 +215,50 @@ func (l *Loader) RenderAgentMetadataFiles(data interface{}) ([]RenderedFile, err
 	return files, nil
 }
 
-func (l *Loader) agentMetadataTemplatePaths() (map[string]string, error) {
-	selected := map[string]string{}
-	var found bool
-	var lastErr error
-
-	for _, agentName := range l.templateAgentNames() {
-		baseDir := metadata.SkillsAgentMetadataDir(agentName)
-		perAgent := map[string]string{}
-
-		err := fs.WalkDir(embedfs.FS, baseDir, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.IsDir() || !strings.HasSuffix(path, ".tmpl") {
-				return nil
-			}
-
-			rel := strings.TrimPrefix(path, baseDir+"/")
-			outputPath, localized := metadataOutputPath(rel, l.locale)
-			if outputPath == "" {
-				return nil
-			}
-			if _, exists := perAgent[outputPath]; !exists || localized {
-				perAgent[outputPath] = path
-			}
-			return nil
-		})
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		for outputPath, templatePath := range perAgent {
-			found = true
-			if _, exists := selected[outputPath]; !exists {
-				selected[outputPath] = templatePath
-			}
+func (l *Loader) agentMetadataEntries() []TemplateEntry {
+	var entries []TemplateEntry
+	for _, entry := range skillTemplateCatalog {
+		if strings.HasPrefix(entry.OutputPath, "agents/") && l.entryAllowsProvider(entry, l.agentName) {
+			entries = append(entries, entry)
 		}
 	}
-
-	if found {
-		return selected, nil
-	}
-	if lastErr != nil {
-		return nil, lastErr
-	}
-	return nil, fs.ErrNotExist
+	return entries
 }
 
-func metadataOutputPath(templatePath, locale string) (string, bool) {
-	if !strings.HasSuffix(templatePath, ".tmpl") {
-		return "", false
-	}
-	withoutTemplateSuffix := strings.TrimSuffix(templatePath, ".tmpl")
+func (l *Loader) catalogTemplatePath(entry TemplateEntry) (string, error) {
+	var lastErr error
+	for _, agentName := range l.templateAgentNames() {
+		if !l.entryAllowsProvider(entry, agentName) {
+			continue
+		}
+		localizedPath := metadata.SkillsTemplatePath(agentName, entry.RelativeName, l.locale, entry.Ext)
+		if _, err := embedfs.FS.ReadFile(localizedPath); err == nil {
+			return localizedPath, nil
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			lastErr = err
+		}
 
-	baseName := filepath.Base(withoutTemplateSuffix)
-	parts := strings.Split(baseName, ".")
-	if len(parts) >= 3 {
-		localeCandidate := parts[len(parts)-2]
-		if strings.Contains(localeCandidate, "-") {
-			if localeCandidate != locale {
-				return "", false
-			}
-			parts = append(parts[:len(parts)-2], parts[len(parts)-1])
-			dir := filepath.Dir(withoutTemplateSuffix)
-			outputName := strings.Join(parts, ".")
-			if dir == "." {
-				return outputName, true
-			}
-			return filepath.Join(dir, outputName), true
+		defaultPath := metadata.SkillsTemplatePath(agentName, entry.RelativeName, "", entry.Ext)
+		if _, err := embedfs.FS.ReadFile(defaultPath); err == nil {
+			return defaultPath, nil
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			lastErr = err
 		}
 	}
-	return withoutTemplateSuffix, false
+	if lastErr != nil {
+		return "", lastErr
+	}
+	return "", fs.ErrNotExist
+}
+
+func (l *Loader) entryAllowsProvider(entry TemplateEntry, provider string) bool {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	for _, allowed := range entry.Providers {
+		if provider == strings.ToLower(allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 // Clear 清除缓存
@@ -338,6 +298,27 @@ func (l *Loader) loadTemplate(key, relativeName, ext string) (*template.Template
 	}
 
 	l.templates[key] = tmpl
+	return tmpl, nil
+}
+
+func (l *Loader) loadCatalogTemplate(entry TemplateEntry) (*template.Template, error) {
+	if cached, ok := l.templates[entry.ID]; ok {
+		return cached, nil
+	}
+
+	templatePath, err := l.catalogTemplatePath(entry)
+	if err != nil {
+		return nil, err
+	}
+	data, err := embedfs.FS.ReadFile(templatePath)
+	if err != nil {
+		return nil, err
+	}
+	tmpl, err := template.New(entry.ID).Option("missingkey=error").Funcs(funcMap()).Parse(string(data))
+	if err != nil {
+		return nil, err
+	}
+	l.templates[entry.ID] = tmpl
 	return tmpl, nil
 }
 

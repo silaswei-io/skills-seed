@@ -2,6 +2,25 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.2.0]
+
+### 变更
+
+- 模板国际化约定翻转：中文模板文件名不再带 `.zh-CN` 后缀（如 `learn-analyze.txt.tmpl`），英文模板显式标注 `.en-US`（如 `learn-analyze.en-US.txt.tmpl`）；`zh-CN` 成为所有模板加载的默认 locale
+- 所有 prompt 和 skills 模板统一使用 `域名-功能` kebab-case 命名，替换原先的 snake_case / 混合命名：
+  `analyze` → `learn-analyze`、`batch-learn` → `learn-batch`、`generate_fixes` → `fix-generate`、`generate_skills_summary` → `skill-project-summary`、`merge-patterns` → `pattern-merge`、`project-analysis` → `project-analyze`、`init-skills` → `skill-project-init`、`workspace-profile` → `skill-workspace-profile`、`workspace-spec` → `skill-workspace-spec`、`skill` → `project-skill`、`workspace/SKILL` → `workspace-skill`
+- Skills 模板引入中央目录（catalog）注册机制，通过 `TemplateEntry` 声明式定义模板 ID、路径和 provider 白名单，取代原有 `fs.WalkDir` 动态扫描
+
+### 功能
+
+- 新增 `DefaultExcludePatterns()` 提取为独立函数，初始化时写入完整的静态排除规则到配置文件
+- 默认排除规则从 7 条扩展到 31 条，覆盖常见构建产物（`dist`、`build`、`out`、`target`）、临时文件（`*.tmp`、`*.bak`、`*.swp`）、压缩包（`*.zip`、`*.tar.gz`）、图片和视频资源等
+- 文件过滤器新增基名 glob 匹配：不含 `/` 的模式（如 `*.log`）会同时对文件基名和完整路径进行匹配
+
+### 文档
+
+- 更新配置参考文档中 `exclude` 默认值表格，反映扩展后的排除规则列表
+
 ## [v0.1.0]
 
 ### 修复

@@ -94,6 +94,41 @@ func defaultCodeGraphConfig() CodeGraphConfig {
 	}
 }
 
+func DefaultExcludePatterns() []string {
+	return []string{
+		".*",
+		"vendor/**",
+		"node_modules/**",
+		"dist/**",
+		"build/**",
+		"out/**",
+		"target/**",
+		"coverage/**",
+		".cache/**",
+		"tmp/**",
+		"temp/**",
+		"*.log",
+		"*.tmp",
+		"*.bak",
+		"*.swp",
+		"*.zip",
+		"*.tar",
+		"*.tar.gz",
+		"*.tgz",
+		"*.rar",
+		"*.7z",
+		"*.png",
+		"*.jpg",
+		"*.jpeg",
+		"*.gif",
+		"*.webp",
+		"*.ico",
+		"*.pdf",
+		"*.mp4",
+		"*.mov",
+	}
+}
+
 // UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
 func (c *CodeGraphConfig) UnmarshalYAML(value *yaml.Node) error {
 	type rawCodeGraphConfig CodeGraphConfig
@@ -179,6 +214,7 @@ func NewRepository(seedPath string, locale string) (*Repository, error) {
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) || errors.Is(err, os.ErrNotExist) {
 			cfg = repo.defaultConfig(locale)
+			cfg.Exclude = DefaultExcludePatterns()
 			if err := repo.save(cfg); err != nil {
 				return nil, err
 			}
@@ -327,6 +363,8 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	content = replaceYAMLValueInSection(content, "logging:", "level:", cfg.Logging.Level)
 	content = replaceYAMLValueInSection(content, "logging:", "logs_path:", cfg.Logging.LogsPath)
 	content = replaceYAMLValueInSection(content, "logging:", "max_log_files:", cfg.Logging.MaxLogFiles)
+
+	content = replaceYAMLStringListAtRoot(content, "exclude:", cfg.Exclude)
 
 	return content
 }
@@ -499,6 +537,54 @@ func replaceYAMLStringMapInSection(content, section, key string, values map[stri
 			}
 			nextIndent := len(next) - len(strings.TrimLeft(next, " "))
 			if nextIndent <= keyIndent {
+				break
+			}
+			end++
+		}
+
+		lines = spliceYAMLLines(lines, i, end, replacement)
+		break
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func replaceYAMLStringListAtRoot(content, key string, values []string) string {
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") || !strings.HasPrefix(trimmed, key) {
+			continue
+		}
+
+		commentIdx := strings.Index(line, " #")
+		comment := ""
+		commentColumn := 0
+		if commentIdx > 0 {
+			comment = line[commentIdx+1:]
+			commentColumn = commentIdx + 1
+		}
+
+		replacement := []string{}
+		if len(values) == 0 {
+			replacement = append(replacement, appendYAMLLineComment(key+" []", yamlLineComment{text: comment, column: commentColumn}))
+		} else {
+			replacement = append(replacement, appendYAMLLineComment(key, yamlLineComment{text: comment, column: commentColumn}))
+			for _, value := range values {
+				replacement = append(replacement, "  - "+quoteYAMLString(value))
+			}
+		}
+
+		end := i + 1
+		for end < len(lines) {
+			next := lines[end]
+			nextTrimmed := strings.TrimSpace(next)
+			if nextTrimmed == "" || strings.HasPrefix(nextTrimmed, "#") {
+				end++
+				continue
+			}
+			nextIndent := len(next) - len(strings.TrimLeft(next, " "))
+			if nextIndent == 0 {
 				break
 			}
 			end++
@@ -815,15 +901,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			LogsPath:    "logs",
 			MaxLogFiles: 30,
 		},
-		Exclude: []string{
-			".*",
-			"vendor/**",
-			"node_modules/**",
-			"**/*.pb.go",
-			"**/*.gen.go",
-			"**/mocks/**",
-			"**/testdata/**",
-		},
+		Exclude: DefaultExcludePatterns(),
 	}
 }
 

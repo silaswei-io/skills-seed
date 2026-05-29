@@ -1,0 +1,119 @@
+# Cross-Project Rules
+
+Use this file to evaluate cross-project impact, choose change order, and constrain parallel writes. Child-project internal rules still belong to the corresponding child skill.
+
+## Core Principles
+
+- Identify impact radius before editing; do not assume a task affects only one child project because it starts in one path.
+- Before editing a child project, read that project's `SKILL.md` and `references/project-spec.md`.
+- When changing contracts, shared libraries, or deployment config, identify producers, consumers, and runtime impact before reading affected skills.
+- Do not promote a child project's local convention into a workspace-wide rule unless multiple projects depend on it.
+- When special paths are not configured, infer contract, shared, and infrastructure impact from filenames, directory names, and imports.
+- If the workspace overview or child skills cannot confirm an important boundary, ask the user during task execution.
+
+{{if .HasRules}}
+## Workspace-Specific Rules
+
+{{range .Rules}}
+- **{{.Title}}**: {{.Description}}{{if .AppliesTo}} (applies to {{range $i, $id := .AppliesTo}}{{if $i}}, {{end}}`{{$id}}`{{end}}){{end}}
+{{end}}
+{{end}}
+
+{{if .HasRouting}}
+## Workspace-Specific Routes
+
+{{range .Routing}}
+- `{{.PathPattern}}`
+  - Read projects: {{range $i, $id := .ProjectIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}}
+  - Reason: {{.Reason}}
+{{end}}
+{{end}}
+
+## Impact Radius
+
+### Single Child Project
+
+- Read only the affected child skill.
+- Keep writes inside that child project path by default.
+- If the change requires contracts, shared code, or deployment config, escalate to cross-project work.
+
+### Contract Changes
+
+- Includes API definitions, OpenAPI/Swagger, proto, request/response types, error codes, events, messages, generation inputs, and SDKs.
+- Update the contract source first, then generated artifacts or adapters.
+- Read producer and consumer child skills together.
+- Verify fields, types, error codes, defaults, compatibility, and tests on both sides.
+
+### Shared Code Changes
+
+- Includes public types, utilities, shared components, common config, and reused libraries.
+- Stabilize public APIs or function signatures before updating consumers.
+- Check importers, build targets, and packaged artifacts.
+- If the shared change is breaking, update every consumer in the same change set.
+
+### Infrastructure Changes
+
+- Includes Dockerfiles, Compose, Kubernetes, Helm, Terraform, Nginx, gateways, middleware, environment variables, CI, and release scripts.
+- Identify runtime-affected child projects before reading skills.
+- Check ports, path prefixes, health checks, environment variable names, image build args, startup commands, and release order.
+
+## Change Order
+
+{{if .HasChangeOrder}}
+{{range $i, $step := .ChangeOrder}}
+{{add $i 1}}. {{$step}}
+{{end}}
+{{else}}
+1. List affected paths and child projects.
+2. Read the workspace overview to confirm child skill paths.
+3. If contracts or shared interfaces are involved, update the contract source, schema, public types, or shared signatures first.
+4. Update producer implementation and tests.
+5. Update consumer calls, generated code, adapters, and tests.
+6. Update infrastructure, environment variables, gateway rules, middleware, or CI.
+7. Verify consistency across generated artifacts, interface shapes, error codes, config keys, build commands, and test scope.
+{{end}}
+
+## Load Multiple Skills When
+
+- The changed path is not owned by exactly one child project.
+- The change affects APIs, types, schemas, error codes, events, messages, or generation inputs.
+- The change touches shared libraries, utilities, components, or common config.
+- The change touches deployment, gateway, middleware, CI, environment variables, or release scripts.
+- The change touches root scripts, workspace-level package/go work/build config, or batch commands.
+{{if .HasContracts}}
+- A configured contract path changes; read related producer, consumer, middleware, or SDK child skills together.
+{{end}}
+{{if .HasShared}}
+- A configured shared path changes; read every child skill that imports, packages, or generates the shared code.
+{{end}}
+{{if .HasInfra}}
+- A configured infrastructure path changes; read child skills affected by deployment, config, gateway, or middleware rules.
+{{end}}
+{{if .HasLoadMultipleWhen}}
+{{range .LoadMultipleWhen}}
+- {{.Condition}}: read {{range $i, $id := .ProjectIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}} together; {{.Reason}}
+{{end}}
+{{end}}
+
+## Parallel Agent Constraints
+
+- Safe to parallelize: non-overlapping child-project internals where each agent writes only its assigned child project path.
+- Do not parallelize: the same contract file, shared file, infrastructure file, root config, or workspace-level script.
+- Before parallel work, define each agent's read/write boundary and affected child projects.
+- Consumer projects must not proceed in parallel until the contract or shared interface is stable.
+- Before merging parallel results, verify interface shapes, error codes, environment variables, generated artifacts, build commands, and tests together.
+{{if .HasParallelGuidance}}
+
+### Workspace-Specific Parallel Rules
+
+{{range .ParallelGuidance}}
+- `{{.Scope}}`: {{if .Allowed}}parallel work is allowed{{else}}parallel work is not allowed{{end}}. Condition: {{.Condition}}
+{{end}}
+{{end}}
+
+## Response Requirements
+
+- State the child projects and paths hit by the task.
+- State whether contracts, shared code, or infrastructure are involved.
+- State which child project skills were read.
+- For cross-project tasks, state change order and verification scope.

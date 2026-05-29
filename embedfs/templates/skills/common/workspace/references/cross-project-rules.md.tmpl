@@ -1,119 +1,119 @@
-# Cross-Project Rules
+# 跨项目规则
 
-Use this file to evaluate cross-project impact, choose change order, and constrain parallel writes. Child-project internal rules still belong to the corresponding child skill.
+本文件用于判断跨项目影响、安排改动顺序和限制并发写入。子项目内部规则仍以对应子项目 skill 为准。
 
-## Core Principles
+## 基本原则
 
-- Identify impact radius before editing; do not assume a task affects only one child project because it starts in one path.
-- Before editing a child project, read that project's `SKILL.md` and `references/project-spec.md`.
-- When changing contracts, shared libraries, or deployment config, identify producers, consumers, and runtime impact before reading affected skills.
-- Do not promote a child project's local convention into a workspace-wide rule unless multiple projects depend on it.
-- When special paths are not configured, infer contract, shared, and infrastructure impact from filenames, directory names, and imports.
-- If the workspace overview or child skills cannot confirm an important boundary, ask the user during task execution.
+- 先判断影响范围，再写代码；不要因为当前任务从一个路径开始，就假设只影响一个子项目。
+- 修改某个子项目代码前，必须读取该子项目的 `SKILL.md` 和 `references/project-spec.md`。
+- 修改契约、共享库或部署配置时，先识别生产者、消费者和运行时影响，再读取对应 skills。
+- 不要把单个子项目内部约定提升为全局规则，除非多个子项目共同依赖。
+- 未配置特殊路径时，使用文件名、目录名和导入关系判断契约、共享和基础设施影响。
+- 如果工作区概览或子项目 skill 无法确认关键边界，实际执行任务时必须先问用户。
 
 {{if .HasRules}}
-## Workspace-Specific Rules
+## 工作区特定规则
 
 {{range .Rules}}
-- **{{.Title}}**: {{.Description}}{{if .AppliesTo}} (applies to {{range $i, $id := .AppliesTo}}{{if $i}}, {{end}}`{{$id}}`{{end}}){{end}}
+- **{{.Title}}**：{{.Description}}{{if .AppliesTo}}（适用：{{range $i, $id := .AppliesTo}}{{if $i}}、{{end}}`{{$id}}`{{end}}）{{end}}
 {{end}}
 {{end}}
 
 {{if .HasRouting}}
-## Workspace-Specific Routes
+## 工作区特定路由
 
 {{range .Routing}}
 - `{{.PathPattern}}`
-  - Read projects: {{range $i, $id := .ProjectIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}}
-  - Reason: {{.Reason}}
+  - 读取项目：{{range $i, $id := .ProjectIDs}}{{if $i}}、{{end}}`{{$id}}`{{end}}
+  - 原因：{{.Reason}}
 {{end}}
 {{end}}
 
-## Impact Radius
+## 影响半径
 
-### Single Child Project
+### 单子项目改动
 
-- Read only the affected child skill.
-- Keep writes inside that child project path by default.
-- If the change requires contracts, shared code, or deployment config, escalate to cross-project work.
+- 只读受影响子项目 skill。
+- 写入默认限制在该子项目路径。
+- 如果发现需要修改契约、共享代码或部署配置，升级为跨项目改动。
 
-### Contract Changes
+### 契约改动
 
-- Includes API definitions, OpenAPI/Swagger, proto, request/response types, error codes, events, messages, generation inputs, and SDKs.
-- Update the contract source first, then generated artifacts or adapters.
-- Read producer and consumer child skills together.
-- Verify fields, types, error codes, defaults, compatibility, and tests on both sides.
+- 包括 API 定义、OpenAPI/Swagger、proto、请求/响应类型、错误码、事件、消息、生成输入和 SDK。
+- 先改契约源，再改生成物或适配层。
+- 同时读取生产者和消费者子项目 skill。
+- 验证两端字段名、类型、错误码、默认值、兼容性和测试。
 
-### Shared Code Changes
+### 共享代码改动
 
-- Includes public types, utilities, shared components, common config, and reused libraries.
-- Stabilize public APIs or function signatures before updating consumers.
-- Check importers, build targets, and packaged artifacts.
-- If the shared change is breaking, update every consumer in the same change set.
+- 包括公共类型、公共工具、共享组件、公共配置和跨项目复用库。
+- 先稳定公共 API 或函数签名，再更新所有消费者。
+- 检查导入方、构建目标和打包产物。
+- 如果共享变更破坏兼容性，必须同步更新所有消费者。
 
-### Infrastructure Changes
+### 基础设施改动
 
-- Includes Dockerfiles, Compose, Kubernetes, Helm, Terraform, Nginx, gateways, middleware, environment variables, CI, and release scripts.
-- Identify runtime-affected child projects before reading skills.
-- Check ports, path prefixes, health checks, environment variable names, image build args, startup commands, and release order.
+- 包括 Dockerfile、Compose、Kubernetes、Helm、Terraform、Nginx、网关、中间件、环境变量、CI 和发布脚本。
+- 先确认运行时影响哪些子项目，再读对应 skill。
+- 检查端口、路径前缀、健康检查、环境变量名、镜像构建参数、启动命令和发布顺序。
 
-## Change Order
+## 改动顺序
 
 {{if .HasChangeOrder}}
 {{range $i, $step := .ChangeOrder}}
 {{add $i 1}}. {{$step}}
 {{end}}
 {{else}}
-1. List affected paths and child projects.
-2. Read the workspace overview to confirm child skill paths.
-3. If contracts or shared interfaces are involved, update the contract source, schema, public types, or shared signatures first.
-4. Update producer implementation and tests.
-5. Update consumer calls, generated code, adapters, and tests.
-6. Update infrastructure, environment variables, gateway rules, middleware, or CI.
-7. Verify consistency across generated artifacts, interface shapes, error codes, config keys, build commands, and test scope.
+1. 列出受影响路径和子项目。
+2. 读取工作区概览，确认所有子项目 skill 路径。
+3. 如果涉及契约或共享接口，先更新契约源、schema、公共类型或共享函数签名。
+4. 更新生产者实现和测试。
+5. 更新消费者调用、生成代码、适配层和测试。
+6. 更新基础设施、环境变量、网关、中间件或 CI。
+7. 汇总验证：生成物、接口形状、错误码、配置键、构建命令和测试范围必须一致。
 {{end}}
 
-## Load Multiple Skills When
+## 必须同时读取多个 skills 的场景
 
-- The changed path is not owned by exactly one child project.
-- The change affects APIs, types, schemas, error codes, events, messages, or generation inputs.
-- The change touches shared libraries, utilities, components, or common config.
-- The change touches deployment, gateway, middleware, CI, environment variables, or release scripts.
-- The change touches root scripts, workspace-level package/go work/build config, or batch commands.
+- 改动路径不在任何单一子项目内。
+- 改动会改变 API、类型、schema、错误码、事件、消息或生成输入。
+- 改动共享库、公共工具、公共组件或公共配置。
+- 改动部署、网关、中间件、CI、环境变量或发布脚本。
+- 改动根目录脚本、workspace 级 package/go work/build 配置或批量命令。
 {{if .HasContracts}}
-- A configured contract path changes; read related producer, consumer, middleware, or SDK child skills together.
+- 修改已配置契约路径时，同时读取相关生产者、消费者、中间件或 SDK 子项目 skill。
 {{end}}
 {{if .HasShared}}
-- A configured shared path changes; read every child skill that imports, packages, or generates the shared code.
+- 修改已配置共享路径时，同时读取所有导入、打包或生成该共享代码的子项目 skill。
 {{end}}
 {{if .HasInfra}}
-- A configured infrastructure path changes; read child skills affected by deployment, config, gateway, or middleware rules.
+- 修改已配置基础设施路径时，同时读取受部署、配置、网关或中间件规则影响的子项目 skill。
 {{end}}
 {{if .HasLoadMultipleWhen}}
 {{range .LoadMultipleWhen}}
-- {{.Condition}}: read {{range $i, $id := .ProjectIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}} together; {{.Reason}}
+- {{.Condition}}：同时读取 {{range $i, $id := .ProjectIDs}}{{if $i}}、{{end}}`{{$id}}`{{end}}；{{.Reason}}
 {{end}}
 {{end}}
 
-## Parallel Agent Constraints
+## 并发 Agent 约束
 
-- Safe to parallelize: non-overlapping child-project internals where each agent writes only its assigned child project path.
-- Do not parallelize: the same contract file, shared file, infrastructure file, root config, or workspace-level script.
-- Before parallel work, define each agent's read/write boundary and affected child projects.
-- Consumer projects must not proceed in parallel until the contract or shared interface is stable.
-- Before merging parallel results, verify interface shapes, error codes, environment variables, generated artifacts, build commands, and tests together.
+- 可以并发：互不重叠的子项目内部改动，且每个 Agent 只写自己的子项目路径。
+- 不可并发：同一契约文件、同一共享文件、同一基础设施文件、根配置和工作区级脚本。
+- 并发前必须明确每个 Agent 的读写边界和受影响子项目。
+- 契约或共享接口稳定前，消费者子项目不能并发实现。
+- 合并并发结果前，统一检查接口形状、错误码、环境变量、生成物、构建命令和测试是否一致。
 {{if .HasParallelGuidance}}
 
-### Workspace-Specific Parallel Rules
+### 工作区特定并发规则
 
 {{range .ParallelGuidance}}
-- `{{.Scope}}`: {{if .Allowed}}parallel work is allowed{{else}}parallel work is not allowed{{end}}. Condition: {{.Condition}}
+- `{{.Scope}}`：{{if .Allowed}}允许并发{{else}}不允许并发{{end}}。条件：{{.Condition}}
 {{end}}
 {{end}}
 
-## Response Requirements
+## 输出要求
 
-- State the child projects and paths hit by the task.
-- State whether contracts, shared code, or infrastructure are involved.
-- State which child project skills were read.
-- For cross-project tasks, state change order and verification scope.
+- 说明本次任务命中的子项目和路径。
+- 说明是否涉及契约、共享代码或基础设施。
+- 说明读取了哪些子项目 skill。
+- 对跨项目任务，说明改动顺序和验证范围。

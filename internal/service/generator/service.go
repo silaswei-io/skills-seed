@@ -846,7 +846,7 @@ func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath str
 	}
 
 	// 生成主 SKILL.md 文件
-	mainContent, err := s.skillsLoader.Render("skill", data)
+	mainContent, err := s.skillsLoader.Render("project-skill", data)
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.render_skill_template",
@@ -1453,7 +1453,7 @@ func (s *GeneratorService) writeWorkspaceRootSkill(ctx context.Context, outputPa
 	if err != nil {
 		return err
 	}
-	content, err := s.skillsLoader.RenderRelative("workspace/SKILL", data)
+	content, err := s.skillsLoader.Render("workspace-skill", data)
 	if err != nil {
 		return err
 	}
@@ -1463,14 +1463,14 @@ func (s *GeneratorService) writeWorkspaceRootSkill(ctx context.Context, outputPa
 	if err := s.generateAgentMetadata(outputPath, data); err != nil {
 		return err
 	}
-	overview, err := s.skillsLoader.RenderRelative("workspace/references/workspace-overview", data)
+	overview, err := s.skillsLoader.Render("workspace-reference-overview", data)
 	if err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(outputPath, "references", "workspace-overview.md"), []byte(overview), 0644); err != nil {
 		return err
 	}
-	rules, err := s.skillsLoader.RenderRelative("workspace/references/cross-project-rules", data)
+	rules, err := s.skillsLoader.Render("workspace-reference-cross-project-rules", data)
 	if err != nil {
 		return err
 	}

@@ -66,10 +66,33 @@ exclude:
   - ".*"
   - "vendor/**"
   - "node_modules/**"
-  - "**/*.pb.go"
-  - "**/*.gen.go"
-  - "**/mocks/**"
-  - "**/testdata/**"
+  - "dist/**"
+  - "build/**"
+  - "out/**"
+  - "target/**"
+  - "coverage/**"
+  - ".cache/**"
+  - "tmp/**"
+  - "temp/**"
+  - "*.log"
+  - "*.tmp"
+  - "*.bak"
+  - "*.swp"
+  - "*.zip"
+  - "*.tar"
+  - "*.tar.gz"
+  - "*.tgz"
+  - "*.rar"
+  - "*.7z"
+  - "*.png"
+  - "*.jpg"
+  - "*.jpeg"
+  - "*.gif"
+  - "*.webp"
+  - "*.ico"
+  - "*.pdf"
+  - "*.mp4"
+  - "*.mov"
 ```
 
 ## 配置项
@@ -255,15 +278,27 @@ skills-seed learn history --limit 100 --batch-size 10
 | Pattern | 说明 |
 |---|---|
 | `.*` | 点号开头的文件和目录，如 `.github`、`.cursor`、`.codegraph`、`.env` |
-| `vendor/**` | Go 依赖目录 |
-| `node_modules/**` | Node.js 依赖目录 |
-| `**/*.pb.go` | Protobuf 生成文件 |
-| `**/*.gen.go` | 代码生成文件 |
-| `**/mocks/**` | Mock 测试文件 |
-| `**/testdata/**` | 测试数据目录 |
+| `vendor/**` | 常见依赖目录 |
+| `node_modules/**` | 常见依赖目录 |
+| `dist/**` | 常见构建产物目录 |
+| `build/**` | 常见构建产物目录 |
+| `out/**` | 常见输出目录 |
+| `target/**` | 常见构建产物目录 |
+| `coverage/**` | 覆盖率报告目录 |
+| `.cache/**` | 缓存目录 |
+| `tmp/**` | 临时目录 |
+| `temp/**` | 临时目录 |
+| `*.log` | 日志文件 |
+| `*.tmp` | 临时文件 |
+| `*.bak` | 备份文件 |
+| `*.swp` | 编辑器交换文件 |
+| `*.zip` / `*.tar` / `*.tar.gz` / `*.tgz` / `*.rar` / `*.7z` | 压缩包 |
+| `*.png` / `*.jpg` / `*.jpeg` / `*.gif` / `*.webp` / `*.ico` | 图片资源 |
+| `*.pdf` | 文档产物 |
+| `*.mp4` / `*.mov` | 视频资源 |
 
 #### 说明
 
-1. `exclude` 使用 glob 风格匹配，不是正则。
+1. `exclude` 使用 glob 风格匹配，不是正则。不含 `/` 的模式（如 `*.log`）会同时对文件基名和完整路径匹配。
 2. 排除规则会影响学习和分析。
 3. 生成的 skills 目录默认也会排除，包括配置中的 `output.skills_paths`、`.claude/skills/**` 和 `.agents/skills/**`。

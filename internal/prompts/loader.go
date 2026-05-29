@@ -28,7 +28,7 @@ type Loader struct {
 // NewLoader 创建提示词模板加载器
 func NewLoader(agentName, locale, seedPath string) *Loader {
 	if locale == "" {
-		locale = "en-US"
+		locale = "zh-CN"
 	}
 
 	return &Loader{

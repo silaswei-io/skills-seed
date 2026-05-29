@@ -183,7 +183,7 @@ func TestE2E_Analyze(t *testing.T) {
 	}
 }
 
-// TestE2E_BatchLearn 测试 batch-learn 模板：渲染 → Claude → 解析
+// TestE2E_BatchLearn 测试 learn-batch 模板：渲染 → Claude → 解析
 // 模板绑定: Commits, CommitFiles, KnownPatternsJSON, KnownPatternsCount
 // 输出格式: {"patterns":[...]}
 func TestE2E_BatchLearn(t *testing.T) {
@@ -211,7 +211,7 @@ func TestE2E_BatchLearn(t *testing.T) {
 	}
 }
 
-// TestE2E_LearnFromCommit 测试 batch-learn 模板（单提交模式）：渲染 → Claude → 解析
+// TestE2E_LearnFromCommit 测试 learn-batch 模板（单提交模式）：渲染 → Claude → 解析
 // 模板绑定: Commit (单条), ChangedFiles, KnownPatternsJSON, KnownPatternsCount
 // 输出格式: {"patterns":[...]}
 func TestE2E_LearnFromCommit(t *testing.T) {
@@ -239,7 +239,7 @@ func TestE2E_LearnFromCommit(t *testing.T) {
 	}
 }
 
-// TestE2E_GenerateFixes 测试 generate_fixes 模板：渲染 → Claude → 解析
+// TestE2E_GenerateFixes 测试 fix-generate 模板：渲染 → Claude → 解析
 // 模板绑定: Issues, Files, Context
 // 输出格式: {"fixes":{"file/path.go":"content"}, "confidence":0.88}
 func TestE2E_GenerateFixes(t *testing.T) {
@@ -277,7 +277,7 @@ func TestE2E_GenerateFixes(t *testing.T) {
 	}
 }
 
-// TestE2E_GenerateSkillsSummary 测试 generate_skills_summary 模板：渲染 → Claude → 解析
+// TestE2E_GenerateSkillsSummary 测试 skill-project-summary 模板：渲染 → Claude → 解析
 // 模板绑定: PROJECT_NAME, LANGUAGE, PATTERNS_JSON, PATTERNS_COUNT, EXISTING_SKILLS_PATH
 // 输出格式: {"category_summaries":{...}, "key_patterns":[...], ...}
 func TestE2E_GenerateSkillsSummary(t *testing.T) {
@@ -321,7 +321,7 @@ func TestE2E_GenerateSkillsSummary(t *testing.T) {
 		len(result.KeyPatterns), len(result.CommonPatterns))
 }
 
-// TestE2E_MergePatterns 测试 merge-patterns 模板：渲染 → Claude → 解析
+// TestE2E_MergePatterns 测试 pattern-merge 模板：渲染 → Claude → 解析
 // 模板绑定: Category, Patterns
 // 输出格式: {"merged_patterns":[...], "unchanged_patterns":[...], "summary":{...}}
 func TestE2E_MergePatterns(t *testing.T) {
@@ -358,7 +358,7 @@ func TestE2E_MergePatterns(t *testing.T) {
 	}
 }
 
-// TestE2E_ProjectAnalysis 测试 project-analysis 模板：渲染 → Claude → 解析
+// TestE2E_ProjectAnalysis 测试 project-analyze 模板：渲染 → Claude → 解析
 // 模板绑定: ProjectName, RootPath, Structure, ReadmePath, MainFiles
 // 输出格式: {"project_name":"...", "language":"go", "frameworks":[...], ...}
 func TestE2E_ProjectAnalysis(t *testing.T) {
@@ -389,7 +389,7 @@ func TestE2E_ProjectAnalysis(t *testing.T) {
 	assert.NotEmpty(t, result.Summary, "Summary should not be empty")
 }
 
-// TestE2E_InitSkills 测试 init-skills 模板：渲染 → Claude → 解析
+// TestE2E_InitSkills 测试 skill-project-init 模板：渲染 → Claude → 解析
 // 模板绑定: ProjectName, RootPath, Language, Structure, MainFiles, SampleFiles
 // 输出格式: {"patterns":[...], "category_summaries":{...}, ...}
 func TestE2E_InitSkills(t *testing.T) {

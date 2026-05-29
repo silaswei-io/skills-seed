@@ -60,11 +60,34 @@ logging:
   max_log_files: 30          # Maximum number of log files (auto-cleanup)
 
 # Global Exclusions
-exclude:                     # Glob-style patterns (not regex) excluded from all learning and analysis
+exclude:                     # Glob-style patterns (not regex); init writes the default static exclusion rules
   - ".*"                     # Dot-prefixed files and directories, such as .github, .cursor, .codegraph, .env
-  - "vendor/**"              # Go dependencies directory
-  - "node_modules/**"        # Node.js dependencies directory
-  - "**/*.pb.go"             # Protobuf generated files
-  - "**/*.gen.go"            # Code generated files
-  - "**/mocks/**"            # Mock test files
-  - "**/testdata/**"         # Test data directory
+  - "vendor/**"              # Common dependency directory
+  - "node_modules/**"        # Common dependency directory
+  - "dist/**"                # Common build output directory
+  - "build/**"               # Common build output directory
+  - "out/**"                 # Common output directory
+  - "target/**"              # Common build output directory
+  - "coverage/**"            # Coverage report directory
+  - ".cache/**"              # Cache directory
+  - "tmp/**"                 # Temporary directory
+  - "temp/**"                # Temporary directory
+  - "*.log"                  # Log files
+  - "*.tmp"                  # Temporary files
+  - "*.bak"                  # Backup files
+  - "*.swp"                  # Editor swap files
+  - "*.zip"                  # Archives
+  - "*.tar"                  # Archives
+  - "*.tar.gz"               # Archives
+  - "*.tgz"                  # Archives
+  - "*.rar"                  # Archives
+  - "*.7z"                   # Archives
+  - "*.png"                  # Image assets
+  - "*.jpg"                  # Image assets
+  - "*.jpeg"                 # Image assets
+  - "*.gif"                  # Image assets
+  - "*.webp"                 # Image assets
+  - "*.ico"                  # Icon assets
+  - "*.pdf"                  # Document artifacts
+  - "*.mp4"                  # Video assets
+  - "*.mov"                  # Video assets

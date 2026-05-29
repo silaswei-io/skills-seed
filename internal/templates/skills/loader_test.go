@@ -1,11 +1,17 @@
 package skills
 
 import (
+	"io/fs"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +60,7 @@ func TestLoader_Render(t *testing.T) {
 		},
 	}
 
-	content, err := loader.Render("skill", data)
+	content, err := loader.Render("project-skill", data)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, content)
@@ -89,7 +95,7 @@ func TestLoader_Render_English(t *testing.T) {
 		"ReferenceGroups":     []ReferenceGroup{},
 	}
 
-	content, err := loader.Render("skill", data)
+	content, err := loader.Render("project-skill", data)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, content)
@@ -102,13 +108,23 @@ func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
 		t.Run(agentName, func(t *testing.T) {
 			loader := NewLoaderForAgent(agentName, "zh-CN")
 
-			content, err := loader.Render("skill", fullSkillData())
+			content, err := loader.Render("project-skill", fullSkillData())
 			require.NoError(t, err)
 
 			require.Contains(t, content, "description: 修改、审查或扩展 demo go 代码时使用")
 			require.NotContains(t, content, "description: Use when")
 		})
 	}
+}
+
+func TestLoader_DefaultLocaleRendersChineseSkill(t *testing.T) {
+	loader := NewLoaderForAgent("codex", "")
+
+	content, err := loader.Render("project-skill", fullSkillData())
+
+	require.NoError(t, err)
+	require.Contains(t, content, "description: 修改、审查或扩展 demo go 代码时使用")
+	require.NotContains(t, content, "description: Use when")
 }
 
 func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
@@ -139,7 +155,7 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 		"HasInfra":     false,
 	}
 
-	content, err := loader.RenderRelative("workspace/SKILL", data)
+	content, err := loader.Render("workspace-skill", data)
 	require.NoError(t, err)
 
 	require.Contains(t, content, "description: 修改、审查或扩展 demo 工作区代码时使用")
@@ -226,8 +242,11 @@ func TestLoader_TemplateExists(t *testing.T) {
 	loader := NewLoader("zh-CN")
 
 	// 测试存在的模板
-	exists := loader.TemplateExists("skill")
+	exists := loader.TemplateExists("project-skill")
 	assert.True(t, exists)
+
+	exists = loader.TemplateExists("skill")
+	assert.False(t, exists)
 
 	// 测试不存在的模板
 	exists = loader.TemplateExists("nonexistent")
@@ -264,16 +283,16 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 				t.Run(locale, func(t *testing.T) {
 					loader := NewLoaderForAgent(agentName, locale)
 
-					mainContent, err := loader.Render("skill", fullSkillData())
+					mainContent, err := loader.Render("project-skill", fullSkillData())
 					require.NoError(t, err)
 					require.NotEmpty(t, mainContent)
 
-					overview, err := loader.RenderProjectOverview(projectOverviewData())
+					overview, err := loader.Render("project-reference-overview", projectOverviewData())
 					require.NoError(t, err)
 					require.NotEmpty(t, overview)
 
 					for _, reference := range []string{"business-methods", "modules", "common-utils", "project-spec"} {
-						referenceContent, err := loader.RenderReferenceFile(reference, projectOverviewData())
+						referenceContent, err := loader.Render("project-reference-"+reference, projectOverviewData())
 						require.NoError(t, err)
 						require.NotEmpty(t, referenceContent)
 					}
@@ -312,11 +331,11 @@ func TestSkillTemplates_DoNotKeepDuplicateOrRetiredReferenceTemplates(t *testing
 	for _, path := range []string{
 		"../../../embedfs/templates/skills/common/references/examples",
 		"../../../embedfs/templates/skills/claude/references/project-overview.md.tmpl",
-		"../../../embedfs/templates/skills/claude/references/project-overview.zh-CN.md.tmpl",
+		"../../../embedfs/templates/skills/claude/references/project-overview.md.tmpl",
 		"../../../embedfs/templates/skills/claude/references/patterns",
 		"../../../embedfs/templates/skills/claude/references/examples",
 		"../../../embedfs/templates/skills/codex/references/project-overview.md.tmpl",
-		"../../../embedfs/templates/skills/codex/references/project-overview.zh-CN.md.tmpl",
+		"../../../embedfs/templates/skills/codex/references/project-overview.md.tmpl",
 		"../../../embedfs/templates/skills/codex/references/patterns",
 		"../../../embedfs/templates/skills/codex/references/examples",
 	} {
@@ -328,7 +347,7 @@ func TestSkillTemplates_DoNotKeepDuplicateOrRetiredReferenceTemplates(t *testing
 func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 	loader := NewLoader("en-US")
 
-	_, err := loader.Render("skill", map[string]interface{}{
+	_, err := loader.Render("project-skill", map[string]interface{}{
 		"ProgramVersion":      "v0.0.1",
 		"SkillsTemplatesHash": "test-hash",
 		"ProjectName":         "demo",
@@ -336,6 +355,67 @@ func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "SkillName")
+}
+
+func TestSkillTemplateCatalogMapsLogicalIDsToNormalizedOutputs(t *testing.T) {
+	projectSkill, ok := TemplateCatalogEntry("project-skill")
+	require.True(t, ok)
+	require.Equal(t, "project/project-skill", projectSkill.RelativeName)
+	require.Equal(t, "SKILL.md", projectSkill.OutputPath)
+	require.ElementsMatch(t, []string{"common", "claude", "codex"}, projectSkill.Providers)
+
+	workspaceSkill, ok := TemplateCatalogEntry("workspace-skill")
+	require.True(t, ok)
+	require.Equal(t, "workspace/workspace-skill", workspaceSkill.RelativeName)
+	require.Equal(t, "SKILL.md", workspaceSkill.OutputPath)
+	require.ElementsMatch(t, []string{"common"}, workspaceSkill.Providers)
+
+	openAI, ok := TemplateCatalogEntry("codex-agent-openai")
+	require.True(t, ok)
+	require.Equal(t, "project/agents/codex-agent-openai", openAI.RelativeName)
+	require.Equal(t, "agents/openai.yaml", openAI.OutputPath)
+	require.Equal(t, ".yaml.tmpl", openAI.Ext)
+}
+
+func TestSkillTemplateCatalogFilesExistAndUsePrefixNames(t *testing.T) {
+	kebabID := regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	entries := SkillTemplateCatalog()
+	require.NotEmpty(t, entries)
+
+	for _, entry := range entries {
+		t.Run(entry.ID, func(t *testing.T) {
+			require.Regexp(t, kebabID, entry.ID)
+			require.NotContains(t, entry.RelativeName, "_")
+			require.NotContains(t, entry.OutputPath, "_")
+			require.NotContains(t, entry.RelativeName, "SKILL")
+			require.NotContains(t, entry.RelativeName, ".")
+
+			for _, provider := range entry.Providers {
+				path := metadata.SkillsTemplatePath(provider, entry.RelativeName, "", entry.Ext)
+				_, err := embedfs.FS.ReadFile(path)
+				require.NoError(t, err, path)
+				require.NotContains(t, path, "_")
+
+				enPath := metadata.SkillsTemplatePath(provider, entry.RelativeName, "en-US", entry.Ext)
+				_, err = embedfs.FS.ReadFile(enPath)
+				require.NoError(t, err, enPath)
+				require.NotContains(t, enPath, "_")
+			}
+		})
+	}
+}
+
+func TestSkillTemplateTreeUsesChineseDefaultsAndNoZhCNFilenames(t *testing.T) {
+	err := fs.WalkDir(embedfs.FS, metadata.SkillsTemplatesRoot, func(path string, entry fs.DirEntry, err error) error {
+		require.NoError(t, err)
+		if entry.IsDir() {
+			return nil
+		}
+		require.NotContains(t, path, ".zh-CN.")
+		require.False(t, strings.Contains(filepath.Base(path), "_"), path)
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 func fullSkillData() map[string]interface{} {

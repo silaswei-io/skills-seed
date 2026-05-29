@@ -141,25 +141,25 @@ other = "不支持的 Agent 提供方: {{.Provider}}"
 other = "Agent {{.Agent}} 不可用，请检查 agent 命令配置"
 
 [AgentRenderAnalyzePromptFailed]
-other = "渲染 analyze prompt 失败"
+other = "渲染 learn-analyze prompt 失败"
 
 [AgentRenderBatchLearnPromptFailed]
-other = "渲染 batch-learn prompt 失败"
+other = "渲染 learn-batch prompt 失败"
 
 [AgentRenderGenerateFixesPromptFailed]
-other = "渲染 generate_fixes prompt 失败"
+other = "渲染 fix-generate prompt 失败"
 
 [AgentRenderGenerateSkillsPromptFailed]
-other = "渲染 generate_skills_summary prompt 失败"
+other = "渲染 skill-project-summary prompt 失败"
 
 [AgentRenderMergePatternsPromptFailed]
-other = "渲染 merge-patterns prompt 失败"
+other = "渲染 pattern-merge prompt 失败"
 
 [AgentRenderProjectAnalysisPromptFailed]
-other = "渲染 project-analysis prompt 失败"
+other = "渲染 project-analyze prompt 失败"
 
 [AgentRenderInitSkillsPromptFailed]
-other = "渲染 init-skills prompt 失败"
+other = "渲染 skill-project-init prompt 失败"
 
 [AgentCodexAnalyzeFailed]
 other = "Codex 分析代码失败"

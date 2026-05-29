@@ -69,7 +69,7 @@ func (c *ClaudeAgent) IsAvailable() bool {
 // AnalyzeCode 分析代码
 func (c *ClaudeAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
 	// 1. 构建提示词（从模板加载）
-	prompt, err := c.promptLoader.Render("analyze", req)
+	prompt, err := c.promptLoader.Render("learn-analyze", req)
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}
@@ -118,11 +118,11 @@ func (c *ClaudeAgent) LearnFromCommit(ctx context.Context, req *agent.LearnReque
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("batch-learn", data)
+	prompt, err := c.promptLoader.Render("learn-batch", data)
 	if err != nil || prompt == "" {
 		logger.Error(i18n.Get("LoggerAgentPromptRenderFailed"),
 			"method", "LearnFromCommit",
-			"template", "batch-learn",
+			"template", "learn-batch",
 		)
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderBatchLearnPromptFailed"))
 	}
@@ -159,7 +159,7 @@ func (c *ClaudeAgent) LearnFromCommit(ctx context.Context, req *agent.LearnReque
 
 // BatchLearnFromCommits 批量从多个提交中学习
 func (c *ClaudeAgent) BatchLearnFromCommits(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-batch-learn")
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-learn-batch")
 	if err != nil {
 		return nil, err
 	}
@@ -172,11 +172,11 @@ func (c *ClaudeAgent) BatchLearnFromCommits(ctx context.Context, req *agent.Batc
 	}
 
 	// 2. 渲染提示词
-	prompt, err := c.promptLoader.Render("batch-learn", data)
+	prompt, err := c.promptLoader.Render("learn-batch", data)
 	if err != nil || prompt == "" {
 		logger.Error(i18n.Get("LoggerAgentPromptRenderFailed"),
 			"method", "BatchLearnFromCommits",
-			"template", "batch-learn",
+			"template", "learn-batch",
 		)
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderBatchLearnPromptFailed"))
 	}
@@ -214,11 +214,11 @@ func (c *ClaudeAgent) BatchLearnFromCommits(ctx context.Context, req *agent.Batc
 // GenerateFixes 为给定的问题生成修复代码
 func (c *ClaudeAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error) {
 	// 1. 构建提示词（从模板加载）
-	prompt, err := c.promptLoader.Render("generate_fixes", req)
+	prompt, err := c.promptLoader.Render("fix-generate", req)
 	if err != nil || prompt == "" {
 		logger.Error(i18n.Get("LoggerAgentPromptRenderFailed"),
 			"method", "GenerateFixes",
-			"template", "generate_fixes",
+			"template", "fix-generate",
 		)
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderGenerateFixesPromptFailed"))
 	}
@@ -556,7 +556,7 @@ func (c *ClaudeAgent) GenerateSkillsSummary(ctx context.Context, req *agent.Gene
 	}
 
 	// 2. 渲染提示词
-	prompt, err := c.promptLoader.Render("generate_skills_summary", data)
+	prompt, err := c.promptLoader.Render("skill-project-summary", data)
 	if err != nil || prompt == "" {
 		logger.Warn(i18n.Get("LoggerAgentSkillsSummaryEmptyPrompt"))
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderGenerateSkillsPromptFailed"))
@@ -607,7 +607,7 @@ func (c *ClaudeAgent) MergePatterns(ctx context.Context, req *agent.MergePattern
 	}
 
 	// 2. 渲染提示词
-	prompt, err := c.promptLoader.Render("merge-patterns", data)
+	prompt, err := c.promptLoader.Render("pattern-merge", data)
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderMergePatternsPromptFailed"))
 	}
@@ -652,7 +652,7 @@ func (c *ClaudeAgent) MergePatterns(ctx context.Context, req *agent.MergePattern
 
 // AnalyzeProject 分析项目结构
 func (c *ClaudeAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-project-analysis")
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-project-analyze")
 	if err != nil {
 		return nil, err
 	}
@@ -665,7 +665,7 @@ func (c *ClaudeAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProj
 	}
 
 	// 2. 渲染提示词
-	prompt, err := c.promptLoader.Render("project-analysis", data)
+	prompt, err := c.promptLoader.Render("project-analyze", data)
 	if err != nil || prompt == "" {
 		logger.Error(i18n.Get("LoggerAgentProjectPromptRenderFailed"),
 			"project", req.ProjectName,
@@ -721,7 +721,7 @@ func (c *ClaudeAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProj
 
 // AnalyzeCurrentCodebase 分析当前代码库，提取初始模式
 func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-init-skills")
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-skill-project-init")
 	if err != nil {
 		return nil, err
 	}
@@ -732,7 +732,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("init-skills", data)
+	prompt, err := c.promptLoader.Render("skill-project-init", data)
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
@@ -774,7 +774,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 
 // AnalyzeWorkspaceProfile 分析工作区结构和跨项目关系
 func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
-	prompt, err := c.promptLoader.Render("workspace-profile", workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
+	prompt, err := c.promptLoader.Render("skill-workspace-profile", workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
 	if err != nil || prompt == "" {
 		if err != nil {
 			return nil, err
@@ -803,7 +803,7 @@ func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.An
 // AnalyzeWorkspaceSpec 生成工作区级开发规范
 func (c *ClaudeAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
 	data := workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
-	prompt, err := c.promptLoader.Render("workspace-spec", data)
+	prompt, err := c.promptLoader.Render("skill-workspace-spec", data)
 	if err != nil || prompt == "" {
 		if err != nil {
 			return nil, err

@@ -141,25 +141,25 @@ other = "Unsupported agent provider: {{.Provider}}"
 other = "Agent {{.Agent}} is not available; check agent command configuration"
 
 [AgentRenderAnalyzePromptFailed]
-other = "Failed to render analyze prompt"
+other = "Failed to render learn-analyze prompt"
 
 [AgentRenderBatchLearnPromptFailed]
-other = "Failed to render batch-learn prompt"
+other = "Failed to render learn-batch prompt"
 
 [AgentRenderGenerateFixesPromptFailed]
-other = "Failed to render generate_fixes prompt"
+other = "Failed to render fix-generate prompt"
 
 [AgentRenderGenerateSkillsPromptFailed]
-other = "Failed to render generate_skills_summary prompt"
+other = "Failed to render skill-project-summary prompt"
 
 [AgentRenderMergePatternsPromptFailed]
-other = "Failed to render merge-patterns prompt"
+other = "Failed to render pattern-merge prompt"
 
 [AgentRenderProjectAnalysisPromptFailed]
-other = "Failed to render project-analysis prompt"
+other = "Failed to render project-analyze prompt"
 
 [AgentRenderInitSkillsPromptFailed]
-other = "Failed to render init-skills prompt"
+other = "Failed to render skill-project-init prompt"
 
 [AgentCodexAnalyzeFailed]
 other = "Codex analyze code failed"
