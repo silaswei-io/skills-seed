@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInitializeWorkspaceDoesNotInitializeChildProjects(t *testing.T) {
+func TestInitializeWorkspaceInitializesDetectedChildProjects(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	initGitDir(t, workspaceRoot)
 	childRoot := filepath.Join(workspaceRoot, "backend")
@@ -23,29 +23,46 @@ func TestInitializeWorkspaceDoesNotInitializeChildProjects(t *testing.T) {
 	require.NoError(t, initializeSkillAt(workspaceRoot, "zh-CN", domain.ModeWorkspace))
 
 	require.FileExists(t, filepath.Join(workspaceRoot, ".skills-seed", "config.yaml"))
-	require.NoFileExists(t, filepath.Join(childRoot, ".skills-seed", "config.yaml"))
+	require.FileExists(t, filepath.Join(childRoot, ".skills-seed", "config.yaml"))
 
 	configRepo, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, domain.ModeWorkspace, configRepo.GetProjectConfig().Mode)
 	require.Len(t, configRepo.GetWorkspaceConfig().Projects, 1)
 	require.Equal(t, "backend", configRepo.GetWorkspaceConfig().Projects[0].Path)
+
+	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeProject, childConfig.GetProjectConfig().Mode)
+	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
 }
 
-func TestInitializeProjectWithAgentSetsProvider(t *testing.T) {
+func TestInitializeWorkspaceWithoutDetectedChildrenKeepsRootSeed(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	initGitDir(t, workspaceRoot)
+
+	require.NoError(t, initializeSkillAt(workspaceRoot, "zh-CN", domain.ModeWorkspace))
+
+	configRepo, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeWorkspace, configRepo.GetProjectConfig().Mode)
+	require.Empty(t, configRepo.GetWorkspaceConfig().Projects)
+}
+
+func TestInitializeProjectWithAgentSetsEngine(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)
 
 	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
 		initLogger:      true,
 		showUserSummary: true,
-		agentProvider:   "codex",
+		agentEngine:     "codex",
 	}))
 
 	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, domain.ModeProject, configRepo.GetProjectConfig().Mode)
-	require.Equal(t, "codex", configRepo.GetAgentConfig().Provider)
+	require.Equal(t, "codex", configRepo.GetAgentConfig().Engine)
 }
 
 func TestInitializeProjectSummaryUsesRelativeSeedPathAndDocumentationLink(t *testing.T) {
@@ -66,7 +83,7 @@ func TestInitializeProjectSummaryUsesRelativeSeedPathAndDocumentationLink(t *tes
 	require.NotContains(t, output, "skills-seed learn current")
 }
 
-func TestInitializeWorkspaceWithChildrenInitializesChildProjects(t *testing.T) {
+func TestInitializeWorkspaceInitializesChildProjectsWithRootAgent(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	initGitDir(t, workspaceRoot)
 	childRoot := filepath.Join(workspaceRoot, "backend")
@@ -75,16 +92,15 @@ func TestInitializeWorkspaceWithChildrenInitializesChildProjects(t *testing.T) {
 	initGitDir(t, childRoot)
 
 	require.NoError(t, initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
-		initLogger:            true,
-		showUserSummary:       true,
-		initWorkspaceChildren: true,
-		agentProvider:         "codex",
+		initLogger:      true,
+		showUserSummary: true,
+		agentEngine:     "codex",
 	}))
 
 	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, domain.ModeWorkspace, rootConfig.GetProjectConfig().Mode)
-	require.Equal(t, "codex", rootConfig.GetAgentConfig().Provider)
+	require.Equal(t, "codex", rootConfig.GetAgentConfig().Engine)
 
 	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
@@ -92,10 +108,10 @@ func TestInitializeWorkspaceWithChildrenInitializesChildProjects(t *testing.T) {
 	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
 	require.Equal(t, "go", childConfig.GetProjectConfig().Language)
 	require.Equal(t, childRoot, childConfig.GetProjectConfig().RootPath)
-	require.Equal(t, "codex", childConfig.GetAgentConfig().Provider)
+	require.Equal(t, "codex", childConfig.GetAgentConfig().Engine)
 }
 
-func TestInitializeWorkspaceWithChildrenRemovesRootSeedWhenChildInitializationFails(t *testing.T) {
+func TestInitializeWorkspaceRemovesRootSeedWhenChildInitializationFails(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	initGitDir(t, workspaceRoot)
 	childRoot := filepath.Join(workspaceRoot, "backend")
@@ -103,9 +119,8 @@ func TestInitializeWorkspaceWithChildrenRemovesRootSeedWhenChildInitializationFa
 	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "go.mod"), []byte("module backend\n"), 0644))
 
 	err := initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
-		initLogger:            true,
-		showUserSummary:       true,
-		initWorkspaceChildren: true,
+		initLogger:      true,
+		showUserSummary: true,
 	})
 
 	require.Error(t, err)
@@ -131,7 +146,7 @@ func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 	}
 	require.NoError(t, rootConfig.Update(cfg))
 
-	require.NoError(t, initializeWorkspaceChildrenAt(workspaceRoot, "zh-CN"))
+	require.NoError(t, initializeWorkspaceChildrenWithRepo(workspaceRoot, "zh-CN", rootConfig))
 
 	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
@@ -144,9 +159,11 @@ func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 
 func TestInitializeWorkspaceChildrenReportsExistingChildWithSameAgent(t *testing.T) {
 	workspaceRoot, childRoot := initWorkspaceWithInitializedChild(t, "codex", "codex")
+	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
 
 	output := captureInitStdout(t, func() {
-		require.NoError(t, initializeWorkspaceChildrenAt(workspaceRoot, "zh-CN"))
+		require.NoError(t, initializeWorkspaceChildrenWithRepo(workspaceRoot, "zh-CN", rootConfig))
 	})
 
 	require.Contains(t, output, "backend")
@@ -154,14 +171,16 @@ func TestInitializeWorkspaceChildrenReportsExistingChildWithSameAgent(t *testing
 	require.Contains(t, output, "agent 相同")
 	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
-	require.Equal(t, "codex", childConfig.GetAgentConfig().Provider)
+	require.Equal(t, "codex", childConfig.GetAgentConfig().Engine)
 }
 
 func TestInitializeWorkspaceChildrenReportsExistingChildWithDifferentAgent(t *testing.T) {
 	workspaceRoot, childRoot := initWorkspaceWithInitializedChild(t, "codex", "claude")
+	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
 
 	output := captureInitStdout(t, func() {
-		require.NoError(t, initializeWorkspaceChildrenAt(workspaceRoot, "zh-CN"))
+		require.NoError(t, initializeWorkspaceChildrenWithRepo(workspaceRoot, "zh-CN", rootConfig))
 	})
 
 	require.Contains(t, output, "backend")
@@ -170,7 +189,7 @@ func TestInitializeWorkspaceChildrenReportsExistingChildWithDifferentAgent(t *te
 	require.Contains(t, output, "agent 不同")
 	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
-	require.Equal(t, "claude", childConfig.GetAgentConfig().Provider)
+	require.Equal(t, "claude", childConfig.GetAgentConfig().Engine)
 }
 
 func TestEnsureWorkspacePromptFilesDoesNotCreateChildProjectPrompts(t *testing.T) {
@@ -242,7 +261,7 @@ func initWorkspaceWithInitializedChild(t *testing.T, rootAgent, childAgent strin
 	cfg.Project.Mode = domain.ModeWorkspace
 	cfg.Project.Locale = "zh-CN"
 	cfg.Project.RootPath = workspaceRoot
-	cfg.Agent.Provider = rootAgent
+	cfg.Agent.Engine = rootAgent
 	cfg.Agent.Commands = map[string]string{rootAgent: rootAgent}
 	cfg.Workspace.Projects = []config.WorkspaceProjectConfig{
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
@@ -255,7 +274,7 @@ func initWorkspaceWithInitializedChild(t *testing.T, rootAgent, childAgent strin
 	childCfg.Project.Mode = domain.ModeProject
 	childCfg.Project.Locale = "zh-CN"
 	childCfg.Project.RootPath = childRoot
-	childCfg.Agent.Provider = childAgent
+	childCfg.Agent.Engine = childAgent
 	childCfg.Agent.Commands = map[string]string{childAgent: childAgent}
 	require.NoError(t, childConfig.Update(childCfg))
 

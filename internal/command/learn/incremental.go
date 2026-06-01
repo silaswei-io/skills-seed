@@ -172,7 +172,7 @@ func generatedSkillExcludeDirs(configRepo config.Reader, projectRoot string) []s
 		}
 	}
 	for _, reader := range readers {
-		for _, outputPath := range reader.GetOutputConfig().SkillsPaths {
+		for _, outputPath := range reader.GetSkillsConfig().Paths {
 			if outputPath == "" {
 				continue
 			}

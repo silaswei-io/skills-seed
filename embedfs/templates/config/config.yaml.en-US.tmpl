@@ -10,7 +10,6 @@ project:
 
 # Workspace
 workspace:
-  init_children: false      # Auto-initialize child projects missing .skills-seed during learn current
   projects: []               # Child projects, for example: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   shared: []                 # Shared libraries or shared code paths, for example: [{path: "pkg"}]
   contracts: []              # API contract paths, for example: [{path: "proto"}]
@@ -29,8 +28,8 @@ analysis:
 
 # Agent
 agent:
-  provider: "claude"         # Current agent provider; matches keys in commands and output.skills_paths
-  commands:                  # provider -> CLI command path; add new providers here
+  engine: "claude"           # Agent engine used for analysis, learning, and generation summaries; matches keys in commands
+  commands:                  # engine -> CLI command path; add new engines here
     claude: "claude"
     codex: "codex"
   timeout: 1800              # AI request timeout (seconds)
@@ -47,9 +46,10 @@ autofix:
   strategy: "patch"          # Fix strategy: patch: Generate .patch files (recommended, safe); backup: Backup files before modification; stash: Apply fixes then git stash; branch: Create new branch to apply fixes
   backup_path: "backups"     # Backup path (relative to .skills-seed directory)
 
-# Output
-output:
-  skills_paths:                    # provider -> Skills output path; add new providers here
+# Skills
+skills:
+  target: "claude"          # Target Skills type; can differ from agent.engine, for example use claude to generate codex skills
+  paths:                    # target -> Skills output path; add new targets here
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 

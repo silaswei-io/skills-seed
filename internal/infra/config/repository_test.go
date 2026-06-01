@@ -52,8 +52,15 @@ func TestNewRepository(t *testing.T) {
 		assert.NotContains(t, string(content), "claude_command:")
 		assert.NotContains(t, string(content), "codex_command:")
 		assert.NotContains(t, string(content), "skills_path:")
+		assert.NotContains(t, string(content), "provider:")
+		assert.NotContains(t, string(content), "output:")
+		assert.NotContains(t, string(content), "skills_provider:")
+		assert.NotContains(t, string(content), "skills_paths:")
+		assert.Contains(t, string(content), "engine:")
 		assert.Contains(t, string(content), "commands:")
-		assert.Contains(t, string(content), "skills_paths:")
+		assert.Contains(t, string(content), "skills:")
+		assert.Contains(t, string(content), "target:")
+		assert.Contains(t, string(content), "paths:")
 	})
 
 	t.Run("returns error for invalid path", func(t *testing.T) {
@@ -73,7 +80,7 @@ func TestRepository_Get(t *testing.T) {
 	// 校验来自嵌入模板或硬编码 fallback 的默认值。
 	assert.Equal(t, "go", cfg.Project.Language)
 	assert.Equal(t, "zh-CN", cfg.Project.Locale)
-	assert.Equal(t, "claude", cfg.Agent.Provider)
+	assert.Equal(t, "claude", cfg.Agent.Engine)
 	assert.Equal(t, "claude", cfg.Agent.Commands["claude"])
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
@@ -87,9 +94,9 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, 0, cfg.Analysis.CodeGraph.MaxCode)
 	assert.Equal(t, 50, cfg.Learning.MaxCommits)
 	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
-	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Output.SkillsPaths["claude"])
-	assert.Equal(t, ".agents/skills/skills-seed-skills", cfg.Output.SkillsPaths["codex"])
-	assert.False(t, cfg.Workspace.InitChildren)
+	assert.Equal(t, "claude", cfg.Skills.Target)
+	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Skills.Paths["claude"])
+	assert.Equal(t, ".agents/skills/skills-seed-skills", cfg.Skills.Paths["codex"])
 	assert.Equal(t, "DEBUG", cfg.Logging.Level)
 	assert.Equal(t, "logs", cfg.Logging.LogsPath)
 	assert.NotEmpty(t, cfg.Project.InitializedAt, "initialized_at should be set")
@@ -111,7 +118,6 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 
 	cfg := repo.Get()
 	cfg.Project.Mode = "workspace"
-	cfg.Workspace.InitChildren = true
 	cfg.Workspace.Projects = []WorkspaceProjectConfig{
 		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
@@ -124,7 +130,7 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 	contentText := string(content)
 	require.Contains(t, contentText, "# 工作区")
 	require.NotContains(t, contentText, `child_skill_policy`)
-	require.Contains(t, contentText, `init_children: true`)
+	require.NotContains(t, contentText, `init_children:`)
 	require.Contains(t, contentText, `id: "frontend"`)
 	require.Contains(t, contentText, `path: "proto"`)
 	require.Contains(t, contentText, `description: "API contracts"`)
@@ -134,7 +140,6 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 
 	reloaded, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
-	require.True(t, reloaded.GetWorkspaceConfig().InitChildren)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 2)
 	require.Equal(t, "backend", reloaded.GetWorkspaceConfig().Projects[1].ID)
 	require.Equal(t, "API contracts", reloaded.GetWorkspaceConfig().Contracts[0].Description)
@@ -154,14 +159,13 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			InitializedAt: "2026-05-26 12:00:00",
 		},
 		Workspace: WorkspaceConfig{
-			InitChildren: true,
 			Projects: []WorkspaceProjectConfig{
 				{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 			},
 			Contracts: []WorkspacePathConfig{{Path: "proto", Description: "API contracts"}},
 		},
 		Agent: AgentConfig{
-			Provider: "claude",
+			Engine: "claude",
 			Commands: map[string]string{
 				"claude": "claude",
 				"codex":  "codex",
@@ -170,7 +174,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 		},
 		Learning: LearningConfig{MaxCommits: 50, BatchSize: 5},
 		AutoFix:  AutoFixConfig{Strategy: "patch", BackupPath: "backups"},
-		Output: OutputConfig{SkillsPaths: map[string]string{
+		Skills: SkillsConfig{Target: "codex", Paths: map[string]string{
 			"claude": ".claude/skills/skills-seed-skills",
 			"codex":  ".agents/skills/skills-seed-skills",
 		}},
@@ -183,7 +187,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal([]byte(content), &parsed), content)
 	require.Contains(t, content, "# 工作区")
 	require.NotContains(t, content, `child_skill_policy`)
-	require.Contains(t, content, `init_children: true`)
+	require.NotContains(t, content, `init_children:`)
 	require.Contains(t, content, `id: "backend"`)
 	require.Contains(t, content, `description: "API contracts"`)
 	require.NotContains(t, content, `- "**/*.pb.go"`)
@@ -220,13 +224,13 @@ project:
   language: "go"
   locale: "zh-CN"
 agent:
-  provider: "claude"
+  engine: "claude"
 learning:
   max_commits: 50
 autofix:
   strategy: "patch"
-output:
-  skills_paths: {}
+skills:
+  paths: {}
 logging:
   level: "DEBUG"
 exclude: []
@@ -263,13 +267,13 @@ analysis:
     max_nodes: 12
     max_code: 3
 agent:
-  provider: "claude"
+  engine: "claude"
 learning:
   max_commits: 50
 autofix:
   strategy: "patch"
-output:
-  skills_paths: {}
+skills:
+  paths: {}
 logging:
   level: "DEBUG"
 exclude: []
@@ -292,7 +296,7 @@ func TestRepository_GetAgentConfig(t *testing.T) {
 	repo := setupTestConfig(t)
 	agentCfg := repo.GetAgentConfig()
 
-	assert.Equal(t, "claude", agentCfg.Provider)
+	assert.Equal(t, "claude", agentCfg.Engine)
 	assert.Equal(t, "claude", agentCfg.Commands["claude"])
 	assert.Equal(t, "codex", agentCfg.Commands["codex"])
 	assert.Equal(t, 1800, agentCfg.Timeout)
@@ -300,17 +304,20 @@ func TestRepository_GetAgentConfig(t *testing.T) {
 }
 
 func TestEffectiveSkillsPath(t *testing.T) {
-	output := OutputConfig{
-		SkillsPaths: map[string]string{
+	skills := SkillsConfig{
+		Target: "beta",
+		Paths: map[string]string{
 			"alpha": "alpha/skills",
 			"beta":  "beta/skills",
 		},
 	}
 
-	assert.Equal(t, "alpha/skills", EffectiveSkillsPath("alpha", output))
-	assert.Equal(t, "beta/skills", EffectiveSkillsPath("beta", output))
-	assert.Equal(t, "", EffectiveSkillsPath("gamma", output))
-	assert.Equal(t, "", EffectiveSkillsPath("", output))
+	assert.Equal(t, "alpha/skills", EffectiveSkillsPath("alpha", skills))
+	assert.Equal(t, "beta/skills", EffectiveSkillsPath("beta", skills))
+	assert.Equal(t, "", EffectiveSkillsPath("gamma", skills))
+	assert.Equal(t, "", EffectiveSkillsPath("", skills))
+	assert.Equal(t, "beta", EffectiveSkillsTarget(AgentConfig{Engine: "alpha"}, skills))
+	assert.Equal(t, "alpha", EffectiveSkillsTarget(AgentConfig{Engine: "alpha"}, SkillsConfig{}))
 }
 
 func TestRepository_GetLearningConfig(t *testing.T) {
@@ -380,17 +387,17 @@ func TestRepository_GetAutoFixConfig(t *testing.T) {
 	assert.Equal(t, "backups", autoFixCfg.BackupPath)
 }
 
-func TestRepository_GetOutputConfig(t *testing.T) {
+func TestRepository_GetSkillsConfig(t *testing.T) {
 	repo := setupTestConfig(t)
-	outputCfg := repo.GetOutputConfig()
+	skillsCfg := repo.GetSkillsConfig()
 
-	assert.NotEmpty(t, outputCfg.SkillsPaths)
+	assert.NotEmpty(t, skillsCfg.Paths)
 }
 
-func TestDefaultSkillsPathForProvider(t *testing.T) {
-	assert.Equal(t, ".claude/skills/skills-seed-skills", DefaultSkillsPathForProvider("claude"))
-	assert.Equal(t, ".agents/skills/skills-seed-skills", DefaultSkillsPathForProvider("codex"))
-	assert.Equal(t, ".skills/skills-seed-skills", DefaultSkillsPathForProvider("custom"))
+func TestDefaultSkillsPathForTarget(t *testing.T) {
+	assert.Equal(t, ".claude/skills/skills-seed-skills", DefaultSkillsPathForTarget("claude"))
+	assert.Equal(t, ".agents/skills/skills-seed-skills", DefaultSkillsPathForTarget("codex"))
+	assert.Equal(t, ".skills/skills-seed-skills", DefaultSkillsPathForTarget("custom"))
 }
 
 func TestRepository_GetLoggingConfig(t *testing.T) {

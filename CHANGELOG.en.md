@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.3.0]
+
+### Breaking Changes
+
+- Rename config from `agent.provider` / `output.skills_paths` to `agent.engine` / `skills.target` / `skills.paths`, clearly separating the Agent CLI used for analysis, learning, and summaries from the generated skills target format
+- Remove `workspace.init_children` and the `init --children` / `init children` semantics; workspace initialization now initializes the child projects detected at that time
+
+### Features
+
+- Add `skills-seed add .` to auto-detect and add all current child projects from a workspace root, initializing child repositories that are missing `.skills-seed`
+- Add `skills-seed add <child...>` to add specific child projects by ID or path; targets such as `./frontend`, `frontend/`, and `frontend\` are normalized to the same child
+- Make `add` initialize child repositories before syncing root `workspace.projects`; failed child initialization no longer pollutes the root config
+- Make workspace initialization initialize detected child projects by default. Newly created children inherit root Agent and Skills config, while existing child configs are preserved
+- Make `generate-skills` resolve its default output path from `skills.paths` using `skills.target`, allowing `claude` to run generation summaries while producing `codex` skills
+
+### Documentation
+
+- Rewrite README / README.en as proper project entry points covering positioning, workflow, workspace behavior, `add`, and the Agent engine vs skills target split
+- Update command reference, configuration reference, CLI help, and prompt text to remove old `provider`, `output.skills_paths`, and `init children` wording
+
 ## [v0.2.0]
 
 ### Changes

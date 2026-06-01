@@ -116,8 +116,8 @@ func newIncrementalConfig(t *testing.T, root string) *config.Repository {
 	require.NoError(t, err)
 	cfg := repo.Get()
 	cfg.Project.RootPath = root
-	cfg.Agent.Provider = "codex"
-	cfg.Output.SkillsPaths = map[string]string{
+	cfg.Agent.Engine = "codex"
+	cfg.Skills.Paths = map[string]string{
 		"claude": ".claude/skills/skills-seed-skills",
 		"codex":  ".agents/skills/skills-seed-skills",
 	}

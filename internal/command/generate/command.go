@@ -49,7 +49,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	// 添加 flags
 	defaultOutputPath := ""
 	if cont != nil {
-		defaultOutputPath = outputPathForCurrentProvider(cont)
+		defaultOutputPath = outputPathForCurrentTarget(cont)
 	}
 	cmd.Flags().StringVarP(&outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
 	cmd.Flags().BoolVarP(&merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
@@ -97,7 +97,7 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 
 	effectiveOutputPath := outputPath
 	if !cmd.Flags().Changed("output") {
-		effectiveOutputPath = outputPathForCurrentProvider(cont)
+		effectiveOutputPath = outputPathForCurrentTarget(cont)
 	}
 
 	// 如果指定了 --merge 标志，先合并模式
@@ -184,7 +184,7 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 		if err := commandutil.RequireAgentAvailable(childCont); err != nil {
 			return err
 		}
-		childOutputPath := outputPathForCurrentProvider(childCont)
+		childOutputPath := outputPathForCurrentTarget(childCont)
 		if err := childCont.GeneratorSvc.GenerateSkills(childCtx, childOutputPath); err != nil {
 			var manualErr *generator.ManualSkillExistsError
 			if errors.As(err, &manualErr) {
@@ -202,9 +202,11 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 	})
 }
 
-func outputPathForCurrentProvider(cont *container.Container) string {
+func outputPathForCurrentTarget(cont *container.Container) string {
 	if cont == nil || cont.ConfigRepo == nil {
 		return ""
 	}
-	return config.EffectiveSkillsPath(cont.ConfigRepo.GetAgentConfig().Provider, cont.ConfigRepo.GetOutputConfig())
+	skillsConfig := cont.ConfigRepo.GetSkillsConfig()
+	target := config.EffectiveSkillsTarget(cont.ConfigRepo.GetAgentConfig(), skillsConfig)
+	return config.EffectiveSkillsPath(target, skillsConfig)
 }

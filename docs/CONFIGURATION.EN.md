@@ -19,7 +19,6 @@ project:
   initialized_at: ""
 
 workspace:
-  init_children: false
   projects: []
   shared: []
   contracts: []
@@ -36,7 +35,7 @@ analysis:
     max_code: 0
 
 agent:
-  provider: "claude"
+  engine: "claude"
   commands:
     claude: "claude"
     codex: "codex"
@@ -52,8 +51,9 @@ autofix:
   strategy: "patch"
   backup_path: "backups"
 
-output:
-  skills_paths:
+skills:
+  target: "claude"
+  paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
@@ -123,7 +123,6 @@ exclude:
 
 | Field | Default | Description |
 |---|---:|---|
-| `init_children` | `false` | Whether `learn current` should initialize child projects missing `.skills-seed` before learning |
 | `projects` | `[]` | Child project list; workspace init tries to discover first-level project folders |
 | `shared` | `[]` | Shared libraries or shared code paths |
 | `contracts` | `[]` | API, IDL, or protocol contract paths |
@@ -147,10 +146,10 @@ exclude:
 
 #### Behavior
 
-1. `skills-seed init --workspace` initializes only the workspace root.
-2. `skills-seed init --workspace --children` initializes the root and child projects from `workspace.projects` when `.skills-seed` is missing.
-3. When `workspace.init_children: true`, `skills-seed learn current` initializes missing child `.skills-seed` directories before learning.
-4. Existing child `.skills-seed/config.yaml` files are not overwritten. If a child agent differs from the root, it is reported and preserved.
+1. `skills-seed init --workspace` initializes the root and the child projects detected at that time.
+2. For child projects added or copied into the workspace later, run `skills-seed add .` to detect all children or `skills-seed add <child>` for specific children.
+3. Existing child `.skills-seed/config.yaml` files are not overwritten. If a child agent differs from the root, it is reported and preserved.
+4. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
 
 ### `analysis.codegraph`
 
@@ -178,8 +177,8 @@ exclude:
 
 | Field | Default | Description |
 |---|---:|---|
-| `provider` | `claude` | Current agent provider; matches keys in `commands` and `output.skills_paths` |
-| `commands` | `claude: claude`, `codex: codex` | Provider-to-CLI command mapping |
+| `engine` | `claude` | Agent engine used for analysis, learning, and generation summaries; matches keys in `commands` |
+| `commands` | `claude: claude`, `codex: codex` | Engine-to-CLI command mapping |
 | `timeout` | `1800` | AI request timeout in seconds |
 | `allow_user_plugins` | `false` | Whether agents may load user plugins; disabled by default for stable batch runs |
 | `parallelism` | `0` | Number of concurrent agents; `0` means automatic |
@@ -195,13 +194,14 @@ exclude:
 
 ```yaml
 agent:
-  provider: "codex"
+  engine: "claude"
   commands:
     claude: "claude"
     codex: "codex"
 
-output:
-  skills_paths:
+skills:
+  target: "codex"
+  paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 ```
@@ -210,7 +210,7 @@ You can also set the agent during initialization:
 
 ```bash
 skills-seed init --mode project --agent codex
-skills-seed init --workspace --children --agent codex
+skills-seed init --workspace --agent codex
 ```
 
 ### `learning`
@@ -246,20 +246,21 @@ Command flags affect only the current run and do not rewrite the config file.
 3. `stash`: apply fixes and save them through Git stash.
 4. `branch`: create a new branch for fixes.
 
-### `output`
+### `skills`
 
 #### Fields
 
 | Field | Default | Description |
 |---|---:|---|
-| `skills_paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills output directory |
-| `skills_paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills output directory |
+| `target` | `agent.engine` | Generated Skills target type; can differ from `agent.engine` |
+| `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills output directory |
+| `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills output directory |
 
 #### Notes
 
-1. `generate-skills` uses `output.skills_paths` for the current `agent.provider` by default.
+1. `generate-skills` uses `skills.paths` for the current `skills.target` by default.
 2. Use `skills-seed generate-skills --output <path>` to override the output directory for one run.
-3. For a custom provider, add both `agent.commands.<provider>` and `output.skills_paths.<provider>`.
+3. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
 
 ### `logging`
 
@@ -301,4 +302,4 @@ Command flags affect only the current run and do not rewrite the config file.
 
 1. `exclude` uses glob-style patterns, not regular expressions. Patterns without `/` (e.g., `*.log`) match against both the file basename and the full path.
 2. Exclusion rules affect learning and analysis.
-3. Generated skill directories are also excluded by default, including configured `output.skills_paths`, `.claude/skills/**`, and `.agents/skills/**`.
+3. Generated skill directories are also excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.

@@ -649,7 +649,7 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 		WorkspaceCfg: config.WorkspaceConfig{
 			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
 		},
-		AgentCfg: config.AgentConfig{Provider: "codex"},
+		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
 	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg)
 
@@ -681,7 +681,7 @@ func TestGenerateWorkspaceSkills_RendersRuntimeContextInWorkspaceReferences(t *t
 				{ID: "core-engine", Path: "core-engine", Type: "library", Language: "go"},
 			},
 		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), strings.TrimSpace(`
@@ -788,7 +788,7 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 				{ID: "kmip-go", Path: "kmip-go", Type: "backend", Language: "go"},
 			},
 		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 为主后端，它调用 kmip-go 实现 KMIP 的能力。")
@@ -832,11 +832,12 @@ project:
   locale: "zh-CN"
   root_path: ""
 agent:
-  provider: "codex"
+  engine: "codex"
   commands:
     codex: "codex"
-output:
-  skills_paths:
+skills:
+  target: "codex"
+  paths:
     codex: ".agents/skills/custom-child-skill"
 `
 	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".skills-seed", "config.yaml"), []byte(childConfig), 0644))
@@ -853,7 +854,7 @@ output:
 		WorkspaceCfg: config.WorkspaceConfig{
 			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
 		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
 
@@ -894,7 +895,7 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 				{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
 			},
 		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
 
@@ -927,7 +928,7 @@ func TestGenerateWorkspaceSkills_DoesNotReadRuntimeContextFromWorkspaceMemory(t 
 		WorkspaceCfg: config.WorkspaceConfig{
 			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
 		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
 
@@ -937,7 +938,7 @@ func TestGenerateWorkspaceSkills_DoesNotReadRuntimeContextFromWorkspaceMemory(t 
 	require.NotContains(t, overview, "旧的 workspace memory summary")
 }
 
-func TestGenerateWorkspaceSkills_UsesConfiguredProviderOnly(t *testing.T) {
+func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
@@ -959,8 +960,8 @@ func TestGenerateWorkspaceSkills_UsesConfiguredProviderOnly(t *testing.T) {
 		WorkspaceCfg: config.WorkspaceConfig{
 			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
 		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
-		OutputCfg: config.OutputConfig{SkillsPaths: map[string]string{
+		AgentCfg: config.AgentConfig{Engine: "claude"},
+		SkillsCfg: config.SkillsConfig{Paths: map[string]string{
 			"claude": ".claude/skills/skills-seed-skills",
 			"codex":  ".agents/skills/skills-seed-skills",
 		}},
@@ -994,11 +995,12 @@ project:
   locale: "zh-CN"
   root_path: ""
 agent:
-  provider: "codex"
+  engine: "codex"
   commands:
     codex: "codex"
-output:
-  skills_paths:
+skills:
+  target: "codex"
+  paths:
     codex: ".agents/skills/custom-child-skill"
 `
 	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".skills-seed", "config.yaml"), []byte(childConfig), 0644))
@@ -1021,7 +1023,7 @@ output:
 		WorkspaceCfg: config.WorkspaceConfig{
 			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
 		},
-		AgentCfg: config.AgentConfig{Provider: "claude"},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
 
@@ -1108,7 +1110,7 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
-		AgentCfg:   config.AgentConfig{Provider: "claude"},
+		AgentCfg:   config.AgentConfig{Engine: "claude"},
 	}
 	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
 
@@ -1186,7 +1188,7 @@ func TestGenerateSkills_CodexWritesOpenAIMetadata(t *testing.T) {
 	loader := skills.NewLoaderForAgent("codex", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
-		AgentCfg:   config.AgentConfig{Provider: "codex"},
+		AgentCfg:   config.AgentConfig{Engine: "codex"},
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
 

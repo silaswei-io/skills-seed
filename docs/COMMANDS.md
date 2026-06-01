@@ -53,25 +53,16 @@ skills-templates-sha256: <hash>
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
 | `skills-seed init` | 初始化当前仓库 | `skills-seed init --mode project --agent codex --locale zh-CN` | 必须在 Git 仓库根目录执行；已存在 `.skills-seed` 时不覆盖 |
-| `skills-seed init children` | 按根仓 `workspace.projects` 初始化子项目 | `skills-seed init children --locale zh-CN` | 只能在 `project.mode: "workspace"` 的根仓执行 |
 
 #### `init` 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--mode` | `project` | 初始化模式：`project` 单项目，`workspace` 多子项目根仓 |
-| `--agent` | `claude` | 初始化时写入的 Agent provider，例如 `claude` 或 `codex` |
+| `--agent` | `claude` | 初始化时写入的 Agent engine，例如 `claude` 或 `codex` |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
-| `--children` | `false` | 与 workspace 模式一起使用，初始化根仓后同步初始化缺失 `.skills-seed` 的子项目 |
 | `--locale`, `-l` | 自动检测 | 配置文件语言：`zh-CN` 或 `en-US` |
 | `--help`, `-h` | `false` | 查看 `init` 帮助 |
-
-#### `init children` 参数
-
-| 参数 | 默认值 | 说明 |
-|---|---:|---|
-| `--locale`, `-l` | 根仓配置语言 | 子项目配置文件语言：`zh-CN` 或 `en-US` |
-| `--help`, `-h` | `false` | 查看 `init children` 帮助 |
 
 #### 常用示例
 
@@ -80,17 +71,35 @@ skills-seed init --mode project --locale zh-CN
 skills-seed init --mode project --agent codex --locale zh-CN
 skills-seed init --mode workspace --locale zh-CN
 skills-seed init --workspace
-skills-seed init --workspace --children --agent codex
-skills-seed init children
+skills-seed init --workspace --agent codex
 ```
 
 #### 注意事项
 
-1. `--agent` 会设置 `agent.provider`，并确保 `agent.commands` 和 `output.skills_paths` 中存在对应 provider。
-2. `--workspace --children` 会先初始化根仓，再按 `workspace.projects` 初始化缺失 `.skills-seed` 的子仓。
-3. 新初始化的子仓会继承根仓 `agent.provider`、`agent.commands` 和 `output.skills_paths`。
+1. `--agent` 会设置 `agent.engine`，并确保 `agent.commands` 中存在对应 engine。
+2. `--workspace` 会初始化根仓，并同步初始化当前检测到的子仓。
+3. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands` 和 `skills.target`、`skills.paths`。
 4. 已初始化的子仓会跳过；如果子仓 agent 与根仓不同，只提示，不覆盖。
 5. 初始化成功后会输出相对 `.skills-seed` 位置和当前版本 tag 对应的 README 文档地址。
+
+### `skills-seed add`
+
+#### 命令概述
+
+向 workspace 添加后续拷入或新增的子项目。命令会检测 workspace 根目录第一层项目，将目标子项目同步到根仓 `workspace.projects`，并初始化缺失的子仓 `.skills-seed`。
+
+#### 命令形式
+
+| 命令形式 | 说明 | 常用示例 | 注意事项 |
+|---|---|---|---|
+| `skills-seed add .` | 自动检测并添加所有子仓 | `skills-seed add .` | 只适用于 workspace 模式根仓 |
+| `skills-seed add <子仓...>` | 只添加指定子仓 | `skills-seed add backend frontend` | 参数可以是检测到的子仓 id 或 path |
+
+#### 注意事项
+
+1. 子仓没有 `.skills-seed` 时，会按 project 模式初始化。
+2. 子仓已有 `.skills-seed/config.yaml` 时会跳过并保留原配置。
+3. 子仓已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
 
 ### `skills-seed reset`
 
@@ -189,28 +198,27 @@ skills-seed learn history --limit 40 --batch-size 5
 #### 注意事项
 
 1. 首次成功后会记录已分析文件的 md5；没有可学习文件变化时，会跳过 patterns 学习和项目画像刷新。
-2. 生成的 skills 目录默认排除，包括配置中的 `output.skills_paths`、`.claude/skills/**` 和 `.agents/skills/**`。
+2. 生成的 skills 目录默认排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
-4. `workspace.init_children: true` 时，缺失 `.skills-seed` 的子项目会先按根仓 agent 配置初始化。
-5. workspace 子项目按 `agent.parallelism` 真并发执行。
+4. workspace 子项目按 `agent.parallelism` 真并发执行。
 
 ### `skills-seed generate-skills`
 
 #### 命令概述
 
-从项目画像和 patterns 生成当前 provider 的 skills。生成阶段会调用 `agent.provider` 对应的 CLI 做摘要合并和润色，并优先使用综合分高、check 命中多、置信度高的 patterns。
+从项目画像和 patterns 生成当前 `skills.target` 的 skills。生成阶段会调用 `agent.engine` 对应的 CLI 做摘要合并和润色，并优先使用综合分高、check 命中多、置信度高的 patterns。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed generate-skills` | 生成当前 provider 的 skills | `skills-seed generate-skills --output .agents/skills/my-project` | 默认输出到当前 provider 的 `output.skills_paths` |
+| `skills-seed generate-skills` | 生成当前 target 的 skills | `skills-seed generate-skills --output .agents/skills/my-project` | 默认输出到当前 `skills.target` 的 `skills.paths` |
 
 #### 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--output`, `-o` | 当前 provider 的 `output.skills_paths` | 临时指定 skills 输出目录 |
+| `--output`, `-o` | 当前 `skills.target` 的 `skills.paths` | 临时指定 skills 输出目录 |
 | `--merge`, `-m` | `false` | 生成前合并相似 patterns；已不推荐，改用 `skills-seed patterns merge` |
 | `--context` | 空 | 本次生成的补充说明，会传给 AI Agent |
 | `--context-file` | 空 | 从文件读取本次生成的补充说明 |
@@ -288,7 +296,7 @@ skills-seed patterns stats
 
 #### 注意事项
 
-1. 合并会调用当前 `agent.provider` 对应的 CLI。
+1. 合并会调用当前 `agent.engine` 对应的 CLI。
 2. 不确定合并结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
 

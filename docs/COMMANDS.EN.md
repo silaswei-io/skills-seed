@@ -53,25 +53,16 @@ Initialize `.skills-seed/`, default config, database, and prompt / skills templa
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed init` | Initialize the current repository | `skills-seed init --mode project --agent codex --locale en-US` | Must run from a Git repository root; existing `.skills-seed` is not overwritten |
-| `skills-seed init children` | Initialize child projects from root `workspace.projects` | `skills-seed init children --locale en-US` | Only works from a root repo with `project.mode: "workspace"` |
 
 #### `init` Flags
 
 | Flag | Default | Description |
 |---|---:|---|
 | `--mode` | `project` | Initialization mode: `project` for a single project, `workspace` for a multi-project root |
-| `--agent` | `claude` | Agent provider to write during initialization, for example `claude` or `codex` |
+| `--agent` | `claude` | Agent engine to write during initialization, for example `claude` or `codex` |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
-| `--children` | `false` | With workspace mode, initialize child projects missing `.skills-seed` after the root is initialized |
 | `--locale`, `-l` | auto-detect | Config language: `zh-CN` or `en-US` |
 | `--help`, `-h` | `false` | Show `init` help |
-
-#### `init children` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--locale`, `-l` | root config language | Child project config language: `zh-CN` or `en-US` |
-| `--help`, `-h` | `false` | Show `init children` help |
 
 #### Common Examples
 
@@ -80,17 +71,35 @@ skills-seed init --mode project --locale en-US
 skills-seed init --mode project --agent codex --locale en-US
 skills-seed init --mode workspace --locale en-US
 skills-seed init --workspace
-skills-seed init --workspace --children --agent codex
-skills-seed init children
+skills-seed init --workspace --agent codex
 ```
 
 #### Notes
 
-1. `--agent` sets `agent.provider` and ensures the provider exists in `agent.commands` and `output.skills_paths`.
-2. `--workspace --children` initializes the root first, then child repositories missing `.skills-seed` from `workspace.projects`.
-3. Newly initialized child repositories inherit root `agent.provider`, `agent.commands`, and `output.skills_paths`.
+1. `--agent` sets `agent.engine` and ensures the engine exists in `agent.commands`.
+2. `--workspace` initializes the root and the child repositories detected at that time.
+3. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `skills.target`, and `skills.paths`.
 4. Already initialized children are skipped. If a child agent differs from the root, it is reported and preserved.
 5. A successful init prints the relative `.skills-seed` location and the README URL for the current version tag.
+
+### `skills-seed add`
+
+#### Command Overview
+
+Add child projects copied or created after workspace initialization. The command detects first-level projects under the workspace root, syncs selected projects into root `workspace.projects`, and initializes missing child `.skills-seed` directories.
+
+#### Command Forms
+
+| Command Form | Description | Common Example | Notes |
+|---|---|---|---|
+| `skills-seed add .` | Detect and add all child repositories | `skills-seed add .` | Only works from a workspace-mode root repository |
+| `skills-seed add <child...>` | Add only selected child repositories | `skills-seed add backend frontend` | Arguments may be detected child ids or paths |
+
+#### Notes
+
+1. If a child has no `.skills-seed`, it is initialized in project mode.
+2. If a child already has `.skills-seed/config.yaml`, it is skipped and preserved.
+3. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
 
 ### `skills-seed reset`
 
@@ -189,28 +198,27 @@ skills-seed learn history --limit 40 --batch-size 5
 #### Notes
 
 1. After the first successful run, Skills Seed records md5 fingerprints for analyzed files. If no learnable files changed, pattern learning and profile refresh are skipped.
-2. Generated skill directories are excluded by default, including configured `output.skills_paths`, `.claude/skills/**`, and `.agents/skills/**`.
+2. Generated skill directories are excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
 3. The workspace root coordinates learning and does not store child patterns in root storage.
-4. When `workspace.init_children: true`, missing child `.skills-seed` directories are initialized from root agent config before learning.
-5. Workspace child projects run with real concurrency according to `agent.parallelism`.
+4. Workspace child projects run with real concurrency according to `agent.parallelism`.
 
 ### `skills-seed generate-skills`
 
 #### Command Overview
 
-Generate skills for the current provider from the project profile and learned patterns. Generation calls the CLI configured by `agent.provider` for summary merging and polishing, and prioritizes patterns with high effective score, more check hits, and higher confidence.
+Generate skills for the current `skills.target` from the project profile and learned patterns. Generation calls the CLI configured by `agent.engine` for summary merging and polishing, and prioritizes patterns with high effective score, more check hits, and higher confidence.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed generate-skills` | Generate skills for the current provider | `skills-seed generate-skills --output .agents/skills/my-project` | Defaults to `output.skills_paths` for the current provider |
+| `skills-seed generate-skills` | Generate skills for the current target | `skills-seed generate-skills --output .agents/skills/my-project` | Defaults to `skills.paths` for the current `skills.target` |
 
 #### Flags
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--output`, `-o` | current provider's `output.skills_paths` | Temporarily override the skills output directory |
+| `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
 | `--merge`, `-m` | `false` | Merge similar patterns before generation; deprecated, use `skills-seed patterns merge` |
 | `--context` | empty | Additional guidance for this generate run, passed to the AI agent |
 | `--context-file` | empty | Read additional guidance for this generate run from a file |
@@ -288,7 +296,7 @@ skills-seed patterns stats
 
 #### Notes
 
-1. Merge runs call the CLI configured by the current `agent.provider`.
+1. Merge runs call the CLI configured by the current `agent.engine`.
 2. Use `--dry-run` first when you want to inspect the merge result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
 

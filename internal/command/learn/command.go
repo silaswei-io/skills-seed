@@ -11,7 +11,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
-	initcmd "github.com/silaswei-io/skills-seed/internal/command/init"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -574,11 +573,6 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			consoleMu.Lock()
 			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectStarted", map[string]interface{}{"ProjectName": project.ID}))
 			consoleMu.Unlock()
-		}
-		if workspaceConfig.InitChildren {
-			if err := initcmd.EnsureWorkspaceChildInitializedAt(projectRoot, project, cont.ConfigRepo, projectConfig.Locale); err != nil {
-				return err
-			}
 		}
 		childCont, err := commandutil.OpenWorkspaceChildContainer(ctx, projectRootPath, project, commandutil.WorkspaceChildErrorKeys{
 			NotInitialized: "LearnWorkspaceChildNotInitialized",

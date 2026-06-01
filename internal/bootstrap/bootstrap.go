@@ -8,6 +8,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	addcmd "github.com/silaswei-io/skills-seed/internal/command/add"
 	"github.com/silaswei-io/skills-seed/internal/command/check"
 	"github.com/silaswei-io/skills-seed/internal/command/generate"
 	"github.com/silaswei-io/skills-seed/internal/command/hook"
@@ -132,6 +133,7 @@ func createRootCmd() *cobra.Command {
 func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(initcmd.Cmd())
 	rootCmd.AddCommand(initcmd.ResetCmd())
+	rootCmd.AddCommand(addcmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))
 	rootCmd.AddCommand(check.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))

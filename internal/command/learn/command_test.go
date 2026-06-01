@@ -364,67 +364,7 @@ func TestRunLearnWorkspaceCurrentRequiresInitializedChildProject(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backend")
-	require.Contains(t, err.Error(), "skills-seed init children")
-	require.Contains(t, err.Error(), "workspace.init_children")
-}
-
-func TestRunLearnWorkspaceCurrentAutoInitializesMissingChildProjectWhenEnabled(t *testing.T) {
-	require.NoError(t, i18n.Init("zh-CN"))
-	tokenusage.Reset()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
-
-	provider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, nil)
-
-	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
-	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
-	cfg := cont.ConfigRepo.Get()
-	cfg.Workspace.InitChildren = true
-	cfg.Agent.Provider = provider
-	cfg.Agent.Commands = map[string]string{provider: provider}
-	require.NoError(t, cont.ConfigRepo.Update(cfg))
-
-	childRoot := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend")
-	require.NoError(t, os.MkdirAll(childRoot, 0755))
-	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
-	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.email", "test@example.com").Run())
-	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.name", "Test User").Run())
-	writeLearnFile(t, childRoot, "main.go", "package main\n")
-	gitAddAll(t, childRoot)
-
-	require.NoError(t, runLearnCurrent(cont))
-
-	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
-	require.NoError(t, err)
-	require.Equal(t, domain.ModeProject, childConfig.GetProjectConfig().Mode)
-	require.Equal(t, project.ID, childConfig.GetProjectConfig().Name)
-	require.Equal(t, project.Language, childConfig.GetProjectConfig().Language)
-	require.Equal(t, provider, childConfig.GetAgentConfig().Provider)
-}
-
-func TestRunLearnWorkspaceCurrentAutoInitPreservesExistingDifferentAgentChildProject(t *testing.T) {
-	require.NoError(t, i18n.Init("zh-CN"))
-	tokenusage.Reset()
-
-	childProvider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, nil)
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
-
-	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
-	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
-	cfg := cont.ConfigRepo.Get()
-	cfg.Workspace.InitChildren = true
-	require.NoError(t, cont.ConfigRepo.Update(cfg))
-
-	childRoot := initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", childProvider)
-	rootProvider := cont.ConfigRepo.GetAgentConfig().Provider
-	require.NotEqual(t, rootProvider, childProvider)
-
-	require.NoError(t, runLearnCurrent(cont))
-
-	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
-	require.NoError(t, err)
-	require.Equal(t, childProvider, childConfig.GetAgentConfig().Provider)
+	require.Contains(t, err.Error(), "skills-seed add")
 }
 
 func TestRunLearnWorkspaceCurrentRequiresChildGitRepository(t *testing.T) {
@@ -465,7 +405,7 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 	cfg.Project.Language = "go"
 	cfg.Project.RootPath = projectRoot
 	cfg.Project.Locale = "zh-CN"
-	cfg.Agent.Provider = "mock"
+	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
 	cfg.Workspace.Projects = projects
 	require.NoError(t, configRepo.Update(cfg))
@@ -600,7 +540,7 @@ func initLearnWorkspaceChildProjectWithProvider(t *testing.T, workspaceRoot stri
 	cfg.Project.Language = project.Language
 	cfg.Project.RootPath = childRoot
 	cfg.Project.Locale = "zh-CN"
-	cfg.Agent.Provider = provider
+	cfg.Agent.Engine = provider
 	cfg.Agent.Commands = map[string]string{provider: provider}
 	cfg.Analysis.CodeGraph.Enabled = false
 	require.NoError(t, childConfigRepo.Update(cfg))

@@ -50,7 +50,7 @@ type Container struct {
 	SkillsLoader         *skills.Loader
 }
 
-// AgentFactory 创建指定 provider 的 Agent
+// AgentFactory 创建指定 engine 的 Agent
 type AgentFactory func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent
 
 var agentFactories = map[string]AgentFactory{
@@ -63,11 +63,11 @@ var agentFactories = map[string]AgentFactory{
 }
 
 // RegisterAgentFactory 注册自定义 Agent 工厂
-func RegisterAgentFactory(provider string, factory AgentFactory) {
-	if provider == "" || factory == nil {
+func RegisterAgentFactory(engine string, factory AgentFactory) {
+	if engine == "" || factory == nil {
 		return
 	}
-	agentFactories[provider] = factory
+	agentFactories[engine] = factory
 }
 
 // NewContainer 创建应用容器
@@ -106,8 +106,9 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	workspaceSpecRepo := workspacestore.NewSpecRepository(seedPath)
 
 	// 5. 创建加载器
-	promptLoader := prompts.NewLoader(cfg.Agent.Provider, locale, seedPath)
-	skillsLoader := skills.NewLoaderForAgent(cfg.Agent.Provider, locale)
+	promptLoader := prompts.NewLoader(cfg.Agent.Engine, locale, seedPath)
+	skillsTarget := config.EffectiveSkillsTarget(cfg.Agent, cfg.Skills)
+	skillsLoader := skills.NewLoaderForAgent(skillsTarget, locale)
 
 	// 6. 创建 Agent
 	agentImpl, err := createAgent(cfg, promptLoader)
@@ -150,16 +151,16 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 func createAgent(cfg *config.Config, promptLoader *prompts.Loader) (agent.Agent, error) {
 	timeout := time.Duration(cfg.Agent.Timeout) * time.Second
-	provider := cfg.Agent.Provider
+	engine := cfg.Agent.Engine
 
-	factory, ok := agentFactories[provider]
+	factory, ok := agentFactories[engine]
 	if !ok {
-		return nil, fmt.Errorf("%s", i18n.GetWithParams("AgentProviderUnsupported", map[string]interface{}{"Provider": cfg.Agent.Provider}))
+		return nil, fmt.Errorf("%s", i18n.GetWithParams("AgentProviderUnsupported", map[string]interface{}{"Provider": cfg.Agent.Engine}))
 	}
 
-	command := cfg.Agent.Commands[provider]
+	command := cfg.Agent.Commands[engine]
 	if command == "" {
-		command = provider
+		command = engine
 	}
 
 	return factory(command, timeout, promptLoader, cfg.Agent.AllowUserPlugins), nil

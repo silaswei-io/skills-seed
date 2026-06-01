@@ -23,9 +23,8 @@ import (
 var (
 	localeFlag    string // locale 参数
 	modeFlag      string // mode 参数
-	agentFlag     string // agent provider 参数
+	agentFlag     string // agent engine 参数
 	workspaceFlag bool   // workspace 快捷参数
-	childrenFlag  bool   // 初始化 workspace 子项目
 )
 
 // Cmd 返回 init 命令
@@ -47,7 +46,7 @@ func Cmd() *cobra.Command {
 				effectiveMode = domain.ModeWorkspace
 			}
 
-			if err := initializeSkillWithWorkspaceChildren(localeFlag, effectiveMode, agentFlag, childrenFlag); err != nil {
+			if err := initializeSkillWithWorkspaceChildren(localeFlag, effectiveMode, agentFlag); err != nil {
 				// 错误信息直接输出（此时 logger 可能未初始化）
 				fmt.Fprintln(os.Stderr, i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 				os.Exit(1)
@@ -60,31 +59,8 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().StringVar(&modeFlag, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	initCmd.Flags().StringVar(&agentFlag, "agent", "", i18n.Get("InitFlagAgent"))
 	initCmd.Flags().BoolVar(&workspaceFlag, "workspace", false, i18n.Get("InitFlagWorkspace"))
-	initCmd.Flags().BoolVar(&childrenFlag, "children", false, i18n.Get("InitFlagChildren"))
-	initCmd.AddCommand(childrenCmd())
 
 	return initCmd
-}
-
-func childrenCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "children",
-		Short:   i18n.Get("InitChildrenShort"),
-		Long:    i18n.Get("InitChildrenLongDesc"),
-		Example: i18n.Get("InitChildrenExample"),
-		Run: func(cmd *cobra.Command, args []string) {
-			if !isValidLocale(localeFlag) {
-				fmt.Fprintln(os.Stderr, i18n.Get("InitLocaleInvalid"))
-				os.Exit(1)
-			}
-			if err := initializeWorkspaceChildren(localeFlag); err != nil {
-				fmt.Fprintln(os.Stderr, i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
-				os.Exit(1)
-			}
-		},
-	}
-	cmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
-	return cmd
 }
 
 func isValidLocale(locale string) bool {
@@ -116,28 +92,26 @@ func ResetCmd() *cobra.Command {
 }
 
 func initializeSkill(locale, mode string) error {
-	return initializeSkillWithWorkspaceChildren(locale, mode, "", false)
+	return initializeSkillWithWorkspaceChildren(locale, mode, "")
 }
 
-func initializeSkillWithWorkspaceChildren(locale, mode, agentProvider string, initWorkspaceChildren bool) error {
+func initializeSkillWithWorkspaceChildren(locale, mode, agentEngine string) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
 	}
 	return initializeSkillWithOptions(projectRoot, locale, mode, initializeSkillOptions{
-		initLogger:            true,
-		showUserSummary:       true,
-		agentProvider:         agentProvider,
-		initWorkspaceChildren: initWorkspaceChildren,
+		initLogger:      true,
+		showUserSummary: true,
+		agentEngine:     agentEngine,
 	})
 }
 
 type initializeSkillOptions struct {
-	initLogger            bool
-	showUserSummary       bool
-	language              string
-	agentProvider         string
-	initWorkspaceChildren bool
+	initLogger      bool
+	showUserSummary bool
+	language        string
+	agentEngine     string
 }
 
 func initializeSkillAt(projectRoot, locale, mode string) error {
@@ -257,20 +231,23 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 			return err
 		}
 	}
-	if opts.agentProvider != "" {
+	if opts.agentEngine != "" {
 		cfg := configRepo.Get()
-		cfg.Agent.Provider = opts.agentProvider
+		cfg.Agent.Engine = opts.agentEngine
 		if cfg.Agent.Commands == nil {
 			cfg.Agent.Commands = map[string]string{}
 		}
-		if cfg.Agent.Commands[opts.agentProvider] == "" {
-			cfg.Agent.Commands[opts.agentProvider] = opts.agentProvider
+		if cfg.Agent.Commands[opts.agentEngine] == "" {
+			cfg.Agent.Commands[opts.agentEngine] = opts.agentEngine
 		}
-		if cfg.Output.SkillsPaths == nil {
-			cfg.Output.SkillsPaths = map[string]string{}
+		if cfg.Skills.Target == "" {
+			cfg.Skills.Target = opts.agentEngine
 		}
-		if cfg.Output.SkillsPaths[opts.agentProvider] == "" {
-			cfg.Output.SkillsPaths[opts.agentProvider] = config.DefaultSkillsPathForProvider(opts.agentProvider)
+		if cfg.Skills.Paths == nil {
+			cfg.Skills.Paths = map[string]string{}
+		}
+		if cfg.Skills.Paths[cfg.Skills.Target] == "" {
+			cfg.Skills.Paths[cfg.Skills.Target] = config.DefaultSkillsPathForTarget(cfg.Skills.Target)
 		}
 		if err := configRepo.Update(cfg); err != nil {
 			return err
@@ -302,11 +279,9 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	if mode == domain.ModeWorkspace {
 		projects := workspacediscovery.DiscoverProjects(projectRoot)
 		workspaceConfig := configRepo.GetWorkspaceConfig()
-		if len(workspaceConfig.Projects) == 0 {
-			workspaceConfig.Projects = projects
-			if err := configRepo.SetWorkspaceConfig(workspaceConfig); err != nil {
-				return err
-			}
+		workspaceConfig.Projects = projects
+		if err := configRepo.SetWorkspaceConfig(workspaceConfig); err != nil {
+			return err
 		}
 		if err := ensureWorkspacePromptFiles(seedPath, projectRoot, projectName, configRepo); err != nil {
 			logger.Error(i18n.Get("InitCreateProjectPromptsFailed"), "error", err)
@@ -323,7 +298,7 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		return err
 	}
 
-	if mode == domain.ModeWorkspace && opts.initWorkspaceChildren {
+	if mode == domain.ModeWorkspace {
 		if err := initializeWorkspaceChildrenWithRepo(projectRoot, locale, configRepo); err != nil {
 			return err
 		}
@@ -354,31 +329,6 @@ func versionedReadmeURL() string {
 	return "https://github.com/silaswei-io/skills-seed/blob/" + version + "/README.md"
 }
 
-func initializeWorkspaceChildren(locale string) error {
-	workspaceRoot, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
-	}
-	return initializeWorkspaceChildrenAt(workspaceRoot, locale)
-}
-
-func initializeWorkspaceChildrenAt(workspaceRoot, locale string) error {
-	rootSeedPath := filepath.Join(workspaceRoot, ".skills-seed")
-	rootConfigPath := filepath.Join(rootSeedPath, "config.yaml")
-	if _, err := os.Stat(rootConfigPath); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
-		}
-		return err
-	}
-
-	rootConfigRepo, err := config.NewRepository(rootSeedPath, locale)
-	if err != nil {
-		return err
-	}
-	return initializeWorkspaceChildrenWithRepo(workspaceRoot, locale, rootConfigRepo)
-}
-
 func initializeWorkspaceChildrenWithRepo(workspaceRoot, locale string, rootConfigRepo *config.Repository) error {
 	configLocale := locale
 	if configLocale == "" {
@@ -396,7 +346,7 @@ func initializeWorkspaceChildrenWithRepo(workspaceRoot, locale string, rootConfi
 	}
 	workspaceConfig := rootConfigRepo.GetWorkspaceConfig()
 	if len(workspaceConfig.Projects) == 0 {
-		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
+		return nil
 	}
 
 	for _, project := range workspaceConfig.Projects {
@@ -433,7 +383,7 @@ func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspacePr
 		initLogger:      false,
 		showUserSummary: false,
 		language:        project.Language,
-		agentProvider:   rootConfigRepo.GetAgentConfig().Provider,
+		agentEngine:     rootConfigRepo.GetAgentConfig().Engine,
 	}); err != nil {
 		return err
 	}
@@ -443,7 +393,7 @@ func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspacePr
 	}
 	childConfig := childConfigRepo.Get()
 	childConfig.Agent = rootConfigRepo.GetAgentConfig()
-	childConfig.Output = rootConfigRepo.GetOutputConfig()
+	childConfig.Skills = rootConfigRepo.GetSkillsConfig()
 	if err := childConfigRepo.Update(childConfig); err != nil {
 		return err
 	}
@@ -469,8 +419,8 @@ func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSe
 	if err != nil {
 		return err
 	}
-	rootAgent := rootConfigRepo.GetAgentConfig().Provider
-	childAgent := childConfigRepo.GetAgentConfig().Provider
+	rootAgent := rootConfigRepo.GetAgentConfig().Engine
+	childAgent := childConfigRepo.GetAgentConfig().Engine
 	params := map[string]interface{}{
 		"ProjectName": project.ID,
 		"Path":        childSeedPath,

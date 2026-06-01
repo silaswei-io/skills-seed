@@ -184,7 +184,7 @@ func TestRunGenerateProjectRequiresAvailableAgent(t *testing.T) {
 	require.NoError(t, err)
 	cfg := configRepo.Get()
 	cfg.Project.Mode = domain.ModeProject
-	cfg.Agent.Provider = "mock"
+	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
 	require.NoError(t, configRepo.Update(cfg))
 
@@ -204,7 +204,7 @@ func TestRunGenerateWorkspaceRequiresAvailableAgent(t *testing.T) {
 	require.NoError(t, err)
 	cfg := configRepo.Get()
 	cfg.Project.Mode = domain.ModeWorkspace
-	cfg.Agent.Provider = "mock"
+	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
 	require.NoError(t, configRepo.Update(cfg))
 
@@ -215,6 +215,22 @@ func TestRunGenerateWorkspaceRequiresAvailableAgent(t *testing.T) {
 
 	err = commandutil.RequireAgentAvailable(cont)
 	require.Error(t, err)
+}
+
+func TestOutputPathForCurrentTargetUsesConfiguredSkillsTarget(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Agent.Engine = "claude"
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{
+		"claude": ".claude/skills/skills-seed-skills",
+		"codex":  ".agents/skills/skills-seed-skills",
+	}
+	require.NoError(t, configRepo.Update(cfg))
+
+	require.Equal(t, ".agents/skills/skills-seed-skills", outputPathForCurrentTarget(&container.Container{ConfigRepo: configRepo}))
 }
 
 func resetGenerateFlagsForTest(t *testing.T) {
@@ -274,9 +290,10 @@ func initGenerateWorkspaceRootContainer(t *testing.T, workspaceRoot, provider st
 	cfg.Project.Language = "go"
 	cfg.Project.Locale = "zh-CN"
 	cfg.Project.RootPath = workspaceRoot
-	cfg.Agent.Provider = provider
+	cfg.Agent.Engine = provider
 	cfg.Agent.Commands = map[string]string{provider: provider}
-	cfg.Output.SkillsPaths = map[string]string{provider: ".agents/skills/skills-seed-skills"}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": ".agents/skills/skills-seed-skills"}
 	cfg.Workspace.Projects = projects
 	require.NoError(t, configRepo.Update(cfg))
 
@@ -300,9 +317,10 @@ func initGenerateWorkspaceChildProject(t *testing.T, workspaceRoot string, proje
 	cfg.Project.Language = project.Language
 	cfg.Project.Locale = "zh-CN"
 	cfg.Project.RootPath = childRoot
-	cfg.Agent.Provider = provider
+	cfg.Agent.Engine = provider
 	cfg.Agent.Commands = map[string]string{provider: provider}
-	cfg.Output.SkillsPaths = map[string]string{provider: ".agents/skills/backend-dev"}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": ".agents/skills/backend-dev"}
 	require.NoError(t, childConfigRepo.Update(cfg))
 	return childRoot
 }
@@ -312,7 +330,8 @@ func setGenerateChildOutputPath(t *testing.T, childRoot, provider, outputPath st
 	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	cfg := childConfigRepo.Get()
-	cfg.Output.SkillsPaths = map[string]string{provider: outputPath}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": outputPath}
 	require.NoError(t, childConfigRepo.Update(cfg))
 }
 

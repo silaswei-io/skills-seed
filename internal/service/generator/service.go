@@ -1363,7 +1363,7 @@ func strongestPatterns(patterns []domain.Pattern, limit int) []domain.Pattern {
 }
 
 func (s *GeneratorService) workspaceRootOutputPath(projectRoot, workspaceName string) (string, error) {
-	return s.providerSkillOutputPath(projectRoot, workspaceSkillName(workspaceName))
+	return s.targetSkillOutputPath(projectRoot, workspaceSkillName(workspaceName))
 }
 
 func workspaceSkillName(workspaceName string) string {
@@ -1404,27 +1404,29 @@ func (s *GeneratorService) childSkillTarget(projectRoot string, project config.W
 }
 
 func configuredSkillOutputPath(projectRoot string, configRepo config.Reader) (string, error) {
-	provider := ""
+	target := ""
 	outputPath := ""
 	if configRepo != nil {
-		provider = configRepo.GetAgentConfig().Provider
-		outputPath = config.EffectiveSkillsPath(provider, configRepo.GetOutputConfig())
+		skillsConfig := configRepo.GetSkillsConfig()
+		target = config.EffectiveSkillsTarget(configRepo.GetAgentConfig(), skillsConfig)
+		outputPath = config.EffectiveSkillsPath(target, skillsConfig)
 	}
 	if strings.TrimSpace(outputPath) == "" {
-		outputPath = defaultProviderSkillPath(provider)
+		outputPath = defaultTargetSkillPath(target)
 	}
 	return utils.ResolvePath(projectRoot, outputPath)
 }
 
-func (s *GeneratorService) providerSkillOutputPath(projectRoot, skillName string) (string, error) {
-	provider := ""
+func (s *GeneratorService) targetSkillOutputPath(projectRoot, skillName string) (string, error) {
+	target := ""
 	outputPath := ""
 	if s.configRepo != nil {
-		provider = s.configRepo.GetAgentConfig().Provider
-		outputPath = config.EffectiveSkillsPath(provider, s.configRepo.GetOutputConfig())
+		skillsConfig := s.configRepo.GetSkillsConfig()
+		target = config.EffectiveSkillsTarget(s.configRepo.GetAgentConfig(), skillsConfig)
+		outputPath = config.EffectiveSkillsPath(target, skillsConfig)
 	}
 	if strings.TrimSpace(outputPath) == "" {
-		outputPath = defaultProviderSkillPath(provider)
+		outputPath = defaultTargetSkillPath(target)
 	}
 	resolvedOutputPath, err := utils.ResolvePath(projectRoot, outputPath)
 	if err != nil {
@@ -1433,8 +1435,8 @@ func (s *GeneratorService) providerSkillOutputPath(projectRoot, skillName string
 	return filepath.Join(filepath.Dir(resolvedOutputPath), skillName), nil
 }
 
-func defaultProviderSkillPath(provider string) string {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
+func defaultTargetSkillPath(target string) string {
+	switch strings.ToLower(strings.TrimSpace(target)) {
 	case "claude":
 		return filepath.Join(".claude", "skills", "skills-seed-skills")
 	case "codex":

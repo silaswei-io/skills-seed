@@ -10,7 +10,6 @@ project:
 
 # 工作区
 workspace:
-  init_children: false      # learn current 时是否自动初始化缺失 .skills-seed 的子项目
   projects: []               # 子项目列表，例如: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   shared: []                 # 公共库或共享代码目录，例如: [{path: "pkg"}]
   contracts: []              # 接口契约目录，例如: [{path: "proto"}]
@@ -29,8 +28,8 @@ analysis:
 
 # Agent
 agent:
-  provider: "claude"         # 当前 Agent 提供方，对应 commands 和 output.skills_paths 的 key
-  commands:                  # provider -> CLI 命令路径，新增 provider 时在这里增加 key
+  engine: "claude"           # 执行分析/学习/生成摘要任务的 Agent 引擎，对应 commands 的 key
+  commands:                  # engine -> CLI 命令路径，新增 engine 时在这里增加 key
     claude: "claude"
     codex: "codex"
   timeout: 1800              # AI 请求超时时间(秒)
@@ -47,9 +46,10 @@ autofix:
   strategy: "patch"          # 修复策略: patch: 生成 .patch 文件(推荐,安全); backup: 备份原文件后修改; stash: 应用修复后 git stash; branch: 创建新分支应用修复
   backup_path: "backups"     # 备份路径(相对于 .skills-seed 目录)
 
-# 输出
-output:
-  skills_paths:                   # provider -> Skills 输出路径，新增 provider 时在这里增加 key
+# Skills
+skills:
+  target: "claude"          # 生成的 Skills 目标类型；可与 agent.engine 不同，例如用 claude 生成 codex skills
+  paths:                    # target -> Skills 输出路径，新增 target 时在这里增加 key
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 

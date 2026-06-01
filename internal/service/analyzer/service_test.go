@@ -408,7 +408,7 @@ func TestCollectSampleFiles_UsesConfiguredExclude(t *testing.T) {
 	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Locale: "zh-CN", Language: "go"},
-		AgentCfg:   config.AgentConfig{Provider: "test"},
+		AgentCfg:   config.AgentConfig{Engine: "test"},
 		Exclude:    []string{"internal/generated/**"},
 	})
 

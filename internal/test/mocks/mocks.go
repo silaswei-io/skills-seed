@@ -488,7 +488,7 @@ type MockConfigReader struct {
 	AgentCfg     config.AgentConfig
 	LearningCfg  config.LearningConfig
 	AutoFixCfg   config.AutoFixConfig
-	OutputCfg    config.OutputConfig
+	SkillsCfg    config.SkillsConfig
 	LoggingCfg   config.LoggingConfig
 	Exclude      []string
 }
@@ -511,8 +511,8 @@ func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.
 // GetAutoFixConfig 模拟获取自动修复配置
 func (m *MockConfigReader) GetAutoFixConfig() config.AutoFixConfig { return m.AutoFixCfg }
 
-// GetOutputConfig 模拟获取输出配置
-func (m *MockConfigReader) GetOutputConfig() config.OutputConfig { return m.OutputCfg }
+// GetSkillsConfig 模拟获取 Skills 配置
+func (m *MockConfigReader) GetSkillsConfig() config.SkillsConfig { return m.SkillsCfg }
 
 // GetLoggingConfig 模拟获取日志配置
 func (m *MockConfigReader) GetLoggingConfig() config.LoggingConfig { return m.LoggingCfg }

@@ -51,15 +51,16 @@ project:
   language: "go"
   locale: "zh-CN"
 agent:
-  provider: "claude"
+  engine: "claude"
   commands:
     claude: "claude"
   timeout: 300
 learning:
   max_commits: 50
   batch_size: 5
-output:
-  skills_paths:
+skills:
+  target: "claude"
+  paths:
     claude: ".claude/skills"
 logging:
   level: "INFO"

@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.3.0]
+
+### 破坏性变更
+
+- 配置命名从 `agent.provider` / `output.skills_paths` 调整为 `agent.engine` / `skills.target` / `skills.paths`，明确区分“执行分析、学习和摘要的 Agent CLI”和“生成的 skills 目标格式”
+- 移除 `workspace.init_children` 和 `init --children` / `init children` 语义；workspace 初始化时会直接初始化当时检测到的子项目
+
+### 功能
+
+- 新增 `skills-seed add .`，可在 workspace 根仓自动检测并添加所有当前子项目，同时初始化缺失 `.skills-seed` 的子仓
+- 新增 `skills-seed add <child...>`，支持按子仓 ID 或路径添加指定子项目；`./frontend`、`frontend/`、`frontend\` 会归一化为同一目标
+- `add` 会先初始化子仓，再同步更新根仓 `workspace.projects`；如果子仓初始化失败，不会污染根仓配置
+- workspace 初始化现在默认同步初始化检测到的子项目，新建子项目继承根仓 Agent 和 Skills 配置，已有子项目配置保持不覆盖
+- `generate-skills` 默认输出路径改为根据 `skills.target` 查询 `skills.paths`，支持用 `claude` 执行生成摘要并输出 `codex` skills
+
+### 文档
+
+- 重写 README / README.en，把项目定位、工作流、workspace 行为、`add` 命令、Agent engine 与 skills target 的关系整理为正式入口文档
+- 更新命令参考、配置参考、CLI help 和 prompt 文案，移除旧 `provider` / `output.skills_paths` / `init children` 说明
+
 ## [v0.2.0]
 
 ### 变更

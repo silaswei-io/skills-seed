@@ -19,7 +19,6 @@ project:
   initialized_at: ""
 
 workspace:
-  init_children: false
   projects: []
   shared: []
   contracts: []
@@ -36,7 +35,7 @@ analysis:
     max_code: 0
 
 agent:
-  provider: "claude"
+  engine: "claude"
   commands:
     claude: "claude"
     codex: "codex"
@@ -52,8 +51,9 @@ autofix:
   strategy: "patch"
   backup_path: "backups"
 
-output:
-  skills_paths:
+skills:
+  target: "claude"
+  paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
@@ -123,7 +123,6 @@ exclude:
 
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
-| `init_children` | `false` | `learn current` 遇到缺失 `.skills-seed` 的子项目时，是否先自动初始化 |
 | `projects` | `[]` | 子项目列表；workspace init 会尝试发现第一层目录中的项目 |
 | `shared` | `[]` | 公共库或共享代码目录 |
 | `contracts` | `[]` | API、IDL、协议等契约目录 |
@@ -147,10 +146,10 @@ exclude:
 
 #### 行为
 
-1. `skills-seed init --workspace` 只初始化根仓。
-2. `skills-seed init --workspace --children` 会初始化根仓，并同步初始化 `workspace.projects` 中缺失 `.skills-seed` 的子项目。
-3. `workspace.init_children: true` 后，`skills-seed learn current` 会在学习前补初始化缺失 `.skills-seed` 的子项目。
-4. 子项目已有 `.skills-seed/config.yaml` 时不覆盖；如果子项目 agent 和根仓不同，只提示并保留子项目配置。
+1. `skills-seed init --workspace` 会初始化根仓，并同步初始化当时检测到的子项目。
+2. 后续新增或拷入 workspace 的子项目使用 `skills-seed add .` 自动检测添加，或使用 `skills-seed add <子项目>` 指定添加。
+3. 子项目已有 `.skills-seed/config.yaml` 时不覆盖；如果子项目 agent 和根仓不同，只提示并保留子项目配置。
+4. 子项目已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
 
 ### `analysis.codegraph`
 
@@ -178,8 +177,8 @@ exclude:
 
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
-| `provider` | `claude` | 当前 Agent provider，对应 `commands` 和 `output.skills_paths` 的 key |
-| `commands` | `claude: claude`、`codex: codex` | provider 到 CLI 命令的映射 |
+| `engine` | `claude` | 执行分析、学习和生成摘要的 Agent 引擎，对应 `commands` 的 key |
+| `commands` | `claude: claude`、`codex: codex` | engine 到 CLI 命令的映射 |
 | `timeout` | `1800` | 单次 AI 请求超时时间，单位秒 |
 | `allow_user_plugins` | `false` | 是否允许 Agent 加载用户插件；默认关闭，避免批处理被用户插件影响 |
 | `parallelism` | `0` | 并发 Agent 数；`0` 表示自动 |
@@ -195,13 +194,14 @@ exclude:
 
 ```yaml
 agent:
-  provider: "codex"
+  engine: "claude"
   commands:
     claude: "claude"
     codex: "codex"
 
-output:
-  skills_paths:
+skills:
+  target: "codex"
+  paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 ```
@@ -210,7 +210,7 @@ output:
 
 ```bash
 skills-seed init --mode project --agent codex
-skills-seed init --workspace --children --agent codex
+skills-seed init --workspace --agent codex
 ```
 
 ### `learning`
@@ -246,20 +246,21 @@ skills-seed learn history --limit 100 --batch-size 10
 3. `stash`：应用修复后通过 Git stash 保存。
 4. `branch`：创建新分支应用修复。
 
-### `output`
+### `skills`
 
 #### 字段
 
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
-| `skills_paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills 输出目录 |
-| `skills_paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills 输出目录 |
+| `target` | `agent.engine` | 生成的 Skills 目标类型；可与 `agent.engine` 不同 |
+| `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills 输出目录 |
+| `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills 输出目录 |
 
 #### 说明
 
-1. `generate-skills` 默认使用当前 `agent.provider` 对应的 `output.skills_paths`。
+1. `generate-skills` 默认使用 `skills.target` 对应的 `skills.paths`。
 2. 可通过 `skills-seed generate-skills --output <path>` 临时指定输出目录。
-3. 新增自定义 provider 时，应同时添加 `agent.commands.<provider>` 和 `output.skills_paths.<provider>`。
+3. 新增自定义 engine 或 target 时，应分别添加 `agent.commands.<engine>` 和 `skills.paths.<target>`。
 
 ### `logging`
 
@@ -301,4 +302,4 @@ skills-seed learn history --limit 100 --batch-size 10
 
 1. `exclude` 使用 glob 风格匹配，不是正则。不含 `/` 的模式（如 `*.log`）会同时对文件基名和完整路径匹配。
 2. 排除规则会影响学习和分析。
-3. 生成的 skills 目录默认也会排除，包括配置中的 `output.skills_paths`、`.claude/skills/**` 和 `.agents/skills/**`。
+3. 生成的 skills 目录默认也会排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。

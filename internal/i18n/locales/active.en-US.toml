@@ -8,13 +8,13 @@ other = "Growing project skills for AI agents"
 other = "Learn project conventions from a codebase and generate AI Agent skills."
 
 [RootExample]
-other = "  skills-seed init --mode project --agent codex --locale en-US"
+other = "  skills-seed init --mode project --agent codex --locale en-US\n  skills-seed init --workspace --agent codex --locale en-US\n  skills-seed add ."
 
 [InitLongDesc]
 other = "Initialize skills-seed in your project.\n\nThis command will:\n  • Create .skills-seed/ directory\n  • Generate default configuration (config.yaml)\n  • Initialize BoltDB database\n  • Prepare cross-agent compatible prompt and skills templates\n\nPlease run this command in the root directory of a Git repository."
 
 [InitExample]
-other = "  # Initialize a single-project repository with an Agent\n  skills-seed init --mode project --agent codex --locale en-US\n\n  # Initialize a workspace root and missing child .skills-seed directories\n  skills-seed init --workspace --children --agent codex --locale en-US"
+other = "  # Initialize a single-project repository with an Agent\n  skills-seed init --mode project --agent codex --locale en-US\n\n  # Initialize a workspace root and currently detected child projects\n  skills-seed init --workspace --agent codex --locale en-US"
 
 [InitStart]
 other = "Initialize skills-seed"
@@ -102,16 +102,16 @@ other = "Failed to set locale"
 other = "Failed to initialize logger"
 
 [InitChildrenShort]
-other = "Initialize child projects from root workspace.projects"
+other = "Initialize workspace child projects"
 
 [InitChildrenLongDesc]
-other = "Read workspace.projects from the workspace root .skills-seed/config.yaml, enter each child project, and initialize it in project mode.\n\nThis command only works from a workspace-mode root repository. Each child project must be an independent Git repository. Already initialized child projects are reported and skipped, including whether their agent.provider matches the root."
+other = "Internal workspace child initialization flow. Each child project must be an independent Git repository. Already initialized child projects are reported and skipped, including whether their agent.engine matches the root."
 
 [InitChildrenExample]
-other = "  # Initialize every configured child project from the workspace root\n  skills-seed init children\n\n  # Specify child project config language\n  skills-seed init children --locale en-US"
+other = "  skills-seed init --workspace\n  skills-seed add backend"
 
 [InitChildrenRequireWorkspaceMode]
-other = "init children can only run in a workspace-mode root repository"
+other = "add can only run in a workspace-mode root repository"
 
 [InitChildrenProjectInitializing]
 other = "Initializing child project {{.ProjectName}}: {{.Path}}"
@@ -135,7 +135,7 @@ other = "Child project initialization check completed"
 other = "Failed to create prompt directory: {{.Path}}"
 
 [AgentProviderUnsupported]
-other = "Unsupported agent provider: {{.Provider}}"
+other = "Unsupported agent engine: {{.Provider}}"
 
 [AgentNotAvailable]
 other = "Agent {{.Agent}} is not available; check agent command configuration"
@@ -528,10 +528,10 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [GenerateLongDesc]
-other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read the project profile saved by learn current/profile refresh\n  • Select the provider-specific template directory from agent.provider\n  • Generate SKILL.md and references/ documentation\n  • Generate metadata such as agents/openai.yaml when the template provides it\n\nRun 'skills-seed learn current' or 'skills-seed profile refresh' before generating."
+other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read the project profile saved by learn current/profile refresh\n  • Select the target skills template from skills.target\n  • Use the CLI configured by agent.engine for summary merging and polishing\n  • Generate SKILL.md and references/ documentation\n  • Generate metadata such as agents/openai.yaml when the template provides it\n\nRun 'skills-seed learn current' or 'skills-seed profile refresh' before generating."
 
 [GenerateExample]
-other = "  # Generate to output.skills_paths for the current provider\n  skills-seed generate-skills\n\n  # Temporarily specify the output directory\n  skills-seed generate-skills --output .agents/skills/my-project\n\n  # Add guidance for this generate run\n  skills-seed generate-skills --context \"Preserve API compatibility constraints\""
+other = "  # Generate to skills.paths for the current skills.target\n  skills-seed generate-skills\n\n  # Temporarily specify the output directory\n  skills-seed generate-skills --output .agents/skills/my-project\n\n  # Add guidance for this generate run\n  skills-seed generate-skills --context \"Preserve API compatibility constraints\""
 
 [GenerateGenerating]
 other = "Generating AI Agent skills..."
@@ -823,7 +823,7 @@ other = "Generated skills for child project {{.ProjectName}}"
 other = "Child project {{.ProjectName}} has a manual SKILL.md; skipping overwrite: {{.Path}}"
 
 [GenerateWorkspaceChildNotInitialized]
-other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed init children"
+other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed add {{.ProjectName}}"
 
 [GenerateWorkspaceChildNotGitRepo]
 other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
@@ -832,7 +832,7 @@ other = "Child project {{.ProjectName}} is not an independent Git repository: {{
 other = "Child project {{.ProjectName}} must use project mode, current mode is {{.Mode}}"
 
 [GenerateFlagOutput]
-other = "Skills output directory (defaults to output.skills_paths for the current provider, such as .claude/skills/... or .agents/skills/...)"
+other = "Skills output directory (defaults to skills.paths for the current skills.target, such as .claude/skills/... or .agents/skills/...)"
 
 # 生成合并
 [GenerateFlagMerge]
@@ -910,7 +910,7 @@ other = "  # Show the current project profile summary\n  skills-seed profile sho
 other = "Re-analyze the project and save the project profile"
 
 [ProfileRefreshLongDesc]
-other = "Re-analyze the current project and overwrite the saved project profile without learning patterns.\n\nUse this when project structure, dependencies, or key modules changed but you do not need to re-learn code patterns. The CLI configured by agent.provider must be available."
+other = "Re-analyze the current project and overwrite the saved project profile without learning patterns.\n\nUse this when project structure, dependencies, or key modules changed but you do not need to re-learn code patterns. The CLI configured by agent.engine must be available."
 
 [ProfileRefreshExample]
 other = "  # Refresh the profile using the configured project language\n  skills-seed profile refresh\n\n  # Temporarily specify the language\n  skills-seed profile refresh --language go"
@@ -1735,7 +1735,7 @@ other = "Child project {{.ProjectName}} has no learnable file changes; skipped, 
 other = "Child project {{.ProjectName}} completed independent learning"
 
 [LearnWorkspaceChildNotInitialized]
-other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed init children; or set workspace.init_children: true and run again"
+other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed add {{.ProjectName}}"
 
 [LearnWorkspaceChildNotGitRepo]
 other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
@@ -1818,13 +1818,34 @@ other = "Initialization mode: project for a single project or workspace for a mu
 other = "Configuration file language: zh-CN or en-US; auto-detected when omitted"
 
 [InitFlagAgent]
-other = "Agent provider to write during initialization, for example claude or codex"
+other = "Agent engine to write during initialization, for example claude or codex"
 
 [InitFlagWorkspace]
 other = "Initialize as workspace mode, equivalent to --mode workspace"
 
-[InitFlagChildren]
-other = "After workspace initialization, initialize child projects from workspace.projects when .skills-seed is missing"
+[AddShort]
+other = "Add child projects to a workspace"
+
+[AddLongDesc]
+other = "Detect child projects under the workspace root, write selected projects to workspace.projects, and initialize their .skills-seed directories in project mode.\n\nUse . to add every currently detected child project. With arguments, each value may be a child project id or path. This command only works from a workspace-mode root repository."
+
+[AddExample]
+other = "  # Add and initialize every currently detected child project\n  skills-seed add .\n\n  # Add only specific child projects\n  skills-seed add backend frontend"
+
+[AddRequireWorkspaceMode]
+other = "add can only run in a workspace-mode root repository"
+
+[AddProjectsMissing]
+other = "No child projects were detected"
+
+[AddProjectNotFound]
+other = "Child project was not detected: {{.ProjectName}}"
+
+[AddTargetRequired]
+other = "Specify child projects to add, or use . to detect and add every child project"
+
+[AddComplete]
+other = "Child projects added"
 
 [ResetShort]
 other = "Back up and reset skills-seed initialization state"

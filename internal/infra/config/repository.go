@@ -24,7 +24,7 @@ type Config struct {
 	Agent     AgentConfig     `yaml:"agent"`
 	Learning  LearningConfig  `yaml:"learning"`
 	AutoFix   AutoFixConfig   `yaml:"autofix"`
-	Output    OutputConfig    `yaml:"output"`
+	Skills    SkillsConfig    `yaml:"skills"`
 	Logging   LoggingConfig   `yaml:"logging"`
 	Exclude   []string        `yaml:"exclude"` // 全局排除配置
 }
@@ -42,11 +42,10 @@ type ProjectConfig struct {
 
 // WorkspaceConfig 工作区配置
 type WorkspaceConfig struct {
-	InitChildren bool                     `yaml:"init_children"`
-	Projects     []WorkspaceProjectConfig `yaml:"projects"`
-	Shared       []WorkspacePathConfig    `yaml:"shared"`
-	Contracts    []WorkspacePathConfig    `yaml:"contracts"`
-	Infra        []WorkspacePathConfig    `yaml:"infra"`
+	Projects  []WorkspaceProjectConfig `yaml:"projects"`
+	Shared    []WorkspacePathConfig    `yaml:"shared"`
+	Contracts []WorkspacePathConfig    `yaml:"contracts"`
+	Infra     []WorkspacePathConfig    `yaml:"infra"`
 }
 
 // WorkspaceProjectConfig 工作区子项目配置
@@ -143,8 +142,8 @@ func (c *CodeGraphConfig) UnmarshalYAML(value *yaml.Node) error {
 
 // AgentConfig Agent 配置
 type AgentConfig struct {
-	Provider         string            `yaml:"provider"`           // Agent provider
-	Commands         map[string]string `yaml:"commands"`           // provider -> CLI 命令
+	Engine           string            `yaml:"engine"`             // Agent 引擎
+	Commands         map[string]string `yaml:"commands"`           // engine -> CLI 命令
 	Timeout          int               `yaml:"timeout"`            // 超时时间（秒）
 	AllowUserPlugins bool              `yaml:"allow_user_plugins"` // 是否加载用户插件
 	Parallelism      int               `yaml:"parallelism"`        // 并发 Agent 数，0 表示自动
@@ -169,21 +168,29 @@ type LoggingConfig struct {
 	MaxLogFiles int    `yaml:"max_log_files"` // 最大日志文件数量
 }
 
-// OutputConfig 输出配置
-type OutputConfig struct {
-	SkillsPaths map[string]string `yaml:"skills_paths"` // provider -> Skills 输出路径
+// SkillsConfig Skills 输出配置
+type SkillsConfig struct {
+	Target string            `yaml:"target"` // 目标 Agent Skills 类型
+	Paths  map[string]string `yaml:"paths"`  // target -> Skills 输出路径
 }
 
-// EffectiveSkillsPath 获取指定 provider 的 Skills 输出路径
-func EffectiveSkillsPath(provider string, output OutputConfig) string {
-	if provider != "" && output.SkillsPaths != nil {
-		return output.SkillsPaths[provider]
+func EffectiveSkillsTarget(agent AgentConfig, skills SkillsConfig) string {
+	if strings.TrimSpace(skills.Target) != "" {
+		return strings.TrimSpace(skills.Target)
+	}
+	return strings.TrimSpace(agent.Engine)
+}
+
+// EffectiveSkillsPath 获取指定 target 的 Skills 输出路径
+func EffectiveSkillsPath(target string, skills SkillsConfig) string {
+	if target != "" && skills.Paths != nil {
+		return skills.Paths[target]
 	}
 	return ""
 }
 
-func DefaultSkillsPathForProvider(provider string) string {
-	switch provider {
+func DefaultSkillsPathForTarget(target string) string {
+	switch target {
 	case "claude":
 		return ".claude/skills/skills-seed-skills"
 	case "codex":
@@ -342,7 +349,7 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	content = replaceYAMLValueInSection(content, "codegraph:", "max_code:", cfg.Analysis.CodeGraph.MaxCode)
 
 	// Agent 配置
-	content = replaceYAMLValueInSection(content, "agent:", "provider:", cfg.Agent.Provider)
+	content = replaceYAMLValueInSection(content, "agent:", "engine:", cfg.Agent.Engine)
 	content = replaceYAMLStringMapInSection(content, "agent:", "commands:", cfg.Agent.Commands)
 	content = replaceYAMLValueInSection(content, "agent:", "timeout:", cfg.Agent.Timeout)
 	content = replaceYAMLValueInSection(content, "agent:", "allow_user_plugins:", cfg.Agent.AllowUserPlugins)
@@ -356,8 +363,9 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	content = replaceYAMLValueInSection(content, "autofix:", "strategy:", cfg.AutoFix.Strategy)
 	content = replaceYAMLValueInSection(content, "autofix:", "backup_path:", cfg.AutoFix.BackupPath)
 
-	// 输出配置
-	content = replaceYAMLStringMapInSection(content, "output:", "skills_paths:", cfg.Output.SkillsPaths)
+	// Skills 配置
+	content = replaceYAMLValueInSection(content, "skills:", "target:", cfg.Skills.Target)
+	content = replaceYAMLStringMapInSection(content, "skills:", "paths:", cfg.Skills.Paths)
 
 	// 日志配置
 	content = replaceYAMLValueInSection(content, "logging:", "level:", cfg.Logging.Level)
@@ -659,11 +667,10 @@ type yamlLineComment struct {
 func workspaceKeyComments(lines []string) map[string]yamlLineComment {
 	comments := map[string]yamlLineComment{}
 	keys := map[string]string{
-		"init_children:": "init_children",
-		"projects:":      "projects",
-		"shared:":        "shared",
-		"contracts:":     "contracts",
-		"infra:":         "infra",
+		"projects:":  "projects",
+		"shared:":    "shared",
+		"contracts:": "contracts",
+		"infra:":     "infra",
 	}
 
 	for _, line := range lines {
@@ -688,7 +695,6 @@ func workspaceKeyComments(lines []string) map[string]yamlLineComment {
 
 func renderWorkspaceConfig(workspace WorkspaceConfig, comments map[string]yamlLineComment) []string {
 	lines := []string{"workspace:"}
-	lines = append(lines, appendYAMLLineComment(fmt.Sprintf("  init_children: %v", workspace.InitChildren), comments["init_children"]))
 	lines = append(lines, renderWorkspaceProjects(workspace.Projects, comments["projects"])...)
 	lines = append(lines, renderWorkspacePathList("shared", workspace.Shared, comments["shared"])...)
 	lines = append(lines, renderWorkspacePathList("contracts", workspace.Contracts, comments["contracts"])...)
@@ -799,20 +805,30 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 		cfg.Agent.Commands = map[string]string{}
 	}
 
-	if cfg.Agent.Provider == "" {
+	if cfg.Agent.Engine == "" {
 		if len(cfg.Agent.Commands) > 0 {
-			cfg.Agent.Provider = sortedStringKeys(cfg.Agent.Commands)[0]
+			cfg.Agent.Engine = sortedStringKeys(cfg.Agent.Commands)[0]
 		} else {
-			cfg.Agent.Provider = "claude"
+			cfg.Agent.Engine = "claude"
 		}
 	}
 
-	if cfg.Agent.Commands[cfg.Agent.Provider] == "" {
-		cfg.Agent.Commands[cfg.Agent.Provider] = cfg.Agent.Provider
+	if cfg.Agent.Commands[cfg.Agent.Engine] == "" {
+		cfg.Agent.Commands[cfg.Agent.Engine] = cfg.Agent.Engine
 	}
 
 	if cfg.Agent.Timeout == 0 {
 		cfg.Agent.Timeout = 1800
+	}
+
+	if strings.TrimSpace(cfg.Skills.Target) == "" {
+		cfg.Skills.Target = cfg.Agent.Engine
+	}
+	if cfg.Skills.Paths == nil {
+		cfg.Skills.Paths = map[string]string{}
+	}
+	if cfg.Skills.Paths[cfg.Skills.Target] == "" {
+		cfg.Skills.Paths[cfg.Skills.Target] = DefaultSkillsPathForTarget(cfg.Skills.Target)
 	}
 
 	if cfg.Project.Mode == "" {
@@ -822,8 +838,8 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 		cfg.Project.Mode = domain.ModeProject
 	}
 
-	if cfg.Output.SkillsPaths == nil {
-		cfg.Output.SkillsPaths = map[string]string{}
+	if cfg.Skills.Paths == nil {
+		cfg.Skills.Paths = map[string]string{}
 	}
 }
 
@@ -871,7 +887,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			Locale:        locale,
 		},
 		Agent: AgentConfig{
-			Provider: "agent",
+			Engine: "agent",
 			Commands: map[string]string{
 				"agent": "agent",
 			},
@@ -890,8 +906,9 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			Strategy:   "patch",
 			BackupPath: "backups",
 		},
-		Output: OutputConfig{
-			SkillsPaths: map[string]string{
+		Skills: SkillsConfig{
+			Target: "agent",
+			Paths: map[string]string{
 				"agent": ".skills/skills-seed-skills",
 			},
 		},
@@ -913,7 +930,7 @@ type Reader interface {
 	GetAgentConfig() AgentConfig
 	GetLearningConfig() LearningConfig
 	GetAutoFixConfig() AutoFixConfig
-	GetOutputConfig() OutputConfig
+	GetSkillsConfig() SkillsConfig
 	GetLoggingConfig() LoggingConfig
 	GetExclude() []string
 }
@@ -948,9 +965,9 @@ func (r *Repository) GetAutoFixConfig() AutoFixConfig {
 	return r.config.AutoFix
 }
 
-// GetOutputConfig 获取输出配置
-func (r *Repository) GetOutputConfig() OutputConfig {
-	return r.config.Output
+// GetSkillsConfig 获取 Skills 配置
+func (r *Repository) GetSkillsConfig() SkillsConfig {
+	return r.config.Skills
 }
 
 // GetLoggingConfig 获取日志配置
