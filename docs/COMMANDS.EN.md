@@ -52,14 +52,15 @@ Initialize `.skills-seed/`, default config, database, and prompt / skills templa
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed init` | Initialize the current repository | `skills-seed init --mode project --agent codex --locale en-US` | Must run from a Git repository root; existing `.skills-seed` is not overwritten |
+| `skills-seed init` | Initialize the current repository | `skills-seed init --mode project --agent codex --skills codex --locale en-US` | Must run from a Git repository root; existing `.skills-seed` is not overwritten |
 
 #### `init` Flags
 
 | Flag | Default | Description |
 |---|---:|---|
 | `--mode` | `project` | Initialization mode: `project` for a single project, `workspace` for a multi-project root |
-| `--agent` | `claude` | Agent engine to write during initialization, for example `claude` or `codex` |
+| `--agent` | `claude` | Execution Agent engine to write during initialization, for example `claude` or `codex` |
+| `--skills` | `claude` | Skills output type to write during initialization, for example `claude` or `codex` |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
 | `--locale`, `-l` | auto-detect | Config language: `zh-CN` or `en-US` |
 | `--help`, `-h` | `false` | Show `init` help |
@@ -68,19 +69,20 @@ Initialize `.skills-seed/`, default config, database, and prompt / skills templa
 
 ```bash
 skills-seed init --mode project --locale en-US
-skills-seed init --mode project --agent codex --locale en-US
+skills-seed init --mode project --agent claude --skills codex --locale en-US
 skills-seed init --mode workspace --locale en-US
 skills-seed init --workspace
-skills-seed init --workspace --agent codex
+skills-seed init --workspace --agent codex --skills codex
 ```
 
 #### Notes
 
 1. `--agent` sets `agent.engine` and ensures the engine exists in `agent.commands`.
-2. `--workspace` initializes the root and the child repositories detected at that time.
-3. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `skills.target`, and `skills.paths`.
-4. Already initialized children are skipped. If a child agent differs from the root, it is reported and preserved.
-5. A successful init prints the relative `.skills-seed` location and the README URL for the current version tag.
+2. `--skills` sets `skills.target` and ensures `skills.paths` contains the target's default output directory.
+3. `--workspace` initializes the root and the child repositories detected at that time.
+4. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `skills.target`, and `skills.paths`.
+5. Already initialized children are skipped. If a child agent differs from the root, it is reported and preserved.
+6. A successful init prints the relative `.skills-seed` location and the README URL for the current version tag.
 
 ### `skills-seed add`
 

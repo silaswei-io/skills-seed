@@ -138,6 +138,86 @@ func TestPrintConsoleLineAfterProgressPrintsImmediatelyWithoutActiveStep(t *test
 	}
 }
 
+func TestMultiTrackerRendersAggregateCountAndTaskLines(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := NewMulti([]string{"backend", "front"})
+		tracker.enabled = true
+		tracker.SetLabel("学习工作区子项目")
+		tracker.SetTaskTotal(5)
+
+		tracker.Start("backend", "分析当前代码库")
+		tracker.Start("front", "检测增量文件变化")
+
+		tracker.mu.Lock()
+		tracker.tasks["backend"].startedAt = time.Now().Add(-2 * time.Second)
+		tracker.tasks["front"].startedAt = time.Now().Add(-1 * time.Second)
+		tracker.mu.Unlock()
+
+		tracker.Render()
+		tracker.Complete("front", "完成")
+		tracker.Complete("backend", "完成")
+	})
+
+	if !strings.Contains(output, "backend") || !strings.Contains(output, "front") {
+		t.Fatalf("expected output to include both task lines, got %q", output)
+	}
+	if !strings.Contains(output, "分析当前代码库") || !strings.Contains(output, "检测增量文件变化") {
+		t.Fatalf("expected output to include each task status, got %q", output)
+	}
+	if !strings.Contains(output, "1/2 学习工作区子项目") || !strings.Contains(output, "2/2 学习工作区子项目") {
+		t.Fatalf("expected aggregate completion counters, got %q", output)
+	}
+	if strings.Contains(output, "0/2 | backend") || strings.Contains(output, "0/2 | front") {
+		t.Fatalf("expected task lines not to include aggregate counters, got %q", output)
+	}
+}
+
+func TestMultiTrackerRendersPerTaskStepCounts(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := NewMulti([]string{"backend"})
+		tracker.enabled = true
+		tracker.SetLabel("学习工作区子项目")
+		tracker.SetTaskTotal(5)
+
+		tracker.Start("backend", "准备项目上下文")
+		tracker.CompleteStep("backend", "准备项目上下文")
+		tracker.Start("backend", "检测增量文件变化")
+		tracker.CompleteStep("backend", "检测增量文件变化")
+		tracker.Start("backend", "分析当前代码库")
+	})
+
+	if !strings.Contains(output, "backend      3/5") {
+		t.Fatalf("expected child task line to include per-project step count, got %q", output)
+	}
+	if !strings.Contains(output, "分析当前代码库") {
+		t.Fatalf("expected child task line to include current step label, got %q", output)
+	}
+}
+
+func TestMultiTrackerFailMarksTaskAndFlushesPendingLines(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := NewMulti([]string{"backend", "front"})
+		tracker.enabled = true
+		tracker.SetLabel("学习工作区子项目")
+
+		tracker.Start("backend", "分析当前代码库")
+		tracker.Start("front", "分析并保存项目画像")
+		PrintConsoleLineAfterProgress("Token 消耗: 子项目 backend")
+		tracker.Complete("backend", "完成")
+		tracker.Fail("front", "失败")
+	})
+
+	if !strings.Contains(output, "front        失败") {
+		t.Fatalf("expected failed task line, got %q", output)
+	}
+	if !strings.Contains(output, "2/2 学习工作区子项目") {
+		t.Fatalf("expected aggregate progress to finish after failure, got %q", output)
+	}
+	if !strings.Contains(output, "Token 消耗: 子项目 backend") {
+		t.Fatalf("expected pending console lines to flush after failure, got %q", output)
+	}
+}
+
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 	resetConsoleState()

@@ -58,7 +58,7 @@ func TestRootHelpUsesConciseIntro(t *testing.T) {
 	require.Contains(t, helpText, "check")
 	require.Contains(t, helpText, "generate-skills")
 	require.Contains(t, helpText, "从代码库学习项目规范，并生成 AI Agent skills。")
-	require.Contains(t, helpText, "skills-seed init --mode project --agent codex --locale zh-CN")
+	require.Contains(t, helpText, "skills-seed init --mode project --agent codex --skills codex --locale zh-CN")
 	require.NotContains(t, helpText, "此工具可集成配置的 AI Agent")
 	require.NotContains(t, helpText, "初始化当前 Git 仓库")
 	require.NotContains(t, helpText, "学习当前代码并生成 skills")
@@ -81,6 +81,23 @@ func TestSubcommandHelpKeepsDetailedContent(t *testing.T) {
 	require.Contains(t, helpText, "Examples:")
 	require.Contains(t, helpText, "skills-seed learn current --focus internal/service --profile skip")
 	require.Contains(t, helpText, "--context string")
+}
+
+func TestRuntimeErrorsDoNotPrintUsage(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	rootCmd := createRootCmd()
+	registerCommands(rootCmd, nil)
+	rootCmd.SetArgs([]string{"learn", "current"})
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+	rootCmd.SetErr(&out)
+
+	require.Error(t, rootCmd.Execute())
+
+	output := out.String()
+	require.NotContains(t, output, "Usage:")
+	require.NotContains(t, output, "Flags:")
 }
 
 func requireHelpText(t *testing.T, fieldName, commandName, value string) {

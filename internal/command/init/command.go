@@ -24,6 +24,7 @@ var (
 	localeFlag    string // locale 参数
 	modeFlag      string // mode 参数
 	agentFlag     string // agent engine 参数
+	skillsFlag    string // skills target 参数
 	workspaceFlag bool   // workspace 快捷参数
 )
 
@@ -46,7 +47,7 @@ func Cmd() *cobra.Command {
 				effectiveMode = domain.ModeWorkspace
 			}
 
-			if err := initializeSkillWithWorkspaceChildren(localeFlag, effectiveMode, agentFlag); err != nil {
+			if err := initializeSkillWithWorkspaceChildren(localeFlag, effectiveMode, agentFlag, skillsFlag); err != nil {
 				// 错误信息直接输出（此时 logger 可能未初始化）
 				fmt.Fprintln(os.Stderr, i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 				os.Exit(1)
@@ -58,6 +59,7 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
 	initCmd.Flags().StringVar(&modeFlag, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	initCmd.Flags().StringVar(&agentFlag, "agent", "", i18n.Get("InitFlagAgent"))
+	initCmd.Flags().StringVar(&skillsFlag, "skills", "", i18n.Get("InitFlagSkills"))
 	initCmd.Flags().BoolVar(&workspaceFlag, "workspace", false, i18n.Get("InitFlagWorkspace"))
 
 	return initCmd
@@ -92,10 +94,10 @@ func ResetCmd() *cobra.Command {
 }
 
 func initializeSkill(locale, mode string) error {
-	return initializeSkillWithWorkspaceChildren(locale, mode, "")
+	return initializeSkillWithWorkspaceChildren(locale, mode, "", "")
 }
 
-func initializeSkillWithWorkspaceChildren(locale, mode, agentEngine string) error {
+func initializeSkillWithWorkspaceChildren(locale, mode, agentEngine, skillsTarget string) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -104,6 +106,7 @@ func initializeSkillWithWorkspaceChildren(locale, mode, agentEngine string) erro
 		initLogger:      true,
 		showUserSummary: true,
 		agentEngine:     agentEngine,
+		skillsTarget:    skillsTarget,
 	})
 }
 
@@ -112,6 +115,7 @@ type initializeSkillOptions struct {
 	showUserSummary bool
 	language        string
 	agentEngine     string
+	skillsTarget    string
 }
 
 func initializeSkillAt(projectRoot, locale, mode string) error {
@@ -253,6 +257,13 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 			return err
 		}
 	}
+	if opts.skillsTarget != "" {
+		cfg := configRepo.Get()
+		ensureSkillsTarget(cfg, opts.skillsTarget)
+		if err := configRepo.Update(cfg); err != nil {
+			return err
+		}
+	}
 
 	projectLanguage := configRepo.Get().Project.Language
 	if projectLanguage == "" {
@@ -311,6 +322,16 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 
 	initSucceeded = true
 	return nil
+}
+
+func ensureSkillsTarget(cfg *config.Config, target string) {
+	cfg.Skills.Target = target
+	if cfg.Skills.Paths == nil {
+		cfg.Skills.Paths = map[string]string{}
+	}
+	if cfg.Skills.Paths[target] == "" {
+		cfg.Skills.Paths[target] = config.DefaultSkillsPathForTarget(target)
+	}
 }
 
 func relativeSeedPath(projectRoot, seedPath string) string {

@@ -44,6 +44,8 @@ var (
 	contextFile            string
 )
 
+var sleepAfterWorkspaceChildStep = time.Sleep
+
 // Cmd 返回 learn 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	learnCmd := &cobra.Command{
@@ -137,6 +139,8 @@ type learnCurrentProjectOptions struct {
 	showProgress     bool
 	showDetailedLogs bool
 	userContext      string
+	onStepStart      func(label string)
+	onStepComplete   func(label string)
 }
 
 type learnCurrentProjectResult struct {
@@ -162,10 +166,20 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	startedAt := time.Now()
 	tracker := progress.New(5)
 	runStep := func(label string, fn func() error) error {
-		if opts.showProgress {
-			return tracker.RunStep(label, fn)
+		if opts.onStepStart != nil {
+			opts.onStepStart(label)
 		}
-		return fn()
+		if opts.showProgress {
+			if err := tracker.RunStep(label, fn); err != nil {
+				return err
+			}
+		} else if err := fn(); err != nil {
+			return err
+		}
+		if opts.onStepComplete != nil {
+			opts.onStepComplete(label)
+		}
+		return nil
 	}
 
 	var projectRoot string
@@ -555,56 +569,85 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
 	showChildDetails := parallelism == 1
 	var consoleMu sync.Mutex
+	var multiTracker *progress.MultiTracker
+	if !showChildDetails {
+		multiTracker = progress.NewMulti(workspaceProjectProgressNames(workspaceConfig.Projects))
+		multiTracker.SetLabel(i18n.Get("ProgressLearnWorkspaceProjects"))
+		multiTracker.SetTaskTotal(5)
+	}
 	logger.Info(i18n.GetWithParams("LearnWorkspaceStart", map[string]interface{}{
 		"Projects":    len(workspaceConfig.Projects),
 		"Parallelism": parallelism,
 	}), "projects", len(workspaceConfig.Projects), "parallelism", parallelism)
 
-	err = workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
-		projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
-		if showChildDetails {
-			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectInfo", map[string]interface{}{
-				"ProjectRoot": projectRootPath,
-				"ProjectName": project.ID,
-				"Language":    project.Language,
-				"Path":        project.Path,
-			}))
-		} else {
-			consoleMu.Lock()
-			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectStarted", map[string]interface{}{"ProjectName": project.ID}))
-			consoleMu.Unlock()
-		}
-		childCont, err := commandutil.OpenWorkspaceChildContainer(ctx, projectRootPath, project, commandutil.WorkspaceChildErrorKeys{
-			NotInitialized: "LearnWorkspaceChildNotInitialized",
-			NotGitRepo:     "LearnWorkspaceChildNotGitRepo",
-			ModeInvalid:    "LearnWorkspaceChildModeInvalid",
-		})
-		if err != nil {
-			return err
-		}
-		defer childCont.Close()
+	runProjects := func() error {
+		return workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
+			projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
+			childCont, err := commandutil.OpenWorkspaceChildContainer(ctx, projectRootPath, project, commandutil.WorkspaceChildErrorKeys{
+				NotInitialized: "LearnWorkspaceChildNotInitialized",
+				NotGitRepo:     "LearnWorkspaceChildNotGitRepo",
+				ModeInvalid:    "LearnWorkspaceChildModeInvalid",
+			})
+			if err != nil {
+				return err
+			}
+			defer childCont.Close()
 
-		scope := project.ID
-		if scope == "" {
-			scope = project.Path
-		}
-		result, err := runLearnCurrentProjectWithOptions(childCont, learnCurrentProjectOptions{
-			tokenScope:       scope,
-			showProgress:     showChildDetails,
-			showDetailedLogs: showChildDetails,
+			consoleMu.Lock()
+			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectStarted", map[string]interface{}{
+				"ProjectName": project.ID,
+				"LogPath":     workspaceProjectLogDir(childCont),
+			}))
+			consoleMu.Unlock()
+
+			scope := project.ID
+			if scope == "" {
+				scope = project.Path
+			}
+			progressName := workspaceProjectProgressName(project)
+			var childLogPath string
+			stepStartedAt := time.Now()
+			result, err := runLearnWorkspaceChildProject(ctx, childCont, scope, showChildDetails, func(label string) {
+				if multiTracker != nil {
+					stepStartedAt = time.Now()
+					multiTracker.Start(progressName, label)
+				}
+			}, func(label string) {
+				if multiTracker != nil {
+					multiTracker.CompleteStep(progressName, label)
+					pauseAfterFastWorkspaceChildStep(stepStartedAt)
+				}
+			}, &childLogPath)
+			if err != nil {
+				if multiTracker != nil {
+					multiTracker.Fail(progressName, i18n.Get("LearnWorkspaceProjectProgressFailed"))
+				}
+				return err
+			}
+			if multiTracker != nil {
+				multiTracker.Complete(progressName, i18n.GetWithParams("LearnWorkspaceProjectProgressComplete", map[string]interface{}{
+					"Patterns": result.patternsCount,
+					"Saved":    result.savedCount,
+				}))
+			}
+			consoleMu.Lock()
+			if !showChildDetails {
+				logLearnWorkspaceProjectSummary(project.ID, result)
+			}
+			agent.FlushTokenUsageScope(result.tokenContext)
+			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectDelegated", map[string]interface{}{
+				"ProjectName": project.ID,
+				"LogPath":     childLogPath,
+			}))
+			consoleMu.Unlock()
+			return nil
 		})
-		if err != nil {
-			return err
-		}
-		consoleMu.Lock()
-		if !showChildDetails {
-			logLearnWorkspaceProjectSummary(project.ID, result)
-		}
-		agent.FlushTokenUsageScope(result.tokenContext)
-		logger.Info(i18n.GetWithParams("LearnWorkspaceProjectDelegated", map[string]interface{}{"ProjectName": project.ID}))
-		consoleMu.Unlock()
-		return nil
-	})
+	}
+	if showChildDetails {
+		err = runProjects()
+	} else {
+		err = runProjects()
+	}
 	if err != nil {
 		return err
 	}
@@ -624,6 +667,55 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 		"projects_count", len(workspaceConfig.Projects),
 	)
 	return nil
+}
+
+func workspaceProjectProgressNames(projects []config.WorkspaceProjectConfig) []string {
+	names := make([]string, 0, len(projects))
+	for _, project := range projects {
+		names = append(names, workspaceProjectProgressName(project))
+	}
+	return names
+}
+
+func workspaceProjectProgressName(project config.WorkspaceProjectConfig) string {
+	if project.ID != "" {
+		return project.ID
+	}
+	return project.Path
+}
+
+func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepComplete func(label string), logPath *string) (*learnCurrentProjectResult, error) {
+	loggingConfig := childCont.ConfigRepo.GetLoggingConfig()
+	logDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
+	logLevel := logger.ParseLevel(loggingConfig.Level)
+
+	var result *learnCurrentProjectResult
+	err := logger.WithScopedLog(ctx, logDir, "learn", logLevel, loggingConfig.MaxLogFiles, func(scopedCtx context.Context, scopedLogPath string) error {
+		if logPath != nil {
+			*logPath = scopedLogPath
+		}
+		var err error
+		result, err = runLearnCurrentProjectWithOptions(childCont, learnCurrentProjectOptions{
+			tokenScope:       scope,
+			showProgress:     showDetails,
+			showDetailedLogs: showDetails,
+			onStepStart:      onStepStart,
+			onStepComplete:   onStepComplete,
+		})
+		return err
+	})
+	return result, err
+}
+
+func workspaceProjectLogDir(cont *container.Container) string {
+	loggingConfig := cont.ConfigRepo.GetLoggingConfig()
+	return filepath.Join(cont.SeedPath, loggingConfig.LogsPath)
+}
+
+func pauseAfterFastWorkspaceChildStep(startedAt time.Time) {
+	if time.Since(startedAt) < time.Second {
+		sleepAfterWorkspaceChildStep(time.Second)
+	}
 }
 
 func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) error {

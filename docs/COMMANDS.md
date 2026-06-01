@@ -52,14 +52,15 @@ skills-templates-sha256: <hash>
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed init` | 初始化当前仓库 | `skills-seed init --mode project --agent codex --locale zh-CN` | 必须在 Git 仓库根目录执行；已存在 `.skills-seed` 时不覆盖 |
+| `skills-seed init` | 初始化当前仓库 | `skills-seed init --mode project --agent codex --skills codex --locale zh-CN` | 必须在 Git 仓库根目录执行；已存在 `.skills-seed` 时不覆盖 |
 
 #### `init` 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--mode` | `project` | 初始化模式：`project` 单项目，`workspace` 多子项目根仓 |
-| `--agent` | `claude` | 初始化时写入的 Agent engine，例如 `claude` 或 `codex` |
+| `--agent` | `claude` | 初始化时写入的执行 Agent engine，例如 `claude` 或 `codex` |
+| `--skills` | `claude` | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex` |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
 | `--locale`, `-l` | 自动检测 | 配置文件语言：`zh-CN` 或 `en-US` |
 | `--help`, `-h` | `false` | 查看 `init` 帮助 |
@@ -68,19 +69,20 @@ skills-templates-sha256: <hash>
 
 ```bash
 skills-seed init --mode project --locale zh-CN
-skills-seed init --mode project --agent codex --locale zh-CN
+skills-seed init --mode project --agent claude --skills codex --locale zh-CN
 skills-seed init --mode workspace --locale zh-CN
 skills-seed init --workspace
-skills-seed init --workspace --agent codex
+skills-seed init --workspace --agent codex --skills codex
 ```
 
 #### 注意事项
 
 1. `--agent` 会设置 `agent.engine`，并确保 `agent.commands` 中存在对应 engine。
-2. `--workspace` 会初始化根仓，并同步初始化当前检测到的子仓。
-3. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands` 和 `skills.target`、`skills.paths`。
-4. 已初始化的子仓会跳过；如果子仓 agent 与根仓不同，只提示，不覆盖。
-5. 初始化成功后会输出相对 `.skills-seed` 位置和当前版本 tag 对应的 README 文档地址。
+2. `--skills` 会设置 `skills.target`，并确保 `skills.paths` 中存在对应 target 的默认输出目录。
+3. `--workspace` 会初始化根仓，并同步初始化当前检测到的子仓。
+4. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands` 和 `skills.target`、`skills.paths`。
+5. 已初始化的子仓会跳过；如果子仓 agent 与根仓不同，只提示，不覆盖。
+6. 初始化成功后会输出相对 `.skills-seed` 位置和当前版本 tag 对应的 README 文档地址。
 
 ### `skills-seed add`
 

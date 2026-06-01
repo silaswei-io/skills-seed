@@ -120,11 +120,12 @@ func createRootCmd() *cobra.Command {
 	skillsTemplatesHash := metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS))
 
 	cmd := &cobra.Command{
-		Use:     "skills-seed",
-		Short:   i18n.Get("RootShort"),
-		Long:    i18n.Get("RootLong"),
-		Example: i18n.Get("RootExample"),
-		Version: metadata.ProgramVersion,
+		Use:          "skills-seed",
+		Short:        i18n.Get("RootShort"),
+		Long:         i18n.Get("RootLong"),
+		Example:      i18n.Get("RootExample"),
+		Version:      metadata.ProgramVersion,
+		SilenceUsage: true,
 	}
 	cmd.SetVersionTemplate("{{.Name}} version {{.Version}}\nprompt-templates-sha256: " + promptTemplatesHash + "\nskills-templates-sha256: " + skillsTemplatesHash + "\n")
 	return cmd

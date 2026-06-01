@@ -8,13 +8,13 @@ other = "Growing project skills for AI agents"
 other = "Learn project conventions from a codebase and generate AI Agent skills."
 
 [RootExample]
-other = "  skills-seed init --mode project --agent codex --locale en-US\n  skills-seed init --workspace --agent codex --locale en-US\n  skills-seed add ."
+other = "  skills-seed init --mode project --agent codex --skills codex --locale en-US\n  skills-seed init --workspace --agent codex --skills codex --locale en-US\n  skills-seed add ."
 
 [InitLongDesc]
 other = "Initialize skills-seed in your project.\n\nThis command will:\n  • Create .skills-seed/ directory\n  • Generate default configuration (config.yaml)\n  • Initialize BoltDB database\n  • Prepare cross-agent compatible prompt and skills templates\n\nPlease run this command in the root directory of a Git repository."
 
 [InitExample]
-other = "  # Initialize a single-project repository with an Agent\n  skills-seed init --mode project --agent codex --locale en-US\n\n  # Initialize a workspace root and currently detected child projects\n  skills-seed init --workspace --agent codex --locale en-US"
+other = "  # Initialize a single-project repository with an execution Agent and skills output type\n  skills-seed init --mode project --agent codex --skills codex --locale en-US\n\n  # Initialize a workspace root and currently detected child projects\n  skills-seed init --workspace --agent codex --skills codex --locale en-US"
 
 [InitStart]
 other = "Initialize skills-seed"
@@ -763,6 +763,9 @@ other = "Analyzing and saving project profile"
 
 [ProgressLearnCurrentSkipProfile]
 other = "Skipping project profile refresh"
+
+[ProgressLearnWorkspaceProjects]
+other = "Learning workspace child projects"
 
 [ProgressLearnHistoryBatch]
 other = "Analyzing batch {{.Current}}/{{.Total}} (commits {{.Start}}-{{.End}}/{{.CommitTotal}})"
@@ -1723,7 +1726,7 @@ other = "Starting workspace project learning: {{.Projects}} projects, parallelis
 other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}\nChild project path: {{.Path}}"
 
 [LearnWorkspaceProjectStarted]
-other = "Starting child project {{.ProjectName}}"
+other = "Learning child project {{.ProjectName}}; logs are kept in {{.LogPath}}"
 
 [LearnWorkspaceProjectSummary]
 other = "Child project {{.ProjectName}} learning completed: changed {{.Changed}}, deleted {{.Deleted}}, excluded {{.Skipped}}, patterns {{.Patterns}}, saved {{.Saved}}, duration {{.Duration}}"
@@ -1732,7 +1735,13 @@ other = "Child project {{.ProjectName}} learning completed: changed {{.Changed}}
 other = "Child project {{.ProjectName}} has no learnable file changes; skipped, duration {{.Duration}}"
 
 [LearnWorkspaceProjectDelegated]
-other = "Child project {{.ProjectName}} completed independent learning"
+other = "Child project {{.ProjectName}} completed independent learning; logs are kept in {{.LogPath}}"
+
+[LearnWorkspaceProjectProgressComplete]
+other = "completed, patterns {{.Patterns}}, saved {{.Saved}}"
+
+[LearnWorkspaceProjectProgressFailed]
+other = "failed"
 
 [LearnWorkspaceChildNotInitialized]
 other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed add {{.ProjectName}}"
@@ -1819,6 +1828,9 @@ other = "Configuration file language: zh-CN or en-US; auto-detected when omitted
 
 [InitFlagAgent]
 other = "Agent engine to write during initialization, for example claude or codex"
+
+[InitFlagSkills]
+other = "Skills output type to write during initialization, for example claude or codex"
 
 [InitFlagWorkspace]
 other = "Initialize as workspace mode, equivalent to --mode workspace"

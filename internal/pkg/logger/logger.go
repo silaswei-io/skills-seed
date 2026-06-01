@@ -1,12 +1,16 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -15,12 +19,21 @@ import (
 )
 
 var (
+	mu         sync.Mutex
+	logger     *slog.Logger
+	file       *os.File
+	logPath    string
+	logLevel   Level
+	startedAt  time.Time
+	scopedLogs = map[uint64]*scopedLog{}
+)
+
+type scopedLog struct {
 	logger    *slog.Logger
 	file      *os.File
 	logPath   string
-	logLevel  Level
 	startedAt time.Time
-)
+}
 
 // Level 表示日志级别
 type Level = slog.Level
@@ -62,6 +75,9 @@ func Init(logDir string, commandName string, level Level) error {
 
 // InitWithRetention 初始化日志记录器，并在配置保留数量时清理旧日志文件
 func InitWithRetention(logDir string, commandName string, level Level, maxLogFiles int) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if file != nil {
 		_ = file.Close()
 		file = nil
@@ -98,7 +114,7 @@ func InitWithRetention(logDir string, commandName string, level Level, maxLogFil
 	// 创建只写入文件的日志记录器
 	logger = slog.New(fileHandler)
 
-	Diagnostic(i18n.Get("LoggerRuntimeInitialized"),
+	writeDiagnosticLocked(i18n.Get("LoggerRuntimeInitialized"),
 		"command", commandName,
 		"log_path", logPath,
 		"level", level.String(),
@@ -108,13 +124,16 @@ func InitWithRetention(logDir string, commandName string, level Level, maxLogFil
 		"cwd", currentWorkingDir(),
 	)
 
-	return cleanupOldLogFiles(logDir, maxLogFiles)
+	return cleanupOldLogFiles(logDir, maxLogFiles, logPath)
 }
 
 // Close 关闭日志文件
 func Close() error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if file != nil {
-		Diagnostic(i18n.Get("LoggerRuntimeClosing"),
+		writeDiagnosticLocked(i18n.Get("LoggerRuntimeClosing"),
 			"log_path", logPath,
 			"uptime", time.Since(startedAt),
 		)
@@ -128,8 +147,7 @@ func Close() error {
 
 // Debug 记录调试信息，只写文件，不输出控制台
 func Debug(msg string, args ...any) {
-	// 只写入日志文件
-	if logger != nil {
+	if logger := currentLogger(); logger != nil {
 		logger.Debug(msg, args...)
 	}
 }
@@ -137,7 +155,7 @@ func Debug(msg string, args ...any) {
 // Diagnostic 记录关键诊断信息，只写日志文件，不输出到终端
 // 用于阶段边界、耗时、提示词和代理尺寸等排障信息，避免终端被调试日志刷屏
 func Diagnostic(msg string, args ...any) {
-	if logger != nil {
+	if logger := currentLogger(); logger != nil {
 		logger.Info(msg, args...)
 	}
 }
@@ -148,7 +166,7 @@ func Info(msg string, args ...any) {
 	progress.PrintConsoleLine(colorize(msg, colors.White))
 
 	// 写入日志文件（详细信息）
-	if logger != nil {
+	if logger := currentLogger(); logger != nil {
 		logger.Info(msg, args...)
 	}
 }
@@ -157,7 +175,7 @@ func Info(msg string, args ...any) {
 func InfoAfterProgress(msg string, args ...any) {
 	progress.PrintConsoleLineAfterProgress(colorize(msg, colors.White))
 
-	if logger != nil {
+	if logger := currentLogger(); logger != nil {
 		logger.Info(msg, args...)
 	}
 }
@@ -168,7 +186,7 @@ func Warn(msg string, args ...any) {
 	progress.PrintConsoleLine(colorize(msg, colors.Yellow))
 
 	// 写入日志文件（详细信息）
-	if logger != nil {
+	if logger := currentLogger(); logger != nil {
 		logger.Warn(msg, args...)
 	}
 }
@@ -179,14 +197,14 @@ func Error(msg string, args ...any) {
 	progress.PrintConsoleLineNow(colorize(msg, colors.Red))
 
 	// 写入日志文件（详细信息）
-	if logger != nil {
+	if logger := currentLogger(); logger != nil {
 		logger.Error(msg, args...)
 	}
 }
 
 // With 返回带有上下文字段的日志记录器
 func With(args ...any) *slog.Logger {
-	if logger != nil {
+	if logger := currentLogger(); logger != nil {
 		return logger.With(args...)
 	}
 	return nil
@@ -194,12 +212,62 @@ func With(args ...any) *slog.Logger {
 
 // CurrentLogPath 返回当前日志路径
 func CurrentLogPath() string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return logPath
 }
 
 // CurrentLevel 返回当前日志级别
 func CurrentLevel() Level {
+	mu.Lock()
+	defer mu.Unlock()
+
 	return logLevel
+}
+
+// WithScopedLog runs fn with file logs from the current goroutine routed to a
+// separate log file. Console output is unchanged.
+func WithScopedLog(ctx context.Context, logDir string, commandName string, level Level, maxLogFiles int, fn func(context.Context, string) error) error {
+	gid := currentGoroutineID()
+	if gid == 0 {
+		return fn(ctx, "")
+	}
+
+	scope, err := openScopedLog(logDir, commandName, level)
+	if err != nil {
+		return err
+	}
+	if err := registerScopedLog(gid, scope); err != nil {
+		_ = scope.file.Close()
+		return err
+	}
+	if err := cleanupOldLogFiles(logDir, maxLogFiles, scope.logPath); err != nil {
+		unregisterScopedLog(gid, scope)
+		_ = scope.file.Close()
+		return err
+	}
+
+	scope.logger.Info(i18n.Get("LoggerRuntimeInitialized"),
+		"command", commandName,
+		"log_path", scope.logPath,
+		"level", level.String(),
+		"pid", os.Getpid(),
+		"go_version", runtime.Version(),
+		"args", os.Args,
+		"cwd", currentWorkingDir(),
+	)
+
+	err = fn(ctx, scope.logPath)
+	scope.logger.Info(i18n.Get("LoggerRuntimeClosing"),
+		"log_path", scope.logPath,
+		"uptime", time.Since(scope.startedAt),
+	)
+	unregisterScopedLog(gid, scope)
+	if closeErr := scope.file.Close(); err == nil {
+		err = closeErr
+	}
+	return err
 }
 
 // 添加颜色
@@ -215,7 +283,81 @@ func currentWorkingDir() string {
 	return cwd
 }
 
-func cleanupOldLogFiles(logDir string, maxLogFiles int) error {
+func currentLogger() *slog.Logger {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if scoped := scopedLogs[currentGoroutineID()]; scoped != nil {
+		return scoped.logger
+	}
+	return logger
+}
+
+func writeDiagnosticLocked(msg string, args ...any) {
+	if logger != nil {
+		logger.Info(msg, args...)
+	}
+}
+
+func openScopedLog(logDir string, commandName string, level Level) (*scopedLog, error) {
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return nil, err
+	}
+
+	timestamp := time.Now().Format("20060102-150405")
+	logFileName := fmt.Sprintf("%s-%s.log", commandName, timestamp)
+	path := filepath.Join(logDir, logFileName)
+	logFile, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	return &scopedLog{
+		logger: slog.New(slog.NewJSONHandler(logFile, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     level,
+		})),
+		file:      logFile,
+		logPath:   filepath.Clean(path),
+		startedAt: time.Now(),
+	}, nil
+}
+
+func registerScopedLog(gid uint64, scope *scopedLog) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if scopedLogs[gid] != nil {
+		return fmt.Errorf("logger scoped log already registered for goroutine %d", gid)
+	}
+	scopedLogs[gid] = scope
+	return nil
+}
+
+func unregisterScopedLog(gid uint64, scope *scopedLog) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if scopedLogs[gid] == scope {
+		delete(scopedLogs, gid)
+	}
+}
+
+func currentGoroutineID() uint64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	fields := strings.Fields(string(buf[:n]))
+	if len(fields) < 2 || fields[0] != "goroutine" {
+		return 0
+	}
+	id, err := strconv.ParseUint(fields[1], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+func cleanupOldLogFiles(logDir string, maxLogFiles int, protectedPaths ...string) error {
 	if maxLogFiles <= 0 {
 		return nil
 	}
@@ -248,8 +390,15 @@ func cleanupOldLogFiles(logDir string, maxLogFiles int) error {
 		return files[i].modTime.After(files[j].modTime)
 	})
 
+	protected := make(map[string]struct{}, len(protectedPaths))
+	for _, path := range protectedPaths {
+		if path != "" {
+			protected[filepath.Clean(path)] = struct{}{}
+		}
+	}
+
 	for _, old := range files[maxLogFiles:] {
-		if filepath.Clean(old.path) == logPath {
+		if _, ok := protected[filepath.Clean(old.path)]; ok {
 			continue
 		}
 		if err := os.Remove(old.path); err != nil {

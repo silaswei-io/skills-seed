@@ -65,6 +65,42 @@ func TestInitializeProjectWithAgentSetsEngine(t *testing.T) {
 	require.Equal(t, "codex", configRepo.GetAgentConfig().Engine)
 }
 
+func TestInitializeProjectWithSkillsSetsTarget(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+		skillsTarget:    "codex",
+	}))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeProject, configRepo.GetProjectConfig().Mode)
+	require.Equal(t, "claude", configRepo.GetAgentConfig().Engine)
+	require.Equal(t, "codex", configRepo.GetSkillsConfig().Target)
+	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
+}
+
+func TestInitializeProjectWithAgentAndSkillsCanDiffer(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+		agentEngine:     "claude",
+		skillsTarget:    "codex",
+	}))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "claude", configRepo.GetAgentConfig().Engine)
+	require.Equal(t, "codex", configRepo.GetSkillsConfig().Target)
+	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
+}
+
 func TestInitializeProjectSummaryUsesRelativeSeedPathAndDocumentationLink(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)
@@ -109,6 +145,36 @@ func TestInitializeWorkspaceInitializesChildProjectsWithRootAgent(t *testing.T) 
 	require.Equal(t, "go", childConfig.GetProjectConfig().Language)
 	require.Equal(t, childRoot, childConfig.GetProjectConfig().RootPath)
 	require.Equal(t, "codex", childConfig.GetAgentConfig().Engine)
+}
+
+func TestInitializeWorkspaceInitializesChildProjectsWithRootSkills(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	initGitDir(t, workspaceRoot)
+	childRoot := filepath.Join(workspaceRoot, "backend")
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "go.mod"), []byte("module backend\n"), 0644))
+	initGitDir(t, childRoot)
+
+	require.NoError(t, initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+		agentEngine:     "claude",
+		skillsTarget:    "codex",
+	}))
+
+	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeWorkspace, rootConfig.GetProjectConfig().Mode)
+	require.Equal(t, "claude", rootConfig.GetAgentConfig().Engine)
+	require.Equal(t, "codex", rootConfig.GetSkillsConfig().Target)
+	require.Equal(t, ".agents/skills/skills-seed-skills", rootConfig.GetSkillsConfig().Paths["codex"])
+
+	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, domain.ModeProject, childConfig.GetProjectConfig().Mode)
+	require.Equal(t, "claude", childConfig.GetAgentConfig().Engine)
+	require.Equal(t, "codex", childConfig.GetSkillsConfig().Target)
+	require.Equal(t, ".agents/skills/skills-seed-skills", childConfig.GetSkillsConfig().Paths["codex"])
 }
 
 func TestInitializeWorkspaceRemovesRootSeedWhenChildInitializationFails(t *testing.T) {

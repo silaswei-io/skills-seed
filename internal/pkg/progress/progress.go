@@ -37,6 +37,30 @@ type Tracker struct {
 	stopped   chan struct{}
 }
 
+type MultiTracker struct {
+	mu        sync.Mutex
+	label     string
+	tasks     map[string]*multiTask
+	order     []string
+	width     int
+	taskTotal int
+	enabled   bool
+	lines     int
+	stop      chan struct{}
+	stopped   chan struct{}
+}
+
+type multiTask struct {
+	name      string
+	label     string
+	frame     int
+	doneSteps int
+	startedAt time.Time
+	elapsed   time.Duration
+	done      bool
+	active    bool
+}
+
 // New 创建指定总步骤数的进度跟踪器
 func New(total int) *Tracker {
 	if total <= 0 {
@@ -46,6 +70,317 @@ func New(total int) *Tracker {
 		total:   total,
 		width:   28,
 		enabled: isTerminal(os.Stdout),
+	}
+}
+
+func NewMulti(names []string) *MultiTracker {
+	tracker := &MultiTracker{
+		tasks:   make(map[string]*multiTask, len(names)),
+		order:   append([]string(nil), names...),
+		width:   28,
+		enabled: isTerminal(os.Stdout),
+	}
+	for _, name := range names {
+		tracker.tasks[name] = &multiTask{name: name}
+	}
+	return tracker
+}
+
+func (t *MultiTracker) SetLabel(label string) {
+	t.mu.Lock()
+	t.label = label
+	t.mu.Unlock()
+}
+
+func (t *MultiTracker) SetTaskTotal(total int) {
+	if total < 0 {
+		total = 0
+	}
+	t.mu.Lock()
+	t.taskTotal = total
+	t.mu.Unlock()
+}
+
+func (t *MultiTracker) Start(name, label string) {
+	t.mu.Lock()
+	task := t.ensureTaskLocked(name)
+	task.label = label
+	task.frame = 0
+	if task.startedAt.IsZero() || task.done {
+		task.startedAt = time.Now()
+		task.elapsed = 0
+	}
+	task.done = false
+	task.active = true
+	shouldStartTicker := t.enabled && t.stop == nil
+	if shouldStartTicker {
+		t.stop = make(chan struct{})
+		t.stopped = make(chan struct{})
+	}
+	lines := t.renderLinesLocked()
+	t.mu.Unlock()
+
+	if !t.enabled {
+		printMultiLines(lines)
+		return
+	}
+	if shouldStartTicker {
+		go t.tick(t.stop, t.stopped)
+	}
+	t.Render()
+}
+
+func (t *MultiTracker) CompleteStep(name, label string) {
+	t.mu.Lock()
+	task := t.ensureTaskLocked(name)
+	task.label = label
+	if task.doneSteps < t.taskTotal || t.taskTotal <= 0 {
+		task.doneSteps++
+	}
+	if task.startedAt.IsZero() {
+		task.startedAt = time.Now()
+	}
+	task.elapsed = time.Since(task.startedAt).Truncate(time.Second)
+	task.active = false
+	lines := t.renderLinesLocked()
+	t.mu.Unlock()
+
+	if !t.enabled {
+		printMultiLines(lines)
+		return
+	}
+	t.Render()
+}
+
+func (t *MultiTracker) Update(name, label string) {
+	t.mu.Lock()
+	task := t.ensureTaskLocked(name)
+	task.label = label
+	if !task.active && !task.done {
+		task.startedAt = time.Now()
+		task.active = true
+	}
+	lines := t.renderLinesLocked()
+	t.mu.Unlock()
+
+	if !t.enabled {
+		printMultiLines(lines)
+		return
+	}
+	t.Render()
+}
+
+func (t *MultiTracker) Complete(name, label string) {
+	t.mu.Lock()
+	task := t.ensureTaskLocked(name)
+	task.label = label
+	if task.startedAt.IsZero() {
+		task.startedAt = time.Now()
+	}
+	if t.taskTotal > 0 {
+		task.doneSteps = t.taskTotal
+	}
+	task.elapsed = time.Since(task.startedAt).Truncate(time.Second)
+	task.done = true
+	task.active = false
+	lines := t.renderLinesLocked()
+	allDone := t.allDoneLocked()
+	stop := t.stop
+	stopped := t.stopped
+	if allDone {
+		t.stop = nil
+		t.stopped = nil
+	}
+	t.mu.Unlock()
+
+	if !t.enabled {
+		printMultiLines(lines)
+		return
+	}
+	t.Render()
+	if allDone && stop != nil {
+		close(stop)
+		<-stopped
+		t.finish()
+	}
+}
+
+func (t *MultiTracker) Fail(name, label string) {
+	t.Complete(name, label)
+}
+
+func (t *MultiTracker) Render() {
+	if !t.enabled {
+		return
+	}
+
+	t.mu.Lock()
+	lines := t.renderLinesLocked()
+	previousLines := t.lines
+	t.lines = len(lines)
+	t.mu.Unlock()
+
+	consoleMu.Lock()
+	defer consoleMu.Unlock()
+
+	if previousLines > 0 {
+		fmt.Fprintf(os.Stdout, "\033[%dF", previousLines)
+	}
+	for i, line := range lines {
+		if i > 0 {
+			fmt.Fprint(os.Stdout, "\n")
+		}
+		fmt.Fprintf(os.Stdout, "\r\033[2K%s", line)
+	}
+	if len(lines) > 0 {
+		fmt.Fprint(os.Stdout, "\n")
+	}
+	progressActive = true
+	progressLineOpen = true
+}
+
+func (t *MultiTracker) tick(stop <-chan struct{}, stopped chan<- struct{}) {
+	defer close(stopped)
+
+	ticker := time.NewTicker(120 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			t.mu.Lock()
+			for _, task := range t.tasks {
+				if task.active {
+					task.frame++
+				}
+			}
+			t.mu.Unlock()
+			t.Render()
+		}
+	}
+}
+
+func (t *MultiTracker) finish() {
+	consoleMu.Lock()
+	defer consoleMu.Unlock()
+
+	progressActive = false
+	progressLineOpen = false
+	flushPendingConsoleLinesLocked()
+}
+
+func (t *MultiTracker) ensureTaskLocked(name string) *multiTask {
+	if task := t.tasks[name]; task != nil {
+		return task
+	}
+	task := &multiTask{name: name}
+	t.tasks[name] = task
+	t.order = append(t.order, name)
+	return task
+}
+
+func (t *MultiTracker) renderLinesLocked() []string {
+	lines := make([]string, 0, len(t.order)+1)
+	done := t.doneCountLocked()
+	total := len(t.order)
+	lines = append(lines, formatMultiSummaryLine(t.label, done, total, t.width))
+	for _, name := range t.order {
+		task := t.tasks[name]
+		if task == nil {
+			continue
+		}
+		lines = append(lines, formatMultiTaskLineWithTotal(task, t.width, t.taskTotal))
+	}
+	return lines
+}
+
+func (t *MultiTracker) doneCountLocked() int {
+	done := 0
+	for _, task := range t.tasks {
+		if task.done {
+			done++
+		}
+	}
+	return done
+}
+
+func (t *MultiTracker) allDoneLocked() bool {
+	if len(t.tasks) == 0 {
+		return true
+	}
+	for _, task := range t.tasks {
+		if !task.done {
+			return false
+		}
+	}
+	return true
+}
+
+func formatMultiSummaryLine(label string, done, total, width int) string {
+	if total <= 0 {
+		total = 1
+	}
+	if label == "" {
+		label = "progress"
+	}
+	filled := int(float64(done) / float64(total) * float64(width))
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("#", filled) + strings.Repeat("-", width-filled)
+	return fmt.Sprintf("[%s] %d/%d %s", bar, done, total, label)
+}
+
+func formatMultiTaskLine(task *multiTask, width int) string {
+	return formatMultiTaskLineWithTotal(task, width, 0)
+}
+
+func formatMultiTaskLineWithTotal(task *multiTask, width int, taskTotal int) string {
+	filled := 0
+	if task.done {
+		filled = width
+	} else if taskTotal > 0 {
+		currentStep := task.doneSteps
+		if task.active && currentStep < taskTotal {
+			currentStep++
+		}
+		filled = int(float64(currentStep) / float64(taskTotal) * float64(width))
+	} else if task.active {
+		filled = width / 3
+	}
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("#", filled) + strings.Repeat("-", width-filled)
+
+	frame := " "
+	elapsed := task.elapsed
+	if task.active {
+		frame = frames[task.frame%len(frames)]
+		elapsed = time.Since(task.startedAt).Truncate(time.Second)
+	}
+	stepText := ""
+	if taskTotal > 0 {
+		currentStep := task.doneSteps
+		if task.done {
+			currentStep = taskTotal
+		} else if task.active && currentStep < taskTotal {
+			currentStep++
+		}
+		stepText = fmt.Sprintf(" %d/%d", currentStep, taskTotal)
+	}
+	line := fmt.Sprintf("[%s] %s %-12s%s %s", bar, frame, task.name, stepText, task.label)
+	if elapsed > 0 {
+		line += fmt.Sprintf(" (%s)", elapsed)
+	}
+	return line
+}
+
+func printMultiLines(lines []string) {
+	for _, line := range lines {
+		PrintConsoleLine(line)
 	}
 }
 
