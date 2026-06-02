@@ -163,8 +163,8 @@ skills-seed reset --workspace
 | `--language`, `-l` | 配置或自动识别 | 项目主要语言 |
 | `--focus`, `-f` | 空 | 只学习指定目录或文件；可重复使用，路径必须在项目根目录内 |
 | `--profile` | `auto` | 项目画像刷新策略：`auto`、`skip`、`refresh` |
-| `--context` | 空 | 本次学习的补充说明，会传给 AI Agent |
-| `--context-file` | 空 | 从文件读取本次学习的补充说明 |
+| `--context` | 空 | 本次学习的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/prompts/` |
+| `--context-file` | 空 | 从文件读取本次学习的一次性补充说明，不写入 `.skills-seed/prompts/` |
 | `--help`, `-h` | `false` | 查看 `learn current` 帮助 |
 
 #### `learn history` 参数
@@ -203,6 +203,7 @@ skills-seed learn history --limit 40 --batch-size 5
 2. 生成的 skills 目录默认排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
 4. workspace 子项目按 `agent.parallelism` 真并发执行。
+5. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
 
 ### `skills-seed generate-skills`
 
@@ -222,8 +223,8 @@ skills-seed learn history --limit 40 --batch-size 5
 |---|---:|---|
 | `--output`, `-o` | 当前 `skills.target` 的 `skills.paths` | 临时指定 skills 输出目录 |
 | `--merge`, `-m` | `false` | 生成前合并相似 patterns；已不推荐，改用 `skills-seed patterns merge` |
-| `--context` | 空 | 本次生成的补充说明，会传给 AI Agent |
-| `--context-file` | 空 | 从文件读取本次生成的补充说明 |
+| `--context` | 空 | 本次生成的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/prompts/` |
+| `--context-file` | 空 | 从文件读取本次生成的一次性补充说明，不写入 `.skills-seed/prompts/` |
 | `--help`, `-h` | `false` | 查看 `generate-skills` 帮助 |
 
 #### 常用示例
@@ -234,6 +235,18 @@ skills-seed generate-skills --output .agents/skills/my-project
 skills-seed generate-skills --context "重点保留 API 兼容性约束"
 skills-seed generate-skills --context-file .skills-seed/context.md
 ```
+
+#### Prompt 合并说明
+
+`.skills-seed/prompts/` 中的文件会与内置 prompt 合并，不会替换内置 prompt。常用持久补充位置：
+
+- `.skills-seed/prompts/project/project-profile.md`：项目事实画像。
+- `.skills-seed/prompts/project/common.md`：项目通用约束。
+- `.skills-seed/prompts/project/<prompt-id>.md`：某个 prompt 的项目级补充。
+- `.skills-seed/prompts/workspace/<prompt-id>.md`：workspace 级补充。
+- `.skills-seed/prompts/instructions/<prompt-id>.md`：用户补充指令。
+
+合并顺序为内置 prompt、项目画像、项目通用约束、项目级补充、workspace 补充、用户补充指令，最后追加内置最终输出契约。最终输出契约不可由用户文件覆盖，用于保护 JSON / Markdown 输出格式。
 
 #### 生成内容
 

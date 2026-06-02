@@ -163,8 +163,8 @@ Learn coding patterns, business methods, and best practices from the current cod
 | `--language`, `-l` | config or auto-detect | Primary project language |
 | `--focus`, `-f` | empty | Learn only a directory or file; may be repeated, and paths must stay under the project root |
 | `--profile` | `auto` | Project profile refresh strategy: `auto`, `skip`, or `refresh` |
-| `--context` | empty | Additional guidance for this learn run, passed to the AI agent |
-| `--context-file` | empty | Read additional guidance for this learn run from a file |
+| `--context` | empty | One-time guidance for this learn run, passed to the AI agent and not written to `.skills-seed/prompts/` |
+| `--context-file` | empty | Read one-time guidance for this learn run from a file; not written to `.skills-seed/prompts/` |
 | `--help`, `-h` | `false` | Show `learn current` help |
 
 #### `learn history` Flags
@@ -203,6 +203,7 @@ skills-seed learn history --limit 40 --batch-size 5
 2. Generated skill directories are excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
 3. The workspace root coordinates learning and does not store child patterns in root storage.
 4. Workspace child projects run with real concurrency according to `agent.parallelism`.
+5. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
 
 ### `skills-seed generate-skills`
 
@@ -222,8 +223,8 @@ Generate skills for the current `skills.target` from the project profile and lea
 |---|---:|---|
 | `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
 | `--merge`, `-m` | `false` | Merge similar patterns before generation; deprecated, use `skills-seed patterns merge` |
-| `--context` | empty | Additional guidance for this generate run, passed to the AI agent |
-| `--context-file` | empty | Read additional guidance for this generate run from a file |
+| `--context` | empty | One-time guidance for this generate run, passed to the AI agent and not written to `.skills-seed/prompts/` |
+| `--context-file` | empty | Read one-time guidance for this generate run from a file; not written to `.skills-seed/prompts/` |
 | `--help`, `-h` | `false` | Show `generate-skills` help |
 
 #### Common Examples
@@ -234,6 +235,18 @@ skills-seed generate-skills --output .agents/skills/my-project
 skills-seed generate-skills --context "Preserve API compatibility constraints"
 skills-seed generate-skills --context-file .skills-seed/context.md
 ```
+
+#### Prompt Merge Notes
+
+Files under `.skills-seed/prompts/` are merged with built-in prompts; they do not replace built-in prompts. Common persistent guidance locations:
+
+- `.skills-seed/prompts/project/project-profile.md`: project facts.
+- `.skills-seed/prompts/project/common.md`: common project constraints.
+- `.skills-seed/prompts/project/<prompt-id>.md`: project-level fragment for one prompt.
+- `.skills-seed/prompts/workspace/<prompt-id>.md`: workspace-level fragment.
+- `.skills-seed/prompts/instructions/<prompt-id>.md`: user instructions.
+
+The merge order is built-in prompt, project profile, common project constraints, project-level fragment, workspace fragment, user instructions, then a built-in final output contract. User files cannot override the final output contract; it protects the JSON / Markdown output format expected by parsers.
 
 #### Generated Content
 

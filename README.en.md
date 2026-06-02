@@ -13,7 +13,7 @@
 
 `Claude Code` · `Codex` · `Local Skills` · `Workspace` · `Code Review`
 
-[Quick Start](#quick-start) · [Output Preview](#output-preview) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
+[Quick Start](#quick-start) · [Output Preview](#output-preview) · [Prompts](#prompts-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
 
 </div>
 
@@ -85,6 +85,48 @@ init -> learn current / learn history -> generate-skills -> check
 | Check later changes | `skills-seed check` | issues, fix suggestions, and pattern hits based on learned rules |
 
 `generate-skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
+
+## Prompts And One-Time Guidance
+
+`skills-seed init` creates `.skills-seed/prompts/`. These files are not full replacements for the built-in prompts. They are merged with built-in prompts as project context, workspace constraints, or user instructions for learning and generation.
+
+Common layout:
+
+```text
+.skills-seed/prompts/
+├── project/
+│   ├── project-profile.md      # Project facts used by related prompts
+│   ├── common.md               # Common project constraints used by related prompts
+│   └── <prompt-id>.md          # Optional project-level fragment for one prompt
+├── workspace/
+│   ├── skill-workspace-profile.md
+│   └── skill-workspace-spec.md
+└── instructions/
+    └── <prompt-id>.md          # User instructions appended to one prompt
+```
+
+Runtime merge order:
+
+```text
+built-in prompt
++ project/project-profile.md
++ project/common.md
++ project/<prompt-id>.md
++ workspace/<prompt-id>.md
++ instructions/<prompt-id>.md
++ built-in final output contract
+```
+
+Use `instructions/<prompt-id>.md` for stable team requirements, such as "ignore temporary debugging code while learning commits" or "prioritize API compatibility rules when generating skills". These instructions are appended after the built-in prompt, but they must not change the JSON / Markdown output format required by the built-in prompt. Skills Seed appends a non-editable final output contract after user fragments to protect parser-facing output.
+
+`--context` and `--context-file` are one-time guidance for the current command. They are not written to `.skills-seed/prompts/`. Use them for temporary instructions:
+
+```bash
+skills-seed learn current --context "Focus only on compatibility boundaries"
+skills-seed generate-skills --context-file .skills-seed/context.md
+```
+
+If a rule should apply across future runs, put it in `.skills-seed/prompts/instructions/<prompt-id>.md`. If it only explains or limits one run, use `--context` or `--context-file`.
 
 ## Quick Start
 

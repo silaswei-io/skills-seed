@@ -13,7 +13,7 @@
 
 `Claude Code` · `Codex` · `Local Skills` · `Workspace` · `Code Review`
 
-[快速开始](#快速开始) · [产物预览](#产物预览) · [设计理念](#设计理念) · [Workspace](#workspace) · [命令参考](docs/COMMANDS.md)
+[快速开始](#快速开始) · [产物预览](#产物预览) · [Prompt 与一次性说明](#prompt-与一次性说明) · [设计理念](#设计理念) · [Workspace](#workspace) · [命令参考](docs/COMMANDS.md)
 
 </div>
 
@@ -85,6 +85,48 @@ init -> learn current / learn history -> generate-skills -> check
 | 检查后续改动 | `skills-seed check` | 基于已学习规则的问题、修复建议和 pattern hits |
 
 `generate-skills` 会按模式质量排序：优先沉淀综合分高、check 命中多、置信度高的规则，降低泛化规则和重复规则进入最终 skills 的概率。
+
+## Prompt 与一次性说明
+
+`skills-seed init` 会生成 `.skills-seed/prompts/`。这些文件不是用来替换内置 prompt 的完整模板，而是会与内置 prompt 合并，作为项目上下文、workspace 约束或用户补充指令参与学习和生成。
+
+常见目录：
+
+```text
+.skills-seed/prompts/
+├── project/
+│   ├── project-profile.md      # 项目事实画像，所有相关 prompt 都会参考
+│   ├── common.md               # 项目通用约束，所有相关 prompt 都会参考
+│   └── <prompt-id>.md          # 可选：某个 prompt 的项目级补充
+├── workspace/
+│   ├── skill-workspace-profile.md
+│   └── skill-workspace-spec.md
+└── instructions/
+    └── <prompt-id>.md          # 用户补充指令，追加到对应 prompt
+```
+
+运行时的合并顺序是：
+
+```text
+内置 prompt
++ project/project-profile.md
++ project/common.md
++ project/<prompt-id>.md
++ workspace/<prompt-id>.md
++ instructions/<prompt-id>.md
++ 内置最终输出契约
+```
+
+`instructions/<prompt-id>.md` 适合写稳定的团队要求，例如“学习 commit 时忽略临时调试代码”或“生成 skill 时优先保留 API 兼容性规则”。它会追加到内置 prompt 后面，但不能改变内置 prompt 要求的 JSON / Markdown 输出格式；最后会追加一个不可编辑的内置输出契约，避免用户补充指令破坏解析。
+
+`--context` 和 `--context-file` 是一次性说明，只影响当前命令，不会写入 `.skills-seed/prompts/`。它们适合临时要求，例如：
+
+```bash
+skills-seed learn current --context "本次只关注兼容性边界"
+skills-seed generate-skills --context-file .skills-seed/context.md
+```
+
+如果同一条规则长期有效，写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；如果只是这次运行的解释或限制，使用 `--context` 或 `--context-file`。
 
 ## 快速开始
 

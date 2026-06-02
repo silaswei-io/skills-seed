@@ -230,6 +230,24 @@ skills-seed learn history --limit 100 --batch-size 10
 
 Command flags affect only the current run and do not rewrite the config file.
 
+### `.skills-seed/prompts/`
+
+`.skills-seed/prompts/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable runtime prompt fragments for the project. Use it for persistent project notes, workspace constraints, and user instructions.
+
+Common paths:
+
+| Path | Purpose |
+|---|---|
+| `.skills-seed/prompts/project/project-profile.md` | Project facts merged into related prompts |
+| `.skills-seed/prompts/project/common.md` | Common project constraints merged into related prompts |
+| `.skills-seed/prompts/project/<prompt-id>.md` | Optional project-level fragment for one prompt |
+| `.skills-seed/prompts/workspace/<prompt-id>.md` | Workspace-level fragment, for example `skill-workspace-profile.md` |
+| `.skills-seed/prompts/instructions/<prompt-id>.md` | User instructions appended to one prompt |
+
+These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
+
+`--context` and `--context-file` are one-time command flags. They affect only the current `learn current` or `generate-skills` run and are not written to `.skills-seed/prompts/`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `--context` or `--context-file` for temporary guidance.
+
 ### `autofix`
 
 #### Fields

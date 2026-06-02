@@ -46,9 +46,30 @@ func TestEnsureProjectPromptsUsesCommonProjectPrompt(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(commonContent), "prompt-type: common")
 
-	_, err = os.Stat(filepath.Join(seedPath, "prompts", "project", "learn-analyze.project.md"))
+	_, err = os.Stat(filepath.Join(seedPath, "prompts", "project", "learn-analyze.md"))
 	require.ErrorIs(t, err, os.ErrNotExist)
 
-	_, err = os.Stat(filepath.Join(seedPath, "prompts", "custom", "learn-analyze.override.md"))
+	_, err = os.Stat(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"))
 	require.NoError(t, err)
+}
+
+func TestEnsureProjectPromptsWritesContextProfileWithoutAnalysisCommands(t *testing.T) {
+	seedPath := t.TempDir()
+
+	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+		ProjectName: "demo",
+		Language:    "go",
+		Locale:      "zh-CN",
+	})
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"))
+	require.NoError(t, err)
+	text := string(content)
+
+	require.Contains(t, text, "未记录")
+	require.NotContains(t, text, "请补充")
+	require.NotContains(t, text, "请分析")
+	require.NotContains(t, text, "分析目标")
+	require.NotContains(t, text, "输出目标")
 }

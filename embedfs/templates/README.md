@@ -7,8 +7,8 @@ Templates are organized by two different dimensions.
 `templates/prompts` stores prompt templates used to ask the AI agent for analysis or generated data.
 
 - `common/` stores runtime agent prompts shared by project and workspace flows.
-- `project/` stores templates used to initialize user-editable project prompt files under `.skills-seed/prompts/project` and `.skills-seed/prompts/custom`.
-- `workspace/` stores templates used to initialize user-editable workspace prompt files under `.skills-seed/prompts/workspace`.
+- `project/` stores templates used to initialize project context files under `.skills-seed/prompts/project` and user instruction files under `.skills-seed/prompts/instructions`.
+- `workspace/` stores templates used to initialize user-editable workspace prompt fragments under `.skills-seed/prompts/workspace`.
 
 Runtime prompt IDs use kebab-case prefixes:
 

@@ -220,7 +220,7 @@ func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
 	require.Equal(t, "go", childConfig.GetProjectConfig().Language)
 	require.Equal(t, childRoot, childConfig.GetProjectConfig().RootPath)
-	require.NoFileExists(t, filepath.Join(childRoot, ".skills-seed", "prompts", "workspace", "workspace-profile.md"))
+	require.NoFileExists(t, filepath.Join(childRoot, ".skills-seed", "prompts", "workspace", "skill-workspace-profile.md"))
 }
 
 func TestInitializeWorkspaceChildrenReportsExistingChildWithSameAgent(t *testing.T) {
@@ -274,8 +274,8 @@ func TestEnsureWorkspacePromptFilesDoesNotCreateChildProjectPrompts(t *testing.T
 
 	require.NoError(t, ensureWorkspacePromptFiles(seedPath, projectRoot, "demo", configRepo))
 
-	require.FileExists(t, filepath.Join(seedPath, "prompts", "workspace", "workspace-profile.md"))
-	require.FileExists(t, filepath.Join(seedPath, "prompts", "workspace", "workspace-spec.md"))
+	require.FileExists(t, filepath.Join(seedPath, "prompts", "workspace", "skill-workspace-profile.md"))
+	require.FileExists(t, filepath.Join(seedPath, "prompts", "workspace", "skill-workspace-spec.md"))
 	_, err = os.Stat(filepath.Join(seedPath, "prompts", "projects", "backend"))
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
@@ -296,7 +296,7 @@ func TestEnsureWorkspacePromptFilesDoesNotWriteRuntimePathPlaceholders(t *testin
 
 	require.NoError(t, ensureWorkspacePromptFiles(seedPath, projectRoot, "hsm-workspace", configRepo))
 
-	for _, name := range []string{"workspace-profile.md", "workspace-spec.md"} {
+	for _, name := range []string{"skill-workspace-profile.md", "skill-workspace-spec.md"} {
 		content, err := os.ReadFile(filepath.Join(seedPath, "prompts", "workspace", name))
 		require.NoError(t, err)
 		text := string(content)

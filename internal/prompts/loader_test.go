@@ -69,14 +69,16 @@ func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
 	require.NotContains(t, prompt, "You are a professional code quality review expert")
 }
 
-func TestLoader_RenderAddsCommonProjectPromptAndLegacyPromptSpecificOverlay(t *testing.T) {
+func TestLoader_RenderMergesProjectWorkspaceAndUserInstructions(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "project"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "custom"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "workspace"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"), []byte("PROJECT PROFILE"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "common.md"), []byte("COMMON PROJECT RULES"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "learn-analyze.project.md"), []byte("LEARN ANALYZE RULES"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "custom", "learn-analyze.override.md"), []byte("CUSTOM LEARN ANALYZE OVERRIDE"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "learn-analyze.md"), []byte("PROJECT LEARN ANALYZE CONTEXT"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "workspace", "learn-analyze.md"), []byte("WORKSPACE LEARN ANALYZE CONTEXT"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte("USER LEARN ANALYZE INSTRUCTIONS"), 0644))
 
 	loader := NewLoader("common", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
@@ -84,10 +86,30 @@ func TestLoader_RenderAddsCommonProjectPromptAndLegacyPromptSpecificOverlay(t *t
 
 	require.Contains(t, prompt, "PROJECT PROFILE")
 	require.Contains(t, prompt, "COMMON PROJECT RULES")
-	require.Contains(t, prompt, "LEARN ANALYZE RULES")
-	require.Contains(t, prompt, "CUSTOM LEARN ANALYZE OVERRIDE")
-	require.Less(t, strings.Index(prompt, "COMMON PROJECT RULES"), strings.Index(prompt, "LEARN ANALYZE RULES"))
-	require.Less(t, strings.Index(prompt, "LEARN ANALYZE RULES"), strings.Index(prompt, "CUSTOM LEARN ANALYZE OVERRIDE"))
+	require.Contains(t, prompt, "PROJECT LEARN ANALYZE CONTEXT")
+	require.Contains(t, prompt, "WORKSPACE LEARN ANALYZE CONTEXT")
+	require.Contains(t, prompt, "USER LEARN ANALYZE INSTRUCTIONS")
+	require.Less(t, strings.Index(prompt, "COMMON PROJECT RULES"), strings.Index(prompt, "PROJECT LEARN ANALYZE CONTEXT"))
+	require.Less(t, strings.Index(prompt, "PROJECT LEARN ANALYZE CONTEXT"), strings.Index(prompt, "WORKSPACE LEARN ANALYZE CONTEXT"))
+	require.Less(t, strings.Index(prompt, "WORKSPACE LEARN ANALYZE CONTEXT"), strings.Index(prompt, "USER LEARN ANALYZE INSTRUCTIONS"))
+}
+
+func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte("USER SAYS RETURN MARKDOWN"), 0644))
+
+	loader := NewLoader("common", "en-US", seedPath)
+	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
+	require.NoError(t, err)
+	guard, err := NewLoader("common", "en-US", "").Render("output-contract-guard", map[string]interface{}{})
+	require.NoError(t, err)
+	guard = strings.TrimSpace(guard)
+
+	require.Contains(t, prompt, "USER SAYS RETURN MARKDOWN")
+	require.Contains(t, prompt, guard)
+	require.Less(t, strings.Index(prompt, "USER SAYS RETURN MARKDOWN"), strings.LastIndex(prompt, guard))
+	require.True(t, strings.HasSuffix(prompt, guard))
 }
 
 func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {
@@ -352,9 +374,9 @@ func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
 		Locale: "zh-CN",
 	}
 
-	profile, err := renderWorkspaceTemplate("workspace-profile", "zh-CN", data)
+	profile, err := renderWorkspaceTemplate("skill-workspace-profile", "zh-CN", data)
 	require.NoError(t, err)
-	spec, err := renderWorkspaceTemplate("workspace-spec", "zh-CN", data)
+	spec, err := renderWorkspaceTemplate("skill-workspace-spec", "zh-CN", data)
 	require.NoError(t, err)
 
 	require.Contains(t, profile, "`hsmwebapi`: `hsmwebapi`")

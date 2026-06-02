@@ -230,6 +230,24 @@ skills-seed learn history --limit 100 --batch-size 10
 
 命令参数只影响本次执行，不会改写配置文件。
 
+### `.skills-seed/prompts/`
+
+`.skills-seed/prompts/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑运行时提示词片段。它用于长期生效的项目说明、workspace 约束和用户补充指令。
+
+常见路径：
+
+| 路径 | 作用 |
+|---|---|
+| `.skills-seed/prompts/project/project-profile.md` | 项目事实画像，会合并到相关 prompt |
+| `.skills-seed/prompts/project/common.md` | 项目通用约束，会合并到相关 prompt |
+| `.skills-seed/prompts/project/<prompt-id>.md` | 可选：某个 prompt 的项目级补充 |
+| `.skills-seed/prompts/workspace/<prompt-id>.md` | workspace 级补充，例如 `skill-workspace-profile.md` |
+| `.skills-seed/prompts/instructions/<prompt-id>.md` | 用户补充指令，追加到对应 prompt |
+
+这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户补充指令破坏解析。
+
+`--context` 和 `--context-file` 是一次性命令参数，只影响当前 `learn current` 或 `generate-skills` 运行，不会写入 `.skills-seed/prompts/`。长期规则写入 `prompts/instructions/<prompt-id>.md`；临时说明使用 `--context` 或 `--context-file`。
+
 ### `autofix`
 
 #### 字段

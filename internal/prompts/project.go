@@ -20,6 +20,9 @@ var projectPromptNames = []string{
 	"skill-project-summary",
 	"fix-generate",
 	"pattern-merge",
+}
+
+var workspacePromptNames = []string{
 	"skill-workspace-profile",
 	"skill-workspace-spec",
 }
@@ -67,7 +70,7 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 	baseDirs := []string{
 		filepath.Join(seedPath, "prompts"),
 		filepath.Join(seedPath, "prompts", "project"),
-		filepath.Join(seedPath, "prompts", "custom"),
+		filepath.Join(seedPath, "prompts", "instructions"),
 	}
 
 	for _, dir := range baseDirs {
@@ -98,12 +101,12 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 	for _, name := range projectPromptNames {
 		data.PromptName = name
 
-		customContent, err := renderProjectTemplate("custom-override", data.Locale, data)
+		instructionsContent, err := renderProjectTemplate("user-instructions", data.Locale, data)
 		if err != nil {
 			return err
 		}
-		customPath := filepath.Join(seedPath, "prompts", "custom", name+".override.md")
-		if err := writeIfNotExists(customPath, customContent); err != nil {
+		instructionsPath := filepath.Join(seedPath, "prompts", "instructions", name+".md")
+		if err := writeIfNotExists(instructionsPath, instructionsContent); err != nil {
 			return err
 		}
 	}
@@ -120,10 +123,8 @@ func EnsureProjectPromptsAt(basePath string, data ProjectPromptData) error {
 		data.PromptTemplatesHash = metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS))
 	}
 
-	customDir := filepath.Join(filepath.Dir(filepath.Dir(basePath)), "custom")
 	baseDirs := []string{
 		basePath,
-		customDir,
 	}
 	for _, dir := range baseDirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -161,7 +162,7 @@ func EnsureWorkspacePrompts(seedPath string, data WorkspacePromptData) error {
 		return fmt.Errorf("%s: %w", i18n.GetWithParams("PromptCreateDirFailed", map[string]interface{}{"Path": workspaceDir}), err)
 	}
 
-	for _, name := range []string{"workspace-profile", "workspace-spec"} {
+	for _, name := range workspacePromptNames {
 		content, err := renderWorkspaceTemplate(name, data.Locale, data)
 		if err != nil {
 			return err

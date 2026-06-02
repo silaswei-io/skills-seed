@@ -131,10 +131,10 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 
 	projectProfile := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "project-profile.md"))
 	commonProjectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "common.md"))
-	projectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", name+".project.md"))
+	projectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", name+".md"))
 	scopedProfile, scopedCommon, scopedPrompt := l.readScopedProjectPrompts(name, data)
 	workspacePrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "workspace", name+".md"))
-	customPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "custom", name+".override.md"))
+	instructionsPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "instructions", name+".md"))
 
 	var parts []string
 	if base != "" {
@@ -161,8 +161,12 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	if workspacePrompt != "" {
 		parts = append(parts, strings.TrimSpace(workspacePrompt))
 	}
-	if customPrompt != "" {
-		parts = append(parts, strings.TrimSpace(customPrompt))
+	if instructionsPrompt != "" {
+		parts = append(parts, strings.TrimSpace(instructionsPrompt))
+	}
+	contractGuard := l.outputContractGuard()
+	if contractGuard != "" {
+		parts = append(parts, contractGuard)
 	}
 
 	rendered := strings.TrimSpace(strings.Join(parts, "\n\n"))
@@ -178,7 +182,8 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 		"scoped_common_project_prompt_length", len(scopedCommon),
 		"scoped_project_prompt_length", len(scopedPrompt),
 		"workspace_prompt_length", len(workspacePrompt),
-		"custom_prompt_length", len(customPrompt),
+		"instructions_prompt_length", len(instructionsPrompt),
+		"output_contract_guard_length", len(contractGuard),
 		"final_length", len(rendered),
 		"has_seed_path", true,
 	)
@@ -211,6 +216,14 @@ func (l *Loader) readPromptFile(path string) string {
 	return string(data)
 }
 
+func (l *Loader) outputContractGuard() string {
+	data, err := l.readEmbeddedTemplate("output-contract-guard")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
 func (l *Loader) readScopedProjectPrompts(name string, data interface{}) (string, string, string) {
 	projectName := promptProjectName(data)
 	if projectName == "" {
@@ -219,7 +232,7 @@ func (l *Loader) readScopedProjectPrompts(name string, data interface{}) (string
 	basePath := filepath.Join(l.seedPath, "prompts", "projects", projectName)
 	return l.readPromptFile(filepath.Join(basePath, "project-profile.md")),
 		l.readPromptFile(filepath.Join(basePath, "common.md")),
-		l.readPromptFile(filepath.Join(basePath, name+".project.md"))
+		l.readPromptFile(filepath.Join(basePath, name+".md"))
 }
 
 func promptProjectName(data interface{}) string {
