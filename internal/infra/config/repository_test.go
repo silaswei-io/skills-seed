@@ -63,6 +63,28 @@ func TestNewRepository(t *testing.T) {
 		assert.Contains(t, string(content), "paths:")
 	})
 
+	t.Run("generated config uses preceding comments", func(t *testing.T) {
+		seedPath := t.TempDir()
+		configPath := filepath.Join(seedPath, "config.yaml")
+
+		_, err := NewRepository(seedPath, "zh-CN")
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(configPath)
+		require.NoError(t, err)
+		text := string(content)
+
+		require.Contains(t, text, "# 项目名称(init 时自动填充)\n  name: \"\"")
+		require.Contains(t, text, "# 子项目列表，例如: [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects: []")
+		require.Contains(t, text, "# 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级\n    enabled: true")
+		require.Contains(t, text, "# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\nexclude:")
+		require.NotContains(t, text, `name: ""                   #`)
+		require.NotContains(t, text, `projects: []               #`)
+		require.NotContains(t, text, `enabled: true             #`)
+		require.NotContains(t, text, `exclude:                     #`)
+		require.NotContains(t, text, `- ".*"                     #`)
+	})
+
 	t.Run("returns error for invalid path", func(t *testing.T) {
 		// 使用不可写路径触发错误。
 		repo, err := NewRepository("/proc/nonexistent/path/that/cannot/be/created", "zh-CN")
@@ -196,7 +218,117 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.Contains(t, content, `- "*.log"`)
 	require.Contains(t, content, `analysis:`)
 	require.Contains(t, content, `enabled: false`)
+	require.Contains(t, content, "# 项目名称(init 时自动填充)\n  name: \"demo-workspace\"")
+	require.Contains(t, content, "# 子项目列表，例如: [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects:")
+	require.Contains(t, content, "# 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级\n    enabled: false")
+	require.Contains(t, content, "# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\nexclude:")
+	require.NotContains(t, content, `name: "demo-workspace" #`)
+	require.NotContains(t, content, `analysis: #`)
+	require.NotContains(t, content, `enabled: false #`)
+	require.NotContains(t, content, `exclude: #`)
+	require.NotContains(t, content, `- "dist/**" #`)
 	require.NotContains(t, content, `generation:`)
+}
+
+func TestRepository_UpdatePreservesExistingComments(t *testing.T) {
+	seedPath := t.TempDir()
+	configPath := filepath.Join(seedPath, "config.yaml")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`# Custom project comment
+project:
+  name: "old-name" # custom project name comment
+  mode: "project"
+  language: "go"
+  locale: "zh-CN"
+  git_remote: ""
+  root_path: ""
+  initialized_at: "2026-05-26 12:00:00"
+
+# Custom workspace comment
+workspace:
+  projects: [] # custom projects comment
+  shared: []
+  contracts: []
+  infra: []
+
+analysis:
+  codegraph:
+    enabled: true # custom codegraph comment
+    required: false
+    command: "codegraph"
+    auto_init: true
+    auto_sync: true
+    max_nodes: 30
+    max_code: 0
+
+agent:
+  engine: "claude"
+  commands:
+    claude: "claude"
+    codex: "codex"
+  timeout: 1800
+  allow_user_plugins: false
+  parallelism: 0
+
+learning:
+  max_commits: 50
+  batch_size: 5
+
+autofix:
+  strategy: "patch"
+  backup_path: "backups"
+
+skills:
+  target: "claude"
+  paths:
+    claude: ".claude/skills/skills-seed-skills"
+    codex: ".agents/skills/skills-seed-skills"
+
+logging:
+  level: "DEBUG"
+  logs_path: "logs"
+  max_log_files: 30
+
+exclude:
+  - ".*" # keep dotfiles comment
+  - "*.log"
+`), 0644))
+
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	cfg := repo.Get()
+	cfg.Project.Name = "new-name"
+	cfg.Project.Mode = "workspace"
+	cfg.Workspace.Projects = []WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+	}
+	cfg.Analysis.CodeGraph.Enabled = false
+	cfg.Exclude = []string{".*", "dist/**"}
+	require.NoError(t, repo.Update(cfg))
+
+	content, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	text := string(content)
+	require.Contains(t, text, "# Custom project comment")
+	require.Contains(t, text, "# custom project name comment\n  name: \"new-name\"")
+	require.Contains(t, text, "# Custom workspace comment")
+	require.Contains(t, text, "# custom projects comment\n  projects:")
+	require.Contains(t, text, "# custom codegraph comment\n    enabled: false")
+	require.Contains(t, text, "# keep dotfiles comment\n  - \".*\"")
+	require.NotContains(t, text, `name: "new-name" # custom project name comment`)
+	require.NotContains(t, text, `projects: # custom projects comment`)
+	require.NotContains(t, text, `analysis: # custom projects comment`)
+	require.NotContains(t, text, `enabled: false # custom codegraph comment`)
+	require.NotContains(t, text, `- ".*" # keep dotfiles comment`)
+
+	reloaded, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "new-name", reloaded.GetProjectConfig().Name)
+	require.Equal(t, "workspace", reloaded.GetProjectConfig().Mode)
+	require.False(t, reloaded.GetAnalysisConfig().CodeGraph.Enabled)
+	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 1)
+	require.Equal(t, []string{".*", "dist/**"}, reloaded.GetExclude())
 }
 
 func TestNewRepositoryUsesDefaultExcludePatterns(t *testing.T) {

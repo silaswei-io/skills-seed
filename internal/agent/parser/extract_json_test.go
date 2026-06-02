@@ -91,6 +91,13 @@ func TestExtractJSON_EscapedStrings(t *testing.T) {
 	assert.JSONEq(t, `{"msg": "hello \"world\""}`, result)
 }
 
+func TestExtractJSON_RepairsInvalidBackslashEscapesInStrings(t *testing.T) {
+	input := `{"good_example": "const path = \"src\ pages\"\nconst re = /\s+/"}`
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"good_example": "const path = \"src\\ pages\"\nconst re = /\\s+/"}`, result)
+}
+
 func TestExtractJSON_CodeBlockWithNestedJSON(t *testing.T) {
 	input := "```json\n{\"outer\": {\"inner\": [1, 2, 3]}}\n```"
 	result, err := ExtractJSON(input)

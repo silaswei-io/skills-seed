@@ -571,7 +571,7 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 	var consoleMu sync.Mutex
 	var multiTracker *progress.MultiTracker
 	if !showChildDetails {
-		multiTracker = progress.NewMulti(workspaceProjectProgressNames(workspaceConfig.Projects))
+		multiTracker = progress.NewMulti(commandutil.WorkspaceProjectProgressNames(workspaceConfig.Projects))
 		multiTracker.SetLabel(i18n.Get("ProgressLearnWorkspaceProjects"))
 		multiTracker.SetTaskTotal(5)
 	}
@@ -604,7 +604,7 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			if scope == "" {
 				scope = project.Path
 			}
-			progressName := workspaceProjectProgressName(project)
+			progressName := commandutil.WorkspaceProjectProgressName(project)
 			var childLogPath string
 			stepStartedAt := time.Now()
 			result, err := runLearnWorkspaceChildProject(ctx, childCont, scope, showChildDetails, func(label string) {
@@ -667,21 +667,6 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 		"projects_count", len(workspaceConfig.Projects),
 	)
 	return nil
-}
-
-func workspaceProjectProgressNames(projects []config.WorkspaceProjectConfig) []string {
-	names := make([]string, 0, len(projects))
-	for _, project := range projects {
-		names = append(names, workspaceProjectProgressName(project))
-	}
-	return names
-}
-
-func workspaceProjectProgressName(project config.WorkspaceProjectConfig) string {
-	if project.ID != "" {
-		return project.ID
-	}
-	return project.Path
 }
 
 func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepComplete func(label string), logPath *string) (*learnCurrentProjectResult, error) {

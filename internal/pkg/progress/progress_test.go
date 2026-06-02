@@ -194,6 +194,28 @@ func TestMultiTrackerRendersPerTaskStepCounts(t *testing.T) {
 	}
 }
 
+func TestMultiTrackerCompletedStepStillAnimatesUntilNextStep(t *testing.T) {
+	tracker := NewMulti([]string{"backend"})
+	tracker.enabled = true
+	tracker.SetTaskTotal(5)
+
+	tracker.Start("backend", "准备项目上下文")
+	tracker.CompleteStep("backend", "准备项目上下文")
+
+	tracker.mu.Lock()
+	task := tracker.tasks["backend"]
+	task.frame = 1
+	line := formatMultiTaskLineWithTotal(task, tracker.width, tracker.taskTotal)
+	tracker.mu.Unlock()
+
+	if !strings.Contains(line, "/ backend") {
+		t.Fatalf("expected completed intermediate step to keep spinner frame, got %q", line)
+	}
+	if !strings.Contains(line, "1/5") {
+		t.Fatalf("expected completed intermediate step to keep completed step count, got %q", line)
+	}
+}
+
 func TestMultiTrackerFailMarksTaskAndFlushesPendingLines(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := NewMulti([]string{"backend", "front"})

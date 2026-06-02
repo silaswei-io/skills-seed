@@ -38,6 +38,13 @@ type GeneratorService struct {
 	configRepo        config.Reader
 }
 
+const GenerateProjectStepTotal = 5
+
+type GenerateProgressHooks struct {
+	OnStepStart    func(label string)
+	OnStepComplete func(label string)
+}
+
 type projectOverviewTemplateData struct {
 	domain.ProjectProfile
 	OverviewReferences []skills.ReferenceItem
@@ -171,6 +178,17 @@ func NewGeneratorService(
 
 // GenerateSkills 生成 Skills 文件夹
 func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string) error {
+	return s.GenerateSkillsWithProgress(ctx, outputPath, nil, nil)
+}
+
+func (s *GeneratorService) GenerateSkillsWithProgress(ctx context.Context, outputPath string, onStepStart func(label string), onStepComplete func(label string)) error {
+	return s.GenerateSkillsWithHooks(ctx, outputPath, GenerateProgressHooks{
+		OnStepStart:    onStepStart,
+		OnStepComplete: onStepComplete,
+	})
+}
+
+func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPath string, hooks GenerateProgressHooks) error {
 	if s.configRepo != nil && s.configRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
 		return s.generateWorkspaceSkills(ctx)
 	}
@@ -180,8 +198,25 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 		"output_path", outputPath,
 	)
 
-	resolvedOutputPath, err := s.resolveOutputPath(outputPath)
-	if err != nil {
+	runStep := func(label string, fn func() error) error {
+		if hooks.OnStepStart != nil {
+			hooks.OnStepStart(label)
+		}
+		if err := fn(); err != nil {
+			return err
+		}
+		if hooks.OnStepComplete != nil {
+			hooks.OnStepComplete(label)
+		}
+		return nil
+	}
+
+	var resolvedOutputPath string
+	if err := runStep(i18n.Get("ProgressGenerateResolveOutput"), func() error {
+		var resolveErr error
+		resolvedOutputPath, resolveErr = s.resolveOutputPath(outputPath)
+		return resolveErr
+	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.resolve_output_path",
 			"duration", time.Since(startedAt),
@@ -191,9 +226,12 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 		return err
 	}
 
-	// 1. 获取所有模式
-	patterns, err := s.patternRepo.GetAll(ctx)
-	if err != nil {
+	var patterns []domain.Pattern
+	if err := runStep(i18n.Get("ProgressGenerateLoadPatterns"), func() error {
+		var loadErr error
+		patterns, loadErr = s.patternRepo.GetAll(ctx)
+		return loadErr
+	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.load_patterns",
 			"duration", time.Since(startedAt),
@@ -219,16 +257,23 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 	}
 	rankedPatterns := rankPatternsForGeneration(patterns, patternInsights)
 
-	summaryResult, err := s.generateSkillsSummary(ctx, rankedPatterns, patternInsights, resolvedOutputPath, startedAt)
-	if err != nil {
+	var summaryResult *agent.GenerateSkillsResult
+	if err := runStep(i18n.Get("ProgressGenerateSummary"), func() error {
+		var summaryErr error
+		summaryResult, summaryErr = s.generateSkillsSummary(ctx, rankedPatterns, patternInsights, resolvedOutputPath, startedAt)
+		return summaryErr
+	}); err != nil {
 		return err
 	}
 
-	// 6. 计算统计信息（用于 writeSkillsOutput）
 	stats := s.calculateStats(patterns)
 
-	profile, err := s.loadProjectProfile(ctx)
-	if err != nil {
+	var profile *domain.ProjectProfile
+	if err := runStep(i18n.Get("ProgressGenerateLoadProfile"), func() error {
+		var profileErr error
+		profile, profileErr = s.loadProjectProfile(ctx)
+		return profileErr
+	}); err != nil {
 		return err
 	}
 	profile = cleanProjectProfile(profile)
@@ -238,7 +283,9 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 			return err
 		}
 	}
-	if err := s.writeSkillsOutput(ctx, resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, generatedSkillName(s.configRepo.GetProjectConfig().Name)); err != nil {
+	if err := runStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
+		return s.writeSkillsOutput(ctx, resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, generatedSkillName(s.configRepo.GetProjectConfig().Name))
+	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.generate_skills",
 			"duration", time.Since(startedAt),

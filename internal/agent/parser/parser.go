@@ -58,6 +58,11 @@ func ExtractJSON(output string) (string, error) {
 
 	// 3. 验证 JSON 有效性
 	if err := validateJSON(jsonStr); err != nil {
+		if repaired, repairErr := repairInvalidStringEscapes(jsonStr); repairErr == nil {
+			if validateJSON(repaired) == nil {
+				return repaired, nil
+			}
+		}
 		logger.Error(i18n.Get("AgentInvalidJSON"),
 			"error", err,
 			"json_length", len(jsonStr),
@@ -112,6 +117,63 @@ func findMatchingBrace(s string, start int) int {
 func validateJSON(jsonStr string) error {
 	var js interface{}
 	return json.Unmarshal([]byte(jsonStr), &js)
+}
+
+func repairInvalidStringEscapes(jsonStr string) (string, error) {
+	var b strings.Builder
+	b.Grow(len(jsonStr))
+
+	inString := false
+	for i := 0; i < len(jsonStr); i++ {
+		ch := jsonStr[i]
+		if !inString {
+			b.WriteByte(ch)
+			if ch == '"' {
+				inString = true
+			}
+			continue
+		}
+
+		switch ch {
+		case '"':
+			b.WriteByte(ch)
+			inString = false
+		case '\\':
+			if i+1 >= len(jsonStr) {
+				b.WriteString(`\\`)
+				continue
+			}
+			next := jsonStr[i+1]
+			if isValidJSONEscape(next) {
+				b.WriteByte(ch)
+				b.WriteByte(next)
+				i++
+				if next == 'u' {
+					for j := 0; j < 4 && i+1 < len(jsonStr); j++ {
+						i++
+						b.WriteByte(jsonStr[i])
+					}
+				}
+				continue
+			}
+			b.WriteString(`\\`)
+		default:
+			b.WriteByte(ch)
+		}
+	}
+	if inString {
+		return "", fmt.Errorf("unterminated JSON string")
+	}
+	return b.String(), nil
+}
+
+func isValidJSONEscape(ch byte) bool {
+	switch ch {
+	case '"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u':
+		return true
+	default:
+		return false
+	}
 }
 
 // TruncString 截断字符串用于日志输出

@@ -798,8 +798,32 @@ other = "找到 {{.Count}} 个模式"
 [ProgressGenerateCountPatterns]
 other = "统计已学习模式"
 
+[ProgressGenerateResolveOutput]
+other = "解析输出目录"
+
+[ProgressGenerateLoadPatterns]
+other = "加载已学习模式"
+
+[ProgressGenerateSummary]
+other = "生成 skills 摘要"
+
+[ProgressGenerateLoadProfile]
+other = "读取项目画像"
+
 [ProgressGenerateWriteSkills]
 other = "写入技能文件"
+
+[ProgressGenerateWriteRootSkills]
+other = "写入工作区根 skills"
+
+[ProgressGenerateWorkspaceProjects]
+other = "生成工作区子项目 skills"
+
+[GenerateWorkspaceProjectProgressComplete]
+other = "完成"
+
+[GenerateWorkspaceProjectProgressFailed]
+other = "失败"
 
 [GenerateFailed]
 other = "生成 skills 失败: {{.Error}}"

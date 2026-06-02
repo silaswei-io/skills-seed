@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
@@ -27,6 +28,8 @@ var (
 	contextText string
 	contextFile string
 )
+
+var sleepAfterGenerateChildStep = time.Sleep
 
 // Cmd 返回 generate 命令
 func Cmd(cont *container.Container) *cobra.Command {
@@ -66,7 +69,6 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 	}
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, userContext)
-	tracker := progress.New(2)
 
 	logger.Info(i18n.Get("GenerateStarting"))
 	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
@@ -75,16 +77,27 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 
 	// 获取模式数量
 	var count int
-	if err := tracker.RunStep(i18n.Get("ProgressGenerateCountPatterns"), func() error {
+	isWorkspaceMode := cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace
+	var tracker *progress.Tracker
+	if !isWorkspaceMode {
+		tracker = progress.New(2)
+		if err := tracker.RunStep(i18n.Get("ProgressGenerateCountPatterns"), func() error {
+			var countErr error
+			count, countErr = cont.PatternRepo.Count(ctx)
+			return countErr
+		}); err != nil {
+			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
+			return err
+		}
+	} else {
 		var countErr error
 		count, countErr = cont.PatternRepo.Count(ctx)
-		return countErr
-	}); err != nil {
-		logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
-		return err
+		if countErr != nil {
+			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": countErr.Error()}))
+			return countErr
+		}
 	}
 
-	isWorkspaceMode := cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace
 	if count == 0 && !isWorkspaceMode {
 		logger.Warn(i18n.Get("GenerateNoPatterns"))
 		return nil
@@ -121,16 +134,28 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 	}
 
 	// 生成 Skills
-	if err := tracker.RunStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
-		if isWorkspaceMode {
-			if err := generateWorkspaceChildSkills(ctx, cont); err != nil {
-				return err
-			}
+	if isWorkspaceMode {
+		childProgress := progress.NewMulti(commandutil.WorkspaceProjectProgressNames(cont.ConfigRepo.GetWorkspaceConfig().Projects))
+		childProgress.SetLabel(i18n.Get("ProgressGenerateWorkspaceProjects"))
+		childProgress.SetTaskTotal(generator.GenerateProjectStepTotal)
+		if err := generateWorkspaceChildSkills(ctx, cont, childProgress); err != nil {
+			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
+			return err
 		}
-		return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
-	}); err != nil {
-		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
-		return err
+		rootTracker := progress.New(1)
+		if err := rootTracker.RunStep(i18n.Get("ProgressGenerateWriteRootSkills"), func() error {
+			return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
+		}); err != nil {
+			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
+			return err
+		}
+	} else {
+		if err := tracker.RunStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
+			return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
+		}); err != nil {
+			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
+			return err
+		}
 	}
 
 	logger.Info(i18n.Get("GenerateSuccessMsg"))
@@ -142,7 +167,7 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 	return nil
 }
 
-func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container) error {
+func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container, trackers ...*progress.MultiTracker) error {
 	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
 	if len(workspaceConfig.Projects) == 0 {
@@ -159,8 +184,33 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 	}
 
 	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
+	var multiTracker *progress.MultiTracker
+	if len(trackers) > 0 {
+		multiTracker = trackers[0]
+	}
 	return workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
 		projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
+		progressName := commandutil.WorkspaceProjectProgressName(project)
+		stepStartedAt := time.Now()
+		startStep := func(label string) {
+			if multiTracker != nil {
+				stepStartedAt = time.Now()
+				multiTracker.Start(progressName, label)
+			}
+		}
+		completeStep := func(label string) {
+			if multiTracker != nil {
+				multiTracker.CompleteStep(progressName, label)
+				pauseAfterFastGenerateChildStep(stepStartedAt)
+			}
+		}
+		failProgress := true
+		defer func() {
+			if failProgress && multiTracker != nil {
+				multiTracker.Fail(progressName, i18n.Get("GenerateWorkspaceProjectProgressFailed"))
+			}
+		}()
+		startStep(i18n.Get("ProgressGenerateResolveOutput"))
 		logger.Info(i18n.GetWithParams("GenerateWorkspaceChildGenerating", map[string]interface{}{"ProjectName": project.ID}))
 		childCont, err := commandutil.OpenWorkspaceChildContainer(ctx, projectRootPath, project, commandutil.WorkspaceChildErrorKeys{
 			NotInitialized: "GenerateWorkspaceChildNotInitialized",
@@ -185,18 +235,26 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 			return err
 		}
 		childOutputPath := outputPathForCurrentTarget(childCont)
-		if err := childCont.GeneratorSvc.GenerateSkills(childCtx, childOutputPath); err != nil {
+		if err := childCont.GeneratorSvc.GenerateSkillsWithProgress(childCtx, childOutputPath, startStep, completeStep); err != nil {
 			var manualErr *generator.ManualSkillExistsError
 			if errors.As(err, &manualErr) {
 				logger.Warn(i18n.GetWithParams("GenerateWorkspaceChildManualSkillSkipped", map[string]interface{}{
 					"ProjectName": project.ID,
 					"Path":        manualErr.Path,
 				}))
+				if multiTracker != nil {
+					multiTracker.Complete(progressName, i18n.Get("GenerateWorkspaceProjectProgressComplete"))
+				}
+				failProgress = false
 				return nil
 			}
 			return err
 		}
 		logger.Info(i18n.GetWithParams("GenerateWorkspaceChildGenerated", map[string]interface{}{"ProjectName": project.ID}))
+		if multiTracker != nil {
+			multiTracker.Complete(progressName, i18n.Get("GenerateWorkspaceProjectProgressComplete"))
+		}
+		failProgress = false
 		agent.FlushTokenUsageScope(childCtx)
 		return nil
 	})
@@ -209,4 +267,10 @@ func outputPathForCurrentTarget(cont *container.Container) string {
 	skillsConfig := cont.ConfigRepo.GetSkillsConfig()
 	target := config.EffectiveSkillsTarget(cont.ConfigRepo.GetAgentConfig(), skillsConfig)
 	return config.EffectiveSkillsPath(target, skillsConfig)
+}
+
+func pauseAfterFastGenerateChildStep(startedAt time.Time) {
+	if time.Since(startedAt) < 120*time.Millisecond {
+		sleepAfterGenerateChildStep(120 * time.Millisecond)
+	}
 }

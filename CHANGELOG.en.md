@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.0]
+
+### Fixes
+
+- Improve workspace `generate-skills` progress output: the first line now shows aggregate child-project completion and each child line shows its own 5-step detailed progress, avoiding the old `1/1 Writing skill files` display and root/child progress overlap.
+- Make fast progress steps visibly animate so short steps still provide stable spinner and elapsed-time feedback.
+- Fix JSON parsing failures caused by invalid escaped characters in Agent output, and centralize JSON file read/write handling.
+
+### Experience
+
+- Improve `.skills-seed/config.yaml` comment layout with clearer block comments and less inline-comment noise.
+- Reuse workspace child-project progress naming between `learn` and `generate-skills` for consistent output.
+
 ## [v0.3.0]
 
 ### Breaking Changes

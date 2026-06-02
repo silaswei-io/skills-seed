@@ -1,93 +1,156 @@
 # Project
 project:
-  name: ""                   # Project name (auto-filled during init)
-  mode: "project"            # Init mode: project (single project) or workspace (multi-project workspace). Locked after learning or generation starts
-  language: "go"             # Primary language: go, typescript, python, etc.
-  locale: "en-US"            # CLI output language: zh-CN (Chinese) or en-US (English)
-  git_remote: ""             # Git remote repository URL (auto-filled during init)
-  root_path: ""              # Project root directory absolute path (auto-filled during init)
-  initialized_at: ""         # Project initialization time (auto-filled during init)
+  # Project name (auto-filled during init)
+  name: ""
+  # Init mode: project (single project) or workspace (multi-project workspace). Locked after learning or generation starts
+  mode: "project"
+  # Primary language: go, typescript, python, etc.
+  language: "go"
+  # CLI output language: zh-CN (Chinese) or en-US (English)
+  locale: "en-US"
+  # Git remote repository URL (auto-filled during init)
+  git_remote: ""
+  # Project root directory absolute path (auto-filled during init)
+  root_path: ""
+  # Project initialization time (auto-filled during init)
+  initialized_at: ""
 
 # Workspace
 workspace:
-  projects: []               # Child projects, for example: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
-  shared: []                 # Shared libraries or shared code paths, for example: [{path: "pkg"}]
-  contracts: []              # API contract paths, for example: [{path: "proto"}]
-  infra: []                  # Deployment/operations paths, for example: [{path: "deploy"}]
+  # Child projects, for example: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
+  projects: []
+  # Shared libraries or shared code paths, for example: [{path: "pkg"}]
+  shared: []
+  # API contract paths, for example: [{path: "proto"}]
+  contracts: []
+  # Deployment/operations paths, for example: [{path: "deploy"}]
+  infra: []
 
 # Analysis
 analysis:
   codegraph:
-    enabled: true             # Enable CodeGraph structural analysis by default; warn and fall back when unavailable
-    required: false           # true fails when CodeGraph is unavailable; false continues with normal analysis
-    command: "codegraph"      # codegraph command path
-    auto_init: true           # Run codegraph init -i automatically when the target project has no .codegraph
-    auto_sync: true           # Run codegraph sync before analysis when an index exists
-    max_nodes: 30             # Maximum symbol nodes for codegraph context
-    max_code: 0               # Maximum code blocks for codegraph context; 0 means structural summary only
+    # Enable CodeGraph structural analysis by default; warn and fall back when unavailable
+    enabled: true
+    # true fails when CodeGraph is unavailable; false continues with normal analysis
+    required: false
+    # codegraph command path
+    command: "codegraph"
+    # Run codegraph init -i automatically when the target project has no .codegraph
+    auto_init: true
+    # Run codegraph sync before analysis when an index exists
+    auto_sync: true
+    # Maximum symbol nodes for codegraph context
+    max_nodes: 30
+    # Maximum code blocks for codegraph context; 0 means structural summary only
+    max_code: 0
 
 # Agent
 agent:
-  engine: "claude"           # Agent engine used for analysis, learning, and generation summaries; matches keys in commands
-  commands:                  # engine -> CLI command path; add new engines here
+  # Agent engine used for analysis, learning, and generation summaries; matches keys in commands
+  engine: "claude"
+  # engine -> CLI command path; add new engines here
+  commands:
     claude: "claude"
     codex: "codex"
-  timeout: 1800              # AI request timeout (seconds)
-  allow_user_plugins: false  # Whether agents may load user plugins; disabled by default for batch stability
-  parallelism: 0             # Number of concurrent agents; 0 means automatic (project=1, workspace=project count with cap)
+  # AI request timeout (seconds)
+  timeout: 1800
+  # Whether agents may load user plugins; disabled by default for batch stability
+  allow_user_plugins: false
+  # Number of concurrent agents; 0 means automatic (project=1, workspace=project count with cap)
+  parallelism: 0
 
 # Learning
 learning:
-  max_commits: 50            # Default number of Git commits to analyze
-  batch_size: 5              # Number of commits to analyze per AI call in batch mode
+  # Default number of Git commits to analyze
+  max_commits: 50
+  # Number of commits to analyze per AI call in batch mode
+  batch_size: 5
 
 # Auto-Fix (check --fix)
 autofix:
-  strategy: "patch"          # Fix strategy: patch: Generate .patch files (recommended, safe); backup: Backup files before modification; stash: Apply fixes then git stash; branch: Create new branch to apply fixes
-  backup_path: "backups"     # Backup path (relative to .skills-seed directory)
+  # Fix strategy: patch: Generate .patch files (recommended, safe); backup: Backup files before modification; stash: Apply fixes then git stash; branch: Create new branch to apply fixes
+  strategy: "patch"
+  # Backup path (relative to .skills-seed directory)
+  backup_path: "backups"
 
 # Skills
 skills:
-  target: "claude"          # Target Skills type; can differ from agent.engine, for example use claude to generate codex skills
-  paths:                    # target -> Skills output path; add new targets here
+  # Target Skills type; can differ from agent.engine, for example use claude to generate codex skills
+  target: "claude"
+  # target -> Skills output path; add new targets here
+  paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
 # Logging
 logging:
-  level: "DEBUG"             # Log level: DEBUG, INFO, WARN, ERROR
-  logs_path: "logs"          # Log path (relative to .skills-seed directory)
-  max_log_files: 30          # Maximum number of log files (auto-cleanup)
+  # Log level: DEBUG, INFO, WARN, ERROR
+  level: "DEBUG"
+  # Log path (relative to .skills-seed directory)
+  logs_path: "logs"
+  # Maximum number of log files (auto-cleanup)
+  max_log_files: 30
 
 # Global Exclusions
-exclude:                     # Glob-style patterns (not regex); init writes the default static exclusion rules
-  - ".*"                     # Dot-prefixed files and directories, such as .github, .cursor, .codegraph, .env
-  - "vendor/**"              # Common dependency directory
-  - "node_modules/**"        # Common dependency directory
-  - "dist/**"                # Common build output directory
-  - "build/**"               # Common build output directory
-  - "out/**"                 # Common output directory
-  - "target/**"              # Common build output directory
-  - "coverage/**"            # Coverage report directory
-  - ".cache/**"              # Cache directory
-  - "tmp/**"                 # Temporary directory
-  - "temp/**"                # Temporary directory
-  - "*.log"                  # Log files
-  - "*.tmp"                  # Temporary files
-  - "*.bak"                  # Backup files
-  - "*.swp"                  # Editor swap files
-  - "*.zip"                  # Archives
-  - "*.tar"                  # Archives
-  - "*.tar.gz"               # Archives
-  - "*.tgz"                  # Archives
-  - "*.rar"                  # Archives
-  - "*.7z"                   # Archives
-  - "*.png"                  # Image assets
-  - "*.jpg"                  # Image assets
-  - "*.jpeg"                 # Image assets
-  - "*.gif"                  # Image assets
-  - "*.webp"                 # Image assets
-  - "*.ico"                  # Icon assets
-  - "*.pdf"                  # Document artifacts
-  - "*.mp4"                  # Video assets
-  - "*.mov"                  # Video assets
+# Glob-style patterns (not regex); init writes the default static exclusion rules
+exclude:
+  # Dot-prefixed files and directories, such as .github, .cursor, .codegraph, .env
+  - ".*"
+  # Common dependency directory
+  - "vendor/**"
+  # Common dependency directory
+  - "node_modules/**"
+  # Common build output directory
+  - "dist/**"
+  # Common build output directory
+  - "build/**"
+  # Common output directory
+  - "out/**"
+  # Common build output directory
+  - "target/**"
+  # Coverage report directory
+  - "coverage/**"
+  # Cache directory
+  - ".cache/**"
+  # Temporary directory
+  - "tmp/**"
+  # Temporary directory
+  - "temp/**"
+  # Log files
+  - "*.log"
+  # Temporary files
+  - "*.tmp"
+  # Backup files
+  - "*.bak"
+  # Editor swap files
+  - "*.swp"
+  # Archives
+  - "*.zip"
+  # Archives
+  - "*.tar"
+  # Archives
+  - "*.tar.gz"
+  # Archives
+  - "*.tgz"
+  # Archives
+  - "*.rar"
+  # Archives
+  - "*.7z"
+  # Image assets
+  - "*.png"
+  # Image assets
+  - "*.jpg"
+  # Image assets
+  - "*.jpeg"
+  # Image assets
+  - "*.gif"
+  # Image assets
+  - "*.webp"
+  # Icon assets
+  - "*.ico"
+  # Document artifacts
+  - "*.pdf"
+  # Video assets
+  - "*.mp4"
+  # Video assets
+  - "*.mov"

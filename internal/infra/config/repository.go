@@ -1,12 +1,12 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -271,31 +271,25 @@ func (r *Repository) save(cfg *Config) error {
 		return fmt.Errorf("%s: %w", i18n.Get("ConfigCreateDirFailed"), err)
 	}
 
-	// 根据 locale 选择模板文件
-	locale := cfg.Project.Locale
-	if locale == "" {
-		locale = domain.DefaultLocale // 默认中文
-	}
-
-	templateName := fmt.Sprintf("templates/config/config.yaml.%s.tmpl", locale)
-	templateData, err := embedfs.FS.ReadFile(templateName)
+	root, err := r.loadConfigYAMLNode(cfg)
 	if err != nil {
-		// 如果指定语言的模板不存在，尝试使用中文模板
-		if locale != domain.DefaultLocale {
-			templateData, err = embedfs.FS.ReadFile("templates/config/config.yaml.zh-CN.tmpl")
-			if err != nil {
-				// 如果中文模板也失败，使用 Marshal（会丢失注释）
-				return r.saveWithMarshal(cfg)
-			}
-		} else {
-			// 如果读取模板失败，使用 Marshal（会丢失注释）
-			return r.saveWithMarshal(cfg)
-		}
+		return r.saveWithMarshal(cfg)
 	}
 
-	// 替换模板中的占位符
-	content := string(templateData)
-	content = r.replaceConfigValues(content, cfg)
+	applyConfigNodeValues(root, cfg)
+
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(root); err != nil {
+		_ = encoder.Close()
+		return r.saveWithMarshal(cfg)
+	}
+	if err := encoder.Close(); err != nil {
+		return r.saveWithMarshal(cfg)
+	}
+
+	content := buf.String()
 	var parsed Config
 	if err := yaml.Unmarshal([]byte(content), &parsed); err != nil {
 		return r.saveWithMarshal(cfg)
@@ -307,6 +301,43 @@ func (r *Repository) save(cfg *Config) error {
 	}
 
 	return nil
+}
+
+func (r *Repository) loadConfigYAMLNode(cfg *Config) (*yaml.Node, error) {
+	data, err := os.ReadFile(r.configPath)
+	if err != nil {
+		data, err = r.defaultConfigTemplate(cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return nil, err
+	}
+	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("config yaml root is not a mapping")
+	}
+	return &root, nil
+}
+
+func (r *Repository) defaultConfigTemplate(cfg *Config) ([]byte, error) {
+	locale := domain.DefaultLocale
+	if cfg != nil && cfg.Project.Locale != "" {
+		locale = cfg.Project.Locale
+	} else if r.config != nil && r.config.Project.Locale != "" {
+		locale = r.config.Project.Locale
+	}
+	templateName := fmt.Sprintf("templates/config/config.yaml.%s.tmpl", locale)
+	templateData, err := embedfs.FS.ReadFile(templateName)
+	if err == nil {
+		return templateData, nil
+	}
+	if locale != domain.DefaultLocale {
+		return embedfs.FS.ReadFile("templates/config/config.yaml.zh-CN.tmpl")
+	}
+	return nil, err
 }
 
 // saveWithMarshal 使用 yaml.Marshal 保存（后备方案，会丢失注释）
@@ -321,428 +352,6 @@ func (r *Repository) saveWithMarshal(cfg *Config) error {
 	}
 
 	return nil
-}
-
-// replaceConfigValues 替换配置值（保留注释）
-func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
-	// 项目信息
-	content = replaceYAMLValueInSection(content, "project:", "name:", cfg.Project.Name)
-	content = replaceYAMLValueInSection(content, "project:", "mode:", cfg.Project.Mode)
-	content = replaceYAMLValueInSection(content, "project:", "language:", cfg.Project.Language)
-	content = replaceYAMLValueInSection(content, "project:", "locale:", cfg.Project.Locale)
-	content = replaceYAMLValueInSection(content, "project:", "git_remote:", cfg.Project.GitRemote)
-	content = replaceYAMLValueInSection(content, "project:", "root_path:", cfg.Project.RootPath)
-	if cfg.Project.InitializedAt != "" {
-		content = replaceYAMLValueInSection(content, "project:", "initialized_at:", cfg.Project.InitializedAt)
-	}
-
-	// 工作区配置
-	content = replaceYAMLWorkspaceConfig(content, cfg.Workspace)
-
-	// 分析增强配置
-	content = replaceYAMLValueInSection(content, "codegraph:", "enabled:", cfg.Analysis.CodeGraph.Enabled)
-	content = replaceYAMLValueInSection(content, "codegraph:", "required:", cfg.Analysis.CodeGraph.Required)
-	content = replaceYAMLValueInSection(content, "codegraph:", "command:", cfg.Analysis.CodeGraph.Command)
-	content = replaceYAMLValueInSection(content, "codegraph:", "auto_init:", cfg.Analysis.CodeGraph.AutoInit)
-	content = replaceYAMLValueInSection(content, "codegraph:", "auto_sync:", cfg.Analysis.CodeGraph.AutoSync)
-	content = replaceYAMLValueInSection(content, "codegraph:", "max_nodes:", cfg.Analysis.CodeGraph.MaxNodes)
-	content = replaceYAMLValueInSection(content, "codegraph:", "max_code:", cfg.Analysis.CodeGraph.MaxCode)
-
-	// Agent 配置
-	content = replaceYAMLValueInSection(content, "agent:", "engine:", cfg.Agent.Engine)
-	content = replaceYAMLStringMapInSection(content, "agent:", "commands:", cfg.Agent.Commands)
-	content = replaceYAMLValueInSection(content, "agent:", "timeout:", cfg.Agent.Timeout)
-	content = replaceYAMLValueInSection(content, "agent:", "allow_user_plugins:", cfg.Agent.AllowUserPlugins)
-	content = replaceYAMLValueInSection(content, "agent:", "parallelism:", cfg.Agent.Parallelism)
-
-	// 学习配置
-	content = replaceYAMLValueInSection(content, "learning:", "max_commits:", cfg.Learning.MaxCommits)
-	content = replaceYAMLValueInSection(content, "learning:", "batch_size:", cfg.Learning.BatchSize)
-
-	// 自动修复配置
-	content = replaceYAMLValueInSection(content, "autofix:", "strategy:", cfg.AutoFix.Strategy)
-	content = replaceYAMLValueInSection(content, "autofix:", "backup_path:", cfg.AutoFix.BackupPath)
-
-	// Skills 配置
-	content = replaceYAMLValueInSection(content, "skills:", "target:", cfg.Skills.Target)
-	content = replaceYAMLStringMapInSection(content, "skills:", "paths:", cfg.Skills.Paths)
-
-	// 日志配置
-	content = replaceYAMLValueInSection(content, "logging:", "level:", cfg.Logging.Level)
-	content = replaceYAMLValueInSection(content, "logging:", "logs_path:", cfg.Logging.LogsPath)
-	content = replaceYAMLValueInSection(content, "logging:", "max_log_files:", cfg.Logging.MaxLogFiles)
-
-	content = replaceYAMLStringListAtRoot(content, "exclude:", cfg.Exclude)
-
-	return content
-}
-
-// replaceYAMLValue 替换 YAML 值（保留注释和格式）
-func replaceYAMLValue(content, key string, value interface{}) string {
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		// 跳过纯注释行
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		// 检查是否包含目标 key
-		if strings.Contains(line, key) {
-			// 分离行尾注释
-			commentIdx := strings.Index(line, " #")
-			var comment string
-			var codePart string
-			var commentColumn int
-
-			if commentIdx > 0 {
-				// 找到了注释，记录注释的列位置
-				codePart = line[:commentIdx]
-				comment = line[commentIdx+1:] // +1 跳过空格
-				commentColumn = commentIdx + 1
-			} else {
-				codePart = line
-				comment = ""
-				commentColumn = 0
-			}
-
-			// 检查 codePart 是否包含 key
-			if !strings.Contains(codePart, key) {
-				continue
-			}
-
-			// 提取缩进
-			indent := ""
-			idx := strings.Index(codePart, key)
-			if idx > 0 {
-				indent = codePart[:idx]
-			}
-
-			// 根据值类型格式化
-			var valueStr string
-			switch v := value.(type) {
-			case string:
-				valueStr = quoteYAMLString(v)
-			case bool:
-				valueStr = fmt.Sprintf("%v", v)
-			case int:
-				valueStr = fmt.Sprintf("%d", v)
-			default:
-				valueStr = fmt.Sprintf("%v", v)
-			}
-
-			// 构建新行
-			newCodePart := fmt.Sprintf("%s%s %s", indent, key, valueStr)
-
-			// 如果有注释，保持注释在原始列位置
-			if comment != "" {
-				// 计算需要填充的空格数，确保注释在原始列位置
-				currentLen := len(newCodePart)
-				if currentLen < commentColumn {
-					// 需要填充空格以对齐注释
-					padding := strings.Repeat(" ", commentColumn-currentLen)
-					lines[i] = fmt.Sprintf("%s %s", newCodePart+padding, comment)
-				} else {
-					// 新值太长，至少保留一个空格
-					lines[i] = fmt.Sprintf("%s %s", newCodePart, comment)
-				}
-			} else {
-				lines[i] = newCodePart
-			}
-			break
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-func replaceYAMLValueInSection(content, section, key string, value interface{}) string {
-	lines := strings.Split(content, "\n")
-	inSection := false
-	sectionIndent := -1
-
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		indent := len(line) - len(strings.TrimLeft(line, " "))
-		if trimmed == section {
-			inSection = true
-			sectionIndent = indent
-			continue
-		}
-
-		if inSection && indent <= sectionIndent && trimmed != "" && strings.HasSuffix(trimmed, ":") {
-			inSection = false
-		}
-
-		if !inSection {
-			continue
-		}
-
-		if strings.Contains(line, key) {
-			lines[i] = replaceYAMLValue(line, key, value)
-			break
-		}
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-func replaceYAMLStringMapInSection(content, section, key string, values map[string]string) string {
-	if values == nil {
-		return content
-	}
-
-	lines := strings.Split(content, "\n")
-	inSection := false
-	sectionIndent := -1
-
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		indent := len(line) - len(strings.TrimLeft(line, " "))
-		if trimmed == section {
-			inSection = true
-			sectionIndent = indent
-			continue
-		}
-
-		if inSection && indent <= sectionIndent && trimmed != "" && strings.HasSuffix(trimmed, ":") {
-			inSection = false
-		}
-
-		if !inSection || !strings.Contains(line, key) {
-			continue
-		}
-
-		codePart := line
-		if commentIdx := strings.Index(line, " #"); commentIdx > 0 {
-			codePart = line[:commentIdx]
-		}
-		if !strings.Contains(codePart, key) {
-			continue
-		}
-
-		keyIndent := len(line) - len(strings.TrimLeft(line, " "))
-		childIndent := strings.Repeat(" ", keyIndent+2)
-		replacement := []string{strings.Repeat(" ", keyIndent) + key}
-		for _, mapKey := range sortedStringKeys(values) {
-			replacement = append(replacement, fmt.Sprintf("%s%s: %s", childIndent, mapKey, quoteYAMLString(values[mapKey])))
-		}
-
-		end := i + 1
-		for end < len(lines) {
-			next := lines[end]
-			nextTrimmed := strings.TrimSpace(next)
-			if nextTrimmed == "" || strings.HasPrefix(nextTrimmed, "#") {
-				end++
-				continue
-			}
-			nextIndent := len(next) - len(strings.TrimLeft(next, " "))
-			if nextIndent <= keyIndent {
-				break
-			}
-			end++
-		}
-
-		lines = spliceYAMLLines(lines, i, end, replacement)
-		break
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-func replaceYAMLStringListAtRoot(content, key string, values []string) string {
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") || !strings.HasPrefix(trimmed, key) {
-			continue
-		}
-
-		commentIdx := strings.Index(line, " #")
-		comment := ""
-		commentColumn := 0
-		if commentIdx > 0 {
-			comment = line[commentIdx+1:]
-			commentColumn = commentIdx + 1
-		}
-
-		replacement := []string{}
-		if len(values) == 0 {
-			replacement = append(replacement, appendYAMLLineComment(key+" []", yamlLineComment{text: comment, column: commentColumn}))
-		} else {
-			replacement = append(replacement, appendYAMLLineComment(key, yamlLineComment{text: comment, column: commentColumn}))
-			for _, value := range values {
-				replacement = append(replacement, "  - "+quoteYAMLString(value))
-			}
-		}
-
-		end := i + 1
-		for end < len(lines) {
-			next := lines[end]
-			nextTrimmed := strings.TrimSpace(next)
-			if nextTrimmed == "" || strings.HasPrefix(nextTrimmed, "#") {
-				end++
-				continue
-			}
-			nextIndent := len(next) - len(strings.TrimLeft(next, " "))
-			if nextIndent == 0 {
-				break
-			}
-			end++
-		}
-
-		lines = spliceYAMLLines(lines, i, end, replacement)
-		break
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-func quoteYAMLString(value string) string {
-	return fmt.Sprintf("%q", value)
-}
-
-func sortedStringKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func replaceYAMLWorkspaceConfig(content string, workspace WorkspaceConfig) string {
-	lines := strings.Split(content, "\n")
-	start := -1
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		if trimmed == "workspace:" {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		return content
-	}
-
-	end := start + 1
-	for end < len(lines) {
-		line := lines[end]
-		indent := len(line) - len(strings.TrimLeft(line, " "))
-		if indent == 0 {
-			break
-		}
-		end++
-	}
-
-	comments := workspaceKeyComments(lines[start:end])
-	replacement := renderWorkspaceConfig(workspace, comments)
-
-	return strings.Join(spliceYAMLLines(lines, start, end, replacement), "\n")
-}
-
-func spliceYAMLLines(lines []string, start, end int, replacement []string) []string {
-	result := make([]string, 0, len(lines)-end+start+len(replacement))
-	result = append(result, lines[:start]...)
-	result = append(result, replacement...)
-	result = append(result, lines[end:]...)
-	return result
-}
-
-type yamlLineComment struct {
-	text   string
-	column int
-}
-
-func workspaceKeyComments(lines []string) map[string]yamlLineComment {
-	comments := map[string]yamlLineComment{}
-	keys := map[string]string{
-		"projects:":  "projects",
-		"shared:":    "shared",
-		"contracts:": "contracts",
-		"infra:":     "infra",
-	}
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		for yamlKey, commentKey := range keys {
-			if !strings.HasPrefix(trimmed, yamlKey) {
-				continue
-			}
-			commentIdx := strings.Index(line, " #")
-			if commentIdx < 0 {
-				continue
-			}
-			comments[commentKey] = yamlLineComment{
-				text:   line[commentIdx+1:],
-				column: commentIdx + 1,
-			}
-		}
-	}
-
-	return comments
-}
-
-func renderWorkspaceConfig(workspace WorkspaceConfig, comments map[string]yamlLineComment) []string {
-	lines := []string{"workspace:"}
-	lines = append(lines, renderWorkspaceProjects(workspace.Projects, comments["projects"])...)
-	lines = append(lines, renderWorkspacePathList("shared", workspace.Shared, comments["shared"])...)
-	lines = append(lines, renderWorkspacePathList("contracts", workspace.Contracts, comments["contracts"])...)
-	lines = append(lines, renderWorkspacePathList("infra", workspace.Infra, comments["infra"])...)
-	return lines
-}
-
-func renderWorkspaceProjects(projects []WorkspaceProjectConfig, comment yamlLineComment) []string {
-	if len(projects) == 0 {
-		return []string{appendYAMLLineComment("  projects: []", comment)}
-	}
-
-	lines := []string{appendYAMLLineComment("  projects:", comment)}
-	for _, project := range projects {
-		lines = append(lines,
-			fmt.Sprintf("    - id: %s", quoteYAMLString(project.ID)),
-			fmt.Sprintf("      path: %s", quoteYAMLString(project.Path)),
-			fmt.Sprintf("      type: %s", quoteYAMLString(project.Type)),
-			fmt.Sprintf("      language: %s", quoteYAMLString(project.Language)),
-		)
-	}
-	return lines
-}
-
-func renderWorkspacePathList(key string, paths []WorkspacePathConfig, comment yamlLineComment) []string {
-	if len(paths) == 0 {
-		return []string{appendYAMLLineComment(fmt.Sprintf("  %s: []", key), comment)}
-	}
-
-	lines := []string{appendYAMLLineComment(fmt.Sprintf("  %s:", key), comment)}
-	for _, path := range paths {
-		lines = append(lines, fmt.Sprintf("    - path: %s", quoteYAMLString(path.Path)))
-		if path.Description != "" {
-			lines = append(lines, fmt.Sprintf("      description: %s", quoteYAMLString(path.Description)))
-		}
-	}
-	return lines
-}
-
-func appendYAMLLineComment(code string, comment yamlLineComment) string {
-	if comment.text == "" {
-		return code
-	}
-	spaces := 1
-	if len(code) < comment.column {
-		spaces = comment.column - len(code)
-	}
-	return code + strings.Repeat(" ", spaces) + comment.text
 }
 
 // defaultConfig 默认配置

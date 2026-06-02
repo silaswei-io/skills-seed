@@ -115,6 +115,71 @@ func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
 	require.GreaterOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
 }
 
+func TestRunGenerateWorkspacePrintsConcurrentChildProjectProgress(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	resetGenerateFlagsForTest(t)
+	stubGenerateChildStepSleep(t, func(time.Duration) {})
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	workspaceRoot := t.TempDir()
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+	}
+	for _, project := range projects {
+		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
+	}
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
+	defer cont.Close()
+
+	output := captureGenerateStdout(t, func() {
+		cmd := Cmd(cont)
+		require.NoError(t, runGenerate(cont, cmd))
+	})
+
+	require.Contains(t, output, "生成工作区子项目 skills")
+	require.Contains(t, output, "backend")
+	require.Contains(t, output, "frontend")
+	require.Contains(t, output, "写入技能文件")
+	require.Contains(t, output, "生成 skills 摘要")
+	require.Contains(t, output, "读取项目画像")
+	require.Contains(t, output, "backend      5/5")
+	require.Contains(t, output, "frontend     5/5")
+	require.Contains(t, output, "2/2 生成工作区子项目 skills")
+	require.NotContains(t, output, "2/2 - 写入技能文件")
+	require.NotContains(t, output, "统计已学习模式")
+	require.NotContains(t, output, "backend      1/1")
+}
+
+func TestRunGenerateWorkspaceShowsRootSkillWriteAfterChildProjectProgress(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	resetGenerateFlagsForTest(t)
+	stubGenerateChildStepSleep(t, func(time.Duration) {})
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	workspaceRoot := t.TempDir()
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+	}
+	for _, project := range projects {
+		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
+	}
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
+	defer cont.Close()
+
+	output := captureGenerateStdout(t, func() {
+		cmd := Cmd(cont)
+		require.NoError(t, runGenerate(cont, cmd))
+	})
+
+	childIndex := strings.Index(output, "生成工作区子项目 skills")
+	rootIndex := strings.Index(output, "写入工作区根 skills")
+	require.NotEqual(t, -1, childIndex, output)
+	require.NotEqual(t, -1, rootIndex, output)
+	require.Less(t, childIndex, rootIndex, output)
+}
+
 func TestGenerateWorkspaceChildSkillsDoesNotPassWorkspaceContextToChildren(t *testing.T) {
 	resetGenerateFlagsForTest(t)
 	var seenContextsMu sync.Mutex
@@ -139,7 +204,7 @@ func TestGenerateWorkspaceChildSkillsDoesNotPassWorkspaceContextToChildren(t *te
 	require.Equal(t, []string{""}, seenContexts)
 }
 
-func TestRunGenerateWorkspacePrintsStepBeforeChildDetailsAndTokenUsage(t *testing.T) {
+func TestRunGenerateWorkspacePrintsWorkspaceProgressBeforeChildDetailsAndTokenUsage(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
 	resetGenerateFlagsForTest(t)
@@ -164,7 +229,7 @@ func TestRunGenerateWorkspacePrintsStepBeforeChildDetailsAndTokenUsage(t *testin
 		require.NoError(t, runGenerate(cont, cmd))
 	})
 
-	stepIndex := strings.Index(output, "写入技能文件")
+	stepIndex := strings.Index(output, "生成工作区子项目 skills")
 	startIndex := strings.Index(output, "子项目 backend 开始生成 skills")
 	doneIndex := strings.Index(output, "子项目 backend skills 生成完成")
 	tokenIndex := strings.Index(output, "Token 消耗: 子项目 backend")
@@ -384,4 +449,13 @@ func captureGenerateStdout(t *testing.T, fn func()) string {
 	data, err := os.ReadFile(tempFile.Name())
 	require.NoError(t, err)
 	return string(data)
+}
+
+func stubGenerateChildStepSleep(t *testing.T, fn func(time.Duration)) {
+	t.Helper()
+	previous := sleepAfterGenerateChildStep
+	sleepAfterGenerateChildStep = fn
+	t.Cleanup(func() {
+		sleepAfterGenerateChildStep = previous
+	})
 }

@@ -2,14 +2,13 @@ package profile
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/jsonfile"
 )
 
 // ErrProfileNotFound 表示项目画像不存在
@@ -37,104 +36,22 @@ func (r *Repository) Path() string {
 
 // Get 读取项目画像
 func (r *Repository) Get(ctx context.Context) (*domain.ProjectProfile, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	data, err := os.ReadFile(r.path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrProfileNotFound
-		}
-		return nil, fmt.Errorf("%s: %w", i18n.Get("ProjectProfileReadFailed"), err)
-	}
-
-	var profile domain.ProjectProfile
-	if err := json.Unmarshal(data, &profile); err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("ProjectProfileParseFailed"), err)
-	}
-	return &profile, nil
+	return profileStore(r.path).Get(ctx)
 }
 
 // Save 保存项目画像
 func (r *Repository) Save(ctx context.Context, projectProfile *domain.ProjectProfile) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	if projectProfile == nil {
-		return fmt.Errorf("%s", i18n.Get("ProjectProfileNil"))
-	}
-	if err := os.MkdirAll(filepath.Dir(r.path), 0755); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectProfileCreateDirFailed"), err)
-	}
-
-	data, err := json.MarshalIndent(projectProfile, "", "  ")
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectProfileMarshalFailed"), err)
-	}
-	data = append(data, '\n')
-
-	if err := os.WriteFile(r.path, data, 0644); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectProfileWriteFailed"), err)
-	}
-	return nil
+	return profileStore(r.path).Save(ctx, projectProfile)
 }
 
 // GetForProject 读取 workspace 子项目画像
 func (r *Repository) GetForProject(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	path := r.projectPath(projectID)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrProfileNotFound
-		}
-		return nil, fmt.Errorf("%s: %w", i18n.Get("ProjectProfileReadFailed"), err)
-	}
-
-	var profile domain.ProjectProfile
-	if err := json.Unmarshal(data, &profile); err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("ProjectProfileParseFailed"), err)
-	}
-	return &profile, nil
+	return profileStore(r.projectPath(projectID)).Get(ctx)
 }
 
 // SaveForProject 保存 workspace 子项目画像
 func (r *Repository) SaveForProject(ctx context.Context, projectID string, projectProfile *domain.ProjectProfile) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	if projectProfile == nil {
-		return fmt.Errorf("%s", i18n.Get("ProjectProfileNil"))
-	}
-	path := r.projectPath(projectID)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectProfileCreateDirFailed"), err)
-	}
-
-	data, err := json.MarshalIndent(projectProfile, "", "  ")
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectProfileMarshalFailed"), err)
-	}
-	data = append(data, '\n')
-
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectProfileWriteFailed"), err)
-	}
-	return nil
+	return profileStore(r.projectPath(projectID)).Save(ctx, projectProfile)
 }
 
 func (r *Repository) projectPath(projectID string) string {
@@ -162,53 +79,43 @@ func (r *Repository) SaveSpecForProject(ctx context.Context, projectID string, s
 }
 
 func (r *Repository) readSpec(ctx context.Context, path string) (*domain.ProjectSpec, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrSpecNotFound
-		}
-		return nil, fmt.Errorf("%s: %w", i18n.Get("ProjectSpecReadFailed"), err)
-	}
-
-	var spec domain.ProjectSpec
-	if err := json.Unmarshal(data, &spec); err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("ProjectSpecParseFailed"), err)
-	}
-	return &spec, nil
+	return specStore(path).Get(ctx)
 }
 
 func (r *Repository) writeSpec(ctx context.Context, path string, spec *domain.ProjectSpec) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	if spec == nil {
-		return fmt.Errorf("%s", i18n.Get("ProjectSpecNil"))
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectSpecCreateDirFailed"), err)
-	}
-
-	data, err := json.MarshalIndent(spec, "", "  ")
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectSpecMarshalFailed"), err)
-	}
-	data = append(data, '\n')
-
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectSpecWriteFailed"), err)
-	}
-	return nil
+	return specStore(path).Save(ctx, spec)
 }
 
 func (r *Repository) projectSpecPath(projectID string) string {
 	return filepath.Join(filepath.Dir(r.path), "projects", projectID, "project-spec.json")
+}
+
+func profileStore(path string) jsonfile.Store[domain.ProjectProfile] {
+	return jsonfile.Store[domain.ProjectProfile]{
+		Path:     path,
+		NotFound: ErrProfileNotFound,
+		NilValue: fmt.Errorf("%s", i18n.Get("ProjectProfileNil")),
+		Labels: jsonfile.Labels{
+			Read:      i18n.Get("ProjectProfileReadFailed"),
+			Parse:     i18n.Get("ProjectProfileParseFailed"),
+			CreateDir: i18n.Get("ProjectProfileCreateDirFailed"),
+			Marshal:   i18n.Get("ProjectProfileMarshalFailed"),
+			Write:     i18n.Get("ProjectProfileWriteFailed"),
+		},
+	}
+}
+
+func specStore(path string) jsonfile.Store[domain.ProjectSpec] {
+	return jsonfile.Store[domain.ProjectSpec]{
+		Path:     path,
+		NotFound: ErrSpecNotFound,
+		NilValue: fmt.Errorf("%s", i18n.Get("ProjectSpecNil")),
+		Labels: jsonfile.Labels{
+			Read:      i18n.Get("ProjectSpecReadFailed"),
+			Parse:     i18n.Get("ProjectSpecParseFailed"),
+			CreateDir: i18n.Get("ProjectSpecCreateDirFailed"),
+			Marshal:   i18n.Get("ProjectSpecMarshalFailed"),
+			Write:     i18n.Get("ProjectSpecWriteFailed"),
+		},
+	}
 }

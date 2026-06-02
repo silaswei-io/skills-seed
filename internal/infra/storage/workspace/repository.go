@@ -2,14 +2,13 @@ package workspace
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/jsonfile"
 )
 
 // ErrProfileNotFound 表示 workspace-profile.json 不存在
@@ -30,37 +29,12 @@ func NewProfileRepository(seedPath string) *ProfileRepository {
 
 // Get 读取工作区画像
 func (r *ProfileRepository) Get(ctx context.Context) (*domain.WorkspaceProfile, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	data, err := os.ReadFile(r.path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrProfileNotFound
-		}
-		return nil, fmt.Errorf("%s: %w", i18n.Get("WorkspaceProfileReadFailed"), err)
-	}
-
-	var profile domain.WorkspaceProfile
-	if err := json.Unmarshal(data, &profile); err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("WorkspaceProfileParseFailed"), err)
-	}
-	return &profile, nil
+	return workspaceProfileStore(r.path).Get(ctx)
 }
 
 // Save 写入工作区画像
 func (r *ProfileRepository) Save(ctx context.Context, profile *domain.WorkspaceProfile) error {
-	if profile == nil {
-		return fmt.Errorf("%s", i18n.Get("WorkspaceProfileNil"))
-	}
-	return writeJSON(ctx, r.path, profile, workspaceJSONLabels{
-		CreateDir: i18n.Get("WorkspaceProfileCreateDirFailed"),
-		Marshal:   i18n.Get("WorkspaceProfileMarshalFailed"),
-		Write:     i18n.Get("WorkspaceProfileWriteFailed"),
-	})
+	return workspaceProfileStore(r.path).Save(ctx, profile)
 }
 
 // SpecRepository 保存 workspace-spec.json
@@ -75,64 +49,40 @@ func NewSpecRepository(seedPath string) *SpecRepository {
 
 // Get 读取工作区规范
 func (r *SpecRepository) Get(ctx context.Context) (*domain.WorkspaceSpec, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	data, err := os.ReadFile(r.path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, ErrSpecNotFound
-		}
-		return nil, fmt.Errorf("%s: %w", i18n.Get("WorkspaceSpecReadFailed"), err)
-	}
-
-	var spec domain.WorkspaceSpec
-	if err := json.Unmarshal(data, &spec); err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("WorkspaceSpecParseFailed"), err)
-	}
-	return &spec, nil
+	return workspaceSpecStore(r.path).Get(ctx)
 }
 
 // Save 写入工作区规范
 func (r *SpecRepository) Save(ctx context.Context, spec *domain.WorkspaceSpec) error {
-	if spec == nil {
-		return fmt.Errorf("%s", i18n.Get("WorkspaceSpecNil"))
-	}
-	return writeJSON(ctx, r.path, spec, workspaceJSONLabels{
-		CreateDir: i18n.Get("WorkspaceSpecCreateDirFailed"),
-		Marshal:   i18n.Get("WorkspaceSpecMarshalFailed"),
-		Write:     i18n.Get("WorkspaceSpecWriteFailed"),
-	})
+	return workspaceSpecStore(r.path).Save(ctx, spec)
 }
 
-type workspaceJSONLabels struct {
-	CreateDir string
-	Marshal   string
-	Write     string
+func workspaceProfileStore(path string) jsonfile.Store[domain.WorkspaceProfile] {
+	return jsonfile.Store[domain.WorkspaceProfile]{
+		Path:     path,
+		NotFound: ErrProfileNotFound,
+		NilValue: fmt.Errorf("%s", i18n.Get("WorkspaceProfileNil")),
+		Labels: jsonfile.Labels{
+			Read:      i18n.Get("WorkspaceProfileReadFailed"),
+			Parse:     i18n.Get("WorkspaceProfileParseFailed"),
+			CreateDir: i18n.Get("WorkspaceProfileCreateDirFailed"),
+			Marshal:   i18n.Get("WorkspaceProfileMarshalFailed"),
+			Write:     i18n.Get("WorkspaceProfileWriteFailed"),
+		},
+	}
 }
 
-func writeJSON(ctx context.Context, path string, value interface{}, labels workspaceJSONLabels) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
+func workspaceSpecStore(path string) jsonfile.Store[domain.WorkspaceSpec] {
+	return jsonfile.Store[domain.WorkspaceSpec]{
+		Path:     path,
+		NotFound: ErrSpecNotFound,
+		NilValue: fmt.Errorf("%s", i18n.Get("WorkspaceSpecNil")),
+		Labels: jsonfile.Labels{
+			Read:      i18n.Get("WorkspaceSpecReadFailed"),
+			Parse:     i18n.Get("WorkspaceSpecParseFailed"),
+			CreateDir: i18n.Get("WorkspaceSpecCreateDirFailed"),
+			Marshal:   i18n.Get("WorkspaceSpecMarshalFailed"),
+			Write:     i18n.Get("WorkspaceSpecWriteFailed"),
+		},
 	}
-
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return fmt.Errorf("%s: %w", labels.CreateDir, err)
-	}
-
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return fmt.Errorf("%s: %w", labels.Marshal, err)
-	}
-	data = append(data, '\n')
-
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("%s: %w", labels.Write, err)
-	}
-	return nil
 }

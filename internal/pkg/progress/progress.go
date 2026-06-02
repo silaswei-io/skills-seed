@@ -51,14 +51,15 @@ type MultiTracker struct {
 }
 
 type multiTask struct {
-	name      string
-	label     string
-	frame     int
-	doneSteps int
-	startedAt time.Time
-	elapsed   time.Duration
-	done      bool
-	active    bool
+	name          string
+	label         string
+	frame         int
+	doneSteps     int
+	startedAt     time.Time
+	elapsed       time.Duration
+	done          bool
+	active        bool
+	animatePaused bool
 }
 
 // New 创建指定总步骤数的进度跟踪器
@@ -112,6 +113,7 @@ func (t *MultiTracker) Start(name, label string) {
 	}
 	task.done = false
 	task.active = true
+	task.animatePaused = false
 	shouldStartTicker := t.enabled && t.stop == nil
 	if shouldStartTicker {
 		t.stop = make(chan struct{})
@@ -142,6 +144,7 @@ func (t *MultiTracker) CompleteStep(name, label string) {
 	}
 	task.elapsed = time.Since(task.startedAt).Truncate(time.Second)
 	task.active = false
+	task.animatePaused = true
 	lines := t.renderLinesLocked()
 	t.mu.Unlock()
 
@@ -159,6 +162,7 @@ func (t *MultiTracker) Update(name, label string) {
 	if !task.active && !task.done {
 		task.startedAt = time.Now()
 		task.active = true
+		task.animatePaused = false
 	}
 	lines := t.renderLinesLocked()
 	t.mu.Unlock()
@@ -183,6 +187,7 @@ func (t *MultiTracker) Complete(name, label string) {
 	task.elapsed = time.Since(task.startedAt).Truncate(time.Second)
 	task.done = true
 	task.active = false
+	task.animatePaused = false
 	lines := t.renderLinesLocked()
 	allDone := t.allDoneLocked()
 	stop := t.stop
@@ -252,7 +257,7 @@ func (t *MultiTracker) tick(stop <-chan struct{}, stopped chan<- struct{}) {
 		case <-ticker.C:
 			t.mu.Lock()
 			for _, task := range t.tasks {
-				if task.active {
+				if task.active || task.animatePaused {
 					task.frame++
 				}
 			}
@@ -357,7 +362,7 @@ func formatMultiTaskLineWithTotal(task *multiTask, width int, taskTotal int) str
 
 	frame := " "
 	elapsed := task.elapsed
-	if task.active {
+	if task.active || task.animatePaused {
 		frame = frames[task.frame%len(frames)]
 		elapsed = time.Since(task.startedAt).Truncate(time.Second)
 	}

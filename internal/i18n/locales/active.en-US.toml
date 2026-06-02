@@ -798,8 +798,32 @@ other = "Found {{.Count}} patterns"
 [ProgressGenerateCountPatterns]
 other = "Counting learned patterns"
 
+[ProgressGenerateResolveOutput]
+other = "Resolving output path"
+
+[ProgressGenerateLoadPatterns]
+other = "Loading learned patterns"
+
+[ProgressGenerateSummary]
+other = "Generating skills summary"
+
+[ProgressGenerateLoadProfile]
+other = "Loading project profile"
+
 [ProgressGenerateWriteSkills]
 other = "Writing skill files"
+
+[ProgressGenerateWriteRootSkills]
+other = "Writing workspace root skills"
+
+[ProgressGenerateWorkspaceProjects]
+other = "Generating workspace child skills"
+
+[GenerateWorkspaceProjectProgressComplete]
+other = "done"
+
+[GenerateWorkspaceProjectProgressFailed]
+other = "failed"
 
 [GenerateFailed]
 other = "Failed to generate skills: {{.Error}}"

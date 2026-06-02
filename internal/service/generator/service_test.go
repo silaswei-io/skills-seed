@@ -115,6 +115,58 @@ func TestGenerateSkills_FillsMissingCategorySummaries(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
+	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Wrap errors with context")
+	pattern.SetRule("Use fmt.Errorf with %w")
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			return &agent.GenerateSkillsResult{}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				GeneratedAt: "2026-05-19 12:00:00",
+			}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+
+	var started []string
+	var completed []string
+	err := svc.GenerateSkillsWithProgress(context.Background(), t.TempDir(), func(label string) {
+		started = append(started, label)
+	}, func(label string) {
+		completed = append(completed, label)
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"解析输出目录",
+		"加载已学习模式",
+		"生成 skills 摘要",
+		"读取项目画像",
+		"写入技能文件",
+	}, started)
+	require.Equal(t, started, completed)
+}
+
 func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
