@@ -33,6 +33,7 @@ func patternsCmd(cont *container.Container) *cobra.Command {
 		Short:   i18n.Get("ViewPatternsShort"),
 		Long:    i18n.Get("ViewPatternsLong"),
 		Example: i18n.Get("ViewPatternsExample"),
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))

@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.2]
+
+### Fixes
+
+- Fix `skills-seed help` hanging on Windows in uninitialized directories because parent-directory traversal did not stop at drive roots.
+- Fix project-independent commands such as `help`, `--version`, `completion`, `init`, and `hook` being unavailable while project learning holds the database/runtime; `reset` still requires the project runtime guard to avoid resetting `.skills-seed` during learning.
+- Fix `skills-seed reset help` being treated as a real `reset` execution; commands that do not accept positional arguments now reject extra arguments before running business logic.
+
 ## [v0.4.1]
 
 ### Changes

@@ -37,6 +37,7 @@ func showCmd(cont *container.Container) *cobra.Command {
 		Short:   i18n.Get("ProfileShowShort"),
 		Long:    i18n.Get("ProfileShowLongDesc"),
 		Example: i18n.Get("ProfileShowExample"),
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
@@ -54,6 +55,7 @@ func refreshCmd(cont *container.Container) *cobra.Command {
 		Short:   i18n.Get("ProfileRefreshShort"),
 		Long:    i18n.Get("ProfileRefreshLongDesc"),
 		Example: i18n.Get("ProfileRefreshExample"),
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))

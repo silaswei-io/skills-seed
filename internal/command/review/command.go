@@ -36,6 +36,7 @@ func importCmd(cont *container.Container) *cobra.Command {
 		Short:   "Import review comments from a JSON file",
 		Long:    "Import local review comments from a JSON array file into the skills-seed memory database.",
 		Example: "skills-seed review import --from-file review-comments.json",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repo, err := requireReviewRepository(cont)
 			if err != nil {
@@ -64,6 +65,7 @@ func statsCmd(cont *container.Container) *cobra.Command {
 		Short:   "Show review comment prevention statistics",
 		Long:    "Show how many imported review comments match recorded pattern hits within the configured line window.",
 		Example: "skills-seed review stats",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repo, err := requireReviewRepository(cont)
 			if err != nil {

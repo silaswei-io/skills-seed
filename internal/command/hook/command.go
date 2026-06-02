@@ -21,6 +21,7 @@ func Cmd() *cobra.Command {
 		Short:   i18n.Get("HookShort"),
 		Long:    i18n.Get("HookLongDesc"),
 		Example: i18n.Get("HookExample"),
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if install && uninstall {
 				fmt.Println(i18n.Get("HookBothFlagsError"))
@@ -64,6 +65,7 @@ func hookActionCmd(use, short, long, example string, action func() error, succes
 		Short:   short,
 		Long:    long,
 		Example: example,
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := action(); err != nil {
 				fmt.Println(err.Error())

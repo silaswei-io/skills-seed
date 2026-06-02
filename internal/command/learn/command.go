@@ -62,6 +62,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 		Short:   i18n.Get("LearnCurrentShort"),
 		Long:    i18n.Get("LearnCurrentLongDesc"),
 		Example: i18n.Get("LearnCurrentExample"),
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
@@ -81,6 +82,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 		Short:   i18n.Get("LearnHistoryShort"),
 		Long:    i18n.Get("LearnHistoryLongDesc"),
 		Example: i18n.Get("LearnHistoryExample"),
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))

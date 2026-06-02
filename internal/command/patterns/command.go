@@ -35,6 +35,7 @@ func statsCmd(cont *container.Container) *cobra.Command {
 		Short:   "Show learned pattern quality and check hit statistics",
 		Long:    "Show learned pattern quality metrics and check hit statistics, including specificity, confidence, effective score, hit count, and last hit time.",
 		Example: "skills-seed patterns stats",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil || cont.PatternStats == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
@@ -85,6 +86,7 @@ func mergeCmd(cont *container.Container) *cobra.Command {
 		Short:   i18n.Get("PatternsMergeShort"),
 		Long:    i18n.Get("PatternsMergeLongDesc"),
 		Example: i18n.Get("PatternsMergeExample"),
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))

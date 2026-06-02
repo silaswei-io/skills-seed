@@ -35,6 +35,7 @@ func Cmd() *cobra.Command {
 		Short:   i18n.Get("InitShort"),
 		Long:    i18n.Get("InitLongDesc"),
 		Example: i18n.Get("InitExample"),
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			// 验证 locale 参数
 			if !isValidLocale(localeFlag) {
@@ -76,6 +77,7 @@ func ResetCmd() *cobra.Command {
 		Short:   i18n.Get("ResetShort"),
 		Long:    i18n.Get("ResetLongDesc"),
 		Example: i18n.Get("ResetExample"),
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			effectiveMode := modeFlag
 			if workspaceFlag {

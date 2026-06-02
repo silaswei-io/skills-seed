@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.2]
+
+### 修复
+
+- 修复 Windows 未初始化目录中执行 `skills-seed help` 时路径上溯无法在盘符根目录退出，导致命令卡死的问题。
+- 修复 `help`、`--version`、`completion`、`init`、`hook` 等不依赖项目运行时的命令在项目学习占用数据库时无法使用的问题；`reset` 仍需要项目运行时保护，避免学习过程中重置 `.skills-seed`。
+- 修复 `skills-seed reset help` 会被当作 `reset` 执行的问题；不接收位置参数的命令现在会拒绝多余参数，避免误触发业务逻辑。
+
 ## [v0.4.1]
 
 ### 变更

@@ -38,6 +38,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 		Short:   i18n.Get("GenerateShort"),
 		Long:    i18n.Get("GenerateLongDesc"),
 		Example: i18n.Get("GenerateExample"),
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 检查 container 是否初始化
 			if cont == nil {

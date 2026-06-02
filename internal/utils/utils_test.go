@@ -42,6 +42,32 @@ func TestGetSeedPath(t *testing.T) {
 	})
 }
 
+func TestFindSeedPathFromStopsWhenParentDoesNotChange(t *testing.T) {
+	parentCalls := 0
+	parentOf := func(path string) string {
+		parentCalls++
+		switch path {
+		case `C:\repo\child`:
+			return `C:\repo`
+		case `C:\repo`:
+			return `C:\`
+		case `C:\`:
+			return `C:\`
+		default:
+			return path
+		}
+	}
+
+	_, found := findSeedPathFrom(
+		`C:\repo\child`,
+		func(string) bool { return false },
+		parentOf,
+	)
+
+	assert.False(t, found)
+	assert.LessOrEqual(t, parentCalls, 3)
+}
+
 func TestLoadConfig(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		tmpDir := t.TempDir()

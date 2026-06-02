@@ -20,29 +20,35 @@ func GetSeedPath() (string, error) {
 		return "", fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
 	}
 
-	// 检查当前目录是否有 .skills-seed
-	seedPath := filepath.Join(currentDir, ".skills-seed")
-	if _, err := os.Stat(seedPath); err == nil {
+	if seedPath, ok := findSeedPathFrom(currentDir, pathExists, filepath.Dir); ok {
 		return seedPath, nil
 	}
 
-	// 向上查找父目录
-	parentDir := filepath.Dir(currentDir)
+	return "", fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+}
+
+func findSeedPathFrom(currentDir string, exists func(string) bool, parentOf func(string) string) (string, bool) {
+	dir := currentDir
 	for {
-		seedPath = filepath.Join(parentDir, ".skills-seed")
-		if _, err := os.Stat(seedPath); err == nil {
-			return seedPath, nil
+		seedPath := filepath.Join(dir, ".skills-seed")
+		if exists(seedPath) {
+			return seedPath, true
 		}
 
-		// 检查是否到达根目录
-		if parentDir == "/" || parentDir == currentDir {
+		parentDir := parentOf(dir)
+		if parentDir == dir {
 			break
 		}
 
-		parentDir = filepath.Dir(parentDir)
+		dir = parentDir
 	}
 
-	return "", fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+	return "", false
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // LoadConfig 加载配置文件（不创建 Container）

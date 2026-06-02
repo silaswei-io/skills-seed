@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -36,7 +37,12 @@ func Run() error {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", i18n.Get("BootstrapI18nInitWarn"), err)
 	}
 
-	rootCmd := createRootCmd()
+	args := os.Args[1:]
+	if !commandNeedsProjectRuntime(args) {
+		rootCmd := createRootCmd()
+		registerCommands(rootCmd, nil)
+		return rootCmd.Execute()
+	}
 
 	var cont *container.Container
 	if hasSeedDir {
@@ -51,6 +57,7 @@ func Run() error {
 		}()
 	}
 
+	rootCmd := createRootCmd()
 	registerCommands(rootCmd, cont)
 	return rootCmd.Execute()
 }
@@ -143,4 +150,58 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(profilecmd.Cmd(cont))
 	rootCmd.AddCommand(view.Cmd(cont))
 	rootCmd.AddCommand(hook.Cmd())
+}
+
+func commandNeedsProjectRuntime(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+
+	cleaned := leadingNonHelpArgs(args)
+	if len(cleaned) == 0 {
+		return false
+	}
+	if containsHelpOrVersionFlag(args) {
+		return false
+	}
+
+	switch cleaned[0] {
+	case "help", "completion", "init", "hook":
+		return false
+	case "add", "check", "generate-skills", "reset":
+		return true
+	case "learn":
+		return len(cleaned) >= 2 && (cleaned[1] == "current" || cleaned[1] == "history")
+	case "patterns":
+		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "merge")
+	case "profile":
+		return len(cleaned) >= 2 && (cleaned[1] == "show" || cleaned[1] == "refresh")
+	case "review":
+		return len(cleaned) >= 2 && (cleaned[1] == "import" || cleaned[1] == "stats")
+	case "view":
+		return len(cleaned) >= 2 && cleaned[1] == "patterns"
+	default:
+		return false
+	}
+}
+
+func leadingNonHelpArgs(args []string) []string {
+	cleaned := make([]string, 0, len(args))
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		cleaned = append(cleaned, arg)
+	}
+	return cleaned
+}
+
+func containsHelpOrVersionFlag(args []string) bool {
+	for _, arg := range args {
+		switch arg {
+		case "-h", "--help", "-v", "--version":
+			return true
+		}
+	}
+	return false
 }
