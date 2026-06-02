@@ -12,6 +12,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/require"
 )
@@ -75,7 +76,7 @@ func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 
 func TestAnalyzeCodeReturnsErrorWhenClaudeCommandMissing(t *testing.T) {
 	loader := prompts.NewLoader("claude", "en-US", "")
-	ag := New("__skills_seed_missing_claude__", time.Second, loader)
+	ag := New("__skills_seed_missing_claude__", time.Second, loader, false, config.DefaultRetryConfig())
 
 	_, err := ag.AnalyzeCode(context.Background(), &agent.AnalyzeRequest{
 		Files: []domain.FileInfo{
@@ -89,7 +90,7 @@ func TestAnalyzeCodeReturnsErrorWhenClaudeCommandMissing(t *testing.T) {
 
 func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
 	loader := prompts.NewLoader("claude", "zh-CN", "")
-	ag := New("__skills_seed_missing_claude__", time.Second, loader)
+	ag := New("__skills_seed_missing_claude__", time.Second, loader, false, config.DefaultRetryConfig())
 
 	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
 		ProjectName:       "demo",

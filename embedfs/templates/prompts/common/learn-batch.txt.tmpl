@@ -22,7 +22,12 @@
 {{end}}
 {{end}}
 
-你运行在项目根目录中。请按提交 hash 和文件路径自行查看提交涉及的完整代码与变更，不要只基于文件名猜测。
+你运行在项目根目录中。请按提交 hash 和文件路径先读取变更文件和对应 diff，不要只基于文件名猜测。
+
+读取范围控制：
+- 先读取变更文件；仅在证据不足时扩展到直接调用方、被调用方或同目录测试。
+- 优先使用提交 hash、变更路径、已有模式文件和实际代码证据。
+- 不要全仓库扫描；如果证据不足，降低 confidence 或跳过该候选。
 
 # 要提取的模式类型
 
@@ -187,7 +192,6 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 
 # 输出示例
 
-```json
 {
   "patterns": [
     {
@@ -224,7 +228,6 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
     }
   ]
 }
-```
 
 # 关键规则
 

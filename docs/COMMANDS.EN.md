@@ -260,6 +260,8 @@ references/
   examples/*.md
 ```
 
+`SKILL.md` includes summary-stage key insights and improvement suggestions when the agent returns those fields, giving the entry skill extra project-specific judgment context.
+
 #### Notes
 
 1. Workspace mode generates each child skill using that child's own config first, then generates the workspace root skill.
@@ -485,6 +487,7 @@ skills-seed check --interactive=false
 
 1. Pre-commit hooks usually run `skills-seed check --interactive=false`.
 2. Without `--all`, only the Git staging area is checked.
+3. When interactive fix generation is used, the agent's fix summary is printed to logs. Files that cannot be safely rewritten in full are surfaced as manual-review warnings instead of being forced into incomplete fixes.
 
 ### `skills-seed hook`
 

@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
@@ -27,6 +28,7 @@ type ClaudeAgent struct {
 	timeout          time.Duration
 	promptLoader     promptRenderer
 	allowUserPlugins bool
+	retryCfg         config.RetryConfig
 }
 
 // promptRenderer 是 Agent 依赖的最小提示词渲染能力，便于测试渲染错误链路
@@ -35,23 +37,20 @@ type promptRenderer interface {
 }
 
 // New 创建代理
-func New(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins ...bool) *ClaudeAgent {
+func New(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) *ClaudeAgent {
 	if commandPath == "" {
 		commandPath = "claude"
 	}
 	if timeout == 0 {
 		timeout = 60 * time.Second
 	}
-	loadUserPlugins := false
-	if len(allowUserPlugins) > 0 {
-		loadUserPlugins = allowUserPlugins[0]
-	}
 
 	return &ClaudeAgent{
 		commandPath:      commandPath,
 		timeout:          timeout,
 		promptLoader:     loader,
-		allowUserPlugins: loadUserPlugins,
+		allowUserPlugins: allowUserPlugins,
+		retryCfg:         retryCfg,
 	}
 }
 
@@ -270,18 +269,18 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) 
 		"args", claudePrintArgs(c.allowUserPlugins),
 	)
 
-	maxRetries := 3
+	maxRetries := c.retryCfg.EffectiveMaxRetries()
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		output, isRateLimit, err := c.doCallClaude(ctx, operation, prompt, attempt+1, workDir)
+		output, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attempt+1, workDir)
 		if err == nil {
 			return output, nil
 		}
-		if !isRateLimit || attempt == maxRetries {
+		if !isRetryable || attempt == maxRetries {
 			return "", err
 		}
 
-		// 速率限制，等待后重试
-		waitDuration := time.Duration(attempt+1) * 15 * time.Second
+		// 可重试错误，等待后重试
+		waitDuration := c.retryCfg.WaitDuration(attempt)
 		logger.Warn(i18n.Get("LoggerAgentRateLimitRetry"),
 			"attempt", attempt+1,
 			"max_retries", maxRetries,
@@ -299,13 +298,16 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) 
 	return "", fmt.Errorf("%s: %d", i18n.Get("AgentClaudeRateLimitExhausted"), maxRetries)
 }
 
-// 检测是否为速率限制错误
-func isRateLimitError(stdout, stderr string) bool {
+// isRetryableError 检测是否为可重试错误（速率限制、过载等）
+func isRetryableError(stdout, stderr string) bool {
 	combined := stdout + stderr
 	return strings.Contains(combined, "429") ||
+		strings.Contains(combined, "529") ||
+		strings.Contains(combined, "overloaded_error") ||
 		strings.Contains(combined, "rate limit") ||
 		strings.Contains(combined, "速率限制") ||
-		strings.Contains(combined, "请求频率")
+		strings.Contains(combined, "请求频率") ||
+		strings.Contains(combined, "访问量过大")
 }
 
 // 执行单次命令行调用
@@ -329,9 +331,9 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 	if err != nil {
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
-		rateLimit := isRateLimitError(stdoutStr, stderrStr)
+		retryable := isRetryableError(stdoutStr, stderrStr)
 
-		if rateLimit {
+		if retryable {
 			logger.Warn(i18n.Get("LoggerAgentClaudeCallFailed"),
 				"agent", c.Name(),
 				"operation", operation,
@@ -340,7 +342,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 				"duration", duration,
 				"stdout", stdoutStr,
 				"stderr", stderrStr,
-				"rate_limit", true,
+				"retryable", true,
 			)
 			return "", true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), err)
 		}
@@ -579,11 +581,13 @@ func (c *ClaudeAgent) GenerateSkillsSummary(ctx context.Context, req *agent.Gene
 			"error", err,
 		)
 		return &agent.GenerateSkillsResult{
-			CategorySummaries: make(map[string]agent.CategorySummary),
-			KeyPatterns:       []agent.PatternSummary{},
-			BusinessRules:     []string{},
-			BestPractices:     []string{},
-			CommonPatterns:    []string{},
+			CategorySummaries:      make(map[string]agent.CategorySummary),
+			KeyPatterns:            []agent.PatternSummary{},
+			BusinessRules:          []string{},
+			BestPractices:          []string{},
+			CommonPatterns:         []string{},
+			KeyInsights:            []string{},
+			ImprovementSuggestions: []string{},
 		}, nil
 	}
 

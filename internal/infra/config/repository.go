@@ -146,6 +146,58 @@ type AgentConfig struct {
 	Timeout          int               `yaml:"timeout"`            // 超时时间（秒）
 	AllowUserPlugins bool              `yaml:"allow_user_plugins"` // 是否加载用户插件
 	Parallelism      int               `yaml:"parallelism"`        // 并发 Agent 数，0 表示自动
+	Retry            RetryConfig       `yaml:"retry"`              // 重试配置
+}
+
+// RetryConfig 可重试错误（429/529 等）的重试配置
+type RetryConfig struct {
+	MaxRetries      int `yaml:"max_retries"`      // 最大重试次数，0 表示不重试
+	InitialInterval int `yaml:"initial_interval"` // 首次重试等待秒数
+	MaxInterval     int `yaml:"max_interval"`     // 最大等待秒数（指数退避上限）
+}
+
+// DefaultRetryConfig 返回默认重试配置
+func DefaultRetryConfig() RetryConfig {
+	return RetryConfig{
+		MaxRetries:      3,
+		InitialInterval: 15,
+		MaxInterval:     120,
+	}
+}
+
+// EffectiveMaxRetries 返回有效最大重试次数
+func (r RetryConfig) EffectiveMaxRetries() int {
+	if r.MaxRetries == 0 {
+		return DefaultRetryConfig().MaxRetries
+	}
+	return r.MaxRetries
+}
+
+// EffectiveInitialInterval 返回有效首次重试等待时间
+func (r RetryConfig) EffectiveInitialInterval() time.Duration {
+	if r.InitialInterval == 0 {
+		return time.Duration(DefaultRetryConfig().InitialInterval) * time.Second
+	}
+	return time.Duration(r.InitialInterval) * time.Second
+}
+
+// EffectiveMaxInterval 返回有效最大等待时间
+func (r RetryConfig) EffectiveMaxInterval() time.Duration {
+	if r.MaxInterval == 0 {
+		return time.Duration(DefaultRetryConfig().MaxInterval) * time.Second
+	}
+	return time.Duration(r.MaxInterval) * time.Second
+}
+
+// WaitDuration 计算第 attempt 次（0-based）重试的等待时间，指数退避
+func (r RetryConfig) WaitDuration(attempt int) time.Duration {
+	initial := r.EffectiveInitialInterval()
+	maximum := r.EffectiveMaxInterval()
+	wait := initial * time.Duration(1<<uint(attempt)) // initial * 2^attempt
+	if wait > maximum {
+		wait = maximum
+	}
+	return wait
 }
 
 // LearningConfig 学习配置

@@ -53,7 +53,7 @@ User-provided context for this learn run is available at `{{.UserContextPath}}`.
 
 # Suggested Code Files To Inspect
 
-The following are representative code file paths selected from the project. You are running in the project root; read the full contents of these files as needed and base the analysis on actual code evidence rather than path names alone.
+The following are representative code file paths selected from the project. You are running in the project root; prioritize CodeGraph structural context, entry files, and these representative files. Expand only to directly related files needed for pattern decisions, and avoid whole-repository scans.
 
 {{range .SampleFiles}}
 - {{.Path}}
@@ -71,11 +71,8 @@ Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path. 
 Based on the project information and the code files you read, perform the following analysis:
 
 1. **Identify frameworks and tech stack**:
-   - Web framework (Gin/Echo/Beego/Fiber/Spring Boot/Express/Django)
-   - ORM (GORM/Ent/XORM/SQLAlchemy/TypeORM/MyBatis)
-   - Config management (Viper/environment variables/properties)
-   - Logging library (Zap/Logrus/log4j)
-   - Dependency injection (Wire/FX/Dig/Spring DI)
+   - Extract only frameworks, runtimes, ORMs, config systems, logging libraries, dependency injection, or build tools actually used by this project.
+   - Do not infer a stack from template examples, stale dependencies, or common framework names.
 
 2. **Extract Architecture and Dependency Information** (Core):
    - Draw module dependency graph (API/Handler -> Service -> Repository -> DB)
@@ -91,7 +88,7 @@ Based on the project information and the code files you read, perform the follow
    - **Important**: Don't extract standard CRUD (like GetByID, Save, Delete), extract methods with business logic
 
 4. **Business Pattern Deep Extraction Workflow** (required internal reasoning, do not output separately):
-   - Build a **business candidate inventory**: scan Service, UseCase, Handler, Repository, Client, and Utils methods in the sample files, and first identify every method or flow that may carry business meaning.
+   - Build a **business candidate inventory**: use CodeGraph, entry files, representative files, and directly related call relationships to identify methods or flows that may carry business meaning.
    - For each candidate, judge business value: validation rules, state changes, cross-module orchestration, external system calls, exceptional branches, authorization/signing/encryption, data transformation, batch processing, or idempotency.
    - Perform **business pattern expansion**: one business method can produce multiple patterns, such as parameter validation, state transition, cross-repository orchestration, external-call fallback, business error wrapping, or data transformation.
    - **Do not compress multiple business details into one generic pattern**. When actual code evidence exists, prefer several focused small patterns over one broad "business processing flow".
@@ -110,7 +107,6 @@ Based on the project information and the code files you read, perform the follow
 
 Return ONLY a valid JSON object (no markdown code blocks, no extra text):
 
-```json
 {
   "patterns": [
     {
@@ -144,7 +140,6 @@ Return ONLY a valid JSON object (no markdown code blocks, no extra text):
   "common_patterns": ["Specific pattern"],
   "summary": "Project overview"
 }
-```
 
 # Pattern Category Decision Rules (Prefer Specific Categories)
 

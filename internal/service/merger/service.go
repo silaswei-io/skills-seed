@@ -206,10 +206,14 @@ func (s *MergerService) applyMerge(ctx context.Context, result *agent.MergePatte
 			domain.Category(mergedPattern.Category),
 		)
 		newPattern.SetDescription(mergedPattern.Description)
+		newPattern.SetExamples(mergedPattern.GoodExample, mergedPattern.BadExample)
 		newPattern.SetRule(mergedPattern.Rule)
 		newPattern.Confidence = mergedPattern.Confidence
 		newPattern.Merged = true
 		newPattern.MergedFrom = mergedPattern.MergedFrom
+		if mergedPattern.BusinessMethod != nil {
+			newPattern.SetBusinessMethod(mergedPattern.BusinessMethod)
+		}
 
 		if err := s.patternRepo.Save(ctx, newPattern); err != nil {
 			logger.Warn(i18n.Get("LoggerMergerSaveMergedFailed"),

@@ -43,6 +43,12 @@ func TestLoader_Render(t *testing.T) {
 		"BusinessRules":  []string{"业务规则1", "业务规则2"},
 		"BestPractices":  []string{"最佳实践1", "最佳实践2"},
 		"CommonPatterns": []string{"通用模式1", "通用模式2"},
+		"KeyInsights": []string{
+			"错误处理是跨层一致性核心",
+		},
+		"ImprovementSuggestions": []string{
+			"为外部调用补充超时测试",
+		},
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},
@@ -70,6 +76,8 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "10")
 	assert.Contains(t, content, "generated-by: skills-seed v0.0.1")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
+	assert.Contains(t, content, "错误处理是跨层一致性核心")
+	assert.Contains(t, content, "为外部调用补充超时测试")
 }
 
 // TestLoader_Render_English 测试英文模板渲染
@@ -91,8 +99,12 @@ func TestLoader_Render_English(t *testing.T) {
 		"BusinessRules":       []string{},
 		"BestPractices":       []string{},
 		"CommonPatterns":      []string{},
-		"OverviewReferences":  []ReferenceItem{},
-		"ReferenceGroups":     []ReferenceGroup{},
+		"KeyInsights":         []string{"Error handling is a cross-layer consistency concern"},
+		"ImprovementSuggestions": []string{
+			"Add timeout tests for external calls",
+		},
+		"OverviewReferences": []ReferenceItem{},
+		"ReferenceGroups":    []ReferenceGroup{},
 	}
 
 	content, err := loader.Render("project-skill", data)
@@ -101,6 +113,8 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.NotEmpty(t, content)
 	assert.Contains(t, content, "test-project")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
+	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
+	assert.Contains(t, content, "Add timeout tests for external calls")
 }
 
 func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
@@ -434,6 +448,10 @@ func fullSkillData() map[string]interface{} {
 		"BusinessRules":       []string{"business rule"},
 		"BestPractices":       []string{"best practice"},
 		"CommonPatterns":      []string{"common pattern"},
+		"KeyInsights":         []string{"key insight"},
+		"ImprovementSuggestions": []string{
+			"improvement suggestion",
+		},
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},

@@ -2,6 +2,24 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.4]
+
+### Improvements
+
+- Improve runtime prompt JSON output constraints by removing markdown code fences from examples, reducing the chance that agents return fenced JSON that parser-facing calls cannot consume.
+- Tighten file-reading scope in prompts related to `learn current`, `learn history`, `generate-skills`, and `check` fix generation: prompts now prioritize target files, changed files, CodeGraph structural context, and directly related call relationships instead of encouraging whole-repository scans.
+- Improve project initialization analysis prompts: fixed framework, ORM, and logging catalogs were removed, so the agent extracts only the technology stack actually used by the project instead of being biased by examples.
+
+### Changes
+
+- `fix-generate` now parses and uses `summary` and `warnings`; generated fixes shown through `check` can surface manual-review warnings when a file cannot be safely rewritten in full.
+- `skill-project-summary` now passes `key_insights` and `improvement_suggestions` into generated project `SKILL.md` files, making summary-stage insights and improvement suggestions visible to agents.
+- `pattern-merge` now preserves good examples, bad examples, and business method data on merged patterns, so generated skills can still use those fields after merging.
+
+### Fixes
+
+- Fix the misspelled `concurrency` category in the Chinese `skill-project-summary` prompt.
+
 ## [v0.4.3]
 
 ### Fixes

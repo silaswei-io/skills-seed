@@ -31,7 +31,9 @@ The following coding patterns have been learned from the project history. Code s
 
 # Analysis Steps
 
-1. You are running in the project root; read the complete content of each file by path
+1. You are running in the project root; first read the files to analyze and only read the extra context needed to judge pattern violations
+   - Prefer the target file itself; expand only to direct callers, direct callees, same-directory tests, or same-directory config when a rule decision requires it
+   - Do not scan the whole repository just because multiple files are listed
 2. Check code against each known pattern's rules for violations
 3. For each violation, try to pinpoint the exact file and line number
 4. Severity standards:
@@ -46,7 +48,6 @@ The following coding patterns have been learned from the project history. Code s
 
 **Return ONLY a valid JSON object** (no markdown code blocks, no extra text):
 
-```json
 {
   "issues": [
     {
@@ -72,7 +73,6 @@ The following coding patterns have been learned from the project history. Code s
   ],
   "confidence": 0.85
 }
-```
 
 **Field descriptions**:
 - **issues**: List of found issues (return empty array `[]` if no issues)

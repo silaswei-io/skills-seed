@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +65,7 @@ enabled = true
 
 func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
 	loader := prompts.NewLoader("codex", "zh-CN", "")
-	ag := New("__skills_seed_missing_codex__", time.Second, loader)
+	ag := New("__skills_seed_missing_codex__", time.Second, loader, false, config.DefaultRetryConfig())
 
 	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
 		ProjectName:       "demo",

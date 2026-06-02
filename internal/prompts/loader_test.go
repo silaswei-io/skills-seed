@@ -409,6 +409,117 @@ func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
 	require.NotContains(t, prompt, `"name":"Known Pattern"`)
 }
 
+func TestLoader_UpdatedRuntimePromptsUseUnfencedJSONExamples(t *testing.T) {
+	loader := NewLoader("common", "zh-CN", "")
+	for _, tc := range []struct {
+		name string
+		data interface{}
+	}{
+		{"learn-analyze", sampleAnalyzeRequest()},
+		{"learn-batch", sampleBatchLearnData()},
+		{"fix-generate", sampleGenerateFixesRequest()},
+		{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prompt, err := loader.Render(tc.name, tc.data)
+			require.NoError(t, err)
+			require.NotContains(t, prompt, "```json")
+		})
+	}
+}
+
+func TestLoader_RuntimePromptsBoundFileReadingScope(t *testing.T) {
+	loader := NewLoader("common", "zh-CN", "")
+	tests := []struct {
+		name         string
+		data         interface{}
+		requiredText []string
+		forbidden    []string
+	}{
+		{
+			name: "learn-batch",
+			data: sampleBatchLearnData(),
+			requiredText: []string{
+				"先读取变更文件",
+				"仅在证据不足时扩展到直接调用方、被调用方或同目录测试",
+				"不要全仓库扫描",
+			},
+			forbidden: []string{
+				"查看提交涉及的完整代码与变更",
+			},
+		},
+		{
+			name: "learn-analyze",
+			data: sampleAnalyzeRequest(),
+			requiredText: []string{
+				"先读取待分析文件",
+				"判断模式违规所必需",
+			},
+			forbidden: []string{
+				"读取每个文件的完整内容",
+			},
+		},
+		{
+			name: "skill-project-init",
+			data: sampleAnalyzeCurrentCodebaseRequest(),
+			requiredText: []string{
+				"优先读取 CodeGraph 结构化上下文",
+				"只扩展到能支持模式判断的直接相关文件",
+				"避免全仓库扫描",
+			},
+			forbidden: []string{
+				"逐个扫描示例文件中的 Service",
+			},
+		},
+		{
+			name: "fix-generate",
+			data: sampleGenerateFixesRequest(),
+			requiredText: []string{
+				"只返回需要修改的文件",
+				"无法安全完整重写",
+				"warnings",
+			},
+			forbidden: []string{
+				"读取相关文件的完整内容",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prompt, err := loader.Render(tc.name, tc.data)
+			require.NoError(t, err)
+			for _, text := range tc.requiredText {
+				require.Contains(t, prompt, text)
+			}
+			for _, text := range tc.forbidden {
+				require.NotContains(t, prompt, text)
+			}
+		})
+	}
+}
+
+func TestLoader_ProjectInitPromptDoesNotHardCodeFrameworkCatalog(t *testing.T) {
+	loader := NewLoader("common", "zh-CN", "")
+
+	prompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
+
+	require.NoError(t, err)
+	require.NotContains(t, prompt, "Gin/Echo/Beego/Fiber/Spring Boot/Express/Django")
+	require.NotContains(t, prompt, "GORM/Ent/XORM/SQLAlchemy/TypeORM/MyBatis")
+	require.Contains(t, prompt, "只提取项目实际使用的框架")
+}
+
+func TestLoader_ZhSkillSummaryUsesCorrectConcurrencySpelling(t *testing.T) {
+	loader := NewLoader("common", "zh-CN", "")
+
+	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "concurrency")
+	require.NotContains(t, prompt, "conurrency")
+}
+
 func sampleAnalyzeRequest() *agent.AnalyzeRequest {
 	return &agent.AnalyzeRequest{
 		Files: []domain.FileInfo{domain.NewFileInfo("main.go", "package main\nfunc main() {}\n")},

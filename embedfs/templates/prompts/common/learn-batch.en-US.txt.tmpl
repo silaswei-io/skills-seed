@@ -22,7 +22,12 @@ Message: {{$c.Message}}
 {{end}}
 {{end}}
 
-You are running in the project root. Inspect commits and changed files by hash/path yourself before extracting patterns; do not infer from file names alone.
+You are running in the project root. First inspect changed files and diffs by commit hash/path before extracting patterns; do not infer from file names alone.
+
+Reading scope control:
+- Read changed files first; expand only to direct callers, direct callees, or same-directory tests when evidence is insufficient.
+- Prefer commit hashes, changed paths, existing pattern files, and actual code evidence.
+- Do not scan the whole repository. If evidence remains insufficient, lower confidence or skip the candidate.
 
 # Pattern Types to Extract
 
@@ -181,7 +186,6 @@ For EACH pattern, you MUST provide:
 
 # Example Output
 
-```json
 {
   "patterns": [
     {
@@ -218,7 +222,6 @@ For EACH pattern, you MUST provide:
     }
   ]
 }
-```
 
 # CRITICAL Rules
 

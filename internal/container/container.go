@@ -51,14 +51,14 @@ type Container struct {
 }
 
 // AgentFactory 创建指定 engine 的 Agent
-type AgentFactory func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent
+type AgentFactory func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent
 
 var agentFactories = map[string]AgentFactory{
-	"claude": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent {
-		return claude.New(commandPath, timeout, loader, allowUserPlugins)
+	"claude": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+		return claude.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
 	},
-	"codex": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent {
-		return codex.New(commandPath, timeout, loader, allowUserPlugins)
+	"codex": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+		return codex.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
 	},
 }
 
@@ -163,7 +163,7 @@ func createAgent(cfg *config.Config, promptLoader *prompts.Loader) (agent.Agent,
 		command = engine
 	}
 
-	return factory(command, timeout, promptLoader, cfg.Agent.AllowUserPlugins), nil
+	return factory(command, timeout, promptLoader, cfg.Agent.AllowUserPlugins, cfg.Agent.Retry), nil
 }
 
 // Close 关闭容器

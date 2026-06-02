@@ -2,6 +2,24 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.4]
+
+### 优化
+
+- 优化运行时 prompt 的 JSON 输出约束，移除示例中的 markdown 代码块，降低 Agent 返回 fenced JSON 导致解析失败的概率。
+- 收紧 `learn current`、`learn history`、`generate-skills` 和 `check` 修复生成相关 prompt 的读取范围：优先读取目标文件、变更文件、CodeGraph 结构化上下文和直接相关调用关系，避免提示 Agent 无差别扫描整个仓库。
+- 优化项目初始化分析 prompt：不再列举固定框架/ORM/日志库清单，只提取项目实际使用的技术栈，减少模板示例诱导误判。
+
+### 变更
+
+- `fix-generate` 的 `summary` 和 `warnings` 字段现在会被解析并在 `check` 生成修复时输出；无法安全完整重写的文件可通过 `warnings` 提示人工审查。
+- `skill-project-summary` 的 `key_insights` 和 `improvement_suggestions` 现在会进入生成的项目 `SKILL.md`，让 Agent 能看到摘要阶段提炼出的关键洞察和改进建议。
+- `pattern-merge` 合并结果会保留正例、反例和业务方法信息，合并后的 pattern 不再丢失这些后续生成 skills 可用的字段。
+
+### 修复
+
+- 修复中文 `skill-project-summary` prompt 中 `concurrency` 分类拼写错误。
+
 ## [v0.4.3]
 
 ### 修复

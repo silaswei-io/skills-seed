@@ -60,6 +60,20 @@ When working in this repository
 - Use project-specific business methods and utilities from the references when they exist
 - Keep generated or incomplete sections explicit with `TODO`; do not silently skip missing content
 
+{{if .KeyInsights}}
+### Key Insights
+{{range .KeyInsights}}
+- {{.}}
+{{end}}
+
+{{end}}
+{{if .ImprovementSuggestions}}
+### Improvement Suggestions
+{{range .ImprovementSuggestions}}
+- {{.}}
+{{end}}
+
+{{end}}
 ### Pattern Confidence Levels
 ```
 New (30%) -> Forming (50%) -> Established (70%) -> Convention (90%)

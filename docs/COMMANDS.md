@@ -260,6 +260,8 @@ references/
   examples/*.md
 ```
 
+`SKILL.md` 会包含摘要阶段产出的关键洞察和改进建议（如果 Agent 返回了这些字段），用于补充入口 skill 中的项目判断依据。
+
 #### 注意事项
 
 1. workspace 模式会先用每个子项目自己的配置生成子项目 skill，再生成根仓 workspace skill。
@@ -485,6 +487,7 @@ skills-seed check --interactive=false
 
 1. pre-commit hook 通常使用 `skills-seed check --interactive=false`。
 2. 未指定 `--all` 时，只检查 Git 暂存区。
+3. 交互式生成修复时，Agent 返回的修复摘要会输出到日志；无法安全完整重写的文件会通过人工审查警告展示，而不会强行写入不完整修复。
 
 ### `skills-seed hook`
 

@@ -327,7 +327,7 @@ func registerGenerateWorkspaceMockAgentFactoryWithSummary(t *testing.T, summaryF
 	t.Helper()
 	provider := "mock-generate-workspace-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
 	generateWorkspaceFactoryMu.Lock()
-	container.RegisterAgentFactory(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent {
+	container.RegisterAgentFactory(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
 		return &mocks.MockAgent{
 			NameVal:      provider,
 			AvailableVal: true,

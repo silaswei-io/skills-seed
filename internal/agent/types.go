@@ -78,6 +78,8 @@ type GenerateFixesRequest struct {
 type GenerateFixesResult struct {
 	Fixes       map[string]string // 文件路径 -> 修复后的内容
 	Confidence  float64           // 置信度
+	Summary     string            // 修复摘要
+	Warnings    []string          // 需要人工审查的警告
 	GeneratedAt time.Time         // 生成时间
 }
 
@@ -95,11 +97,13 @@ type GenerateSkillsRequest struct {
 
 // GenerateSkillsResult AI汇总生成Skills的结果
 type GenerateSkillsResult struct {
-	CategorySummaries map[string]CategorySummary // 按分类的汇总内容
-	KeyPatterns       []PatternSummary           // 关键模式列表
-	BusinessRules     []string                   // 业务规则总结
-	BestPractices     []string                   // 最佳实践总结
-	CommonPatterns    []string                   // 通用模式总结
+	CategorySummaries      map[string]CategorySummary // 按分类的汇总内容
+	KeyPatterns            []PatternSummary           // 关键模式列表
+	BusinessRules          []string                   // 业务规则总结
+	BestPractices          []string                   // 最佳实践总结
+	CommonPatterns         []string                   // 通用模式总结
+	KeyInsights            []string                   // 关键洞察
+	ImprovementSuggestions []string                   // 改进建议
 }
 
 // CategorySummary 分类汇总
@@ -129,14 +133,18 @@ type MergePatternsRequest struct {
 
 // MergedPattern 合并后的模式
 type MergedPattern struct {
-	ID          string   // 模式ID
-	Name        string   // 模式名称
-	Category    string   // 分类
-	Description string   // 描述
-	Rule        string   // 规则
-	Confidence  float64  // 置信度
-	MergedFrom  []string // 从哪些模式合并而来
-	MergeReason string   // 合并理由
+	ID              string                 // 模式ID
+	Name            string                 // 模式名称
+	Category        string                 // 分类
+	Description     string                 // 描述
+	GoodExample     string                 // 正例代码
+	BadExample      string                 // 反例代码
+	Rule            string                 // 规则
+	Confidence      float64                // 置信度
+	MergedFrom      []string               // 从哪些模式合并而来
+	MergeReason     string                 // 合并理由
+	SimilarityScore float64                // 合并相似度
+	BusinessMethod  *domain.BusinessMethod // 业务方法信息
 }
 
 // UnchangedPattern 未变更的模式

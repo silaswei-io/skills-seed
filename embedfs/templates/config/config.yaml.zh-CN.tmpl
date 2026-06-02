@@ -58,6 +58,14 @@ agent:
   allow_user_plugins: false
   # 并发 Agent 数；0 表示自动(project=1, workspace=子项目数并带上限)
   parallelism: 0
+  # 可重试错误（429/529 过载等）的重试配置
+  retry:
+    # 最大重试次数，0 使用默认值(3)
+    max_retries: 3
+    # 首次重试等待秒数
+    initial_interval: 15
+    # 最大等待秒数（指数退避上限）
+    max_interval: 120
 
 # 学习
 learning:

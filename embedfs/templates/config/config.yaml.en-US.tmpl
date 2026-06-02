@@ -58,6 +58,14 @@ agent:
   allow_user_plugins: false
   # Number of concurrent agents; 0 means automatic (project=1, workspace=project count with cap)
   parallelism: 0
+  # Retry configuration for retryable errors (429/529 overloaded, etc.)
+  retry:
+    # Maximum retry attempts; 0 uses default (3)
+    max_retries: 3
+    # Initial retry wait in seconds
+    initial_interval: 15
+    # Maximum wait in seconds (exponential backoff cap)
+    max_interval: 120
 
 # Learning
 learning:

@@ -622,7 +622,7 @@ func registerLearnWorkspaceMockAgentFactoryWithHandlers(t *testing.T, handlers l
 	t.Helper()
 	provider := "mock-workspace-learn-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
 	learnWorkspaceFactoryMu.Lock()
-	container.RegisterAgentFactory(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool) agent.Agent {
+	container.RegisterAgentFactory(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
 		return &mocks.MockAgent{
 			NameVal:      provider,
 			AvailableVal: true,

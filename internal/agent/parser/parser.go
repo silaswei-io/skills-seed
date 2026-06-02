@@ -398,6 +398,8 @@ func ParseGenerateFixesResult(output string) (*agent.GenerateFixesResult, error)
 	var result struct {
 		Fixes      map[string]string `json:"fixes"`
 		Confidence float64           `json:"confidence"`
+		Summary    string            `json:"summary"`
+		Warnings   []string          `json:"warnings"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -407,6 +409,8 @@ func ParseGenerateFixesResult(output string) (*agent.GenerateFixesResult, error)
 	return &agent.GenerateFixesResult{
 		Fixes:      result.Fixes,
 		Confidence: result.Confidence,
+		Summary:    result.Summary,
+		Warnings:   result.Warnings,
 	}, nil
 }
 
@@ -442,9 +446,11 @@ func ParseGenerateSkillsResult(output string) (*agent.GenerateSkillsResult, erro
 			Summary    string `json:"summary"`
 			WhenToUse  string `json:"when_to_use"`
 		} `json:"key_patterns"`
-		BusinessRules  []string `json:"business_rules"`
-		BestPractices  []string `json:"best_practices"`
-		CommonPatterns []string `json:"common_patterns"`
+		BusinessRules          []string `json:"business_rules"`
+		BestPractices          []string `json:"best_practices"`
+		CommonPatterns         []string `json:"common_patterns"`
+		KeyInsights            []string `json:"key_insights"`
+		ImprovementSuggestions []string `json:"improvement_suggestions"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -452,11 +458,13 @@ func ParseGenerateSkillsResult(output string) (*agent.GenerateSkillsResult, erro
 	}
 
 	generateResult := &agent.GenerateSkillsResult{
-		CategorySummaries: make(map[string]agent.CategorySummary),
-		KeyPatterns:       []agent.PatternSummary{},
-		BusinessRules:     result.BusinessRules,
-		BestPractices:     result.BestPractices,
-		CommonPatterns:    result.CommonPatterns,
+		CategorySummaries:      make(map[string]agent.CategorySummary),
+		KeyPatterns:            []agent.PatternSummary{},
+		BusinessRules:          result.BusinessRules,
+		BestPractices:          result.BestPractices,
+		CommonPatterns:         result.CommonPatterns,
+		KeyInsights:            result.KeyInsights,
+		ImprovementSuggestions: result.ImprovementSuggestions,
 	}
 
 	for key, summary := range result.CategorySummaries {
@@ -508,14 +516,27 @@ func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error)
 
 	var result struct {
 		MergedPatterns []struct {
-			ID          string   `json:"id"`
-			Name        string   `json:"name"`
-			Category    string   `json:"category"`
-			Description string   `json:"description"`
-			Rule        string   `json:"rule"`
-			Confidence  float64  `json:"confidence"`
-			MergedFrom  []string `json:"merged_from"`
-			MergeReason string   `json:"merge_reason"`
+			ID              string   `json:"id"`
+			Name            string   `json:"name"`
+			Category        string   `json:"category"`
+			Description     string   `json:"description"`
+			GoodExample     string   `json:"good_example"`
+			BadExample      string   `json:"bad_example"`
+			Rule            string   `json:"rule"`
+			Confidence      float64  `json:"confidence"`
+			MergedFrom      []string `json:"merged_from"`
+			MergeReason     string   `json:"merge_reason"`
+			SimilarityScore float64  `json:"similarity_score"`
+			BusinessMethod  *struct {
+				Name          string `json:"name"`
+				Location      string `json:"location"`
+				Description   string `json:"description"`
+				Usage         string `json:"usage"`
+				Type          string `json:"type"`
+				Function      string `json:"function"`
+				Prerequisites string `json:"prerequisites"`
+				Returns       string `json:"returns"`
+			} `json:"business_method"`
 		} `json:"merged_patterns"`
 		UnchangedPatterns []struct {
 			ID     string `json:"id"`
@@ -545,15 +566,32 @@ func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error)
 	}
 
 	for i, p := range result.MergedPatterns {
+		var businessMethod *domain.BusinessMethod
+		if p.BusinessMethod != nil {
+			businessMethod = &domain.BusinessMethod{
+				Name:          p.BusinessMethod.Name,
+				Location:      p.BusinessMethod.Location,
+				Description:   p.BusinessMethod.Description,
+				Usage:         p.BusinessMethod.Usage,
+				Type:          p.BusinessMethod.Type,
+				Function:      p.BusinessMethod.Function,
+				Prerequisites: p.BusinessMethod.Prerequisites,
+				Returns:       p.BusinessMethod.Returns,
+			}
+		}
 		mergeResult.MergedPatterns[i] = agent.MergedPattern{
-			ID:          p.ID,
-			Name:        p.Name,
-			Category:    p.Category,
-			Description: p.Description,
-			Rule:        p.Rule,
-			Confidence:  p.Confidence,
-			MergedFrom:  p.MergedFrom,
-			MergeReason: p.MergeReason,
+			ID:              p.ID,
+			Name:            p.Name,
+			Category:        p.Category,
+			Description:     p.Description,
+			GoodExample:     p.GoodExample,
+			BadExample:      p.BadExample,
+			Rule:            p.Rule,
+			Confidence:      p.Confidence,
+			MergedFrom:      p.MergedFrom,
+			MergeReason:     p.MergeReason,
+			SimilarityScore: p.SimilarityScore,
+			BusinessMethod:  businessMethod,
 		}
 	}
 

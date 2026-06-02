@@ -262,6 +262,14 @@ func generateFixes(cont *container.Container, ctx context.Context, issues []doma
 	}
 
 	logger.Info(i18n.GetWithParams("LoggerCheckConfidence", map[string]interface{}{"Confidence": fmt.Sprintf("%.0f", result.Confidence*100)}))
+	if strings.TrimSpace(result.Summary) != "" {
+		logger.Info(result.Summary)
+	}
+	for _, warning := range result.Warnings {
+		if strings.TrimSpace(warning) != "" {
+			logger.Warn(warning)
+		}
+	}
 
 	return result.Fixes, nil
 }
