@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.1]
+
+### 变更
+
+- 优化 `.skills-seed/prompts/` 语义：用户文件现在作为项目上下文、workspace 约束和补充指令与内置 prompt 合并，不再表达为替换内置 prompt 的覆盖模板。
+- 将用户补充指令目录调整为 `.skills-seed/prompts/instructions/<prompt-id>.md`，并将项目级 prompt 片段调整为 `.skills-seed/prompts/project/<prompt-id>.md`。
+- workspace prompt 初始化文件名改为 canonical runtime prompt ID：`skill-workspace-profile.md` 和 `skill-workspace-spec.md`。
+- `project-profile.md` 默认内容改为事实记录式“未记录”，避免把“请补充/请分析”类任务指令混入运行时 prompt。
+- 新增内置 `output-contract-guard` prompt 模板，在用户补充指令后追加最终输出契约，保护 JSON / Markdown 输出格式。
+
+### 文档
+
+- README / README.en 新增 prompt 合并和一次性 `--context` / `--context-file` 说明。
+- 更新命令参考与配置参考，说明 `.skills-seed/prompts/` 的目录用途、合并顺序、最终输出契约，以及一次性说明参数和持久补充指令的区别。
+
 ## [v0.4.0]
 
 ### 修复

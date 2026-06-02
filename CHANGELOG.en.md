@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.1]
+
+### Changes
+
+- Clarify `.skills-seed/prompts/` semantics: user files are now merged with built-in prompts as project context, workspace constraints, and user instructions instead of acting as full prompt replacements.
+- Move user instructions to `.skills-seed/prompts/instructions/<prompt-id>.md`, and use `.skills-seed/prompts/project/<prompt-id>.md` for project-level prompt fragments.
+- Rename initialized workspace prompt files to canonical runtime prompt IDs: `skill-workspace-profile.md` and `skill-workspace-spec.md`.
+- Change the default `project-profile.md` content to fact-style `Not recorded` placeholders, avoiding task instructions such as "describe" or "analyze" inside runtime prompt context.
+- Add built-in `output-contract-guard` prompt templates appended after user instructions to protect JSON / Markdown output formats.
+
+### Documentation
+
+- Add README / README.en coverage for prompt merging and one-time `--context` / `--context-file` guidance.
+- Update command and configuration references with `.skills-seed/prompts/` directory purposes, merge order, final output contract behavior, and the difference between one-time guidance flags and persistent instructions.
+
 ## [v0.4.0]
 
 ### Fixes
