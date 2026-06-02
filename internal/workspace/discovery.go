@@ -159,6 +159,15 @@ func detectProject(root, rel string) (config.WorkspaceProjectConfig, bool) {
 	}, true
 }
 
+func DetectProjectKindAndLanguage(root string) (string, string, bool) {
+	markers := collectProjectMarkers(root)
+	if len(markers) == 0 {
+		return "", "", false
+	}
+	projectType, language := inferTypeAndLanguage(root, markers)
+	return projectType, language, true
+}
+
 func collectProjectMarkers(abs string) map[string]bool {
 	markers := map[string]bool{}
 	for _, marker := range projectMarkerFiles {
@@ -185,9 +194,9 @@ func collectProjectMarkers(abs string) map[string]bool {
 func inferTypeAndLanguage(abs string, markers map[string]bool) (string, string) {
 	if hasAnyMarker(markers, markerGroups["node"]) {
 		if isFrontendPackage(filepath.Join(abs, "package.json")) {
-			return "frontend", "typescript"
+			return "frontend", inferNodeLanguage(abs, markers)
 		}
-		return "backend", "typescript"
+		return "backend", inferNodeLanguage(abs, markers)
 	}
 	if hasAnyMarker(markers, markerGroups["go"]) {
 		if pathExists(filepath.Join(abs, "cmd")) || pathExists(filepath.Join(abs, "internal")) {
@@ -232,6 +241,32 @@ func inferTypeAndLanguage(abs string, markers map[string]bool) (string, string) 
 		return "service", "unknown"
 	}
 	return "project", "unknown"
+}
+
+func inferNodeLanguage(abs string, markers map[string]bool) string {
+	if markers["tsconfig.json"] || markers["vite.config.ts"] || markers["nuxt.config.ts"] {
+		return "typescript"
+	}
+	data, err := os.ReadFile(filepath.Join(abs, "package.json"))
+	if err != nil {
+		return "javascript"
+	}
+	var pkg struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return "javascript"
+	}
+	for _, deps := range []map[string]string{pkg.Dependencies, pkg.DevDependencies} {
+		for name := range deps {
+			switch strings.ToLower(name) {
+			case "typescript", "ts-node", "tsx":
+				return "typescript"
+			}
+		}
+	}
+	return "javascript"
 }
 
 func hasAnyMarker(markers map[string]bool, names []string) bool {

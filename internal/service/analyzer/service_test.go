@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,12 @@ func TestGetProjectStructure(t *testing.T) {
 	assert.Contains(t, structure, "cmd")
 	assert.Contains(t, structure, "internal")
 	assert.Contains(t, structure, "main.go")
+}
+
+func TestShouldUseExternalTreeCommandSkipsWindows(t *testing.T) {
+	assert.Equal(t, runtime.GOOS != "windows", shouldUseExternalTreeCommand(runtime.GOOS, true))
+	assert.False(t, shouldUseExternalTreeCommand("windows", true))
+	assert.False(t, shouldUseExternalTreeCommand("linux", false))
 }
 
 func TestFindMainFiles(t *testing.T) {

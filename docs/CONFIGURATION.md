@@ -106,7 +106,7 @@ exclude:
 | `name` | 当前目录名 | 项目名称，init 时自动填充 |
 | `mode` | `project` | 初始化模式：`project` 单项目，`workspace` 多子项目工作区 |
 | `language` | `go` | 项目主要语言，可按项目改为 `typescript`、`python` 等 |
-| `locale` | 自动检测；未识别时 `zh-CN` | CLI 输出、配置模板、prompt 和 skills 模板语言 |
+| `locale` | `zh-CN` | CLI 输出、配置模板、prompt 和 skills 模板语言 |
 | `git_remote` | 自动填充或空 | Git 远程仓库地址 |
 | `root_path` | 当前项目绝对路径 | init 时写入，供运行时定位项目根目录 |
 | `initialized_at` | init 时间 | 初始化时间 |

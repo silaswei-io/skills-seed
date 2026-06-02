@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -73,15 +72,15 @@ func ResolvePath(projectRoot, path string) (string, error) {
 		return projectRoot, nil
 	}
 
-	if strings.HasPrefix(path, "~/") || path == "~" {
-		usr, err := user.Current()
+	if strings.HasPrefix(path, "~/") || strings.HasPrefix(path, `~\`) || path == "~" {
+		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
 		}
 		if path == "~" {
-			return usr.HomeDir, nil
+			return homeDir, nil
 		}
-		return filepath.Join(usr.HomeDir, strings.TrimPrefix(path, "~/")), nil
+		return filepath.Join(homeDir, strings.TrimPrefix(strings.TrimPrefix(path, "~/"), `~\`)), nil
 	}
 
 	if filepath.IsAbs(path) {

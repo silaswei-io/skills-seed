@@ -117,6 +117,17 @@ logging:
 	})
 }
 
+func TestResolvePathExpandsWindowsStyleHomePrefix(t *testing.T) {
+	projectRoot := t.TempDir()
+
+	resolved, err := ResolvePath(projectRoot, `~\skills-seed`)
+
+	require.NoError(t, err)
+	assert.True(t, filepath.IsAbs(resolved))
+	assert.Contains(t, filepath.ToSlash(resolved), "/skills-seed")
+	assert.NotContains(t, resolved, "~")
+}
+
 func TestRelativePaths(t *testing.T) {
 	projectRoot := filepath.Join("tmp", "project")
 	paths := []string{

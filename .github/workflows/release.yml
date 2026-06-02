@@ -84,6 +84,7 @@ jobs:
           build darwin amd64 x86_64
           build darwin arm64 arm64
           build windows amd64 x86_64
+          build windows arm64 arm64
 
           (cd dist && sha256sum * > checksums.txt)
 

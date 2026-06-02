@@ -62,7 +62,7 @@ skills-templates-sha256: <hash>
 | `--agent` | `claude` | 初始化时写入的执行 Agent engine，例如 `claude` 或 `codex` |
 | `--skills` | `claude` | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex` |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
-| `--locale`, `-l` | 自动检测 | 配置文件语言：`zh-CN` 或 `en-US` |
+| `--locale`, `-l` | `zh-CN` | 配置文件语言：`zh-CN` 或 `en-US` |
 | `--help`, `-h` | `false` | 查看 `init` 帮助 |
 
 #### 常用示例
@@ -121,7 +121,7 @@ skills-seed init --workspace --agent codex --skills codex
 |---|---:|---|
 | `--mode` | `project` | 重置后的初始化模式：`project` 或 `workspace` |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
-| `--locale`, `-l` | 自动检测 | 重置后配置文件语言：`zh-CN` 或 `en-US` |
+| `--locale`, `-l` | `zh-CN` | 重置后配置文件语言：`zh-CN` 或 `en-US` |
 | `--help`, `-h` | `false` | 查看 `reset` 帮助 |
 
 #### 常用示例

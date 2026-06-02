@@ -62,7 +62,7 @@ Initialize `.skills-seed/`, default config, database, and prompt / skills templa
 | `--agent` | `claude` | Execution Agent engine to write during initialization, for example `claude` or `codex` |
 | `--skills` | `claude` | Skills output type to write during initialization, for example `claude` or `codex` |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
-| `--locale`, `-l` | auto-detect | Config language: `zh-CN` or `en-US` |
+| `--locale`, `-l` | `zh-CN` | Config language: `zh-CN` or `en-US` |
 | `--help`, `-h` | `false` | Show `init` help |
 
 #### Common Examples
@@ -121,7 +121,7 @@ Back up and reset the current repository's `.skills-seed`. Existing data is move
 |---|---:|---|
 | `--mode` | `project` | Mode after reset: `project` or `workspace` |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
-| `--locale`, `-l` | auto-detect | Config language after reset: `zh-CN` or `en-US` |
+| `--locale`, `-l` | `zh-CN` | Config language after reset: `zh-CN` or `en-US` |
 | `--help`, `-h` | `false` | Show `reset` help |
 
 #### Common Examples

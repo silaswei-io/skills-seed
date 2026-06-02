@@ -26,7 +26,7 @@ func TestDiscoverProjectsUsesOnlyFirstLevelDirectories(t *testing.T) {
 	require.Equal(t, "frontend", projects[1].ID)
 	require.Equal(t, "frontend", projects[1].Path)
 	require.Equal(t, "frontend", projects[1].Type)
-	require.Equal(t, "typescript", projects[1].Language)
+	require.Equal(t, "javascript", projects[1].Language)
 }
 
 func TestDiscoverProjectsSupportsAdditionalMarkers(t *testing.T) {
@@ -49,6 +49,25 @@ func TestDiscoverProjectsSupportsAdditionalMarkers(t *testing.T) {
 	require.Equal(t, "php", projects[2].Language)
 	require.Equal(t, "rust", projects[3].ID)
 	require.Equal(t, "rust", projects[3].Language)
+}
+
+func TestDetectProjectKindAndLanguageDistinguishesNodeLanguage(t *testing.T) {
+	jsRoot := t.TempDir()
+	writeFile(t, filepath.Join(jsRoot, "package.json"), `{"dependencies":{"react":"latest"}}`)
+
+	projectType, language, ok := DetectProjectKindAndLanguage(jsRoot)
+	require.True(t, ok)
+	require.Equal(t, "frontend", projectType)
+	require.Equal(t, "javascript", language)
+
+	tsRoot := t.TempDir()
+	writeFile(t, filepath.Join(tsRoot, "package.json"), `{"devDependencies":{"typescript":"latest","vite":"latest"}}`)
+	writeFile(t, filepath.Join(tsRoot, "tsconfig.json"), "{}")
+
+	projectType, language, ok = DetectProjectKindAndLanguage(tsRoot)
+	require.True(t, ok)
+	require.Equal(t, "frontend", projectType)
+	require.Equal(t, "typescript", language)
 }
 
 func writeFile(t *testing.T, path, content string) {

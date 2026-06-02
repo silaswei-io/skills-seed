@@ -106,7 +106,7 @@ exclude:
 | `name` | current directory name | Project name, filled during init |
 | `mode` | `project` | Init mode: `project` for a single project, `workspace` for a multi-project workspace |
 | `language` | `go` | Primary project language, such as `typescript` or `python` |
-| `locale` | auto-detect; fallback `zh-CN` | Language for CLI output, config templates, prompts, and skill templates |
+| `locale` | `zh-CN` | Language for CLI output, config templates, prompts, and skill templates |
 | `git_remote` | auto-filled or empty | Git remote URL |
 | `root_path` | current project absolute path | Written during init and used to locate the project root |
 | `initialized_at` | init time | Initialization time |

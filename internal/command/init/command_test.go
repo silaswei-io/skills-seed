@@ -83,6 +83,47 @@ func TestInitializeProjectWithSkillsSetsTarget(t *testing.T) {
 	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
 }
 
+func TestInitializeProjectDetectsFrontendLanguage(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "src"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "package.json"), []byte(`{
+  "scripts": {"dev": "vite --host 0.0.0.0"},
+  "dependencies": {"@vitejs/plugin-react": "latest", "react": "latest"},
+  "devDependencies": {"typescript": "latest", "vite": "latest"}
+}`), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "tsconfig.json"), []byte(`{"compilerOptions": {}}`), 0644))
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+	}))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "typescript", configRepo.GetProjectConfig().Language)
+}
+
+func TestInitializeProjectDetectsJavaScriptFrontendLanguage(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "src"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "package.json"), []byte(`{
+  "scripts": {"dev": "vite --host 0.0.0.0"},
+  "dependencies": {"@vitejs/plugin-react": "latest", "react": "latest"},
+  "devDependencies": {"vite": "latest"}
+}`), 0644))
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+	}))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "javascript", configRepo.GetProjectConfig().Language)
+}
+
 func TestInitializeProjectWithAgentAndSkillsCanDiffer(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)

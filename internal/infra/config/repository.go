@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -356,10 +355,7 @@ func (r *Repository) saveWithMarshal(cfg *Config) error {
 
 // defaultConfig 默认配置
 func (r *Repository) defaultConfig(locale string) *Config {
-	// 如果指定了 locale，使用指定的；否则检测系统语言
-	if locale == "" {
-		locale = r.detectSystemLocale()
-	}
+	locale = normalizeLocale(locale)
 
 	// 根据语言选择对应的模板文件
 	templateName := fmt.Sprintf("templates/config/config.yaml.%s.tmpl", locale)
@@ -452,33 +448,15 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	}
 }
 
-// detectSystemLocale 检测系统语言
-func (r *Repository) detectSystemLocale() string {
-	// 检查 LANG 环境变量
-	lang := os.Getenv("LANG")
-	if strings.Contains(lang, "zh_CN") || strings.Contains(lang, "zh-CN") {
+func normalizeLocale(locale string) string {
+	switch strings.TrimSpace(locale) {
+	case "en-US":
+		return "en-US"
+	case "zh-CN":
 		return "zh-CN"
+	default:
+		return domain.DefaultLocale
 	}
-
-	// 检查 LC_ALL 环境变量
-	lcAll := os.Getenv("LC_ALL")
-	if strings.Contains(lcAll, "zh_CN") || strings.Contains(lcAll, "zh-CN") {
-		return "zh-CN"
-	}
-
-	// macOS 检查
-	if _, err := os.Stat("/usr/bin/defaults"); err == nil {
-		cmd := exec.Command("defaults", "read", "-g", "AppleLocale")
-		if output, err := cmd.Output(); err == nil {
-			locale := strings.TrimSpace(string(output))
-			if strings.Contains(locale, "zh_CN") || strings.Contains(locale, "zh-CN") {
-				return "zh-CN"
-			}
-		}
-	}
-
-	// 默认使用英文
-	return "en-US"
 }
 
 // fallbackDefaultConfig 是模板不可用时的最小后备配置

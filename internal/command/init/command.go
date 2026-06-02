@@ -236,6 +236,10 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		if err := configRepo.SetProjectLanguage(opts.language); err != nil {
 			return err
 		}
+	} else if _, detectedLanguage, ok := workspacediscovery.DetectProjectKindAndLanguage(projectRoot); ok && detectedLanguage != "" && detectedLanguage != "unknown" {
+		if err := configRepo.SetProjectLanguage(detectedLanguage); err != nil {
+			return err
+		}
 	}
 	if opts.agentEngine != "" {
 		cfg := configRepo.Get()

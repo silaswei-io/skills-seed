@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.3]
+
+### Fixes
+
+- Fix Windows generating English config by default when `--locale` is omitted; the implicit default is now consistently Chinese.
+- Fix root project `init` not auto-detecting frontend/Node project language and leaving config as `go`.
+- Improve Windows path compatibility by supporting `~\path` expansion and avoiding Unix `tree` arguments on Windows.
+
+### Release
+
+- Add a Windows arm64 release asset.
+
 ## [v0.4.2]
 
 ### Fixes

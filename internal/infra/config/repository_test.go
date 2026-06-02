@@ -605,14 +605,23 @@ func TestRepository_SetRootPath(t *testing.T) {
 
 func TestNewRepository_DefaultLocale(t *testing.T) {
 	seedPath := t.TempDir()
-	// 传入空 locale 时，应使用检测到的系统语言或默认语言。
+	t.Setenv("LANG", "en_US.UTF-8")
+	t.Setenv("LC_ALL", "")
 	repo, err := NewRepository(seedPath, "")
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 
 	cfg := repo.Get()
-	// locale 应该被设置为非空值。
-	assert.NotEmpty(t, cfg.Project.Locale)
+	assert.Equal(t, "zh-CN", cfg.Project.Locale)
+}
+
+func TestNormalizeLocaleDefaultsToChinese(t *testing.T) {
+	assert.Equal(t, "zh-CN", normalizeLocale(""))
+	assert.Equal(t, "zh-CN", normalizeLocale("en_US.UTF-8"))
+}
+
+func TestNormalizeLocalePreservesExplicitEnglish(t *testing.T) {
+	assert.Equal(t, "en-US", normalizeLocale("en-US"))
 }
 
 func TestNewRepository_EnUSLocale(t *testing.T) {

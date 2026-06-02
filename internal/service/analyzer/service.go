@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -397,7 +398,7 @@ func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error
 	)
 
 	// 使用 tree 命令获取目录结构（如果可用）
-	if _, err := exec.LookPath("tree"); err == nil {
+	if _, err := exec.LookPath("tree"); shouldUseExternalTreeCommand(runtime.GOOS, err == nil) {
 		cmd := exec.Command("tree", "-L", "3", "-I", "vendor|node_modules|.git|.skills-seed", projectRoot)
 		output, err := cmd.Output()
 		if err == nil {
@@ -478,6 +479,10 @@ func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error
 	)
 
 	return result, nil
+}
+
+func shouldUseExternalTreeCommand(goos string, treeAvailable bool) bool {
+	return treeAvailable && goos != "windows"
 }
 
 // FindMainFiles 查找主要入口文件

@@ -1849,7 +1849,7 @@ other = "skills-seed 已经初始化"
 other = "初始化模式：project 单项目或 workspace 多子项目根仓"
 
 [InitFlagLocale]
-other = "配置文件语言：zh-CN 或 en-US；不指定时自动检测"
+other = "配置文件语言：zh-CN 或 en-US；不指定时默认 zh-CN"
 
 [InitFlagAgent]
 other = "初始化时写入的 Agent engine，例如 claude 或 codex"

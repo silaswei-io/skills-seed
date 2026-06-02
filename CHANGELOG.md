@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.4.3]
+
+### 修复
+
+- 修复未指定 `--locale` 时 Windows 默认生成英文配置的问题；未显式指定时稳定使用中文。
+- 修复根项目 `init` 未自动识别前端/Node 项目语言、导致配置默认写成 `go` 的问题。
+- 优化 Windows 路径兼容：支持 `~\path` 展开，并避免调用 Windows 不兼容的 Unix `tree` 参数。
+
+### 发布
+
+- 新增 Windows arm64 release 包。
+
 ## [v0.4.2]
 
 ### 修复
