@@ -749,33 +749,12 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 // workspaceSpecFromConfig 基于根仓配置生成只描述跨子仓关系的工作区规范。
 func workspaceSpecFromConfig(workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig, generatedAt string) *domain.WorkspaceSpec {
 	profile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
-	routing := make([]domain.WorkspaceRoute, 0, len(profile.Projects)+len(profile.Shared)+len(profile.Contracts)+len(profile.Infra))
+	routing := make([]domain.WorkspaceRoute, 0, len(profile.Projects))
 	for _, project := range profile.Projects {
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: filepath.ToSlash(filepath.Join(project.Path, "**")),
 			ProjectIDs:  []string{project.ID},
 			Reason:      "子项目路径只路由到该子项目的独立 skill",
-		})
-	}
-	for _, path := range profile.Contracts {
-		routing = append(routing, domain.WorkspaceRoute{
-			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
-			ProjectIDs:  workspaceProjectIDs(profile.Projects),
-			Reason:      "契约路径变更需要检查生产者、消费者和生成物",
-		})
-	}
-	for _, path := range profile.Shared {
-		routing = append(routing, domain.WorkspaceRoute{
-			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
-			ProjectIDs:  workspaceProjectIDs(profile.Projects),
-			Reason:      "共享代码变更需要检查所有导入方或复用方",
-		})
-	}
-	for _, path := range profile.Infra {
-		routing = append(routing, domain.WorkspaceRoute{
-			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
-			ProjectIDs:  workspaceProjectIDs(profile.Projects),
-			Reason:      "基础设施变更需要检查受部署或运行时配置影响的子项目",
 		})
 	}
 

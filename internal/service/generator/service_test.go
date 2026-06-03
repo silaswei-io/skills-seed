@@ -792,6 +792,15 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 				Dependencies: []domain.WorkspaceDependency{
 					{From: "hsmwebapi", To: "kmip-go", Reason: "hsmwebapi 调用 kmip-go 实现 KMIP 能力"},
 				},
+				Shared: []domain.WorkspacePath{
+					{Path: "core-engine", Description: "核心能力库", Consumers: []string{"hsmwebapi", "kmip-go"}},
+				},
+				Contracts: []domain.WorkspacePath{
+					{Path: "kmip-go/proto", Description: "KMIP 契约", Producers: []string{"kmip-go"}, Consumers: []string{"hsmwebapi"}},
+				},
+				Infra: []domain.WorkspacePath{
+					{Path: "base-xengine", Description: "离线安装底座", AffectedProjects: []string{"hsmwebapi", "kmip-go"}},
+				},
 				ImpactRoutes: []domain.WorkspaceRoute{
 					{PathPattern: "kmip-go/**", ProjectIDs: []string{"hsmwebapi", "kmip-go"}, Reason: "KMIP 能力变更需要同步检查调用方"},
 				},
@@ -865,19 +874,25 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 	require.Contains(t, overview, "HSM 工作区负责私有化密码设备管理")
 	require.Contains(t, overview, "主后端，负责管理 API")
 	require.Contains(t, overview, "hsmwebapi 调用 kmip-go 实现 KMIP 能力")
+	require.Contains(t, overview, "`kmip-go/proto` - KMIP 契约")
+	require.Contains(t, overview, "`core-engine` - 核心能力库")
+	require.Contains(t, overview, "`base-xengine` - 离线安装底座")
 	require.Contains(t, overview, "KMIP 能力变更需要同步检查调用方")
 
 	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
 	require.Contains(t, rules, "KMIP 能力同步")
 	require.Contains(t, rules, "先确认 KMIP 契约和核心能力边界")
 	require.Contains(t, rules, "修改 kmip-go/**")
+	require.Contains(t, rules, "修改已识别契约路径时")
+	require.Contains(t, rules, "修改已识别共享路径时")
+	require.Contains(t, rules, "修改已识别基础设施路径时")
 }
 
 func TestGenerateWorkspaceSkills_RootSkillStaysConciseAndRoutesViaOverview(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend", ".skills-seed"), 0755))
 	childConfig := `
-project:
+profile:
   name: "backend"
   mode: "project"
   language: "go"
@@ -1032,7 +1047,7 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 	require.NotContains(t, rootSkill, "backend/.claude/skills/skills-seed-skills/SKILL.md")
 
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
-	require.Contains(t, overview, "未显式配置契约路径")
+	require.Contains(t, overview, "未分析出明确契约路径")
 	require.Contains(t, overview, "默认写入边界")
 }
 
@@ -1040,7 +1055,7 @@ func TestGenerateWorkspaceSkills_UsesChildProjectConfigPath(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend", ".skills-seed"), 0755))
 	childConfig := `
-project:
+profile:
   name: "backend"
   mode: "project"
   language: "go"

@@ -126,9 +126,6 @@ type workspaceGenerateInputData struct {
 	Name       string                          `json:"name"`
 	RootPath   string                          `json:"root_path"`
 	Projects   []workspaceGenerateInputProject `json:"projects"`
-	Shared     []config.WorkspacePathConfig    `json:"shared,omitempty"`
-	Contracts  []config.WorkspacePathConfig    `json:"contracts,omitempty"`
-	Infra      []config.WorkspacePathConfig    `json:"infra,omitempty"`
 	ConfigPath string                          `json:"config_path,omitempty"`
 }
 
@@ -473,9 +470,6 @@ func (s *GeneratorService) workspaceGenerateInput(projectConfig config.ProjectCo
 		Name:       workspaceNameOrDefault(projectConfig.Name),
 		RootPath:   projectRoot,
 		Projects:   make([]workspaceGenerateInputProject, 0, len(workspaceConfig.Projects)),
-		Shared:     workspaceConfig.Shared,
-		Contracts:  workspaceConfig.Contracts,
-		Infra:      workspaceConfig.Infra,
 		ConfigPath: filepath.Join(projectRoot, ".skills-seed", "config.yaml"),
 	}
 	for _, project := range workspaceConfig.Projects {
@@ -1561,9 +1555,9 @@ func (s *GeneratorService) workspaceTemplateData(ctx context.Context, projectCon
 		})
 	}
 	userContext := runtimecontext.UserContext(ctx)
-	shared := workspacePathsFromConfig(workspaceConfig.Shared)
-	contracts := workspacePathsFromConfig(workspaceConfig.Contracts)
-	infra := workspacePathsFromConfig(workspaceConfig.Infra)
+	var shared []domain.WorkspacePath
+	var contracts []domain.WorkspacePath
+	var infra []domain.WorkspacePath
 	var dependencies []domain.WorkspaceDependency
 	var impactRoutes []domain.WorkspaceRoute
 	if profile != nil {
@@ -1637,17 +1631,6 @@ func workspaceProjectByID(profile *domain.WorkspaceProfile, id string) domain.Wo
 		}
 	}
 	return domain.WorkspaceProject{}
-}
-
-func workspacePathsFromConfig(paths []config.WorkspacePathConfig) []domain.WorkspacePath {
-	result := make([]domain.WorkspacePath, 0, len(paths))
-	for _, path := range paths {
-		result = append(result, domain.WorkspacePath{
-			Path:        path.Path,
-			Description: path.Description,
-		})
-	}
-	return result
 }
 
 func relativeWorkspacePath(workspaceRoot, path string) string {

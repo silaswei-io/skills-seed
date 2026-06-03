@@ -4,12 +4,21 @@
 
 配置文件位于 `.skills-seed/config.yaml`。`skills-seed init` 会按当前项目生成默认配置；大多数路径都相对项目根目录或 `.skills-seed` 目录，具体以字段说明为准。
 
+## 0.6.0 配置结构
+
+0.6.0 是一次未发布前的干净配置重构，不保留旧字段兼容：
+
+- 顶层 `project` 改名为 `profile`，表示当前配置文件所属项目或工作区本身，不表示 `project` 运行模式。
+- `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
+- workspace 公共库、契约和基础设施影响会在学习/生成 workspace profile 与 spec 时根据仓库证据、依赖关系和用户上下文分析，不从配置文件读取。
+- workspace 根配置的 `profile.language` 默认留空，因为一个工作区可以包含多种语言子项目。
+
 ## 配置示例
 
 ### 默认结构
 
 ```yaml
-project:
+profile:
   name: "your-project"
   mode: "project"
   language: "go"
@@ -20,9 +29,6 @@ project:
 
 workspace:
   projects: []
-  shared: []
-  contracts: []
-  infra: []
 
 analysis:
   codegraph:
@@ -101,7 +107,9 @@ exclude:
 
 ## 配置项
 
-### `project`
+### `profile`
+
+`profile` 描述当前配置文件所属的项目或工作区本身，不表示 `project` 运行模式
 
 #### 字段
 
@@ -117,7 +125,7 @@ exclude:
 
 #### 说明
 
-1. `mode` 在开始学习或生成 skills 后会被锁定，不能直接在 `project` 和 `workspace` 之间切换。
+1. `mode` 在开始学习或生成 skills 后会被锁定，不能直接在 `project` 和 `workspace` 模式之间切换。
 2. 需要重新选择模式时，使用 `skills-seed reset --mode project` 或 `skills-seed reset --mode workspace`。
 3. `locale` 支持 `zh-CN` 和 `en-US`。
 
@@ -128,9 +136,6 @@ exclude:
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `projects` | `[]` | 子项目列表；workspace init 会尝试发现第一层目录中的项目 |
-| `shared` | `[]` | 公共库或共享代码目录 |
-| `contracts` | `[]` | API、IDL、协议等契约目录 |
-| `infra` | `[]` | 部署、运维、基础设施目录 |
 
 #### `projects` 项目字段
 
@@ -138,15 +143,8 @@ exclude:
 |---|---:|---|
 | `id` | 目录名规范化 | 子项目唯一标识 |
 | `path` | 发现到的相对路径 | 子项目路径，相对 workspace 根目录 |
-| `type` | 自动识别 | 子项目角色，例如 `backend`、`frontend`、`infra`、`contracts` |
+| `type` | 自动识别 | 子项目类型，例如 `backend`、`frontend`、`library`、`infra`、`contracts` |
 | `language` | 自动识别 | 子项目主要语言 |
-
-#### `shared` / `contracts` / `infra` 路径字段
-
-| 字段 | 默认值 | 说明 |
-|---|---:|---|
-| `path` | 无 | 路径，相对 workspace 根目录 |
-| `description` | 空 | 路径用途说明 |
 
 #### 行为
 
@@ -154,6 +152,8 @@ exclude:
 2. 后续新增或拷入 workspace 的子项目使用 `skills-seed workspace add .` 自动检测添加，或使用 `skills-seed workspace add <子项目>` 指定添加。
 3. 子项目已有 `.skills-seed/config.yaml` 时不覆盖；如果子项目 agent 和根仓不同，只提示并保留子项目配置。
 4. 子项目已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
+5. 只有 workspace 根目录第一层且拥有独立 `.git` 的目录会被识别为子项目。
+6. `go.mod`、`package.json`、安装脚本、Helm/Terraform 等标记只用于识别 `type` 和 `language`，不再决定目录是否是项目。
 
 ### `analysis.codegraph`
 

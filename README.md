@@ -156,7 +156,7 @@ Claude Code 默认读取：
 
 ### Workspace
 
-workspace 模式适用于一个根目录下管理多个独立 Git 子项目的场景。初始化时会扫描第一层目录，检测子项目，并为当时检测到的子项目初始化 `.skills-seed`。
+workspace 模式适用于一个根目录下管理多个独立 Git 子项目的场景。初始化时会扫描第一层目录，只有拥有独立 `.git` 的目录会进入 `workspace.projects`，并为当时检测到的子项目初始化 `.skills-seed`。`go.mod`、`package.json`、安装脚本、Helm/Terraform 等文件只用于识别子项目类型和语言。
 
 ```bash
 cd your-workspace
@@ -174,6 +174,8 @@ skills-seed workspace add backend frontend
 ```
 
 workspace 根仓只负责编排、路由和跨项目关系；子项目用自己的 `.skills-seed` 独立学习、生成和保存 patterns。已有子项目 `.skills-seed/config.yaml` 不会被覆盖，如果子项目 agent 与根仓不同，只提示并保留子项目配置。
+
+0.6.0 起，workspace 用户配置只保留 `workspace.projects`。公共库、契约和基础设施影响不再通过 `workspace.shared`、`workspace.contracts`、`workspace.infra` 手填，而是在学习/生成 workspace profile 和 spec 时从仓库证据、依赖关系和用户上下文中分析出来。
 
 ## 设计理念
 

@@ -14,22 +14,33 @@ import (
 
 func TestInitializeWorkspaceInitializesDetectedChildProjects(t *testing.T) {
 	workspaceRoot := t.TempDir()
-	initGitDir(t, workspaceRoot)
+	initGitDirWithOrigin(t, workspaceRoot, "git@example.com:workspace.git")
 	childRoot := filepath.Join(workspaceRoot, "backend")
 	require.NoError(t, os.MkdirAll(childRoot, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "go.mod"), []byte("module backend\n"), 0644))
 	initGitDir(t, childRoot)
+	shellRoot := filepath.Join(workspaceRoot, "base-xengine")
+	require.NoError(t, os.MkdirAll(shellRoot, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(shellRoot, "install.sh"), []byte("#!/bin/sh\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(shellRoot, "install.ini"), []byte("[install]\n"), 0644))
+	initGitDir(t, shellRoot)
 
 	require.NoError(t, initializeSkillAt(workspaceRoot, "zh-CN", domain.ModeWorkspace))
 
 	require.FileExists(t, filepath.Join(workspaceRoot, ".skills-seed", "config.yaml"))
 	require.FileExists(t, filepath.Join(childRoot, ".skills-seed", "config.yaml"))
+	require.FileExists(t, filepath.Join(shellRoot, ".skills-seed", "config.yaml"))
 
 	configRepo, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, domain.ModeWorkspace, configRepo.GetProjectConfig().Mode)
-	require.Len(t, configRepo.GetWorkspaceConfig().Projects, 1)
+	require.Empty(t, configRepo.GetProjectConfig().Language)
+	require.Equal(t, "git@example.com:workspace.git", configRepo.GetProjectConfig().GitRemote)
+	require.Len(t, configRepo.GetWorkspaceConfig().Projects, 2)
 	require.Equal(t, "backend", configRepo.GetWorkspaceConfig().Projects[0].Path)
+	require.Equal(t, "base-xengine", configRepo.GetWorkspaceConfig().Projects[1].Path)
+	require.Equal(t, "infra", configRepo.GetWorkspaceConfig().Projects[1].Type)
+	require.Equal(t, "shell", configRepo.GetWorkspaceConfig().Projects[1].Language)
 
 	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
@@ -218,20 +229,26 @@ func TestInitializeWorkspaceInitializesChildProjectsWithRootSkills(t *testing.T)
 	require.Equal(t, ".agents/skills/skills-seed-skills", childConfig.GetSkillsConfig().Paths["codex"])
 }
 
-func TestInitializeWorkspaceRemovesRootSeedWhenChildInitializationFails(t *testing.T) {
+func TestInitializeWorkspaceChildrenFailsForConfiguredChildWithoutGitRepository(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	initGitDir(t, workspaceRoot)
 	childRoot := filepath.Join(workspaceRoot, "backend")
 	require.NoError(t, os.MkdirAll(childRoot, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "go.mod"), []byte("module backend\n"), 0644))
 
-	err := initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
-		initLogger:      true,
-		showUserSummary: true,
-	})
+	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	cfg := rootConfig.Get()
+	cfg.Project.Mode = domain.ModeWorkspace
+	cfg.Project.Locale = "zh-CN"
+	cfg.Project.RootPath = workspaceRoot
+	cfg.Workspace.Projects = []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+	}
+	require.NoError(t, rootConfig.Update(cfg))
 
+	err = initializeWorkspaceChildrenWithRepo(workspaceRoot, "zh-CN", rootConfig)
 	require.Error(t, err)
-	require.NoDirExists(t, filepath.Join(workspaceRoot, ".skills-seed"))
 	require.NoDirExists(t, filepath.Join(childRoot, ".skills-seed"))
 }
 
@@ -351,6 +368,13 @@ func TestEnsureWorkspacePromptFilesDoesNotWriteRuntimePathPlaceholders(t *testin
 func initGitDir(t *testing.T, root string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, ".git"), 0755))
+}
+
+func initGitDirWithOrigin(t *testing.T, root, origin string) {
+	t.Helper()
+	initGitDir(t, root)
+	configDir := filepath.Join(root, ".git")
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "config"), []byte("[remote \"origin\"]\n\turl = "+origin+"\n"), 0644))
 }
 
 func initWorkspaceWithInitializedChild(t *testing.T, rootAgent, childAgent string) (string, string) {

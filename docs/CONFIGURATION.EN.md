@@ -4,12 +4,21 @@
 
 The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates it from the project context. Most paths are relative to the project root or `.skills-seed`; each field below states the relevant base.
 
+## 0.6.0 Config Structure
+
+0.6.0 is a clean pre-release config refactor and does not keep compatibility with old fields:
+
+- Top-level `project` was renamed to `profile`. It describes the project or workspace that owns the config file; it is not the `project` run mode.
+- `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
+- Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec from repository evidence, dependency relationships, and user context during learning/generation, not read from config.
+- Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
+
 ## Config Example
 
 ### Default Structure
 
 ```yaml
-project:
+profile:
   name: "your-project"
   mode: "project"
   language: "go"
@@ -20,9 +29,6 @@ project:
 
 workspace:
   projects: []
-  shared: []
-  contracts: []
-  infra: []
 
 analysis:
   codegraph:
@@ -101,7 +107,9 @@ exclude:
 
 ## Config Sections
 
-### `project`
+### `profile`
+
+`profile` describes the project or workspace that owns this config file; it is not the `project` run mode
 
 #### Fields
 
@@ -128,9 +136,6 @@ exclude:
 | Field | Default | Description |
 |---|---:|---|
 | `projects` | `[]` | Child project list; workspace init tries to discover first-level project folders |
-| `shared` | `[]` | Shared libraries or shared code paths |
-| `contracts` | `[]` | API, IDL, or protocol contract paths |
-| `infra` | `[]` | Deployment, operations, or infrastructure paths |
 
 #### `projects` Fields
 
@@ -138,15 +143,8 @@ exclude:
 |---|---:|---|
 | `id` | normalized directory name | Unique child project id |
 | `path` | discovered relative path | Child project path relative to the workspace root |
-| `type` | auto-detected | Child role, such as `backend`, `frontend`, `infra`, or `contracts` |
+| `type` | auto-detected | Child project type, such as `backend`, `frontend`, `library`, `infra`, or `contracts` |
 | `language` | auto-detected | Primary child project language |
-
-#### `shared` / `contracts` / `infra` Fields
-
-| Field | Default | Description |
-|---|---:|---|
-| `path` | none | Path relative to the workspace root |
-| `description` | empty | Purpose of the path |
 
 #### Behavior
 
@@ -154,6 +152,8 @@ exclude:
 2. For child projects added or copied into the workspace later, run `skills-seed workspace add .` to detect all children or `skills-seed workspace add <child>` for specific children.
 3. Existing child `.skills-seed/config.yaml` files are not overwritten. If a child agent differs from the root, it is reported and preserved.
 4. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
+5. Only first-level directories under the workspace root that have their own `.git` are recognized as child projects.
+6. Markers such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files classify `type` and `language`; they no longer decide whether a directory is a project.
 
 ### `analysis.codegraph`
 

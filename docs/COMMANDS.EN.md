@@ -83,6 +83,7 @@ skills-seed init --workspace --agent codex --skills codex
 4. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `skills.target`, and `skills.paths`.
 5. Already initialized children are skipped. If a child agent differs from the root, it is reported and preserved.
 6. A successful init prints the relative `.skills-seed` location and the README URL for the current version tag.
+7. Workspace child discovery only treats first-level independent Git repositories as children; marker files classify type and language only.
 
 ### `skills-seed workspace`
 
@@ -105,9 +106,12 @@ Manage sub-projects in workspace mode.
 
 #### Notes
 
-1. If a child has no `.skills-seed`, it is initialized in project mode.
-2. If a child already has `.skills-seed/config.yaml`, it is skipped and preserved.
-3. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
+1. `workspace add` uses the same discovery rule as `init --workspace`: only first-level directories with their own `.git` are treated as child repositories.
+2. Files such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files only classify child `type` and `language`.
+3. Starting in 0.6.0, workspace config no longer exposes `shared`, `contracts`, or `infra`; cross-project impact is analyzed into workspace profile/spec during learning/generation.
+4. If a child has no `.skills-seed`, it is initialized in project mode.
+5. If a child already has `.skills-seed/config.yaml`, it is skipped and preserved.
+6. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
 
 ### `skills-seed reset`
 

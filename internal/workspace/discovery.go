@@ -25,6 +25,14 @@ var ignoredDirs = map[string]bool{
 }
 
 var projectMarkerFiles = []string{
+	"install.sh",
+	"_install.sh",
+	"update.sh",
+	"preinst.sh",
+	"postinst.sh",
+	"postinst_after.sh",
+	"functions.sh",
+	"install.ini",
 	"package.json",
 	"pnpm-workspace.yaml",
 	"pnpm-lock.yaml",
@@ -83,6 +91,16 @@ var projectMarkerExtensions = []string{
 }
 
 var markerGroups = map[string][]string{
+	"shell": {
+		"install.sh",
+		"_install.sh",
+		"update.sh",
+		"preinst.sh",
+		"postinst.sh",
+		"postinst_after.sh",
+		"functions.sh",
+		"install.ini",
+	},
 	"node": {
 		"package.json",
 		"pnpm-workspace.yaml",
@@ -141,12 +159,11 @@ func DiscoverProjects(root string) []config.WorkspaceProjectConfig {
 
 func detectProject(root, rel string) (config.WorkspaceProjectConfig, bool) {
 	abs := filepath.Join(root, rel)
-	markers := collectProjectMarkers(abs)
-	if len(markers) == 0 {
+	if !isGitRepository(abs) {
 		return config.WorkspaceProjectConfig{}, false
 	}
 
-	projectType, language := inferTypeAndLanguage(abs, markers)
+	projectType, language := InferProjectKindAndLanguage(abs)
 	id := sanitizeID(filepath.Base(rel))
 	if id == "" {
 		id = "project"
@@ -166,6 +183,15 @@ func DetectProjectKindAndLanguage(root string) (string, string, bool) {
 	}
 	projectType, language := inferTypeAndLanguage(root, markers)
 	return projectType, language, true
+}
+
+func InferProjectKindAndLanguage(root string) (string, string) {
+	markers := collectProjectMarkers(root)
+	return inferTypeAndLanguage(root, markers)
+}
+
+func isGitRepository(root string) bool {
+	return pathExists(filepath.Join(root, ".git"))
 }
 
 func collectProjectMarkers(abs string) map[string]bool {
@@ -192,6 +218,9 @@ func collectProjectMarkers(abs string) map[string]bool {
 }
 
 func inferTypeAndLanguage(abs string, markers map[string]bool) (string, string) {
+	if hasAnyMarker(markers, markerGroups["shell"]) {
+		return "infra", "shell"
+	}
 	if hasAnyMarker(markers, markerGroups["node"]) {
 		if isFrontendPackage(filepath.Join(abs, "package.json")) {
 			return "frontend", inferNodeLanguage(abs, markers)
@@ -343,22 +372,8 @@ func ProfileFromConfig(name, root string, cfg config.WorkspaceConfig) *domain.Wo
 	}
 
 	return &domain.WorkspaceProfile{
-		Name:      name,
-		RootPath:  root,
-		Projects:  projects,
-		Shared:    pathsFromConfig(cfg.Shared),
-		Contracts: pathsFromConfig(cfg.Contracts),
-		Infra:     pathsFromConfig(cfg.Infra),
+		Name:     name,
+		RootPath: root,
+		Projects: projects,
 	}
-}
-
-func pathsFromConfig(paths []config.WorkspacePathConfig) []domain.WorkspacePath {
-	result := make([]domain.WorkspacePath, 0, len(paths))
-	for _, path := range paths {
-		result = append(result, domain.WorkspacePath{
-			Path:        path.Path,
-			Description: path.Description,
-		})
-	}
-	return result
 }

@@ -8,7 +8,7 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 - Before editing a child project, read that project's `SKILL.md` and `references/project-spec.md`.
 - When changing contracts, shared libraries, or deployment config, identify producers, consumers, and runtime impact before reading affected skills.
 - Do not promote a child project's local convention into a workspace-wide rule unless multiple projects depend on it.
-- When special paths are not configured, infer contract, shared, and infrastructure impact from filenames, directory names, and imports.
+- When special paths were not analyzed, infer contract, shared, and infrastructure impact from filenames, directory names, and imports.
 - If the workspace overview or child skills cannot confirm an important boundary, ask the user during task execution.
 
 {{if .HasRules}}
@@ -81,13 +81,13 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 - The change touches deployment, gateway, middleware, CI, environment variables, or release scripts.
 - The change touches root scripts, workspace-level package/go work/build config, or batch commands.
 {{if .HasContracts}}
-- A configured contract path changes; read related producer, consumer, middleware, or SDK child skills together.
+- A recognized contract path changes; read related producer, consumer, middleware, or SDK child skills together.
 {{end}}
 {{if .HasShared}}
-- A configured shared path changes; read every child skill that imports, packages, or generates the shared code.
+- A recognized shared path changes; read every child skill that imports, packages, or generates the shared code.
 {{end}}
 {{if .HasInfra}}
-- A configured infrastructure path changes; read child skills affected by deployment, config, gateway, or middleware rules.
+- A recognized infrastructure path changes; read child skills affected by deployment, config, gateway, or middleware rules.
 {{end}}
 {{if .HasLoadMultipleWhen}}
 {{range .LoadMultipleWhen}}

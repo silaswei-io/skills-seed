@@ -1,39 +1,42 @@
-# 项目
-project:
-  # 项目名称(init 时自动填充)
+########################################################################
+# 基础信息
+# 当前配置文件所属项目或工作区的身份信息
+########################################################################
+profile:
+  # 项目名称，init 时自动填充
   name: ""
-  # 初始化模式: project(单项目) 或 workspace(多子项目工作区)。开始学习或生成后不可切换
+  # 初始化模式：project 单项目，workspace 多子项目工作区；开始学习或生成后不可切换
   mode: "project"
-  # 项目主要语言: go, typescript, python 等
+  # 项目主要语言，例如 go、typescript、python
   language: "go"
-  # CLI 输出语言: zh-CN(中文) 或 en-US(英文)
+  # CLI 输出语言：zh-CN 中文，en-US 英文
   locale: "zh-CN"
-  # Git 远程仓库地址(init 时自动填充)
+  # Git 远程仓库地址，init 时自动填充
   git_remote: ""
-  # 项目根目录绝对路径(init 时自动填充)
+  # 项目根目录绝对路径，init 时自动填充
   root_path: ""
-  # 项目初始化时间(init 时自动填充)
+  # 项目初始化时间，init 时自动填充
   initialized_at: ""
 
+########################################################################
 # 工作区
+# 仅 workspace 模式生效，普通 project 子仓通常不需要配置
+########################################################################
 workspace:
-  # 子项目列表，例如: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
+  # 子项目列表，例如 [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   projects: []
-  # 公共库或共享代码目录，例如: [{path: "pkg"}]
-  shared: []
-  # 接口契约目录，例如: [{path: "proto"}]
-  contracts: []
-  # 部署/运维目录，例如: [{path: "deploy"}]
-  infra: []
 
+########################################################################
 # 分析增强
+# 控制结构化代码分析能力，省略字段时使用默认值
+########################################################################
 analysis:
   codegraph:
     # 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级
     enabled: true
     # true 表示 CodeGraph 不可用时直接失败；false 表示继续普通分析
     required: false
-    # codegraph 命令路径
+    # CodeGraph 命令路径
     command: "codegraph"
     # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
     auto_init: true
@@ -44,7 +47,10 @@ analysis:
     # 传给 codegraph context 的最大代码块数；0 表示只提供结构摘要
     max_code: 0
 
+########################################################################
 # Agent
+# 控制学习、检查和生成任务使用的 Agent 引擎与并发策略
+########################################################################
 agent:
   # 执行分析/学习/生成摘要任务的 Agent 引擎，对应 commands 的 key
   engine: "claude"
@@ -58,30 +64,39 @@ agent:
   allow_user_plugins: false
   # 并发 Agent 数；0 表示自动(project=1, workspace=子项目数并带上限)
   parallelism: 0
-  # 可重试错误（429/529 过载等）的重试配置
+  # 可重试错误，如 429、529 过载等的重试配置
   retry:
-    # 最大重试次数，0 使用默认值(3)
+    # 最大重试次数，0 使用默认值 3
     max_retries: 3
     # 首次重试等待秒数
     initial_interval: 15
     # 最大等待秒数（指数退避上限）
     max_interval: 120
 
+########################################################################
 # 学习
+# 控制从 Git 历史学习项目规范时的默认范围
+########################################################################
 learning:
   # 默认分析的 Git 提交数量
   max_commits: 50
   # 批量分析时,单次 AI 调用分析的 commit 数量
   batch_size: 5
 
-# 自动修复(check --fix)
+########################################################################
+# 自动修复
+# 控制 check --fix 的修复产物和回滚策略
+########################################################################
 autofix:
-  # 修复策略: patch: 生成 .patch 文件(推荐,安全); backup: 备份原文件后修改; stash: 应用修复后 git stash; branch: 创建新分支应用修复
+  # 修复策略：patch 生成 .patch 文件，backup 备份原文件后修改，stash 应用修复后 git stash，branch 创建新分支应用修复
   strategy: "patch"
-  # 备份路径(相对于 .skills-seed 目录)
+  # 备份路径，相对于 .skills-seed 目录
   backup_path: "backups"
 
+########################################################################
 # Skills
+# 控制生成的 Skills 目标类型和输出路径
+########################################################################
 skills:
   # 生成的 Skills 目标类型；可与 agent.engine 不同，例如用 claude 生成 codex skills
   target: "claude"
@@ -90,17 +105,22 @@ skills:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
+########################################################################
 # 日志
+# 控制命令运行日志的级别、路径和保留数量
+########################################################################
 logging:
   # 日志级别: DEBUG, INFO, WARN, ERROR
   level: "DEBUG"
-  # 日志路径(相对于 .skills-seed 目录)
+  # 日志路径，相对于 .skills-seed 目录
   logs_path: "logs"
   # 日志文件最大数量(自动清理旧日志)
   max_log_files: 30
 
+########################################################################
 # 全局排除
 # glob 风格匹配（不是正则）；初始化时写入默认静态排除规则
+########################################################################
 exclude:
   # 点号开头的文件和目录，如 .github、.cursor、.codegraph、.env
   - ".*"

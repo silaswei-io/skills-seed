@@ -83,6 +83,7 @@ skills-seed init --workspace --agent codex --skills codex
 4. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands` 和 `skills.target`、`skills.paths`。
 5. 已初始化的子仓会跳过；如果子仓 agent 与根仓不同，只提示，不覆盖。
 6. 初始化成功后会输出相对 `.skills-seed` 位置和当前版本 tag 对应的 README 文档地址。
+7. workspace 子仓发现只认根目录第一层的独立 Git 仓库；标记文件只用于识别类型和语言。
 
 ### `skills-seed workspace`
 
@@ -105,9 +106,12 @@ skills-seed init --workspace --agent codex --skills codex
 
 #### 注意事项
 
-1. 子仓没有 `.skills-seed` 时，会按 project 模式初始化。
-2. 子仓已有 `.skills-seed/config.yaml` 时会跳过并保留原配置。
-3. 子仓已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
+1. `workspace add` 使用和 `init --workspace` 相同的发现规则：只有第一层目录中拥有独立 `.git` 的目录会被视为子仓。
+2. `go.mod`、`package.json`、安装脚本、Helm/Terraform 等文件只用于识别子仓 `type` 和 `language`。
+3. 0.6.0 起，workspace 配置不再提供 `shared`、`contracts`、`infra` 字段；跨项目影响由学习/生成阶段分析进入 workspace profile/spec。
+4. 子仓没有 `.skills-seed` 时，会按 project 模式初始化。
+5. 子仓已有 `.skills-seed/config.yaml` 时会跳过并保留原配置。
+6. 子仓已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
 
 ### `skills-seed reset`
 

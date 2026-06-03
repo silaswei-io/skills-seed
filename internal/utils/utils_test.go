@@ -72,7 +72,7 @@ func TestLoadConfig(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		configContent := []byte(`
-project:
+profile:
   name: "test-project"
   language: "go"
   locale: "zh-CN"

@@ -1,10 +1,13 @@
-# Project
-project:
+########################################################################
+# Profile
+# Identity for the project or workspace described by this config file
+########################################################################
+profile:
   # Project name (auto-filled during init)
   name: ""
   # Init mode: project (single project) or workspace (multi-project workspace). Locked after learning or generation starts
   mode: "project"
-  # Primary language: go, typescript, python, etc.
+  # Primary language, for example go, typescript, python
   language: "go"
   # CLI output language: zh-CN (Chinese) or en-US (English)
   locale: "en-US"
@@ -15,18 +18,18 @@ project:
   # Project initialization time (auto-filled during init)
   initialized_at: ""
 
+########################################################################
 # Workspace
+# Only used in workspace mode, ordinary project child repositories usually do not need this
+########################################################################
 workspace:
   # Child projects, for example: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
   projects: []
-  # Shared libraries or shared code paths, for example: [{path: "pkg"}]
-  shared: []
-  # API contract paths, for example: [{path: "proto"}]
-  contracts: []
-  # Deployment/operations paths, for example: [{path: "deploy"}]
-  infra: []
 
+########################################################################
 # Analysis
+# Controls structured code analysis, omitted fields use defaults
+########################################################################
 analysis:
   codegraph:
     # Enable CodeGraph structural analysis by default; warn and fall back when unavailable
@@ -44,7 +47,10 @@ analysis:
     # Maximum code blocks for codegraph context; 0 means structural summary only
     max_code: 0
 
+########################################################################
 # Agent
+# Controls the Agent engine and concurrency used by learning, checking, and generation
+########################################################################
 agent:
   # Agent engine used for analysis, learning, and generation summaries; matches keys in commands
   engine: "claude"
@@ -58,7 +64,7 @@ agent:
   allow_user_plugins: false
   # Number of concurrent agents; 0 means automatic (project=1, workspace=project count with cap)
   parallelism: 0
-  # Retry configuration for retryable errors (429/529 overloaded, etc.)
+  # Retry configuration for retryable errors such as 429 and 529 overloaded
   retry:
     # Maximum retry attempts; 0 uses default (3)
     max_retries: 3
@@ -67,21 +73,30 @@ agent:
     # Maximum wait in seconds (exponential backoff cap)
     max_interval: 120
 
+########################################################################
 # Learning
+# Controls the default range for learning project rules from Git history
+########################################################################
 learning:
   # Default number of Git commits to analyze
   max_commits: 50
   # Number of commits to analyze per AI call in batch mode
   batch_size: 5
 
-# Auto-Fix (check --fix)
+########################################################################
+# Auto-Fix
+# Controls the output and rollback strategy for check --fix
+########################################################################
 autofix:
   # Fix strategy: patch: Generate .patch files (recommended, safe); backup: Backup files before modification; stash: Apply fixes then git stash; branch: Create new branch to apply fixes
   strategy: "patch"
   # Backup path (relative to .skills-seed directory)
   backup_path: "backups"
 
+########################################################################
 # Skills
+# Controls the generated Skills target type and output paths
+########################################################################
 skills:
   # Target Skills type; can differ from agent.engine, for example use claude to generate codex skills
   target: "claude"
@@ -90,7 +105,10 @@ skills:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
 
+########################################################################
 # Logging
+# Controls command log level, path, and retention
+########################################################################
 logging:
   # Log level: DEBUG, INFO, WARN, ERROR
   level: "DEBUG"
@@ -99,8 +117,10 @@ logging:
   # Maximum number of log files (auto-cleanup)
   max_log_files: 30
 
+########################################################################
 # Global Exclusions
 # Glob-style patterns (not regex); init writes the default static exclusion rules
+########################################################################
 exclude:
   # Dot-prefixed files and directories, such as .github, .cursor, .codegraph, .env
   - ".*"

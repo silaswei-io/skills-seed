@@ -8,12 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDiscoverProjectsUsesOnlyFirstLevelDirectories(t *testing.T) {
+func TestDiscoverProjectsUsesOnlyFirstLevelGitRepositories(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "backend", "go.mod"), "module example.com/backend\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "backend", ".git"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "backend", "internal"), 0755))
 	writeFile(t, filepath.Join(root, "nested", "service", "go.mod"), "module example.com/service\n")
 	writeFile(t, filepath.Join(root, "frontend", "package.json"), `{"dependencies":{"react":"latest"}}`)
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "frontend", ".git"), 0755))
+	writeFile(t, filepath.Join(root, "not-a-repo", "go.mod"), "module example.com/not-a-repo\n")
 	writeFile(t, filepath.Join(root, "README.md"), "# workspace\n")
 
 	projects := DiscoverProjects(root)
@@ -29,12 +32,16 @@ func TestDiscoverProjectsUsesOnlyFirstLevelDirectories(t *testing.T) {
 	require.Equal(t, "javascript", projects[1].Language)
 }
 
-func TestDiscoverProjectsSupportsAdditionalMarkers(t *testing.T) {
+func TestDiscoverProjectsClassifiesGitRepositoriesByMarkers(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "dotnet", "service.csproj"), "<Project />\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "dotnet", ".git"), 0755))
 	writeFile(t, filepath.Join(root, "infra", "Chart.yaml"), "apiVersion: v2\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "infra", ".git"), 0755))
 	writeFile(t, filepath.Join(root, "php", "composer.json"), "{}\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "php", ".git"), 0755))
 	writeFile(t, filepath.Join(root, "rust", "Cargo.toml"), "[package]\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "rust", ".git"), 0755))
 
 	projects := DiscoverProjects(root)
 
@@ -49,6 +56,22 @@ func TestDiscoverProjectsSupportsAdditionalMarkers(t *testing.T) {
 	require.Equal(t, "php", projects[2].Language)
 	require.Equal(t, "rust", projects[3].ID)
 	require.Equal(t, "rust", projects[3].Language)
+}
+
+func TestDiscoverProjectsIncludesShellGitRepositories(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "base-xengine", ".git"), 0755))
+	writeFile(t, filepath.Join(root, "base-xengine", "install.sh"), "#!/bin/sh\n")
+	writeFile(t, filepath.Join(root, "base-xengine", "functions.sh"), "#!/bin/sh\n")
+	writeFile(t, filepath.Join(root, "base-xengine", "install.ini"), "[install]\n")
+
+	projects := DiscoverProjects(root)
+
+	require.Len(t, projects, 1)
+	require.Equal(t, "base-xengine", projects[0].ID)
+	require.Equal(t, "base-xengine", projects[0].Path)
+	require.Equal(t, "infra", projects[0].Type)
+	require.Equal(t, "shell", projects[0].Language)
 }
 
 func TestDetectProjectKindAndLanguageDistinguishesNodeLanguage(t *testing.T) {

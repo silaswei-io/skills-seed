@@ -2,6 +2,30 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.6.0]
+
+### Breaking Changes
+
+- Renamed the top-level config key from `project` to `profile`. `profile` describes the project or workspace that owns the config file and avoids confusion with `profile.mode: "project"`.
+- Removed `workspace.shared`, `workspace.contracts`, and `workspace.infra` from user config. Workspace shared paths, contract paths, and infrastructure paths are now learned/analyzed into workspace profile/spec from repository evidence and user context instead of being hand-written by users.
+- Workspace child discovery is now limited to first-level directories that have their own `.git`. Files such as `go.mod`, `package.json`, install scripts, Helm charts, or Terraform files only classify project type and language; they no longer decide whether a child project exists.
+
+### Features
+
+- Workspace initialization leaves root `profile.language` empty by default, supporting workspaces that contain multiple languages.
+- `init` now fills `profile.git_remote` from the current repository's `origin` remote.
+- Shell installer/base repositories can be classified as `type: "infra"` and `language: "shell"`, for example independent Git children containing `install.sh`, `_install.sh`, or `install.ini`.
+
+### Experience
+
+- Default `config.yaml` now uses large module comment headers and field-level preceding comments, keeps blank lines between modules, and avoids sentence-ending punctuation in comments.
+- `workspace.projects` is now the only user-facing workspace config field, reducing confusion between project/profile/workspace/shared/infra concepts.
+- Saving an old config rewrites it to the new structure and removes deprecated workspace path fields.
+
+### Documentation
+
+- Updated README, command reference, and configuration reference for the 0.6.0 config structure, workspace child boundary rule, and removed path config fields.
+
 ## [v0.5.0]
 
 ### Breaking Changes

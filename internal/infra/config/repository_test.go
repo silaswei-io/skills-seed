@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
@@ -74,10 +75,18 @@ func TestNewRepository(t *testing.T) {
 		require.NoError(t, err)
 		text := string(content)
 
-		require.Contains(t, text, "# 项目名称(init 时自动填充)\n  name: \"\"")
-		require.Contains(t, text, "# 子项目列表，例如: [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects: []")
+		require.Contains(t, text, "########################################################################\n# 基础信息\n# 当前配置文件所属项目或工作区的身份信息\n########################################################################\nprofile:")
+		require.NotContains(t, text, "\nproject:")
+		require.Contains(t, text, "########################################################################\n# 工作区\n# 仅 workspace 模式生效，普通 project 子仓通常不需要配置\n########################################################################\nworkspace:")
+		require.Contains(t, text, "# 项目名称，init 时自动填充\n  name: \"\"")
+		require.Contains(t, text, "# 子项目列表，例如 [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects: []")
+		require.NotContains(t, text, `shared:`)
+		require.NotContains(t, text, `contracts:`)
+		require.NotContains(t, text, `infra:`)
 		require.Contains(t, text, "# 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级\n    enabled: true")
-		require.Contains(t, text, "# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\nexclude:")
+		require.Contains(t, text, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
+		assertTopLevelModuleBannersHaveBlankLineBefore(t, text)
+		assertCommentLinesDoNotEndWithFullStops(t, text)
 		require.NotContains(t, text, `name: ""                   #`)
 		require.NotContains(t, text, `projects: []               #`)
 		require.NotContains(t, text, `enabled: true             #`)
@@ -144,19 +153,21 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 	}
-	cfg.Workspace.Contracts = []WorkspacePathConfig{{Path: "proto", Description: "API contracts"}}
 	require.NoError(t, repo.Update(cfg))
 
 	content, err := os.ReadFile(filepath.Join(seedPath, "config.yaml"))
 	require.NoError(t, err)
 	contentText := string(content)
-	require.Contains(t, contentText, "# 工作区")
+	require.Contains(t, contentText, "\nprofile:")
+	require.NotContains(t, contentText, "\nproject:")
+	require.Contains(t, contentText, "# 工作区\n# 仅 workspace 模式生效，普通 project 子仓通常不需要配置")
 	require.NotContains(t, contentText, `child_skill_policy`)
 	require.NotContains(t, contentText, `init_children:`)
 	require.Contains(t, contentText, `id: "frontend"`)
-	require.Contains(t, contentText, `path: "proto"`)
-	require.Contains(t, contentText, `description: "API contracts"`)
-	require.Contains(t, contentText, `shared: []`)
+	require.NotContains(t, contentText, `shared:`)
+	require.NotContains(t, contentText, `contracts:`)
+	require.NotContains(t, contentText, `infra:`)
+	assertTopLevelModuleBannersHaveBlankLineBefore(t, contentText)
 	require.NotContains(t, contentText, `generation:`)
 	require.NotContains(t, contentText, `'**/*.pb.go'`)
 
@@ -164,7 +175,6 @@ func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 2)
 	require.Equal(t, "backend", reloaded.GetWorkspaceConfig().Projects[1].ID)
-	require.Equal(t, "API contracts", reloaded.GetWorkspaceConfig().Contracts[0].Description)
 }
 
 func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
@@ -184,7 +194,6 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			Projects: []WorkspaceProjectConfig{
 				{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 			},
-			Contracts: []WorkspacePathConfig{{Path: "proto", Description: "API contracts"}},
 		},
 		Agent: AgentConfig{
 			Engine: "claude",
@@ -207,21 +216,27 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	content := repo.replaceConfigValues(string(templateData), cfg)
 	var parsed Config
 	require.NoError(t, yaml.Unmarshal([]byte(content), &parsed), content)
-	require.Contains(t, content, "# 工作区")
+	require.Contains(t, content, "\nprofile:")
+	require.NotContains(t, content, "\nproject:")
+	require.Contains(t, content, "# 工作区\n# 仅 workspace 模式生效，普通 project 子仓通常不需要配置")
 	require.NotContains(t, content, `child_skill_policy`)
 	require.NotContains(t, content, `init_children:`)
 	require.Contains(t, content, `id: "backend"`)
-	require.Contains(t, content, `description: "API contracts"`)
+	require.NotContains(t, content, `shared:`)
+	require.NotContains(t, content, `contracts:`)
+	require.NotContains(t, content, `infra:`)
 	require.NotContains(t, content, `- "**/*.pb.go"`)
 	require.NotContains(t, content, `- "**/*.gen.go"`)
 	require.Contains(t, content, `- "dist/**"`)
 	require.Contains(t, content, `- "*.log"`)
 	require.Contains(t, content, `analysis:`)
 	require.Contains(t, content, `enabled: false`)
-	require.Contains(t, content, "# 项目名称(init 时自动填充)\n  name: \"demo-workspace\"")
-	require.Contains(t, content, "# 子项目列表，例如: [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects:")
+	require.Contains(t, content, "# 项目名称，init 时自动填充\n  name: \"demo-workspace\"")
+	require.Contains(t, content, "# 子项目列表，例如 [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects:")
 	require.Contains(t, content, "# 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级\n    enabled: false")
-	require.Contains(t, content, "# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\nexclude:")
+	require.Contains(t, content, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
+	assertTopLevelModuleBannersHaveBlankLineBefore(t, content)
+	assertCommentLinesDoNotEndWithFullStops(t, content)
 	require.NotContains(t, content, `name: "demo-workspace" #`)
 	require.NotContains(t, content, `analysis: #`)
 	require.NotContains(t, content, `enabled: false #`)
@@ -230,12 +245,62 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.NotContains(t, content, `generation:`)
 }
 
+func TestGeneratedConfigCommentLinesDoNotEndWithFullStops(t *testing.T) {
+	for _, locale := range []string{"zh-CN", "en-US"} {
+		t.Run(locale, func(t *testing.T) {
+			seedPath := t.TempDir()
+			configPath := filepath.Join(seedPath, "config.yaml")
+
+			_, err := NewRepository(seedPath, locale)
+			require.NoError(t, err)
+
+			content, err := os.ReadFile(configPath)
+			require.NoError(t, err)
+			assertCommentLinesDoNotEndWithFullStops(t, string(content))
+		})
+	}
+}
+
+func assertCommentLinesDoNotEndWithFullStops(t *testing.T, text string) {
+	t.Helper()
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		require.Falsef(t, strings.HasSuffix(trimmed, "。") || strings.HasSuffix(trimmed, "."),
+			"comment line must not end with a full stop: %q", line)
+	}
+}
+
+func assertTopLevelModuleBannersHaveBlankLineBefore(t *testing.T, text string) {
+	t.Helper()
+	banner := strings.Repeat("#", 72)
+	lines := strings.Split(text, "\n")
+	bannerCount := 0
+	for i, line := range lines {
+		if line != banner {
+			continue
+		}
+		if i+1 >= len(lines) || !strings.HasPrefix(lines[i+1], "# ") {
+			continue
+		}
+		bannerCount++
+		if bannerCount == 1 {
+			continue
+		}
+		require.Greater(t, i, 0, "module banner should not be first line after first banner")
+		require.Equalf(t, "", lines[i-1], "module banner should have one blank line before it at line %d", i+1)
+	}
+	require.GreaterOrEqual(t, bannerCount, 2, "expected multiple module banners")
+}
+
 func TestRepository_UpdatePreservesExistingComments(t *testing.T) {
 	seedPath := t.TempDir()
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
 	require.NoError(t, os.WriteFile(configPath, []byte(`# Custom project comment
-project:
+profile:
   name: "old-name" # custom project name comment
   mode: "project"
   language: "go"
@@ -247,9 +312,6 @@ project:
 # Custom workspace comment
 workspace:
   projects: [] # custom projects comment
-  shared: []
-  contracts: []
-  infra: []
 
 analysis:
   codegraph:
@@ -318,6 +380,9 @@ exclude:
 	require.Contains(t, text, "# keep dotfiles comment\n  - \".*\"")
 	require.NotContains(t, text, `name: "new-name" # custom project name comment`)
 	require.NotContains(t, text, `projects: # custom projects comment`)
+	require.NotContains(t, text, `shared:`)
+	require.NotContains(t, text, `contracts:`)
+	require.NotContains(t, text, `infra:`)
 	require.NotContains(t, text, `analysis: # custom projects comment`)
 	require.NotContains(t, text, `enabled: false # custom codegraph comment`)
 	require.NotContains(t, text, `- ".*" # keep dotfiles comment`)
@@ -352,7 +417,7 @@ func TestRepository_NormalizeAnalysisCodeGraphDefaults(t *testing.T) {
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
 	require.NoError(t, os.WriteFile(configPath, []byte(`
-project:
+profile:
   language: "go"
   locale: "zh-CN"
 agent:
@@ -386,7 +451,7 @@ func TestRepository_PreservesExplicitCodeGraphDisabled(t *testing.T) {
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
 	require.NoError(t, os.WriteFile(configPath, []byte(`
-project:
+profile:
   language: "go"
   locale: "zh-CN"
 analysis:

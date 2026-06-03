@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -232,8 +233,17 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		logger.Error(i18n.Get("InitSetRootPathFailed"), "error", err)
 		return err
 	}
+	if gitRemote := gitOriginRemote(projectRoot); gitRemote != "" {
+		if err := configRepo.SetGitRemote(gitRemote); err != nil {
+			return err
+		}
+	}
 	if opts.language != "" {
 		if err := configRepo.SetProjectLanguage(opts.language); err != nil {
+			return err
+		}
+	} else if mode == domain.ModeWorkspace {
+		if err := configRepo.SetProjectLanguage(""); err != nil {
 			return err
 		}
 	} else if _, detectedLanguage, ok := workspacediscovery.DetectProjectKindAndLanguage(projectRoot); ok && detectedLanguage != "" && detectedLanguage != "unknown" {
@@ -328,6 +338,39 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 
 	initSucceeded = true
 	return nil
+}
+
+func gitOriginRemote(projectRoot string) string {
+	cmd := exec.Command("git", "remote", "get-url", "origin")
+	cmd.Dir = projectRoot
+	output, err := cmd.Output()
+	if err == nil {
+		return strings.TrimSpace(string(output))
+	}
+	return gitOriginRemoteFromConfig(filepath.Join(projectRoot, ".git", "config"))
+}
+
+func gitOriginRemoteFromConfig(configPath string) string {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return ""
+	}
+	inOrigin := false
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			inOrigin = line == `[remote "origin"]`
+			continue
+		}
+		if !inOrigin {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if ok && strings.TrimSpace(key) == "url" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func ensureSkillsTarget(cfg *config.Config, target string) {

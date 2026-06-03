@@ -86,7 +86,7 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
   - After changes, check producers, consumers, generated clients, server handlers, middleware adapters, and tests.
 {{end}}
 {{else}}
-- No contract paths are explicitly configured.
+- No explicit contract paths were analyzed.
 - Treat `api`, `proto`, `openapi`, `swagger`, `schema`, `types`, `sdk`, and `client` paths or filenames as contract changes.
 - Contract changes usually affect at least one producer and one consumer; do not update only one side.
 {{end}}
@@ -100,7 +100,7 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
   - After changes, check every child project that imports, packages, or generates this shared content.
 {{end}}
 {{else}}
-- No shared paths are explicitly configured.
+- No explicit shared paths were analyzed.
 - When touching `pkg`, `common`, `shared`, `lib`, `utils`, or `components`, identify importers or packagers first.
 - Stabilize shared APIs before consumer child projects follow.
 {{end}}
@@ -114,7 +114,7 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
   - After changes, check child projects affected by deployment targets, environment variables, gateway rules, or middleware config.
 {{end}}
 {{else}}
-- No infrastructure paths are explicitly configured.
+- No explicit infrastructure paths were analyzed.
 - When touching `deploy`, `docker`, `k8s`, `helm`, `terraform`, `nginx`, `gateway`, `env`, or `config`, evaluate runtime impact first.
 - Infrastructure changes should check startup commands, ports, environment variables, health checks, gateway routes, and CI together.
 {{end}}
@@ -125,4 +125,4 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 - Path matches special paths or root scripts: identify covered child projects, then read every affected child skill.
 - Filename or content represents interfaces, types, error codes, events, messages, or generation inputs: treat as a contract change.
 - Filename or content represents deployment, runtime config, gateway, or middleware: treat as an infrastructure change.
-- If ownership is unclear, stop and inspect config before assigning responsibility.
+- If ownership is unclear, stop and inspect the workspace overview, child skills, or ask the user before assigning responsibility.

@@ -2,6 +2,30 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.6.0]
+
+### 破坏性变更
+
+- 配置顶层 `project` 重命名为 `profile`，用于描述当前配置文件所属项目或工作区本身，避免和 `profile.mode: "project"` 混淆。
+- 移除用户配置中的 `workspace.shared`、`workspace.contracts`、`workspace.infra`。workspace 公共路径、契约路径和基础设施路径改由学习/生成阶段根据仓库证据和用户上下文分析进入 workspace profile/spec，不再要求用户手填。
+- workspace 子项目发现规则收紧为“第一层目录中拥有独立 `.git` 的目录才是子项目”。`go.mod`、`package.json`、安装脚本、Helm/Terraform 等文件只用于识别项目类型和语言，不再决定项目是否存在。
+
+### 功能
+
+- workspace 初始化会把根仓 `profile.language` 留空，适配一个工作区包含多种语言子项目的场景。
+- `init` 自动写入 `profile.git_remote`，从当前仓库 `origin` 远程地址读取。
+- Shell 安装/底座类仓库可被识别为 `type: "infra"`、`language: "shell"`，例如包含 `install.sh`、`_install.sh`、`install.ini` 的独立 Git 子仓。
+
+### 体验
+
+- 默认 `config.yaml` 改为大块模块注释和字段前置说明，模块之间保留空行，注释行不再使用句号结尾。
+- `workspace.projects` 成为 workspace 配置中唯一需要用户关注的字段，减少 project/profile/workspace/shared/infra 概念混杂。
+- 保存旧配置时会按新结构重写配置文件并移除已废弃的 workspace 路径字段。
+
+### 文档
+
+- 更新 README、命令参考和配置参考，说明 0.6.0 配置结构、workspace 子项目边界规则和已移除的路径配置项。
+
 ## [v0.5.0]
 
 ### 破坏性变更

@@ -156,7 +156,7 @@ For Claude Code, the default generated skill is:
 
 ### Workspace
 
-Workspace mode is for a root directory that contains multiple independent Git child projects. During initialization, Skills Seed scans first-level directories, detects child projects, and initializes `.skills-seed` for the children found at that time.
+Workspace mode is for a root directory that contains multiple independent Git child projects. During initialization, Skills Seed scans first-level directories; only directories with their own `.git` are added to `workspace.projects`, and `.skills-seed` is initialized for the children found at that time. Files such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files classify child project type and language only.
 
 ```bash
 cd your-workspace
@@ -174,6 +174,8 @@ skills-seed workspace add backend frontend
 ```
 
 The workspace root coordinates routing and cross-project relationships only. Child projects use their own `.skills-seed` directories to learn, generate, and store patterns independently. Existing child `.skills-seed/config.yaml` files are never overwritten; if a child uses a different agent from the root, it is reported and preserved.
+
+Starting in 0.6.0, the only user-facing workspace config field is `workspace.projects`. Shared libraries, contracts, and infrastructure impact are no longer hand-written through `workspace.shared`, `workspace.contracts`, or `workspace.infra`; they are analyzed into the workspace profile and spec from repository evidence, dependency relationships, and user context during learning/generation.
 
 ## Design Principles
 

@@ -17,7 +17,7 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Project   ProjectConfig   `yaml:"project"`
+	Project   ProjectConfig   `yaml:"profile"`
 	Workspace WorkspaceConfig `yaml:"workspace"`
 	Analysis  AnalysisConfig  `yaml:"analysis"`
 	Agent     AgentConfig     `yaml:"agent"`
@@ -41,10 +41,7 @@ type ProjectConfig struct {
 
 // WorkspaceConfig 工作区配置
 type WorkspaceConfig struct {
-	Projects  []WorkspaceProjectConfig `yaml:"projects"`
-	Shared    []WorkspacePathConfig    `yaml:"shared"`
-	Contracts []WorkspacePathConfig    `yaml:"contracts"`
-	Infra     []WorkspacePathConfig    `yaml:"infra"`
+	Projects []WorkspaceProjectConfig `yaml:"projects"`
 }
 
 // WorkspaceProjectConfig 工作区子项目配置
@@ -53,12 +50,6 @@ type WorkspaceProjectConfig struct {
 	Path     string `yaml:"path"`
 	Type     string `yaml:"type"`
 	Language string `yaml:"language"`
-}
-
-// WorkspacePathConfig 工作区特殊路径配置
-type WorkspacePathConfig struct {
-	Path        string `yaml:"path"`
-	Description string `yaml:"description,omitempty"`
 }
 
 // AnalysisConfig 分析增强配置
@@ -340,7 +331,7 @@ func (r *Repository) save(cfg *Config) error {
 		return r.saveWithMarshal(cfg)
 	}
 
-	content := buf.String()
+	content := formatTopLevelModuleSpacing(buf.String())
 	var parsed Config
 	if err := yaml.Unmarshal([]byte(content), &parsed); err != nil {
 		return r.saveWithMarshal(cfg)

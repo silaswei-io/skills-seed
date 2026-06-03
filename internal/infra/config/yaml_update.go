@@ -28,7 +28,7 @@ func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	if err := encoder.Close(); err != nil {
 		return content
 	}
-	return buf.String()
+	return formatTopLevelModuleSpacing(buf.String())
 }
 
 func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
@@ -39,14 +39,14 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 
 	promoteLineComments(doc)
 
-	setYAMLString(doc, []string{"project", "name"}, cfg.Project.Name)
-	setYAMLString(doc, []string{"project", "mode"}, cfg.Project.Mode)
-	setYAMLString(doc, []string{"project", "language"}, cfg.Project.Language)
-	setYAMLString(doc, []string{"project", "locale"}, cfg.Project.Locale)
-	setYAMLString(doc, []string{"project", "git_remote"}, cfg.Project.GitRemote)
-	setYAMLString(doc, []string{"project", "root_path"}, cfg.Project.RootPath)
+	setYAMLString(doc, []string{"profile", "name"}, cfg.Project.Name)
+	setYAMLString(doc, []string{"profile", "mode"}, cfg.Project.Mode)
+	setYAMLString(doc, []string{"profile", "language"}, cfg.Project.Language)
+	setYAMLString(doc, []string{"profile", "locale"}, cfg.Project.Locale)
+	setYAMLString(doc, []string{"profile", "git_remote"}, cfg.Project.GitRemote)
+	setYAMLString(doc, []string{"profile", "root_path"}, cfg.Project.RootPath)
 	if cfg.Project.InitializedAt != "" {
-		setYAMLString(doc, []string{"project", "initialized_at"}, cfg.Project.InitializedAt)
+		setYAMLString(doc, []string{"profile", "initialized_at"}, cfg.Project.InitializedAt)
 	}
 
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
@@ -81,6 +81,33 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLStringList(doc, []string{"exclude"}, cfg.Exclude)
 
 	promoteLineComments(doc)
+}
+
+func formatTopLevelModuleSpacing(content string) string {
+	const banner = "########################################################################"
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return content
+	}
+	formatted := make([]string, 0, len(lines)+8)
+	for i, line := range lines {
+		if line == banner && i > 0 && nextLineIsModuleTitle(lines, i) && lastFormattedLine(formatted) != "" {
+			formatted = append(formatted, "")
+		}
+		formatted = append(formatted, line)
+	}
+	return strings.Join(formatted, "\n")
+}
+
+func nextLineIsModuleTitle(lines []string, index int) bool {
+	return index+1 < len(lines) && strings.HasPrefix(lines[index+1], "# ")
+}
+
+func lastFormattedLine(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	return lines[len(lines)-1]
 }
 
 func configDocument(root *yaml.Node) *yaml.Node {
@@ -149,9 +176,7 @@ func setYAMLStringList(root *yaml.Node, path []string, values []string) {
 
 func setYAMLWorkspaceConfig(root *yaml.Node, workspace WorkspaceConfig) {
 	setYAMLProjects(root, []string{"workspace", "projects"}, workspace.Projects)
-	setYAMLWorkspacePaths(root, []string{"workspace", "shared"}, workspace.Shared)
-	setYAMLWorkspacePaths(root, []string{"workspace", "contracts"}, workspace.Contracts)
-	setYAMLWorkspacePaths(root, []string{"workspace", "infra"}, workspace.Infra)
+	removeYAMLMappingKeys(root, []string{"workspace"}, "shared", "contracts", "infra")
 }
 
 func setYAMLProjects(root *yaml.Node, path []string, projects []WorkspaceProjectConfig) {
@@ -175,29 +200,6 @@ func setYAMLProjects(root *yaml.Node, path []string, projects []WorkspaceProject
 			stringKeyNode("type"), quotedStringNode(project.Type),
 			stringKeyNode("language"), quotedStringNode(project.Language),
 		)
-		node.Content = append(node.Content, item)
-	}
-}
-
-func setYAMLWorkspacePaths(root *yaml.Node, path []string, paths []WorkspacePathConfig) {
-	node := ensureYAMLPath(root, path)
-	comments := yamlCommentsFrom(node)
-	moveCollectionLineCommentToKey(root, path, &comments)
-	node.Kind = yaml.SequenceNode
-	node.Tag = "!!seq"
-	node.Value = ""
-	node.Style = 0
-	node.Content = nil
-	if len(paths) == 0 {
-		node.Style = yaml.FlowStyle
-	}
-	applyYAMLComments(node, comments)
-	for _, workspacePath := range paths {
-		item := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-		item.Content = append(item.Content, stringKeyNode("path"), quotedStringNode(workspacePath.Path))
-		if workspacePath.Description != "" {
-			item.Content = append(item.Content, stringKeyNode("description"), quotedStringNode(workspacePath.Description))
-		}
 		node.Content = append(node.Content, item)
 	}
 }
@@ -265,6 +267,31 @@ func mappingKeyForPath(root *yaml.Node, path []string) *yaml.Node {
 		}
 	}
 	return mappingKey(current, path[len(path)-1])
+}
+
+func removeYAMLMappingKeys(root *yaml.Node, path []string, keys ...string) {
+	node := root
+	for _, key := range path {
+		node = mappingValue(node, key)
+		if node == nil {
+			return
+		}
+	}
+	if node.Kind != yaml.MappingNode {
+		return
+	}
+	remove := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		remove[key] = true
+	}
+	content := node.Content[:0]
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if remove[node.Content[i].Value] {
+			continue
+		}
+		content = append(content, node.Content[i], node.Content[i+1])
+	}
+	node.Content = content
 }
 
 func appendMappingValue(node *yaml.Node, key string, value *yaml.Node) {
