@@ -33,11 +33,22 @@ var sleepAfterGenerateChildStep = time.Sleep
 
 // Cmd 返回 generate 命令
 func Cmd(cont *container.Container) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "generate-skills",
+	generateCmd := &cobra.Command{
+		Use:     "generate",
 		Short:   i18n.Get("GenerateShort"),
 		Long:    i18n.Get("GenerateLongDesc"),
 		Example: i18n.Get("GenerateExample"),
+	}
+	generateCmd.AddCommand(skillsCmd(cont))
+	return generateCmd
+}
+
+func skillsCmd(cont *container.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "skills",
+		Short:   i18n.Get("GenerateSkillsShort"),
+		Long:    i18n.Get("GenerateSkillsLongDesc"),
+		Example: i18n.Get("GenerateSkillsExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 检查 container 是否初始化
@@ -61,6 +72,11 @@ func Cmd(cont *container.Container) *cobra.Command {
 	cmd.Flags().StringVar(&contextFile, "context-file", "", i18n.Get("GenerateFlagContextFile"))
 
 	return cmd
+}
+
+// RunGenerate 导出：生成 skills（供 sync 调用）
+func RunGenerate(cont *container.Container) error {
+	return runGenerate(cont, nil)
 }
 
 func runGenerate(cont *container.Container, cmd *cobra.Command) error {
@@ -144,15 +160,27 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 			return err
 		}
 		rootTracker := progress.New(1)
-		if err := rootTracker.RunStep(i18n.Get("ProgressGenerateWriteRootSkills"), func() error {
-			return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
+		rootLabel := i18n.Get("ProgressGenerateWriteRootSkills")
+		retryProgress := agent.NewRetryProgressBinder(rootTracker.UpdateStep)
+		rootCtx := retryProgress.WithContext(ctx)
+		if err := rootTracker.RunStep(rootLabel, func() error {
+			retryProgress.StartStep(rootLabel)
+			callErr := cont.GeneratorSvc.GenerateSkills(rootCtx, effectiveOutputPath)
+			retryProgress.FinishStep(rootLabel, callErr == nil)
+			return callErr
 		}); err != nil {
 			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 			return err
 		}
 	} else {
-		if err := tracker.RunStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
-			return cont.GeneratorSvc.GenerateSkills(ctx, effectiveOutputPath)
+		generateLabel := i18n.Get("ProgressGenerateWriteSkills")
+		retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+		generateCtx := retryProgress.WithContext(ctx)
+		if err := tracker.RunStep(generateLabel, func() error {
+			retryProgress.StartStep(generateLabel)
+			callErr := cont.GeneratorSvc.GenerateSkills(generateCtx, effectiveOutputPath)
+			retryProgress.FinishStep(generateLabel, callErr == nil)
+			return callErr
 		}); err != nil {
 			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 			return err
@@ -199,6 +227,11 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 				multiTracker.Start(progressName, label)
 			}
 		}
+		updateStep := func(label string) {
+			if multiTracker != nil {
+				multiTracker.Update(progressName, label)
+			}
+		}
 		completeStep := func(label string) {
 			if multiTracker != nil {
 				multiTracker.CompleteStep(progressName, label)
@@ -236,7 +269,11 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 			return err
 		}
 		childOutputPath := outputPathForCurrentTarget(childCont)
-		if err := childCont.GeneratorSvc.GenerateSkillsWithProgress(childCtx, childOutputPath, startStep, completeStep); err != nil {
+		if err := childCont.GeneratorSvc.GenerateSkillsWithHooks(childCtx, childOutputPath, generator.GenerateProgressHooks{
+			OnStepStart:    startStep,
+			OnStepUpdate:   updateStep,
+			OnStepComplete: completeStep,
+		}); err != nil {
 			var manualErr *generator.ManualSkillExistsError
 			if errors.As(err, &manualErr) {
 				logger.Warn(i18n.GetWithParams("GenerateWorkspaceChildManualSkillSkipped", map[string]interface{}{

@@ -308,6 +308,8 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 	patternsLearned := 0
 	totalBatches := (len(unanalyzedCommits) + batchSize - 1) / batchSize
 	batchProgress := progress.New(totalBatches)
+	retryProgress := agent.NewRetryProgressBinder(batchProgress.UpdateStep)
+	ctx = retryProgress.WithContext(ctx)
 
 	// 5. 批量处理 commits
 	for i := 0; i < len(unanalyzedCommits); i += batchSize {
@@ -359,8 +361,10 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 		})
 		// 单个批次的 AI 调用可能持续较久，使用动态进度提示避免终端长时间无输出
 		err := batchProgress.RunStep(progressLabel, func() error {
+			retryProgress.StartStep(progressLabel)
 			var callErr error
 			result, callErr = s.agent.BatchLearnFromCommits(ctx, req)
+			retryProgress.FinishStep(progressLabel, callErr == nil)
 			return callErr
 		})
 		if err != nil {

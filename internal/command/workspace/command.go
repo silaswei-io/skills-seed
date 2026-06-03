@@ -1,4 +1,4 @@
-package add
+package workspace
 
 import (
 	"context"
@@ -17,12 +17,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Cmd 返回 workspace 命令
 func Cmd(cont *container.Container) *cobra.Command {
+	workspaceCmd := &cobra.Command{
+		Use:     "workspace",
+		Short:   i18n.Get("WorkspaceShort"),
+		Long:    i18n.Get("WorkspaceLongDesc"),
+		Example: i18n.Get("WorkspaceExample"),
+	}
+	workspaceCmd.AddCommand(addCmd(cont))
+	return workspaceCmd
+}
+
+func addCmd(cont *container.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add .|project-id-or-path...",
-		Short:   i18n.Get("AddShort"),
-		Long:    i18n.Get("AddLongDesc"),
-		Example: i18n.Get("AddExample"),
+		Short:   i18n.Get("WorkspaceAddShort"),
+		Long:    i18n.Get("WorkspaceAddLongDesc"),
+		Example: i18n.Get("WorkspaceAddExample"),
 		Args:    cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {

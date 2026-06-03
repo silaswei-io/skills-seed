@@ -2,6 +2,36 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.5.0]
+
+### Breaking Changes
+
+- `skills-seed add` migrated to `skills-seed workspace add`
+- `skills-seed generate-skills` split into `skills-seed generate skills`
+- Removed the legacy `internal/command/add` package; logic unified under `internal/command/workspace`
+
+### Features
+
+- Added `skills-seed patterns add <description>`: define coding patterns in natural language; AI generates structured patterns
+- Added `skills-seed sync` one-step command:
+  - `sync` = learn current → patterns merge → generate skills
+  - `sync --add <description>` = patterns add → patterns merge → generate skills
+- Added `skills-seed generate` parent command with `generate skills` subcommand, reserving room for future generation types
+- Added `skills-seed workspace` parent command with `workspace add` subcommand for cleaner command structure
+- AI agents now support exponential backoff retry for 429 / 529 / overloaded errors; retry count and interval configurable in `config.yaml` under `agent.retry`; the active progress line distinguishes normal, waiting, and retrying states, showing the agent error, failed call duration, and backoff wait
+- Added `UserPatternDefiner` agent interface for user-defined pattern generation
+- Added user-defined pattern prompt templates (`user-define-pattern`) in both Chinese and English
+- User-defined patterns are automatically tagged with `source: user_defined`
+
+### Changes
+
+- Updated command routing table: `generate/skills`, `sync`, `workspace/add`, `patterns/add` require project runtime
+- Removed unreachable code in `commandNeedsProjectRuntime`
+
+### Documentation
+
+- Updated README, command reference, and configuration reference for the 0.5.0 command structure, `patterns add`, `sync`, and `agent.retry`
+
 ## [v0.4.4]
 
 ### Improvements

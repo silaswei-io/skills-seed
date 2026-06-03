@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	"github.com/spf13/cobra"
 )
@@ -24,9 +27,75 @@ func Cmd(cont *container.Container) *cobra.Command {
 		Example: i18n.Get("PatternsExample"),
 	}
 
+	patternsCmd.AddCommand(addCmd(cont))
 	patternsCmd.AddCommand(mergeCmd(cont))
 	patternsCmd.AddCommand(statsCmd(cont))
 	return patternsCmd
+}
+
+func addCmd(cont *container.Container) *cobra.Command {
+	var category string
+	var files []string
+	var userContext string
+
+	cmd := &cobra.Command{
+		Use:     "add <description>",
+		Short:   i18n.Get("PatternsAddShort"),
+		Long:    i18n.Get("PatternsAddLongDesc"),
+		Example: i18n.Get("PatternsAddExample"),
+		Args:    cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cont == nil {
+				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+			}
+			if err := commandutil.RequireAgentAvailable(cont); err != nil {
+				return err
+			}
+
+			description := strings.Join(args, " ")
+			req := &agent.UserDefinePatternRequest{
+				Description: description,
+				Category:    category,
+				Files:       files,
+				UserContext: userContext,
+				WorkDir:     cont.Config.Project.RootPath,
+				Language:    cont.Config.Project.Language,
+			}
+
+			tracker := progress.New(1)
+			retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+			ctx := retryProgress.WithContext(cmd.Context())
+			label := i18n.Get("ProgressUserDefinePatternAI")
+			var result *agent.UserDefinePatternResult
+			err := tracker.RunStep(label, func() error {
+				retryProgress.StartStep(label)
+				var callErr error
+				result, callErr = cont.Agent.UserDefinePattern(ctx, req)
+				retryProgress.FinishStep(label, callErr == nil)
+				return callErr
+			})
+			if err != nil {
+				return err
+			}
+
+			if err := cont.PatternRepo.Save(ctx, result.Pattern); err != nil {
+				return err
+			}
+
+			logger.Info(i18n.GetWithParams("PatternsAddComplete", map[string]interface{}{
+				"PatternID":   result.Pattern.ID,
+				"PatternName": result.Pattern.Name,
+				"Category":    string(result.Pattern.Category),
+				"Source":      string(result.Pattern.Source),
+			}))
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsAddFlagCategory"))
+	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("PatternsAddFlagFiles"))
+	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("PatternsAddFlagContext"))
+	return cmd
 }
 
 func statsCmd(cont *container.Container) *cobra.Command {

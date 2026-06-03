@@ -9,6 +9,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/charmbracelet/x/term"
+	"github.com/mattn/go-runewidth"
 )
 
 var (
@@ -17,6 +20,7 @@ var (
 	progressActive      bool
 	progressLineOpen    bool
 	pendingConsoleLines []string
+	terminalWidth       = currentTerminalWidth
 )
 
 // Tracker 以步骤为单位显示进度
@@ -38,16 +42,17 @@ type Tracker struct {
 }
 
 type MultiTracker struct {
-	mu        sync.Mutex
-	label     string
-	tasks     map[string]*multiTask
-	order     []string
-	width     int
-	taskTotal int
-	enabled   bool
-	lines     int
-	stop      chan struct{}
-	stopped   chan struct{}
+	mu            sync.Mutex
+	label         string
+	tasks         map[string]*multiTask
+	order         []string
+	width         int
+	taskTotal     int
+	enabled       bool
+	lines         int
+	physicalLines int
+	stop          chan struct{}
+	stopped       chan struct{}
 }
 
 type multiTask struct {
@@ -188,7 +193,6 @@ func (t *MultiTracker) Complete(name, label string) {
 	task.done = true
 	task.active = false
 	task.animatePaused = false
-	lines := t.renderLinesLocked()
 	allDone := t.allDoneLocked()
 	stop := t.stop
 	stopped := t.stopped
@@ -196,6 +200,7 @@ func (t *MultiTracker) Complete(name, label string) {
 		t.stop = nil
 		t.stopped = nil
 	}
+	lines := t.renderLinesLocked()
 	t.mu.Unlock()
 
 	if !t.enabled {
@@ -221,24 +226,26 @@ func (t *MultiTracker) Render() {
 
 	t.mu.Lock()
 	lines := t.renderLinesLocked()
-	previousLines := t.lines
+	width := terminalWidth()
+	previousPhysicalLines := t.physicalLines
 	t.lines = len(lines)
+	t.physicalLines = renderedPhysicalLineCount(lines, width)
 	t.mu.Unlock()
 
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 
-	if previousLines > 0 {
-		fmt.Fprintf(os.Stdout, "\033[%dF", previousLines)
+	if previousPhysicalLines > 1 {
+		fmt.Fprintf(os.Stdout, "\033[%dF", previousPhysicalLines-1)
+	}
+	if previousPhysicalLines > 0 {
+		fmt.Fprint(os.Stdout, "\r\033[J")
 	}
 	for i, line := range lines {
 		if i > 0 {
 			fmt.Fprint(os.Stdout, "\n")
 		}
 		fmt.Fprintf(os.Stdout, "\r\033[2K%s", line)
-	}
-	if len(lines) > 0 {
-		fmt.Fprint(os.Stdout, "\n")
 	}
 	progressActive = true
 	progressLineOpen = true
@@ -271,6 +278,9 @@ func (t *MultiTracker) finish() {
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 
+	if progressLineOpen {
+		fmt.Fprintln(os.Stdout)
+	}
 	progressActive = false
 	progressLineOpen = false
 	flushPendingConsoleLinesLocked()
@@ -389,6 +399,30 @@ func printMultiLines(lines []string) {
 	}
 }
 
+func renderedPhysicalLineCount(lines []string, width int) int {
+	if width <= 0 {
+		width = 80
+	}
+	count := 0
+	for _, line := range lines {
+		lineWidth := runewidth.StringWidth(line)
+		physical := lineWidth / width
+		if lineWidth%width != 0 || physical == 0 {
+			physical++
+		}
+		count += physical
+	}
+	return count
+}
+
+func currentTerminalWidth() int {
+	width, _, err := term.GetSize(os.Stdout.Fd())
+	if err != nil || width <= 0 {
+		return 80
+	}
+	return width
+}
+
 // RunStep 在执行回调期间显示该步骤的动态进度
 func (t *Tracker) RunStep(label string, fn func() error) error {
 	t.StartStep(label)
@@ -437,6 +471,17 @@ func (t *Tracker) CompleteStep(label string) {
 	}
 	t.label = label
 	t.renderLocked(true)
+}
+
+func (t *Tracker) UpdateStep(label string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.label = label
+	if !t.enabled || !t.active {
+		return
+	}
+	t.renderLocked(false)
 }
 
 // FailStep 结束当前步骤并保留当前进度行，错误文案由调用方负责输出

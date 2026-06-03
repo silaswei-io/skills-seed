@@ -42,6 +42,7 @@ const GenerateProjectStepTotal = 5
 
 type GenerateProgressHooks struct {
 	OnStepStart    func(label string)
+	OnStepUpdate   func(label string)
 	OnStepComplete func(label string)
 }
 
@@ -197,14 +198,19 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		"operation", "generator.generate_skills",
 		"output_path", outputPath,
 	)
+	retryProgress := agent.NewRetryProgressBinder(hooks.OnStepUpdate)
+	ctx = retryProgress.WithContext(ctx)
 
 	runStep := func(label string, fn func() error) error {
+		retryProgress.StartStep(label)
 		if hooks.OnStepStart != nil {
 			hooks.OnStepStart(label)
 		}
 		if err := fn(); err != nil {
+			retryProgress.FinishStep(label, false)
 			return err
 		}
+		retryProgress.FinishStep(label, true)
 		if hooks.OnStepComplete != nil {
 			hooks.OnStepComplete(label)
 		}

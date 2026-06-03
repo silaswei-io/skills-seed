@@ -84,18 +84,24 @@ skills-seed init --workspace --agent codex --skills codex
 5. Already initialized children are skipped. If a child agent differs from the root, it is reported and preserved.
 6. A successful init prints the relative `.skills-seed` location and the README URL for the current version tag.
 
-### `skills-seed add`
+### `skills-seed workspace`
 
 #### Command Overview
 
-Add child projects copied or created after workspace initialization. The command detects first-level projects under the workspace root, syncs selected projects into root `workspace.projects`, and initializes missing child `.skills-seed` directories.
+Manage sub-projects in workspace mode.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed add .` | Detect and add all child repositories | `skills-seed add .` | Only works from a workspace-mode root repository |
-| `skills-seed add <child...>` | Add only selected child repositories | `skills-seed add backend frontend` | Arguments may be detected child ids or paths |
+| `skills-seed workspace add .` | Detect and add all child repositories | `skills-seed workspace add .` | Only works from a workspace-mode root repository |
+| `skills-seed workspace add <child...>` | Add only selected child repositories | `skills-seed workspace add backend frontend` | Arguments may be detected child ids or paths |
+
+#### `workspace` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--help`, `-h` | `false` | Show `workspace` help |
 
 #### Notes
 
@@ -204,20 +210,27 @@ skills-seed learn history --limit 40 --batch-size 5
 3. The workspace root coordinates learning and does not store child patterns in root storage.
 4. Workspace child projects run with real concurrency according to `agent.parallelism`.
 5. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
+6. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
 
-### `skills-seed generate-skills`
+### `skills-seed generate`
 
 #### Command Overview
 
-Generate skills for the current `skills.target` from the project profile and learned patterns. Generation calls the CLI configured by `agent.engine` for summary merging and polishing, and prioritizes patterns with high effective score, more check hits, and higher confidence.
+Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed generate-skills` | Generate skills for the current target | `skills-seed generate-skills --output .agents/skills/my-project` | Defaults to `skills.paths` for the current `skills.target` |
+| `skills-seed generate skills` | Generate skills from patterns and project profile | `skills-seed generate skills --output .agents/skills/my-project` | Defaults to `skills.paths` for the current `skills.target` |
 
-#### Flags
+#### `generate` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--help`, `-h` | `false` | Show `generate` help |
+
+#### `generate skills` Flags
 
 | Flag | Default | Description |
 |---|---:|---|
@@ -225,15 +238,15 @@ Generate skills for the current `skills.target` from the project profile and lea
 | `--merge`, `-m` | `false` | Merge similar patterns before generation; deprecated, use `skills-seed patterns merge` |
 | `--context` | empty | One-time guidance for this generate run, passed to the AI agent and not written to `.skills-seed/prompts/` |
 | `--context-file` | empty | Read one-time guidance for this generate run from a file; not written to `.skills-seed/prompts/` |
-| `--help`, `-h` | `false` | Show `generate-skills` help |
+| `--help`, `-h` | `false` | Show `generate skills` help |
 
 #### Common Examples
 
 ```bash
-skills-seed generate-skills
-skills-seed generate-skills --output .agents/skills/my-project
-skills-seed generate-skills --context "Preserve API compatibility constraints"
-skills-seed generate-skills --context-file .skills-seed/context.md
+skills-seed generate skills
+skills-seed generate skills --output .agents/skills/my-project
+skills-seed generate skills --context "Preserve API compatibility constraints"
+skills-seed generate skills --context-file .skills-seed/context.md
 ```
 
 #### Prompt Merge Notes
@@ -273,12 +286,13 @@ references/
 
 #### Command Overview
 
-Manage learned patterns. This is used to merge semantically similar patterns and inspect pattern quality and check-hit statistics.
+Manage learned patterns. Supports adding user-defined patterns, merging semantically similar patterns, and inspecting pattern quality and check-hit statistics.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
+| `skills-seed patterns add <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add "Use RESTful API routes" --category api` | Calls the AI agent |
 | `skills-seed patterns merge` | Ask the current agent to merge similar patterns | `skills-seed patterns merge --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
 
@@ -287,6 +301,15 @@ Manage learned patterns. This is used to merge semantically similar patterns and
 | Flag | Default | Description |
 |---|---:|---|
 | `--help`, `-h` | `false` | Show `patterns` help |
+
+#### `patterns add` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--category`, `-c` | empty | Specify a category, such as `business`, `api`, or `testing`; leave empty for AI auto-detection |
+| `--files` | empty | Reference file paths, comma-separated; AI reads files to help generate the pattern |
+| `--context` | empty | Additional context to help AI understand the pattern more accurately |
+| `--help`, `-h` | `false` | Show `patterns add` help |
 
 #### `patterns merge` Flags
 
@@ -305,6 +328,9 @@ Manage learned patterns. This is used to merge semantically similar patterns and
 #### Common Examples
 
 ```bash
+skills-seed patterns add "All API routes use RESTful style"
+skills-seed patterns add "Errors must wrap context" --category error
+skills-seed patterns add "Database operations use transactions" --files internal/service/user.go --context "Project uses GORM"
 skills-seed patterns merge
 skills-seed patterns merge --category api
 skills-seed patterns merge --category business --dry-run
@@ -454,6 +480,44 @@ skills-seed view patterns --category testing
 
 1. Without `--category`, all categories are displayed.
 2. This command is read-only and does not trigger learning, merging, or generation.
+
+### `skills-seed sync`
+
+#### Command Overview
+
+One-step sync: learn current code, merge patterns, generate skills. When `--add` is provided, learning is skipped and a user-defined pattern is created instead before merging and generating.
+
+#### Command Forms
+
+| Command Form | Description | Common Example | Notes |
+|---|---|---|---|
+| `skills-seed sync` | Learn current → patterns merge → generate skills | `skills-seed sync` | Equivalent to `learn current`, `patterns merge`, `generate skills` in sequence |
+| `skills-seed sync --add <desc>` | patterns add → patterns merge → generate skills | `skills-seed sync --add "Use RESTful API routes"` | Skips learning; good for patterns the AI did not discover |
+
+#### Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--add` | empty | Natural language pattern description; triggers patterns add → merge → generate |
+| `--category`, `-c` | empty | Category for `--add` mode |
+| `--files` | empty | Reference file paths (comma-separated) for `--add` mode |
+| `--context` | empty | Additional context for `--add` mode |
+| `--help`, `-h` | `false` | Show `sync` help |
+
+#### Common Examples
+
+```bash
+skills-seed sync
+skills-seed sync --add "All API routes use RESTful style"
+skills-seed sync --add "Errors must wrap context" --category error
+skills-seed sync --add "Database operations use transactions" --files internal/service/user.go
+```
+
+#### Notes
+
+1. `sync` without `--add` runs `learn current`, then `patterns merge`, then `generate skills`.
+2. `sync --add` skips learning and defines a pattern from natural language, useful for patterns the AI missed.
+3. If any step fails, subsequent steps are skipped.
 
 ### `skills-seed check`
 

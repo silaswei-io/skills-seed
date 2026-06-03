@@ -8,7 +8,7 @@ other = "为 AI 助手培育项目技能"
 other = "从代码库学习项目规范，并生成 AI Agent skills。"
 
 [RootExample]
-other = "  skills-seed init --mode project --agent codex --skills codex --locale zh-CN\n  skills-seed init --workspace --agent codex --skills codex --locale zh-CN\n  skills-seed add ."
+other = "  skills-seed init --mode project --agent codex --skills codex --locale zh-CN\n  skills-seed init --workspace --agent codex --skills codex --locale zh-CN\n  skills-seed workspace add ."
 
 [InitLongDesc]
 other = "在当前项目中初始化 skills-seed。\n\n此命令将：\n  • 创建 .skills-seed/ 目录\n  • 生成默认配置文件 (config.yaml)\n  • 初始化 BoltDB 数据库\n  • 准备跨 Agent 兼容的 prompt 与 skills 模板\n\n请在 Git 仓库根目录运行此命令。"
@@ -187,6 +187,18 @@ other = "Codex 代码库分析失败"
 
 [AgentCodexCLIFailed]
 other = "Codex CLI 调用失败"
+
+[AgentRetryProgressNote]
+other = "{{.Label}}（{{.Reason}}，{{.Wait}} 后重试）"
+
+[AgentRetryProgressNoteWithDuration]
+other = "{{.Label}}（{{.Reason}}，本次调用 {{.CallDuration}}，{{.Wait}} 后重试）"
+
+[AgentRetryAttemptProgressNote]
+other = "{{.Label}}（第{{.Attempt}}次尝试）"
+
+[AgentRetryReasonUnknown]
+other = "未捕获到具体原因"
 
 [AgentCodexPrepareWorkDirFailed]
 other = "准备 Codex 临时工作目录失败"
@@ -528,10 +540,10 @@ other = "skills-seed 未初始化"
 other = "请先运行 'skills-seed init' 初始化项目"
 
 [GenerateLongDesc]
-other = "从学到的 patterns 和项目画像生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取学到的 patterns\n  • 读取 learn current/profile refresh 保存的项目画像\n  • 根据 skills.target 选择目标 skills 模板\n  • 使用 agent.engine 对应的 CLI 做摘要合并和润色\n  • 生成 SKILL.md 与 references/ 文档\n  • 当模板提供 agents/openai.yaml 时自动生成对应元数据\n\n生成前请先运行 'skills-seed learn current' 或 'skills-seed profile refresh'。"
+other = "生成 AI Agent 相关产物。\n\n当前支持：\n  skills  - 从 patterns 和项目画像生成 skills 文档"
 
 [GenerateExample]
-other = "  # 生成到当前 skills.target 的默认 skills.paths\n  skills-seed generate-skills\n\n  # 临时指定输出目录\n  skills-seed generate-skills --output .agents/skills/my-project\n\n  # 带本次生成补充说明\n  skills-seed generate-skills --context \"重点保留 API 兼容性约束\""
+other = "  # 生成到当前 skills.target 的默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project\n\n  # 带本次生成补充说明\n  skills-seed generate skills --context \"重点保留 API 兼容性约束\""
 
 [GenerateGenerating]
 other = "生成 AI Agent skills..."
@@ -773,6 +785,18 @@ other = "分析批次 {{.Current}}/{{.Total}}（提交 {{.Start}}-{{.End}}/{{.Co
 [ProgressMergePatternsAI]
 other = "AI 合并相似模式"
 
+[ProgressGenerateFixesAI]
+other = "生成修复建议"
+
+[ProgressCheckAnalyzeAI]
+other = "分析代码问题"
+
+[ProgressUserDefinePatternAI]
+other = "生成用户定义模式"
+
+[ProgressProfileRefreshAI]
+other = "分析项目画像"
+
 [LearnFailed]
 other = "学习失败: {{.Error}}"
 
@@ -913,6 +937,118 @@ other = "只预览合并结果，不写入数据库"
 
 [PatternsMergeComplete]
 other = "Patterns 合并完成: 输入 {{.TotalInput}}，合并后 {{.TotalMerged}}，未变更 {{.TotalUnchanged}}，合并操作 {{.MergeCount}}"
+
+[PatternsAddShort]
+other = "用自然语言添加用户自定义模式"
+
+[PatternsAddLongDesc]
+other = "使用自然语言描述编码规范或模式，AI 结合项目代码生成结构化 Pattern。\n\nAI 会根据描述自动推断分类、生成正例/反例代码和可操作规则。\n可用 --files 指定关联文件，AI 会读取这些文件生成更精准的示例。"
+
+[PatternsAddExample]
+other = "  # 最简用法\n  skills-seed patterns add \"所有 service 方法必须返回 domain error\"\n\n  # 指定分类和关联文件\n  skills-seed patterns add \"分页查询统一使用 limit/offset\" --category api --files internal/handler/pagination.go\n\n  # 带额外上下文\n  skills-seed patterns add \"使用事务写入订单\" --category database --context \"参考 order.go 的事务模式\""
+
+[PatternsAddFlagCategory]
+other = "指定分类：naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
+
+[PatternsAddFlagFiles]
+other = "关联文件路径，AI 会读取这些文件生成精准示例（逗号分隔或重复 -f）"
+
+[PatternsAddFlagContext]
+other = "额外上下文说明"
+
+[PatternsAddComplete]
+other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, 来源: {{.Source}})"
+
+# sync 一条龙
+[SyncShort]
+other = "一键同步：学习 + 合并 + 生成 skills"
+
+[SyncLongDesc]
+other = "一键完成完整流程，自动执行所有步骤：\n\n  路径 A（默认）: learn current → patterns merge → generate skills\n  路径 B（--add）: patterns add → patterns merge → generate skills\n\n不带 --add 时执行路径 A：先从当前代码库学习模式，再合并相似模式，最后生成 skills。\n带 --add 时执行路径 B：先添加用户定义的模式，再合并，最后生成 skills。"
+
+[SyncExample]
+other = "  # 完整流程：学习 + 合并 + 生成\n  skills-seed sync\n\n  # 添加用户模式 + 合并 + 生成\n  skills-seed sync --add \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件\n  skills-seed sync --add \"分页查询使用 limit/offset\" --files internal/handler/pagination.go"
+
+[SyncFlagAdd]
+other = "添加用户自定义模式（触发路径 B）"
+
+[SyncFlagCategory]
+other = "用户模式的分类（配合 --add 使用）"
+
+[SyncFlagFiles]
+other = "关联文件路径（配合 --add 使用）"
+
+[SyncFlagContext]
+other = "额外上下文说明"
+
+[SyncStepLearn]
+other = "[sync] 步骤 1/3: 学习当前代码库..."
+
+[SyncStepAddPattern]
+other = "[sync] 步骤 1/3: 添加用户自定义模式..."
+
+[SyncStepMerge]
+other = "[sync] 步骤 2/3: 合并相似模式..."
+
+[SyncStepGenerate]
+other = "[sync] 步骤 3/3: 生成 skills..."
+
+[SyncComplete]
+other = "[sync] 完成！"
+
+[SyncLearnFailed]
+other = "学习失败"
+
+[SyncMergeFailed]
+other = "合并失败"
+
+[SyncGenerateFailed]
+other = "生成 skills 失败"
+
+[SyncAddPatternFailed]
+other = "添加用户模式失败"
+
+[SyncSavePatternFailed]
+other = "保存用户模式失败"
+
+[SyncPatternAdded]
+other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}})"
+
+# workspace
+[WorkspaceShort]
+other = "管理工作区子项目"
+
+[WorkspaceLongDesc]
+other = "管理工作区模式下的子项目，包括添加新子项目等操作。"
+
+[WorkspaceExample]
+other = "  # 添加子项目到工作区\n  skills-seed workspace add .\n  skills-seed workspace add ./backend ./frontend"
+
+[WorkspaceAddShort]
+other = "向工作区添加子项目"
+
+[WorkspaceAddLongDesc]
+other = "向 workspace 添加后续拷入或新增的子项目。命令会检测 workspace 根目录第一层项目，将目标子项目同步到根仓 workspace.projects，并初始化缺失的子仓 .skills-seed。"
+
+[WorkspaceAddExample]
+other = "  # 自动检测并添加所有子仓\n  skills-seed workspace add .\n\n  # 只添加指定子仓\n  skills-seed workspace add backend frontend"
+
+# generate skills 子命令
+[GenerateSkillsShort]
+other = "生成 AI Agent skills"
+
+[GenerateSkillsLongDesc]
+other = "从学到的 patterns 和项目画像生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取学到的 patterns\n  • 读取项目画像\n  • 根据 skills.target 选择目标 skills 模板\n  • 使用 agent.engine 做摘要合并和润色\n  • 生成 SKILL.md 与 references/ 文档"
+
+[GenerateSkillsExample]
+other = "  # 生成到默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project\n\n  # 带本次生成补充说明\n  skills-seed generate skills --context \"重点保留 API 兼容性约束\""
+
+# agent 错误
+[AgentRenderUserDefinePatternPromptFailed]
+other = "渲染用户自定义模式提示词失败"
+
+[AgentUserDefinePatternFailed]
+other = "AI 生成用户自定义模式失败"
 
 # 画像
 [ProfileShort]

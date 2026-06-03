@@ -259,33 +259,47 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) 
 	if err != nil {
 		return "", err
 	}
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
-		"agent", c.Name(),
-		"operation", operation,
-		"command", c.commandPath,
-		"timeout", c.timeout,
-		"work_dir", workDir,
-		"prompt_length", len(prompt),
-		"args", claudePrintArgs(c.allowUserPlugins),
-	)
 
 	maxRetries := c.retryCfg.EffectiveMaxRetries()
+	retried := false
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		output, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attempt+1, workDir)
+		attemptNumber := attempt + 1
+		if attempt > 0 {
+			agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
+				AgentName:  c.Name(),
+				Operation:  operation,
+				Attempt:    attemptNumber,
+				MaxRetries: maxRetries,
+			})
+		}
+		output, callDuration, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attemptNumber, workDir)
 		if err == nil {
+			if retried {
+				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
+					AgentName:    c.Name(),
+					Operation:    operation,
+					Attempt:      attemptNumber,
+					MaxRetries:   maxRetries,
+					CallDuration: callDuration,
+				})
+			}
 			return output, nil
 		}
 		if !isRetryable || attempt == maxRetries {
 			return "", err
 		}
 
-		// 可重试错误，等待后重试
+		retried = true
 		waitDuration := c.retryCfg.WaitDuration(attempt)
-		logger.Warn(i18n.Get("LoggerAgentRateLimitRetry"),
-			"attempt", attempt+1,
-			"max_retries", maxRetries,
-			"wait_seconds", waitDuration.Seconds(),
-		)
+		agent.ReportRetryForContext(ctx, agent.RetryInfo{
+			AgentName:    c.Name(),
+			Operation:    operation,
+			Attempt:      attemptNumber,
+			MaxRetries:   maxRetries,
+			WaitDuration: waitDuration,
+			CallDuration: callDuration,
+			Reason:       agent.RetryReasonFromOutput(output, ""),
+		})
 
 		select {
 		case <-ctx.Done():
@@ -311,11 +325,23 @@ func isRetryableError(stdout, stderr string) bool {
 }
 
 // 执行单次命令行调用
-func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string, attempt int, workDir string) (string, bool, error) {
+func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string, attempt int, workDir string) (string, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, c.commandPath, claudePrintArgs(c.allowUserPlugins)...)
+	args := claudePrintArgs(c.allowUserPlugins)
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
+		"agent", c.Name(),
+		"operation", operation,
+		"command", c.commandPath,
+		"timeout", c.timeout,
+		"work_dir", workDir,
+		"prompt_length", len(prompt),
+		"args", args,
+		"attempt", attempt,
+	)
+
+	cmd := exec.CommandContext(ctx, c.commandPath, args...)
 	cmd.Dir = workDir
 	cmd.Stdin = strings.NewReader(prompt)
 
@@ -344,7 +370,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 				"stderr", stderrStr,
 				"retryable", true,
 			)
-			return "", true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), err)
+			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), err)
 		}
 
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailed"),
@@ -357,7 +383,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 			"stderr", stderrStr,
 			"prompt_length", len(prompt),
 		)
-		return "", false, fmt.Errorf("%s: %w, stdout: %s, stderr: %s", i18n.Get("AgentClaudeCLIFailed"), err, stdoutStr, stderrStr)
+		return "", duration, false, fmt.Errorf("%s: %w, stdout: %s, stderr: %s", i18n.Get("AgentClaudeCLIFailed"), err, stdoutStr, stderrStr)
 	}
 
 	rawOutput := stdout.String()
@@ -382,7 +408,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 		"output_preview", claudeReplyPreview(output),
 	)
 
-	return output, false, nil
+	return output, duration, false, nil
 }
 
 func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage) {
@@ -649,6 +675,49 @@ func (c *ClaudeAgent) MergePatterns(ctx context.Context, req *agent.MergePattern
 		"merged_count", len(result.MergedPatterns),
 		"unchanged_count", len(result.UnchangedPatterns),
 		"total_input", result.Summary.TotalInput,
+	)
+
+	return result, nil
+}
+
+// UserDefinePattern 根据用户自然语言描述生成模式
+func (c *ClaudeAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-user-pattern")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.UserDefinePatternPromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+
+	prompt, err := c.promptLoader.Render("user-define-pattern", data)
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderUserDefinePatternPromptFailed"))
+	}
+
+	output, err := c.callClaude(ctx, "UserDefinePattern", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentUserDefinePatternFailed"), err)
+	}
+
+	result, err := parser.ParseUserDefinePatternResult(output)
+	if err != nil {
+		logger.Warn(i18n.Get("LoggerAgentParseResultFallback"),
+			"method", "UserDefinePattern",
+			"error", err,
+		)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
+		"agent", c.Name(),
+		"operation", "UserDefinePattern",
+		"pattern_id", result.Pattern.ID,
+		"pattern_name", result.Pattern.Name,
+		"category", result.Pattern.Category,
 	)
 
 	return result, nil

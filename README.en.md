@@ -50,7 +50,7 @@ All data is local by default. The generated skills type is selected by `skills.t
 
 ## Output Preview
 
-After `generate-skills`, the default output looks like this:
+After `generate skills`, the default output looks like this:
 
 ```text
 .agents/skills/skills-seed-skills/
@@ -73,7 +73,7 @@ After `generate-skills`, the default output looks like this:
 ## Workflow
 
 ```text
-init -> learn current / learn history -> generate-skills -> check
+init -> learn current / learn history -> generate skills -> check
 ```
 
 | Stage | Command | Output |
@@ -81,10 +81,12 @@ init -> learn current / learn history -> generate-skills -> check
 | Initialize | `skills-seed init` | `.skills-seed/config.yaml`, local database, default prompts |
 | Learn current code | `skills-seed learn current` | patterns, business methods, utilities, project profile |
 | Learn history | `skills-seed learn history` | long-lived rules extracted from Git evolution |
-| Generate skills | `skills-seed generate-skills` | `SKILL.md`, project overview, specs, pattern references |
+| Generate skills | `skills-seed generate skills` | `SKILL.md`, project overview, specs, pattern references |
 | Check later changes | `skills-seed check` | issues, fix suggestions, and pattern hits based on learned rules |
 
-`generate-skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
+`generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
+
+When an AI Agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries with exponential backoff according to `agent.retry`. Long-running progress lines switch between normal, waiting, and retrying states, for example `Analyze current codebase`, `Analyze current codebase (API Error: 529 overloaded_error, call 3m37s, retry in 15s)`, and `Analyze current codebase (attempt 2)`. The call duration is how long the failed Agent call took; `retry in 15s` is the backoff wait.
 
 ## Prompts And One-Time Guidance
 
@@ -123,7 +125,7 @@ Use `instructions/<prompt-id>.md` for stable team requirements, such as "ignore 
 
 ```bash
 skills-seed learn current --context "Focus only on compatibility boundaries"
-skills-seed generate-skills --context-file .skills-seed/context.md
+skills-seed generate skills --context-file .skills-seed/context.md
 ```
 
 If a rule should apply across future runs, put it in `.skills-seed/prompts/instructions/<prompt-id>.md`. If it only explains or limits one run, use `--context` or `--context-file`.
@@ -134,9 +136,9 @@ If a rule should apply across future runs, put it in `.skills-seed/prompts/instr
 
 ```bash
 cd your-project
-skills-seed init --mode project --agent codex --locale en-US
+skills-seed init --mode project --agent codex --skills codex --locale en-US
 skills-seed learn current
-skills-seed generate-skills
+skills-seed generate skills
 test -f .agents/skills/skills-seed-skills/SKILL.md
 ```
 
@@ -158,17 +160,17 @@ Workspace mode is for a root directory that contains multiple independent Git ch
 
 ```bash
 cd your-workspace
-skills-seed init --workspace --agent codex --locale en-US
+skills-seed init --workspace --agent codex --skills codex --locale en-US
 skills-seed learn current
-skills-seed generate-skills
+skills-seed generate skills
 test -f .agents/skills/skills-seed-skills/SKILL.md
 ```
 
-If a new project is copied into the workspace root later, use `add` to sync config and initialize the child repo:
+If a new project is copied into the workspace root later, use `workspace add` to sync config and initialize the child repo:
 
 ```bash
-skills-seed add .
-skills-seed add backend frontend
+skills-seed workspace add .
+skills-seed workspace add backend frontend
 ```
 
 The workspace root coordinates routing and cross-project relationships only. Child projects use their own `.skills-seed` directories to learn, generate, and store patterns independently. Existing child `.skills-seed/config.yaml` files are never overwritten; if a child uses a different agent from the root, it is reported and preserved.
@@ -213,11 +215,13 @@ Built-in targets:
 | Command | Description |
 |---|---|
 | `skills-seed init` | Initialize a single project or workspace root |
-| `skills-seed add .` | Auto-detect and add all child projects from a workspace root |
-| `skills-seed add <child...>` | Add specific child projects from a workspace root |
+| `skills-seed workspace add .` | Auto-detect and add all child projects from a workspace root |
+| `skills-seed workspace add <child...>` | Add specific child projects from a workspace root |
 | `skills-seed learn current` | Incrementally learn rules and profile from current code |
 | `skills-seed learn history` | Learn long-lived rules from Git history |
-| `skills-seed generate-skills` | Generate skills for the current `skills.target` |
+| `skills-seed generate skills` | Generate skills for the current `skills.target` |
+| `skills-seed patterns add <description>` | Add a user-defined pattern in natural language |
+| `skills-seed sync` | Run learning or pattern add, merge, and skill generation in one command |
 | `skills-seed check` | Check staged files or Git-tracked files |
 | `skills-seed patterns stats` | Show pattern quality, hit counts, and recent hits |
 | `skills-seed review import --from-file` | Import local review comments |
@@ -228,7 +232,7 @@ See [Command Reference](docs/COMMANDS.EN.md) for all flags and forms.
 ## Local And Safety Boundaries
 
 - Project code is not uploaded to a remote knowledge base by default; learned data is written to `.skills-seed` in the current repository.
-- `check` and `generate-skills` call the configured Agent CLI, so network behavior depends on the `claude` / `codex` CLI you use.
+- `check` and `generate skills` call the configured Agent CLI, so network behavior depends on the `claude` / `codex` CLI you use.
 - Generated skills directories, `.git/**`, `.skills-seed/**`, and common build outputs are excluded by default so generated content does not feed back into later learning.
 - A handwritten `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 

@@ -42,6 +42,10 @@ agent:
   timeout: 1800
   allow_user_plugins: false
   parallelism: 0
+  retry:
+    max_retries: 3
+    initial_interval: 15
+    max_interval: 120
 
 learning:
   max_commits: 50
@@ -147,7 +151,7 @@ exclude:
 #### 行为
 
 1. `skills-seed init --workspace` 会初始化根仓，并同步初始化当时检测到的子项目。
-2. 后续新增或拷入 workspace 的子项目使用 `skills-seed add .` 自动检测添加，或使用 `skills-seed add <子项目>` 指定添加。
+2. 后续新增或拷入 workspace 的子项目使用 `skills-seed workspace add .` 自动检测添加，或使用 `skills-seed workspace add <子项目>` 指定添加。
 3. 子项目已有 `.skills-seed/config.yaml` 时不覆盖；如果子项目 agent 和根仓不同，只提示并保留子项目配置。
 4. 子项目已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
 
@@ -182,6 +186,9 @@ exclude:
 | `timeout` | `1800` | 单次 AI 请求超时时间，单位秒 |
 | `allow_user_plugins` | `false` | 是否允许 Agent 加载用户插件；默认关闭，避免批处理被用户插件影响 |
 | `parallelism` | `0` | 并发 Agent 数；`0` 表示自动 |
+| `retry.max_retries` | `3` | 可重试错误的最大重试次数；配置为 `0` 时使用默认值 `3` |
+| `retry.initial_interval` | `15` | 首次重试等待秒数；配置为 `0` 时使用默认值 `15` |
+| `retry.max_interval` | `120` | 指数退避最大等待秒数；配置为 `0` 时使用默认值 `120` |
 
 #### `parallelism` 说明
 
@@ -189,6 +196,12 @@ exclude:
 2. `workspace` 模式下，自动值为子项目数，上限 `6`。
 3. 设置为大于 `0` 的数字时，使用该数字作为并发上限。
 4. 实现上是真并发：子项目任务会通过 goroutine worker 池并行执行。
+
+#### `retry` 说明
+
+1. 当前会对 429 / 529 / overloaded 等可重试 Agent CLI 错误进行指数退避重试。
+2. 等待时间从 `initial_interval` 开始，每次翻倍，并受 `max_interval` 限制。
+3. `learn current` 等长耗时步骤会在进度行实时显示 Agent 错误、本次调用耗时和退避等待；等待结束并进入下一次调用时会切换为“第 N 次尝试”。
 
 #### 切换 Agent
 
@@ -246,7 +259,7 @@ skills-seed learn history --limit 100 --batch-size 10
 
 这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户补充指令破坏解析。
 
-`--context` 和 `--context-file` 是一次性命令参数，只影响当前 `learn current` 或 `generate-skills` 运行，不会写入 `.skills-seed/prompts/`。长期规则写入 `prompts/instructions/<prompt-id>.md`；临时说明使用 `--context` 或 `--context-file`。
+`--context` 和 `--context-file` 是一次性命令参数，只影响当前 `learn current` 或 `generate skills` 运行，不会写入 `.skills-seed/prompts/`。长期规则写入 `prompts/instructions/<prompt-id>.md`；临时说明使用 `--context` 或 `--context-file`。
 
 ### `autofix`
 
@@ -276,8 +289,8 @@ skills-seed learn history --limit 100 --batch-size 10
 
 #### 说明
 
-1. `generate-skills` 默认使用 `skills.target` 对应的 `skills.paths`。
-2. 可通过 `skills-seed generate-skills --output <path>` 临时指定输出目录。
+1. `generate skills` 默认使用 `skills.target` 对应的 `skills.paths`。
+2. 可通过 `skills-seed generate skills --output <path>` 临时指定输出目录。
 3. 新增自定义 engine 或 target 时，应分别添加 `agent.commands.<engine>` 和 `skills.paths.<target>`。
 
 ### `logging`

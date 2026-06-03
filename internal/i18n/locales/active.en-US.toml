@@ -188,6 +188,18 @@ other = "Codex codebase analysis failed"
 [AgentCodexCLIFailed]
 other = "Codex CLI call failed"
 
+[AgentRetryProgressNote]
+other = "{{.Label}} ({{.Reason}}, retry in {{.Wait}})"
+
+[AgentRetryProgressNoteWithDuration]
+other = "{{.Label}} ({{.Reason}}, call {{.CallDuration}}, retry in {{.Wait}})"
+
+[AgentRetryAttemptProgressNote]
+other = "{{.Label}} (attempt {{.Attempt}})"
+
+[AgentRetryReasonUnknown]
+other = "unknown reason"
+
 [AgentCodexPrepareWorkDirFailed]
 other = "Failed to prepare Codex temporary work directory"
 
@@ -519,7 +531,7 @@ other = "Check all files instead of only staged files"
 other = "  # Check staged files and enter interactive handling when issues are found\n  skills-seed check\n\n  # Check all Git-tracked files\n  skills-seed check --all\n\n  # Disable interactivity for scripts or hooks\n  skills-seed check --interactive=false"
 
 [GenerateShort]
-other = "Generate AI Agent skills"
+other = "Generate AI Agent outputs"
 
 [GenerateNotInitialized]
 other = "skills-seed not initialized"
@@ -528,10 +540,10 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [GenerateLongDesc]
-other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read the project profile saved by learn current/profile refresh\n  • Select the target skills template from skills.target\n  • Use the CLI configured by agent.engine for summary merging and polishing\n  • Generate SKILL.md and references/ documentation\n  • Generate metadata such as agents/openai.yaml when the template provides it\n\nRun 'skills-seed learn current' or 'skills-seed profile refresh' before generating."
+other = "Generate AI Agent related outputs.\n\nCurrently supported:\n  skills  - Generate skills documentation from patterns and project profile"
 
 [GenerateExample]
-other = "  # Generate to skills.paths for the current skills.target\n  skills-seed generate-skills\n\n  # Temporarily specify the output directory\n  skills-seed generate-skills --output .agents/skills/my-project\n\n  # Add guidance for this generate run\n  skills-seed generate-skills --context \"Preserve API compatibility constraints\""
+other = "  # Generate skills\n  skills-seed generate skills\n\n  # Specify output directory\n  skills-seed generate skills --output .agents/skills/my-project"
 
 [GenerateGenerating]
 other = "Generating AI Agent skills..."
@@ -773,6 +785,18 @@ other = "Analyzing batch {{.Current}}/{{.Total}} (commits {{.Start}}-{{.End}}/{{
 [ProgressMergePatternsAI]
 other = "Merging similar patterns with AI"
 
+[ProgressGenerateFixesAI]
+other = "Generate fix suggestions"
+
+[ProgressCheckAnalyzeAI]
+other = "Analyze code issues"
+
+[ProgressUserDefinePatternAI]
+other = "Generate user-defined pattern"
+
+[ProgressProfileRefreshAI]
+other = "Analyze project profile"
+
 [LearnFailed]
 other = "Failed to learn: {{.Error}}"
 
@@ -913,6 +937,118 @@ other = "Preview merge results without writing to the database"
 
 [PatternsMergeComplete]
 other = "Patterns merged: input {{.TotalInput}}, merged output {{.TotalMerged}}, unchanged {{.TotalUnchanged}}, merge operations {{.MergeCount}}"
+
+[PatternsAddShort]
+other = "Add a user-defined pattern using natural language"
+
+[PatternsAddLongDesc]
+other = "Describe a coding convention or pattern in natural language, and AI will generate a structured Pattern combined with project code.\n\nAI auto-infers category, generates good/bad examples and actionable rules. Use --files to specify related files for more accurate examples."
+
+[PatternsAddExample]
+other = "  # Minimal usage\n  skills-seed patterns add \"All service methods must return domain error\"\n\n  # Specify category and files\n  skills-seed patterns add \"Use limit/offset for pagination\" --category api --files internal/handler/pagination.go\n\n  # With context\n  skills-seed patterns add \"Use transactions for order writes\" --category database --context \"See order.go transaction pattern\""
+
+[PatternsAddFlagCategory]
+other = "Category: naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
+
+[PatternsAddFlagFiles]
+other = "Related file paths, AI reads these for accurate examples"
+
+[PatternsAddFlagContext]
+other = "Additional context"
+
+[PatternsAddComplete]
+other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
+
+# sync
+[SyncShort]
+other = "One-stop sync: learn + merge + generate skills"
+
+[SyncLongDesc]
+other = "Run the full pipeline in one command:\n\n  Path A (default): learn current → patterns merge → generate skills\n  Path B (--add): patterns add → patterns merge → generate skills\n\nWithout --add, runs Path A: learn from current codebase, merge similar patterns, generate skills.\nWith --add, runs Path B: add user-defined pattern, merge, generate skills."
+
+[SyncExample]
+other = "  # Full pipeline: learn + merge + generate\n  skills-seed sync\n\n  # Add user pattern + merge + generate\n  skills-seed sync --add \"All APIs must handle errors\" --category api\n\n  # With related files\n  skills-seed sync --add \"Use limit/offset for pagination\" --files internal/handler/pagination.go"
+
+[SyncFlagAdd]
+other = "Add a user-defined pattern (triggers Path B)"
+
+[SyncFlagCategory]
+other = "Category for user pattern (used with --add)"
+
+[SyncFlagFiles]
+other = "Related file paths (used with --add)"
+
+[SyncFlagContext]
+other = "Additional context"
+
+[SyncStepLearn]
+other = "[sync] Step 1/3: Learning from current codebase..."
+
+[SyncStepAddPattern]
+other = "[sync] Step 1/3: Adding user-defined pattern..."
+
+[SyncStepMerge]
+other = "[sync] Step 2/3: Merging similar patterns..."
+
+[SyncStepGenerate]
+other = "[sync] Step 3/3: Generating skills..."
+
+[SyncComplete]
+other = "[sync] Complete!"
+
+[SyncLearnFailed]
+other = "Learn failed"
+
+[SyncMergeFailed]
+other = "Merge failed"
+
+[SyncGenerateFailed]
+other = "Generate skills failed"
+
+[SyncAddPatternFailed]
+other = "Add user pattern failed"
+
+[SyncSavePatternFailed]
+other = "Save user pattern failed"
+
+[SyncPatternAdded]
+other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}})"
+
+# workspace
+[WorkspaceShort]
+other = "Manage workspace sub-projects"
+
+[WorkspaceLongDesc]
+other = "Manage sub-projects in workspace mode, including adding new sub-projects."
+
+[WorkspaceExample]
+other = "  # Add sub-projects to workspace\n  skills-seed workspace add .\n  skills-seed workspace add ./backend ./frontend"
+
+[WorkspaceAddShort]
+other = "Add sub-projects to workspace"
+
+[WorkspaceAddLongDesc]
+other = "Add new or existing sub-projects to the workspace. Detects first-level projects in the workspace root, syncs targets to workspace.projects, and initializes missing .skills-seed directories."
+
+[WorkspaceAddExample]
+other = "  # Auto-detect and add all sub-projects\n  skills-seed workspace add .\n\n  # Add specific sub-projects\n  skills-seed workspace add backend frontend"
+
+# generate skills
+[GenerateSkillsShort]
+other = "Generate AI Agent skills"
+
+[GenerateSkillsLongDesc]
+other = "Generate AI Agent skills from learned patterns and project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read project profile\n  • Select skills template based on skills.target\n  • Use agent.engine for summary and polish\n  • Generate SKILL.md and references/"
+
+[GenerateSkillsExample]
+other = "  # Generate to default skills.paths\n  skills-seed generate skills\n\n  # Specify output directory\n  skills-seed generate skills --output .agents/skills/my-project\n\n  # With additional context\n  skills-seed generate skills --context \"Focus on API compatibility constraints\""
+
+# agent errors
+[AgentRenderUserDefinePatternPromptFailed]
+other = "Failed to render user-defined pattern prompt"
+
+[AgentUserDefinePatternFailed]
+other = "AI failed to generate user-defined pattern"
 
 # 画像
 [ProfileShort]

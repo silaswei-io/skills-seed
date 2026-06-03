@@ -123,10 +123,15 @@ func (s *MergerService) MergePatterns(ctx context.Context, req *MergePatternsReq
 
 	var result *agent.MergePatternsResult
 	mergeProgress := progress.New(1)
+	retryProgress := agent.NewRetryProgressBinder(mergeProgress.UpdateStep)
+	ctx = retryProgress.WithContext(ctx)
 	// AI 合并需要读取所有候选模式，数据量大时耗时明显，用进度行显示当前阶段
 	err = mergeProgress.RunStep(i18n.Get("ProgressMergePatternsAI"), func() error {
+		label := i18n.Get("ProgressMergePatternsAI")
+		retryProgress.StartStep(label)
 		var callErr error
 		result, callErr = s.agent.MergePatterns(ctx, agentReq)
+		retryProgress.FinishStep(label, callErr == nil)
 		return callErr
 	})
 	if err != nil {

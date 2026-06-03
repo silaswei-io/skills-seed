@@ -19,6 +19,7 @@ type MockAgent struct {
 	GenerateFixesFn           func(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error)
 	GenerateSkillsSummaryFn   func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)
 	MergePatternsFn           func(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error)
+	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
 	AnalyzeProjectFn          func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
 	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
@@ -87,6 +88,14 @@ func (m *MockAgent) MergePatterns(ctx context.Context, req *agent.MergePatternsR
 		UnchangedPatterns: []agent.UnchangedPattern{},
 		Summary:           agent.MergeSummary{},
 	}, nil
+}
+
+// UserDefinePattern 模拟用户自定义模式
+func (m *MockAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+	if m.UserDefinePatternFn != nil {
+		return m.UserDefinePatternFn(ctx, req)
+	}
+	return &agent.UserDefinePatternResult{}, nil
 }
 
 // AnalyzeProject 模拟项目分析

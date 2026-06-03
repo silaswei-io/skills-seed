@@ -49,9 +49,12 @@ const (
 type Source string
 
 const (
-	SourceLearned Source = "learned" // 从 commit 历史学习
-	SourceDefault Source = "default" // 默认规则
-	SourceInit    Source = "init"    // 从初始代码库分析
+	SourceLearned        Source = "learned"         // 从 commit 历史学习（向后兼容）
+	SourceLearnedHistory Source = "learned_history" // learn history
+	SourceLearnedCurrent Source = "learned_current" // learn current
+	SourceUserDefined    Source = "user_defined"    // 用户自定义 patterns add
+	SourceDefault        Source = "default"         // 默认规则
+	SourceInit           Source = "init"            // 从初始代码库分析
 )
 
 // BusinessMethod 业务方法信息

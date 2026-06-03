@@ -61,6 +61,17 @@ func GenerateSkillsPromptData(session *PromptInputSession, req *GenerateSkillsRe
 	}, nil
 }
 
+// UserDefinePatternPromptData 返回用户自定义模式所需的提示词数据。
+func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePatternRequest) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"Description": req.Description,
+		"Category":    req.Category,
+		"Files":       req.Files,
+		"UserContext": req.UserContext,
+		"Language":    req.Language,
+	}, nil
+}
+
 // AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
 func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRequest) (map[string]interface{}, error) {
 	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", req.Structure)

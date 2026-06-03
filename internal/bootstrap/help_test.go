@@ -60,7 +60,9 @@ func TestRootHelpUsesConciseIntro(t *testing.T) {
 	require.Contains(t, helpText, "Usage:")
 	require.Contains(t, helpText, "Available Commands:")
 	require.Contains(t, helpText, "check")
-	require.Contains(t, helpText, "generate-skills")
+	require.Contains(t, helpText, "generate")
+	require.Contains(t, helpText, "sync")
+	require.Contains(t, helpText, "workspace")
 	require.Contains(t, helpText, "从代码库学习项目规范，并生成 AI Agent skills。")
 	require.Contains(t, helpText, "skills-seed init --mode project --agent codex --skills codex --locale zh-CN")
 	require.NotContains(t, helpText, "此工具可集成配置的 AI Agent")
@@ -123,9 +125,10 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "reset help flag", args: []string{"reset", "--help"}, want: false},
 		{name: "hook install", args: []string{"hook", "install"}, want: false},
 		{name: "unknown command", args: []string{"unknown"}, want: false},
-		{name: "add", args: []string{"add", "."}, want: true},
+		{name: "add", args: []string{"workspace", "add", "."}, want: true},
 		{name: "check", args: []string{"check"}, want: true},
-		{name: "generate", args: []string{"generate-skills"}, want: true},
+		{name: "generate skills", args: []string{"generate", "skills"}, want: true},
+		{name: "sync", args: []string{"sync"}, want: true},
 		{name: "learn parent help", args: []string{"learn"}, want: false},
 		{name: "learn current", args: []string{"learn", "current"}, want: true},
 		{name: "learn history", args: []string{"learn", "history"}, want: true},
@@ -159,7 +162,7 @@ func TestNoArgCommandsRejectPositionalHelpArgument(t *testing.T) {
 		{"init"},
 		{"reset"},
 		{"check"},
-		{"generate-skills"},
+		{"generate", "skills"},
 		{"learn", "current"},
 		{"learn", "history"},
 		{"patterns", "stats"},

@@ -403,6 +403,71 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	require.Contains(t, output, "子项目 frontend 独立学习完成")
 }
 
+func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
+	defer restoreLearnFlags()
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	provider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		agent.ReportRetryForContext(ctx, agent.RetryInfo{
+			AgentName:    "claude",
+			Operation:    "AnalyzeCurrentCodebase",
+			Attempt:      1,
+			MaxRetries:   3,
+			WaitDuration: 15 * time.Second,
+			CallDuration: 217 * time.Second,
+			Reason:       "API Error: 529 overloaded_error",
+		})
+		agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
+			AgentName:  "claude",
+			Operation:  "AnalyzeCurrentCodebase",
+			Attempt:    2,
+			MaxRetries: 3,
+		})
+		agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
+			AgentName:  "claude",
+			Operation:  "AnalyzeCurrentCodebase",
+			Attempt:    2,
+			MaxRetries: 3,
+		})
+		pattern := domain.NewPattern("p1", "Error Handling", domain.CategoryError)
+		pattern.Confidence = 0.9
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{*pattern},
+			Summary:  "summary",
+		}, nil
+	})
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "front", Path: "front", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", provider)
+	}
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont))
+	})
+
+	retryLabel := "分析当前代码库（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）"
+	attemptLabel := "分析当前代码库（第2次尝试）"
+	require.Contains(t, output, retryLabel)
+	require.Contains(t, output, attemptLabel)
+	afterRetry := output[strings.Index(output, retryLabel)+len(retryLabel):]
+	attemptIndex := strings.Index(afterRetry, attemptLabel)
+	require.NotEqual(t, -1, attemptIndex, "expected retry attempt progress label after retry wait, got %q", output)
+	afterAttempt := afterRetry[attemptIndex+len(attemptLabel):]
+	restoreIndex := strings.Index(afterAttempt, "3/5 分析当前代码库\n")
+	require.NotEqual(t, -1, restoreIndex, "expected retry progress label to be restored after a successful retry, got %q", output)
+}
+
 func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()

@@ -904,3 +904,65 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 	}
 	return &spec, nil
 }
+
+// ParseUserDefinePatternResult 解析用户自定义模式结果
+func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult, error) {
+	jsonStr, err := ExtractJSON(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentNoValidJSONFound"), err)
+	}
+
+	var result struct {
+		ID             string  `json:"id"`
+		Name           string  `json:"name"`
+		Category       string  `json:"category"`
+		Description    string  `json:"description"`
+		GoodExample    string  `json:"good_example"`
+		BadExample     string  `json:"bad_example"`
+		Rule           string  `json:"rule"`
+		Confidence     float64 `json:"confidence"`
+		BusinessMethod *struct {
+			Name          string `json:"name"`
+			Location      string `json:"location"`
+			Description   string `json:"description"`
+			Usage         string `json:"usage"`
+			Type          string `json:"type"`
+			Function      string `json:"function"`
+			Prerequisites string `json:"prerequisites"`
+			Returns       string `json:"returns"`
+		} `json:"business_method"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+
+	pattern := domain.Pattern{
+		ID:          result.ID,
+		Name:        result.Name,
+		Category:    domain.Category(result.Category),
+		Description: result.Description,
+		GoodExample: result.GoodExample,
+		BadExample:  result.BadExample,
+		Rule:        result.Rule,
+		Confidence:  result.Confidence,
+		Source:      domain.SourceUserDefined,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if result.BusinessMethod != nil {
+		pattern.BusinessMethod = &domain.BusinessMethod{
+			Name:          result.BusinessMethod.Name,
+			Location:      result.BusinessMethod.Location,
+			Description:   result.BusinessMethod.Description,
+			Usage:         result.BusinessMethod.Usage,
+			Type:          result.BusinessMethod.Type,
+			Function:      result.BusinessMethod.Function,
+			Prerequisites: result.BusinessMethod.Prerequisites,
+			Returns:       result.BusinessMethod.Returns,
+		}
+	}
+
+	return &agent.UserDefinePatternResult{Pattern: &pattern}, nil
+}

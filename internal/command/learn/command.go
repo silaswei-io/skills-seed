@@ -115,7 +115,11 @@ func historyDefaults(cont *container.Container) (int, int) {
 	return defaultLimit, defaultBatchSize
 }
 
-// runLearnCurrent 从当前代码库学习
+// RunLearnCurrent 导出：从当前代码库学习（供 sync 调用）
+func RunLearnCurrent(cont *container.Container) error {
+	return runLearnCurrent(cont)
+}
+
 func runLearnCurrent(cont *container.Container) error {
 	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
 		return runLearnWorkspaceCurrent(cont)
@@ -143,6 +147,7 @@ type learnCurrentProjectOptions struct {
 	userContext      string
 	onStepStart      func(label string)
 	onStepComplete   func(label string)
+	onStepUpdate     func(label string)
 }
 
 type learnCurrentProjectResult struct {
@@ -167,17 +172,31 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	startedAt := time.Now()
 	tracker := progress.New(5)
+	retryProgress := agent.NewRetryProgressBinder(func(label string) {
+		if opts.onStepUpdate != nil {
+			opts.onStepUpdate(label)
+		}
+		if opts.showProgress {
+			tracker.UpdateStep(label)
+		}
+	})
+	ctx = retryProgress.WithContext(ctx)
 	runStep := func(label string, fn func() error) error {
+		retryProgress.StartStep(label)
 		if opts.onStepStart != nil {
 			opts.onStepStart(label)
 		}
+		var err error
 		if opts.showProgress {
-			if err := tracker.RunStep(label, fn); err != nil {
-				return err
-			}
-		} else if err := fn(); err != nil {
+			err = tracker.RunStep(label, fn)
+		} else {
+			err = fn()
+		}
+		if err != nil {
+			retryProgress.FinishStep(label, false)
 			return err
 		}
+		retryProgress.FinishStep(label, true)
 		if opts.onStepComplete != nil {
 			opts.onStepComplete(label)
 		}
@@ -616,6 +635,10 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 				}
 			}, func(label string) {
 				if multiTracker != nil {
+					multiTracker.Update(progressName, label)
+				}
+			}, func(label string) {
+				if multiTracker != nil {
 					multiTracker.CompleteStep(progressName, label)
 					pauseAfterFastWorkspaceChildStep(stepStartedAt)
 				}
@@ -671,7 +694,7 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 	return nil
 }
 
-func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepComplete func(label string), logPath *string) (*learnCurrentProjectResult, error) {
+func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepUpdate func(label string), onStepComplete func(label string), logPath *string) (*learnCurrentProjectResult, error) {
 	loggingConfig := childCont.ConfigRepo.GetLoggingConfig()
 	logDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
 	logLevel := logger.ParseLevel(loggingConfig.Level)
@@ -687,6 +710,7 @@ func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Con
 			showProgress:     showDetails,
 			showDetailedLogs: showDetails,
 			onStepStart:      onStepStart,
+			onStepUpdate:     onStepUpdate,
 			onStepComplete:   onStepComplete,
 		})
 		return err

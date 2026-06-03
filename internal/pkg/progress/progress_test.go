@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCompleteStepKeepsFinalElapsedTime(t *testing.T) {
@@ -105,6 +107,21 @@ func TestPrintConsoleLineNowClearsActiveProgressLine(t *testing.T) {
 	}
 }
 
+func TestUpdateStepRefreshesActiveProgressLabel(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := New(1)
+		tracker.enabled = true
+
+		tracker.StartStep("分析当前代码库")
+		tracker.UpdateStep("分析当前代码库（API Error: 529，本次调用 3m37s，15s 后重试）")
+		tracker.CompleteStep("分析当前代码库")
+	})
+
+	if !strings.Contains(output, "分析当前代码库（API Error: 529，本次调用 3m37s，15s 后重试）") {
+		t.Fatalf("expected updated progress label, got %q", output)
+	}
+}
+
 func TestPrintConsoleLineAfterProgressPrintsAfterCompletedStep(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := New(1)
@@ -194,6 +211,60 @@ func TestMultiTrackerRendersPerTaskStepCounts(t *testing.T) {
 	}
 }
 
+func TestMultiTrackerRenderKeepsCursorInsideProgressBlock(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := NewMulti([]string{"backend", "front"})
+		tracker.enabled = true
+		tracker.SetLabel("学习工作区子项目")
+		tracker.SetTaskTotal(5)
+
+		tracker.mu.Lock()
+		tracker.tasks["backend"].label = "分析当前代码库"
+		tracker.tasks["backend"].active = true
+		tracker.tasks["backend"].startedAt = time.Now()
+		tracker.tasks["front"].label = "分析当前代码库"
+		tracker.tasks["front"].active = true
+		tracker.tasks["front"].startedAt = time.Now()
+		tracker.mu.Unlock()
+
+		tracker.Render()
+		tracker.Update("front", "分析当前代码库（API Error: 529，本次调用 3m37s，15s 后重试）")
+	})
+
+	if strings.HasSuffix(output, "\n") {
+		t.Fatalf("expected active multi progress render to keep cursor on progress block without trailing newline, got %q", output)
+	}
+	if !strings.Contains(output, "\x1b[2F") {
+		t.Fatalf("expected second render to move from last progress line back to the first line, got %q", output)
+	}
+	if strings.Contains(output, "\x1b[3F") {
+		t.Fatalf("expected second render not to move above the active progress block, got %q", output)
+	}
+}
+
+func TestMultiTrackerRenderMovesByWrappedPhysicalLines(t *testing.T) {
+	restore := setTerminalWidthForTest(80)
+	defer restore()
+
+	output := captureStdout(t, func() {
+		tracker := NewMulti([]string{"backend", "front"})
+		tracker.enabled = true
+		tracker.SetLabel("学习工作区子项目")
+		tracker.SetTaskTotal(5)
+
+		tracker.Start("backend", "分析当前代码库")
+		tracker.Start("front", "分析当前代码库")
+		tracker.Update("front", "分析当前代码库（API Error: 529 {\"error\":{\"code\":\"1305\",\"message\":\"[1305][该模型当前访问量过大，请您稍后再试][2026060311061203164c3724b3416a]\",\"type\":\"overloaded_error\"},\"request_id\":\"2026060311061203164c3724b3416a\",\"type\":\"error\"}，本次调用 3m37s，15s 后重试）")
+		tracker.Render()
+	})
+
+	if !strings.Contains(output, "\x1b[5F") && !strings.Contains(output, "\x1b[6F") {
+		t.Fatalf("expected wrapped progress render to move back across wrapped physical lines, got %q", output)
+	}
+	require.Contains(t, output, "\x1b[J")
+	require.Contains(t, output, "request_id")
+}
+
 func TestMultiTrackerCompletedStepStillAnimatesUntilNextStep(t *testing.T) {
 	tracker := NewMulti([]string{"backend"})
 	tracker.enabled = true
@@ -276,4 +347,14 @@ func resetConsoleState() {
 	progressActive = false
 	progressLineOpen = false
 	pendingConsoleLines = nil
+}
+
+func setTerminalWidthForTest(width int) func() {
+	original := terminalWidth
+	terminalWidth = func() int {
+		return width
+	}
+	return func() {
+		terminalWidth = original
+	}
 }

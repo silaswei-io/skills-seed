@@ -340,6 +340,37 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 	return result, nil
 }
 
+// UserDefinePattern 根据用户自然语言描述生成模式
+func (c *CodexAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+	data, err := agent.UserDefinePatternPromptData(nil, req)
+	if err != nil {
+		return nil, err
+	}
+
+	prompt, err := c.promptLoader.Render("user-define-pattern", data)
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderUserDefinePatternPromptFailed"))
+	}
+
+	output, err := c.callCodex(ctx, "UserDefinePattern", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentUserDefinePatternFailed"), err)
+	}
+
+	result, err := parser.ParseUserDefinePatternResult(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
+		"agent", c.Name(),
+		"operation", "UserDefinePattern",
+		"pattern_id", result.Pattern.ID,
+	)
+
+	return result, nil
+}
+
 // AnalyzeWorkspaceProfile 分析工作区结构和跨项目关系
 func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
 	prompt, err := c.promptLoader.Render("skill-workspace-profile", workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
@@ -409,21 +440,45 @@ func workspacePromptData(workspaceName, workspaceRoot, workspaceInputPath, works
 
 func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string) (string, error) {
 	maxRetries := c.retryCfg.EffectiveMaxRetries()
+	retried := false
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		output, isRetryable, err := c.doCallCodex(ctx, operation, prompt, attempt+1)
+		attemptNumber := attempt + 1
+		if attempt > 0 {
+			agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
+				AgentName:  c.Name(),
+				Operation:  operation,
+				Attempt:    attemptNumber,
+				MaxRetries: maxRetries,
+			})
+		}
+		output, callDuration, isRetryable, err := c.doCallCodex(ctx, operation, prompt, attemptNumber)
 		if err == nil {
+			if retried {
+				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
+					AgentName:    c.Name(),
+					Operation:    operation,
+					Attempt:      attemptNumber,
+					MaxRetries:   maxRetries,
+					CallDuration: callDuration,
+				})
+			}
 			return output, nil
 		}
 		if !isRetryable || attempt == maxRetries {
 			return "", err
 		}
 
+		retried = true
 		waitDuration := c.retryCfg.WaitDuration(attempt)
-		logger.Warn(i18n.Get("LoggerAgentRateLimitRetry"),
-			"attempt", attempt+1,
-			"max_retries", maxRetries,
-			"wait_seconds", waitDuration.Seconds(),
-		)
+		agent.ReportRetryForContext(ctx, agent.RetryInfo{
+			AgentName:    c.Name(),
+			Operation:    operation,
+			Attempt:      attemptNumber,
+			MaxRetries:   maxRetries,
+			WaitDuration: waitDuration,
+			CallDuration: callDuration,
+			Reason:       agent.RetryReasonFromOutput(output, ""),
+		})
 
 		select {
 		case <-ctx.Done():
@@ -449,13 +504,13 @@ func isCodexRetryableError(stdout, stderr string) bool {
 }
 
 // doCallCodex 执行单次 Codex CLI 调用
-func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, attempt int) (string, bool, error) {
+func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, attempt int) (string, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	workDir, err := os.Getwd()
 	if err != nil {
-		return "", false, err
+		return "", 0, false, err
 	}
 	args := codexExecArgs(c.allowUserPlugins)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
@@ -479,6 +534,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 
 	startedAt := time.Now()
 	if err := cmd.Run(); err != nil {
+		duration := time.Since(startedAt)
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
 		retryable := isCodexRetryableError(stdoutStr, stderrStr)
@@ -488,30 +544,31 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 				"agent", c.Name(),
 				"operation", operation,
 				"attempt", attempt,
-				"duration", time.Since(startedAt),
+				"duration", duration,
 				"error", err,
 				"retryable", true,
 			)
-			return "", true, fmt.Errorf("%s: %w, stderr: %s", i18n.Get("AgentCodexCLIFailed"), err, stderrStr)
+			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w, stderr: %s", i18n.Get("AgentCodexCLIFailed"), err, stderrStr)
 		}
 
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"agent", c.Name(),
 			"operation", operation,
-			"duration", time.Since(startedAt),
+			"duration", duration,
 			"stdout_length", stdout.Len(),
 			"stderr_length", stderr.Len(),
 			"stderr", stderr.String(),
 		)
-		return "", false, fmt.Errorf("%s: %w, stderr: %s", i18n.Get("AgentCodexCLIFailed"), err, stderr.String())
+		return "", duration, false, fmt.Errorf("%s: %w, stderr: %s", i18n.Get("AgentCodexCLIFailed"), err, stderr.String())
 	}
+	duration := time.Since(startedAt)
 
 	rawOutput := stdout.String()
 	usage := tokenusage.Extract(rawOutput)
 	callCompleteFields := []any{
 		"agent", c.Name(),
 		"operation", operation,
-		"duration", time.Since(startedAt),
+		"duration", duration,
 		"output_length", stdout.Len(),
 		"stderr_length", stderr.Len(),
 		"attempt", attempt,
@@ -525,12 +582,12 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"agent", c.Name(),
 			"operation", operation,
-			"duration", time.Since(startedAt),
+			"duration", duration,
 			"error", err,
 			"output_length", stdout.Len(),
 			"output_preview", parser.TruncString(rawOutput, 500),
 		)
-		return "", false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), err)
+		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), err)
 	}
 	logger.Debug("Codex 模型回复预览",
 		"agent", c.Name(),
@@ -543,7 +600,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 		"operation", operation,
 		"content_length", len(content),
 	)
-	return content, false, nil
+	return content, duration, false, nil
 }
 
 func codexExecArgs(allowUserPlugins bool) []string {

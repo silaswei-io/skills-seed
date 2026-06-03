@@ -125,6 +125,21 @@ type PatternSummary struct {
 	WhenToUse  string // 何时使用
 }
 
+// UserDefinePatternRequest 用户自定义模式请求
+type UserDefinePatternRequest struct {
+	Description string   // 用户自然语言描述
+	Category    string   // 可选，用户指定的分类
+	Files       []string // 可选，关联的文件路径
+	UserContext string   // 可选，额外上下文
+	WorkDir     string   // 项目根目录
+	Language    string   // 项目语言
+}
+
+// UserDefinePatternResult 用户自定义模式结果
+type UserDefinePatternResult struct {
+	Pattern *domain.Pattern
+}
+
 // MergePatternsRequest 模式汇总请求
 type MergePatternsRequest struct {
 	Category string           // 分类名称
@@ -284,6 +299,11 @@ type PatternMerger interface {
 	MergePatterns(ctx context.Context, req *MergePatternsRequest) (*MergePatternsResult, error)
 }
 
+// UserPatternDefiner 用户自定义模式接口
+type UserPatternDefiner interface {
+	UserDefinePattern(ctx context.Context, req *UserDefinePatternRequest) (*UserDefinePatternResult, error)
+}
+
 // ProjectAnalyzer 项目分析接口
 type ProjectAnalyzer interface {
 	AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
@@ -301,5 +321,6 @@ type Agent interface {
 	FixGenerator
 	SkillsGenerator
 	PatternMerger
+	UserPatternDefiner
 	ProjectAnalyzer
 }

@@ -2,6 +2,36 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.5.0]
+
+### 破坏性变更
+
+- `skills-seed add` 迁移为 `skills-seed workspace add`
+- `skills-seed generate-skills` 拆分为 `skills-seed generate skills`
+- 移除旧的 `internal/command/add` 包，逻辑统一到 `internal/command/workspace`
+
+### 功能
+
+- 新增 `skills-seed patterns add <描述>`，支持用自然语言定义编码模式，AI 结合代码生成结构化 pattern
+- 新增 `skills-seed sync` 一键同步命令：
+  - `sync` = learn current → patterns merge → generate skills
+  - `sync --add <描述>` = patterns add → patterns merge → generate skills
+- 新增 `skills-seed generate` 父命令和 `generate skills` 子命令，为后续更多生成类型预留扩展
+- 新增 `skills-seed workspace` 父命令和 `workspace add` 子命令，使命令结构更清晰
+- AI Agent 新增指数退避重试机制（429 / 529 / overloaded），重试次数和间隔可在 `config.yaml` 的 `agent.retry` 中配置；当前进度行会区分正常、等待重试和重试中状态，并显示 Agent 错误、本次调用耗时和退避等待
+- 新增 `UserPatternDefiner` Agent 接口，支持用户自定义模式生成
+- 新增用户定义模式 prompt 模板（`user-define-pattern`），支持中英文
+- 用户定义的模式自动标记 `source: user_defined`
+
+### 变更
+
+- 命令路由表更新：`generate/skills`、`sync`、`workspace/add`、`patterns/add` 需要项目运行时
+- `commandNeedsProjectRuntime` 移除不可达代码
+
+### 文档
+
+- 更新 README、命令参考和配置参考，覆盖 0.5.0 命令结构、`patterns add`、`sync` 和 `agent.retry`
+
 ## [v0.4.4]
 
 ### 优化

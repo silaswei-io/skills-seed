@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/spf13/cobra"
 )
@@ -114,7 +116,18 @@ func refreshProfile(cont *container.Container, language string) error {
 		"Language":    currentLanguage,
 	}))
 
-	result, err := cont.AnalyzerSvc.AnalyzeProjectFullWithLanguage(ctx, projectRoot, projectName, currentLanguage)
+	tracker := progress.New(1)
+	retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+	ctx = retryProgress.WithContext(ctx)
+	label := i18n.Get("ProgressProfileRefreshAI")
+	var result *analyzer.AnalyzeProjectResult
+	err = tracker.RunStep(label, func() error {
+		retryProgress.StartStep(label)
+		var callErr error
+		result, callErr = cont.AnalyzerSvc.AnalyzeProjectFullWithLanguage(ctx, projectRoot, projectName, currentLanguage)
+		retryProgress.FinishStep(label, callErr == nil)
+		return callErr
+	})
 	if err != nil {
 		return err
 	}

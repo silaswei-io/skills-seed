@@ -22,16 +22,29 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCmdDoesNotExposeWorkspaceChildSkillPolicyFlags(t *testing.T) {
 	cmd := Cmd(&container.Container{})
+	skills := getSkillsSubCommand(t, cmd)
 
-	require.Nil(t, cmd.Flags().Lookup("overwrite"))
-	require.Nil(t, cmd.Flags().Lookup("root-only"))
-	require.NotNil(t, cmd.Flags().Lookup("context"))
-	require.NotNil(t, cmd.Flags().Lookup("context-file"))
+	require.Nil(t, skills.Flags().Lookup("overwrite"))
+	require.Nil(t, skills.Flags().Lookup("root-only"))
+	require.NotNil(t, skills.Flags().Lookup("context"))
+	require.NotNil(t, skills.Flags().Lookup("context-file"))
+}
+
+func getSkillsSubCommand(t *testing.T, cmd *cobra.Command) *cobra.Command {
+	t.Helper()
+	for _, sub := range cmd.Commands() {
+		if sub.Name() == "skills" {
+			return sub
+		}
+	}
+	t.Fatal("skills subcommand not found")
+	return nil
 }
 
 func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {

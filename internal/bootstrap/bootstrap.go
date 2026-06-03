@@ -9,7 +9,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
-	addcmd "github.com/silaswei-io/skills-seed/internal/command/add"
 	"github.com/silaswei-io/skills-seed/internal/command/check"
 	"github.com/silaswei-io/skills-seed/internal/command/generate"
 	"github.com/silaswei-io/skills-seed/internal/command/hook"
@@ -18,7 +17,9 @@ import (
 	patternscmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
 	reviewcmd "github.com/silaswei-io/skills-seed/internal/command/review"
+	synccmd "github.com/silaswei-io/skills-seed/internal/command/sync"
 	"github.com/silaswei-io/skills-seed/internal/command/view"
+	workspacecmd "github.com/silaswei-io/skills-seed/internal/command/workspace"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -141,7 +142,8 @@ func createRootCmd() *cobra.Command {
 func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(initcmd.Cmd())
 	rootCmd.AddCommand(initcmd.ResetCmd())
-	rootCmd.AddCommand(addcmd.Cmd(cont))
+	rootCmd.AddCommand(workspacecmd.Cmd(cont))
+	rootCmd.AddCommand(synccmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))
 	rootCmd.AddCommand(check.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
@@ -168,18 +170,22 @@ func commandNeedsProjectRuntime(args []string) bool {
 	switch cleaned[0] {
 	case "help", "completion", "init", "hook":
 		return false
-	case "add", "check", "generate-skills", "reset":
+	case "add", "check", "reset", "sync":
 		return true
+	case "generate":
+		return len(cleaned) >= 2 && cleaned[1] == "skills"
 	case "learn":
 		return len(cleaned) >= 2 && (cleaned[1] == "current" || cleaned[1] == "history")
 	case "patterns":
-		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "merge")
+		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "merge" || cleaned[1] == "add")
 	case "profile":
 		return len(cleaned) >= 2 && (cleaned[1] == "show" || cleaned[1] == "refresh")
 	case "review":
 		return len(cleaned) >= 2 && (cleaned[1] == "import" || cleaned[1] == "stats")
 	case "view":
 		return len(cleaned) >= 2 && cleaned[1] == "patterns"
+	case "workspace":
+		return len(cleaned) >= 2 && cleaned[1] == "add"
 	default:
 		return false
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/autofix"
 	interact "github.com/silaswei-io/skills-seed/internal/utils/interactive"
 	"github.com/spf13/cobra"
@@ -60,15 +61,24 @@ func runCheck(cont *container.Container, opts checkOptions) error {
 
 	var issues []domain.Issue
 	var err error
+	tracker := progress.New(1)
+	retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+	ctx = retryProgress.WithContext(ctx)
+	label := i18n.Get("ProgressCheckAnalyzeAI")
 
 	// 检查所有文件还是只检查暂存文件
-	if opts.checkAll {
-		logger.Debug(i18n.Get("CheckAllFiles") + "\n")
-		issues, err = cont.CheckerSvc.CheckAll(ctx)
-	} else {
-		logger.Debug(i18n.Get("CheckStagedFiles") + "\n")
-		issues, err = cont.CheckerSvc.Check(ctx)
-	}
+	err = tracker.RunStep(label, func() error {
+		retryProgress.StartStep(label)
+		if opts.checkAll {
+			logger.Debug(i18n.Get("CheckAllFiles") + "\n")
+			issues, err = cont.CheckerSvc.CheckAll(ctx)
+		} else {
+			logger.Debug(i18n.Get("CheckStagedFiles") + "\n")
+			issues, err = cont.CheckerSvc.Check(ctx)
+		}
+		retryProgress.FinishStep(label, err == nil)
+		return err
+	})
 
 	if err != nil {
 		logger.Error(i18n.GetWithParams("CheckFailed", map[string]interface{}{"Error": err.Error()}))
@@ -256,7 +266,18 @@ func generateFixes(cont *container.Container, ctx context.Context, issues []doma
 		Context: context,
 	}
 
-	result, err := cont.Agent.GenerateFixes(ctx, req)
+	tracker := progress.New(1)
+	retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+	ctx = retryProgress.WithContext(ctx)
+	label := i18n.Get("ProgressGenerateFixesAI")
+	var result *agent.GenerateFixesResult
+	err := tracker.RunStep(label, func() error {
+		retryProgress.StartStep(label)
+		var callErr error
+		result, callErr = cont.Agent.GenerateFixes(ctx, req)
+		retryProgress.FinishStep(label, callErr == nil)
+		return callErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToGenerateFixes", map[string]interface{}{"Error": err.Error()}))
 	}

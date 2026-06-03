@@ -42,6 +42,10 @@ agent:
   timeout: 1800
   allow_user_plugins: false
   parallelism: 0
+  retry:
+    max_retries: 3
+    initial_interval: 15
+    max_interval: 120
 
 learning:
   max_commits: 50
@@ -147,7 +151,7 @@ exclude:
 #### Behavior
 
 1. `skills-seed init --workspace` initializes the root and the child projects detected at that time.
-2. For child projects added or copied into the workspace later, run `skills-seed add .` to detect all children or `skills-seed add <child>` for specific children.
+2. For child projects added or copied into the workspace later, run `skills-seed workspace add .` to detect all children or `skills-seed workspace add <child>` for specific children.
 3. Existing child `.skills-seed/config.yaml` files are not overwritten. If a child agent differs from the root, it is reported and preserved.
 4. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
 
@@ -182,6 +186,9 @@ exclude:
 | `timeout` | `1800` | AI request timeout in seconds |
 | `allow_user_plugins` | `false` | Whether agents may load user plugins; disabled by default for stable batch runs |
 | `parallelism` | `0` | Number of concurrent agents; `0` means automatic |
+| `retry.max_retries` | `3` | Maximum retry attempts for retryable errors; `0` uses the default `3` |
+| `retry.initial_interval` | `15` | Initial retry wait in seconds; `0` uses the default `15` |
+| `retry.max_interval` | `120` | Maximum exponential-backoff wait in seconds; `0` uses the default `120` |
 
 #### `parallelism` Notes
 
@@ -189,6 +196,12 @@ exclude:
 2. In `workspace` mode, automatic parallelism is the child project count, capped at `6`.
 3. A positive value is used as the explicit concurrency limit.
 4. The implementation is real concurrency: child project tasks run through a goroutine worker pool.
+
+#### `retry` Notes
+
+1. Retry currently applies to retryable Agent CLI errors such as 429 / 529 / overloaded.
+2. Wait time starts at `initial_interval`, doubles after each retry, and is capped by `max_interval`.
+3. Long-running steps such as `learn current` update the active progress line with the agent error, failed call duration, and backoff wait; when the next call starts, the line switches to `attempt N`.
 
 #### Switch Agent
 
@@ -246,7 +259,7 @@ Common paths:
 
 These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
 
-`--context` and `--context-file` are one-time command flags. They affect only the current `learn current` or `generate-skills` run and are not written to `.skills-seed/prompts/`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `--context` or `--context-file` for temporary guidance.
+`--context` and `--context-file` are one-time command flags. They affect only the current `learn current` or `generate skills` run and are not written to `.skills-seed/prompts/`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `--context` or `--context-file` for temporary guidance.
 
 ### `autofix`
 
@@ -276,8 +289,8 @@ These files are merged with built-in prompts; they do not replace built-in promp
 
 #### Notes
 
-1. `generate-skills` uses `skills.paths` for the current `skills.target` by default.
-2. Use `skills-seed generate-skills --output <path>` to override the output directory for one run.
+1. `generate skills` uses `skills.paths` for the current `skills.target` by default.
+2. Use `skills-seed generate skills --output <path>` to override the output directory for one run.
 3. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
 
 ### `logging`
