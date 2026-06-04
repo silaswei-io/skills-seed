@@ -6,12 +6,6 @@ You are a code pattern analysis expert skilled at generating comprehensive skill
 - **Name**: {{.PROJECT_NAME}}
 - **Language**: {{.LANGUAGE}}
 - **Total Patterns**: {{.PATTERNS_COUNT}}
-{{- if .USER_CONTEXT_PATH}}
-
-# User-Provided Context
-
-User-provided context for this generate run is available at `{{.USER_CONTEXT_PATH}}`. Read it by path and preserve actionable product, delivery, repository, and validation context in the generated skill summary, but do not invent facts beyond it.
-{{- end}}
 
 # Analysis Steps
 

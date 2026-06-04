@@ -4,13 +4,13 @@
 
 配置文件位于 `.skills-seed/config.yaml`。`skills-seed init` 会按当前项目生成默认配置；大多数路径都相对项目根目录或 `.skills-seed` 目录，具体以字段说明为准。
 
-## 0.6.0 配置结构
+## 0.6.1 配置结构
 
-0.6.0 是一次未发布前的干净配置重构，不保留旧字段兼容：
+0.6.1 延续 0.6.0 的干净配置结构，不保留旧字段兼容：
 
 - 顶层 `project` 改名为 `profile`，表示当前配置文件所属项目或工作区本身，不表示 `project` 运行模式。
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
-- workspace 公共库、契约和基础设施影响会在学习/生成 workspace profile 与 spec 时根据仓库证据、依赖关系和用户上下文分析，不从配置文件读取。
+- workspace 公共库、契约和基础设施影响会在 `learn current` 阶段根据仓库证据、子项目画像和一次性用户说明分析并沉淀到 workspace profile/spec，不从配置文件读取；生成阶段只消费已沉淀结果。
 - workspace 根配置的 `profile.language` 默认留空，因为一个工作区可以包含多种语言子项目。
 
 ## 配置示例
@@ -259,7 +259,7 @@ skills-seed learn history --limit 100 --batch-size 10
 
 这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户补充指令破坏解析。
 
-`--context` 和 `--context-file` 是一次性命令参数，只影响当前 `learn current` 或 `generate skills` 运行，不会写入 `.skills-seed/prompts/`。长期规则写入 `prompts/instructions/<prompt-id>.md`；临时说明使用 `--context` 或 `--context-file`。
+`--context` 和 `--context-file` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/prompts/`，也不会传给 `generate skills`。长期规则写入 `prompts/instructions/<prompt-id>.md`；临时说明使用 `learn current --context` 或 `learn current --context-file`。
 
 ### `autofix`
 

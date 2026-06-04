@@ -255,7 +255,7 @@ func (c *ClaudeAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixe
 
 // 调用外部命令行程序（含速率限制自动重试）
 func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) (string, error) {
-	workDir, err := os.Getwd()
+	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
 		return "", err
 	}

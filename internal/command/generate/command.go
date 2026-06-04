@@ -22,14 +22,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	outputPath  string
-	merge       bool // 是否在生成前合并模式
-	contextText string
-	contextFile string
-)
-
 var sleepAfterGenerateChildStep = time.Sleep
+
+type generateOptions struct {
+	outputPath    string
+	outputChanged bool
+	merge         bool
+}
 
 // Cmd 返回 generate 命令
 func Cmd(cont *container.Container) *cobra.Command {
@@ -44,6 +43,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 }
 
 func skillsCmd(cont *container.Container) *cobra.Command {
+	opts := generateOptions{}
 	cmd := &cobra.Command{
 		Use:     "skills",
 		Short:   i18n.Get("GenerateSkillsShort"),
@@ -57,7 +57,8 @@ func skillsCmd(cont *container.Container) *cobra.Command {
 				logger.Debug(i18n.Get("GenerateRunInitFirst"))
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			return runGenerate(cont, cmd)
+			opts.outputChanged = cmd.Flags().Changed("output")
+			return runGenerate(cont, opts)
 		},
 	}
 
@@ -66,26 +67,20 @@ func skillsCmd(cont *container.Container) *cobra.Command {
 	if cont != nil {
 		defaultOutputPath = outputPathForCurrentTarget(cont)
 	}
-	cmd.Flags().StringVarP(&outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
-	cmd.Flags().BoolVarP(&merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
-	cmd.Flags().StringVar(&contextText, "context", "", i18n.Get("GenerateFlagContext"))
-	cmd.Flags().StringVar(&contextFile, "context-file", "", i18n.Get("GenerateFlagContextFile"))
+	opts.outputPath = defaultOutputPath
+	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
+	cmd.Flags().BoolVarP(&opts.merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
 
 	return cmd
 }
 
 // RunGenerate 导出：生成 skills（供 sync 调用）
 func RunGenerate(cont *container.Container) error {
-	return runGenerate(cont, nil)
+	return runGenerate(cont, generateOptions{})
 }
 
-func runGenerate(cont *container.Container, cmd *cobra.Command) error {
-	userContext, err := commandutil.ResolveRuntimeContext(contextText, contextFile)
-	if err != nil {
-		return err
-	}
+func runGenerate(cont *container.Container, opts generateOptions) error {
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
-	ctx = runtimecontext.WithUserContext(ctx, userContext)
 
 	logger.Info(i18n.Get("GenerateStarting"))
 	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
@@ -125,13 +120,13 @@ func runGenerate(cont *container.Container, cmd *cobra.Command) error {
 
 	logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
 
-	effectiveOutputPath := outputPath
-	if !cmd.Flags().Changed("output") {
+	effectiveOutputPath := opts.outputPath
+	if !opts.outputChanged {
 		effectiveOutputPath = outputPathForCurrentTarget(cont)
 	}
 
 	// 如果指定了 --merge 标志，先合并模式
-	if merge {
+	if opts.merge {
 		logger.Warn(i18n.Get("GenerateMergeDeprecated"))
 		logger.Info(i18n.Get("GenerateMergeStarting"))
 		if _, err := cont.MergerSvc.MergePatterns(ctx, &merger.MergePatternsRequest{}); err != nil {
@@ -218,7 +213,10 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 		multiTracker = trackers[0]
 	}
 	return workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
-		projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
+		projectRootPath, err := workspacediscovery.ResolveProjectRoot(projectRoot, project)
+		if err != nil {
+			return err
+		}
 		progressName := commandutil.WorkspaceProjectProgressName(project)
 		stepStartedAt := time.Now()
 		startStep := func(label string) {

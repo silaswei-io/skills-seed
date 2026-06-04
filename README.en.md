@@ -121,11 +121,11 @@ built-in prompt
 
 Use `instructions/<prompt-id>.md` for stable team requirements, such as "ignore temporary debugging code while learning commits" or "prioritize API compatibility rules when generating skills". These instructions are appended after the built-in prompt, but they must not change the JSON / Markdown output format required by the built-in prompt. Skills Seed appends a non-editable final output contract after user fragments to protect parser-facing output.
 
-`--context` and `--context-file` are one-time guidance for the current command. They are not written to `.skills-seed/prompts/`. Use them for temporary instructions:
+`--context` and `--context-file` are one-time guidance for the current `learn current` command. They are not written to `.skills-seed/prompts/`, and they are not passed as temporary input to `generate skills`. Use them for temporary instructions:
 
 ```bash
 skills-seed learn current --context "Focus only on compatibility boundaries"
-skills-seed generate skills --context-file .skills-seed/context.md
+skills-seed learn current --context-file .skills-seed/context.md
 ```
 
 If a rule should apply across future runs, put it in `.skills-seed/prompts/instructions/<prompt-id>.md`. If it only explains or limits one run, use `--context` or `--context-file`.
@@ -175,7 +175,7 @@ skills-seed workspace add backend frontend
 
 The workspace root coordinates routing and cross-project relationships only. Child projects use their own `.skills-seed` directories to learn, generate, and store patterns independently. Existing child `.skills-seed/config.yaml` files are never overwritten; if a child uses a different agent from the root, it is reported and preserved.
 
-Starting in 0.6.0, the only user-facing workspace config field is `workspace.projects`. Shared libraries, contracts, and infrastructure impact are no longer hand-written through `workspace.shared`, `workspace.contracts`, or `workspace.infra`; they are analyzed into the workspace profile and spec from repository evidence, dependency relationships, and user context during learning/generation.
+Starting in 0.6.1, the only user-facing workspace config field is `workspace.projects`. Shared libraries, contracts, and infrastructure impact are no longer hand-written through `workspace.shared`, `workspace.contracts`, or `workspace.infra`; during `learn current`, they are analyzed from repository evidence, child `project-profile.json` files, and one-shot user context into root `workspace-profile.json` / `workspace-spec.json`. `generate skills` only consumes these learned artifacts and no longer accepts user context.
 
 ## Design Principles
 

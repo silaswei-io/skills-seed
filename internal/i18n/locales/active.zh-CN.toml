@@ -843,6 +843,15 @@ other = "写入工作区根 skills"
 [ProgressGenerateWorkspaceProjects]
 other = "生成工作区子项目 skills"
 
+[ProgressLearnWorkspaceAnalyzeProfile]
+other = "分析工作区画像"
+
+[ProgressLearnWorkspaceAnalyzeSpec]
+other = "分析工作区规范"
+
+[ProgressLearnWorkspaceSaveArtifacts]
+other = "保存工作区关系"
+
 [GenerateWorkspaceProjectProgressComplete]
 other = "完成"
 

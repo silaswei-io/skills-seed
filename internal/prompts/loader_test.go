@@ -51,7 +51,6 @@ func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 		"LANGUAGE":             "go",
 		"PATTERNS_PATH":        "/tmp/skills-seed/patterns.json",
 		"PATTERNS_COUNT":       0,
-		"USER_CONTEXT_PATH":    "",
 		"EXISTING_SKILLS_PATH": "",
 	})
 
@@ -362,6 +361,8 @@ func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *t
 	require.Contains(t, prompt, "所有面向用户阅读的自然语言字段必须使用简体中文")
 	require.Contains(t, prompt, "如果输入模式里包含英文说明，请改写成中文")
 	require.Contains(t, prompt, "不要输出 “Repository pattern”")
+	require.NotContains(t, prompt, "用户提供的上下文")
+	require.NotContains(t, prompt, "USER_CONTEXT_PATH")
 }
 
 func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
@@ -394,6 +395,24 @@ func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
 	require.NotContains(t, spec, "workspace-profile.json")
 	require.NotContains(t, spec, "user-context.md")
 	require.NotContains(t, spec, "kmip-go 提供 KMIP 能力")
+}
+
+func TestRenderWorkspacePromptsIncludeLearnUserContextPathWhenProvided(t *testing.T) {
+	profileData := workspacePromptData()
+	profileData["UserContextPath"] = "/tmp/skills-seed/user-context.md"
+	specData := workspaceSpecPromptData()
+	specData["UserContextPath"] = "/tmp/skills-seed/user-context.md"
+
+	loader := NewLoader("common", "zh-CN", "")
+	profile, err := loader.Render("skill-workspace-profile", profileData)
+	require.NoError(t, err)
+	spec, err := loader.Render("skill-workspace-spec", specData)
+	require.NoError(t, err)
+
+	require.Contains(t, profile, "/tmp/skills-seed/user-context.md")
+	require.Contains(t, profile, "不要把说明文件原文")
+	require.Contains(t, spec, "/tmp/skills-seed/user-context.md")
+	require.Contains(t, spec, "不要把说明文件原文")
 }
 
 func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
@@ -574,7 +593,6 @@ func sampleGenerateSkillsData() map[string]interface{} {
 		"PATTERNS_PATH":        "/tmp/skills-seed/patterns.json",
 		"PATTERNS_COUNT":       1,
 		"EXISTING_SKILLS_PATH": "",
-		"USER_CONTEXT_PATH":    "",
 	}
 }
 

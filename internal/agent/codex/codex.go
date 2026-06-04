@@ -508,7 +508,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	workDir, err := os.Getwd()
+	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
 		return "", 0, false, err
 	}

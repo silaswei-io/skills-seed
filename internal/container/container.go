@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -53,21 +54,47 @@ type Container struct {
 // AgentFactory 创建指定 engine 的 Agent
 type AgentFactory func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent
 
-var agentFactories = map[string]AgentFactory{
-	"claude": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
-		return claude.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
-	},
-	"codex": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
-		return codex.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
-	},
-}
+var (
+	agentFactoriesMu sync.RWMutex
+	agentFactories   = map[string]AgentFactory{
+		"claude": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+			return claude.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
+		},
+		"codex": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+			return codex.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
+		},
+	}
+)
 
 // RegisterAgentFactory 注册自定义 Agent 工厂
 func RegisterAgentFactory(engine string, factory AgentFactory) {
 	if engine == "" || factory == nil {
 		return
 	}
+	agentFactoriesMu.Lock()
+	defer agentFactoriesMu.Unlock()
 	agentFactories[engine] = factory
+}
+
+// RegisterAgentFactoryForTest 注册测试 Agent 工厂，并返回清理函数。
+func RegisterAgentFactoryForTest(engine string, factory AgentFactory) func() {
+	if engine == "" || factory == nil {
+		return func() {}
+	}
+	agentFactoriesMu.Lock()
+	previous, existed := agentFactories[engine]
+	agentFactories[engine] = factory
+	agentFactoriesMu.Unlock()
+
+	return func() {
+		agentFactoriesMu.Lock()
+		defer agentFactoriesMu.Unlock()
+		if existed {
+			agentFactories[engine] = previous
+			return
+		}
+		delete(agentFactories, engine)
+	}
 }
 
 // NewContainer 创建应用容器
@@ -123,7 +150,8 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	learnerSvc := learner.NewLearnerService(agentImpl, gitRepo, patternRepo, patternRepo, mergerSvc)
 
 	checkerSvc := checker.NewCheckerService(agentImpl, gitRepo, patternRepo, configRepo)
-	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo)
+	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo).
+		WithWorkspaceRepositories(workspaceProfileRepo, workspaceSpecRepo)
 
 	return &Container{
 		SeedPath:             seedPath,
@@ -153,7 +181,9 @@ func createAgent(cfg *config.Config, promptLoader *prompts.Loader) (agent.Agent,
 	timeout := time.Duration(cfg.Agent.Timeout) * time.Second
 	engine := cfg.Agent.Engine
 
+	agentFactoriesMu.RLock()
 	factory, ok := agentFactories[engine]
+	agentFactoriesMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("%s", i18n.GetWithParams("AgentProviderUnsupported", map[string]interface{}{"Provider": cfg.Agent.Engine}))
 	}

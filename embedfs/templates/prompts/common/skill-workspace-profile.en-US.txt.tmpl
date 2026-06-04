@@ -28,16 +28,20 @@ Separate these facts carefully:
 
 - Workspace input: `{{.WorkspaceInputPath}}`
 {{- if .UserContextPath}}
-- User-provided context: `{{.UserContextPath}}`
+- One-shot context for this workspace learn run: `{{.UserContextPath}}`
 {{- end}}
 
 Read these files by path. Do not expect their contents to be embedded in this prompt.
+{{- if .UserContextPath}}
+
+Use the context only to interpret workspace positioning, delivery boundaries, repository organization, and validation priorities; do not copy the file verbatim or persist long paraphrased passages into the workspace profile.
+{{- end}}
 
 # Rules
 
 - Do not describe the workspace as a single monolithic project.
 - Do not promote a local child-project convention to a workspace rule unless multiple projects depend on it.
-- If a relationship cannot be confirmed from repository structure, config, README, build files, or input context, record the uncertainty in `summary` or use an empty array. Do not invent facts.
+- If a relationship cannot be confirmed from repository structure, config, README, or build files, record the uncertainty in `summary` or use an empty array. Do not invent facts.
 - The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
 - Preserve paths, commands, config keys, environment variables, protocol names, and file names verbatim.
 

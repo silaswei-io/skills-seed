@@ -25,12 +25,16 @@ You may receive:
 - Workspace input: `{{.WorkspaceInputPath}}`
 - Workspace profile: `{{.WorkspaceProfilePath}}`
 {{- if .UserContextPath}}
-- User-provided context: `{{.UserContextPath}}`
+- One-shot context for this workspace learn run: `{{.UserContextPath}}`
 {{- end}}
 
 Read these files by path. Do not expect their contents to be embedded in this prompt. Use the workspace profile as the primary evidence for routes, rules, and change order.
+{{- if .UserContextPath}}
 
-Prefer evidence that includes paths and project IDs. Do not invent relationships that cannot be confirmed.
+Use the context only to interpret workspace-level rules, delivery boundaries, and validation priorities; do not copy the file verbatim or persist long paraphrased passages into the workspace spec.
+{{- end}}
+
+Prefer repository evidence that includes paths and project IDs. Do not invent relationships that cannot be confirmed.
 The AI call is non-interactive; do not ask the user outside the JSON. If an unconfirmed relationship affects execution, make the rule require asking the user during task execution.
 
 # Output Requirements

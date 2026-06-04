@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 )
 
 // Labels contains user-facing error prefixes for JSON file persistence.
@@ -69,7 +71,7 @@ func (s Store[T]) Save(ctx context.Context, value *T) error {
 	}
 	data = append(data, '\n')
 
-	if err := os.WriteFile(s.Path, data, 0644); err != nil {
+	if err := fileio.WriteFileAtomic(s.Path, data, 0644); err != nil {
 		return wrapLabel(s.Labels.Write, err)
 	}
 	return nil

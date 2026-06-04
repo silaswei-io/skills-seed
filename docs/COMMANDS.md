@@ -108,7 +108,7 @@ skills-seed init --workspace --agent codex --skills codex
 
 1. `workspace add` 使用和 `init --workspace` 相同的发现规则：只有第一层目录中拥有独立 `.git` 的目录会被视为子仓。
 2. `go.mod`、`package.json`、安装脚本、Helm/Terraform 等文件只用于识别子仓 `type` 和 `language`。
-3. 0.6.0 起，workspace 配置不再提供 `shared`、`contracts`、`infra` 字段；跨项目影响由学习/生成阶段分析进入 workspace profile/spec。
+3. 0.6.1 起，workspace 配置不再提供 `shared`、`contracts`、`infra` 字段；跨项目影响由 `learn current` 分析并沉淀到 workspace profile/spec，生成阶段只消费已沉淀结果。
 4. 子仓没有 `.skills-seed` 时，会按 project 模式初始化。
 5. 子仓已有 `.skills-seed/config.yaml` 时会跳过并保留原配置。
 6. 子仓已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
@@ -213,8 +213,9 @@ skills-seed learn history --limit 40 --batch-size 5
 2. 生成的 skills 目录默认排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
 4. workspace 子项目按 `agent.parallelism` 真并发执行。
-5. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
-6. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
+5. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
+6. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
+7. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
 
@@ -240,8 +241,6 @@ skills-seed learn history --limit 40 --batch-size 5
 |---|---:|---|
 | `--output`, `-o` | 当前 `skills.target` 的 `skills.paths` | 临时指定 skills 输出目录 |
 | `--merge`, `-m` | `false` | 生成前合并相似 patterns；已不推荐，改用 `skills-seed patterns merge` |
-| `--context` | 空 | 本次生成的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/prompts/` |
-| `--context-file` | 空 | 从文件读取本次生成的一次性补充说明，不写入 `.skills-seed/prompts/` |
 | `--help`, `-h` | `false` | 查看 `generate skills` 帮助 |
 
 #### 常用示例
@@ -249,9 +248,9 @@ skills-seed learn history --limit 40 --batch-size 5
 ```bash
 skills-seed generate skills
 skills-seed generate skills --output .agents/skills/my-project
-skills-seed generate skills --context "重点保留 API 兼容性约束"
-skills-seed generate skills --context-file .skills-seed/context.md
 ```
+
+一次性补充说明只在学习阶段使用，例如 `skills-seed learn current --context-file .skills-seed/context.md`。`generate skills` 只消费已沉淀的项目画像、workspace 画像/spec 和 patterns。
 
 #### Prompt 合并说明
 

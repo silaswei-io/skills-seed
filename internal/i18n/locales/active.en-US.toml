@@ -843,6 +843,15 @@ other = "Writing workspace root skills"
 [ProgressGenerateWorkspaceProjects]
 other = "Generating workspace child skills"
 
+[ProgressLearnWorkspaceAnalyzeProfile]
+other = "Analyzing workspace profile"
+
+[ProgressLearnWorkspaceAnalyzeSpec]
+other = "Analyzing workspace rules"
+
+[ProgressLearnWorkspaceSaveArtifacts]
+other = "Saving workspace relationships"
+
 [GenerateWorkspaceProjectProgressComplete]
 other = "done"
 

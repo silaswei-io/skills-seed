@@ -121,11 +121,11 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 `instructions/<prompt-id>.md` 适合写稳定的团队要求，例如“学习 commit 时忽略临时调试代码”或“生成 skill 时优先保留 API 兼容性规则”。它会追加到内置 prompt 后面，但不能改变内置 prompt 要求的 JSON / Markdown 输出格式；最后会追加一个不可编辑的内置输出契约，避免用户补充指令破坏解析。
 
-`--context` 和 `--context-file` 是一次性说明，只影响当前命令，不会写入 `.skills-seed/prompts/`。它们适合临时要求，例如：
+`--context` 和 `--context-file` 是学习阶段的一次性说明，只影响当前 `learn current` 命令，不会写入 `.skills-seed/prompts/`，也不会作为临时输入传给 `generate skills`。它们适合临时要求，例如：
 
 ```bash
 skills-seed learn current --context "本次只关注兼容性边界"
-skills-seed generate skills --context-file .skills-seed/context.md
+skills-seed learn current --context-file .skills-seed/context.md
 ```
 
 如果同一条规则长期有效，写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；如果只是这次运行的解释或限制，使用 `--context` 或 `--context-file`。
@@ -175,7 +175,7 @@ skills-seed workspace add backend frontend
 
 workspace 根仓只负责编排、路由和跨项目关系；子项目用自己的 `.skills-seed` 独立学习、生成和保存 patterns。已有子项目 `.skills-seed/config.yaml` 不会被覆盖，如果子项目 agent 与根仓不同，只提示并保留子项目配置。
 
-0.6.0 起，workspace 用户配置只保留 `workspace.projects`。公共库、契约和基础设施影响不再通过 `workspace.shared`、`workspace.contracts`、`workspace.infra` 手填，而是在学习/生成 workspace profile 和 spec 时从仓库证据、依赖关系和用户上下文中分析出来。
+0.6.1 起，workspace 用户配置只保留 `workspace.projects`。公共库、契约和基础设施影响不再通过 `workspace.shared`、`workspace.contracts`、`workspace.infra` 手填，而是在 `learn current` 阶段结合仓库证据、子项目 `project-profile.json` 和一次性用户说明分析并沉淀到根仓 `workspace-profile.json` / `workspace-spec.json`；`generate skills` 只消费这些已沉淀结果，不再接收用户说明。
 
 ## 设计理念
 

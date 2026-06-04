@@ -2,6 +2,7 @@ package runtimecontext
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 )
 
@@ -53,4 +54,13 @@ func SeedPath(ctx context.Context) string {
 	}
 	path, _ := ctx.Value(seedPathKey{}).(string)
 	return strings.TrimSpace(path)
+}
+
+// ProjectRoot 返回当前 .skills-seed 所属的项目根目录。
+func ProjectRoot(ctx context.Context) string {
+	seedPath := SeedPath(ctx)
+	if seedPath == "" {
+		return ""
+	}
+	return filepath.Dir(seedPath)
 }

@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.6.1]
+
+### Fixes
+
+- Fixed workspace learning writing only the `workspace.projects` config skeleton to `workspace-profile.json`, which prevented root workspace skills from inheriting child project profiles and one-shot learning context.
+- Fixed workspace child learning/generation Agent calls that could still execute from the root workspace path; Agent calls now resolve their working directory from the active child `.skills-seed`.
+- Fixed the boundary where generation could accept one-shot user context and include it in skill summaries; `generate skills` no longer accepts `--context` / `--context-file` and only consumes profile/spec/patterns already learned.
+- Fixed missing terminal progress during root workspace profile/spec analysis after child learning completed, which made long workspace analysis look stuck.
+- Tightened skill output path validation so workspace roots and child projects cannot write generated skills outside their corresponding project root.
+
+### Changes
+
+- `learn current --context` / `--context-file` remain one-shot learning inputs. Workspace learning passes them into workspace profile/spec analysis, while prompts explicitly forbid copying the original text or long paraphrases into persisted artifacts.
+- Workspace root learning now reads each child project's learned `project-profile.json` summary, frameworks, and key modules before generating and saving richer `workspace-profile.json` and `workspace-spec.json`.
+- Workspace profile/spec merge logic moved into `internal/workspace`, so learning and generation share the same fallback routing and merge rules.
+
+### Documentation
+
+- Updated README, command reference, and configuration reference for the 0.6.1 one-shot context boundary, workspace learning artifact flow, and removal of context flags from `generate skills`.
+
 ## [v0.6.0]
 
 ### Breaking Changes

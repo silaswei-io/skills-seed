@@ -2,6 +2,7 @@ package learn
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,21 +31,42 @@ const (
 	learnCurrentProfileRefresh = "refresh"
 )
 
-var (
-	// history 模式参数
+var sleepAfterWorkspaceChildStep = time.Sleep
+
+type learnCurrentOptions struct {
+	language    string
+	focusPaths  []string
+	profileMode string
+	contextText string
+	contextFile string
+	userContext string
+}
+
+type learnHistoryOptions struct {
 	limit     int
 	since     string
 	batchSize int
+}
 
-	// current 模式参数
-	language               string
-	focusPaths             []string
-	learnCurrentProfileOpt string
-	contextText            string
-	contextFile            string
-)
+type workspaceLearnInputData struct {
+	Name       string                       `json:"name"`
+	RootPath   string                       `json:"root_path"`
+	Projects   []workspaceLearnInputProject `json:"projects"`
+	ConfigPath string                       `json:"config_path,omitempty"`
+}
 
-var sleepAfterWorkspaceChildStep = time.Sleep
+type workspaceLearnInputProject struct {
+	ID                 string   `json:"id"`
+	Path               string   `json:"path"`
+	Type               string   `json:"type"`
+	Language           string   `json:"language"`
+	SkillPath          string   `json:"skill_path,omitempty"`
+	ProjectProfilePath string   `json:"project_profile_path,omitempty"`
+	ProjectSpecPath    string   `json:"project_spec_path,omitempty"`
+	Summary            string   `json:"summary,omitempty"`
+	Frameworks         []string `json:"frameworks,omitempty"`
+	KeyModules         []string `json:"key_modules,omitempty"`
+}
 
 // Cmd 返回 learn 命令
 func Cmd(cont *container.Container) *cobra.Command {
@@ -57,6 +79,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	defaultLimit, defaultBatchSize := historyDefaults(cont)
 
 	// learn current 子命令
+	currentOpts := learnCurrentOptions{profileMode: learnCurrentProfileAuto}
 	currentCmd := &cobra.Command{
 		Use:     "current",
 		Short:   i18n.Get("LearnCurrentShort"),
@@ -67,16 +90,17 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			return runLearnCurrent(cont)
+			return runLearnCurrent(cont, currentOpts)
 		},
 	}
-	currentCmd.Flags().StringVarP(&language, "language", "l", "", i18n.Get("LearnFlagLanguage"))
-	currentCmd.Flags().StringArrayVarP(&focusPaths, "focus", "f", nil, i18n.Get("LearnFlagFocus"))
-	currentCmd.Flags().StringVar(&learnCurrentProfileOpt, "profile", learnCurrentProfileAuto, i18n.Get("LearnFlagProfile"))
-	currentCmd.Flags().StringVar(&contextText, "context", "", i18n.Get("LearnFlagContext"))
-	currentCmd.Flags().StringVar(&contextFile, "context-file", "", i18n.Get("LearnFlagContextFile"))
+	currentCmd.Flags().StringVarP(&currentOpts.language, "language", "l", "", i18n.Get("LearnFlagLanguage"))
+	currentCmd.Flags().StringArrayVarP(&currentOpts.focusPaths, "focus", "f", nil, i18n.Get("LearnFlagFocus"))
+	currentCmd.Flags().StringVar(&currentOpts.profileMode, "profile", learnCurrentProfileAuto, i18n.Get("LearnFlagProfile"))
+	currentCmd.Flags().StringVar(&currentOpts.contextText, "context", "", i18n.Get("LearnFlagContext"))
+	currentCmd.Flags().StringVar(&currentOpts.contextFile, "context-file", "", i18n.Get("LearnFlagContextFile"))
 
 	// learn history 子命令
+	historyOpts := learnHistoryOptions{limit: defaultLimit, batchSize: defaultBatchSize}
 	historyCmd := &cobra.Command{
 		Use:     "history",
 		Short:   i18n.Get("LearnHistoryShort"),
@@ -87,12 +111,12 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			return runLearnHistory(cont)
+			return runLearnHistory(cont, historyOpts)
 		},
 	}
-	historyCmd.Flags().IntVarP(&limit, "limit", "n", defaultLimit, i18n.Get("LearnFlagLimit"))
-	historyCmd.Flags().StringVarP(&since, "since", "s", "", i18n.Get("LearnFlagSince"))
-	historyCmd.Flags().IntVarP(&batchSize, "batch-size", "b", defaultBatchSize, i18n.Get("LearnFlagBatchSize"))
+	historyCmd.Flags().IntVarP(&historyOpts.limit, "limit", "n", defaultLimit, i18n.Get("LearnFlagLimit"))
+	historyCmd.Flags().StringVarP(&historyOpts.since, "since", "s", "", i18n.Get("LearnFlagSince"))
+	historyCmd.Flags().IntVarP(&historyOpts.batchSize, "batch-size", "b", defaultBatchSize, i18n.Get("LearnFlagBatchSize"))
 
 	learnCmd.AddCommand(currentCmd, historyCmd)
 
@@ -117,25 +141,39 @@ func historyDefaults(cont *container.Container) (int, int) {
 
 // RunLearnCurrent 导出：从当前代码库学习（供 sync 调用）
 func RunLearnCurrent(cont *container.Container) error {
-	return runLearnCurrent(cont)
+	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto})
 }
 
-func runLearnCurrent(cont *container.Container) error {
+// RunLearnCurrentWithContext 导出：从当前代码库学习，并附加一次性用户上下文（供 sync 调用）
+func RunLearnCurrentWithContext(cont *container.Container, userContext string) error {
+	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext})
+}
+
+func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) error {
+	if opts.profileMode == "" {
+		opts.profileMode = learnCurrentProfileAuto
+	}
+	if opts.userContext == "" {
+		userContext, err := commandutil.ResolveRuntimeContext(opts.contextText, opts.contextFile)
+		if err != nil {
+			return err
+		}
+		opts.userContext = userContext
+	}
 	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
-		return runLearnWorkspaceCurrent(cont)
+		return runLearnWorkspaceCurrent(cont, opts)
 	}
-	return runLearnCurrentProject(cont)
+	return runLearnCurrentProject(cont, opts)
 }
 
-func runLearnCurrentProject(cont *container.Container) error {
-	userContext, err := commandutil.ResolveRuntimeContext(contextText, contextFile)
-	if err != nil {
-		return err
-	}
-	_, err = runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
+func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions) error {
+	_, err := runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
 		showProgress:     true,
 		showDetailedLogs: true,
-		userContext:      userContext,
+		userContext:      opts.userContext,
+		language:         opts.language,
+		focusPaths:       opts.focusPaths,
+		profileMode:      opts.profileMode,
 	})
 	return err
 }
@@ -148,6 +186,9 @@ type learnCurrentProjectOptions struct {
 	onStepStart      func(label string)
 	onStepComplete   func(label string)
 	onStepUpdate     func(label string)
+	language         string
+	focusPaths       []string
+	profileMode      string
 }
 
 type learnCurrentProjectResult struct {
@@ -239,7 +280,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			projectName = configuredName
 		}
 
-		currentLanguage = language
+		currentLanguage = opts.language
 		if currentLanguage == "" {
 			currentLanguage = cont.ConfigRepo.GetProjectConfig().Language
 		}
@@ -247,7 +288,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			currentLanguage = "go"
 		}
 
-		resolvedFocusPaths, err = resolveFocusPaths(projectRoot, focusPaths)
+		resolvedFocusPaths, err = resolveFocusPaths(projectRoot, opts.focusPaths)
 		if err != nil {
 			return err
 		}
@@ -258,7 +299,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 				profileExists = true
 			}
 		}
-		refreshProfile, err = shouldRefreshProfile(projectRoot, resolvedFocusPaths, learnCurrentProfileOpt, profileExists)
+		refreshProfile, err = shouldRefreshProfile(projectRoot, resolvedFocusPaths, opts.profileMode, profileExists)
 		if err != nil {
 			return err
 		}
@@ -278,7 +319,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		"project_name", projectName,
 		"language", currentLanguage,
 		"focus_paths", strings.Join(utils.RelativePaths(projectRoot, resolvedFocusPaths), ","),
-		"profile_mode", learnCurrentProfileOpt,
+		"profile_mode", opts.profileMode,
 		"refresh_profile", refreshProfile,
 	)
 	if opts.showDetailedLogs {
@@ -290,7 +331,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		if len(resolvedFocusPaths) > 0 {
 			logger.Info(i18n.GetWithParams("LearnCurrentFocusInfo", map[string]interface{}{
 				"Focus":       strings.Join(utils.RelativePaths(projectRoot, resolvedFocusPaths), ", "),
-				"ProfileMode": learnCurrentProfileOpt,
+				"ProfileMode": opts.profileMode,
 			}))
 		}
 	}
@@ -330,7 +371,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		"unchanged_count", len(incrementalChanges.Unchanged),
 		"skipped_count", len(incrementalChanges.Skipped),
 	)
-	if learnCurrentProfileOpt != learnCurrentProfileSkip && incrementalChanges.HasChanges() {
+	if opts.profileMode != learnCurrentProfileSkip && incrementalChanges.HasChanges() {
 		refreshProfile = true
 	}
 
@@ -470,7 +511,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current.save_project_profile",
 			"duration", time.Since(profileStartedAt),
-			"profile_mode", learnCurrentProfileOpt,
+			"profile_mode", opts.profileMode,
 			"incremental_profile", existingProfile != nil && len(resolvedFocusPaths) > 0,
 		)
 		if opts.showDetailedLogs {
@@ -483,7 +524,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current.skip_project_profile",
 			"duration", time.Since(profileStartedAt),
-			"profile_mode", learnCurrentProfileOpt,
+			"profile_mode", opts.profileMode,
 		)
 		if opts.showDetailedLogs {
 			logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
@@ -556,13 +597,9 @@ func resolveIncrementalFocusPaths(projectRoot string, relPaths []string) []strin
 	return paths
 }
 
-func runLearnWorkspaceCurrent(cont *container.Container) error {
-	userContext, err := commandutil.ResolveRuntimeContext(contextText, contextFile)
-	if err != nil {
-		return err
-	}
+func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOptions) error {
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
-	ctx = runtimecontext.WithUserContext(ctx, userContext)
+	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	startedAt := time.Now()
 	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
@@ -603,7 +640,10 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 
 	runProjects := func() error {
 		return workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
-			projectRootPath := workspacediscovery.ProjectRoot(projectRoot, project)
+			projectRootPath, err := workspacediscovery.ResolveProjectRoot(projectRoot, project)
+			if err != nil {
+				return err
+			}
 			childCont, err := commandutil.OpenWorkspaceChildContainer(ctx, projectRootPath, project, commandutil.WorkspaceChildErrorKeys{
 				NotInitialized: "LearnWorkspaceChildNotInitialized",
 				NotGitRepo:     "LearnWorkspaceChildNotGitRepo",
@@ -642,7 +682,7 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 					multiTracker.CompleteStep(progressName, label)
 					pauseAfterFastWorkspaceChildStep(stepStartedAt)
 				}
-			}, &childLogPath)
+			}, &childLogPath, opts)
 			if err != nil {
 				if multiTracker != nil {
 					multiTracker.Fail(progressName, i18n.Get("LearnWorkspaceProjectProgressFailed"))
@@ -668,12 +708,7 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 			return nil
 		})
 	}
-	if showChildDetails {
-		err = runProjects()
-	} else {
-		err = runProjects()
-	}
-	if err != nil {
+	if err := runProjects(); err != nil {
 		return err
 	}
 
@@ -694,7 +729,7 @@ func runLearnWorkspaceCurrent(cont *container.Container) error {
 	return nil
 }
 
-func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepUpdate func(label string), onStepComplete func(label string), logPath *string) (*learnCurrentProjectResult, error) {
+func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepUpdate func(label string), onStepComplete func(label string), logPath *string, opts learnCurrentOptions) (*learnCurrentProjectResult, error) {
 	loggingConfig := childCont.ConfigRepo.GetLoggingConfig()
 	logDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
 	logLevel := logger.ParseLevel(loggingConfig.Level)
@@ -712,6 +747,10 @@ func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Con
 			onStepStart:      onStepStart,
 			onStepUpdate:     onStepUpdate,
 			onStepComplete:   onStepComplete,
+			userContext:      opts.userContext,
+			language:         opts.language,
+			focusPaths:       opts.focusPaths,
+			profileMode:      opts.profileMode,
 		})
 		return err
 	})
@@ -730,20 +769,230 @@ func pauseAfterFastWorkspaceChildStep(startedAt time.Time) {
 }
 
 func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) error {
+	if cont.WorkspaceProfileRepo == nil && cont.WorkspaceSpecRepo == nil {
+		return nil
+	}
 	generatedAt := time.Now().Format(time.RFC3339)
-	if cont.WorkspaceProfileRepo != nil {
-		profile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
+	baseProfile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
+	if cont.Agent == nil {
+		return saveWorkspaceRelationshipFallback(ctx, cont, baseProfile, generatedAt)
+	}
+
+	input, err := workspaceLearnInput(ctx, cont, workspaceName, projectRoot, workspaceConfig)
+	if err != nil {
+		return err
+	}
+	runtimeDir := filepath.Join(projectRoot, ".skills-seed", "memory", "runtime")
+	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
+		return err
+	}
+	tmpDir, err := os.MkdirTemp(runtimeDir, "skills-seed-workspace-learn-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	inputPath, err := writeJSONInput(filepath.Join(tmpDir, "workspace-input.json"), input)
+	if err != nil {
+		return err
+	}
+	userContextPath := ""
+	if userContext := runtimecontext.UserContext(ctx); userContext != "" {
+		userContextPath = filepath.Join(tmpDir, "user-context.md")
+		if err := os.WriteFile(userContextPath, []byte(userContext+"\n"), 0600); err != nil {
+			return err
+		}
+	}
+
+	tracker := progress.New(3)
+	var profile *domain.WorkspaceProfile
+	if err := tracker.RunStep(i18n.Get("ProgressLearnWorkspaceAnalyzeProfile"), func() error {
+		var err error
+		profile, err = cont.Agent.AnalyzeWorkspaceProfile(ctx, &agent.AnalyzeWorkspaceProfileRequest{
+			WorkspaceName:      workspaceName,
+			WorkspaceRoot:      projectRoot,
+			WorkspaceInputPath: inputPath,
+			UserContextPath:    userContextPath,
+		})
+		if err != nil {
+			return err
+		}
+		profile = workspacediscovery.MergeProfile(baseProfile, profile)
 		profile.GeneratedAt = generatedAt
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	var spec *domain.WorkspaceSpec
+	if err := tracker.RunStep(i18n.Get("ProgressLearnWorkspaceAnalyzeSpec"), func() error {
+		profilePath, err := writeJSONInput(filepath.Join(tmpDir, "workspace-profile.json"), profile)
+		if err != nil {
+			return err
+		}
+		spec, err = cont.Agent.AnalyzeWorkspaceSpec(ctx, &agent.AnalyzeWorkspaceSpecRequest{
+			WorkspaceName:        workspaceName,
+			WorkspaceRoot:        projectRoot,
+			WorkspaceInputPath:   inputPath,
+			WorkspaceProfilePath: profilePath,
+			UserContextPath:      userContextPath,
+		})
+		if err != nil {
+			return err
+		}
+		spec = workspacediscovery.MergeSpec(workspacediscovery.SpecFromProfile(profile), spec)
+		spec.GeneratedAt = generatedAt
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if err := tracker.RunStep(i18n.Get("ProgressLearnWorkspaceSaveArtifacts"), func() error {
+		if cont.WorkspaceProfileRepo != nil {
+			if err := cont.WorkspaceProfileRepo.Save(ctx, profile); err != nil {
+				return err
+			}
+		}
+		if cont.WorkspaceSpecRepo != nil {
+			if err := cont.WorkspaceSpecRepo.Save(ctx, spec); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func saveWorkspaceRelationshipFallback(ctx context.Context, cont *container.Container, profile *domain.WorkspaceProfile, generatedAt string) error {
+	if profile == nil {
+		profile = &domain.WorkspaceProfile{}
+	}
+	profile.GeneratedAt = generatedAt
+	if cont.WorkspaceProfileRepo != nil {
 		if err := cont.WorkspaceProfileRepo.Save(ctx, profile); err != nil {
 			return err
 		}
 	}
 	if cont.WorkspaceSpecRepo != nil {
-		if err := cont.WorkspaceSpecRepo.Save(ctx, workspaceSpecFromConfig(workspaceName, projectRoot, workspaceConfig, generatedAt)); err != nil {
+		spec := workspacediscovery.SpecFromProfile(profile)
+		spec.GeneratedAt = generatedAt
+		if err := cont.WorkspaceSpecRepo.Save(ctx, spec); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func workspaceLearnInput(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) (workspaceLearnInputData, error) {
+	input := workspaceLearnInputData{
+		Name:       workspaceName,
+		RootPath:   projectRoot,
+		Projects:   make([]workspaceLearnInputProject, 0, len(workspaceConfig.Projects)),
+		ConfigPath: filepath.ToSlash(filepath.Join(projectRoot, ".skills-seed", "config.yaml")),
+	}
+	for _, project := range workspaceConfig.Projects {
+		projectRootPath, err := workspacediscovery.ResolveProjectRoot(projectRoot, project)
+		if err != nil {
+			return workspaceLearnInputData{}, err
+		}
+		childSeedPath := filepath.Join(projectRootPath, ".skills-seed")
+		projectProfilePath := filepath.Join(childSeedPath, "memory", "project-profile.json")
+		projectSpecPath := filepath.Join(childSeedPath, "memory", "project-spec.json")
+		skillPath := workspaceChildSkillPath(projectRootPath, childSeedPath, cont.ConfigRepo)
+		child := workspaceLearnInputProject{
+			ID:                 project.ID,
+			Path:               project.Path,
+			Type:               project.Type,
+			Language:           project.Language,
+			SkillPath:          filepath.ToSlash(filepath.Join(project.Path, skillPath, "SKILL.md")),
+			ProjectProfilePath: filepath.ToSlash(projectProfilePath),
+			ProjectSpecPath:    filepath.ToSlash(projectSpecPath),
+		}
+		if profile, err := readChildProjectProfile(ctx, cont, project.ID, projectProfilePath); err == nil && profile != nil {
+			child.Summary = profile.Summary
+			child.Frameworks = append([]string(nil), profile.Frameworks...)
+			child.KeyModules = projectProfileModuleSummaries(profile)
+		}
+		input.Projects = append(input.Projects, child)
+	}
+	return input, nil
+}
+
+func workspaceChildSkillPath(projectRootPath, childSeedPath string, rootConfig config.Reader) string {
+	configRepo, err := config.NewRepository(childSeedPath, "")
+	if err == nil {
+		target := config.EffectiveSkillsTarget(configRepo.GetAgentConfig(), configRepo.GetSkillsConfig())
+		outputPath := config.EffectiveSkillsPath(target, configRepo.GetSkillsConfig())
+		if outputPath == "" {
+			outputPath = config.DefaultSkillsPathForTarget(target)
+		}
+		return filepath.ToSlash(outputPath)
+	}
+
+	target := ""
+	skillsConfig := config.SkillsConfig{}
+	if rootConfig != nil {
+		target = config.EffectiveSkillsTarget(rootConfig.GetAgentConfig(), rootConfig.GetSkillsConfig())
+		skillsConfig = rootConfig.GetSkillsConfig()
+	}
+	outputPath := config.EffectiveSkillsPath(target, skillsConfig)
+	if outputPath == "" {
+		outputPath = config.DefaultSkillsPathForTarget(target)
+	}
+	return filepath.ToSlash(outputPath)
+}
+
+func readChildProjectProfile(ctx context.Context, cont *container.Container, projectID, profilePath string) (*domain.ProjectProfile, error) {
+	if cont.ProfileRepo != nil {
+		if profile, err := cont.ProfileRepo.GetForProject(ctx, projectID); err == nil {
+			return profile, nil
+		}
+	}
+	data, err := os.ReadFile(profilePath)
+	if err != nil {
+		return nil, err
+	}
+	var profile domain.ProjectProfile
+	if err := json.Unmarshal(data, &profile); err != nil {
+		return nil, err
+	}
+	return &profile, nil
+}
+
+func projectProfileModuleSummaries(profile *domain.ProjectProfile) []string {
+	if profile == nil {
+		return nil
+	}
+	modules := make([]string, 0, len(profile.KeyModules))
+	for _, module := range profile.KeyModules {
+		if module.Path == "" && module.Description == "" {
+			continue
+		}
+		if module.Description == "" {
+			modules = append(modules, module.Path)
+			continue
+		}
+		if module.Path == "" {
+			modules = append(modules, module.Description)
+			continue
+		}
+		modules = append(modules, module.Path+": "+module.Description)
+	}
+	return modules
+}
+
+func writeJSONInput(path string, value interface{}) (string, error) {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // workspaceSpecFromConfig 基于根仓配置生成只描述跨子仓关系的工作区规范。
@@ -927,7 +1176,7 @@ func focusModuleKey(relPath string) string {
 }
 
 // runLearnHistory 从 Git 历史提交学习
-func runLearnHistory(cont *container.Container) error {
+func runLearnHistory(cont *container.Container, opts learnHistoryOptions) error {
 	if err := commandutil.RequireAgentAvailable(cont); err != nil {
 		return err
 	}
@@ -939,21 +1188,21 @@ func runLearnHistory(cont *container.Container) error {
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "command.learn_history",
 		"agent", cont.Agent.Name(),
-		"limit", limit,
-		"since", since,
-		"batch_size", batchSize,
+		"limit", opts.limit,
+		"since", opts.since,
+		"batch_size", opts.batchSize,
 	)
 	logger.Info(i18n.GetWithParams("LearnHistoryInfo", map[string]interface{}{
-		"Limit":     limit,
-		"Since":     since,
-		"BatchSize": batchSize,
+		"Limit":     opts.limit,
+		"Since":     opts.since,
+		"BatchSize": opts.batchSize,
 	}))
 
 	// 调用学习服务
 	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
 		return err
 	}
-	err := cont.LearnerSvc.Learn(ctx, limit, since, batchSize)
+	err := cont.LearnerSvc.Learn(ctx, opts.limit, opts.since, opts.batchSize)
 	if err != nil {
 		logger.Error(i18n.GetWithParams("LearnHistoryFailed", map[string]interface{}{"Error": err.Error()}))
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),

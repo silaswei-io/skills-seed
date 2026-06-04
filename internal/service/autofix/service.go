@@ -83,7 +83,10 @@ func (s *AutofixService) fixWithPatch(ctx context.Context, issues []domain.Issue
 
 	// 为每个文件生成 diff
 	for file, fix := range fixes {
-		originalPath := s.resolveFilePath(ctx, file)
+		originalPath, err := s.resolveFilePath(ctx, file)
+		if err != nil {
+			return nil, err
+		}
 		original, err := os.ReadFile(originalPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file %s: %w", file, err)
@@ -116,7 +119,10 @@ func (s *AutofixService) fixWithBackup(ctx context.Context, issues []domain.Issu
 	// 备份并修改每个文件
 	for file, fix := range fixes {
 		// 读取原文件
-		originalPath := s.resolveFilePath(ctx, file)
+		originalPath, err := s.resolveFilePath(ctx, file)
+		if err != nil {
+			return nil, err
+		}
 		content, err := os.ReadFile(originalPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file %s: %w", file, err)
@@ -153,7 +159,11 @@ func (s *AutofixService) fixWithStash(ctx context.Context, issues []domain.Issue
 
 	// 2. 先应用修复
 	for file, fix := range fixes {
-		if err := os.WriteFile(s.resolveFilePath(ctx, file), []byte(fix), 0644); err != nil {
+		path, err := s.resolveFilePath(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(path, []byte(fix), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write fix to %s: %w", file, err)
 		}
 	}
@@ -183,7 +193,12 @@ func (s *AutofixService) fixWithBranch(ctx context.Context, issues []domain.Issu
 
 	// 3. 在新分支上应用修复
 	for file, fix := range fixes {
-		if err := os.WriteFile(s.resolveFilePath(ctx, file), []byte(fix), 0644); err != nil {
+		path, err := s.resolveFilePath(ctx, file)
+		if err != nil {
+			_ = s.gitRepo.Checkout(ctx, "-")
+			return nil, err
+		}
+		if err := os.WriteFile(path, []byte(fix), 0644); err != nil {
 			// 如果失败，切回原分支
 			_ = s.gitRepo.Checkout(ctx, "-")
 			return nil, fmt.Errorf("failed to write fix to %s: %w", file, err)
@@ -198,16 +213,28 @@ func (s *AutofixService) fixWithBranch(ctx context.Context, issues []domain.Issu
 	}, nil
 }
 
-func (s *AutofixService) resolveFilePath(ctx context.Context, file string) string {
-	if filepath.IsAbs(file) {
-		return file
+func (s *AutofixService) resolveFilePath(ctx context.Context, file string) (string, error) {
+	clean := filepath.Clean(file)
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("refusing to fix path outside project root: %s", file)
 	}
 	if s.gitRepo != nil {
 		if root, err := s.gitRepo.GetProjectRoot(ctx); err == nil && root != "" {
-			return filepath.Join(root, file)
+			path := clean
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(root, clean)
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return "", fmt.Errorf("refusing to fix path outside project root: %s", file)
+			}
+			return path, nil
 		}
 	}
-	return file
+	if filepath.IsAbs(clean) {
+		return "", fmt.Errorf("refusing to fix absolute path without project root: %s", file)
+	}
+	return clean, nil
 }
 
 func safeBackupPath(file string) string {

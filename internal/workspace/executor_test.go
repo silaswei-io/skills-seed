@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -30,4 +31,16 @@ func TestRunProjectTasksReturnsCanceledContextWithoutRunningTasks(t *testing.T) 
 
 	require.ErrorIs(t, err, context.Canceled)
 	require.False(t, called)
+}
+
+func TestResolveProjectRootRejectsPathOutsideWorkspaceRoot(t *testing.T) {
+	workspaceRoot := t.TempDir()
+
+	projectRoot, err := ResolveProjectRoot(workspaceRoot, config.WorkspaceProjectConfig{ID: "backend", Path: "backend"})
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(workspaceRoot, "backend"), projectRoot)
+
+	_, err = ResolveProjectRoot(workspaceRoot, config.WorkspaceProjectConfig{ID: "escaped", Path: "../escaped"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "outside workspace root")
 }

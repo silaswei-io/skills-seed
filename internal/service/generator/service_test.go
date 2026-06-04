@@ -115,6 +115,24 @@ func TestGenerateSkills_FillsMissingCategorySummaries(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestResolveProjectOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
+	parent := t.TempDir()
+	projectRoot := filepath.Join(parent, "repo")
+	require.NoError(t, os.MkdirAll(projectRoot, 0755))
+
+	inside, err := resolveProjectOutputPath(projectRoot, ".agents/skills/demo")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(projectRoot, ".agents", "skills", "demo"), inside)
+
+	_, err = resolveProjectOutputPath(projectRoot, "../outside")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "outside project root")
+
+	_, err = resolveProjectOutputPath(projectRoot, filepath.Join(parent, "outside"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "outside project root")
+}
+
 func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
@@ -295,7 +313,7 @@ func TestRankPatternsForGenerationUsesEffectiveScoreHitsAndConfidence(t *testing
 	assert.Equal(t, 0.22, insights["low"].GenerationRank)
 }
 
-func TestGenerateSkills_PassesRuntimeUserContextToAISummary(t *testing.T) {
+func TestGenerateSkillsDoesNotPassRuntimeUserContextToAISummary(t *testing.T) {
 	pattern := domain.NewPattern("p1", "HSM Delivery Boundary", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("HSM 私有化交付边界")
@@ -326,7 +344,6 @@ func TestGenerateSkills_PassesRuntimeUserContextToAISummary(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(ctx, t.TempDir()))
 
 	require.NotNil(t, received)
-	assert.Equal(t, "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。", received.UserContext)
 }
 
 func TestGenerateSkills_AlwaysUsesAISummary(t *testing.T) {
@@ -340,7 +357,6 @@ func TestGenerateSkills_AlwaysUsesAISummary(t *testing.T) {
 		NameVal: "test", AvailableVal: true,
 		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
 			called = true
-			require.Equal(t, "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。", req.UserContext)
 			return &agent.GenerateSkillsResult{
 				CategorySummaries: map[string]agent.CategorySummary{
 					"business": {
@@ -713,7 +729,115 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
 }
 
-func TestGenerateWorkspaceSkills_RendersRuntimeContextInWorkspaceReferences(t *testing.T) {
+func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			require.Fail(t, "workspace root generation should not read centralized patterns")
+			return nil, nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "claude", AvailableVal: true,
+		AnalyzeWorkspaceProfileFn: func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+			require.Fail(t, "persisted workspace profile should be used before AI analysis")
+			return nil, nil
+		},
+		AnalyzeWorkspaceSpecFn: func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+			require.Fail(t, "persisted workspace spec should be used before AI analysis")
+			return nil, nil
+		},
+	}
+	profileRepo := &memoryWorkspaceProfileRepo{profile: &domain.WorkspaceProfile{
+		Name:     "demo",
+		RootPath: projectRoot,
+		Summary:  "学习阶段沉淀：backend 是私有化部署主后端，不是 SaaS。",
+		Projects: []domain.WorkspaceProject{
+			{
+				ID:             "backend",
+				Path:           "backend",
+				Type:           "backend",
+				Language:       "go",
+				Responsibility: "学习阶段沉淀：负责离线安装包的管理 API。",
+			},
+		},
+		Shared: []domain.WorkspacePath{
+			{Path: "shared", Description: "学习阶段沉淀：离线包共享配置", Consumers: []string{"backend"}},
+		},
+	}}
+	specRepo := &memoryWorkspaceSpecRepo{spec: &domain.WorkspaceSpec{
+		Name:     "demo",
+		RootPath: projectRoot,
+		Rules: []domain.WorkspaceRule{
+			{Title: "离线交付边界", Description: "学习阶段沉淀：变更 backend 时必须保留离线安装包验证。", AppliesTo: []string{"backend"}},
+		},
+		Routing: []domain.WorkspaceRoute{
+			{PathPattern: "backend/**", ProjectIDs: []string{"backend"}, Reason: "学习阶段沉淀：backend 变更读取 backend skill"},
+		},
+	}}
+
+	loader := skills.NewLoaderForAgent("claude", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
+	}
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg).
+		WithWorkspaceRepositories(profileRepo, specRepo)
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
+
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	require.Contains(t, overview, "学习阶段沉淀：backend 是私有化部署主后端，不是 SaaS。")
+	require.Contains(t, overview, "学习阶段沉淀：负责离线安装包的管理 API。")
+	require.Contains(t, overview, "`shared` - 学习阶段沉淀：离线包共享配置")
+
+	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "cross-project-rules.md")
+	require.Contains(t, rules, "离线交付边界")
+	require.Contains(t, rules, "学习阶段沉淀：变更 backend 时必须保留离线安装包验证。")
+}
+
+func TestGenerateWorkspaceSkillsRejectsChildOutputOutsideChildRoot(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend", ".skills-seed"), 0755))
+
+	childConfig := strings.TrimSpace(`
+project:
+  name: backend
+  mode: project
+  root_path: ` + filepath.Join(projectRoot, "backend") + `
+  language: go
+agent:
+  engine: codex
+skills:
+  target: codex
+  paths:
+    codex: "../escaped-skill"
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".skills-seed", "config.yaml"), []byte(childConfig), 0644))
+
+	loader := skills.NewLoaderForAgent("codex", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "codex"},
+	}
+	svc := NewGeneratorService(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg)
+
+	err := svc.GenerateSkills(context.Background(), "")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "outside project root")
+	require.NoFileExists(t, filepath.Join(projectRoot, "escaped-skill", "SKILL.md"))
+}
+
+func TestGenerateWorkspaceSkillsDoesNotPersistRuntimeContextInWorkspaceReferences(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "hsmwebapi"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "core-engine"), 0755))
@@ -747,10 +871,11 @@ hsmwebapi 是管理 API 入口，core-engine 是核心能力库。
 	require.NoError(t, svc.GenerateSkills(ctx, ""))
 
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "workspace-overview.md")
-	require.Contains(t, overview, "HSM 工作区用于管理密码设备")
-	require.Contains(t, overview, "hsmwebapi 是管理 API 入口")
-	require.Contains(t, overview, "私有化部署")
-	require.Contains(t, overview, "go test ./...")
+	require.NotContains(t, overview, "HSM 工作区用于管理密码设备")
+	require.NotContains(t, overview, "hsmwebapi 是管理 API 入口")
+	require.NotContains(t, overview, "私有化部署")
+	require.NotContains(t, overview, "go test ./...")
+	require.NotContains(t, overview, "用户提供的工作区说明")
 }
 
 func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *testing.T) {
@@ -765,10 +890,8 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 		AnalyzeWorkspaceProfileFn: func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
 			profileReq = req
 			workspaceInput := readFilePath(t, req.WorkspaceInputPath)
-			userContext := readFilePath(t, req.UserContextPath)
 			require.Contains(t, workspaceInput, `"id": "hsmwebapi"`)
 			require.Contains(t, workspaceInput, `"skill_path": "hsmwebapi/.claude/skills/skills-seed-skills/SKILL.md"`)
-			require.Contains(t, userContext, "hsmwebapi 为主后端")
 			return &domain.WorkspaceProfile{
 				Name:     req.WorkspaceName,
 				RootPath: req.WorkspaceRoot,
@@ -810,10 +933,8 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 			specReq = req
 			workspaceInput := readFilePath(t, req.WorkspaceInputPath)
 			profileInput := readFilePath(t, req.WorkspaceProfilePath)
-			userContext := readFilePath(t, req.UserContextPath)
 			require.Contains(t, workspaceInput, `"id": "kmip-go"`)
 			require.Contains(t, profileInput, "hsmwebapi 调用 kmip-go")
-			require.Contains(t, userContext, "KMIP 的能力")
 			return &domain.WorkspaceSpec{
 				Name:     req.WorkspaceName,
 				RootPath: req.WorkspaceRoot,
@@ -858,16 +979,12 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 
 	require.NotNil(t, profileReq)
 	require.NotEmpty(t, profileReq.WorkspaceInputPath)
-	require.NotEmpty(t, profileReq.UserContextPath)
 	require.Contains(t, filepath.ToSlash(profileReq.WorkspaceInputPath), ".skills-seed/memory/runtime/")
-	require.Contains(t, filepath.ToSlash(profileReq.UserContextPath), ".skills-seed/memory/runtime/")
 	require.NotNil(t, specReq)
 	require.NotEmpty(t, specReq.WorkspaceInputPath)
 	require.NotEmpty(t, specReq.WorkspaceProfilePath)
 	require.Contains(t, filepath.ToSlash(specReq.WorkspaceProfilePath), ".skills-seed/memory/runtime/")
-	require.Equal(t, profileReq.UserContextPath, specReq.UserContextPath)
 	require.NoFileExists(t, profileReq.WorkspaceInputPath)
-	require.NoFileExists(t, profileReq.UserContextPath)
 	require.NoFileExists(t, specReq.WorkspaceProfilePath)
 
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "workspace-overview.md")
@@ -972,16 +1089,9 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 	assertMarkdownTableHasNoBlankLines(t, overview, "## 路由表")
 }
 
-func TestGenerateWorkspaceSkills_DoesNotReadRuntimeContextFromWorkspaceMemory(t *testing.T) {
+func TestGenerateWorkspaceSkills_DoesNotPersistRuntimeUserContext(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".skills-seed", "memory"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, ".skills-seed", "memory", "workspace-profile.json"), []byte(`{
-  "name": "demo",
-  "root_path": "`+projectRoot+`",
-  "summary": "旧的 workspace memory summary 不应进入新生成结果",
-  "projects": []
-}`), 0644))
 
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
@@ -999,10 +1109,11 @@ func TestGenerateWorkspaceSkills_DoesNotReadRuntimeContextFromWorkspaceMemory(t 
 	}
 	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
 
-	require.NoError(t, svc.GenerateSkills(context.Background(), ""))
+	ctx := runtimecontext.WithUserContext(context.Background(), "本次运行的一次性原文不能进入 workspace skill")
+	require.NoError(t, svc.GenerateSkills(ctx, ""))
 
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
-	require.NotContains(t, overview, "旧的 workspace memory summary")
+	require.NotContains(t, overview, "本次运行的一次性原文不能进入 workspace skill")
 }
 
 func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
@@ -1410,4 +1521,36 @@ func TestCalculateCategoryConfidence(t *testing.T) {
 	assert.InDelta(t, 0.85, svc.calculateCategoryConfidence(patterns, "error"), 0.01)
 	assert.InDelta(t, 0.7, svc.calculateCategoryConfidence(patterns, "naming"), 0.01)
 	assert.InDelta(t, 0.0, svc.calculateCategoryConfidence(patterns, "testing"), 0.01)
+}
+
+type memoryWorkspaceProfileRepo struct {
+	profile *domain.WorkspaceProfile
+}
+
+func (r *memoryWorkspaceProfileRepo) Get(ctx context.Context) (*domain.WorkspaceProfile, error) {
+	if r.profile == nil {
+		return nil, errors.New("workspace profile not found")
+	}
+	return r.profile, nil
+}
+
+func (r *memoryWorkspaceProfileRepo) Save(ctx context.Context, profile *domain.WorkspaceProfile) error {
+	r.profile = profile
+	return nil
+}
+
+type memoryWorkspaceSpecRepo struct {
+	spec *domain.WorkspaceSpec
+}
+
+func (r *memoryWorkspaceSpecRepo) Get(ctx context.Context) (*domain.WorkspaceSpec, error) {
+	if r.spec == nil {
+		return nil, errors.New("workspace spec not found")
+	}
+	return r.spec, nil
+}
+
+func (r *memoryWorkspaceSpecRepo) Save(ctx context.Context, spec *domain.WorkspaceSpec) error {
+	r.spec = spec
+	return nil
 }

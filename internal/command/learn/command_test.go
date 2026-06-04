@@ -21,6 +21,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
@@ -123,13 +124,12 @@ func TestShouldRefreshProfile(t *testing.T) {
 func TestRunLearnCurrentPrintsTokenUsageLast(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	require.Contains(t, output, "当前代码学习完成")
@@ -144,8 +144,7 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
 	defer restoreFactory()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -159,7 +158,7 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	profileSavedIndex := strings.LastIndex(output, "已跳过项目画像刷新")
@@ -183,12 +182,11 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileAuto)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 
-	require.NoError(t, runLearnCurrent(cont))
+	require.NoError(t, runLearnCurrent(cont, opts))
 
 	analyzeCalls := 0
 	profileCalls := 0
@@ -202,7 +200,7 @@ func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
 	}
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	require.Zero(t, analyzeCalls)
@@ -213,11 +211,10 @@ func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
 func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileAuto)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
-	require.NoError(t, runLearnCurrent(cont))
+	require.NoError(t, runLearnCurrent(cont, opts))
 
 	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "main.go", "package main\nconst changed = true\n")
 	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
@@ -233,10 +230,29 @@ func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
 		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
 	}
 
-	require.NoError(t, runLearnCurrent(cont))
+	require.NoError(t, runLearnCurrent(cont, opts))
 
 	require.Equal(t, []string{"main.go"}, patternFocus)
 	require.Equal(t, []string{"main.go"}, profileFocus)
+}
+
+func TestRunLearnCurrentWithContextPassesUserContextToAnalysis(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	var receivedContext string
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		receivedContext = req.UserContext
+		pattern := domain.NewPattern("p-context", "Context Boundary", domain.CategoryBusiness)
+		pattern.Confidence = 0.9
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}, Summary: "summary"}, nil
+	}
+
+	require.NoError(t, RunLearnCurrentWithContext(cont, "私有化部署，不是 SaaS"))
+
+	require.Equal(t, "私有化部署，不是 SaaS", receivedContext)
 }
 
 func TestRunLearnWorkspaceCurrentDelegatesIncrementalSkipToChildProject(t *testing.T) {
@@ -244,8 +260,7 @@ func TestRunLearnWorkspaceCurrentDelegatesIncrementalSkipToChildProject(t *testi
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
 	defer restoreFactory()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -253,16 +268,128 @@ func TestRunLearnWorkspaceCurrentDelegatesIncrementalSkipToChildProject(t *testi
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
 	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 
-	require.NoError(t, runLearnCurrent(cont))
+	require.NoError(t, runLearnCurrent(cont, opts))
 
 	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	require.Zero(t, atomic.LoadInt32(&learnWorkspaceMockAnalyzeCalls))
 	require.Contains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	registerLearnWorkspaceMockAgentFactoryWithHandlers(t, learnWorkspaceMockHandlers{
+		analyzeProject: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			return &agent.AnalyzeProjectResult{
+				Language:   "go",
+				Frameworks: []string{"Gin"},
+				Summary:    "backend 是私有化部署主后端。",
+				KeyModules: []domain.ModuleInfo{
+					{Path: "internal/api", Description: "管理 API 入口"},
+				},
+			}, nil
+		},
+	})
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+	require.DirExists(t, childRoot)
+
+	var profileReq *agent.AnalyzeWorkspaceProfileRequest
+	var specReq *agent.AnalyzeWorkspaceSpecRequest
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceProfileFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+		profileReq = req
+		workspaceInput := readLearnFilePath(t, req.WorkspaceInputPath)
+		userContext := readLearnFilePath(t, req.UserContextPath)
+		require.Contains(t, workspaceInput, `"project_profile_path"`)
+		require.Contains(t, workspaceInput, "backend 是私有化部署主后端。")
+		require.Contains(t, workspaceInput, "internal/api: 管理 API 入口")
+		require.Contains(t, userContext, "工作区用于离线交付")
+		return &domain.WorkspaceProfile{
+			Name:     req.WorkspaceName,
+			RootPath: req.WorkspaceRoot,
+			Summary:  "学习阶段分析：工作区用于离线交付。",
+			Projects: []domain.WorkspaceProject{
+				{ID: "backend", Path: "backend", Type: "backend", Language: "go", Responsibility: "负责管理 API", Frameworks: []string{"Gin"}},
+			},
+			Shared: []domain.WorkspacePath{
+				{Path: "shared", Description: "离线交付共享配置", Consumers: []string{"backend"}},
+			},
+		}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceSpecFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+		specReq = req
+		profileInput := readLearnFilePath(t, req.WorkspaceProfilePath)
+		userContext := readLearnFilePath(t, req.UserContextPath)
+		require.Contains(t, profileInput, "学习阶段分析：工作区用于离线交付。")
+		require.Contains(t, userContext, "工作区用于离线交付")
+		return &domain.WorkspaceSpec{
+			Name:     req.WorkspaceName,
+			RootPath: req.WorkspaceRoot,
+			Rules: []domain.WorkspaceRule{
+				{Title: "离线交付边界", Description: "变更 backend 时必须保留离线安装包验证。", AppliesTo: []string{"backend"}},
+			},
+		}, nil
+	}
+
+	require.NoError(t, runLearnCurrent(cont, learnCurrentOptionsForTestWithContext("工作区用于离线交付")))
+
+	require.NotNil(t, profileReq)
+	require.NotNil(t, specReq)
+	require.NotEmpty(t, profileReq.UserContextPath)
+	require.Equal(t, profileReq.UserContextPath, specReq.UserContextPath)
+	require.NoFileExists(t, profileReq.WorkspaceInputPath)
+	require.NoFileExists(t, profileReq.UserContextPath)
+	require.NoFileExists(t, specReq.WorkspaceProfilePath)
+
+	profile, err := cont.WorkspaceProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "学习阶段分析：工作区用于离线交付。", profile.Summary)
+	require.Equal(t, "负责管理 API", profile.Projects[0].Responsibility)
+	require.Equal(t, []string{"Gin"}, profile.Projects[0].Frameworks)
+	require.Equal(t, "shared", profile.Shared[0].Path)
+
+	spec, err := cont.WorkspaceSpecRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "离线交付边界", spec.Rules[0].Title)
+	require.Contains(t, spec.Rules[0].Description, "离线安装包验证")
+}
+
+func TestRunLearnWorkspaceCurrentShowsRootAnalysisProgress(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)))
+	})
+
+	profileIndex := strings.Index(output, "分析工作区画像")
+	specIndex := strings.Index(output, "分析工作区规范")
+	saveIndex := strings.Index(output, "保存工作区关系")
+	completeIndex := strings.LastIndex(output, "工作区学习完成")
+	require.NotEqual(t, -1, profileIndex, "expected workspace profile analysis progress in output: %q", output)
+	require.NotEqual(t, -1, specIndex, "expected workspace spec analysis progress in output: %q", output)
+	require.NotEqual(t, -1, saveIndex, "expected workspace relationship save progress in output: %q", output)
+	require.NotEqual(t, -1, completeIndex, "expected workspace completion in output: %q", output)
+	require.Less(t, profileIndex, specIndex)
+	require.Less(t, specIndex, saveIndex)
+	require.Less(t, saveIndex, completeIndex)
 }
 
 func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
@@ -270,8 +397,7 @@ func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
 	defer restoreFactory()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -285,7 +411,7 @@ func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 	defer logger.Close()
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	childLogs := readLearnLogFiles(t, filepath.Join(childRoot, ".skills-seed", "logs"))
@@ -305,8 +431,7 @@ func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 func TestRunLearnWorkspaceCurrentUsesConfiguredParallelism(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -339,7 +464,7 @@ func TestRunLearnWorkspaceCurrentUsesConfiguredParallelism(t *testing.T) {
 		initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", provider)
 	}
 
-	require.NoError(t, runLearnCurrent(cont))
+	require.NoError(t, runLearnCurrent(cont, opts))
 
 	require.GreaterOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
 }
@@ -349,8 +474,7 @@ func TestRunLearnWorkspaceCurrentSuppressesChildNextSteps(t *testing.T) {
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
 	defer restoreFactory()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -359,7 +483,7 @@ func TestRunLearnWorkspaceCurrentSuppressesChildNextSteps(t *testing.T) {
 	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	require.NotContains(t, output, "后续可执行:")
@@ -371,8 +495,7 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
 	defer restoreFactory()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -389,7 +512,7 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	}
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	require.Contains(t, output, "backend")
@@ -406,8 +529,7 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -453,7 +575,7 @@ func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.
 	}
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	retryLabel := "分析当前代码库（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）"
@@ -473,8 +595,7 @@ func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
 	defer restoreFactory()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileSkip)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 	var pauseDurations []time.Duration
 	var pauseMu sync.Mutex
 	restorePause := setWorkspaceChildStepPauseForTest(func(duration time.Duration) {
@@ -497,7 +618,7 @@ func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
 	}
 
 	output := captureLearnStdout(t, func() {
-		require.NoError(t, runLearnCurrent(cont))
+		require.NoError(t, runLearnCurrent(cont, opts))
 	})
 
 	require.Contains(t, output, "backend")
@@ -517,8 +638,7 @@ func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
 func TestRunLearnWorkspaceCurrentMarksFailedChildProgress(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
-	restoreLearnFlags := setLearnCurrentFlagsForTest("", nil, learnCurrentProfileAuto)
-	defer restoreLearnFlags()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
 	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
 	defer restorePause()
 
@@ -543,7 +663,7 @@ func TestRunLearnWorkspaceCurrentMarksFailedChildProgress(t *testing.T) {
 	}
 
 	output := captureLearnStdout(t, func() {
-		err := runLearnCurrent(cont)
+		err := runLearnCurrent(cont, opts)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "front")
 		require.Contains(t, err.Error(), "profile overloaded")
@@ -563,7 +683,7 @@ func TestRunLearnWorkspaceCurrentRequiresInitializedChildProject(t *testing.T) {
 	require.NoError(t, os.MkdirAll(childRoot, 0755))
 	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
 
-	err := runLearnCurrent(cont)
+	err := runLearnCurrent(cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backend")
@@ -584,7 +704,7 @@ func TestRunLearnWorkspaceCurrentRequiresChildGitRepository(t *testing.T) {
 	cfg.Project.Mode = domain.ModeProject
 	require.NoError(t, childConfigRepo.Update(cfg))
 
-	err = runLearnCurrent(cont)
+	err = runLearnCurrent(cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backend")
@@ -646,18 +766,20 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 	mergerSvc := merger.NewMergerService(mockAgent, patternRepo)
 
 	return &container.Container{
-		SeedPath:    seedPath,
-		Config:      configRepo.Get(),
-		ConfigRepo:  configRepo,
-		GitRepo:     gitRepo,
-		PatternRepo: patternRepo,
-		ProfileRepo: profilestore.NewRepository(seedPath),
-		StateRepo:   statestore.NewRepository(seedPath),
-		Agent:       mockAgent,
-		AnalyzerSvc: analyzer.NewAnalyzerService(mockAgent, configRepo),
-		LearnerSvc:  servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, mergerSvc),
-		FileTracker: patternRepo,
-		MergerSvc:   mergerSvc,
+		SeedPath:             seedPath,
+		Config:               configRepo.Get(),
+		ConfigRepo:           configRepo,
+		GitRepo:              gitRepo,
+		PatternRepo:          patternRepo,
+		ProfileRepo:          profilestore.NewRepository(seedPath),
+		StateRepo:            statestore.NewRepository(seedPath),
+		WorkspaceProfileRepo: workspacestore.NewProfileRepository(seedPath),
+		WorkspaceSpecRepo:    workspacestore.NewSpecRepository(seedPath),
+		Agent:                mockAgent,
+		AnalyzerSvc:          analyzer.NewAnalyzerService(mockAgent, configRepo),
+		LearnerSvc:           servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, mergerSvc),
+		FileTracker:          patternRepo,
+		MergerSvc:            mergerSvc,
 	}
 }
 
@@ -687,7 +809,7 @@ func registerLearnWorkspaceMockAgentFactoryWithHandlers(t *testing.T, handlers l
 	t.Helper()
 	provider := "mock-workspace-learn-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
 	learnWorkspaceFactoryMu.Lock()
-	container.RegisterAgentFactory(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
 		return &mocks.MockAgent{
 			NameVal:      provider,
 			AvailableVal: true,
@@ -722,6 +844,7 @@ func registerLearnWorkspaceMockAgentFactoryWithHandlers(t *testing.T, handlers l
 			},
 		}
 	})
+	t.Cleanup(restoreFactory)
 	learnWorkspaceFactoryMu.Unlock()
 	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
 	t.Cleanup(func() {
@@ -766,24 +889,29 @@ func initLearnWorkspaceChildProjectWithProvider(t *testing.T, workspaceRoot stri
 	return childRoot
 }
 
-func setLearnCurrentFlagsForTest(testLanguage string, testFocusPaths []string, testProfileOpt string) func() {
-	previousLanguage := language
-	previousFocusPaths := focusPaths
-	previousProfileOpt := learnCurrentProfileOpt
-	previousContextText := contextText
-	previousContextFile := contextFile
-	language = testLanguage
-	focusPaths = testFocusPaths
-	learnCurrentProfileOpt = testProfileOpt
-	contextText = ""
-	contextFile = ""
-	return func() {
-		language = previousLanguage
-		focusPaths = previousFocusPaths
-		learnCurrentProfileOpt = previousProfileOpt
-		contextText = previousContextText
-		contextFile = previousContextFile
+func learnCurrentOptionsForTest(testLanguage string, testFocusPaths []string, testProfileMode string) learnCurrentOptions {
+	if testProfileMode == "" {
+		testProfileMode = learnCurrentProfileAuto
 	}
+	return learnCurrentOptions{
+		language:    testLanguage,
+		focusPaths:  testFocusPaths,
+		profileMode: testProfileMode,
+	}
+}
+
+func learnCurrentOptionsForTestWithContext(userContext string) learnCurrentOptions {
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+	opts.userContext = userContext
+	return opts
+}
+
+func readLearnFilePath(t *testing.T, path string) string {
+	t.Helper()
+	require.NotEmpty(t, path)
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(content)
 }
 
 func setWorkspaceChildStepPauseForTest(fn func(time.Duration)) func() {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -101,4 +102,27 @@ func RunProjectTasks(ctx context.Context, projects []config.WorkspaceProjectConf
 // ProjectRoot 返回子项目绝对路径
 func ProjectRoot(workspaceRoot string, project config.WorkspaceProjectConfig) string {
 	return filepath.Join(workspaceRoot, filepath.FromSlash(project.Path))
+}
+
+// ResolveProjectRoot 返回子项目绝对路径，并确保配置路径没有逃逸工作区根目录。
+func ResolveProjectRoot(workspaceRoot string, project config.WorkspaceProjectConfig) (string, error) {
+	rootAbs, err := filepath.Abs(workspaceRoot)
+	if err != nil {
+		return "", err
+	}
+	projectAbs, err := filepath.Abs(ProjectRoot(rootAbs, project))
+	if err != nil {
+		return "", err
+	}
+	rootAbs = filepath.Clean(rootAbs)
+	projectAbs = filepath.Clean(projectAbs)
+
+	relPath, err := filepath.Rel(rootAbs, projectAbs)
+	if err != nil {
+		return "", err
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("workspace project path %s is outside workspace root %s", project.Path, workspaceRoot)
+	}
+	return projectAbs, nil
 }

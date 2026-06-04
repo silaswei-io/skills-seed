@@ -108,7 +108,7 @@ Manage sub-projects in workspace mode.
 
 1. `workspace add` uses the same discovery rule as `init --workspace`: only first-level directories with their own `.git` are treated as child repositories.
 2. Files such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files only classify child `type` and `language`.
-3. Starting in 0.6.0, workspace config no longer exposes `shared`, `contracts`, or `infra`; cross-project impact is analyzed into workspace profile/spec during learning/generation.
+3. Starting in 0.6.1, workspace config no longer exposes `shared`, `contracts`, or `infra`; cross-project impact is analyzed and persisted into workspace profile/spec during `learn current`, and generation only consumes learned artifacts.
 4. If a child has no `.skills-seed`, it is initialized in project mode.
 5. If a child already has `.skills-seed/config.yaml`, it is skipped and preserved.
 6. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
@@ -213,8 +213,9 @@ skills-seed learn history --limit 40 --batch-size 5
 2. Generated skill directories are excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
 3. The workspace root coordinates learning and does not store child patterns in root storage.
 4. Workspace child projects run with real concurrency according to `agent.parallelism`.
-5. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
-6. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
+5. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
+6. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
+7. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
 
@@ -240,8 +241,6 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 |---|---:|---|
 | `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
 | `--merge`, `-m` | `false` | Merge similar patterns before generation; deprecated, use `skills-seed patterns merge` |
-| `--context` | empty | One-time guidance for this generate run, passed to the AI agent and not written to `.skills-seed/prompts/` |
-| `--context-file` | empty | Read one-time guidance for this generate run from a file; not written to `.skills-seed/prompts/` |
 | `--help`, `-h` | `false` | Show `generate skills` help |
 
 #### Common Examples
@@ -249,9 +248,9 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 ```bash
 skills-seed generate skills
 skills-seed generate skills --output .agents/skills/my-project
-skills-seed generate skills --context "Preserve API compatibility constraints"
-skills-seed generate skills --context-file .skills-seed/context.md
 ```
+
+One-shot guidance is only accepted during learning, for example `skills-seed learn current --context-file .skills-seed/context.md`. `generate skills` only consumes learned project profiles, workspace profile/spec, and patterns.
 
 #### Prompt Merge Notes
 

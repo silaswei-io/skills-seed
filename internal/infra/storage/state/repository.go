@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 )
 
 // ErrStateNotFound 表示运行状态文件尚不存在
@@ -82,7 +83,7 @@ func (r *Repository) Save(ctx context.Context, state *domain.RuntimeState) error
 	}
 	data = append(data, '\n')
 
-	if err := os.WriteFile(r.path, data, 0644); err != nil {
+	if err := fileio.WriteFileAtomic(r.path, data, 0644); err != nil {
 		return fmt.Errorf("write runtime state: %w", err)
 	}
 	return nil

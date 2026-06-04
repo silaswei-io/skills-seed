@@ -2,12 +2,6 @@
 
 This file is the workspace map and AI handoff guide. It describes entry points, paths, and coordination scope. For child project architecture, business methods, utilities, and executable rules, read that child skill's `references/project-spec.md` and `references/project-overview.md`.
 
-{{if .HasUserContext}}
-## User-Provided Workspace Context
-
-{{.UserContext}}
-{{end}}
-
 {{if .HasWorkspaceFacts}}
 ## Workspace Facts
 
@@ -17,7 +11,7 @@ This file is the workspace map and AI handoff guide. It describes entry points, 
 ## Gaps To Confirm
 
 - If this file and the child skills do not confirm product boundaries, project responsibility, delivery model, validation commands, or cross-project dependencies, ask the user before continuing.
-- Do not invent workspace facts from path names alone; use repository evidence or user-provided workspace context.
+- Do not invent workspace facts from path names alone; use repository evidence.
 
 ## Child Projects
 

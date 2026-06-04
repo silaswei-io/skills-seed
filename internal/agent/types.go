@@ -91,8 +91,6 @@ type GenerateSkillsRequest struct {
 	ExistingSkillsPath string // 已有 skills 文件路径（如果有）
 	ProjectName        string // 项目名称
 	Language           string // 项目语言
-	UserContext        string // 本次生成传入的一次性用户上下文
-	UserContextPath    string // 本次生成的一次性用户上下文文件路径
 }
 
 // GenerateSkillsResult AI汇总生成Skills的结果
@@ -261,7 +259,7 @@ type AnalyzeWorkspaceProfileRequest struct {
 	WorkspaceName      string // 工作区名称
 	WorkspaceRoot      string // 工作区根路径
 	WorkspaceInputPath string // 本次工作区生成输入文件路径
-	UserContextPath    string // 本次用户补充说明文件路径
+	UserContextPath    string // 本次学习传入的一次性用户上下文文件路径
 }
 
 // AnalyzeWorkspaceSpecRequest 请求生成工作区开发规范
@@ -270,7 +268,7 @@ type AnalyzeWorkspaceSpecRequest struct {
 	WorkspaceRoot        string // 工作区根路径
 	WorkspaceInputPath   string // 本次工作区生成输入文件路径
 	WorkspaceProfilePath string // 本次工作区画像文件路径
-	UserContextPath      string // 本次用户补充说明文件路径
+	UserContextPath      string // 本次学习传入的一次性用户上下文文件路径
 }
 
 // CodeAnalyzer 代码分析接口

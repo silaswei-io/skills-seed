@@ -21,48 +21,47 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	localeFlag    string // locale 参数
-	modeFlag      string // mode 参数
-	agentFlag     string // agent engine 参数
-	skillsFlag    string // skills target 参数
-	workspaceFlag bool   // workspace 快捷参数
-)
+type commandOptions struct {
+	locale    string
+	mode      string
+	agent     string
+	skills    string
+	workspace bool
+}
 
 // Cmd 返回 init 命令
 func Cmd() *cobra.Command {
+	opts := commandOptions{mode: domain.ModeProject}
 	initCmd := &cobra.Command{
 		Use:     "init",
 		Short:   i18n.Get("InitShort"),
 		Long:    i18n.Get("InitLongDesc"),
 		Example: i18n.Get("InitExample"),
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// 验证 locale 参数
-			if !isValidLocale(localeFlag) {
-				fmt.Fprintln(os.Stderr, i18n.Get("InitLocaleInvalid"))
-				os.Exit(1)
+			if !isValidLocale(opts.locale) {
+				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
 			}
 
-			effectiveMode := modeFlag
-			if workspaceFlag {
+			effectiveMode := opts.mode
+			if opts.workspace {
 				effectiveMode = domain.ModeWorkspace
 			}
 
-			if err := initializeSkillWithWorkspaceChildren(localeFlag, effectiveMode, agentFlag, skillsFlag); err != nil {
-				// 错误信息直接输出（此时 logger 可能未初始化）
-				fmt.Fprintln(os.Stderr, i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
-				os.Exit(1)
+			if err := initializeSkillWithWorkspaceChildren(opts.locale, effectiveMode, opts.agent, opts.skills); err != nil {
+				return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 			}
+			return nil
 		},
 	}
 
 	// 添加 --locale 参数
-	initCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
-	initCmd.Flags().StringVar(&modeFlag, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
-	initCmd.Flags().StringVar(&agentFlag, "agent", "", i18n.Get("InitFlagAgent"))
-	initCmd.Flags().StringVar(&skillsFlag, "skills", "", i18n.Get("InitFlagSkills"))
-	initCmd.Flags().BoolVar(&workspaceFlag, "workspace", false, i18n.Get("InitFlagWorkspace"))
+	initCmd.Flags().StringVarP(&opts.locale, "locale", "l", "", i18n.Get("InitFlagLocale"))
+	initCmd.Flags().StringVar(&opts.mode, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
+	initCmd.Flags().StringVar(&opts.agent, "agent", "", i18n.Get("InitFlagAgent"))
+	initCmd.Flags().StringVar(&opts.skills, "skills", "", i18n.Get("InitFlagSkills"))
+	initCmd.Flags().BoolVar(&opts.workspace, "workspace", false, i18n.Get("InitFlagWorkspace"))
 
 	return initCmd
 }
@@ -73,26 +72,27 @@ func isValidLocale(locale string) bool {
 
 // ResetCmd 返回 reset 命令
 func ResetCmd() *cobra.Command {
+	opts := commandOptions{mode: domain.ModeProject}
 	resetCmd := &cobra.Command{
 		Use:     "reset",
 		Short:   i18n.Get("ResetShort"),
 		Long:    i18n.Get("ResetLongDesc"),
 		Example: i18n.Get("ResetExample"),
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			effectiveMode := modeFlag
-			if workspaceFlag {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			effectiveMode := opts.mode
+			if opts.workspace {
 				effectiveMode = domain.ModeWorkspace
 			}
-			if err := resetSkill(localeFlag, effectiveMode); err != nil {
-				fmt.Fprintln(os.Stderr, i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
-				os.Exit(1)
+			if err := resetSkill(opts.locale, effectiveMode); err != nil {
+				return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 			}
+			return nil
 		},
 	}
-	resetCmd.Flags().StringVarP(&localeFlag, "locale", "l", "", i18n.Get("InitFlagLocale"))
-	resetCmd.Flags().StringVar(&modeFlag, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
-	resetCmd.Flags().BoolVar(&workspaceFlag, "workspace", false, i18n.Get("InitFlagWorkspace"))
+	resetCmd.Flags().StringVarP(&opts.locale, "locale", "l", "", i18n.Get("InitFlagLocale"))
+	resetCmd.Flags().StringVar(&opts.mode, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
+	resetCmd.Flags().BoolVar(&opts.workspace, "workspace", false, i18n.Get("InitFlagWorkspace"))
 	return resetCmd
 }
 

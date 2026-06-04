@@ -64,3 +64,52 @@ func TestFixWithBackupUsesProjectRootAndPreservesPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "package internal\n", string(backup))
 }
+
+func TestFixAllowsAbsolutePathInsideProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	appPath := filepath.Join(root, "app.go")
+	require.NoError(t, os.WriteFile(appPath, []byte("package main\n"), 0644))
+
+	gitRepo := &mocks.MockGitRepository{
+		ProjectRootFn: func(ctx context.Context) (string, error) {
+			return root, nil
+		},
+	}
+	svc := NewAutofixService("backup", filepath.Join(root, ".skills-seed"), gitRepo)
+
+	result, err := svc.FixIssues(context.Background(), []domain.Issue{{File: appPath}}, map[string]string{
+		appPath: "package main\n\nfunc main() {}\n",
+	})
+
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	updated, readErr := os.ReadFile(appPath)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(updated), "func main() {}")
+}
+
+func TestFixRejectsPathsOutsideProjectRoot(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "repo")
+	require.NoError(t, os.MkdirAll(root, 0755))
+	outsidePath := filepath.Join(parent, "outside.go")
+	require.NoError(t, os.WriteFile(outsidePath, []byte("package outside\n"), 0644))
+
+	gitRepo := &mocks.MockGitRepository{
+		ProjectRootFn: func(ctx context.Context) (string, error) {
+			return root, nil
+		},
+	}
+	svc := NewAutofixService("backup", filepath.Join(root, ".skills-seed"), gitRepo)
+
+	_, err := svc.FixIssues(context.Background(), []domain.Issue{{File: "../outside.go"}}, map[string]string{
+		"../outside.go": "package outside\n\nfunc Escaped() {}\n",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "outside project root")
+
+	content, readErr := os.ReadFile(outsidePath)
+	require.NoError(t, readErr)
+	assert.Equal(t, "package outside\n", string(content))
+}

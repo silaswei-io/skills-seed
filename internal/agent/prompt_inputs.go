@@ -47,17 +47,12 @@ func GenerateSkillsPromptData(session *PromptInputSession, req *GenerateSkillsRe
 	if err != nil {
 		return nil, fmt.Errorf("write patterns prompt input: %w", err)
 	}
-	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
-	if err != nil {
-		return nil, fmt.Errorf("write user context prompt input: %w", err)
-	}
 	return map[string]interface{}{
 		"PROJECT_NAME":         req.ProjectName,
 		"LANGUAGE":             req.Language,
 		"PATTERNS_PATH":        patternsPath,
 		"PATTERNS_COUNT":       req.PatternsCount,
 		"EXISTING_SKILLS_PATH": req.ExistingSkillsPath,
-		"USER_CONTEXT_PATH":    userContextPath,
 	}, nil
 }
 

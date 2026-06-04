@@ -41,7 +41,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if addDesc != "" {
 				return syncWithUserPattern(ctx, cont, addDesc, category, files, userContext)
 			}
-			return syncLearn(ctx, cont)
+			return syncLearn(ctx, cont, userContext)
 		},
 	}
 
@@ -54,10 +54,10 @@ func Cmd(cont *container.Container) *cobra.Command {
 }
 
 // syncLearn 路径 A: learn current → patterns merge → generate skills
-func syncLearn(ctx context.Context, cont *container.Container) error {
+func syncLearn(ctx context.Context, cont *container.Container, userContext string) error {
 	// Step 1: learn current
 	logger.Info(i18n.Get("SyncStepLearn"))
-	if err := learncmd.RunLearnCurrent(cont); err != nil {
+	if err := learncmd.RunLearnCurrentWithContext(cont, userContext); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
 

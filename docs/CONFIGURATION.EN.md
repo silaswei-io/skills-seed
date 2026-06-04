@@ -4,13 +4,13 @@
 
 The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates it from the project context. Most paths are relative to the project root or `.skills-seed`; each field below states the relevant base.
 
-## 0.6.0 Config Structure
+## 0.6.1 Config Structure
 
-0.6.0 is a clean pre-release config refactor and does not keep compatibility with old fields:
+0.6.1 keeps the clean 0.6.0 config structure and does not keep compatibility with old fields:
 
 - Top-level `project` was renamed to `profile`. It describes the project or workspace that owns the config file; it is not the `project` run mode.
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
-- Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec from repository evidence, dependency relationships, and user context during learning/generation, not read from config.
+- Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec during `learn current` from repository evidence, child project profiles, and one-shot user context. They are not read from config, and generation only consumes learned artifacts.
 - Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
 
 ## Config Example
@@ -259,7 +259,7 @@ Common paths:
 
 These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
 
-`--context` and `--context-file` are one-time command flags. They affect only the current `learn current` or `generate skills` run and are not written to `.skills-seed/prompts/`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `--context` or `--context-file` for temporary guidance.
+`--context` and `--context-file` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/prompts/`, and are not passed to `generate skills`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `learn current --context` or `learn current --context-file` for temporary guidance.
 
 ### `autofix`
 
