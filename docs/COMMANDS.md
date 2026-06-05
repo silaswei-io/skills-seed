@@ -59,10 +59,10 @@ skills-templates-sha256: <hash>
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--mode` | `project` | 初始化模式：`project` 单项目，`workspace` 多子项目根仓 |
-| `--agent` | `claude` | 初始化时写入的执行 Agent engine，例如 `claude` 或 `codex` |
-| `--skills` | `claude` | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex` |
+| `--agent` | 空 | 初始化时写入的执行 Agent engine，例如 `claude` 或 `codex`；留空时使用内置默认值 |
+| `--skills` | 空 | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex`；留空时使用内置默认值 |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
-| `--locale`, `-l` | `zh-CN` | 配置文件语言：`zh-CN` 或 `en-US` |
+| `--locale`, `-l` | 空 | 配置文件语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
 | `--help`, `-h` | `false` | 查看 `init` 帮助 |
 
 #### 常用示例
@@ -131,7 +131,7 @@ skills-seed init --workspace --agent codex --skills codex
 |---|---:|---|
 | `--mode` | `project` | 重置后的初始化模式：`project` 或 `workspace` |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
-| `--locale`, `-l` | `zh-CN` | 重置后配置文件语言：`zh-CN` 或 `en-US` |
+| `--locale`, `-l` | 空 | 重置后配置文件语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
 | `--help`, `-h` | `false` | 查看 `reset` 帮助 |
 
 #### 常用示例
@@ -145,7 +145,7 @@ skills-seed reset --workspace
 #### 注意事项
 
 1. `reset` 用于重新选择模式或恢复初始化状态。
-2. `project.mode` 在学习或生成后会锁定，不能直接在配置中切换模式。
+2. `profile.mode` 在学习或生成后会锁定，不能直接在配置中切换模式。
 
 ### `skills-seed learn`
 
@@ -183,7 +183,7 @@ skills-seed reset --workspace
 |---|---:|---|
 | `--limit`, `-n` | `learning.max_commits`，默认 `50` | 最多分析的提交数量 |
 | `--since`, `-s` | 空 | 时间范围，例如 `7d`、`30d`、`6m`、`1y` |
-| `--batch-size`, `-b` | `learning.batch_size`，默认 `5` | 每批提交数量；每批会合并后调用一次 Agent |
+| `--batch-size`, `-b` | `learning.batch_size`；未加载配置时为 `10` | 每批提交数量；每批会合并后调用一次 Agent |
 | `--help`, `-h` | `false` | 查看 `learn history` 帮助 |
 
 #### `--profile` 取值
@@ -312,7 +312,7 @@ references/
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--category`, `-c` | 空 | 指定模式分类，如 `business`、`api`、`testing`；留空由 AI 自动推断 |
-| `--files` | 空 | 指定参考文件路径，多个文件用逗号分隔；AI 会读取文件内容辅助生成 |
+| `--files`, `-f` | 空 | 指定参考文件路径；多个文件需重复传入该参数，AI 会读取文件内容辅助生成 |
 | `--context` | 空 | 补充上下文说明，帮助 AI 更准确理解模式 |
 | `--help`, `-h` | `false` | 查看 `patterns add` 帮助 |
 
@@ -505,8 +505,8 @@ skills-seed view patterns --category testing
 |---|---:|---|
 | `--add` | 空 | 用自然语言定义模式描述，传入后执行 patterns add → merge → generate |
 | `--category`, `-c` | 空 | `--add` 模式下指定模式分类 |
-| `--files` | 空 | `--add` 模式下指定参考文件路径，多个文件用逗号分隔 |
-| `--context` | 空 | `--add` 模式下的补充上下文 |
+| `--files`, `-f` | 空 | `--add` 模式下指定参考文件路径；多个文件需重复传入该参数 |
+| `--context` | 空 | 补充上下文；普通 `sync` 会传给 `learn current`，`sync --add` 会传给用户模式生成 |
 | `--help`, `-h` | `false` | 查看 `sync` 帮助 |
 
 #### 常用示例
@@ -516,6 +516,7 @@ skills-seed sync
 skills-seed sync --add "所有 API 路由使用 RESTful 风格"
 skills-seed sync --add "错误必须包装上下文" --category error
 skills-seed sync --add "数据库操作使用事务" --files internal/service/user.go
+skills-seed sync --context "本次只关注兼容性边界"
 ```
 
 #### 注意事项

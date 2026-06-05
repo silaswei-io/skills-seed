@@ -543,7 +543,7 @@ other = "请先运行 'skills-seed init' 初始化项目"
 other = "生成 AI Agent 相关产物。\n\n当前支持：\n  skills  - 从 patterns 和项目画像生成 skills 文档"
 
 [GenerateExample]
-other = "  # 生成到当前 skills.target 的默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project\n\n  # 带本次生成补充说明\n  skills-seed generate skills --context \"重点保留 API 兼容性约束\""
+other = "  # 生成到当前 skills.target 的默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project"
 
 [GenerateGenerating]
 other = "生成 AI Agent skills..."
@@ -969,7 +969,7 @@ other = "  # 最简用法\n  skills-seed patterns add \"所有 service 方法必
 other = "指定分类：naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
 
 [PatternsAddFlagFiles]
-other = "关联文件路径，AI 会读取这些文件生成精准示例（逗号分隔或重复 -f）"
+other = "关联文件路径，可重复传入；AI 会读取这些文件生成精准示例"
 
 [PatternsAddFlagContext]
 other = "额外上下文说明"
@@ -994,10 +994,10 @@ other = "添加用户自定义模式（触发路径 B）"
 other = "用户模式的分类（配合 --add 使用）"
 
 [SyncFlagFiles]
-other = "关联文件路径（配合 --add 使用）"
+other = "关联文件路径，可重复传入（配合 --add 使用）"
 
 [SyncFlagContext]
-other = "额外上下文说明"
+other = "额外上下文说明；普通 sync 传给学习阶段，--add 时传给用户模式生成"
 
 [SyncStepLearn]
 other = "[sync] 步骤 1/3: 学习当前代码库..."
@@ -1059,7 +1059,7 @@ other = "生成 AI Agent skills"
 other = "从学到的 patterns 和项目画像生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取学到的 patterns\n  • 读取项目画像\n  • 根据 skills.target 选择目标 skills 模板\n  • 使用 agent.engine 做摘要合并和润色\n  • 生成 SKILL.md 与 references/ 文档"
 
 [GenerateSkillsExample]
-other = "  # 生成到默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project\n\n  # 带本次生成补充说明\n  skills-seed generate skills --context \"重点保留 API 兼容性约束\""
+other = "  # 生成到默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project"
 
 # agent 错误
 [AgentRenderUserDefinePatternPromptFailed]

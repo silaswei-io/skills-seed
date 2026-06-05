@@ -59,10 +59,10 @@ Initialize `.skills-seed/`, default config, database, and prompt / skills templa
 | Flag | Default | Description |
 |---|---:|---|
 | `--mode` | `project` | Initialization mode: `project` for a single project, `workspace` for a multi-project root |
-| `--agent` | `claude` | Execution Agent engine to write during initialization, for example `claude` or `codex` |
-| `--skills` | `claude` | Skills output type to write during initialization, for example `claude` or `codex` |
+| `--agent` | empty | Execution Agent engine to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
+| `--skills` | empty | Skills output type to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
-| `--locale`, `-l` | `zh-CN` | Config language: `zh-CN` or `en-US` |
+| `--locale`, `-l` | empty | Config language: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
 | `--help`, `-h` | `false` | Show `init` help |
 
 #### Common Examples
@@ -131,7 +131,7 @@ Back up and reset the current repository's `.skills-seed`. Existing data is move
 |---|---:|---|
 | `--mode` | `project` | Mode after reset: `project` or `workspace` |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
-| `--locale`, `-l` | `zh-CN` | Config language after reset: `zh-CN` or `en-US` |
+| `--locale`, `-l` | empty | Config language after reset: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
 | `--help`, `-h` | `false` | Show `reset` help |
 
 #### Common Examples
@@ -145,7 +145,7 @@ skills-seed reset --workspace
 #### Notes
 
 1. Use `reset` to reinitialize or choose another mode.
-2. `project.mode` is locked after learning or skill generation starts and should not be changed directly in config.
+2. `profile.mode` is locked after learning or skill generation starts and should not be changed directly in config.
 
 ### `skills-seed learn`
 
@@ -183,7 +183,7 @@ Learn coding patterns, business methods, and best practices from the current cod
 |---|---:|---|
 | `--limit`, `-n` | `learning.max_commits`, default `50` | Maximum number of commits to analyze |
 | `--since`, `-s` | empty | Time range, such as `7d`, `30d`, `6m`, or `1y` |
-| `--batch-size`, `-b` | `learning.batch_size`, default `5` | Commits per batch; each batch is merged into one agent call |
+| `--batch-size`, `-b` | `learning.batch_size`; `10` when config is not loaded | Commits per batch; each batch is merged into one agent call |
 | `--help`, `-h` | `false` | Show `learn history` help |
 
 #### `--profile` Values
@@ -312,7 +312,7 @@ Manage learned patterns. Supports adding user-defined patterns, merging semantic
 | Flag | Default | Description |
 |---|---:|---|
 | `--category`, `-c` | empty | Specify a category, such as `business`, `api`, or `testing`; leave empty for AI auto-detection |
-| `--files` | empty | Reference file paths, comma-separated; AI reads files to help generate the pattern |
+| `--files`, `-f` | empty | Reference file path; repeat this flag for multiple files. AI reads the files to help generate the pattern |
 | `--context` | empty | Additional context to help AI understand the pattern more accurately |
 | `--help`, `-h` | `false` | Show `patterns add` help |
 
@@ -505,8 +505,8 @@ One-step sync: learn current code, merge patterns, generate skills. When `--add`
 |---|---:|---|
 | `--add` | empty | Natural language pattern description; triggers patterns add → merge → generate |
 | `--category`, `-c` | empty | Category for `--add` mode |
-| `--files` | empty | Reference file paths (comma-separated) for `--add` mode |
-| `--context` | empty | Additional context for `--add` mode |
+| `--files`, `-f` | empty | Reference file path for `--add` mode; repeat this flag for multiple files |
+| `--context` | empty | Additional context; plain `sync` passes it to `learn current`, while `sync --add` passes it to user pattern generation |
 | `--help`, `-h` | `false` | Show `sync` help |
 
 #### Common Examples
@@ -516,6 +516,7 @@ skills-seed sync
 skills-seed sync --add "All API routes use RESTful style"
 skills-seed sync --add "Errors must wrap context" --category error
 skills-seed sync --add "Database operations use transactions" --files internal/service/user.go
+skills-seed sync --context "Focus on compatibility boundaries for this run"
 ```
 
 #### Notes

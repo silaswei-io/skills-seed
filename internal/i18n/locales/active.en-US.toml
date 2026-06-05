@@ -969,7 +969,7 @@ other = "  # Minimal usage\n  skills-seed patterns add \"All service methods mus
 other = "Category: naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
 
 [PatternsAddFlagFiles]
-other = "Related file paths, AI reads these for accurate examples"
+other = "Related file paths; may be repeated for multiple files"
 
 [PatternsAddFlagContext]
 other = "Additional context"
@@ -994,10 +994,10 @@ other = "Add a user-defined pattern (triggers Path B)"
 other = "Category for user pattern (used with --add)"
 
 [SyncFlagFiles]
-other = "Related file paths (used with --add)"
+other = "Related file paths; may be repeated (used with --add)"
 
 [SyncFlagContext]
-other = "Additional context"
+other = "Additional context; plain sync passes it to learning, --add passes it to user pattern generation"
 
 [SyncStepLearn]
 other = "[sync] Step 1/3: Learning from current codebase..."
@@ -1059,7 +1059,7 @@ other = "Generate AI Agent skills"
 other = "Generate AI Agent skills from learned patterns and project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read project profile\n  • Select skills template based on skills.target\n  • Use agent.engine for summary and polish\n  • Generate SKILL.md and references/"
 
 [GenerateSkillsExample]
-other = "  # Generate to default skills.paths\n  skills-seed generate skills\n\n  # Specify output directory\n  skills-seed generate skills --output .agents/skills/my-project\n\n  # With additional context\n  skills-seed generate skills --context \"Focus on API compatibility constraints\""
+other = "  # Generate to default skills.paths\n  skills-seed generate skills\n\n  # Specify output directory\n  skills-seed generate skills --output .agents/skills/my-project"
 
 # agent errors
 [AgentRenderUserDefinePatternPromptFailed]
