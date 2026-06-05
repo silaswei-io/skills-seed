@@ -10,6 +10,7 @@
 - 修复 workspace 模式下进入子项目学习/生成时仍可能在根工作区路径执行 Agent 的问题；Agent 调用会按当前子项目 `.skills-seed` 解析工作目录。
 - 修复生成阶段可传入一次性用户说明并进入 skill 摘要的边界问题；`generate skills` 不再接收 `--context` / `--context-file`，只消费学习阶段已经沉淀的 profile/spec/patterns。
 - 修复 workspace 子项目学习完成后，根仓 workspace profile/spec 分析阶段缺少终端进度输出、看起来像卡住的问题。
+- 修复 workspace 根关系分析和 skills 生成在输入未变化时仍重复调用 Agent / 重写输出的问题；现在会记录输入 md5，输入不变且产物完整时直接跳过。
 - 收紧 skills 输出目录校验，禁止 workspace 根或子项目把生成结果写出对应项目根目录，避免跨项目污染。
 
 ### 变更
@@ -17,10 +18,11 @@
 - `learn current --context` / `--context-file` 仍作为学习阶段一次性输入；workspace 学习会把该说明传给 workspace profile/spec 分析，但提示词明确禁止把说明原文或长段转述写入持久化画像/规范。
 - workspace 根学习现在会读取子项目已沉淀的 `project-profile.json` 摘要、框架和关键模块，生成并保存更完整的 `workspace-profile.json` 与 `workspace-spec.json`。
 - workspace 画像/spec 合并逻辑提取到 `internal/workspace`，学习阶段和生成阶段共用同一套保底路由与合并规则。
+- workspace 子项目快速跳过/完成步骤统一使用全局 `200ms` 短暂停顿，替代原先分散的固定等待，减少无变化场景下的终端空等。
 
 ### 文档
 
-- 更新 README、命令参考和配置参考，说明 0.6.1 的一次性用户说明边界、workspace 学习沉淀流程，以及 `generate skills` 不再接收 context 参数。
+- 更新 README、命令参考和配置参考，说明 0.6.1 的一次性用户说明边界、workspace 学习沉淀流程、输入 md5 跳过行为，以及 `generate skills` 不再接收 context 参数。
 
 ## [v0.6.0]
 

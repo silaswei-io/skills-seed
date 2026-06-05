@@ -10,6 +10,7 @@
 - Fixed workspace child learning/generation Agent calls that could still execute from the root workspace path; Agent calls now resolve their working directory from the active child `.skills-seed`.
 - Fixed the boundary where generation could accept one-shot user context and include it in skill summaries; `generate skills` no longer accepts `--context` / `--context-file` and only consumes profile/spec/patterns already learned.
 - Fixed missing terminal progress during root workspace profile/spec analysis after child learning completed, which made long workspace analysis look stuck.
+- Fixed repeated workspace root relationship analysis and skill generation when inputs had not changed. Skills Seed now records input md5 values and skips unchanged work when outputs are complete.
 - Tightened skill output path validation so workspace roots and child projects cannot write generated skills outside their corresponding project root.
 
 ### Changes
@@ -17,10 +18,11 @@
 - `learn current --context` / `--context-file` remain one-shot learning inputs. Workspace learning passes them into workspace profile/spec analysis, while prompts explicitly forbid copying the original text or long paraphrases into persisted artifacts.
 - Workspace root learning now reads each child project's learned `project-profile.json` summary, frameworks, and key modules before generating and saving richer `workspace-profile.json` and `workspace-spec.json`.
 - Workspace profile/spec merge logic moved into `internal/workspace`, so learning and generation share the same fallback routing and merge rules.
+- Fast skipped/completed workspace child steps now share a global `200ms` pause instead of scattered fixed waits, reducing idle terminal time for unchanged runs.
 
 ### Documentation
 
-- Updated README, command reference, and configuration reference for the 0.6.1 one-shot context boundary, workspace learning artifact flow, and removal of context flags from `generate skills`.
+- Updated README, command reference, and configuration reference for the 0.6.1 one-shot context boundary, workspace learning artifact flow, input-md5 skip behavior, and removal of context flags from `generate skills`.
 
 ## [v0.6.0]
 

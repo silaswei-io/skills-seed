@@ -155,6 +155,27 @@ func TestPrintConsoleLineAfterProgressPrintsImmediatelyWithoutActiveStep(t *test
 	}
 }
 
+func TestPauseAfterFastStepUsesSharedFastStepPause(t *testing.T) {
+	var slept []time.Duration
+
+	PauseAfterFastStep(time.Now(), func(duration time.Duration) {
+		slept = append(slept, duration)
+	})
+
+	require.Equal(t, []time.Duration{FastStepPause}, slept)
+	require.Equal(t, 200*time.Millisecond, FastStepPause)
+}
+
+func TestPauseAfterFastStepDoesNotSleepAfterSlowStep(t *testing.T) {
+	var slept []time.Duration
+
+	PauseAfterFastStep(time.Now().Add(-FastStepPause-time.Millisecond), func(duration time.Duration) {
+		slept = append(slept, duration)
+	})
+
+	require.Empty(t, slept)
+}
+
 func TestMultiTrackerRendersAggregateCountAndTaskLines(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := NewMulti([]string{"backend", "front"})

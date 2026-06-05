@@ -214,8 +214,9 @@ skills-seed learn history --limit 40 --batch-size 5
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
 4. workspace 子项目按 `agent.parallelism` 真并发执行。
 5. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
-6. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
-7. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
+6. workspace 根仓会对工作区关系分析输入记录 md5；当 `workspace.projects`、子项目画像、prompt 模板和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。
+7. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
+8. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
 
@@ -284,6 +285,7 @@ references/
 2. 已有手写 `SKILL.md` 没有 `generated-by: skills-seed` 标记时默认不会被覆盖。
 3. `--merge` 是兼容旧用法，推荐先单独执行 `skills-seed patterns merge`。
 4. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
+5. `generate skills` 会对生成输入记录 md5；当项目画像、patterns、命中统计、配置、prompt/skills 模板和输出路径未变化，且输出产物完整时，会跳过 Agent 摘要和文件重写。workspace 根 skill 也会用同样机制跳过未变化的根产物。
 
 ### `skills-seed patterns`
 

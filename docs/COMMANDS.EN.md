@@ -214,8 +214,9 @@ skills-seed learn history --limit 40 --batch-size 5
 3. The workspace root coordinates learning and does not store child patterns in root storage.
 4. Workspace child projects run with real concurrency according to `agent.parallelism`.
 5. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
-6. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
-7. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
+6. The workspace root records an md5 for relationship-analysis inputs. When `workspace.projects`, child project profiles, prompt templates, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped.
+7. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
+8. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
 
@@ -284,6 +285,7 @@ references/
 2. A manual `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 3. `--merge` is kept for compatibility. Prefer running `skills-seed patterns merge` explicitly.
 4. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
+5. `generate skills` records an md5 for generation inputs. When project profile, patterns, hit stats, config, prompt/skill templates, and output path are unchanged, and generated outputs are complete, Skills Seed skips the agent summary and file rewrite. Workspace root skills use the same mechanism for unchanged root outputs.
 
 ### `skills-seed patterns`
 

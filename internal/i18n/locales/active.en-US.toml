@@ -834,6 +834,9 @@ other = "Generating skills summary"
 [ProgressGenerateLoadProfile]
 other = "Loading project profile"
 
+[ProgressGenerateCheckFingerprint]
+other = "Checking generation input"
+
 [ProgressGenerateWriteSkills]
 other = "Writing skill files"
 
@@ -881,6 +884,12 @@ other = "Generated skills for child project {{.ProjectName}}"
 
 [GenerateWorkspaceChildManualSkillSkipped]
 other = "Child project {{.ProjectName}} has a manual SKILL.md; skipping overwrite: {{.Path}}"
+
+[GenerateSkillsSkipped]
+other = "Generation input is unchanged; skipped writing skills"
+
+[GenerateWorkspaceRootSkipped]
+other = "Workspace root skills input is unchanged; skipped writing"
 
 [GenerateWorkspaceChildNotInitialized]
 other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed add {{.ProjectName}}"
@@ -1905,6 +1914,9 @@ other = "Child project {{.ProjectName}} has no learnable file changes; skipped, 
 
 [LearnWorkspaceProjectDelegated]
 other = "Child project {{.ProjectName}} completed independent learning; logs are kept in {{.LogPath}}"
+
+[LearnWorkspaceRelationshipsSkipped]
+other = "Workspace relationship input is unchanged; skipped workspace profile and rules analysis"
 
 [LearnWorkspaceProjectProgressComplete]
 other = "completed, patterns {{.Patterns}}, saved {{.Saved}}"

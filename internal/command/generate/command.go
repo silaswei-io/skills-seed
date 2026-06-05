@@ -306,7 +306,5 @@ func outputPathForCurrentTarget(cont *container.Container) string {
 }
 
 func pauseAfterFastGenerateChildStep(startedAt time.Time) {
-	if time.Since(startedAt) < 120*time.Millisecond {
-		sleepAfterGenerateChildStep(120 * time.Millisecond)
-	}
+	progress.PauseAfterFastStep(startedAt, sleepAfterGenerateChildStep)
 }

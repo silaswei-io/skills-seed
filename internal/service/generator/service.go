@@ -14,6 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/fingerprint"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
@@ -40,7 +41,7 @@ type GeneratorService struct {
 	configRepo           config.Reader
 }
 
-const GenerateProjectStepTotal = 5
+const GenerateProjectStepTotal = 6
 
 type GenerateProgressHooks struct {
 	OnStepStart    func(label string)
@@ -138,6 +139,28 @@ type workspaceGenerateInputProject struct {
 	ProjectSpecPath string `json:"project_spec_path,omitempty"`
 	ConfigPath      string `json:"config_path,omitempty"`
 	SelfManaged     bool   `json:"self_managed,omitempty"`
+}
+
+type projectSkillsFingerprintInput struct {
+	Kind                string                              `json:"kind"`
+	ProgramVersion      string                              `json:"program_version"`
+	PromptTemplatesHash string                              `json:"prompt_templates_hash"`
+	SkillsTemplatesHash string                              `json:"skills_templates_hash"`
+	OutputPath          string                              `json:"output_path"`
+	ProjectConfig       config.ProjectConfig                `json:"project_config"`
+	AgentConfig         config.AgentConfig                  `json:"agent_config"`
+	SkillsConfig        config.SkillsConfig                 `json:"skills_config"`
+	Patterns            []domain.Pattern                    `json:"patterns"`
+	PatternInsights     map[string]patternGenerationInsight `json:"pattern_insights,omitempty"`
+	Profile             *domain.ProjectProfile              `json:"profile,omitempty"`
+}
+
+type workspaceSkillsFingerprintInput struct {
+	Kind                string                     `json:"kind"`
+	ProgramVersion      string                     `json:"program_version"`
+	SkillsTemplatesHash string                     `json:"skills_templates_hash"`
+	OutputPath          string                     `json:"output_path"`
+	TemplateData        workspaceSkillTemplateData `json:"template_data"`
 }
 
 // ManualSkillExistsError 表示目标目录已有非 skills-seed 生成的 SKILL.md
@@ -268,15 +291,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	}
 	rankedPatterns := rankPatternsForGeneration(patterns, patternInsights)
 
-	var summaryResult *agent.GenerateSkillsResult
-	if err := runStep(i18n.Get("ProgressGenerateSummary"), func() error {
-		var summaryErr error
-		summaryResult, summaryErr = s.generateSkillsSummary(ctx, rankedPatterns, patternInsights, resolvedOutputPath, startedAt)
-		return summaryErr
-	}); err != nil {
-		return err
-	}
-
 	stats := s.calculateStats(patterns)
 
 	var profile *domain.ProjectProfile
@@ -289,12 +303,43 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	}
 	profile = cleanProjectProfile(profile)
 	spec := s.projectSpecFromProfileAndPatterns(profile, rankedPatterns, config.WorkspaceProjectConfig{})
-	if s.projectSpecRepo != nil {
-		if err := s.projectSpecRepo.SaveSpec(ctx, spec); err != nil {
-			return err
+
+	var decision *fingerprint.Decision
+	skipGeneration := false
+	if err := runStep(i18n.Get("ProgressGenerateCheckFingerprint"), func() error {
+		var fingerprintErr error
+		decision, fingerprintErr = s.prepareProjectSkillsFingerprint(ctx, resolvedOutputPath, rankedPatterns, patternInsights, profile)
+		if fingerprintErr != nil {
+			return fingerprintErr
 		}
+		skipGeneration = decision.ShouldSkip() && projectSkillsOutputExists(resolvedOutputPath, rankedPatterns)
+		return nil
+	}); err != nil {
+		return err
 	}
+
+	var summaryResult *agent.GenerateSkillsResult
+	if err := runStep(i18n.Get("ProgressGenerateSummary"), func() error {
+		if skipGeneration {
+			return nil
+		}
+		var summaryErr error
+		summaryResult, summaryErr = s.generateSkillsSummary(ctx, rankedPatterns, patternInsights, resolvedOutputPath, startedAt)
+		return summaryErr
+	}); err != nil {
+		return err
+	}
+
 	if err := runStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
+		if skipGeneration {
+			logger.Info(i18n.Get("GenerateSkillsSkipped"))
+			return nil
+		}
+		if s.projectSpecRepo != nil {
+			if err := s.projectSpecRepo.SaveSpec(ctx, spec); err != nil {
+				return err
+			}
+		}
 		return s.writeSkillsOutput(ctx, resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, generatedSkillName(s.configRepo.GetProjectConfig().Name))
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -305,6 +350,11 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			"error", err,
 		)
 		return err
+	}
+	if !skipGeneration {
+		if err := decision.Commit(ctx, s.fileAnalysisTracker()); err != nil {
+			return err
+		}
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -359,6 +409,60 @@ func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns [
 		return nil, fmt.Errorf("%s: %w", i18n.Get("GeneratorGenerateSummaryFailed"), err)
 	}
 	return summaryResult, nil
+}
+
+func (s *GeneratorService) prepareProjectSkillsFingerprint(ctx context.Context, resolvedOutputPath string, patterns []domain.Pattern, insights map[string]patternGenerationInsight, profile *domain.ProjectProfile) (*fingerprint.Decision, error) {
+	tracker := s.fileAnalysisTracker()
+	if tracker == nil {
+		return nil, nil
+	}
+	return fingerprint.Prepare(ctx, tracker, projectSkillsFingerprintScope(), "project-skills.json", projectSkillsFingerprintInput{
+		Kind:                "project_skills_generation",
+		ProgramVersion:      metadata.ProgramVersion,
+		PromptTemplatesHash: metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS)),
+		SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
+		OutputPath:          filepath.ToSlash(resolvedOutputPath),
+		ProjectConfig:       s.configRepo.GetProjectConfig(),
+		AgentConfig:         s.configRepo.GetAgentConfig(),
+		SkillsConfig:        s.configRepo.GetSkillsConfig(),
+		Patterns:            patterns,
+		PatternInsights:     insights,
+		Profile:             profile,
+	})
+}
+
+func (s *GeneratorService) fileAnalysisTracker() domain.FileAnalysisTracker {
+	tracker, _ := s.patternRepo.(domain.FileAnalysisTracker)
+	return tracker
+}
+
+func projectSkillsFingerprintScope() domain.FileAnalysisScope {
+	return domain.FileAnalysisScope{ProjectID: "__skills__", ScopePath: "project"}
+}
+
+func projectSkillsOutputExists(outputPath string, patterns []domain.Pattern) bool {
+	if outputPath == "" {
+		return false
+	}
+	requiredFiles := []string{
+		"SKILL.md",
+		filepath.Join("references", "project-overview.md"),
+		filepath.Join("references", "project-spec.md"),
+	}
+	for _, path := range requiredFiles {
+		if _, err := os.Stat(filepath.Join(outputPath, path)); err != nil {
+			return false
+		}
+	}
+	if info, err := os.Stat(filepath.Join(outputPath, "references", "patterns")); err != nil || !info.IsDir() {
+		return false
+	}
+	for _, category := range categoryNamesWithPatterns(patterns) {
+		if _, err := os.Stat(filepath.Join(outputPath, "references", "patterns", category+".md")); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func patternImportance(confidence float64) string {
@@ -1403,12 +1507,19 @@ func defaultTargetSkillPath(target string) string {
 }
 
 func (s *GeneratorService) writeWorkspaceRootSkill(ctx context.Context, outputPath string, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec) error {
-	if err := os.MkdirAll(filepath.Join(outputPath, "references"), 0755); err != nil {
-		return err
-	}
-
 	data, err := s.workspaceTemplateData(ctx, projectConfig, workspaceConfig, profile, spec)
 	if err != nil {
+		return err
+	}
+	decision, err := s.prepareWorkspaceSkillsFingerprint(ctx, outputPath, data)
+	if err != nil {
+		return err
+	}
+	if decision.ShouldSkip() && workspaceRootSkillsOutputExists(outputPath) {
+		logger.Info(i18n.Get("GenerateWorkspaceRootSkipped"))
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Join(outputPath, "references"), 0755); err != nil {
 		return err
 	}
 	content, err := s.skillsLoader.Render("workspace-skill", data)
@@ -1432,7 +1543,45 @@ func (s *GeneratorService) writeWorkspaceRootSkill(ctx context.Context, outputPa
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(outputPath, "references", "cross-project-rules.md"), []byte(rules), 0644)
+	if err := os.WriteFile(filepath.Join(outputPath, "references", "cross-project-rules.md"), []byte(rules), 0644); err != nil {
+		return err
+	}
+	return decision.Commit(ctx, s.fileAnalysisTracker())
+}
+
+func (s *GeneratorService) prepareWorkspaceSkillsFingerprint(ctx context.Context, outputPath string, data workspaceSkillTemplateData) (*fingerprint.Decision, error) {
+	tracker := s.fileAnalysisTracker()
+	if tracker == nil {
+		return nil, nil
+	}
+	return fingerprint.Prepare(ctx, tracker, workspaceSkillsFingerprintScope(), "workspace-skills.json", workspaceSkillsFingerprintInput{
+		Kind:                "workspace_skills_generation",
+		ProgramVersion:      metadata.ProgramVersion,
+		SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
+		OutputPath:          filepath.ToSlash(outputPath),
+		TemplateData:        data,
+	})
+}
+
+func workspaceSkillsFingerprintScope() domain.FileAnalysisScope {
+	return domain.FileAnalysisScope{ProjectID: "__skills__", ScopePath: "workspace"}
+}
+
+func workspaceRootSkillsOutputExists(outputPath string) bool {
+	if outputPath == "" {
+		return false
+	}
+	requiredFiles := []string{
+		"SKILL.md",
+		filepath.Join("references", "workspace-overview.md"),
+		filepath.Join("references", "cross-project-rules.md"),
+	}
+	for _, path := range requiredFiles {
+		if _, err := os.Stat(filepath.Join(outputPath, path)); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *GeneratorService) workspaceTemplateData(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec) (workspaceSkillTemplateData, error) {

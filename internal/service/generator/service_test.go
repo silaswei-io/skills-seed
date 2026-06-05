@@ -10,10 +10,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
@@ -178,11 +180,103 @@ func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
 	require.Equal(t, []string{
 		"解析输出目录",
 		"加载已学习模式",
-		"生成 skills 摘要",
 		"读取项目画像",
+		"检查生成输入",
+		"生成 skills 摘要",
 		"写入技能文件",
 	}, started)
 	require.Equal(t, started, completed)
+}
+
+func TestGenerateSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T) {
+	ctx := context.Background()
+	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Wrap errors with context")
+	pattern.SetRule("Use fmt.Errorf with %w")
+
+	dbPath := filepath.Join(t.TempDir(), "project.db")
+	patternRepo, err := boltdb.NewPatternRepository(dbPath)
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+
+	calls := 0
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			calls++
+			if calls > 1 {
+				t.Fatal("skills summary generation should be skipped when input fingerprint is unchanged")
+			}
+			return &agent.GenerateSkillsResult{}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				GeneratedAt: "2026-05-19 12:00:00",
+			}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	}
+	svc := NewGeneratorService(patternRepo, mockProfile, loader, mockAgent, cfg)
+	outputPath := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+	require.Equal(t, 1, calls)
+}
+
+func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) {
+	ctx := context.Background()
+	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Wrap errors with context")
+	pattern.SetRule("Use fmt.Errorf with %w")
+
+	dbPath := filepath.Join(t.TempDir(), "project.db")
+	patternRepo, err := boltdb.NewPatternRepository(dbPath)
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			return &agent.GenerateSkillsResult{}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				GeneratedAt: "2026-05-19 12:00:00",
+			}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	}
+	svc := NewGeneratorService(patternRepo, mockProfile, loader, mockAgent, cfg)
+	outputPath := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+
+	missingPath := filepath.Join(outputPath, "references", "patterns", "error.md")
+	require.NoError(t, os.Remove(missingPath))
+
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+	require.FileExists(t, missingPath)
 }
 
 func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t *testing.T) {
@@ -727,6 +821,70 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
+}
+
+func TestGenerateWorkspaceSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T) {
+	ctx := context.Background()
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+
+	dbPath := filepath.Join(t.TempDir(), "workspace.db")
+	patternRepo, err := boltdb.NewPatternRepository(dbPath)
+	require.NoError(t, err)
+	defer patternRepo.Close()
+
+	loader := skills.NewLoaderForAgent("claude", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
+	}
+	svc := NewGeneratorService(patternRepo, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
+
+	require.NoError(t, svc.GenerateSkills(ctx, ""))
+
+	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace")
+	skillPath := filepath.Join(outputPath, "SKILL.md")
+	oldTime := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	require.NoError(t, os.Chtimes(skillPath, oldTime, oldTime))
+
+	require.NoError(t, svc.GenerateSkills(ctx, ""))
+
+	stat, err := os.Stat(skillPath)
+	require.NoError(t, err)
+	require.Equal(t, oldTime.UnixNano(), stat.ModTime().UnixNano())
+}
+
+func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) {
+	ctx := context.Background()
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+
+	dbPath := filepath.Join(t.TempDir(), "workspace.db")
+	patternRepo, err := boltdb.NewPatternRepository(dbPath)
+	require.NoError(t, err)
+	defer patternRepo.Close()
+
+	loader := skills.NewLoaderForAgent("claude", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
+	}
+	svc := NewGeneratorService(patternRepo, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg)
+
+	require.NoError(t, svc.GenerateSkills(ctx, ""))
+
+	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace")
+	missingPath := filepath.Join(outputPath, "references", "cross-project-rules.md")
+	require.NoError(t, os.Remove(missingPath))
+
+	require.NoError(t, svc.GenerateSkills(ctx, ""))
+	require.FileExists(t, missingPath)
 }
 
 func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {

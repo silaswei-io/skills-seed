@@ -23,6 +23,8 @@ var (
 	terminalWidth       = currentTerminalWidth
 )
 
+const FastStepPause = 200 * time.Millisecond
+
 // Tracker 以步骤为单位显示进度
 // 交互式终端环境下刷新同一行；非交互式终端环境下降级为逐行输出，便于持续集成和日志采集
 type Tracker struct {
@@ -90,6 +92,15 @@ func NewMulti(names []string) *MultiTracker {
 		tracker.tasks[name] = &multiTask{name: name}
 	}
 	return tracker
+}
+
+func PauseAfterFastStep(startedAt time.Time, sleep func(time.Duration)) {
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	if time.Since(startedAt) < FastStepPause {
+		sleep(FastStepPause)
+	}
 }
 
 func (t *MultiTracker) SetLabel(label string) {

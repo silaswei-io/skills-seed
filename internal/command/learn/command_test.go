@@ -23,6 +23,7 @@ import (
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
@@ -392,6 +393,36 @@ func TestRunLearnWorkspaceCurrentShowsRootAnalysisProgress(t *testing.T) {
 	require.Less(t, saveIndex, completeIndex)
 }
 
+func TestRunLearnWorkspaceCurrentSkipsWorkspaceArtifactsWhenInputUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	require.NoError(t, runLearnCurrent(cont, opts))
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceProfileFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+		t.Fatal("workspace profile analysis should be skipped when input fingerprint is unchanged")
+		return nil, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceSpecFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+		t.Fatal("workspace spec analysis should be skipped when input fingerprint is unchanged")
+		return nil, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		require.NoError(t, runLearnCurrent(cont, opts))
+	})
+
+	require.Contains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
+}
+
 func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
@@ -631,7 +662,7 @@ func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
 	require.NotContains(t, output, "0/2 | front")
 	pauseMu.Lock()
 	require.NotEmpty(t, pauseDurations)
-	require.Equal(t, time.Second, pauseDurations[0])
+	require.Equal(t, progress.FastStepPause, pauseDurations[0])
 	pauseMu.Unlock()
 }
 

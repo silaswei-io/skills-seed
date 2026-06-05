@@ -10,12 +10,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/fingerprint"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -66,6 +69,14 @@ type workspaceLearnInputProject struct {
 	Summary            string   `json:"summary,omitempty"`
 	Frameworks         []string `json:"frameworks,omitempty"`
 	KeyModules         []string `json:"key_modules,omitempty"`
+}
+
+type workspaceRelationshipFingerprintInput struct {
+	Kind                string                  `json:"kind"`
+	ProgramVersion      string                  `json:"program_version"`
+	PromptTemplatesHash string                  `json:"prompt_templates_hash"`
+	WorkspaceInput      workspaceLearnInputData `json:"workspace_input"`
+	UserContext         string                  `json:"user_context,omitempty"`
 }
 
 // Cmd 返回 learn 命令
@@ -763,9 +774,7 @@ func workspaceProjectLogDir(cont *container.Container) string {
 }
 
 func pauseAfterFastWorkspaceChildStep(startedAt time.Time) {
-	if time.Since(startedAt) < time.Second {
-		sleepAfterWorkspaceChildStep(time.Second)
-	}
+	progress.PauseAfterFastStep(startedAt, sleepAfterWorkspaceChildStep)
 }
 
 func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) error {
@@ -782,6 +791,21 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 	if err != nil {
 		return err
 	}
+	userContext := runtimecontext.UserContext(ctx)
+	decision, err := fingerprint.Prepare(ctx, cont.FileTracker, workspaceRelationshipFingerprintScope(), "workspace-relationships.json", workspaceRelationshipFingerprintInput{
+		Kind:                "workspace_relationship_learning",
+		ProgramVersion:      metadata.ProgramVersion,
+		PromptTemplatesHash: metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS)),
+		WorkspaceInput:      input,
+		UserContext:         userContext,
+	})
+	if err != nil {
+		return err
+	}
+	if decision.ShouldSkip() && workspaceRelationshipArtifactsExist(ctx, cont) {
+		logger.Info(i18n.Get("LearnWorkspaceRelationshipsSkipped"))
+		return nil
+	}
 	runtimeDir := filepath.Join(projectRoot, ".skills-seed", "memory", "runtime")
 	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
 		return err
@@ -797,7 +821,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		return err
 	}
 	userContextPath := ""
-	if userContext := runtimecontext.UserContext(ctx); userContext != "" {
+	if userContext != "" {
 		userContextPath = filepath.Join(tmpDir, "user-context.md")
 		if err := os.WriteFile(userContextPath, []byte(userContext+"\n"), 0600); err != nil {
 			return err
@@ -858,11 +882,32 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 				return err
 			}
 		}
+		if err := decision.Commit(ctx, cont.FileTracker); err != nil {
+			return err
+		}
 		return nil
 	}); err != nil {
 		return err
 	}
 	return nil
+}
+
+func workspaceRelationshipFingerprintScope() domain.FileAnalysisScope {
+	return domain.FileAnalysisScope{ProjectID: "__workspace__", ScopePath: "learn"}
+}
+
+func workspaceRelationshipArtifactsExist(ctx context.Context, cont *container.Container) bool {
+	if cont.WorkspaceProfileRepo != nil {
+		if _, err := cont.WorkspaceProfileRepo.Get(ctx); err != nil {
+			return false
+		}
+	}
+	if cont.WorkspaceSpecRepo != nil {
+		if _, err := cont.WorkspaceSpecRepo.Get(ctx); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func saveWorkspaceRelationshipFallback(ctx context.Context, cont *container.Container, profile *domain.WorkspaceProfile, generatedAt string) error {
