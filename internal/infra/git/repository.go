@@ -133,34 +133,6 @@ func (r *Repository) GetStagedFiles(ctx context.Context) ([]domain.FileInfo, err
 	return files, nil
 }
 
-// GetAllFiles 获取所有文件
-func (r *Repository) GetAllFiles(ctx context.Context) ([]domain.FileInfo, error) {
-	cmd := exec.CommandContext(ctx, "git", "ls-files")
-	cmd.Dir = r.projectRoot
-
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("GitListFilesFailed"), err)
-	}
-
-	lines := strings.Split(string(output), "\n")
-	files := make([]domain.FileInfo, 0, len(lines))
-
-	for _, filePath := range lines {
-		if filePath == "" {
-			continue
-		}
-
-		files = append(files, domain.FileInfo{
-			Path:     filePath,
-			Language: domain.NewFileInfo(filePath, "").Language,
-			Status:   domain.StatusModified,
-		})
-	}
-
-	return files, nil
-}
-
 // GetCurrentBranch 获取当前分支
 func (r *Repository) GetCurrentBranch(ctx context.Context) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")

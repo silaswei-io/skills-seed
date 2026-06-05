@@ -67,8 +67,18 @@ func (c *ClaudeAgent) IsAvailable() bool {
 
 // AnalyzeCode 分析代码
 func (c *ClaudeAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-check")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
 	// 1. 构建提示词（从模板加载）
-	prompt, err := c.promptLoader.Render("learn-analyze", req)
+	data, err := agent.CheckPromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := c.promptLoader.Render("learn-analyze", data)
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}

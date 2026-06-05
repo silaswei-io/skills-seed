@@ -135,7 +135,6 @@ type MockGitRepository struct {
 	CommitsFn       func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error)
 	ChangedFilesFn  func(ctx context.Context, hash string) ([]string, error)
 	StagedFilesFn   func(ctx context.Context) ([]domain.FileInfo, error)
-	AllFilesFn      func(ctx context.Context) ([]domain.FileInfo, error)
 	CurrentBranchFn func(ctx context.Context) (string, error)
 	ProjectRootFn   func(ctx context.Context) (string, error)
 	StashFn         func(ctx context.Context, message string) error
@@ -163,14 +162,6 @@ func (m *MockGitRepository) GetChangedFiles(ctx context.Context, hash string) ([
 func (m *MockGitRepository) GetStagedFiles(ctx context.Context) ([]domain.FileInfo, error) {
 	if m.StagedFilesFn != nil {
 		return m.StagedFilesFn(ctx)
-	}
-	return []domain.FileInfo{}, nil
-}
-
-// GetAllFiles 模拟获取所有文件
-func (m *MockGitRepository) GetAllFiles(ctx context.Context) ([]domain.FileInfo, error) {
-	if m.AllFilesFn != nil {
-		return m.AllFilesFn(ctx)
 	}
 	return []domain.FileInfo{}, nil
 }
@@ -528,3 +519,61 @@ func (m *MockConfigReader) GetLoggingConfig() config.LoggingConfig { return m.Lo
 
 // GetExclude 模拟获取排除配置
 func (m *MockConfigReader) GetExclude() []string { return m.Exclude }
+
+// GetToolLocale 模拟获取工具输出语言
+func (m *MockConfigReader) GetToolLocale() string {
+	if m.ProjectCfg.Locale != "" {
+		return m.ProjectCfg.Locale
+	}
+	return "zh-CN"
+}
+
+// GetSkillsLocale 模拟获取 Skills 语言
+func (m *MockConfigReader) GetSkillsLocale() string {
+	if m.SkillsCfg.Locale != "" {
+		return m.SkillsCfg.Locale
+	}
+	return "en-US"
+}
+
+// GetPromptLocale 模拟按提示词用途获取语言
+func (m *MockConfigReader) GetPromptLocale(name string) string {
+	return m.GetSkillsLocale()
+}
+
+// GetEffectiveAgentEngine 模拟获取有效 Agent 引擎
+func (m *MockConfigReader) GetEffectiveAgentEngine() string {
+	if m.AgentCfg.Engine != "" {
+		return m.AgentCfg.Engine
+	}
+	return "claude"
+}
+
+// GetEffectiveAgentCommand 模拟获取有效 Agent 命令
+func (m *MockConfigReader) GetEffectiveAgentCommand() string {
+	engine := m.GetEffectiveAgentEngine()
+	if m.AgentCfg.Commands != nil && m.AgentCfg.Commands[engine] != "" {
+		return m.AgentCfg.Commands[engine]
+	}
+	return engine
+}
+
+// GetEffectiveSkillsTarget 模拟获取有效 Skills target
+func (m *MockConfigReader) GetEffectiveSkillsTarget() string {
+	return config.EffectiveSkillsTarget(m.AgentCfg, m.SkillsCfg)
+}
+
+// GetEffectiveSkillsPath 模拟获取有效 Skills 输出路径
+func (m *MockConfigReader) GetEffectiveSkillsPath() string {
+	return config.EffectiveSkillsPath(m.GetEffectiveSkillsTarget(), m.SkillsCfg)
+}
+
+// GetCurrentProjectConfig 模拟获取当前项目配置
+func (m *MockConfigReader) GetCurrentProjectConfig() config.ProjectConfig { return m.ProjectCfg }
+
+// GetWorkspaceProjects 模拟获取工作区子项目配置
+func (m *MockConfigReader) GetWorkspaceProjects() []config.WorkspaceProjectConfig {
+	projects := make([]config.WorkspaceProjectConfig, len(m.WorkspaceCfg.Projects))
+	copy(projects, m.WorkspaceCfg.Projects)
+	return projects
+}

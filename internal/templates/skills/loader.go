@@ -49,7 +49,7 @@ func NewLoaderForAgent(agentName, locale string) *Loader {
 		agentName = metadata.CommonTemplateProvider
 	}
 	if locale == "" {
-		locale = "zh-CN"
+		locale = "en-US"
 	}
 	return &Loader{
 		agentName: strings.ToLower(agentName),

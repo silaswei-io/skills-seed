@@ -67,7 +67,17 @@ func (c *CodexAgent) IsAvailable() bool {
 
 // AnalyzeCode 分析代码
 func (c *CodexAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
-	prompt, err := c.promptLoader.Render("learn-analyze", req)
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-check")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.CheckPromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := c.promptLoader.Render("learn-analyze", data)
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}

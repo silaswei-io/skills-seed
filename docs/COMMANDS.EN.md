@@ -62,7 +62,8 @@ Initialize `.skills-seed/`, default config, database, and prompt / skills templa
 | `--agent` | empty | Execution Agent engine to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
 | `--skills` | empty | Skills output type to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
-| `--locale`, `-l` | empty | Config language: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
+| `--locale`, `-l` | empty | Tool output and config template language: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
+| `--skills-locale` | empty | Generated Skills and AI prompt language: `zh-CN` or `en-US`; empty uses the built-in default `en-US` |
 | `--help`, `-h` | `false` | Show `init` help |
 
 #### Common Examples
@@ -131,7 +132,8 @@ Back up and reset the current repository's `.skills-seed`. Existing data is move
 |---|---:|---|
 | `--mode` | `project` | Mode after reset: `project` or `workspace` |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
-| `--locale`, `-l` | empty | Config language after reset: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
+| `--locale`, `-l` | empty | Tool output and config template language after reset: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
+| `--skills-locale` | empty | Generated Skills and AI prompt language after reset: `zh-CN` or `en-US`; empty uses the built-in default `en-US` |
 | `--help`, `-h` | `false` | Show `reset` help |
 
 #### Common Examples

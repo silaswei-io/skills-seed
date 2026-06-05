@@ -437,6 +437,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			FocusPaths:         effectiveFocusPaths,
 			KnownPatternsJSON:  knownPatternsJSON,
 			KnownPatternsCount: knownPatternsCount,
+			UseSnapshotDiffs:   true,
 		})
 		if err != nil {
 			return err
@@ -968,8 +969,8 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 func workspaceChildSkillPath(projectRootPath, childSeedPath string, rootConfig config.Reader) string {
 	configRepo, err := config.NewRepository(childSeedPath, "")
 	if err == nil {
-		target := config.EffectiveSkillsTarget(configRepo.GetAgentConfig(), configRepo.GetSkillsConfig())
-		outputPath := config.EffectiveSkillsPath(target, configRepo.GetSkillsConfig())
+		target := configRepo.GetEffectiveSkillsTarget()
+		outputPath := configRepo.GetEffectiveSkillsPath()
 		if outputPath == "" {
 			outputPath = config.DefaultSkillsPathForTarget(target)
 		}
@@ -977,12 +978,11 @@ func workspaceChildSkillPath(projectRootPath, childSeedPath string, rootConfig c
 	}
 
 	target := ""
-	skillsConfig := config.SkillsConfig{}
+	outputPath := ""
 	if rootConfig != nil {
-		target = config.EffectiveSkillsTarget(rootConfig.GetAgentConfig(), rootConfig.GetSkillsConfig())
-		skillsConfig = rootConfig.GetSkillsConfig()
+		target = rootConfig.GetEffectiveSkillsTarget()
+		outputPath = rootConfig.GetEffectiveSkillsPath()
 	}
-	outputPath := config.EffectiveSkillsPath(target, skillsConfig)
 	if outputPath == "" {
 		outputPath = config.DefaultSkillsPathForTarget(target)
 	}

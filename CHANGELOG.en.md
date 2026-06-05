@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.6.3]
+
+### Features
+
+- Added `--skills-locale` so tool output/config template language can be separated from generated Skills and prompt language.
+
+### Changes
+
+- Added `skills.locale` to config. Generated Skills now default to English, while `profile.locale` continues to control CLI output and config templates.
+- Agent prompts, project prompts, Skills templates, and workspace generation now consistently read the Skills language setting instead of inheriting the tool UI language.
+
+### Documentation
+
+- Updated command and configuration references for the different responsibilities of `--locale` and `--skills-locale`.
+
 ## [v0.6.2]
 
 ### Fixes

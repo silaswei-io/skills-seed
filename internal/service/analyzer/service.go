@@ -29,8 +29,10 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/service/snapshotflow"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
+	"github.com/silaswei-io/skills-seed/internal/utils/filetree"
 )
 
 // AnalyzerService 代码分析服务
@@ -299,6 +301,7 @@ type AnalyzeCurrentCodebaseRequest struct {
 	StructuralContext  string
 	MainFiles          []string
 	SampleFiles        []agent.SampleFile
+	DiffFiles          []agent.DiffFileRef
 	KnownPatternsJSON  string
 	KnownPatternsCount int
 	UserContext        string
@@ -350,6 +353,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		StructuralContext:  structuralContext,
 		MainFiles:          req.MainFiles,
 		SampleFiles:        req.SampleFiles,
+		DiffFiles:          req.DiffFiles,
 		KnownPatternsJSON:  req.KnownPatternsJSON,
 		KnownPatternsCount: req.KnownPatternsCount,
 		UserContext:        req.UserContext,
@@ -666,11 +670,12 @@ type AnalyzeCodebaseOptions struct {
 	FocusPaths         []string
 	KnownPatternsJSON  string
 	KnownPatternsCount int
+	UseSnapshotDiffs   bool
 }
 
 // AnalyzeCodebaseFull 完整代码库分析（提取模式并转换为 domain.Pattern）
 func (s *AnalyzerService) AnalyzeCodebaseFull(ctx context.Context, projectRoot, projectName, language string) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
-	return s.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, language, AnalyzeCodebaseOptions{})
+	return s.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, language, AnalyzeCodebaseOptions{UseSnapshotDiffs: true})
 }
 
 // AnalyzeCodebaseFullWithOptions 完整代码库分析，支持指定扫描范围
@@ -692,6 +697,20 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 	}
 	mainFiles := s.FindMainFiles(projectRoot)
 	sampleFiles := s.collectSampleFilesFromRoots(projectRoot, opts.FocusPaths, language)
+	var diffFiles []agent.DiffFileRef
+	var snapshotFlow *snapshotflow.Result
+	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
+		files, err := filetree.Walk(projectRoot, s.excludePatterns())
+		if err != nil {
+			return nil, nil, err
+		}
+		snapshotFlow, err = snapshotflow.Build(ctx, projectRoot, files)
+		if err != nil {
+			return nil, nil, err
+		}
+		sampleFiles = sampleFilesFromFileInfos(snapshotFlow.AddedFiles)
+		diffFiles = snapshotFlow.DiffFiles
+	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.collect_codebase_context",
 		"duration", time.Since(startedAt),
@@ -699,6 +718,7 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		"focus_paths_count", len(focusPaths),
 		"main_files_count", len(mainFiles),
 		"sample_files_count", len(sampleFiles),
+		"diff_files_count", len(diffFiles),
 	)
 
 	req := &AnalyzeCurrentCodebaseRequest{
@@ -709,6 +729,7 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		Structure:          structure,
 		MainFiles:          mainFiles,
 		SampleFiles:        sampleFiles,
+		DiffFiles:          diffFiles,
 		KnownPatternsJSON:  opts.KnownPatternsJSON,
 		KnownPatternsCount: opts.KnownPatternsCount,
 		UserContext:        runtimecontext.UserContext(ctx),
@@ -723,6 +744,11 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		)
 		return nil, nil, err
 	}
+	if snapshotFlow != nil {
+		if err := snapshotFlow.Repository.Replace(snapshotFlow.CurrentFiles); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	// Patterns 已经是 []domain.Pattern，直接使用
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -731,6 +757,21 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		"patterns_count", len(result.Patterns),
 	)
 	return result, result.Patterns, nil
+}
+
+func (s *AnalyzerService) excludePatterns() []string {
+	if s.configRepo == nil {
+		return nil
+	}
+	return s.configRepo.GetExclude()
+}
+
+func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
+	samples := make([]agent.SampleFile, 0, len(files))
+	for _, file := range files {
+		samples = append(samples, agent.SampleFile{Path: file.Path})
+	}
+	return samples
 }
 
 // collectSampleFiles 收集项目中的代表性代码文件

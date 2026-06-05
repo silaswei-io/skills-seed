@@ -300,9 +300,7 @@ func outputPathForCurrentTarget(cont *container.Container) string {
 	if cont == nil || cont.ConfigRepo == nil {
 		return ""
 	}
-	skillsConfig := cont.ConfigRepo.GetSkillsConfig()
-	target := config.EffectiveSkillsTarget(cont.ConfigRepo.GetAgentConfig(), skillsConfig)
-	return config.EffectiveSkillsPath(target, skillsConfig)
+	return cont.ConfigRepo.GetEffectiveSkillsPath()
 }
 
 func pauseAfterFastGenerateChildStep(startedAt time.Time) {

@@ -38,6 +38,7 @@ type ProjectPromptData struct {
 	Structure           string
 	MainFiles           []string
 	Locale              string
+	SkillsLocale        string
 }
 
 // WorkspacePromptData 渲染工作区提示词模板的数据
@@ -48,6 +49,7 @@ type WorkspacePromptData struct {
 	WorkspaceRoot       string
 	Projects            []WorkspacePromptProject
 	Locale              string
+	SkillsLocale        string
 }
 
 // WorkspacePromptProject 是 workspace prompt 中展示的子项目摘要
@@ -66,6 +68,9 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 	if data.PromptTemplatesHash == "" {
 		data.PromptTemplatesHash = metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS))
 	}
+	if data.SkillsLocale == "" {
+		data.SkillsLocale = data.Locale
+	}
 
 	baseDirs := []string{
 		filepath.Join(seedPath, "prompts"),
@@ -79,7 +84,7 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 		}
 	}
 
-	profileContent, err := renderProjectTemplate("project-profile", data.Locale, data)
+	profileContent, err := renderProjectTemplate("project-profile", data.SkillsLocale, data)
 	if err != nil {
 		return err
 	}
@@ -89,7 +94,7 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 	}
 
 	data.PromptName = "common"
-	projectContent, err := renderProjectTemplate("project-prompt", data.Locale, data)
+	projectContent, err := renderProjectTemplate("project-prompt", data.SkillsLocale, data)
 	if err != nil {
 		return err
 	}
@@ -101,7 +106,7 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 	for _, name := range projectPromptNames {
 		data.PromptName = name
 
-		instructionsContent, err := renderProjectTemplate("user-instructions", data.Locale, data)
+		instructionsContent, err := renderProjectTemplate("user-instructions", data.SkillsLocale, data)
 		if err != nil {
 			return err
 		}
@@ -122,6 +127,9 @@ func EnsureProjectPromptsAt(basePath string, data ProjectPromptData) error {
 	if data.PromptTemplatesHash == "" {
 		data.PromptTemplatesHash = metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS))
 	}
+	if data.SkillsLocale == "" {
+		data.SkillsLocale = data.Locale
+	}
 
 	baseDirs := []string{
 		basePath,
@@ -132,7 +140,7 @@ func EnsureProjectPromptsAt(basePath string, data ProjectPromptData) error {
 		}
 	}
 
-	profileContent, err := renderProjectTemplate("project-profile", data.Locale, data)
+	profileContent, err := renderProjectTemplate("project-profile", data.SkillsLocale, data)
 	if err != nil {
 		return err
 	}
@@ -141,7 +149,7 @@ func EnsureProjectPromptsAt(basePath string, data ProjectPromptData) error {
 	}
 
 	data.PromptName = "common"
-	projectContent, err := renderProjectTemplate("project-prompt", data.Locale, data)
+	projectContent, err := renderProjectTemplate("project-prompt", data.SkillsLocale, data)
 	if err != nil {
 		return err
 	}
@@ -156,6 +164,9 @@ func EnsureWorkspacePrompts(seedPath string, data WorkspacePromptData) error {
 	if data.PromptTemplatesHash == "" {
 		data.PromptTemplatesHash = metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS))
 	}
+	if data.SkillsLocale == "" {
+		data.SkillsLocale = data.Locale
+	}
 
 	workspaceDir := filepath.Join(seedPath, "prompts", "workspace")
 	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
@@ -163,7 +174,7 @@ func EnsureWorkspacePrompts(seedPath string, data WorkspacePromptData) error {
 	}
 
 	for _, name := range workspacePromptNames {
-		content, err := renderWorkspaceTemplate(name, data.Locale, data)
+		content, err := renderWorkspaceTemplate(name, data.SkillsLocale, data)
 		if err != nil {
 			return err
 		}

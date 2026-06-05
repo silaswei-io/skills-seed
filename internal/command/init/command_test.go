@@ -94,6 +94,72 @@ func TestInitializeProjectWithSkillsSetsTarget(t *testing.T) {
 	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
 }
 
+func TestInitializeProjectWithSkillsLocaleSetsSkillsLanguage(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+		skillsLocale:    "zh-CN",
+	}))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "zh-CN", configRepo.GetToolLocale())
+	require.Equal(t, "zh-CN", configRepo.GetSkillsLocale())
+}
+
+func TestCmdAcceptsSeparateSkillsLocale(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+	previousDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(projectRoot))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(previousDir))
+	})
+
+	cmd := Cmd()
+	cmd.SetArgs([]string{"--locale", "zh-CN", "--skills-locale", "zh-CN"})
+	require.NoError(t, cmd.Execute())
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "zh-CN", configRepo.GetToolLocale())
+	require.Equal(t, "zh-CN", configRepo.GetSkillsLocale())
+}
+
+func TestCmdDefaultsSkillsLocaleToEnglishAndWritesEnglishPrompts(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+	previousDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(projectRoot))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(previousDir))
+	})
+
+	cmd := Cmd()
+	cmd.SetArgs([]string{"--locale", "zh-CN"})
+	require.NoError(t, cmd.Execute())
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "zh-CN", configRepo.GetToolLocale())
+	require.Equal(t, "en-US", configRepo.GetSkillsLocale())
+
+	profile, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "prompts", "project", "project-profile.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(profile), "# Project Profile")
+	require.NotContains(t, string(profile), "# 项目画像")
+
+	instructions, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "prompts", "instructions", "fix-generate.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(instructions), "# User Instructions")
+	require.NotContains(t, string(instructions), "# 用户补充指令")
+}
+
 func TestInitializeProjectDetectsFrontendLanguage(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)

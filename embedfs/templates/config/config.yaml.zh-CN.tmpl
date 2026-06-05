@@ -9,7 +9,7 @@ profile:
   mode: "project"
   # 项目主要语言，例如 go、typescript、python
   language: "go"
-  # CLI 输出语言：zh-CN 中文，en-US 英文
+  # 工具输出语言：zh-CN 中文，en-US 英文
   locale: "zh-CN"
   # Git 远程仓库地址，init 时自动填充
   git_remote: ""
@@ -95,11 +95,13 @@ autofix:
 
 ########################################################################
 # Skills
-# 控制生成的 Skills 目标类型和输出路径
+# 控制生成的 Skills 目标类型、输出路径和内容语言
 ########################################################################
 skills:
   # 生成的 Skills 目标类型；可与 agent.engine 不同，例如用 claude 生成 codex skills
   target: "claude"
+  # 生成的 Skills、AI prompt 和沉淀到 Skills 的自然语言内容：zh-CN 中文，en-US 英文
+  locale: "en-US"
   # target -> Skills 输出路径，新增 target 时在这里增加 key
   paths:
     claude: ".claude/skills/skills-seed-skills"

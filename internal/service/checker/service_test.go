@@ -3,11 +3,15 @@ package checker
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,6 +74,10 @@ func TestCheck_GitError(t *testing.T) {
 }
 
 func TestCheckAll_Success(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeCheckerFile(t, projectRoot, "main.go", "package main\n")
+	writeCheckerFile(t, projectRoot, "handler.go", "package main\n")
+
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		AnalyzeCodeFn: func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
@@ -80,12 +88,6 @@ func TestCheckAll_Success(t *testing.T) {
 		},
 	}
 	mockGit := &mocks.MockGitRepository{
-		AllFilesFn: func(ctx context.Context) ([]domain.FileInfo, error) {
-			return []domain.FileInfo{
-				{Path: "main.go", Content: "package main", Language: "go"},
-				{Path: "handler.go", Content: "package main", Language: "go"},
-			}, nil
-		},
 		CommitsFn: func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error) {
 			return []domain.CommitInfo{}, nil
 		},
@@ -96,13 +98,21 @@ func TestCheckAll_Success(t *testing.T) {
 		},
 	}
 
-	svc := newTestService(mockAgent, mockGit, mockPattern)
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: projectRoot},
+	}
+	svc := NewCheckerService(mockAgent, mockGit, mockPattern, cfg)
 	issues, err := svc.CheckAll(context.Background())
 	assert.NoError(t, err)
 	assert.Len(t, issues, 0)
 }
 
 func TestCheckAll_FiltersExcludedFiles(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeCheckerFile(t, projectRoot, "internal/service/user.go", "package service\n")
+	writeCheckerFile(t, projectRoot, "internal/service/mocks/repo.go", "package mocks\n")
+	writeCheckerFile(t, projectRoot, "api/user.pb.go", "package api\n")
+
 	var analyzed []domain.FileInfo
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
@@ -112,13 +122,6 @@ func TestCheckAll_FiltersExcludedFiles(t *testing.T) {
 		},
 	}
 	mockGit := &mocks.MockGitRepository{
-		AllFilesFn: func(ctx context.Context) ([]domain.FileInfo, error) {
-			return []domain.FileInfo{
-				domain.NewFileInfo("internal/service/user.go", "package service"),
-				domain.NewFileInfo("internal/service/mocks/repo.go", "package mocks"),
-				domain.NewFileInfo("api/user.pb.go", "package api"),
-			}, nil
-		},
 		CommitsFn: func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error) {
 			return []domain.CommitInfo{}, nil
 		},
@@ -129,7 +132,7 @@ func TestCheckAll_FiltersExcludedFiles(t *testing.T) {
 		},
 	}
 	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: projectRoot},
 		Exclude:    []string{"**/mocks/**", "**/*.pb.go"},
 	}
 
@@ -137,8 +140,67 @@ func TestCheckAll_FiltersExcludedFiles(t *testing.T) {
 	_, err := svc.CheckAll(context.Background())
 
 	assert.NoError(t, err)
-	assert.Len(t, analyzed, 1)
+	require.Len(t, analyzed, 1)
 	assert.Equal(t, "internal/service/user.go", analyzed[0].Path)
+}
+
+func TestCheckAllUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	writeCheckerFile(t, projectRoot, "added.go", "package added\n")
+	writeCheckerFile(t, projectRoot, "modified.go", "package main\nfunc newName() {}\n")
+	writeCheckerFile(t, projectRoot, "unchanged.go", "package same\n")
+	repo := snapshotstore.NewRepository(seedPath)
+	require.NoError(t, repo.Replace(map[string]string{
+		"modified.go":  "package main\nfunc oldName() {}\n",
+		"unchanged.go": "package same\n",
+	}))
+
+	var received *agent.AnalyzeRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCodeFn: func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
+			received = req
+			return &agent.AnalyzeResult{Issues: []domain.Issue{}, Confidence: 0.5}, nil
+		},
+	}
+	mockGit := &mocks.MockGitRepository{
+		CommitsFn: func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error) {
+			return []domain.CommitInfo{}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{}, nil
+		},
+	}
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: projectRoot},
+		Exclude:    []string{".*"},
+	}
+	svc := NewCheckerService(mockAgent, mockGit, mockPattern, cfg)
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	issues, err := svc.CheckAll(ctx)
+
+	require.NoError(t, err)
+	require.Empty(t, issues)
+	require.NotNil(t, received)
+	require.Equal(t, []domain.FileInfo{domain.NewFileInfo("added.go", "")}, received.Files)
+	require.Len(t, received.DiffFiles, 1)
+	require.Equal(t, "modified.go", received.DiffFiles[0].Path)
+	diffContent, err := os.ReadFile(received.DiffFiles[0].DiffPath)
+	require.NoError(t, err)
+	require.Contains(t, string(diffContent), "-func oldName() {}")
+	require.Contains(t, string(diffContent), "+func newName() {}")
+
+	loaded, err := repo.Load()
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"added.go":     "package added\n",
+		"modified.go":  "package main\nfunc newName() {}\n",
+		"unchanged.go": "package same\n",
+	}, loaded)
 }
 
 func TestCheckFiles_AIError(t *testing.T) {
@@ -284,4 +346,11 @@ func TestCheckFiles_PatternRepoError(t *testing.T) {
 		{Path: "main.go"},
 	})
 	assert.Error(t, err)
+}
+
+func writeCheckerFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }

@@ -72,7 +72,7 @@ func runAddWorkspaceProjects(ctx context.Context, workspaceRoot string, rootConf
 		return fmt.Errorf("%s", i18n.Get("AddProjectsMissing"))
 	}
 
-	locale := rootConfigRepo.GetProjectConfig().Locale
+	locale := rootConfigRepo.GetToolLocale()
 	for _, project := range selected {
 		select {
 		case <-ctx.Done():

@@ -63,6 +63,7 @@ autofix:
 
 skills:
   target: "claude"
+  locale: "en-US"
   paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
@@ -118,7 +119,7 @@ exclude:
 | `name` | current directory name | Project name, filled during init |
 | `mode` | `project` | Init mode: `project` for a single project, `workspace` for a multi-project workspace |
 | `language` | `go` | Primary project language, such as `typescript` or `python` |
-| `locale` | `zh-CN` | Language for CLI output, config templates, prompts, and skill templates |
+| `locale` | `zh-CN` | Language for tool output and config templates |
 | `git_remote` | auto-filled or empty | Git remote URL |
 | `root_path` | current project absolute path | Written during init and used to locate the project root |
 | `initialized_at` | init time | Initialization time |
@@ -214,6 +215,7 @@ agent:
 
 skills:
   target: "codex"
+  locale: "en-US"
   paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
@@ -284,6 +286,7 @@ These files are merged with built-in prompts; they do not replace built-in promp
 | Field | Default | Description |
 |---|---:|---|
 | `target` | `agent.engine` | Generated Skills target type; can differ from `agent.engine` |
+| `locale` | `en-US` | Generated Skills, AI prompts, and natural-language content persisted into Skills |
 | `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills output directory |
 | `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills output directory |
 
@@ -291,7 +294,8 @@ These files are merged with built-in prompts; they do not replace built-in promp
 
 1. `generate skills` uses `skills.paths` for the current `skills.target` by default.
 2. Use `skills-seed generate skills --output <path>` to override the output directory for one run.
-3. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
+3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; `profile.locale` no longer controls AI prompt or Skills content language.
+4. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
 
 ### `logging`
 

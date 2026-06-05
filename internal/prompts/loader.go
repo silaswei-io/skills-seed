@@ -18,36 +18,51 @@ import (
 
 // Loader 加载内置模板，并叠加项目/自定义提示词片段。
 type Loader struct {
-	agentName string
-	locale    string
-	seedPath  string
-	templates map[string]*template.Template
-	mu        sync.RWMutex
+	agentName    string
+	locale       string
+	skillsLocale string
+	seedPath     string
+	templates    map[string]*template.Template
+	mu           sync.RWMutex
 }
 
 // NewLoader 创建提示词模板加载器
 func NewLoader(agentName, locale, seedPath string) *Loader {
+	return NewLoaderWithLocales(agentName, locale, "", seedPath)
+}
+
+// NewLoaderWithLocales 创建可按提示词用途选择语言的提示词模板加载器。
+func NewLoaderWithLocales(agentName, locale, skillsLocale, seedPath string) *Loader {
 	if locale == "" {
 		locale = "zh-CN"
 	}
+	if skillsLocale == "" {
+		skillsLocale = locale
+	}
 
 	return &Loader{
-		agentName: agentName,
-		locale:    locale,
-		seedPath:  seedPath,
-		templates: make(map[string]*template.Template),
+		agentName:    agentName,
+		locale:       locale,
+		skillsLocale: skillsLocale,
+		seedPath:     seedPath,
+		templates:    make(map[string]*template.Template),
 	}
 }
 
 // Load 加载指定提示词模板
 func (l *Loader) Load(name string) error {
+	return l.loadWithLocale(name, l.localeForPrompt(name))
+}
+
+func (l *Loader) loadWithLocale(name, locale string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if _, ok := l.templates[name]; ok {
+	cacheKey := templateCacheKey(locale, name)
+	if _, ok := l.templates[cacheKey]; ok {
 		return nil
 	}
 
-	data, err := l.readEmbeddedTemplate(name)
+	data, err := l.readEmbeddedTemplateWithLocale(name, locale)
 	if err != nil {
 		return err
 	}
@@ -57,13 +72,17 @@ func (l *Loader) Load(name string) error {
 		return err
 	}
 
-	l.templates[name] = tmpl
+	l.templates[cacheKey] = tmpl
 	return nil
 }
 
 func (l *Loader) readEmbeddedTemplate(name string) ([]byte, error) {
+	return l.readEmbeddedTemplateWithLocale(name, l.localeForPrompt(name))
+}
+
+func (l *Loader) readEmbeddedTemplateWithLocale(name, locale string) ([]byte, error) {
 	for _, agentName := range l.templateAgentNames() {
-		localizedPath := metadata.PromptTemplatePath(agentName, name, l.locale)
+		localizedPath := metadata.PromptTemplatePath(agentName, name, locale)
 		data, err := embedfs.FS.ReadFile(localizedPath)
 		if err == nil {
 			return data, nil
@@ -85,16 +104,18 @@ func (l *Loader) templateAgentNames() []string {
 
 // Render 渲染指定提示词模板
 func (l *Loader) Render(name string, data interface{}) (string, error) {
+	locale := l.localeForPrompt(name)
+	cacheKey := templateCacheKey(locale, name)
 	l.mu.RLock()
-	_, loaded := l.templates[name]
+	_, loaded := l.templates[cacheKey]
 	l.mu.RUnlock()
 	if !loaded {
-		if err := l.Load(name); err != nil {
+		if err := l.loadWithLocale(name, locale); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "prompt.load",
 				"template", name,
 				"agent", l.agentName,
-				"locale", l.locale,
+				"locale", locale,
 				"error", err,
 			)
 			return "", err
@@ -102,7 +123,7 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	}
 
 	l.mu.RLock()
-	tmpl := l.templates[name]
+	tmpl := l.templates[cacheKey]
 	l.mu.RUnlock()
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
@@ -110,7 +131,7 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 			"operation", "prompt.render",
 			"template", name,
 			"agent", l.agentName,
-			"locale", l.locale,
+			"locale", locale,
 			"error", err,
 		)
 		return "", err
@@ -121,7 +142,7 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticPromptRendered"),
 			"template", name,
 			"agent", l.agentName,
-			"locale", l.locale,
+			"locale", locale,
 			"base_length", len(base),
 			"final_length", len(strings.TrimSpace(base)),
 			"has_seed_path", false,
@@ -164,7 +185,7 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	if instructionsPrompt != "" {
 		parts = append(parts, strings.TrimSpace(instructionsPrompt))
 	}
-	contractGuard := l.outputContractGuard()
+	contractGuard := l.outputContractGuard(locale)
 	if contractGuard != "" {
 		parts = append(parts, contractGuard)
 	}
@@ -173,7 +194,7 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticPromptRendered"),
 		"template", name,
 		"agent", l.agentName,
-		"locale", l.locale,
+		"locale", locale,
 		"base_length", len(base),
 		"project_profile_length", len(projectProfile),
 		"common_project_prompt_length", len(commonProjectPrompt),
@@ -216,12 +237,23 @@ func (l *Loader) readPromptFile(path string) string {
 	return string(data)
 }
 
-func (l *Loader) outputContractGuard() string {
-	data, err := l.readEmbeddedTemplate("output-contract-guard")
+func (l *Loader) outputContractGuard(locale string) string {
+	data, err := l.readEmbeddedTemplateWithLocale("output-contract-guard", locale)
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(string(data))
+}
+
+func (l *Loader) localeForPrompt(name string) string {
+	if strings.TrimSpace(name) != "" {
+		return l.skillsLocale
+	}
+	return l.skillsLocale
+}
+
+func templateCacheKey(locale, name string) string {
+	return locale + "/" + name
 }
 
 func (l *Loader) readScopedProjectPrompts(name string, data interface{}) (string, string, string) {

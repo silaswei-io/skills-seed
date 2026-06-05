@@ -18,9 +18,16 @@ type ProjectContext struct {
 // AnalyzeRequest 分析请求
 type AnalyzeRequest struct {
 	Files         []domain.FileInfo   // 待分析文件
+	DiffFiles     []DiffFileRef       // 变更文件 diff 引用
 	Context       ProjectContext      // 项目上下文
 	Patterns      []domain.Pattern    // 已知模式
 	RecentCommits []domain.CommitInfo // 最近提交
+}
+
+// DiffFileRef 指向 runtime 目录中的文件 diff。
+type DiffFileRef struct {
+	Path     string // 原文件路径
+	DiffPath string // runtime 中的 diff 文件路径
 }
 
 // AnalyzeResult 分析结果
@@ -225,23 +232,24 @@ type SampleFile struct {
 
 // AnalyzeCurrentCodebaseRequest 分析当前代码库请求
 type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName           string       // 项目名称
-	RootPath              string       // 项目根路径
-	Language              string       // 主要语言
-	FocusPaths            []string     // 指定扫描范围（相对项目根）
-	Structure             string       // 目录结构
-	StructurePath         string       // 目录结构文件路径
-	StructuralContext     string       // CodeGraph 等结构化分析上下文
-	StructuralContextPath string       // CodeGraph 等结构化分析上下文文件路径
-	MainFiles             []string     // 主要入口文件路径
-	SampleFiles           []SampleFile // 示例文件路径
-	KnownPatternsJSON     string       // 已知模式 JSON（不包含代码示例）
-	KnownPatternsPath     string       // 已知模式 JSON 文件路径
-	KnownPatternsCount    int          // 已知模式数量
-	FileCount             int          // 文件总数
-	DirCount              int          // 目录总数
-	UserContext           string       // 本次学习传入的一次性用户上下文
-	UserContextPath       string       // 本次学习传入的一次性用户上下文文件路径
+	ProjectName           string        // 项目名称
+	RootPath              string        // 项目根路径
+	Language              string        // 主要语言
+	FocusPaths            []string      // 指定扫描范围（相对项目根）
+	Structure             string        // 目录结构
+	StructurePath         string        // 目录结构文件路径
+	StructuralContext     string        // CodeGraph 等结构化分析上下文
+	StructuralContextPath string        // CodeGraph 等结构化分析上下文文件路径
+	MainFiles             []string      // 主要入口文件路径
+	SampleFiles           []SampleFile  // 示例文件路径
+	DiffFiles             []DiffFileRef // 变更文件 diff 引用
+	KnownPatternsJSON     string        // 已知模式 JSON（不包含代码示例）
+	KnownPatternsPath     string        // 已知模式 JSON 文件路径
+	KnownPatternsCount    int           // 已知模式数量
+	FileCount             int           // 文件总数
+	DirCount              int           // 目录总数
+	UserContext           string        // 本次学习传入的一次性用户上下文
+	UserContextPath       string        // 本次学习传入的一次性用户上下文文件路径
 }
 
 // AnalyzeCurrentCodebaseResult 分析当前代码库结果

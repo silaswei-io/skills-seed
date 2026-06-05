@@ -111,6 +111,7 @@ func TestRepository_Get(t *testing.T) {
 	// 校验来自嵌入模板或硬编码 fallback 的默认值。
 	assert.Equal(t, "go", cfg.Project.Language)
 	assert.Equal(t, "zh-CN", cfg.Project.Locale)
+	assert.Equal(t, "en-US", cfg.Skills.Locale)
 	assert.Equal(t, "claude", cfg.Agent.Engine)
 	assert.Equal(t, "claude", cfg.Agent.Commands["claude"])
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
@@ -126,6 +127,7 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, 50, cfg.Learning.MaxCommits)
 	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
 	assert.Equal(t, "claude", cfg.Skills.Target)
+	assert.Equal(t, "en-US", cfg.Skills.Locale)
 	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Skills.Paths["claude"])
 	assert.Equal(t, ".agents/skills/skills-seed-skills", cfg.Skills.Paths["codex"])
 	assert.Equal(t, "DEBUG", cfg.Logging.Level)
@@ -140,6 +142,55 @@ func TestRepository_GetProjectConfig(t *testing.T) {
 	assert.Equal(t, "go", projectCfg.Language)
 	assert.Equal(t, "zh-CN", projectCfg.Locale)
 	assert.NotEmpty(t, projectCfg.InitializedAt)
+}
+
+func TestRepository_EffectiveGetterDefaults(t *testing.T) {
+	repo := setupTestConfig(t)
+
+	assert.Equal(t, "zh-CN", repo.GetToolLocale())
+	assert.Equal(t, "en-US", repo.GetSkillsLocale())
+	assert.Equal(t, "en-US", repo.GetPromptLocale("learn-batch"))
+	assert.Equal(t, "en-US", repo.GetPromptLocale("fix-generate"))
+	assert.Equal(t, "claude", repo.GetEffectiveAgentEngine())
+	assert.Equal(t, "claude", repo.GetEffectiveAgentCommand())
+	assert.Equal(t, "claude", repo.GetEffectiveSkillsTarget())
+	assert.Equal(t, ".claude/skills/skills-seed-skills", repo.GetEffectiveSkillsPath())
+	assert.Equal(t, "go", repo.GetCurrentProjectConfig().Language)
+	assert.Empty(t, repo.GetWorkspaceProjects())
+}
+
+func TestRepository_NormalizesMissingSkillsLocaleToEnglish(t *testing.T) {
+	seedPath := t.TempDir()
+	configPath := filepath.Join(seedPath, "config.yaml")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+profile:
+  language: "go"
+  locale: "zh-CN"
+agent:
+  engine: "codex"
+  commands:
+    codex: "codex"
+learning:
+  max_commits: 50
+autofix:
+  strategy: "patch"
+skills:
+  target: "codex"
+  paths:
+    codex: ".agents/skills/demo"
+logging:
+  level: "DEBUG"
+exclude: []
+`), 0644))
+
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	assert.Equal(t, "zh-CN", repo.GetToolLocale())
+	assert.Equal(t, "en-US", repo.GetSkillsLocale())
+	assert.Equal(t, "en-US", repo.GetSkillsConfig().Locale)
+	assert.Equal(t, ".agents/skills/demo", repo.GetEffectiveSkillsPath())
 }
 
 func TestRepository_UpdatePersistsWorkspaceConfig(t *testing.T) {
@@ -208,7 +259,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 		Skills: SkillsConfig{Target: "codex", Paths: map[string]string{
 			"claude": ".claude/skills/skills-seed-skills",
 			"codex":  ".agents/skills/skills-seed-skills",
-		}},
+		}, Locale: "en-US"},
 		Logging: LoggingConfig{Level: "DEBUG", LogsPath: "logs", MaxLogFiles: 30},
 		Exclude: []string{"dist/**", "*.log"},
 	}
@@ -342,6 +393,7 @@ autofix:
 
 skills:
   target: "claude"
+  locale: "en-US"
   paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"
@@ -588,6 +640,7 @@ func TestRepository_GetSkillsConfig(t *testing.T) {
 	repo := setupTestConfig(t)
 	skillsCfg := repo.GetSkillsConfig()
 
+	assert.Equal(t, "en-US", skillsCfg.Locale)
 	assert.NotEmpty(t, skillsCfg.Paths)
 }
 
@@ -678,6 +731,7 @@ func TestNewRepository_DefaultLocale(t *testing.T) {
 
 	cfg := repo.Get()
 	assert.Equal(t, "zh-CN", cfg.Project.Locale)
+	assert.Equal(t, "en-US", cfg.Skills.Locale)
 }
 
 func TestNormalizeLocaleDefaultsToChinese(t *testing.T) {
@@ -697,4 +751,5 @@ func TestNewRepository_EnUSLocale(t *testing.T) {
 
 	cfg := repo.Get()
 	assert.Equal(t, "en-US", cfg.Project.Locale)
+	assert.Equal(t, "en-US", cfg.Skills.Locale)
 }

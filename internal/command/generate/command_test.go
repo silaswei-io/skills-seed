@@ -69,7 +69,8 @@ func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
 	require.FileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 	rootOverview := readGenerateFile(t, workspaceRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md")
 	require.Contains(t, rootOverview, "backend/.agents/skills/backend-dev/SKILL.md")
-	require.Contains(t, rootOverview, "backend 开发技能")
+	require.Contains(t, rootOverview, "backend Development Skill")
+	require.NotContains(t, rootOverview, "backend 开发技能")
 }
 
 func TestRunGenerateUsesConfiguredOutputPathWithoutCobraCommand(t *testing.T) {

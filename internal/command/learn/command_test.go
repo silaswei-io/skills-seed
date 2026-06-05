@@ -140,6 +140,39 @@ func TestRunLearnCurrentPrintsTokenUsageLast(t *testing.T) {
 	require.NotContains(t, output, "后续可执行:")
 }
 
+func TestRunLearnCurrentWritesSnapshotsAfterFirstLearning(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	require.NoError(t, runLearnCurrent(cont, opts))
+
+	content, err := os.ReadFile(filepath.Join(cont.SeedPath, "memory", "snapshots", "main.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package main\n", string(content))
+}
+
+func TestRunLearnCurrentWithFocusReplacesSnapshotsAfterAnalysis(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	snapshotDir := filepath.Join(cont.SeedPath, "memory", "snapshots")
+	require.NoError(t, os.MkdirAll(snapshotDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(snapshotDir, "main.go"), []byte("old snapshot\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(snapshotDir, "stale.go"), []byte("stale snapshot\n"), 0644))
+
+	opts := learnCurrentOptionsForTest("", []string{"main.go"}, learnCurrentProfileSkip)
+	require.NoError(t, runLearnCurrent(cont, opts))
+
+	content, err := os.ReadFile(filepath.Join(snapshotDir, "main.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package main\n", string(content))
+	require.NoFileExists(t, filepath.Join(snapshotDir, "stale.go"))
+}
+
 func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()

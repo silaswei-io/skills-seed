@@ -681,9 +681,9 @@ func (s *GeneratorService) workspaceChildConfig(projectRoot string, project conf
 		}
 		return nil, false, configPath, err
 	}
-	locale := ""
-	if s.skillsLoader != nil {
-		locale = s.skillsLoader.GetLocale()
+	locale := domain.DefaultLocale
+	if s.configRepo != nil {
+		locale = s.configRepo.GetToolLocale()
 	}
 	repo, err := config.NewRepository(filepath.Dir(configPath), locale)
 	if err != nil {
@@ -1438,9 +1438,8 @@ func configuredSkillOutputPath(projectRoot string, configRepo config.Reader) (st
 	target := ""
 	outputPath := ""
 	if configRepo != nil {
-		skillsConfig := configRepo.GetSkillsConfig()
-		target = config.EffectiveSkillsTarget(configRepo.GetAgentConfig(), skillsConfig)
-		outputPath = config.EffectiveSkillsPath(target, skillsConfig)
+		target = configRepo.GetEffectiveSkillsTarget()
+		outputPath = configRepo.GetEffectiveSkillsPath()
 	}
 	if strings.TrimSpace(outputPath) == "" {
 		outputPath = defaultTargetSkillPath(target)
@@ -1452,9 +1451,8 @@ func (s *GeneratorService) targetSkillOutputPath(projectRoot, skillName string) 
 	target := ""
 	outputPath := ""
 	if s.configRepo != nil {
-		skillsConfig := s.configRepo.GetSkillsConfig()
-		target = config.EffectiveSkillsTarget(s.configRepo.GetAgentConfig(), skillsConfig)
-		outputPath = config.EffectiveSkillsPath(target, skillsConfig)
+		target = s.configRepo.GetEffectiveSkillsTarget()
+		outputPath = s.configRepo.GetEffectiveSkillsPath()
 	}
 	if strings.TrimSpace(outputPath) == "" {
 		outputPath = defaultTargetSkillPath(target)

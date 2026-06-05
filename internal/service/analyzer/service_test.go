@@ -13,6 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
@@ -362,6 +363,57 @@ func TestAnalyzeCodebaseFullPassesKnownPatterns(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, `[{"id":"known"}]`, received.KnownPatternsJSON)
 	require.Equal(t, 1, received.KnownPatternsCount)
+}
+
+func TestAnalyzeCodebaseFullUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	require.NoError(t, os.MkdirAll(seedPath, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "added.go"), []byte("package added\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "modified.go"), []byte("package main\nfunc newName() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "unchanged.go"), []byte("package same\n"), 0o644))
+	repo := snapshotstore.NewRepository(seedPath)
+	require.NoError(t, repo.Replace(map[string]string{
+		"modified.go":  "package main\nfunc oldName() {}\n",
+		"unchanged.go": "package same\n",
+	}))
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{
+				Patterns: []domain.Pattern{*domain.NewPattern("p1", "Snapshot Pattern", domain.CategoryStructure)},
+			}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
+		Exclude:    []string{".*"},
+	})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	_, patterns, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{})
+
+	require.NoError(t, err)
+	require.Len(t, patterns, 1)
+	require.Len(t, received.SampleFiles, 1)
+	require.Equal(t, "added.go", received.SampleFiles[0].Path)
+	require.Len(t, received.DiffFiles, 1)
+	require.Equal(t, "modified.go", received.DiffFiles[0].Path)
+	diffContent, err := os.ReadFile(received.DiffFiles[0].DiffPath)
+	require.NoError(t, err)
+	require.Contains(t, string(diffContent), "-func oldName() {}")
+	require.Contains(t, string(diffContent), "+func newName() {}")
+
+	loaded, err := repo.Load()
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"added.go":     "package added\n",
+		"modified.go":  "package main\nfunc newName() {}\n",
+		"unchanged.go": "package same\n",
+	}, loaded)
 }
 
 func TestCollectSampleFiles(t *testing.T) {

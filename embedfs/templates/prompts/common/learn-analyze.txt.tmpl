@@ -22,6 +22,16 @@
 {{range .Files}}
 - {{.Path}} [{{.Language}}]
 {{end}}
+{{- if .DiffFiles}}
+
+# 变更文件 Diff ({{len .DiffFiles}} 个)
+
+以下文件自上次分析后发生变更，diff 文件位于对应路径。请优先读取 diff，仅在规则判断需要更完整上下文时读取原文件。
+
+{{range .DiffFiles}}
+- {{.Path}} -> diff: {{.DiffPath}}
+{{end}}
+{{- end}}
 
 # 最近提交记录 ({{len .RecentCommits}} 个)
 

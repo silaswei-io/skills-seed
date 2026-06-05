@@ -213,8 +213,11 @@ type LoggingConfig struct {
 // SkillsConfig Skills 输出配置
 type SkillsConfig struct {
 	Target string            `yaml:"target"` // 目标 Agent Skills 类型
+	Locale string            `yaml:"locale"` // Skills 与沉淀内容语言：zh-CN, en-US
 	Paths  map[string]string `yaml:"paths"`  // target -> Skills 输出路径
 }
+
+const defaultSkillsLocale = "en-US"
 
 func EffectiveSkillsTarget(agent AgentConfig, skills SkillsConfig) string {
 	if strings.TrimSpace(skills.Target) != "" {
@@ -472,6 +475,7 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if strings.TrimSpace(cfg.Skills.Target) == "" {
 		cfg.Skills.Target = cfg.Agent.Engine
 	}
+	cfg.Skills.Locale = normalizeSkillsLocale(cfg.Skills.Locale)
 	if cfg.Skills.Paths == nil {
 		cfg.Skills.Paths = map[string]string{}
 	}
@@ -499,6 +503,17 @@ func normalizeLocale(locale string) string {
 		return "zh-CN"
 	default:
 		return domain.DefaultLocale
+	}
+}
+
+func normalizeSkillsLocale(locale string) string {
+	switch strings.TrimSpace(locale) {
+	case "zh-CN":
+		return "zh-CN"
+	case "en-US":
+		return "en-US"
+	default:
+		return defaultSkillsLocale
 	}
 }
 
@@ -538,6 +553,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 		},
 		Skills: SkillsConfig{
 			Target: "agent",
+			Locale: defaultSkillsLocale,
 			Paths: map[string]string{
 				"agent": ".skills/skills-seed-skills",
 			},
@@ -563,6 +579,15 @@ type Reader interface {
 	GetSkillsConfig() SkillsConfig
 	GetLoggingConfig() LoggingConfig
 	GetExclude() []string
+	GetToolLocale() string
+	GetSkillsLocale() string
+	GetPromptLocale(name string) string
+	GetEffectiveAgentEngine() string
+	GetEffectiveAgentCommand() string
+	GetEffectiveSkillsTarget() string
+	GetEffectiveSkillsPath() string
+	GetCurrentProjectConfig() ProjectConfig
+	GetWorkspaceProjects() []WorkspaceProjectConfig
 }
 
 // GetProjectConfig 获取项目配置
@@ -610,6 +635,61 @@ func (r *Repository) GetExclude() []string {
 	return r.config.Exclude
 }
 
+// GetToolLocale returns the locale used for CLI output and operational UI.
+func (r *Repository) GetToolLocale() string {
+	return normalizeLocale(r.config.Project.Locale)
+}
+
+// GetSkillsLocale returns the locale used for generated skills and learned
+// natural-language content that is later rendered into skills.
+func (r *Repository) GetSkillsLocale() string {
+	return normalizeSkillsLocale(r.config.Skills.Locale)
+}
+
+// GetPromptLocale returns the locale for a prompt by output destination.
+func (r *Repository) GetPromptLocale(name string) string {
+	return r.GetSkillsLocale()
+}
+
+// GetEffectiveAgentEngine returns the normalized agent engine after defaults.
+func (r *Repository) GetEffectiveAgentEngine() string {
+	return strings.TrimSpace(r.config.Agent.Engine)
+}
+
+// GetEffectiveAgentCommand returns the configured command for the effective engine.
+func (r *Repository) GetEffectiveAgentCommand() string {
+	engine := r.GetEffectiveAgentEngine()
+	if engine == "" {
+		return ""
+	}
+	if r.config.Agent.Commands != nil && strings.TrimSpace(r.config.Agent.Commands[engine]) != "" {
+		return strings.TrimSpace(r.config.Agent.Commands[engine])
+	}
+	return engine
+}
+
+// GetEffectiveSkillsTarget returns the target used for generated skills.
+func (r *Repository) GetEffectiveSkillsTarget() string {
+	return EffectiveSkillsTarget(r.config.Agent, r.config.Skills)
+}
+
+// GetEffectiveSkillsPath returns the configured output path for the effective target.
+func (r *Repository) GetEffectiveSkillsPath() string {
+	return EffectiveSkillsPath(r.GetEffectiveSkillsTarget(), r.config.Skills)
+}
+
+// GetCurrentProjectConfig returns the current project/workspace identity config.
+func (r *Repository) GetCurrentProjectConfig() ProjectConfig {
+	return r.GetProjectConfig()
+}
+
+// GetWorkspaceProjects returns the configured workspace children.
+func (r *Repository) GetWorkspaceProjects() []WorkspaceProjectConfig {
+	projects := make([]WorkspaceProjectConfig, len(r.config.Workspace.Projects))
+	copy(projects, r.config.Workspace.Projects)
+	return projects
+}
+
 // SetProjectName 设置项目名称
 func (r *Repository) SetProjectName(name string) error {
 	r.config.Project.Name = name
@@ -643,6 +723,12 @@ func (r *Repository) SetRootPath(rootPath string) error {
 // SetLocale 设置语言
 func (r *Repository) SetLocale(locale string) error {
 	r.config.Project.Locale = locale
+	return r.Update(r.config)
+}
+
+// SetSkillsLocale 设置生成 Skills 和提示词语言
+func (r *Repository) SetSkillsLocale(locale string) error {
+	r.config.Skills.Locale = locale
 	return r.Update(r.config)
 }
 

@@ -131,14 +131,14 @@ func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
 	}
 }
 
-func TestLoader_DefaultLocaleRendersChineseSkill(t *testing.T) {
+func TestLoader_DefaultLocaleRendersEnglishSkill(t *testing.T) {
 	loader := NewLoaderForAgent("codex", "")
 
 	content, err := loader.Render("project-skill", fullSkillData())
 
 	require.NoError(t, err)
-	require.Contains(t, content, "description: 修改、审查或扩展 demo go 代码时使用")
-	require.NotContains(t, content, "description: Use when")
+	require.Contains(t, content, "description: Use when modifying, reviewing, or extending demo go code")
+	require.NotContains(t, content, "description: 修改、审查或扩展")
 }
 
 func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {

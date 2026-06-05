@@ -53,6 +53,55 @@ func TestEnsureProjectPromptsUsesCommonProjectPrompt(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestEnsureProjectPromptsUsesSkillsLocaleForPersistedSkillPrompts(t *testing.T) {
+	seedPath := t.TempDir()
+
+	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+		ProjectName:  "demo",
+		Language:     "go",
+		Locale:       "zh-CN",
+		SkillsLocale: "en-US",
+	})
+	require.NoError(t, err)
+
+	skillsPrompt, err := os.ReadFile(filepath.Join(seedPath, "prompts", "instructions", "learn-batch.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(skillsPrompt), "# User Instructions")
+	require.NotContains(t, string(skillsPrompt), "# 用户补充指令")
+
+	toolPrompt, err := os.ReadFile(filepath.Join(seedPath, "prompts", "instructions", "fix-generate.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(toolPrompt), "# User Instructions")
+	require.NotContains(t, string(toolPrompt), "# 用户补充指令")
+}
+
+func TestEnsureProjectPromptsUsesSkillsLocaleForAllPromptFiles(t *testing.T) {
+	seedPath := t.TempDir()
+
+	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+		ProjectName:  "demo",
+		Language:     "go",
+		Locale:       "zh-CN",
+		SkillsLocale: "en-US",
+	})
+	require.NoError(t, err)
+
+	profile, err := os.ReadFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(profile), "# Project Profile")
+	require.NotContains(t, string(profile), "# 项目画像")
+
+	common, err := os.ReadFile(filepath.Join(seedPath, "prompts", "project", "common.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(common), "# Project-Specific Constraints")
+	require.NotContains(t, string(common), "# 项目专属约束")
+
+	fixInstructions, err := os.ReadFile(filepath.Join(seedPath, "prompts", "instructions", "fix-generate.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(fixInstructions), "# User Instructions")
+	require.NotContains(t, string(fixInstructions), "# 用户补充指令")
+}
+
 func TestEnsureProjectPromptsWritesContextProfileWithoutAnalysisCommands(t *testing.T) {
 	seedPath := t.TempDir()
 

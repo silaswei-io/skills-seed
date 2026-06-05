@@ -9,7 +9,7 @@ profile:
   mode: "project"
   # Primary language, for example go, typescript, python
   language: "go"
-  # CLI output language: zh-CN (Chinese) or en-US (English)
+  # Tool output language: zh-CN (Chinese) or en-US (English)
   locale: "en-US"
   # Git remote repository URL (auto-filled during init)
   git_remote: ""
@@ -95,11 +95,13 @@ autofix:
 
 ########################################################################
 # Skills
-# Controls the generated Skills target type and output paths
+# Controls the generated Skills target type, output paths, and content language
 ########################################################################
 skills:
   # Target Skills type; can differ from agent.engine, for example use claude to generate codex skills
   target: "claude"
+  # Generated Skills, AI prompts, and natural-language content persisted into Skills: zh-CN (Chinese) or en-US (English)
+  locale: "en-US"
   # target -> Skills output path; add new targets here
   paths:
     claude: ".claude/skills/skills-seed-skills"

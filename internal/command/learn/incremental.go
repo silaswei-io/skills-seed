@@ -13,9 +13,9 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/infra/git"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
+	"github.com/silaswei-io/skills-seed/internal/utils/filetree"
 )
 
 type incrementalFileChanges struct {
@@ -45,7 +45,7 @@ func prepareIncrementalFileChanges(ctx context.Context, tracker domain.FileAnaly
 		return nil, fmt.Errorf("file analysis tracker is nil")
 	}
 	focusRelPaths := utils.RelativePaths(scanRoot, focusAbsPaths)
-	files, err := git.NewRepository(repoRoot).GetAllFiles(ctx)
+	files, err := filetree.Walk(repoRoot, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -132,9 +132,6 @@ type GitRepository interface {
 	// GetStagedFiles 获取暂存文件
 	GetStagedFiles(ctx context.Context) ([]FileInfo, error)
 
-	// GetAllFiles 获取所有文件
-	GetAllFiles(ctx context.Context) ([]FileInfo, error)
-
 	// GetCurrentBranch 获取当前分支
 	GetCurrentBranch(ctx context.Context) (string, error)
 

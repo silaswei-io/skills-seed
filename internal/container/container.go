@@ -107,11 +107,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	cfg := configRepo.Get()
 
 	// 2. 初始化 i18n
-	locale := cfg.Project.Locale
-	if locale == "" {
-		locale = domain.DefaultLocale // 默认中文
-	}
-	if err := i18n.Init(locale); err != nil {
+	if err := i18n.Init(configRepo.GetToolLocale()); err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("ContainerI18nInitFailed"), err)
 	}
 
@@ -133,9 +129,8 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	workspaceSpecRepo := workspacestore.NewSpecRepository(seedPath)
 
 	// 5. 创建加载器
-	promptLoader := prompts.NewLoader(cfg.Agent.Engine, locale, seedPath)
-	skillsTarget := config.EffectiveSkillsTarget(cfg.Agent, cfg.Skills)
-	skillsLoader := skills.NewLoaderForAgent(skillsTarget, locale)
+	promptLoader := prompts.NewLoaderWithLocales(cfg.Agent.Engine, configRepo.GetToolLocale(), configRepo.GetSkillsLocale(), seedPath)
+	skillsLoader := skills.NewLoaderForAgent(configRepo.GetEffectiveSkillsTarget(), configRepo.GetSkillsLocale())
 
 	// 6. 创建 Agent
 	agentImpl, err := createAgent(cfg, promptLoader)

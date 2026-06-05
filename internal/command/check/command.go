@@ -13,6 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/autofix"
 	interact "github.com/silaswei-io/skills-seed/internal/utils/interactive"
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ func runCheck(cont *container.Container, opts checkOptions) error {
 		return err
 	}
 
-	ctx := context.Background()
+	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
 
 	logger.Info(i18n.Get("CheckStarting"))
 

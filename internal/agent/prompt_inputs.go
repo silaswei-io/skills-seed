@@ -67,6 +67,17 @@ func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePat
 	}, nil
 }
 
+// CheckPromptData 返回 check 场景所需的提示词数据。
+func CheckPromptData(session *PromptInputSession, req *AnalyzeRequest) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"Files":         req.Files,
+		"DiffFiles":     req.DiffFiles,
+		"Context":       req.Context,
+		"Patterns":      req.Patterns,
+		"RecentCommits": req.RecentCommits,
+	}, nil
+}
+
 // AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
 func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRequest) (map[string]interface{}, error) {
 	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", req.Structure)
@@ -126,6 +137,7 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"StructuralContextPath": structuralContextPath,
 		"MainFiles":             req.MainFiles,
 		"SampleFiles":           req.SampleFiles,
+		"DiffFiles":             req.DiffFiles,
 		"KnownPatternsPath":     knownPatternsPath,
 		"KnownPatternsCount":    req.KnownPatternsCount,
 		"FileCount":             req.FileCount,

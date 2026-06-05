@@ -22,11 +22,12 @@ import (
 )
 
 type commandOptions struct {
-	locale    string
-	mode      string
-	agent     string
-	skills    string
-	workspace bool
+	locale       string
+	skillsLocale string
+	mode         string
+	agent        string
+	skills       string
+	workspace    bool
 }
 
 // Cmd 返回 init 命令
@@ -43,13 +44,16 @@ func Cmd() *cobra.Command {
 			if !isValidLocale(opts.locale) {
 				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
 			}
+			if !isValidLocale(opts.skillsLocale) {
+				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
+			}
 
 			effectiveMode := opts.mode
 			if opts.workspace {
 				effectiveMode = domain.ModeWorkspace
 			}
 
-			if err := initializeSkillWithWorkspaceChildren(opts.locale, effectiveMode, opts.agent, opts.skills); err != nil {
+			if err := initializeSkillWithWorkspaceChildren(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills); err != nil {
 				return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 			}
 			return nil
@@ -58,6 +62,7 @@ func Cmd() *cobra.Command {
 
 	// 添加 --locale 参数
 	initCmd.Flags().StringVarP(&opts.locale, "locale", "l", "", i18n.Get("InitFlagLocale"))
+	initCmd.Flags().StringVar(&opts.skillsLocale, "skills-locale", "", i18n.Get("InitFlagSkillsLocale"))
 	initCmd.Flags().StringVar(&opts.mode, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	initCmd.Flags().StringVar(&opts.agent, "agent", "", i18n.Get("InitFlagAgent"))
 	initCmd.Flags().StringVar(&opts.skills, "skills", "", i18n.Get("InitFlagSkills"))
@@ -80,27 +85,34 @@ func ResetCmd() *cobra.Command {
 		Example: i18n.Get("ResetExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !isValidLocale(opts.locale) {
+				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
+			}
+			if !isValidLocale(opts.skillsLocale) {
+				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
+			}
 			effectiveMode := opts.mode
 			if opts.workspace {
 				effectiveMode = domain.ModeWorkspace
 			}
-			if err := resetSkill(opts.locale, effectiveMode); err != nil {
+			if err := resetSkill(opts.locale, opts.skillsLocale, effectiveMode); err != nil {
 				return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 			}
 			return nil
 		},
 	}
 	resetCmd.Flags().StringVarP(&opts.locale, "locale", "l", "", i18n.Get("InitFlagLocale"))
+	resetCmd.Flags().StringVar(&opts.skillsLocale, "skills-locale", "", i18n.Get("InitFlagSkillsLocale"))
 	resetCmd.Flags().StringVar(&opts.mode, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	resetCmd.Flags().BoolVar(&opts.workspace, "workspace", false, i18n.Get("InitFlagWorkspace"))
 	return resetCmd
 }
 
 func initializeSkill(locale, mode string) error {
-	return initializeSkillWithWorkspaceChildren(locale, mode, "", "")
+	return initializeSkillWithWorkspaceChildren(locale, "", mode, "", "")
 }
 
-func initializeSkillWithWorkspaceChildren(locale, mode, agentEngine, skillsTarget string) error {
+func initializeSkillWithWorkspaceChildren(locale, skillsLocale, mode, agentEngine, skillsTarget string) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -110,6 +122,7 @@ func initializeSkillWithWorkspaceChildren(locale, mode, agentEngine, skillsTarge
 		showUserSummary: true,
 		agentEngine:     agentEngine,
 		skillsTarget:    skillsTarget,
+		skillsLocale:    skillsLocale,
 	})
 }
 
@@ -119,6 +132,7 @@ type initializeSkillOptions struct {
 	language        string
 	agentEngine     string
 	skillsTarget    string
+	skillsLocale    string
 }
 
 func initializeSkillAt(projectRoot, locale, mode string) error {
@@ -182,7 +196,7 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 
 	// 如果指定了 locale 但配置还未初始化，确保 i18n 使用正确的语言
 	if locale != "" {
-		configLocale := configRepo.Get().Project.Locale
+		configLocale := configRepo.GetToolLocale()
 		if configLocale != locale {
 			// 更新配置中的 locale
 			if err := configRepo.SetLocale(locale); err != nil {
@@ -195,10 +209,7 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		}
 	} else {
 		// 从配置中读取 locale 并初始化 i18n
-		configLocale := configRepo.Get().Project.Locale
-		if configLocale == "" {
-			configLocale = domain.DefaultLocale
-		}
+		configLocale := configRepo.GetToolLocale()
 		if err := i18n.Init(configLocale); err != nil {
 			return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
 		}
@@ -280,6 +291,11 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 			return err
 		}
 	}
+	if opts.skillsLocale != "" {
+		if err := configRepo.SetSkillsLocale(opts.skillsLocale); err != nil {
+			return err
+		}
+	}
 
 	projectLanguage := configRepo.Get().Project.Language
 	if projectLanguage == "" {
@@ -291,12 +307,13 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	mainFiles := analyzerSvc.FindMainFiles(projectRoot)
 
 	promptData := prompts.ProjectPromptData{
-		ProjectName: projectName,
-		Language:    projectLanguage,
-		ProjectRoot: projectRoot,
-		Structure:   structure,
-		MainFiles:   mainFiles,
-		Locale:      configRepo.Get().Project.Locale,
+		ProjectName:  projectName,
+		Language:     projectLanguage,
+		ProjectRoot:  projectRoot,
+		Structure:    structure,
+		MainFiles:    mainFiles,
+		Locale:       configRepo.GetToolLocale(),
+		SkillsLocale: configRepo.GetSkillsLocale(),
 	}
 	if err := prompts.EnsureProjectPrompts(seedPath, promptData); err != nil {
 		logger.Error(i18n.Get("InitCreateProjectPromptsFailed"), "error", err)
@@ -402,10 +419,7 @@ func versionedReadmeURL() string {
 func initializeWorkspaceChildrenWithRepo(workspaceRoot, locale string, rootConfigRepo *config.Repository) error {
 	configLocale := locale
 	if configLocale == "" {
-		configLocale = rootConfigRepo.GetProjectConfig().Locale
-	}
-	if configLocale == "" {
-		configLocale = domain.DefaultLocale
+		configLocale = rootConfigRepo.GetToolLocale()
 	}
 	if err := i18n.Init(configLocale); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
@@ -454,6 +468,7 @@ func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspacePr
 		showUserSummary: false,
 		language:        project.Language,
 		agentEngine:     rootConfigRepo.GetAgentConfig().Engine,
+		skillsLocale:    rootConfigRepo.GetSkillsLocale(),
 	}); err != nil {
 		return err
 	}
@@ -485,7 +500,7 @@ func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSe
 		return err
 	}
 
-	childConfigRepo, err := config.NewRepository(childSeedPath, rootConfigRepo.GetProjectConfig().Locale)
+	childConfigRepo, err := config.NewRepository(childSeedPath, rootConfigRepo.GetToolLocale())
 	if err != nil {
 		return err
 	}
@@ -505,7 +520,7 @@ func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSe
 	return nil
 }
 
-func resetSkill(locale, mode string) error {
+func resetSkill(locale, skillsLocale, mode string) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -522,7 +537,11 @@ func resetSkill(locale, mode string) error {
 			return fmt.Errorf("%s: %w", i18n.Get("ResetBackupFailed"), err)
 		}
 	}
-	return initializeSkillAt(projectRoot, locale, mode)
+	return initializeSkillWithOptions(projectRoot, locale, mode, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+		skillsLocale:    skillsLocale,
+	})
 }
 
 func normalizeInitMode(mode string) string {
@@ -552,6 +571,7 @@ func ensureWorkspacePromptFiles(seedPath, projectRoot, projectName string, confi
 		WorkspaceName: projectName,
 		WorkspaceRoot: projectRoot,
 		Projects:      projects,
-		Locale:        configRepo.GetProjectConfig().Locale,
+		Locale:        configRepo.GetToolLocale(),
+		SkillsLocale:  configRepo.GetSkillsLocale(),
 	})
 }

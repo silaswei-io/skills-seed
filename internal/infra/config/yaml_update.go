@@ -72,6 +72,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLString(doc, []string{"autofix", "backup_path"}, cfg.AutoFix.BackupPath)
 
 	setYAMLString(doc, []string{"skills", "target"}, cfg.Skills.Target)
+	setYAMLString(doc, []string{"skills", "locale"}, cfg.Skills.Locale)
 	setYAMLStringMap(doc, []string{"skills", "paths"}, cfg.Skills.Paths)
 
 	setYAMLString(doc, []string{"logging", "level"}, cfg.Logging.Level)

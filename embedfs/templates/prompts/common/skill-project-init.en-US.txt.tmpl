@@ -59,6 +59,16 @@ The following are representative code file paths selected from the project. You 
 - {{.Path}}
 {{- end}}
 {{- end}}
+{{- if .DiffFiles}}
+
+# Changed File Diffs ({{len .DiffFiles}})
+
+The following files changed since the previous analysis. Each diff is available at the listed path. Read the diff first, and read the original file only when a rule decision needs broader context.
+
+{{range .DiffFiles}}
+- {{.Path}} -> diff: {{.DiffPath}}
+{{- end}}
+{{- end}}
 {{- if .KnownPatternsPath}}
 
 # Existing Patterns ({{.KnownPatternsCount}})

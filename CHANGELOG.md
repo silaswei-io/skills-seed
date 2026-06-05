@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.6.3]
+
+### 功能
+
+- 新增 `--skills-locale` 参数，将工具输出/配置模板语言与生成 Skills、提示词语言分离。
+
+### 变更
+
+- 配置新增 `skills.locale`，默认生成英文 Skills；`profile.locale` 继续控制 CLI 输出和配置模板语言。
+- Agent prompt、项目 prompt、Skills 模板和 workspace 生成流程统一读取 Skills 语言配置，减少工具界面语言对沉淀内容语言的影响。
+
+### 文档
+
+- 更新命令参考和配置参考，说明 `--locale` 与 `--skills-locale` 的职责差异。
+
 ## [v0.6.2]
 
 ### 修复

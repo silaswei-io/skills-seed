@@ -68,6 +68,33 @@ func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
 	require.NotContains(t, prompt, "You are a professional code quality review expert")
 }
 
+func TestLoader_RendersSkillsPromptsWithSkillsLocale(t *testing.T) {
+	loader := NewLoaderWithLocales("common", "zh-CN", "en-US", "")
+
+	skillsPrompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
+	require.NoError(t, err)
+	require.Contains(t, skillsPrompt, "You are a code pattern analysis expert")
+	require.NotContains(t, skillsPrompt, "你是一位代码模式分析专家")
+
+	toolPrompt, err := loader.Render("fix-generate", sampleGenerateFixesRequest())
+	require.NoError(t, err)
+	require.Contains(t, toolPrompt, "You are a professional code fix expert")
+	require.NotContains(t, toolPrompt, "你是一位专业的代码修复专家")
+}
+
+func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "skill-project-summary.md"), []byte("USER SUMMARY INSTRUCTIONS"), 0644))
+
+	loader := NewLoaderWithLocales("common", "zh-CN", "en-US", seedPath)
+	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "Do not return Markdown, comments, explanations, or code fences")
+	require.NotContains(t, prompt, "不要使用 markdown 代码块包裹 JSON")
+}
+
 func TestLoader_RenderMergesProjectWorkspaceAndUserInstructions(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "project"), 0755))
@@ -139,6 +166,39 @@ func TestRenderAnalyzeListsFilePathsWithoutEmbeddedContent(t *testing.T) {
 	require.NotContains(t, prompt, "secretAnalyzeContent")
 	require.NotContains(t, prompt, "secretGoodExample")
 	require.NotContains(t, prompt, "secretBadExample")
+}
+
+func TestRenderAnalyzeListsDiffFilePaths(t *testing.T) {
+	loader := NewLoader("codex", "zh-CN", "")
+	req := sampleAnalyzeRequest()
+	req.Files = []domain.FileInfo{domain.NewFileInfo("new.go", "package main\n")}
+	req.DiffFiles = []agent.DiffFileRef{{
+		Path:     "changed.go",
+		DiffPath: "/tmp/skills-seed/runtime/diffs/changed.go.diff",
+	}}
+
+	prompt, err := loader.Render("learn-analyze", req)
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "变更文件 Diff (1 个)")
+	require.Contains(t, prompt, "changed.go")
+	require.Contains(t, prompt, "/tmp/skills-seed/runtime/diffs/changed.go.diff")
+}
+
+func TestRenderInitSkillsListsDiffFilePaths(t *testing.T) {
+	loader := NewLoader("codex", "zh-CN", "")
+	req := sampleAnalyzeCurrentCodebaseRequest()
+	req.DiffFiles = []agent.DiffFileRef{{
+		Path:     "internal/service.go",
+		DiffPath: "/tmp/skills-seed/runtime/diffs/internal/service.go.diff",
+	}}
+
+	prompt, err := loader.Render("skill-project-init", req)
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "变更文件 Diff (1 个)")
+	require.Contains(t, prompt, "internal/service.go")
+	require.Contains(t, prompt, "/tmp/skills-seed/runtime/diffs/internal/service.go.diff")
 }
 
 func TestRenderGenerateFixesListsFilePathsWithoutEmbeddedContent(t *testing.T) {
