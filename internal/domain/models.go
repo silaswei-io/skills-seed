@@ -7,7 +7,7 @@
 //   - CommitInfo: Git 提交信息
 //   - FileInfo: 文件信息
 //
-// 遵循领域驱动设计（DDD）原则，所有领域对象都是不可变的（通过方法修改）
+// 领域对象以稳定数据结构和基础行为为主，应用层策略和默认值不放在这里
 package domain
 
 import (
@@ -15,9 +15,6 @@ import (
 	"strings"
 	"time"
 )
-
-// DefaultLocale 默认语言设置
-const DefaultLocale = "zh-CN"
 
 const (
 	// ModeProject 表示把初始化根目录作为单个项目处理

@@ -12,6 +12,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
@@ -34,7 +35,7 @@ func NewLoader(agentName, locale, seedPath string) *Loader {
 // NewLoaderWithLocales 创建可按提示词用途选择语言的提示词模板加载器。
 func NewLoaderWithLocales(agentName, locale, skillsLocale, seedPath string) *Loader {
 	if locale == "" {
-		locale = "zh-CN"
+		locale = config.DefaultToolLocale
 	}
 	if skillsLocale == "" {
 		skillsLocale = locale

@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 )
 
 const (
 	// ProgramVersion 是 `skills-seed --version` 展示的 CLI 版本
-	ProgramVersion = "v0.6.3"
+	ProgramVersion = "v0.6.4"
 
 	UnavailableHash = "unavailable"
 
@@ -86,11 +88,7 @@ func SkillsTemplatePath(provider, relativeName, locale, ext string) string {
 }
 
 func templateLocaleSuffix(locale string) string {
-	locale = strings.TrimSpace(locale)
-	if locale == "" || strings.EqualFold(locale, "zh-CN") {
-		return ""
-	}
-	return locale
+	return config.TemplateLocaleSuffix(locale)
 }
 
 // SkillsAgentMetadataDir 返回 Agent 元数据模板目录

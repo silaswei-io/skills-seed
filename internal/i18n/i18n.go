@@ -13,8 +13,12 @@ import (
 //go:embed locales/*.toml
 var localeFS embed.FS
 
-// defaultLocale 默认语言设置
-const defaultLocale = "zh-CN"
+const (
+	LocaleChinese = "zh-CN"
+	LocaleEnglish = "en-US"
+
+	DefaultLocale = LocaleChinese
+)
 
 var (
 	bundle    *i18n.Bundle
@@ -42,7 +46,7 @@ func Init(lang string) error {
 
 	// 创建 localizer
 	if lang == "" {
-		lang = defaultLocale
+		lang = DefaultLocale
 	}
 	localizer = i18n.NewLocalizer(bundle, lang)
 
@@ -56,7 +60,7 @@ func Get(key string) string {
 	mu.RUnlock()
 
 	if loc == nil {
-		if err := Init(defaultLocale); err != nil {
+		if err := Init(DefaultLocale); err != nil {
 			// 初始化失败，创建一个空的 localizer 作为 fallback
 			bun := i18n.NewBundle(language.English)
 			loc = i18n.NewLocalizer(bun, "en")
@@ -83,7 +87,7 @@ func GetWithParams(key string, params map[string]interface{}) string {
 	mu.RUnlock()
 
 	if loc == nil {
-		if err := Init(defaultLocale); err != nil {
+		if err := Init(DefaultLocale); err != nil {
 			// 初始化失败，创建一个空的 localizer 作为 fallback
 			bun := i18n.NewBundle(language.English)
 			loc = i18n.NewLocalizer(bun, "en")

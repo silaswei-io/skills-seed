@@ -21,8 +21,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/command/view"
 	workspacecmd "github.com/silaswei-io/skills-seed/internal/command/workspace"
 	"github.com/silaswei-io/skills-seed/internal/container"
-	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/utils"
@@ -69,7 +69,7 @@ func initI18n(seedPath string, hasSeedDir bool) error {
 }
 
 func getLocale(seedPath string, hasSeedDir bool) string {
-	locale := domain.DefaultLocale
+	locale := config.DefaultToolLocale
 	if !hasSeedDir {
 		return locale
 	}

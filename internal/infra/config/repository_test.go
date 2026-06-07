@@ -644,7 +644,7 @@ func TestRepository_GetSkillsConfig(t *testing.T) {
 	assert.NotEmpty(t, skillsCfg.Paths)
 }
 
-func TestDefaultSkillsPathForTarget(t *testing.T) {
+func TestRepositoryDefaultSkillsPathForTargetCompatibility(t *testing.T) {
 	assert.Equal(t, ".claude/skills/skills-seed-skills", DefaultSkillsPathForTarget("claude"))
 	assert.Equal(t, ".agents/skills/skills-seed-skills", DefaultSkillsPathForTarget("codex"))
 	assert.Equal(t, ".skills/skills-seed-skills", DefaultSkillsPathForTarget("custom"))

@@ -19,6 +19,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
+	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +29,7 @@ type generateOptions struct {
 	outputPath    string
 	outputChanged bool
 	merge         bool
+	noReferences bool
 }
 
 // Cmd 返回 generate 命令
@@ -70,6 +72,7 @@ func skillsCmd(cont *container.Container) *cobra.Command {
 	opts.outputPath = defaultOutputPath
 	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
 	cmd.Flags().BoolVarP(&opts.merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
+	cmd.Flags().BoolVar(&opts.noReferences, "no-references", false, i18n.Get("GenerateFlagNoReferences"))
 
 	return cmd
 }
@@ -149,7 +152,7 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	if isWorkspaceMode {
 		childProgress := progress.NewMulti(commandutil.WorkspaceProjectProgressNames(cont.ConfigRepo.GetWorkspaceConfig().Projects))
 		childProgress.SetLabel(i18n.Get("ProgressGenerateWorkspaceProjects"))
-		childProgress.SetTaskTotal(generator.GenerateProjectStepTotal)
+		childProgress.SetTaskTotal(ws.GenerateProjectStepTotal)
 		if err := generateWorkspaceChildSkills(ctx, cont, childProgress); err != nil {
 			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 			return err
@@ -160,7 +163,7 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		rootCtx := retryProgress.WithContext(ctx)
 		if err := rootTracker.RunStep(rootLabel, func() error {
 			retryProgress.StartStep(rootLabel)
-			callErr := cont.GeneratorSvc.GenerateSkills(rootCtx, effectiveOutputPath)
+			callErr := cont.WorkspaceGeneratorSvc.GenerateWorkspaceSkills(rootCtx)
 			retryProgress.FinishStep(rootLabel, callErr == nil)
 			return callErr
 		}); err != nil {
@@ -173,7 +176,7 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		generateCtx := retryProgress.WithContext(ctx)
 		if err := tracker.RunStep(generateLabel, func() error {
 			retryProgress.StartStep(generateLabel)
-			callErr := cont.GeneratorSvc.GenerateSkills(generateCtx, effectiveOutputPath)
+			callErr := cont.GeneratorSvc.GenerateSkillsWithHooks(generateCtx, effectiveOutputPath, generator.GenerateProgressHooks{}, generator.GenerateOptions{SkipReferences: opts.noReferences})
 			retryProgress.FinishStep(generateLabel, callErr == nil)
 			return callErr
 		}); err != nil {
@@ -271,7 +274,7 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 			OnStepStart:    startStep,
 			OnStepUpdate:   updateStep,
 			OnStepComplete: completeStep,
-		}); err != nil {
+		}, generator.GenerateOptions{}); err != nil {
 			var manualErr *generator.ManualSkillExistsError
 			if errors.As(err, &manualErr) {
 				logger.Warn(i18n.GetWithParams("GenerateWorkspaceChildManualSkillSkipped", map[string]interface{}{

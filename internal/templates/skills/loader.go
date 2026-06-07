@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 )
 
@@ -49,7 +50,7 @@ func NewLoaderForAgent(agentName, locale string) *Loader {
 		agentName = metadata.CommonTemplateProvider
 	}
 	if locale == "" {
-		locale = "en-US"
+		locale = config.DefaultSkillsLocale
 	}
 	return &Loader{
 		agentName: strings.ToLower(agentName),

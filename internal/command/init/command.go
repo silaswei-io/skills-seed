@@ -72,7 +72,7 @@ func Cmd() *cobra.Command {
 }
 
 func isValidLocale(locale string) bool {
-	return locale == "" || locale == "zh-CN" || locale == "en-US"
+	return config.IsSupportedLocale(locale)
 }
 
 // ResetCmd 返回 reset 命令

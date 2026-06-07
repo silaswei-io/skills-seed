@@ -302,6 +302,12 @@ other = "Failed to write config"
 [ConfigMarshalFailed]
 other = "Failed to marshal config"
 
+[ConfigYAMLRootNotMapping]
+other = "Config YAML root is not a mapping"
+
+[GenerateOutputPathOutsideProjectRoot]
+other = "Skills output path {{.OutputPath}} is outside project root {{.ProjectRoot}}"
+
 [GitLogFailed]
 other = "Failed to read Git commit history"
 
@@ -906,6 +912,9 @@ other = "Skills output directory (defaults to skills.paths for the current skill
 # 生成合并
 [GenerateFlagMerge]
 other = "Merge similar patterns before generating (deprecated; use patterns merge)"
+
+[GenerateFlagNoReferences]
+other = "Skip generating reference documents (references/ directory)"
 
 [GenerateFlagContext]
 other = "Additional guidance for this generate run, passed to the AI agent as extra constraints"

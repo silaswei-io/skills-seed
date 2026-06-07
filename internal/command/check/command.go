@@ -15,7 +15,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/autofix"
-	interact "github.com/silaswei-io/skills-seed/internal/utils/interactive"
 	"github.com/spf13/cobra"
 )
 
@@ -119,17 +118,17 @@ func runCheck(cont *container.Container, opts checkOptions) error {
 // handleIssuesInteractively 交互式处理问题
 func handleIssuesInteractively(cont *container.Container, issues []domain.Issue, ctx context.Context) error {
 	// 第一阶段：选择主要操作
-	action, err := interact.SelectAction(len(issues))
+	action, err := SelectAction(len(issues))
 	if err != nil {
 		logger.Error(i18n.GetWithParams("LoggerCheckSelectorError", map[string]interface{}{"Error": err.Error()}))
 		return err
 	}
 
 	switch action {
-	case interact.ActionAutoFix:
+	case ActionAutoFix:
 		// 第二阶段：选择修复策略
 		defaultStrategy := cont.ConfigRepo.GetAutoFixConfig().Strategy
-		strategy, err := interact.SelectStrategy(defaultStrategy)
+		strategy, err := SelectStrategy(defaultStrategy)
 		if err != nil {
 			logger.Error(i18n.GetWithParams("LoggerCheckStrategyError", map[string]interface{}{"Error": err.Error()}))
 			return err
@@ -143,11 +142,11 @@ func handleIssuesInteractively(cont *container.Container, issues []domain.Issue,
 
 		return nil
 
-	case interact.ActionManualFix:
+	case ActionManualFix:
 		logger.Info(i18n.Get("InteractiveManualFixHint"))
 		return fmt.Errorf("%s", i18n.Get("ErrManualFixRequired"))
 
-	case interact.ActionLearnAndCommit:
+	case ActionLearnAndCommit:
 		logger.Info(i18n.Get("InteractiveLearning"))
 
 		// 从暂存区学习

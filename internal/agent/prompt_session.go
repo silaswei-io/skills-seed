@@ -1,4 +1,4 @@
-package promptfiles
+package agent
 
 import (
 	"os"
@@ -6,25 +6,24 @@ import (
 	"strings"
 )
 
-// Session 管理单次 Agent 调用的临时提示词输入文件。
-type Session struct {
+// PromptInputSession 管理单次 Agent 调用的临时提示词输入文件。
+type PromptInputSession struct {
 	dir string
 }
 
-// New 创建用于保存提示词输入文件的临时目录。
-func New(prefix string) (*Session, error) {
+// NewPromptInputSession 创建临时提示词输入文件会话。
+func NewPromptInputSession(prefix string) (*PromptInputSession, error) {
 	dir, err := os.MkdirTemp("", strings.TrimSpace(prefix)+"-*")
 	if err != nil {
 		return nil, err
 	}
-	return &Session{dir: dir}, nil
+	return &PromptInputSession{dir: dir}, nil
 }
 
-// NewIn 在 baseDir 下创建用于保存提示词输入文件的临时目录。
-func NewIn(baseDir, prefix string) (*Session, error) {
+func newPromptInputSessionIn(baseDir, prefix string) (*PromptInputSession, error) {
 	baseDir = strings.TrimSpace(baseDir)
 	if baseDir == "" {
-		return New(prefix)
+		return NewPromptInputSession(prefix)
 	}
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, err
@@ -33,11 +32,11 @@ func NewIn(baseDir, prefix string) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Session{dir: dir}, nil
+	return &PromptInputSession{dir: dir}, nil
 }
 
 // Cleanup 删除所有临时提示词输入文件。
-func (s *Session) Cleanup() {
+func (s *PromptInputSession) Cleanup() {
 	if s == nil || s.dir == "" {
 		return
 	}
@@ -45,7 +44,7 @@ func (s *Session) Cleanup() {
 }
 
 // Write 将非空内容写入会话目录并返回文件路径。
-func (s *Session) Write(name, content string) (string, error) {
+func (s *PromptInputSession) Write(name, content string) (string, error) {
 	if s == nil || s.dir == "" || strings.TrimSpace(content) == "" {
 		return "", nil
 	}
@@ -58,7 +57,7 @@ func (s *Session) Write(name, content string) (string, error) {
 }
 
 // UsePathOrWrite 优先返回已有路径；没有路径时写入内容并返回临时文件路径。
-func (s *Session) UsePathOrWrite(existingPath, name, content string) (string, error) {
+func (s *PromptInputSession) UsePathOrWrite(existingPath, name, content string) (string, error) {
 	if strings.TrimSpace(existingPath) != "" {
 		return existingPath, nil
 	}

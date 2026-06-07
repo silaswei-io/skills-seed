@@ -15,7 +15,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/fingerprint"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
@@ -793,7 +792,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		return err
 	}
 	userContext := runtimecontext.UserContext(ctx)
-	decision, err := fingerprint.Prepare(ctx, cont.FileTracker, workspaceRelationshipFingerprintScope(), "workspace-relationships.json", workspaceRelationshipFingerprintInput{
+	decision, err := domain.PrepareInputFingerprint(ctx, cont.FileTracker, workspaceRelationshipFingerprintScope(), "workspace-relationships.json", workspaceRelationshipFingerprintInput{
 		Kind:                "workspace_relationship_learning",
 		ProgramVersion:      metadata.ProgramVersion,
 		PromptTemplatesHash: metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS)),

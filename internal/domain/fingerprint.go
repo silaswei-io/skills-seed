@@ -1,4 +1,4 @@
-package fingerprint
+package domain
 
 import (
 	"context"
@@ -7,18 +7,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-const SourceInputDigest = "input_digest"
+const FileAnalysisSourceInputDigest = "input_digest"
 
-type Decision struct {
-	record domain.FileAnalysisRecord
+type InputFingerprintDecision struct {
+	record FileAnalysisRecord
 	skip   bool
 }
 
-func Prepare(ctx context.Context, tracker domain.FileAnalysisTracker, scope domain.FileAnalysisScope, path string, input any) (*Decision, error) {
+func PrepareInputFingerprint(ctx context.Context, tracker FileAnalysisTracker, scope FileAnalysisScope, path string, input any) (*InputFingerprintDecision, error) {
 	if tracker == nil {
 		return nil, nil
 	}
@@ -29,34 +27,34 @@ func Prepare(ctx context.Context, tracker domain.FileAnalysisTracker, scope doma
 	sum := md5.Sum(payload)
 	hash := hex.EncodeToString(sum[:])
 	now := time.Now().Format(time.RFC3339)
-	record := domain.FileAnalysisRecord{
+	record := FileAnalysisRecord{
 		ProjectID:      scope.ProjectID,
 		ScopePath:      scope.ScopePath,
 		Path:           path,
 		Hash:           hash,
-		HashAlgorithm:  domain.FileAnalysisHashMD5,
+		HashAlgorithm:  FileAnalysisHashMD5,
 		Size:           int64(len(payload)),
 		ModTime:        now,
-		Source:         SourceInputDigest,
+		Source:         FileAnalysisSourceInputDigest,
 		LastAnalyzedAt: now,
 	}
 	previous, err := tracker.GetAnalyzedFile(ctx, scope, path)
 	if err != nil {
 		return nil, err
 	}
-	return &Decision{
+	return &InputFingerprintDecision{
 		record: record,
-		skip:   previous != nil && previous.Hash == hash && previous.HashAlgorithm == domain.FileAnalysisHashMD5,
+		skip:   previous != nil && previous.Hash == hash && previous.HashAlgorithm == FileAnalysisHashMD5,
 	}, nil
 }
 
-func (d *Decision) ShouldSkip() bool {
+func (d *InputFingerprintDecision) ShouldSkip() bool {
 	return d != nil && d.skip
 }
 
-func (d *Decision) Commit(ctx context.Context, tracker domain.FileAnalysisTracker) error {
+func (d *InputFingerprintDecision) Commit(ctx context.Context, tracker FileAnalysisTracker) error {
 	if d == nil || tracker == nil {
 		return nil
 	}
-	return tracker.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{d.record})
+	return tracker.SaveAnalyzedFiles(ctx, []FileAnalysisRecord{d.record})
 }

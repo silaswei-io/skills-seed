@@ -9,6 +9,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 )
 
@@ -206,7 +207,7 @@ func renderProjectTemplate(name, locale string, data ProjectPromptData) (string,
 
 func readProjectTemplate(name, locale string) ([]byte, error) {
 	if locale == "" {
-		locale = "zh-CN"
+		locale = config.DefaultToolLocale
 	}
 
 	localizedPath := metadata.ProjectPromptTemplatePath(name, locale)
@@ -239,7 +240,7 @@ func renderWorkspaceTemplate(name, locale string, data WorkspacePromptData) (str
 
 func readWorkspaceTemplate(name, locale string) ([]byte, error) {
 	if locale == "" {
-		locale = "zh-CN"
+		locale = config.DefaultToolLocale
 	}
 
 	localizedPath := metadata.WorkspacePromptTemplatePath(name, locale)

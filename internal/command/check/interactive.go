@@ -1,4 +1,4 @@
-package interactive
+package check
 
 import (
 	"fmt"

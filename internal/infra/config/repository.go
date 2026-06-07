@@ -83,41 +83,6 @@ func defaultCodeGraphConfig() CodeGraphConfig {
 	}
 }
 
-func DefaultExcludePatterns() []string {
-	return []string{
-		".*",
-		"vendor/**",
-		"node_modules/**",
-		"dist/**",
-		"build/**",
-		"out/**",
-		"target/**",
-		"coverage/**",
-		".cache/**",
-		"tmp/**",
-		"temp/**",
-		"*.log",
-		"*.tmp",
-		"*.bak",
-		"*.swp",
-		"*.zip",
-		"*.tar",
-		"*.tar.gz",
-		"*.tgz",
-		"*.rar",
-		"*.7z",
-		"*.png",
-		"*.jpg",
-		"*.jpeg",
-		"*.gif",
-		"*.webp",
-		"*.ico",
-		"*.pdf",
-		"*.mp4",
-		"*.mov",
-	}
-}
-
 // UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
 func (c *CodeGraphConfig) UnmarshalYAML(value *yaml.Node) error {
 	type rawCodeGraphConfig CodeGraphConfig
@@ -217,8 +182,6 @@ type SkillsConfig struct {
 	Paths  map[string]string `yaml:"paths"`  // target -> Skills 输出路径
 }
 
-const defaultSkillsLocale = "en-US"
-
 func EffectiveSkillsTarget(agent AgentConfig, skills SkillsConfig) string {
 	if strings.TrimSpace(skills.Target) != "" {
 		return strings.TrimSpace(skills.Target)
@@ -232,17 +195,6 @@ func EffectiveSkillsPath(target string, skills SkillsConfig) string {
 		return skills.Paths[target]
 	}
 	return ""
-}
-
-func DefaultSkillsPathForTarget(target string) string {
-	switch target {
-	case "claude":
-		return ".claude/skills/skills-seed-skills"
-	case "codex":
-		return ".agents/skills/skills-seed-skills"
-	default:
-		return ".skills/skills-seed-skills"
-	}
 }
 
 // Repository 配置仓储
@@ -362,13 +314,13 @@ func (r *Repository) loadConfigYAMLNode(cfg *Config) (*yaml.Node, error) {
 		return nil, err
 	}
 	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("config yaml root is not a mapping")
+		return nil, fmt.Errorf("%s", i18n.Get("ConfigYAMLRootNotMapping"))
 	}
 	return &root, nil
 }
 
 func (r *Repository) defaultConfigTemplate(cfg *Config) ([]byte, error) {
-	locale := domain.DefaultLocale
+	locale := DefaultToolLocale
 	if cfg != nil && cfg.Project.Locale != "" {
 		locale = cfg.Project.Locale
 	} else if r.config != nil && r.config.Project.Locale != "" {
@@ -379,8 +331,8 @@ func (r *Repository) defaultConfigTemplate(cfg *Config) ([]byte, error) {
 	if err == nil {
 		return templateData, nil
 	}
-	if locale != domain.DefaultLocale {
-		return embedfs.FS.ReadFile("templates/config/config.yaml.zh-CN.tmpl")
+	if locale != DefaultToolLocale {
+		return embedfs.FS.ReadFile("templates/config/config.yaml." + DefaultToolLocale + ".tmpl")
 	}
 	return nil, err
 }
@@ -408,8 +360,8 @@ func (r *Repository) defaultConfig(locale string) *Config {
 	templateData, err := embedfs.FS.ReadFile(templateName)
 	if err != nil {
 		// 如果指定语言的模板不存在，使用中文模板
-		if locale != domain.DefaultLocale {
-			templateData, err = embedfs.FS.ReadFile("templates/config/config.yaml.zh-CN.tmpl")
+		if locale != DefaultToolLocale {
+			templateData, err = embedfs.FS.ReadFile("templates/config/config.yaml." + DefaultToolLocale + ".tmpl")
 			if err != nil {
 				// 如果中文模板也失败，使用最小后备配置
 				return r.fallbackDefaultConfig(locale)
@@ -496,31 +448,17 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 }
 
 func normalizeLocale(locale string) string {
-	switch strings.TrimSpace(locale) {
-	case "en-US":
-		return "en-US"
-	case "zh-CN":
-		return "zh-CN"
-	default:
-		return domain.DefaultLocale
-	}
+	return NormalizeToolLocale(locale)
 }
 
 func normalizeSkillsLocale(locale string) string {
-	switch strings.TrimSpace(locale) {
-	case "zh-CN":
-		return "zh-CN"
-	case "en-US":
-		return "en-US"
-	default:
-		return defaultSkillsLocale
-	}
+	return NormalizeSkillsLocale(locale)
 }
 
 // fallbackDefaultConfig 是模板不可用时的最小后备配置
 func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 	if locale == "" {
-		locale = domain.DefaultLocale
+		locale = DefaultToolLocale
 	}
 
 	return &Config{
@@ -553,9 +491,9 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 		},
 		Skills: SkillsConfig{
 			Target: "agent",
-			Locale: defaultSkillsLocale,
+			Locale: DefaultSkillsLocale,
 			Paths: map[string]string{
-				"agent": ".skills/skills-seed-skills",
+				"agent": DefaultSkillsPathForTarget("agent"),
 			},
 		},
 		Workspace: WorkspaceConfig{},

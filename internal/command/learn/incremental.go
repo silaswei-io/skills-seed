@@ -143,20 +143,11 @@ func commitIncrementalFileChanges(ctx context.Context, tracker domain.FileAnalys
 }
 
 func configuredLearnExcludes(configRepo config.Reader, projectRoot string) []string {
-	excludePatterns := defaultLearnExcludePatterns()
+	configExcludes := []string{}
 	if configRepo != nil {
-		excludePatterns = append(excludePatterns, configRepo.GetExclude()...)
+		configExcludes = configRepo.GetExclude()
 	}
-	for _, dir := range generatedSkillExcludeDirs(configRepo, projectRoot) {
-		if dir != "" {
-			excludePatterns = append(excludePatterns, filepath.ToSlash(dir)+"/**")
-		}
-	}
-	return excludePatterns
-}
-
-func defaultLearnExcludePatterns() []string {
-	return []string{".git/**", ".skills-seed/**", ".claude/**", ".agents/**"}
+	return config.LearnExcludePatterns(configExcludes, generatedSkillExcludeDirs(configRepo, projectRoot))
 }
 
 func generatedSkillExcludeDirs(configRepo config.Reader, projectRoot string) []string {

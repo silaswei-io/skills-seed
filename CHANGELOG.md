@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.6.4]
+
+### 功能
+
+- 新增 `generate skills --no-references` 标志，跳过参考文档（`references/` 目录）生成；SKILL.md 和 Agent 元数据始终生成。
+
+### 变更
+
+- Generator 重构为纯编排层，非职责代码归还各层：
+  - 提取 `SkillWriter`（`writer.go`）封装所有模板渲染与文件写入逻辑。
+  - 纯函数移入 domain 层：`CleanProjectProfile`、`RankPatternsForGeneration`、`NewProjectSpecFromProfile` 等。
+  - Workspace 生成流水线拆为独立子包 `internal/service/workspace/`，与单项目生成彻底解耦。
+- `GeneratorService` 依赖从 10 个降至 5 个（`patternRepo`、`profileRepo`、`agent`、`configRepo`、`writer`）。
+
 ## [v0.6.3]
 
 ### 功能

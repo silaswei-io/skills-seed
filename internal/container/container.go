@@ -24,6 +24,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/learner"
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
+	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -46,6 +47,7 @@ type Container struct {
 	LearnerSvc           *learner.LearnerService
 	CheckerSvc           *checker.CheckerService
 	GeneratorSvc         *generator.GeneratorService
+	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
 	MergerSvc            *merger.MergerService
 	PromptLoader         *prompts.Loader
 	SkillsLoader         *skills.Loader
@@ -145,8 +147,8 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	learnerSvc := learner.NewLearnerService(agentImpl, gitRepo, patternRepo, patternRepo, mergerSvc)
 
 	checkerSvc := checker.NewCheckerService(agentImpl, gitRepo, patternRepo, configRepo)
-	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo).
-		WithWorkspaceRepositories(workspaceProfileRepo, workspaceSpecRepo)
+	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo)
+	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo, workspaceProfileRepo, workspaceSpecRepo)
 
 	return &Container{
 		SeedPath:             seedPath,
@@ -166,6 +168,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		LearnerSvc:           learnerSvc,
 		CheckerSvc:           checkerSvc,
 		GeneratorSvc:         generatorSvc,
+		WorkspaceGeneratorSvc: workspaceGeneratorSvc,
 		MergerSvc:            mergerSvc,
 		PromptLoader:         promptLoader,
 		SkillsLoader:         skillsLoader,

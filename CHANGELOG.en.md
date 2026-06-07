@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.6.4]
+
+### Features
+
+- Added `generate skills --no-references` flag to skip reference document generation (`references/` directory); SKILL.md and Agent metadata are always generated.
+
+### Changes
+
+- Refactored Generator into a pure orchestration layer:
+  - Extracted `SkillWriter` (`writer.go`) for all template rendering and file I/O.
+  - Moved pure functions to the domain layer: `CleanProjectProfile`, `RankPatternsForGeneration`, `NewProjectSpecFromProfile`, etc.
+  - Split workspace generation into a standalone sub-package `internal/service/workspace/`, fully decoupled from single-project generation.
+- Reduced `GeneratorService` dependencies from 10 to 5 (`patternRepo`, `profileRepo`, `agent`, `configRepo`, `writer`).
+
 ## [v0.6.3]
 
 ### Features

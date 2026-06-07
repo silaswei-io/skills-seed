@@ -5,18 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/silaswei-io/skills-seed/internal/agent/promptfiles"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 )
-
-// PromptInputSession 管理单次 Agent 调用的临时输入文件，避免大块输入直接进入渲染后的提示词正文。
-type PromptInputSession = promptfiles.Session
-
-// NewPromptInputSession 创建临时提示词输入文件会话。
-func NewPromptInputSession(prefix string) (*PromptInputSession, error) {
-	return promptfiles.New(prefix)
-}
 
 // NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/memory/runtime 下。
 func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*PromptInputSession, error) {
@@ -24,7 +15,7 @@ func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*Promp
 	if seedPath == "" {
 		return NewPromptInputSession(prefix)
 	}
-	return promptfiles.NewIn(filepath.Join(seedPath, "memory", "runtime"), prefix)
+	return newPromptInputSessionIn(filepath.Join(seedPath, "memory", "runtime"), prefix)
 }
 
 // BatchLearnPromptData 返回提交学习所需的提示词数据。
