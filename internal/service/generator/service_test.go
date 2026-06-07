@@ -795,7 +795,6 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	assertNoBrokenMarkdownLinks(t, tmpDir)
 }
 
-
 func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Business Flow", domain.CategoryBusiness)
 	pattern.Confidence = 0.916
@@ -1097,4 +1096,3 @@ func TestCalculateCategoryConfidence(t *testing.T) {
 	assert.InDelta(t, 0.7, calculateCategoryConfidence(patterns, "naming"), 0.01)
 	assert.InDelta(t, 0.0, calculateCategoryConfidence(patterns, "testing"), 0.01)
 }
-

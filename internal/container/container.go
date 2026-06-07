@@ -30,27 +30,27 @@ import (
 
 // Container 应用容器
 type Container struct {
-	SeedPath             string // .skills-seed 目录的路径
-	Config               *config.Config
-	ConfigRepo           *config.Repository
-	GitRepo              *git.Repository
-	PatternRepo          *boltdb.PatternRepository
-	FileTracker          domain.FileAnalysisTracker
-	PatternStats         domain.PatternStatsRepository
-	ReviewRepo           domain.ReviewRepository
-	ProfileRepo          *profilestore.Repository
-	StateRepo            *statestore.Repository
-	WorkspaceProfileRepo *workspacestore.ProfileRepository
-	WorkspaceSpecRepo    *workspacestore.SpecRepository
-	Agent                agent.Agent
-	AnalyzerSvc          *analyzer.AnalyzerService
-	LearnerSvc           *learner.LearnerService
-	CheckerSvc           *checker.CheckerService
-	GeneratorSvc         *generator.GeneratorService
+	SeedPath              string // .skills-seed 目录的路径
+	Config                *config.Config
+	ConfigRepo            *config.Repository
+	GitRepo               *git.Repository
+	PatternRepo           *boltdb.PatternRepository
+	FileTracker           domain.FileAnalysisTracker
+	PatternStats          domain.PatternStatsRepository
+	ReviewRepo            domain.ReviewRepository
+	ProfileRepo           *profilestore.Repository
+	StateRepo             *statestore.Repository
+	WorkspaceProfileRepo  *workspacestore.ProfileRepository
+	WorkspaceSpecRepo     *workspacestore.SpecRepository
+	Agent                 agent.Agent
+	AnalyzerSvc           *analyzer.AnalyzerService
+	LearnerSvc            *learner.LearnerService
+	CheckerSvc            *checker.CheckerService
+	GeneratorSvc          *generator.GeneratorService
 	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
-	MergerSvc            *merger.MergerService
-	PromptLoader         *prompts.Loader
-	SkillsLoader         *skills.Loader
+	MergerSvc             *merger.MergerService
+	PromptLoader          *prompts.Loader
+	SkillsLoader          *skills.Loader
 }
 
 // AgentFactory 创建指定 engine 的 Agent
@@ -151,27 +151,27 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo, workspaceProfileRepo, workspaceSpecRepo)
 
 	return &Container{
-		SeedPath:             seedPath,
-		Config:               cfg,
-		ConfigRepo:           configRepo,
-		GitRepo:              gitRepo,
-		PatternRepo:          patternRepo,
-		FileTracker:          patternRepo,
-		PatternStats:         patternRepo,
-		ReviewRepo:           patternRepo,
-		ProfileRepo:          profileRepo,
-		StateRepo:            stateRepo,
-		WorkspaceProfileRepo: workspaceProfileRepo,
-		WorkspaceSpecRepo:    workspaceSpecRepo,
-		Agent:                agentImpl,
-		AnalyzerSvc:          analyzerSvc,
-		LearnerSvc:           learnerSvc,
-		CheckerSvc:           checkerSvc,
-		GeneratorSvc:         generatorSvc,
+		SeedPath:              seedPath,
+		Config:                cfg,
+		ConfigRepo:            configRepo,
+		GitRepo:               gitRepo,
+		PatternRepo:           patternRepo,
+		FileTracker:           patternRepo,
+		PatternStats:          patternRepo,
+		ReviewRepo:            patternRepo,
+		ProfileRepo:           profileRepo,
+		StateRepo:             stateRepo,
+		WorkspaceProfileRepo:  workspaceProfileRepo,
+		WorkspaceSpecRepo:     workspaceSpecRepo,
+		Agent:                 agentImpl,
+		AnalyzerSvc:           analyzerSvc,
+		LearnerSvc:            learnerSvc,
+		CheckerSvc:            checkerSvc,
+		GeneratorSvc:          generatorSvc,
 		WorkspaceGeneratorSvc: workspaceGeneratorSvc,
-		MergerSvc:            mergerSvc,
-		PromptLoader:         promptLoader,
-		SkillsLoader:         skillsLoader,
+		MergerSvc:             mergerSvc,
+		PromptLoader:          promptLoader,
+		SkillsLoader:          skillsLoader,
 	}, nil
 }
 

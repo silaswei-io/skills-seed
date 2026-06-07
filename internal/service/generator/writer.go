@@ -132,19 +132,18 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		return err
 	}
 
-
-		// 生成参考文档
-		if !opts.SkipReferences {
-			if err := w.GenerateReferenceFiles(ctx, outputPath, summaryResult.CategorySummaries, patterns, profile, spec); err != nil {
-				logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-					"operation", "generator.generate_reference_files",
-					"duration", time.Since(startedAt),
-					"output_path", outputPath,
-					"error", err,
-				)
-				return err
-			}
+	// 生成参考文档
+	if !opts.SkipReferences {
+		if err := w.GenerateReferenceFiles(ctx, outputPath, summaryResult.CategorySummaries, patterns, profile, spec); err != nil {
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+				"operation", "generator.generate_reference_files",
+				"duration", time.Since(startedAt),
+				"output_path", outputPath,
+				"error", err,
+			)
+			return err
 		}
+	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.write_skills_output",

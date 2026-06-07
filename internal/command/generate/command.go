@@ -18,8 +18,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
-	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
+	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ type generateOptions struct {
 	outputPath    string
 	outputChanged bool
 	merge         bool
-	noReferences bool
+	noReferences  bool
 }
 
 // Cmd 返回 generate 命令
