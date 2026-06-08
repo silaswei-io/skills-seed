@@ -15,6 +15,7 @@ import (
 	initcmd "github.com/silaswei-io/skills-seed/internal/command/init"
 	"github.com/silaswei-io/skills-seed/internal/command/learn"
 	patternscmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
+	previewcmd "github.com/silaswei-io/skills-seed/internal/command/preview"
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
 	reviewcmd "github.com/silaswei-io/skills-seed/internal/command/review"
 	synccmd "github.com/silaswei-io/skills-seed/internal/command/sync"
@@ -148,6 +149,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(check.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
 	rootCmd.AddCommand(patternscmd.Cmd(cont))
+	rootCmd.AddCommand(previewcmd.Cmd(cont))
 	rootCmd.AddCommand(reviewcmd.Cmd(cont))
 	rootCmd.AddCommand(profilecmd.Cmd(cont))
 	rootCmd.AddCommand(view.Cmd(cont))
@@ -178,6 +180,8 @@ func commandNeedsProjectRuntime(args []string) bool {
 		return len(cleaned) >= 2 && (cleaned[1] == "current" || cleaned[1] == "history")
 	case "patterns":
 		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "merge" || cleaned[1] == "add")
+	case "preview":
+		return len(cleaned) >= 2 && cleaned[1] == "files"
 	case "profile":
 		return len(cleaned) >= 2 && (cleaned[1] == "show" || cleaned[1] == "refresh")
 	case "review":

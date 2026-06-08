@@ -9,8 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// replaceConfigValues updates config YAML through yaml.Node so comments stay attached
-// to the nodes they describe. It exists for tests and fallback rendering paths.
+// replaceConfigValues 通过 yaml.Node 更新配置值，保证注释继续附着在描述的节点上。
+// 该方法用于测试和模板渲染失败后的后备保存路径。
 func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
 	if cfg != nil {
 		normalized := *cfg
@@ -86,6 +86,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 }
 
 func formatTopLevelModuleSpacing(content string) string {
+	// banner 是配置模板中分隔顶层模块的固定横线。
 	const banner = "########################################################################"
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 {

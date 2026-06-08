@@ -366,6 +366,9 @@ func funcMap() template.FuncMap {
 		"add": func(a, b interface{}) int {
 			return int(toFloat(a) + toFloat(b))
 		},
+		"includeSkillsSeedGeneratedNotice": func() bool {
+			return config.DefaultIncludeSkillsSeedGeneratedNotice
+		},
 	}
 }
 

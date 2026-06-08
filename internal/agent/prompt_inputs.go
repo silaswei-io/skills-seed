@@ -7,6 +7,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	textutil "github.com/silaswei-io/skills-seed/internal/utils/text"
 )
 
 // NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/memory/runtime 下。
@@ -58,7 +59,7 @@ func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePat
 	}, nil
 }
 
-// CheckPromptData 返回 check 场景所需的提示词数据。
+// CheckPromptData 返回检查场景所需的提示词数据。
 func CheckPromptData(session *PromptInputSession, req *AnalyzeRequest) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"Files":         req.Files,
@@ -71,7 +72,7 @@ func CheckPromptData(session *PromptInputSession, req *AnalyzeRequest) (map[stri
 
 // AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
 func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRequest) (map[string]interface{}, error) {
-	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", req.Structure)
+	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", textutil.NormalizeStructureSummary(req.Structure))
 	if err != nil {
 		return nil, fmt.Errorf("write project structure prompt input: %w", err)
 	}
@@ -103,7 +104,7 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 
 // AnalyzeCurrentCodebasePromptData 返回当前代码库分析所需的提示词数据。
 func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeCurrentCodebaseRequest) (map[string]interface{}, error) {
-	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", req.Structure)
+	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", textutil.NormalizeStructureSummary(req.Structure))
 	if err != nil {
 		return nil, fmt.Errorf("write project structure prompt input: %w", err)
 	}

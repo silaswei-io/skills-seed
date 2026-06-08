@@ -9,7 +9,7 @@ import (
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 )
 
-// LockConfiguredMode 锁定当前配置中的 project/workspace 模式
+// LockConfiguredMode 锁定当前配置中的单项目或工作区模式。
 func LockConfiguredMode(ctx context.Context, cont *container.Container) error {
 	if cont == nil || cont.StateRepo == nil || cont.ConfigRepo == nil {
 		return nil
@@ -41,7 +41,7 @@ func MarkLearned(ctx context.Context, cont *container.Container) error {
 	return cont.StateRepo.MarkLearned(ctx, cont.ConfigRepo.GetProjectConfig().Mode)
 }
 
-// MarkSkillsGenerated 锁定当前模式并标记已生成 skills
+// MarkSkillsGenerated 锁定当前模式并标记已生成 Skills。
 func MarkSkillsGenerated(ctx context.Context, cont *container.Container) error {
 	if cont == nil || cont.StateRepo == nil || cont.ConfigRepo == nil {
 		return nil

@@ -6,20 +6,20 @@ import (
 	"github.com/odvcencio/gotreesitter"
 )
 
-// symbolInfo represents an extracted code symbol.
+// symbolInfo 表示从源码中提取出的代码符号。
 type symbolInfo struct {
 	Name string
 	Kind string // func, method, type, class, interface, struct, enum, trait, protocol, module, object
 	Line int
 }
 
-// importInfo represents an extracted import/dependency.
+// importInfo 表示从源码中提取出的 import 或依赖路径。
 type importInfo struct {
 	Path string
 }
 
-// symbolNodeTypes maps (language name) → (AST node type → display kind).
-// Only node types that have a "name" field in the grammar are listed.
+// symbolNodeTypes 映射语言名到“AST 节点类型 -> 展示类型”。
+// 这里只登记语法中带有 name 字段的节点，避免无法稳定取名的结构进入结果。
 var symbolNodeTypes = map[string]map[string]string{
 	"go": {
 		"function_declaration": "func",
@@ -84,22 +84,21 @@ var symbolNodeTypes = map[string]map[string]string{
 	},
 }
 
-// typeSpecParentKinds lists languages where the type name lives inside a
-// type_spec child (e.g. Go: type_declaration > type_spec > name).
-// For these languages we look at type_spec nodes instead of the outer declaration.
+// typeSpecLanguages 记录类型名称位于内层 type_spec 子节点的语言。
+// 例如 Go 的结构是 type_declaration > type_spec > name，因此要读取 type_spec 而不是外层声明。
 var typeSpecLanguages = map[string]string{
 	"go": "type_spec",
 }
 
-// extractSymbols walks the AST and extracts named symbols.
+// extractSymbols 遍历 AST 并提取具名符号。
 func extractSymbols(root *gotreesitter.Node, lang *gotreesitter.Language, src []byte, langName string) []symbolInfo {
 	typeMap := symbolNodeTypes[langName]
 	if len(typeMap) == 0 {
-		// Unknown language — try generic extraction using common node types.
+		// 未登记语言时，使用常见节点类型做通用提取。
 		typeMap = genericSymbolTypes
 	}
 
-	// Check if this language uses nested type_spec nodes.
+	// 检查该语言是否使用内嵌 type_spec 节点表达类型声明。
 	typeSpecKind := typeSpecLanguages[langName]
 
 	var symbols []symbolInfo
@@ -119,7 +118,7 @@ func extractSymbols(root *gotreesitter.Node, lang *gotreesitter.Language, src []
 			return
 		}
 
-		// For Go type_spec, the parent is the actual declaration — use parent's line.
+		// 普通声明节点直接使用自身起始行。
 		line := int(node.StartPoint().Row) + 1
 
 		symbols = append(symbols, symbolInfo{
@@ -129,7 +128,7 @@ func extractSymbols(root *gotreesitter.Node, lang *gotreesitter.Language, src []
 		})
 	})
 
-	// For languages with nested type_spec, also extract type-level declarations.
+	// 对使用内嵌 type_spec 的语言，额外提取类型级声明。
 	if typeSpecKind != "" {
 		walkNodes(root, lang, func(node *gotreesitter.Node) {
 			if node.Type(lang) != typeSpecKind {
@@ -144,7 +143,7 @@ func extractSymbols(root *gotreesitter.Node, lang *gotreesitter.Language, src []
 				return
 			}
 
-			// Determine the concrete type kind (struct, interface, etc.)
+			// 根据子节点判断更具体的类型种类，如 struct、interface 等。
 			kind := "type"
 			for i := 0; i < node.NamedChildCount(); i++ {
 				child := node.NamedChild(i)
@@ -173,7 +172,7 @@ func extractSymbols(root *gotreesitter.Node, lang *gotreesitter.Language, src []
 	return symbols
 }
 
-// genericSymbolTypes is a fallback for unregistered languages.
+// genericSymbolTypes 是未登记语言的通用符号节点 fallback。
 var genericSymbolTypes = map[string]string{
 	"function_declaration":  "func",
 	"function_definition":   "func",
@@ -188,7 +187,7 @@ var genericSymbolTypes = map[string]string{
 	"enum_item":             "enum",
 }
 
-// extractImports extracts import paths from the AST.
+// extractImports 从 AST 中提取 import 路径。
 func extractImports(root *gotreesitter.Node, lang *gotreesitter.Language, src []byte, langName string) []importInfo {
 	switch langName {
 	case "go":
@@ -228,7 +227,7 @@ func extractPythonImports(root *gotreesitter.Node, lang *gotreesitter.Language, 
 	walkNodes(root, lang, func(node *gotreesitter.Node) {
 		switch node.Type(lang) {
 		case "import_statement":
-			// import X, Y
+			// Python: import X, Y
 			for i := 0; i < node.NamedChildCount(); i++ {
 				child := node.NamedChild(i)
 				if child != nil {
@@ -236,7 +235,7 @@ func extractPythonImports(root *gotreesitter.Node, lang *gotreesitter.Language, 
 				}
 			}
 		case "import_from_statement":
-			// from X import Y
+			// Python: from X import Y
 			modNode := node.ChildByFieldName("module_name", lang)
 			if modNode != nil {
 				imports = append(imports, importInfo{Path: modNode.Text(src)})
@@ -285,7 +284,7 @@ func extractRustImports(root *gotreesitter.Node, lang *gotreesitter.Language, sr
 		if node.Type(lang) != "use_declaration" {
 			return
 		}
-		// Get the argument (the imported path)
+		// 读取 use 声明的参数作为导入路径。
 		for i := 0; i < node.NamedChildCount(); i++ {
 			child := node.NamedChild(i)
 			if child != nil {
@@ -297,12 +296,12 @@ func extractRustImports(root *gotreesitter.Node, lang *gotreesitter.Language, sr
 	return imports
 }
 
-// isEntryPoint returns true if the symbol looks like an entry point (main).
+// isEntryPoint 判断符号是否看起来像入口函数。
 func isEntryPoint(name string) bool {
 	return name == "main"
 }
 
-// walkNodes recursively visits all named nodes in pre-order.
+// walkNodes 以前序递归访问所有节点。
 func walkNodes(node *gotreesitter.Node, lang *gotreesitter.Language, visit func(*gotreesitter.Node)) {
 	if node == nil {
 		return

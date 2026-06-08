@@ -8,7 +8,8 @@ import (
 
 // PromptInputSession 管理单次 Agent 调用的临时提示词输入文件。
 type PromptInputSession struct {
-	dir string
+	dir           string
+	keepOnCleanup bool
 }
 
 // NewPromptInputSession 创建临时提示词输入文件会话。
@@ -32,12 +33,15 @@ func newPromptInputSessionIn(baseDir, prefix string) (*PromptInputSession, error
 	if err != nil {
 		return nil, err
 	}
-	return &PromptInputSession{dir: dir}, nil
+	return &PromptInputSession{dir: dir, keepOnCleanup: true}, nil
 }
 
 // Cleanup 删除所有临时提示词输入文件。
 func (s *PromptInputSession) Cleanup() {
 	if s == nil || s.dir == "" {
+		return
+	}
+	if s.keepOnCleanup {
 		return
 	}
 	_ = os.RemoveAll(s.dir)

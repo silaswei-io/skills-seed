@@ -156,7 +156,7 @@ func TestCmdDefaultsSkillsLocaleToEnglishAndWritesEnglishPrompts(t *testing.T) {
 
 	instructions, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "prompts", "instructions", "fix-generate.md"))
 	require.NoError(t, err)
-	require.Contains(t, string(instructions), "# User Instructions")
+	require.Contains(t, string(instructions), "Add user-confirmed project constraints")
 	require.NotContains(t, string(instructions), "# 用户补充指令")
 }
 

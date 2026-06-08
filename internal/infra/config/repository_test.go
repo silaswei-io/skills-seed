@@ -108,7 +108,7 @@ func TestRepository_Get(t *testing.T) {
 
 	require.NotNil(t, cfg, "Get() should return non-nil config")
 
-	// 校验来自嵌入模板或硬编码 fallback 的默认值。
+	// 校验来自嵌入模板或硬编码后备配置的默认值。
 	assert.Equal(t, "go", cfg.Project.Language)
 	assert.Equal(t, "zh-CN", cfg.Project.Locale)
 	assert.Equal(t, "en-US", cfg.Skills.Locale)
@@ -346,9 +346,9 @@ func TestRepository_UpdatePreservesExistingComments(t *testing.T) {
 	seedPath := t.TempDir()
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
-	require.NoError(t, os.WriteFile(configPath, []byte(`# Custom project comment
+	require.NoError(t, os.WriteFile(configPath, []byte(`# 自定义项目注释
 profile:
-  name: "old-name" # custom project name comment
+  name: "old-name" # 自定义项目名称注释
   mode: "project"
   language: "go"
   locale: "zh-CN"
@@ -356,13 +356,13 @@ profile:
   root_path: ""
   initialized_at: "2026-05-26 12:00:00"
 
-# Custom workspace comment
+# 自定义工作区注释
 workspace:
-  projects: [] # custom projects comment
+  projects: [] # 自定义子项目注释
 
 analysis:
   structural:
-    enabled: true # custom structural comment
+    enabled: true # 自定义结构化分析注释
     max_symbols: 30
     max_file_size: 512
 
@@ -396,7 +396,7 @@ logging:
   max_log_files: 30
 
 exclude:
-  - ".*" # keep dotfiles comment
+  - ".*" # 保留点号文件注释
   - "*.log"
 `), 0644))
 
@@ -416,20 +416,20 @@ exclude:
 	content, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	text := string(content)
-	require.Contains(t, text, "# Custom project comment")
-	require.Contains(t, text, "# custom project name comment\n  name: \"new-name\"")
-	require.Contains(t, text, "# Custom workspace comment")
-	require.Contains(t, text, "# custom projects comment\n  projects:")
-	require.Contains(t, text, "# custom structural comment\n    enabled: false")
-	require.Contains(t, text, "# keep dotfiles comment\n  - \".*\"")
-	require.NotContains(t, text, `name: "new-name" # custom project name comment`)
-	require.NotContains(t, text, `projects: # custom projects comment`)
+	require.Contains(t, text, "# 自定义项目注释")
+	require.Contains(t, text, "# 自定义项目名称注释\n  name: \"new-name\"")
+	require.Contains(t, text, "# 自定义工作区注释")
+	require.Contains(t, text, "# 自定义子项目注释\n  projects:")
+	require.Contains(t, text, "# 自定义结构化分析注释\n    enabled: false")
+	require.Contains(t, text, "# 保留点号文件注释\n  - \".*\"")
+	require.NotContains(t, text, `name: "new-name" # 自定义项目名称注释`)
+	require.NotContains(t, text, `projects: # 自定义子项目注释`)
 	require.NotContains(t, text, `shared:`)
 	require.NotContains(t, text, `contracts:`)
 	require.NotContains(t, text, `infra:`)
-	require.NotContains(t, text, `analysis: # custom projects comment`)
-	require.NotContains(t, text, `enabled: false # custom structural comment`)
-	require.NotContains(t, text, `- ".*" # keep dotfiles comment`)
+	require.NotContains(t, text, `analysis: # 自定义子项目注释`)
+	require.NotContains(t, text, `enabled: false # 自定义结构化分析注释`)
+	require.NotContains(t, text, `- ".*" # 保留点号文件注释`)
 
 	reloaded, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)

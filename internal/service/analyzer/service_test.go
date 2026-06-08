@@ -526,6 +526,36 @@ func TestAnalyzeCodebaseFullUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) 
 	}, loaded)
 }
 
+func TestAnalyzeCodebaseFullSkipsDocumentsButKeepsDocsSourceInSnapshotDiffs(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "docs", "examples"), 0o755))
+	require.NoError(t, os.MkdirAll(seedPath, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "README.MD"), []byte("# readme\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "docs", "Guide.MD"), []byte("# guide\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "docs", "examples", "main.go"), []byte("package examples\n"), 0o644))
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
+		Exclude:    []string{".*"},
+	})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{})
+
+	require.NoError(t, err)
+	require.Equal(t, []agent.SampleFile{{Path: "docs/examples/main.go"}}, received.SampleFiles)
+	require.Empty(t, received.DiffFiles)
+}
+
 func TestAnalyzeCodebaseFullCapsSnapshotAddedSampleFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	seedPath := filepath.Join(tmpDir, ".skills-seed")
@@ -595,6 +625,19 @@ func TestCollectSampleFiles_ExcludeVendor(t *testing.T) {
 	for _, f := range files {
 		assert.NotContains(t, f.Path, "vendor")
 	}
+}
+
+func TestCollectSampleFilesKeepsSourceFilesUnderDocs(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "docs", "examples"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "docs", "examples", "main.go"), []byte("package main"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "docs", "Guide.MD"), []byte("# guide"), 0644))
+
+	svc := &AnalyzerService{}
+	files := svc.collectSampleFiles(tmpDir, "go")
+
+	require.Len(t, files, 1)
+	require.Equal(t, "docs/examples/main.go", files[0].Path)
 }
 
 func TestCollectSampleFiles_UsesConfiguredExclude(t *testing.T) {

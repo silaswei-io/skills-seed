@@ -6,8 +6,7 @@ import (
 	"path/filepath"
 )
 
-// WriteFileAtomic writes data to path through a temporary file in the same
-// directory, then renames it into place.
+// WriteFileAtomic 先把数据写入同目录临时文件，再通过重命名原子替换目标文件。
 func WriteFileAtomic(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {

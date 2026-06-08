@@ -2,15 +2,16 @@ package skills
 
 import "github.com/silaswei-io/skills-seed/internal/metadata"
 
-// TemplateEntry describes one logical skills template and the normalized file it produces.
+// TemplateEntry 描述一个逻辑 Skills 模板及其最终生成的标准化文件。
 type TemplateEntry struct {
-	ID           string
-	RelativeName string
-	Ext          string
-	OutputPath   string
-	Providers    []string
+	ID           string   // 逻辑模板 ID，用于目录查询和测试断言
+	RelativeName string   // provider 目录下不含语言后缀的相对模板名
+	Ext          string   // 模板文件扩展名
+	OutputPath   string   // 渲染后写入 Skills 目录的相对路径
+	Providers    []string // 支持该模板的 provider，按查找优先级配合 fallback 使用
 }
 
+// skillTemplateCatalog 维护所有可生成 Skills 文件的固定目录。
 var skillTemplateCatalog = []TemplateEntry{
 	{
 		ID:           "project-skill",
@@ -105,14 +106,14 @@ var skillTemplateCatalog = []TemplateEntry{
 	},
 }
 
-// SkillTemplateCatalog returns all logical skills template entries.
+// SkillTemplateCatalog 返回所有逻辑 Skills 模板条目。
 func SkillTemplateCatalog() []TemplateEntry {
 	entries := make([]TemplateEntry, len(skillTemplateCatalog))
 	copy(entries, skillTemplateCatalog)
 	return entries
 }
 
-// TemplateCatalogEntry returns a logical skills template entry by ID.
+// TemplateCatalogEntry 按 ID 返回逻辑 Skills 模板条目。
 func TemplateCatalogEntry(id string) (TemplateEntry, bool) {
 	for _, entry := range skillTemplateCatalog {
 		if entry.ID == id {

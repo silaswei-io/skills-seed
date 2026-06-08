@@ -11,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
+	textutil "github.com/silaswei-io/skills-seed/internal/utils/text"
 )
 
 var projectPromptNames = []string{
@@ -53,7 +54,7 @@ type WorkspacePromptData struct {
 	SkillsLocale        string
 }
 
-// WorkspacePromptProject 是 workspace prompt 中展示的子项目摘要
+// WorkspacePromptProject 是工作区提示词中展示的子项目摘要
 type WorkspacePromptProject struct {
 	ID       string
 	Path     string
@@ -63,6 +64,7 @@ type WorkspacePromptProject struct {
 
 // EnsureProjectPrompts 初始化项目级提示词文件
 func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
+	data = normalizeProjectPromptData(data)
 	if data.ProgramVersion == "" {
 		data.ProgramVersion = metadata.ProgramVersion
 	}
@@ -122,6 +124,7 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 
 // EnsureProjectPromptsAt 初始化指定目录下的项目级提示词文件
 func EnsureProjectPromptsAt(basePath string, data ProjectPromptData) error {
+	data = normalizeProjectPromptData(data)
 	if data.ProgramVersion == "" {
 		data.ProgramVersion = metadata.ProgramVersion
 	}
@@ -251,6 +254,11 @@ func readWorkspaceTemplate(name, locale string) ([]byte, error) {
 
 	defaultPath := metadata.WorkspacePromptTemplatePath(name, "")
 	return embedfs.FS.ReadFile(defaultPath)
+}
+
+func normalizeProjectPromptData(data ProjectPromptData) ProjectPromptData {
+	data.Structure = textutil.NormalizeStructureSummary(data.Structure)
+	return data
 }
 
 func writeIfNotExists(path, content string) error {

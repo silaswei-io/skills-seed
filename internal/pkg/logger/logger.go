@@ -226,8 +226,8 @@ func CurrentLevel() Level {
 	return logLevel
 }
 
-// WithScopedLog runs fn with file logs from the current goroutine routed to a
-// separate log file. Console output is unchanged.
+// WithScopedLog 运行 fn，并把当前 goroutine 的文件日志路由到独立日志文件。
+// 控制台输出保持不变。
 func WithScopedLog(ctx context.Context, logDir string, commandName string, level Level, maxLogFiles int, fn func(context.Context, string) error) error {
 	gid := currentGoroutineID()
 	if gid == 0 {

@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config 应用配置
+// Config 应用配置，映射 .skills-seed/config.yaml 的顶层结构。
 type Config struct {
 	Project   ProjectConfig   `yaml:"profile"`
 	Workspace WorkspaceConfig `yaml:"workspace"`
@@ -28,31 +28,31 @@ type Config struct {
 	Exclude   []string        `yaml:"exclude"` // 全局排除配置
 }
 
-// ProjectConfig 项目配置
+// ProjectConfig 保存当前项目或工作区根的身份信息。
 type ProjectConfig struct {
-	Name          string `yaml:"name"`
-	Mode          string `yaml:"mode"` // 初始化模式：project 或 workspace
-	Language      string `yaml:"language"`
+	Name          string `yaml:"name"`           // 项目或工作区名称
+	Mode          string `yaml:"mode"`           // 初始化模式：project 或 workspace
+	Language      string `yaml:"language"`       // 主语言，用于提示词上下文
 	InitializedAt string `yaml:"initialized_at"` // 改用字符串存储，更易读
-	GitRemote     string `yaml:"git_remote"`
-	RootPath      string `yaml:"root_path"`
-	Locale        string `yaml:"locale"` // 语言设置：zh-CN, en-US
+	GitRemote     string `yaml:"git_remote"`     // Git 远程地址
+	RootPath      string `yaml:"root_path"`      // 项目或工作区根目录绝对路径
+	Locale        string `yaml:"locale"`         // 语言设置：zh-CN, en-US
 }
 
-// WorkspaceConfig 工作区配置
+// WorkspaceConfig 保存工作区模式下的子项目列表。
 type WorkspaceConfig struct {
 	Projects []WorkspaceProjectConfig `yaml:"projects"`
 }
 
-// WorkspaceProjectConfig 工作区子项目配置
+// WorkspaceProjectConfig 描述一个工作区子项目的路径、类型和语言。
 type WorkspaceProjectConfig struct {
-	ID       string `yaml:"id"`
-	Path     string `yaml:"path"`
-	Type     string `yaml:"type"`
-	Language string `yaml:"language"`
+	ID       string `yaml:"id"`       // 子项目唯一标识
+	Path     string `yaml:"path"`     // 相对工作区根目录的路径
+	Type     string `yaml:"type"`     // 子项目类型，如 frontend、backend、library
+	Language string `yaml:"language"` // 子项目主语言
 }
 
-// AnalysisConfig 分析增强配置
+// AnalysisConfig 控制学习前置的本地代码分析能力。
 type AnalysisConfig struct {
 	Structural StructuralConfig `yaml:"structural"`
 }
@@ -87,7 +87,7 @@ func (c *StructuralConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// AgentConfig Agent 配置
+// AgentConfig 控制调用外部 Agent CLI 的引擎、命令、超时和并发策略。
 type AgentConfig struct {
 	Engine           string            `yaml:"engine"`             // Agent 引擎
 	Commands         map[string]string `yaml:"commands"`           // engine -> CLI 命令
@@ -148,26 +148,26 @@ func (r RetryConfig) WaitDuration(attempt int) time.Duration {
 	return wait
 }
 
-// LearningConfig 学习配置
+// LearningConfig 控制从代码和 Git 历史学习项目规范时的默认范围。
 type LearningConfig struct {
 	MaxCommits int `yaml:"max_commits"` // 默认分析的提交数量
 	BatchSize  int `yaml:"batch_size"`  // 批量分析 commit 数量（默认10）
 }
 
-// AutoFixConfig 自动修复配置
+// AutoFixConfig 控制检查自动修复的修复产物和回滚策略。
 type AutoFixConfig struct {
 	Strategy   string `yaml:"strategy"`    // 修复策略：patch, backup, stash, branch
 	BackupPath string `yaml:"backup_path"` // 备份路径（相对于 .skills-seed 目录）
 }
 
-// LoggingConfig 日志配置
+// LoggingConfig 控制命令运行日志的级别、目录和保留数量。
 type LoggingConfig struct {
 	Level       string `yaml:"level"`         // 日志级别：DEBUG, INFO, WARN, ERROR
 	LogsPath    string `yaml:"logs_path"`     // 日志路径（相对于 .skills-seed 目录）
 	MaxLogFiles int    `yaml:"max_log_files"` // 最大日志文件数量
 }
 
-// SkillsConfig Skills 输出配置
+// SkillsConfig 控制生成的 Skills 类型、输出路径和内容语言。
 type SkillsConfig struct {
 	Target string            `yaml:"target"` // 目标 Agent Skills 类型
 	Locale string            `yaml:"locale"` // Skills 与沉淀内容语言：zh-CN, en-US
@@ -181,7 +181,7 @@ func EffectiveSkillsTarget(agent AgentConfig, skills SkillsConfig) string {
 	return strings.TrimSpace(agent.Engine)
 }
 
-// EffectiveSkillsPath 获取指定 target 的 Skills 输出路径
+// EffectiveSkillsPath 获取指定目标类型的 Skills 输出路径。
 func EffectiveSkillsPath(target string, skills SkillsConfig) string {
 	if target != "" && skills.Paths != nil {
 		return skills.Paths[target]
@@ -565,28 +565,27 @@ func (r *Repository) GetExclude() []string {
 	return r.config.Exclude
 }
 
-// GetToolLocale returns the locale used for CLI output and operational UI.
+// GetToolLocale 返回 CLI 输出和运行界面使用的语言。
 func (r *Repository) GetToolLocale() string {
 	return normalizeLocale(r.config.Project.Locale)
 }
 
-// GetSkillsLocale returns the locale used for generated skills and learned
-// natural-language content that is later rendered into skills.
+// GetSkillsLocale 返回生成 Skills 和学习沉淀内容使用的语言。
 func (r *Repository) GetSkillsLocale() string {
 	return normalizeSkillsLocale(r.config.Skills.Locale)
 }
 
-// GetPromptLocale returns the locale for a prompt by output destination.
+// GetPromptLocale 返回指定提示词输出目标使用的语言。
 func (r *Repository) GetPromptLocale(name string) string {
 	return r.GetSkillsLocale()
 }
 
-// GetEffectiveAgentEngine returns the normalized agent engine after defaults.
+// GetEffectiveAgentEngine 返回应用默认值后的 Agent 引擎。
 func (r *Repository) GetEffectiveAgentEngine() string {
 	return strings.TrimSpace(r.config.Agent.Engine)
 }
 
-// GetEffectiveAgentCommand returns the configured command for the effective engine.
+// GetEffectiveAgentCommand 返回当前有效 Agent 引擎对应的 CLI 命令。
 func (r *Repository) GetEffectiveAgentCommand() string {
 	engine := r.GetEffectiveAgentEngine()
 	if engine == "" {
@@ -598,22 +597,22 @@ func (r *Repository) GetEffectiveAgentCommand() string {
 	return engine
 }
 
-// GetEffectiveSkillsTarget returns the target used for generated skills.
+// GetEffectiveSkillsTarget 返回生成 Skills 使用的目标类型。
 func (r *Repository) GetEffectiveSkillsTarget() string {
 	return EffectiveSkillsTarget(r.config.Agent, r.config.Skills)
 }
 
-// GetEffectiveSkillsPath returns the configured output path for the effective target.
+// GetEffectiveSkillsPath 返回当前有效目标类型对应的 Skills 输出路径。
 func (r *Repository) GetEffectiveSkillsPath() string {
 	return EffectiveSkillsPath(r.GetEffectiveSkillsTarget(), r.config.Skills)
 }
 
-// GetCurrentProjectConfig returns the current project/workspace identity config.
+// GetCurrentProjectConfig 返回当前项目或工作区根的身份配置。
 func (r *Repository) GetCurrentProjectConfig() ProjectConfig {
 	return r.GetProjectConfig()
 }
 
-// GetWorkspaceProjects returns the configured workspace children.
+// GetWorkspaceProjects 返回配置中的工作区子项目列表副本。
 func (r *Repository) GetWorkspaceProjects() []WorkspaceProjectConfig {
 	projects := make([]WorkspaceProjectConfig, len(r.config.Workspace.Projects))
 	copy(projects, r.config.Workspace.Projects)

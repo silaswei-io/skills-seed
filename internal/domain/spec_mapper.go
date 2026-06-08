@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// WorkspaceProjectOverride 描述 workspace 子项目覆盖字段，
+// WorkspaceProjectOverride 描述工作区子项目覆盖字段，
 // 用于 NewProjectSpecFromProfile 中避免 domain → config 依赖。
 type WorkspaceProjectOverride struct {
 	ID       string
@@ -15,7 +15,7 @@ type WorkspaceProjectOverride struct {
 }
 
 // NewProjectSpecFromProfile 根据 profile 和 patterns 构建项目规范。
-// project 参数为可选的 workspace 子项目覆盖。
+// project 参数为可选的工作区子项目覆盖。
 func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, project WorkspaceProjectOverride) *ProjectSpec {
 	if profile == nil {
 		return nil

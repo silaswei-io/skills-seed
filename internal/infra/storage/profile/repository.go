@@ -44,12 +44,12 @@ func (r *Repository) Save(ctx context.Context, projectProfile *domain.ProjectPro
 	return profileStore(r.path).Save(ctx, projectProfile)
 }
 
-// GetForProject 读取 workspace 子项目画像
+// GetForProject 读取工作区子项目画像
 func (r *Repository) GetForProject(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
 	return profileStore(r.projectPath(projectID)).Get(ctx)
 }
 
-// SaveForProject 保存 workspace 子项目画像
+// SaveForProject 保存工作区子项目画像
 func (r *Repository) SaveForProject(ctx context.Context, projectID string, projectProfile *domain.ProjectProfile) error {
 	return profileStore(r.projectPath(projectID)).Save(ctx, projectProfile)
 }
@@ -68,12 +68,12 @@ func (r *Repository) SaveSpec(ctx context.Context, spec *domain.ProjectSpec) err
 	return r.writeSpec(ctx, filepath.Join(filepath.Dir(r.path), "project-spec.json"), spec)
 }
 
-// GetSpecForProject 读取 workspace 子项目开发规范
+// GetSpecForProject 读取工作区子项目开发规范
 func (r *Repository) GetSpecForProject(ctx context.Context, projectID string) (*domain.ProjectSpec, error) {
 	return r.readSpec(ctx, r.projectSpecPath(projectID))
 }
 
-// SaveSpecForProject 保存 workspace 子项目开发规范
+// SaveSpecForProject 保存工作区子项目开发规范
 func (r *Repository) SaveSpecForProject(ctx context.Context, projectID string, spec *domain.ProjectSpec) error {
 	return r.writeSpec(ctx, r.projectSpecPath(projectID), spec)
 }

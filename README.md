@@ -94,6 +94,8 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 `skills-seed init` 会生成 `.skills-seed/prompts/`。这些文件不是用来替换内置 prompt 的完整模板，而是会与内置 prompt 合并，作为项目上下文、workspace 约束或用户补充指令参与学习和生成。
 
+0.7.1 起，默认 prompt 文件中的生成元数据、空脚手架和未填写占位内容会在渲染时自动过滤；只有用户实际写入的约束会进入 Agent 输入。每次渲染后的 prompt 会保存在 `.skills-seed/memory/runtime/rendered-prompts/`，同目录 `.manifest.json` 会记录 base、project、workspace、instructions 等片段是否参与合并和各自长度，便于排查上下文来源。
+
 常见目录：
 
 ```text
@@ -131,6 +133,8 @@ skills-seed learn current --context-file .skills-seed/context.md
 ```
 
 如果同一条规则长期有效，写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；如果只是这次运行的解释或限制，使用 `--context` 或 `--context-file`。
+
+`learn current`、`preview` 和结构化分析共用同一套文件选择策略：默认只分析源码、构建配置和依赖配置，继续跳过文档、生成产物、全局 `exclude` 命中的路径以及已生成 Skills 输出目录。
 
 ## 快速开始
 

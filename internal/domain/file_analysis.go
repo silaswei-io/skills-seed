@@ -28,7 +28,7 @@ func (s FileAnalysisScope) KeyPrefix() string {
 	return s.ProjectID + "\x00" + normalizeAnalysisPath(s.ScopePath) + "\x00"
 }
 
-// ContainsPath 判断 path 是否落在 focusPaths 指定的相对范围内。
+// ContainsPath 判断文件路径是否落在聚焦路径指定的相对范围内。
 func (s FileAnalysisScope) ContainsPath(path string, focusPaths []string) bool {
 	if len(focusPaths) == 0 {
 		return true

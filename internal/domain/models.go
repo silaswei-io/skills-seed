@@ -23,7 +23,7 @@ const (
 	ModeWorkspace = "workspace"
 )
 
-// ==================== Pattern ====================
+// ==================== 模式 ====================
 
 // Category 模式分类
 type Category string
@@ -303,7 +303,7 @@ func (p *Pattern) IsSimilar(other *Pattern) bool {
 		p.ScopePath == other.ScopePath
 }
 
-// ==================== Issue ====================
+// ==================== 问题 ====================
 
 // Severity 问题严重程度
 type Severity string
@@ -402,7 +402,7 @@ func (i *Issue) SetPatternID(patternID string) {
 	i.PatternID = patternID
 }
 
-// ==================== Commit ====================
+// ==================== 提交 ====================
 
 // CommitInfo 提交值对象
 type CommitInfo struct {
@@ -445,7 +445,7 @@ func (c CommitInfo) Summary() string {
 	return c.Message
 }
 
-// ==================== File ====================
+// ==================== 文件 ====================
 
 // Status 文件状态
 type Status string

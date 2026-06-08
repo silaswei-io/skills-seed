@@ -442,8 +442,8 @@ func initializeWorkspaceChildrenWithRepo(workspaceRoot, locale string, rootConfi
 	return nil
 }
 
-// EnsureWorkspaceChildInitializedAt initializes a missing workspace child seed and
-// preserves existing child seeds, including children configured with a different agent.
+// EnsureWorkspaceChildInitializedAt 初始化缺失的 workspace 子项目 seed。
+// 已存在的子项目 seed 会被保留，包括配置了不同 agent 的子项目。
 func EnsureWorkspaceChildInitializedAt(workspaceRoot string, project config.WorkspaceProjectConfig, rootConfigRepo *config.Repository, locale string) error {
 	return initializeWorkspaceChildAt(workspaceRoot, project, rootConfigRepo, locale)
 }

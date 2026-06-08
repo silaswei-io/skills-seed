@@ -10,24 +10,28 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 )
 
-// ChangeStatus describes how a current file compares with its previous snapshot.
+// ChangeStatus 表示当前文件相对上一份快照的变化状态。
 type ChangeStatus string
 
 const (
-	ChangeAdded     ChangeStatus = "added"
-	ChangeModified  ChangeStatus = "modified"
+	// ChangeAdded 表示文件是本次新增。
+	ChangeAdded ChangeStatus = "added"
+	// ChangeModified 表示文件内容相对上一份快照发生变化。
+	ChangeModified ChangeStatus = "modified"
+	// ChangeUnchanged 表示文件内容与上一份快照一致。
 	ChangeUnchanged ChangeStatus = "unchanged"
-	ChangeDeleted   ChangeStatus = "deleted"
+	// ChangeDeleted 表示上一份快照中的文件在当前范围内已删除。
+	ChangeDeleted ChangeStatus = "deleted"
 )
 
-// FileChange is the comparison result for one current file.
+// FileChange 表示单个文件的快照对比结果。
 type FileChange struct {
 	Path     string
 	Status   ChangeStatus
 	DiffPath string
 }
 
-// Compare compares current files to old snapshots and writes diffs for modified files.
+// Compare 对比当前文件与旧快照，并为修改过的文件写入 diff。
 func Compare(currentFiles map[string]string, oldSnapshots map[string]string, runtimeDir string) ([]FileChange, error) {
 	paths := make([]string, 0, len(currentFiles))
 	for path := range currentFiles {
@@ -57,8 +61,8 @@ func Compare(currentFiles map[string]string, oldSnapshots map[string]string, run
 	return changes, nil
 }
 
-// CompareScoped compares current files and also reports old snapshots deleted
-// inside scopePaths. Empty scopePaths means the current file set is complete.
+// CompareScoped 对比当前文件，并报告 scopePaths 范围内旧快照已删除的文件。
+// scopePaths 为空表示当前文件集合是完整范围。
 func CompareScoped(currentFiles map[string]string, oldSnapshots map[string]string, runtimeDir string, scopePaths []string) ([]FileChange, error) {
 	changes, err := Compare(currentFiles, oldSnapshots, runtimeDir)
 	if err != nil {
@@ -101,7 +105,7 @@ func pathInScope(path string, scopePaths []string) bool {
 	return false
 }
 
-// WriteUnifiedDiff writes a deterministic unified-style diff for one file.
+// WriteUnifiedDiff 为单个文件写入确定性的 unified 风格 diff。
 func WriteUnifiedDiff(dir, path, oldContent, newContent string) (string, error) {
 	diffPath, err := diffOutputPath(dir, path)
 	if err != nil {

@@ -29,7 +29,7 @@ type PatternRepository interface {
 	Count(ctx context.Context) (int, error)
 }
 
-// PatternHitRecorder 保存 check 命中记录。
+// PatternHitRecorder 保存检查命中记录。
 type PatternHitRecorder interface {
 	RecordPatternHits(ctx context.Context, hits []PatternHit) error
 }
@@ -81,7 +81,7 @@ type ProjectProfileRepository interface {
 	Save(ctx context.Context, profile *ProjectProfile) error
 }
 
-// ScopedProjectProfileRepository 保存指定 workspace 子项目的画像
+// ScopedProjectProfileRepository 保存指定工作区子项目的画像
 type ScopedProjectProfileRepository interface {
 	GetForProject(ctx context.Context, projectID string) (*ProjectProfile, error)
 	SaveForProject(ctx context.Context, projectID string, profile *ProjectProfile) error
@@ -93,7 +93,7 @@ type ProjectSpecRepository interface {
 	SaveSpec(ctx context.Context, spec *ProjectSpec) error
 }
 
-// ScopedProjectSpecRepository 保存 workspace 子项目的开发规范
+// ScopedProjectSpecRepository 保存工作区子项目的开发规范
 type ScopedProjectSpecRepository interface {
 	GetSpecForProject(ctx context.Context, projectID string) (*ProjectSpec, error)
 	SaveSpecForProject(ctx context.Context, projectID string, spec *ProjectSpec) error

@@ -14,7 +14,7 @@ import (
 	snapshotdiff "github.com/silaswei-io/skills-seed/internal/snapshot"
 )
 
-// Result contains the request inputs derived from comparing current files to snapshots.
+// Result 保存通过当前文件与快照对比推导出的 AI 请求输入。
 type Result struct {
 	AddedFiles   []domain.FileInfo
 	DiffFiles    []agent.DiffFileRef
@@ -23,14 +23,12 @@ type Result struct {
 	Repository   *snapshotstore.Repository
 }
 
-// Build reads current file contents, compares them with stored snapshots, and
-// returns the added files and modified-file diff references for an AI request.
+// Build 读取当前文件内容并与已存快照对比，返回 AI 请求需要的新增文件和修改文件 diff 引用。
 func Build(ctx context.Context, projectRoot string, files []domain.FileInfo) (*Result, error) {
 	return BuildScoped(ctx, projectRoot, files, nil)
 }
 
-// BuildScoped is like Build, but MergedFiles replaces only snapshots inside
-// scopePaths and preserves snapshots outside the scope.
+// BuildScoped 与 Build 类似，但 MergedFiles 只替换 scopePaths 内的快照，并保留范围外快照。
 func BuildScoped(ctx context.Context, projectRoot string, files []domain.FileInfo, scopePaths []string) (*Result, error) {
 	seedPath := seedPathFor(ctx, projectRoot)
 	repo := snapshotstore.NewRepository(seedPath)

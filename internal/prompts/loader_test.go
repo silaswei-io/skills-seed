@@ -1,6 +1,7 @@
 package prompts
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,6 +121,88 @@ func TestLoader_RenderMergesProjectWorkspaceAndUserInstructions(t *testing.T) {
 	require.Less(t, strings.Index(prompt, "WORKSPACE LEARN ANALYZE CONTEXT"), strings.Index(prompt, "USER LEARN ANALYZE INSTRUCTIONS"))
 }
 
+func TestLoader_RenderSkipsLegacyDefaultPromptScaffolds(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "project"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
+
+	legacyCommon := `<!-- generated-by: skills-seed v0.7.0 -->
+<!-- prompt-template-sha256: old -->
+<!-- prompt-type: common -->
+<!-- editable: true -->
+
+# 项目专属约束
+
+处理这个项目时，优先遵循当前仓库的真实结构、命名风格和已有模式
+
+## 项目画像来源
+
+请结合 ` + "`project-profile.md`" + ` 中记录的项目背景理解代码，不要输出适用于任意项目的泛化建议
+
+## 额外要求
+
+- 先遵循本项目现有结构
+- 优先复用现有模式
+- 仅在必要时引入新抽象
+- 输出必须具体到当前项目
+`
+	legacyInstructions := `<!-- generated-by: skills-seed v0.7.0 -->
+<!-- prompt-template-sha256: old -->
+<!-- prompt-type: learn-analyze -->
+<!-- editable: true -->
+<!-- prompt-merge: append -->
+<!-- priority: user-instructions -->
+
+# 用户补充指令
+
+这些内容会追加到内置 ` + "`learn-analyze`" + ` 提示词之后，不会替换内置任务定义、输入约定或输出格式。
+
+在此补充团队约束、编码偏好或特定场景规则。不要修改内置提示词要求的 JSON/Markdown 输出结构。
+`
+	profile := `<!-- generated-by: skills-seed v0.7.0 -->
+<!-- prompt-template-sha256: old -->
+<!-- prompt-type: project-profile -->
+<!-- editable: true -->
+
+# 项目画像
+
+- 项目名称: demo
+- 主要语言: go
+- 项目根目录: /tmp/demo
+
+## 目录结构摘要
+
+` + "```text\n/tmp/demo\n├── README.md\n└── main.go\n```\n" + `
+## 架构摘要
+
+未记录
+
+## 关键模块
+
+未记录
+
+## 团队编码风格
+
+未记录
+`
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "common.md"), []byte(legacyCommon), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte(legacyInstructions), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"), []byte(profile), 0644))
+
+	loader := NewLoader("common", "zh-CN", seedPath)
+	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
+	require.NoError(t, err)
+
+	require.NotContains(t, prompt, "这些内容会追加到内置")
+	require.NotContains(t, prompt, "在此补充团队约束")
+	require.NotContains(t, prompt, "处理这个项目时，优先遵循当前仓库")
+	require.NotContains(t, prompt, "prompt-template-sha256")
+	require.NotContains(t, prompt, "未记录")
+	require.NotContains(t, prompt, "README.md")
+	require.Contains(t, prompt, "项目名称: demo")
+	require.Contains(t, prompt, "主要语言: go")
+}
+
 func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
@@ -136,6 +219,62 @@ func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 	require.Contains(t, prompt, guard)
 	require.Less(t, strings.Index(prompt, "USER SAYS RETURN MARKDOWN"), strings.LastIndex(prompt, guard))
 	require.True(t, strings.HasSuffix(prompt, guard))
+}
+
+func TestLoader_RenderStoresSuccessfulPromptUnderRuntimeMemory(t *testing.T) {
+	seedPath := t.TempDir()
+	loader := NewLoader("common", "en-US", seedPath)
+
+	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
+	require.NoError(t, err)
+
+	runtimeDir := filepath.Join(seedPath, "memory", "runtime", "rendered-prompts")
+	entries, err := os.ReadDir(runtimeDir)
+	require.NoError(t, err)
+	var renderedName string
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".md") {
+			renderedName = entry.Name()
+		}
+	}
+	require.NotEmpty(t, renderedName)
+	require.True(t, strings.HasPrefix(renderedName, "learn-analyze-"))
+
+	content, err := os.ReadFile(filepath.Join(runtimeDir, renderedName))
+	require.NoError(t, err)
+	require.Equal(t, prompt, strings.TrimSuffix(string(content), "\n"))
+	require.Contains(t, string(content), "You are a professional code quality review expert")
+}
+
+func TestLoader_RenderStoresPromptDebugManifest(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte(`# 用户补充指令
+
+这些内容会追加到内置 `+"`learn-analyze`"+` 提示词之后，不会替换内置任务定义、输入约定或输出格式。
+`), 0644))
+
+	loader := NewLoader("common", "zh-CN", seedPath)
+	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
+	require.NoError(t, err)
+
+	runtimeDir := filepath.Join(seedPath, "memory", "runtime", "rendered-prompts")
+	entries, err := os.ReadDir(runtimeDir)
+	require.NoError(t, err)
+	var manifestPath string
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".manifest.json") {
+			manifestPath = filepath.Join(runtimeDir, entry.Name())
+		}
+	}
+	require.NotEmpty(t, manifestPath)
+	data, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	var manifest map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &manifest))
+	require.Equal(t, "learn-analyze", manifest["template"])
+	require.EqualValues(t, len(prompt), manifest["final_length"])
+	require.NotEmpty(t, manifest["parts"])
 }
 
 func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {

@@ -13,8 +13,10 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
+// retryReasonMaxLength 限制终端进度行中的重试原因长度，避免长错误撑开界面。
 const retryReasonMaxLength = 220
 
+// whitespacePattern 用于把多行或多空白的错误原因压缩成单行。
 var whitespacePattern = regexp.MustCompile(`\s+`)
 
 type retryReporterKey struct{}
@@ -27,7 +29,7 @@ const (
 	RetryProgressStatusRecovered RetryProgressStatus = "recovered"
 )
 
-// RetryInfo describes one retryable Agent CLI failure before the next attempt.
+// RetryInfo 描述一次可重试的 Agent CLI 失败及下一次尝试前的状态。
 type RetryInfo struct {
 	AgentName    string
 	Operation    string
@@ -39,7 +41,7 @@ type RetryInfo struct {
 	Reason       string
 }
 
-// RetryReporter receives retry events so command progress UIs can update in real time.
+// RetryReporter 接收重试事件，让命令进度 UI 可以实时更新。
 type RetryReporter func(RetryInfo)
 
 type RetryProgressBinder struct {
@@ -123,7 +125,7 @@ func (b *RetryProgressBinder) Report(info RetryInfo) {
 	}
 }
 
-// WithRetryReporter attaches a retry reporter to ctx.
+// WithRetryReporter 将重试事件报告器绑定到 ctx。
 func WithRetryReporter(ctx context.Context, reporter RetryReporter) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -134,7 +136,7 @@ func WithRetryReporter(ctx context.Context, reporter RetryReporter) context.Cont
 	return context.WithValue(ctx, retryReporterKey{}, reporter)
 }
 
-// RetryReasonFromOutput returns a compact terminal-safe reason extracted from CLI output.
+// RetryReasonFromOutput 从 CLI 输出中提取适合终端展示的简短重试原因。
 func RetryReasonFromOutput(stdout, stderr string) string {
 	reason := retryReasonFromJSON(stdout)
 	if reason == "" {
@@ -149,7 +151,7 @@ func RetryReasonFromOutput(stdout, stderr string) string {
 	return truncateRetryReason(normalizeRetryReason(reason))
 }
 
-// ReportRetryForContext reports one retry event and writes structured diagnostics.
+// ReportRetryForContext 上报一次重试事件，并写入结构化诊断日志。
 func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 	scopeLabel := ""
 	if scope := tokenUsageScopeFromContext(ctx); scope != nil {

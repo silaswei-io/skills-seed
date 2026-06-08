@@ -100,7 +100,7 @@ func installHook() error {
 	// 创建 hook 脚本
 	hookPath := filepath.Join(gitDir, "hooks", "pre-commit")
 	hookContent := `#!/bin/bash
-# skills-seed pre-commit hook
+# skills-seed 预提交钩子
 
 # 获取暂存的文件
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$')

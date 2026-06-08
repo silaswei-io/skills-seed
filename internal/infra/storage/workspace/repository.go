@@ -11,13 +11,13 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/jsonfile"
 )
 
-// ErrProfileNotFound 表示 workspace-profile.json 不存在
+// ErrProfileNotFound 表示工作区画像文件不存在。
 var ErrProfileNotFound = errors.New("workspace profile not found")
 
-// ErrSpecNotFound 表示 workspace-spec.json 不存在
+// ErrSpecNotFound 表示工作区规范文件不存在。
 var ErrSpecNotFound = errors.New("workspace spec not found")
 
-// ProfileRepository 保存 workspace-profile.json
+// ProfileRepository 保存工作区画像文件。
 type ProfileRepository struct {
 	path string
 }
@@ -37,7 +37,7 @@ func (r *ProfileRepository) Save(ctx context.Context, profile *domain.WorkspaceP
 	return workspaceProfileStore(r.path).Save(ctx, profile)
 }
 
-// SpecRepository 保存 workspace-spec.json
+// SpecRepository 保存工作区规范文件。
 type SpecRepository struct {
 	path string
 }

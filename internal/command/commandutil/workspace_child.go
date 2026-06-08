@@ -19,7 +19,7 @@ type WorkspaceChildErrorKeys struct {
 	ModeInvalid    string
 }
 
-// OpenWorkspaceChildContainer 打开已独立初始化的 workspace 子项目容器。
+// OpenWorkspaceChildContainer 打开已独立初始化的工作区子项目容器。
 func OpenWorkspaceChildContainer(ctx context.Context, projectRootPath string, project config.WorkspaceProjectConfig, keys WorkspaceChildErrorKeys) (*container.Container, error) {
 	childSeedPath := filepath.Join(projectRootPath, ".skills-seed")
 	childConfigPath := filepath.Join(childSeedPath, "config.yaml")

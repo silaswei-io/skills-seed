@@ -2,13 +2,16 @@ package prompts
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -25,6 +28,22 @@ type Loader struct {
 	seedPath     string
 	templates    map[string]*template.Template
 	mu           sync.RWMutex
+}
+
+type promptPartDebug struct {
+	Name       string `json:"name"`
+	Included   bool   `json:"included"`
+	Length     int    `json:"length"`
+	RawLength  int    `json:"raw_length,omitempty"`
+	SkipReason string `json:"skip_reason,omitempty"`
+}
+
+type renderedPromptManifest struct {
+	Template    string            `json:"template"`
+	Agent       string            `json:"agent"`
+	Locale      string            `json:"locale"`
+	FinalLength int               `json:"final_length"`
+	Parts       []promptPartDebug `json:"parts"`
 }
 
 // NewLoader 创建提示词模板加载器
@@ -151,44 +170,59 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 		return base, nil
 	}
 
-	projectProfile := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "project-profile.md"))
-	commonProjectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "common.md"))
-	projectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", name+".md"))
+	rawProjectProfile := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "project-profile.md"))
+	rawCommonProjectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "common.md"))
+	rawProjectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", name+".md"))
+	projectProfile := prepareProjectProfilePrompt(rawProjectProfile)
+	commonProjectPrompt := prepareUserPromptFragment(rawCommonProjectPrompt)
+	projectPrompt := prepareUserPromptFragment(rawProjectPrompt)
 	scopedProfile, scopedCommon, scopedPrompt := l.readScopedProjectPrompts(name, data)
-	workspacePrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "workspace", name+".md"))
-	instructionsPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "instructions", name+".md"))
+	rawScopedProfile, rawScopedCommon, rawScopedPrompt := scopedProfile, scopedCommon, scopedPrompt
+	scopedProfile = prepareProjectProfilePrompt(scopedProfile)
+	scopedCommon = prepareUserPromptFragment(scopedCommon)
+	scopedPrompt = prepareUserPromptFragment(scopedPrompt)
+	rawWorkspacePrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "workspace", name+".md"))
+	rawInstructionsPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "instructions", name+".md"))
+	workspacePrompt := prepareUserPromptFragment(rawWorkspacePrompt)
+	instructionsPrompt := prepareUserPromptFragment(rawInstructionsPrompt)
 
 	var parts []string
+	debugParts := []promptPartDebug{}
+	addPart := func(partName, raw, cleaned string) {
+		if strings.TrimSpace(cleaned) == "" {
+			if strings.TrimSpace(raw) != "" {
+				debugParts = append(debugParts, promptPartDebug{
+					Name:       partName,
+					Included:   false,
+					RawLength:  len(raw),
+					SkipReason: "empty-after-filter",
+				})
+			}
+			return
+		}
+		trimmed := strings.TrimSpace(cleaned)
+		parts = append(parts, trimmed)
+		debugParts = append(debugParts, promptPartDebug{
+			Name:      partName,
+			Included:  true,
+			Length:    len(trimmed),
+			RawLength: len(raw),
+		})
+	}
 	if base != "" {
-		parts = append(parts, strings.TrimSpace(base))
+		addPart("base", base, base)
 	}
-	if projectProfile != "" {
-		parts = append(parts, strings.TrimSpace(projectProfile))
-	}
-	if commonProjectPrompt != "" {
-		parts = append(parts, strings.TrimSpace(commonProjectPrompt))
-	}
-	if projectPrompt != "" {
-		parts = append(parts, strings.TrimSpace(projectPrompt))
-	}
-	if scopedProfile != "" {
-		parts = append(parts, strings.TrimSpace(scopedProfile))
-	}
-	if scopedCommon != "" {
-		parts = append(parts, strings.TrimSpace(scopedCommon))
-	}
-	if scopedPrompt != "" {
-		parts = append(parts, strings.TrimSpace(scopedPrompt))
-	}
-	if workspacePrompt != "" {
-		parts = append(parts, strings.TrimSpace(workspacePrompt))
-	}
-	if instructionsPrompt != "" {
-		parts = append(parts, strings.TrimSpace(instructionsPrompt))
-	}
+	addPart("project-profile", rawProjectProfile, projectProfile)
+	addPart("project-common", rawCommonProjectPrompt, commonProjectPrompt)
+	addPart("project-prompt", rawProjectPrompt, projectPrompt)
+	addPart("scoped-project-profile", rawScopedProfile, scopedProfile)
+	addPart("scoped-project-common", rawScopedCommon, scopedCommon)
+	addPart("scoped-project-prompt", rawScopedPrompt, scopedPrompt)
+	addPart("workspace-prompt", rawWorkspacePrompt, workspacePrompt)
+	addPart("instructions-prompt", rawInstructionsPrompt, instructionsPrompt)
 	contractGuard := l.outputContractGuard(locale)
 	if contractGuard != "" {
-		parts = append(parts, contractGuard)
+		addPart("output-contract-guard", contractGuard, contractGuard)
 	}
 
 	rendered := strings.TrimSpace(strings.Join(parts, "\n\n"))
@@ -209,6 +243,13 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 		"final_length", len(rendered),
 		"has_seed_path", true,
 	)
+	l.saveRenderedPrompt(name, rendered, renderedPromptManifest{
+		Template:    name,
+		Agent:       l.agentName,
+		Locale:      locale,
+		FinalLength: len(rendered),
+		Parts:       debugParts,
+	})
 
 	return rendered, nil
 }
@@ -257,6 +298,138 @@ func templateCacheKey(locale, name string) string {
 	return locale + "/" + name
 }
 
+var htmlCommentBlockPattern = regexp.MustCompile(`(?s)<!--.*?-->\s*`)
+
+func prepareUserPromptFragment(content string) string {
+	content = stripPromptMetadata(content)
+	content = removeLegacyDefaultUserInstructionScaffold(content)
+	content = removeLegacyDefaultProjectPromptScaffold(content)
+	content = strings.TrimSpace(content)
+	if content == "# 用户补充指令" || content == "# User Instructions" || content == "# 项目专属约束" || content == "# Project-Specific Constraints" {
+		return ""
+	}
+	return content
+}
+
+func prepareProjectProfilePrompt(content string) string {
+	content = stripPromptMetadata(content)
+	content = removeUnrecordedProfileSections(content)
+	content = removeStructureSummarySection(content)
+	return strings.TrimSpace(content)
+}
+
+func stripPromptMetadata(content string) string {
+	return htmlCommentBlockPattern.ReplaceAllString(content, "")
+}
+
+func removeLegacyDefaultUserInstructionScaffold(content string) string {
+	lines := strings.Split(content, "\n")
+	filtered := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case trimmed == "# 用户补充指令" || trimmed == "# User Instructions":
+			continue
+		case strings.Contains(trimmed, "这些内容会追加到内置") || strings.Contains(trimmed, "This content is appended after the built-in"):
+			continue
+		case strings.Contains(trimmed, "在此补充团队约束") || strings.Contains(trimmed, "Add team constraints, coding preferences"):
+			continue
+		default:
+			filtered = append(filtered, line)
+		}
+	}
+	return strings.Join(filtered, "\n")
+}
+
+func removeLegacyDefaultProjectPromptScaffold(content string) string {
+	defaultFragments := []string{
+		"# 项目专属约束",
+		"处理这个项目时，优先遵循当前仓库的真实结构、命名风格和已有模式",
+		"## 项目画像来源",
+		"请结合 `project-profile.md` 中记录的项目背景理解代码，不要输出适用于任意项目的泛化建议",
+		"## 额外要求",
+		"- 先遵循本项目现有结构",
+		"- 优先复用现有模式",
+		"- 仅在必要时引入新抽象",
+		"- 输出必须具体到当前项目",
+		"# Project-Specific Constraints",
+		"When working on this project, prioritize the real structure, naming style, and established patterns in this repository",
+		"## Project Context Source",
+		"Use `project-profile.md` as the primary background for this project. Avoid generic advice that would fit any project",
+		"## Extra Requirements",
+		"- Follow the current project structure first",
+		"- Reuse existing patterns whenever possible",
+		"- Introduce new abstractions only when necessary",
+		"- Keep outputs specific to this project",
+	}
+	for _, fragment := range defaultFragments {
+		content = strings.ReplaceAll(content, fragment, "")
+	}
+	return content
+}
+
+func removeUnrecordedProfileSections(content string) string {
+	sectionTitles := []string{
+		"## 架构摘要",
+		"## 关键模块",
+		"## 团队编码风格",
+		"## Architecture Summary",
+		"## Key Modules",
+		"## Team Coding Style",
+	}
+	for _, title := range sectionTitles {
+		content = removeSectionWithOnlyValues(content, title, []string{"未记录", "Not recorded"})
+	}
+	return content
+}
+
+func removeStructureSummarySection(content string) string {
+	for _, title := range []string{"## 目录结构摘要", "## Structure Summary"} {
+		content = removeMarkdownSection(content, title)
+	}
+	return content
+}
+
+func removeSectionWithOnlyValues(content, title string, values []string) string {
+	section := extractMarkdownSection(content, title)
+	if section == "" {
+		return content
+	}
+	body := strings.TrimSpace(strings.TrimPrefix(section, title))
+	for _, value := range values {
+		if body == value {
+			return strings.Replace(content, section, "", 1)
+		}
+	}
+	return content
+}
+
+func removeMarkdownSection(content, title string) string {
+	section := extractMarkdownSection(content, title)
+	if section == "" {
+		return content
+	}
+	return strings.Replace(content, section, "", 1)
+}
+
+func extractMarkdownSection(content, title string) string {
+	start := strings.Index(content, title)
+	if start < 0 {
+		return ""
+	}
+	rest := content[start+len(title):]
+	nextRel := -1
+	for _, marker := range []string{"\n## ", "\n# "} {
+		if idx := strings.Index(rest, marker); idx >= 0 && (nextRel < 0 || idx < nextRel) {
+			nextRel = idx
+		}
+	}
+	if nextRel < 0 {
+		return content[start:]
+	}
+	return content[start : start+len(title)+nextRel]
+}
+
 func (l *Loader) readScopedProjectPrompts(name string, data interface{}) (string, string, string) {
 	projectName := promptProjectName(data)
 	if projectName == "" {
@@ -266,6 +439,104 @@ func (l *Loader) readScopedProjectPrompts(name string, data interface{}) (string
 	return l.readPromptFile(filepath.Join(basePath, "project-profile.md")),
 		l.readPromptFile(filepath.Join(basePath, "common.md")),
 		l.readPromptFile(filepath.Join(basePath, name+".md"))
+}
+
+func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromptManifest) {
+	if strings.TrimSpace(l.seedPath) == "" {
+		return
+	}
+
+	dir := filepath.Join(l.seedPath, "memory", "runtime", "rendered-prompts")
+	if config.DefaultAutoDeleteRenderedPrompts {
+		if err := os.RemoveAll(dir); err != nil {
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+				"operation", "prompt.rendered.cleanup",
+				"template", name,
+				"path", dir,
+				"error", err,
+			)
+		}
+	}
+	if !config.DefaultSaveRenderedPrompts {
+		return
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "prompt.rendered.mkdir",
+			"template", name,
+			"path", dir,
+			"error", err,
+		)
+		return
+	}
+
+	filename := safeRenderedPromptName(name) + "-" + time.Now().Format("20060102-150405.000000000") + ".md"
+	path := filepath.Join(dir, filename)
+	if err := os.WriteFile(path, []byte(content+"\n"), 0600); err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "prompt.rendered.write",
+			"template", name,
+			"path", path,
+			"error", err,
+		)
+		return
+	}
+	manifestPath := strings.TrimSuffix(path, ".md") + ".manifest.json"
+	manifestData, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "prompt.rendered.manifest.marshal",
+			"template", name,
+			"path", manifestPath,
+			"error", err,
+		)
+		return
+	}
+	if err := os.WriteFile(manifestPath, append(manifestData, '\n'), 0600); err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "prompt.rendered.manifest.write",
+			"template", name,
+			"path", manifestPath,
+			"error", err,
+		)
+		return
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "prompt.rendered.write",
+		"template", name,
+		"path", path,
+		"manifest_path", manifestPath,
+		"content_length", len(content),
+	)
+}
+
+func safeRenderedPromptName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "prompt"
+	}
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(name) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		case r == '-' || r == '_' || r == '.':
+			b.WriteRune(r)
+			lastDash = false
+		default:
+			if !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	safe := strings.Trim(b.String(), "-_.")
+	if safe == "" {
+		return "prompt"
+	}
+	return safe
 }
 
 func promptProjectName(data interface{}) string {

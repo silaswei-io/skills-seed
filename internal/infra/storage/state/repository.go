@@ -89,7 +89,7 @@ func (r *Repository) Save(ctx context.Context, state *domain.RuntimeState) error
 	return nil
 }
 
-// LockMode 记录当前模式，并禁止后续切换 project/workspace
+// LockMode 记录当前模式，并禁止后续在单项目和工作区模式之间切换。
 func (r *Repository) LockMode(ctx context.Context, mode string) (*domain.RuntimeState, error) {
 	if mode == "" {
 		mode = domain.ModeProject

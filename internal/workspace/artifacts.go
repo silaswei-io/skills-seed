@@ -7,7 +7,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-// MergeProfile overlays analyzed workspace facts onto a config-derived base.
+// MergeProfile 将 AI 分析出的工作区事实覆盖到由配置推导出的基础画像上。
 func MergeProfile(base, analyzed *domain.WorkspaceProfile) *domain.WorkspaceProfile {
 	if base == nil {
 		base = &domain.WorkspaceProfile{}
@@ -32,7 +32,7 @@ func MergeProfile(base, analyzed *domain.WorkspaceProfile) *domain.WorkspaceProf
 	return base
 }
 
-// MergeSpec overlays analyzed workspace rules onto defaults derived from profile.
+// MergeSpec 将 AI 分析出的工作区规则覆盖到由画像推导出的默认规范上。
 func MergeSpec(base, analyzed *domain.WorkspaceSpec) *domain.WorkspaceSpec {
 	if base == nil {
 		base = &domain.WorkspaceSpec{}
@@ -64,7 +64,7 @@ func MergeSpec(base, analyzed *domain.WorkspaceSpec) *domain.WorkspaceSpec {
 	return base
 }
 
-// SpecFromProfile builds conservative workspace routing and rules from profile facts.
+// SpecFromProfile 根据工作区画像生成保守的路由规则和跨项目规则。
 func SpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
 	if profile == nil {
 		return &domain.WorkspaceSpec{}
@@ -117,7 +117,7 @@ func SpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
 	}
 }
 
-// ChoosePaths uses analyzed paths when present, otherwise keeps the base paths.
+// ChoosePaths 优先使用分析结果中的路径；分析结果为空时保留基础路径。
 func ChoosePaths(base, analyzed []domain.WorkspacePath) []domain.WorkspacePath {
 	if len(analyzed) > 0 {
 		return analyzed
@@ -125,7 +125,7 @@ func ChoosePaths(base, analyzed []domain.WorkspacePath) []domain.WorkspacePath {
 	return base
 }
 
-// ProjectIDs returns non-empty workspace project IDs in order.
+// ProjectIDs 按原顺序返回非空的工作区子项目 ID。
 func ProjectIDs(projects []domain.WorkspaceProject) []string {
 	ids := make([]string, 0, len(projects))
 	for _, project := range projects {

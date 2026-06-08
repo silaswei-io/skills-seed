@@ -11,7 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 )
 
-// Labels contains user-facing error prefixes for JSON file persistence.
+// Labels 保存 JSON 文件持久化时面向用户的错误前缀。
 type Labels struct {
 	Read      string
 	Parse     string
@@ -20,7 +20,7 @@ type Labels struct {
 	Write     string
 }
 
-// Store persists one JSON document at a fixed path.
+// Store 把一个 JSON 文档持久化到固定路径。
 type Store[T any] struct {
 	Path     string
 	NotFound error
@@ -28,7 +28,7 @@ type Store[T any] struct {
 	Labels   Labels
 }
 
-// Get reads and unmarshals the store path.
+// Get 读取并反序列化存储路径中的 JSON 文档。
 func (s Store[T]) Get(ctx context.Context) (*T, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (s Store[T]) Get(ctx context.Context) (*T, error) {
 	return &value, nil
 }
 
-// Save marshals value as indented JSON and writes it to the store path.
+// Save 将 value 序列化为缩进 JSON，并写入存储路径。
 func (s Store[T]) Save(ctx context.Context, value *T) error {
 	if err := ctx.Err(); err != nil {
 		return err

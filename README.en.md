@@ -94,6 +94,8 @@ When an AI Agent hits retryable errors such as 429 / 529 / overloaded, Skills Se
 
 `skills-seed init` creates `.skills-seed/prompts/`. These files are not full replacements for the built-in prompts. They are merged with built-in prompts as project context, workspace constraints, or user instructions for learning and generation.
 
+Starting in 0.7.1, generated metadata, empty scaffolding, and unfilled placeholder text in default prompt files are filtered during rendering. Only user-authored constraints enter the Agent input. Each rendered prompt is saved under `.skills-seed/memory/runtime/rendered-prompts/`; the neighboring `.manifest.json` records whether base, project, workspace, and instruction fragments were included and their lengths, making context provenance easier to debug.
+
 Common layout:
 
 ```text
@@ -131,6 +133,8 @@ skills-seed learn current --context-file .skills-seed/context.md
 ```
 
 If a rule should apply across future runs, put it in `.skills-seed/prompts/instructions/<prompt-id>.md`. If it only explains or limits one run, use `--context` or `--context-file`.
+
+`learn current`, `preview`, and structural analysis now share one file-selection policy: by default they analyze source files, build config, and dependency config while continuing to skip documents, generated outputs, paths matched by global `exclude`, and generated Skills output directories.
 
 ## Quick Start
 

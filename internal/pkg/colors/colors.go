@@ -3,20 +3,31 @@ package colors
 
 // ANSI 颜色常量
 const (
-	Reset   = "\033[0m"
-	Red     = "\033[31m"
-	Green   = "\033[32m"
-	Yellow  = "\033[33m"
-	Blue    = "\033[34m"
+	// Reset 清除前面设置的颜色或样式。
+	Reset = "\033[0m"
+	// Red 前景色红色，用于错误或高风险信息。
+	Red = "\033[31m"
+	// Green 前景色绿色，用于成功信息。
+	Green = "\033[32m"
+	// Yellow 前景色黄色，用于警告信息。
+	Yellow = "\033[33m"
+	// Blue 前景色蓝色，用于普通强调信息。
+	Blue = "\033[34m"
+	// Magenta 前景色洋红色。
 	Magenta = "\033[35m" // 也叫 Purple
-	Cyan    = "\033[36m"
-	White   = "\033[37m"
-	Gray    = "\033[90m"
-	Bold    = "\033[1m"
+	// Cyan 前景色青色。
+	Cyan = "\033[36m"
+	// White 前景色白色。
+	White = "\033[37m"
+	// Gray 前景色灰色。
+	Gray = "\033[90m"
+	// Bold 开启加粗样式。
+	Bold = "\033[1m"
 )
 
 // 别名（兼容性）
 const (
+	// Purple 是 Magenta 的兼容别名。
 	Purple = Magenta
 )
 

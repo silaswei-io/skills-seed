@@ -10,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,11 +67,31 @@ func TestPrepareIncrementalFileChangesExcludesGeneratedSkills(t *testing.T) {
 	require.ElementsMatch(t, []string{".agents/skills/skills-seed-skills", ".claude/skills/skills-seed-skills"}, changes.ExcludedGeneratedSkillDirs)
 }
 
+func TestPrepareIncrementalFileChangesSkipsDocumentsButKeepsDocsSource(t *testing.T) {
+	ctx := context.Background()
+	projectRoot := initLearnGitRepo(t)
+	writeLearnFile(t, projectRoot, "main.go", "package main\n")
+	writeLearnFile(t, projectRoot, "README.MD", "# readme\n")
+	writeLearnFile(t, projectRoot, "docs/Guide.MD", "# guide\n")
+	writeLearnFile(t, projectRoot, "docs/examples/demo.go", "package examples\n")
+	gitAddAll(t, projectRoot)
+
+	repo := newLearnTracker(t, projectRoot)
+	configRepo := newIncrementalConfig(t, projectRoot)
+
+	changes, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"main.go", "docs/examples/demo.go"}, changes.AddedOrModified)
+	require.Contains(t, changes.Skipped, "README.MD")
+	require.Contains(t, changes.Skipped, "docs/Guide.MD")
+	require.Equal(t, 2, changes.SkippedCount(fileanalysis.SkipReasonDocument))
+}
+
 func TestConfiguredLearnExcludesSeparatesBuiltinsFromConfigDefaults(t *testing.T) {
 	projectRoot := t.TempDir()
 	configRepo := newIncrementalConfig(t, projectRoot)
 
-	excludes := configuredLearnExcludes(configRepo, projectRoot)
+	excludes := fileanalysis.ConfiguredLearnExcludes(configRepo, projectRoot)
 
 	require.Contains(t, excludes, ".git/**")
 	require.Contains(t, excludes, ".skills-seed/**")

@@ -70,10 +70,10 @@ func (g *WorkspaceGenerator) fileAnalysisTracker() domain.FileAnalysisTracker {
 	return tracker
 }
 
-// GenerateProgressHooks mirrors generator.GenerateProgressHooks for workspace consumers
+// GenerateProgressHooks 复用 generator.GenerateProgressHooks，供 workspace 生成流程消费。
 type GenerateProgressHooks = generator.GenerateProgressHooks
 
-// GenerateProjectStepTotal mirrors generator.GenerateProjectStepTotal
+// GenerateProjectStepTotal 复用单项目生成流程的步骤总数。
 const GenerateProjectStepTotal = generator.GenerateProjectStepTotal
 
 // GenerateWorkspaceSkills 只生成工作区根 skill，子项目 skill 由各子仓自己生成

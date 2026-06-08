@@ -9,17 +9,17 @@ import (
 	"strings"
 )
 
-// Repository stores full-file snapshots under .skills-seed/memory/snapshots.
+// Repository 将完整文件快照保存到 .skills-seed/memory/snapshots 下。
 type Repository struct {
 	dir string
 }
 
-// NewRepository creates a snapshot repository rooted at the seed path.
+// NewRepository 创建以 seedPath 为根的快照仓储。
 func NewRepository(seedPath string) *Repository {
 	return &Repository{dir: filepath.Join(seedPath, "memory", "snapshots")}
 }
 
-// Load reads all snapshots as path -> content. Missing snapshot directories are empty.
+// Load 读取所有快照，返回“路径 -> 内容”；快照目录不存在时返回空集合。
 func (r *Repository) Load() (map[string]string, error) {
 	files := map[string]string{}
 	err := filepath.WalkDir(r.dir, func(path string, d fs.DirEntry, err error) error {
@@ -49,7 +49,7 @@ func (r *Repository) Load() (map[string]string, error) {
 	return files, nil
 }
 
-// Replace atomically replaces all snapshots with the provided file contents.
+// Replace 用给定文件内容原子替换全部快照。
 func (r *Repository) Replace(files map[string]string) error {
 	parent := filepath.Dir(r.dir)
 	if err := os.MkdirAll(parent, 0o755); err != nil {

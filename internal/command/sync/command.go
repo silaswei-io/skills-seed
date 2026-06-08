@@ -53,21 +53,21 @@ func Cmd(cont *container.Container) *cobra.Command {
 	return cmd
 }
 
-// syncLearn 路径 A: learn current → patterns merge → generate skills
+// syncLearn 路径 A：学习当前代码 → 合并模式 → 生成 Skills。
 func syncLearn(ctx context.Context, cont *container.Container, userContext string) error {
-	// Step 1: learn current
+	// 步骤 1：学习当前代码。
 	logger.Info(i18n.Get("SyncStepLearn"))
 	if err := learncmd.RunLearnCurrentWithContext(cont, userContext); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
 
-	// Step 2: patterns merge
+	// 步骤 2：合并相似模式。
 	logger.Info(i18n.Get("SyncStepMerge"))
 	if _, err := cont.MergerSvc.MergePatterns(ctx, &merger.MergePatternsRequest{}); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncMergeFailed"), err)
 	}
 
-	// Step 3: generate skills
+	// 步骤 3：生成 Skills。
 	logger.Info(i18n.Get("SyncStepGenerate"))
 	if err := gencmd.RunGenerate(cont); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
@@ -77,9 +77,9 @@ func syncLearn(ctx context.Context, cont *container.Container, userContext strin
 	return nil
 }
 
-// syncWithUserPattern 路径 B: patterns add → patterns merge → generate skills
+// syncWithUserPattern 路径 B：添加模式 → 合并模式 → 生成 Skills。
 func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, userContext string) error {
-	// Step 1: patterns add
+	// 步骤 1：添加用户自定义模式。
 	logger.Info(i18n.Get("SyncStepAddPattern"))
 	req := &agent.UserDefinePatternRequest{
 		Description: description,
@@ -116,13 +116,13 @@ func syncWithUserPattern(ctx context.Context, cont *container.Container, descrip
 		"Category":    string(result.Pattern.Category),
 	}))
 
-	// Step 2: patterns merge
+	// 步骤 2：合并相似模式。
 	logger.Info(i18n.Get("SyncStepMerge"))
 	if _, err := cont.MergerSvc.MergePatterns(ctx, &merger.MergePatternsRequest{}); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncMergeFailed"), err)
 	}
 
-	// Step 3: generate skills
+	// 步骤 3：生成 Skills。
 	logger.Info(i18n.Get("SyncStepGenerate"))
 	if err := gencmd.RunGenerate(cont); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)

@@ -180,6 +180,25 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 	require.NotContains(t, content, "Use when modifying")
 }
 
+func TestLoader_OmitsVisibleSkillsSeedGeneratedNoticeByDefault(t *testing.T) {
+	loader := NewLoader("zh-CN")
+
+	content, err := loader.RenderPattern("business", map[string]interface{}{
+		"Category":       "business",
+		"Priority":       1,
+		"PatternCount":   9,
+		"Confidence":     90.0,
+		"LastUpdated":    "2026-06-08 12:00:00",
+		"Summary":        "业务模式",
+		"PatternObjects": []domain.Pattern{*domain.NewPattern("p1", "业务规则", domain.CategoryBusiness)},
+		"UsageScenes":    []string{},
+	})
+	require.NoError(t, err)
+
+	require.NotContains(t, content, "此文档由 skills-seed 从")
+	require.NotContains(t, content, "自动生成")
+}
+
 // TestLoader_RenderReference 测试分类模板渲染
 func TestLoader_RenderReference(t *testing.T) {
 	loader := NewLoader("zh-CN")

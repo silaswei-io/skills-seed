@@ -4,9 +4,9 @@
 
 配置文件位于 `.skills-seed/config.yaml`。`skills-seed init` 会按当前项目生成默认配置；大多数路径都相对项目根目录或 `.skills-seed` 目录，具体以字段说明为准。
 
-## 0.7.0 配置结构
+## 0.7.x 配置结构
 
-0.7.0 继续不保留旧字段兼容：
+0.7.x 继续不保留旧字段兼容：
 
 - 顶层 `project` 改名为 `profile`，表示当前配置文件所属项目或工作区本身，不表示 `project` 运行模式。
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
@@ -157,6 +157,8 @@ exclude:
 
 基于内嵌 tree-sitter 的轻量结构化预扫描。它提供符号、导入、入口点和模块线索，不依赖外部命令，也不维护索引。
 
+0.7.1 起，结构化预扫描、`learn current` 和 `preview` 共用同一套文件选择策略：默认只纳入源码、构建配置和依赖配置；文档、生成产物、全局 `exclude` 命中的路径以及已生成 Skills 输出目录会被跳过。
+
 #### 字段
 
 | 字段 | 默认值 | 说明 |
@@ -171,6 +173,16 @@ exclude:
 2. 明确不需要结构化上下文时，把 `enabled` 设为 `false`。
 3. 大型仓库可降低 `max_file_size`，避免解析生成文件、bundle 或异常大文件。
 4. 结构化预扫描只消费已有边界输入，不在没有 seed 时全仓扫描。
+
+### Prompt 运行时调试
+
+Prompt 片段仍从 `.skills-seed/prompts/` 读取，但 0.7.1 起渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的约束。
+
+渲染后的 prompt 默认保存在 `.skills-seed/memory/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、项目画像、项目补充、workspace 补充、用户指令和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。
+
+### 生成标记
+
+Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默认不写入最终文件，减少生成内容对后续学习的干扰。需要确认产物来源时，可通过文件头部的 `generated-by` 元数据或运行时日志排查。
 
 ### `agent`
 

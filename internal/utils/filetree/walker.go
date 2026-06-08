@@ -9,8 +9,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
 )
 
-// Walk recursively lists files under root, applying exclude patterns to both
-// directories and files. Returned file paths are slash-separated and relative to root.
+// Walk 递归列出 root 下的文件，并把排除规则同时应用到目录和文件。
+// 返回的文件路径使用斜杠分隔，并且相对于 root。
 func Walk(root string, exclude []string) ([]domain.FileInfo, error) {
 	files := []domain.FileInfo{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {

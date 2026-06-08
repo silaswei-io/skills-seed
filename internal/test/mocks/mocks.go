@@ -365,7 +365,7 @@ func (m *MockProjectProfileRepository) Save(ctx context.Context, profile *domain
 	return nil
 }
 
-// GetForProject 模拟获取 workspace 子项目画像
+// GetForProject 模拟获取工作区子项目画像
 func (m *MockProjectProfileRepository) GetForProject(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
 	if m.GetForProjectFn != nil {
 		return m.GetForProjectFn(ctx, projectID)
@@ -373,7 +373,7 @@ func (m *MockProjectProfileRepository) GetForProject(ctx context.Context, projec
 	return m.Get(ctx)
 }
 
-// SaveForProject 模拟保存 workspace 子项目画像
+// SaveForProject 模拟保存工作区子项目画像
 func (m *MockProjectProfileRepository) SaveForProject(ctx context.Context, projectID string, profile *domain.ProjectProfile) error {
 	if m.SaveForProjectFn != nil {
 		return m.SaveForProjectFn(ctx, projectID, profile)
@@ -397,7 +397,7 @@ func (m *MockProjectProfileRepository) SaveSpec(ctx context.Context, spec *domai
 	return nil
 }
 
-// GetSpecForProject 模拟获取 workspace 子项目规范
+// GetSpecForProject 模拟获取工作区子项目规范
 func (m *MockProjectProfileRepository) GetSpecForProject(ctx context.Context, projectID string) (*domain.ProjectSpec, error) {
 	if m.GetSpecForProjectFn != nil {
 		return m.GetSpecForProjectFn(ctx, projectID)
@@ -405,7 +405,7 @@ func (m *MockProjectProfileRepository) GetSpecForProject(ctx context.Context, pr
 	return nil, nil
 }
 
-// SaveSpecForProject 模拟保存 workspace 子项目规范
+// SaveSpecForProject 模拟保存工作区子项目规范
 func (m *MockProjectProfileRepository) SaveSpecForProject(ctx context.Context, projectID string, spec *domain.ProjectSpec) error {
 	if m.SaveSpecForProjectFn != nil {
 		return m.SaveSpecForProjectFn(ctx, projectID, spec)
@@ -558,7 +558,7 @@ func (m *MockConfigReader) GetEffectiveAgentCommand() string {
 	return engine
 }
 
-// GetEffectiveSkillsTarget 模拟获取有效 Skills target
+// GetEffectiveSkillsTarget 模拟获取有效 Skills 目标类型
 func (m *MockConfigReader) GetEffectiveSkillsTarget() string {
 	return config.EffectiveSkillsTarget(m.AgentCfg, m.SkillsCfg)
 }

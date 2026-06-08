@@ -27,10 +27,9 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/service/snapshotflow"
 	"github.com/silaswei-io/skills-seed/internal/utils"
-	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
-	"github.com/silaswei-io/skills-seed/internal/utils/filetree"
 )
 
 // AnalyzerService 代码分析服务
@@ -710,14 +709,15 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 	var diffFiles []agent.DiffFileRef
 	var snapshotFlow *snapshotflow.Result
 	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
-		files, err := filetree.Walk(projectRoot, s.excludePatterns())
+		selection, err := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
+			Root:          projectRoot,
+			Policy:        fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot),
+			FocusAbsPaths: opts.FocusPaths,
+		})
 		if err != nil {
 			return nil, nil, err
 		}
-		if len(focusPaths) > 0 {
-			files = filterFileInfosByFocusPaths(files, focusPaths)
-		}
-		snapshotFlow, err = snapshotflow.BuildScoped(ctx, projectRoot, files, focusPaths)
+		snapshotFlow, err = snapshotflow.BuildScoped(ctx, projectRoot, selection.Files, focusPaths)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -772,13 +772,6 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 	return result, result.Patterns, nil
 }
 
-func (s *AnalyzerService) excludePatterns() []string {
-	if s.configRepo == nil {
-		return nil
-	}
-	return s.configRepo.GetExclude()
-}
-
 func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
 	limit := len(files)
 	if limit > maxSampleFiles {
@@ -792,33 +785,6 @@ func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
 		samples = append(samples, agent.SampleFile{Path: file.Path})
 	}
 	return samples
-}
-
-func filterFileInfosByFocusPaths(files []domain.FileInfo, focusPaths []string) []domain.FileInfo {
-	if len(files) == 0 || len(focusPaths) == 0 {
-		return files
-	}
-	filtered := make([]domain.FileInfo, 0, len(files))
-	for _, file := range files {
-		if pathInFocus(file.Path, focusPaths) {
-			filtered = append(filtered, file)
-		}
-	}
-	return filtered
-}
-
-func pathInFocus(path string, focusPaths []string) bool {
-	path = strings.Trim(filepath.ToSlash(path), "/")
-	for _, focus := range focusPaths {
-		focus = strings.Trim(filepath.ToSlash(focus), "/")
-		if focus == "" {
-			continue
-		}
-		if path == focus || strings.HasPrefix(path, focus+"/") {
-			return true
-		}
-	}
-	return false
 }
 
 // collectSampleFiles 收集项目中的代表性代码文件
@@ -848,7 +814,7 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 	// 排除目录
 	excludeDirs := map[string]bool{
 		"vendor": true, "node_modules": true, ".git": true, ".skills-seed": true,
-		"testdata": true, "mocks": true, "docs": true, "scripts": true,
+		"testdata": true, "mocks": true,
 	}
 
 	// 排除文件后缀
@@ -858,10 +824,7 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 
 	var files []agent.SampleFile
 	seenFiles := make(map[string]bool)
-	excludePatterns := []string(nil)
-	if s.configRepo != nil {
-		excludePatterns = s.configRepo.GetExclude()
-	}
+	selectionPolicy := fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot)
 	if len(scanRoots) == 0 {
 		scanRoots = []string{projectRoot}
 	}
@@ -893,7 +856,12 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 
 			relPath, _ := filepath.Rel(projectRoot, path)
 			relPath = filepath.ToSlash(relPath)
-			if seenFiles[relPath] || filefilter.MatchExcluded(relPath, excludePatterns) {
+			if config.DefaultAnalyzeSourceFilesOnly {
+				if include, _ := selectionPolicy.Include(relPath); !include {
+					return nil
+				}
+			}
+			if seenFiles[relPath] || selectionPolicy.IsExcluded(relPath) {
 				return nil
 			}
 

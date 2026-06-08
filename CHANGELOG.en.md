@@ -2,6 +2,25 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.1]
+
+### Features
+
+- Prompt rendering now strips default scaffolding and generated metadata, merging only user-authored project constraints, workspace constraints, and instruction fragments into Agent input.
+- Rendered prompts are saved under the runtime directory with a manifest that records whether each fragment was included, plus raw and final lengths, making prompt-context debugging easier.
+- `learn current` file selection, excludes, incremental fingerprints, and commit bookkeeping moved into the `fileanalysis` service so analysis, preview, and learning share one policy.
+
+### Changes
+
+- Project prompt templates now default to empty comment guidance, preventing generic bootstrap text from being repeatedly appended as user constraints.
+- Structural analysis and sample selection now default to source, build config, and dependency config files while continuing to skip documents, generated outputs, and generated Skills directories.
+- The skills-seed generated footer in Skills templates is now configuration-controlled and omitted by default.
+- Default config templates, source comments, and constant documentation now use Chinese-first wording with mixed English where technical names are clearer, such as Agent, Skills, CLI, and tree-sitter.
+
+### Documentation
+
+- Updated README, configuration reference, and changelog for 0.7.1 prompt merge cleanup, runtime debug manifests, unified file-selection policy, and comment/documentation wording.
+
 ## [v0.7.0]
 
 ### Breaking Changes

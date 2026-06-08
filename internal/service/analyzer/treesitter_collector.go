@@ -17,7 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
 )
 
-// structuralContextRequest defines parameters for structural analysis.
+// structuralContextRequest 定义结构化分析所需的输入参数。
 type structuralContextRequest struct {
 	ProjectName string
 	Language    string
@@ -26,12 +26,12 @@ type structuralContextRequest struct {
 	SeedPaths   []string
 }
 
-// structuralCollector extracts symbols, imports, and entry points from source files.
+// structuralCollector 从源码文件中提取符号、import 和入口点。
 type structuralCollector interface {
 	Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error)
 }
 
-// treesitterCollector implements structuralCollector using embedded tree-sitter.
+// treesitterCollector 基于内嵌 tree-sitter 实现 structuralCollector。
 type treesitterCollector struct {
 	maxSymbols  int
 	maxFileSize int64
@@ -39,7 +39,7 @@ type treesitterCollector struct {
 	excludeDirs map[string]bool
 }
 
-// fileResult holds per-file extraction results.
+// fileResult 保存单个文件的结构化提取结果。
 type fileResult struct {
 	relPath  string
 	langName string
@@ -53,19 +53,20 @@ type seedRoot struct {
 }
 
 func newStructuralCollector(cfg config.StructuralConfig, exclude []string) structuralCollector {
-	maxFileSize := int64(512 * 1024) // 512 KB default
+	// maxFileSize 默认限制单文件 512KB，避免大文件拖慢 tree-sitter 解析。
+	maxFileSize := int64(512 * 1024)
 	if cfg.MaxFileSize > 0 {
 		maxFileSize = int64(cfg.MaxFileSize) * 1024
 	}
 
-	// Build exclude dirs from exclude patterns
+	// excludeDirs 合并固定元数据目录和配置中的简单目录排除规则。
 	excludeDirs := map[string]bool{
 		".git": true, ".skills-seed": true, ".idea": true, ".vscode": true,
 		".cache": true,
 	}
 	for _, pattern := range exclude {
 		clean := strings.TrimSpace(pattern)
-		// Simple dir patterns like "vendor", "node_modules", "build"
+		// 只把 vendor、node_modules、build 这类简单目录名加入快速跳过列表。
 		if !strings.Contains(clean, "/") && !strings.Contains(clean, "*") && !strings.Contains(clean, ".") {
 			excludeDirs[clean] = true
 		}
@@ -79,8 +80,7 @@ func newStructuralCollector(cfg config.StructuralConfig, exclude []string) struc
 	}
 }
 
-// Collect walks the project tree, parses source files, and returns a
-// markdown-formatted structural context.
+// Collect 遍历项目树、解析源码文件，并返回 Markdown 格式的结构化上下文。
 func (c *treesitterCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
 	startedAt := time.Now()
 	seedRoots := c.boundedSeedRoots(projectRoot, req.SeedPaths)
@@ -93,6 +93,7 @@ func (c *treesitterCollector) Collect(ctx context.Context, projectRoot string, r
 	var stats grammars.WalkStats
 	maxSymbols := c.maxSymbols
 	if maxSymbols <= 0 {
+		// maxSymbols 默认最多输出 30 个符号，控制提示词上下文体积。
 		maxSymbols = 30
 	}
 
@@ -311,17 +312,17 @@ func (c *treesitterCollector) assembleMarkdown(
 	var b strings.Builder
 	b.WriteString("## Structural Context\n\n")
 
-	// Status section
+	// 状态区：输出扫描文件数、解析文件数和语言分布。
 	b.WriteString("### Status\n\n")
 	b.WriteString(fmt.Sprintf("Files scanned: %d | Files parsed: %d | Languages: %s\n\n",
 		stats.FilesFound, stats.FilesParsed, formatLangCounts(langCounts)))
 
-	// Symbols section — cap to maxSymbols
+	// 符号区：按 maxSymbols 限制输出数量。
 	b.WriteString("### Symbols\n\n")
 	printed := 0
 	var entryPoints []string
 
-	// Sort files for deterministic output
+	// 按文件路径排序，保证输出稳定。
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].relPath < results[j].relPath
 	})
@@ -349,7 +350,7 @@ func (c *treesitterCollector) assembleMarkdown(
 		b.WriteByte('\n')
 	}
 
-	// Imports section (brief)
+	// import 区：只输出简要依赖路径。
 	b.WriteString("### Imports\n\n")
 	importPrinted := 0
 	for _, fr := range results {
@@ -370,7 +371,7 @@ func (c *treesitterCollector) assembleMarkdown(
 		b.WriteByte('\n')
 	}
 
-	// Entry points
+	// 入口点区：集中列出 main 等入口符号。
 	if len(entryPoints) > 0 {
 		b.WriteString("### Entry Points\n\n")
 		for _, ep := range entryPoints {
@@ -402,7 +403,7 @@ func formatLangCounts(counts map[string]int) string {
 	return strings.Join(parts, ", ")
 }
 
-// parseTree is a helper for tests: parse a source string and return the tree.
+// parseTree 是测试辅助方法：解析源码并返回 tree-sitter 语法树。
 func parseTree(filename string, src []byte) (*gotreesitter.Tree, *gotreesitter.Language, error) {
 	entry := grammars.DetectLanguage(filename)
 	if entry == nil {

@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	// frames 是进度动画的固定帧序列。
 	frames              = []string{"|", "/", "-", "\\"}
 	consoleMu           sync.Mutex
 	progressActive      bool
@@ -23,6 +24,7 @@ var (
 	terminalWidth       = currentTerminalWidth
 )
 
+// FastStepPause 是极短步骤完成后的最小停顿，避免进度行闪烁。
 const FastStepPause = 200 * time.Millisecond
 
 // Tracker 以步骤为单位显示进度

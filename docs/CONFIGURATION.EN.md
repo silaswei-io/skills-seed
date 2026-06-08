@@ -4,9 +4,9 @@
 
 The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates it from the project context. Most paths are relative to the project root or `.skills-seed`; each field below states the relevant base.
 
-## 0.7.0 Config Structure
+## 0.7.x Config Structure
 
-0.7.0 continues to avoid compatibility with old fields:
+0.7.x continues to avoid compatibility with old fields:
 
 - Top-level `project` was renamed to `profile`. It describes the project or workspace that owns the config file; it is not the `project` run mode.
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
@@ -157,6 +157,8 @@ exclude:
 
 Lightweight structural pre-scan based on embedded tree-sitter. It provides symbols, imports, entry points, and module clues without depending on an external command or maintaining an index.
 
+Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the same file-selection policy: source files, build config, and dependency config are included by default, while documents, generated outputs, paths matched by global `exclude`, and generated Skills output directories are skipped.
+
 #### Fields
 
 | Field | Default | Description |
@@ -171,6 +173,16 @@ Lightweight structural pre-scan based on embedded tree-sitter. It provides symbo
 2. Set `enabled` to `false` when structural context is not needed.
 3. Lower `max_file_size` for large repositories to avoid generated files, bundles, or unusually large files.
 4. Structural pre-scan only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
+
+### Prompt Runtime Debugging
+
+Prompt fragments are still read from `.skills-seed/prompts/`, but starting in 0.7.1 rendering filters default metadata, empty scaffolding, and unfilled placeholder text. Only user-authored constraints are kept.
+
+Rendered prompts are saved by default under `.skills-seed/memory/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, project profile, project fragment, workspace fragment, user instruction, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent.
+
+### Generated Notice
+
+The skills-seed generated footer in Skills templates is now controlled by an internal default and is omitted by default, reducing generated-content feedback into later learning. To inspect artifact provenance, use the `generated-by` metadata header or runtime logs.
 
 ### `agent`
 

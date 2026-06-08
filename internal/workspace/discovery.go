@@ -11,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 )
 
+// ignoredDirs 是工作区自动发现时跳过的目录，避免依赖、构建产物和生成内容被识别为子项目。
 var ignoredDirs = map[string]bool{
 	".git":         true,
 	".skills-seed": true,
@@ -24,6 +25,7 @@ var ignoredDirs = map[string]bool{
 	"coverage":     true,
 }
 
+// projectMarkerFiles 是用于识别子项目根目录的典型项目、构建、依赖和部署配置文件。
 var projectMarkerFiles = []string{
 	"install.sh",
 	"_install.sh",
@@ -83,6 +85,7 @@ var projectMarkerFiles = []string{
 	"main.tf",
 }
 
+// projectMarkerExtensions 是用于识别 .NET 等工程文件的项目标记扩展名。
 var projectMarkerExtensions = []string{
 	".csproj",
 	".fsproj",
@@ -90,6 +93,7 @@ var projectMarkerExtensions = []string{
 	".sln",
 }
 
+// markerGroups 按生态或用途组织项目标记，用于推断子项目类型和语言。
 var markerGroups = map[string][]string{
 	"shell": {
 		"install.sh",
