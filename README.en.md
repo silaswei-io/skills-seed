@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 `generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
 
+Starting in 0.7.0, learning and project-profile analysis use an embedded tree-sitter structural pre-scan when bounded inputs exist. It extracts symbols, imports, entry points, and module clues so the Agent can prioritize source files to inspect. It no longer depends on an external CodeGraph command or index; configure it under `analysis.structural`, where `max_symbols` controls emitted symbol count and `max_file_size` controls the per-source-file size limit.
+
 When an AI Agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries with exponential backoff according to `agent.retry`. Long-running progress lines switch between normal, waiting, and retrying states, for example `Analyze current codebase`, `Analyze current codebase (API Error: 529 overloaded_error, call 3m37s, retry in 15s)`, and `Analyze current codebase (attempt 2)`. The call duration is how long the failed Agent call took; `retry in 15s` is the backoff wait.
 
 ## Prompts And One-Time Guidance
@@ -175,7 +177,7 @@ skills-seed workspace add backend frontend
 
 The workspace root coordinates routing and cross-project relationships only. Child projects use their own `.skills-seed` directories to learn, generate, and store patterns independently. Existing child `.skills-seed/config.yaml` files are never overwritten; if a child uses a different agent from the root, it is reported and preserved.
 
-Starting in 0.6.1, the only user-facing workspace config field is `workspace.projects`. Shared libraries, contracts, and infrastructure impact are no longer hand-written through `workspace.shared`, `workspace.contracts`, or `workspace.infra`; during `learn current`, they are analyzed from repository evidence, child `project-profile.json` files, and one-shot user context into root `workspace-profile.json` / `workspace-spec.json`. `generate skills` only consumes these learned artifacts and no longer accepts user context.
+The only user-facing workspace config field is `workspace.projects`. Shared libraries, contracts, and infrastructure impact are no longer hand-written through `workspace.shared`, `workspace.contracts`, or `workspace.infra`; during `learn current`, they are analyzed from repository evidence, child `project-profile.json` files, and one-shot user context into root `workspace-profile.json` / `workspace-spec.json`. `generate skills` only consumes these learned artifacts and no longer accepts user context.
 
 ## Design Principles
 

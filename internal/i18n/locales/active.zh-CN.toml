@@ -278,14 +278,8 @@ other = "项目分析失败"
 [AnalyzerAnalyzeCodebaseFailed]
 other = "代码库分析失败"
 
-[AnalyzerCodeGraphCommandUnavailable]
-other = "CodeGraph 分析增强已启用，但未找到 codegraph 命令。将跳过结构化索引分析并继续使用普通文件分析。安装方式：npm install -g @colbymchenry/codegraph"
-
-[AnalyzerCodeGraphIndexMissing]
-other = "CodeGraph 分析增强已启用，但目标项目没有 .codegraph 索引。将跳过结构化索引分析并继续使用普通文件分析。可在目标项目执行：codegraph init -i"
-
-[AnalyzerCodeGraphCollectFailed]
-other = "CodeGraph 分析增强失败，将跳过结构化索引分析并继续使用普通文件分析。"
+[AnalyzerStructuralCollectFailed]
+other = "结构化分析失败，将跳过结构化预扫描并继续使用普通文件分析。"
 
 [ConfigReadFailed]
 other = "读取配置失败"

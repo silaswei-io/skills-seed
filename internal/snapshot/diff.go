@@ -17,6 +17,7 @@ const (
 	ChangeAdded     ChangeStatus = "added"
 	ChangeModified  ChangeStatus = "modified"
 	ChangeUnchanged ChangeStatus = "unchanged"
+	ChangeDeleted   ChangeStatus = "deleted"
 )
 
 // FileChange is the comparison result for one current file.
@@ -54,6 +55,50 @@ func Compare(currentFiles map[string]string, oldSnapshots map[string]string, run
 		changes = append(changes, FileChange{Path: path, Status: ChangeModified, DiffPath: diffPath})
 	}
 	return changes, nil
+}
+
+// CompareScoped compares current files and also reports old snapshots deleted
+// inside scopePaths. Empty scopePaths means the current file set is complete.
+func CompareScoped(currentFiles map[string]string, oldSnapshots map[string]string, runtimeDir string, scopePaths []string) ([]FileChange, error) {
+	changes, err := Compare(currentFiles, oldSnapshots, runtimeDir)
+	if err != nil {
+		return nil, err
+	}
+
+	deleted := make([]string, 0)
+	for path := range oldSnapshots {
+		if _, ok := currentFiles[path]; ok {
+			continue
+		}
+		if len(scopePaths) > 0 && !pathInScope(path, scopePaths) {
+			continue
+		}
+		deleted = append(deleted, path)
+	}
+	sort.Strings(deleted)
+
+	for _, path := range deleted {
+		diffPath, err := WriteUnifiedDiff(runtimeDir, path, oldSnapshots[path], "")
+		if err != nil {
+			return nil, err
+		}
+		changes = append(changes, FileChange{Path: path, Status: ChangeDeleted, DiffPath: diffPath})
+	}
+	return changes, nil
+}
+
+func pathInScope(path string, scopePaths []string) bool {
+	path = strings.Trim(filepath.ToSlash(path), "/")
+	for _, scope := range scopePaths {
+		scope = strings.Trim(filepath.ToSlash(scope), "/")
+		if scope == "" {
+			continue
+		}
+		if path == scope || strings.HasPrefix(path, scope+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // WriteUnifiedDiff writes a deterministic unified-style diff for one file.

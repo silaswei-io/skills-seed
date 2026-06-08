@@ -28,24 +28,16 @@ workspace:
 
 ########################################################################
 # Analysis
-# Controls structured code analysis, omitted fields use defaults
+# Controls embedded tree-sitter structural code analysis, omitted fields use defaults
 ########################################################################
 analysis:
-  codegraph:
-    # Enable CodeGraph structural analysis by default; warn and fall back when unavailable
+  structural:
+    # Enable bounded structural analysis; it does not run without bounded inputs
     enabled: true
-    # true fails when CodeGraph is unavailable; false continues with normal analysis
-    required: false
-    # codegraph command path
-    command: "codegraph"
-    # Run codegraph init -i automatically when the target project has no .codegraph
-    auto_init: true
-    # Run codegraph sync before analysis when an index exists
-    auto_sync: true
-    # Maximum symbol nodes for codegraph context
-    max_nodes: 30
-    # Maximum code blocks for codegraph context; 0 means structural summary only
-    max_code: 0
+    # Maximum symbols emitted into structural context
+    max_symbols: 30
+    # Skip individual files larger than this size (KB)
+    max_file_size: 512
 
 ########################################################################
 # Agent
@@ -124,7 +116,7 @@ logging:
 # Glob-style patterns (not regex); init writes the default static exclusion rules
 ########################################################################
 exclude:
-  # Dot-prefixed files and directories, such as .github, .cursor, .codegraph, .env
+  # Dot-prefixed files and directories, such as .github, .cursor, .env
   - ".*"
   # Common dependency directory
   - "vendor/**"

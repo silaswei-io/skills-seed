@@ -28,24 +28,16 @@ workspace:
 
 ########################################################################
 # 分析增强
-# 控制结构化代码分析能力，省略字段时使用默认值
+# 控制基于内嵌 tree-sitter 的结构化代码分析能力，省略字段时使用默认值
 ########################################################################
 analysis:
-  codegraph:
-    # 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级
+  structural:
+    # 启用有边界的结构化分析；无边界输入时不会运行
     enabled: true
-    # true 表示 CodeGraph 不可用时直接失败；false 表示继续普通分析
-    required: false
-    # CodeGraph 命令路径
-    command: "codegraph"
-    # 目标项目没有 .codegraph 时是否自动执行 codegraph init -i
-    auto_init: true
-    # 目标项目已有索引时是否在分析前执行 codegraph sync
-    auto_sync: true
-    # 传给 codegraph context 的最大符号节点数
-    max_nodes: 30
-    # 传给 codegraph context 的最大代码块数；0 表示只提供结构摘要
-    max_code: 0
+    # 输出到结构化上下文的最大符号数
+    max_symbols: 30
+    # 跳过超过此大小的单个文件（KB）
+    max_file_size: 512
 
 ########################################################################
 # Agent
@@ -124,7 +116,7 @@ logging:
 # glob 风格匹配（不是正则）；初始化时写入默认静态排除规则
 ########################################################################
 exclude:
-  # 点号开头的文件和目录，如 .github、.cursor、.codegraph、.env
+  # 点号开头的文件和目录，如 .github、.cursor、.env
   - ".*"
   # 常见依赖目录
   - "vendor/**"

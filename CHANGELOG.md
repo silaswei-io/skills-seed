@@ -2,6 +2,24 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.0]
+
+### 破坏性变更
+
+- 移除 CodeGraph 集成和 `analysis.codegraph` 配置项，不保留旧字段兼容。
+- 结构化分析配置改为 `analysis.structural`，仅保留 `enabled`、`max_symbols` 和 `max_file_size`。
+- `max_nodes` 重命名为 `max_symbols`，含义明确为输出到结构化上下文的最大符号数。
+
+### 功能
+
+- 新增基于内嵌 tree-sitter 的轻量结构化预扫描，提取符号、导入、入口点和模块线索，不再依赖外部命令或本地索引。
+- 结构化预扫描只在存在 focus、diff、sample 或入口文件等边界输入时运行，避免无边界全仓扫描。
+- 当前代码学习支持新增、修改、删除三类文件状态；分析完成后会按作用范围覆盖快照，使下一次学习可以基于干净快照计算增量 diff。
+
+### 文档
+
+- 更新 README、命令参考和配置参考，说明 0.7.0 的内嵌结构化预扫描、`analysis.structural` 配置和 CodeGraph 移除。
+
 ## [v0.6.4]
 
 ### 功能

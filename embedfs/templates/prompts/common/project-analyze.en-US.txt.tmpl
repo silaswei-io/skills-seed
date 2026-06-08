@@ -15,9 +15,9 @@ Project directory structure is available at `{{.StructurePath}}`. Read it by pat
 {{- end}}
 {{- if .StructuralContextPath}}
 
-# CodeGraph Structural Context
+# Structural Context
 
-CodeGraph structural context is available at `{{.StructuralContextPath}}`. Treat it as structured evidence for symbols, call relationships, entry points, module dependencies, and impact radius. Use it to prioritize files and relationships, but still read source files when detailed business behavior or exact examples are needed.
+Structural context is available at `{{.StructuralContextPath}}`. Treat it as structured evidence for symbols, imports, entry points, and module clues. Use it to prioritize files, but still read source files to confirm call relationships, detailed business behavior, or exact examples.
 {{- end}}
 {{- if .UserContextPath}}
 

@@ -97,7 +97,7 @@ func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
 		RootPath:          t.TempDir(),
 		Language:          "go",
 		Structure:         "main.go",
-		StructuralContext: "## CodeGraph\n- handler calls service",
+		StructuralContext: "## Structural Context\n- handler symbol",
 		MainFiles:         []string{"main.go"},
 	})
 

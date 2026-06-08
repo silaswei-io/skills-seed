@@ -4,14 +4,15 @@
 
 配置文件位于 `.skills-seed/config.yaml`。`skills-seed init` 会按当前项目生成默认配置；大多数路径都相对项目根目录或 `.skills-seed` 目录，具体以字段说明为准。
 
-## 0.6.1 配置结构
+## 0.7.0 配置结构
 
-0.6.1 延续 0.6.0 的干净配置结构，不保留旧字段兼容：
+0.7.0 继续不保留旧字段兼容：
 
 - 顶层 `project` 改名为 `profile`，表示当前配置文件所属项目或工作区本身，不表示 `project` 运行模式。
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
 - workspace 公共库、契约和基础设施影响会在 `learn current` 阶段根据仓库证据、子项目画像和一次性用户说明分析并沉淀到 workspace profile/spec，不从配置文件读取；生成阶段只消费已沉淀结果。
 - workspace 根配置的 `profile.language` 默认留空，因为一个工作区可以包含多种语言子项目。
+- `analysis.codegraph` 已移除，结构化预扫描改为 `analysis.structural`，基于内嵌 tree-sitter，不需要外部 CodeGraph 命令或索引。
 
 ## 配置示例
 
@@ -31,14 +32,10 @@ workspace:
   projects: []
 
 analysis:
-  codegraph:
+  structural:
     enabled: true
-    required: false
-    command: "codegraph"
-    auto_init: true
-    auto_sync: true
-    max_nodes: 30
-    max_code: 0
+    max_symbols: 30
+    max_file_size: 512
 
 agent:
   engine: "claude"
@@ -156,25 +153,24 @@ exclude:
 5. 只有 workspace 根目录第一层且拥有独立 `.git` 的目录会被识别为子项目。
 6. `go.mod`、`package.json`、安装脚本、Helm/Terraform 等标记只用于识别 `type` 和 `language`，不再决定目录是否是项目。
 
-### `analysis.codegraph`
+### `analysis.structural`
+
+基于内嵌 tree-sitter 的轻量结构化预扫描。它提供符号、导入、入口点和模块线索，不依赖外部命令，也不维护索引。
 
 #### 字段
 
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
-| `enabled` | `true` | 是否启用 CodeGraph 结构化分析增强 |
-| `required` | `false` | CodeGraph 不可用时是否直接失败；`false` 表示提醒后降级为普通文件分析 |
-| `command` | `codegraph` | CodeGraph 命令路径 |
-| `auto_init` | `true` | 目标项目没有 `.codegraph` 时是否自动执行 `codegraph init -i` |
-| `auto_sync` | `true` | 目标项目已有索引时，分析前是否执行 `codegraph sync` |
-| `max_nodes` | `30` | 传给 `codegraph context` 的最大符号节点数 |
-| `max_code` | `0` | 传给 `codegraph context` 的最大代码块数；`0` 表示只提供结构摘要 |
+| `enabled` | `true` | 是否启用结构化预扫描；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
+| `max_symbols` | `30` | 输出到结构化上下文的最大符号数 |
+| `max_file_size` | `512` | 单个源码文件大小上限，单位 KB；超过时跳过该文件 |
 
 #### 建议
 
-1. 本地开发可保持默认值。
-2. CI 或团队强约束环境中，如果必须使用 CodeGraph，可设置 `required: true`。
-3. 如果不想自动创建或同步索引，可把 `auto_init` 或 `auto_sync` 改为 `false`。
+1. 大多数项目保持默认 `true` 即可；没有边界输入时不会运行结构化预扫描。
+2. 明确不需要结构化上下文时，把 `enabled` 设为 `false`。
+3. 大型仓库可降低 `max_file_size`，避免解析生成文件、bundle 或异常大文件。
+4. 结构化预扫描只消费已有边界输入，不在没有 seed 时全仓扫描。
 
 ### `agent`
 
@@ -313,7 +309,7 @@ skills-seed learn history --limit 100 --batch-size 10
 
 | Pattern | 说明 |
 |---|---|
-| `.*` | 点号开头的文件和目录，如 `.github`、`.cursor`、`.codegraph`、`.env` |
+| `.*` | 点号开头的文件和目录，如 `.github`、`.cursor`、`.env` |
 | `vendor/**` | 常见依赖目录 |
 | `node_modules/**` | 常见依赖目录 |
 | `dist/**` | 常见构建产物目录 |

@@ -154,23 +154,31 @@ func TestRunLearnCurrentWritesSnapshotsAfterFirstLearning(t *testing.T) {
 	require.Equal(t, "package main\n", string(content))
 }
 
-func TestRunLearnCurrentWithFocusReplacesSnapshotsAfterAnalysis(t *testing.T) {
+func TestRunLearnCurrentWithFocusUpdatesFocusedSnapshotsAfterAnalysis(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/deleted.go", "package internal\n")
+	gitAddAll(t, projectRoot)
+	require.NoError(t, runLearnCurrent(cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)))
+
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "internal", "deleted.go")))
+	gitAddAll(t, projectRoot)
 	snapshotDir := filepath.Join(cont.SeedPath, "memory", "snapshots")
-	require.NoError(t, os.MkdirAll(snapshotDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(snapshotDir, "main.go"), []byte("old snapshot\n"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(snapshotDir, "stale.go"), []byte("stale snapshot\n"), 0644))
 
-	opts := learnCurrentOptionsForTest("", []string{"main.go"}, learnCurrentProfileSkip)
+	opts := learnCurrentOptionsForTest("", []string{"main.go", "internal"}, learnCurrentProfileSkip)
 	require.NoError(t, runLearnCurrent(cont, opts))
 
 	content, err := os.ReadFile(filepath.Join(snapshotDir, "main.go"))
 	require.NoError(t, err)
 	require.Equal(t, "package main\n", string(content))
-	require.NoFileExists(t, filepath.Join(snapshotDir, "stale.go"))
+	require.NoFileExists(t, filepath.Join(snapshotDir, "internal", "deleted.go"))
+	staleContent, err := os.ReadFile(filepath.Join(snapshotDir, "stale.go"))
+	require.NoError(t, err)
+	require.Equal(t, "stale snapshot\n", string(staleContent))
 }
 
 func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *testing.T) {
@@ -268,6 +276,35 @@ func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
 
 	require.Equal(t, []string{"main.go"}, patternFocus)
 	require.Equal(t, []string{"main.go"}, profileFocus)
+}
+
+func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/deleted.go", "package internal\n")
+	gitAddAll(t, projectRoot)
+	require.NoError(t, runLearnCurrent(cont, opts))
+
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "internal", "deleted.go")))
+	gitAddAll(t, projectRoot)
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		received = *req
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+
+	require.NoError(t, runLearnCurrent(cont, opts))
+
+	require.Equal(t, []string{"internal/deleted.go"}, received.FocusPaths)
+	require.Len(t, received.DiffFiles, 1)
+	require.Equal(t, "internal/deleted.go", received.DiffFiles[0].Path)
+	diffContent := readLearnFilePath(t, received.DiffFiles[0].DiffPath)
+	require.Contains(t, diffContent, "-package internal")
 }
 
 func TestRunLearnCurrentWithContextPassesUserContextToAnalysis(t *testing.T) {
@@ -948,7 +985,7 @@ func initLearnWorkspaceChildProjectWithProvider(t *testing.T, workspaceRoot stri
 	cfg.Project.Locale = "zh-CN"
 	cfg.Agent.Engine = provider
 	cfg.Agent.Commands = map[string]string{provider: provider}
-	cfg.Analysis.CodeGraph.Enabled = false
+	cfg.Analysis.Structural.Enabled = false
 	require.NoError(t, childConfigRepo.Update(cfg))
 	return childRoot
 }

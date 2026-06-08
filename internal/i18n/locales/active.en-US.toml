@@ -278,14 +278,8 @@ other = "Project analysis failed"
 [AnalyzerAnalyzeCodebaseFailed]
 other = "Codebase analysis failed"
 
-[AnalyzerCodeGraphCommandUnavailable]
-other = "CodeGraph analysis enhancement is enabled, but the codegraph command was not found. Skipping structural index analysis and continuing with normal file analysis. Install with: npm install -g @colbymchenry/codegraph"
-
-[AnalyzerCodeGraphIndexMissing]
-other = "CodeGraph analysis enhancement is enabled, but the target project has no .codegraph index. Skipping structural index analysis and continuing with normal file analysis. Run in the target project: codegraph init -i"
-
-[AnalyzerCodeGraphCollectFailed]
-other = "CodeGraph analysis enhancement failed. Skipping structural index analysis and continuing with normal file analysis."
+[AnalyzerStructuralCollectFailed]
+other = "Structural analysis failed. Skipping structural pre-scan and continuing with normal file analysis."
 
 [ConfigReadFailed]
 other = "Failed to read config"

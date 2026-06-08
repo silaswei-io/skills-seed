@@ -12,6 +12,11 @@ import (
 // replaceConfigValues updates config YAML through yaml.Node so comments stay attached
 // to the nodes they describe. It exists for tests and fallback rendering paths.
 func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
+	if cfg != nil {
+		normalized := *cfg
+		r.normalizeConfig(&normalized)
+		cfg = &normalized
+	}
 	var root yaml.Node
 	if err := yaml.Unmarshal([]byte(content), &root); err != nil {
 		return content
@@ -51,13 +56,9 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
 
-	setYAMLBool(doc, []string{"analysis", "codegraph", "enabled"}, cfg.Analysis.CodeGraph.Enabled)
-	setYAMLBool(doc, []string{"analysis", "codegraph", "required"}, cfg.Analysis.CodeGraph.Required)
-	setYAMLString(doc, []string{"analysis", "codegraph", "command"}, cfg.Analysis.CodeGraph.Command)
-	setYAMLBool(doc, []string{"analysis", "codegraph", "auto_init"}, cfg.Analysis.CodeGraph.AutoInit)
-	setYAMLBool(doc, []string{"analysis", "codegraph", "auto_sync"}, cfg.Analysis.CodeGraph.AutoSync)
-	setYAMLInt(doc, []string{"analysis", "codegraph", "max_nodes"}, cfg.Analysis.CodeGraph.MaxNodes)
-	setYAMLInt(doc, []string{"analysis", "codegraph", "max_code"}, cfg.Analysis.CodeGraph.MaxCode)
+	setYAMLBool(doc, []string{"analysis", "structural", "enabled"}, cfg.Analysis.Structural.Enabled)
+	setYAMLInt(doc, []string{"analysis", "structural", "max_symbols"}, cfg.Analysis.Structural.MaxSymbols)
+	setYAMLInt(doc, []string{"analysis", "structural", "max_file_size"}, cfg.Analysis.Structural.MaxFileSize)
 
 	setYAMLString(doc, []string{"agent", "engine"}, cfg.Agent.Engine)
 	setYAMLStringMap(doc, []string{"agent", "commands"}, cfg.Agent.Commands)

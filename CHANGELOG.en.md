@@ -2,6 +2,24 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.0]
+
+### Breaking Changes
+
+- Removed CodeGraph integration and the `analysis.codegraph` config section. Old fields are not kept for compatibility.
+- Structural analysis is now configured through `analysis.structural`, with only `enabled`, `max_symbols`, and `max_file_size`.
+- Renamed `max_nodes` to `max_symbols` to make the meaning explicit: the maximum number of symbols emitted into structural context.
+
+### Features
+
+- Added a lightweight embedded tree-sitter structural pre-scan that extracts symbols, imports, entry points, and module clues without an external command or local index.
+- Structural pre-scan only runs when bounded inputs such as focus paths, diffs, samples, or entry files exist, avoiding unbounded whole-repository scans.
+- Current-code learning now handles added, modified, and deleted file states. After analysis, snapshots are replaced within the learned scope so the next run can compute incremental diffs from a clean snapshot.
+
+### Documentation
+
+- Updated README, command reference, and configuration reference for the 0.7.0 embedded structural pre-scan, `analysis.structural` config, and CodeGraph removal.
+
 ## [v0.6.4]
 
 ### Features

@@ -15,9 +15,9 @@
 {{- end}}
 {{- if .StructuralContextPath}}
 
-# CodeGraph 结构化上下文
+# 结构化上下文
 
-CodeGraph 结构化上下文位于 `{{.StructuralContextPath}}`。请把它作为符号、调用关系、入口点、模块依赖和影响范围的结构化证据，用它来优先判断需要查看的文件和关系；涉及具体业务行为或代码示例时，仍需要按路径读取源码确认。
+结构化上下文位于 `{{.StructuralContextPath}}`。请把它作为符号、导入、入口点和模块线索的结构化证据，用它来优先判断需要查看的文件；涉及调用关系、具体业务行为或代码示例时，仍需要按路径读取源码确认。
 {{- end}}
 {{- if .UserContextPath}}
 

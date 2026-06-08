@@ -195,8 +195,8 @@ type AnalyzeProjectRequest struct {
 	Language              string   // 主要语言
 	Structure             string   // 目录结构（tree 输出）
 	StructurePath         string   // 目录结构文件路径
-	StructuralContext     string   // CodeGraph 等结构化分析上下文
-	StructuralContextPath string   // CodeGraph 等结构化分析上下文文件路径
+	StructuralContext     string   // tree-sitter 结构化分析上下文
+	StructuralContextPath string   // tree-sitter 结构化分析上下文文件路径
 	ReadmePath            string   // README 文件路径（如果存在）
 	MainFiles             []string // 主要入口文件路径
 	ExistingProfileJSON   string   // 已有项目画像 JSON
@@ -238,8 +238,8 @@ type AnalyzeCurrentCodebaseRequest struct {
 	FocusPaths            []string      // 指定扫描范围（相对项目根）
 	Structure             string        // 目录结构
 	StructurePath         string        // 目录结构文件路径
-	StructuralContext     string        // CodeGraph 等结构化分析上下文
-	StructuralContextPath string        // CodeGraph 等结构化分析上下文文件路径
+	StructuralContext     string        // tree-sitter 结构化分析上下文
+	StructuralContextPath string        // tree-sitter 结构化分析上下文文件路径
 	MainFiles             []string      // 主要入口文件路径
 	SampleFiles           []SampleFile  // 示例文件路径
 	DiffFiles             []DiffFileRef // 变更文件 diff 引用

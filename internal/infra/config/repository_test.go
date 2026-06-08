@@ -83,13 +83,13 @@ func TestNewRepository(t *testing.T) {
 		require.NotContains(t, text, `shared:`)
 		require.NotContains(t, text, `contracts:`)
 		require.NotContains(t, text, `infra:`)
-		require.Contains(t, text, "# 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级\n    enabled: true")
+		require.Contains(t, text, "# 启用有边界的结构化分析；无边界输入时不会运行\n    enabled: true")
 		require.Contains(t, text, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
 		assertTopLevelModuleBannersHaveBlankLineBefore(t, text)
 		assertCommentLinesDoNotEndWithFullStops(t, text)
 		require.NotContains(t, text, `name: ""                   #`)
 		require.NotContains(t, text, `projects: []               #`)
-		require.NotContains(t, text, `enabled: true             #`)
+		require.NotContains(t, text, `enabled: false            #`)
 		require.NotContains(t, text, `exclude:                     #`)
 		require.NotContains(t, text, `- ".*"                     #`)
 	})
@@ -117,13 +117,9 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
 	assert.False(t, cfg.Agent.AllowUserPlugins)
-	assert.True(t, cfg.Analysis.CodeGraph.Enabled)
-	assert.False(t, cfg.Analysis.CodeGraph.Required)
-	assert.Equal(t, "codegraph", cfg.Analysis.CodeGraph.Command)
-	assert.True(t, cfg.Analysis.CodeGraph.AutoInit)
-	assert.True(t, cfg.Analysis.CodeGraph.AutoSync)
-	assert.Equal(t, 30, cfg.Analysis.CodeGraph.MaxNodes)
-	assert.Equal(t, 0, cfg.Analysis.CodeGraph.MaxCode)
+	assert.True(t, cfg.Analysis.Structural.Enabled)
+	assert.Equal(t, 30, cfg.Analysis.Structural.MaxSymbols)
+	assert.Equal(t, 512, cfg.Analysis.Structural.MaxFileSize)
 	assert.Equal(t, 50, cfg.Learning.MaxCommits)
 	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
 	assert.Equal(t, "claude", cfg.Skills.Target)
@@ -281,10 +277,10 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.Contains(t, content, `- "dist/**"`)
 	require.Contains(t, content, `- "*.log"`)
 	require.Contains(t, content, `analysis:`)
-	require.Contains(t, content, `enabled: false`)
+	require.Contains(t, content, `enabled: true`)
 	require.Contains(t, content, "# 项目名称，init 时自动填充\n  name: \"demo-workspace\"")
 	require.Contains(t, content, "# 子项目列表，例如 [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects:")
-	require.Contains(t, content, "# 默认启用 CodeGraph 结构化分析增强；未安装时会提醒并降级\n    enabled: false")
+	require.Contains(t, content, "# 启用有边界的结构化分析；无边界输入时不会运行\n    enabled: true")
 	require.Contains(t, content, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
 	assertTopLevelModuleBannersHaveBlankLineBefore(t, content)
 	assertCommentLinesDoNotEndWithFullStops(t, content)
@@ -365,14 +361,10 @@ workspace:
   projects: [] # custom projects comment
 
 analysis:
-  codegraph:
-    enabled: true # custom codegraph comment
-    required: false
-    command: "codegraph"
-    auto_init: true
-    auto_sync: true
-    max_nodes: 30
-    max_code: 0
+  structural:
+    enabled: true # custom structural comment
+    max_symbols: 30
+    max_file_size: 512
 
 agent:
   engine: "claude"
@@ -417,7 +409,7 @@ exclude:
 	cfg.Workspace.Projects = []WorkspaceProjectConfig{
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 	}
-	cfg.Analysis.CodeGraph.Enabled = false
+	cfg.Analysis.Structural.Enabled = false
 	cfg.Exclude = []string{".*", "dist/**"}
 	require.NoError(t, repo.Update(cfg))
 
@@ -428,7 +420,7 @@ exclude:
 	require.Contains(t, text, "# custom project name comment\n  name: \"new-name\"")
 	require.Contains(t, text, "# Custom workspace comment")
 	require.Contains(t, text, "# custom projects comment\n  projects:")
-	require.Contains(t, text, "# custom codegraph comment\n    enabled: false")
+	require.Contains(t, text, "# custom structural comment\n    enabled: false")
 	require.Contains(t, text, "# keep dotfiles comment\n  - \".*\"")
 	require.NotContains(t, text, `name: "new-name" # custom project name comment`)
 	require.NotContains(t, text, `projects: # custom projects comment`)
@@ -436,14 +428,14 @@ exclude:
 	require.NotContains(t, text, `contracts:`)
 	require.NotContains(t, text, `infra:`)
 	require.NotContains(t, text, `analysis: # custom projects comment`)
-	require.NotContains(t, text, `enabled: false # custom codegraph comment`)
+	require.NotContains(t, text, `enabled: false # custom structural comment`)
 	require.NotContains(t, text, `- ".*" # keep dotfiles comment`)
 
 	reloaded, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, "new-name", reloaded.GetProjectConfig().Name)
 	require.Equal(t, "workspace", reloaded.GetProjectConfig().Mode)
-	require.False(t, reloaded.GetAnalysisConfig().CodeGraph.Enabled)
+	require.False(t, reloaded.GetAnalysisConfig().Structural.Enabled)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 1)
 	require.Equal(t, []string{".*", "dist/**"}, reloaded.GetExclude())
 }
@@ -464,7 +456,7 @@ func TestNewRepositoryUsesDefaultExcludePatterns(t *testing.T) {
 	require.Contains(t, text, `- "*.log"`)
 }
 
-func TestRepository_NormalizeAnalysisCodeGraphDefaults(t *testing.T) {
+func TestRepository_NormalizeAnalysisStructuralDefaults(t *testing.T) {
 	seedPath := t.TempDir()
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
@@ -488,17 +480,13 @@ exclude: []
 	repo, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 
-	cfg := repo.GetAnalysisConfig().CodeGraph
+	cfg := repo.GetAnalysisConfig().Structural
 	require.True(t, cfg.Enabled)
-	require.False(t, cfg.Required)
-	require.Equal(t, "codegraph", cfg.Command)
-	require.True(t, cfg.AutoInit)
-	require.True(t, cfg.AutoSync)
-	require.Equal(t, 30, cfg.MaxNodes)
-	require.Equal(t, 0, cfg.MaxCode)
+	require.Equal(t, 30, cfg.MaxSymbols)
+	require.Equal(t, 512, cfg.MaxFileSize)
 }
 
-func TestRepository_PreservesExplicitCodeGraphDisabled(t *testing.T) {
+func TestRepository_PreservesExplicitStructuralDisabled(t *testing.T) {
 	seedPath := t.TempDir()
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
@@ -507,14 +495,10 @@ profile:
   language: "go"
   locale: "zh-CN"
 analysis:
-  codegraph:
+  structural:
     enabled: false
-    required: false
-    command: "custom-codegraph"
-    auto_init: true
-    auto_sync: false
-    max_nodes: 12
-    max_code: 3
+    max_symbols: 12
+    max_file_size: 256
 agent:
   engine: "claude"
 learning:
@@ -531,14 +515,10 @@ exclude: []
 	repo, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 
-	cfg := repo.GetAnalysisConfig().CodeGraph
+	cfg := repo.GetAnalysisConfig().Structural
 	require.False(t, cfg.Enabled)
-	require.False(t, cfg.Required)
-	require.Equal(t, "custom-codegraph", cfg.Command)
-	require.True(t, cfg.AutoInit)
-	require.False(t, cfg.AutoSync)
-	require.Equal(t, 12, cfg.MaxNodes)
-	require.Equal(t, 3, cfg.MaxCode)
+	require.Equal(t, 12, cfg.MaxSymbols)
+	require.Equal(t, 256, cfg.MaxFileSize)
 }
 
 func TestRepository_GetAgentConfig(t *testing.T) {

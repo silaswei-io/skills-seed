@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -108,7 +109,7 @@ func TestAnalyzeProject(t *testing.T) {
 	assert.Contains(t, result.Frameworks, "gin")
 }
 
-func TestAnalyzeProjectAddsCodeGraphContext(t *testing.T) {
+func TestAnalyzeProjectAddsStructuralContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
@@ -120,28 +121,27 @@ func TestAnalyzeProjectAddsCodeGraphContext(t *testing.T) {
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		AnalysisCfg: config.AnalysisConfig{
-			CodeGraph: config.CodeGraphConfig{
-				Enabled:  true,
-				Required: false,
-				Command:  "codegraph",
+			Structural: config.StructuralConfig{
+				Enabled: true,
 			},
 		},
 	})
-	svc.codeGraphCollector = fakeCodeGraphCollector{
-		context: "## CodeGraph Context\n- main calls service",
+	svc.structuralCollector = fakeStructuralCollector{
+		context: "## Structural Context\n- main calls service",
 	}
 
 	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
 		ProjectName: "test",
 		RootPath:    tmpDir,
 		Language:    "go",
+		MainFiles:   []string{"main.go"},
 	})
 
 	require.NoError(t, err)
 	require.Contains(t, received.StructuralContext, "main calls service")
 }
 
-func TestAnalyzeProjectSkipsUnavailableOptionalCodeGraph(t *testing.T) {
+func TestAnalyzeProjectSkipsStructuralContextWithoutSeeds(t *testing.T) {
 	tmpDir := t.TempDir()
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
@@ -153,15 +153,13 @@ func TestAnalyzeProjectSkipsUnavailableOptionalCodeGraph(t *testing.T) {
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		AnalysisCfg: config.AnalysisConfig{
-			CodeGraph: config.CodeGraphConfig{
-				Enabled:  true,
-				Required: false,
-				Command:  "missing-codegraph",
+			Structural: config.StructuralConfig{
+				Enabled: true,
 			},
 		},
 	})
-	svc.codeGraphCollector = fakeCodeGraphCollector{
-		err: errCodeGraphUnavailable,
+	svc.structuralCollector = fakeStructuralCollector{
+		context: "## Structural Context\n- should not be used",
 	}
 
 	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
@@ -174,30 +172,36 @@ func TestAnalyzeProjectSkipsUnavailableOptionalCodeGraph(t *testing.T) {
 	require.Empty(t, received.StructuralContext)
 }
 
-func TestAnalyzeProjectFailsWhenRequiredCodeGraphUnavailable(t *testing.T) {
+func TestAnalyzeProjectSkipsUnavailableOptionalStructuralContext(t *testing.T) {
 	tmpDir := t.TempDir()
-	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
+	var received agent.AnalyzeProjectRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			received = *req
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		AnalysisCfg: config.AnalysisConfig{
-			CodeGraph: config.CodeGraphConfig{
-				Enabled:  true,
-				Required: true,
-				Command:  "missing-codegraph",
+			Structural: config.StructuralConfig{
+				Enabled: true,
 			},
 		},
 	})
-	svc.codeGraphCollector = fakeCodeGraphCollector{
-		err: errCodeGraphUnavailable,
+	svc.structuralCollector = fakeStructuralCollector{
+		err: errors.New("unavailable"),
 	}
 
 	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
 		ProjectName: "test",
 		RootPath:    tmpDir,
 		Language:    "go",
+		MainFiles:   []string{"main.go"},
 	})
 
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "CodeGraph")
+	require.NoError(t, err)
+	require.Empty(t, received.StructuralContext)
 }
 
 func TestAnalyzeProject_AIError(t *testing.T) {
@@ -210,6 +214,28 @@ func TestAnalyzeProject_AIError(t *testing.T) {
 	svc := NewAnalyzerService(mockAgent, nil)
 	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{})
 	assert.Error(t, err)
+}
+
+func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {
+	projectRoot := t.TempDir()
+	smallSource := "package main\n\nfunc Small() {}\n"
+	largeSource := "package main\n\n" + strings.Repeat("// padding\n", 140) + "\nfunc Large() {}\n"
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "small.go"), []byte(smallSource), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "large.go"), []byte(largeSource), 0644))
+
+	collector := newStructuralCollector(config.StructuralConfig{
+		Enabled:     true,
+		MaxSymbols:  10,
+		MaxFileSize: 1,
+	}, nil)
+
+	result, err := collector.Collect(context.Background(), projectRoot, structuralContextRequest{
+		SeedPaths: []string{"small.go", "large.go"},
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, result, "Small")
+	require.NotContains(t, result, "Large")
 }
 
 func TestAnalyzeCurrentCodebase(t *testing.T) {
@@ -238,7 +264,7 @@ func TestAnalyzeCurrentCodebase(t *testing.T) {
 	assert.Contains(t, result.BusinessRules, "Always wrap errors")
 }
 
-func TestAnalyzeCurrentCodebaseAddsCodeGraphContext(t *testing.T) {
+func TestAnalyzeCurrentCodebaseAddsStructuralContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	var received agent.AnalyzeCurrentCodebaseRequest
 	mockAgent := &mocks.MockAgent{
@@ -250,24 +276,60 @@ func TestAnalyzeCurrentCodebaseAddsCodeGraphContext(t *testing.T) {
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		AnalysisCfg: config.AnalysisConfig{
-			CodeGraph: config.CodeGraphConfig{
+			Structural: config.StructuralConfig{
 				Enabled: true,
-				Command: "codegraph",
 			},
 		},
 	})
-	svc.codeGraphCollector = fakeCodeGraphCollector{
-		context: "## CodeGraph Context\n- service has 3 callers",
+	svc.structuralCollector = fakeStructuralCollector{
+		context: "## Structural Context\n- service has 3 callers",
 	}
 
 	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{
 		ProjectName: "test",
 		RootPath:    tmpDir,
 		Language:    "go",
+		SampleFiles: []agent.SampleFile{{Path: "internal/service.go"}},
 	})
 
 	require.NoError(t, err)
 	require.Contains(t, received.StructuralContext, "service has 3 callers")
+}
+
+func TestAnalyzeCurrentCodebasePassesBoundedSeedsToStructuralCollector(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		AnalysisCfg: config.AnalysisConfig{
+			Structural: config.StructuralConfig{
+				Enabled: true,
+			},
+		},
+	})
+	collector := &recordingStructuralCollector{context: "## Structural Context\n"}
+	svc.structuralCollector = collector
+
+	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
+		FocusPaths:  []string{"internal/service"},
+		MainFiles:   []string{"cmd/app/main.go"},
+		SampleFiles: []agent.SampleFile{{Path: "internal/new.go"}},
+		DiffFiles:   []agent.DiffFileRef{{Path: "internal/changed.go", DiffPath: "/tmp/changed.go.diff"}},
+	})
+
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{
+		"cmd/app/main.go",
+		"internal/new.go",
+		"internal/changed.go",
+	}, collector.req.SeedPaths)
 }
 
 func TestAnalyzeCurrentCodebase_AIError(t *testing.T) {
@@ -339,6 +401,54 @@ func TestAnalyzeCodebaseFullWithFocusPathsOnlySendsFocusedSamples(t *testing.T) 
 		require.Contains(t, file.Path, "internal/agent")
 		require.NotContains(t, file.Path, "internal/prompts")
 	}
+}
+
+func TestAnalyzeCodebaseFullWithFocusPathsOnlyDiffsFocusedFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	require.NoError(t, os.MkdirAll(seedPath, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "prompts"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "agent", "agent.go"), []byte("package agent\nfunc NewAgent() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "prompts", "loader.go"), []byte("package prompts\nfunc NewLoader() {}\n"), 0o644))
+	repo := snapshotstore.NewRepository(seedPath)
+	require.NoError(t, repo.Replace(map[string]string{
+		"internal/agent/agent.go":    "package agent\nfunc OldAgent() {}\n",
+		"internal/agent/deleted.go":  "package agent\nfunc Deleted() {}\n",
+		"internal/prompts/loader.go": "package prompts\nfunc OldLoader() {}\n",
+		"internal/unchanged/keep.go": "package unchanged\n",
+	}))
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
+		Exclude:    []string{".*"},
+	})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{
+		FocusPaths:       []string{filepath.Join(tmpDir, "internal", "agent")},
+		UseSnapshotDiffs: true,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, received.DiffFiles, 2)
+	require.Equal(t, "internal/agent/agent.go", received.DiffFiles[0].Path)
+	require.Equal(t, "internal/agent/deleted.go", received.DiffFiles[1].Path)
+	require.Empty(t, received.SampleFiles)
+	loaded, err := repo.Load()
+	require.NoError(t, err)
+	require.Equal(t, "package agent\nfunc NewAgent() {}\n", loaded["internal/agent/agent.go"])
+	require.NotContains(t, loaded, "internal/agent/deleted.go")
+	require.Equal(t, "package prompts\nfunc OldLoader() {}\n", loaded["internal/prompts/loader.go"])
+	require.Equal(t, "package unchanged\n", loaded["internal/unchanged/keep.go"])
 }
 
 func TestAnalyzeCodebaseFullPassesKnownPatterns(t *testing.T) {
@@ -414,6 +524,35 @@ func TestAnalyzeCodebaseFullUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) 
 		"modified.go":  "package main\nfunc newName() {}\n",
 		"unchanged.go": "package same\n",
 	}, loaded)
+}
+
+func TestAnalyzeCodebaseFullCapsSnapshotAddedSampleFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	require.NoError(t, os.MkdirAll(seedPath, 0o755))
+	for i := 0; i < 20; i++ {
+		path := filepath.Join(tmpDir, fmt.Sprintf("added_%02d.go", i))
+		require.NoError(t, os.WriteFile(path, []byte("package added\n"), 0o644))
+	}
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
+		Exclude:    []string{".*"},
+	})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{})
+
+	require.NoError(t, err)
+	require.Len(t, received.SampleFiles, maxSampleFiles)
 }
 
 func TestCollectSampleFiles(t *testing.T) {
@@ -608,11 +747,22 @@ func TestAnalyzeCodebaseFullWithOptions_PassesRuntimeUserContext(t *testing.T) {
 	assert.Equal(t, "hsmwebapi 是管理 API，core-engine 是核心能力库。", received.UserContext)
 }
 
-type fakeCodeGraphCollector struct {
+type fakeStructuralCollector struct {
 	context string
 	err     error
 }
 
-func (f fakeCodeGraphCollector) Collect(ctx context.Context, projectRoot string, req codeGraphContextRequest) (string, error) {
+func (f fakeStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
 	return f.context, f.err
+}
+
+type recordingStructuralCollector struct {
+	context string
+	err     error
+	req     structuralContextRequest
+}
+
+func (r *recordingStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
+	r.req = req
+	return r.context, r.err
 }

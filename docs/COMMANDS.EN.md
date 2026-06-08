@@ -109,7 +109,7 @@ Manage sub-projects in workspace mode.
 
 1. `workspace add` uses the same discovery rule as `init --workspace`: only first-level directories with their own `.git` are treated as child repositories.
 2. Files such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files only classify child `type` and `language`.
-3. Starting in 0.6.1, workspace config no longer exposes `shared`, `contracts`, or `infra`; cross-project impact is analyzed and persisted into workspace profile/spec during `learn current`, and generation only consumes learned artifacts.
+3. Workspace config no longer exposes `shared`, `contracts`, or `infra`; cross-project impact is analyzed and persisted into workspace profile/spec during `learn current`, and generation only consumes learned artifacts.
 4. If a child has no `.skills-seed`, it is initialized in project mode.
 5. If a child already has `.skills-seed/config.yaml`, it is skipped and preserved.
 6. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
@@ -218,7 +218,9 @@ skills-seed learn history --limit 40 --batch-size 5
 5. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
 6. The workspace root records an md5 for relationship-analysis inputs. When `workspace.projects`, child project profiles, prompt templates, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped.
 7. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
-8. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
+8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
+9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use the embedded tree-sitter structural pre-scan configured by `analysis.structural`; without bounded inputs, it does not scan the whole repository.
+10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
 

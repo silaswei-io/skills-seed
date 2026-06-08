@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 `generate skills` 会按模式质量排序：优先沉淀综合分高、check 命中多、置信度高的规则，降低泛化规则和重复规则进入最终 skills 的概率。
 
+0.7.0 起，学习和项目画像分析会在有边界输入时使用内嵌 tree-sitter 做轻量结构化预扫描，提取符号、导入、入口点和模块线索，辅助 Agent 优先判断需要读取的源码。它不再依赖外部 CodeGraph 命令或索引；配置位于 `analysis.structural`，其中 `max_symbols` 控制写入结构化上下文的符号数，`max_file_size` 控制单个源码文件大小上限。
+
 AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.retry` 指数退避重试。长耗时步骤的进度行会在正常、等待重试、重试中三种状态间切换，例如 `分析当前代码库`、`分析当前代码库（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）`、`分析当前代码库（第2次尝试）`；其中“本次调用”是失败前的 Agent 调用耗时，“15s 后重试”才是退避等待时间。
 
 ## Prompt 与一次性说明
@@ -175,7 +177,7 @@ skills-seed workspace add backend frontend
 
 workspace 根仓只负责编排、路由和跨项目关系；子项目用自己的 `.skills-seed` 独立学习、生成和保存 patterns。已有子项目 `.skills-seed/config.yaml` 不会被覆盖，如果子项目 agent 与根仓不同，只提示并保留子项目配置。
 
-0.6.1 起，workspace 用户配置只保留 `workspace.projects`。公共库、契约和基础设施影响不再通过 `workspace.shared`、`workspace.contracts`、`workspace.infra` 手填，而是在 `learn current` 阶段结合仓库证据、子项目 `project-profile.json` 和一次性用户说明分析并沉淀到根仓 `workspace-profile.json` / `workspace-spec.json`；`generate skills` 只消费这些已沉淀结果，不再接收用户说明。
+workspace 用户配置只保留 `workspace.projects`。公共库、契约和基础设施影响不再通过 `workspace.shared`、`workspace.contracts`、`workspace.infra` 手填，而是在 `learn current` 阶段结合仓库证据、子项目 `project-profile.json` 和一次性用户说明分析并沉淀到根仓 `workspace-profile.json` / `workspace-spec.json`；`generate skills` 只消费这些已沉淀结果，不再接收用户说明。
 
 ## 设计理念
 

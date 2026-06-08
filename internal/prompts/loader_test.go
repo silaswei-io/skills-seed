@@ -249,7 +249,7 @@ func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
 	prompt, err := loader.Render("project-analyze", data)
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "CodeGraph")
+	require.Contains(t, prompt, "结构化上下文")
 	require.Contains(t, prompt, "/tmp/skills-seed/structural-context.md")
 	require.NotContains(t, prompt, "handler calls service")
 	require.Contains(t, prompt, "结构化")
@@ -263,7 +263,7 @@ func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
 	prompt, err := loader.Render("skill-project-init", req)
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "CodeGraph")
+	require.Contains(t, prompt, "结构化上下文")
 	require.Contains(t, prompt, "/tmp/skills-seed/structural-context.md")
 	require.NotContains(t, prompt, "service has callers")
 	require.Contains(t, prompt, "结构化")
@@ -542,7 +542,7 @@ func TestLoader_RuntimePromptsBoundFileReadingScope(t *testing.T) {
 			name: "skill-project-init",
 			data: sampleAnalyzeCurrentCodebaseRequest(),
 			requiredText: []string{
-				"优先读取 CodeGraph 结构化上下文",
+				"优先读取结构化上下文",
 				"只扩展到能支持模式判断的直接相关文件",
 				"避免全仓库扫描",
 			},

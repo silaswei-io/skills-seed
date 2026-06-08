@@ -14,8 +14,6 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,9 +36,9 @@ import (
 // AnalyzerService 代码分析服务
 // 职责：分析代码、提取模式、分析项目结构
 type AnalyzerService struct {
-	agent              agent.Agent
-	configRepo         config.Reader
-	codeGraphCollector codeGraphCollector
+	agent               agent.Agent
+	configRepo          config.Reader
+	structuralCollector structuralCollector
 }
 
 // NewAnalyzerService 创建分析服务
@@ -50,54 +48,62 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerServi
 		configRepo: configRepo,
 	}
 	if configRepo != nil {
-		cfg := configRepo.GetAnalysisConfig().CodeGraph
+		cfg := configRepo.GetAnalysisConfig().Structural
 		if cfg.Enabled {
-			svc.codeGraphCollector = newCodeGraphCollector(cfg)
+			svc.structuralCollector = newStructuralCollector(cfg, configRepo.GetExclude())
 		}
 	}
 	return svc
 }
 
-func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectRoot string, req codeGraphContextRequest) (string, error) {
-	if s.configRepo == nil || s.codeGraphCollector == nil || projectRoot == "" {
+func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
+	if s.configRepo == nil || s.structuralCollector == nil || projectRoot == "" {
 		return "", nil
 	}
 
-	cfg := s.configRepo.GetAnalysisConfig().CodeGraph
-	if !cfg.Enabled {
+	cfg := s.configRepo.GetAnalysisConfig().Structural
+	if !cfg.Enabled || len(req.SeedPaths) == 0 {
 		return "", nil
 	}
-	if req.MaxNodes <= 0 {
-		req.MaxNodes = cfg.MaxNodes
-	}
-	if req.MaxCode == 0 {
-		req.MaxCode = cfg.MaxCode
-	}
 
-	contextText, err := s.codeGraphCollector.Collect(ctx, projectRoot, req)
+	contextText, err := s.structuralCollector.Collect(ctx, projectRoot, req)
 	if err == nil {
 		return contextText, nil
 	}
 
-	if cfg.Required {
-		return "", fmt.Errorf("CodeGraph analysis is required but unavailable: %w", err)
-	}
-
-	switch {
-	case errors.Is(err, errCodeGraphUnavailable):
-		logger.Warn(i18n.Get("AnalyzerCodeGraphCommandUnavailable"))
-	case errors.Is(err, errCodeGraphNotInitialized):
-		logger.Warn(i18n.Get("AnalyzerCodeGraphIndexMissing"))
-	default:
-		logger.Warn(i18n.Get("AnalyzerCodeGraphCollectFailed"))
-	}
+	logger.Warn(i18n.Get("AnalyzerStructuralCollectFailed"))
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-		"operation", "analyzer.codegraph_collect",
+		"operation", "analyzer.structural_collect",
 		"project_root", projectRoot,
 		"error", err,
-		"required", cfg.Required,
 	)
 	return "", nil
+}
+
+func structuralSeedPaths(focusPaths []string, sampleFiles []agent.SampleFile, diffFiles []agent.DiffFileRef, mainFiles []string) []string {
+	seeds := make([]string, 0, len(focusPaths)+len(sampleFiles)+len(diffFiles)+len(mainFiles))
+	seen := make(map[string]bool)
+	add := func(path string) {
+		path = strings.TrimSpace(filepath.ToSlash(path))
+		if path == "" || seen[path] {
+			return
+		}
+		seen[path] = true
+		seeds = append(seeds, path)
+	}
+	for _, path := range focusPaths {
+		add(path)
+	}
+	for _, file := range sampleFiles {
+		add(file.Path)
+	}
+	for _, file := range diffFiles {
+		add(file.Path)
+	}
+	for _, path := range mainFiles {
+		add(path)
+	}
+	return seeds
 }
 
 // AnalyzePatternsRequest 分析模式请求
@@ -224,11 +230,12 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 		"focus_paths_count", len(req.FocusPaths),
 	)
 
-	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, codeGraphContextRequest{
+	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
 		ProjectName: req.ProjectName,
 		Language:    req.Language,
 		Purpose:     "project profile analysis",
 		FocusPaths:  req.FocusPaths,
+		SeedPaths:   structuralSeedPaths(req.FocusPaths, nil, nil, req.MainFiles),
 	})
 	if err != nil {
 		return nil, err
@@ -331,11 +338,12 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		"sample_files_count", len(req.SampleFiles),
 	)
 
-	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, codeGraphContextRequest{
+	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
 		ProjectName: req.ProjectName,
 		Language:    req.Language,
 		Purpose:     "current codebase pattern extraction",
 		FocusPaths:  req.FocusPaths,
+		SeedPaths:   structuralSeedPaths(nil, req.SampleFiles, req.DiffFiles, req.MainFiles),
 	})
 	if err != nil {
 		return nil, err
@@ -673,6 +681,8 @@ type AnalyzeCodebaseOptions struct {
 	UseSnapshotDiffs   bool
 }
 
+const maxSampleFiles = 15
+
 // AnalyzeCodebaseFull 完整代码库分析（提取模式并转换为 domain.Pattern）
 func (s *AnalyzerService) AnalyzeCodebaseFull(ctx context.Context, projectRoot, projectName, language string) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
 	return s.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, language, AnalyzeCodebaseOptions{UseSnapshotDiffs: true})
@@ -704,7 +714,10 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		if err != nil {
 			return nil, nil, err
 		}
-		snapshotFlow, err = snapshotflow.Build(ctx, projectRoot, files)
+		if len(focusPaths) > 0 {
+			files = filterFileInfosByFocusPaths(files, focusPaths)
+		}
+		snapshotFlow, err = snapshotflow.BuildScoped(ctx, projectRoot, files, focusPaths)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -745,7 +758,7 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		return nil, nil, err
 	}
 	if snapshotFlow != nil {
-		if err := snapshotFlow.Repository.Replace(snapshotFlow.CurrentFiles); err != nil {
+		if err := snapshotFlow.Repository.Replace(snapshotFlow.MergedFiles); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -767,11 +780,45 @@ func (s *AnalyzerService) excludePatterns() []string {
 }
 
 func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
-	samples := make([]agent.SampleFile, 0, len(files))
+	limit := len(files)
+	if limit > maxSampleFiles {
+		limit = maxSampleFiles
+	}
+	samples := make([]agent.SampleFile, 0, limit)
 	for _, file := range files {
+		if len(samples) >= maxSampleFiles {
+			break
+		}
 		samples = append(samples, agent.SampleFile{Path: file.Path})
 	}
 	return samples
+}
+
+func filterFileInfosByFocusPaths(files []domain.FileInfo, focusPaths []string) []domain.FileInfo {
+	if len(files) == 0 || len(focusPaths) == 0 {
+		return files
+	}
+	filtered := make([]domain.FileInfo, 0, len(files))
+	for _, file := range files {
+		if pathInFocus(file.Path, focusPaths) {
+			filtered = append(filtered, file)
+		}
+	}
+	return filtered
+}
+
+func pathInFocus(path string, focusPaths []string) bool {
+	path = strings.Trim(filepath.ToSlash(path), "/")
+	for _, focus := range focusPaths {
+		focus = strings.Trim(filepath.ToSlash(focus), "/")
+		if focus == "" {
+			continue
+		}
+		if path == focus || strings.HasPrefix(path, focus+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // collectSampleFiles 收集项目中的代表性代码文件
@@ -810,7 +857,6 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 	}
 
 	var files []agent.SampleFile
-	maxFiles := 15
 	seenFiles := make(map[string]bool)
 	excludePatterns := []string(nil)
 	if s.configRepo != nil {
@@ -821,7 +867,7 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 	}
 
 	for _, scanRoot := range scanRoots {
-		if len(files) >= maxFiles {
+		if len(files) >= maxSampleFiles {
 			break
 		}
 		if scanRoot == "" {
@@ -829,7 +875,7 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 		}
 
 		if err := filepath.Walk(scanRoot, func(path string, info os.FileInfo, err error) error {
-			if err != nil || len(files) >= maxFiles {
+			if err != nil || len(files) >= maxSampleFiles {
 				return nil
 			}
 

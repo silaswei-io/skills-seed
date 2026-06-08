@@ -109,7 +109,7 @@ skills-seed init --workspace --agent codex --skills codex
 
 1. `workspace add` 使用和 `init --workspace` 相同的发现规则：只有第一层目录中拥有独立 `.git` 的目录会被视为子仓。
 2. `go.mod`、`package.json`、安装脚本、Helm/Terraform 等文件只用于识别子仓 `type` 和 `language`。
-3. 0.6.1 起，workspace 配置不再提供 `shared`、`contracts`、`infra` 字段；跨项目影响由 `learn current` 分析并沉淀到 workspace profile/spec，生成阶段只消费已沉淀结果。
+3. workspace 配置不再提供 `shared`、`contracts`、`infra` 字段；跨项目影响由 `learn current` 分析并沉淀到 workspace profile/spec，生成阶段只消费已沉淀结果。
 4. 子仓没有 `.skills-seed` 时，会按 project 模式初始化。
 5. 子仓已有 `.skills-seed/config.yaml` 时会跳过并保留原配置。
 6. 子仓已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
@@ -218,7 +218,9 @@ skills-seed learn history --limit 40 --batch-size 5
 5. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
 6. workspace 根仓会对工作区关系分析输入记录 md5；当 `workspace.projects`、子项目画像、prompt 模板和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。
 7. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
-8. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
+8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
+9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `analysis.structural` 的内嵌 tree-sitter 结构化预扫描；没有边界输入时不会因此全仓扫描。
+10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
 

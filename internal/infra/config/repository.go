@@ -54,43 +54,35 @@ type WorkspaceProjectConfig struct {
 
 // AnalysisConfig 分析增强配置
 type AnalysisConfig struct {
-	CodeGraph CodeGraphConfig `yaml:"codegraph"`
+	Structural StructuralConfig `yaml:"structural"`
 }
 
-// CodeGraphConfig CodeGraph 结构化分析增强配置
-type CodeGraphConfig struct {
-	Enabled  bool   `yaml:"enabled"`   // 是否启用 CodeGraph 增强分析
-	Required bool   `yaml:"required"`  // 是否要求 CodeGraph 必须可用
-	Command  string `yaml:"command"`   // codegraph 命令路径
-	AutoInit bool   `yaml:"auto_init"` // 目标项目未初始化时是否自动执行 init -i
-	AutoSync bool   `yaml:"auto_sync"` // 目标项目已有索引时是否自动 sync
-	MaxNodes int    `yaml:"max_nodes"` // context 最大符号节点数
-	MaxCode  int    `yaml:"max_code"`  // context 最大代码块数；0 表示不包含代码块
+// StructuralConfig 结构化分析配置（基于内嵌 tree-sitter）
+type StructuralConfig struct {
+	Enabled     bool `yaml:"enabled"`       // 是否启用结构化分析
+	MaxSymbols  int  `yaml:"max_symbols"`   // context 最大符号数
+	MaxFileSize int  `yaml:"max_file_size"` // 跳过超过此大小的文件（KB），默认 512
 
 	defaultsApplied bool `yaml:"-"`
 }
 
-func defaultCodeGraphConfig() CodeGraphConfig {
-	return CodeGraphConfig{
+func defaultStructuralConfig() StructuralConfig {
+	return StructuralConfig{
 		Enabled:         true,
-		Required:        false,
-		Command:         "codegraph",
-		AutoInit:        true,
-		AutoSync:        true,
-		MaxNodes:        30,
-		MaxCode:         0,
+		MaxSymbols:      30,
+		MaxFileSize:     512,
 		defaultsApplied: true,
 	}
 }
 
 // UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
-func (c *CodeGraphConfig) UnmarshalYAML(value *yaml.Node) error {
-	type rawCodeGraphConfig CodeGraphConfig
-	defaults := rawCodeGraphConfig(defaultCodeGraphConfig())
+func (c *StructuralConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawStructuralConfig StructuralConfig
+	defaults := rawStructuralConfig(defaultStructuralConfig())
 	if err := value.Decode(&defaults); err != nil {
 		return err
 	}
-	*c = CodeGraphConfig(defaults)
+	*c = StructuralConfig(defaults)
 	c.defaultsApplied = true
 	return nil
 }
@@ -238,6 +230,9 @@ func (r *Repository) Get() *Config {
 
 // Update 更新配置
 func (r *Repository) Update(cfg *Config) error {
+	if cfg != nil {
+		r.normalizeConfig(cfg)
+	}
 	if err := r.save(cfg); err != nil {
 		return err
 	}
@@ -391,17 +386,14 @@ func (r *Repository) defaultConfig(locale string) *Config {
 }
 
 func (r *Repository) normalizeConfig(cfg *Config) {
-	if !cfg.Analysis.CodeGraph.defaultsApplied {
-		cfg.Analysis.CodeGraph = defaultCodeGraphConfig()
+	if !cfg.Analysis.Structural.defaultsApplied {
+		cfg.Analysis.Structural = defaultStructuralConfig()
 	}
-	if cfg.Analysis.CodeGraph.Command == "" {
-		cfg.Analysis.CodeGraph.Command = "codegraph"
+	if cfg.Analysis.Structural.MaxSymbols <= 0 {
+		cfg.Analysis.Structural.MaxSymbols = 30
 	}
-	if cfg.Analysis.CodeGraph.MaxNodes <= 0 {
-		cfg.Analysis.CodeGraph.MaxNodes = 30
-	}
-	if cfg.Analysis.CodeGraph.MaxCode < 0 {
-		cfg.Analysis.CodeGraph.MaxCode = 0
+	if cfg.Analysis.Structural.MaxFileSize <= 0 {
+		cfg.Analysis.Structural.MaxFileSize = 512
 	}
 
 	if cfg.Agent.Commands == nil {
@@ -479,7 +471,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			Parallelism:      0,
 		},
 		Analysis: AnalysisConfig{
-			CodeGraph: defaultCodeGraphConfig(),
+			Structural: defaultStructuralConfig(),
 		},
 		Learning: LearningConfig{
 			MaxCommits: 50,

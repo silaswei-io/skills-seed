@@ -4,14 +4,15 @@
 
 The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates it from the project context. Most paths are relative to the project root or `.skills-seed`; each field below states the relevant base.
 
-## 0.6.1 Config Structure
+## 0.7.0 Config Structure
 
-0.6.1 keeps the clean 0.6.0 config structure and does not keep compatibility with old fields:
+0.7.0 continues to avoid compatibility with old fields:
 
 - Top-level `project` was renamed to `profile`. It describes the project or workspace that owns the config file; it is not the `project` run mode.
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
 - Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec during `learn current` from repository evidence, child project profiles, and one-shot user context. They are not read from config, and generation only consumes learned artifacts.
 - Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
+- `analysis.codegraph` was removed. Structural pre-scan is now configured through `analysis.structural`, uses embedded tree-sitter, and does not require an external CodeGraph command or index.
 
 ## Config Example
 
@@ -31,14 +32,10 @@ workspace:
   projects: []
 
 analysis:
-  codegraph:
+  structural:
     enabled: true
-    required: false
-    command: "codegraph"
-    auto_init: true
-    auto_sync: true
-    max_nodes: 30
-    max_code: 0
+    max_symbols: 30
+    max_file_size: 512
 
 agent:
   engine: "claude"
@@ -156,25 +153,24 @@ exclude:
 5. Only first-level directories under the workspace root that have their own `.git` are recognized as child projects.
 6. Markers such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files classify `type` and `language`; they no longer decide whether a directory is a project.
 
-### `analysis.codegraph`
+### `analysis.structural`
+
+Lightweight structural pre-scan based on embedded tree-sitter. It provides symbols, imports, entry points, and module clues without depending on an external command or maintaining an index.
 
 #### Fields
 
 | Field | Default | Description |
 |---|---:|---|
-| `enabled` | `true` | Enable CodeGraph structural analysis enhancement |
-| `required` | `false` | Fail when CodeGraph is unavailable; `false` warns and falls back to normal file analysis |
-| `command` | `codegraph` | CodeGraph command path |
-| `auto_init` | `true` | Run `codegraph init -i` automatically when the target project has no `.codegraph` |
-| `auto_sync` | `true` | Run `codegraph sync` before analysis when an index exists |
-| `max_nodes` | `30` | Maximum symbol nodes passed to `codegraph context` |
-| `max_code` | `0` | Maximum code blocks passed to `codegraph context`; `0` means structural summary only |
+| `enabled` | `true` | Enable structural pre-scan; even when enabled, it only runs when focus, diff, sample, or entry files are available |
+| `max_symbols` | `30` | Maximum symbols emitted into structural context |
+| `max_file_size` | `512` | Per-source-file size limit in KB; larger files are skipped |
 
 #### Recommendations
 
-1. Keep the defaults for local development.
-2. In CI or strict team environments, set `required: true` if CodeGraph is mandatory.
-3. Set `auto_init` or `auto_sync` to `false` if indexing should be controlled manually.
+1. Most projects should keep the default `true`; structural pre-scan still does not run without bounded inputs.
+2. Set `enabled` to `false` when structural context is not needed.
+3. Lower `max_file_size` for large repositories to avoid generated files, bundles, or unusually large files.
+4. Structural pre-scan only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
 
 ### `agent`
 
@@ -313,7 +309,7 @@ These files are merged with built-in prompts; they do not replace built-in promp
 
 | Pattern | Description |
 |---|---|
-| `.*` | Dot-prefixed files and directories, such as `.github`, `.cursor`, `.codegraph`, `.env` |
+| `.*` | Dot-prefixed files and directories, such as `.github`, `.cursor`, `.env` |
 | `vendor/**` | Common dependency directory |
 | `node_modules/**` | Common dependency directory |
 | `dist/**` | Common build output directory |
