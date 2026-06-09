@@ -246,6 +246,7 @@ skills:
 
 - 默认不上传项目代码到远端知识库；学习结果写入当前仓库的 `.skills-seed`。
 - `check` 和 `generate skills` 会调用配置中的 Agent CLI，因此是否联网取决于你使用的 `claude` / `codex` CLI。
+- `.skills-seed/memory/project.db` 是本地 BoltDB 文件，同一时间只能被一个 `skills-seed` 进程写入或打开；如果另一个命令正在学习、合并或查看 patterns，新的命令可能提示数据库正在被占用，等待当前命令结束后重试即可。
 - 生成的 skills 目录、`.git/**`、`.skills-seed/**` 以及常见构建产物默认会被排除，避免生成内容回流到下一轮学习。
 - 手写 `SKILL.md` 如果没有 `generated-by: skills-seed` 标记，默认不会被覆盖。
 

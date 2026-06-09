@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.4]
+
+### 修复
+
+- 优化项目数据库被占用时的错误提示。当 BoltDB 无法在超时时间内获取 `.skills-seed/memory/project.db` 锁时，CLI 会提示数据库可能正在被其他 `skills-seed` 命令使用，并给出等待或检查残留进程的处理建议。
+
 ## [v0.7.3]
 
 ### 功能

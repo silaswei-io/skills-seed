@@ -218,6 +218,31 @@ func TestRunHelpDoesNotOpenLockedProjectRuntime(t *testing.T) {
 	require.NoError(t, Run())
 }
 
+func TestInitContainerAndLoggerReportsLockedPatternDBHint(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	projectRoot := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(projectRoot, ".git"), 0755))
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.RootPath = projectRoot
+	require.NoError(t, configRepo.Update(cfg))
+
+	lockedRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	require.NoError(t, err)
+	defer lockedRepo.Close()
+
+	cont, err := initContainerAndLogger(seedPath)
+
+	require.Nil(t, cont)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "创建容器失败")
+	require.Contains(t, err.Error(), "创建模式仓储失败")
+	require.Contains(t, err.Error(), "数据库文件可能正在被其他 skills-seed 命令使用，请等待当前命令结束后重试")
+}
+
 func requireHelpText(t *testing.T, fieldName, commandName, value string) {
 	t.Helper()
 

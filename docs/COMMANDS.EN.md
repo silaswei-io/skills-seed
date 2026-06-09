@@ -362,6 +362,7 @@ skills-seed patterns show business-create-order --format json
 2. Use `--dry-run` first when you want to inspect the merge result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
 4. `patterns show` reads saved DB fields and helps inspect `created_at/updated_at`, code-location status, and language-agnostic symbol snapshots.
+5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/memory/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
 
 ### `skills-seed review`
 

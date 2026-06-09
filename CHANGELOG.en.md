@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.4]
+
+### Fixes
+
+- Improved the error message when the project database is locked. When BoltDB cannot acquire the `.skills-seed/memory/project.db` lock before its timeout, the CLI now explains that another `skills-seed` command may be using the database and suggests waiting or checking for a stale process.
+
 ## [v0.7.3]
 
 ### Features

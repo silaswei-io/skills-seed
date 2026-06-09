@@ -227,6 +227,9 @@ other = "初始化 i18n 失败"
 [ContainerCreatePatternRepoFailed]
 other = "创建模式仓储失败"
 
+[ContainerPatternDBLockedHint]
+other = "数据库文件可能正在被其他 skills-seed 命令使用，请等待当前命令结束后重试；如果确认没有运行中的命令，请检查是否有残留进程占用 .skills-seed/memory/project.db"
+
 [ContainerSubscribeLoggingFailed]
 other = "订阅日志处理器失败"
 

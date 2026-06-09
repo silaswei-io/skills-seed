@@ -246,6 +246,7 @@ See [Command Reference](docs/COMMANDS.EN.md) for all flags and forms.
 
 - Project code is not uploaded to a remote knowledge base by default; learned data is written to `.skills-seed` in the current repository.
 - `check` and `generate skills` call the configured Agent CLI, so network behavior depends on the `claude` / `codex` CLI you use.
+- `.skills-seed/memory/project.db` is a local BoltDB file and can only be opened by one `skills-seed` process at a time. If another command is learning, merging, or inspecting patterns, a new command may report that the database is in use; wait for the running command to finish and retry.
 - Generated skills directories, `.git/**`, `.skills-seed/**`, and common build outputs are excluded by default so generated content does not feed back into later learning.
 - A handwritten `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 

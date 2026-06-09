@@ -362,6 +362,7 @@ skills-seed patterns show business-create-order --format json
 2. 不确定合并结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
 4. `patterns show` 读取 DB 中已保存字段，可用于排查 `created_at/updated_at`、代码位置状态和语言无关符号快照。
+5. `patterns stats` 和 `patterns show` 不调用 AI，也不修改数据，但仍需要打开 `.skills-seed/memory/project.db`；如果数据库被其他 `skills-seed` 命令占用，CLI 会提示等待当前命令结束或检查残留进程。
 
 ### `skills-seed review`
 

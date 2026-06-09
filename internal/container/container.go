@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Container 应用容器
@@ -123,7 +125,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	dbPath := filepath.Join(seedPath, "memory", "project.db")
 	patternRepo, err := boltdb.NewPatternRepository(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("ContainerCreatePatternRepoFailed"), err)
+		return nil, patternRepositoryError(err)
 	}
 
 	profileRepo := profilestore.NewRepository(seedPath)
@@ -194,6 +196,13 @@ func createAgent(cfg *config.Config, promptLoader *prompts.Loader) (agent.Agent,
 	}
 
 	return factory(command, timeout, promptLoader, cfg.Agent.AllowUserPlugins, cfg.Agent.Retry), nil
+}
+
+func patternRepositoryError(err error) error {
+	if errors.Is(err, bolt.ErrTimeout) {
+		return fmt.Errorf("%s: %w. %s", i18n.Get("ContainerCreatePatternRepoFailed"), err, i18n.Get("ContainerPatternDBLockedHint"))
+	}
+	return fmt.Errorf("%s: %w", i18n.Get("ContainerCreatePatternRepoFailed"), err)
 }
 
 // Close 关闭容器

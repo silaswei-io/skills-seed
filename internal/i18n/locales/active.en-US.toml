@@ -227,6 +227,9 @@ other = "Failed to initialize i18n"
 [ContainerCreatePatternRepoFailed]
 other = "Failed to create pattern repository"
 
+[ContainerPatternDBLockedHint]
+other = "The database file may be in use by another skills-seed command. Wait for that command to finish and retry; if no command should be running, check for a stale process holding .skills-seed/memory/project.db"
+
 [ContainerSubscribeLoggingFailed]
 other = "Failed to subscribe logging handler"
 
