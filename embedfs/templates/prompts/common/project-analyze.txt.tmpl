@@ -79,8 +79,9 @@
 
 # 输出格式
 
-只返回符合以下结构的合法 JSON 对象：
+只返回符合以下结构的合法 JSON 对象。下面的 `json` 代码块仅用于说明结构；实际回复不要包含 markdown 代码块或额外文本：
 
+```json
 {
   "project_name": "{{.ProjectName}}",
   "language": "{{.Language}}",
@@ -112,7 +113,7 @@
   "business_methods": [
     {
       "name": "MethodName",
-      "location": "file/path.go:line",
+      "code_location": {"current_location": "file/path.go:line"},
       "description": "业务逻辑说明",
       "usage": "何时调用该方法",
       "type": "domain|common",
@@ -134,6 +135,7 @@
   "dependencies": ["依赖名称"],
   "summary": "具体项目概览"
 }
+```
 
 # 严格输出要求
 

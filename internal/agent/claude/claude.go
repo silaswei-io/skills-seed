@@ -368,6 +368,14 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
 		retryable := isRetryableError(stdoutStr, stderrStr)
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:     c.Name(),
+			Operation: operation,
+			Attempt:   attempt,
+			RawOutput: stdoutStr,
+			Stderr:    stderrStr,
+			ExitError: true,
+		})
 
 		if retryable {
 			logger.Warn(i18n.Get("LoggerAgentClaudeCallFailed"),
@@ -376,8 +384,10 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 				"attempt", attempt,
 				"error", err,
 				"duration", duration,
-				"stdout", stdoutStr,
-				"stderr", stderrStr,
+				"stdout_length", len(stdoutStr),
+				"stderr_length", len(stderrStr),
+				"raw_output_path", archive.RawPath,
+				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
 			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), err)
@@ -389,15 +399,26 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 			"attempt", attempt,
 			"error", err,
 			"duration", duration,
-			"stdout", stdoutStr,
-			"stderr", stderrStr,
+			"stdout_length", len(stdoutStr),
+			"stderr_length", len(stderrStr),
+			"raw_output_path", archive.RawPath,
+			"stderr_path", archive.StderrPath,
 			"prompt_length", len(prompt),
 		)
-		return "", duration, false, fmt.Errorf("%s: %w, stdout: %s, stderr: %s", i18n.Get("AgentClaudeCLIFailed"), err, stdoutStr, stderrStr)
+		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), err)
 	}
 
 	rawOutput := stdout.String()
 	output, usage := parseClaudeOutput(rawOutput)
+	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+		Agent:           c.Name(),
+		Operation:       operation,
+		Attempt:         attempt,
+		Content:         output,
+		RawOutput:       rawOutput,
+		Stderr:          stderr.String(),
+		TokenUsageKnown: usage.Known(),
+	})
 	callCompleteFields := []any{
 		"agent", c.Name(),
 		"operation", operation,
@@ -406,17 +427,13 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 		"raw_output_length", stdout.Len(),
 		"stderr_length", stderr.Len(),
 		"duration", duration,
+		"output_path", archive.ContentPath,
+		"raw_output_path", archive.RawPath,
+		"stderr_path", archive.StderrPath,
 	}
 	callCompleteFields = append(callCompleteFields, tokenusage.Fields(usage, "")...)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
 	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
-
-	logger.Debug("Claude 模型回复预览",
-		"agent", c.Name(),
-		"operation", operation,
-		"output_length", len(output),
-		"output_preview", claudeReplyPreview(output),
-	)
 
 	return output, duration, false, nil
 }
@@ -430,10 +447,6 @@ func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage) {
 		return result.Result, usage
 	}
 	return rawOutput, usage
-}
-
-func claudeReplyPreview(output string) string {
-	return parser.TruncString(output, 1000)
 }
 
 func claudePrintArgs(allowUserPlugins bool) []string {
@@ -823,7 +836,6 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 			"method", "AnalyzeCurrentCodebase",
 			"error", err,
 			"output_length", len(output),
-			"output_preview", parser.TruncString(output, 500),
 		)
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
 	}

@@ -22,7 +22,7 @@
 
 **规则**: {{.Rule}}
 
-**置信度**: {{printf "%.2f" (mul .Confidence 100)}}% | **出现次数**: {{.Frequency}}
+**证据**: 置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，来源 {{.Source}}
 
 {{if .GoodExample}}
 #### ✅ 正确示例

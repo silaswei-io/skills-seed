@@ -730,7 +730,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 				BusinessMethods: []domain.BusinessMethod{
 					{
 						Name:          "IssueCertificate",
-						Location:      "internal/service/certificate/service.go:42",
+						CodeLocation:  domain.CodeLocation{CurrentLocation: "internal/service/certificate/service.go:42"},
 						Description:   "issues a certificate after validating request state",
 						Function:      "func (s *Service) IssueCertificate(ctx context.Context, req *IssueRequest) error",
 						Usage:         "certificate issuance flow",
@@ -772,6 +772,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	businessMethods, err := os.ReadFile(filepath.Join(tmpDir, "references", "business-methods.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(businessMethods), "IssueCertificate")
+	assert.Contains(t, string(businessMethods), "- **位置状态**: `valid`")
 	assert.Contains(t, string(businessMethods), "func (s *Service) IssueCertificate(ctx context.Context, req *IssueRequest) error")
 	assert.Contains(t, string(businessMethods), "./patterns/business.md")
 
@@ -816,12 +817,12 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 						Priority:    5,
 						BusinessMethods: []*domain.BusinessMethod{
 							{
-								Name:        "DuplicatedMethod",
-								Location:    "internal/service/demo.go:10",
-								Description: "method already documented in business-methods.md",
-								Usage:       "business flow reuse",
-								Type:        "domain",
-								Function:    "func DuplicatedMethod() error",
+								Name:         "DuplicatedMethod",
+								CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/demo.go:10"},
+								Description:  "method already documented in business-methods.md",
+								Usage:        "business flow reuse",
+								Type:         "domain",
+								Function:     "func DuplicatedMethod() error",
 							},
 						},
 					},
@@ -850,12 +851,12 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 				},
 				BusinessMethods: []domain.BusinessMethod{
 					{
-						Name:        "DuplicatedMethod",
-						Location:    "internal/service/demo.go:10",
-						Description: "method documented once in the split reference",
-						Usage:       "business flow reuse",
-						Type:        "domain",
-						Function:    "func DuplicatedMethod() error",
+						Name:         "DuplicatedMethod",
+						CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/demo.go:10"},
+						Description:  "method documented once in the split reference",
+						Usage:        "business flow reuse",
+						Type:         "domain",
+						Function:     "func DuplicatedMethod() error",
 					},
 				},
 			}, nil

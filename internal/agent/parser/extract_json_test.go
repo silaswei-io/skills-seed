@@ -50,7 +50,7 @@ func TestExtractJSON_NoBraces(t *testing.T) {
 }
 
 func TestExtractJSON_UnmatchedBraces(t *testing.T) {
-	input := `{"key": "value"`
+	input := `{"key": "value",`
 	result, err := ExtractJSON(input)
 	assert.Error(t, err)
 	assert.Empty(t, result)
@@ -98,6 +98,20 @@ func TestExtractJSON_RepairsInvalidBackslashEscapesInStrings(t *testing.T) {
 	assert.JSONEq(t, `{"good_example": "const path = \"src\\ pages\"\nconst re = /\\s+/"}`, result)
 }
 
+func TestExtractJSON_RepairsMissingClosingContainersAtEnd(t *testing.T) {
+	input := `{"patterns":[{"id":"service","name":"Service"}],"category_summaries":{"structure":{"summary":"layers","patterns":["Service"]}}`
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"id":"service","name":"Service"}],"category_summaries":{"structure":{"summary":"layers","patterns":["Service"]}}}`, result)
+}
+
+func TestExtractJSON_DoesNotRepairUnterminatedString(t *testing.T) {
+	input := `{"patterns":[{"id":"service","name":"Service}]`
+	result, err := ExtractJSON(input)
+	assert.Error(t, err)
+	assert.Empty(t, result)
+}
+
 func TestExtractJSON_CodeBlockWithNestedJSON(t *testing.T) {
 	input := "```json\n{\"outer\": {\"inner\": [1, 2, 3]}}\n```"
 	result, err := ExtractJSON(input)
@@ -130,7 +144,7 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
   "framework_patterns": ["cobra command wiring"],
   "structure": "internal/",
   "key_modules": [{"name":"service","path":"internal/service","description":"business layer","responsibilities":["orchestrate"],"dependencies":["domain"],"dependents":["command"],"key_methods":["Run()"]}],
-  "business_methods": [{"name":"Run","location":"internal/service/demo.go:10","description":"runs demo","usage":"demo flow","type":"domain","function":"func Run() error","prerequisites":"config loaded","returns":"error"}],
+  "business_methods": [{"name":"Run","code_location":{"current_location":"internal/service/demo.go:10"},"description":"runs demo","usage":"demo flow","type":"domain","function":"func Run() error","prerequisites":"config loaded","returns":"error"}],
   "common_utils": [{"name":"Ptr","file":"internal/utils/ptr.go","signature":"func Ptr[T any](v T) *T","description":"returns pointer","usage":"optional fields"}],
   "config_patterns": ["yaml config"],
   "dependencies": ["bbolt"],
@@ -146,7 +160,7 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	assert.Len(t, result.KeyModules, 1)
 	assert.Equal(t, []string{"domain"}, result.KeyModules[0].Dependencies)
 	assert.Len(t, result.BusinessMethods, 1)
-	assert.Equal(t, "internal/service/demo.go:10", result.BusinessMethods[0].Location)
+	assert.Equal(t, "internal/service/demo.go:10", result.BusinessMethods[0].DisplayLocation())
 	assert.Equal(t, "func Ptr[T any](v T) *T", result.CommonUtils[0].Signature)
 }
 
@@ -194,7 +208,7 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
     "frequency": 1,
     "business_method": {
       "name": "Run",
-      "location": "internal/service/demo.go:10",
+      "code_location": {"current_location":"internal/service/demo.go:10"},
       "description": "runs demo workflow",
       "usage": "demo flow",
       "type": "domain",
@@ -216,7 +230,7 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result.Patterns, 1)
 	assert.NotNil(t, result.Patterns[0].BusinessMethod)
-	assert.Equal(t, "internal/service/demo.go:10", result.Patterns[0].BusinessMethod.Location)
+	assert.Equal(t, "internal/service/demo.go:10", result.Patterns[0].BusinessMethod.DisplayLocation())
 	assert.Equal(t, "config loaded", result.Patterns[0].BusinessMethod.Prerequisites)
 	assert.Equal(t, "error", result.Patterns[0].BusinessMethod.Returns)
 }

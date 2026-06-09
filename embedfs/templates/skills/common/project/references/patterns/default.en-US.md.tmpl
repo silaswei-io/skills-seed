@@ -22,7 +22,7 @@
 
 {{if .Rule}}**Rule**: {{.Rule}}{{end}}
 
-**Confidence**: {{printf "%.2f" (mul .Confidence 100)}}% | **Frequency**: {{.Frequency}} occurrences
+**Evidence**: confidence {{printf "%.2f" (mul .Confidence 100)}}%, occurrences {{.Frequency}}, source {{.Source}}
 
 {{if .GoodExample}}
 #### Good Example

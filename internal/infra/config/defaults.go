@@ -16,6 +16,10 @@ const (
 	DefaultSaveRenderedPrompts = true
 	// DefaultAutoDeleteRenderedPrompts 表示默认不自动删除运行时提示词文件。
 	DefaultAutoDeleteRenderedPrompts = false
+	// DefaultSaveAgentOutputs 表示默认保留 Agent 原始输出文件，便于排查 AI 调用结果。
+	DefaultSaveAgentOutputs = DefaultSaveRenderedPrompts
+	// DefaultAutoDeleteAgentOutputs 表示默认不自动删除运行时 Agent 输出文件。
+	DefaultAutoDeleteAgentOutputs = DefaultAutoDeleteRenderedPrompts
 	// DefaultIncludeSkillsSeedGeneratedNotice 表示默认不在生成文件中写入 skills-seed 生成标记。
 	DefaultIncludeSkillsSeedGeneratedNotice = false
 	// DefaultAnalyzeSourceFilesOnly 表示默认只把源码和构建配置纳入结构化分析。

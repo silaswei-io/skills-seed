@@ -47,8 +47,9 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 
 # Output Format
 
-Return only a valid JSON object with this structure:
+Return only a valid JSON object with this structure. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
 
+```json
 {
   "name": "workspace name",
   "root_path": "workspace root path",
@@ -100,6 +101,7 @@ Return only a valid JSON object with this structure:
     }
   ]
 }
+```
 
 # Strict Requirements
 

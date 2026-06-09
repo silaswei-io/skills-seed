@@ -60,8 +60,7 @@ func TestShowCmdPrintsPatternDatabaseFields(t *testing.T) {
 	p.CreatedAt = createdAt
 	p.UpdatedAt = updatedAt
 	p.BusinessMethod = &domain.BusinessMethod{
-		Name:     "CreateOrder",
-		Location: "service/order.ts:20",
+		Name: "CreateOrder",
 		CodeLocation: domain.CodeLocation{
 			HistoricalLocation: "service/order.ts:10",
 			CurrentLocation:    "service/order.ts:20",
@@ -107,8 +106,7 @@ func TestShowCmdPrintsSinglePatternDetails(t *testing.T) {
 	p.Description = "创建订单并写入业务流水"
 	p.Rule = "订单创建必须经过领域服务"
 	p.BusinessMethod = &domain.BusinessMethod{
-		Name:     "CreateOrder",
-		Location: "service/order.ts:20",
+		Name: "CreateOrder",
 		CodeLocation: domain.CodeLocation{
 			HistoricalLocation: "service/order.ts:10",
 			CurrentLocation:    "service/order.ts:20",
@@ -160,8 +158,7 @@ func TestShowCmdPrintsJSON(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	p := domain.NewPattern("business-create-order", "创建订单", domain.CategoryBusiness)
 	p.BusinessMethod = &domain.BusinessMethod{
-		Name:     "CreateOrder",
-		Location: "service/order.ts:20",
+		Name: "CreateOrder",
 		CodeLocation: domain.CodeLocation{
 			CurrentLocation: "service/order.ts:20",
 			Status:          domain.CodeLocationStatusValid,

@@ -627,7 +627,7 @@ func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
 	require.NotContains(t, prompt, `"name":"Known Pattern"`)
 }
 
-func TestLoader_UpdatedRuntimePromptsUseUnfencedJSONExamples(t *testing.T) {
+func TestLoader_RuntimePromptsFenceJSONExamplesButRequireUnfencedResponses(t *testing.T) {
 	loader := NewLoader("common", "zh-CN", "")
 	for _, tc := range []struct {
 		name string
@@ -641,7 +641,8 @@ func TestLoader_UpdatedRuntimePromptsUseUnfencedJSONExamples(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			prompt, err := loader.Render(tc.name, tc.data)
 			require.NoError(t, err)
-			require.NotContains(t, prompt, "```json")
+			require.Contains(t, prompt, "```json")
+			require.Contains(t, prompt, "不要使用 markdown 代码块（不要 ```)")
 		})
 	}
 }

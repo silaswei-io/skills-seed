@@ -27,16 +27,11 @@
 {{range .Layers}}
 #### {{.Name}}
 
-**Description**: {{.Description}}
-
-**Responsibilities**
-{{range .Responsibilities}}
-- {{.}}
-{{end}}
-
-**Main Files**
-{{range .Files}}
-- `{{.}}`
+{{if .Description}}{{.Description}}{{end}}
+{{if .Responsibilities}}
+Responsibilities: {{range $i, $item := .Responsibilities}}{{if $i}}; {{end}}{{$item}}{{end}}
+{{end}}{{if .Files}}
+Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 {{end}}
 
 {{end}}
@@ -88,16 +83,6 @@
 {{range .FrameworkPatterns}}
 - {{.}}
 {{end}}
-{{end}}
-
-## Project Structure
-
-{{if .Structure}}
-```
-{{.Structure}}
-```
-{{else}}
-*Project structure has not been extracted yet*
 {{end}}
 
 ## Key Modules

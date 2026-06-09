@@ -4,9 +4,9 @@
 
 配置文件位于 `.skills-seed/config.yaml`。`skills-seed init` 会按当前项目生成默认配置；大多数路径都相对项目根目录或 `.skills-seed` 目录，具体以字段说明为准。
 
-## 0.7.x 配置结构
+## 0.8.x 配置结构
 
-0.7.x 继续不保留旧字段兼容：
+0.8.x 继续沿用 0.7.x 配置结构，不保留旧字段兼容：
 
 - 顶层 `project` 改名为 `profile`，表示当前配置文件所属项目或工作区本身，不表示 `project` 运行模式。
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
@@ -179,6 +179,8 @@ exclude:
 Prompt 片段仍从 `.skills-seed/prompts/` 读取，但 0.7.1 起渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的约束。
 
 渲染后的 prompt 默认保存在 `.skills-seed/memory/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、项目画像、项目补充、workspace 补充、用户指令和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。
+
+0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。
 
 ### 生成标记
 

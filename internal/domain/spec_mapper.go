@@ -79,7 +79,7 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 		spec.Touchpoints = append(spec.Touchpoints, ProjectSpecTouchpoint{
 			Kind:        "business_method",
 			Name:        method.Name,
-			Path:        method.Location,
+			Path:        method.DisplayLocation(),
 			Description: method.Description,
 		})
 	}

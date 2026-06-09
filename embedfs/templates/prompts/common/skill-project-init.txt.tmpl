@@ -112,11 +112,13 @@
    - 如果多个 service 都有相似的初始化方式 → 提取为"服务初始化模式"
    - 如果多个 API 都使用了相同的中间件 → 提取为"中间件使用模式"
    - 如果多个 repository 都使用了相同的事务处理 → 提取为"事务管理模式"
+   - 输出高价值模式即可，`patterns` 总数控制在 8 个以内；不要为同一层次的同质代码批量生成近似模式。
 
 # 输出格式
 
-**仅返回一个有效的 JSON 对象**（不要 markdown 代码块，不要额外文本）：
+**仅返回一个有效的 JSON 对象**。下面的 `json` 代码块仅用于说明结构；实际回复不要包含 markdown 代码块或额外文本：
 
+```json
 {
   "patterns": [
     {
@@ -124,14 +126,14 @@
       "name": "模式名称",
       "category": "business|api|database|error|structure|naming|concurrency|testing|utils|middleware|config",
       "description": "功能描述和使用时机",
-      "good_example": "实际代码（5-30行）",
+      "good_example": "实际代码（5-12行）",
       "bad_example": "",
       "rule": "何时应用此模式",
       "confidence": 0.9,
       "frequency": 3,
       "business_method": {
         "name": "完整方法签名",
-        "location": "文件路径:行号",
+        "code_location": {"current_location": "文件路径:行号"},
         "layer": "Service/Repository/Handler/Utils",
         "description": "功能和业务逻辑",
         "function": "包含参数和返回类型的完整签名",
@@ -150,6 +152,7 @@
   "common_patterns": ["具体模式"],
   "summary": "项目概述"
 }
+```
 
 # 模式分类判定（具体分类优先）
 
@@ -180,5 +183,5 @@
 - 不要使用 markdown 代码块（不要 ```)
 - JSON 前后不要有任何说明文字
 - **业务方法必须包含完整的方法签名和文件位置**
-- 每个模式的 `good_example` 必须包含实际代码（5-30行）
+- 每个模式的 `good_example` 必须包含实际代码（5-12行）
 - `good_example` 和 `bad_example` 是 JSON 字符串：代码中的反斜杠必须写成 `\\`，双引号必须写成 `\"`，换行必须写成 `\n`，不要输出未转义的 `\s`、`\ `、路径反斜杠或正则反斜杠

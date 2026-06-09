@@ -151,13 +151,6 @@ func TestAnalyzeProjectReturnsErrorWhenModelJSONCannotBeParsed(t *testing.T) {
 	require.Contains(t, err.Error(), "解析")
 }
 
-func TestClaudeReplyPreview_TruncatesAt1000Chars(t *testing.T) {
-	preview := claudeReplyPreview(strings.Repeat("a", 1001))
-
-	require.Len(t, preview, 1003)
-	require.True(t, strings.HasSuffix(preview, "..."))
-}
-
 func TestParseClaudeOutput_ExtractsResultAndTokenUsage(t *testing.T) {
 	output, usage := parseClaudeOutput(`{
   "type": "result",

@@ -192,6 +192,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 
 # 输出示例
 
+```json
 {
   "patterns": [
     {
@@ -205,7 +206,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
       "frequency": 5,
       "business_method": {
         "name": "OrderService.ProcessOrderPayment(ctx, orderID, payment) error",
-        "location": "internal/service/order.go:120",
+        "code_location": {"current_location": "internal/service/order.go:120"},
         "layer": "Service",
         "description": "处理订单支付的完整流程，包含状态验证、支付网关集成、订单状态更新",
         "function": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error",
@@ -228,10 +229,11 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
     }
   ]
 }
+```
 
 # 关键规则
 
-1. 仅返回有效的JSON - 不要markdown，前后不要文本
+1. 仅返回有效的JSON - 不要使用 markdown 代码块（不要 ```)，前后不要文本
 2. 每个模式的`good_example`必须有实际代码（5-30行）
 3. 仅对工具/业务方法使用`business_method`
 4. **先判断最具体分类**：数据库、API、错误、配置、中间件、结构、工具模式不得归入 business；跳过简单 CRUD

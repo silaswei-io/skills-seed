@@ -2,6 +2,24 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.8.0]
+
+### Features
+
+- Agent call outputs are now archived separately under `.skills-seed/memory/runtime/agent-outputs/`, including final content, raw CLI output, stderr, and a manifest for model-output debugging without polluting runtime logs.
+- Business-method code locations now use structured `code_location` metadata throughout, preserving current location, historical location, status, and language-agnostic symbol snapshots. Generated business-method references show location status.
+
+### Changes
+
+- Runtime logs no longer include Agent reply previews, raw stdout/stderr, or JSON snippets. They now keep lengths and runtime archive paths only.
+- Initial project learning and pattern-merge prompt examples now use `code_location.current_location`; example JSON is fenced as documentation while the actual model response is still required to be unfenced JSON.
+- Generated project skills and references are more compact: entry skills guide the Agent to read only the minimum relevant references, project specs focus on executable rules, and project overviews avoid repeated structure dumps.
+- Project profiles clean unusable business methods before saving; a business method must have both a name and a displayable location to be retained.
+
+### Fixes
+
+- Fixed `learn current` failing immediately when Agent output only missed trailing JSON container closers. The parser now conservatively restores missing `}` / `]` closers, while still rejecting unterminated strings and truly invalid JSON.
+
 ## [v0.7.4]
 
 ### Fixes

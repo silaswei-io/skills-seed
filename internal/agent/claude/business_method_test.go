@@ -20,7 +20,7 @@ func TestParseBatchLearnResultWithBusinessMethod(t *testing.T) {
       "frequency": 5,
       "business_method": {
         "name": "GenerateUUID",
-        "location": "internal/utils/uuid.go:15",
+        "code_location": {"current_location": "internal/utils/uuid.go:15"},
         "description": "生成符合 RFC 4122 的 UUID v4",
         "usage": "在创建新实体、生成追踪ID、或需要唯一标识符时使用",
         "type": "common",
@@ -39,7 +39,7 @@ func TestParseBatchLearnResultWithBusinessMethod(t *testing.T) {
       "frequency": 3,
       "business_method": {
         "name": "CallUserRPC",
-        "location": "internal/infra/rpc/user.go:25",
+        "code_location": {"current_location": "internal/infra/rpc/user.go:25"},
         "description": "调用用户服务的 RPC 方法",
         "usage": "需要查询用户信息、验证用户权限时使用",
         "type": "domain",
@@ -61,8 +61,10 @@ func TestParseBatchLearnResultWithBusinessMethod(t *testing.T) {
 			Confidence     float64 `json:"confidence"`
 			Frequency      int     `json:"frequency"`
 			BusinessMethod *struct {
-				Name        string `json:"name"`
-				Location    string `json:"location"`
+				Name         string `json:"name"`
+				CodeLocation struct {
+					CurrentLocation string `json:"current_location"`
+				} `json:"code_location"`
 				Description string `json:"description"`
 				Usage       string `json:"usage"`
 				Type        string `json:"type"`
@@ -91,8 +93,8 @@ func TestParseBatchLearnResultWithBusinessMethod(t *testing.T) {
 	if p1.BusinessMethod.Name != "GenerateUUID" {
 		t.Errorf("Expected BusinessMethod.Name 'GenerateUUID', got '%s'", p1.BusinessMethod.Name)
 	}
-	if p1.BusinessMethod.Location != "internal/utils/uuid.go:15" {
-		t.Errorf("Expected Location 'internal/utils/uuid.go:15', got '%s'", p1.BusinessMethod.Location)
+	if p1.BusinessMethod.CodeLocation.CurrentLocation != "internal/utils/uuid.go:15" {
+		t.Errorf("Expected CurrentLocation 'internal/utils/uuid.go:15', got '%s'", p1.BusinessMethod.CodeLocation.CurrentLocation)
 	}
 	if p1.BusinessMethod.Type != "common" {
 		t.Errorf("Expected Type 'common', got '%s'", p1.BusinessMethod.Type)

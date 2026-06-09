@@ -41,6 +41,7 @@ func (r *Repository) Get(ctx context.Context) (*domain.ProjectProfile, error) {
 
 // Save 保存项目画像
 func (r *Repository) Save(ctx context.Context, projectProfile *domain.ProjectProfile) error {
+	projectProfile = domain.CleanProjectProfile(projectProfile)
 	return profileStore(r.path).Save(ctx, projectProfile)
 }
 
@@ -51,6 +52,7 @@ func (r *Repository) GetForProject(ctx context.Context, projectID string) (*doma
 
 // SaveForProject 保存工作区子项目画像
 func (r *Repository) SaveForProject(ctx context.Context, projectID string, projectProfile *domain.ProjectProfile) error {
+	projectProfile = domain.CleanProjectProfile(projectProfile)
 	return profileStore(r.projectPath(projectID)).Save(ctx, projectProfile)
 }
 

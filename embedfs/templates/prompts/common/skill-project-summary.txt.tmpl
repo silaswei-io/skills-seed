@@ -51,8 +51,9 @@
 
 ## 输出格式
 
-**仅返回一个有效的 JSON 对象**（不要 markdown 代码块，不要额外文本）：
+**仅返回一个有效的 JSON 对象**。下面的 `json` 代码块仅用于说明结构；实际回复不要包含 markdown 代码块或额外文本：
 
+```json
 {
   "category_summaries": {
     "business": {
@@ -64,7 +65,7 @@
       "business_methods": [
         {
           "name": "ProcessPayment",
-          "location": "internal/service/payment/service.go",
+          "code_location": {"current_location": "internal/service/payment/service.go"},
           "description": "处理支付流程，包含验证和错误处理",
           "function": "验证支付请求，调用支付网关，处理响应，更新订单状态",
           "usage": "在结账流程中处理支付时使用",
@@ -88,6 +89,7 @@
   "key_insights": ["项目使用整洁架构，关注点清晰分离", "团队倾向于组合而非继承"],
   "improvement_suggestions": ["考虑为频繁访问的数据添加缓存层", "为 API 响应添加更全面的错误码"]
 }
+```
 
 **重要提示**：
 - 所有文本字段必须包含从模式中提取的**具体、可执行的内容**

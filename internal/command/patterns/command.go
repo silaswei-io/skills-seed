@@ -341,10 +341,7 @@ func patternLocationSummary(pattern domain.Pattern) (string, string) {
 	if status == "" {
 		status = "-"
 	}
-	current := location.CurrentLocation
-	if current == "" {
-		current = pattern.BusinessMethod.Location
-	}
+	current := pattern.BusinessMethod.DisplayLocation()
 	if current == "" {
 		current = "-"
 	}

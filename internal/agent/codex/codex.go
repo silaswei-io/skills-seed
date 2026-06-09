@@ -548,6 +548,14 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
 		retryable := isCodexRetryableError(stdoutStr, stderrStr)
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:     c.Name(),
+			Operation: operation,
+			Attempt:   attempt,
+			RawOutput: stdoutStr,
+			Stderr:    stderrStr,
+			ExitError: true,
+		})
 
 		if retryable {
 			logger.Warn(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -556,9 +564,13 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 				"attempt", attempt,
 				"duration", duration,
 				"error", err,
+				"stdout_length", len(stdoutStr),
+				"stderr_length", len(stderrStr),
+				"raw_output_path", archive.RawPath,
+				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w, stderr: %s", i18n.Get("AgentCodexCLIFailed"), err, stderrStr)
+			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), err)
 		}
 
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -567,9 +579,10 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 			"duration", duration,
 			"stdout_length", stdout.Len(),
 			"stderr_length", stderr.Len(),
-			"stderr", stderr.String(),
+			"raw_output_path", archive.RawPath,
+			"stderr_path", archive.StderrPath,
 		)
-		return "", duration, false, fmt.Errorf("%s: %w, stderr: %s", i18n.Get("AgentCodexCLIFailed"), err, stderr.String())
+		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), err)
 	}
 	duration := time.Since(startedAt)
 
@@ -589,26 +602,41 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 
 	content, err := extractFinalContent(rawOutput)
 	if err != nil {
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:           c.Name(),
+			Operation:       operation,
+			Attempt:         attempt,
+			RawOutput:       rawOutput,
+			Stderr:          stderr.String(),
+			TokenUsageKnown: usage.Known(),
+		})
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"agent", c.Name(),
 			"operation", operation,
 			"duration", duration,
 			"error", err,
 			"output_length", stdout.Len(),
-			"output_preview", parser.TruncString(rawOutput, 500),
+			"raw_output_path", archive.RawPath,
+			"stderr_path", archive.StderrPath,
 		)
 		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), err)
 	}
-	logger.Debug("Codex 模型回复预览",
-		"agent", c.Name(),
-		"operation", operation,
-		"output_length", len(content),
-		"output_preview", codexReplyPreview(content),
-	)
+	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+		Agent:           c.Name(),
+		Operation:       operation,
+		Attempt:         attempt,
+		Content:         content,
+		RawOutput:       rawOutput,
+		Stderr:          stderr.String(),
+		TokenUsageKnown: usage.Known(),
+	})
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
 		"agent", c.Name(),
 		"operation", operation,
 		"content_length", len(content),
+		"output_path", archive.ContentPath,
+		"raw_output_path", archive.RawPath,
+		"stderr_path", archive.StderrPath,
 	)
 	return content, duration, false, nil
 }
@@ -677,10 +705,6 @@ func codexHomeDir() string {
 		return ".codex"
 	}
 	return filepath.Join(userHome, ".codex")
-}
-
-func codexReplyPreview(output string) string {
-	return parser.TruncString(output, 1000)
 }
 
 func extractFinalContent(output string) (string, error) {

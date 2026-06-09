@@ -76,8 +76,9 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "10")
 	assert.Contains(t, content, "generated-by: skills-seed v0.0.1")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
+	assert.Contains(t, content, "按任务读取最小必要参考")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")
-	assert.Contains(t, content, "为外部调用补充超时测试")
+	assert.NotContains(t, content, "为外部调用补充超时测试")
 }
 
 // TestLoader_Render_English 测试英文模板渲染
@@ -113,8 +114,9 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.NotEmpty(t, content)
 	assert.Contains(t, content, "test-project")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
+	assert.Contains(t, content, "Read the smallest relevant reference set")
 	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
-	assert.Contains(t, content, "Add timeout tests for external calls")
+	assert.NotContains(t, content, "Add timeout tests for external calls")
 }
 
 func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
@@ -498,7 +500,7 @@ func categoryData(category string) map[string]interface{} {
 	pattern.Frequency = 2
 	method := &domain.BusinessMethod{
 		Name:          "DemoMethod",
-		Location:      "internal/demo.go:10",
+		CodeLocation:  domain.CodeLocation{CurrentLocation: "internal/demo.go:10"},
 		Description:   "demo business method",
 		Usage:         "use in demo flow",
 		Type:          "domain",
@@ -543,7 +545,7 @@ func projectOverviewData() map[string]interface{} {
 			{Title: "通用工具", Path: "./common-utils.md", Description: "工具方法清单"},
 		},
 		"KeyModules":          []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Dependencies: []string{"domain"}, Dependents: []string{"command"}, KeyMethods: []string{"Run()"}}},
-		"BusinessMethods":     []domain.BusinessMethod{{Name: "Demo", Location: "internal/demo.go:10", Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
+		"BusinessMethods":     []domain.BusinessMethod{{Name: "Demo", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/demo.go:10"}, Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
 		"CommonUtils":         []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
 		"ConfigPatterns":      []string{"yaml config"},
 		"ProjectID":           "demo",

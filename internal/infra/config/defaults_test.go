@@ -12,6 +12,8 @@ func TestLocaleDefaultsAndNormalization(t *testing.T) {
 	require.Equal(t, i18n.LocaleEnglish, DefaultSkillsLocale)
 	require.True(t, DefaultSaveRenderedPrompts)
 	require.False(t, DefaultAutoDeleteRenderedPrompts)
+	require.Equal(t, DefaultSaveRenderedPrompts, DefaultSaveAgentOutputs)
+	require.Equal(t, DefaultAutoDeleteRenderedPrompts, DefaultAutoDeleteAgentOutputs)
 	require.False(t, DefaultIncludeSkillsSeedGeneratedNotice)
 	require.Equal(t, i18n.LocaleChinese, NormalizeToolLocale(""))
 	require.Equal(t, i18n.LocaleEnglish, NormalizeSkillsLocale(""))

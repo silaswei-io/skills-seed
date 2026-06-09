@@ -10,45 +10,15 @@
 
 ## Usage Principles
 
-- Use this spec to confirm boundaries, rules, and change touchpoints before opening broader project overview or category pattern references.
-- This spec describes executable constraints inside the current project only; cross-project coordination belongs to the workspace root skill.
+- This spec keeps executable constraints, generated/config conventions, and change touchpoints only.
+- For architecture map read [Project Overview](./project-overview.md); for module details read [Key Modules](./modules.md); for business methods read [Business Methods](./business-methods.md).
 - If this spec conflicts with the current code, trust the code and regenerate with `skills-seed learn current` and `skills-seed generate-skills` when needed.
-
-## Project Summary
-
-{{if .Summary}}{{.Summary}}{{else}}*No project summary extracted yet.*{{end}}
-
-## Boundaries And Responsibilities
-
-{{if .Boundaries}}
-{{range .Boundaries}}
-### {{.Name}}
-
-- **Type**: {{.Type}}
-{{if .Description}}- **Description**: {{.Description}}
-{{end}}{{if .Responsibilities}}- **Responsibilities**:
-{{range .Responsibilities}}  - {{.}}
-{{end}}{{end}}{{if .Paths}}- **Paths**:
-{{range .Paths}}  - `{{.}}`
-{{end}}{{end}}
-
-{{end}}
-{{else}}
-*No explicit boundaries extracted yet.*
-{{end}}
 
 ## Rules
 
 {{if .PatternRules}}
 {{range .PatternRules}}
-### {{.Name}}
-
-- **Category**: {{.Category}}
-- **Confidence**: {{printf "%.2f" .Confidence}}
-- **Frequency**: {{.Frequency}}
-{{if .Description}}- **Description**: {{.Description}}
-{{end}}{{if .Rule}}- **Rule**: {{.Rule}}
-{{end}}
+- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
 {{end}}
 {{else}}
 *No executable rules extracted yet.*

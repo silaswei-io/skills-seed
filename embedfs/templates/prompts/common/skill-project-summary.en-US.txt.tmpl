@@ -45,8 +45,9 @@ Actions:
 
 ## Output Format
 
-Return ONLY a valid JSON object (no markdown code blocks, no extra text):
+Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
 
+```json
 {
   "category_summaries": {
     "business": {
@@ -58,7 +59,7 @@ Return ONLY a valid JSON object (no markdown code blocks, no extra text):
       "business_methods": [
         {
           "name": "ProcessPayment",
-          "location": "internal/service/payment/service.go",
+          "code_location": {"current_location": "internal/service/payment/service.go"},
           "description": "Handles payment processing with validation and error handling",
           "function": "Validates payment request, calls payment gateway, handles response, updates order status",
           "usage": "Use when processing payments in checkout flow",
@@ -82,6 +83,7 @@ Return ONLY a valid JSON object (no markdown code blocks, no extra text):
   "key_insights": ["Project uses clean architecture with clear separation of concerns", "Team prefers composition over inheritance"],
   "improvement_suggestions": ["Consider adding caching layer for frequently accessed data", "Add more comprehensive error codes for API responses"]
 }
+```
 
 **IMPORTANT**:
 - All text fields must contain **specific, actionable content** derived from the patterns

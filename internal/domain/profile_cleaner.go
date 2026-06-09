@@ -1,6 +1,9 @@
 package domain
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // CleanProjectProfile 清洗 profile 中的占位符和无效数据
 func CleanProjectProfile(profile *ProjectProfile) *ProjectProfile {
@@ -17,8 +20,10 @@ func CleanProjectProfile(profile *ProjectProfile) *ProjectProfile {
 	}
 
 	cleaned.BusinessMethods = make([]BusinessMethod, 0, len(profile.BusinessMethods))
+	now := time.Now()
 	for _, method := range profile.BusinessMethods {
 		if strings.TrimSpace(method.Name) != "" {
+			method.NormalizeCodeLocation(nil, now)
 			cleaned.BusinessMethods = append(cleaned.BusinessMethods, method)
 		}
 	}
@@ -59,5 +64,7 @@ func ValidBusinessMethods(methods []*BusinessMethod) []*BusinessMethod {
 
 // IsUsableBusinessMethod 判断业务方法是否可用
 func IsUsableBusinessMethod(method *BusinessMethod) bool {
-	return method != nil && strings.TrimSpace(method.Name) != ""
+	return method != nil &&
+		strings.TrimSpace(method.Name) != "" &&
+		strings.TrimSpace(method.DisplayLocation()) != ""
 }

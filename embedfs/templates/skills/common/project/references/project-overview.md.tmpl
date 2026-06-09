@@ -27,16 +27,11 @@
 {{range .Layers}}
 #### {{.Name}}
 
-**描述**: {{.Description}}
-
-**职责**
-{{range .Responsibilities}}
-- {{.}}
-{{end}}
-
-**主要文件**
-{{range .Files}}
-- `{{.}}`
+{{if .Description}}{{.Description}}{{end}}
+{{if .Responsibilities}}
+职责：{{range $i, $item := .Responsibilities}}{{if $i}}；{{end}}{{$item}}{{end}}
+{{end}}{{if .Files}}
+主要文件：{{range $i, $file := .Files}}{{if $i}}，{{end}}`{{$file}}`{{end}}
 {{end}}
 
 {{end}}
@@ -88,16 +83,6 @@
 {{range .FrameworkPatterns}}
 - {{.}}
 {{end}}
-{{end}}
-
-## 项目结构
-
-{{if .Structure}}
-```
-{{.Structure}}
-```
-{{else}}
-*项目结构信息尚未提取*
 {{end}}
 
 ## 关键模块

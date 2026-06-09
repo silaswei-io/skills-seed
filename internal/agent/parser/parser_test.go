@@ -23,7 +23,7 @@ func TestParseMergePatternsResultPreservesUsablePatternFields(t *testing.T) {
       "similarity_score": 0.87,
       "business_method": {
         "name": "UserService.Create(ctx, req) error",
-        "location": "internal/service/user.go:42",
+        "code_location": {"current_location":"internal/service/user.go:42"},
         "description": "创建用户并包装仓储错误",
         "usage": "用户创建流程",
         "type": "domain",
@@ -51,7 +51,7 @@ func TestParseMergePatternsResultPreservesUsablePatternFields(t *testing.T) {
 	require.Equal(t, "return err", merged.BadExample)
 	require.Equal(t, 0.87, merged.SimilarityScore)
 	require.NotNil(t, merged.BusinessMethod)
-	require.Equal(t, "internal/service/user.go:42", merged.BusinessMethod.Location)
+	require.Equal(t, "internal/service/user.go:42", merged.BusinessMethod.DisplayLocation())
 	require.Equal(t, "UserRepository 已初始化", merged.BusinessMethod.Prerequisites)
 }
 

@@ -4,9 +4,9 @@
 
 The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates it from the project context. Most paths are relative to the project root or `.skills-seed`; each field below states the relevant base.
 
-## 0.7.x Config Structure
+## 0.8.x Config Structure
 
-0.7.x continues to avoid compatibility with old fields:
+0.8.x keeps the 0.7.x config shape and continues to avoid compatibility with old fields:
 
 - Top-level `project` was renamed to `profile`. It describes the project or workspace that owns the config file; it is not the `project` run mode.
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
@@ -179,6 +179,8 @@ Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the
 Prompt fragments are still read from `.skills-seed/prompts/`, but starting in 0.7.1 rendering filters default metadata, empty scaffolding, and unfilled placeholder text. Only user-authored constraints are kept.
 
 Rendered prompts are saved by default under `.skills-seed/memory/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, project profile, project fragment, workspace fragment, user instruction, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent.
+
+Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr.
 
 ### Generated Notice
 

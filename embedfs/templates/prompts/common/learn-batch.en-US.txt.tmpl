@@ -186,6 +186,7 @@ For EACH pattern, you MUST provide:
 
 # Example Output
 
+```json
 {
   "patterns": [
     {
@@ -199,7 +200,7 @@ For EACH pattern, you MUST provide:
       "frequency": 5,
       "business_method": {
         "name": "OrderService.ProcessOrderPayment(ctx, orderID, payment) error",
-        "location": "internal/service/order.go:120",
+        "code_location": {"current_location": "internal/service/order.go:120"},
         "layer": "Service",
         "description": "Complete payment processing flow with status validation, payment gateway integration, and order status update",
         "function": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error",
@@ -222,10 +223,11 @@ For EACH pattern, you MUST provide:
     }
   ]
 }
+```
 
 # CRITICAL Rules
 
-1. Return ONLY valid JSON - no markdown, no text before/after
+1. Return ONLY valid JSON - no markdown code blocks (no ```), no text before/after
 2. Every pattern MUST have `good_example` with actual code (5-30 lines)
 3. Use `business_method` ONLY for utility/business methods
 4. **Choose the most specific category first**: database, API, error, config, middleware, structure, and utility patterns must not be labeled business. Skip simple CRUD.

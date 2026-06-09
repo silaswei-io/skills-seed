@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -126,13 +125,6 @@ func TestExtractFinalContent_IgnoresCommandExecutionOutput(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "final answer", content)
-}
-
-func TestCodexReplyPreview_TruncatesAt1000Chars(t *testing.T) {
-	preview := codexReplyPreview(strings.Repeat("a", 1001))
-
-	require.Len(t, preview, 1003)
-	require.True(t, strings.HasSuffix(preview, "..."))
 }
 
 type failingPromptRenderer struct {

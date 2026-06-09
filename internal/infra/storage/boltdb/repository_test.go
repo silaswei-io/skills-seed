@@ -81,10 +81,10 @@ func TestPatternRepository_PreservesPatternCreatedAtOnUpdate(t *testing.T) {
 	original.CreatedAt = time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
 	original.UpdatedAt = original.CreatedAt
 	original.SetBusinessMethod(&domain.BusinessMethod{
-		Name:     "CreateOrder",
-		Location: "internal/service/order.go:42",
-		Type:     "domain",
-		Function: "func (s *Service) CreateOrder(ctx context.Context, req CreateOrderReq) error",
+		Name:         "CreateOrder",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/order.go:42"},
+		Type:         "domain",
+		Function:     "func (s *Service) CreateOrder(ctx context.Context, req CreateOrderReq) error",
 	})
 	require.NoError(t, repo.Save(ctx, original))
 
@@ -96,7 +96,7 @@ func TestPatternRepository_PreservesPatternCreatedAtOnUpdate(t *testing.T) {
 	require.False(t, updatedAt.IsZero())
 	require.Equal(t, "internal/service/order.go:42", saved.BusinessMethod.CodeLocation.HistoricalLocation)
 	require.Equal(t, "internal/service/order.go:42", saved.BusinessMethod.CodeLocation.CurrentLocation)
-	require.Equal(t, domain.CodeLocationStatusUnknown, saved.BusinessMethod.CodeLocation.Status)
+	require.Equal(t, domain.CodeLocationStatusValid, saved.BusinessMethod.CodeLocation.Status)
 	require.False(t, saved.BusinessMethod.CodeLocation.CreatedAt.IsZero())
 	require.False(t, saved.BusinessMethod.CodeLocation.UpdatedAt.IsZero())
 	locationCreatedAt := saved.BusinessMethod.CodeLocation.CreatedAt
@@ -115,9 +115,9 @@ func TestPatternRepository_PreservesPatternCreatedAtOnUpdate(t *testing.T) {
 
 	replacement := newTestPattern("p-001", "business service", domain.CategoryBusiness, 0.88)
 	replacement.SetBusinessMethod(&domain.BusinessMethod{
-		Name:     "CreateOrder",
-		Location: "internal/service/order.go:84",
-		Type:     "domain",
+		Name:         "CreateOrder",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/order.go:84"},
+		Type:         "domain",
 	})
 	require.NoError(t, repo.Save(ctx, replacement))
 

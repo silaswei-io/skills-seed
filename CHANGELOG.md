@@ -2,6 +2,24 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.8.0]
+
+### 功能
+
+- Agent 调用输出会单独归档到 `.skills-seed/memory/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest，便于排查模型返回而不污染运行日志。
+- 业务方法代码位置全面改为 `code_location` 结构化元数据，保留当前位置、历史位置、状态和语言无关符号快照；生成的 business methods reference 会展示位置状态。
+
+### 变更
+
+- 运行日志不再输出 Agent 回复预览、stdout/stderr 明文或 JSON 片段，只保留长度和 runtime 归档路径。
+- 初始项目学习和模式合并等 prompt 示例统一使用 `code_location.current_location`，并把示例 JSON 包在说明用代码块内，同时继续强制实际回复不得使用 markdown。
+- 生成的项目 skill 和 references 更紧凑：入口文档按任务读取最小必要参考，项目规范聚焦可执行规则，项目概览减少重复结构正文。
+- Profile 保存前会清理不可用业务方法；业务方法必须有名称和可展示位置才进入最终画像。
+
+### 修复
+
+- 修复 `learn current` 在 Agent 输出末尾缺少 JSON 闭合容器时直接失败的问题；现在会对缺失的 `}` / `]` 做保守恢复，但不会修复半截字符串或真正非法 JSON。
+
 ## [v0.7.4]
 
 ### 修复

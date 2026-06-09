@@ -17,6 +17,35 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
+type businessMethodPayload struct {
+	Name          string              `json:"name"`
+	CodeLocation  domain.CodeLocation `json:"code_location"`
+	Description   string              `json:"description"`
+	Usage         string              `json:"usage"`
+	Type          string              `json:"type"`
+	Function      string              `json:"function"`
+	Prerequisites string              `json:"prerequisites"`
+	Returns       string              `json:"returns"`
+}
+
+func (p *businessMethodPayload) toDomain(now time.Time) *domain.BusinessMethod {
+	if p == nil {
+		return nil
+	}
+	method := &domain.BusinessMethod{
+		Name:          p.Name,
+		Description:   p.Description,
+		Usage:         p.Usage,
+		Type:          p.Type,
+		Function:      p.Function,
+		Prerequisites: p.Prerequisites,
+		Returns:       p.Returns,
+		CodeLocation:  p.CodeLocation,
+	}
+	method.NormalizeCodeLocation(nil, now)
+	return method
+}
+
 // ExtractJSON 从 AI 输出中提取 JSON
 func ExtractJSON(output string) (string, error) {
 	trimmed := strings.TrimSpace(output)
@@ -41,7 +70,6 @@ func ExtractJSON(output string) (string, error) {
 	if start == -1 {
 		logger.Error(i18n.Get("AgentNoJSONFound"),
 			"output_length", len(output),
-			"output_preview", TruncString(output, 100),
 			"hint", i18n.Get("AgentNoJSONFoundHint"))
 		return "", fmt.Errorf("%s", i18n.Get("AgentNoJSONObjectFound"))
 	}
@@ -54,6 +82,12 @@ func ExtractJSON(output string) (string, error) {
 				if err := validateJSON(jsonStr); err == nil {
 					return jsonStr, nil
 				}
+			}
+		}
+		if repairedOutput, repairErr := repairMissingClosingContainers(output[start:]); repairErr == nil {
+			jsonStr := strings.TrimSpace(repairedOutput)
+			if err := validateJSON(jsonStr); err == nil {
+				return jsonStr, nil
 			}
 		}
 		logger.Error(i18n.Get("AgentUnmatchedBraces"),
@@ -78,8 +112,7 @@ func ExtractJSON(output string) (string, error) {
 		}
 		logger.Error(i18n.Get("AgentInvalidJSON"),
 			"error", err,
-			"json_length", len(jsonStr),
-			"json_preview", TruncString(jsonStr, 200))
+			"json_length", len(jsonStr))
 		return "", fmt.Errorf("%s: %w", i18n.Get("AgentInvalidJSONError"), err)
 	}
 
@@ -136,6 +169,62 @@ func repairDuplicatedObjectStarts(jsonStr string) (string, error) {
 	}
 	if !repaired {
 		return jsonStr, nil
+	}
+	return b.String(), nil
+}
+
+func repairMissingClosingContainers(jsonStr string) (string, error) {
+	jsonStr = strings.TrimSpace(jsonStr)
+	if jsonStr == "" || jsonStr[0] != '{' {
+		return "", fmt.Errorf("JSON object start not found")
+	}
+
+	stack := make([]byte, 0, 8)
+	inString := false
+	escapeNext := false
+	for i := 0; i < len(jsonStr); i++ {
+		ch := jsonStr[i]
+		if escapeNext {
+			escapeNext = false
+			continue
+		}
+		if ch == '\\' {
+			if inString {
+				escapeNext = true
+			}
+			continue
+		}
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		switch ch {
+		case '{':
+			stack = append(stack, '}')
+		case '[':
+			stack = append(stack, ']')
+		case '}', ']':
+			if len(stack) == 0 || stack[len(stack)-1] != ch {
+				return "", fmt.Errorf("JSON containers are mismatched")
+			}
+			stack = stack[:len(stack)-1]
+		}
+	}
+	if inString {
+		return "", fmt.Errorf("unterminated JSON string")
+	}
+	if len(stack) == 0 {
+		return jsonStr, nil
+	}
+
+	var b strings.Builder
+	b.Grow(len(jsonStr) + len(stack))
+	b.WriteString(jsonStr)
+	for i := len(stack) - 1; i >= 0; i-- {
+		b.WriteByte(stack[i])
 	}
 	return b.String(), nil
 }
@@ -313,23 +402,16 @@ func ParseLearnResult(output string) (*agent.LearnResult, error) {
 
 	var result struct {
 		Patterns []struct {
-			ID             string  `json:"id"`
-			Name           string  `json:"name"`
-			Category       string  `json:"category"`
-			Description    string  `json:"description"`
-			GoodExample    string  `json:"good_example"`
-			BadExample     string  `json:"bad_example"`
-			Rule           string  `json:"rule"`
-			Confidence     float64 `json:"confidence"`
-			Frequency      int     `json:"frequency"`
-			BusinessMethod *struct {
-				Name        string `json:"name"`
-				Location    string `json:"location"`
-				Description string `json:"description"`
-				Usage       string `json:"usage"`
-				Type        string `json:"type"`
-				Function    string `json:"function"`
-			} `json:"business_method"`
+			ID             string                 `json:"id"`
+			Name           string                 `json:"name"`
+			Category       string                 `json:"category"`
+			Description    string                 `json:"description"`
+			GoodExample    string                 `json:"good_example"`
+			BadExample     string                 `json:"bad_example"`
+			Rule           string                 `json:"rule"`
+			Confidence     float64                `json:"confidence"`
+			Frequency      int                    `json:"frequency"`
+			BusinessMethod *businessMethodPayload `json:"business_method"`
 		} `json:"patterns"`
 	}
 
@@ -353,16 +435,7 @@ func ParseLearnResult(output string) (*agent.LearnResult, error) {
 			CreatedAt:   time.Now(),
 		}
 
-		if p.BusinessMethod != nil {
-			pattern.BusinessMethod = &domain.BusinessMethod{
-				Name:        p.BusinessMethod.Name,
-				Location:    p.BusinessMethod.Location,
-				Description: p.BusinessMethod.Description,
-				Usage:       p.BusinessMethod.Usage,
-				Type:        p.BusinessMethod.Type,
-				Function:    p.BusinessMethod.Function,
-			}
-		}
+		pattern.BusinessMethod = p.BusinessMethod.toDomain(pattern.CreatedAt)
 
 		patterns[i] = pattern
 	}
@@ -386,25 +459,16 @@ func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
 
 	var result struct {
 		Patterns []struct {
-			ID             string  `json:"id"`
-			Name           string  `json:"name"`
-			Category       string  `json:"category"`
-			Description    string  `json:"description"`
-			GoodExample    string  `json:"good_example"`
-			BadExample     string  `json:"bad_example"`
-			Rule           string  `json:"rule"`
-			Confidence     float64 `json:"confidence"`
-			Frequency      int     `json:"frequency"`
-			BusinessMethod *struct {
-				Name          string `json:"name"`
-				Location      string `json:"location"`
-				Description   string `json:"description"`
-				Usage         string `json:"usage"`
-				Type          string `json:"type"`
-				Function      string `json:"function"`
-				Prerequisites string `json:"prerequisites"`
-				Returns       string `json:"returns"`
-			} `json:"business_method"`
+			ID             string                 `json:"id"`
+			Name           string                 `json:"name"`
+			Category       string                 `json:"category"`
+			Description    string                 `json:"description"`
+			GoodExample    string                 `json:"good_example"`
+			BadExample     string                 `json:"bad_example"`
+			Rule           string                 `json:"rule"`
+			Confidence     float64                `json:"confidence"`
+			Frequency      int                    `json:"frequency"`
+			BusinessMethod *businessMethodPayload `json:"business_method"`
 		} `json:"patterns"`
 	}
 
@@ -427,18 +491,7 @@ func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
 			Source:      domain.SourceLearned,
 			CreatedAt:   time.Now(),
 		}
-		if p.BusinessMethod != nil {
-			pattern.BusinessMethod = &domain.BusinessMethod{
-				Name:          p.BusinessMethod.Name,
-				Location:      p.BusinessMethod.Location,
-				Description:   p.BusinessMethod.Description,
-				Usage:         p.BusinessMethod.Usage,
-				Type:          p.BusinessMethod.Type,
-				Function:      p.BusinessMethod.Function,
-				Prerequisites: p.BusinessMethod.Prerequisites,
-				Returns:       p.BusinessMethod.Returns,
-			}
-		}
+		pattern.BusinessMethod = p.BusinessMethod.toDomain(pattern.CreatedAt)
 		patterns[i] = pattern
 	}
 
@@ -490,21 +543,12 @@ func ParseGenerateSkillsResult(output string) (*agent.GenerateSkillsResult, erro
 
 	var result struct {
 		CategorySummaries map[string]struct {
-			Category        string   `json:"category"`
-			Summary         string   `json:"summary"`
-			Patterns        []string `json:"patterns"`
-			UsageScenes     []string `json:"usage_scenes"`
-			Priority        int      `json:"priority"`
-			BusinessMethods []*struct {
-				Name          string `json:"name"`
-				Location      string `json:"location"`
-				Description   string `json:"description"`
-				Usage         string `json:"usage"`
-				Type          string `json:"type"`
-				Function      string `json:"function"`
-				Prerequisites string `json:"prerequisites"`
-				Returns       string `json:"returns"`
-			} `json:"business_methods"`
+			Category        string                   `json:"category"`
+			Summary         string                   `json:"summary"`
+			Patterns        []string                 `json:"patterns"`
+			UsageScenes     []string                 `json:"usage_scenes"`
+			Priority        int                      `json:"priority"`
+			BusinessMethods []*businessMethodPayload `json:"business_methods"`
 		} `json:"category_summaries"`
 		KeyPatterns []struct {
 			Name       string `json:"name"`
@@ -537,17 +581,8 @@ func ParseGenerateSkillsResult(output string) (*agent.GenerateSkillsResult, erro
 	for key, summary := range result.CategorySummaries {
 		var businessMethods []*domain.BusinessMethod
 		for _, bm := range summary.BusinessMethods {
-			if bm != nil {
-				businessMethods = append(businessMethods, &domain.BusinessMethod{
-					Name:          bm.Name,
-					Location:      bm.Location,
-					Description:   bm.Description,
-					Usage:         bm.Usage,
-					Type:          bm.Type,
-					Function:      bm.Function,
-					Prerequisites: bm.Prerequisites,
-					Returns:       bm.Returns,
-				})
+			if method := bm.toDomain(time.Now()); method != nil {
+				businessMethods = append(businessMethods, method)
 			}
 		}
 
@@ -583,27 +618,18 @@ func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error)
 
 	var result struct {
 		MergedPatterns []struct {
-			ID              string   `json:"id"`
-			Name            string   `json:"name"`
-			Category        string   `json:"category"`
-			Description     string   `json:"description"`
-			GoodExample     string   `json:"good_example"`
-			BadExample      string   `json:"bad_example"`
-			Rule            string   `json:"rule"`
-			Confidence      float64  `json:"confidence"`
-			MergedFrom      []string `json:"merged_from"`
-			MergeReason     string   `json:"merge_reason"`
-			SimilarityScore float64  `json:"similarity_score"`
-			BusinessMethod  *struct {
-				Name          string `json:"name"`
-				Location      string `json:"location"`
-				Description   string `json:"description"`
-				Usage         string `json:"usage"`
-				Type          string `json:"type"`
-				Function      string `json:"function"`
-				Prerequisites string `json:"prerequisites"`
-				Returns       string `json:"returns"`
-			} `json:"business_method"`
+			ID              string                 `json:"id"`
+			Name            string                 `json:"name"`
+			Category        string                 `json:"category"`
+			Description     string                 `json:"description"`
+			GoodExample     string                 `json:"good_example"`
+			BadExample      string                 `json:"bad_example"`
+			Rule            string                 `json:"rule"`
+			Confidence      float64                `json:"confidence"`
+			MergedFrom      []string               `json:"merged_from"`
+			MergeReason     string                 `json:"merge_reason"`
+			SimilarityScore float64                `json:"similarity_score"`
+			BusinessMethod  *businessMethodPayload `json:"business_method"`
 		} `json:"merged_patterns"`
 		UnchangedPatterns []struct {
 			ID     string `json:"id"`
@@ -633,19 +659,7 @@ func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error)
 	}
 
 	for i, p := range result.MergedPatterns {
-		var businessMethod *domain.BusinessMethod
-		if p.BusinessMethod != nil {
-			businessMethod = &domain.BusinessMethod{
-				Name:          p.BusinessMethod.Name,
-				Location:      p.BusinessMethod.Location,
-				Description:   p.BusinessMethod.Description,
-				Usage:         p.BusinessMethod.Usage,
-				Type:          p.BusinessMethod.Type,
-				Function:      p.BusinessMethod.Function,
-				Prerequisites: p.BusinessMethod.Prerequisites,
-				Returns:       p.BusinessMethod.Returns,
-			}
-		}
+		businessMethod := p.BusinessMethod.toDomain(time.Now())
 		mergeResult.MergedPatterns[i] = agent.MergedPattern{
 			ID:              p.ID,
 			Name:            p.Name,
@@ -712,19 +726,10 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 			Dependents       []string `json:"dependents"`
 			KeyMethods       []string `json:"key_methods"`
 		} `json:"key_modules"`
-		ConfigPatterns  []string `json:"config_patterns"`
-		Dependencies    []string `json:"dependencies"`
-		BusinessMethods []struct {
-			Name          string `json:"name"`
-			Location      string `json:"location"`
-			Description   string `json:"description"`
-			Usage         string `json:"usage"`
-			Type          string `json:"type"`
-			Function      string `json:"function"`
-			Prerequisites string `json:"prerequisites"`
-			Returns       string `json:"returns"`
-		} `json:"business_methods"`
-		Summary string `json:"summary"`
+		ConfigPatterns  []string                `json:"config_patterns"`
+		Dependencies    []string                `json:"dependencies"`
+		BusinessMethods []businessMethodPayload `json:"business_methods"`
+		Summary         string                  `json:"summary"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -791,16 +796,7 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 	}
 
 	for i, method := range result.BusinessMethods {
-		analyzeResult.BusinessMethods[i] = domain.BusinessMethod{
-			Name:          method.Name,
-			Location:      method.Location,
-			Description:   method.Description,
-			Usage:         method.Usage,
-			Type:          method.Type,
-			Function:      method.Function,
-			Prerequisites: method.Prerequisites,
-			Returns:       method.Returns,
-		}
+		analyzeResult.BusinessMethods[i] = *method.toDomain(time.Now())
 	}
 
 	return analyzeResult, nil
@@ -814,32 +810,22 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 			"method", "ParseAnalyzeCurrentCodebaseResult",
 			"error", err,
 			"output_length", len(output),
-			"output_preview", TruncString(output, 500),
 		)
 		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
 	var result struct {
 		Patterns []struct {
-			ID             string  `json:"id"`
-			Name           string  `json:"name"`
-			Category       string  `json:"category"`
-			Description    string  `json:"description"`
-			GoodExample    string  `json:"good_example"`
-			BadExample     string  `json:"bad_example"`
-			Rule           string  `json:"rule"`
-			Confidence     float64 `json:"confidence"`
-			Frequency      int     `json:"frequency"`
-			BusinessMethod *struct {
-				Name          string `json:"name"`
-				Location      string `json:"location"`
-				Description   string `json:"description"`
-				Usage         string `json:"usage"`
-				Type          string `json:"type"`
-				Function      string `json:"function"`
-				Prerequisites string `json:"prerequisites"`
-				Returns       string `json:"returns"`
-			} `json:"business_method"`
+			ID             string                 `json:"id"`
+			Name           string                 `json:"name"`
+			Category       string                 `json:"category"`
+			Description    string                 `json:"description"`
+			GoodExample    string                 `json:"good_example"`
+			BadExample     string                 `json:"bad_example"`
+			Rule           string                 `json:"rule"`
+			Confidence     float64                `json:"confidence"`
+			Frequency      int                    `json:"frequency"`
+			BusinessMethod *businessMethodPayload `json:"business_method"`
 		} `json:"patterns"`
 		CategorySummaries map[string]struct {
 			Summary     string   `json:"summary"`
@@ -872,18 +858,7 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 			Source:      domain.SourceInit,
 			CreatedAt:   time.Now(),
 		}
-		if p.BusinessMethod != nil {
-			pattern.BusinessMethod = &domain.BusinessMethod{
-				Name:          p.BusinessMethod.Name,
-				Location:      p.BusinessMethod.Location,
-				Description:   p.BusinessMethod.Description,
-				Usage:         p.BusinessMethod.Usage,
-				Type:          p.BusinessMethod.Type,
-				Function:      p.BusinessMethod.Function,
-				Prerequisites: p.BusinessMethod.Prerequisites,
-				Returns:       p.BusinessMethod.Returns,
-			}
-		}
+		pattern.BusinessMethod = p.BusinessMethod.toDomain(pattern.CreatedAt)
 		patterns[i] = pattern
 	}
 
@@ -980,24 +955,15 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 	}
 
 	var result struct {
-		ID             string  `json:"id"`
-		Name           string  `json:"name"`
-		Category       string  `json:"category"`
-		Description    string  `json:"description"`
-		GoodExample    string  `json:"good_example"`
-		BadExample     string  `json:"bad_example"`
-		Rule           string  `json:"rule"`
-		Confidence     float64 `json:"confidence"`
-		BusinessMethod *struct {
-			Name          string `json:"name"`
-			Location      string `json:"location"`
-			Description   string `json:"description"`
-			Usage         string `json:"usage"`
-			Type          string `json:"type"`
-			Function      string `json:"function"`
-			Prerequisites string `json:"prerequisites"`
-			Returns       string `json:"returns"`
-		} `json:"business_method"`
+		ID             string                 `json:"id"`
+		Name           string                 `json:"name"`
+		Category       string                 `json:"category"`
+		Description    string                 `json:"description"`
+		GoodExample    string                 `json:"good_example"`
+		BadExample     string                 `json:"bad_example"`
+		Rule           string                 `json:"rule"`
+		Confidence     float64                `json:"confidence"`
+		BusinessMethod *businessMethodPayload `json:"business_method"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -1018,18 +984,7 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 		UpdatedAt:   time.Now(),
 	}
 
-	if result.BusinessMethod != nil {
-		pattern.BusinessMethod = &domain.BusinessMethod{
-			Name:          result.BusinessMethod.Name,
-			Location:      result.BusinessMethod.Location,
-			Description:   result.BusinessMethod.Description,
-			Usage:         result.BusinessMethod.Usage,
-			Type:          result.BusinessMethod.Type,
-			Function:      result.BusinessMethod.Function,
-			Prerequisites: result.BusinessMethod.Prerequisites,
-			Returns:       result.BusinessMethod.Returns,
-		}
-	}
+	pattern.BusinessMethod = result.BusinessMethod.toDomain(pattern.CreatedAt)
 
 	return &agent.UserDefinePatternResult{Pattern: &pattern}, nil
 }

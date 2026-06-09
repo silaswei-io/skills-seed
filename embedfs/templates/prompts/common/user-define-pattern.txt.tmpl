@@ -42,8 +42,9 @@ naming, error, structure, concurrency, testing, business, api, database, utils, 
 
 # 输出格式
 
-**仅返回一个有效的 JSON 对象**（不要 markdown 代码块，不要额外文本）：
+**仅返回一个有效的 JSON 对象**。下面的 `json` 代码块仅用于说明结构；实际回复不要包含 markdown 代码块或额外文本：
 
+```json
 {
   "id": "kebab-case-id",
   "name": "模式名称",
@@ -55,12 +56,14 @@ naming, error, structure, concurrency, testing, business, api, database, utils, 
   "confidence": 0.85,
   "business_method": null
 }
+```
 
 如果模式与特定业务方法相关，填写 business_method：
 
+```json
 {
   "name": "方法签名",
-  "location": "文件路径:行号",
+  "code_location": {"current_location": "文件路径:行号"},
   "description": "方法描述",
   "usage": "使用说明",
   "type": "domain|common",
@@ -68,6 +71,7 @@ naming, error, structure, concurrency, testing, business, api, database, utils, 
   "prerequisites": "前置条件",
   "returns": "返回值说明"
 }
+```
 
 # 要求
 

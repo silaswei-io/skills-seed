@@ -258,11 +258,11 @@ func TestPattern_SetBusinessMethod(t *testing.T) {
 	beforeUpdate := p.UpdatedAt
 
 	method := &BusinessMethod{
-		Name:        "GenerateUUID",
-		Location:    "internal/utils/uuid.go:15",
-		Description: "Generates a new UUID v4",
-		Usage:       "Use when creating new entity IDs",
-		Type:        "common",
+		Name:         "GenerateUUID",
+		CodeLocation: CodeLocation{CurrentLocation: "internal/utils/uuid.go:15"},
+		Description:  "Generates a new UUID v4",
+		Usage:        "Use when creating new entity IDs",
+		Type:         "common",
 	}
 
 	// 短暂等待，确保 UpdatedAt 会发生变化。
@@ -277,10 +277,10 @@ func TestPattern_SetBusinessMethod(t *testing.T) {
 func TestBusinessMethod_NormalizeCodeLocationPreservesLanguageAgnosticSnapshot(t *testing.T) {
 	now := time.Date(2026, 6, 9, 10, 0, 0, 0, time.UTC)
 	method := &BusinessMethod{
-		Name:     "CreateOrder",
-		Location: "service/order.ts:20",
+		Name: "CreateOrder",
 		CodeLocation: CodeLocation{
-			Status: CodeLocationStatusChanged,
+			CurrentLocation: "service/order.ts:20",
+			Status:          CodeLocationStatusChanged,
 			ChangeKinds: []CodeLocationChangeKind{
 				CodeLocationChangeMoved,
 				CodeLocationChangeInputsChanged,
@@ -310,6 +310,22 @@ func TestBusinessMethod_NormalizeCodeLocationPreservesLanguageAgnosticSnapshot(t
 	assert.False(t, method.CodeLocation.UpdatedAt.IsZero())
 }
 
+func TestBusinessMethod_NormalizeCodeLocationMarksInitialLocationValid(t *testing.T) {
+	now := time.Date(2026, 6, 9, 10, 0, 0, 0, time.UTC)
+	method := &BusinessMethod{
+		Name:         "CreateOrder",
+		CodeLocation: CodeLocation{CurrentLocation: "service/order.go:42"},
+	}
+
+	method.NormalizeCodeLocation(nil, now)
+
+	assert.Equal(t, "service/order.go:42", method.CodeLocation.HistoricalLocation)
+	assert.Equal(t, "service/order.go:42", method.CodeLocation.CurrentLocation)
+	assert.Equal(t, CodeLocationStatusValid, method.CodeLocation.Status)
+	assert.False(t, method.CodeLocation.CreatedAt.IsZero())
+	assert.False(t, method.CodeLocation.UpdatedAt.IsZero())
+}
+
 func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *testing.T) {
 	specific := NewPattern("generator-write-output", "生成器写入技能输出", CategoryBusiness)
 	specific.Confidence = 0.8
@@ -317,10 +333,10 @@ func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *
 	specific.Rule = "修改生成流程时必须保持 generated-by 标记，并继续生成 references/project-spec.md。"
 	specific.GoodExample = "func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error"
 	specific.BusinessMethod = &BusinessMethod{
-		Name:     "GeneratorService.writeSkillsOutput",
-		Location: "internal/service/generator/service.go:672",
-		Function: "func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error",
-		Type:     "domain",
+		Name:         "GeneratorService.writeSkillsOutput",
+		CodeLocation: CodeLocation{CurrentLocation: "internal/service/generator/service.go:672"},
+		Function:     "func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error",
+		Type:         "domain",
 	}
 
 	generic := NewPattern("layered-architecture", "使用分层架构", CategoryStructure)

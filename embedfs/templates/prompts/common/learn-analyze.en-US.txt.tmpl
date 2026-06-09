@@ -46,8 +46,9 @@ The following coding patterns have been learned from the project history. Code s
 
 # Output Format
 
-**Return ONLY a valid JSON object** (no markdown code blocks, no extra text):
+**Return ONLY a valid JSON object**. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
 
+```json
 {
   "issues": [
     {
@@ -73,6 +74,7 @@ The following coding patterns have been learned from the project history. Code s
   ],
   "confidence": 0.85
 }
+```
 
 **Field descriptions**:
 - **issues**: List of found issues (return empty array `[]` if no issues)

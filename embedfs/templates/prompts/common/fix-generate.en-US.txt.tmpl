@@ -49,8 +49,9 @@ You are a professional code fix expert. Generate precise code fixes based on ana
 
 # Output Format
 
-Return ONLY a valid JSON object (no markdown code blocks, no extra text):
+Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
 
+```json
 {
   "fixes": {
     "path/to/file1.go": "complete fixed content for file1",
@@ -60,6 +61,7 @@ Return ONLY a valid JSON object (no markdown code blocks, no extra text):
   "summary": "Fix description (optional)",
   "warnings": ["Areas needing manual review (optional)"]
 }
+```
 
 - **fixes**: Map of file path → **complete** fixed content (not diffs); include only files that actually need changes and can be safely rewritten completely
 - **confidence**: 0.0-1.0 (0.9+: safe, 0.7-0.9: should work, 0.5-0.7: needs review)

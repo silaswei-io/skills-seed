@@ -105,7 +105,7 @@ func TestMergePatterns_ActualMerge(t *testing.T) {
 						MergedFrom:  []string{"p1", "p2"}, Confidence: 0.9,
 						BusinessMethod: &domain.BusinessMethod{
 							Name:          "UserService.Create(ctx, req) error",
-							Location:      "internal/service/user.go:42",
+							CodeLocation:  domain.CodeLocation{CurrentLocation: "internal/service/user.go:42"},
 							Description:   "创建用户并包装仓储错误",
 							Usage:         "用户创建流程",
 							Type:          "domain",
@@ -147,7 +147,7 @@ func TestMergePatterns_ActualMerge(t *testing.T) {
 	assert.Equal(t, "return fmt.Errorf(\"create user: %w\", err)", saved[0].GoodExample)
 	assert.Equal(t, "return err", saved[0].BadExample)
 	assert.NotNil(t, saved[0].BusinessMethod)
-	assert.Equal(t, "internal/service/user.go:42", saved[0].BusinessMethod.Location)
+	assert.Equal(t, "internal/service/user.go:42", saved[0].BusinessMethod.DisplayLocation())
 }
 
 func TestMergePatterns_AIError(t *testing.T) {

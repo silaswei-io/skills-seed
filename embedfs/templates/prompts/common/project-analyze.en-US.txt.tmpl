@@ -72,8 +72,9 @@ If an existing project profile is provided, preserve unchanged modules, utilitie
 
 # Output Format
 
-Return ONLY a valid JSON object matching this schema:
+Return ONLY a valid JSON object matching this schema. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
 
+```json
 {
   "project_name": "{{.ProjectName}}",
   "language": "{{.Language}}",
@@ -105,7 +106,7 @@ Return ONLY a valid JSON object matching this schema:
   "business_methods": [
     {
       "name": "MethodName",
-      "location": "file/path.go:line",
+      "code_location": {"current_location": "file/path.go:line"},
       "description": "Business logic description",
       "usage": "When to call this method",
       "type": "domain|common",
@@ -127,6 +128,7 @@ Return ONLY a valid JSON object matching this schema:
   "dependencies": ["dependency name"],
   "summary": "Specific project overview"
 }
+```
 
 # Critical Output Requirements
 

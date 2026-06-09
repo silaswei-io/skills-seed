@@ -42,8 +42,9 @@ naming, error, structure, concurrency, testing, business, api, database, utils, 
 
 # Output Format
 
-**Return only a valid JSON object** (no markdown code blocks, no extra text):
+**Return only a valid JSON object**. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
 
+```json
 {
   "id": "kebab-case-id",
   "name": "Pattern name",
@@ -55,12 +56,14 @@ naming, error, structure, concurrency, testing, business, api, database, utils, 
   "confidence": 0.85,
   "business_method": null
 }
+```
 
 If the pattern relates to a specific business method, fill in business_method:
 
+```json
 {
   "name": "Method signature",
-  "location": "file path:line number",
+  "code_location": {"current_location": "file path:line number"},
   "description": "Method description",
   "usage": "Usage instructions",
   "type": "domain|common",
@@ -68,6 +71,7 @@ If the pattern relates to a specific business method, fill in business_method:
   "prerequisites": "Prerequisites",
   "returns": "Return value description"
 }
+```
 
 # Requirements
 

@@ -62,8 +62,9 @@
 
 # 输出格式
 
-**仅返回一个有效的 JSON 对象**（不要 markdown 代码块，不要额外文本）：
+**仅返回一个有效的 JSON 对象**。下面的 `json` 代码块仅用于说明结构；实际回复不要包含 markdown 代码块或额外文本：
 
+```json
 {
   "merged_patterns": [
     {
@@ -80,7 +81,7 @@
       "similarity_score": 0.85,
       "business_method": {
         "name": "完整的方法签名",
-        "location": "文件路径:行号",
+        "code_location": {"current_location": "文件路径:行号"},
         "description": "综合的描述",
         "usage": "何时以及如何使用",
         "type": "domain|common",
@@ -104,6 +105,7 @@
     "merge_count": 2
   }
 }
+```
 
 - **merged_patterns**: 合并结果，含 `merged_from` ID 和 `merge_reason`
 - **unchanged_patterns**: 独立模式，含 `reason` 和 `similarity_score`

@@ -112,11 +112,13 @@ Based on the project information and the code files you read, perform the follow
    - If multiple services have similar initialization -> extract as "service initialization pattern"
    - If multiple APIs use the same middleware -> extract as "middleware usage pattern"
    - If multiple repositories use the same transaction handling -> extract as "transaction management pattern"
+   - Output only high-value patterns. Keep `patterns` to 8 items or fewer; do not emit many near-duplicate patterns for homogeneous code in the same layer.
 
 # Output Format
 
-Return ONLY a valid JSON object (no markdown code blocks, no extra text):
+Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
 
+```json
 {
   "patterns": [
     {
@@ -124,14 +126,14 @@ Return ONLY a valid JSON object (no markdown code blocks, no extra text):
       "name": "Pattern Name",
       "category": "business|api|database|error|structure|naming|concurrency|testing|utils|middleware|config",
       "description": "Description of the pattern and when to use it",
-      "good_example": "Actual code (5-30 lines)",
+      "good_example": "Actual code (5-12 lines)",
       "bad_example": "",
       "rule": "When to apply this pattern",
       "confidence": 0.9,
       "frequency": 3,
       "business_method": {
         "name": "Complete method signature",
-        "location": "file/path:line",
+        "code_location": {"current_location": "file/path:line"},
         "layer": "Service/Repository/Handler/Utils",
         "description": "Functionality and business logic",
         "function": "Full signature with parameters and return types",
@@ -150,6 +152,7 @@ Return ONLY a valid JSON object (no markdown code blocks, no extra text):
   "common_patterns": ["Specific pattern"],
   "summary": "Project overview"
 }
+```
 
 # Pattern Category Decision Rules (Prefer Specific Categories)
 
@@ -174,5 +177,5 @@ Your ENTIRE response must be ONLY a valid JSON object.
 - NO markdown code blocks (no ```)
 - NO explanatory text before or after the JSON
 - **Business methods MUST include complete method signatures and file locations**
-- Each pattern's `good_example` MUST contain actual code (5-30 lines)
+- Each pattern's `good_example` MUST contain actual code (5-12 lines)
 - `good_example` and `bad_example` are JSON strings: escape code backslashes as `\\`, double quotes as `\"`, and newlines as `\n`; never emit raw `\s`, `\ `, path backslashes, or regex backslashes inside JSON strings

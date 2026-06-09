@@ -17,13 +17,13 @@ description: Use when modifying, reviewing, or extending {{.ProjectName}} {{.Lan
 
 ## Workflow
 
-When working in this repository
-1. Read [Project Spec](./references/project-spec.md) for boundaries, rules, and change touchpoints
-2. Read [Project Overview](./references/project-overview.md) when the task touches architecture, module boundaries, or project-specific business methods
-3. Open only the pattern reference files relevant to the requested change
-4. Treat high-confidence patterns as conventions and medium-confidence patterns as guidance
-5. Prefer existing business methods and utilities documented in references before creating new ones
-6. If required behavior is not visible in the repository or references, state the gap instead of inventing details
+Read the smallest relevant reference set for the task:
+- Business flow or project method reuse: read [Business Methods](./references/business-methods.md), then the related business patterns
+- API, generated layer, routes, or types: read [Project Spec](./references/project-spec.md) and structure/API patterns
+- Architecture, module boundary, or dependency changes: read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md)
+- Utilities, config, middleware, or concurrency: read only the matching category pattern
+
+Prefer current code and high-confidence project patterns; treat medium-confidence patterns as guidance. If evidence is missing, state the gap instead of inventing implementation details.
 
 ---
 
@@ -56,9 +56,9 @@ When working in this repository
 ## Repository Rules
 
 - Check nearby code before introducing a new pattern or abstraction
-- Respect module dependencies and ownership described in project overview
 - Use project-specific business methods and utilities from the references when they exist
-- Keep generated or incomplete sections explicit with `TODO`; do not silently skip missing content
+- Generated layers, types, routes, and configuration conventions are governed by [Project Spec](./references/project-spec.md)
+- If references and current code disagree, trust current code and rerun learning/generation
 
 {{if .KeyInsights}}
 ### Key Insights
@@ -67,18 +67,6 @@ When working in this repository
 {{end}}
 
 {{end}}
-{{if .ImprovementSuggestions}}
-### Improvement Suggestions
-{{range .ImprovementSuggestions}}
-- {{.}}
-{{end}}
-
-{{end}}
-### Pattern Confidence Levels
-```
-New (30%) -> Forming (50%) -> Established (70%) -> Convention (90%)
-```
-
 ---
 
 ## Pattern Statistics

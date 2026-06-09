@@ -10,45 +10,15 @@
 
 ## 使用原则
 
-- 先按本规范确认边界、规则和改动触点，再读取更详细的项目概览或分类模式参考。
-- 本规范只描述当前项目内的可执行约束；跨项目协作规则以工作区根 skill 为准。
+- 本规范只保留当前项目的可执行约束、生成/配置约定和改动触点。
+- 架构地图读 [项目概览](./project-overview.md)，模块详情读 [关键模块](./modules.md)，业务方法读 [强业务方法](./business-methods.md)。
 - 当本规范和实际代码不一致时，以当前代码为准，并在必要时重新运行 `skills-seed learn current` 和 `skills-seed generate-skills`。
-
-## 项目摘要
-
-{{if .Summary}}{{.Summary}}{{else}}*项目摘要尚未提取*{{end}}
-
-## 边界与职责
-
-{{if .Boundaries}}
-{{range .Boundaries}}
-### {{.Name}}
-
-- **类型**: {{.Type}}
-{{if .Description}}- **说明**: {{.Description}}
-{{end}}{{if .Responsibilities}}- **职责**:
-{{range .Responsibilities}}  - {{.}}
-{{end}}{{end}}{{if .Paths}}- **路径**:
-{{range .Paths}}  - `{{.}}`
-{{end}}{{end}}
-
-{{end}}
-{{else}}
-*尚未提取明确边界。*
-{{end}}
 
 ## 规则
 
 {{if .PatternRules}}
 {{range .PatternRules}}
-### {{.Name}}
-
-- **分类**: {{.Category}}
-- **置信度**: {{printf "%.2f" .Confidence}}
-- **频率**: {{.Frequency}}
-{{if .Description}}- **说明**: {{.Description}}
-{{end}}{{if .Rule}}- **执行规则**: {{.Rule}}
-{{end}}
+- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
 {{end}}
 {{else}}
 *尚未提取可执行规则。*

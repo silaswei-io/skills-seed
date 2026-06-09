@@ -123,7 +123,6 @@ type CodeLocation struct {
 // BusinessMethod 业务方法信息
 type BusinessMethod struct {
 	Name          string       // 方法名称（如 GenerateUUID, CallUserRPC）
-	Location      string       // 兼容旧数据的当前位置（如 internal/utils/uuid.go:15）
 	CodeLocation  CodeLocation `json:"code_location,omitempty"` // 可维护的位置元数据
 	Description   string       // 功能说明（1-2句话）
 	Usage         string       // 使用场景（何时使用）
@@ -210,37 +209,11 @@ func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 // NormalizeAfterLoad 补齐旧 DB 记录缺失的派生字段，不改变更新时间。
 func (p *Pattern) NormalizeAfterLoad() {
 	if p.BusinessMethod != nil {
-		p.BusinessMethod.NormalizeCodeLocationAfterLoad()
+		p.BusinessMethod.NormalizeCodeLocation(nil, time.Time{})
 	}
 }
 
-// NormalizeCodeLocationAfterLoad 兼容只有 Location 的旧业务方法记录。
-func (m *BusinessMethod) NormalizeCodeLocationAfterLoad() {
-	if m == nil {
-		return
-	}
-	location := strings.TrimSpace(m.Location)
-	if location == "" {
-		location = strings.TrimSpace(m.CodeLocation.CurrentLocation)
-	}
-	if location == "" {
-		location = strings.TrimSpace(m.CodeLocation.HistoricalLocation)
-	}
-	if m.CodeLocation.HistoricalLocation == "" {
-		m.CodeLocation.HistoricalLocation = location
-	}
-	if m.CodeLocation.CurrentLocation == "" {
-		m.CodeLocation.CurrentLocation = location
-	}
-	if m.CodeLocation.Status == "" && location != "" {
-		m.CodeLocation.Status = CodeLocationStatusUnknown
-	}
-	if m.Location == "" {
-		m.Location = m.CodeLocation.CurrentLocation
-	}
-}
-
-// NormalizeCodeLocation 将旧 Location 字段和新 code_location 字段保持兼容。
+// NormalizeCodeLocation 规范化业务方法的结构化代码位置。
 func (m *BusinessMethod) NormalizeCodeLocation(previous *BusinessMethod, now time.Time) {
 	if m == nil {
 		return
@@ -251,15 +224,9 @@ func (m *BusinessMethod) NormalizeCodeLocation(previous *BusinessMethod, now tim
 		previousLocation = previous.CodeLocation
 	}
 
-	location := strings.TrimSpace(m.Location)
-	if location == "" {
-		location = strings.TrimSpace(m.CodeLocation.CurrentLocation)
-	}
+	location := strings.TrimSpace(m.CodeLocation.CurrentLocation)
 	if location == "" {
 		location = strings.TrimSpace(m.CodeLocation.HistoricalLocation)
-	}
-	if location == "" && previous != nil {
-		location = strings.TrimSpace(previous.Location)
 	}
 	if location == "" {
 		location = strings.TrimSpace(previousLocation.CurrentLocation)
@@ -278,19 +245,19 @@ func (m *BusinessMethod) NormalizeCodeLocation(previous *BusinessMethod, now tim
 	if m.CodeLocation.Status == "" {
 		if previousLocation.Status != "" {
 			m.CodeLocation.Status = previousLocation.Status
+		} else if location != "" {
+			m.CodeLocation.Status = CodeLocationStatusValid
 		} else {
 			m.CodeLocation.Status = CodeLocationStatusUnknown
 		}
 	}
 	if !previousLocation.CreatedAt.IsZero() {
 		m.CodeLocation.CreatedAt = previousLocation.CreatedAt
-	} else if m.CodeLocation.CreatedAt.IsZero() {
+	} else if m.CodeLocation.CreatedAt.IsZero() && !now.IsZero() {
 		m.CodeLocation.CreatedAt = now
 	}
-	m.CodeLocation.UpdatedAt = now
-
-	if m.CodeLocation.CurrentLocation != "" {
-		m.Location = m.CodeLocation.CurrentLocation
+	if !now.IsZero() {
+		m.CodeLocation.UpdatedAt = now
 	}
 }
 
@@ -298,9 +265,6 @@ func (m *BusinessMethod) NormalizeCodeLocation(previous *BusinessMethod, now tim
 func (m BusinessMethod) DisplayLocation() string {
 	if m.CodeLocation.CurrentLocation != "" {
 		return m.CodeLocation.CurrentLocation
-	}
-	if m.Location != "" {
-		return m.Location
 	}
 	return m.CodeLocation.HistoricalLocation
 }
@@ -421,7 +385,7 @@ func (p *Pattern) evidenceCount() int {
 
 	if p.BusinessMethod != nil {
 		count++
-		if p.BusinessMethod.Location != "" {
+		if p.BusinessMethod.DisplayLocation() != "" {
 			count++
 		}
 		if p.BusinessMethod.Function != "" {
