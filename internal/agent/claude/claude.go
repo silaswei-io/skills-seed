@@ -770,25 +770,11 @@ func (c *ClaudeAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProj
 	// 4. 解析结果
 	result, err := parser.ParseAnalyzeProjectResult(output)
 	if err != nil {
-		// 解析失败，记录详细错误，返回带有项目名称的基础结果
 		logger.Error(i18n.Get("AgentParseProjectAnalysisFailed"),
 			"error", err,
 			"project", req.ProjectName)
 		logger.Error(i18n.Get("AgentRawOutputLength"), "output_length", len(output))
-
-		// 尝试返回基础结果而不是空结果
-		return &agent.AnalyzeProjectResult{
-			ProjectName:    req.ProjectName,
-			Language:       "unknown",
-			Summary:        i18n.GetWithParams("AgentParsingFailedSummary", map[string]interface{}{"Length": len(output)}),
-			Frameworks:     []string{},
-			Dependencies:   []string{},
-			Architecture:   i18n.Get("AgentUnknownArchitecture"),
-			Structure:      "",
-			ConfigPatterns: []string{},
-			CommonUtils:    []domain.UtilityFunction{},
-			KeyModules:     []domain.ModuleInfo{},
-		}, nil
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),

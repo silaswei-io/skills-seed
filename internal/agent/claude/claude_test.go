@@ -14,6 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
 
@@ -128,6 +129,28 @@ func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
 	require.ErrorIs(t, err, renderErr)
 }
 
+func TestAnalyzeProjectReturnsErrorWhenModelJSONCannotBeParsed(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+
+	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{\"project_name\":\"demo\",\"common_utils\":[{{\"name\":\"bad\"}]"}`)
+	loader := prompts.NewLoader("claude", "zh-CN", "")
+	ag := New(commandPath, time.Second, loader, false, config.DefaultRetryConfig())
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	result, err := ag.AnalyzeProject(ctx, &agent.AnalyzeProjectRequest{
+		ProjectName: "demo",
+		RootPath:    projectRoot,
+		Language:    "go",
+		Structure:   "main.go",
+	})
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.Contains(t, err.Error(), "解析")
+}
+
 func TestClaudeReplyPreview_TruncatesAt1000Chars(t *testing.T) {
 	preview := claudeReplyPreview(strings.Repeat("a", 1001))
 
@@ -162,6 +185,18 @@ func writeClaudeJSON(t *testing.T, path string, value interface{}) {
 	data, err := json.Marshal(value)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, data, 0644))
+}
+
+func writeFakeClaudeCommand(t *testing.T, output string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "claude")
+	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s' " + shellQuote(output) + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0755))
+	return path
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 func requireArgValue(t *testing.T, args []string, name string) string {

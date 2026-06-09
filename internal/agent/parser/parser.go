@@ -48,6 +48,14 @@ func ExtractJSON(output string) (string, error) {
 
 	end := findMatchingBrace(output, start)
 	if end == -1 {
+		if repairedOutput, repairErr := repairDuplicatedObjectStarts(output); repairErr == nil && repairedOutput != output {
+			if repairedEnd := findMatchingBrace(repairedOutput, start); repairedEnd != -1 {
+				jsonStr := strings.TrimSpace(repairedOutput[start : repairedEnd+1])
+				if err := validateJSON(jsonStr); err == nil {
+					return jsonStr, nil
+				}
+			}
+		}
 		logger.Error(i18n.Get("AgentUnmatchedBraces"),
 			"start", start,
 			"output_length", len(output))
@@ -58,6 +66,11 @@ func ExtractJSON(output string) (string, error) {
 
 	// 3. 验证 JSON 有效性
 	if err := validateJSON(jsonStr); err != nil {
+		if repaired, repairErr := repairDuplicatedObjectStarts(jsonStr); repairErr == nil && repaired != jsonStr {
+			if validateJSON(repaired) == nil {
+				return repaired, nil
+			}
+		}
 		if repaired, repairErr := repairInvalidStringEscapes(jsonStr); repairErr == nil {
 			if validateJSON(repaired) == nil {
 				return repaired, nil
@@ -71,6 +84,60 @@ func ExtractJSON(output string) (string, error) {
 	}
 
 	return jsonStr, nil
+}
+
+func repairDuplicatedObjectStarts(jsonStr string) (string, error) {
+	var b strings.Builder
+	b.Grow(len(jsonStr))
+
+	inString := false
+	escapeNext := false
+	repaired := false
+
+	for i := 0; i < len(jsonStr); i++ {
+		ch := jsonStr[i]
+		if escapeNext {
+			b.WriteByte(ch)
+			escapeNext = false
+			continue
+		}
+
+		if ch == '\\' {
+			b.WriteByte(ch)
+			if inString {
+				escapeNext = true
+			}
+			continue
+		}
+
+		if ch == '"' {
+			b.WriteByte(ch)
+			inString = !inString
+			continue
+		}
+
+		if !inString && ch == '{' && i+2 < len(jsonStr) && jsonStr[i+1] == '{' && jsonStr[i+2] == '"' {
+			b.WriteByte(ch)
+			repaired = true
+			i++
+			continue
+		}
+		if !inString && ch == '{' && i+3 < len(jsonStr) && jsonStr[i+1] == '"' && jsonStr[i+2] == '{' && jsonStr[i+3] == '"' {
+			b.WriteByte(ch)
+			repaired = true
+			i += 2
+			continue
+		}
+
+		b.WriteByte(ch)
+	}
+	if inString {
+		return "", fmt.Errorf("unterminated JSON string")
+	}
+	if !repaired {
+		return jsonStr, nil
+	}
+	return b.String(), nil
 }
 
 // findMatchingBrace 找到匹配的结束括号

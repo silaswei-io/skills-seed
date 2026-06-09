@@ -150,6 +150,36 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	assert.Equal(t, "func Ptr[T any](v T) *T", result.CommonUtils[0].Signature)
 }
 
+func TestParseAnalyzeProjectResult_RepairsDuplicatedObjectStart(t *testing.T) {
+	output := `{
+  "project_name": "demo",
+  "language": "go",
+  "frameworks": ["cobra"],
+  "architecture": "layered",
+  "layers": [],
+  "dependency_graph": "command -> service",
+  "data_flow": "request -> response",
+  "framework_patterns": [],
+  "structure": "internal/",
+  "key_modules": [],
+  "business_methods": [],
+  "common_utils": [
+    {"name":"QuoteWithFlavor","file":"core/stores/condition/adaptor.go","signature":"func QuoteWithFlavor(flavor sqlbuilder.Flavor, str string) string","description":"按数据库方言对字段名加引号","usage":"生成 SQL 时确保字段名按方言正确引用"},
+    {"{"name":"RawFieldNames","file":"core/stores/condition/adaptor.go","signature":"func RawFieldNames(in any) []string","description":"从结构体提取 db tag 对应的字段名列表","usage":"将 Go 结构体字段转为数据库列名列表"}
+  ],
+  "config_patterns": [],
+  "dependencies": [],
+  "summary": "demo project"
+}`
+
+	result, err := ParseAnalyzeProjectResult(output)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Len(t, result.CommonUtils, 2)
+	assert.Equal(t, "RawFieldNames", result.CommonUtils[1].Name)
+}
+
 func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
 	output := `{
   "patterns": [{
