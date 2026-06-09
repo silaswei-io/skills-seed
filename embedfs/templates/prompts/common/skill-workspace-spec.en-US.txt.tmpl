@@ -61,6 +61,12 @@ The AI call is non-interactive; do not ask the user outside the JSON. If an unco
    - Do not promote one project's naming, error handling, directory layout, or test style into a global rule.
    - Keep child details in that child project's `project-spec.md` or pattern references.
 
+# Language Requirements
+
+- All user-facing natural-language fields must be written in English.
+- If workspace input, workspace profile, child project profiles, learned patterns, README text, comments, or user-provided context contain Chinese or another language, summarize or translate the content into English instead of copying non-English prose.
+- Preserve paths, commands, config keys, environment variables, project IDs, and code identifiers exactly when needed.
+
 # Output Format
 
 Return only a valid JSON object with this structure. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:

@@ -96,7 +96,7 @@ Before returning JSON, complete these steps internally:
 3. Enrich every business pattern:
    - `description` must explain the business scenario, trigger, core steps, and boundary.
    - `rule` must be an actionable team convention covering when to use it, ordering requirements, and error handling requirements.
-   - `good_example` must use actual code, preferably the 5-30 lines that best show the business rule.
+   - `good_example` must use code evidence copied verbatim from source you read, preferably the 5-30 lines that best show the business rule. Do not complete, rewrite, synthesize, or invent code, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering.
    - `business_method.description` must explain the full business intent, not just repeat the function name.
    - `business_method.prerequisites` and `returns` must describe setup, dependencies, return values, and error semantics.
 
@@ -161,6 +161,13 @@ Extract patterns in these categories:
 - **config**: Configuration management
 - **middleware**: Middleware usage
 
+# Language Requirements
+
+- All user-facing natural-language fields must be written in English, including `name`, `description`, `rule`, and descriptive fields inside `business_method`.
+- If commit messages, code comments, dependency descriptions, existing patterns, or user-provided context contain Chinese or another language, translate or rewrite the content into English.
+- Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.
+- Do not output Chinese phrases such as “业务流程”, “具体规则”, or “使用场景” unless they are literal code identifiers or quoted source terms.
+
 # Required Format
 
 For EACH pattern, you MUST provide:
@@ -168,7 +175,7 @@ For EACH pattern, you MUST provide:
 2. **name**: Clear, descriptive name
 3. **category**: One of the categories above
 4. **description**: What it does and when to use it
-5. **good_example**: ACTUAL code (5-30 lines) from the codebase - REQUIRED
+5. **good_example**: Code evidence copied verbatim from source you read (5-30 lines) - REQUIRED
 6. **bad_example**: Common mistake to avoid (if applicable)
 7. **rule**: When to apply this pattern
 8. **confidence**: 0.0 to 1.0 (how certain you are)
@@ -228,11 +235,11 @@ For EACH pattern, you MUST provide:
 # CRITICAL Rules
 
 1. Return ONLY valid JSON - no markdown code blocks (no ```), no text before/after
-2. Every pattern MUST have `good_example` with actual code (5-30 lines)
+2. Every pattern MUST have `good_example` with code evidence copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, or invent code; if surrounding context must be omitted, mark it explicitly with `// ...`, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering
 3. Use `business_method` ONLY for utility/business methods
 4. **Choose the most specific category first**: database, API, error, config, middleware, structure, and utility patterns must not be labeled business. Skip simple CRUD.
 5. Keep `bad_example` empty if not applicable
-6. Code examples must be syntactically correct and copy-pasteable
+6. Code evidence must be syntactically correct. If it is only an excerpt, mark omitted context with `// ...` and do not present it as a complete implementation
 
 {{if .KnownPatternsPath}}
 # Existing Patterns ({{.KnownPatternsCount}})

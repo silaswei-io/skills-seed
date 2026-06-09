@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.8.1]
+
+### 功能
+
+- 业务模式 reference 改为索引 + 子域详情结构：`business.md` 只保留读取指引和子域链接，详细规则与代码证据写入 `references/patterns/business/*.md`，避免单文件上下文过大。
+- 业务模式子域按代码位置、scope 和稳定目录名自动聚类；无法稳定归属的规则归入 `other`，避免在通用生成器中写死具体项目业务词。
+- 生成的主 skill 和 project spec 会根据实际生成的 reference 条件化链接，稀疏项目或跳过 references 时不再产生坏链接。
+
+### 变更
+
+- 项目初始化、增量学习和模式合并 prompt 强制 `good_example` 只能来自已读取源码的完整语义片段，禁止合成或改写“正确示例”。
+- Skills 模板中的示例标题从 “Good Example/正确示例” 调整为 “Code Evidence/代码证据”，降低模型把示例当成可自由创作代码的概率。
+- 项目规范不再限制业务规则数量，保留所有可执行业务规则，由 reference 拆分控制上下文体积。
+
+### 修复
+
+- 修复 `GenerateSkillsWithOptions` 丢弃传入选项的问题，`SkipReferences` 现在会真正跳过 reference 文件生成。
+- 修复生成输入未变化时只检查 `business.md` 而忽略业务详情文件的问题，避免业务详情缺失时误跳过重新生成。
+- 修复旧模板中残留的 `skills-seed generate-skills` 命令引用，统一为 `skills-seed generate skills`。
+
 ## [v0.8.0]
 
 ### 功能

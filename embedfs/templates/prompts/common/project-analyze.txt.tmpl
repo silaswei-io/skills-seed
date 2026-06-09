@@ -72,10 +72,8 @@
 
 # 语言要求
 
-- 所有面向用户阅读的自然语言字段必须使用简体中文，包括 `architecture`、`layers`、`dependency_graph`、`data_flow`、`framework_patterns`、`structure`、`key_modules`、`business_methods`、`common_utils`、`config_patterns` 和 `summary`。
-- 如果代码、README 或目录名中出现英文，请用中文概括，不要直接复制成英文说明。
-- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量和代码标识符必须保留原文，例如 Cobra、Viper、goctl、protoc、JZERO_*、GetCommand。
-- `framework_patterns` 必须用中文描述框架使用方式，例如“Cobra 命令模式：每个命令包暴露 GetCommand() 并由 main.go 注册”，不要输出 “Cobra command pattern” 这类英文句子。
+- 面向用户阅读的自然语言字段应优先使用简体中文，包括 `architecture`、`layers`、`dependency_graph`、`data_flow`、`framework_patterns`、`structure`、`key_modules`、`business_methods`、`common_utils`、`config_patterns` 和 `summary`，但允许中英文混合表达技术概念。
+- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可保留原文，例如 Cobra、Viper、goctl、protoc、JZERO_*、GetCommand。
 
 # 输出格式
 

@@ -45,6 +45,12 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 - The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
 - Preserve paths, commands, config keys, environment variables, protocol names, and file names verbatim.
 
+# Language Requirements
+
+- All user-facing natural-language fields must be written in English.
+- If workspace input, child project summaries, README text, comments, learned patterns, or user-provided context contain Chinese or another language, summarize or translate the content into English instead of copying non-English prose.
+- Preserve paths, commands, config keys, environment variables, protocol names, file names, project IDs, and code identifiers exactly when needed.
+
 # Output Format
 
 Return only a valid JSON object with this structure. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:

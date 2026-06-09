@@ -96,7 +96,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 3. 丰富每个业务模式：
    - `description` 说明业务场景、触发条件、核心步骤和边界。
    - `rule` 写成可执行的团队约定，说明何时必须使用、顺序要求和错误处理要求。
-   - `good_example` 使用实际代码，优先截取最能体现业务规则的 5-30 行。
+   - `good_example` 使用从已读取源码逐字复制的代码证据，优先截取最能体现业务规则的 5-30 行；不要补全、改写、综合或伪造代码，不能省略错误处理、fallback、状态更新、锁释放、缓存/任务顺序等语义关键分支。
    - `business_method.description` 说明完整业务意图，不要只重复函数名。
    - `business_method.prerequisites` 和 `returns` 必须写出调用前置条件、依赖、返回值和错误语义。
 
@@ -163,9 +163,8 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 
 # 语言要求
 
-- 所有面向用户阅读的自然语言字段必须使用简体中文，包括 `name`、`description`、`rule` 和 `business_method` 内的说明字段。
-- 如果提交消息、代码注释或依赖说明中出现英文，请改写成中文；框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量和代码标识符保留原文。
-- 不要输出 “Repository pattern”、“Use when ...”、“Concrete pattern ...” 这类英文说明短语，除非它们是代码标识符或专有名词的一部分。
+- 面向用户阅读的自然语言字段应优先使用简体中文，包括 `name`、`description`、`rule` 和 `business_method` 内的说明字段，但允许中英文混合表达技术概念。
+- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可保留原文。
 
 # 必需格式
 
@@ -174,7 +173,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 2. **name**: 清晰的描述性名称
 3. **category**: 上述分类之一
 4. **description**: 功能描述和使用时机
-5. **good_example**: 实际代码（5-30行）- 必需
+5. **good_example**: 从已读取源码逐字复制的代码证据（5-30行）- 必需
 6. **bad_example**: 需要避免的常见错误（如适用）
 7. **rule**: 何时应用此模式
 8. **confidence**: 0.0到1.0（确定程度）
@@ -234,11 +233,11 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 # 关键规则
 
 1. 仅返回有效的JSON - 不要使用 markdown 代码块（不要 ```)，前后不要文本
-2. 每个模式的`good_example`必须有实际代码（5-30行）
+2. 每个模式的`good_example`必须是从已读取源码逐字复制的代码证据（5-30行），不要补全、改写、综合或伪造代码；如果必须省略上下文，使用 `// ...` 明确标注，且不能省略错误处理、fallback、状态更新、锁释放、缓存/任务顺序等语义关键分支
 3. 仅对工具/业务方法使用`business_method`
 4. **先判断最具体分类**：数据库、API、错误、配置、中间件、结构、工具模式不得归入 business；跳过简单 CRUD
 5. 如不适用则保持`bad_example`为空
-6. 代码示例必须语法正确且可复制粘贴
+6. 代码证据必须语法正确；如果只是片段，必须用 `// ...` 标明省略位置，不要把片段伪装成完整实现
 
 {{if .KnownPatternsPath}}
 # 已有模式 ({{.KnownPatternsCount}})

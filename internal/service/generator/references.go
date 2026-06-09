@@ -48,6 +48,27 @@ func categoryNamesWithPatterns(patterns []domain.Pattern) []string {
 	return domain.CategoryNamesWithPatterns(patterns)
 }
 
+func referenceAvailability(profile *domain.ProjectProfile, patterns []domain.Pattern, enabled bool) ReferenceAvailability {
+	refs := ReferenceAvailability{Enabled: enabled}
+	if !enabled {
+		return refs
+	}
+	refs.ProjectSpec = true
+	refs.ProjectOverview = true
+	if profile != nil {
+		refs.BusinessMethods = len(profile.BusinessMethods) > 0
+		refs.KeyModules = len(profile.KeyModules) > 0
+		refs.CommonUtils = len(profile.CommonUtils) > 0
+	}
+	for _, pattern := range patterns {
+		if pattern.Category == domain.CategoryBusiness {
+			refs.BusinessPatterns = true
+			break
+		}
+	}
+	return refs
+}
+
 func categoryReferenceGroups(patterns []domain.Pattern, locale string) []skills.ReferenceGroup {
 	groupOrder := []string{
 		localizedText(locale, "架构与结构", "Architecture & Structure"),
@@ -82,6 +103,13 @@ func categoryReferenceGroups(patterns []domain.Pattern, locale string) []skills.
 		}
 	}
 	return groups
+}
+
+func conditionalCategoryReferenceGroups(patterns []domain.Pattern, locale string, enabled bool) []skills.ReferenceGroup {
+	if !enabled {
+		return nil
+	}
+	return categoryReferenceGroups(patterns, locale)
 }
 
 func categoryReferenceMetadata(category, locale string) categoryReferenceMeta {
@@ -187,6 +215,13 @@ func profileReferenceItems(profile *domain.ProjectProfile, locale, prefix string
 		})
 	}
 	return items
+}
+
+func conditionalProfileReferenceItems(profile *domain.ProjectProfile, locale, prefix string, enabled bool) []skills.ReferenceItem {
+	if !enabled {
+		return nil
+	}
+	return profileReferenceItems(profile, locale, prefix)
 }
 
 func patternForTemplate(pattern domain.Pattern) domain.Pattern {

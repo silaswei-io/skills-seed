@@ -45,7 +45,7 @@
 - **描述**：综合所有被合并模式的关键信息，更清晰更准确
 - **置信度**：频率加权平均：`新置信度 = (Σ(置信度 × 频率)) / Σ(频率)`
 - **规则**：选择最准确完整的规则，使用"当 X 时，应该 Y"格式
-- **good_example**：合并所有模式中最好的代码示例，或创建一个综合示例
+- **good_example**：只能从被合并模式中选择最能代表规则的已有代码示例；不要创建、补全、改写或综合新代码示例，没有合适示例则留空
 - **bad_example**：保留最能说明常见错误的反面示例
 - **business_method**：合并业务方法时，综合以下信息：
   - **name**：使用最完整的签名
@@ -72,7 +72,7 @@
       "name": "合并后的模式名称",
       "category": "{{.Category}}",
       "description": "综合所有合并模式的清晰完整描述",
-      "good_example": "从合并模式中选出的最佳代码示例",
+      "good_example": "从被合并模式中选出的已有代码示例",
       "bad_example": "最能说明错误的反面示例",
       "rule": "可操作的规则（当 X 时，应该 Y）",
       "confidence": 0.83,
@@ -110,6 +110,11 @@
 - **merged_patterns**: 合并结果，含 `merged_from` ID 和 `merge_reason`
 - **unchanged_patterns**: 独立模式，含 `reason` 和 `similarity_score`
 - **summary**: total_input = total_merged + total_unchanged
+
+# 语言要求
+
+- 面向用户阅读的自然语言字段应优先使用简体中文，包括合并模式的 `name`、`description`、`rule`、`merge_reason`、未合并模式的 `reason` 和 `business_method` 内的说明字段，但允许中英文混合表达技术概念。
+- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可按需保留原文。
 
 # ⚠️ 关键输出要求
 

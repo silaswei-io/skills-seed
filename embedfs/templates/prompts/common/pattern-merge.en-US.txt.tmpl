@@ -44,7 +44,7 @@ Analyze multiple code patterns in the same category and perform intelligent merg
 - **Description**: Synthesize key info from all merged patterns; clearer and more accurate
 - **Confidence**: Use frequency-weighted average: `New = (Σ(confidence × frequency)) / Σ(frequency)`
 - **Rule**: Choose most accurate/complete rule; use "When X, should Y" format
-- **good_example**: Merge the best code examples from all patterns, or create a comprehensive example
+- **good_example**: Select the existing code example that best represents the rule from the merged patterns only. Do not create, complete, rewrite, or synthesize new code examples; leave it empty if no suitable existing example is available
 - **bad_example**: Keep the most illustrative bad examples showing common mistakes
 - **business_method**: When merging business methods, combine:
   - **name**: Use the most complete signature
@@ -71,7 +71,7 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
       "name": "Merged Pattern Name",
       "category": "{{.Category}}",
       "description": "Clear, complete description synthesized from all merged patterns",
-      "good_example": "Best code example from merged patterns",
+      "good_example": "Existing code example selected from merged patterns",
       "bad_example": "Most illustrative bad example",
       "rule": "Actionable rule (When X, should Y)",
       "confidence": 0.83,
@@ -109,6 +109,12 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
 - **merged_patterns**: Merged results with `merged_from` IDs and `merge_reason`
 - **unchanged_patterns**: Independent patterns with `reason` and `similarity_score`
 - **summary**: total_input = total_merged + total_unchanged
+
+# Language Requirements
+
+- All user-facing natural-language fields must be written in English, including merged pattern `name`, `description`, `rule`, `merge_reason`, unchanged pattern `reason`, and descriptive fields inside `business_method`.
+- If input patterns, comments, README text, or user-provided context contain Chinese or another language, translate or rewrite the content into English.
+- Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.
 
 # ⚠️ CRITICAL OUTPUT REQUIREMENT
 

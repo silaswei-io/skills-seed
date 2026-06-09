@@ -112,7 +112,7 @@
    - 如果多个 service 都有相似的初始化方式 → 提取为"服务初始化模式"
    - 如果多个 API 都使用了相同的中间件 → 提取为"中间件使用模式"
    - 如果多个 repository 都使用了相同的事务处理 → 提取为"事务管理模式"
-   - 输出高价值模式即可，`patterns` 总数控制在 8 个以内；不要为同一层次的同质代码批量生成近似模式。
+   - 不要为同一层次的同质代码批量生成近似模式；只要有独立业务规则、状态分支、错误语义、数据转换或跨模块约束，就应单独输出，不设置 `patterns` 总数上限。
 
 # 输出格式
 
@@ -126,7 +126,7 @@
       "name": "模式名称",
       "category": "business|api|database|error|structure|naming|concurrency|testing|utils|middleware|config",
       "description": "功能描述和使用时机",
-      "good_example": "实际代码（5-12行）",
+      "good_example": "从已读取源码逐字复制的代码证据（5-12行）",
       "bad_example": "",
       "rule": "何时应用此模式",
       "confidence": 0.9,
@@ -172,9 +172,8 @@
 
 # 语言要求
 
-- 所有面向用户阅读的自然语言字段必须使用简体中文，包括 `name`、`description`、`rule`、`category_summaries`、`business_rules`、`best_practices`、`common_patterns`、`summary` 和 `business_method` 内的说明字段。
-- 如果代码注释、README 或依赖说明中出现英文，请改写成中文；框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量和代码标识符保留原文。
-- 不要输出 “business flow pattern”、“Use when ...”、“Concrete pattern ...” 这类英文说明短语，除非它们是代码标识符或专有名词的一部分。
+- 面向用户阅读的自然语言字段应优先使用简体中文，包括 `name`、`description`、`rule`、`category_summaries`、`business_rules`、`best_practices`、`common_patterns`、`summary` 和 `business_method` 内的说明字段，但允许中英文混合表达技术概念。
+- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可保留原文。
 
 # ⚠️ 关键输出要求
 
@@ -183,5 +182,5 @@
 - 不要使用 markdown 代码块（不要 ```)
 - JSON 前后不要有任何说明文字
 - **业务方法必须包含完整的方法签名和文件位置**
-- 每个模式的 `good_example` 必须包含实际代码（5-12行）
+- 每个模式的 `good_example` 必须从已读取源码中逐字复制代码证据（5-12行），不要补全、改写、综合或伪造代码；截取时不能省略错误处理、fallback、状态更新、锁释放、缓存/任务顺序等语义关键分支，必须省略上下文时用 `// ...` 明确标注
 - `good_example` 和 `bad_example` 是 JSON 字符串：代码中的反斜杠必须写成 `\\`，双引号必须写成 `\"`，换行必须写成 `\n`，不要输出未转义的 `\s`、`\ `、路径反斜杠或正则反斜杠

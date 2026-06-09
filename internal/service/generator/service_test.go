@@ -285,6 +285,64 @@ func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) 
 	require.FileExists(t, missingPath)
 }
 
+func TestGenerateSkillsWithOptionsSkipsReferencesAndReferenceLinks(t *testing.T) {
+	pattern := domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Use existing business rule")
+	pattern.SetRule("Reuse the documented flow")
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			return &agent.GenerateSkillsResult{}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				GeneratedAt: "2026-05-19 12:00:00",
+				KeyModules: []domain.ModuleInfo{{
+					Name:        "vocab",
+					Path:        "internal/application/vocab",
+					Description: "vocabulary business service",
+				}},
+				BusinessMethods: []domain.BusinessMethod{{
+					Name:         "ActivatePlan",
+					CodeLocation: domain.CodeLocation{CurrentLocation: "internal/application/vocab/service.go:1"},
+					Description:  "activates a plan",
+					Function:     "func ActivatePlan()",
+					Usage:        "plan activation",
+					Type:         "domain",
+				}},
+			}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	tmpDir := t.TempDir()
+
+	err := svc.GenerateSkillsWithOptions(context.Background(), tmpDir, GenerateOptions{SkipReferences: true})
+	require.NoError(t, err)
+
+	require.FileExists(t, filepath.Join(tmpDir, "SKILL.md"))
+	require.NoDirExists(t, filepath.Join(tmpDir, "references"))
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	assert.Contains(t, skill, "本次生成未写入 references")
+	assert.NotContains(t, skill, "./references/")
+	assertNoBrokenMarkdownLinks(t, tmpDir)
+}
+
 func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
@@ -485,6 +543,7 @@ func TestGenerateSkills_AlwaysUsesAISummary(t *testing.T) {
 
 	require.True(t, called)
 	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "AI 根据用户说明生成的业务边界摘要")
+	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "other.md"), "HSM Delivery Boundary")
 }
 
 func TestGenerateSkills_AIModeCallsAgentSummary(t *testing.T) {
@@ -525,6 +584,7 @@ func TestGenerateSkills_AIModeCallsAgentSummary(t *testing.T) {
 
 	assert.True(t, called)
 	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "AI generated business summary")
+	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "other.md"), "AI Rule")
 }
 
 func TestGenerateSkills_DoesNotOverwriteManualSkill(t *testing.T) {
@@ -570,7 +630,10 @@ func TestGenerateSkills_OverwritesGeneratedSkill(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	businessPattern := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	assert.Contains(t, businessPattern, "Generated Rule")
+	assert.Contains(t, businessPattern, "./business/other.md")
+	assert.NotContains(t, businessPattern, "#### ✅ 代码证据")
+	assert.NotContains(t, businessPattern, "```go")
+	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "other.md"), "Generated Rule")
 	assert.NotContains(t, readGeneratedFile(t, tmpDir, "SKILL.md"), "old generated skill")
 }
 
@@ -882,6 +945,10 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	assert.NotContains(t, businessPattern, "## 业务方法汇总")
 	assert.NotContains(t, businessPattern, "DuplicatedMethod")
 
+	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "other.md")
+	assert.Contains(t, businessDetail, "Business Flow")
+	assert.NotContains(t, businessDetail, "DuplicatedMethod")
+
 	businessMethods := readGeneratedFile(t, tmpDir, "references", "business-methods.md")
 	assert.Contains(t, businessMethods, "DuplicatedMethod")
 
@@ -915,13 +982,89 @@ func TestGenerateSkills_SkipsEmptyBusinessMethodDetails(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
-	content, err := os.ReadFile(filepath.Join(tmpDir, "references", "patterns", "business.md"))
+	content, err := os.ReadFile(filepath.Join(tmpDir, "references", "patterns", "business", "other.md"))
 	require.NoError(t, err)
 	businessPattern := string(content)
 
 	assert.NotContains(t, businessPattern, "业务方法详情")
 	assert.NotContains(t, businessPattern, "| **方法** | `` |")
 	assert.NotContains(t, businessPattern, "```go\n\n```")
+}
+
+func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
+	patterns := []domain.Pattern{
+		businessPatternWithLocation("billing-activation", "Activation Rule", "Activation deactivates existing active entities", "Always deactivate existing entities before activation", "func (s *Service) Activate(planID int64) (Plan, error) {\n\treturn Plan{}, nil\n}", "internal/application/billing/service.go:10"),
+		businessPatternWithLocation("billing-renewal", "Renewal Rule", "Renewal keeps billing state consistent", "Renew only after validating billing state", "func (s *Service) Renew(planID int64) error {\n\treturn nil\n}", "internal/application/billing/renewal.go:12"),
+		businessPatternWithLocation("notification-delivery", "Delivery Rule", "Delivery records notification attempts", "Record delivery attempts before retry", "func (s *Service) Deliver(id int64) error {\n\treturn nil\n}", "internal/application/notification/delivery.go:20"),
+	}
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			return &agent.GenerateSkillsResult{
+				CategorySummaries: map[string]agent.CategorySummary{
+					"business": {
+						Category: "business",
+						Summary:  "业务规则覆盖 billing 和 notification。",
+						Priority: 5,
+					},
+				},
+			}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return patterns, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				GeneratedAt: "2026-05-19 12:00:00",
+				KeyModules: []domain.ModuleInfo{{
+					Name:        "vocab",
+					Path:        "internal/application/vocab",
+					Description: "vocabulary business service",
+				}},
+				BusinessMethods: []domain.BusinessMethod{{
+					Name:         "ActivatePlan",
+					CodeLocation: domain.CodeLocation{CurrentLocation: "internal/application/vocab/service.go:1"},
+					Description:  "activates a plan",
+					Function:     "func ActivatePlan()",
+					Usage:        "plan activation",
+					Type:         "domain",
+				}},
+			}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, index, "business 模式索引")
+	assert.Contains(t, index, "./business/billing.md")
+	assert.Contains(t, index, "./business/notification.md")
+	assert.NotContains(t, index, "func (s *Service)")
+	assert.NotContains(t, index, "#### ✅ 代码证据")
+
+	billingDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "billing.md")
+	assert.Contains(t, billingDetail, "Activation Rule")
+	assert.Contains(t, billingDetail, "Renewal Rule")
+	assert.Contains(t, billingDetail, "#### ✅ 代码证据")
+	assert.Contains(t, billingDetail, "Activate")
+
+	notificationDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "notification.md")
+	assert.Contains(t, notificationDetail, "Delivery Rule")
+
+	assertNoBrokenMarkdownLinks(t, tmpDir)
 }
 
 func TestGenerateSkills_CodexWritesOpenAIMetadata(t *testing.T) {
@@ -967,6 +1110,28 @@ func readGeneratedFile(t *testing.T, root string, parts ...string) string {
 	content, err := os.ReadFile(filepath.Join(append([]string{root}, parts...)...))
 	require.NoError(t, err)
 	return string(content)
+}
+
+func businessPattern(id, name, description, rule, example string) domain.Pattern {
+	pattern := domain.NewPattern(id, name, domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.Frequency = 1
+	pattern.SetDescription(description)
+	pattern.SetRule(rule)
+	pattern.SetExamples(example, "")
+	return *pattern
+}
+
+func businessPatternWithLocation(id, name, description, rule, example, location string) domain.Pattern {
+	pattern := businessPattern(id, name, description, rule, example)
+	pattern.SetBusinessMethod(&domain.BusinessMethod{
+		Name:         name,
+		CodeLocation: domain.CodeLocation{CurrentLocation: location},
+		Description:  description,
+		Type:         "domain",
+		Function:     strings.Split(example, "{")[0],
+	})
+	return pattern
 }
 
 func readFilePath(t *testing.T, path string) string {

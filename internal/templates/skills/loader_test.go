@@ -52,6 +52,7 @@ func TestLoader_Render(t *testing.T) {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},
+		"References": fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
 			{
 				Title: "业务与领域",
@@ -105,6 +106,7 @@ func TestLoader_Render_English(t *testing.T) {
 			"Add timeout tests for external calls",
 		},
 		"OverviewReferences": []ReferenceItem{},
+		"References":         fullReferenceAvailability(),
 		"ReferenceGroups":    []ReferenceGroup{},
 	}
 
@@ -321,6 +323,8 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 					mainContent, err := loader.Render("project-skill", fullSkillData())
 					require.NoError(t, err)
 					require.NotEmpty(t, mainContent)
+					require.Contains(t, mainContent, "skills-seed generate skills")
+					require.NotContains(t, mainContent, "skills-seed generate-skills")
 
 					overview, err := loader.Render("project-reference-overview", projectOverviewData())
 					require.NoError(t, err)
@@ -330,6 +334,7 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 						referenceContent, err := loader.Render("project-reference-"+reference, projectOverviewData())
 						require.NoError(t, err)
 						require.NotEmpty(t, referenceContent)
+						require.NotContains(t, referenceContent, "skills-seed generate-skills")
 					}
 
 					for _, category := range categories {
@@ -476,6 +481,7 @@ func fullSkillData() map[string]interface{} {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},
+		"References": fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
 			{
 				Title: "业务与领域",
@@ -544,6 +550,7 @@ func projectOverviewData() map[string]interface{} {
 			{Title: "关键模块", Path: "./modules.md", Description: "完整模块清单"},
 			{Title: "通用工具", Path: "./common-utils.md", Description: "工具方法清单"},
 		},
+		"References":          fullReferenceAvailability(),
 		"KeyModules":          []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Dependencies: []string{"domain"}, Dependents: []string{"command"}, KeyMethods: []string{"Run()"}}},
 		"BusinessMethods":     []domain.BusinessMethod{{Name: "Demo", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/demo.go:10"}, Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
 		"CommonUtils":         []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
@@ -562,5 +569,17 @@ func projectOverviewData() map[string]interface{} {
 		"Touchpoints": []domain.ProjectSpecTouchpoint{
 			{Kind: "business_method", Name: "Demo", Path: "internal/demo.go:10", Description: "demo"},
 		},
+	}
+}
+
+func fullReferenceAvailability() map[string]bool {
+	return map[string]bool{
+		"Enabled":          true,
+		"ProjectSpec":      true,
+		"ProjectOverview":  true,
+		"BusinessMethods":  true,
+		"KeyModules":       true,
+		"CommonUtils":      true,
+		"BusinessPatterns": true,
 	}
 }

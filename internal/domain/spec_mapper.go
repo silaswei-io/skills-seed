@@ -64,7 +64,7 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 		})
 	}
 
-	for _, pattern := range StrongestPatterns(patterns, 12) {
+	for _, pattern := range StrongestPatterns(patterns, 0) {
 		spec.PatternRules = append(spec.PatternRules, ProjectSpecPatternRule{
 			Name:        pattern.Name,
 			Category:    string(pattern.Category),

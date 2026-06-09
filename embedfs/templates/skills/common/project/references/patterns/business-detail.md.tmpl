@@ -1,16 +1,11 @@
-# {{.Category}} 模式概览
+# {{.GroupTitle}}
 
 **分类**: {{.Category}}
-**优先级**: {{.Priority}}
 **模式数量**: {{.PatternCount}}
 **置信度**: {{printf "%.2f" .Confidence}}%
 **最后更新**: {{.LastUpdated}}
 
----
-
-## 概述
-
-{{.Summary}}
+{{.GroupSummary}}
 
 {{if .PatternObjects}}
 ## 详细模式
@@ -43,18 +38,4 @@
 ---
 
 {{end}}
-{{end}}
-
-{{if .UsageScenes}}
-## 使用场景
-
-{{range .UsageScenes}}
-- {{.}}
-{{end}}
-{{end}}
-
-{{if includeSkillsSeedGeneratedNotice}}
----
-
-*此文档由 skills-seed 从 {{len .PatternObjects}} 个模式自动生成*
 {{end}}

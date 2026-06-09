@@ -75,7 +75,7 @@ run-check:
 
 run-generate:
 	@echo "运行 generate 命令..."
-	$(BINARY) generate-skills
+	$(BINARY) generate skills
 
 # 依赖管理
 deps:

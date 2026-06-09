@@ -112,7 +112,7 @@ Based on the project information and the code files you read, perform the follow
    - If multiple services have similar initialization -> extract as "service initialization pattern"
    - If multiple APIs use the same middleware -> extract as "middleware usage pattern"
    - If multiple repositories use the same transaction handling -> extract as "transaction management pattern"
-   - Output only high-value patterns. Keep `patterns` to 8 items or fewer; do not emit many near-duplicate patterns for homogeneous code in the same layer.
+   - Do not emit many near-duplicate patterns for homogeneous code in the same layer. When there is an independent business rule, state branch, error semantic, data transformation, or cross-module constraint, output it as its own pattern; do not apply a fixed total limit to `patterns`.
 
 # Output Format
 
@@ -126,7 +126,7 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
       "name": "Pattern Name",
       "category": "business|api|database|error|structure|naming|concurrency|testing|utils|middleware|config",
       "description": "Description of the pattern and when to use it",
-      "good_example": "Actual code (5-12 lines)",
+      "good_example": "Code evidence copied verbatim from source you read (5-12 lines)",
       "bad_example": "",
       "rule": "When to apply this pattern",
       "confidence": 0.9,
@@ -170,6 +170,13 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
 
 When a code snippet contains both business semantics and a technical convention, prefer the most specific technical category. Use `business` only for domain rules that cannot be expressed by a more specific technical category.
 
+# Language Requirements
+
+- All user-facing natural-language fields must be written in English, including `name`, `description`, `rule`, `category_summaries`, `business_rules`, `best_practices`, `common_patterns`, `summary`, and descriptive fields inside `business_method`.
+- If code comments, README text, dependency descriptions, existing patterns, or user-provided context contain Chinese or another language, translate or rewrite the content into English.
+- Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.
+- Do not output Chinese phrases such as “业务流程”, “具体规则”, or “使用场景” unless they are literal code identifiers or quoted source terms.
+
 # CRITICAL OUTPUT REQUIREMENTS
 
 Your ENTIRE response must be ONLY a valid JSON object.
@@ -177,5 +184,5 @@ Your ENTIRE response must be ONLY a valid JSON object.
 - NO markdown code blocks (no ```)
 - NO explanatory text before or after the JSON
 - **Business methods MUST include complete method signatures and file locations**
-- Each pattern's `good_example` MUST contain actual code (5-12 lines)
+- Each pattern's `good_example` MUST be code evidence copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, or invent code; when excerpting, do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering. If surrounding context must be omitted, mark it explicitly with `// ...`
 - `good_example` and `bad_example` are JSON strings: escape code backslashes as `\\`, double quotes as `\"`, and newlines as `\n`; never emit raw `\s`, `\ `, path backslashes, or regex backslashes inside JSON strings

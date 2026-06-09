@@ -70,6 +70,13 @@ You are running in the project root; read entry files, the README, and necessary
 
 If an existing project profile is provided, preserve unchanged modules, utilities, business methods, dependencies, and architecture details from it. Update, add, or remove profile entries only when the focused paths or directly related files provide clear evidence. The output must still be a complete project profile, not a partial patch
 
+# Language Requirements
+
+- All user-facing natural-language fields must be written in English, including `architecture`, `layers`, `dependency_graph`, `data_flow`, `framework_patterns`, `structure`, `key_modules`, `business_methods`, `common_utils`, `config_patterns`, and `summary`.
+- If code, README text, existing project profiles, comments, or user-provided context contain Chinese or another language, summarize or translate the content into English instead of copying non-English prose.
+- Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed, such as Cobra, Viper, goctl, protoc, JZERO_*, and GetCommand.
+- `framework_patterns` must describe framework usage in English, for example "Cobra command pattern: each command package exposes GetCommand() and main.go registers it". Do not output Chinese sentences such as “Cobra 命令模式”.
+
 # Output Format
 
 Return ONLY a valid JSON object matching this schema. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:

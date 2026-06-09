@@ -32,12 +32,23 @@ type profileReferenceTemplateData struct {
 
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
+	References ReferenceAvailability
 }
 
 type categoryReferenceMeta struct {
 	Group       string
 	Title       string
 	Description string
+}
+
+type ReferenceAvailability struct {
+	Enabled          bool
+	ProjectSpec      bool
+	ProjectOverview  bool
+	BusinessMethods  bool
+	KeyModules       bool
+	CommonUtils      bool
+	BusinessPatterns bool
 }
 
 type projectSkillsFingerprintInput struct {

@@ -57,9 +57,39 @@ func projectSkillsOutputExists(outputPath string, patterns []domain.Pattern) boo
 		return false
 	}
 	for _, category := range categoryNamesWithPatterns(patterns) {
-		if _, err := os.Stat(filepath.Join(outputPath, "references", "patterns", category+".md")); err != nil {
+		if !categoryPatternOutputExists(outputPath, category, patterns) {
 			return false
 		}
 	}
 	return true
+}
+
+func categoryPatternOutputExists(outputPath, category string, patterns []domain.Pattern) bool {
+	categoryPath := filepath.Join(outputPath, "references", "patterns", category+".md")
+	if _, err := os.Stat(categoryPath); err != nil {
+		return false
+	}
+	if category != string(domain.CategoryBusiness) {
+		return true
+	}
+	detailDir := filepath.Join(outputPath, "references", "patterns", string(domain.CategoryBusiness))
+	if info, err := os.Stat(detailDir); err != nil || !info.IsDir() {
+		return false
+	}
+	for _, group := range businessPatternGroups("", businessPatterns(patterns)) {
+		if _, err := os.Stat(filepath.Join(detailDir, group.ID+".md")); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func businessPatterns(patterns []domain.Pattern) []domain.Pattern {
+	result := make([]domain.Pattern, 0)
+	for _, pattern := range patterns {
+		if pattern.Category == domain.CategoryBusiness {
+			result = append(result, patternForTemplate(pattern))
+		}
+	}
+	return result
 }

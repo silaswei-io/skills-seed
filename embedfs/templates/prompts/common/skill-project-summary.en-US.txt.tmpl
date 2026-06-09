@@ -43,6 +43,13 @@ Actions:
 - Each usage scenario must be specific and actionable
 - Business rules and best practices must be derived from actual patterns, not generic advice
 
+## Language Requirements
+
+- All user-facing natural-language fields must be written in English, including `summary`, `patterns`, `usage_scenes`, `key_patterns`, `business_rules`, `best_practices`, `common_patterns`, `key_insights`, and `improvement_suggestions`.
+- If input patterns, existing Skills, README text, code comments, or user-provided context contain Chinese or another language, translate or rewrite the content into English.
+- Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.
+- Do not output Chinese phrases such as “业务流程”, “实现新的接口”, or “具体模式” unless they are literal code identifiers or quoted source terms.
+
 ## Output Format
 
 Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:

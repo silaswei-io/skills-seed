@@ -501,7 +501,7 @@ other = "skills-seed 未初始化"
 other = "请先运行 'skills-seed init' 初始化项目"
 
 [LearnLongDesc]
-other = "从当前代码或 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析当前代码或最近的 Git 提交\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 为 check 和 generate-skills 提供项目规范输入"
+other = "从当前代码或 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析当前代码或最近的 Git 提交\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 为 check 和 generate skills 提供项目规范输入"
 
 [LearnExample]
 other = "  # 从当前代码学习\n  skills-seed learn current\n\n  # 从 Git 历史学习\n  skills-seed learn history --limit=50\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service --profile skip"
@@ -861,7 +861,7 @@ other = "从文件读取本次生成的补充说明；适合较长约束"
 other = "开始合并相似模式..."
 
 [GenerateMergeDeprecated]
-other = "'generate-skills --merge' 已不推荐使用；请改用 'skills-seed patterns merge' 后再运行 'skills-seed generate-skills'。"
+other = "'generate-skills --merge' 已不推荐使用；请改用 'skills-seed patterns merge' 后再运行 'skills-seed generate skills'。"
 
 [GenerateMergeFailed]
 other = "合并失败: {{.Error}}"
@@ -1017,7 +1017,7 @@ other = "AI 生成用户自定义模式失败"
 other = "查看或刷新项目画像"
 
 [ProfileLongDesc]
-other = "查看或刷新由 learn current 生成的项目画像。\n\n项目画像保存于 .skills-seed/memory/project-profile.json，用于生成 references/project-overview.md，并为 generate-skills 提供项目结构、依赖、关键模块和业务方法上下文。"
+other = "查看或刷新由 learn current 生成的项目画像。\n\n项目画像保存于 .skills-seed/memory/project-profile.json，用于生成 references/project-overview.md，并为 generate skills 提供项目结构、依赖、关键模块和业务方法上下文。"
 
 [ProfileExample]
 other = "  # 查看当前项目画像摘要\n  skills-seed profile show\n\n  # 重新分析项目并刷新画像\n  skills-seed profile refresh"
@@ -1687,7 +1687,7 @@ other = "事件统计"
 other = "从当前代码学习"
 
 [LearnCurrentLongDesc]
-other = "分析当前代码库，提取编码模式、业务方法、最佳实践与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/memory/project-profile.json\n  • 为 generate-skills 准备完整 project-overview 输入"
+other = "分析当前代码库，提取编码模式、业务方法、最佳实践与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/memory/project-profile.json\n  • 为 generate skills 准备完整 project-overview 输入"
 
 [LearnCurrentExample]
 other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不刷新项目画像\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从文件读取本次学习补充说明\n  skills-seed learn current --context-file .skills-seed/context.md"

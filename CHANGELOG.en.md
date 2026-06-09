@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.8.1]
+
+### Features
+
+- Business pattern references now use an index + domain-detail structure: `business.md` keeps only reading guidance and detail links, while full rules and code evidence are written to `references/patterns/business/*.md` to avoid oversized single files.
+- Business pattern domains are grouped from code location, scope, and stable directory names; rules without stable ownership fall back to `other`, avoiding project-specific business keywords in the generic generator.
+- Generated main skills and project specs now link references conditionally based on the files actually generated, preventing broken links in sparse projects or `--no-references` output.
+
+### Changes
+
+- Project-init, incremental learning, and pattern-merge prompts now require `good_example` to be copied from read source as a complete semantic snippet, forbidding synthesized or rewritten “good examples”.
+- Skills templates now label examples as “Code Evidence” instead of “Good Example” to reduce the chance that models treat examples as freely generated code.
+- Project specs no longer cap business rules; all executable business rules are retained, with reference splitting controlling context size.
+
+### Fixes
+
+- Fixed `GenerateSkillsWithOptions` dropping its options. `SkipReferences` now actually skips reference file generation.
+- Fixed unchanged-input generation checks only validating `business.md` and ignoring business detail files, preventing false skips when detail files are missing.
+- Fixed remaining `skills-seed generate-skills` template references, standardizing on `skills-seed generate skills`.
+
 ## [v0.8.0]
 
 ### Features

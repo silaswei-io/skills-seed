@@ -1,0 +1,23 @@
+# business 模式索引
+
+**模式数量**: {{.PatternCount}}
+**置信度**: {{printf "%.2f" .Confidence}}%
+**最后更新**: {{.LastUpdated}}
+
+{{if .Summary}}{{.Summary}}{{end}}
+
+## 读取方式
+
+先按任务选择下方最相关的子域详情文件；不要一次性读取所有业务详情。
+
+{{range .Groups}}
+- **[{{.Title}}]({{.Path}})** - {{.Description}}（{{len .Patterns}} 个模式）
+{{end}}
+
+{{if .UsageScenes}}
+## 使用场景
+
+{{range .UsageScenes}}
+- {{.}}
+{{end}}
+{{end}}

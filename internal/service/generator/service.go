@@ -76,7 +76,7 @@ func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string
 }
 
 func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, outputPath string, opts GenerateOptions) error {
-	return s.GenerateSkillsWithProgress(ctx, outputPath, nil, nil)
+	return s.GenerateSkillsWithHooks(ctx, outputPath, GenerateProgressHooks{}, opts)
 }
 
 func (s *GeneratorService) GenerateSkillsWithProgress(ctx context.Context, outputPath string, onStepStart func(label string), onStepComplete func(label string)) error {

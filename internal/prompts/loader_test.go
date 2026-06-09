@@ -93,6 +93,7 @@ func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "Do not return Markdown, comments, explanations, or code fences")
+	require.Contains(t, prompt, "All user-facing natural-language fields in the JSON must be written in English")
 	require.NotContains(t, prompt, "不要使用 markdown 代码块包裹 JSON")
 }
 
@@ -444,7 +445,7 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 				"业务候选清单",
 				"业务模式展开",
 				"不要把多个业务细节压缩成一个泛化模式",
-				"所有面向用户阅读的自然语言字段必须使用简体中文",
+				"允许中英文混合表达技术概念",
 			},
 		},
 		{
@@ -453,6 +454,7 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 				"business candidate inventory",
 				"business pattern expansion",
 				"Do not compress multiple business details into one generic pattern",
+				"All user-facing natural-language fields must be written in English",
 			},
 		},
 	}
@@ -546,9 +548,9 @@ func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing
 	prompt, err := loader.Render("project-analyze", sampleProjectAnalysisData())
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "所有面向用户阅读的自然语言字段必须使用简体中文")
-	require.Contains(t, prompt, "`framework_patterns` 必须用中文描述框架使用方式")
-	require.Contains(t, prompt, "不要输出 “Cobra command pattern”")
+	require.Contains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
+	require.Contains(t, prompt, "允许中英文混合表达技术概念")
+	require.Contains(t, prompt, "Cobra、Viper、goctl")
 }
 
 func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *testing.T) {
@@ -557,11 +559,56 @@ func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *t
 	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "所有面向用户阅读的自然语言字段必须使用简体中文")
-	require.Contains(t, prompt, "如果输入模式里包含英文说明，请改写成中文")
-	require.Contains(t, prompt, "不要输出 “Repository pattern”")
+	require.Contains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
+	require.Contains(t, prompt, "允许中英文混合表达技术概念")
+	require.Contains(t, prompt, "英文专有名词可保留原文")
 	require.NotContains(t, prompt, "用户提供的上下文")
 	require.NotContains(t, prompt, "USER_CONTEXT_PATH")
+}
+
+func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing.T) {
+	loader := NewLoader("codex", "en-US", "")
+
+	prompt, err := loader.Render("project-analyze", sampleProjectAnalysisData())
+	require.NoError(t, err)
+
+	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
+	require.Contains(t, prompt, "`framework_patterns` must describe framework usage in English")
+	require.Contains(t, prompt, "Do not output Chinese sentences such as “Cobra 命令模式”")
+}
+
+func TestLoader_RenderEnGenerateSkillsSummaryRequiresEnglishNaturalLanguage(t *testing.T) {
+	loader := NewLoader("codex", "en-US", "")
+
+	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
+	require.NoError(t, err)
+
+	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
+	require.Contains(t, prompt, "If input patterns, existing Skills, README text, code comments, or user-provided context contain Chinese")
+	require.Contains(t, prompt, "Do not output Chinese phrases such as “业务流程”")
+}
+
+func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testing.T) {
+	loader := NewLoader("common", "en-US", "")
+
+	for _, tc := range []struct {
+		name string
+		data interface{}
+	}{
+		{"learn-batch", sampleBatchLearnData()},
+		{"pattern-merge", sampleMergePatternsData()},
+		{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+		{"skill-project-summary", sampleGenerateSkillsData()},
+		{"skill-workspace-profile", workspacePromptData()},
+		{"skill-workspace-spec", workspaceSpecPromptData()},
+		{"user-define-pattern", sampleUserDefinePatternData()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prompt, err := loader.Render(tc.name, tc.data)
+			require.NoError(t, err)
+			require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
+		})
+	}
 }
 
 func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
@@ -826,6 +873,16 @@ func sampleProjectAnalysisData() map[string]interface{} {
 		"ExistingProfilePath":   "",
 		"FocusPaths":            []string{},
 		"UserContextPath":       "",
+	}
+}
+
+func sampleUserDefinePatternData() map[string]interface{} {
+	return map[string]interface{}{
+		"Language":    "go",
+		"Files":       []string{"internal/demo.go"},
+		"UserContext": "团队希望把中文说明改写为目标语言",
+		"Description": "新增接口时复用现有 mapper",
+		"Category":    "structure",
 	}
 }
 

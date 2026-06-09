@@ -1,0 +1,23 @@
+# business Pattern Index
+
+**Pattern Count**: {{.PatternCount}}
+**Confidence**: {{printf "%.2f" .Confidence}}%
+**Last Updated**: {{.LastUpdated}}
+
+{{if .Summary}}{{.Summary}}{{end}}
+
+## How To Read
+
+Choose the most relevant domain detail file below for the task; do not read every business detail file by default.
+
+{{range .Groups}}
+- **[{{.Title}}]({{.Path}})** - {{.Description}} ({{len .Patterns}} patterns)
+{{end}}
+
+{{if .UsageScenes}}
+## Usage Scenarios
+
+{{range .UsageScenes}}
+- {{.}}
+{{end}}
+{{end}}
