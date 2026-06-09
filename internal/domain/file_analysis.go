@@ -3,6 +3,7 @@ package domain
 import (
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -45,15 +46,17 @@ func (s FileAnalysisScope) ContainsPath(path string, focusPaths []string) bool {
 
 // FileAnalysisRecord 保存单个文件最近一次成功分析时的指纹。
 type FileAnalysisRecord struct {
-	ProjectID      string `json:"project_id,omitempty"`
-	ScopePath      string `json:"scope_path,omitempty"`
-	Path           string `json:"path"`
-	Hash           string `json:"hash"`
-	HashAlgorithm  string `json:"hash_algorithm"`
-	Size           int64  `json:"size"`
-	ModTime        string `json:"mod_time"`
-	Source         string `json:"source"`
-	LastAnalyzedAt string `json:"last_analyzed_at"`
+	ProjectID      string    `json:"project_id,omitempty"`
+	ScopePath      string    `json:"scope_path,omitempty"`
+	Path           string    `json:"path"`
+	Hash           string    `json:"hash"`
+	HashAlgorithm  string    `json:"hash_algorithm"`
+	Size           int64     `json:"size"`
+	ModTime        string    `json:"mod_time"`
+	Source         string    `json:"source"`
+	LastAnalyzedAt string    `json:"last_analyzed_at"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 func normalizeAnalysisPath(path string) string {

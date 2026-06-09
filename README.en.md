@@ -98,6 +98,8 @@ Starting in 0.7.1, generated metadata, empty scaffolding, and unfilled placehold
 
 Starting in 0.7.2, project-profile analysis performs a narrow JSON recovery for duplicated object-start fragments inside object arrays in model output. If parsing still fails, it returns an error and keeps the existing profile instead of saving an `unknown/parse failed` placeholder as a successful result.
 
+Starting in 0.7.3, current-code learning commits file-analysis fingerprints only after patterns are persisted, preventing unsuccessfully learned files from being skipped by later incremental learning. Pattern, file-fingerprint, hit, and review-comment records maintain `created_at/updated_at`; business-method code locations are stored in the DB as language-agnostic snapshot metadata and can be inspected with `patterns show`.
+
 Common layout:
 
 ```text
@@ -234,6 +236,7 @@ Built-in targets:
 | `skills-seed sync` | Run learning or pattern add, merge, and skill generation in one command |
 | `skills-seed check` | Check staged files or Git-tracked files |
 | `skills-seed patterns stats` | Show pattern quality, hit counts, and recent hits |
+| `skills-seed patterns show` | Show pattern timestamps and code-location fields from the DB |
 | `skills-seed review import --from-file` | Import local review comments |
 | `skills-seed hook install` | Install the local pre-commit hook |
 

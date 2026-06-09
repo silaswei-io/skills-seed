@@ -2,11 +2,17 @@
 
 本文件记录项目画像中提取的复杂业务逻辑方法。修改业务流程、复用领域能力或生成新业务代码前，优先检查这里是否已有可复用方法
 
+{{if .HasBusinessPatterns}}相关业务规则见 [业务模式](./patterns/business.md)
+{{end}}
+
 {{if .BusinessMethods}}
 {{range .BusinessMethods}}{{if .Name}}
 ## {{.Name}}
 
-- **位置**: `{{.Location}}`
+- **当前位置**: `{{.DisplayLocation}}`
+{{if .LocationStatus}}- **位置状态**: `{{.LocationStatus}}`
+{{end}}{{if .HistoricalDisplayLocation}}- **历史位置**: `{{.HistoricalDisplayLocation}}`
+{{end}}
 {{if .Type}}- **类型**: {{.Type}}{{end}}
 - **功能**: {{.Description}}
 {{if .Function}}

@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.3]
+
+### 功能
+
+- 新增 `skills-seed patterns show`，可查看 DB 中 pattern 的时间字段、来源、代码位置状态和语言无关符号快照；支持单条详情和 JSON 输出。
+
+### 变更
+
+- Pattern、文件分析指纹、pattern 命中、评审评论和已分析提交记录会维护 `created_at/updated_at`。
+- 业务方法代码位置新增结构化 DB 元数据，保留历史位置、当前位置、状态、变化类型和语言无关符号快照；生成文档优先展示当前位置，并保留历史位置和状态。
+
+### 修复
+
+- 修复 `learn current` 在 pattern 保存失败时仍提交文件分析指纹的问题，避免未成功学习的文件在后续增量学习中被误判为已学习。
+
 ## [v0.7.2]
 
 ### 修复
@@ -487,7 +502,7 @@ Skills Seed 的首个公开版本
 - `skills-seed patterns merge`
 - `skills-seed profile refresh`
 - `skills-seed hook install pre-commit`
-- `skills-seed view`
+- `skills-seed patterns show`
 
 ### 发布
 

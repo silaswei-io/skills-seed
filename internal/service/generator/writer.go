@@ -202,15 +202,6 @@ func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath str
 	if err := w.generateProjectOverview(refsPath, profile); err != nil {
 		return err
 	}
-	if err := w.generateProfileReferenceFiles(refsPath, profile); err != nil {
-		return err
-	}
-	if spec != nil {
-		if err := w.generateProjectSpec(refsPath, spec); err != nil {
-			return err
-		}
-	}
-
 	patternsPath := filepath.Join(refsPath, "patterns")
 	examplesPath := filepath.Join(refsPath, "examples")
 
@@ -221,7 +212,17 @@ func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath str
 		return err
 	}
 
-	for _, categoryName := range categoryNamesWithPatterns(patterns) {
+	categoriesWithPatterns := categoryNamesWithPatterns(patterns)
+	if err := w.generateProfileReferenceFiles(refsPath, profile, categoriesWithPatterns); err != nil {
+		return err
+	}
+	if spec != nil {
+		if err := w.generateProjectSpec(refsPath, spec); err != nil {
+			return err
+		}
+	}
+
+	for _, categoryName := range categoriesWithPatterns {
 		summary := summaries[categoryName]
 		if err := w.generateCategoryPattern(patternsPath, categoryName, summary, patterns); err != nil {
 			return err
@@ -277,7 +278,16 @@ func (w *SkillWriter) generateProjectOverview(refsPath string, profile *domain.P
 	return nil
 }
 
-func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *domain.ProjectProfile) error {
+func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *domain.ProjectProfile, categoriesWithPatterns []string) error {
+	categorySet := make(map[string]bool, len(categoriesWithPatterns))
+	for _, category := range categoriesWithPatterns {
+		categorySet[category] = true
+	}
+	data := profileReferenceTemplateData{
+		ProjectProfile:      *profile,
+		HasBusinessPatterns: categorySet[string(domain.CategoryBusiness)],
+		HasUtilityPatterns:  categorySet[string(domain.CategoryUtils)],
+	}
 	files := []struct {
 		templateName string
 		outputName   string
@@ -292,7 +302,7 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 		if !file.enabled {
 			continue
 		}
-		content, err := w.skillsLoader.RenderReferenceFile(file.templateName, profile)
+		content, err := w.skillsLoader.RenderReferenceFile(file.templateName, data)
 		if err != nil {
 			return fmt.Errorf("%s: reference=%s: %w", i18n.Get("InitGenerateOverviewFailed"), file.templateName, err)
 		}

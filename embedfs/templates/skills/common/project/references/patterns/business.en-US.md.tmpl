@@ -40,35 +40,6 @@
 ```
 {{end}}
 
-{{if .BusinessMethod}}
-#### 📦 Business Method Details
-
-| Field | Value |
-|-------|-------|
-| **Method** | `{{.BusinessMethod.Name}}` |
-| **Location** | `{{.BusinessMethod.Location}}` |
-| **Type** | {{if eq .BusinessMethod.Type "domain"}}🔒 Project-Specific{{else if eq .BusinessMethod.Type "common"}}🌐 Reusable{{else}}{{.BusinessMethod.Type}}{{end}} |
-
-**Description**: {{.BusinessMethod.Description}}
-
-**Function Signature**
-```go
-{{.BusinessMethod.Function}}
-```
-
-{{if .BusinessMethod.Prerequisites}}
-**Prerequisites**
-{{.BusinessMethod.Prerequisites}}
-{{end}}
-
-{{if .BusinessMethod.Returns}}
-**Returns**
-{{.BusinessMethod.Returns}}
-{{end}}
-
-**Usage**: {{.BusinessMethod.Usage}}
-{{end}}
-
 ---
 
 {{end}}

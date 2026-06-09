@@ -475,8 +475,9 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	savedCount := 0
 	saveStartedAt := time.Now()
 	if err := runStep(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error {
-		savedCount = cont.LearnerSvc.SavePatterns(ctx, patterns, "learn_current")
-		return nil
+		var err error
+		savedCount, err = cont.LearnerSvc.SavePatternsStrict(ctx, patterns, "learn_current")
+		return err
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.save_patterns",

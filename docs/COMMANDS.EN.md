@@ -295,7 +295,7 @@ references/
 
 #### Command Overview
 
-Manage learned patterns. Supports adding user-defined patterns, merging semantically similar patterns, and inspecting pattern quality and check-hit statistics.
+Manage learned patterns. Supports adding user-defined patterns, merging semantically similar patterns, and inspecting DB fields, pattern quality, and check-hit statistics.
 
 #### Command Forms
 
@@ -304,6 +304,7 @@ Manage learned patterns. Supports adding user-defined patterns, merging semantic
 | `skills-seed patterns add <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add "Use RESTful API routes" --category api` | Calls the AI agent |
 | `skills-seed patterns merge` | Ask the current agent to merge similar patterns | `skills-seed patterns merge --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
+| `skills-seed patterns show [pattern-id]` | Show pattern DB fields, timestamps, and code-location metadata | `skills-seed patterns show business-create-order --format json` | Does not call the AI agent or modify the database |
 
 #### `patterns` Flags
 
@@ -334,6 +335,13 @@ Manage learned patterns. Supports adding user-defined patterns, merging semantic
 |---|---:|---|
 | `--help`, `-h` | `false` | Show `patterns stats` help |
 
+#### `patterns show` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--format` | `table` | Output format: `table` or `json` |
+| `--help`, `-h` | `false` | Show `patterns show` help |
+
 #### Common Examples
 
 ```bash
@@ -344,6 +352,8 @@ skills-seed patterns merge
 skills-seed patterns merge --category api
 skills-seed patterns merge --category business --dry-run
 skills-seed patterns stats
+skills-seed patterns show
+skills-seed patterns show business-create-order --format json
 ```
 
 #### Notes
@@ -351,6 +361,7 @@ skills-seed patterns stats
 1. Merge runs call the CLI configured by the current `agent.engine`.
 2. Use `--dry-run` first when you want to inspect the merge result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
+4. `patterns show` reads saved DB fields and helps inspect `created_at/updated_at`, code-location status, and language-agnostic symbol snapshots.
 
 ### `skills-seed review`
 
@@ -452,43 +463,6 @@ skills-seed profile refresh --language go
 
 1. `profile show` is useful for quickly checking the current profile.
 2. `profile refresh` overwrites the existing project profile, but does not run pattern learning.
-
-### `skills-seed view`
-
-#### Command Overview
-
-View learned or generated content from `.skills-seed`. Currently this mainly shows learned patterns.
-
-#### Command Forms
-
-| Command Form | Description | Common Example | Notes |
-|---|---|---|---|
-| `skills-seed view patterns` | View learned patterns grouped by category | `skills-seed view patterns --category testing` | Read-only; does not modify the database |
-
-#### `view` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--help`, `-h` | `false` | Show `view` help |
-
-#### `view patterns` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--category`, `-c` | empty | Filter by category: `naming`, `error`, `structure`, `concurrency`, `testing`, `business`, `api`, `database`, `utils`, `middleware`, `config` |
-| `--help`, `-h` | `false` | Show `view patterns` help |
-
-#### Common Examples
-
-```bash
-skills-seed view patterns
-skills-seed view patterns --category testing
-```
-
-#### Notes
-
-1. Without `--category`, all categories are displayed.
-2. This command is read-only and does not trigger learning, merging, or generation.
 
 ### `skills-seed sync`
 

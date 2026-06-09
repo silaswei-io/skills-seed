@@ -365,6 +365,26 @@ func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 	require.Equal(t, 3, saved.Frequency)
 }
 
+func TestSavePatternsStrictReturnsErrorWhenSaveFails(t *testing.T) {
+	mockPattern := &mocks.MockPatternRepository{
+		FindSimilarFn: func(ctx context.Context, p *domain.Pattern) (*domain.Pattern, error) {
+			return nil, nil
+		},
+		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
+			return errors.New("db closed")
+		},
+	}
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
+	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, merger.NewMergerService(mockAgent, mockPattern))
+
+	count, err := svc.SavePatternsStrict(context.Background(), []domain.Pattern{*domain.NewPattern("new", "Error Handling", domain.CategoryError)}, "learn_current")
+
+	require.Error(t, err)
+	require.Zero(t, count)
+	require.Contains(t, err.Error(), "save pattern")
+	require.Contains(t, err.Error(), "db closed")
+}
+
 func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 	t.Run("new patterns", func(t *testing.T) {
 		mockPattern := &mocks.MockPatternRepository{

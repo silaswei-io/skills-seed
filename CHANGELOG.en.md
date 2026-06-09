@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.3]
+
+### Features
+
+- Added `skills-seed patterns show` to inspect pattern timestamps, source, code-location status, and language-agnostic symbol snapshots from the DB; supports single-record details and JSON output.
+
+### Changes
+
+- Pattern, file-analysis fingerprint, pattern-hit, review-comment, and analyzed-commit records now maintain `created_at/updated_at`.
+- Business-method code locations now include structured DB metadata for historical location, current location, status, change kinds, and language-agnostic symbol snapshots. Generated docs prefer the current location while retaining historical location and status.
+
+### Fixes
+
+- Fixed `learn current` committing file-analysis fingerprints when pattern persistence fails, preventing unsuccessfully learned files from being skipped by later incremental learning.
+
 ## [v0.7.2]
 
 ### Fixes
@@ -487,7 +502,7 @@ Initial public release of Skills Seed
 - `skills-seed patterns merge`
 - `skills-seed profile refresh`
 - `skills-seed hook install pre-commit`
-- `skills-seed view`
+- `skills-seed patterns show`
 
 ### Distribution
 

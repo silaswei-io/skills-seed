@@ -94,6 +94,7 @@ func (r *PatternRepository) Get(ctx context.Context, id string) (*domain.Pattern
 				if err := json.Unmarshal(data, &found); err != nil {
 					return err
 				}
+				found.NormalizeAfterLoad()
 				p = &found
 				return nil // 找到了
 			}
@@ -132,6 +133,7 @@ func (r *PatternRepository) GetAll(ctx context.Context) ([]domain.Pattern, error
 				if err := json.Unmarshal(v, &p); err != nil {
 					return err
 				}
+				p.NormalizeAfterLoad()
 				patterns = append(patterns, p)
 				return nil
 			})
@@ -162,6 +164,7 @@ func (r *PatternRepository) GetByCategory(ctx context.Context, category domain.C
 			if err := json.Unmarshal(v, &p); err != nil {
 				return err
 			}
+			p.NormalizeAfterLoad()
 			patterns = append(patterns, p)
 			return nil
 		})
@@ -196,7 +199,6 @@ func (r *PatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
 	if !p.IsValid() {
 		return fmt.Errorf("invalid pattern")
 	}
-	p.RefreshMetrics()
 
 	return r.db.Update(func(tx *bolt.Tx) error {
 		mainBucket := tx.Bucket(bucketPatterns)
@@ -207,6 +209,13 @@ func (r *PatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
 		if err != nil {
 			return fmt.Errorf("failed to create category bucket %s: %w", p.Category, err)
 		}
+
+		previous, err := findPatternInTx(mainBucket, p.ID)
+		if err != nil {
+			return err
+		}
+		p.RefreshMetrics()
+		p.NormalizeForSave(previous, time.Now())
 
 		// 在该分类的子bucket中保存模式
 		data, err := json.Marshal(p)
@@ -227,6 +236,9 @@ func (r *PatternRepository) RecordPatternHits(ctx context.Context, hits []domain
 			}
 			if hit.CreatedAt.IsZero() {
 				hit.CreatedAt = time.Now()
+			}
+			if hit.UpdatedAt.IsZero() {
+				hit.UpdatedAt = hit.CreatedAt
 			}
 			if hit.CheckRunID == "" {
 				hit.CheckRunID = fmt.Sprintf("check-%d", hit.CreatedAt.UnixNano())
@@ -306,6 +318,21 @@ func (r *PatternRepository) ImportReviewComments(ctx context.Context, comments [
 			if comment.ID == "" {
 				continue
 			}
+			previous := domain.ReviewComment{}
+			if data := bucket.Get([]byte(comment.ID)); data != nil {
+				if err := json.Unmarshal(data, &previous); err != nil {
+					return err
+				}
+			}
+			now := time.Now()
+			if comment.CreatedAt.IsZero() {
+				if !previous.CreatedAt.IsZero() {
+					comment.CreatedAt = previous.CreatedAt
+				} else {
+					comment.CreatedAt = now
+				}
+			}
+			comment.UpdatedAt = now
 			data, err := json.Marshal(comment)
 			if err != nil {
 				return err
@@ -516,25 +543,26 @@ func (r *PatternRepository) MarkCommitAnalyzed(ctx context.Context, commitHash s
 		metaBucket := tx.Bucket(bucketMetadata)
 
 		// 获取已存在的列表
-		var commits []string
-		data := metaBucket.Get(keyAnalyzedCommits)
-		if data != nil {
-			if err := json.Unmarshal(data, &commits); err != nil {
-				return err
-			}
+		records, err := readAnalyzedCommitRecords(metaBucket.Get(keyAnalyzedCommits))
+		if err != nil {
+			return err
 		}
-
 		// 添加新的commit（如果不存在）
-		for _, c := range commits {
-			if c == commitHash {
+		for _, record := range records {
+			if record.Hash == commitHash {
 				return nil // 已存在
 			}
 		}
 
-		commits = append(commits, commitHash)
+		now := time.Now()
+		records = append(records, domain.AnalyzedCommitRecord{
+			Hash:      commitHash,
+			CreatedAt: now,
+			UpdatedAt: now,
+		})
 
 		// 保存更新后的列表
-		updated, err := json.Marshal(commits)
+		updated, err := json.Marshal(records)
 		if err != nil {
 			return err
 		}
@@ -553,13 +581,13 @@ func (r *PatternRepository) IsCommitAnalyzed(ctx context.Context, commitHash str
 			return nil // 没有任何记录
 		}
 
-		var commits []string
-		if err := json.Unmarshal(data, &commits); err != nil {
+		records, err := readAnalyzedCommitRecords(data)
+		if err != nil {
 			return err
 		}
 
-		for _, c := range commits {
-			if c == commitHash {
+		for _, record := range records {
+			if record.Hash == commitHash {
 				analyzed = true
 				break
 			}
@@ -581,7 +609,16 @@ func (r *PatternRepository) GetAnalyzedCommits(ctx context.Context) ([]string, e
 			return nil
 		}
 
-		return json.Unmarshal(data, &commits)
+		records, err := readAnalyzedCommitRecords(data)
+		if err != nil {
+			return err
+		}
+		for _, record := range records {
+			if record.Hash != "" {
+				commits = append(commits, record.Hash)
+			}
+		}
+		return nil
 	})
 
 	return commits, err
@@ -640,11 +677,27 @@ func (r *PatternRepository) SaveAnalyzedFiles(ctx context.Context, records []dom
 		for _, record := range records {
 			scope := domain.FileAnalysisScope{ProjectID: record.ProjectID, ScopePath: record.ScopePath}
 			record.Path = filepath.ToSlash(filepath.Clean(record.Path))
+			key := []byte(scope.KeyForPath(record.Path))
+			previous := domain.FileAnalysisRecord{}
+			if data := bucket.Get(key); data != nil {
+				if err := json.Unmarshal(data, &previous); err != nil {
+					return err
+				}
+			}
+			now := time.Now()
+			if record.CreatedAt.IsZero() {
+				if !previous.CreatedAt.IsZero() {
+					record.CreatedAt = previous.CreatedAt
+				} else {
+					record.CreatedAt = now
+				}
+			}
+			record.UpdatedAt = now
 			data, err := json.Marshal(record)
 			if err != nil {
 				return err
 			}
-			if err := bucket.Put([]byte(scope.KeyForPath(record.Path)), data); err != nil {
+			if err := bucket.Put(key, data); err != nil {
 				return err
 			}
 		}
@@ -668,4 +721,55 @@ func (r *PatternRepository) DeleteAnalyzedFiles(ctx context.Context, scope domai
 // Close 关闭数据库
 func (r *PatternRepository) Close() error {
 	return r.db.Close()
+}
+
+func findPatternInTx(mainBucket *bolt.Bucket, id string) (*domain.Pattern, error) {
+	var found *domain.Pattern
+	err := mainBucket.ForEach(func(categoryKey, _ []byte) error {
+		categoryBucket := mainBucket.Bucket(categoryKey)
+		if categoryBucket == nil {
+			return nil
+		}
+		data := categoryBucket.Get([]byte(id))
+		if data == nil {
+			return nil
+		}
+		var pattern domain.Pattern
+		if err := json.Unmarshal(data, &pattern); err != nil {
+			return err
+		}
+		pattern.NormalizeAfterLoad()
+		found = &pattern
+		return nil
+	})
+	return found, err
+}
+
+func readAnalyzedCommitRecords(data []byte) ([]domain.AnalyzedCommitRecord, error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	var records []domain.AnalyzedCommitRecord
+	if err := json.Unmarshal(data, &records); err == nil && records != nil {
+		return records, nil
+	}
+
+	var hashes []string
+	if err := json.Unmarshal(data, &hashes); err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	records = make([]domain.AnalyzedCommitRecord, 0, len(hashes))
+	for _, hash := range hashes {
+		if hash == "" {
+			continue
+		}
+		records = append(records, domain.AnalyzedCommitRecord{
+			Hash:      hash,
+			CreatedAt: now,
+			UpdatedAt: now,
+		})
+	}
+	return records, nil
 }

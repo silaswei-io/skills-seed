@@ -614,24 +614,6 @@ other = "请先运行 'skills-seed init' 初始化项目"
 [AnalyzeLongDesc]
 other = "分析指定的文件或目录。\n\n此命令将：\n  • 分析指定的文件\n  • 使用 配置的 AI Agent 检查代码\n  • 不依赖 Git 状态\n\n适用于：\n  • 在暂存前分析文件\n  • 检查其他分支的文件\n  • 快速分析无需 Git 上下文\n\n示例：\n  # 分析单个文件\n  skills-seed analyze main.go\n\n  # 分析目录\n  skills-seed analyze src/\n\n  # 分析多个文件\n  skills-seed analyze *.go"
 
-[ViewShort]
-other = "查看学习内容"
-
-[ViewNotInitialized]
-other = "skills-seed 未初始化"
-
-[ViewRunInitFirst]
-other = "请先运行 'skills-seed init' 初始化项目"
-
-[ViewLongDesc]
-other = "查看 skills-seed 已学习并保存的内容。\n\n当前支持：\n  patterns  - 查看所有学到的 patterns，并可按分类过滤"
-
-[ViewFlagCategory]
-other = "按分类过滤: naming/error/structure/concurrency/testing/business/api/database/utils/middleware/config"
-
-[ViewExample]
-other = "  # 查看已学习 patterns\n  skills-seed view patterns\n\n  # 按分类过滤\n  skills-seed view patterns --category api"
-
 [ScanShort]
 other = "扫描并分析项目"
 
@@ -655,50 +637,6 @@ other = "找到 {{.Count}} 个文件"
 
 [ScanCompleted]
 other = "项目扫描完成"
-
-# 查看模式
-[ViewPatternsShort]
-other = "查看所有学到的模式"
-
-[ViewPatternsLong]
-other = "列出数据库中保存的 patterns，按分类分组显示名称、描述、置信度和频率。可使用 --category 只查看某一类。"
-
-[ViewPatternsExample]
-other = "  # 查看全部 patterns\n  skills-seed view patterns\n\n  # 只查看测试相关 patterns\n  skills-seed view patterns --category testing"
-
-[ViewNoPatterns]
-other = "还没有学习到任何模式。"
-
-[ViewPatternsTotal]
-other = "学到的模式 (共 {{.Count}} 个):"
-
-[ViewPatternConfidence]
-other = "   置信度: {{.Confidence}} | 频率: {{.Frequency}}"
-
-[ViewPatternDescription]
-other = "   描述: {{.Description}}"
-
-# 查看规则
-[ViewRulesShort]
-other = "查看所有生成的规则"
-
-[ViewRulesLong]
-other = "查看从模式生成的所有规则。"
-
-[ViewNoRules]
-other = "还没有生成任何规则。"
-
-[ViewRulesTotal]
-other = "生成的规则 (共 {{.Count}} 个):"
-
-[ViewRuleDescription]
-other = "   描述: {{.Description}}"
-
-[ViewRulePatterns]
-other = "   模式: {{.Count}}"
-
-[ViewFailed]
-other = "失败: {{.Error}}"
 
 # 分析
 [AnalyzeNoFiles]
@@ -936,10 +874,10 @@ other = "合并后模式数: {{.Count}}"
 other = "管理已学习的 patterns"
 
 [PatternsLongDesc]
-other = "管理已学习的代码模式。\n\n当前支持：\n  merge  - 调用当前 Agent 合并语义相近的 patterns，减少重复规则。\n\n合并前建议先运行 'skills-seed view patterns' 检查已有内容。"
+other = "管理已学习的代码模式。\n\n当前支持：\n  show   - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  merge  - 调用当前 Agent 合并语义相近的 patterns，减少重复规则。\n\n合并前建议先运行 'skills-seed patterns show' 检查已有内容。"
 
 [PatternsExample]
-other = "  # 合并所有分类中的相似 patterns\n  skills-seed patterns merge\n\n  # 只预览 business 分类合并效果\n  skills-seed patterns merge --category business --dry-run"
+other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  # 查看单条 pattern 详情\n  skills-seed patterns show business-create-order\n\n  # 合并所有分类中的相似 patterns\n  skills-seed patterns merge"
 
 [PatternsMergeShort]
 other = "合并相似 patterns"
@@ -1329,58 +1267,6 @@ other = "没有模式需要汇总"
 
 [LearnMergeCategoryComplete]
 other = "分类 {{.Category}} 汇总完成: 输入 {{.Input}} 个, 合并 {{.Merged}} 个, 保留 {{.Unchanged}} 个"
-
-# 查看分类
-[ViewCategoryBusiness]
-other = "业务逻辑模式"
-
-[ViewCategoryDatabase]
-other = "数据库操作模式"
-
-[ViewCategoryAPI]
-other = "API设计模式"
-
-[ViewCategoryNaming]
-other = "命名模式"
-
-[ViewCategoryError]
-other = "错误处理模式"
-
-[ViewCategoryStructure]
-other = "代码结构模式"
-
-[ViewCategoryConcurrency]
-other = "并发模式"
-
-[ViewCategoryTesting]
-other = "测试模式"
-
-[ViewCategoryUtils]
-other = "工具方法模式"
-
-[ViewCategoryMiddleware]
-other = "中间件模式"
-
-[ViewCategoryConfig]
-other = "配置管理模式"
-
-[ViewCategoryUnknown]
-other = "其他模式"
-
-[ViewCategoryPatternCount]
-other = "{{.Count}} 个模式, 平均置信度: {{.Confidence}}%"
-
-[ViewPatternFrequency]
-other = "置信度: {{.Confidence}}% | 频率: {{.Frequency}} 次"
-
-[ViewStatsSummary]
-other = "统计摘要:"
-
-[ViewStatsCategoryLine]
-other = "{{.Category}}: {{.Count}} 个"
-
-[ViewNoPatternsInCategory]
-other = "未找到分类为 '{{.Category}}' 的模式"
 
 # 生成服务
 [GeneratorNoPatterns]
@@ -1792,25 +1678,6 @@ other = "事件已发布（同步）"
 
 [LoggerEventStatsUpdated]
 other = "事件统计"
-
-# ==================== 查看命令 ====================
-[ViewSeparatorLine]
-other = "------------------------------------------------------------"
-
-[ViewDoubleLine]
-other = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-[ViewCategoryHeader]
-other = "{{.Category}} ({{.Count}} 个模式, 平均置信度: {{.Confidence}}%)"
-
-[ViewPatternName]
-other = "{{.Index}}. {{.Name}}"
-
-[ViewPatternDesc]
-other = "   {{.Description}}"
-
-[ViewRuleName]
-other = "{{.Index}}. {{.Name}} [{{.Category}}]"
 
 # 学习命令 - 子命令
 [LearnCurrentShort]

@@ -135,14 +135,13 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "patterns parent help", args: []string{"patterns"}, want: false},
 		{name: "patterns stats", args: []string{"patterns", "stats"}, want: true},
 		{name: "patterns merge", args: []string{"patterns", "merge"}, want: true},
+		{name: "patterns show", args: []string{"patterns", "show"}, want: true},
 		{name: "profile parent help", args: []string{"profile"}, want: false},
 		{name: "profile show", args: []string{"profile", "show"}, want: true},
 		{name: "profile refresh", args: []string{"profile", "refresh"}, want: true},
 		{name: "review parent help", args: []string{"review"}, want: false},
 		{name: "review import", args: []string{"review", "import", "--from-file", "comments.json"}, want: true},
 		{name: "review stats", args: []string{"review", "stats"}, want: true},
-		{name: "view parent help", args: []string{"view"}, want: false},
-		{name: "view patterns", args: []string{"view", "patterns"}, want: true},
 	}
 
 	for _, tt := range tests {
@@ -171,7 +170,6 @@ func TestNoArgCommandsRejectPositionalHelpArgument(t *testing.T) {
 		{"profile", "refresh"},
 		{"review", "import"},
 		{"review", "stats"},
-		{"view", "patterns"},
 		{"hook"},
 		{"hook", "install"},
 		{"hook", "uninstall"},

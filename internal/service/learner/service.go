@@ -92,7 +92,7 @@ func (s *LearnerService) marshalKnownPatterns(ctx context.Context) (string, int)
 }
 
 // savePattern 保存单个模式（自动查找相似模式并合并）
-func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, operation string) bool {
+func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, operation string) error {
 	newPattern := domain.NewPattern(p.ID, p.Name, p.Category)
 	newPattern.SetDescription(p.Description)
 	newPattern.SetExamples(p.GoodExample, p.BadExample)
@@ -122,7 +122,7 @@ func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, oper
 				"pattern_name", existing.Name,
 				"error", err,
 			)
-			return false
+			return fmt.Errorf("save merged pattern %q: %w", existing.Name, err)
 		}
 		logger.Diagnostic(i18n.Get("LoggerLearnerMergedPattern"),
 			"operation", operation,
@@ -137,7 +137,7 @@ func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, oper
 				"pattern_name", newPattern.Name,
 				"error", err,
 			)
-			return false
+			return fmt.Errorf("save pattern %q: %w", newPattern.Name, err)
 		}
 		logger.Diagnostic(i18n.Get("LoggerLearnerNewPattern"),
 			"operation", operation,
@@ -145,18 +145,25 @@ func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, oper
 		)
 	}
 
-	return true
+	return nil
 }
 
 // SavePatterns 保存多个模式，并通过已有相似模式自动合并
 func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pattern, operation string) int {
+	savedCount, _ := s.SavePatternsStrict(ctx, patterns, operation)
+	return savedCount
+}
+
+// SavePatternsStrict 保存多个模式，任何模式保存失败都会返回错误。
+func (s *LearnerService) SavePatternsStrict(ctx context.Context, patterns []domain.Pattern, operation string) (int, error) {
 	savedCount := 0
 	for _, p := range patterns {
-		if s.savePattern(ctx, p, operation) {
-			savedCount++
+		if err := s.savePattern(ctx, p, operation); err != nil {
+			return savedCount, err
 		}
+		savedCount++
 	}
-	return savedCount
+	return savedCount, nil
 }
 
 // KnownPatternsSnapshot 返回给当前代码学习使用的已知模式摘要。
@@ -399,7 +406,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 		// 6. 保存新模式
 		beforeSaveCount := patternsLearned
 		for _, p := range result.Patterns {
-			if s.savePattern(ctx, p, "learn") {
+			if err := s.savePattern(ctx, p, "learn"); err == nil {
 				patternsLearned++
 			}
 		}
@@ -505,7 +512,7 @@ func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInf
 	}
 
 	for _, p := range result.Patterns {
-		s.savePattern(ctx, p, "learn_from_commit")
+		_ = s.savePattern(ctx, p, "learn_from_commit")
 	}
 
 	return nil
@@ -546,7 +553,7 @@ func (s *LearnerService) LearnFromStaged(ctx context.Context, commitInfo domain.
 	}
 
 	for _, p := range result.Patterns {
-		s.savePattern(ctx, p, "learn_from_staged")
+		_ = s.savePattern(ctx, p, "learn_from_staged")
 	}
 
 	return nil

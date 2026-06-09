@@ -278,6 +278,32 @@ func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
 	require.Equal(t, []string{"main.go"}, profileFocus)
 }
 
+func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternSaveFails(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	cont.PatternRepo.Close()
+	cont.FileTracker = &mocks.MockFileAnalysisTracker{
+		ListAnalyzedFilesFn: func(ctx context.Context, scope domain.FileAnalysisScope) ([]domain.FileAnalysisRecord, error) {
+			return []domain.FileAnalysisRecord{}, nil
+		},
+		SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
+			t.Fatalf("file fingerprint should not be committed when pattern save fails: %#v", records)
+			return nil
+		},
+		DeleteAnalyzedFilesFn: func(ctx context.Context, scope domain.FileAnalysisScope, paths []string) error {
+			return nil
+		},
+	}
+
+	err := runLearnCurrent(cont, opts)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "save pattern")
+}
+
 func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
@@ -589,6 +615,7 @@ func TestRunLearnWorkspaceCurrentSuppressesChildNextSteps(t *testing.T) {
 
 	require.NotContains(t, output, "后续可执行:")
 	require.NotContains(t, output, "查看模式: skills-seed view patterns")
+	require.NotContains(t, output, "查看模式: skills-seed patterns show")
 }
 
 func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetailedLogs(t *testing.T) {

@@ -2,6 +2,7 @@ package boltdb
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	bolt "go.etcd.io/bbolt"
 )
 
 // setupTestDB 创建测试用的全新 PatternRepository。
@@ -71,6 +73,62 @@ func TestPatternRepository_SaveAndGet(t *testing.T) {
 	assert.WithinDuration(t, original.CreatedAt, got.CreatedAt, time.Second)
 }
 
+func TestPatternRepository_PreservesPatternCreatedAtOnUpdate(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	original := newTestPattern("p-001", "business service", domain.CategoryBusiness, 0.82)
+	original.CreatedAt = time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
+	original.UpdatedAt = original.CreatedAt
+	original.SetBusinessMethod(&domain.BusinessMethod{
+		Name:     "CreateOrder",
+		Location: "internal/service/order.go:42",
+		Type:     "domain",
+		Function: "func (s *Service) CreateOrder(ctx context.Context, req CreateOrderReq) error",
+	})
+	require.NoError(t, repo.Save(ctx, original))
+
+	saved, err := repo.Get(ctx, "p-001")
+	require.NoError(t, err)
+	createdAt := saved.CreatedAt
+	updatedAt := saved.UpdatedAt
+	require.False(t, createdAt.IsZero())
+	require.False(t, updatedAt.IsZero())
+	require.Equal(t, "internal/service/order.go:42", saved.BusinessMethod.CodeLocation.HistoricalLocation)
+	require.Equal(t, "internal/service/order.go:42", saved.BusinessMethod.CodeLocation.CurrentLocation)
+	require.Equal(t, domain.CodeLocationStatusUnknown, saved.BusinessMethod.CodeLocation.Status)
+	require.False(t, saved.BusinessMethod.CodeLocation.CreatedAt.IsZero())
+	require.False(t, saved.BusinessMethod.CodeLocation.UpdatedAt.IsZero())
+	locationCreatedAt := saved.BusinessMethod.CodeLocation.CreatedAt
+	locationUpdatedAt := saved.BusinessMethod.CodeLocation.UpdatedAt
+
+	time.Sleep(2 * time.Millisecond)
+	saved.Description = "Updated description with more evidence in internal/service/order.go."
+	require.NoError(t, repo.Save(ctx, saved))
+
+	updated, err := repo.Get(ctx, "p-001")
+	require.NoError(t, err)
+	require.True(t, updated.CreatedAt.Equal(createdAt), "CreatedAt should be stable across updates")
+	require.True(t, updated.UpdatedAt.After(updatedAt), "UpdatedAt should move forward on update")
+	require.True(t, updated.BusinessMethod.CodeLocation.CreatedAt.Equal(locationCreatedAt))
+	require.True(t, updated.BusinessMethod.CodeLocation.UpdatedAt.After(locationUpdatedAt))
+
+	replacement := newTestPattern("p-001", "business service", domain.CategoryBusiness, 0.88)
+	replacement.SetBusinessMethod(&domain.BusinessMethod{
+		Name:     "CreateOrder",
+		Location: "internal/service/order.go:84",
+		Type:     "domain",
+	})
+	require.NoError(t, repo.Save(ctx, replacement))
+
+	replaced, err := repo.Get(ctx, "p-001")
+	require.NoError(t, err)
+	require.True(t, replaced.CreatedAt.Equal(createdAt), "existing DB CreatedAt should win over NewPattern defaults")
+	require.True(t, replaced.BusinessMethod.CodeLocation.CreatedAt.Equal(locationCreatedAt))
+	require.Equal(t, "internal/service/order.go:42", replaced.BusinessMethod.CodeLocation.HistoricalLocation)
+	require.Equal(t, "internal/service/order.go:84", replaced.BusinessMethod.CodeLocation.CurrentLocation)
+}
+
 func TestPatternRepository_RecordPatternHitsAndStats(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -117,6 +175,38 @@ func TestPatternRepository_RecordPatternHitsAndStats(t *testing.T) {
 	assert.Equal(t, "p-002", stats[1].Pattern.ID)
 	assert.Equal(t, 0, stats[1].HitCount)
 	assert.True(t, stats[1].LastHitAt.IsZero())
+}
+
+func TestPatternRepository_RecordPatternHitsMaintainsTimestamps(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	require.NoError(t, repo.RecordPatternHits(ctx, []domain.PatternHit{
+		{
+			PatternID:  "p-001",
+			File:       "internal/service/checker/service.go",
+			Line:       81,
+			Severity:   domain.SeverityWarning,
+			Confidence: 0.82,
+		},
+	}))
+
+	var hits []domain.PatternHit
+	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketPatternHits)
+		return bucket.ForEach(func(k, v []byte) error {
+			var hit domain.PatternHit
+			if err := json.Unmarshal(v, &hit); err != nil {
+				return err
+			}
+			hits = append(hits, hit)
+			return nil
+		})
+	}))
+	require.Len(t, hits, 1)
+	require.False(t, hits[0].CreatedAt.IsZero())
+	require.False(t, hits[0].UpdatedAt.IsZero())
+	require.True(t, hits[0].UpdatedAt.Equal(hits[0].CreatedAt))
 }
 
 func TestPatternRepository_ImportReviewCommentsAndStats(t *testing.T) {
@@ -182,6 +272,33 @@ func TestPatternRepository_ImportReviewCommentsAndStats(t *testing.T) {
 	require.Len(t, stats.MatchedPatterns, 1)
 	assert.Equal(t, "p-error-wrap", stats.MatchedPatterns[0].PatternID)
 	assert.Equal(t, 1, stats.MatchedPatterns[0].CommentCount)
+}
+
+func TestPatternRepository_ImportReviewCommentsMaintainsTimestamps(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	require.NoError(t, repo.ImportReviewComments(ctx, []domain.ReviewComment{
+		{
+			ID:       "c-1",
+			Provider: "local",
+			File:     "internal/service/checker/service.go",
+			Line:     84,
+			Body:     "wrap checker errors",
+		},
+	}))
+
+	first := readReviewCommentForTest(t, repo, "c-1")
+	require.False(t, first.CreatedAt.IsZero())
+	require.False(t, first.UpdatedAt.IsZero())
+
+	time.Sleep(2 * time.Millisecond)
+	first.Body = "wrap checker errors with domain error"
+	require.NoError(t, repo.ImportReviewComments(ctx, []domain.ReviewComment{first}))
+
+	updated := readReviewCommentForTest(t, repo, "c-1")
+	require.True(t, updated.CreatedAt.Equal(first.CreatedAt))
+	require.True(t, updated.UpdatedAt.After(first.UpdatedAt))
 }
 
 func TestPatternRepository_Get_NotFound(t *testing.T) {
@@ -416,6 +533,23 @@ func TestPatternRepository_CommitTracking(t *testing.T) {
 	assert.Len(t, commits, 2) // 仍为 2，不应变成 3
 }
 
+func TestPatternRepository_MarkCommitAnalyzedStoresTimestampedRecords(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	require.NoError(t, repo.MarkCommitAnalyzed(ctx, "abc123"))
+
+	var records []domain.AnalyzedCommitRecord
+	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
+		data := tx.Bucket(bucketMetadata).Get(keyAnalyzedCommits)
+		return json.Unmarshal(data, &records)
+	}))
+	require.Len(t, records, 1)
+	require.Equal(t, "abc123", records[0].Hash)
+	require.False(t, records[0].CreatedAt.IsZero())
+	require.False(t, records[0].UpdatedAt.IsZero())
+}
+
 func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -452,6 +586,47 @@ func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 	assert.Nil(t, got)
 }
 
+func TestPatternRepository_SaveAnalyzedFilesMaintainsTimestamps(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+	scope := domain.FileAnalysisScope{ProjectID: "backend", ScopePath: "backend"}
+
+	require.NoError(t, repo.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{
+		{
+			ProjectID:     "backend",
+			ScopePath:     "backend",
+			Path:          "internal/app.go",
+			Hash:          "abc",
+			HashAlgorithm: domain.FileAnalysisHashMD5,
+			Source:        domain.FileAnalysisSourceCurrentCode,
+		},
+	}))
+
+	first, err := repo.GetAnalyzedFile(ctx, scope, "internal/app.go")
+	require.NoError(t, err)
+	require.NotNil(t, first)
+	require.False(t, first.CreatedAt.IsZero())
+	require.False(t, first.UpdatedAt.IsZero())
+
+	time.Sleep(2 * time.Millisecond)
+	require.NoError(t, repo.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{
+		{
+			ProjectID:     "backend",
+			ScopePath:     "backend",
+			Path:          "internal/app.go",
+			Hash:          "def",
+			HashAlgorithm: domain.FileAnalysisHashMD5,
+			Source:        domain.FileAnalysisSourceCurrentCode,
+		},
+	}))
+
+	updated, err := repo.GetAnalyzedFile(ctx, scope, "internal/app.go")
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.True(t, updated.CreatedAt.Equal(first.CreatedAt))
+	require.True(t, updated.UpdatedAt.After(first.UpdatedAt))
+}
+
 func TestPatternRepository_FileAnalysisTrackingScopesRecords(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -470,4 +645,15 @@ func TestPatternRepository_FileAnalysisTrackingScopesRecords(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, frontend)
 	assert.Equal(t, "frontend", frontend.Hash)
+}
+
+func readReviewCommentForTest(t *testing.T, repo *PatternRepository, id string) domain.ReviewComment {
+	t.Helper()
+
+	var comment domain.ReviewComment
+	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
+		data := tx.Bucket(bucketReviewComments).Get([]byte(id))
+		return json.Unmarshal(data, &comment)
+	}))
+	return comment
 }

@@ -295,7 +295,7 @@ references/
 
 #### 命令概述
 
-管理已学习的 patterns。支持添加用户自定义模式、合并语义相近的 patterns、查看模式质量和 check 命中统计。
+管理已学习的 patterns。支持添加用户自定义模式、合并语义相近的 patterns、查看 DB 字段、模式质量和 check 命中统计。
 
 #### 命令形式
 
@@ -304,6 +304,7 @@ references/
 | `skills-seed patterns add <描述>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add "API 路由使用 RESTful 风格" --category api` | 会调用 AI Agent |
 | `skills-seed patterns merge` | 调用当前 Agent 合并相似 patterns | `skills-seed patterns merge --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
 | `skills-seed patterns stats` | 查看模式质量和 check 命中统计 | `skills-seed patterns stats` | 不调用 AI Agent，不修改数据库 |
+| `skills-seed patterns show [pattern-id]` | 查看 pattern 的 DB 字段、时间和代码位置元数据 | `skills-seed patterns show business-create-order --format json` | 不调用 AI Agent，不修改数据库 |
 
 #### `patterns` 参数
 
@@ -334,6 +335,13 @@ references/
 |---|---:|---|
 | `--help`, `-h` | `false` | 查看 `patterns stats` 帮助 |
 
+#### `patterns show` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--format` | `table` | 输出格式：`table` 或 `json` |
+| `--help`, `-h` | `false` | 查看 `patterns show` 帮助 |
+
 #### 常用示例
 
 ```bash
@@ -344,6 +352,8 @@ skills-seed patterns merge
 skills-seed patterns merge --category api
 skills-seed patterns merge --category business --dry-run
 skills-seed patterns stats
+skills-seed patterns show
+skills-seed patterns show business-create-order --format json
 ```
 
 #### 注意事项
@@ -351,6 +361,7 @@ skills-seed patterns stats
 1. 合并会调用当前 `agent.engine` 对应的 CLI。
 2. 不确定合并结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
+4. `patterns show` 读取 DB 中已保存字段，可用于排查 `created_at/updated_at`、代码位置状态和语言无关符号快照。
 
 ### `skills-seed review`
 
@@ -452,43 +463,6 @@ skills-seed profile refresh --language go
 
 1. `profile show` 适合快速确认当前画像内容。
 2. `profile refresh` 会覆盖现有项目画像，但不会执行 patterns 学习。
-
-### `skills-seed view`
-
-#### 命令概述
-
-查看 `.skills-seed` 中已学习或生成的内容。目前主要用于查看已学习 patterns。
-
-#### 命令形式
-
-| 命令形式 | 说明 | 常用示例 | 注意事项 |
-|---|---|---|---|
-| `skills-seed view patterns` | 按分类查看已学习 patterns | `skills-seed view patterns --category testing` | 不修改数据库 |
-
-#### `view` 参数
-
-| 参数 | 默认值 | 说明 |
-|---|---:|---|
-| `--help`, `-h` | `false` | 查看 `view` 帮助 |
-
-#### `view patterns` 参数
-
-| 参数 | 默认值 | 说明 |
-|---|---:|---|
-| `--category`, `-c` | 空 | 按分类过滤：`naming`、`error`、`structure`、`concurrency`、`testing`、`business`、`api`、`database`、`utils`、`middleware`、`config` |
-| `--help`, `-h` | `false` | 查看 `view patterns` 帮助 |
-
-#### 常用示例
-
-```bash
-skills-seed view patterns
-skills-seed view patterns --category testing
-```
-
-#### 注意事项
-
-1. 不指定 `--category` 时显示全部分类。
-2. 该命令只读，不会触发学习、合并或生成。
 
 ### `skills-seed sync`
 

@@ -274,6 +274,42 @@ func TestPattern_SetBusinessMethod(t *testing.T) {
 	assert.True(t, p.UpdatedAt.After(beforeUpdate), "UpdatedAt should be updated")
 }
 
+func TestBusinessMethod_NormalizeCodeLocationPreservesLanguageAgnosticSnapshot(t *testing.T) {
+	now := time.Date(2026, 6, 9, 10, 0, 0, 0, time.UTC)
+	method := &BusinessMethod{
+		Name:     "CreateOrder",
+		Location: "service/order.ts:20",
+		CodeLocation: CodeLocation{
+			Status: CodeLocationStatusChanged,
+			ChangeKinds: []CodeLocationChangeKind{
+				CodeLocationChangeMoved,
+				CodeLocationChangeInputsChanged,
+			},
+			Snapshot: &SymbolSnapshot{
+				Language:      "typescript",
+				Kind:          "method",
+				Namespace:     "OrderService",
+				Name:          "createOrder",
+				SignatureHash: "sig-v2",
+				InputTypes:    []string{"CreateOrderRequestV2"},
+				InputHashes:   []string{"req-v2"},
+				OutputTypes:   []string{"Promise<Order>"},
+			},
+		},
+	}
+
+	method.NormalizeCodeLocation(nil, now)
+
+	assert.Equal(t, "service/order.ts:20", method.CodeLocation.HistoricalLocation)
+	assert.Equal(t, "service/order.ts:20", method.CodeLocation.CurrentLocation)
+	assert.Equal(t, CodeLocationStatusChanged, method.CodeLocation.Status)
+	assert.Equal(t, []CodeLocationChangeKind{CodeLocationChangeMoved, CodeLocationChangeInputsChanged}, method.CodeLocation.ChangeKinds)
+	assert.Equal(t, "typescript", method.CodeLocation.Snapshot.Language)
+	assert.Equal(t, []string{"CreateOrderRequestV2"}, method.CodeLocation.Snapshot.InputTypes)
+	assert.False(t, method.CodeLocation.CreatedAt.IsZero())
+	assert.False(t, method.CodeLocation.UpdatedAt.IsZero())
+}
+
 func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *testing.T) {
 	specific := NewPattern("generator-write-output", "生成器写入技能输出", CategoryBusiness)
 	specific.Confidence = 0.8

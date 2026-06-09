@@ -773,6 +773,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(businessMethods), "IssueCertificate")
 	assert.Contains(t, string(businessMethods), "func (s *Service) IssueCertificate(ctx context.Context, req *IssueRequest) error")
+	assert.Contains(t, string(businessMethods), "./patterns/business.md")
 
 	modules, err := os.ReadFile(filepath.Join(tmpDir, "references", "modules.md"))
 	require.NoError(t, err)
@@ -783,6 +784,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(commonUtils), "NormalizeSerial")
 	assert.Contains(t, string(commonUtils), "func NormalizeSerial(serial string) string")
+	assert.NotContains(t, string(commonUtils), "./patterns/utils.md")
 
 	skill, err := os.ReadFile(filepath.Join(tmpDir, "SKILL.md"))
 	require.NoError(t, err)

@@ -2,11 +2,17 @@
 
 This file documents complex business logic methods extracted into the project profile. Check it before changing business flows, reusing domain behavior, or generating new business code
 
+{{if .HasBusinessPatterns}}Related business rules: [Business Patterns](./patterns/business.md)
+{{end}}
+
 {{if .BusinessMethods}}
 {{range .BusinessMethods}}{{if .Name}}
 ## {{.Name}}
 
-- **Location**: `{{.Location}}`
+- **Current Location**: `{{.DisplayLocation}}`
+{{if .LocationStatus}}- **Location Status**: `{{.LocationStatus}}`
+{{end}}{{if .HistoricalDisplayLocation}}- **Historical Location**: `{{.HistoricalDisplayLocation}}`
+{{end}}
 {{if .Type}}- **Type**: {{.Type}}{{end}}
 - **Function**: {{.Description}}
 {{if .Function}}

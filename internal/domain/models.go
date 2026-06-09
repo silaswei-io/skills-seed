@@ -54,16 +54,83 @@ const (
 	SourceInit           Source = "init"            // 从初始代码库分析
 )
 
+// CodeLocationStatus 表示一段代码位置元数据的当前可信状态。
+type CodeLocationStatus string
+
+const (
+	CodeLocationStatusUnknown   CodeLocationStatus = "unknown"
+	CodeLocationStatusValid     CodeLocationStatus = "valid"
+	CodeLocationStatusMoved     CodeLocationStatus = "moved"
+	CodeLocationStatusChanged   CodeLocationStatus = "changed"
+	CodeLocationStatusMissing   CodeLocationStatus = "missing"
+	CodeLocationStatusAmbiguous CodeLocationStatus = "ambiguous"
+)
+
+// CodeLocationChangeKind 表示位置刷新时识别出的变化类型。
+type CodeLocationChangeKind string
+
+const (
+	CodeLocationChangeMoved               CodeLocationChangeKind = "moved"
+	CodeLocationChangeSignatureChanged    CodeLocationChangeKind = "signature_changed"
+	CodeLocationChangeInputsChanged       CodeLocationChangeKind = "inputs_changed"
+	CodeLocationChangeOutputsChanged      CodeLocationChangeKind = "outputs_changed"
+	CodeLocationChangeBodyChanged         CodeLocationChangeKind = "body_changed"
+	CodeLocationChangeDependenciesChanged CodeLocationChangeKind = "dependencies_changed"
+)
+
+// SymbolSnapshot 保存语言无关的代码符号快照。
+// tree-sitter 刷新位置时可以把 Go/TS/Python/Java 等语言的符号统一写入这些字段。
+type SymbolSnapshot struct {
+	Language          string   `json:"language,omitempty"`
+	Kind              string   `json:"kind,omitempty"`
+	Namespace         string   `json:"namespace,omitempty"`
+	Receiver          string   `json:"receiver,omitempty"`
+	Name              string   `json:"name,omitempty"`
+	Signature         string   `json:"signature,omitempty"`
+	SignatureHash     string   `json:"signature_hash,omitempty"`
+	InputTypes        []string `json:"input_types,omitempty"`
+	InputHashes       []string `json:"input_hashes,omitempty"`
+	OutputTypes       []string `json:"output_types,omitempty"`
+	OutputHashes      []string `json:"output_hashes,omitempty"`
+	BodyHash          string   `json:"body_hash,omitempty"`
+	DependencySymbols []string `json:"dependency_symbols,omitempty"`
+}
+
+// CodeLocationHistory 保存一次位置或快照变化记录。
+type CodeLocationHistory struct {
+	Location    string                   `json:"location,omitempty"`
+	Status      CodeLocationStatus       `json:"status,omitempty"`
+	ChangeKinds []CodeLocationChangeKind `json:"change_kinds,omitempty"`
+	Snapshot    *SymbolSnapshot          `json:"snapshot,omitempty"`
+	ChangedAt   time.Time                `json:"changed_at,omitempty"`
+	Note        string                   `json:"note,omitempty"`
+}
+
+// CodeLocation 保存业务方法或工具函数的可维护代码位置元数据。
+type CodeLocation struct {
+	HistoricalLocation string                   `json:"historical_location,omitempty"`
+	CurrentLocation    string                   `json:"current_location,omitempty"`
+	Status             CodeLocationStatus       `json:"status,omitempty"`
+	ChangeKinds        []CodeLocationChangeKind `json:"change_kinds,omitempty"`
+	Confidence         float64                  `json:"confidence,omitempty"`
+	VerifiedAt         time.Time                `json:"verified_at,omitempty"`
+	CreatedAt          time.Time                `json:"created_at,omitempty"`
+	UpdatedAt          time.Time                `json:"updated_at,omitempty"`
+	Snapshot           *SymbolSnapshot          `json:"snapshot,omitempty"`
+	History            []CodeLocationHistory    `json:"history,omitempty"`
+}
+
 // BusinessMethod 业务方法信息
 type BusinessMethod struct {
-	Name          string // 方法名称（如 GenerateUUID, CallUserRPC）
-	Location      string // 方法位置（如 internal/utils/uuid.go:15）
-	Description   string // 功能说明（1-2句话）
-	Usage         string // 使用场景（何时使用）
-	Type          string // 方法类型：domain（领域特定）| common（通用）
-	Function      string // 完整的方法签名（如 func (s *Service) Method(ctx, req) (resp, error)）
-	Prerequisites string // 调用前需要的设置或依赖（如 context, 已初始化的 service）
-	Returns       string // 返回值说明（包括可能的错误情况）
+	Name          string       // 方法名称（如 GenerateUUID, CallUserRPC）
+	Location      string       // 兼容旧数据的当前位置（如 internal/utils/uuid.go:15）
+	CodeLocation  CodeLocation `json:"code_location,omitempty"` // 可维护的位置元数据
+	Description   string       // 功能说明（1-2句话）
+	Usage         string       // 使用场景（何时使用）
+	Type          string       // 方法类型：domain（领域特定）| common（通用）
+	Function      string       // 完整的方法签名（如 func (s *Service) Method(ctx, req) (resp, error)）
+	Prerequisites string       // 调用前需要的设置或依赖（如 context, 已初始化的 service）
+	Returns       string       // 返回值说明（包括可能的错误情况）
 }
 
 // PatternMetrics 描述一条模式的质量和可排序性。
@@ -94,8 +161,8 @@ type Pattern struct {
 	ProjectID      string          `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
 	ScopePath      string          `json:"scope_path,omitempty"`     // workspace 模式下的路径范围
 	WorkspaceRole  string          `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
-	CreatedAt      time.Time
-	UpdatedAt      time.Time // 最后更新时间
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"` // 最后更新时间
 }
 
 // NewPattern 创建新的模式
@@ -121,6 +188,141 @@ func (p *Pattern) SetBusinessMethod(method *BusinessMethod) {
 	p.BusinessMethod = method
 	p.UpdatedAt = time.Now()
 	p.RefreshMetrics()
+}
+
+// NormalizeForSave 补齐持久化时需要稳定保存的字段。
+func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
+	if previous != nil && !previous.CreatedAt.IsZero() {
+		p.CreatedAt = previous.CreatedAt
+	} else if p.CreatedAt.IsZero() {
+		p.CreatedAt = now
+	}
+	p.UpdatedAt = now
+	if p.BusinessMethod != nil {
+		var previousMethod *BusinessMethod
+		if previous != nil {
+			previousMethod = previous.BusinessMethod
+		}
+		p.BusinessMethod.NormalizeCodeLocation(previousMethod, now)
+	}
+}
+
+// NormalizeAfterLoad 补齐旧 DB 记录缺失的派生字段，不改变更新时间。
+func (p *Pattern) NormalizeAfterLoad() {
+	if p.BusinessMethod != nil {
+		p.BusinessMethod.NormalizeCodeLocationAfterLoad()
+	}
+}
+
+// NormalizeCodeLocationAfterLoad 兼容只有 Location 的旧业务方法记录。
+func (m *BusinessMethod) NormalizeCodeLocationAfterLoad() {
+	if m == nil {
+		return
+	}
+	location := strings.TrimSpace(m.Location)
+	if location == "" {
+		location = strings.TrimSpace(m.CodeLocation.CurrentLocation)
+	}
+	if location == "" {
+		location = strings.TrimSpace(m.CodeLocation.HistoricalLocation)
+	}
+	if m.CodeLocation.HistoricalLocation == "" {
+		m.CodeLocation.HistoricalLocation = location
+	}
+	if m.CodeLocation.CurrentLocation == "" {
+		m.CodeLocation.CurrentLocation = location
+	}
+	if m.CodeLocation.Status == "" && location != "" {
+		m.CodeLocation.Status = CodeLocationStatusUnknown
+	}
+	if m.Location == "" {
+		m.Location = m.CodeLocation.CurrentLocation
+	}
+}
+
+// NormalizeCodeLocation 将旧 Location 字段和新 code_location 字段保持兼容。
+func (m *BusinessMethod) NormalizeCodeLocation(previous *BusinessMethod, now time.Time) {
+	if m == nil {
+		return
+	}
+
+	previousLocation := CodeLocation{}
+	if previous != nil {
+		previousLocation = previous.CodeLocation
+	}
+
+	location := strings.TrimSpace(m.Location)
+	if location == "" {
+		location = strings.TrimSpace(m.CodeLocation.CurrentLocation)
+	}
+	if location == "" {
+		location = strings.TrimSpace(m.CodeLocation.HistoricalLocation)
+	}
+	if location == "" && previous != nil {
+		location = strings.TrimSpace(previous.Location)
+	}
+	if location == "" {
+		location = strings.TrimSpace(previousLocation.CurrentLocation)
+	}
+
+	if m.CodeLocation.HistoricalLocation == "" {
+		if previousLocation.HistoricalLocation != "" {
+			m.CodeLocation.HistoricalLocation = previousLocation.HistoricalLocation
+		} else {
+			m.CodeLocation.HistoricalLocation = location
+		}
+	}
+	if m.CodeLocation.CurrentLocation == "" {
+		m.CodeLocation.CurrentLocation = location
+	}
+	if m.CodeLocation.Status == "" {
+		if previousLocation.Status != "" {
+			m.CodeLocation.Status = previousLocation.Status
+		} else {
+			m.CodeLocation.Status = CodeLocationStatusUnknown
+		}
+	}
+	if !previousLocation.CreatedAt.IsZero() {
+		m.CodeLocation.CreatedAt = previousLocation.CreatedAt
+	} else if m.CodeLocation.CreatedAt.IsZero() {
+		m.CodeLocation.CreatedAt = now
+	}
+	m.CodeLocation.UpdatedAt = now
+
+	if m.CodeLocation.CurrentLocation != "" {
+		m.Location = m.CodeLocation.CurrentLocation
+	}
+}
+
+// DisplayLocation 返回模板和命令展示时优先使用的当前位置。
+func (m BusinessMethod) DisplayLocation() string {
+	if m.CodeLocation.CurrentLocation != "" {
+		return m.CodeLocation.CurrentLocation
+	}
+	if m.Location != "" {
+		return m.Location
+	}
+	return m.CodeLocation.HistoricalLocation
+}
+
+// HistoricalDisplayLocation 返回与当前位置不同的历史位置。
+func (m BusinessMethod) HistoricalDisplayLocation() string {
+	historical := m.CodeLocation.HistoricalLocation
+	if historical == "" || historical == m.DisplayLocation() {
+		return ""
+	}
+	return historical
+}
+
+// LocationStatus 返回位置状态字符串。
+func (m BusinessMethod) LocationStatus() string {
+	if m.CodeLocation.Status != "" {
+		return string(m.CodeLocation.Status)
+	}
+	if m.DisplayLocation() != "" {
+		return string(CodeLocationStatusUnknown)
+	}
+	return ""
 }
 
 // IsValid 验证模式是否有效
@@ -334,7 +536,8 @@ type PatternHit struct {
 	Severity   Severity
 	Confidence float64
 	CheckRunID string
-	CreatedAt  time.Time
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // PatternHitStats 表示模式质量指标与 check 命中统计的聚合视图。
@@ -356,6 +559,14 @@ type ReviewComment struct {
 	Body      string    `json:"body"`
 	Resolved  bool      `json:"resolved"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AnalyzedCommitRecord 保存 learn history 已分析提交的持久化记录。
+type AnalyzedCommitRecord struct {
+	Hash      string    `json:"hash"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ReviewMatchedPatternStats 表示评审评论命中的模式统计。

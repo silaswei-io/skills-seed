@@ -614,24 +614,6 @@ other = "Please run 'skills-seed init' first"
 [AnalyzeLongDesc]
 other = "Analyze specified files or directories.\n\nThis command will:\n  • Analyze specified files\n  • Check code using configured AI agent\n  • Not depend on Git status\n\nUseful for:\n  • Analyzing files before staging\n  • Checking files in different branches\n  • Quick analysis without Git context\n\nExamples:\n  # Analyze single file\n  skills-seed analyze main.go\n\n  # Analyze directory\n  skills-seed analyze src/\n\n  # Analyze multiple files\n  skills-seed analyze *.go"
 
-[ViewShort]
-other = "View learned content"
-
-[ViewNotInitialized]
-other = "skills-seed not initialized"
-
-[ViewRunInitFirst]
-other = "Please run 'skills-seed init' first"
-
-[ViewLongDesc]
-other = "View content learned and stored by skills-seed.\n\nCurrently supported:\n  patterns  - View all learned patterns, optionally filtered by category"
-
-[ViewFlagCategory]
-other = "Filter by category: naming/error/structure/concurrency/testing/business/api/database/utils/middleware/config"
-
-[ViewExample]
-other = "  # View learned patterns\n  skills-seed view patterns\n\n  # Filter by category\n  skills-seed view patterns --category api"
-
 [ScanShort]
 other = "Scan and analyze project"
 
@@ -655,50 +637,6 @@ other = "Found {{.Count}} files"
 
 [ScanCompleted]
 other = "Project scan completed"
-
-# 查看模式
-[ViewPatternsShort]
-other = "View all learned patterns"
-
-[ViewPatternsLong]
-other = "List patterns stored in the database, grouped by category, including name, description, confidence, and frequency. Use --category to show only one category."
-
-[ViewPatternsExample]
-other = "  # View all patterns\n  skills-seed view patterns\n\n  # View only testing patterns\n  skills-seed view patterns --category testing"
-
-[ViewNoPatterns]
-other = "No patterns learned yet."
-
-[ViewPatternsTotal]
-other = "Learned patterns ({{.Count}} total):"
-
-[ViewPatternConfidence]
-other = "   Confidence: {{.Confidence}} | Frequency: {{.Frequency}}"
-
-[ViewPatternDescription]
-other = "   Description: {{.Description}}"
-
-# 查看规则
-[ViewRulesShort]
-other = "View all generated rules"
-
-[ViewRulesLong]
-other = "View all generated rules from patterns."
-
-[ViewNoRules]
-other = "No rules generated yet."
-
-[ViewRulesTotal]
-other = "Generated rules ({{.Count}} total):"
-
-[ViewRuleDescription]
-other = "   Description: {{.Description}}"
-
-[ViewRulePatterns]
-other = "   Patterns: {{.Count}}"
-
-[ViewFailed]
-other = "Failed: {{.Error}}"
 
 # 分析
 [AnalyzeNoFiles]
@@ -936,10 +874,10 @@ other = "Merged pattern count: {{.Count}}"
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns.\n\nCurrently supported:\n  merge  - Ask the current agent to merge semantically similar patterns and reduce duplicate rules.\n\nBefore merging, consider running 'skills-seed view patterns' to inspect existing content."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  show   - Show database fields, timestamps, and code-location metadata for patterns\n  merge  - Ask the current agent to merge semantically similar patterns and reduce duplicate rules.\n\nBefore merging, consider running 'skills-seed patterns show' to inspect existing content."
 
 [PatternsExample]
-other = "  # Merge similar patterns in all categories\n  skills-seed patterns merge\n\n  # Preview merging only the business category\n  skills-seed patterns merge --category business --dry-run"
+other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Merge similar patterns in all categories\n  skills-seed patterns merge"
 
 [PatternsMergeShort]
 other = "Merge similar patterns"
@@ -1328,58 +1266,6 @@ other = "No patterns to merge"
 
 [LearnMergeCategoryComplete]
 other = "Category {{.Category}} merge complete: {{.Input}} input, {{.Merged}} merged, {{.Unchanged}} unchanged"
-
-# 查看分类
-[ViewCategoryBusiness]
-other = "Business Logic Patterns"
-
-[ViewCategoryDatabase]
-other = "Database Operation Patterns"
-
-[ViewCategoryAPI]
-other = "API Design Patterns"
-
-[ViewCategoryNaming]
-other = "Naming Patterns"
-
-[ViewCategoryError]
-other = "Error Handling Patterns"
-
-[ViewCategoryStructure]
-other = "Code Structure Patterns"
-
-[ViewCategoryConcurrency]
-other = "Concurrency Patterns"
-
-[ViewCategoryTesting]
-other = "Testing Patterns"
-
-[ViewCategoryUtils]
-other = "Utility Method Patterns"
-
-[ViewCategoryMiddleware]
-other = "Middleware Patterns"
-
-[ViewCategoryConfig]
-other = "Configuration Management Patterns"
-
-[ViewCategoryUnknown]
-other = "Other Patterns"
-
-[ViewCategoryPatternCount]
-other = "{{.Count}} patterns, avg confidence: {{.Confidence}}%"
-
-[ViewPatternFrequency]
-other = "Confidence: {{.Confidence}}% | Frequency: {{.Frequency}} times"
-
-[ViewStatsSummary]
-other = "Statistics Summary:"
-
-[ViewStatsCategoryLine]
-other = "{{.Category}}: {{.Count}} patterns"
-
-[ViewNoPatternsInCategory]
-other = "No patterns found for category '{{.Category}}'"
 
 # 生成服务
 [GeneratorNoPatterns]
@@ -1791,25 +1677,6 @@ other = "Event published synchronously"
 
 [LoggerEventStatsUpdated]
 other = "Event statistics updated"
-
-# ==================== 查看命令 ====================
-[ViewSeparatorLine]
-other = "------------------------------------------------------------"
-
-[ViewDoubleLine]
-other = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-[ViewCategoryHeader]
-other = "{{.Category}} ({{.Count}} patterns, avg confidence: {{.Confidence}}%)"
-
-[ViewPatternName]
-other = "{{.Index}}. {{.Name}}"
-
-[ViewPatternDesc]
-other = "   {{.Description}}"
-
-[ViewRuleName]
-other = "{{.Index}}. {{.Name}} [{{.Category}}]"
 
 # ==================== 学习子命令 ====================
 [LearnCurrentShort]

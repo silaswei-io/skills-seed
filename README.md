@@ -98,6 +98,8 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.7.2 起，项目画像分析会对模型输出中对象数组里的重复对象起始片段做窄范围 JSON 恢复；如果仍无法解析，会返回错误并保留已有画像，不再把 `unknown/解析失败` 占位画像当作成功结果保存。
 
+0.7.3 起，当前代码学习会在 pattern 保存成功后才提交文件分析指纹，避免保存失败的文件在后续增量学习中被误判为已学习。Pattern、文件指纹、命中和评审评论记录会维护 `created_at/updated_at`，业务方法代码位置会以语言无关的快照元数据保存到 DB，并可通过 `patterns show` 查看。
+
 常见目录：
 
 ```text
@@ -234,6 +236,7 @@ skills:
 | `skills-seed sync` | 一键执行学习/添加模式、合并和生成 skills |
 | `skills-seed check` | 检查暂存区或 Git 跟踪文件 |
 | `skills-seed patterns stats` | 查看模式质量、命中次数和最近命中 |
+| `skills-seed patterns show` | 查看 DB 中的 pattern 时间和代码位置字段 |
 | `skills-seed review import --from-file` | 导入本地评审评论 |
 | `skills-seed hook install` | 安装本地 pre-commit hook |
 

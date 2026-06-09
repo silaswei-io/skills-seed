@@ -24,6 +24,12 @@ type projectOverviewTemplateData struct {
 	OverviewReferences []skills.ReferenceItem
 }
 
+type profileReferenceTemplateData struct {
+	domain.ProjectProfile
+	HasBusinessPatterns bool
+	HasUtilityPatterns  bool
+}
+
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
 }

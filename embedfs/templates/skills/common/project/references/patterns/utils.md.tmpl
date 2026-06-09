@@ -40,33 +40,6 @@
 ```
 {{end}}
 
-{{if .BusinessMethod}}
-#### 📦 工具方法详情
-
-| 字段 | 值 |
-|-----|-----|
-| **方法** | `{{.BusinessMethod.Name}}` |
-| **位置** | `{{.BusinessMethod.Location}}` |
-| **类型** | {{if eq .BusinessMethod.Type "domain"}}🔒 项目特定{{else if eq .BusinessMethod.Type "common"}}🌐 可复用{{else}}{{.BusinessMethod.Type}}{{end}} |
-
-**描述**: {{.BusinessMethod.Description}}
-
-**方法签名**
-```go
-{{.BusinessMethod.Function}}
-```
-
-{{if .BusinessMethod.Prerequisites}}
-**前置条件**: {{.BusinessMethod.Prerequisites}}
-{{end}}
-
-{{if .BusinessMethod.Returns}}
-**返回值**: {{.BusinessMethod.Returns}}
-{{end}}
-
-**用法**: {{.BusinessMethod.Usage}}
-{{end}}
-
 ---
 
 {{end}}
