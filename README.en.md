@@ -96,6 +96,8 @@ When an AI Agent hits retryable errors such as 429 / 529 / overloaded, Skills Se
 
 Starting in 0.7.1, generated metadata, empty scaffolding, and unfilled placeholder text in default prompt files are filtered during rendering. Only user-authored constraints enter the Agent input. Each rendered prompt is saved under `.skills-seed/memory/runtime/rendered-prompts/`; the neighboring `.manifest.json` records whether base, project, workspace, and instruction fragments were included and their lengths, making context provenance easier to debug.
 
+Starting in 0.7.2, project-profile analysis performs a narrow JSON recovery for duplicated object-start fragments inside object arrays in model output. If parsing still fails, it returns an error and keeps the existing profile instead of saving an `unknown/parse failed` placeholder as a successful result.
+
 Common layout:
 
 ```text

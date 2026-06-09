@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.7.2]
+
+### Fixes
+
+- Fixed project-profile JSON parsing when `AnalyzeProject` output contains an occasional duplicated object-start fragment inside object arrays, covering malformed model output such as `{"{"name": ...`.
+- Fixed `AnalyzeProject` parse failures being converted into a successful `unknown/parse failed` fallback profile. Parse failures now return errors so existing valid profiles are not overwritten.
+- Fixed misleading `learn current` output that could report “project profile saved” even when the saved profile was only a parse-failure placeholder.
+
+### Documentation
+
+- Updated README and changelog notes for 0.7.2 project-profile JSON recovery and parse-failure protection.
+
 ## [v0.7.1]
 
 ### Features

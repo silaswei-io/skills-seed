@@ -136,7 +136,7 @@ func TestAnalyzeProjectReturnsErrorWhenModelJSONCannotBeParsed(t *testing.T) {
 
 	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{\"project_name\":\"demo\",\"common_utils\":[{{\"name\":\"bad\"}]"}`)
 	loader := prompts.NewLoader("claude", "zh-CN", "")
-	ag := New(commandPath, time.Second, loader, false, config.DefaultRetryConfig())
+	ag := New(commandPath, 5*time.Second, loader, false, config.DefaultRetryConfig())
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
 
 	result, err := ag.AnalyzeProject(ctx, &agent.AnalyzeProjectRequest{

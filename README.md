@@ -96,6 +96,8 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.7.1 起，默认 prompt 文件中的生成元数据、空脚手架和未填写占位内容会在渲染时自动过滤；只有用户实际写入的约束会进入 Agent 输入。每次渲染后的 prompt 会保存在 `.skills-seed/memory/runtime/rendered-prompts/`，同目录 `.manifest.json` 会记录 base、project、workspace、instructions 等片段是否参与合并和各自长度，便于排查上下文来源。
 
+0.7.2 起，项目画像分析会对模型输出中对象数组里的重复对象起始片段做窄范围 JSON 恢复；如果仍无法解析，会返回错误并保留已有画像，不再把 `unknown/解析失败` 占位画像当作成功结果保存。
+
 常见目录：
 
 ```text
