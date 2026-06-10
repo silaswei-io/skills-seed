@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -76,6 +77,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 	if profile.Language != "" {
 		templateLanguage = profile.Language
 	}
+	locale := w.skillsLoader.GetLocale()
 	references := referenceAvailability(profile, patterns, !opts.SkipReferences)
 
 	// 准备模板数据
@@ -98,8 +100,11 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		"ImprovementSuggestions": summaryResult.ImprovementSuggestions,
 		"STATS":                  stats,
 		"References":             references,
-		"OverviewReferences":     conditionalProfileReferenceItems(profile, w.skillsLoader.GetLocale(), "./references/", references.Enabled),
-		"ReferenceGroups":        conditionalCategoryReferenceGroups(patterns, w.skillsLoader.GetLocale(), references.Enabled),
+		"OverviewReferences":     conditionalProfileReferenceItems(profile, locale, "./references/", references.Enabled),
+		"ReferenceGroups":        conditionalCategoryReferenceGroups(patterns, locale, references.Enabled),
+		"Workflows":              []interface{}{},
+		"ValidationCommands":     []interface{}{},
+		"StateSummaries":         []string{},
 	}
 
 	// 生成主 SKILL.md 文件
@@ -226,7 +231,7 @@ func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath str
 
 	for _, categoryName := range categoriesWithPatterns {
 		summary := summaries[categoryName]
-		if err := w.generateCategoryPattern(patternsPath, categoryName, summary, patterns); err != nil {
+		if err := w.generateCategoryPattern(patternsPath, categoryName, summary, patterns, profile.Language); err != nil {
 			return err
 		}
 	}
@@ -242,7 +247,7 @@ func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath str
 
 func (w *SkillWriter) generateProjectSpec(refsPath string, spec *domain.ProjectSpec, references ReferenceAvailability) error {
 	specPath := filepath.Join(refsPath, "project-spec.md")
-	content, err := w.skillsLoader.RenderReferenceFile("project-spec", projectSpecTemplateData{ProjectSpec: *spec, References: references})
+	content, err := w.skillsLoader.RenderReferenceFile("project-spec", projectSpecTemplateData{ProjectSpec: *spec, References: references, SourceOfTruth: []SourceOfTruthItem{}})
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("ProjectSpecRenderFailed"), err)
 	}
@@ -289,6 +294,7 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 		ProjectProfile:      *profile,
 		HasBusinessPatterns: categorySet[string(domain.CategoryBusiness)],
 		HasUtilityPatterns:  categorySet[string(domain.CategoryUtils)],
+		CodeFenceLanguage:   codeFenceLanguage(profile.Language),
 	}
 	files := []struct {
 		templateName string
@@ -322,7 +328,7 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 	return nil
 }
 
-func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string, summary agent.CategorySummary, allPatterns []domain.Pattern) error {
+func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string, summary agent.CategorySummary, allPatterns []domain.Pattern, language string) error {
 	var categoryPatterns []domain.Pattern
 	for _, p := range allPatterns {
 		if string(p.Category) == categoryName {
@@ -336,7 +342,7 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 	}
 
 	if categoryName == string(domain.CategoryBusiness) {
-		return w.generateSplitBusinessPatterns(patternsPath, summary, categoryPatterns, allPatterns)
+		return w.generateSplitBusinessPatterns(patternsPath, summary, categoryPatterns, allPatterns, language)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerGeneratorGeneratingPatternFile"),
@@ -347,16 +353,17 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 	)
 
 	data := map[string]interface{}{
-		"Category":        summary.Category,
-		"Summary":         summary.Summary,
-		"Patterns":        summary.Patterns,
-		"PatternObjects":  categoryPatterns,
-		"UsageScenes":     summary.UsageScenes,
-		"Priority":        summary.Priority,
-		"PatternCount":    len(categoryPatterns),
-		"Confidence":      calculateCategoryConfidence(allPatterns, categoryName) * 100,
-		"LastUpdated":     time.Now().Format("2006-01-02 15:04:05"),
-		"BusinessMethods": domain.ValidBusinessMethods(summary.BusinessMethods),
+		"Category":          summary.Category,
+		"Summary":           summary.Summary,
+		"Patterns":          summary.Patterns,
+		"PatternObjects":    categoryPatterns,
+		"UsageScenes":       summary.UsageScenes,
+		"Priority":          summary.Priority,
+		"PatternCount":      len(categoryPatterns),
+		"Confidence":        calculateCategoryConfidence(allPatterns, categoryName) * 100,
+		"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
+		"BusinessMethods":   domain.ValidBusinessMethods(summary.BusinessMethods),
+		"CodeFenceLanguage": codeFenceLanguage(language),
 	}
 
 	content, err := w.skillsLoader.RenderPattern(templateCategoryName(categoryName), data)
@@ -377,7 +384,7 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 	return nil
 }
 
-func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary agent.CategorySummary, categoryPatterns, allPatterns []domain.Pattern) error {
+func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary agent.CategorySummary, categoryPatterns, allPatterns []domain.Pattern, language string) error {
 	groups := businessPatternGroups(w.skillsLoader.GetLocale(), categoryPatterns)
 	if err := os.MkdirAll(filepath.Join(patternsPath, string(domain.CategoryBusiness)), 0755); err != nil {
 		return err
@@ -404,13 +411,14 @@ func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary
 
 	for _, group := range groups {
 		data := map[string]interface{}{
-			"Category":       summary.Category,
-			"GroupTitle":     group.Title,
-			"GroupSummary":   group.Description,
-			"PatternObjects": group.Patterns,
-			"PatternCount":   len(group.Patterns),
-			"Confidence":     calculatePatternConfidence(group.Patterns) * 100,
-			"LastUpdated":    time.Now().Format("2006-01-02 15:04:05"),
+			"Category":          summary.Category,
+			"GroupTitle":        group.Title,
+			"GroupSummary":      group.Description,
+			"PatternObjects":    group.Patterns,
+			"PatternCount":      len(group.Patterns),
+			"Confidence":        calculatePatternConfidence(group.Patterns) * 100,
+			"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
+			"CodeFenceLanguage": codeFenceLanguage(language),
 		}
 		content, err := w.skillsLoader.RenderRelative("project/references/patterns/business-detail", data)
 		if err != nil {
@@ -428,6 +436,39 @@ func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary
 		"patterns_count", len(categoryPatterns),
 	)
 	return nil
+}
+
+func codeFenceLanguage(language string) string {
+	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "go", "golang":
+		return "go"
+	case "typescript", "ts":
+		return "typescript"
+	case "javascript", "js", "node", "nodejs":
+		return "javascript"
+	case "python", "py":
+		return "python"
+	case "java":
+		return "java"
+	case "rust", "rs":
+		return "rust"
+	case "csharp", "c#":
+		return "csharp"
+	case "cpp", "c++":
+		return "cpp"
+	case "c":
+		return "c"
+	case "php":
+		return "php"
+	case "ruby", "rb":
+		return "ruby"
+	case "swift":
+		return "swift"
+	case "kotlin":
+		return "kotlin"
+	default:
+		return ""
+	}
 }
 
 // calculateCategoryConfidence 计算特定分类的平均置信度

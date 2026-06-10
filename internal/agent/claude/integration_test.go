@@ -322,10 +322,10 @@ func TestE2E_GenerateSkillsSummary(t *testing.T) {
 		len(result.KeyPatterns), len(result.CommonPatterns))
 }
 
-// TestE2E_MergePatterns 测试 pattern-merge 模板：渲染 → Claude → 解析
-// 模板绑定: Category, Patterns
-// 输出格式: {"merged_patterns":[...], "unchanged_patterns":[...], "summary":{...}}
-func TestE2E_MergePatterns(t *testing.T) {
+// TestE2E_CuratePatterns 测试 pattern-curate 模板：渲染 → Claude → 解析
+// 模板绑定: Operation, CandidatePatterns, ExistingPatterns, AllExisting, ExistingByCandidate
+// 输出格式: {"patterns":[...], "dropped":[...], "summary":{...}}
+func TestE2E_CuratePatterns(t *testing.T) {
 	ag := skipIfShort(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
@@ -337,25 +337,29 @@ func TestE2E_MergePatterns(t *testing.T) {
 	p1.Confidence = 0.85
 	p1.Frequency = 5
 
-	p2 := domain.NewPattern("err-02", "Error Checking", domain.CategoryError)
-	p2.SetDescription("Always check error return values")
-	p2.SetRule("Check all error returns")
+	p2 := domain.NewPattern("err-02", "Error Wrapping", domain.CategoryError)
+	p2.SetDescription("Use contextual error wrapping")
+	p2.SetRule("Always wrap errors with context")
 	p2.Confidence = 0.80
 	p2.Frequency = 3
 
-	req := &agent.MergePatternsRequest{
-		Category: "error",
-		Patterns: []domain.Pattern{*p1, *p2},
+	req := &agent.CuratePatternsRequest{
+		Operation:         "learn_current",
+		CandidatePatterns: []domain.Pattern{*p2},
+		ExistingPatterns:  []domain.Pattern{*p1},
+		ExistingByCandidate: map[string][]string{
+			p2.ID: []string{p1.ID},
+		},
 	}
 
-	result, err := ag.MergePatterns(ctx, req)
-	require.NoError(t, err, "MergePatterns should succeed")
+	result, err := ag.CuratePatterns(ctx, req)
+	require.NoError(t, err, "CuratePatterns should succeed")
 	require.NotNil(t, result, "Result should not be nil")
 
-	t.Logf("Merged: %d, Unchanged: %d, TotalInput: %d",
-		len(result.MergedPatterns), len(result.UnchangedPatterns), result.Summary.TotalInput)
-	for _, mp := range result.MergedPatterns {
-		t.Logf("  Merged: %s (from %v)", mp.Name, mp.MergedFrom)
+	t.Logf("Written: %d, Dropped: %d, TotalCandidates: %d",
+		len(result.Patterns), len(result.Dropped), result.Summary.TotalCandidates)
+	for _, pattern := range result.Patterns {
+		t.Logf("  Curated: %s (from %v)", pattern.Name, pattern.MergedFrom)
 	}
 }
 

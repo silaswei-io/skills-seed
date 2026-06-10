@@ -18,7 +18,7 @@ type MockAgent struct {
 	BatchLearnFromCommitsFn   func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error)
 	GenerateFixesFn           func(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error)
 	GenerateSkillsSummaryFn   func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)
-	MergePatternsFn           func(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error)
+	CuratePatternsFn          func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
 	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
 	AnalyzeProjectFn          func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
@@ -78,15 +78,40 @@ func (m *MockAgent) GenerateSkillsSummary(ctx context.Context, req *agent.Genera
 	}, nil
 }
 
-// MergePatterns 模拟模式合并
-func (m *MockAgent) MergePatterns(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error) {
-	if m.MergePatternsFn != nil {
-		return m.MergePatternsFn(ctx, req)
+// CuratePatterns 模拟模式策展
+func (m *MockAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+	if m.CuratePatternsFn != nil {
+		return m.CuratePatternsFn(ctx, req)
 	}
-	return &agent.MergePatternsResult{
-		MergedPatterns:    []agent.MergedPattern{},
-		UnchangedPatterns: []agent.UnchangedPattern{},
-		Summary:           agent.MergeSummary{},
+	patterns := make([]agent.CuratedPattern, 0, len(req.CandidatePatterns))
+	for _, candidate := range req.CandidatePatterns {
+		patterns = append(patterns, agent.CuratedPattern{
+			ID:             candidate.ID,
+			Name:           candidate.Name,
+			Category:       string(candidate.Category),
+			Description:    candidate.Description,
+			GoodExample:    candidate.GoodExample,
+			BadExample:     candidate.BadExample,
+			Rule:           candidate.Rule,
+			Confidence:     candidate.Confidence,
+			Frequency:      candidate.Frequency,
+			MergedFrom:     []string{candidate.ID},
+			MergeReason:    "new candidate",
+			Source:         string(candidate.Source),
+			BusinessMethod: candidate.BusinessMethod,
+			ProjectID:      candidate.ProjectID,
+			ScopePath:      candidate.ScopePath,
+			WorkspaceRole:  candidate.WorkspaceRole,
+		})
+	}
+	return &agent.CuratePatternsResult{
+		Patterns: patterns,
+		Dropped:  []agent.CuratedDrop{},
+		Summary: agent.CurateSummary{
+			TotalCandidates: len(req.CandidatePatterns),
+			TotalExisting:   len(req.ExistingPatterns),
+			TotalWritten:    len(patterns),
+		},
 	}, nil
 }
 

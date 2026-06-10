@@ -177,6 +177,35 @@ When a code snippet contains both business semantics and a technical convention,
 - Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.
 - Do not output Chinese phrases such as “业务流程”, “具体规则”, or “使用场景” unless they are literal code identifiers or quoted source terms.
 
+# Pre-Output Validation Checklist
+
+Before returning JSON, validate every candidate pattern internally:
+1. Evidence check:
+   - `good_example` must be copied verbatim from source code read during this task.
+   - `good_example` must match this template's 5-12 line requirement unless the complete relevant function is shorter.
+   - Do not invent code, paths, signatures, line numbers, call relationships, or behavior.
+2. Category check:
+   - Use `business` only for domain rules, state transitions, cross-entity workflows, or business invariants.
+   - Use `api`, `error`, `config`, `middleware`, `structure`, `utils`, `database`, `concurrency`, or `testing` for technical conventions.
+   - If a pattern fits a more specific technical category, do not label it `business`.
+3. Rule quality check:
+   - `rule` must be actionable and say when to apply it.
+   - Mention ordering, error handling, state constraints, or boundaries when relevant.
+   - Reject generic rules such as "use clean code" or "follow best practices".
+4. Duplication check:
+   - If Existing Patterns are provided, do not re-emit the same rule under a new name.
+   - If new evidence only strengthens an existing rule, emit a materially improved version, not a duplicate.
+5. `business_method` check:
+   - Attach `business_method` only to real business or utility methods.
+   - It must include a real signature and location.
+   - Do not attach it to pure routing, generated code, or simple CRUD.
+6. Confidence check:
+   - Use `confidence >= 0.90` only when code evidence is direct and repeated or structurally obvious.
+   - Lower confidence when evidence is partial.
+   - Drop the pattern if evidence is too weak.
+
+If a candidate fails any required validation check, do not output it.
+
 # CRITICAL OUTPUT REQUIREMENTS
 
 Your ENTIRE response must be ONLY a valid JSON object.

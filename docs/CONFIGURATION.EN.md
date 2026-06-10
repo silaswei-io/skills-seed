@@ -159,6 +159,8 @@ Lightweight structural pre-scan based on embedded tree-sitter. It provides symbo
 
 Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the same file-selection policy: source files, build config, and dependency config are included by default, while documents, generated outputs, paths matched by global `exclude`, and generated Skills output directories are skipped.
 
+Starting in 0.9.0, project-structure summaries, sample-file collection, and structural pre-scan all use the same configured file-selection policy. Except for built-in safety boundaries such as `.git`, `.skills-seed`, and configured generated-skills output directories, analyzer no longer keeps extra directory-name keywords. Put dependency, build-output, or project-specific directories in `exclude` when they should be skipped.
+
 #### Fields
 
 | Field | Default | Description |
@@ -181,6 +183,8 @@ Prompt fragments are still read from `.skills-seed/prompts/`, but starting in 0.
 Rendered prompts are saved by default under `.skills-seed/memory/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, project profile, project fragment, workspace fragment, user instruction, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr.
+
+Starting in 0.9.0, the pattern store renders the `pattern-curate` prompt before storage so AI can deduplicate, consolidate, drop, and self-check candidate patterns against related historical patterns. `generate skills` no longer runs pattern merging, so generation prompts only summarize and produce artifacts.
 
 ### Generated Notice
 
@@ -346,5 +350,5 @@ These files are merged with built-in prompts; they do not replace built-in promp
 #### Notes
 
 1. `exclude` uses glob-style patterns, not regular expressions. Patterns without `/` (e.g., `*.log`) match against both the file basename and the full path.
-2. Exclusion rules affect learning and analysis.
+2. Exclusion rules affect learning, preview, project-structure summaries, sample-file collection, and structural pre-scan.
 3. Generated skill directories are also excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.

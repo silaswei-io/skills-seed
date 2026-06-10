@@ -10,7 +10,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/service/merger"
+	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,9 +21,9 @@ func TestNewLearnerService(t *testing.T) {
 	mockGit := &mocks.MockGitRepository{}
 	mockPattern := &mocks.MockPatternRepository{}
 	mockTracker := &mocks.MockCommitTracker{}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	assert.NotNil(t, svc)
 }
 
@@ -36,9 +36,9 @@ func TestLearn_NoCommits(t *testing.T) {
 	}
 	mockPattern := &mocks.MockPatternRepository{}
 	mockTracker := &mocks.MockCommitTracker{}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.Learn(context.Background(), 10, "", 5)
 	assert.NoError(t, err)
 }
@@ -52,9 +52,9 @@ func TestLearn_GitError(t *testing.T) {
 	}
 	mockPattern := &mocks.MockPatternRepository{}
 	mockTracker := &mocks.MockCommitTracker{}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.Learn(context.Background(), 10, "", 5)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Git")
@@ -81,9 +81,9 @@ func TestLearn_AllCommitsAnalyzed(t *testing.T) {
 		},
 	}
 	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.Learn(context.Background(), 10, "", 5)
 	assert.NoError(t, err)
 }
@@ -106,9 +106,6 @@ func TestLearn_Success(t *testing.T) {
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{}, nil
-		},
-		FindSimilarFn: func(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error) {
-			return nil, errors.New("not found")
 		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
 			savedPatterns = append(savedPatterns, p.Name)
@@ -143,9 +140,9 @@ func TestLearn_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.Learn(context.Background(), 10, "", 5)
 	assert.NoError(t, err)
 	assert.Len(t, savedPatterns, 2)
@@ -168,9 +165,6 @@ func TestLearn_SavesNewPatternWhenNoSimilarPattern(t *testing.T) {
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{}, nil
 		},
-		FindSimilarFn: func(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error) {
-			return nil, nil
-		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
 			savedPatterns = append(savedPatterns, p.Name)
 			return nil
@@ -190,9 +184,9 @@ func TestLearn_SavesNewPatternWhenNoSimilarPattern(t *testing.T) {
 			}, nil
 		},
 	}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.Learn(context.Background(), 10, "", 5)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"New Pattern"}, savedPatterns)
@@ -218,9 +212,9 @@ func TestLearnFromCommit_DoesNotFetchOrSendDiff(t *testing.T) {
 		},
 	}
 	mockTracker := &mocks.MockCommitTracker{}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.LearnFromCommit(context.Background(), domain.CommitInfo{Hash: "abc123"})
 	assert.NoError(t, err)
 }
@@ -230,9 +224,6 @@ func TestLearnFromStaged_Success(t *testing.T) {
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{}, nil
-		},
-		FindSimilarFn: func(ctx context.Context, p *domain.Pattern) (*domain.Pattern, error) {
-			return nil, errors.New("not found")
 		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
 			saved = append(saved, p.ID)
@@ -257,9 +248,9 @@ func TestLearnFromStaged_Success(t *testing.T) {
 		},
 	}
 	mockTracker := &mocks.MockCommitTracker{}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.LearnFromStaged(context.Background(), domain.CommitInfo{Hash: "abc"})
 	require.NoError(t, err)
 	assert.Len(t, saved, 1)
@@ -283,9 +274,9 @@ func TestLearnFromStaged_AIError(t *testing.T) {
 		},
 	}
 	mockTracker := &mocks.MockCommitTracker{}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.LearnFromStaged(context.Background(), domain.CommitInfo{Hash: "abc"})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "AI")
@@ -293,7 +284,9 @@ func TestLearnFromStaged_AIError(t *testing.T) {
 
 func TestLearnFromCommit_WithMerge(t *testing.T) {
 	existingPattern := domain.NewPattern("e1", "Error Handling", domain.CategoryError)
+	existingPattern.Confidence = 0.8
 	existingPattern.Frequency = 3
+	existingPattern.SetRule("wrap errors with context")
 
 	mockGit := &mocks.MockGitRepository{
 		ChangedFilesFn: func(ctx context.Context, hash string) ([]string, error) {
@@ -305,10 +298,8 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*existingPattern}, nil
 		},
-		FindSimilarFn: func(ctx context.Context, p *domain.Pattern) (*domain.Pattern, error) {
-			// 模拟找到相似模式。
-			pCopy := *existingPattern
-			return &pCopy, nil
+		DeleteFn: func(ctx context.Context, id string) error {
+			return nil
 		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
 			mergedPatterns = append(mergedPatterns, p)
@@ -318,18 +309,37 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		LearnFromCommitFn: func(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error) {
+			p := domain.NewPattern("p1", "Error Handling", domain.CategoryError)
+			p.Confidence = 0.9
+			p.SetRule("wrap errors with context")
 			return &agent.LearnResult{
-				Patterns: []domain.Pattern{
-					*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
-				},
+				Patterns:  []domain.Pattern{*p},
 				LearnedAt: time.Now(),
+			}, nil
+		},
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			require.Len(t, req.CandidatePatterns, 1)
+			require.Len(t, req.ExistingPatterns, 1)
+			return &agent.CuratePatternsResult{
+				Patterns: []agent.CuratedPattern{
+					{
+						ID:         "e1",
+						Name:       "Error Handling",
+						Category:   string(domain.CategoryError),
+						Rule:       "wrap errors with context",
+						Confidence: 0.85,
+						Frequency:  4,
+						MergedFrom: []string{"e1", "p1"},
+					},
+				},
+				Summary: agent.CurateSummary{TotalCandidates: 1, TotalExisting: 1, TotalWritten: 1},
 			}, nil
 		},
 	}
 	mockTracker := &mocks.MockCommitTracker{}
-	mockMerger := merger.NewMergerService(mockAgent, mockPattern)
+	mockCurator := curator.NewService(mockAgent, mockPattern)
 
-	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockMerger)
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.LearnFromCommit(context.Background(), domain.CommitInfo{Hash: "abc123"})
 	require.NoError(t, err)
 	assert.Len(t, mergedPatterns, 1)
@@ -339,24 +349,48 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 
 func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 	existingPattern := domain.NewPattern("existing", "Error Handling", domain.CategoryError)
+	existingPattern.Confidence = 0.8
 	existingPattern.Frequency = 2
+	existingPattern.SetRule("wrap errors with context")
 
 	var saved *domain.Pattern
 	mockPattern := &mocks.MockPatternRepository{
-		FindSimilarFn: func(ctx context.Context, p *domain.Pattern) (*domain.Pattern, error) {
-			pCopy := *existingPattern
-			return &pCopy, nil
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*existingPattern}, nil
+		},
+		DeleteFn: func(ctx context.Context, id string) error {
+			return nil
 		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
 			saved = p
 			return nil
 		},
 	}
-	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, merger.NewMergerService(mockAgent, mockPattern))
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			return &agent.CuratePatternsResult{
+				Patterns: []agent.CuratedPattern{
+					{
+						ID:         "existing",
+						Name:       "Error Handling",
+						Category:   string(domain.CategoryError),
+						Rule:       "wrap errors with context",
+						Confidence: 0.85,
+						Frequency:  3,
+						MergedFrom: []string{"existing", "new"},
+					},
+				},
+				Summary: agent.CurateSummary{TotalCandidates: 1, TotalExisting: 1, TotalWritten: 1},
+			}, nil
+		},
+	}
+	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
 	newPattern := domain.NewPattern("new", "Error Handling", domain.CategoryError)
+	newPattern.Confidence = 0.9
 	newPattern.Frequency = 1
+	newPattern.SetRule("wrap errors with context")
 	count := svc.SavePatterns(context.Background(), []domain.Pattern{*newPattern}, "learn_current")
 
 	require.Equal(t, 1, count)
@@ -367,21 +401,17 @@ func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 
 func TestSavePatternsStrictReturnsErrorWhenSaveFails(t *testing.T) {
 	mockPattern := &mocks.MockPatternRepository{
-		FindSimilarFn: func(ctx context.Context, p *domain.Pattern) (*domain.Pattern, error) {
-			return nil, nil
-		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
 			return errors.New("db closed")
 		},
 	}
 	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, merger.NewMergerService(mockAgent, mockPattern))
+	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
 	count, err := svc.SavePatternsStrict(context.Background(), []domain.Pattern{*domain.NewPattern("new", "Error Handling", domain.CategoryError)}, "learn_current")
 
 	require.Error(t, err)
 	require.Zero(t, count)
-	require.Contains(t, err.Error(), "save pattern")
 	require.Contains(t, err.Error(), "db closed")
 }
 
@@ -396,7 +426,7 @@ func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 			},
 		}
 		mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, merger.NewMergerService(mockAgent, mockPattern))
+		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
 		patterns := []domain.Pattern{
 			*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
@@ -425,7 +455,7 @@ func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 			},
 		}
 		mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, merger.NewMergerService(mockAgent, mockPattern))
+		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
 		var count int
 		output := captureStdout(t, func() {

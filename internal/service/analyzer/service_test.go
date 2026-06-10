@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -36,10 +35,21 @@ func TestGetProjectStructure(t *testing.T) {
 	assert.Contains(t, structure, "main.go")
 }
 
-func TestShouldUseExternalTreeCommandSkipsWindows(t *testing.T) {
-	assert.Equal(t, runtime.GOOS != "windows", shouldUseExternalTreeCommand(runtime.GOOS, true))
-	assert.False(t, shouldUseExternalTreeCommand("windows", true))
-	assert.False(t, shouldUseExternalTreeCommand("linux", false))
+func TestGetProjectStructureUsesConfiguredExclude(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "generated"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "generated", "wire.go"), []byte("package generated"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main"), 0644))
+
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
+		Exclude:    []string{"internal/generated/**"},
+	})
+	structure, err := svc.GetProjectStructure(tmpDir)
+
+	require.NoError(t, err)
+	assert.Contains(t, structure, "main.go")
+	assert.NotContains(t, structure, "wire.go")
 }
 
 func TestFindMainFiles(t *testing.T) {
@@ -227,7 +237,7 @@ func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {
 		Enabled:     true,
 		MaxSymbols:  10,
 		MaxFileSize: 1,
-	}, nil)
+	})
 
 	result, err := collector.Collect(context.Background(), projectRoot, structuralContextRequest{
 		SeedPaths: []string{"small.go", "large.go"},
@@ -590,16 +600,12 @@ func TestCollectSampleFiles(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "service", "user.go"), []byte("package service"), 0644))
-	// 测试文件应被排除。
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main_test.go"), []byte("package main"), 0644))
 
 	svc := &AnalyzerService{}
 	files := svc.collectSampleFiles(tmpDir, "go")
 	assert.NotEmpty(t, files)
-	// 结果不应包含测试文件。
-	for _, f := range files {
-		assert.NotContains(t, f.Path, "_test.go")
-	}
+	assertSamplePathsContain(t, files, "main.go", "internal/service/user.go", "main_test.go")
 }
 
 func TestCollectSampleFiles_ReturnsPathsWithoutEmbeddingContent(t *testing.T) {
@@ -614,7 +620,7 @@ func TestCollectSampleFiles_ReturnsPathsWithoutEmbeddingContent(t *testing.T) {
 	assert.Equal(t, "webshell.go", files[0].Path)
 }
 
-func TestCollectSampleFiles_ExcludeVendor(t *testing.T) {
+func TestCollectSampleFiles_DoesNotTreatVendorAsKeyword(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "vendor", "pkg"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "vendor", "pkg", "lib.go"), []byte("package pkg"), 0644))
@@ -622,9 +628,7 @@ func TestCollectSampleFiles_ExcludeVendor(t *testing.T) {
 
 	svc := &AnalyzerService{}
 	files := svc.collectSampleFiles(tmpDir, "go")
-	for _, f := range files {
-		assert.NotContains(t, f.Path, "vendor")
-	}
+	assertSamplePathsContain(t, files, "main.go", "vendor/pkg/lib.go")
 }
 
 func TestCollectSampleFilesKeepsSourceFilesUnderDocs(t *testing.T) {
@@ -657,6 +661,17 @@ func TestCollectSampleFiles_UsesConfiguredExclude(t *testing.T) {
 	require.NotEmpty(t, files)
 	for _, f := range files {
 		assert.NotContains(t, f.Path, "internal/generated")
+	}
+}
+
+func assertSamplePathsContain(t *testing.T, files []agent.SampleFile, expected ...string) {
+	t.Helper()
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.Path)
+	}
+	for _, path := range expected {
+		require.Contains(t, paths, path)
 	}
 }
 

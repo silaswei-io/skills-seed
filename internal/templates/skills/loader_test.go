@@ -52,7 +52,18 @@ func TestLoader_Render(t *testing.T) {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},
-		"References": fullReferenceAvailability(),
+		"Workflows": []map[string]interface{}{
+			{
+				"Title":       "新增或调整 API",
+				"AppliesWhen": "接口或生成层变化时",
+				"Steps":       []string{"修改接口定义。", "运行生成命令。"},
+			},
+		},
+		"ValidationCommands": []map[string]string{
+			{"Command": "go test ./...", "When": "Go 代码变化后"},
+		},
+		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
+		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
 			{
 				Title: "业务与领域",
@@ -78,6 +89,8 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "generated-by: skills-seed v0.0.1")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "按任务读取最小必要参考")
+	assert.Contains(t, content, "常用工作流")
+	assert.Contains(t, content, "go test ./...")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")
 	assert.NotContains(t, content, "为外部调用补充超时测试")
 }
@@ -106,8 +119,19 @@ func TestLoader_Render_English(t *testing.T) {
 			"Add timeout tests for external calls",
 		},
 		"OverviewReferences": []ReferenceItem{},
-		"References":         fullReferenceAvailability(),
-		"ReferenceGroups":    []ReferenceGroup{},
+		"Workflows": []map[string]interface{}{
+			{
+				"Title":       "Add Or Change API",
+				"AppliesWhen": "endpoints change",
+				"Steps":       []string{"Change the API source files first."},
+			},
+		},
+		"ValidationCommands": []map[string]string{
+			{"Command": "go test ./...", "When": "Go code changes"},
+		},
+		"StateSummaries":  []string{"Task: preserve task state transitions."},
+		"References":      fullReferenceAvailability(),
+		"ReferenceGroups": []ReferenceGroup{},
 	}
 
 	content, err := loader.Render("project-skill", data)
@@ -117,6 +141,8 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.Contains(t, content, "test-project")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "Read the smallest relevant reference set")
+	assert.Contains(t, content, "Common Workflows")
+	assert.Contains(t, content, "go test ./...")
 	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
 	assert.NotContains(t, content, "Add timeout tests for external calls")
 }
@@ -188,14 +214,15 @@ func TestLoader_OmitsVisibleSkillsSeedGeneratedNoticeByDefault(t *testing.T) {
 	loader := NewLoader("zh-CN")
 
 	content, err := loader.RenderPattern("business", map[string]interface{}{
-		"Category":       "business",
-		"Priority":       1,
-		"PatternCount":   9,
-		"Confidence":     90.0,
-		"LastUpdated":    "2026-06-08 12:00:00",
-		"Summary":        "业务模式",
-		"PatternObjects": []domain.Pattern{*domain.NewPattern("p1", "业务规则", domain.CategoryBusiness)},
-		"UsageScenes":    []string{},
+		"Category":          "business",
+		"Priority":          1,
+		"PatternCount":      9,
+		"Confidence":        90.0,
+		"LastUpdated":       "2026-06-08 12:00:00",
+		"Summary":           "业务模式",
+		"PatternObjects":    []domain.Pattern{*domain.NewPattern("p1", "业务规则", domain.CategoryBusiness)},
+		"UsageScenes":       []string{},
+		"CodeFenceLanguage": "go",
 	})
 	require.NoError(t, err)
 
@@ -208,16 +235,17 @@ func TestLoader_RenderReference(t *testing.T) {
 	loader := NewLoader("zh-CN")
 
 	data := map[string]interface{}{
-		"Category":        "api",
-		"Summary":         "API 相关的编码模式",
-		"Patterns":        []string{"API 路由命名规范", "错误处理模式"},
-		"PatternObjects":  []domain.Pattern{*domain.NewPattern("p1", "API 路由命名规范", domain.CategoryAPI)},
-		"UsageScenes":     []string{"创建新 API 端点时", "重构 API 路由时"},
-		"Priority":        4,
-		"PatternCount":    2,
-		"Confidence":      87.5,
-		"LastUpdated":     "2026-03-25 15:00:00",
-		"BusinessMethods": []interface{}{}, // 添加业务方法
+		"Category":          "api",
+		"Summary":           "API 相关的编码模式",
+		"Patterns":          []string{"API 路由命名规范", "错误处理模式"},
+		"PatternObjects":    []domain.Pattern{*domain.NewPattern("p1", "API 路由命名规范", domain.CategoryAPI)},
+		"UsageScenes":       []string{"创建新 API 端点时", "重构 API 路由时"},
+		"Priority":          4,
+		"PatternCount":      2,
+		"Confidence":        87.5,
+		"LastUpdated":       "2026-03-25 15:00:00",
+		"BusinessMethods":   []interface{}{}, // 添加业务方法
+		"CodeFenceLanguage": "go",
 	}
 
 	content, err := loader.RenderPattern("api", data)
@@ -253,20 +281,37 @@ func TestLoader_RenderReferenceFile(t *testing.T) {
 	assert.Contains(t, content, "func Demo()")
 }
 
+func TestLoader_RenderReferencesUseConfiguredCodeFenceLanguage(t *testing.T) {
+	loader := NewLoader("zh-CN")
+	pattern := domain.NewPattern("p1", "API Pattern", domain.CategoryAPI)
+	pattern.SetExamples("function demo() {\n  return true\n}", "")
+
+	data := categoryData("api")
+	data["CodeFenceLanguage"] = "typescript"
+	data["PatternObjects"] = []domain.Pattern{*pattern}
+
+	content, err := loader.RenderPattern("api", data)
+
+	require.NoError(t, err)
+	require.Contains(t, content, "```typescript")
+	require.NotContains(t, content, "```go")
+}
+
 func TestLoader_RenderPatternFallsBackToDefaultTemplate(t *testing.T) {
 	loader := NewLoader("zh-CN")
 
 	content, err := loader.RenderPattern("custom-domain", map[string]interface{}{
-		"Category":        "custom-domain",
-		"Summary":         "自定义分类模式",
-		"Patterns":        []string{"Custom Pattern"},
-		"PatternObjects":  []domain.Pattern{*domain.NewPattern("p1", "Custom Pattern", domain.Category("custom-domain"))},
-		"UsageScenes":     []string{"自定义场景"},
-		"Priority":        3,
-		"PatternCount":    1,
-		"Confidence":      80.0,
-		"LastUpdated":     "2026-05-21 00:00:00",
-		"BusinessMethods": []*domain.BusinessMethod{},
+		"Category":          "custom-domain",
+		"Summary":           "自定义分类模式",
+		"Patterns":          []string{"Custom Pattern"},
+		"PatternObjects":    []domain.Pattern{*domain.NewPattern("p1", "Custom Pattern", domain.Category("custom-domain"))},
+		"UsageScenes":       []string{"自定义场景"},
+		"Priority":          3,
+		"PatternCount":      1,
+		"Confidence":        80.0,
+		"LastUpdated":       "2026-05-21 00:00:00",
+		"BusinessMethods":   []*domain.BusinessMethod{},
+		"CodeFenceLanguage": "go",
 	})
 
 	require.NoError(t, err)
@@ -481,7 +526,18 @@ func fullSkillData() map[string]interface{} {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},
-		"References": fullReferenceAvailability(),
+		"Workflows": []map[string]interface{}{
+			{
+				"Title":       "新增或调整 API",
+				"AppliesWhen": "接口或生成层变化时",
+				"Steps":       []string{"修改接口定义。", "运行生成命令。"},
+			},
+		},
+		"ValidationCommands": []map[string]string{
+			{"Command": "go test ./...", "When": "Go 代码变化后"},
+		},
+		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
+		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
 			{
 				Title: "业务与领域",
@@ -517,17 +573,18 @@ func categoryData(category string) map[string]interface{} {
 	pattern.BusinessMethod = method
 
 	return map[string]interface{}{
-		"Category":        category,
-		"Summary":         "demo summary",
-		"Patterns":        []string{"Demo Pattern"},
-		"PatternObjects":  []domain.Pattern{*pattern},
-		"UsageScenes":     []string{"demo usage"},
-		"Priority":        4,
-		"PatternCount":    1,
-		"Confidence":      90.0,
-		"LastUpdated":     "2026-05-19 00:00:00",
-		"BusinessMethods": []*domain.BusinessMethod{method},
-		"SamplePatterns":  []string{"Demo Pattern"},
+		"Category":          category,
+		"Summary":           "demo summary",
+		"Patterns":          []string{"Demo Pattern"},
+		"PatternObjects":    []domain.Pattern{*pattern},
+		"UsageScenes":       []string{"demo usage"},
+		"Priority":          4,
+		"PatternCount":      1,
+		"Confidence":        90.0,
+		"LastUpdated":       "2026-05-19 00:00:00",
+		"BusinessMethods":   []*domain.BusinessMethod{method},
+		"SamplePatterns":    []string{"Demo Pattern"},
+		"CodeFenceLanguage": "go",
 	}
 }
 
@@ -555,6 +612,7 @@ func projectOverviewData() map[string]interface{} {
 		"BusinessMethods":     []domain.BusinessMethod{{Name: "Demo", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/demo.go:10"}, Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
 		"CommonUtils":         []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
 		"ConfigPatterns":      []string{"yaml config"},
+		"CodeFenceLanguage":   "go",
 		"ProjectID":           "demo",
 		"ScopePath":           "demo",
 		"WorkspaceRole":       "backend",
@@ -568,6 +626,9 @@ func projectOverviewData() map[string]interface{} {
 		},
 		"Touchpoints": []domain.ProjectSpecTouchpoint{
 			{Kind: "business_method", Name: "Demo", Path: "internal/demo.go:10", Description: "demo"},
+		},
+		"SourceOfTruth": []map[string]string{
+			{"Area": "业务规则", "Edit": "`internal/service`", "DoNotEdit": "generated files"},
 		},
 	}
 }

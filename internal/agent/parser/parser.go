@@ -609,15 +609,15 @@ func ParseGenerateSkillsResult(output string) (*agent.GenerateSkillsResult, erro
 	return generateResult, nil
 }
 
-// ParseMergePatternsResult 解析模式合并结果
-func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error) {
+// ParseCuratePatternsResult 解析模式策展结果。
+func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, error) {
 	jsonStr, err := ExtractJSON(output)
 	if err != nil {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
 	var result struct {
-		MergedPatterns []struct {
+		Patterns []struct {
 			ID              string                 `json:"id"`
 			Name            string                 `json:"name"`
 			Category        string                 `json:"category"`
@@ -626,20 +626,26 @@ func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error)
 			BadExample      string                 `json:"bad_example"`
 			Rule            string                 `json:"rule"`
 			Confidence      float64                `json:"confidence"`
+			Frequency       int                    `json:"frequency"`
 			MergedFrom      []string               `json:"merged_from"`
 			MergeReason     string                 `json:"merge_reason"`
 			SimilarityScore float64                `json:"similarity_score"`
+			Source          string                 `json:"source"`
 			BusinessMethod  *businessMethodPayload `json:"business_method"`
-		} `json:"merged_patterns"`
-		UnchangedPatterns []struct {
+			ProjectID       string                 `json:"project_id"`
+			ScopePath       string                 `json:"scope_path"`
+			WorkspaceRole   string                 `json:"workspace_role"`
+		} `json:"patterns"`
+		Dropped []struct {
 			ID     string `json:"id"`
 			Reason string `json:"reason"`
-		} `json:"unchanged_patterns"`
+		} `json:"dropped"`
 		Summary struct {
-			TotalInput     int `json:"total_input"`
-			TotalMerged    int `json:"total_merged"`
-			TotalUnchanged int `json:"total_unchanged"`
-			MergeCount     int `json:"merge_count"`
+			TotalCandidates int `json:"total_candidates"`
+			TotalExisting   int `json:"total_existing"`
+			TotalWritten    int `json:"total_written"`
+			TotalDropped    int `json:"total_dropped"`
+			MergeCount      int `json:"merge_count"`
 		} `json:"summary"`
 	}
 
@@ -647,20 +653,21 @@ func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error)
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
 	}
 
-	mergeResult := &agent.MergePatternsResult{
-		MergedPatterns:    make([]agent.MergedPattern, len(result.MergedPatterns)),
-		UnchangedPatterns: make([]agent.UnchangedPattern, len(result.UnchangedPatterns)),
-		Summary: agent.MergeSummary{
-			TotalInput:     result.Summary.TotalInput,
-			TotalMerged:    result.Summary.TotalMerged,
-			TotalUnchanged: result.Summary.TotalUnchanged,
-			MergeCount:     result.Summary.MergeCount,
+	curateResult := &agent.CuratePatternsResult{
+		Patterns: make([]agent.CuratedPattern, len(result.Patterns)),
+		Dropped:  make([]agent.CuratedDrop, len(result.Dropped)),
+		Summary: agent.CurateSummary{
+			TotalCandidates: result.Summary.TotalCandidates,
+			TotalExisting:   result.Summary.TotalExisting,
+			TotalWritten:    result.Summary.TotalWritten,
+			TotalDropped:    result.Summary.TotalDropped,
+			MergeCount:      result.Summary.MergeCount,
 		},
 	}
 
-	for i, p := range result.MergedPatterns {
-		businessMethod := p.BusinessMethod.toDomain(time.Now())
-		mergeResult.MergedPatterns[i] = agent.MergedPattern{
+	now := time.Now()
+	for i, p := range result.Patterns {
+		curateResult.Patterns[i] = agent.CuratedPattern{
 			ID:              p.ID,
 			Name:            p.Name,
 			Category:        p.Category,
@@ -669,21 +676,25 @@ func ParseMergePatternsResult(output string) (*agent.MergePatternsResult, error)
 			BadExample:      p.BadExample,
 			Rule:            p.Rule,
 			Confidence:      p.Confidence,
+			Frequency:       p.Frequency,
 			MergedFrom:      p.MergedFrom,
 			MergeReason:     p.MergeReason,
 			SimilarityScore: p.SimilarityScore,
-			BusinessMethod:  businessMethod,
+			Source:          p.Source,
+			BusinessMethod:  p.BusinessMethod.toDomain(now),
+			ProjectID:       p.ProjectID,
+			ScopePath:       p.ScopePath,
+			WorkspaceRole:   p.WorkspaceRole,
+		}
+	}
+	for i, dropped := range result.Dropped {
+		curateResult.Dropped[i] = agent.CuratedDrop{
+			ID:     dropped.ID,
+			Reason: dropped.Reason,
 		}
 	}
 
-	for i, p := range result.UnchangedPatterns {
-		mergeResult.UnchangedPatterns[i] = agent.UnchangedPattern{
-			ID:     p.ID,
-			Reason: p.Reason,
-		}
-	}
-
-	return mergeResult, nil
+	return curateResult, nil
 }
 
 // ParseAnalyzeProjectResult 解析项目分析结果

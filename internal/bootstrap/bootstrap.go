@@ -177,7 +177,7 @@ func commandNeedsProjectRuntime(args []string) bool {
 	case "learn":
 		return len(cleaned) >= 2 && (cleaned[1] == "current" || cleaned[1] == "history")
 	case "patterns":
-		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "merge" || cleaned[1] == "add" || cleaned[1] == "show")
+		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "compact" || cleaned[1] == "add" || cleaned[1] == "show")
 	case "preview":
 		return len(cleaned) >= 2 && cleaned[1] == "files"
 	case "profile":

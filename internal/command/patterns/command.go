@@ -17,7 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
-	"github.com/silaswei-io/skills-seed/internal/service/merger"
+	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	}
 
 	patternsCmd.AddCommand(addCmd(cont))
-	patternsCmd.AddCommand(mergeCmd(cont))
+	patternsCmd.AddCommand(compactCmd(cont))
 	patternsCmd.AddCommand(statsCmd(cont))
 	patternsCmd.AddCommand(showCmd(cont))
 	return patternsCmd
@@ -81,10 +81,27 @@ func addCmd(cont *container.Container) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if cont.CuratorSvc == nil {
+				return fmt.Errorf("pattern curator is not configured")
+			}
 
-			if err := cont.PatternRepo.Save(ctx, result.Pattern); err != nil {
+			curateTracker := progress.New(1)
+			curated, err := cont.CuratorSvc.CurateAndStoreWithHooks(ctx, curator.CurateRequest{
+				Operation:  curator.OperationUserDefined,
+				Candidates: []domain.Pattern{*result.Pattern},
+			}, curatorProgressHooks(curateTracker))
+			if err != nil {
 				return err
 			}
+			if len(curated.Written) == 0 {
+				reason := "pattern was not written"
+				if len(curated.Dropped) > 0 && curated.Dropped[0].Reason != "" {
+					reason = curated.Dropped[0].Reason
+				}
+				return fmt.Errorf("%s", reason)
+			}
+			written := curated.Written[0]
+			result.Pattern = &written
 
 			logger.Info(i18n.GetWithParams("PatternsAddComplete", map[string]interface{}{
 				"PatternID":   result.Pattern.ID,
@@ -373,15 +390,15 @@ func formatOptionalFloat(value float64) string {
 	return fmt.Sprintf("%.2f", value)
 }
 
-func mergeCmd(cont *container.Container) *cobra.Command {
+func compactCmd(cont *container.Container) *cobra.Command {
 	var category string
 	var dryRun bool
 
 	cmd := &cobra.Command{
-		Use:     "merge",
-		Short:   i18n.Get("PatternsMergeShort"),
-		Long:    i18n.Get("PatternsMergeLongDesc"),
-		Example: i18n.Get("PatternsMergeExample"),
+		Use:     "compact",
+		Short:   i18n.Get("PatternsCompactShort"),
+		Long:    i18n.Get("PatternsCompactLongDesc"),
+		Example: i18n.Get("PatternsCompactExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
@@ -390,24 +407,36 @@ func mergeCmd(cont *container.Container) *cobra.Command {
 			if err := commandutil.RequireAgentAvailable(cont); err != nil {
 				return err
 			}
-			result, err := cont.MergerSvc.MergePatterns(context.Background(), &merger.MergePatternsRequest{
+			if cont.CuratorSvc == nil {
+				return fmt.Errorf("pattern curator is not configured")
+			}
+			tracker := progress.New(1)
+			result, err := cont.CuratorSvc.CompactWithHooks(cmd.Context(), curator.CompactRequest{
 				Category: category,
 				DryRun:   dryRun,
-			})
+			}, curatorProgressHooks(tracker))
 			if err != nil {
 				return err
 			}
-			logger.Info(i18n.GetWithParams("PatternsMergeComplete", map[string]interface{}{
-				"TotalInput":     result.Summary.TotalInput,
-				"TotalMerged":    result.Summary.TotalMerged,
-				"TotalUnchanged": result.Summary.TotalUnchanged,
-				"MergeCount":     result.Summary.MergeCount,
+			logger.Info(i18n.GetWithParams("PatternsCompactComplete", map[string]interface{}{
+				"TotalInput":   result.Summary.TotalCandidates,
+				"TotalWritten": result.Summary.TotalWritten,
+				"TotalDropped": result.Summary.TotalDropped,
+				"MergeCount":   result.Summary.MergeCount,
 			}))
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsMergeFlagCategory"))
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, i18n.Get("PatternsMergeFlagDryRun"))
+	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsCompactFlagCategory"))
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, i18n.Get("PatternsCompactFlagDryRun"))
 	return cmd
+}
+
+func curatorProgressHooks(tracker *progress.Tracker) curator.ProgressHooks {
+	return curator.ProgressHooks{
+		OnStepStart:    tracker.StartStep,
+		OnStepUpdate:   tracker.UpdateStep,
+		OnStepComplete: tracker.CompleteStep,
+	}
 }

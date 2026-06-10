@@ -185,7 +185,7 @@ skills-seed reset --workspace
 |---|---:|---|
 | `--limit`, `-n` | `learning.max_commits`，默认 `50` | 最多分析的提交数量 |
 | `--since`, `-s` | 空 | 时间范围，例如 `7d`、`30d`、`6m`、`1y` |
-| `--batch-size`, `-b` | `learning.batch_size`；未加载配置时为 `10` | 每批提交数量；每批会合并后调用一次 Agent |
+| `--batch-size`, `-b` | `learning.batch_size`；未加载配置时为 `10` | 每批提交数量；每批调用一次 Agent 分析并在入库前策展候选模式 |
 | `--help`, `-h` | `false` | 查看 `learn history` 帮助 |
 
 #### `--profile` 取值
@@ -245,7 +245,6 @@ skills-seed learn history --limit 40 --batch-size 5
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--output`, `-o` | 当前 `skills.target` 的 `skills.paths` | 临时指定 skills 输出目录 |
-| `--merge`, `-m` | `false` | 生成前合并相似 patterns；已不推荐，改用 `skills-seed patterns merge` |
 | `--help`, `-h` | `false` | 查看 `generate skills` 帮助 |
 
 #### 常用示例
@@ -287,22 +286,21 @@ references/
 
 1. workspace 模式会先用每个子项目自己的配置生成子项目 skill，再生成根仓 workspace skill。
 2. 已有手写 `SKILL.md` 没有 `generated-by: skills-seed` 标记时默认不会被覆盖。
-3. `--merge` 是兼容旧用法，推荐先单独执行 `skills-seed patterns merge`。
-4. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
-5. `generate skills` 会对生成输入记录 md5；当项目画像、patterns、命中统计、配置、prompt/skills 模板和输出路径未变化，且输出产物完整时，会跳过 Agent 摘要和文件重写。workspace 根 skill 也会用同样机制跳过未变化的根产物。
+3. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
+4. `generate skills` 会对生成输入记录 md5；当项目画像、patterns、命中统计、配置、prompt/skills 模板和输出路径未变化，且输出产物完整时，会跳过 Agent 摘要和文件重写。workspace 根 skill 也会用同样机制跳过未变化的根产物。
 
 ### `skills-seed patterns`
 
 #### 命令概述
 
-管理已学习的 patterns。支持添加用户自定义模式、合并语义相近的 patterns、查看 DB 字段、模式质量和 check 命中统计。
+管理已学习的 patterns。支持添加用户自定义模式、整理语义相近的 patterns、查看 DB 字段、模式质量和 check 命中统计。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
 | `skills-seed patterns add <描述>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add "API 路由使用 RESTful 风格" --category api` | 会调用 AI Agent |
-| `skills-seed patterns merge` | 调用当前 Agent 合并相似 patterns | `skills-seed patterns merge --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
+| `skills-seed patterns compact` | 调用当前 Agent 策展整理相似 patterns | `skills-seed patterns compact --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
 | `skills-seed patterns stats` | 查看模式质量和 check 命中统计 | `skills-seed patterns stats` | 不调用 AI Agent，不修改数据库 |
 | `skills-seed patterns show [pattern-id]` | 查看 pattern 的 DB 字段、时间和代码位置元数据 | `skills-seed patterns show business-create-order --format json` | 不调用 AI Agent，不修改数据库 |
 
@@ -321,13 +319,13 @@ references/
 | `--context` | 空 | 补充上下文说明，帮助 AI 更准确理解模式 |
 | `--help`, `-h` | `false` | 查看 `patterns add` 帮助 |
 
-#### `patterns merge` 参数
+#### `patterns compact` 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--category`, `-c` | 空 | 只合并指定分类，如 `business`、`api`、`testing`；留空表示全部 |
-| `--dry-run` | `false` | 只预览合并结果，不写入数据库 |
-| `--help`, `-h` | `false` | 查看 `patterns merge` 帮助 |
+| `--category`, `-c` | 空 | 只整理指定分类，如 `business`、`api`、`testing`；留空表示全部 |
+| `--dry-run` | `false` | 只预览整理结果，不写入数据库 |
+| `--help`, `-h` | `false` | 查看 `patterns compact` 帮助 |
 
 #### `patterns stats` 参数
 
@@ -348,9 +346,9 @@ references/
 skills-seed patterns add "所有 API 路由使用 RESTful 风格"
 skills-seed patterns add "错误必须包装上下文" --category error
 skills-seed patterns add "数据库操作使用事务" --files internal/service/user.go --context "项目使用 GORM"
-skills-seed patterns merge
-skills-seed patterns merge --category api
-skills-seed patterns merge --category business --dry-run
+skills-seed patterns compact
+skills-seed patterns compact --category api
+skills-seed patterns compact --category business --dry-run
 skills-seed patterns stats
 skills-seed patterns show
 skills-seed patterns show business-create-order --format json
@@ -358,8 +356,8 @@ skills-seed patterns show business-create-order --format json
 
 #### 注意事项
 
-1. 合并会调用当前 `agent.engine` 对应的 CLI。
-2. 不确定合并结果时先使用 `--dry-run`。
+1. `patterns compact` 会调用当前 `agent.engine` 对应的 CLI。
+2. 不确定整理结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
 4. `patterns show` 读取 DB 中已保存字段，可用于排查 `created_at/updated_at`、代码位置状态和语言无关符号快照。
 5. `patterns stats` 和 `patterns show` 不调用 AI，也不修改数据，但仍需要打开 `.skills-seed/memory/project.db`；如果数据库被其他 `skills-seed` 命令占用，CLI 会提示等待当前命令结束或检查残留进程。
@@ -469,20 +467,20 @@ skills-seed profile refresh --language go
 
 #### 命令概述
 
-一键同步：学习当前代码 → 合并模式 → 生成 skills。如果传入 `--add` 参数，则跳过学习步骤，改为用自然语言定义模式后再合并和生成。
+一键同步：学习当前代码 → 生成 skills。如果传入 `--add` 参数，则跳过学习步骤，改为用自然语言定义模式后直接生成。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed sync` | 学习当前代码 → patterns merge → generate skills | `skills-seed sync` | 等效于依次执行 `learn current`、`patterns merge`、`generate skills` |
-| `skills-seed sync --add <描述>` | patterns add → patterns merge → generate skills | `skills-seed sync --add "API 路由使用 RESTful 风格"` | 跳过学习，适合补充 AI 未自动发现的模式 |
+| `skills-seed sync` | 学习当前代码 → generate skills | `skills-seed sync` | 等效于依次执行 `learn current`、`generate skills` |
+| `skills-seed sync --add <描述>` | patterns add → generate skills | `skills-seed sync --add "API 路由使用 RESTful 风格"` | 跳过学习，适合补充 AI 未自动发现的模式 |
 
 #### 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--add` | 空 | 用自然语言定义模式描述，传入后执行 patterns add → merge → generate |
+| `--add` | 空 | 用自然语言定义模式描述，传入后执行 patterns add → generate |
 | `--category`, `-c` | 空 | `--add` 模式下指定模式分类 |
 | `--files`, `-f` | 空 | `--add` 模式下指定参考文件路径；多个文件需重复传入该参数 |
 | `--context` | 空 | 补充上下文；普通 `sync` 会传给 `learn current`，`sync --add` 会传给用户模式生成 |
@@ -500,7 +498,7 @@ skills-seed sync --context "本次只关注兼容性边界"
 
 #### 注意事项
 
-1. `sync` 不带 `--add` 时，会先执行 `learn current`，再 `patterns merge`，最后 `generate skills`。
+1. `sync` 不带 `--add` 时，会先执行 `learn current`，再 `generate skills`；模式策展在学习入库阶段完成。
 2. `sync --add` 跳过学习步骤，直接用自然语言定义模式，适合补充 AI 未自动发现的规则。
 3. 中间步骤失败会中断后续步骤。
 

@@ -2,6 +2,28 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.0]
+
+### 功能
+
+- 新增模式策展服务 `curator`，作为候选模式写入本地模式库前的统一边界：检索相关历史模式、调用 AI 做去重/整合/丢弃、服务端校验输出，再写入数据库。
+- 新增 `pattern-curate` prompt，要求 AI 在入库前验证候选覆盖、重复规则整合、代码证据来源、统计一致性和低质量候选丢弃。
+- 新增显式维护命令 `skills-seed patterns compact`，用于人工触发已有模式库整理；支持 `--category` 和 `--dry-run`。
+
+### 变更
+
+- `learn current`、`learn history`、`learn staged/commit` 和 `patterns add` 现在只产出候选模式，所有新增、更新、合并或丢弃都由 curator 入库边界负责。
+- `generate skills` 改为只读模式库，不再合并或修正 patterns；生成阶段只负责读取已沉淀的项目画像、workspace 画像/spec 和 patterns 并生成 skills。
+- `sync` 流程简化为 `learn current -> generate skills` 或 `patterns add -> generate skills`，模式策展发生在学习/添加入库阶段。
+- 项目结构摘要、样例文件收集和结构化预扫描统一走配置化文件选择策略，除内置安全边界和 `exclude` 外，不再在 analyzer 中维护额外目录关键字机制。
+- Skills 模板和生成引用进一步收紧为语言无关、证据驱动表达，避免生成器合成硬编码项目指导。
+
+### 破坏性变化
+
+- 移除 `skills-seed generate skills --merge`。
+- 移除旧命令 `skills-seed patterns merge`，请改用 `skills-seed patterns compact`。
+- 移除旧的 `internal/service/merger`、`pattern-merge` prompt 和 `MergePatterns*` Agent API。
+
 ## [v0.8.1]
 
 ### 功能

@@ -15,9 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -49,7 +47,7 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerServi
 	if configRepo != nil {
 		cfg := configRepo.GetAnalysisConfig().Structural
 		if cfg.Enabled {
-			svc.structuralCollector = newStructuralCollector(cfg, configRepo.GetExclude())
+			svc.structuralCollector = newStructuralCollector(cfg)
 		}
 	}
 	return svc
@@ -65,7 +63,11 @@ func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectR
 		return "", nil
 	}
 
-	contextText, err := s.structuralCollector.Collect(ctx, projectRoot, req)
+	collector := s.structuralCollector
+	if treeCollector, ok := collector.(*treesitterCollector); ok {
+		collector = treeCollector.withExclude(fileanalysis.ConfiguredLearnExcludes(s.configRepo, projectRoot))
+	}
+	contextText, err := collector.Collect(ctx, projectRoot, req)
 	if err == nil {
 		return contextText, nil
 	}
@@ -408,39 +410,11 @@ func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error
 		"project_root", projectRoot,
 	)
 
-	// 使用 tree 命令获取目录结构（如果可用）
-	if _, err := exec.LookPath("tree"); shouldUseExternalTreeCommand(runtime.GOOS, err == nil) {
-		cmd := exec.Command("tree", "-L", "3", "-I", "vendor|node_modules|.git|.skills-seed", projectRoot)
-		output, err := cmd.Output()
-		if err == nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-				"operation", "analyzer.get_project_structure",
-				"method", "tree",
-				"duration", time.Since(startedAt),
-				"output_length", len(output),
-			)
-			return string(output), nil
-		}
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "analyzer.get_project_structure.tree",
-			"duration", time.Since(startedAt),
-			"error", err,
-		)
-	}
-
-	// 如果 tree 命令不可用，使用 find 作为后备
 	var structure strings.Builder
+	selectionPolicy := fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot)
 	err := filepath.Walk(projectRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
-		}
-
-		// 跳过隐藏目录和常见排除目录
-		if info.IsDir() {
-			name := filepath.Base(path)
-			if name == ".git" || name == ".skills-seed" || name == "vendor" || name == "node_modules" {
-				return filepath.SkipDir
-			}
 		}
 
 		// 获取相对路径
@@ -448,9 +422,20 @@ func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error
 		if err != nil {
 			return nil
 		}
+		relPath = filepath.ToSlash(relPath)
+		if relPath == "." {
+			structure.WriteString(".\n")
+			return nil
+		}
+		if selectionPolicy.IsExcluded(relPath) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
 		// 只显示前3层
-		depth := strings.Count(relPath, string(filepath.Separator))
+		depth := strings.Count(relPath, "/")
 		if depth > 3 {
 			if info.IsDir() {
 				return filepath.SkipDir
@@ -490,10 +475,6 @@ func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error
 	)
 
 	return result, nil
-}
-
-func shouldUseExternalTreeCommand(goos string, treeAvailable bool) bool {
-	return treeAvailable && goos != "windows"
 }
 
 // FindMainFiles 查找主要入口文件
@@ -794,33 +775,7 @@ func (s *AnalyzerService) collectSampleFiles(projectRoot, language string) []age
 
 func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRoots []string, language string) []agent.SampleFile {
 	startedAt := time.Now()
-	var ext string
-	switch language {
-	case "go":
-		ext = ".go"
-	case "typescript", "javascript":
-		ext = ".ts"
-		if language == "javascript" {
-			ext = ".js"
-		}
-	case "python":
-		ext = ".py"
-	case "java":
-		ext = ".java"
-	default:
-		ext = ".go"
-	}
-
-	// 排除目录
-	excludeDirs := map[string]bool{
-		"vendor": true, "node_modules": true, ".git": true, ".skills-seed": true,
-		"testdata": true, "mocks": true,
-	}
-
-	// 排除文件后缀
-	excludeSuffixes := map[string]bool{
-		"_test.go": true, "_test.py": true, "_test.ts": true,
-	}
+	extensions := sampleFileExtensions(language)
 
 	var files []agent.SampleFile
 	seenFiles := make(map[string]bool)
@@ -837,62 +792,40 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 			continue
 		}
 
-		if err := filepath.Walk(scanRoot, func(path string, info os.FileInfo, err error) error {
-			if err != nil || len(files) >= maxSampleFiles {
-				return nil
-			}
-
-			if info.IsDir() {
-				name := filepath.Base(path)
-				if excludeDirs[name] {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-
-			if !strings.HasSuffix(path, ext) {
-				return nil
-			}
-
-			relPath, _ := filepath.Rel(projectRoot, path)
-			relPath = filepath.ToSlash(relPath)
-			if config.DefaultAnalyzeSourceFilesOnly {
-				if include, _ := selectionPolicy.Include(relPath); !include {
-					return nil
-				}
-			}
-			if seenFiles[relPath] || selectionPolicy.IsExcluded(relPath) {
-				return nil
-			}
-
-			// 排除测试文件和生成文件
-			base := filepath.Base(path)
-			for suffix := range excludeSuffixes {
-				if strings.HasSuffix(base, suffix) {
-					return nil
-				}
-			}
-			if strings.HasSuffix(base, ".pb.go") || strings.HasSuffix(base, ".gen.go") {
-				return nil
-			}
-			if info.Size() == 0 {
-				return nil
-			}
-
-			files = append(files, agent.SampleFile{
-				Path: relPath,
-			})
-			seenFiles[relPath] = true
-
-			logger.Diagnostic(i18n.Get("LoggerAnalyzerSampleFileCollected"), "file", relPath, "size", info.Size())
-			return nil
-		}); err != nil {
+		selection, err := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
+			Root:          projectRoot,
+			Policy:        selectionPolicy,
+			FocusAbsPaths: []string{scanRoot},
+		})
+		if err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "analyzer.collect_sample_files",
 				"duration", time.Since(startedAt),
 				"scan_root", scanRoot,
 				"error", err,
 			)
+			continue
+		}
+
+		for _, selected := range selection.Files {
+			if len(files) >= maxSampleFiles {
+				break
+			}
+			relPath := filepath.ToSlash(selected.Path)
+			if seenFiles[relPath] || !matchesAnySuffix(relPath, extensions) {
+				continue
+			}
+			absPath := filepath.Join(projectRoot, filepath.FromSlash(relPath))
+			info, err := os.Stat(absPath)
+			if err != nil || info.Size() == 0 {
+				continue
+			}
+			files = append(files, agent.SampleFile{
+				Path: relPath,
+			})
+			seenFiles[relPath] = true
+
+			logger.Diagnostic(i18n.Get("LoggerAnalyzerSampleFileCollected"), "file", relPath, "size", info.Size())
 		}
 	}
 
@@ -900,13 +833,42 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 		"operation", "analyzer.collect_sample_files",
 		"project_root", projectRoot,
 		"language", language,
-		"extension", ext,
+		"extensions", strings.Join(extensions, ","),
 		"scan_roots_count", len(scanRoots),
 		"duration", time.Since(startedAt),
 		"sample_files_count", len(files),
 	)
 
 	return files
+}
+
+func sampleFileExtensions(language string) []string {
+	switch language {
+	case "go":
+		return []string{".go"}
+	case "typescript":
+		return []string{".ts", ".tsx"}
+	case "javascript":
+		return []string{".js", ".jsx"}
+	case "python":
+		return []string{".py"}
+	case "java":
+		return []string{".java"}
+	default:
+		return nil
+	}
+}
+
+func matchesAnySuffix(path string, suffixes []string) bool {
+	if len(suffixes) == 0 {
+		return true
+	}
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(path, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func focusedStructure(projectStructure string, focusPaths []string) string {

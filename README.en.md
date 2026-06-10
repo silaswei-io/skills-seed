@@ -84,6 +84,8 @@ init -> learn current / learn history -> generate skills -> check
 | Generate skills | `skills-seed generate skills` | `SKILL.md`, project overview, specs, pattern references |
 | Check later changes | `skills-seed check` | issues, fix suggestions, and pattern hits based on learned rules |
 
+Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
+
 `generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
 
 Starting in 0.7.0, learning and project-profile analysis use an embedded tree-sitter structural pre-scan when bounded inputs exist. It extracts symbols, imports, entry points, and module clues so the Agent can prioritize source files to inspect. It no longer depends on an external CodeGraph command or index; configure it under `analysis.structural`, where `max_symbols` controls emitted symbol count and `max_file_size` controls the per-source-file size limit.
@@ -101,6 +103,8 @@ Starting in 0.7.2, project-profile analysis performs a narrow JSON recovery for 
 Starting in 0.7.3, current-code learning commits file-analysis fingerprints only after patterns are persisted, preventing unsuccessfully learned files from being skipped by later incremental learning. Pattern, file-fingerprint, hit, and review-comment records maintain `created_at/updated_at`; business-method code locations are stored in the DB as language-agnostic snapshot metadata and can be inspected with `patterns show`.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/`. Runtime logs keep only output lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Business-method locations now use structured `code_location` metadata throughout, generated business-method references show location status, and project skills/references are more compact so the entry skill guides Agents to read the minimum relevant references for each task.
+
+Starting in 0.9.0, learning and user-added patterns use the `pattern-curate` prompt for pre-storage curation: every candidate must be covered, duplicate rules must be consolidated, code evidence must come from input source, and invalid or low-quality candidates are dropped. The old pre-generation merge flow and `patterns merge` command have been removed; generation remains read-only.
 
 Common layout:
 
@@ -235,7 +239,8 @@ Built-in targets:
 | `skills-seed learn history` | Learn long-lived rules from Git history |
 | `skills-seed generate skills` | Generate skills for the current `skills.target` |
 | `skills-seed patterns add <description>` | Add a user-defined pattern in natural language |
-| `skills-seed sync` | Run learning or pattern add, merge, and skill generation in one command |
+| `skills-seed patterns compact` | Explicitly compact similar stored patterns |
+| `skills-seed sync` | Run learning or pattern add, then skill generation in one command |
 | `skills-seed check` | Check staged files or Git-tracked files |
 | `skills-seed patterns stats` | Show pattern quality, hit counts, and recent hits |
 | `skills-seed patterns show` | Show pattern timestamps and code-location fields from the DB |
@@ -248,7 +253,7 @@ See [Command Reference](docs/COMMANDS.EN.md) for all flags and forms.
 
 - Project code is not uploaded to a remote knowledge base by default; learned data is written to `.skills-seed` in the current repository.
 - `check` and `generate skills` call the configured Agent CLI, so network behavior depends on the `claude` / `codex` CLI you use.
-- `.skills-seed/memory/project.db` is a local BoltDB file and can only be opened by one `skills-seed` process at a time. If another command is learning, merging, or inspecting patterns, a new command may report that the database is in use; wait for the running command to finish and retry.
+- `.skills-seed/memory/project.db` is a local BoltDB file and can only be opened by one `skills-seed` process at a time. If another command is learning, compacting, or inspecting patterns, a new command may report that the database is in use; wait for the running command to finish and retry.
 - Generated skills directories, `.git/**`, `.skills-seed/**`, and common build outputs are excluded by default so generated content does not feed back into later learning.
 - A handwritten `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 

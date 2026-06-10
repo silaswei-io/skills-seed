@@ -40,6 +40,16 @@
 
 naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config
 
+# 输出前验证清单（必须内部执行）
+
+返回 JSON 前逐条自检：
+1. 如果提供了关联文件，`good_example` 和 `bad_example` 必须来自已读取文件或严格贴合项目真实代码风格；不要编造文件路径、行号或方法签名。
+2. 如果没有提供关联文件，可以输出空示例或风格示例，但不要声称它来自项目源码，也不要填写虚假的 `business_method`。
+3. 分类必须来自可用分类；优先选择最具体技术分类，只有领域规则、状态流转或业务编排才使用 `business`。
+4. `rule` 必须是可执行规则，说明“当 X 时，应该 Y”，不要输出泛化最佳实践。
+5. `business_method` 只能在真实源码证据支持时填写，且必须包含真实签名和位置；否则使用 `null`。
+6. 证据不足或用户描述过泛时，降低 `confidence`，不要补造事实。
+
 # 输出格式
 
 **仅返回一个有效的 JSON 对象**。下面的 `json` 代码块仅用于说明结构；实际回复不要包含 markdown 代码块或额外文本：

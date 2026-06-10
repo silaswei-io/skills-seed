@@ -27,8 +27,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
-	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -278,7 +278,7 @@ func TestRunLearnCurrentUsesChangedFilesAsFocusPaths(t *testing.T) {
 	require.Equal(t, []string{"main.go"}, profileFocus)
 }
 
-func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternSaveFails(t *testing.T) {
+func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternStoreFails(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
@@ -301,7 +301,7 @@ func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternSaveFails(t *test
 	err := runLearnCurrent(cont, opts)
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "save pattern")
+	require.Contains(t, err.Error(), "patterns")
 }
 
 func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
@@ -891,7 +891,7 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		},
 	}
 	gitRepo := git.NewRepository(projectRoot)
-	mergerSvc := merger.NewMergerService(mockAgent, patternRepo)
+	curatorSvc := curator.NewService(mockAgent, patternRepo)
 
 	return &container.Container{
 		SeedPath:             seedPath,
@@ -905,9 +905,9 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		WorkspaceSpecRepo:    workspacestore.NewSpecRepository(seedPath),
 		Agent:                mockAgent,
 		AnalyzerSvc:          analyzer.NewAnalyzerService(mockAgent, configRepo),
-		LearnerSvc:           servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, mergerSvc),
+		LearnerSvc:           servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, curatorSvc),
 		FileTracker:          patternRepo,
-		MergerSvc:            mergerSvc,
+		CuratorSvc:           curatorSvc,
 	}
 }
 

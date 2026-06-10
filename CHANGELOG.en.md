@@ -2,6 +2,28 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.0]
+
+### Features
+
+- Added the `curator` service as the single pre-storage boundary for candidate patterns: it retrieves related historical patterns, asks AI to deduplicate/consolidate/drop candidates, validates the result server-side, then writes to the database.
+- Added the `pattern-curate` prompt, requiring pre-storage validation for candidate coverage, duplicate-rule consolidation, code-evidence provenance, summary consistency, and low-quality candidate drops.
+- Added the explicit maintenance command `skills-seed patterns compact` for curating the existing pattern store; supports `--category` and `--dry-run`.
+
+### Changes
+
+- `learn current`, `learn history`, `learn staged/commit`, and `patterns add` now produce candidate patterns; all add/update/merge/drop decisions happen inside the curator storage boundary.
+- `generate skills` is now read-only with respect to the pattern store. It no longer merges or repairs patterns; it only reads stored project profiles, workspace profile/spec data, and patterns to generate skills.
+- `sync` now runs `learn current -> generate skills` or `patterns add -> generate skills`; pattern curation happens while learning or adding patterns stores candidates.
+- Project-structure summaries, sample-file collection, and structural pre-scan now share the configured file-selection policy. Apart from built-in safety boundaries and `exclude`, analyzer no longer maintains extra directory-name keyword rules.
+- Skills templates and generated references were tightened toward language-agnostic, evidence-driven wording so the generator does not synthesize hardcoded project guidance.
+
+### Breaking Changes
+
+- Removed `skills-seed generate skills --merge`.
+- Removed the old `skills-seed patterns merge` command; use `skills-seed patterns compact` instead.
+- Removed the old `internal/service/merger`, `pattern-merge` prompt, and `MergePatterns*` Agent API.
+
 ## [v0.8.1]
 
 ### Features

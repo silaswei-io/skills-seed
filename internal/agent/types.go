@@ -145,14 +145,17 @@ type UserDefinePatternResult struct {
 	Pattern *domain.Pattern
 }
 
-// MergePatternsRequest 模式汇总请求
-type MergePatternsRequest struct {
-	Category string           // 分类名称
-	Patterns []domain.Pattern // 待汇总的模式列表
+// CuratePatternsRequest 模式策展请求。
+type CuratePatternsRequest struct {
+	Operation           string              // 操作来源，如 learn_current、learn_history、manual_compact
+	CandidatePatterns   []domain.Pattern    // 本次分析产出的候选模式
+	ExistingPatterns    []domain.Pattern    // 与候选相关的既有规范模式
+	AllExisting         bool                // ExistingPatterns 是否代表整个模式集合
+	ExistingByCandidate map[string][]string // 候选模式 ID -> 相关既有模式 ID
 }
 
-// MergedPattern 合并后的模式
-type MergedPattern struct {
+// CuratedPattern 表示 AI 策展后建议写入的规范模式。
+type CuratedPattern struct {
 	ID              string                 // 模式ID
 	Name            string                 // 模式名称
 	Category        string                 // 分类
@@ -161,31 +164,37 @@ type MergedPattern struct {
 	BadExample      string                 // 反例代码
 	Rule            string                 // 规则
 	Confidence      float64                // 置信度
-	MergedFrom      []string               // 从哪些模式合并而来
+	Frequency       int                    // 频率
+	MergedFrom      []string               // 被合并的候选或既有模式ID
 	MergeReason     string                 // 合并理由
 	SimilarityScore float64                // 合并相似度
+	Source          string                 // 来源
 	BusinessMethod  *domain.BusinessMethod // 业务方法信息
+	ProjectID       string                 // workspace 子项目 ID
+	ScopePath       string                 // workspace 路径范围
+	WorkspaceRole   string                 // workspace 角色
 }
 
-// UnchangedPattern 未变更的模式
-type UnchangedPattern struct {
-	ID     string // 模式ID
-	Reason string // 未变更的理由
+// CuratedDrop 表示不入库的候选模式。
+type CuratedDrop struct {
+	ID     string // 候选模式 ID
+	Reason string // 丢弃原因
 }
 
-// MergePatternsResult 模式汇总结果
-type MergePatternsResult struct {
-	MergedPatterns    []MergedPattern    // 合并后的模式
-	UnchangedPatterns []UnchangedPattern // 未变更的模式
-	Summary           MergeSummary       // 汇总统计
+// CuratePatternsResult 模式策展结果。
+type CuratePatternsResult struct {
+	Patterns []CuratedPattern // 应写入模式库的规范模式
+	Dropped  []CuratedDrop    // 明确不入库的候选模式
+	Summary  CurateSummary    // 策展统计
 }
 
-// MergeSummary 汇总统计
-type MergeSummary struct {
-	TotalInput     int // 输入模式总数
-	TotalMerged    int // 合并后模式数
-	TotalUnchanged int // 未变更模式数
-	MergeCount     int // 合并操作次数
+// CurateSummary 策展统计。
+type CurateSummary struct {
+	TotalCandidates int // 候选模式总数
+	TotalExisting   int // 参与判断的既有模式总数
+	TotalWritten    int // 输出规范模式数
+	TotalDropped    int // 丢弃候选数
+	MergeCount      int // 合并操作数
 }
 
 // AnalyzeProjectRequest 项目分析请求
@@ -300,9 +309,9 @@ type SkillsGenerator interface {
 	GenerateSkillsSummary(ctx context.Context, req *GenerateSkillsRequest) (*GenerateSkillsResult, error)
 }
 
-// PatternMerger 模式合并接口
-type PatternMerger interface {
-	MergePatterns(ctx context.Context, req *MergePatternsRequest) (*MergePatternsResult, error)
+// PatternCurator 模式策展接口
+type PatternCurator interface {
+	CuratePatterns(ctx context.Context, req *CuratePatternsRequest) (*CuratePatternsResult, error)
 }
 
 // UserPatternDefiner 用户自定义模式接口
@@ -326,7 +335,7 @@ type Agent interface {
 	PatternLearner
 	FixGenerator
 	SkillsGenerator
-	PatternMerger
+	PatternCurator
 	UserPatternDefiner
 	ProjectAnalyzer
 }

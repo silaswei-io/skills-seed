@@ -28,11 +28,19 @@ type profileReferenceTemplateData struct {
 	domain.ProjectProfile
 	HasBusinessPatterns bool
 	HasUtilityPatterns  bool
+	CodeFenceLanguage   string
 }
 
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
-	References ReferenceAvailability
+	References    ReferenceAvailability
+	SourceOfTruth []SourceOfTruthItem
+}
+
+type SourceOfTruthItem struct {
+	Area      string
+	Edit      string
+	DoNotEdit string
 }
 
 type categoryReferenceMeta struct {

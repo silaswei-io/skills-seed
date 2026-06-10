@@ -152,8 +152,8 @@ other = "Failed to render fix-generate prompt"
 [AgentRenderGenerateSkillsPromptFailed]
 other = "Failed to render skill-project-summary prompt"
 
-[AgentRenderMergePatternsPromptFailed]
-other = "Failed to render pattern-merge prompt"
+[AgentRenderCuratePatternsPromptFailed]
+other = "Failed to render pattern-curate prompt"
 
 [AgentRenderProjectAnalysisPromptFailed]
 other = "Failed to render project-analyze prompt"
@@ -176,8 +176,8 @@ other = "Codex generate fixes failed"
 [AgentCodexGenerateSkillsFailed]
 other = "Codex generate skills summary failed"
 
-[AgentCodexMergePatternsFailed]
-other = "Codex merge patterns failed"
+[AgentCodexCuratePatternsFailed]
+other = "Codex curate patterns failed"
 
 [AgentCodexProjectAnalysisFailed]
 other = "Codex project analysis failed"
@@ -344,8 +344,8 @@ other = "Claude generate fixes failed"
 [AgentClaudeGenerateSkillsFailed]
 other = "Claude generate skills summary failed"
 
-[AgentClaudeMergePatternsFailed]
-other = "Claude merge patterns failed"
+[AgentClaudeCuratePatternsFailed]
+other = "Claude curate patterns failed"
 
 [AgentClaudeProjectAnalysisFailed]
 other = "Claude project analysis failed"
@@ -687,9 +687,6 @@ other = "Starting to learn from Git history..."
 [LearnAnalyzingCommitsCount]
 other = "Analyzing up to {{.Count}} commits"
 
-[LearnFlagMerge]
-other = "Merge similar patterns using AI after learning"
-
 [LearnNoCommits]
 other = "No new commits to learn"
 
@@ -723,8 +720,8 @@ other = "Learning workspace child projects"
 [ProgressLearnHistoryBatch]
 other = "Analyzing batch {{.Current}}/{{.Total}} (commits {{.Start}}-{{.End}}/{{.CommitTotal}})"
 
-[ProgressMergePatternsAI]
-other = "Merging similar patterns with AI"
+[ProgressCuratePatternsAI]
+other = "Curating patterns with AI"
 
 [ProgressGenerateFixesAI]
 other = "Generate fix suggestions"
@@ -844,10 +841,6 @@ other = "Child project {{.ProjectName}} must use project mode, current mode is {
 [GenerateFlagOutput]
 other = "Skills output directory (defaults to skills.paths for the current skills.target, such as .claude/skills/... or .agents/skills/...)"
 
-# 生成合并
-[GenerateFlagMerge]
-other = "Merge similar patterns before generating (deprecated; use patterns merge)"
-
 [GenerateFlagNoReferences]
 other = "Skip generating reference documents (references/ directory)"
 
@@ -857,48 +850,33 @@ other = "Additional guidance for this generate run, passed to the AI agent as ex
 [GenerateFlagContextFile]
 other = "Read additional guidance for this generate run from a file; useful for longer constraints"
 
-[GenerateMergeStarting]
-other = "Starting to merge similar patterns..."
-
-[GenerateMergeDeprecated]
-other = "'generate-skills --merge' is deprecated. Use 'skills-seed patterns merge' before 'skills-seed generate skills' instead."
-
-[GenerateMergeFailed]
-other = "Merge failed: {{.Error}}"
-
-[GenerateMergeCompleted]
-other = "Merge completed"
-
-[GenerateMergedCount]
-other = "Merged pattern count: {{.Count}}"
-
 # 模式
 [PatternsShort]
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns.\n\nCurrently supported:\n  show   - Show database fields, timestamps, and code-location metadata for patterns\n  merge  - Ask the current agent to merge semantically similar patterns and reduce duplicate rules.\n\nBefore merging, consider running 'skills-seed patterns show' to inspect existing content."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern and curate it before storage\n  compact - Ask the current agent to curate existing patterns and reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
 
 [PatternsExample]
-other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Merge similar patterns in all categories\n  skills-seed patterns merge"
+other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Compact similar patterns in all categories\n  skills-seed patterns compact"
 
-[PatternsMergeShort]
-other = "Merge similar patterns"
+[PatternsCompactShort]
+other = "Compact similar patterns"
 
-[PatternsMergeLongDesc]
-other = "Use the configured AI agent to analyze learned patterns and merge semantically duplicate or highly similar entries into fewer, clearer patterns.\n\nBy default this writes back to the database. Use --dry-run to preview the merge summary only. Use --category to limit the merge to one category."
+[PatternsCompactLongDesc]
+other = "Use the configured AI agent to curate learned patterns and compact semantically duplicate or highly similar entries into fewer, clearer patterns.\n\nBy default this writes back to the database. Use --dry-run to preview the curation summary only. Use --category to limit compaction to one category."
 
-[PatternsMergeExample]
-other = "  # Merge all similar patterns and write back to the database\n  skills-seed patterns merge\n\n  # Merge only the api category\n  skills-seed patterns merge --category api\n\n  # Preview merge results without writing\n  skills-seed patterns merge --dry-run"
+[PatternsCompactExample]
+other = "  # Compact all similar patterns and write back to the database\n  skills-seed patterns compact\n\n  # Compact only the api category\n  skills-seed patterns compact --category api\n\n  # Preview compact results without writing\n  skills-seed patterns compact --dry-run"
 
-[PatternsMergeFlagCategory]
-other = "Only merge the specified category, such as business, api, or testing; empty means all categories"
+[PatternsCompactFlagCategory]
+other = "Only compact the specified category, such as business, api, or testing; empty means all categories"
 
-[PatternsMergeFlagDryRun]
-other = "Preview merge results without writing to the database"
+[PatternsCompactFlagDryRun]
+other = "Preview compact results without writing to the database"
 
-[PatternsMergeComplete]
-other = "Patterns merged: input {{.TotalInput}}, merged output {{.TotalMerged}}, unchanged {{.TotalUnchanged}}, merge operations {{.MergeCount}}"
+[PatternsCompactComplete]
+other = "Patterns compacted: input {{.TotalInput}}, written {{.TotalWritten}}, dropped {{.TotalDropped}}, merged groups {{.MergeCount}}"
 
 [PatternsAddShort]
 other = "Add a user-defined pattern using natural language"
@@ -923,13 +901,13 @@ other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, s
 
 # sync
 [SyncShort]
-other = "One-stop sync: learn + merge + generate skills"
+other = "One-stop sync: learn or add patterns + generate skills"
 
 [SyncLongDesc]
-other = "Run the full pipeline in one command:\n\n  Path A (default): learn current → patterns merge → generate skills\n  Path B (--add): patterns add → patterns merge → generate skills\n\nWithout --add, runs Path A: learn from current codebase, merge similar patterns, generate skills.\nWith --add, runs Path B: add user-defined pattern, merge, generate skills."
+other = "Run the full pipeline in one command:\n\n  Path A (default): learn current → generate skills\n  Path B (--add): patterns add → generate skills\n\nLearning and adding patterns curate candidates before storing them; generate skills only reads stored patterns."
 
 [SyncExample]
-other = "  # Full pipeline: learn + merge + generate\n  skills-seed sync\n\n  # Add user pattern + merge + generate\n  skills-seed sync --add \"All APIs must handle errors\" --category api\n\n  # With related files\n  skills-seed sync --add \"Use limit/offset for pagination\" --files internal/handler/pagination.go"
+other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add user pattern + generate\n  skills-seed sync --add \"All APIs must handle errors\" --category api\n\n  # With related files\n  skills-seed sync --add \"Use limit/offset for pagination\" --files internal/handler/pagination.go"
 
 [SyncFlagAdd]
 other = "Add a user-defined pattern (triggers Path B)"
@@ -944,25 +922,19 @@ other = "Related file paths; may be repeated (used with --add)"
 other = "Additional context; plain sync passes it to learning, --add passes it to user pattern generation"
 
 [SyncStepLearn]
-other = "[sync] Step 1/3: Learning from current codebase..."
+other = "[sync] Step 1/2: Learning from current codebase..."
 
 [SyncStepAddPattern]
-other = "[sync] Step 1/3: Adding user-defined pattern..."
-
-[SyncStepMerge]
-other = "[sync] Step 2/3: Merging similar patterns..."
+other = "[sync] Step 1/2: Adding user-defined pattern..."
 
 [SyncStepGenerate]
-other = "[sync] Step 3/3: Generating skills..."
+other = "[sync] Step 2/2: Generating skills..."
 
 [SyncComplete]
 other = "[sync] Complete!"
 
 [SyncLearnFailed]
 other = "Learn failed"
-
-[SyncMergeFailed]
-other = "Merge failed"
 
 [SyncGenerateFailed]
 other = "Generate skills failed"
@@ -1239,37 +1211,6 @@ other = "Stash created: {{.Message}}\nRestore fixes with 'git stash pop'"
 [AutoFixBranchCreated]
 other = "New branch created: {{.BranchName}}\nFixes applied on new branch, original branch unchanged"
 
-# 模式合并
-[LearnMergeStarting]
-other = "Starting AI pattern merge..."
-
-[LearnMergeFailed]
-other = "Pattern merge failed: {{.Error}}"
-
-[LearnMergeCompleted]
-other = "Pattern merge completed"
-
-[LearnMergeCategory]
-other = "Merging category {{.Category}} ({{.Count}} patterns)..."
-
-[LearnMergeWarning]
-other = "Warning: Failed to merge category {{.Category}}: {{.Error}}"
-
-[LearnMergePatternMerged]
-other = "  Merged pattern: {{.Name}} (from {{.Count}} patterns)"
-
-[LearnMergeDeleteFailed]
-other = "Warning: Failed to delete old pattern {{.ID}}: {{.Error}}"
-
-[LearnMergeSaveFailed]
-other = "Warning: Failed to save merged pattern {{.Name}}: {{.Error}}"
-
-[LearnMergeNoPatterns]
-other = "No patterns to merge"
-
-[LearnMergeCategoryComplete]
-other = "Category {{.Category}} merge complete: {{.Input}} input, {{.Merged}} merged, {{.Unchanged}} unchanged"
-
 # 生成服务
 [GeneratorNoPatterns]
 other = "No patterns learned, skipping skills generation"
@@ -1446,12 +1387,6 @@ other = "Batch learning failed"
 [LoggerLearnerBatchComplete]
 other = "Batch learning completed"
 
-[LoggerLearnerSaveMergedFailed]
-other = "Failed to save merged pattern"
-
-[LoggerLearnerMergedPattern]
-other = "Merged pattern"
-
 [LoggerLearnerSaveNewFailed]
 other = "Failed to save new pattern"
 
@@ -1463,27 +1398,6 @@ other = "Failed to mark commit as analyzed"
 
 [LoggerLearnerComplete]
 other = "Learning completed"
-
-[LoggerLearnerMergeStart]
-other = "Starting pattern merge"
-
-[LoggerLearnerProcessingCategory]
-other = "Processing category"
-
-[LoggerLearnerCategoryMergeFailed]
-other = "Category merge failed"
-
-[LoggerLearnerPatternMergedSuccess]
-other = "Pattern merged successfully"
-
-[LoggerLearnerCategoryMergeComplete]
-other = "Category merge completed"
-
-[LoggerLearnerAllCategoriesComplete]
-other = "All categories merged"
-
-[LoggerLearnerDeleteOldFailed]
-other = "Failed to delete old pattern"
 
 # 日志 - 更新服务
 [LoggerUpdaterStart]
@@ -1511,33 +1425,6 @@ other = "Failed to render category template"
 other = "Failed to write category document"
 
 # 日志 - 合并服务
-[LoggerMergerStart]
-other = "Starting pattern merge"
-
-[LoggerMergerNoPatterns]
-other = "No patterns to merge"
-
-[LoggerMergerFoundPatterns]
-other = "Found patterns to merge"
-
-[LoggerMergerAIComplete]
-other = "AI merge completed"
-
-[LoggerMergerDryRun]
-other = "Dry run mode, not executing actual merge"
-
-[LoggerMergerComplete]
-other = "Merge completed"
-
-[LoggerMergerDeleteOldFailed]
-other = "Failed to delete old pattern"
-
-[LoggerMergerSaveMergedFailed]
-other = "Failed to save merged pattern"
-
-[LoggerMergerPatternSaved]
-other = "Pattern saved"
-
 # 日志 - 代理
 [LoggerAgentClaudeCallFailed]
 other = "Claude CLI call failed"
@@ -1578,11 +1465,11 @@ other = "Skills summary generation call failed"
 [LoggerAgentSkillsSummaryParseFallback]
 other = "Skills summary parsing failed, returning empty result"
 
-[LoggerAgentMergePatternsCallFailed]
-other = "Pattern merge call failed"
+[LoggerAgentCuratePatternsCallFailed]
+other = "Pattern curation call failed"
 
-[LoggerAgentMergePatternsParseFallback]
-other = "Pattern merge result parsing failed, returning empty result"
+[LoggerAgentCuratePatternsParseFallback]
+other = "Pattern curation result parsing failed"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
@@ -1707,7 +1594,7 @@ other = "Number of commits to analyze; already learned commits are skipped"
 other = "Time range (e.g., 7d, 30d, 6m, 1y)"
 
 [LearnFlagBatchSize]
-other = "Number of commits per batch; each batch is merged into one agent call"
+other = "Number of commits per batch; each batch is analyzed by one agent call and candidate patterns are curated before storage"
 
 [LearnFlagLanguage]
 other = "Primary programming language of the project; empty uses config or auto-detection"

@@ -84,6 +84,8 @@ init -> learn current / learn history -> generate skills -> check
 | 生成 skills | `skills-seed generate skills` | `SKILL.md`、项目概览、规范、patterns references |
 | 检查后续改动 | `skills-seed check` | 基于已学习规则的问题、修复建议和 pattern hits |
 
+0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
+
 `generate skills` 会按模式质量排序：优先沉淀综合分高、check 命中多、置信度高的规则，降低泛化规则和重复规则进入最终 skills 的概率。
 
 0.7.0 起，学习和项目画像分析会在有边界输入时使用内嵌 tree-sitter 做轻量结构化预扫描，提取符号、导入、入口点和模块线索，辅助 Agent 优先判断需要读取的源码。它不再依赖外部 CodeGraph 命令或索引；配置位于 `analysis.structural`，其中 `max_symbols` 控制写入结构化上下文的符号数，`max_file_size` 控制单个源码文件大小上限。
@@ -101,6 +103,8 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 0.7.3 起，当前代码学习会在 pattern 保存成功后才提交文件分析指纹，避免保存失败的文件在后续增量学习中被误判为已学习。Pattern、文件指纹、命中和评审评论记录会维护 `created_at/updated_at`，业务方法代码位置会以语言无关的快照元数据保存到 DB，并可通过 `patterns show` 查看。
 
 0.8.0 起，Agent 输出会单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
+
+0.9.0 起，学习和用户添加模式时会使用 `pattern-curate` 提示词做入库前策展：候选模式必须覆盖、重复规则必须整合、代码证据只能来自输入源码，非法或低质量候选会被丢弃。旧的生成前合并流程和 `patterns merge` 已移除，生成阶段保持只读。
 
 常见目录：
 
@@ -235,7 +239,8 @@ skills:
 | `skills-seed learn history` | 从 Git 历史提交学习长期规则 |
 | `skills-seed generate skills` | 生成当前 `skills.target` 的 skills |
 | `skills-seed patterns add <描述>` | 用自然语言补充用户自定义模式 |
-| `skills-seed sync` | 一键执行学习/添加模式、合并和生成 skills |
+| `skills-seed patterns compact` | 显式整理已入库的相似 patterns |
+| `skills-seed sync` | 一键执行学习/添加模式，并生成 skills |
 | `skills-seed check` | 检查暂存区或 Git 跟踪文件 |
 | `skills-seed patterns stats` | 查看模式质量、命中次数和最近命中 |
 | `skills-seed patterns show` | 查看 DB 中的 pattern 时间和代码位置字段 |
@@ -248,7 +253,7 @@ skills:
 
 - 默认不上传项目代码到远端知识库；学习结果写入当前仓库的 `.skills-seed`。
 - `check` 和 `generate skills` 会调用配置中的 Agent CLI，因此是否联网取决于你使用的 `claude` / `codex` CLI。
-- `.skills-seed/memory/project.db` 是本地 BoltDB 文件，同一时间只能被一个 `skills-seed` 进程写入或打开；如果另一个命令正在学习、合并或查看 patterns，新的命令可能提示数据库正在被占用，等待当前命令结束后重试即可。
+- `.skills-seed/memory/project.db` 是本地 BoltDB 文件，同一时间只能被一个 `skills-seed` 进程写入或打开；如果另一个命令正在学习、整理或查看 patterns，新的命令可能提示数据库正在被占用，等待当前命令结束后重试即可。
 - 生成的 skills 目录、`.git/**`、`.skills-seed/**` 以及常见构建产物默认会被排除，避免生成内容回流到下一轮学习。
 - 手写 `SKILL.md` 如果没有 `generated-by: skills-seed` 标记，默认不会被覆盖。
 

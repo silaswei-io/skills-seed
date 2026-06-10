@@ -185,7 +185,7 @@ Learn coding patterns, business methods, and best practices from the current cod
 |---|---:|---|
 | `--limit`, `-n` | `learning.max_commits`, default `50` | Maximum number of commits to analyze |
 | `--since`, `-s` | empty | Time range, such as `7d`, `30d`, `6m`, or `1y` |
-| `--batch-size`, `-b` | `learning.batch_size`; `10` when config is not loaded | Commits per batch; each batch is merged into one agent call |
+| `--batch-size`, `-b` | `learning.batch_size`; `10` when config is not loaded | Commits per batch; each batch is analyzed by one agent call and candidate patterns are curated before storage |
 | `--help`, `-h` | `false` | Show `learn history` help |
 
 #### `--profile` Values
@@ -245,7 +245,6 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 | Flag | Default | Description |
 |---|---:|---|
 | `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
-| `--merge`, `-m` | `false` | Merge similar patterns before generation; deprecated, use `skills-seed patterns merge` |
 | `--help`, `-h` | `false` | Show `generate skills` help |
 
 #### Common Examples
@@ -287,22 +286,21 @@ references/
 
 1. Workspace mode generates each child skill using that child's own config first, then generates the workspace root skill.
 2. A manual `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
-3. `--merge` is kept for compatibility. Prefer running `skills-seed patterns merge` explicitly.
-4. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
-5. `generate skills` records an md5 for generation inputs. When project profile, patterns, hit stats, config, prompt/skill templates, and output path are unchanged, and generated outputs are complete, Skills Seed skips the agent summary and file rewrite. Workspace root skills use the same mechanism for unchanged root outputs.
+3. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
+4. `generate skills` records an md5 for generation inputs. When project profile, patterns, hit stats, config, prompt/skill templates, and output path are unchanged, and generated outputs are complete, Skills Seed skips the agent summary and file rewrite. Workspace root skills use the same mechanism for unchanged root outputs.
 
 ### `skills-seed patterns`
 
 #### Command Overview
 
-Manage learned patterns. Supports adding user-defined patterns, merging semantically similar patterns, and inspecting DB fields, pattern quality, and check-hit statistics.
+Manage learned patterns. Supports adding user-defined patterns, compacting semantically similar patterns, and inspecting DB fields, pattern quality, and check-hit statistics.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed patterns add <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add "Use RESTful API routes" --category api` | Calls the AI agent |
-| `skills-seed patterns merge` | Ask the current agent to merge similar patterns | `skills-seed patterns merge --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
+| `skills-seed patterns compact` | Ask the current agent to curate and compact similar patterns | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
 | `skills-seed patterns show [pattern-id]` | Show pattern DB fields, timestamps, and code-location metadata | `skills-seed patterns show business-create-order --format json` | Does not call the AI agent or modify the database |
 
@@ -321,13 +319,13 @@ Manage learned patterns. Supports adding user-defined patterns, merging semantic
 | `--context` | empty | Additional context to help AI understand the pattern more accurately |
 | `--help`, `-h` | `false` | Show `patterns add` help |
 
-#### `patterns merge` Flags
+#### `patterns compact` Flags
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--category`, `-c` | empty | Merge only one category, such as `business`, `api`, or `testing`; empty means all |
-| `--dry-run` | `false` | Preview merge results without writing to the database |
-| `--help`, `-h` | `false` | Show `patterns merge` help |
+| `--category`, `-c` | empty | Compact only one category, such as `business`, `api`, or `testing`; empty means all |
+| `--dry-run` | `false` | Preview compact results without writing to the database |
+| `--help`, `-h` | `false` | Show `patterns compact` help |
 
 #### `patterns stats` Flags
 
@@ -348,9 +346,9 @@ Manage learned patterns. Supports adding user-defined patterns, merging semantic
 skills-seed patterns add "All API routes use RESTful style"
 skills-seed patterns add "Errors must wrap context" --category error
 skills-seed patterns add "Database operations use transactions" --files internal/service/user.go --context "Project uses GORM"
-skills-seed patterns merge
-skills-seed patterns merge --category api
-skills-seed patterns merge --category business --dry-run
+skills-seed patterns compact
+skills-seed patterns compact --category api
+skills-seed patterns compact --category business --dry-run
 skills-seed patterns stats
 skills-seed patterns show
 skills-seed patterns show business-create-order --format json
@@ -358,8 +356,8 @@ skills-seed patterns show business-create-order --format json
 
 #### Notes
 
-1. Merge runs call the CLI configured by the current `agent.engine`.
-2. Use `--dry-run` first when you want to inspect the merge result.
+1. `patterns compact` calls the CLI configured by the current `agent.engine`.
+2. Use `--dry-run` first when you want to inspect the curation result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
 4. `patterns show` reads saved DB fields and helps inspect `created_at/updated_at`, code-location status, and language-agnostic symbol snapshots.
 5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/memory/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
@@ -469,20 +467,20 @@ skills-seed profile refresh --language go
 
 #### Command Overview
 
-One-step sync: learn current code, merge patterns, generate skills. When `--add` is provided, learning is skipped and a user-defined pattern is created instead before merging and generating.
+One-step sync: learn current code, then generate skills. When `--add` is provided, learning is skipped and a user-defined pattern is created before generation.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed sync` | Learn current → patterns merge → generate skills | `skills-seed sync` | Equivalent to `learn current`, `patterns merge`, `generate skills` in sequence |
-| `skills-seed sync --add <desc>` | patterns add → patterns merge → generate skills | `skills-seed sync --add "Use RESTful API routes"` | Skips learning; good for patterns the AI did not discover |
+| `skills-seed sync` | Learn current → generate skills | `skills-seed sync` | Equivalent to `learn current`, `generate skills` in sequence |
+| `skills-seed sync --add <desc>` | patterns add → generate skills | `skills-seed sync --add "Use RESTful API routes"` | Skips learning; good for patterns the AI did not discover |
 
 #### Flags
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--add` | empty | Natural language pattern description; triggers patterns add → merge → generate |
+| `--add` | empty | Natural language pattern description; triggers patterns add → generate |
 | `--category`, `-c` | empty | Category for `--add` mode |
 | `--files`, `-f` | empty | Reference file path for `--add` mode; repeat this flag for multiple files |
 | `--context` | empty | Additional context; plain `sync` passes it to `learn current`, while `sync --add` passes it to user pattern generation |
@@ -500,7 +498,7 @@ skills-seed sync --context "Focus on compatibility boundaries for this run"
 
 #### Notes
 
-1. `sync` without `--add` runs `learn current`, then `patterns merge`, then `generate skills`.
+1. `sync` without `--add` runs `learn current`, then `generate skills`; pattern curation happens while learned candidates are stored.
 2. `sync --add` skips learning and defines a pattern from natural language, useful for patterns the AI missed.
 3. If any step fails, subsequent steps are skipped.
 

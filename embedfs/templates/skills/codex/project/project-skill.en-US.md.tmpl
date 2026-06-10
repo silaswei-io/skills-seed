@@ -1,6 +1,6 @@
 ---
 name: {{.SkillName}}
-description: Use when modifying, reviewing, or extending {{.ProjectName}} {{.Language}} code, especially architecture, module boundaries, business flows, utilities, generated layers, or repository conventions
+description: Use when modifying, reviewing, or extending {{.ProjectName}} {{.Language}} code, especially architecture, module boundaries, business flows, utilities, derived artifacts, or repository conventions
 ---
 
 <!-- generated-by: skills-seed {{.ProgramVersion}} -->
@@ -21,7 +21,7 @@ Read the smallest relevant reference set for the task:
 {{if .References.Enabled}}{{if .References.BusinessMethods}}- Business flow or project method reuse: read [Business Methods](./references/business-methods.md), then the related category patterns
 {{else if .References.BusinessPatterns}}- Business flow changes: read the related business pattern details, then verify against current code
 {{else}}- Business flow changes: inspect current code and reuse nearby implementations
-{{end}}- API, generated layer, routes, or types: read [Project Spec](./references/project-spec.md) and structure/API patterns
+{{end}}- API, contracts, adapters, or derived artifacts: read [Project Spec](./references/project-spec.md) and structure/API patterns
 {{if .References.KeyModules}}- Architecture, module boundary, or dependency changes: read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md)
 {{else}}- Architecture, module boundary, or dependency changes: read [Project Overview](./references/project-overview.md)
 {{end}}- Utilities, config, middleware, or concurrency: read only the matching category pattern
@@ -32,6 +32,44 @@ Prefer current code and high-confidence project patterns; treat medium-confidenc
 
 ---
 
+{{if .Workflows}}
+## Common Workflows
+
+{{range .Workflows}}
+### {{.Title}}
+
+Applies when: {{.AppliesWhen}}
+
+{{range .Steps}}
+- {{.}}
+{{end}}
+
+{{end}}
+---
+
+{{end}}
+{{if .StateSummaries}}
+## State And Boundary Notes
+
+{{range .StateSummaries}}
+- {{.}}
+{{end}}
+
+---
+
+{{end}}
+{{if .ValidationCommands}}
+## Validation Commands
+
+Choose the smallest command set that matches the change:
+
+{{range .ValidationCommands}}
+- `{{.Command}}` - {{.When}}
+{{end}}
+
+---
+
+{{end}}
 ## Pattern References
 
 {{if .References.Enabled}}- **[Project Spec](./references/project-spec.md)** - Boundaries, rules, configuration, and touchpoints
@@ -64,7 +102,7 @@ Prefer current code and high-confidence project patterns; treat medium-confidenc
 
 - Check nearby code before introducing a new pattern or abstraction
 - Use project-specific business methods and utilities from the references when they exist
-{{if .References.ProjectSpec}}- Generated layers, types, routes, and configuration conventions are governed by [Project Spec](./references/project-spec.md){{else}}- Generated layers, types, routes, and configuration conventions are governed by current code and project configuration{{end}}
+{{if .References.ProjectSpec}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by [Project Spec](./references/project-spec.md){{else}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by current code and project configuration{{end}}
 - If references and current code disagree, trust current code and rerun learning/generation
 
 {{if .KeyInsights}}

@@ -21,7 +21,7 @@ var projectPromptNames = []string{
 	"learn-batch",
 	"skill-project-summary",
 	"fix-generate",
-	"pattern-merge",
+	"pattern-curate",
 }
 
 var workspacePromptNames = []string{

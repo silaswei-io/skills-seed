@@ -152,8 +152,8 @@ other = "渲染 fix-generate prompt 失败"
 [AgentRenderGenerateSkillsPromptFailed]
 other = "渲染 skill-project-summary prompt 失败"
 
-[AgentRenderMergePatternsPromptFailed]
-other = "渲染 pattern-merge prompt 失败"
+[AgentRenderCuratePatternsPromptFailed]
+other = "渲染 pattern-curate prompt 失败"
 
 [AgentRenderProjectAnalysisPromptFailed]
 other = "渲染 project-analyze prompt 失败"
@@ -176,8 +176,8 @@ other = "Codex 生成修复失败"
 [AgentCodexGenerateSkillsFailed]
 other = "Codex 生成技能摘要失败"
 
-[AgentCodexMergePatternsFailed]
-other = "Codex 合并模式失败"
+[AgentCodexCuratePatternsFailed]
+other = "Codex 策展模式失败"
 
 [AgentCodexProjectAnalysisFailed]
 other = "Codex 项目分析失败"
@@ -344,8 +344,8 @@ other = "Claude 生成修复失败"
 [AgentClaudeGenerateSkillsFailed]
 other = "Claude 生成技能摘要失败"
 
-[AgentClaudeMergePatternsFailed]
-other = "Claude 合并模式失败"
+[AgentClaudeCuratePatternsFailed]
+other = "Claude 策展模式失败"
 
 [AgentClaudeProjectAnalysisFailed]
 other = "Claude 项目分析失败"
@@ -687,9 +687,6 @@ other = "开始从 Git 历史学习..."
 [LearnAnalyzingCommitsCount]
 other = "分析最多 {{.Count}} 个提交"
 
-[LearnFlagMerge]
-other = "学习后使用 AI 合并相似模式"
-
 [LearnNoCommits]
 other = "没有新的提交需要学习"
 
@@ -723,8 +720,8 @@ other = "学习工作区子项目"
 [ProgressLearnHistoryBatch]
 other = "分析批次 {{.Current}}/{{.Total}}（提交 {{.Start}}-{{.End}}/{{.CommitTotal}}）"
 
-[ProgressMergePatternsAI]
-other = "AI 合并相似模式"
+[ProgressCuratePatternsAI]
+other = "AI 策展模式"
 
 [ProgressGenerateFixesAI]
 other = "生成修复建议"
@@ -844,10 +841,6 @@ other = "子项目 {{.ProjectName}} 必须使用 project 模式，当前为 {{.M
 [GenerateFlagOutput]
 other = "skills 输出目录（默认使用当前 skills.target 的 skills.paths，例如 .claude/skills/... 或 .agents/skills/...）"
 
-# 生成合并
-[GenerateFlagMerge]
-other = "生成前合并相似模式（已不推荐，改用 patterns merge）"
-
 [GenerateFlagNoReferences]
 other = "跳过参考文档生成（不生成 references/ 目录）"
 
@@ -857,48 +850,33 @@ other = "本次生成的补充说明，会传给 AI Agent 作为额外约束"
 [GenerateFlagContextFile]
 other = "从文件读取本次生成的补充说明；适合较长约束"
 
-[GenerateMergeStarting]
-other = "开始合并相似模式..."
-
-[GenerateMergeDeprecated]
-other = "'generate-skills --merge' 已不推荐使用；请改用 'skills-seed patterns merge' 后再运行 'skills-seed generate skills'。"
-
-[GenerateMergeFailed]
-other = "合并失败: {{.Error}}"
-
-[GenerateMergeCompleted]
-other = "合并完成"
-
-[GenerateMergedCount]
-other = "合并后模式数: {{.Count}}"
-
 # 模式
 [PatternsShort]
 other = "管理已学习的 patterns"
 
 [PatternsLongDesc]
-other = "管理已学习的代码模式。\n\n当前支持：\n  show   - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  merge  - 调用当前 Agent 合并语义相近的 patterns，减少重复规则。\n\n合并前建议先运行 'skills-seed patterns show' 检查已有内容。"
+other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 添加用户自定义候选模式，并在入库前完成策展\n  compact - 调用当前 Agent 策展已有 patterns，减少重复规则\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量和命中统计。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
 
 [PatternsExample]
-other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  # 查看单条 pattern 详情\n  skills-seed patterns show business-create-order\n\n  # 合并所有分类中的相似 patterns\n  skills-seed patterns merge"
+other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  # 查看单条 pattern 详情\n  skills-seed patterns show business-create-order\n\n  # 整理所有分类中的相似 patterns\n  skills-seed patterns compact"
 
-[PatternsMergeShort]
-other = "合并相似 patterns"
+[PatternsCompactShort]
+other = "整理相似 patterns"
 
-[PatternsMergeLongDesc]
-other = "使用当前配置的 AI Agent 分析已学习 patterns，将语义重复或高度相似的条目合并为更少、更清晰的 patterns。\n\n默认会写回数据库；使用 --dry-run 可只预览合并摘要。可用 --category 限定分类。"
+[PatternsCompactLongDesc]
+other = "使用当前配置的 AI Agent 策展已学习 patterns，将语义重复或高度相似的条目整理为更少、更清晰的 patterns。\n\n默认会写回数据库；使用 --dry-run 可只预览策展摘要。可用 --category 限定分类。"
 
-[PatternsMergeExample]
-other = "  # 合并所有相似 patterns 并写回数据库\n  skills-seed patterns merge\n\n  # 只合并 api 分类\n  skills-seed patterns merge --category api\n\n  # 预览合并结果，不写入数据库\n  skills-seed patterns merge --dry-run"
+[PatternsCompactExample]
+other = "  # 整理所有相似 patterns 并写回数据库\n  skills-seed patterns compact\n\n  # 只整理 api 分类\n  skills-seed patterns compact --category api\n\n  # 预览整理结果，不写入数据库\n  skills-seed patterns compact --dry-run"
 
-[PatternsMergeFlagCategory]
-other = "只合并指定分类，如 business、api、testing；留空表示所有分类"
+[PatternsCompactFlagCategory]
+other = "只整理指定分类，如 business、api、testing；留空表示所有分类"
 
-[PatternsMergeFlagDryRun]
-other = "只预览合并结果，不写入数据库"
+[PatternsCompactFlagDryRun]
+other = "只预览整理结果，不写入数据库"
 
-[PatternsMergeComplete]
-other = "Patterns 合并完成: 输入 {{.TotalInput}}，合并后 {{.TotalMerged}}，未变更 {{.TotalUnchanged}}，合并操作 {{.MergeCount}}"
+[PatternsCompactComplete]
+other = "Patterns 整理完成: 输入 {{.TotalInput}}，写入 {{.TotalWritten}}，丢弃 {{.TotalDropped}}，合并分组 {{.MergeCount}}"
 
 [PatternsAddShort]
 other = "用自然语言添加用户自定义模式"
@@ -923,13 +901,13 @@ other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}}
 
 # sync 一条龙
 [SyncShort]
-other = "一键同步：学习 + 合并 + 生成 skills"
+other = "一键同步：学习或添加模式 + 生成 skills"
 
 [SyncLongDesc]
-other = "一键完成完整流程，自动执行所有步骤：\n\n  路径 A（默认）: learn current → patterns merge → generate skills\n  路径 B（--add）: patterns add → patterns merge → generate skills\n\n不带 --add 时执行路径 A：先从当前代码库学习模式，再合并相似模式，最后生成 skills。\n带 --add 时执行路径 B：先添加用户定义的模式，再合并，最后生成 skills。"
+other = "一键完成完整流程，自动执行所有步骤：\n\n  路径 A（默认）: learn current → generate skills\n  路径 B（--add）: patterns add → generate skills\n\n学习和添加模式时会先完成模式策展入库，generate skills 只读取已入库模式并生成 skills。"
 
 [SyncExample]
-other = "  # 完整流程：学习 + 合并 + 生成\n  skills-seed sync\n\n  # 添加用户模式 + 合并 + 生成\n  skills-seed sync --add \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件\n  skills-seed sync --add \"分页查询使用 limit/offset\" --files internal/handler/pagination.go"
+other = "  # 完整流程：学习 + 生成\n  skills-seed sync\n\n  # 添加用户模式 + 生成\n  skills-seed sync --add \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件\n  skills-seed sync --add \"分页查询使用 limit/offset\" --files internal/handler/pagination.go"
 
 [SyncFlagAdd]
 other = "添加用户自定义模式（触发路径 B）"
@@ -944,25 +922,19 @@ other = "关联文件路径，可重复传入（配合 --add 使用）"
 other = "额外上下文说明；普通 sync 传给学习阶段，--add 时传给用户模式生成"
 
 [SyncStepLearn]
-other = "[sync] 步骤 1/3: 学习当前代码库..."
+other = "[sync] 步骤 1/2: 学习当前代码库..."
 
 [SyncStepAddPattern]
-other = "[sync] 步骤 1/3: 添加用户自定义模式..."
-
-[SyncStepMerge]
-other = "[sync] 步骤 2/3: 合并相似模式..."
+other = "[sync] 步骤 1/2: 添加用户自定义模式..."
 
 [SyncStepGenerate]
-other = "[sync] 步骤 3/3: 生成 skills..."
+other = "[sync] 步骤 2/2: 生成 skills..."
 
 [SyncComplete]
 other = "[sync] 完成！"
 
 [SyncLearnFailed]
 other = "学习失败"
-
-[SyncMergeFailed]
-other = "合并失败"
 
 [SyncGenerateFailed]
 other = "生成 skills 失败"
@@ -1000,7 +972,7 @@ other = "  # 自动检测并添加所有子仓\n  skills-seed workspace add .\n\
 other = "生成 AI Agent skills"
 
 [GenerateSkillsLongDesc]
-other = "从学到的 patterns 和项目画像生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取学到的 patterns\n  • 读取项目画像\n  • 根据 skills.target 选择目标 skills 模板\n  • 使用 agent.engine 做摘要合并和润色\n  • 生成 SKILL.md 与 references/ 文档"
+other = "从学到的 patterns 和项目画像生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取学到的 patterns\n  • 读取项目画像\n  • 根据 skills.target 选择目标 skills 模板\n  • 使用 agent.engine 做摘要和润色\n  • 生成 SKILL.md 与 references/ 文档"
 
 [GenerateSkillsExample]
 other = "  # 生成到默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project"
@@ -1240,37 +1212,6 @@ other = "已创建 stash: {{.Message}}\n使用 'git stash pop' 恢复修复"
 [AutoFixBranchCreated]
 other = "已创建新分支: {{.BranchName}}\n在新分支上应用了修复，原分支未修改"
 
-# 模式合并
-[LearnMergeStarting]
-other = "开始 AI 模式汇总..."
-
-[LearnMergeFailed]
-other = "模式汇总失败: {{.Error}}"
-
-[LearnMergeCompleted]
-other = "模式汇总完成"
-
-[LearnMergeCategory]
-other = "正在汇总分类 {{.Category}} ({{.Count}} 个模式)..."
-
-[LearnMergeWarning]
-other = "警告: 汇总分类 {{.Category}} 失败: {{.Error}}"
-
-[LearnMergePatternMerged]
-other = "  合并模式: {{.Name}} (从 {{.Count}} 个模式合并)"
-
-[LearnMergeDeleteFailed]
-other = "警告: 删除旧模式失败 {{.ID}}: {{.Error}}"
-
-[LearnMergeSaveFailed]
-other = "警告: 保存合并模式失败 {{.Name}}: {{.Error}}"
-
-[LearnMergeNoPatterns]
-other = "没有模式需要汇总"
-
-[LearnMergeCategoryComplete]
-other = "分类 {{.Category}} 汇总完成: 输入 {{.Input}} 个, 合并 {{.Merged}} 个, 保留 {{.Unchanged}} 个"
-
 # 生成服务
 [GeneratorNoPatterns]
 other = "没有学习到任何模式，跳过 skills 生成"
@@ -1447,12 +1388,6 @@ other = "批量学习失败"
 [LoggerLearnerBatchComplete]
 other = "批量学习完成"
 
-[LoggerLearnerSaveMergedFailed]
-other = "保存合并模式失败"
-
-[LoggerLearnerMergedPattern]
-other = "合并模式"
-
 [LoggerLearnerSaveNewFailed]
 other = "保存新模式失败"
 
@@ -1464,27 +1399,6 @@ other = "标记commit为已分析失败"
 
 [LoggerLearnerComplete]
 other = "学习完成"
-
-[LoggerLearnerMergeStart]
-other = "开始合并模式"
-
-[LoggerLearnerProcessingCategory]
-other = "处理分类"
-
-[LoggerLearnerCategoryMergeFailed]
-other = "分类合并失败"
-
-[LoggerLearnerPatternMergedSuccess]
-other = "模式合并成功"
-
-[LoggerLearnerCategoryMergeComplete]
-other = "分类合并完成"
-
-[LoggerLearnerAllCategoriesComplete]
-other = "所有分类合并完成"
-
-[LoggerLearnerDeleteOldFailed]
-other = "删除旧模式失败"
 
 # 日志 - 更新服务
 [LoggerUpdaterStart]
@@ -1512,33 +1426,6 @@ other = "渲染分类模板失败"
 other = "写入分类文档失败"
 
 # 日志 - 合并服务
-[LoggerMergerStart]
-other = "开始合并模式"
-
-[LoggerMergerNoPatterns]
-other = "没有模式需要合并"
-
-[LoggerMergerFoundPatterns]
-other = "找到待合并模式"
-
-[LoggerMergerAIComplete]
-other = "AI 合并完成"
-
-[LoggerMergerDryRun]
-other = "预览模式，不执行实际合并"
-
-[LoggerMergerComplete]
-other = "合并完成"
-
-[LoggerMergerDeleteOldFailed]
-other = "删除旧模式失败"
-
-[LoggerMergerSaveMergedFailed]
-other = "保存合并模式失败"
-
-[LoggerMergerPatternSaved]
-other = "保存合并模式"
-
 # 日志 - 代理
 [LoggerAgentClaudeCallFailed]
 other = "Claude CLI 调用失败"
@@ -1579,11 +1466,11 @@ other = "Skills 摘要生成调用失败"
 [LoggerAgentSkillsSummaryParseFallback]
 other = "Skills 摘要解析失败，返回空结果"
 
-[LoggerAgentMergePatternsCallFailed]
-other = "模式合并调用失败"
+[LoggerAgentCuratePatternsCallFailed]
+other = "模式策展调用失败"
 
-[LoggerAgentMergePatternsParseFallback]
-other = "模式合并结果解析失败，返回空结果"
+[LoggerAgentCuratePatternsParseFallback]
+other = "模式策展结果解析失败"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "项目分析提示词模板渲染失败"
@@ -1708,7 +1595,7 @@ other = "要分析的提交数量；已学习过的 commit 会跳过"
 other = "时间范围（如 7d, 30d, 6m, 1y）"
 
 [LearnFlagBatchSize]
-other = "每批提交数量；每批会合并后调用一次 Agent"
+other = "每批提交数量；每批调用一次 Agent 分析，并在入库前策展候选模式"
 
 [LearnFlagLanguage]
 other = "项目主要编程语言；留空时使用配置或自动识别"

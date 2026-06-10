@@ -36,7 +36,6 @@ type treesitterCollector struct {
 	maxSymbols  int
 	maxFileSize int64
 	exclude     []string
-	excludeDirs map[string]bool
 }
 
 // fileResult 保存单个文件的结构化提取结果。
@@ -52,32 +51,23 @@ type seedRoot struct {
 	isDir bool
 }
 
-func newStructuralCollector(cfg config.StructuralConfig, exclude []string) structuralCollector {
+func newStructuralCollector(cfg config.StructuralConfig) *treesitterCollector {
 	// maxFileSize 默认限制单文件 512KB，避免大文件拖慢 tree-sitter 解析。
 	maxFileSize := int64(512 * 1024)
 	if cfg.MaxFileSize > 0 {
 		maxFileSize = int64(cfg.MaxFileSize) * 1024
 	}
 
-	// excludeDirs 合并固定元数据目录和配置中的简单目录排除规则。
-	excludeDirs := map[string]bool{
-		".git": true, ".skills-seed": true, ".idea": true, ".vscode": true,
-		".cache": true,
-	}
-	for _, pattern := range exclude {
-		clean := strings.TrimSpace(pattern)
-		// 只把 vendor、node_modules、build 这类简单目录名加入快速跳过列表。
-		if !strings.Contains(clean, "/") && !strings.Contains(clean, "*") && !strings.Contains(clean, ".") {
-			excludeDirs[clean] = true
-		}
-	}
-
 	return &treesitterCollector{
 		maxSymbols:  cfg.MaxSymbols,
 		maxFileSize: maxFileSize,
-		exclude:     exclude,
-		excludeDirs: excludeDirs,
 	}
+}
+
+func (c *treesitterCollector) withExclude(exclude []string) *treesitterCollector {
+	next := *c
+	next.exclude = append([]string(nil), exclude...)
+	return &next
 }
 
 // Collect 遍历项目树、解析源码文件，并返回 Markdown 格式的结构化上下文。
@@ -221,9 +211,12 @@ func (c *treesitterCollector) collectFromRoot(ctx context.Context, projectRoot, 
 
 func (c *treesitterCollector) parsePolicy(projectRoot string) grammars.ParsePolicy {
 	policy := grammars.DefaultPolicy()
-	policy.SkipDirs = c.buildSkipDirs()
 	policy.ShouldSkipDir = func(path string) bool {
-		return c.excludeDirs[filepath.Base(path)]
+		relPath, err := filepath.Rel(projectRoot, path)
+		if err != nil {
+			return false
+		}
+		return filefilter.MatchExcluded(filepath.ToSlash(relPath), c.exclude)
 	}
 	policy.ShouldParse = func(path string, size int64, _ time.Time) bool {
 		if size > c.maxFileSize {
@@ -284,23 +277,6 @@ func fileSize(path string) int64 {
 		return 0
 	}
 	return info.Size()
-}
-
-func (c *treesitterCollector) buildSkipDirs() []string {
-	dirs := []string{".git", ".skills-seed", ".hg", ".svn"}
-	for d := range c.excludeDirs {
-		found := false
-		for _, existing := range dirs {
-			if existing == d {
-				found = true
-				break
-			}
-		}
-		if !found {
-			dirs = append(dirs, d)
-		}
-	}
-	return dirs
 }
 
 func (c *treesitterCollector) assembleMarkdown(

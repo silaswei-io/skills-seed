@@ -651,53 +651,45 @@ func (c *ClaudeAgent) GenerateSkillsSummary(ctx context.Context, req *agent.Gene
 	return result, nil
 }
 
-// MergePatterns 汇总合并相似模式
-func (c *ClaudeAgent) MergePatterns(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error) {
-	// 1. 准备模板数据
+// CuratePatterns 策展候选模式并输出规范模式。
+func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
 	data := map[string]interface{}{
-		"Category": req.Category,
-		"Patterns": req.Patterns,
+		"Operation":           req.Operation,
+		"CandidatePatterns":   req.CandidatePatterns,
+		"ExistingPatterns":    req.ExistingPatterns,
+		"AllExisting":         req.AllExisting,
+		"ExistingByCandidate": req.ExistingByCandidate,
 	}
 
-	// 2. 渲染提示词
-	prompt, err := c.promptLoader.Render("pattern-merge", data)
+	prompt, err := c.promptLoader.Render("pattern-curate", data)
 	if err != nil || prompt == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderMergePatternsPromptFailed"))
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderCuratePatternsPromptFailed"))
 	}
 
-	// 3. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "MergePatterns", prompt)
+	output, err := c.callClaude(ctx, "CuratePatterns", prompt)
 	if err != nil {
-		logger.Error(i18n.Get("LoggerAgentMergePatternsCallFailed"),
+		logger.Error(i18n.Get("LoggerAgentCuratePatternsCallFailed"),
 			"error", err,
-			"category", req.Category,
+			"operation", req.Operation,
 		)
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeMergePatternsFailed"), err)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCuratePatternsFailed"), err)
 	}
 
-	// 4. 解析结果
-	result, err := parser.ParseMergePatternsResult(output)
+	result, err := parser.ParseCuratePatternsResult(output)
 	if err != nil {
-		// 解析失败，返回空结果而不是错误
-		logger.Warn(i18n.Get("LoggerAgentMergePatternsParseFallback"),
+		logger.Warn(i18n.Get("LoggerAgentCuratePatternsParseFallback"),
 			"error", err,
-			"category", req.Category,
+			"operation", req.Operation,
 		)
-		return &agent.MergePatternsResult{
-			MergedPatterns:    []agent.MergedPattern{},
-			UnchangedPatterns: []agent.UnchangedPattern{},
-			Summary: agent.MergeSummary{
-				TotalInput: len(req.Patterns),
-			},
-		}, nil
+		return nil, err
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
 		"agent", c.Name(),
-		"operation", "MergePatterns",
-		"merged_count", len(result.MergedPatterns),
-		"unchanged_count", len(result.UnchangedPatterns),
-		"total_input", result.Summary.TotalInput,
+		"operation", "CuratePatterns",
+		"written_count", len(result.Patterns),
+		"dropped_count", len(result.Dropped),
+		"total_candidates", result.Summary.TotalCandidates,
 	)
 
 	return result, nil

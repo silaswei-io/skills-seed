@@ -2,18 +2,17 @@
 //
 // 本包实现从 Git 历史学习编码模式的流程编排
 //   - Learn: 批量学习 Git 提交历史
-//   - MergePatterns: AI 汇总合并相似模式
 //   - LearnFromCommit: 从单个提交学习
 //   - LearnFromStaged: 从暂存文件路径学习
 //
 // 服务职责
-//   - 流程编排：协调 Git、Agent、Repository 完成学习
+//   - 流程编排：协调 Git、Agent、Curator 完成学习
 //   - 增量学习：只处理未分析的提交
-//   - 模式合并：自动合并相似模式
+//   - 候选入库：把 AI 学到的候选模式交给 Curator 规范化入库
 //
 // 不负责
 //   - AI 分析（由 Agent 负责）
-//   - 数据持久化（由 Repository 负责）
+//   - 模式策展与持久化（由 Curator 负责）
 package learner
 
 import (
@@ -27,17 +26,17 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
-	"github.com/silaswei-io/skills-seed/internal/service/merger"
+	"github.com/silaswei-io/skills-seed/internal/service/curator"
 )
 
 // LearnerService 学习服务 - 流程编排层
-// 职责：协调 Git、Analyzer、Merger 完成学习流程
+// 职责：协调 Git、Agent、Curator 完成学习流程
 type LearnerService struct {
 	agent         agent.Agent
 	gitRepo       domain.GitRepository
 	patternRepo   domain.PatternRepository
 	commitTracker domain.CommitAnalysisTracker
-	mergerSvc     *merger.MergerService
+	curatorSvc    *curator.Service
 }
 
 // NewLearnerService 创建学习服务
@@ -46,14 +45,14 @@ func NewLearnerService(
 	gitRepo domain.GitRepository,
 	patternRepo domain.PatternRepository,
 	commitTracker domain.CommitAnalysisTracker,
-	mergerSvc *merger.MergerService,
+	curatorSvc *curator.Service,
 ) *LearnerService {
 	return &LearnerService{
 		agent:         ag,
 		gitRepo:       gitRepo,
 		patternRepo:   patternRepo,
 		commitTracker: commitTracker,
-		mergerSvc:     mergerSvc,
+		curatorSvc:    curatorSvc,
 	}
 }
 
@@ -91,79 +90,25 @@ func (s *LearnerService) marshalKnownPatterns(ctx context.Context) (string, int)
 	return string(jsonBytes), len(patterns)
 }
 
-// savePattern 保存单个模式（自动查找相似模式并合并）
-func (s *LearnerService) savePattern(ctx context.Context, p domain.Pattern, operation string) error {
-	newPattern := domain.NewPattern(p.ID, p.Name, p.Category)
-	newPattern.SetDescription(p.Description)
-	newPattern.SetExamples(p.GoodExample, p.BadExample)
-	newPattern.SetRule(p.Rule)
-	newPattern.Confidence = p.Confidence
-	newPattern.Frequency = p.Frequency
-	newPattern.Source = p.Source
-	newPattern.BusinessMethod = p.BusinessMethod
-	newPattern.ProjectID = p.ProjectID
-	newPattern.ScopePath = p.ScopePath
-	newPattern.WorkspaceRole = p.WorkspaceRole
-
-	existing, err := s.patternRepo.FindSimilar(ctx, newPattern)
-	if err != nil {
-		logger.Warn(i18n.Get("LoggerLearnerCheckCommitStatusFailed"),
-			"operation", operation,
-			"pattern_name", newPattern.Name,
-			"error", err,
-		)
-	}
-
-	if err == nil && existing != nil {
-		existing.Merge(newPattern)
-		if err := s.patternRepo.Save(ctx, existing); err != nil {
-			logger.Warn(i18n.Get("LoggerLearnerSaveMergedFailed"),
-				"operation", operation,
-				"pattern_name", existing.Name,
-				"error", err,
-			)
-			return fmt.Errorf("save merged pattern %q: %w", existing.Name, err)
-		}
-		logger.Diagnostic(i18n.Get("LoggerLearnerMergedPattern"),
-			"operation", operation,
-			"pattern_name", existing.Name,
-			"frequency", existing.Frequency,
-			"confidence", existing.Confidence,
-		)
-	} else {
-		if err := s.patternRepo.Save(ctx, newPattern); err != nil {
-			logger.Warn(i18n.Get("LoggerLearnerSaveNewFailed"),
-				"operation", operation,
-				"pattern_name", newPattern.Name,
-				"error", err,
-			)
-			return fmt.Errorf("save pattern %q: %w", newPattern.Name, err)
-		}
-		logger.Diagnostic(i18n.Get("LoggerLearnerNewPattern"),
-			"operation", operation,
-			"pattern_name", newPattern.Name,
-		)
-	}
-
-	return nil
-}
-
-// SavePatterns 保存多个模式，并通过已有相似模式自动合并
+// SavePatterns 策展并保存多个候选模式。
 func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pattern, operation string) int {
 	savedCount, _ := s.SavePatternsStrict(ctx, patterns, operation)
 	return savedCount
 }
 
-// SavePatternsStrict 保存多个模式，任何模式保存失败都会返回错误。
+// SavePatternsStrict 策展并保存多个候选模式，失败时返回错误。
 func (s *LearnerService) SavePatternsStrict(ctx context.Context, patterns []domain.Pattern, operation string) (int, error) {
-	savedCount := 0
-	for _, p := range patterns {
-		if err := s.savePattern(ctx, p, operation); err != nil {
-			return savedCount, err
-		}
-		savedCount++
+	if s.curatorSvc == nil {
+		return 0, fmt.Errorf("pattern curator is not configured")
 	}
-	return savedCount, nil
+	result, err := s.curatorSvc.CurateAndStore(ctx, curator.CurateRequest{
+		Operation:  operation,
+		Candidates: patterns,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return len(result.Written), nil
 }
 
 // KnownPatternsSnapshot 返回给当前代码学习使用的已知模式摘要。
@@ -187,7 +132,7 @@ func (s *LearnerService) KnownPatternsSnapshot(ctx context.Context) (string, int
 //  2. 过滤掉已分析的提交（增量学习）
 //  3. 批量处理提交（batchSize 个一批）
 //  4. 调用 AI 分析每个批次
-//  5. 保存新模式（自动合并相似模式）
+//  5. 策展并保存候选模式
 //  6. 标记提交为已分析
 //  7. 发布学习完成事件
 //
@@ -195,10 +140,9 @@ func (s *LearnerService) KnownPatternsSnapshot(ctx context.Context) (string, int
 //   - 使用 patternRepo.IsCommitAnalyzed() 检查提交是否已分析
 //   - 使用 patternRepo.MarkCommitAnalyzed() 标记已分析
 //
-// 模式合并
-//   - 使用 patternRepo.FindSimilar() 查找相似模式
-//   - 使用 existing.Merge() 合并模式
-//   - 更新置信度：加权平均（基于频率）
+// 模式入库
+//   - Learner 只产生候选模式
+//   - Curator 负责新增、更新、合并或丢弃候选模式
 func (s *LearnerService) Learn(ctx context.Context, limit int, since string, batchSize int) error {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
@@ -403,12 +347,17 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 			"patterns_count", len(result.Patterns),
 		)
 
-		// 6. 保存新模式
+		// 6. 策展并保存新模式
 		beforeSaveCount := patternsLearned
-		for _, p := range result.Patterns {
-			if err := s.savePattern(ctx, p, "learn"); err == nil {
-				patternsLearned++
-			}
+		savedCount, saveErr := s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnHistory)
+		if saveErr != nil {
+			logger.Warn(i18n.Get("LoggerLearnerBatchFailed"),
+				"operation", "learn",
+				"batch_id", i/batchSize+1,
+				"error", saveErr,
+			)
+		} else {
+			patternsLearned += savedCount
 		}
 
 		// 7. 标记这些 commits 已被分析
@@ -475,13 +424,6 @@ func commitInfos(commitFiles []agent.CommitFileChange) []domain.CommitInfo {
 	return commits
 }
 
-// MergePatterns AI汇总合并相似模式
-// 委托给 MergerService
-func (s *LearnerService) MergePatterns(ctx context.Context) error {
-	_, err := s.mergerSvc.MergePatterns(ctx, &merger.MergePatternsRequest{})
-	return err
-}
-
 // LearnFromCommit 从单个提交学习
 func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInfo) error {
 	changedFiles, err := s.gitRepo.GetChangedFiles(ctx, c.Hash)
@@ -511,11 +453,8 @@ func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInf
 		).WithContext("commit_hash", c.Hash)
 	}
 
-	for _, p := range result.Patterns {
-		_ = s.savePattern(ctx, p, "learn_from_commit")
-	}
-
-	return nil
+	_, err = s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnCommit)
+	return err
 }
 
 // LearnFromStaged 从暂存文件路径学习
@@ -552,11 +491,8 @@ func (s *LearnerService) LearnFromStaged(ctx context.Context, commitInfo domain.
 		)
 	}
 
-	for _, p := range result.Patterns {
-		_ = s.savePattern(ctx, p, "learn_from_staged")
-	}
-
-	return nil
+	_, err = s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnStaged)
+	return err
 }
 
 // shortHash 安全截取 hash 前 7 位

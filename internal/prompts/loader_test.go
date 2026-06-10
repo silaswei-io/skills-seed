@@ -28,7 +28,7 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 						{"fix-generate", sampleGenerateFixesRequest()},
 						{"skill-project-summary", sampleGenerateSkillsData()},
 						{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
-						{"pattern-merge", sampleMergePatternsData()},
+						{"pattern-curate", sampleCuratePatternsData()},
 						{"project-analyze", sampleProjectAnalysisData()},
 						{"skill-workspace-profile", workspacePromptData()},
 						{"skill-workspace-spec", workspaceSpecPromptData()},
@@ -542,6 +542,110 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 	}
 }
 
+func TestLoader_RenderPatternPromptsIncludePreOutputValidation(t *testing.T) {
+	tests := []struct {
+		locale       string
+		requiredText []string
+	}{
+		{
+			locale: "zh-CN",
+			requiredText: []string{
+				"输出前验证清单",
+				"证据校验",
+				"分类校验",
+				"任何候选未通过必需校验时，不要输出",
+			},
+		},
+		{
+			locale: "en-US",
+			requiredText: []string{
+				"Pre-Output Validation Checklist",
+				"Evidence check",
+				"Category check",
+				"If a candidate fails any required validation check, do not output it",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("common", tt.locale, "")
+			for _, tc := range []struct {
+				name string
+				data interface{}
+			}{
+				{"learn-batch", sampleBatchLearnData()},
+				{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					prompt, err := loader.Render(tc.name, tc.data)
+					require.NoError(t, err)
+					for _, text := range tt.requiredText {
+						require.Contains(t, prompt, text)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *testing.T) {
+	tests := []struct {
+		locale string
+		checks map[string][]string
+	}{
+		{
+			locale: "zh-CN",
+			checks: map[string][]string{
+				"user-define-pattern": {
+					"输出前验证清单",
+					"如果提供了关联文件",
+					"不要填写虚假的 `business_method`",
+				},
+				"pattern-curate": {
+					"输出前验证清单",
+					"每个候选模式都必须被 `patterns[].merged_from` 覆盖",
+					"`summary.total_candidates",
+				},
+			},
+		},
+		{
+			locale: "en-US",
+			checks: map[string][]string{
+				"user-define-pattern": {
+					"Pre-Output Validation Checklist",
+					"If related files are provided",
+					"do not fill a fake `business_method`",
+				},
+				"pattern-curate": {
+					"Pre-Output Validation Checklist",
+					"Every candidate pattern must be covered by `patterns[].merged_from`",
+					"`summary.total_candidates",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("common", tt.locale, "")
+			for name, requiredText := range tt.checks {
+				t.Run(name, func(t *testing.T) {
+					data := interface{}(sampleUserDefinePatternData())
+					if name == "pattern-curate" {
+						data = sampleCuratePatternsData()
+					}
+					prompt, err := loader.Render(name, data)
+					require.NoError(t, err)
+					for _, text := range requiredText {
+						require.Contains(t, prompt, text)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 
@@ -596,7 +700,7 @@ func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testin
 		data interface{}
 	}{
 		{"learn-batch", sampleBatchLearnData()},
-		{"pattern-merge", sampleMergePatternsData()},
+		{"pattern-curate", sampleCuratePatternsData()},
 		{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
 		{"skill-project-summary", sampleGenerateSkillsData()},
 		{"skill-workspace-profile", workspacePromptData()},
@@ -854,10 +958,17 @@ func sampleAnalyzeCurrentCodebaseRequest() *agent.AnalyzeCurrentCodebaseRequest 
 	}
 }
 
-func sampleMergePatternsData() map[string]interface{} {
+func sampleCuratePatternsData() map[string]interface{} {
+	candidate := *samplePattern()
+	candidate.ID = "candidate-pattern"
+	existing := *samplePattern()
+	existing.ID = "existing-pattern"
 	return map[string]interface{}{
-		"Category": "api",
-		"Patterns": []domain.Pattern{*samplePattern()},
+		"Operation":           "learn_current",
+		"CandidatePatterns":   []domain.Pattern{candidate},
+		"ExistingPatterns":    []domain.Pattern{existing},
+		"AllExisting":         false,
+		"ExistingByCandidate": map[string][]string{"candidate-pattern": []string{"existing-pattern"}},
 	}
 }
 

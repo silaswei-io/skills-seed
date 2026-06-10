@@ -27,7 +27,7 @@
 {{if .GoodExample}}
 #### 代码证据
 
-```go
+```{{$.CodeFenceLanguage}}
 {{.GoodExample}}
 ```
 {{end}}
@@ -35,7 +35,7 @@
 {{if .BadExample}}
 #### 避免示例
 
-```go
+```{{$.CodeFenceLanguage}}
 {{.BadExample}}
 ```
 {{end}}

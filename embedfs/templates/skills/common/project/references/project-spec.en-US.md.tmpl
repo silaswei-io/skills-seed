@@ -14,6 +14,15 @@
 - For architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for business methods read [Business Methods](./business-methods.md){{end}}.
 - If this spec conflicts with the current code, trust the code and regenerate with `skills-seed learn current` and `skills-seed generate skills` when needed.
 
+{{if .SourceOfTruth}}
+## Source Of Truth
+
+| Area | Edit | Do Not Edit Directly |
+|---|---|---|
+{{range .SourceOfTruth}}| {{.Area}} | {{.Edit}} | {{.DoNotEdit}} |
+{{end}}
+{{end}}
+
 ## Rules
 
 {{if .PatternRules}}

@@ -22,9 +22,9 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/checker"
+	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/learner"
-	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	bolt "go.etcd.io/bbolt"
@@ -51,7 +51,7 @@ type Container struct {
 	CheckerSvc            *checker.CheckerService
 	GeneratorSvc          *generator.GeneratorService
 	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
-	MergerSvc             *merger.MergerService
+	CuratorSvc            *curator.Service
 	PromptLoader          *prompts.Loader
 	SkillsLoader          *skills.Loader
 }
@@ -146,8 +146,8 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 	// 7. 创建服务
 	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo)
-	mergerSvc := merger.NewMergerService(agentImpl, patternRepo)
-	learnerSvc := learner.NewLearnerService(agentImpl, gitRepo, patternRepo, patternRepo, mergerSvc)
+	curatorSvc := curator.NewService(agentImpl, patternRepo)
+	learnerSvc := learner.NewLearnerService(agentImpl, gitRepo, patternRepo, patternRepo, curatorSvc)
 
 	checkerSvc := checker.NewCheckerService(agentImpl, gitRepo, patternRepo, configRepo)
 	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo)
@@ -173,7 +173,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		CheckerSvc:            checkerSvc,
 		GeneratorSvc:          generatorSvc,
 		WorkspaceGeneratorSvc: workspaceGeneratorSvc,
-		MergerSvc:             mergerSvc,
+		CuratorSvc:            curatorSvc,
 		PromptLoader:          promptLoader,
 		SkillsLoader:          skillsLoader,
 	}, nil

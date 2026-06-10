@@ -12,8 +12,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
-	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
@@ -53,9 +53,6 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 			patternContext = req.UserContext
 			return &agent.UserDefinePatternResult{Pattern: pattern}, nil
 		},
-		MergePatternsFn: func(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error) {
-			return &agent.MergePatternsResult{Summary: agent.MergeSummary{TotalInput: len(req.Patterns)}}, nil
-		},
 		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
 			generateCalled = true
 			return &agent.GenerateSkillsResult{}, nil
@@ -77,7 +74,7 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 		ProfileRepo:  profileRepo,
 		StateRepo:    statestore.NewRepository(seedPath),
 		Agent:        mockAgent,
-		MergerSvc:    merger.NewMergerService(mockAgent, patternRepo),
+		CuratorSvc:   curator.NewService(mockAgent, patternRepo),
 		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), mockAgent, configRepo),
 	}
 

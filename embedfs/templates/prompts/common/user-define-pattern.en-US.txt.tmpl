@@ -40,6 +40,16 @@ Suggested category: {{.Category}}
 
 naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config
 
+# Pre-Output Validation Checklist
+
+Before returning JSON, validate the result internally:
+1. If related files are provided, `good_example` and `bad_example` must come from files you read or closely match the project's real code style. Do not invent file paths, line numbers, or method signatures.
+2. If no related files are provided, examples may be empty or illustrative style examples, but do not claim they came from project source and do not fill a fake `business_method`.
+3. Category must be one of the available categories. Prefer the most specific technical category; use `business` only for domain rules, state transitions, or business orchestration.
+4. `rule` must be actionable and explain "when X, do Y"; do not output generic best practices.
+5. Fill `business_method` only when real source evidence supports it, and include a real signature and location. Otherwise use `null`.
+6. Lower `confidence` when evidence is weak or the user description is broad. Do not invent facts.
+
 # Language Requirements
 
 - All user-facing natural-language fields must be written in English, including `name`, `description`, `bad_example`, `rule`, and descriptive fields inside `business_method`.

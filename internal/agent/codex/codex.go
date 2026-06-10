@@ -238,32 +238,35 @@ func (c *CodexAgent) GenerateSkillsSummary(ctx context.Context, req *agent.Gener
 	return result, nil
 }
 
-// MergePatterns 汇总合并相似模式
-func (c *CodexAgent) MergePatterns(ctx context.Context, req *agent.MergePatternsRequest) (*agent.MergePatternsResult, error) {
+// CuratePatterns 策展候选模式并输出规范模式。
+func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
 	data := map[string]interface{}{
-		"Category": req.Category,
-		"Patterns": req.Patterns,
+		"Operation":           req.Operation,
+		"CandidatePatterns":   req.CandidatePatterns,
+		"ExistingPatterns":    req.ExistingPatterns,
+		"AllExisting":         req.AllExisting,
+		"ExistingByCandidate": req.ExistingByCandidate,
 	}
-	prompt, err := c.promptLoader.Render("pattern-merge", data)
+	prompt, err := c.promptLoader.Render("pattern-curate", data)
 	if err != nil || prompt == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderMergePatternsPromptFailed"))
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderCuratePatternsPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "MergePatterns", prompt)
+	output, err := c.callCodex(ctx, "CuratePatterns", prompt)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexMergePatternsFailed"), err)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCuratePatternsFailed"), err)
 	}
 
-	result, err := parser.ParseMergePatternsResult(output)
+	result, err := parser.ParseCuratePatternsResult(output)
 	if err != nil {
 		return nil, err
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
 		"agent", c.Name(),
-		"operation", "MergePatterns",
-		"merged_count", len(result.MergedPatterns),
-		"unchanged_count", len(result.UnchangedPatterns),
-		"total_input", result.Summary.TotalInput,
+		"operation", "CuratePatterns",
+		"written_count", len(result.Patterns),
+		"dropped_count", len(result.Dropped),
+		"total_candidates", result.Summary.TotalCandidates,
 	)
 	return result, nil
 }

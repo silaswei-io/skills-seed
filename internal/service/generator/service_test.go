@@ -959,6 +959,77 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	assertNoExcessiveBlankLines(t, tmpDir)
 }
 
+func TestGenerateSkills_DoesNotSynthesizeHardCodedGuidance(t *testing.T) {
+	apiPattern := domain.NewPattern("api", "JZero Code Generation Convention", domain.CategoryAPI)
+	apiPattern.Confidence = 0.95
+	apiPattern.SetDescription("jzero generates handlers and types from .api files")
+	apiPattern.SetRule("Do not hand-edit generated handlers or types")
+	businessPattern := domain.NewPattern("business", "Plan Lifecycle State Machine", domain.CategoryBusiness)
+	businessPattern.Confidence = 0.95
+	businessPattern.SetDescription("Only one plan can be active")
+	businessPattern.SetRule("Deactivate existing active plans before creating or activating a plan")
+	concurrencyPattern := domain.NewPattern("concurrency", "Mutex Guarded In-Memory Store", domain.CategoryConcurrency)
+	concurrencyPattern.Confidence = 0.95
+	concurrencyPattern.SetDescription("The service uses mutex protected maps")
+	concurrencyPattern.SetRule("Public methods lock and Locked helpers assume caller holds lock")
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			return &agent.GenerateSkillsResult{}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*apiPattern, *businessPattern, *concurrencyPattern}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName:       "backend",
+				Language:          "go",
+				Summary:           "Word Weave backend",
+				Frameworks:        []string{"jzero", "go-zero", "gRPC"},
+				FrameworkPatterns: []string{"jzero gen generates handlers, types, routes, and swagger from desc/api .api files"},
+				ConfigPatterns:    []string{"YAML config with hot reload"},
+				KeyModules: []domain.ModuleInfo{
+					{Name: "vocab", Path: "internal/application/vocab", Description: "business service"},
+					{Name: "mapper", Path: "internal/logic/mapper", Description: "API response mapping"},
+					{Name: "rpcclient", Path: "internal/rpcclient", Description: "typed gRPC wrappers"},
+				},
+				BusinessMethods: []domain.BusinessMethod{{
+					Name:         "ActivatePlan",
+					CodeLocation: domain.CodeLocation{CurrentLocation: "internal/application/vocab/service.go:1"},
+					Description:  "activates a plan",
+					Function:     "func ActivatePlan()",
+					Usage:        "plan activation",
+					Type:         "domain",
+				}},
+			}, nil
+		},
+	}
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go"},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	tmpDir := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	assert.NotContains(t, skill, "## 常用工作流")
+	assert.NotContains(t, skill, "`jzero gen`")
+	assert.NotContains(t, skill, "`go test ./internal/application/vocab`")
+	assert.Contains(t, skill, "## 模式参考")
+
+	spec := readGeneratedFile(t, tmpDir, "references", "project-spec.md")
+	assert.NotContains(t, spec, "## 修改来源")
+	assert.Contains(t, spec, "Do not hand-edit generated handlers or types")
+	assert.Contains(t, spec, "Deactivate existing active plans before creating or activating a plan")
+}
+
 func TestGenerateSkills_SkipsEmptyBusinessMethodDetails(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Business Flow", domain.CategoryBusiness)
 	pattern.Confidence = 0.9

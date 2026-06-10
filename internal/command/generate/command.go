@@ -17,7 +17,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
-	"github.com/silaswei-io/skills-seed/internal/service/merger"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
@@ -28,7 +27,6 @@ var sleepAfterGenerateChildStep = time.Sleep
 type generateOptions struct {
 	outputPath    string
 	outputChanged bool
-	merge         bool
 	noReferences  bool
 }
 
@@ -71,7 +69,6 @@ func skillsCmd(cont *container.Container) *cobra.Command {
 	}
 	opts.outputPath = defaultOutputPath
 	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
-	cmd.Flags().BoolVarP(&opts.merge, "merge", "m", false, i18n.Get("GenerateFlagMerge"))
 	cmd.Flags().BoolVar(&opts.noReferences, "no-references", false, i18n.Get("GenerateFlagNoReferences"))
 
 	return cmd
@@ -126,26 +123,6 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	effectiveOutputPath := opts.outputPath
 	if !opts.outputChanged {
 		effectiveOutputPath = outputPathForCurrentTarget(cont)
-	}
-
-	// 如果指定了 --merge 标志，先合并模式
-	if opts.merge {
-		logger.Warn(i18n.Get("GenerateMergeDeprecated"))
-		logger.Info(i18n.Get("GenerateMergeStarting"))
-		if _, err := cont.MergerSvc.MergePatterns(ctx, &merger.MergePatternsRequest{}); err != nil {
-			logger.Error(i18n.GetWithParams("GenerateMergeFailed", map[string]interface{}{"Error": err.Error()}))
-			return err
-		}
-		logger.Info(i18n.Get("GenerateMergeCompleted"))
-
-		// 重新获取合并后的模式数量
-		var err error
-		count, err = cont.PatternRepo.Count(ctx)
-		if err != nil {
-			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
-			return err
-		}
-		logger.Info(i18n.GetWithParams("GenerateMergedCount", map[string]interface{}{"Count": count}))
 	}
 
 	// 生成 Skills

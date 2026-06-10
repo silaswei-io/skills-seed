@@ -22,7 +22,7 @@
 {{if .GoodExample}}
 #### ✅ Code Evidence
 
-```go
+```{{$.CodeFenceLanguage}}
 {{.GoodExample}}
 ```
 {{end}}
@@ -30,7 +30,7 @@
 {{if .BadExample}}
 #### ❌ Bad Example (Avoid)
 
-```go
+```{{$.CodeFenceLanguage}}
 {{.BadExample}}
 ```
 {{end}}

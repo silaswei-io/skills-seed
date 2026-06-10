@@ -14,6 +14,15 @@
 - 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，业务方法读 [强业务方法](./business-methods.md){{end}}。
 - 当本规范和实际代码不一致时，以当前代码为准，并在必要时重新运行 `skills-seed learn current` 和 `skills-seed generate skills`。
 
+{{if .SourceOfTruth}}
+## 修改来源
+
+| 领域 | 应修改 | 不应直接修改 |
+|---|---|---|
+{{range .SourceOfTruth}}| {{.Area}} | {{.Edit}} | {{.DoNotEdit}} |
+{{end}}
+{{end}}
+
 ## 规则
 
 {{if .PatternRules}}
