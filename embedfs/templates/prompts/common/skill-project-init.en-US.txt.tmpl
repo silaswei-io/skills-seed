@@ -80,6 +80,8 @@ Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path. 
 
 Based on the project information and the code files you read, perform the following analysis:
 
+Allowed categories: {{.AllowedCategories}}
+
 1. **Identify frameworks and tech stack**:
    - Extract only frameworks, runtimes, data access tools, config systems, observability tools, dependency management, or build tools actually used by this project.
    - Do not infer a stack from template examples, stale dependencies, or common framework names.
@@ -124,7 +126,7 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
     {
       "id": "kebab-case-id",
       "name": "Pattern Name",
-      "category": "business|api|database|error|structure|naming|concurrency|testing|utils|middleware|config",
+      "category": "choose one allowed category: {{.AllowedCategories}}",
       "description": "Description of the pattern and when to use it",
       "good_example": "Code evidence copied verbatim from source you read (5-12 lines)",
       "bad_example": "",
@@ -155,6 +157,8 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
 ```
 
 # Pattern Category Decision Rules (Prefer Specific Categories)
+
+Allowed categories: {{.AllowedCategories}}
 
 1. **database** - Data queries, transactions, data access boundaries, persistence
 2. **api** - Interface entries, input/output shapes, parameter binding, interface error responses

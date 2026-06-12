@@ -270,6 +270,7 @@ func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatter
 		"ExistingPatterns":    req.ExistingPatterns,
 		"AllExisting":         req.AllExisting,
 		"ExistingByCandidate": req.ExistingByCandidate,
+		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
 	prompt, err := c.promptLoader.Render("pattern-curate", data)
 	if err != nil || prompt == "" {

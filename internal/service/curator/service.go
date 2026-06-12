@@ -47,7 +47,7 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
 	curated := s.curate(ctx, req.Operation, candidates, retrieved.related, false, retrieved.existingByCandidate, hooks)
 	if err := validateCurateResult(curated, candidates, retrieved.related); err != nil {
-		logger.Warn(i18n.Get("LoggerAgentCuratePatternsParseFallback"),
+		logger.Warn(i18n.Get("LoggerAgentCuratePatternsValidationFallback"),
 			"operation", req.Operation,
 			"error", err,
 		)
@@ -104,7 +104,7 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 	}
 	curated := s.curate(ctx, OperationCompact, patterns, patterns, true, byCandidate, hooks)
 	if err := validateCurateResult(curated, patterns, patterns); err != nil {
-		logger.Warn(i18n.Get("LoggerAgentCuratePatternsParseFallback"),
+		logger.Warn(i18n.Get("LoggerAgentCuratePatternsValidationFallback"),
 			"operation", OperationCompact,
 			"error", err,
 		)

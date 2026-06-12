@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.2]
+
+### Changes
+
+- Centralized the pattern-category contract in the domain layer so prompts, curator validation, and storage paths share the same allowed category list.
+- Updated Chinese and English prompts for `learn history`, `learn current`, `patterns add`, and `pattern-curate` to show the shared allowed categories.
+
+### Fixes
+
+- Fixed pattern curation fallback when AI outputs the compatible `security` category; it is now normalized to `utils`.
+- Fixed misleading curator logs so validation failures are reported separately from parse failures.
+
 ## [v0.9.1]
 
 ### Features

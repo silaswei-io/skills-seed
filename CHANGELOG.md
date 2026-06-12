@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.2]
+
+### 变更
+
+- 模式分类契约集中到 domain 层，prompt、curator 校验和保存路径共用同一份合法分类列表。
+- `learn history`、`learn current`、`patterns add` 和 `pattern-curate` 的中英文 prompt 统一展示合法分类，减少 AI 输出未支持分类。
+
+### 修复
+
+- 修复 AI 输出 `security` 分类时导致模式策展校验失败并回退的问题；该兼容别名现在归一为 `utils`。
+- 修复 curator 校验失败日志误显示为“模式策展结果解析失败”的问题，现在区分解析失败和校验失败。
+
 ## [v0.9.1]
 
 ### 功能

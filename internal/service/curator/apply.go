@@ -21,7 +21,7 @@ func curatedToDomain(pattern agent.CuratedPattern) domain.Pattern {
 	result := domain.Pattern{
 		ID:             pattern.ID,
 		Name:           pattern.Name,
-		Category:       domain.Category(pattern.Category),
+		Category:       domain.NormalizePatternCategory(domain.Category(pattern.Category)),
 		Description:    pattern.Description,
 		GoodExample:    pattern.GoodExample,
 		BadExample:     pattern.BadExample,

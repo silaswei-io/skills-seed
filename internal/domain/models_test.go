@@ -79,6 +79,16 @@ func TestPattern_IsValid(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "unknown category",
+			pattern: &Pattern{
+				ID:         "p1",
+				Name:       "Use descriptive names",
+				Category:   Category("performance"),
+				Confidence: 0.8,
+			},
+			want: false,
+		},
+		{
 			name: "negative confidence",
 			pattern: &Pattern{
 				ID:         "p1",
@@ -975,6 +985,54 @@ func TestNewPattern_AllCategories(t *testing.T) {
 			assert.True(t, p.IsValid(), "Pattern with category %s should be valid", cat)
 		})
 	}
+}
+
+func TestAllowedPatternCategoryNames(t *testing.T) {
+	names := AllowedPatternCategoryNames()
+
+	assert.Equal(t, []string{
+		"naming",
+		"error",
+		"structure",
+		"concurrency",
+		"testing",
+		"business",
+		"api",
+		"database",
+		"utils",
+		"middleware",
+		"config",
+	}, names)
+	assert.NotContains(t, names, "security")
+}
+
+func TestNormalizePatternCategoryAliases(t *testing.T) {
+	tests := []struct {
+		name string
+		in   Category
+		want Category
+	}{
+		{name: "known category", in: CategoryAPI, want: CategoryAPI},
+		{name: "trim and lower", in: Category(" Error "), want: CategoryError},
+		{name: "security alias", in: Category("security"), want: CategoryUtils},
+		{name: "security dashed alias", in: Category("security-hardening"), want: CategoryUtils},
+		{name: "unknown category", in: Category("performance"), want: Category("performance")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, NormalizePatternCategory(tt.in))
+		})
+	}
+}
+
+func TestIsValidPatternCategory(t *testing.T) {
+	for _, name := range AllowedPatternCategoryNames() {
+		assert.True(t, IsValidPatternCategory(Category(name)), "category %q should be valid", name)
+	}
+
+	assert.False(t, IsValidPatternCategory(Category("security")))
+	assert.True(t, IsValidPatternCategory(NormalizePatternCategory(Category("security"))))
 }
 
 func TestCommitInfo_Summary_WithMultipleNewlines(t *testing.T) {

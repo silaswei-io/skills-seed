@@ -118,6 +118,8 @@
 
 # 提取内容（具体分类优先）
 
+可用分类：{{.AllowedCategories}}
+
 从这些分类提取模式：
 - **business**: 领域规则、状态流转、跨实体业务编排、业务工作流
 - **utils**: 辅助函数、工具、完整签名的方法
@@ -139,7 +141,7 @@
 每个模式必须提供：
 1. **id**: 唯一的kebab-case标识符
 2. **name**: 清晰的描述性名称
-3. **category**: 上述分类之一
+3. **category**: 可用分类之一（{{.AllowedCategories}}）
 4. **description**: 功能描述和使用时机
 5. **good_example**: 从已读取源码逐字复制的代码证据（5-30行）- 必需
 6. **bad_example**: 需要避免的常见错误（如适用）
@@ -215,6 +217,7 @@
    - `good_example` 必须为 5-30 行；完整相关函数更短时可保留完整短函数。
    - 不要编造代码、路径、签名、行号或行为。
 2. 分类校验：
+   - `category` 必须是可用分类之一：{{.AllowedCategories}}。
    - `business` 只用于领域规则、状态流转、跨实体业务编排或业务不变量。
    - 技术约定必须优先使用 `api`、`error`、`config`、`middleware`、`structure`、`utils`、`database`、`concurrency` 或 `testing`。
    - 如果模式可归入更具体技术分类，不要标为 `business`。

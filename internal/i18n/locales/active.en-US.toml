@@ -1765,6 +1765,9 @@ other = "Pattern curation call failed"
 [LoggerAgentCuratePatternsParseFallback]
 other = "Pattern curation result parsing failed"
 
+[LoggerAgentCuratePatternsValidationFallback]
+other = "Pattern curation result validation failed"
+
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
 

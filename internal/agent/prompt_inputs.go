@@ -31,6 +31,7 @@ func BatchLearnPromptData(session *PromptInputSession, commits []domain.CommitIn
 		"CommitFiles":        commitFiles,
 		"KnownPatternsPath":  path,
 		"KnownPatternsCount": knownPatternsCount,
+		"AllowedCategories":  domain.AllowedPatternCategoriesText(),
 	}, nil
 }
 
@@ -52,11 +53,12 @@ func GenerateSkillsPromptData(session *PromptInputSession, req *GenerateSkillsRe
 // UserDefinePatternPromptData 返回用户自定义模式所需的提示词数据。
 func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePatternRequest) (map[string]interface{}, error) {
 	return map[string]interface{}{
-		"Description": req.Description,
-		"Category":    req.Category,
-		"Files":       req.Files,
-		"UserContext": req.UserContext,
-		"Language":    req.Language,
+		"Description":       req.Description,
+		"Category":          req.Category,
+		"Files":             req.Files,
+		"UserContext":       req.UserContext,
+		"Language":          req.Language,
+		"AllowedCategories": domain.AllowedPatternCategoriesText(),
 	}, nil
 }
 
@@ -162,5 +164,6 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"FileCount":             req.FileCount,
 		"DirCount":              req.DirCount,
 		"UserContextPath":       userContextPath,
+		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
 	}, nil
 }

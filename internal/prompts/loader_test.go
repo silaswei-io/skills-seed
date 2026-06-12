@@ -710,6 +710,59 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 	}
 }
 
+func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
+	allowedCategories := "naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
+	tests := []struct {
+		locale string
+		checks map[string]string
+	}{
+		{
+			locale: "zh-CN",
+			checks: map[string]string{
+				"learn-batch":         "可用分类：" + allowedCategories,
+				"skill-project-init":  "可用分类：" + allowedCategories,
+				"user-define-pattern": "可用分类：" + allowedCategories,
+				"pattern-curate":      "可用分类：" + allowedCategories,
+			},
+		},
+		{
+			locale: "en-US",
+			checks: map[string]string{
+				"learn-batch":         "Allowed categories: " + allowedCategories,
+				"skill-project-init":  "Allowed categories: " + allowedCategories,
+				"user-define-pattern": "Allowed categories: " + allowedCategories,
+				"pattern-curate":      "Allowed categories: " + allowedCategories,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("common", tt.locale, "")
+			for name, requiredText := range tt.checks {
+				t.Run(name, func(t *testing.T) {
+					var data interface{}
+					switch name {
+					case "learn-batch":
+						data = sampleBatchLearnData()
+					case "skill-project-init":
+						data = sampleAnalyzeCurrentCodebaseRequest()
+					case "user-define-pattern":
+						data = sampleUserDefinePatternData()
+					case "pattern-curate":
+						data = sampleCuratePatternsData()
+					}
+
+					prompt, err := loader.Render(name, data)
+					require.NoError(t, err)
+					require.Contains(t, prompt, requiredText)
+					require.NotContains(t, prompt, "security")
+				})
+			}
+		})
+	}
+}
+
 func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 
@@ -983,6 +1036,7 @@ func sampleBatchLearnData() map[string]interface{} {
 		},
 		"KnownPatternsPath":  "/tmp/skills-seed/known-patterns.json",
 		"KnownPatternsCount": 1,
+		"AllowedCategories":  domain.AllowedPatternCategoriesText(),
 	}
 }
 
@@ -1033,6 +1087,7 @@ func sampleCuratePatternsData() map[string]interface{} {
 		"ExistingPatterns":    []domain.Pattern{existing},
 		"AllExisting":         false,
 		"ExistingByCandidate": map[string][]string{"candidate-pattern": []string{"existing-pattern"}},
+		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
 }
 
@@ -1053,11 +1108,12 @@ func sampleProjectAnalysisData() map[string]interface{} {
 
 func sampleUserDefinePatternData() map[string]interface{} {
 	return map[string]interface{}{
-		"Language":    "go",
-		"Files":       []string{"internal/demo.go"},
-		"UserContext": "团队希望把中文说明改写为目标语言",
-		"Description": "新增接口时复用现有 mapper",
-		"Category":    "structure",
+		"Language":          "go",
+		"Files":             []string{"internal/demo.go"},
+		"UserContext":       "团队希望把中文说明改写为目标语言",
+		"Description":       "新增接口时复用现有 mapper",
+		"Category":          "structure",
+		"AllowedCategories": domain.AllowedPatternCategoriesText(),
 	}
 }
 

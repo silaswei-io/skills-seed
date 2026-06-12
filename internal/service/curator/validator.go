@@ -8,20 +8,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-var validCategories = map[domain.Category]struct{}{
-	domain.CategoryNaming:      {},
-	domain.CategoryError:       {},
-	domain.CategoryStructure:   {},
-	domain.CategoryConcurrency: {},
-	domain.CategoryTesting:     {},
-	domain.CategoryBusiness:    {},
-	domain.CategoryAPI:         {},
-	domain.CategoryDatabase:    {},
-	domain.CategoryUtils:       {},
-	domain.CategoryMiddleware:  {},
-	domain.CategoryConfig:      {},
-}
-
 func validateCandidates(candidates []domain.Pattern) []domain.Pattern {
 	valid := make([]domain.Pattern, 0, len(candidates))
 	for _, candidate := range candidates {
@@ -50,7 +36,9 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 
 	coveredCandidates := make(map[string]struct{}, len(candidateIDs))
 	outputIDs := make(map[string]struct{}, len(result.Patterns))
-	for _, pattern := range result.Patterns {
+	for i := range result.Patterns {
+		pattern := &result.Patterns[i]
+		pattern.Category = string(domain.NormalizePatternCategory(domain.Category(pattern.Category)))
 		if strings.TrimSpace(pattern.ID) == "" {
 			return fmt.Errorf("curated pattern has empty id")
 		}
@@ -58,7 +46,7 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 			return fmt.Errorf("duplicate curated pattern id %q", pattern.ID)
 		}
 		outputIDs[pattern.ID] = struct{}{}
-		if _, ok := validCategories[domain.Category(pattern.Category)]; !ok {
+		if !domain.IsValidPatternCategory(domain.Category(pattern.Category)) {
 			return fmt.Errorf("curated pattern %q has invalid category %q", pattern.ID, pattern.Category)
 		}
 		if strings.TrimSpace(pattern.Name) == "" {
@@ -133,6 +121,7 @@ func normalizeCandidate(pattern domain.Pattern) domain.Pattern {
 	pattern.ProjectID = strings.TrimSpace(pattern.ProjectID)
 	pattern.ScopePath = strings.TrimSpace(pattern.ScopePath)
 	pattern.WorkspaceRole = strings.TrimSpace(pattern.WorkspaceRole)
+	pattern.Category = domain.NormalizePatternCategory(pattern.Category)
 	if pattern.Source == "" {
 		pattern.Source = domain.SourceLearned
 	}

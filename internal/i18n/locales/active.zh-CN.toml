@@ -1766,6 +1766,9 @@ other = "模式策展调用失败"
 [LoggerAgentCuratePatternsParseFallback]
 other = "模式策展结果解析失败"
 
+[LoggerAgentCuratePatternsValidationFallback]
+other = "模式策展结果校验失败"
+
 [LoggerAgentProjectPromptRenderFailed]
 other = "项目分析提示词模板渲染失败"
 

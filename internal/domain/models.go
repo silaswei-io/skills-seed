@@ -42,6 +42,65 @@ const (
 	CategoryConfig      Category = "config"      // 配置管理模式
 )
 
+// allowedPatternCategories 定义模式库支持的规范分类和展示顺序。
+var allowedPatternCategories = []Category{
+	CategoryNaming,
+	CategoryError,
+	CategoryStructure,
+	CategoryConcurrency,
+	CategoryTesting,
+	CategoryBusiness,
+	CategoryAPI,
+	CategoryDatabase,
+	CategoryUtils,
+	CategoryMiddleware,
+	CategoryConfig,
+}
+
+// patternCategoryAliases 记录历史或模型常见输出到规范分类的兼容映射。
+var patternCategoryAliases = map[Category]Category{
+	Category("security"):           CategoryUtils,
+	Category("security-hardening"): CategoryUtils,
+}
+
+// AllowedPatternCategoryNames 返回稳定顺序的合法模式分类名。
+func AllowedPatternCategoryNames() []string {
+	names := make([]string, 0, len(allowedPatternCategories))
+	for _, category := range allowedPatternCategories {
+		names = append(names, string(category))
+	}
+	return names
+}
+
+// AllowedPatternCategoriesText 返回提示词可直接展示的合法分类列表。
+func AllowedPatternCategoriesText() string {
+	return strings.Join(AllowedPatternCategoryNames(), ", ")
+}
+
+// NormalizePatternCategory 把兼容别名归一化为内部规范分类。
+func NormalizePatternCategory(category Category) Category {
+	normalized := canonicalPatternCategory(category)
+	if alias, ok := patternCategoryAliases[normalized]; ok {
+		return alias
+	}
+	return normalized
+}
+
+// IsValidPatternCategory 判断分类是否属于内部规范分类集合。
+func IsValidPatternCategory(category Category) bool {
+	category = canonicalPatternCategory(category)
+	for _, allowed := range allowedPatternCategories {
+		if category == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func canonicalPatternCategory(category Category) Category {
+	return Category(strings.ToLower(strings.TrimSpace(string(category))))
+}
+
 // Source 模式来源
 type Source string
 
@@ -293,7 +352,7 @@ func (m BusinessMethod) LocationStatus() string {
 func (p *Pattern) IsValid() bool {
 	return p.ID != "" &&
 		p.Name != "" &&
-		p.Category != "" &&
+		IsValidPatternCategory(p.Category) &&
 		p.Confidence >= 0.0 &&
 		p.Confidence <= 1.0
 }

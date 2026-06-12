@@ -140,6 +140,11 @@ type UserDefinePatternRequest struct {
 	Language    string   // 项目语言
 }
 
+// AllowedCategories 返回提示词可展示的合法模式分类列表。
+func (r *UserDefinePatternRequest) AllowedCategories() string {
+	return domain.AllowedPatternCategoriesText()
+}
+
 // UserDefinePatternResult 用户自定义模式结果
 type UserDefinePatternResult struct {
 	Pattern *domain.Pattern
@@ -285,6 +290,11 @@ type AnalyzeCurrentCodebaseRequest struct {
 	DirCount              int           // 目录总数
 	UserContext           string        // 本次学习传入的一次性用户上下文
 	UserContextPath       string        // 本次学习传入的一次性用户上下文文件路径
+}
+
+// AllowedCategories 返回提示词可展示的合法模式分类列表。
+func (r *AnalyzeCurrentCodebaseRequest) AllowedCategories() string {
+	return domain.AllowedPatternCategoriesText()
 }
 
 // AnalyzeCurrentCodebaseResult 分析当前代码库结果

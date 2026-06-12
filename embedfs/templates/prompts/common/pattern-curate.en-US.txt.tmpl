@@ -16,6 +16,7 @@ Given candidate patterns and related existing patterns, output the final canonic
 - **Candidate count**: {{len .CandidatePatterns}}
 - **Related existing count**: {{len .ExistingPatterns}}
 - **Existing scope**: {{if .AllExisting}}all existing patterns{{else}}only existing patterns related to candidates{{end}}
+- Allowed categories: {{.AllowedCategories}}
 
 # Candidate Patterns
 
@@ -98,7 +99,7 @@ Given candidate patterns and related existing patterns, output the final canonic
 - `good_example` must be selected from existing input examples only. Do not create, complete, rewrite, or synthesize code examples.
 - `bad_example` should also come from input; leave it empty only when input has none.
 - `business_method` may preserve only real information present in the input. Do not invent signatures, locations, prerequisites, or returns.
-- Categories must come from input patterns. Do not create new categories.
+- Categories must come from input patterns and must be one of the allowed categories: {{.AllowedCategories}}. Do not create new categories.
 - `confidence` must be between 0.0 and 1.0. Use a frequency-weighted average or a conservative estimate when merging.
 - `frequency` should reflect merged occurrences and must be at least 1.
 

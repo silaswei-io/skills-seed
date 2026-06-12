@@ -683,6 +683,7 @@ func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatte
 		"ExistingPatterns":    req.ExistingPatterns,
 		"AllExisting":         req.AllExisting,
 		"ExistingByCandidate": req.ExistingByCandidate,
+		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
 
 	prompt, err := c.promptLoader.Render("pattern-curate", data)

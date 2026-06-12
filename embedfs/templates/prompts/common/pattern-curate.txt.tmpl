@@ -16,6 +16,7 @@
 - **候选模式数**: {{len .CandidatePatterns}}
 - **相关既有模式数**: {{len .ExistingPatterns}}
 - **既有模式范围**: {{if .AllExisting}}全部既有模式{{else}}仅候选相关的既有模式{{end}}
+- 可用分类：{{.AllowedCategories}}
 
 # 候选模式
 
@@ -98,7 +99,7 @@
 - `good_example` 只能从输入模式已有示例中选择；不要创建、补全、改写或综合新代码示例。
 - `bad_example` 也应来自输入，只有输入为空时才能留空。
 - `business_method` 只能保留输入中真实存在的信息；不要发明签名、位置、前置条件或返回值。
-- 分类必须来自输入模式的分类，不要创建新分类。
+- 分类必须来自输入模式的分类，且必须属于可用分类：{{.AllowedCategories}}。不要创建新分类。
 - `confidence` 必须在 0.0 到 1.0 之间；合并时使用频率加权平均或保守估计。
 - `frequency` 应反映合并后的出现次数，至少为 1。
 

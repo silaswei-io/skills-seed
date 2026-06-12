@@ -201,6 +201,67 @@ func TestCurateAndStoreFallsBackWhenAgentResultInvalid(t *testing.T) {
 	require.Equal(t, "existing", saved[0].ID)
 }
 
+func TestCurateAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testing.T) {
+	candidate := domain.NewPattern("path-traversal-protection", "Path Traversal Protection", domain.Category("security"))
+	candidate.Confidence = 0.9
+	candidate.SetDescription("Validate archive paths before extracting files")
+	candidate.SetRule("When extracting archive entries, reject paths outside the target directory")
+	candidate.SetExamples("cleanedTarget := filepath.Clean(targetDir)\ncleanedFile := filepath.Clean(filePath)\nif !strings.HasPrefix(cleanedFile, cleanedTarget+string(os.PathSeparator)) {\n\treturn fmt.Errorf(\"invalid path\")\n}", "")
+
+	var saved []*domain.Pattern
+	var called bool
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return nil, nil
+		},
+		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
+			saved = append(saved, p)
+			return nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			called = true
+			require.Len(t, req.CandidatePatterns, 1)
+			require.Equal(t, domain.CategoryUtils, req.CandidatePatterns[0].Category)
+
+			return &agent.CuratePatternsResult{
+				Patterns: []agent.CuratedPattern{
+					{
+						ID:          "path-traversal-protection",
+						Name:        "Path Traversal Protection",
+						Category:    "security",
+						Description: "Validate archive paths before extracting files",
+						GoodExample: candidate.GoodExample,
+						Rule:        "When extracting archive entries, reject paths outside the target directory",
+						Confidence:  0.9,
+						Frequency:   1,
+						MergedFrom:  []string{"path-traversal-protection"},
+						MergeReason: "new candidate",
+						Source:      string(domain.SourceLearnedCurrent),
+					},
+				},
+				Summary: agent.CurateSummary{TotalCandidates: 1, TotalWritten: 1},
+			}, nil
+		},
+	}
+	svc := NewService(mockAgent, repo)
+
+	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
+	})
+
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Len(t, result.Written, 1)
+	require.Len(t, saved, 1)
+	require.Equal(t, domain.CategoryUtils, result.Written[0].Category)
+	require.Equal(t, domain.CategoryUtils, saved[0].Category)
+	require.Equal(t, "path-traversal-protection", saved[0].ID)
+}
+
 func TestCompactDryRunDoesNotWrite(t *testing.T) {
 	p1 := domain.NewPattern("p1", "Error Wrap", domain.CategoryError)
 	p1.Confidence = 0.8

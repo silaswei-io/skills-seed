@@ -80,6 +80,8 @@
 
 根据上述项目信息和你读取到的代码文件，执行以下分析：
 
+可用分类：{{.AllowedCategories}}
+
 1. **识别框架和技术栈**：
    - 只提取项目实际使用的框架、运行时、数据访问工具、配置系统、观测工具、依赖管理或构建工具。
    - 不要因为模板示例、依赖残留或常见框架名而假设项目使用了某个技术栈。
@@ -124,7 +126,7 @@
     {
       "id": "kebab-case-id",
       "name": "模式名称",
-      "category": "business|api|database|error|structure|naming|concurrency|testing|utils|middleware|config",
+      "category": "从可用分类中选择一个：{{.AllowedCategories}}",
       "description": "功能描述和使用时机",
       "good_example": "从已读取源码逐字复制的代码证据（5-12行）",
       "bad_example": "",
@@ -155,6 +157,8 @@
 ```
 
 # 模式分类判定（具体分类优先）
+
+可用分类：{{.AllowedCategories}}
 
 1. **database** - 数据查询、事务、数据访问边界、持久化
 2. **api** - 接口入口、输入/输出结构、参数绑定、接口错误响应
