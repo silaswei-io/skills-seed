@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/stretchr/testify/require"
 )
@@ -41,6 +42,7 @@ func TestBuildFullFilesPreviewSkipsDocumentsButKeepsDocsSource(t *testing.T) {
 }
 
 func TestWriteFilesPreview(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
 	var buf bytes.Buffer
 	err := writeFilesPreview(&buf, &filesPreview{
 		Mode:             "full",
@@ -49,7 +51,10 @@ func TestWriteFilesPreview(t *testing.T) {
 	}, 10)
 
 	require.NoError(t, err)
-	require.Contains(t, buf.String(), "included")
-	require.Contains(t, buf.String(), "main.go")
-	require.Contains(t, buf.String(), "skipped_documents")
+	text := buf.String()
+	require.Contains(t, text, "已包含文件数")
+	require.Contains(t, text, "main.go")
+	require.Contains(t, text, "跳过文档数")
+	require.NotContains(t, text, "included")
+	require.NotContains(t, text, "skipped_documents")
 }

@@ -27,7 +27,7 @@ Based on the provided project information, analyze the project to identify:
 
 # Project Directory Structure
 
-Project directory structure is available at `{{.StructurePath}}`. Read it by path.
+Project structure summary is available at `{{.StructurePath}}`. Read it by path and use it only as the allowed analysis boundary and directory ownership clue for this run. If focused scan paths are provided above, do not expand into files outside those paths just because this structure file mentions path clues, unless they are directly related files required to confirm call relationships.
 {{- end}}
 {{- if .StructuralContextPath}}
 
@@ -81,18 +81,18 @@ Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path. 
 Based on the project information and the code files you read, perform the following analysis:
 
 1. **Identify frameworks and tech stack**:
-   - Extract only frameworks, runtimes, ORMs, config systems, logging libraries, dependency injection, or build tools actually used by this project.
+   - Extract only frameworks, runtimes, data access tools, config systems, observability tools, dependency management, or build tools actually used by this project.
    - Do not infer a stack from template examples, stale dependencies, or common framework names.
 
 2. **Extract Architecture and Dependency Information** (Core):
-   - Draw module dependency graph (API/Handler -> Service -> Repository -> DB)
-   - Identify architecture layers (Presentation/Business/Domain/Infrastructure)
+   - Draw a module dependency graph using real module names and dependency directions found in the code.
+   - Identify architecture layers using layer names and responsibilities supported by code evidence.
    - Analyze key data flow (how requests are processed, how data flows)
    - Record specific usage patterns of frameworks and libraries
 
 3. **Extract Strong Business Methods** (only for real domain logic):
    - **Domain-specific methods**: Complex business rules, workflows, state machines
-   - **Cross-layer calls**: Service layer calling multiple Repositories or external services
+   - **Cross-layer calls**: One responsibility layer calling multiple local modules or external services
    - **Business rule methods**: Validation, calculation, transformation, approval processes
    - **Special handling methods**: Encryption, decryption, signing, authorization, RPC calls
    - **Important**: Don't extract standard CRUD (like GetByID, Save, Delete), extract methods with business logic
@@ -134,7 +134,7 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
       "business_method": {
         "name": "Complete method signature",
         "code_location": {"current_location": "file/path:line"},
-        "layer": "Service/Repository/Handler/Utils",
+        "layer": "Real responsibility layer such as entry, orchestration, domain, data access, or utility",
         "description": "Functionality and business logic",
         "function": "Full signature with parameters and return types",
         "usage": "When to call",
@@ -156,11 +156,11 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
 
 # Pattern Category Decision Rules (Prefer Specific Categories)
 
-1. **database** - Database queries, transactions, repositories, ORM usage, persistence
-2. **api** - Routes, handlers, request/response shapes, parameter binding, API error responses
+1. **database** - Data queries, transactions, data access boundaries, persistence
+2. **api** - Interface entries, input/output shapes, parameter binding, interface error responses
 3. **error** - Error wrapping, error mapping, logging, custom error types
 4. **config** - Config files, environment variables, config loading, defaults
-5. **middleware** - Auth, logging, rate limiting, context injection, middleware chains
+5. **middleware** - Access control, observability, traffic control, context injection, middleware chains
 6. **structure** - Layering, module boundaries, dependency direction, file organization
 7. **utils** - Domain-neutral helpers and utility methods
 8. **business** - Only domain rules, state transitions, cross-entity orchestration, business workflows

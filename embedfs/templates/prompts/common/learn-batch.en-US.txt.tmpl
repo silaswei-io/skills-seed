@@ -42,40 +42,9 @@ Prioritize extracting methods with **complex business logic**:
 
 **Don't extract**: Simple CRUD (GetByID, Save, Delete, Create)
 
-**Business method examples**:
-```go
-// ✅ Extract this: Contains business logic
-func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error {
-    // 1. Validate order status
-    order, err := s.repo.GetByID(ctx, orderID)
-    if err != nil {
-        return fmt.Errorf("order not found: %w", err)
-    }
-    if order.Status != OrderStatusPending {
-        return ErrInvalidOrderStatus
-    }
-
-    // 2. Call payment gateway
-    result, err := s.paymentGateway.Charge(ctx, payment)
-    if err != nil {
-        order.Status = OrderStatusPaymentFailed
-        s.repo.Save(ctx, order)
-        return fmt.Errorf("payment failed: %w", err)
-    }
-
-    // 3. Update order status
-    order.Status = OrderStatusPaid
-    order.PaymentID = result.TransactionID
-    return s.repo.Save(ctx, order)
-}
-
-// ❌ Don't extract this: Simple CRUD
-func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error) {
-    var order Order
-    err := r.db.WithContext(ctx).Where("id = ?", id).First(&order).Error
-    return &order, err
-}
-```
+**Business method judgment examples**:
+- Extract: a method or flow that shows domain preconditions, state or phase progression, cross-module orchestration, external dependency calls, failure compensation, error semantics, or data transformation.
+- Do not extract: a method that only reads, saves, deletes, forwards parameters, or assigns plain fields without domain rule or workflow semantics.
 
 ## Business Pattern Deep Extraction Workflow (Required)
 
@@ -83,7 +52,7 @@ Before returning JSON, complete these steps internally:
 
 1. Build a **business candidate inventory**:
    - Analyze each commit message, changed file, and visible code evidence.
-   - Prioritize added or modified methods in Service, UseCase, Handler, Repository, Client, Job, Consumer, and Utils code.
+   - Prioritize added or modified methods in entry, orchestration, domain, data access, external dependency, task, message handling, and utility modules.
    - Treat methods, flows, rules, state changes, cross-module calls, external calls, data transformations, and exceptional branches with business meaning as candidates.
 
 2. Perform **business pattern expansion**:
@@ -91,7 +60,7 @@ Before returning JSON, complete these steps internally:
    - Split code-backed details into reusable patterns such as request validation, business state progression, cross-repository transaction orchestration, external system calls, failure compensation/fallback, business error mapping, or domain data transformation.
    - **Do not compress multiple business details into one generic pattern**. If a method contains both domain rules and technical conventions, domain rules may be `business`, while transactions, queries, routing, error wrapping, config loading, and middleware chains must use their specific categories.
    - Prefer specific categories: business is not the default category. Do not force a business pattern for every candidate.
-   - Keep business patterns only for domain rules, state transitions, cross-entity orchestration, and real business workflows. Pure technical conventions do not become business patterns just because they appear in Service or Handler code.
+   - Keep business patterns only for domain rules, state transitions, cross-entity orchestration, and real business workflows. Pure technical conventions do not become business patterns just because they appear in entry or orchestration code.
 
 3. Enrich every business pattern:
    - `description` must explain the business scenario, trigger, core steps, and boundary.
@@ -109,21 +78,21 @@ Before returning JSON, complete these steps internally:
 
 - Transaction management: begin, commit, rollback
 - Query building: condition combination, relation loading
-- ORM usage (GORM/Ent/XORM)
+- Actual use of data access libraries or query builders
 - Error handling and retry logic
 
 ## 3. Error Handling and Logging ⭐⭐
 
 - Log locations and formats (structured logging)
-- Error wrapping and propagation (fmt.Errorf with %w)
+- Error wrapping and propagation using the project's existing error semantics
 - Custom error type definitions
-- HTTP error response formats
+- External error response formats
 
 ## 4. API and Middleware ⭐
 
-- Route registration patterns
+- Interface entry registration patterns
 - Middleware usage (auth/logging/rate limiting)
-- Request/response structures
+- Input/output structures
 - Parameter validation approaches
 
 ## 5. Configuration and Dependency Management
@@ -141,19 +110,18 @@ Before returning JSON, complete these steps internally:
 3. If multiple APIs use the same middleware → Extract "middleware usage pattern"
 4. If multiple repositories use the same transaction handling → Extract "transaction management pattern"
 
-**Framework-specific patterns**:
+**Framework or library usage patterns**:
 
-- **Gin**: Route registration, middleware chain, context handling
-- **GORM**: Query building, relation loading, transaction usage
-- **Zap**: Structured logging, log level usage
-- **Viper**: Config reading, environment variable binding
+- Extract only framework, library, runtime, or tool usage directly supported by current code evidence
+- Do not output a concrete technology stack from template examples, stale dependencies, common names, or inference
+- Record observed conventions for routing, data access, logging, configuration, dependency injection, scheduling, messaging, or similar mechanisms
 
 # What to Extract (Prefer Specific Categories)
 
 Extract patterns in these categories:
 - **business**: Domain rules, state transitions, cross-entity orchestration, business workflows
 - **utils**: Helper functions, utilities, tools with full signatures
-- **api**: REST endpoints, request/response formats
+- **api**: Interface entries and input/output formats
 - **database**: Queries, transactions, data access patterns
 - **error**: Error handling, wrapping, logging
 - **structure**: Code organization, layering
@@ -181,9 +149,9 @@ For EACH pattern, you MUST provide:
 8. **confidence**: 0.0 to 1.0 (how certain you are)
 9. **frequency**: How many times it appears in these commits
 10. **business_method**: For utility/business methods ONLY:
-    - **name**: Full method signature (e.g., "ProcessOrderPayment(ctx, orderID, payment) error")
-    - **location**: "file/path.go:line"
-    - **layer**: "Service/Repository/Handler/Utils"
+    - **name**: Full method signature or code identifier
+    - **location**: "relative/file/path:line"
+    - **layer**: Responsibility layer or module type
     - **function**: Complete signature with params and returns
     - **prerequisites**: What needs to be set up first (e.g., transaction opened, config loaded)
     - **returns**: What it returns including errors
@@ -191,40 +159,40 @@ For EACH pattern, you MUST provide:
     - **description**: Detailed business logic explanation
     - **usage**: When to call this method
 
-# Example Output
+# Output Shape Example
 
 ```json
 {
   "patterns": [
     {
-      "id": "order-payment-processing",
-      "name": "Order Payment Processing Flow",
+      "id": "domain-workflow-state-transition",
+      "name": "Domain Workflow State Transition",
       "category": "business",
-      "description": "Complete payment processing flow including status validation, payment gateway call, and order status update",
-      "good_example": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error {\n\t// 1. Validate order status\n\torder, err := s.repo.GetByID(ctx, orderID)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"order not found: %w\", err)\n\t}\n\tif order.Status != OrderStatusPending {\n\t\treturn ErrInvalidOrderStatus\n\t}\n\n\t// 2. Call payment gateway\n\tresult, err := s.paymentGateway.Charge(ctx, payment)\n\tif err != nil {\n\t\torder.Status = OrderStatusPaymentFailed\n\t\ts.repo.Save(ctx, order)\n\t\treturn fmt.Errorf(\"payment failed: %w\", err)\n\t}\n\n\t// 3. Update order status\n\torder.Status = OrderStatusPaid\n\torder.PaymentID = result.TransactionID\n\treturn s.repo.Save(ctx, order)\n}",
-      "rule": "Order payment must include status validation, payment gateway call, and order status update. Rollback order status on failure.",
+      "description": "Business flow, trigger, state progression, and exceptional branch inferred from real code evidence",
+      "good_example": "Code evidence copied verbatim from source you read (5-30 lines); do not output this placeholder",
+      "rule": "For the same business scenario, follow the validation order, state progression, and exceptional boundary shown by code evidence",
       "confidence": 0.95,
       "frequency": 5,
       "business_method": {
-        "name": "OrderService.ProcessOrderPayment(ctx, orderID, payment) error",
-        "code_location": {"current_location": "internal/service/order.go:120"},
-        "layer": "Service",
-        "description": "Complete payment processing flow with status validation, payment gateway integration, and order status update",
-        "function": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error",
-        "prerequisites": "OrderRepository and PaymentGateway must be initialized. Order must exist and be in pending status.",
-        "returns": "nil on success, wrapped error on failure (order not found, invalid status, payment failed)",
+        "name": "Real method signature or code identifier",
+        "code_location": {"current_location": "relative/file/path:line"},
+        "layer": "Responsibility layer or module type",
+        "description": "Full business intent supported by code evidence",
+        "function": "Real complete signature",
+        "prerequisites": "Preconditions and dependencies shown by code evidence",
+        "returns": "Return values and error semantics shown by code evidence",
         "type": "domain",
-        "usage": "Call when user completes payment selection and clicks pay button"
+        "usage": "Usage scenario supported by code evidence"
       }
     },
     {
-      "id": "gorm-transaction-pattern",
-      "name": "GORM Transaction Pattern",
+      "id": "transaction-boundary-pattern",
+      "name": "Transaction Boundary Pattern",
       "category": "database",
-      "description": "Use GORM's Transaction method for database operations with automatic commit or rollback",
-      "good_example": "err := s.db.Transaction(func(tx *gorm.DB) error {\n\tif err := tx.Create(&user).Error; err != nil {\n\t\treturn err // auto rollback\n\t}\n\treturn tx.Create(&profile).Error\n})",
-      "bad_example": "tx := s.db.Begin()\ntx.Create(&user)\nif err != nil {\n\ttx.Rollback()\n\treturn err\n}\ntx.Commit()",
-      "rule": "Use db.Transaction() instead of manual Begin/Commit/Rollback",
+      "description": "Use the project's existing transaction wrapper for multi-step writes so failures roll back consistently",
+      "good_example": "Transaction-boundary code evidence copied verbatim from source you read (5-30 lines); do not output this placeholder",
+      "bad_example": "",
+      "rule": "Multi-step writes must use the existing project transaction boundary wrapper",
       "confidence": 0.90,
       "frequency": 8
     }

@@ -87,6 +87,26 @@ func TestPrepareIncrementalFileChangesSkipsDocumentsButKeepsDocsSource(t *testin
 	require.Equal(t, 2, changes.SkippedCount(fileanalysis.SkipReasonDocument))
 }
 
+func TestIncrementalFileChangesApplyAISelectionMarksUnselectedRecords(t *testing.T) {
+	changes := &incrementalFileChanges{
+		Records: []domain.FileAnalysisRecord{
+			{Path: "internal/logic/create.go", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
+			{Path: "internal/types/types.go", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
+		},
+	}
+
+	changes.ApplyAISelection([]string{"internal/logic/create.go"}, "generated contract")
+
+	byPath := map[string]domain.FileAnalysisRecord{}
+	for _, record := range changes.Records {
+		byPath[record.Path] = record
+	}
+	require.Equal(t, domain.FileAnalysisStatusAnalyzed, byPath["internal/logic/create.go"].AnalysisStatus)
+	require.Empty(t, byPath["internal/logic/create.go"].SelectionReason)
+	require.Equal(t, domain.FileAnalysisStatusAISkipped, byPath["internal/types/types.go"].AnalysisStatus)
+	require.Equal(t, "generated contract", byPath["internal/types/types.go"].SelectionReason)
+}
+
 func TestConfiguredLearnExcludesSeparatesBuiltinsFromConfigDefaults(t *testing.T) {
 	projectRoot := t.TempDir()
 	configRepo := newIncrementalConfig(t, projectRoot)

@@ -79,6 +79,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 	}
 	locale := w.skillsLoader.GetLocale()
 	references := referenceAvailability(profile, patterns, !opts.SkipReferences)
+	triggerDescription := skillTriggerDescription(templateProjectName, templateLanguage, locale, profile)
 
 	// 准备模板数据
 	data := map[string]interface{}{
@@ -86,6 +87,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		"SkillsTemplatesHash":    opts.SkillsTemplatesHash,
 		"ProjectName":            templateProjectName,
 		"SkillName":              skillName,
+		"SkillDescription":       triggerDescription,
 		"Language":               templateLanguage,
 		"PatternCount":           len(patterns),
 		"AvgConfidence":          stats.AvgConfidence * 100,
@@ -102,8 +104,8 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		"References":             references,
 		"OverviewReferences":     conditionalProfileReferenceItems(profile, locale, "./references/", references.Enabled),
 		"ReferenceGroups":        conditionalCategoryReferenceGroups(patterns, locale, references.Enabled),
-		"Workflows":              []interface{}{},
-		"ValidationCommands":     []interface{}{},
+		"Workflows":              skillWorkflows(profile, patterns, locale),
+		"ValidationCommands":     validationCommands(profile, patterns, locale),
 		"StateSummaries":         []string{},
 	}
 

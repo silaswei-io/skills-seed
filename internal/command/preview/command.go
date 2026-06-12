@@ -11,6 +11,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/spf13/cobra"
@@ -33,9 +34,9 @@ type filesPreview struct {
 func Cmd(cont *container.Container) *cobra.Command {
 	previewCmd := &cobra.Command{
 		Use:     "preview",
-		Short:   "Preview analysis inputs",
-		Long:    "Preview files and prompt inputs that skills-seed would analyze without calling an AI agent.",
-		Example: "skills-seed preview files\nskills-seed preview files --mode incremental --focus internal/service",
+		Short:   i18n.Get("PreviewShort"),
+		Long:    i18n.Get("PreviewLongDesc"),
+		Example: i18n.Get("PreviewExample"),
 	}
 	previewCmd.AddCommand(filesCmd(cont))
 	return previewCmd
@@ -45,13 +46,13 @@ func filesCmd(cont *container.Container) *cobra.Command {
 	opts := filesOptions{mode: "full", limit: 200}
 	cmd := &cobra.Command{
 		Use:     "files",
-		Short:   "Preview files selected for analysis",
-		Long:    "Preview source files selected for full or incremental analysis. Document files are skipped by default; source files under docs/ are kept.",
-		Example: "skills-seed preview files --mode full\nskills-seed preview files --mode incremental --focus internal/service",
+		Short:   i18n.Get("PreviewFilesShort"),
+		Long:    i18n.Get("PreviewFilesLongDesc"),
+		Example: i18n.Get("PreviewFilesExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
-				return fmt.Errorf("skills-seed project is not initialized")
+				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
 			preview, err := buildFilesPreview(cmd.Context(), cont, opts)
 			if err != nil {
@@ -60,9 +61,9 @@ func filesCmd(cont *container.Container) *cobra.Command {
 			return writeFilesPreview(cmd.OutOrStdout(), preview, opts.limit)
 		},
 	}
-	cmd.Flags().StringVar(&opts.mode, "mode", opts.mode, "analysis mode: full or incremental")
-	cmd.Flags().StringArrayVarP(&opts.focusPaths, "focus", "f", nil, "only preview files under these paths")
-	cmd.Flags().IntVar(&opts.limit, "limit", opts.limit, "maximum included files to print")
+	cmd.Flags().StringVar(&opts.mode, "mode", opts.mode, i18n.Get("PreviewFilesFlagMode"))
+	cmd.Flags().StringArrayVarP(&opts.focusPaths, "focus", "f", nil, i18n.Get("PreviewFilesFlagFocus"))
+	cmd.Flags().IntVar(&opts.limit, "limit", opts.limit, i18n.Get("PreviewFilesFlagLimit"))
 	return cmd
 }
 
@@ -93,7 +94,7 @@ func buildFilesPreview(ctx context.Context, cont *container.Container, opts file
 		preview.SkippedOther = len(changes.Skipped) - preview.SkippedDocuments
 		return preview, nil
 	default:
-		return nil, fmt.Errorf("unsupported preview mode %q", opts.mode)
+		return nil, fmt.Errorf("%s", i18n.GetWithParams("PreviewFilesUnsupportedMode", map[string]interface{}{"Mode": opts.mode}))
 	}
 }
 
@@ -124,27 +125,27 @@ func writeFilesPreview(w io.Writer, preview *filesPreview, limit int) error {
 		limit = len(preview.Included)
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintf(tw, "mode\t%s\n", preview.Mode); err != nil {
+	if _, err := fmt.Fprintf(tw, "%s\t%s\n", i18n.Get("PreviewFilesOutputMode"), preview.Mode); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(tw, "included\t%d\n", len(preview.Included)); err != nil {
+	if _, err := fmt.Fprintf(tw, "%s\t%d\n", i18n.Get("PreviewFilesOutputIncluded"), len(preview.Included)); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(tw, "deleted\t%d\n", len(preview.Deleted)); err != nil {
+	if _, err := fmt.Fprintf(tw, "%s\t%d\n", i18n.Get("PreviewFilesOutputDeleted"), len(preview.Deleted)); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(tw, "skipped_documents\t%d\n", preview.SkippedDocuments); err != nil {
+	if _, err := fmt.Fprintf(tw, "%s\t%d\n", i18n.Get("PreviewFilesOutputSkippedDocuments"), preview.SkippedDocuments); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(tw, "skipped_other\t%d\n\n", preview.SkippedOther); err != nil {
+	if _, err := fmt.Fprintf(tw, "%s\t%d\n\n", i18n.Get("PreviewFilesOutputSkippedOther"), preview.SkippedOther); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(tw, "INCLUDED_FILES"); err != nil {
+	if _, err := fmt.Fprintln(tw, i18n.Get("PreviewFilesOutputIncludedFiles")); err != nil {
 		return err
 	}
 	for i, path := range preview.Included {
 		if i >= limit {
-			if _, err := fmt.Fprintf(tw, "... %d more\n", len(preview.Included)-limit); err != nil {
+			if _, err := fmt.Fprintln(tw, i18n.GetWithParams("PreviewFilesOutputMore", map[string]interface{}{"Count": len(preview.Included) - limit})); err != nil {
 				return err
 			}
 			break
@@ -154,7 +155,7 @@ func writeFilesPreview(w io.Writer, preview *filesPreview, limit int) error {
 		}
 	}
 	if len(preview.Deleted) > 0 {
-		if _, err := fmt.Fprintln(tw, "\nDELETED_FILES"); err != nil {
+		if _, err := fmt.Fprintf(tw, "\n%s\n", i18n.Get("PreviewFilesOutputDeletedFiles")); err != nil {
 			return err
 		}
 		for _, path := range preview.Deleted {

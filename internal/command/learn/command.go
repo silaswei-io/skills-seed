@@ -22,6 +22,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
@@ -140,11 +141,11 @@ func historyDefaults(cont *container.Container) (int, int) {
 		return defaultLimit, defaultBatchSize
 	}
 	learningConfig := cont.ConfigRepo.GetLearningConfig()
-	if learningConfig.MaxCommits > 0 {
-		defaultLimit = learningConfig.MaxCommits
+	if learningConfig.History.MaxCommits > 0 {
+		defaultLimit = learningConfig.History.MaxCommits
 	}
-	if learningConfig.BatchSize > 0 {
-		defaultBatchSize = learningConfig.BatchSize
+	if learningConfig.History.BatchSize > 0 {
+		defaultBatchSize = learningConfig.History.BatchSize
 	}
 	return defaultLimit, defaultBatchSize
 }
@@ -211,6 +212,14 @@ type learnCurrentProjectResult struct {
 	skipped       bool
 	duration      time.Duration
 	tokenContext  context.Context
+}
+
+type aiFileSelectionSummary struct {
+	Applied        bool
+	CandidateCount int
+	SelectedCount  int
+	SkippedCount   int
+	Reason         string
 }
 
 func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
@@ -295,7 +304,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			currentLanguage = cont.ConfigRepo.GetProjectConfig().Language
 		}
 		if currentLanguage == "" {
-			currentLanguage = "go"
+			currentLanguage = "unknown"
 		}
 
 		resolvedFocusPaths, err = resolveFocusPaths(projectRoot, opts.focusPaths)
@@ -348,6 +357,8 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 
 	var incrementalChanges *incrementalFileChanges
 	var effectiveFocusPaths []string
+	var selectedFiles []domain.FileInfo
+	var selectionSummary aiFileSelectionSummary
 	detectStartedAt := time.Now()
 	if err := runStep(i18n.Get("ProgressLearnCurrentDetectChanges"), func() error {
 		var err error
@@ -355,7 +366,53 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		if err != nil {
 			return err
 		}
-		effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, incrementalChanges.FocusPaths())
+		focusRelPaths := incrementalChanges.FocusPaths()
+		effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, focusRelPaths)
+		selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, incrementalChanges.AddedOrModified))
+		currentLearningConfig := cont.ConfigRepo.GetCurrentLearningConfig()
+		shouldSelectRelevantFiles := currentLearningConfig.SelectRelevantFiles &&
+			len(focusRelPaths) >= currentLearningConfig.SelectRelevantFilesMinCandidates
+		if shouldSelectRelevantFiles {
+			selectionResult, selectErr := fileanalysis.ApplyAIFileSelector(ctx, cont.Agent, fileanalysis.AISelectorOptions{
+				ProjectRoot: projectRoot,
+				Candidates:  focusRelPaths,
+				Changes:     incrementalChanges,
+				UserContext: opts.userContext,
+			})
+			if selectErr != nil {
+				logger.Warn("AI file selector failed; falling back to all candidate files")
+				logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+					"operation", "command.learn_current.select_relevant_files",
+					"error", selectErr,
+					"candidate_count", len(focusRelPaths),
+				)
+			} else if selectionResult != nil && len(selectionResult.SelectedPaths) > 0 {
+				effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, selectionResult.SelectedPaths)
+				selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(selectionResult.SelectedPaths, incrementalChanges.AddedOrModified))
+				incrementalChanges.ApplyAISelection(selectionResult.SelectedPaths, selectionResult.Reason)
+				selectionSummary = aiFileSelectionSummary{
+					Applied:        true,
+					CandidateCount: len(focusRelPaths),
+					SelectedCount:  len(selectionResult.SelectedPaths),
+					SkippedCount:   len(selectionResult.SkippedPaths),
+					Reason:         selectionResult.Reason,
+				}
+				logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+					"operation", "command.learn_current.select_relevant_files",
+					"candidate_count", len(focusRelPaths),
+					"selected_count", len(selectionResult.SelectedPaths),
+					"skipped_count", len(selectionResult.SkippedPaths),
+					"reason", selectionResult.Reason,
+				)
+			}
+		} else if currentLearningConfig.SelectRelevantFiles && len(focusRelPaths) > 0 {
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+				"operation", "command.learn_current.select_relevant_files",
+				"candidate_count", len(focusRelPaths),
+				"min_candidates", currentLearningConfig.SelectRelevantFilesMinCandidates,
+				"skipped", true,
+			)
+		}
 		return nil
 	}); err != nil {
 		return nil, err
@@ -372,6 +429,16 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 				"Paths": strings.Join(incrementalChanges.ExcludedGeneratedSkillDirs, ", "),
 			}))
 		}
+		if selectionSummary.Applied {
+			logger.Info(i18n.GetWithParams("LearnCurrentAIFileSelectionSummary", map[string]interface{}{
+				"Candidates": selectionSummary.CandidateCount,
+				"Selected":   selectionSummary.SelectedCount,
+				"Skipped":    selectionSummary.SkippedCount,
+			}))
+			logger.Info(i18n.GetWithParams("LearnCurrentFingerprintCommitPlan", map[string]interface{}{
+				"Records": len(incrementalChanges.Records),
+			}))
+		}
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.detect_changes",
@@ -381,10 +448,6 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		"unchanged_count", len(incrementalChanges.Unchanged),
 		"skipped_count", len(incrementalChanges.Skipped),
 	)
-	if opts.profileMode != learnCurrentProfileSkip && incrementalChanges.HasChanges() {
-		refreshProfile = true
-	}
-
 	var patterns []domain.Pattern
 	var businessRulesCount int
 	var bestPracticesCount int
@@ -434,6 +497,8 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		knownPatternsJSON, knownPatternsCount := cont.LearnerSvc.KnownPatternsSnapshot(ctx)
 		analyzeResult, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeCodebaseOptions{
 			FocusPaths:         effectiveFocusPaths,
+			SelectedFiles:      selectedFiles,
+			SelectedFilesSet:   true,
 			KnownPatternsJSON:  knownPatternsJSON,
 			KnownPatternsCount: knownPatternsCount,
 			UseSnapshotDiffs:   true,
@@ -497,6 +562,9 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	if opts.showDetailedLogs && len(patterns) > 0 {
 		logger.Info(i18n.GetWithParams("LearnCurrentPatternsSaved", map[string]interface{}{"Count": savedCount}))
 	}
+	if opts.profileMode == learnCurrentProfileAuto && savedCount > 0 {
+		refreshProfile = true
+	}
 
 	profileStartedAt := time.Now()
 	if refreshProfile {
@@ -559,6 +627,11 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	if err := commandutil.MarkLearned(ctx, cont); err != nil {
 		return nil, err
 	}
+	if savedCount > 0 {
+		if err := markLearnedSkillsDirty(ctx, cont, domain.SkillsDirtyTarget{Project: true}); err != nil {
+			return nil, err
+		}
+	}
 
 	result := &learnCurrentProjectResult{
 		projectName:   projectName,
@@ -609,6 +682,21 @@ func resolveIncrementalFocusPaths(projectRoot string, relPaths []string) []strin
 	return paths
 }
 
+func intersectPaths(paths []string, allowed []string) []string {
+	allowedSet := make(map[string]bool, len(allowed))
+	for _, path := range allowed {
+		allowedSet[filepath.ToSlash(filepath.Clean(path))] = true
+	}
+	out := make([]string, 0, len(paths))
+	for _, path := range paths {
+		normalized := filepath.ToSlash(filepath.Clean(path))
+		if allowedSet[normalized] {
+			out = append(out, path)
+		}
+	}
+	return out
+}
+
 func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOptions) error {
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
@@ -639,6 +727,8 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
 	showChildDetails := parallelism == 1
 	var consoleMu sync.Mutex
+	var dirtyMu sync.Mutex
+	var dirtyProjectIDs []string
 	var multiTracker *progress.MultiTracker
 	if !showChildDetails {
 		multiTracker = progress.NewMulti(commandutil.WorkspaceProjectProgressNames(workspaceConfig.Projects))
@@ -711,6 +801,11 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 			if !showChildDetails {
 				logLearnWorkspaceProjectSummary(project.ID, result)
 			}
+			if result.savedCount > 0 {
+				dirtyMu.Lock()
+				dirtyProjectIDs = append(dirtyProjectIDs, scope)
+				dirtyMu.Unlock()
+			}
 			agent.FlushTokenUsageScope(result.tokenContext)
 			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectDelegated", map[string]interface{}{
 				"ProjectName": project.ID,
@@ -724,8 +819,15 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		return err
 	}
 
-	if err := saveWorkspaceRelationshipArtifacts(ctx, cont, workspaceName, projectRoot, workspaceConfig); err != nil {
+	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(ctx, cont, workspaceName, projectRoot, workspaceConfig)
+	if err != nil {
 		return err
+	}
+	dirtyTarget := domain.SkillsDirtyTarget{Workspace: relationshipsChanged, Projects: dirtyProjectIDs}
+	if !skillsDirtyTargetEmpty(dirtyTarget) {
+		if err := markLearnedSkillsDirty(ctx, cont, dirtyTarget); err != nil {
+			return err
+		}
 	}
 
 	if err := commandutil.MarkLearned(ctx, cont); err != nil {
@@ -739,6 +841,17 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		"projects_count", len(workspaceConfig.Projects),
 	)
 	return nil
+}
+
+func markLearnedSkillsDirty(ctx context.Context, cont *container.Container, target domain.SkillsDirtyTarget) error {
+	if cont == nil || cont.StateRepo == nil {
+		return nil
+	}
+	return cont.StateRepo.MarkSkillsDirty(ctx, target)
+}
+
+func skillsDirtyTargetEmpty(target domain.SkillsDirtyTarget) bool {
+	return !target.Project && !target.Workspace && len(target.Projects) == 0
 }
 
 func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepUpdate func(label string), onStepComplete func(label string), logPath *string, opts learnCurrentOptions) (*learnCurrentProjectResult, error) {
@@ -778,19 +891,19 @@ func pauseAfterFastWorkspaceChildStep(startedAt time.Time) {
 	progress.PauseAfterFastStep(startedAt, sleepAfterWorkspaceChildStep)
 }
 
-func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) error {
+func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) (bool, error) {
 	if cont.WorkspaceProfileRepo == nil && cont.WorkspaceSpecRepo == nil {
-		return nil
+		return false, nil
 	}
 	generatedAt := time.Now().Format(time.RFC3339)
 	baseProfile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
 	if cont.Agent == nil {
-		return saveWorkspaceRelationshipFallback(ctx, cont, baseProfile, generatedAt)
+		return true, saveWorkspaceRelationshipFallback(ctx, cont, baseProfile, generatedAt)
 	}
 
 	input, err := workspaceLearnInput(ctx, cont, workspaceName, projectRoot, workspaceConfig)
 	if err != nil {
-		return err
+		return false, err
 	}
 	userContext := runtimecontext.UserContext(ctx)
 	decision, err := domain.PrepareInputFingerprint(ctx, cont.FileTracker, workspaceRelationshipFingerprintScope(), "workspace-relationships.json", workspaceRelationshipFingerprintInput{
@@ -801,31 +914,31 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		UserContext:         userContext,
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if decision.ShouldSkip() && workspaceRelationshipArtifactsExist(ctx, cont) {
 		logger.Info(i18n.Get("LearnWorkspaceRelationshipsSkipped"))
-		return nil
+		return false, nil
 	}
 	runtimeDir := filepath.Join(projectRoot, ".skills-seed", "memory", "runtime")
 	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
-		return err
+		return false, err
 	}
 	tmpDir, err := os.MkdirTemp(runtimeDir, "skills-seed-workspace-learn-*")
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer os.RemoveAll(tmpDir)
 
 	inputPath, err := writeJSONInput(filepath.Join(tmpDir, "workspace-input.json"), input)
 	if err != nil {
-		return err
+		return false, err
 	}
 	userContextPath := ""
 	if userContext != "" {
 		userContextPath = filepath.Join(tmpDir, "user-context.md")
 		if err := os.WriteFile(userContextPath, []byte(userContext+"\n"), 0600); err != nil {
-			return err
+			return false, err
 		}
 	}
 
@@ -846,7 +959,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		profile.GeneratedAt = generatedAt
 		return nil
 	}); err != nil {
-		return err
+		return false, err
 	}
 
 	var spec *domain.WorkspaceSpec
@@ -869,7 +982,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		spec.GeneratedAt = generatedAt
 		return nil
 	}); err != nil {
-		return err
+		return false, err
 	}
 
 	if err := tracker.RunStep(i18n.Get("ProgressLearnWorkspaceSaveArtifacts"), func() error {
@@ -888,9 +1001,9 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		}
 		return nil
 	}); err != nil {
-		return err
+		return false, err
 	}
-	return nil
+	return true, nil
 }
 
 func workspaceRelationshipFingerprintScope() domain.FileAnalysisScope {
@@ -1137,16 +1250,7 @@ func resolveFocusPaths(projectRoot string, paths []string) ([]string, error) {
 func shouldRefreshProfile(projectRoot string, focusPaths []string, mode string, profileExists bool) (bool, error) {
 	switch mode {
 	case "", learnCurrentProfileAuto:
-		if !profileExists || len(focusPaths) == 0 {
-			return true, nil
-		}
-		if hasRootFocus(projectRoot, focusPaths) {
-			return true, nil
-		}
-		if hasCriticalFocus(projectRoot, focusPaths) {
-			return true, nil
-		}
-		return focusModuleCount(projectRoot, focusPaths) > 1, nil
+		return !profileExists, nil
 	case learnCurrentProfileSkip:
 		return false, nil
 	case learnCurrentProfileRefresh:
@@ -1154,70 +1258,6 @@ func shouldRefreshProfile(projectRoot string, focusPaths []string, mode string, 
 	default:
 		return false, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileModeInvalid", map[string]interface{}{"Mode": mode}))
 	}
-}
-
-func hasRootFocus(projectRoot string, focusPaths []string) bool {
-	projectAbs, err := filepath.Abs(projectRoot)
-	if err != nil {
-		return false
-	}
-	projectAbs = filepath.Clean(projectAbs)
-	for _, path := range focusPaths {
-		absPath, err := filepath.Abs(path)
-		if err == nil && filepath.Clean(absPath) == projectAbs {
-			return true
-		}
-	}
-	return false
-}
-
-func hasCriticalFocus(projectRoot string, focusPaths []string) bool {
-	for _, relPath := range utils.RelativePaths(projectRoot, focusPaths) {
-		if isCriticalFocusPath(relPath) {
-			return true
-		}
-	}
-	return false
-}
-
-func isCriticalFocusPath(relPath string) bool {
-	relPath = filepath.ToSlash(filepath.Clean(relPath))
-	criticalPrefixes := []string{
-		"cmd",
-		"internal/bootstrap",
-		"internal/container",
-		"internal/domain",
-		"internal/infra/config",
-	}
-	for _, prefix := range criticalPrefixes {
-		if relPath == prefix || strings.HasPrefix(relPath, prefix+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-func focusModuleCount(projectRoot string, focusPaths []string) int {
-	modules := make(map[string]bool)
-	for _, relPath := range utils.RelativePaths(projectRoot, focusPaths) {
-		key := focusModuleKey(relPath)
-		if key != "" {
-			modules[key] = true
-		}
-	}
-	return len(modules)
-}
-
-func focusModuleKey(relPath string) string {
-	relPath = filepath.ToSlash(filepath.Clean(relPath))
-	if relPath == "." || relPath == "" {
-		return relPath
-	}
-	parts := strings.Split(relPath, "/")
-	if len(parts) >= 2 && parts[0] == "internal" {
-		return parts[0] + "/" + parts[1]
-	}
-	return parts[0]
 }
 
 // runLearnHistory 从 Git 历史提交学习

@@ -135,8 +135,31 @@ func createRootCmd() *cobra.Command {
 		Version:      metadata.ProgramVersion,
 		SilenceUsage: true,
 	}
+	configureCobraDefaults(cmd)
 	cmd.SetVersionTemplate("{{.Name}} version {{.Version}}\nprompt-templates-sha256: " + promptTemplatesHash + "\nskills-templates-sha256: " + skillsTemplatesHash + "\n")
 	return cmd
+}
+
+func configureCobraDefaults(rootCmd *cobra.Command) {
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	rootCmd.PersistentFlags().BoolP("help", "h", false, i18n.Get("CobraFlagHelp"))
+	rootCmd.Flags().BoolP("version", "v", false, i18n.Get("CobraFlagVersion"))
+	rootCmd.SetHelpCommand(&cobra.Command{
+		Use:   "help [command]",
+		Short: i18n.Get("CobraHelpShort"),
+		Long:  i18n.Get("CobraHelpLong"),
+		Run: func(cmd *cobra.Command, args []string) {
+			target, _, err := cmd.Root().Find(args)
+			if target == nil || err != nil {
+				cmd.Printf("%s %#q\n", i18n.Get("CobraHelpUnknownTopic"), args)
+				cobra.CheckErr(cmd.Root().Usage())
+				return
+			}
+			target.InitDefaultHelpFlag()
+			target.InitDefaultVersionFlag()
+			cobra.CheckErr(target.Help())
+		},
+	})
 }
 
 func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
@@ -168,7 +191,7 @@ func commandNeedsProjectRuntime(args []string) bool {
 	}
 
 	switch cleaned[0] {
-	case "help", "completion", "init", "hook":
+	case "help", "init", "hook":
 		return false
 	case "add", "check", "reset", "sync":
 		return true
@@ -177,7 +200,7 @@ func commandNeedsProjectRuntime(args []string) bool {
 	case "learn":
 		return len(cleaned) >= 2 && (cleaned[1] == "current" || cleaned[1] == "history")
 	case "patterns":
-		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "compact" || cleaned[1] == "add" || cleaned[1] == "show")
+		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "compact" || cleaned[1] == "add" || cleaned[1] == "delete" || cleaned[1] == "remove" || cleaned[1] == "rm" || cleaned[1] == "show")
 	case "preview":
 		return len(cleaned) >= 2 && cleaned[1] == "files"
 	case "profile":

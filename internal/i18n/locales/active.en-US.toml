@@ -8,7 +8,22 @@ other = "Growing project skills for AI agents"
 other = "Learn project conventions from a codebase and generate AI Agent skills."
 
 [RootExample]
-other = "  skills-seed init --mode project --agent codex --skills codex --locale en-US\n  skills-seed init --workspace --agent codex --skills codex --locale en-US\n  skills-seed add ."
+other = "  skills-seed init --mode project --agent codex --skills codex --locale en-US\n  skills-seed init --workspace --agent codex --skills codex --locale en-US\n  skills-seed workspace add ."
+
+[CobraHelpShort]
+other = "Help about any command"
+
+[CobraHelpLong]
+other = "Help provides help for any command in the application.\n\nUse skills-seed help [command] for full details about a command."
+
+[CobraHelpUnknownTopic]
+other = "Unknown help topic"
+
+[CobraFlagHelp]
+other = "help for skills-seed"
+
+[CobraFlagVersion]
+other = "version for skills-seed"
 
 [InitLongDesc]
 other = "Initialize skills-seed in your project.\n\nThis command will:\n  • Create .skills-seed/ directory\n  • Generate default configuration (config.yaml)\n  • Initialize BoltDB database\n  • Prepare cross-agent compatible prompt and skills templates\n\nPlease run this command in the root directory of a Git repository."
@@ -844,6 +859,9 @@ other = "Skills output directory (defaults to skills.paths for the current skill
 [GenerateFlagNoReferences]
 other = "Skip generating reference documents (references/ directory)"
 
+[GenerateFlagForce]
+other = "Force regenerating all skills and ignore pattern dirty state"
+
 [GenerateFlagContext]
 other = "Additional guidance for this generate run, passed to the AI agent as extra constraints"
 
@@ -855,7 +873,7 @@ other = "Read additional guidance for this generate run from a file; useful for 
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern and curate it before storage\n  compact - Ask the current agent to curate existing patterns and reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern and curate it before storage\n  delete  - Delete a pattern and mark related skills dirty\n  compact - Ask the current agent to curate existing patterns and reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
 
 [PatternsExample]
 other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Compact similar patterns in all categories\n  skills-seed patterns compact"
@@ -885,7 +903,7 @@ other = "Add a user-defined pattern using natural language"
 other = "Describe a coding convention or pattern in natural language, and AI will generate a structured Pattern combined with project code.\n\nAI auto-infers category, generates good/bad examples and actionable rules. Use --files to specify related files for more accurate examples."
 
 [PatternsAddExample]
-other = "  # Minimal usage\n  skills-seed patterns add \"All service methods must return domain error\"\n\n  # Specify category and files\n  skills-seed patterns add \"Use limit/offset for pagination\" --category api --files internal/handler/pagination.go\n\n  # With context\n  skills-seed patterns add \"Use transactions for order writes\" --category database --context \"See order.go transaction pattern\""
+other = "  # Minimal usage\n  skills-seed patterns add \"All service methods must return domain error\"\n\n  # Specify category and files\n  skills-seed patterns add \"Use limit/offset for pagination\" --category api --files internal/handler/pagination.go"
 
 [PatternsAddFlagCategory]
 other = "Category: naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
@@ -893,11 +911,182 @@ other = "Category: naming, error, structure, concurrency, testing, business, api
 [PatternsAddFlagFiles]
 other = "Related file paths; may be repeated for multiple files"
 
-[PatternsAddFlagContext]
-other = "Additional context"
+[PatternsAddRequireDescription]
+other = "pattern description required: skills-seed patterns add \"rule description\""
 
 [PatternsAddComplete]
 other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
+
+[PatternsDeleteShort]
+other = "Delete a pattern"
+
+[PatternsDeleteLongDesc]
+other = "Delete a learned pattern by pattern ID.\n\nProject mode deletes only the current project's pattern. From a workspace root, this deletes the root pattern first and also deletes the child project pattern when the root pattern records a child project ID."
+
+[PatternsDeleteExample]
+other = "  # Delete one pattern\n  skills-seed patterns delete plugin-source-editing-rule"
+
+[PatternsDeleteRequireID]
+other = "pattern ID required: skills-seed patterns delete <pattern-id>"
+
+[PatternsDeleteComplete]
+other = "Pattern deleted: {{.PatternID}}"
+
+[PatternsStatsShort]
+other = "Show learned pattern quality and check hit statistics"
+
+[PatternsStatsLongDesc]
+other = "Show learned pattern quality metrics and check hit statistics, including specificity, confidence, effective score, hit count, and last hit time."
+
+[PatternsStatsExample]
+other = "skills-seed patterns stats"
+
+[PatternsStatsHeaderPattern]
+other = "PATTERN"
+
+[PatternsStatsHeaderCategory]
+other = "CATEGORY"
+
+[PatternsStatsHeaderSpecificity]
+other = "SPECIFICITY"
+
+[PatternsStatsHeaderConfidence]
+other = "CONFIDENCE"
+
+[PatternsStatsHeaderEffective]
+other = "EFFECTIVE"
+
+[PatternsStatsHeaderHits]
+other = "HITS"
+
+[PatternsStatsHeaderLastHit]
+other = "LAST_HIT"
+
+[PatternsShowShort]
+other = "Show learned pattern database fields"
+
+[PatternsShowLongDesc]
+other = "Show learned patterns with stored database fields such as source, timestamps, and code location metadata."
+
+[PatternsShowExample]
+other = "skills-seed patterns show\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
+
+[PatternsShowFlagFormat]
+other = "output format: table or json"
+
+[PatternsShowUnsupportedFormat]
+other = "unsupported format {{.Format}}"
+
+[PatternsShowHeaderID]
+other = "ID"
+
+[PatternsShowHeaderCategory]
+other = "CATEGORY"
+
+[PatternsShowHeaderSource]
+other = "SOURCE"
+
+[PatternsShowHeaderConfidence]
+other = "CONFIDENCE"
+
+[PatternsShowHeaderCreatedAt]
+other = "CREATED_AT"
+
+[PatternsShowHeaderUpdatedAt]
+other = "UPDATED_AT"
+
+[PatternsShowHeaderLocationStatus]
+other = "LOCATION_STATUS"
+
+[PatternsShowHeaderCurrentLocation]
+other = "CURRENT_LOCATION"
+
+[PatternsShowFieldID]
+other = "id"
+
+[PatternsShowFieldName]
+other = "name"
+
+[PatternsShowFieldCategory]
+other = "category"
+
+[PatternsShowFieldSource]
+other = "source"
+
+[PatternsShowFieldConfidence]
+other = "confidence"
+
+[PatternsShowFieldFrequency]
+other = "frequency"
+
+[PatternsShowFieldCreatedAt]
+other = "created_at"
+
+[PatternsShowFieldUpdatedAt]
+other = "updated_at"
+
+[PatternsShowFieldDescription]
+other = "description"
+
+[PatternsShowFieldRule]
+other = "rule"
+
+[PatternsShowFieldBusinessMethod]
+other = "business_method"
+
+[PatternsShowFieldCurrentLocation]
+other = "current_location"
+
+[PatternsShowFieldHistoricalLocation]
+other = "historical_location"
+
+[PatternsShowFieldLocationStatus]
+other = "location_status"
+
+[PatternsShowFieldChangeKinds]
+other = "change_kinds"
+
+[PatternsShowFieldLocationConfidence]
+other = "location_confidence"
+
+[PatternsShowFieldLocationVerifiedAt]
+other = "location_verified_at"
+
+[PatternsShowFieldLocationCreatedAt]
+other = "location_created_at"
+
+[PatternsShowFieldLocationUpdatedAt]
+other = "location_updated_at"
+
+[PatternsShowFieldSnapshotLanguage]
+other = "snapshot_language"
+
+[PatternsShowFieldSnapshotKind]
+other = "snapshot_kind"
+
+[PatternsShowFieldSnapshotNamespace]
+other = "snapshot_namespace"
+
+[PatternsShowFieldSnapshotReceiver]
+other = "snapshot_receiver"
+
+[PatternsShowFieldSnapshotName]
+other = "snapshot_name"
+
+[PatternsShowFieldSnapshotSignatureHash]
+other = "snapshot_signature_hash"
+
+[PatternsShowFieldSnapshotInputs]
+other = "snapshot_inputs"
+
+[PatternsShowFieldSnapshotOutputs]
+other = "snapshot_outputs"
+
+[PatternsShowFieldSnapshotBodyHash]
+other = "snapshot_body_hash"
+
+[PatternsShowFieldSnapshotDependencies]
+other = "snapshot_dependencies"
 
 # sync
 [SyncShort]
@@ -947,6 +1136,111 @@ other = "Save user pattern failed"
 
 [SyncPatternAdded]
 other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}})"
+
+[PreviewShort]
+other = "Preview analysis inputs"
+
+[PreviewLongDesc]
+other = "Preview files and prompt inputs that skills-seed would analyze without calling an AI agent."
+
+[PreviewExample]
+other = "skills-seed preview files\nskills-seed preview files --mode incremental --focus internal/service"
+
+[PreviewFilesShort]
+other = "Preview files selected for analysis"
+
+[PreviewFilesLongDesc]
+other = "Preview source files selected for full or incremental analysis. Document files are skipped by default; source files under docs/ are kept."
+
+[PreviewFilesExample]
+other = "skills-seed preview files --mode full\nskills-seed preview files --mode incremental --focus internal/service"
+
+[PreviewFilesFlagMode]
+other = "analysis mode: full or incremental"
+
+[PreviewFilesFlagFocus]
+other = "only preview files under these paths"
+
+[PreviewFilesFlagLimit]
+other = "maximum included files to print"
+
+[PreviewFilesUnsupportedMode]
+other = "unsupported preview mode {{.Mode}}"
+
+[PreviewFilesOutputMode]
+other = "mode"
+
+[PreviewFilesOutputIncluded]
+other = "included"
+
+[PreviewFilesOutputDeleted]
+other = "deleted"
+
+[PreviewFilesOutputSkippedDocuments]
+other = "skipped_documents"
+
+[PreviewFilesOutputSkippedOther]
+other = "skipped_other"
+
+[PreviewFilesOutputIncludedFiles]
+other = "INCLUDED_FILES"
+
+[PreviewFilesOutputDeletedFiles]
+other = "DELETED_FILES"
+
+[PreviewFilesOutputMore]
+other = "... {{.Count}} more"
+
+[ReviewShort]
+other = "Import review comments and show prevention statistics"
+
+[ReviewLongDesc]
+other = "Import local review comments and compare them with recorded pattern hits by file and line window to observe which comments are already covered by existing patterns."
+
+[ReviewExample]
+other = "skills-seed review import --from-file review-comments.json\nskills-seed review stats"
+
+[ReviewImportShort]
+other = "Import review comments from a JSON file"
+
+[ReviewImportLongDesc]
+other = "Import local review comments from a JSON array file into the skills-seed memory database."
+
+[ReviewImportExample]
+other = "skills-seed review import --from-file review-comments.json"
+
+[ReviewImportFlagFromFile]
+other = "JSON file containing review comments"
+
+[ReviewImportComplete]
+other = "Imported {{.Count}} review comments"
+
+[ReviewStatsShort]
+other = "Show review comment prevention statistics"
+
+[ReviewStatsLongDesc]
+other = "Show how many imported review comments match recorded pattern hits within the configured line window."
+
+[ReviewStatsExample]
+other = "skills-seed review stats"
+
+[ReviewStatsFlagLineWindow]
+other = "Line distance used to match review comments to pattern hits"
+
+[ReviewStatsOutputTotal]
+other = "TOTAL"
+
+[ReviewStatsOutputPrevented]
+other = "PREVENTED"
+
+[ReviewStatsOutputMissed]
+other = "MISSED"
+
+[ReviewStatsOutputPattern]
+other = "PATTERN"
+
+[ReviewStatsOutputComments]
+other = "COMMENTS"
 
 # workspace
 [WorkspaceShort]
@@ -1603,7 +1897,7 @@ other = "Primary programming language of the project; empty uses config or auto-
 other = "Directory or file to scan for learning; may be repeated; paths must stay under the project root"
 
 [LearnFlagProfile]
-other = "Project profile refresh strategy: auto for first/full runs, skip to omit, refresh to force"
+other = "Project profile refresh strategy: auto refreshes when missing or when this run writes patterns, skip omits, refresh forces regeneration"
 
 [LearnFlagContext]
 other = "Additional guidance for this learn run, passed to the AI agent as extra constraints"
@@ -1629,6 +1923,12 @@ other = "No learnable file changes detected; skipped pattern learning and projec
 
 [LearnCurrentGeneratedSkillsExcluded]
 other = "Excluded generated skills directories: {{.Paths}}"
+
+[LearnCurrentAIFileSelectionSummary]
+other = "AI file selection:\n  • candidates: {{.Candidates}}\n  • selected for analysis: {{.Selected}}\n  • skipped by AI: {{.Skipped}}"
+
+[LearnCurrentFingerprintCommitPlan]
+other = "Will commit {{.Records}} file fingerprints after this run succeeds, including AI-skipped file status"
 
 [LearnCurrentFocusOutsideRoot]
 other = "Focus path {{.Path}} is outside the project root"

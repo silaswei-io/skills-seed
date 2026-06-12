@@ -8,12 +8,11 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	gencmd "github.com/silaswei-io/skills-seed/internal/command/generate"
 	learncmd "github.com/silaswei-io/skills-seed/internal/command/learn"
+	patterncmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	"github.com/silaswei-io/skills-seed/internal/container"
-	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
-	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/spf13/cobra"
 )
 
@@ -104,26 +103,10 @@ func syncWithUserPattern(ctx context.Context, cont *container.Container, descrip
 		return fmt.Errorf("%s: %s", i18n.Get("SyncSavePatternFailed"), "pattern curator is not configured")
 	}
 
-	curateTracker := progress.New(1)
-	curated, err := cont.CuratorSvc.CurateAndStoreWithHooks(ctx, curator.CurateRequest{
-		Operation:  curator.OperationUserDefined,
-		Candidates: []domain.Pattern{*result.Pattern},
-	}, curator.ProgressHooks{
-		OnStepStart:    curateTracker.StartStep,
-		OnStepUpdate:   curateTracker.UpdateStep,
-		OnStepComplete: curateTracker.CompleteStep,
-	})
+	written, err := patterncmd.StoreUserDefinedPattern(ctx, cont, description, *result.Pattern)
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncSavePatternFailed"), err)
 	}
-	if len(curated.Written) == 0 {
-		reason := "pattern was not written"
-		if len(curated.Dropped) > 0 && curated.Dropped[0].Reason != "" {
-			reason = curated.Dropped[0].Reason
-		}
-		return fmt.Errorf("%s: %s", i18n.Get("SyncSavePatternFailed"), reason)
-	}
-	written := curated.Written[0]
 	result.Pattern = &written
 
 	logger.Info(i18n.GetWithParams("SyncPatternAdded", map[string]interface{}{

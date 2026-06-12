@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -150,4 +152,95 @@ func (r *Repository) MarkSkillsGenerated(ctx context.Context, mode string) error
 	}
 	state.SkillsGenerated = true
 	return r.Save(ctx, state)
+}
+
+// MarkSkillsDirty 标记需要重新生成 skills 的目标。
+func (r *Repository) MarkSkillsDirty(ctx context.Context, target domain.SkillsDirtyTarget) error {
+	state, err := r.getOrDefault(ctx)
+	if err != nil {
+		return err
+	}
+	if target.Project {
+		state.SkillsDirty.Project = true
+	}
+	if target.Workspace {
+		state.SkillsDirty.Workspace = true
+	}
+	state.SkillsDirty.Projects = mergeProjectIDs(state.SkillsDirty.Projects, target.Projects)
+	return r.Save(ctx, state)
+}
+
+// ClearSkillsDirty 清理已成功生成的 skills 目标。
+func (r *Repository) ClearSkillsDirty(ctx context.Context, target domain.SkillsDirtyTarget) error {
+	state, err := r.getOrDefault(ctx)
+	if err != nil {
+		return err
+	}
+	if target.Project {
+		state.SkillsDirty.Project = false
+	}
+	if target.Workspace {
+		state.SkillsDirty.Workspace = false
+	}
+	state.SkillsDirty.Projects = removeProjectIDs(state.SkillsDirty.Projects, target.Projects)
+	return r.Save(ctx, state)
+}
+
+func (r *Repository) getOrDefault(ctx context.Context) (*domain.RuntimeState, error) {
+	state, err := r.Get(ctx)
+	if err != nil {
+		if !errors.Is(err, ErrStateNotFound) {
+			return nil, err
+		}
+		return &domain.RuntimeState{Mode: domain.ModeProject}, nil
+	}
+	return state, nil
+}
+
+func mergeProjectIDs(existing, added []string) []string {
+	set := map[string]struct{}{}
+	for _, projectID := range existing {
+		projectID = strings.TrimSpace(projectID)
+		if projectID != "" {
+			set[projectID] = struct{}{}
+		}
+	}
+	for _, projectID := range added {
+		projectID = strings.TrimSpace(projectID)
+		if projectID != "" {
+			set[projectID] = struct{}{}
+		}
+	}
+	return sortedProjectIDs(set)
+}
+
+func removeProjectIDs(existing, removed []string) []string {
+	removeSet := map[string]struct{}{}
+	for _, projectID := range removed {
+		projectID = strings.TrimSpace(projectID)
+		if projectID != "" {
+			removeSet[projectID] = struct{}{}
+		}
+	}
+	set := map[string]struct{}{}
+	for _, projectID := range existing {
+		projectID = strings.TrimSpace(projectID)
+		if projectID == "" {
+			continue
+		}
+		if _, ok := removeSet[projectID]; ok {
+			continue
+		}
+		set[projectID] = struct{}{}
+	}
+	return sortedProjectIDs(set)
+}
+
+func sortedProjectIDs(set map[string]struct{}) []string {
+	result := make([]string, 0, len(set))
+	for projectID := range set {
+		result = append(result, projectID)
+	}
+	sort.Strings(result)
+	return result
 }

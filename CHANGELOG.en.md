@@ -2,6 +2,28 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.1]
+
+### Features
+
+- Added AI relevant-file selection for `learn current`, narrowing large candidate file sets from the file tree and change metadata before analysis.
+- Added `skills-seed patterns delete` to remove patterns by ID and synchronize linked child-project patterns from a workspace root.
+- Added skills dirty state and `generate skills --force`; generation can now skip unchanged targets and regenerate only skills affected by learning, pattern, or workspace relationship changes.
+- Added a stronger AI JSON repair pipeline for common model-output issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers.
+
+### Changes
+
+- Reorganized learning config into `learning.current` and `learning.history`: structural context moved from `analysis.structural` to `learning.current.structural`, and history defaults moved under `learning.history`.
+- `learn current --profile auto` now refreshes project profiles only when missing or when this run actually writes or updates patterns.
+- Workspace relationship analysis skips unchanged inputs when artifacts already exist and marks only affected workspace or child skills dirty.
+- Generated skills and references now include validation commands and tighter module and business-method evidence guidance.
+
+### Fixes
+
+- Removed the root `completion` command and deleted its command-reference sections.
+- Fixed Chinese locale help text for `help`, `preview`, `review`, and `patterns show/stats` so command descriptions, flags, and table headers no longer fall back to English.
+- Fixed the English README root example to use `skills-seed workspace add .`.
+
 ## [v0.9.0]
 
 ### Features

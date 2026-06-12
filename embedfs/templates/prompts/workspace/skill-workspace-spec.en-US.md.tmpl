@@ -38,12 +38,12 @@ Generate workspace rules that directly guide coding agents operating from the ro
 - Child project paths route to that project's `.agents/skills/<skill>/SKILL.md` or `.claude/skills/<skill>/SKILL.md`.
 - Contract paths route to contract producers and consumers.
 - Shared paths route to every child project that imports, packages, or generates that shared content.
-- Infra paths route to child projects affected by deployment, config, or gateway rules.
+- Infra paths route to child projects affected by deployment, config, or routing rules.
 
 ## Change Order
 
 - Stabilize contracts or shared interfaces before changing producers and consumers.
-- Keep generated code, type definitions, SDKs, and API handlers synchronized with contract changes.
+- Keep derived artifacts, type definitions, and interface adapters synchronized with contract changes.
 - Validate deployment config, environment variables, and middleware adapters after implementation changes.
 
 ## Parallel Agent Rules

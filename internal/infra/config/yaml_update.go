@@ -56,9 +56,11 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
 
-	setYAMLBool(doc, []string{"analysis", "structural", "enabled"}, cfg.Analysis.Structural.Enabled)
-	setYAMLInt(doc, []string{"analysis", "structural", "max_symbols"}, cfg.Analysis.Structural.MaxSymbols)
-	setYAMLInt(doc, []string{"analysis", "structural", "max_file_size"}, cfg.Analysis.Structural.MaxFileSize)
+	setYAMLBool(doc, []string{"learning", "current", "select_relevant_files"}, cfg.Learning.Current.SelectRelevantFiles)
+	setYAMLInt(doc, []string{"learning", "current", "select_relevant_files_min_candidates"}, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
+	setYAMLBool(doc, []string{"learning", "current", "structural", "enabled"}, cfg.Learning.Current.Structural.Enabled)
+	setYAMLInt(doc, []string{"learning", "current", "structural", "max_symbols"}, cfg.Learning.Current.Structural.MaxSymbols)
+	setYAMLInt(doc, []string{"learning", "current", "structural", "max_file_size"}, cfg.Learning.Current.Structural.MaxFileSize)
 
 	setYAMLString(doc, []string{"agent", "engine"}, cfg.Agent.Engine)
 	setYAMLStringMap(doc, []string{"agent", "commands"}, cfg.Agent.Commands)
@@ -66,8 +68,8 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLBool(doc, []string{"agent", "allow_user_plugins"}, cfg.Agent.AllowUserPlugins)
 	setYAMLInt(doc, []string{"agent", "parallelism"}, cfg.Agent.Parallelism)
 
-	setYAMLInt(doc, []string{"learning", "max_commits"}, cfg.Learning.MaxCommits)
-	setYAMLInt(doc, []string{"learning", "batch_size"}, cfg.Learning.BatchSize)
+	setYAMLInt(doc, []string{"learning", "history", "max_commits"}, cfg.Learning.History.MaxCommits)
+	setYAMLInt(doc, []string{"learning", "history", "batch_size"}, cfg.Learning.History.BatchSize)
 
 	setYAMLString(doc, []string{"autofix", "strategy"}, cfg.AutoFix.Strategy)
 	setYAMLString(doc, []string{"autofix", "backup_path"}, cfg.AutoFix.BackupPath)

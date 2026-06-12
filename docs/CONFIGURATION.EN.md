@@ -12,7 +12,7 @@ The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates 
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
 - Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec during `learn current` from repository evidence, child project profiles, and one-shot user context. They are not read from config, and generation only consumes learned artifacts.
 - Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
-- `analysis.codegraph` was removed. Structural pre-scan is now configured through `analysis.structural`, uses embedded tree-sitter, and does not require an external CodeGraph command or index.
+- `analysis.codegraph` was removed. Structural pre-scan is now configured through `learning.current.structural`, uses embedded tree-sitter, and does not require an external CodeGraph command or index.
 
 ## Config Example
 
@@ -22,7 +22,7 @@ The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates 
 profile:
   name: "your-project"
   mode: "project"
-  language: "go"
+  language: ""
   locale: "en-US"
   git_remote: ""
   root_path: ""
@@ -30,12 +30,6 @@ profile:
 
 workspace:
   projects: []
-
-analysis:
-  structural:
-    enabled: true
-    max_symbols: 30
-    max_file_size: 512
 
 agent:
   engine: "claude"
@@ -51,8 +45,16 @@ agent:
     max_interval: 120
 
 learning:
-  max_commits: 50
-  batch_size: 5
+  current:
+    select_relevant_files: true
+    select_relevant_files_min_candidates: 200
+    structural:
+      enabled: true
+      max_symbols: 30
+      max_file_size: 512
+  history:
+    max_commits: 50
+    batch_size: 5
 
 autofix:
   strategy: "patch"
@@ -115,7 +117,7 @@ exclude:
 |---|---:|---|
 | `name` | current directory name | Project name, filled during init |
 | `mode` | `project` | Init mode: `project` for a single project, `workspace` for a multi-project workspace |
-| `language` | `go` | Primary project language, such as `typescript` or `python` |
+| `language` | auto-detected or empty | Primary project language; left empty when init cannot detect it |
 | `locale` | `zh-CN` | Language for tool output and config templates |
 | `git_remote` | auto-filled or empty | Git remote URL |
 | `root_path` | current project absolute path | Written during init and used to locate the project root |
@@ -141,7 +143,7 @@ exclude:
 |---|---:|---|
 | `id` | normalized directory name | Unique child project id |
 | `path` | discovered relative path | Child project path relative to the workspace root |
-| `type` | auto-detected | Child project type, such as `backend`, `frontend`, `library`, `infra`, or `contracts` |
+| `type` | auto-detected | Child project type, such as application, library, shared component, infrastructure, or contract project |
 | `language` | auto-detected | Primary child project language |
 
 #### Behavior
@@ -153,7 +155,21 @@ exclude:
 5. Only first-level directories under the workspace root that have their own `.git` are recognized as child projects.
 6. Markers such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files classify `type` and `language`; they no longer decide whether a directory is a project.
 
-### `analysis.structural`
+### `learning.current`
+
+`learning.current` controls the file scope and structural context used by `learn current`.
+
+#### Fields
+
+| Field | Default | Description |
+|---|---:|---|
+| `select_relevant_files` | `true` | Select the most relevant files from the candidate file tree before AI analysis to reduce noisy inputs |
+| `select_relevant_files_min_candidates` | `200` | Only call AI file selection when the candidate count reaches this threshold; smaller projects use local filtering to avoid an extra AI call |
+| `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
+| `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |
+| `structural.max_file_size` | `512` | Per-source-file size limit in KB; larger files are skipped |
+
+#### `structural`
 
 Lightweight structural pre-scan based on embedded tree-sitter. It provides symbols, imports, entry points, and module clues without depending on an external command or maintaining an index.
 
@@ -161,20 +177,16 @@ Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the
 
 Starting in 0.9.0, project-structure summaries, sample-file collection, and structural pre-scan all use the same configured file-selection policy. Except for built-in safety boundaries such as `.git`, `.skills-seed`, and configured generated-skills output directories, analyzer no longer keeps extra directory-name keywords. Put dependency, build-output, or project-specific directories in `exclude` when they should be skipped.
 
-#### Fields
-
-| Field | Default | Description |
-|---|---:|---|
-| `enabled` | `true` | Enable structural pre-scan; even when enabled, it only runs when focus, diff, sample, or entry files are available |
-| `max_symbols` | `30` | Maximum symbols emitted into structural context |
-| `max_file_size` | `512` | Per-source-file size limit in KB; larger files are skipped |
+Starting in 0.9.1, `select_relevant_files` is enabled by default. When the locally filtered candidate count reaches `select_relevant_files_min_candidates`, `learn current` asks AI to select the most relevant files from the candidate file tree and change metadata before deeper analysis.
 
 #### Recommendations
 
-1. Most projects should keep the default `true`; structural pre-scan still does not run without bounded inputs.
-2. Set `enabled` to `false` when structural context is not needed.
-3. Lower `max_file_size` for large repositories to avoid generated files, bundles, or unusually large files.
-4. Structural pre-scan only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
+1. Most projects should keep the defaults; structural context still does not run without bounded inputs.
+2. Set `select_relevant_files` to `false` when relevant-file selection is not needed.
+3. Raise `select_relevant_files_min_candidates` for small projects to skip AI file selection, or lower it for large projects to narrow scope earlier.
+4. Set `structural.enabled` to `false` when structural context is not needed.
+5. Lower `structural.max_file_size` for large repositories to avoid generated files, bundles, or unusually large files.
+6. Structural context only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
 
 ### Prompt Runtime Debugging
 
@@ -185,6 +197,8 @@ Rendered prompts are saved by default under `.skills-seed/memory/runtime/rendere
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr.
 
 Starting in 0.9.0, the pattern store renders the `pattern-curate` prompt before storage so AI can deduplicate, consolidate, drop, and self-check candidate patterns against related historical patterns. `generate skills` no longer runs pattern merging, so generation prompts only summarize and produce artifacts.
+
+Starting in 0.9.1, skills generation reads dirty state: learning, pattern deletion, and workspace relationship changes only mark affected targets for regeneration; unchanged and clean targets are skipped. Use `skills-seed generate skills --force` to ignore dirty state and rebuild everything.
 
 ### Generated Notice
 
@@ -242,7 +256,7 @@ skills-seed init --mode project --agent codex
 skills-seed init --workspace --agent codex
 ```
 
-### `learning`
+### `learning.history`
 
 #### Fields
 

@@ -381,6 +381,38 @@ func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	require.Contains(t, prompt, "完整项目画像")
 }
 
+func TestRenderProjectAnalysisBoundsStructureToFocusPaths(t *testing.T) {
+	tests := []struct {
+		locale string
+		label  string
+		bound  string
+	}{
+		{
+			locale: "zh-CN",
+			label:  "项目目录结构摘要",
+			bound:  "不要因为该文件中出现路径线索而扩展到未列入范围的文件",
+		},
+		{
+			locale: "en-US",
+			label:  "Project structure summary",
+			bound:  "do not expand into files outside those paths",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("codex", tt.locale, "")
+			data := sampleProjectAnalysisData()
+			data["FocusPaths"] = []string{"internal/service"}
+
+			prompt, err := loader.Render("project-analyze", data)
+
+			require.NoError(t, err)
+			require.Contains(t, prompt, tt.label)
+			require.Contains(t, prompt, tt.bound)
+		})
+	}
+}
+
 func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 	data := sampleProjectAnalysisData()
@@ -393,6 +425,38 @@ func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
 	require.Contains(t, prompt, "/tmp/skills-seed/structural-context.md")
 	require.NotContains(t, prompt, "handler calls service")
 	require.Contains(t, prompt, "结构化")
+}
+
+func TestRenderInitSkillsBoundsStructureToFocusPaths(t *testing.T) {
+	tests := []struct {
+		locale string
+		label  string
+		bound  string
+	}{
+		{
+			locale: "zh-CN",
+			label:  "项目目录结构摘要",
+			bound:  "不要因为该文件中出现路径线索而扩展到未列入范围的文件",
+		},
+		{
+			locale: "en-US",
+			label:  "Project structure summary",
+			bound:  "do not expand into files outside those paths",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("codex", tt.locale, "")
+			req := sampleAnalyzeCurrentCodebaseRequest()
+			req.FocusPaths = []string{"internal/service"}
+
+			prompt, err := loader.Render("skill-project-init", req)
+
+			require.NoError(t, err)
+			require.Contains(t, prompt, tt.label)
+			require.Contains(t, prompt, tt.bound)
+		})
+	}
 }
 
 func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
@@ -654,7 +718,7 @@ func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing
 
 	require.Contains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
 	require.Contains(t, prompt, "允许中英文混合表达技术概念")
-	require.Contains(t, prompt, "Cobra、Viper、goctl")
+	require.Contains(t, prompt, "不要从模板示例推断具体技术栈")
 }
 
 func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *testing.T) {
@@ -677,8 +741,8 @@ func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
-	require.Contains(t, prompt, "`framework_patterns` must describe framework usage in English")
-	require.Contains(t, prompt, "Do not output Chinese sentences such as “Cobra 命令模式”")
+	require.Contains(t, prompt, "`framework_patterns` must describe concrete framework or library usage in English")
+	require.Contains(t, prompt, "Do not infer a concrete technology stack from template examples")
 }
 
 func TestLoader_RenderEnGenerateSkillsSummaryRequiresEnglishNaturalLanguage(t *testing.T) {

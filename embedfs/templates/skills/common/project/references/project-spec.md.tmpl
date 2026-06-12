@@ -12,7 +12,17 @@
 
 - 本规范只保留当前项目的可执行约束、生成/配置约定和改动触点。
 - 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，业务方法读 [强业务方法](./business-methods.md){{end}}。
+- “规则”只包含当前 pattern 中带代码证据的约束；没有直接代码证据的内容会降级为“参考观察”。
 - 当本规范和实际代码不一致时，以当前代码为准，并在必要时重新运行 `skills-seed learn current` 和 `skills-seed generate skills`。
+
+## 目录
+
+- [规则](#规则)
+{{if .PatternGuidance}}- [参考观察](#参考观察)
+{{end}}{{if .FrameworkPatterns}}- [框架使用约定](#框架使用约定)
+{{end}}{{if .ConfigPatterns}}- [配置约定](#配置约定)
+{{end}}{{if .ValidationCommands}}- [验证命令](#验证命令)
+{{end}}- [改动触点](#改动触点)
 
 {{if .SourceOfTruth}}
 ## 修改来源
@@ -33,6 +43,16 @@
 *尚未提取可执行规则。*
 {{end}}
 
+{{if .PatternGuidance}}
+## 参考观察
+
+以下内容来自已学习模式，但缺少足够直接的代码证据，不能覆盖当前代码行为：
+
+{{range .PatternGuidance}}
+- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{end}}
+{{end}}
+
 {{if .FrameworkPatterns}}
 ## 框架使用约定
 
@@ -46,6 +66,14 @@
 
 {{range .ConfigPatterns}}
 - {{.}}
+{{end}}
+{{end}}
+
+{{if .ValidationCommands}}
+## 验证命令
+
+{{range .ValidationCommands}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}
 {{end}}
 {{end}}
 

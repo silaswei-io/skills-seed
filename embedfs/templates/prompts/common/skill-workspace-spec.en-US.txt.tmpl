@@ -9,7 +9,7 @@ The workspace spec must answer:
 1. Which child project skills should be read before editing a path.
 2. When multiple child project skills must be loaded together.
 3. Which synchronization checkpoints are required after contracts, shared code, or infra changes.
-4. The change order across frontend, backend, middleware, shared libraries, and deployment config.
+4. The change order across child projects, shared libraries, adapters, and runtime config.
 5. Which rules are workspace-level rules and which must remain in a child project's project spec.
 
 # Input Interpretation
@@ -46,10 +46,10 @@ The AI call is non-interactive; do not ask the user outside the JSON. If an unco
 
 2. **Cross-project change flow**
    - Specify whether contracts, implementation, shared code, consumers, infra, and tests should be updated first.
-   - Include checkpoints for generated code, SDKs, type definitions, API handlers, client calls, deployment config, and tests.
+   - Include checkpoints for derived artifacts, type definitions, interface adapters, callers, deployment config, and tests.
 
 3. **Consistency rules**
-   - Keep API request/response shapes, error codes, auth context, environment variables, config keys, event schemas, database schemas, and log fields consistent across projects.
+   - Keep interface input/output shapes, error codes, access context, environment variables, config keys, event structures, data structures, and log fields consistent across projects.
    - Only include rules supported by current workspace evidence.
 
 4. **Parallel agent rules**
@@ -77,16 +77,16 @@ Return only a valid JSON object with this structure. The `json` fenced block bel
   "root_path": "workspace root path",
   "routing": [
     {
-      "path_pattern": "frontend/**",
-      "project_ids": ["frontend"],
-      "reason": "frontend code changes require the frontend child skill first"
+      "path_pattern": "project-a/**",
+      "project_ids": ["project-a"],
+      "reason": "changes under this path require the matching child skill first"
     }
   ],
   "rules": [
     {
-      "title": "Contract first",
-      "description": "After changing proto/**, check backend handlers, frontend generated clients, and middleware adapters",
-      "applies_to": ["frontend", "backend", "middleware"]
+      "title": "Shared boundary first",
+      "description": "After changing shared contracts or interface boundaries, check producers, consumers, derived artifacts, and adapters",
+      "applies_to": ["producer", "consumer", "adapter"]
     }
   ],
   "change_order": [
@@ -97,16 +97,16 @@ Return only a valid JSON object with this structure. The `json` fenced block bel
   ],
   "parallel_agent_guidance": [
     {
-      "scope": "frontend + backend",
+      "scope": "project-a + project-b",
       "allowed": true,
       "condition": "contract files are stable and write paths do not overlap"
     }
   ],
   "load_multiple_skills_when": [
     {
-      "condition": "editing proto/**",
-      "project_ids": ["frontend", "backend"],
-      "reason": "contract changes affect generated clients and server handlers"
+      "condition": "editing shared contracts or interface boundaries",
+      "project_ids": ["producer-project", "consumer-project"],
+      "reason": "contract changes affect producers, consumers, derived artifacts, and adapters"
     }
   ]
 }

@@ -70,6 +70,105 @@ func TestRootHelpUsesConciseIntro(t *testing.T) {
 	require.NotContains(t, helpText, "学习当前代码并生成 skills")
 }
 
+func TestRootHelpRemovesCompletionAndLocalizesBuiltins(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	rootCmd := createRootCmd()
+	registerCommands(rootCmd, nil)
+	rootCmd.SetArgs([]string{"--help"})
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+	rootCmd.SetErr(&out)
+
+	require.NoError(t, rootCmd.Execute())
+
+	helpText := out.String()
+	require.NotContains(t, helpText, "completion")
+	require.NotContains(t, helpText, "Generate the autocompletion script")
+	require.NotContains(t, helpText, "Help about any command")
+	require.Contains(t, helpText, "help")
+	require.Contains(t, helpText, "查看命令帮助")
+
+	cmd, _, err := rootCmd.Find([]string{"completion"})
+	require.Error(t, err)
+	require.Equal(t, rootCmd, cmd)
+}
+
+func TestChineseHelpDoesNotExposeEnglishCommandDescriptions(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	tests := []struct {
+		name    string
+		args    []string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "preview",
+			args:    []string{"preview", "--help"},
+			want:    []string{"预览 skills-seed 将分析的文件"},
+			notWant: []string{"Preview analysis inputs"},
+		},
+		{
+			name:    "preview files",
+			args:    []string{"preview", "files", "--help"},
+			want:    []string{"预览 full 或 incremental 分析会选中的源文件", "只预览这些路径下的文件", "最大输出文件数量"},
+			notWant: []string{"Preview files selected for analysis", "only preview files under these paths", "maximum included files to print"},
+		},
+		{
+			name:    "patterns show",
+			args:    []string{"patterns", "show", "--help"},
+			want:    []string{"查看已学习 pattern 的数据库字段", "输出格式：table 或 json"},
+			notWant: []string{"Show learned pattern database fields", "output format: table or json"},
+		},
+		{
+			name:    "patterns stats",
+			args:    []string{"patterns", "stats", "--help"},
+			want:    []string{"查看已学习 pattern 的质量指标和 check 命中统计"},
+			notWant: []string{"Show learned pattern quality"},
+		},
+		{
+			name:    "review",
+			args:    []string{"review", "--help"},
+			want:    []string{"导入本地评审评论，并与已记录的 pattern 命中"},
+			notWant: []string{"Import review comments and show prevention statistics"},
+		},
+		{
+			name:    "review import",
+			args:    []string{"review", "import", "--help"},
+			want:    []string{"从 JSON 数组文件导入本地评审评论", "包含评审评论数组的 JSON 文件"},
+			notWant: []string{"Import review comments from a JSON file", "JSON file containing review comments"},
+		},
+		{
+			name:    "review stats",
+			args:    []string{"review", "stats", "--help"},
+			want:    []string{"查看已导入评审评论在指定行号窗口内命中", "匹配评审评论与 pattern 命中时允许的行号距离"},
+			notWant: []string{"Show review comment prevention statistics", "Line distance used to match review comments"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootCmd := createRootCmd()
+			registerCommands(rootCmd, nil)
+			rootCmd.SetArgs(tt.args)
+			var out bytes.Buffer
+			rootCmd.SetOut(&out)
+			rootCmd.SetErr(&out)
+
+			require.NoError(t, rootCmd.Execute())
+
+			helpText := out.String()
+			for _, want := range tt.want {
+				require.Contains(t, helpText, want)
+			}
+			for _, notWant := range tt.notWant {
+				require.NotContains(t, helpText, notWant)
+			}
+		})
+	}
+}
+
 func TestSubcommandHelpKeepsDetailedContent(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 
@@ -118,7 +217,6 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "builtin help command", args: []string{"help"}, want: false},
 		{name: "help reset", args: []string{"help", "reset"}, want: false},
 		{name: "subcommand help", args: []string{"learn", "current", "--help"}, want: false},
-		{name: "completion", args: []string{"completion", "bash"}, want: false},
 		{name: "init", args: []string{"init"}, want: false},
 		{name: "reset", args: []string{"reset"}, want: true},
 		{name: "reset help positional arg", args: []string{"reset", "help"}, want: true},
@@ -135,6 +233,8 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "patterns parent help", args: []string{"patterns"}, want: false},
 		{name: "patterns stats", args: []string{"patterns", "stats"}, want: true},
 		{name: "patterns compact", args: []string{"patterns", "compact"}, want: true},
+		{name: "patterns delete", args: []string{"patterns", "delete", "plugin-source-edit-rule"}, want: true},
+		{name: "patterns rm alias", args: []string{"patterns", "rm", "plugin-source-edit-rule"}, want: true},
 		{name: "patterns show", args: []string{"patterns", "show"}, want: true},
 		{name: "profile parent help", args: []string{"profile"}, want: false},
 		{name: "profile show", args: []string{"profile", "show"}, want: true},
@@ -268,5 +368,5 @@ func commandPath(cmd *cobra.Command) string {
 }
 
 func isBuiltinHelpCommand(cmd *cobra.Command) bool {
-	return cmd.Name() == "help" || cmd.Name() == "completion"
+	return cmd.Name() == "help"
 }

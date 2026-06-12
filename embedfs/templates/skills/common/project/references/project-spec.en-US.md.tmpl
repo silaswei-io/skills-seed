@@ -12,7 +12,17 @@
 
 - This spec keeps executable constraints, generated/config conventions, and change touchpoints only.
 - For architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for business methods read [Business Methods](./business-methods.md){{end}}.
+- "Rules" only include constraints backed by code evidence in the current pattern set; content without direct code evidence is downgraded to "Reference Observations."
 - If this spec conflicts with the current code, trust the code and regenerate with `skills-seed learn current` and `skills-seed generate skills` when needed.
+
+## Table Of Contents
+
+- [Rules](#rules)
+{{if .PatternGuidance}}- [Reference Observations](#reference-observations)
+{{end}}{{if .FrameworkPatterns}}- [Framework Conventions](#framework-conventions)
+{{end}}{{if .ConfigPatterns}}- [Configuration Conventions](#configuration-conventions)
+{{end}}{{if .ValidationCommands}}- [Validation Commands](#validation-commands)
+{{end}}- [Change Touchpoints](#change-touchpoints)
 
 {{if .SourceOfTruth}}
 ## Source Of Truth
@@ -33,6 +43,16 @@
 *No executable rules extracted yet.*
 {{end}}
 
+{{if .PatternGuidance}}
+## Reference Observations
+
+These items come from learned patterns, but do not have enough direct code evidence to override current code behavior:
+
+{{range .PatternGuidance}}
+- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{end}}
+{{end}}
+
 {{if .FrameworkPatterns}}
 ## Framework Conventions
 
@@ -46,6 +66,14 @@
 
 {{range .ConfigPatterns}}
 - {{.}}
+{{end}}
+{{end}}
+
+{{if .ValidationCommands}}
+## Validation Commands
+
+{{range .ValidationCommands}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}
 {{end}}
 {{end}}
 

@@ -263,6 +263,30 @@ func (c *ClaudeAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixe
 	return result, nil
 }
 
+// SelectFiles 基于候选文件树选择当前代码学习范围。
+func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-file-select")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.SelectFilesPromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := c.promptLoader.Render("file-select", data)
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
+	}
+
+	output, err := c.callClaude(ctx, "SelectFiles", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeAnalyzeFailed"), err)
+	}
+	return parser.ParseSelectFilesResult(output)
+}
+
 // 调用外部命令行程序（含速率限制自动重试）
 func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) (string, error) {
 	workDir, err := agent.WorkDirForContext(ctx)

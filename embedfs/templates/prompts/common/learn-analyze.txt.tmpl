@@ -62,25 +62,25 @@
 {
   "issues": [
     {
-      "file": "path/to/file.go",
+      "file": "path/to/file",
       "line": 42,
       "severity": "warning",
-      "message": "错误处理不符合项目模式：应使用 fmt.Errorf(\"%w\", err) 包装错误",
-      "suggestion": "改为：return fmt.Errorf(\"failed to create user: %w\", err)",
+      "message": "错误处理不符合已学习的项目模式",
+      "suggestion": "按匹配模式中的本地代码风格修正错误处理",
       "pattern_id": "error-wrapping-pattern"
     },
     {
-      "file": "path/to/another.go",
+      "file": "path/to/another-file",
       "line": 15,
       "severity": "error",
-      "message": "数据库操作缺少事务处理",
-      "suggestion": "使用 db.Transaction() 包装多个数据库操作",
-      "pattern_id": "gorm-transaction-pattern"
+      "message": "多步数据变更未遵循已学习的事务边界",
+      "suggestion": "使用匹配模式中体现的项目本地事务封装",
+      "pattern_id": "transaction-boundary-pattern"
     }
   ],
   "suggestions": [
-    "建议在整个项目中统一使用结构化日志格式",
-    "考虑为所有 Service 层方法添加 context.Context 参数"
+    "建议在受影响文件中对齐已学习的日志形态",
+    "建议按已学习的结构模式调整模块边界"
   ],
   "confidence": 0.85
 }

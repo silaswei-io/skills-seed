@@ -129,7 +129,7 @@ func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
 	require.ErrorIs(t, err, renderErr)
 }
 
-func TestAnalyzeProjectReturnsErrorWhenModelJSONCannotBeParsed(t *testing.T) {
+func TestAnalyzeProjectRepairsMalformedModelJSON(t *testing.T) {
 	projectRoot := t.TempDir()
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
@@ -146,9 +146,11 @@ func TestAnalyzeProjectReturnsErrorWhenModelJSONCannotBeParsed(t *testing.T) {
 		Structure:   "main.go",
 	})
 
-	require.Error(t, err)
-	require.Nil(t, result)
-	require.Contains(t, err.Error(), "解析")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "demo", result.ProjectName)
+	require.Len(t, result.CommonUtils, 1)
+	require.Equal(t, "bad", result.CommonUtils[0].Name)
 }
 
 func TestParseClaudeOutput_ExtractsResultAndTokenUsage(t *testing.T) {

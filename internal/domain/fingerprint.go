@@ -36,6 +36,7 @@ func PrepareInputFingerprint(ctx context.Context, tracker FileAnalysisTracker, s
 		Size:           int64(len(payload)),
 		ModTime:        now,
 		Source:         FileAnalysisSourceInputDigest,
+		AnalysisStatus: FileAnalysisStatusInputDigest,
 		LastAnalyzedAt: now,
 	}
 	previous, err := tracker.GetAnalyzedFile(ctx, scope, path)

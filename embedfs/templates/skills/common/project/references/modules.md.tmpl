@@ -3,6 +3,11 @@
 本文件记录项目画像中提取的关键模块、职责边界、依赖关系和入口方法。调整模块结构或新增功能入口前，优先检查对应模块边界
 
 {{if .KeyModules}}
+## 目录
+
+{{range .KeyModules}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}
+
 {{range .KeyModules}}
 ## {{.Name}}
 

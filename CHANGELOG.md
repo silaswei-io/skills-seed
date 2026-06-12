@@ -2,6 +2,28 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.1]
+
+### 功能
+
+- 新增 `learn current` 的 AI 相关文件筛选，可在候选文件较多时先根据文件树和变更元数据收敛分析范围。
+- 新增 `skills-seed patterns delete`，支持按 pattern ID 删除模式，并在 workspace 根目录同步处理已关联子项目模式。
+- 新增 skills dirty state 和 `generate skills --force`，生成阶段可跳过未变化目标，只重新生成受学习、pattern 或 workspace 关系影响的 skills。
+- 新增更稳健的 AI JSON 修复流程，覆盖重复对象起始、非法转义、字符串内未转义引号和缺失闭合容器等常见模型输出问题。
+
+### 变更
+
+- 配置结构调整为 `learning.current` 和 `learning.history`：结构化上下文从 `analysis.structural` 移到 `learning.current.structural`，历史学习默认值移到 `learning.history`。
+- `learn current --profile auto` 仅在缺少画像或本次实际写入/更新模式时刷新项目画像，减少无意义 Agent 调用。
+- workspace 关系分析输入未变化且产物存在时会跳过重新分析，并只标记受影响的 workspace/子项目 skills 待生成。
+- 生成的 skills/references 增加项目验证命令、模块与业务方法证据提示，减少硬编码项目指导。
+
+### 修复
+
+- 移除根命令中的 `completion` 命令，并删除命令文档中的 completion 章节。
+- 修复中文 locale 下 `help`、`preview`、`review`、`patterns show/stats` 等命令露出英文描述、flag 或表头的问题。
+- 修复英文 README 根示例仍使用旧 `skills-seed add .` 的问题，统一为 `skills-seed workspace add .`。
+
 ## [v0.9.0]
 
 ### 功能

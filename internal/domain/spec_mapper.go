@@ -22,12 +22,13 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 	}
 
 	spec := &ProjectSpec{
-		ProjectName:       profile.ProjectName,
-		Language:          profile.Language,
-		Summary:           profile.Summary,
-		ConfigPatterns:    append([]string(nil), profile.ConfigPatterns...),
-		FrameworkPatterns: append([]string(nil), profile.FrameworkPatterns...),
-		GeneratedAt:       time.Now().Format("2006-01-02 15:04:05"),
+		ProjectName:        profile.ProjectName,
+		Language:           profile.Language,
+		Summary:            profile.Summary,
+		ConfigPatterns:     append([]string(nil), profile.ConfigPatterns...),
+		FrameworkPatterns:  append([]string(nil), profile.FrameworkPatterns...),
+		ValidationCommands: CleanValidationCommands(profile.ValidationCommands),
+		GeneratedAt:        time.Now().Format("2006-01-02 15:04:05"),
 	}
 	if project.ID != "" {
 		spec.ProjectID = project.ID
@@ -65,14 +66,19 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 	}
 
 	for _, pattern := range StrongestPatterns(patterns, 0) {
-		spec.PatternRules = append(spec.PatternRules, ProjectSpecPatternRule{
+		rule := ProjectSpecPatternRule{
 			Name:        pattern.Name,
 			Category:    string(pattern.Category),
 			Description: pattern.Description,
 			Rule:        pattern.Rule,
 			Confidence:  pattern.Confidence,
 			Frequency:   pattern.Frequency,
-		})
+		}
+		if patternHasExecutableEvidence(pattern) {
+			spec.PatternRules = append(spec.PatternRules, rule)
+		} else {
+			spec.PatternGuidance = append(spec.PatternGuidance, rule)
+		}
 	}
 
 	for _, method := range profile.BusinessMethods {
@@ -93,6 +99,17 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 	}
 
 	return spec
+}
+
+func patternHasExecutableEvidence(pattern Pattern) bool {
+	if strings.TrimSpace(pattern.GoodExample) != "" {
+		return true
+	}
+	if pattern.BusinessMethod != nil {
+		return strings.TrimSpace(pattern.BusinessMethod.DisplayLocation()) != "" ||
+			strings.TrimSpace(pattern.BusinessMethod.Function) != ""
+	}
+	return pattern.Metrics.EvidenceCount >= 3 && pattern.Metrics.GenericPenalty < 0.4
 }
 
 // patternForTemplate 清除不可用的 BusinessMethod，用于模板渲染

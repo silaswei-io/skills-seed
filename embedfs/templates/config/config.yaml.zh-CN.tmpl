@@ -7,8 +7,8 @@ profile:
   name: ""
   # 初始化模式：project 单项目，workspace 多子项目工作区；开始学习或生成后不可切换
   mode: "project"
-  # 项目主要语言，例如 go、typescript、python
-  language: "go"
+  # 项目主要语言，init 时自动识别；识别不到时留空
+  language: ""
   # 工具输出语言：zh-CN 中文，en-US 英文
   locale: "zh-CN"
   # Git 远程仓库地址，init 时自动填充
@@ -23,21 +23,8 @@ profile:
 # 仅 workspace 模式生效，普通 project 子仓通常不需要配置
 ########################################################################
 workspace:
-  # 子项目列表，例如 [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
+  # 子项目列表，例如 [{id: "project-a", path: "project-a", type: "application", language: "primary-language"}]
   projects: []
-
-########################################################################
-# 分析增强
-# 控制基于内嵌 tree-sitter 的结构化代码分析能力，省略字段时使用默认值
-########################################################################
-analysis:
-  structural:
-    # 启用有边界的结构化分析；无边界输入时不会运行
-    enabled: true
-    # 输出到结构化上下文的最大符号数
-    max_symbols: 30
-    # 跳过超过此大小的单个文件（KB）
-    max_file_size: 512
 
 ########################################################################
 # Agent 引擎
@@ -46,7 +33,7 @@ analysis:
 agent:
   # 执行分析/学习/生成摘要任务的 Agent 引擎，对应 commands 的 key
   engine: "claude"
-  # engine -> CLI 命令路径，新增 engine 时在这里增加 key
+  # Agent 引擎到本机 CLI 命令的映射；仅控制如何调用分析 Agent
   commands:
     claude: "claude"
     codex: "codex"
@@ -67,13 +54,26 @@ agent:
 
 ########################################################################
 # 学习
-# 控制从 Git 历史学习项目规范时的默认范围
+# 控制 learn current 和 learn history 的默认学习范围
 ########################################################################
 learning:
-  # 默认分析的 Git 提交数量
-  max_commits: 50
-  # 批量分析时,单次 AI 调用分析的 commit 数量
-  batch_size: 5
+  current:
+    # 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围
+    select_relevant_files: true
+    # 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果
+    select_relevant_files_min_candidates: 200
+    structural:
+      # 启用有边界的结构化上下文；无边界输入时不会运行
+      enabled: true
+      # 输出到结构化上下文的最大符号数
+      max_symbols: 30
+      # 跳过超过此大小的单个文件（KB）
+      max_file_size: 512
+  history:
+    # 默认分析的 Git 提交数量
+    max_commits: 50
+    # 批量分析时，单次 AI 调用分析的 commit 数量
+    batch_size: 5
 
 ########################################################################
 # 自动修复
@@ -94,7 +94,7 @@ skills:
   target: "claude"
   # 生成的 Skills、AI prompt 和沉淀到 Skills 的自然语言内容：zh-CN 中文，en-US 英文
   locale: "en-US"
-  # target -> Skills 输出路径，新增 target 时在这里增加 key
+  # Skills 目标类型到输出目录的映射；仅控制生成产物保存位置
   paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"

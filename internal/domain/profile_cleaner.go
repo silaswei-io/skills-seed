@@ -35,7 +35,38 @@ func CleanProjectProfile(profile *ProjectProfile) *ProjectProfile {
 		}
 	}
 
+	cleaned.ValidationCommands = CleanValidationCommands(profile.ValidationCommands)
+
 	return &cleaned
+}
+
+// CleanValidationCommands 清洗从项目证据中学习到的验证命令。
+func CleanValidationCommands(commands []ValidationCommand) []ValidationCommand {
+	cleaned := make([]ValidationCommand, 0, len(commands))
+	seen := make(map[string]bool, len(commands))
+	for _, command := range commands {
+		command.Command = strings.TrimSpace(command.Command)
+		command.When = strings.TrimSpace(command.When)
+		command.Source = strings.TrimSpace(command.Source)
+		if isInvalidValidationCommand(command.Command) {
+			continue
+		}
+		key := strings.ToLower(command.Command + "\x00" + command.When)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		cleaned = append(cleaned, command)
+	}
+	return cleaned
+}
+
+func isInvalidValidationCommand(command string) bool {
+	if command == "" {
+		return true
+	}
+	upper := strings.ToUpper(command)
+	return strings.Contains(upper, "TODO") || strings.Contains(command, "待确认")
 }
 
 // FilterGeneratedPlaceholders 过滤掉空值和含 TODO 的占位符

@@ -11,7 +11,7 @@
 
 # 项目目录结构
 
-项目目录结构位于 `{{.StructurePath}}`。请按路径读取。
+项目目录结构摘要位于 `{{.StructurePath}}`。请按路径读取，并仅把它作为本次允许分析范围和目录归属线索；如果下方提供了变更或聚焦路径，不要因为该文件中出现路径线索而扩展到未列入范围的文件，除非它们是判断调用关系所必需的直接相关文件。
 {{- end}}
 {{- if .StructuralContextPath}}
 
@@ -65,15 +65,18 @@
 3. 模块依赖图和关键数据流。
 4. 重要业务方法，必须包含完整签名和文件位置。
 5. 通用工具方法和配置模式。
+6. 项目中明确记录的验证命令。
 
 你运行在项目根目录中，请按路径自行读取入口文件、README 和必要源码。不要编造上下文中无法确认的信息。如果信息不足，对应数组留空，或在相关描述里使用简短 TODO 说明
 
-如果提供了已有项目画像，请保留其中未变化的模块、工具方法、业务方法、依赖和架构信息。只有当 focus 路径或直接相关文件提供明确证据时，才更新、新增或删除画像条目。输出必须仍是完整项目画像，不要返回局部 patch
+验证命令只能来自仓库内明确证据或用户提供上下文，例如 README、脚本、任务配置、CI 配置、构建配置或已有项目画像。必须保留证据中的原始命令文本；不要根据语言、框架、文件后缀或常见习惯推断默认命令。`source` 使用仓库相对路径；若只来自用户提供上下文，写 `user_context`。没有明确证据时，`validation_commands` 返回空数组。
+
+如果提供了已有项目画像，请保留其中未变化的模块、工具方法、业务方法、验证命令、依赖和架构信息。只有当 focus 路径或直接相关文件提供明确证据时，才更新、新增或删除画像条目。输出必须仍是完整项目画像，不要返回局部 patch
 
 # 语言要求
 
-- 面向用户阅读的自然语言字段应优先使用简体中文，包括 `architecture`、`layers`、`dependency_graph`、`data_flow`、`framework_patterns`、`structure`、`key_modules`、`business_methods`、`common_utils`、`config_patterns` 和 `summary`，但允许中英文混合表达技术概念。
-- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可保留原文，例如 Cobra、Viper、goctl、protoc、JZERO_*、GetCommand。
+- 面向用户阅读的自然语言字段应优先使用简体中文，包括 `architecture`、`layers`、`dependency_graph`、`data_flow`、`framework_patterns`、`structure`、`key_modules`、`business_methods`、`common_utils`、`config_patterns`、`validation_commands.when` 和 `summary`，但允许中英文混合表达技术概念。
+- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可按源码原文保留；不要从模板示例推断具体技术栈。
 
 # 输出格式
 
@@ -90,11 +93,11 @@
       "name": "层次名称",
       "description": "层次职责",
       "responsibilities": ["具体职责"],
-      "files": ["path/to/file.go"]
+      "files": ["path/to/file"]
     }
   ],
-  "dependency_graph": "Handler -> Service -> Repository -> Database",
-  "data_flow": "Request -> validation -> business logic -> persistence -> response",
+  "dependency_graph": "使用代码证据中的真实模块名描述依赖方向",
+  "data_flow": "使用代码证据中的真实处理阶段描述数据流",
   "framework_patterns": ["具体框架使用模式"],
   "structure": "具体项目结构摘要",
   "key_modules": [
@@ -111,7 +114,7 @@
   "business_methods": [
     {
       "name": "MethodName",
-      "code_location": {"current_location": "file/path.go:line"},
+      "code_location": {"current_location": "file/path:line"},
       "description": "业务逻辑说明",
       "usage": "何时调用该方法",
       "type": "domain|common",
@@ -123,14 +126,21 @@
   "common_utils": [
     {
       "name": "FunctionName",
-      "file": "file/path.go",
-      "signature": "func FunctionName(...) ...",
+      "file": "file/path",
+      "signature": "真实函数或方法签名",
       "description": "工具方法作用",
       "usage": "何时使用"
     }
   ],
   "config_patterns": ["配置模式"],
   "dependencies": ["依赖名称"],
+  "validation_commands": [
+    {
+      "command": "证据中出现的完整命令",
+      "when": "何时运行该命令",
+      "source": "仓库相对路径或 user_context"
+    }
+  ],
   "summary": "具体项目概览"
 }
 ```

@@ -1,6 +1,6 @@
 ---
 name: {{.SkillName}}
-description: Use when modifying, reviewing, or extending {{.ProjectName}} {{.Language}} code, especially architecture, module boundaries, business flows, utilities, derived artifacts, or repository conventions
+description: {{.SkillDescription}}
 ---
 
 <!-- generated-by: skills-seed {{.ProgramVersion}} -->
@@ -28,7 +28,7 @@ Read the smallest relevant reference set for the task:
 {{else}}- References were not written in this generation; inspect current code directly and reuse nearby implementations
 {{end}}
 
-Prefer current code and high-confidence project patterns; treat medium-confidence patterns as guidance. If evidence is missing, state the gap instead of inventing implementation details.
+Prefer current code and high-confidence project patterns backed by code evidence; treat medium-confidence patterns or patterns without code evidence as reference observations. If evidence is missing, state the gap instead of inventing product rules or implementation details.
 
 ---
 
@@ -64,7 +64,7 @@ Applies when: {{.AppliesWhen}}
 Choose the smallest command set that matches the change:
 
 {{range .ValidationCommands}}
-- `{{.Command}}` - {{.When}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}
 {{end}}
 
 ---
@@ -103,6 +103,7 @@ Choose the smallest command set that matches the change:
 - Check nearby code before introducing a new pattern or abstraction
 - Use project-specific business methods and utilities from the references when they exist
 {{if .References.ProjectSpec}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by [Project Spec](./references/project-spec.md){{else}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by current code and project configuration{{end}}
+- Only pattern rules backed by code evidence should be treated as hard constraints; reference observations cannot override current code behavior
 - If references and current code disagree, trust current code and rerun learning/generation
 
 {{if .KeyInsights}}

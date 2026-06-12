@@ -102,10 +102,11 @@ func TestAnalyzeProject(t *testing.T) {
 		NameVal: "test", AvailableVal: true,
 		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			return &agent.AnalyzeProjectResult{
-				Language:     "go",
-				Frameworks:   []string{"gin"},
-				Architecture: "DDD",
-				Summary:      "Test project summary",
+				Language:           "go",
+				Frameworks:         []string{"gin"},
+				Architecture:       "DDD",
+				ValidationCommands: []domain.ValidationCommand{{Command: "task verify", When: "after changes", Source: "Taskfile.yml"}},
+				Summary:            "Test project summary",
 			}, nil
 		},
 	}
@@ -117,6 +118,21 @@ func TestAnalyzeProject(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "go", result.Language)
 	assert.Contains(t, result.Frameworks, "gin")
+	require.Len(t, result.ValidationCommands, 1)
+	assert.Equal(t, "task verify", result.ValidationCommands[0].Command)
+}
+
+func TestNewProjectProfilePreservesValidationCommands(t *testing.T) {
+	profile := NewProjectProfile(&AnalyzeProjectResult{
+		Language:           "unknown",
+		ValidationCommands: []domain.ValidationCommand{{Command: "task verify", When: "after changes", Source: "Taskfile.yml"}},
+		Summary:            "profile",
+	}, "demo", "")
+
+	require.NotNil(t, profile)
+	require.Len(t, profile.ValidationCommands, 1)
+	assert.Equal(t, "task verify", profile.ValidationCommands[0].Command)
+	assert.Equal(t, "Taskfile.yml", profile.ValidationCommands[0].Source)
 }
 
 func TestAnalyzeProjectAddsStructuralContext(t *testing.T) {
@@ -130,9 +146,11 @@ func TestAnalyzeProjectAddsStructuralContext(t *testing.T) {
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		AnalysisCfg: config.AnalysisConfig{
-			Structural: config.StructuralConfig{
-				Enabled: true,
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
 			},
 		},
 	})
@@ -162,9 +180,11 @@ func TestAnalyzeProjectSkipsStructuralContextWithoutSeeds(t *testing.T) {
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		AnalysisCfg: config.AnalysisConfig{
-			Structural: config.StructuralConfig{
-				Enabled: true,
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
 			},
 		},
 	})
@@ -193,9 +213,11 @@ func TestAnalyzeProjectSkipsUnavailableOptionalStructuralContext(t *testing.T) {
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		AnalysisCfg: config.AnalysisConfig{
-			Structural: config.StructuralConfig{
-				Enabled: true,
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
 			},
 		},
 	})
@@ -285,9 +307,11 @@ func TestAnalyzeCurrentCodebaseAddsStructuralContext(t *testing.T) {
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		AnalysisCfg: config.AnalysisConfig{
-			Structural: config.StructuralConfig{
-				Enabled: true,
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
 			},
 		},
 	})
@@ -315,9 +339,11 @@ func TestAnalyzeCurrentCodebasePassesBoundedSeedsToStructuralCollector(t *testin
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		AnalysisCfg: config.AnalysisConfig{
-			Structural: config.StructuralConfig{
-				Enabled: true,
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
 			},
 		},
 	})
@@ -763,6 +789,62 @@ func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testin
 	assert.Contains(t, received.ExistingProfileJSON, `"architecture": "Clean Architecture"`)
 	assert.Contains(t, received.Structure, "Focused scan paths")
 	assert.Contains(t, received.Structure, "internal/service")
+}
+
+func TestAnalyzeProjectFullWithOptions_FocusedStructureOmitsUnfocusedTree(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "service", "service.go"), []byte("package service\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "agent", "agent.go"), []byte("package agent\n"), 0644))
+
+	var received agent.AnalyzeProjectRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			received = *req
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+
+	_, err := svc.AnalyzeProjectFullWithOptions(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
+		FocusPaths: []string{filepath.Join(tmpDir, "internal", "service")},
+	})
+
+	require.NoError(t, err)
+	assert.Contains(t, received.Structure, "Focused scan paths")
+	assert.Contains(t, received.Structure, "internal/service")
+	assert.NotContains(t, received.Structure, "internal/agent")
+	assert.NotContains(t, received.Structure, "Project structure:")
+}
+
+func TestAnalyzeCodebaseFullWithOptions_FocusedStructureOmitsUnfocusedTree(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "service", "service.go"), []byte("package service\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "agent", "agent.go"), []byte("package agent\n"), 0644))
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+
+	_, _, err := svc.AnalyzeCodebaseFullWithOptions(context.Background(), tmpDir, "test-project", "go", AnalyzeCodebaseOptions{
+		FocusPaths: []string{filepath.Join(tmpDir, "internal", "service")},
+	})
+
+	require.NoError(t, err)
+	assert.Contains(t, received.Structure, "Focused scan paths")
+	assert.Contains(t, received.Structure, "internal/service")
+	assert.NotContains(t, received.Structure, "internal/agent")
+	assert.NotContains(t, received.Structure, "Project structure:")
 }
 
 func TestAnalyzeProjectFullWithOptions_PassesRuntimeUserContext(t *testing.T) {

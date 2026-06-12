@@ -6,6 +6,13 @@ This file documents complex business logic methods extracted into the project pr
 {{end}}
 
 {{if .BusinessMethods}}
+## Table Of Contents
+
+{{range .BusinessMethods}}{{if .Name}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}{{end}}
+{{end}}
+
+{{if .BusinessMethods}}
 {{range .BusinessMethods}}{{if .Name}}
 ## {{.Name}}
 

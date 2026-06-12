@@ -6,6 +6,13 @@
 {{end}}
 
 {{if .BusinessMethods}}
+## 目录
+
+{{range .BusinessMethods}}{{if .Name}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}{{end}}
+{{end}}
+
+{{if .BusinessMethods}}
 {{range .BusinessMethods}}{{if .Name}}
 ## {{.Name}}
 

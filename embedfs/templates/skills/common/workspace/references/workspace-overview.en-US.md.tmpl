@@ -77,11 +77,11 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
   {{if .Producers}}- Producers: {{range $i, $id := .Producers}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
   {{if .Consumers}}- Consumers: {{range $i, $id := .Consumers}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
-  - After changes, check producers, consumers, generated clients, server handlers, middleware adapters, and tests.
+  - After changes, check producers, consumers, derived artifacts, adapters, and tests.
 {{end}}
 {{else}}
 - No explicit contract paths were analyzed.
-- Treat `api`, `proto`, `openapi`, `swagger`, `schema`, `types`, `sdk`, and `client` paths or filenames as contract changes.
+- Treat paths related to interface definitions, shared schemas, type definitions, event definitions, generation inputs, or derived artifacts as contract changes.
 - Contract changes usually affect at least one producer and one consumer; do not update only one side.
 {{end}}
 
@@ -105,12 +105,12 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 {{range .Infra}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
   {{if .AffectedProjects}}- Affected projects: {{range $i, $id := .AffectedProjects}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
-  - After changes, check child projects affected by deployment targets, environment variables, gateway rules, or middleware config.
+  - After changes, check child projects affected by deployment targets, environment variables, routing rules, or middleware config.
 {{end}}
 {{else}}
 - No explicit infrastructure paths were analyzed.
-- When touching `deploy`, `docker`, `k8s`, `helm`, `terraform`, `nginx`, `gateway`, `env`, or `config`, evaluate runtime impact first.
-- Infrastructure changes should check startup commands, ports, environment variables, health checks, gateway routes, and CI together.
+- When touching deployment, container, orchestration, routing, environment, or runtime config paths, evaluate runtime impact first.
+- Infrastructure changes should check startup commands, ports, environment variables, health checks, routing rules, and automation together.
 {{end}}
 
 ## Decision Rules
@@ -118,5 +118,5 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 - Path matches one child project only: read that child skill and keep writes inside that child project path.
 - Path matches special paths or root scripts: identify covered child projects, then read every affected child skill.
 - Filename or content represents interfaces, types, error codes, events, messages, or generation inputs: treat as a contract change.
-- Filename or content represents deployment, runtime config, gateway, or middleware: treat as an infrastructure change.
+- Filename or content represents deployment, runtime config, routing, or middleware: treat as an infrastructure change.
 - If ownership is unclear, stop and inspect the workspace overview, child skills, or ask the user before assigning responsibility.

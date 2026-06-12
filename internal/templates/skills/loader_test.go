@@ -25,6 +25,7 @@ func TestLoader_Render(t *testing.T) {
 		"SkillsTemplatesHash": "test-hash",
 		"ProjectName":         "test-project",
 		"SkillName":           "test-project-dev",
+		"SkillDescription":    "修改 test-project go 代码且涉及项目约定时使用",
 		"Language":            "go",
 		"PatternCount":        10,
 		"AvgConfidence":       85.5,
@@ -60,7 +61,7 @@ func TestLoader_Render(t *testing.T) {
 			},
 		},
 		"ValidationCommands": []map[string]string{
-			{"Command": "go test ./...", "When": "Go 代码变化后"},
+			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
 		},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
 		"References":     fullReferenceAvailability(),
@@ -90,7 +91,7 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "按任务读取最小必要参考")
 	assert.Contains(t, content, "常用工作流")
-	assert.Contains(t, content, "go test ./...")
+	assert.Contains(t, content, "task verify")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")
 	assert.NotContains(t, content, "为外部调用补充超时测试")
 }
@@ -104,6 +105,7 @@ func TestLoader_Render_English(t *testing.T) {
 		"SkillsTemplatesHash": "test-hash",
 		"ProjectName":         "test-project",
 		"SkillName":           "test-project-dev",
+		"SkillDescription":    "Use when modifying test-project go code involving project conventions",
 		"Language":            "go",
 		"PatternCount":        10,
 		"AvgConfidence":       85.5,
@@ -127,7 +129,7 @@ func TestLoader_Render_English(t *testing.T) {
 			},
 		},
 		"ValidationCommands": []map[string]string{
-			{"Command": "go test ./...", "When": "Go code changes"},
+			{"Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml"},
 		},
 		"StateSummaries":  []string{"Task: preserve task state transitions."},
 		"References":      fullReferenceAvailability(),
@@ -142,7 +144,7 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "Read the smallest relevant reference set")
 	assert.Contains(t, content, "Common Workflows")
-	assert.Contains(t, content, "go test ./...")
+	assert.Contains(t, content, "task verify")
 	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
 	assert.NotContains(t, content, "Add timeout tests for external calls")
 }
@@ -155,7 +157,7 @@ func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
 			content, err := loader.Render("project-skill", fullSkillData())
 			require.NoError(t, err)
 
-			require.Contains(t, content, "description: 修改、审查或扩展 demo go 代码时使用")
+			require.Contains(t, content, "description: 修改、审查或扩展 demo go 代码且涉及项目特定约定时使用")
 			require.NotContains(t, content, "description: Use when")
 		})
 	}
@@ -163,11 +165,13 @@ func TestLoader_RenderZhSkillFrontmatterDescriptionIsLocalized(t *testing.T) {
 
 func TestLoader_DefaultLocaleRendersEnglishSkill(t *testing.T) {
 	loader := NewLoaderForAgent("codex", "")
+	data := fullSkillData()
+	data["SkillDescription"] = "Use when modifying, reviewing, or extending demo go code involving project-specific conventions"
 
-	content, err := loader.Render("project-skill", fullSkillData())
+	content, err := loader.Render("project-skill", data)
 
 	require.NoError(t, err)
-	require.Contains(t, content, "description: Use when modifying, reviewing, or extending demo go code")
+	require.Contains(t, content, "description: Use when modifying, reviewing, or extending demo go code involving project-specific conventions")
 	require.NotContains(t, content, "description: 修改、审查或扩展")
 }
 
@@ -509,6 +513,7 @@ func fullSkillData() map[string]interface{} {
 		"SkillsTemplatesHash": "test-hash",
 		"ProjectName":         "demo",
 		"SkillName":           "demo-dev",
+		"SkillDescription":    "修改、审查或扩展 demo go 代码且涉及项目特定约定时使用",
 		"Language":            "go",
 		"PatternCount":        1,
 		"AvgConfidence":       90.0,
@@ -534,7 +539,7 @@ func fullSkillData() map[string]interface{} {
 			},
 		},
 		"ValidationCommands": []map[string]string{
-			{"Command": "go test ./...", "When": "Go 代码变化后"},
+			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
 		},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
 		"References":     fullReferenceAvailability(),
@@ -607,11 +612,14 @@ func projectOverviewData() map[string]interface{} {
 			{Title: "关键模块", Path: "./modules.md", Description: "完整模块清单"},
 			{Title: "通用工具", Path: "./common-utils.md", Description: "工具方法清单"},
 		},
-		"References":          fullReferenceAvailability(),
-		"KeyModules":          []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Dependencies: []string{"domain"}, Dependents: []string{"command"}, KeyMethods: []string{"Run()"}}},
-		"BusinessMethods":     []domain.BusinessMethod{{Name: "Demo", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/demo.go:10"}, Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
-		"CommonUtils":         []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
-		"ConfigPatterns":      []string{"yaml config"},
+		"References":      fullReferenceAvailability(),
+		"KeyModules":      []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Dependencies: []string{"domain"}, Dependents: []string{"command"}, KeyMethods: []string{"Run()"}}},
+		"BusinessMethods": []domain.BusinessMethod{{Name: "Demo", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/demo.go:10"}, Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
+		"CommonUtils":     []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
+		"ConfigPatterns":  []string{"yaml config"},
+		"ValidationCommands": []domain.ValidationCommand{
+			{Command: "task verify", When: "项目代码变化后", Source: "Taskfile.yml"},
+		},
 		"CodeFenceLanguage":   "go",
 		"ProjectID":           "demo",
 		"ScopePath":           "demo",
@@ -623,6 +631,9 @@ func projectOverviewData() map[string]interface{} {
 		},
 		"PatternRules": []domain.ProjectSpecPatternRule{
 			{Name: "Error Wrapping", Category: "error", Description: "wrap errors", Rule: "use %w", Confidence: 0.9, Frequency: 2},
+		},
+		"PatternGuidance": []domain.ProjectSpecPatternRule{
+			{Name: "Naming Observation", Category: "naming", Description: "names align", Rule: "prefer local names", Confidence: 0.7, Frequency: 1},
 		},
 		"Touchpoints": []domain.ProjectSpecTouchpoint{
 			{Kind: "business_method", Name: "Demo", Path: "internal/demo.go:10", Description: "demo"},

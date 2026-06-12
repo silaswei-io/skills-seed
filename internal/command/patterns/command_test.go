@@ -4,15 +4,252 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPlanWorkspacePatternTargetsMatchesProjectMention(t *testing.T) {
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend"},
+		{ID: "cluster-manage", Path: "cluster_manage", Type: "backend"},
+	}
+
+	plan := planWorkspacePatternTargets("hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码", projects)
+
+	require.True(t, plan.Workspace)
+	require.Equal(t, []string{"hsmwebapi"}, plan.Projects)
+}
+
+func TestAddCmdInWorkspaceRootDistributesPatternAndMarksDirtyTargets(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	ctx := context.Background()
+	workspaceRoot := t.TempDir()
+	childRoot := filepath.Join(workspaceRoot, "hsmwebapi")
+
+	rootConfigRepo, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	rootCfg := rootConfigRepo.Get()
+	rootCfg.Project.Name = "hsm-workspace"
+	rootCfg.Project.Mode = domain.ModeWorkspace
+	rootCfg.Project.RootPath = workspaceRoot
+	rootCfg.Project.Language = "go"
+	rootCfg.Agent.Engine = "mock"
+	rootCfg.Agent.Commands = map[string]string{"mock": "mock"}
+	rootCfg.Workspace.Projects = []config.WorkspaceProjectConfig{
+		{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"},
+	}
+	require.NoError(t, rootConfigRepo.Update(rootCfg))
+
+	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	childCfg := childConfigRepo.Get()
+	childCfg.Project.Name = "hsmwebapi"
+	childCfg.Project.Mode = domain.ModeProject
+	childCfg.Project.RootPath = childRoot
+	childCfg.Project.Language = "go"
+	childCfg.Agent.Engine = "mock"
+	childCfg.Agent.Commands = map[string]string{"mock": "mock"}
+	require.NoError(t, childConfigRepo.Update(childCfg))
+
+	rootPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(workspaceRoot, ".skills-seed", "memory", "project.db"))
+	require.NoError(t, err)
+	defer rootPatternRepo.Close()
+	stateRepo := statestore.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"))
+	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	pattern.SetDescription("hsmwebapi plugins 应修改源插件代码")
+	pattern.SetRule("当 hsmwebapi 的 plugins 由 plugins_custom.sh 拉取时，应该修改源插件代码")
+	pattern.Confidence = 0.9
+	mockAgent := &mocks.MockAgent{
+		NameVal:      "mock",
+		AvailableVal: true,
+		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+			return &agent.UserDefinePatternResult{Pattern: pattern}, nil
+		},
+	}
+	cont := &container.Container{
+		SeedPath:    filepath.Join(workspaceRoot, ".skills-seed"),
+		Config:      rootConfigRepo.Get(),
+		ConfigRepo:  rootConfigRepo,
+		PatternRepo: rootPatternRepo,
+		StateRepo:   stateRepo,
+		Agent:       mockAgent,
+		CuratorSvc:  curator.NewService(mockAgent, rootPatternRepo),
+	}
+	cmd := addCmd(cont)
+	cmd.SetArgs([]string{"hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码"})
+
+	require.NoError(t, cmd.Execute())
+
+	rootPattern, err := rootPatternRepo.Get(ctx, "plugin-source-editing-rule")
+	require.NoError(t, err)
+	require.Equal(t, "hsmwebapi", rootPattern.ProjectID)
+	require.Equal(t, "hsmwebapi", rootPattern.ScopePath)
+
+	childPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	require.NoError(t, err)
+	defer childPatternRepo.Close()
+	childPattern, err := childPatternRepo.Get(ctx, "plugin-source-editing-rule")
+	require.NoError(t, err)
+	require.Empty(t, childPattern.ProjectID)
+	require.Empty(t, childPattern.ScopePath)
+
+	state, err := stateRepo.Get(ctx)
+	require.NoError(t, err)
+	require.True(t, state.SkillsDirty.Workspace)
+	require.Equal(t, []string{"hsmwebapi"}, state.SkillsDirty.Projects)
+}
+
+func TestAddCmdRejectsContextFlag(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cmd := addCmd(&container.Container{})
+	cmd.SetArgs([]string{"--context", "hsmwebapi 的 plugins 来自 plugins_custom.sh"})
+
+	err := cmd.Execute()
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown flag: --context")
+}
+
+func TestAddCmdRequiresDescription(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cmd := addCmd(&container.Container{})
+
+	err := cmd.Execute()
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "需要提供模式描述")
+}
+
+func TestDeleteCmdInProjectDeletesPatternAndMarksProjectDirty(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	ctx := context.Background()
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.RootPath = projectRoot
+	require.NoError(t, configRepo.Update(cfg))
+
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+	stateRepo := statestore.NewRepository(seedPath)
+
+	cont := &container.Container{
+		SeedPath:    seedPath,
+		ConfigRepo:  configRepo,
+		PatternRepo: patternRepo,
+		StateRepo:   stateRepo,
+	}
+	cmd := deleteCmd(cont)
+	cmd.SetArgs([]string{"plugin-source-editing-rule"})
+
+	require.NoError(t, cmd.Execute())
+
+	deleted, err := patternRepo.Get(ctx, "plugin-source-editing-rule")
+	require.Error(t, err)
+	require.Nil(t, deleted)
+	state, err := stateRepo.Get(ctx)
+	require.NoError(t, err)
+	require.True(t, state.SkillsDirty.Project)
+	require.False(t, state.SkillsDirty.Workspace)
+	require.Empty(t, state.SkillsDirty.Projects)
+}
+
+func TestDeleteCmdRequiresPatternID(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cmd := deleteCmd(&container.Container{})
+
+	err := cmd.Execute()
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "需要提供 pattern ID")
+}
+
+func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	ctx := context.Background()
+	workspaceRoot := t.TempDir()
+	childRoot := filepath.Join(workspaceRoot, "hsmwebapi")
+
+	rootConfigRepo, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	rootCfg := rootConfigRepo.Get()
+	rootCfg.Project.Name = "hsm-workspace"
+	rootCfg.Project.Mode = domain.ModeWorkspace
+	rootCfg.Project.RootPath = workspaceRoot
+	rootCfg.Workspace.Projects = []config.WorkspaceProjectConfig{
+		{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"},
+	}
+	require.NoError(t, rootConfigRepo.Update(rootCfg))
+
+	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	childCfg := childConfigRepo.Get()
+	childCfg.Project.Name = "hsmwebapi"
+	childCfg.Project.Mode = domain.ModeProject
+	childCfg.Project.RootPath = childRoot
+	require.NoError(t, childConfigRepo.Update(childCfg))
+
+	rootPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(workspaceRoot, ".skills-seed", "memory", "project.db"))
+	require.NoError(t, err)
+	defer rootPatternRepo.Close()
+	rootPattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	rootPattern.ProjectID = "hsmwebapi"
+	rootPattern.ScopePath = "hsmwebapi"
+	require.NoError(t, rootPatternRepo.Save(ctx, rootPattern))
+
+	childPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	require.NoError(t, err)
+	childPattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	require.NoError(t, childPatternRepo.Save(ctx, childPattern))
+	require.NoError(t, childPatternRepo.Close())
+
+	stateRepo := statestore.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"))
+	cont := &container.Container{
+		SeedPath:    filepath.Join(workspaceRoot, ".skills-seed"),
+		ConfigRepo:  rootConfigRepo,
+		PatternRepo: rootPatternRepo,
+		StateRepo:   stateRepo,
+	}
+	cmd := deleteCmd(cont)
+	cmd.SetArgs([]string{"plugin-source-editing-rule"})
+
+	require.NoError(t, cmd.Execute())
+
+	deletedRoot, err := rootPatternRepo.Get(ctx, "plugin-source-editing-rule")
+	require.Error(t, err)
+	require.Nil(t, deletedRoot)
+	childPatternRepo, err = boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	require.NoError(t, err)
+	defer childPatternRepo.Close()
+	deletedChild, err := childPatternRepo.Get(ctx, "plugin-source-editing-rule")
+	require.Error(t, err)
+	require.Nil(t, deletedChild)
+
+	state, err := stateRepo.Get(ctx)
+	require.NoError(t, err)
+	require.True(t, state.SkillsDirty.Workspace)
+	require.Equal(t, []string{"hsmwebapi"}, state.SkillsDirty.Projects)
+	require.False(t, state.SkillsDirty.Project)
+}
 
 func TestStatsCmdPrintsPatternMetricsAndHits(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
@@ -42,6 +279,8 @@ func TestStatsCmdPrintsPatternMetricsAndHits(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 
 	text := out.String()
+	require.Contains(t, text, "具体度")
+	require.Contains(t, text, "命中数")
 	require.Contains(t, text, "domain-error-wrap")
 	require.Contains(t, text, "error")
 	require.Contains(t, text, "0.72")
@@ -91,6 +330,8 @@ func TestShowCmdPrintsPatternDatabaseFields(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 
 	text := out.String()
+	require.Contains(t, text, "分类")
+	require.Contains(t, text, "当前位置")
 	require.Contains(t, text, "business-create-order")
 	require.Contains(t, text, "business")
 	require.Contains(t, text, "learned_current")
@@ -140,17 +381,17 @@ func TestShowCmdPrintsSinglePatternDetails(t *testing.T) {
 	text := out.String()
 	require.Contains(t, text, "id")
 	require.Contains(t, text, "business-create-order")
-	require.Contains(t, text, "description")
+	require.Contains(t, text, "描述")
 	require.Contains(t, text, "创建订单并写入业务流水")
-	require.Contains(t, text, "current_location")
+	require.Contains(t, text, "当前位置")
 	require.Contains(t, text, "service/order.ts:20")
-	require.Contains(t, text, "historical_location")
+	require.Contains(t, text, "历史位置")
 	require.Contains(t, text, "service/order.ts:10")
-	require.Contains(t, text, "change_kinds")
+	require.Contains(t, text, "变更类型")
 	require.Contains(t, text, "moved,inputs_changed")
-	require.Contains(t, text, "snapshot_language")
+	require.Contains(t, text, "快照语言")
 	require.Contains(t, text, "typescript")
-	require.Contains(t, text, "snapshot_inputs")
+	require.Contains(t, text, "输入类型")
 	require.Contains(t, text, "CreateOrderRequestV2")
 }
 

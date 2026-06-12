@@ -54,6 +54,98 @@ func executeGenerateSkillsCommand(t *testing.T, cont *container.Container) {
 	require.NoError(t, cmd.Execute())
 }
 
+func executeGenerateSkillsCommandWithArgs(t *testing.T, cont *container.Container, args ...string) {
+	t.Helper()
+	cmd := Cmd(cont)
+	cmd.SetArgs(append([]string{"skills"}, args...))
+	require.NoError(t, cmd.Execute())
+}
+
+func TestRunGenerateWorkspaceOnlyGeneratesDirtyTargets(t *testing.T) {
+	var generatedMu sync.Mutex
+	var generated []string
+	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+		generatedMu.Lock()
+		defer generatedMu.Unlock()
+		generated = append(generated, req.ProjectName)
+		return &agent.GenerateSkillsResult{}, nil
+	})
+	workspaceRoot := t.TempDir()
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "go"},
+	}
+	for _, project := range projects {
+		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
+	}
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
+	defer cont.Close()
+	require.NoError(t, cont.StateRepo.MarkSkillsGenerated(context.Background(), domain.ModeWorkspace))
+	require.NoError(t, cont.StateRepo.MarkSkillsDirty(context.Background(), domain.SkillsDirtyTarget{Projects: []string{"backend"}}))
+
+	executeGenerateSkillsCommand(t, cont)
+
+	require.Equal(t, []string{"backend"}, generated)
+	state, err := cont.StateRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, state.SkillsDirty.Projects)
+	require.False(t, state.SkillsDirty.Workspace)
+}
+
+func TestRunGenerateWorkspaceFirstRunGeneratesAllTargetsEvenWhenDirty(t *testing.T) {
+	var generatedMu sync.Mutex
+	var generated []string
+	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+		generatedMu.Lock()
+		defer generatedMu.Unlock()
+		generated = append(generated, req.ProjectName)
+		return &agent.GenerateSkillsResult{}, nil
+	})
+	workspaceRoot := t.TempDir()
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "go"},
+	}
+	for _, project := range projects {
+		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
+	}
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
+	defer cont.Close()
+	require.NoError(t, cont.StateRepo.MarkSkillsDirty(context.Background(), domain.SkillsDirtyTarget{Projects: []string{"backend"}}))
+
+	executeGenerateSkillsCommand(t, cont)
+
+	require.ElementsMatch(t, []string{"backend", "frontend"}, generated)
+}
+
+func TestRunGenerateWorkspaceForceGeneratesAllTargets(t *testing.T) {
+	var generatedMu sync.Mutex
+	var generated []string
+	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+		generatedMu.Lock()
+		defer generatedMu.Unlock()
+		generated = append(generated, req.ProjectName)
+		return &agent.GenerateSkillsResult{}, nil
+	})
+	workspaceRoot := t.TempDir()
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "go"},
+	}
+	for _, project := range projects {
+		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
+	}
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
+	defer cont.Close()
+
+	executeGenerateSkillsCommandWithArgs(t, cont, "--force")
+
+	require.ElementsMatch(t, []string{"backend", "frontend"}, generated)
+}
+
 func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()

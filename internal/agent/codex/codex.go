@@ -202,6 +202,30 @@ func (c *CodexAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixes
 	return result, nil
 }
 
+// SelectFiles 基于候选文件树选择当前代码学习范围。
+func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-file-select")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.SelectFilesPromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := c.promptLoader.Render("file-select", data)
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
+	}
+
+	output, err := c.callCodex(ctx, "SelectFiles", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexAnalyzeFailed"), err)
+	}
+	return parser.ParseSelectFilesResult(output)
+}
+
 // GenerateSkillsSummary 汇总生成技能内容
 func (c *CodexAgent) GenerateSkillsSummary(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-generate")

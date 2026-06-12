@@ -5,6 +5,20 @@
 
 ---
 
+## 目录
+
+- [项目简介](#项目简介)
+- [技术架构](#技术架构)
+- [架构层次](#架构层次)
+- [模块依赖关系](#模块依赖关系)
+- [主要框架](#主要框架)
+- [关键模块](#关键模块)
+- [强业务方法](#强业务方法)
+- [通用工具](#通用工具)
+- [配置模式](#配置模式)
+{{if .ValidationCommands}}- [验证命令](#验证命令)
+{{end}}
+
 ## 项目简介
 
 {{if .Summary}}{{.Summary}}{{else}}*项目简介尚未提取*{{end}}
@@ -117,6 +131,14 @@
 {{end}}
 {{else}}
 *配置模式信息尚未提取*
+{{end}}
+
+{{if .ValidationCommands}}
+## 验证命令
+
+{{range .ValidationCommands}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}
+{{end}}
 {{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}

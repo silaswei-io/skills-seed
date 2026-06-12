@@ -31,17 +31,17 @@ Prioritize these facts:
 2. Workspace context: product/business context, repository model, and delivery or validation boundaries. Only write facts confirmed from repository evidence.
 3. Shared/contracts/infra path responsibilities: whether these paths are consumed by multiple projects and which projects must be checked after changes.
 4. Common tasks and validation: record only task entry points and commands confirmed by README files, scripts, CI, build files, or config.
-5. Dependency direction across frontend, backend, middleware, shared libraries, contracts, and deployment config.
-6. Synchronization relationships among API contracts, generated code, SDKs, deployment config, environment variables, database schemas, and tests.
+5. Dependency direction across child projects, adapters, shared libraries, contracts, and deployment config.
+6. Synchronization relationships among interface contracts, derived artifacts, deployment config, environment variables, data schemas, and tests.
 7. Impact radius: paths that require multiple child project skills to be read together.
 
 # Routing Hints
 
 Write routing as executable decisions, for example:
 
-- `frontend/**` routes only to the `frontend` child project skill.
-- `proto/**` routes to frontend, backend, and middleware project skills that consume the contract.
-- `deploy/**` routes to runtime service project skills affected by deployment config.
+- `project-a/**` routes only to the `project-a` child project skill.
+- `contracts/**` routes to producer, consumer, and adapter project skills that consume the contract.
+- `infra/**` routes to project skills affected by runtime config.
 
 # Constraints
 

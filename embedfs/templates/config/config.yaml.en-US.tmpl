@@ -7,8 +7,8 @@ profile:
   name: ""
   # Init mode: project (single project) or workspace (multi-project workspace). Locked after learning or generation starts
   mode: "project"
-  # Primary language, for example go, typescript, python
-  language: "go"
+  # Primary language, auto-detected during init; empty when unknown
+  language: ""
   # Tool output language: zh-CN (Chinese) or en-US (English)
   locale: "en-US"
   # Git remote repository URL (auto-filled during init)
@@ -23,21 +23,8 @@ profile:
 # Only used in workspace mode, ordinary project child repositories usually do not need this
 ########################################################################
 workspace:
-  # Child projects, for example: [{id: "frontend", path: "frontend", type: "frontend", language: "typescript"}]
+  # Child projects, for example: [{id: "project-a", path: "project-a", type: "application", language: "primary-language"}]
   projects: []
-
-########################################################################
-# Analysis
-# Controls embedded tree-sitter structural code analysis, omitted fields use defaults
-########################################################################
-analysis:
-  structural:
-    # Enable bounded structural analysis; it does not run without bounded inputs
-    enabled: true
-    # Maximum symbols emitted into structural context
-    max_symbols: 30
-    # Skip individual files larger than this size (KB)
-    max_file_size: 512
 
 ########################################################################
 # Agent
@@ -46,7 +33,7 @@ analysis:
 agent:
   # Agent engine used for analysis, learning, and generation summaries; matches keys in commands
   engine: "claude"
-  # engine -> CLI command path; add new engines here
+  # Mapping from Agent engine to local CLI command; only controls how analysis agents are invoked
   commands:
     claude: "claude"
     codex: "codex"
@@ -67,13 +54,26 @@ agent:
 
 ########################################################################
 # Learning
-# Controls the default range for learning project rules from Git history
+# Controls the default scope for learn current and learn history
 ########################################################################
 learning:
-  # Default number of Git commits to analyze
-  max_commits: 50
-  # Number of commits to analyze per AI call in batch mode
-  batch_size: 5
+  current:
+    # Enable relevant-file selection to narrow learn current scope from the candidate file tree
+    select_relevant_files: true
+    # Only call AI file selection when candidate files reach this threshold; smaller projects use local filtering
+    select_relevant_files_min_candidates: 200
+    structural:
+      # Enable bounded structural context; it does not run without bounded inputs
+      enabled: true
+      # Maximum symbols emitted into structural context
+      max_symbols: 30
+      # Skip individual files larger than this size (KB)
+      max_file_size: 512
+  history:
+    # Default number of Git commits to analyze
+    max_commits: 50
+    # Number of commits to analyze per AI call in batch mode
+    batch_size: 5
 
 ########################################################################
 # Auto-Fix
@@ -94,7 +94,7 @@ skills:
   target: "claude"
   # Generated Skills, AI prompts, and natural-language content persisted into Skills: zh-CN (Chinese) or en-US (English)
   locale: "en-US"
-  # target -> Skills output path; add new targets here
+  # Mapping from Skills target type to output directory; only controls where generated artifacts are saved
   paths:
     claude: ".claude/skills/skills-seed-skills"
     codex: ".agents/skills/skills-seed-skills"

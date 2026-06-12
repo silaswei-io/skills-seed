@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -368,6 +369,11 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		parallelGuidance = spec.ParallelAgentGuidance
 		loadMultipleWhen = spec.LoadMultipleSkillsWhen
 	}
+	patternRules, err := g.workspaceRulesFromPatterns(ctx, workspaceConfig)
+	if err != nil {
+		return workspaceSkillTemplateData{}, err
+	}
+	rules = append(rules, patternRules...)
 	summary := ""
 	if profile != nil {
 		summary = profile.Summary
@@ -403,6 +409,70 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		HasParallelGuidance: len(parallelGuidance) > 0,
 		HasLoadMultipleWhen: len(loadMultipleWhen) > 0,
 	}, nil
+}
+
+func (g *WorkspaceGenerator) workspaceRulesFromPatterns(ctx context.Context, workspaceConfig config.WorkspaceConfig) ([]domain.WorkspaceRule, error) {
+	if g.patternRepo == nil {
+		return nil, nil
+	}
+	patterns, err := g.patternRepo.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(patterns, func(i, j int) bool {
+		return patterns[i].ID < patterns[j].ID
+	})
+	rules := make([]domain.WorkspaceRule, 0, len(patterns))
+	for _, pattern := range patterns {
+		rule := workspaceRuleFromPattern(pattern, workspaceConfig)
+		if rule.Title == "" || rule.Description == "" {
+			continue
+		}
+		rules = append(rules, rule)
+	}
+	return rules, nil
+}
+
+func workspaceRuleFromPattern(pattern domain.Pattern, workspaceConfig config.WorkspaceConfig) domain.WorkspaceRule {
+	title := strings.TrimSpace(pattern.Name)
+	if title == "" {
+		title = strings.TrimSpace(pattern.ID)
+	}
+	description := strings.TrimSpace(pattern.Rule)
+	if description == "" {
+		description = strings.TrimSpace(pattern.Description)
+	}
+	if title == "" || description == "" {
+		return domain.WorkspaceRule{}
+	}
+	return domain.WorkspaceRule{
+		Title:       title,
+		Description: description,
+		AppliesTo:   workspacePatternAppliesTo(pattern, workspaceConfig),
+	}
+}
+
+func workspacePatternAppliesTo(pattern domain.Pattern, workspaceConfig config.WorkspaceConfig) []string {
+	if strings.TrimSpace(pattern.ProjectID) != "" {
+		return []string{strings.TrimSpace(pattern.ProjectID)}
+	}
+	scopePath := strings.Trim(filepath.ToSlash(strings.TrimSpace(pattern.ScopePath)), "/")
+	if scopePath == "" {
+		return nil
+	}
+	for _, project := range workspaceConfig.Projects {
+		projectPath := strings.Trim(filepath.ToSlash(strings.TrimSpace(project.Path)), "/")
+		if projectPath == "" {
+			continue
+		}
+		if scopePath == projectPath || strings.HasPrefix(scopePath, projectPath+"/") {
+			if strings.TrimSpace(project.ID) != "" {
+				return []string{strings.TrimSpace(project.ID)}
+			}
+			return []string{project.Path}
+		}
+	}
+	return nil
 }
 
 func workspaceProjectByID(profile *domain.WorkspaceProfile, id string) domain.WorkspaceProject {

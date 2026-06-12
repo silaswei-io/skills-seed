@@ -183,16 +183,16 @@ Learn coding patterns, business methods, and best practices from the current cod
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--limit`, `-n` | `learning.max_commits`, default `50` | Maximum number of commits to analyze |
+| `--limit`, `-n` | `learning.history.max_commits`, default `50` | Maximum number of commits to analyze |
 | `--since`, `-s` | empty | Time range, such as `7d`, `30d`, `6m`, or `1y` |
-| `--batch-size`, `-b` | `learning.batch_size`; `10` when config is not loaded | Commits per batch; each batch is analyzed by one agent call and candidate patterns are curated before storage |
+| `--batch-size`, `-b` | `learning.history.batch_size`; `10` when config is not loaded | Commits per batch; each batch is analyzed by one agent call and candidate patterns are curated before storage |
 | `--help`, `-h` | `false` | Show `learn history` help |
 
 #### `--profile` Values
 
 | Value | Description |
 |---|---|
-| `auto` | Refreshes for first/full learning and skips narrow changes when possible |
+| `auto` | Creates the project profile when missing; refreshes when this run writes new or updated patterns; otherwise skips |
 | `skip` | Learn patterns only |
 | `refresh` | Force profile refresh from the current input |
 
@@ -219,7 +219,7 @@ skills-seed learn history --limit 40 --batch-size 5
 6. The workspace root records an md5 for relationship-analysis inputs. When `workspace.projects`, child project profiles, prompt templates, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped.
 7. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
 8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
-9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use the embedded tree-sitter structural pre-scan configured by `analysis.structural`; without bounded inputs, it does not scan the whole repository.
+9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use the embedded tree-sitter structural pre-scan configured by `learning.current.structural`; without bounded inputs, it does not scan the whole repository.
 10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
@@ -245,6 +245,7 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 | Flag | Default | Description |
 |---|---:|---|
 | `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
+| `--force` | `false` | Ignore pattern dirty state and regenerate all skills |
 | `--help`, `-h` | `false` | Show `generate skills` help |
 
 #### Common Examples
@@ -284,10 +285,11 @@ references/
 
 #### Notes
 
-1. Workspace mode generates each child skill using that child's own config first, then generates the workspace root skill.
+1. Workspace mode generates each child skill using that child's own config first, then generates the workspace root skill on the first run; later runs generate only targets affected by pattern or workspace-relationship changes.
 2. A manual `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 3. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
 4. `generate skills` records an md5 for generation inputs. When project profile, patterns, hit stats, config, prompt/skill templates, and output path are unchanged, and generated outputs are complete, Skills Seed skips the agent summary and file rewrite. Workspace root skills use the same mechanism for unchanged root outputs.
+5. Use `skills-seed generate skills --force` when every target must be regenerated.
 
 ### `skills-seed patterns`
 
@@ -300,6 +302,7 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed patterns add <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add "Use RESTful API routes" --category api` | Calls the AI agent |
+| `skills-seed patterns delete <pattern-id>` | Delete a pattern by ID | `skills-seed patterns delete plugin-source-editing-rule` | Workspace root also deletes the linked child project pattern |
 | `skills-seed patterns compact` | Ask the current agent to curate and compact similar patterns | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
 | `skills-seed patterns show [pattern-id]` | Show pattern DB fields, timestamps, and code-location metadata | `skills-seed patterns show business-create-order --format json` | Does not call the AI agent or modify the database |
@@ -316,8 +319,15 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 |---|---:|---|
 | `--category`, `-c` | empty | Specify a category, such as `business`, `api`, or `testing`; leave empty for AI auto-detection |
 | `--files`, `-f` | empty | Reference file path; repeat this flag for multiple files. AI reads the files to help generate the pattern |
-| `--context` | empty | Additional context to help AI understand the pattern more accurately |
 | `--help`, `-h` | `false` | Show `patterns add` help |
+
+When run from a workspace root, `patterns add` writes the root pattern first. If the description mentions a child project id or path, it also writes the child project's pattern database and marks only affected skills targets dirty.
+
+#### `patterns delete` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--help`, `-h` | `false` | Show `patterns delete` help |
 
 #### `patterns compact` Flags
 
@@ -345,7 +355,8 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 ```bash
 skills-seed patterns add "All API routes use RESTful style"
 skills-seed patterns add "Errors must wrap context" --category error
-skills-seed patterns add "Database operations use transactions" --files internal/service/user.go --context "Project uses GORM"
+skills-seed patterns add "Database operations use transactions; project uses GORM" --files internal/service/user.go
+skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
 skills-seed patterns compact --category business --dry-run
@@ -581,54 +592,6 @@ skills-seed hook --uninstall
 1. Legacy `--install` / `--uninstall` flags still work, but subcommands are preferred.
 2. `hook uninstall` only removes the hook file; learned data is preserved.
 
-### `skills-seed completion`
-
-#### Command Overview
-
-Generate an autocompletion script for a specified shell. This command is provided by Cobra and is intended for local shell setup.
-
-#### Command Forms
-
-| Command Form | Description | Common Example | Notes |
-|---|---|---|---|
-| `skills-seed completion bash` | Generate Bash completion | `source <(skills-seed completion bash)` | Requires bash-completion |
-| `skills-seed completion zsh` | Generate Zsh completion | `source <(skills-seed completion zsh)` | If completion is not enabled, run `autoload -U compinit; compinit` once |
-| `skills-seed completion fish` | Generate Fish completion | `skills-seed completion fish \| source` | Can be written to `~/.config/fish/completions/skills-seed.fish` |
-| `skills-seed completion powershell` | Generate PowerShell completion | `skills-seed completion powershell \| Out-String \| Invoke-Expression` | Can be added to the PowerShell profile |
-
-#### `completion` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--help`, `-h` | `false` | Show `completion` help |
-
-#### Subcommand Flags
-
-| Subcommand | Flag | Default | Description |
-|---|---|---:|---|
-| `completion bash` | `--no-descriptions` | `false` | Disable completion descriptions |
-| `completion bash` | `--help`, `-h` | `false` | Show Bash completion help |
-| `completion zsh` | `--no-descriptions` | `false` | Disable completion descriptions |
-| `completion zsh` | `--help`, `-h` | `false` | Show Zsh completion help |
-| `completion fish` | `--no-descriptions` | `false` | Disable completion descriptions |
-| `completion fish` | `--help`, `-h` | `false` | Show Fish completion help |
-| `completion powershell` | `--no-descriptions` | `false` | Disable completion descriptions |
-| `completion powershell` | `--help`, `-h` | `false` | Show PowerShell completion help |
-
-#### Common Examples
-
-```bash
-source <(skills-seed completion bash)
-source <(skills-seed completion zsh)
-skills-seed completion fish | source
-skills-seed completion powershell | Out-String | Invoke-Expression
-```
-
-#### Notes
-
-1. For persistent installation, read `skills-seed completion <shell> --help`.
-2. macOS/Linux completion installation paths depend on the shell and package manager.
-
 ### `skills-seed help`
 
 #### Command Overview
@@ -652,7 +615,6 @@ Show help for any command path. This command is provided by Cobra.
 ```bash
 skills-seed help init
 skills-seed help learn current
-skills-seed help completion zsh
 ```
 
 #### Notes

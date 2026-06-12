@@ -366,10 +366,33 @@ func funcMap() template.FuncMap {
 		"add": func(a, b interface{}) int {
 			return int(toFloat(a) + toFloat(b))
 		},
+		"anchor": markdownAnchor,
 		"includeSkillsSeedGeneratedNotice": func() bool {
 			return config.DefaultIncludeSkillsSeedGeneratedNotice
 		},
 	}
+}
+
+func markdownAnchor(value interface{}) string {
+	text := strings.ToLower(strings.TrimSpace(fmt.Sprint(value)))
+	var b strings.Builder
+	previousHyphen := false
+	for _, r := range text {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			previousHyphen = false
+		case r == ' ' || r == '-' || r == '_' || r == '.':
+			if !previousHyphen && b.Len() > 0 {
+				b.WriteRune('-')
+				previousHyphen = true
+			}
+		case r >= 0x4e00 && r <= 0x9fff:
+			b.WriteRune(r)
+			previousHyphen = false
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }
 
 func normalizeMarkdown(content string) string {

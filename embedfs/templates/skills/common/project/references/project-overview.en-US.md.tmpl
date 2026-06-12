@@ -5,6 +5,20 @@
 
 ---
 
+## Table Of Contents
+
+- [Project Introduction](#project-introduction)
+- [Technical Architecture](#technical-architecture)
+- [Architecture Layers](#architecture-layers)
+- [Module Dependencies](#module-dependencies)
+- [Main Frameworks](#main-frameworks)
+- [Key Modules](#key-modules)
+- [Business Methods](#business-methods)
+- [Common Utilities](#common-utilities)
+- [Configuration Patterns](#configuration-patterns)
+{{if .ValidationCommands}}- [Validation Commands](#validation-commands)
+{{end}}
+
 ## Project Introduction
 
 {{if .Summary}}{{.Summary}}{{else}}*Project summary has not been extracted yet*{{end}}
@@ -117,6 +131,14 @@ Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 {{end}}
 {{else}}
 *Configuration pattern information has not been extracted yet*
+{{end}}
+
+{{if .ValidationCommands}}
+## Validation Commands
+
+{{range .ValidationCommands}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}
+{{end}}
 {{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}

@@ -639,6 +639,7 @@ func (r *PatternRepository) GetAnalyzedFile(ctx context.Context, scope domain.Fi
 		if err := json.Unmarshal(data, &found); err != nil {
 			return err
 		}
+		normalizeFileAnalysisRecordDefaults(&found)
 		record = &found
 		return nil
 	})
@@ -662,6 +663,7 @@ func (r *PatternRepository) ListAnalyzedFiles(ctx context.Context, scope domain.
 			if err := json.Unmarshal(v, &record); err != nil {
 				return err
 			}
+			normalizeFileAnalysisRecordDefaults(&record)
 			records = append(records, record)
 			return nil
 		})
@@ -677,6 +679,7 @@ func (r *PatternRepository) SaveAnalyzedFiles(ctx context.Context, records []dom
 		for _, record := range records {
 			scope := domain.FileAnalysisScope{ProjectID: record.ProjectID, ScopePath: record.ScopePath}
 			record.Path = filepath.ToSlash(filepath.Clean(record.Path))
+			normalizeFileAnalysisRecordDefaults(&record)
 			key := []byte(scope.KeyForPath(record.Path))
 			previous := domain.FileAnalysisRecord{}
 			if data := bucket.Get(key); data != nil {
@@ -703,6 +706,21 @@ func (r *PatternRepository) SaveAnalyzedFiles(ctx context.Context, records []dom
 		}
 		return nil
 	})
+}
+
+func normalizeFileAnalysisRecordDefaults(record *domain.FileAnalysisRecord) {
+	if record == nil {
+		return
+	}
+	if record.AnalysisStatus != "" {
+		return
+	}
+	switch record.Source {
+	case domain.FileAnalysisSourceInputDigest:
+		record.AnalysisStatus = domain.FileAnalysisStatusInputDigest
+	default:
+		record.AnalysisStatus = domain.FileAnalysisStatusAnalyzed
+	}
 }
 
 // DeleteAnalyzedFiles 删除指定范围内的文件分析记录

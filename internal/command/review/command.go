@@ -20,9 +20,9 @@ const defaultLineWindow = 3
 func Cmd(cont *container.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "review",
-		Short:   "Import review comments and show prevention statistics",
-		Long:    "Import local review comments and compare them with recorded pattern hits.",
-		Example: "skills-seed review import --from-file review-comments.json\nskills-seed review stats",
+		Short:   i18n.Get("ReviewShort"),
+		Long:    i18n.Get("ReviewLongDesc"),
+		Example: i18n.Get("ReviewExample"),
 	}
 	cmd.AddCommand(importCmd(cont))
 	cmd.AddCommand(statsCmd(cont))
@@ -33,9 +33,9 @@ func importCmd(cont *container.Container) *cobra.Command {
 	var fromFile string
 	cmd := &cobra.Command{
 		Use:     "import",
-		Short:   "Import review comments from a JSON file",
-		Long:    "Import local review comments from a JSON array file into the skills-seed memory database.",
-		Example: "skills-seed review import --from-file review-comments.json",
+		Short:   i18n.Get("ReviewImportShort"),
+		Long:    i18n.Get("ReviewImportLongDesc"),
+		Example: i18n.Get("ReviewImportExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repo, err := requireReviewRepository(cont)
@@ -49,11 +49,11 @@ func importCmd(cont *container.Container) *cobra.Command {
 			if err := repo.ImportReviewComments(context.Background(), comments); err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Imported %d review comments\n", len(comments))
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), i18n.GetWithParams("ReviewImportComplete", map[string]interface{}{"Count": len(comments)}))
 			return err
 		},
 	}
-	cmd.Flags().StringVar(&fromFile, "from-file", "", "JSON file containing review comments")
+	cmd.Flags().StringVar(&fromFile, "from-file", "", i18n.Get("ReviewImportFlagFromFile"))
 	_ = cmd.MarkFlagRequired("from-file")
 	return cmd
 }
@@ -62,9 +62,9 @@ func statsCmd(cont *container.Container) *cobra.Command {
 	var lineWindow int
 	cmd := &cobra.Command{
 		Use:     "stats",
-		Short:   "Show review comment prevention statistics",
-		Long:    "Show how many imported review comments match recorded pattern hits within the configured line window.",
-		Example: "skills-seed review stats",
+		Short:   i18n.Get("ReviewStatsShort"),
+		Long:    i18n.Get("ReviewStatsLongDesc"),
+		Example: i18n.Get("ReviewStatsExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repo, err := requireReviewRepository(cont)
@@ -78,7 +78,7 @@ func statsCmd(cont *container.Container) *cobra.Command {
 			return writeReviewStats(cmd.OutOrStdout(), stats)
 		},
 	}
-	cmd.Flags().IntVar(&lineWindow, "line-window", defaultLineWindow, "Line distance used to match review comments to pattern hits")
+	cmd.Flags().IntVar(&lineWindow, "line-window", defaultLineWindow, i18n.Get("ReviewStatsFlagLineWindow"))
 	return cmd
 }
 
@@ -103,14 +103,14 @@ func readReviewComments(path string) ([]domain.ReviewComment, error) {
 
 func writeReviewStats(w io.Writer, stats domain.ReviewStats) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "TOTAL\tPREVENTED\tMISSED"); err != nil {
+	if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", i18n.Get("ReviewStatsOutputTotal"), i18n.Get("ReviewStatsOutputPrevented"), i18n.Get("ReviewStatsOutputMissed")); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(tw, "%d\t%d\t%d\n", stats.TotalComments, stats.PreventedComments, stats.MissedComments); err != nil {
 		return err
 	}
 	if len(stats.MatchedPatterns) > 0 {
-		if _, err := fmt.Fprintln(tw, "\nPATTERN\tCOMMENTS"); err != nil {
+		if _, err := fmt.Fprintf(tw, "\n%s\t%s\n", i18n.Get("ReviewStatsOutputPattern"), i18n.Get("ReviewStatsOutputComments")); err != nil {
 			return err
 		}
 		for _, matched := range stats.MatchedPatterns {

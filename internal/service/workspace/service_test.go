@@ -27,12 +27,6 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
 			require.Fail(t, "workspace root generation should not read child profiles")
@@ -47,7 +41,7 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -121,16 +115,61 @@ func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *te
 	require.FileExists(t, missingPath)
 }
 
+func TestGenerateWorkspaceSkillsIncludesRootPatternsInCrossProjectRules(t *testing.T) {
+	ctx := context.Background()
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "hsmwebapi"), 0755))
+
+	dbPath := filepath.Join(t.TempDir(), "workspace.db")
+	patternRepo, err := boltdb.NewPatternRepository(dbPath)
+	require.NoError(t, err)
+	defer patternRepo.Close()
+
+	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	pattern.SetDescription("hsmwebapi 的 plugins 由 plugins_custom.sh 定义并拉取。")
+	pattern.SetRule("改代码时应该改源插件代码，而不是改 hsmwebapi/plugins 中的拉取副本。")
+	pattern.ProjectID = "hsmwebapi"
+	pattern.ScopePath = "hsmwebapi"
+	pattern.WorkspaceRole = "backend"
+	pattern.Confidence = 0.9
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+
+	loader := skills.NewLoaderForAgent("claude", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "hsm-workspace", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
+	}
+	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+
+	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
+
+	rulesPath := filepath.Join(projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
+	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
+	require.Contains(t, rules, "插件源码修改规范")
+	require.Contains(t, rules, "改代码时应该改源插件代码")
+	require.Contains(t, rules, "`hsmwebapi`")
+
+	oldTime := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	require.NoError(t, os.Chtimes(rulesPath, oldTime, oldTime))
+	pattern.SetRule("改代码时应该改源插件仓库，只有未在 plugins_custom.sh 定义时才改 plugins 目录。")
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+
+	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
+
+	stat, err := os.Stat(rulesPath)
+	require.NoError(t, err)
+	require.NotEqual(t, oldTime.UnixNano(), stat.ModTime().UnixNano())
+	rules = readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
+	require.Contains(t, rules, "只有未在 plugins_custom.sh 定义时才改 plugins 目录")
+}
+
 func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	mockAgent := &mocks.MockAgent{
 		NameVal: "claude", AvailableVal: true,
 		AnalyzeWorkspaceProfileFn: func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
@@ -178,7 +217,7 @@ func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg, profileRepo, specRepo)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg, profileRepo, specRepo)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -236,12 +275,6 @@ func TestGenerateWorkspaceSkillsDoesNotPersistRuntimeContextInWorkspaceReference
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "hsmwebapi"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "core-engine"), 0755))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsm-workspace", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
@@ -253,7 +286,7 @@ func TestGenerateWorkspaceSkillsDoesNotPersistRuntimeContextInWorkspaceReference
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), strings.TrimSpace(`
 HSM 工作区用于管理密码设备、密钥服务、KMIP 接入和日志/网络组件。
 hsmwebapi 是管理 API 入口，core-engine 是核心能力库。
@@ -349,12 +382,6 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 			}, nil
 		},
 	}
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsm-workspace", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
@@ -366,7 +393,7 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 为主后端，它调用 kmip-go 实现 KMIP 的能力。")
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
@@ -420,12 +447,6 @@ skills:
 `
 	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".skills-seed", "config.yaml"), []byte(childConfig), 0644))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
@@ -434,7 +455,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -458,12 +479,6 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "frontend"), 0755))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
@@ -475,7 +490,7 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -487,12 +502,6 @@ func TestGenerateWorkspaceSkills_DoesNotPersistRuntimeUserContext(t *testing.T) 
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
@@ -501,7 +510,7 @@ func TestGenerateWorkspaceSkills_DoesNotPersistRuntimeUserContext(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
 
 	ctx := runtimecontext.WithUserContext(context.Background(), "本次运行的一次性原文不能进入 workspace skill")
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
@@ -514,12 +523,6 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
 			require.Fail(t, "workspace root generation should not read child profiles")
@@ -538,7 +541,7 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 			"codex":  ".agents/skills/skills-seed-skills",
 		}},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
@@ -577,12 +580,6 @@ skills:
 `
 	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "backend", ".skills-seed", "config.yaml"), []byte(childConfig), 0644))
 
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			require.Fail(t, "workspace root generation should not read centralized patterns")
-			return nil, nil
-		},
-	}
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetForProjectFn: func(ctx context.Context, projectID string) (*domain.ProjectProfile, error) {
 			require.Fail(t, "workspace root generation should not read child profiles")
@@ -597,7 +594,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(mockPattern, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))

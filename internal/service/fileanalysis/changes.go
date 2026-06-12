@@ -129,6 +129,26 @@ func (c FileChanges) SkippedCount(reason SkipReason) int {
 	return count
 }
 
+func (c *FileChanges) ApplyAISelection(selectedPaths []string, reason string) {
+	if c == nil {
+		return
+	}
+	selected := make(map[string]bool, len(selectedPaths))
+	for _, path := range selectedPaths {
+		selected[filepath.ToSlash(filepath.Clean(path))] = true
+	}
+	for i := range c.Records {
+		path := filepath.ToSlash(filepath.Clean(c.Records[i].Path))
+		if selected[path] {
+			c.Records[i].AnalysisStatus = domain.FileAnalysisStatusAnalyzed
+			c.Records[i].SelectionReason = ""
+			continue
+		}
+		c.Records[i].AnalysisStatus = domain.FileAnalysisStatusAISkipped
+		c.Records[i].SelectionReason = reason
+	}
+}
+
 func (c *FileChanges) addSkipped(path string, reason SkipReason) {
 	if c == nil {
 		return
@@ -159,6 +179,7 @@ func fingerprintLearnFile(projectRoot string, scope domain.FileAnalysisScope, re
 		Size:           info.Size(),
 		ModTime:        info.ModTime().Format(time.RFC3339),
 		Source:         domain.FileAnalysisSourceCurrentCode,
+		AnalysisStatus: domain.FileAnalysisStatusAnalyzed,
 		LastAnalyzedAt: now,
 	}, nil
 }

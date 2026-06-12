@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -57,6 +58,32 @@ func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePat
 		"UserContext": req.UserContext,
 		"Language":    req.Language,
 	}, nil
+}
+
+// SelectFilesPromptData 返回 AI 文件选择器所需的提示词数据。
+func SelectFilesPromptData(session *PromptInputSession, req *SelectFilesRequest) (map[string]interface{}, error) {
+	candidatesPath, err := session.Write("candidates.json", mustJSON(req.Candidates))
+	if err != nil {
+		return nil, fmt.Errorf("write file selection candidates: %w", err)
+	}
+	userContextPath, err := session.Write("user-context.md", req.UserContext)
+	if err != nil {
+		return nil, fmt.Errorf("write file selection user context: %w", err)
+	}
+	return map[string]interface{}{
+		"FileTree":        req.FileTree,
+		"CandidatesPath":  candidatesPath,
+		"UserContextPath": userContextPath,
+		"CandidateNum":    req.CandidateNum,
+	}, nil
+}
+
+func mustJSON(value interface{}) string {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
 }
 
 // CheckPromptData 返回检查场景所需的提示词数据。

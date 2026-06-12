@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
 
+0.9.1 起，`learn current` 在候选文件较多时可先通过 AI 文件筛选收敛分析范围；`generate skills` 会根据 dirty state 只生成受影响目标，必要时可用 `--force` 强制全量生成。根命令中的 `completion` 已移除，中文 help 文案已统一。
+
 `generate skills` 会按模式质量排序：优先沉淀综合分高、check 命中多、置信度高的规则，降低泛化规则和重复规则进入最终 skills 的概率。
 
 0.7.0 起，学习和项目画像分析会在有边界输入时使用内嵌 tree-sitter 做轻量结构化预扫描，提取符号、导入、入口点和模块线索，辅助 Agent 优先判断需要读取的源码。它不再依赖外部 CodeGraph 命令或索引；配置位于 `analysis.structural`，其中 `max_symbols` 控制写入结构化上下文的符号数，`max_file_size` 控制单个源码文件大小上限。
@@ -105,6 +107,8 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 0.8.0 起，Agent 输出会单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
 
 0.9.0 起，学习和用户添加模式时会使用 `pattern-curate` 提示词做入库前策展：候选模式必须覆盖、重复规则必须整合、代码证据只能来自输入源码，非法或低质量候选会被丢弃。旧的生成前合并流程和 `patterns merge` 已移除，生成阶段保持只读。
+
+0.9.1 起，模型输出解析会先经过更稳健的 JSON 修复流程，覆盖重复对象起始、非法转义、字符串内未转义引号和缺失闭合容器等常见异常；`patterns delete` 也会在删除模式后标记相关 skills 待重新生成。
 
 常见目录：
 

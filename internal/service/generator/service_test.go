@@ -937,7 +937,7 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
-	assert.Contains(t, skill, "description: 修改、审查或扩展 hsmwebapi go 代码时使用")
+	assert.Contains(t, skill, "description: 修改、审查或扩展 hsmwebapi go 代码且涉及")
 	assert.Contains(t, skill, "**平均置信度**: 91.60%")
 	assert.NotContains(t, skill, "91.60000000000001")
 
@@ -959,7 +959,7 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	assertNoExcessiveBlankLines(t, tmpDir)
 }
 
-func TestGenerateSkills_DoesNotSynthesizeHardCodedGuidance(t *testing.T) {
+func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	apiPattern := domain.NewPattern("api", "JZero Code Generation Convention", domain.CategoryAPI)
 	apiPattern.Confidence = 0.95
 	apiPattern.SetDescription("jzero generates handlers and types from .api files")
@@ -1006,6 +1006,9 @@ func TestGenerateSkills_DoesNotSynthesizeHardCodedGuidance(t *testing.T) {
 					Usage:        "plan activation",
 					Type:         "domain",
 				}},
+				ValidationCommands: []domain.ValidationCommand{
+					{Command: "task verify", When: "业务逻辑变更后运行", Source: "Taskfile.yml"},
+				},
 			}, nil
 		},
 	}
@@ -1019,15 +1022,64 @@ func TestGenerateSkills_DoesNotSynthesizeHardCodedGuidance(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
-	assert.NotContains(t, skill, "## 常用工作流")
+	assert.Contains(t, skill, "## 常用工作流")
+	assert.Contains(t, skill, "新增或调整 API")
+	assert.Contains(t, skill, "修改业务流程")
+	assert.Contains(t, skill, "接入或调整外部依赖")
+	assert.Contains(t, skill, "## 验证命令")
+	assert.Contains(t, skill, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
 	assert.NotContains(t, skill, "`jzero gen`")
+	assert.NotContains(t, skill, "`go test ./...`")
 	assert.NotContains(t, skill, "`go test ./internal/application/vocab`")
+	assert.Contains(t, skill, "只有带代码证据的 pattern 规则可视为硬约束")
 	assert.Contains(t, skill, "## 模式参考")
 
 	spec := readGeneratedFile(t, tmpDir, "references", "project-spec.md")
 	assert.NotContains(t, spec, "## 修改来源")
+	assert.Contains(t, spec, "## 参考观察")
+	assert.Contains(t, spec, "## 验证命令")
+	assert.Contains(t, spec, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
+	assert.Contains(t, spec, "以下内容来自已学习模式，但缺少足够直接的代码证据")
 	assert.Contains(t, spec, "Do not hand-edit generated handlers or types")
 	assert.Contains(t, spec, "Deactivate existing active plans before creating or activating a plan")
+
+	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
+	assert.Contains(t, overview, "## 验证命令")
+	assert.Contains(t, overview, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
+}
+
+func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			return &agent.GenerateSkillsResult{}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "backend",
+				Language:    "unknown",
+				Summary:     "Profile-backed project overview",
+			}, nil
+		},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), mockAgent, &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "backend"},
+	})
+	tmpDir := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	assert.NotContains(t, skill, "## 验证命令")
+	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
+	assert.NotContains(t, overview, "## 验证命令")
 }
 
 func TestGenerateSkills_SkipsEmptyBusinessMethodDetails(t *testing.T) {

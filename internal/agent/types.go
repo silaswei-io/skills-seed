@@ -197,6 +197,31 @@ type CurateSummary struct {
 	MergeCount      int // 合并操作数
 }
 
+// FileSelectionCandidate 是 AI 文件选择器可见的候选文件元数据。
+type FileSelectionCandidate struct {
+	Path    string `json:"path"`              // 相对项目根路径
+	Status  string `json:"status,omitempty"`  // 文件状态，如 added、modified、deleted
+	Size    int64  `json:"size,omitempty"`    // 文件大小（字节）
+	Kind    string `json:"kind,omitempty"`    // 文件类型，如 source、config、schema
+	Changed bool   `json:"changed,omitempty"` // 是否属于本次新增或修改
+}
+
+// SelectFilesRequest 请求 AI 基于候选文件树选择本次应分析的文件。
+type SelectFilesRequest struct {
+	FileTree     string                   // 候选文件树，不包含源码内容
+	Candidates   []FileSelectionCandidate // 候选文件元数据
+	UserContext  string                   // 一次性用户上下文
+	CandidateNum int                      // 候选文件数量
+}
+
+// SelectFilesResult 是 AI 文件选择器返回的结构化范围。
+type SelectFilesResult struct {
+	Include       []string // 需要纳入的相对路径或 glob
+	Exclude       []string // 需要从 include 中剔除的相对路径或 glob
+	SelectedPaths []string // 可选，明确选择的相对文件路径
+	Reason        string   // 简短通用理由
+}
+
 // AnalyzeProjectRequest 项目分析请求
 type AnalyzeProjectRequest struct {
 	ProjectName           string   // 项目名称
@@ -217,21 +242,22 @@ type AnalyzeProjectRequest struct {
 
 // AnalyzeProjectResult 项目分析结果
 type AnalyzeProjectResult struct {
-	ProjectName       string                   // 项目名称
-	Language          string                   // 主要编程语言
-	Frameworks        []string                 // 使用的框架
-	Architecture      string                   // 架构描述
-	Structure         string                   // 目录结构说明
-	CommonUtils       []domain.UtilityFunction // 公共工具方法
-	KeyModules        []domain.ModuleInfo      // 关键模块
-	ConfigPatterns    []string                 // 配置模式
-	Dependencies      []string                 // 主要依赖
-	Layers            []domain.ArchitectureLayer
-	DependencyGraph   string
-	DataFlow          string
-	FrameworkPatterns []string
-	BusinessMethods   []domain.BusinessMethod
-	Summary           string // 项目总结
+	ProjectName        string                   // 项目名称
+	Language           string                   // 主要编程语言
+	Frameworks         []string                 // 使用的框架
+	Architecture       string                   // 架构描述
+	Structure          string                   // 目录结构说明
+	CommonUtils        []domain.UtilityFunction // 公共工具方法
+	KeyModules         []domain.ModuleInfo      // 关键模块
+	ConfigPatterns     []string                 // 配置模式
+	Dependencies       []string                 // 主要依赖
+	Layers             []domain.ArchitectureLayer
+	DependencyGraph    string
+	DataFlow           string
+	FrameworkPatterns  []string
+	BusinessMethods    []domain.BusinessMethod
+	ValidationCommands []domain.ValidationCommand
+	Summary            string // 项目总结
 }
 
 // SampleFile 示例文件路径
@@ -319,6 +345,11 @@ type UserPatternDefiner interface {
 	UserDefinePattern(ctx context.Context, req *UserDefinePatternRequest) (*UserDefinePatternResult, error)
 }
 
+// FileSelector 基于候选文件树选择当前代码学习范围。
+type FileSelector interface {
+	SelectFiles(ctx context.Context, req *SelectFilesRequest) (*SelectFilesResult, error)
+}
+
 // ProjectAnalyzer 项目分析接口
 type ProjectAnalyzer interface {
 	AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
@@ -337,5 +368,6 @@ type Agent interface {
 	SkillsGenerator
 	PatternCurator
 	UserPatternDefiner
+	FileSelector
 	ProjectAnalyzer
 }

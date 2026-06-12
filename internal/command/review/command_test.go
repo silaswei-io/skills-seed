@@ -52,7 +52,7 @@ func TestImportCmdImportsReviewCommentsFromJSONFile(t *testing.T) {
 	require.Equal(t, "c-1", imported[0].ID)
 	require.Equal(t, "internal/service/checker/service.go", imported[0].File)
 	require.Equal(t, 84, imported[0].Line)
-	require.Contains(t, out.String(), "Imported 1 review comments")
+	require.Contains(t, out.String(), "已导入 1 条评审评论")
 }
 
 func TestStatsCmdPrintsReviewStats(t *testing.T) {
@@ -80,9 +80,12 @@ func TestStatsCmdPrintsReviewStats(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 
 	text := out.String()
-	require.Contains(t, text, "TOTAL")
-	require.Contains(t, text, "PREVENTED")
-	require.Contains(t, text, "MISSED")
+	require.Contains(t, text, "总评论数")
+	require.Contains(t, text, "已防漏")
+	require.Contains(t, text, "未命中")
 	require.Contains(t, text, "2")
 	require.Contains(t, text, "p-error-wrap")
+	require.NotContains(t, text, "TOTAL")
+	require.NotContains(t, text, "PREVENTED")
+	require.NotContains(t, text, "MISSED")
 }

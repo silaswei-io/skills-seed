@@ -183,16 +183,16 @@ skills-seed reset --workspace
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--limit`, `-n` | `learning.max_commits`，默认 `50` | 最多分析的提交数量 |
+| `--limit`, `-n` | `learning.history.max_commits`，默认 `50` | 最多分析的提交数量 |
 | `--since`, `-s` | 空 | 时间范围，例如 `7d`、`30d`、`6m`、`1y` |
-| `--batch-size`, `-b` | `learning.batch_size`；未加载配置时为 `10` | 每批提交数量；每批调用一次 Agent 分析并在入库前策展候选模式 |
+| `--batch-size`, `-b` | `learning.history.batch_size`；未加载配置时为 `10` | 每批提交数量；每批调用一次 Agent 分析并在入库前策展候选模式 |
 | `--help`, `-h` | `false` | 查看 `learn history` 帮助 |
 
 #### `--profile` 取值
 
 | 取值 | 说明 |
 |---|---|
-| `auto` | 首次或全量学习会刷新画像；窄范围改动会尽量跳过 |
+| `auto` | 项目画像不存在时自动生成；本次实际写入新模式/更新模式时自动刷新；否则跳过 |
 | `skip` | 只学习 patterns，不更新画像 |
 | `refresh` | 基于当前输入强制刷新画像 |
 
@@ -219,7 +219,7 @@ skills-seed learn history --limit 40 --batch-size 5
 6. workspace 根仓会对工作区关系分析输入记录 md5；当 `workspace.projects`、子项目画像、prompt 模板和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。
 7. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
 8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
-9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `analysis.structural` 的内嵌 tree-sitter 结构化预扫描；没有边界输入时不会因此全仓扫描。
+9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的内嵌 tree-sitter 结构化预扫描；没有边界输入时不会因此全仓扫描。
 10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
@@ -245,6 +245,7 @@ skills-seed learn history --limit 40 --batch-size 5
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--output`, `-o` | 当前 `skills.target` 的 `skills.paths` | 临时指定 skills 输出目录 |
+| `--force` | `false` | 忽略模式变更状态，强制重新生成所有 skills |
 | `--help`, `-h` | `false` | 查看 `generate skills` 帮助 |
 
 #### 常用示例
@@ -284,10 +285,11 @@ references/
 
 #### 注意事项
 
-1. workspace 模式会先用每个子项目自己的配置生成子项目 skill，再生成根仓 workspace skill。
+1. workspace 模式首次会先用每个子项目自己的配置生成子项目 skill，再生成根仓 workspace skill；之后默认只生成模式或工作区关系变更影响到的目标。
 2. 已有手写 `SKILL.md` 没有 `generated-by: skills-seed` 标记时默认不会被覆盖。
 3. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
 4. `generate skills` 会对生成输入记录 md5；当项目画像、patterns、命中统计、配置、prompt/skills 模板和输出路径未变化，且输出产物完整时，会跳过 Agent 摘要和文件重写。workspace 根 skill 也会用同样机制跳过未变化的根产物。
+5. 需要重新生成所有目标时使用 `skills-seed generate skills --force`。
 
 ### `skills-seed patterns`
 
@@ -300,6 +302,7 @@ references/
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
 | `skills-seed patterns add <描述>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add "API 路由使用 RESTful 风格" --category api` | 会调用 AI Agent |
+| `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | `skills-seed patterns delete plugin-source-editing-rule` | workspace 根目录会同步删除已关联子项目模式 |
 | `skills-seed patterns compact` | 调用当前 Agent 策展整理相似 patterns | `skills-seed patterns compact --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
 | `skills-seed patterns stats` | 查看模式质量和 check 命中统计 | `skills-seed patterns stats` | 不调用 AI Agent，不修改数据库 |
 | `skills-seed patterns show [pattern-id]` | 查看 pattern 的 DB 字段、时间和代码位置元数据 | `skills-seed patterns show business-create-order --format json` | 不调用 AI Agent，不修改数据库 |
@@ -316,8 +319,15 @@ references/
 |---|---:|---|
 | `--category`, `-c` | 空 | 指定模式分类，如 `business`、`api`、`testing`；留空由 AI 自动推断 |
 | `--files`, `-f` | 空 | 指定参考文件路径；多个文件需重复传入该参数，AI 会读取文件内容辅助生成 |
-| `--context` | 空 | 补充上下文说明，帮助 AI 更准确理解模式 |
 | `--help`, `-h` | `false` | 查看 `patterns add` 帮助 |
+
+workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果描述中命中子项目 id 或 path，也会同步写入对应子项目模式库，并只标记受影响的 skills 目标待生成。
+
+#### `patterns delete` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--help`, `-h` | `false` | 查看 `patterns delete` 帮助 |
 
 #### `patterns compact` 参数
 
@@ -345,7 +355,8 @@ references/
 ```bash
 skills-seed patterns add "所有 API 路由使用 RESTful 风格"
 skills-seed patterns add "错误必须包装上下文" --category error
-skills-seed patterns add "数据库操作使用事务" --files internal/service/user.go --context "项目使用 GORM"
+skills-seed patterns add "数据库操作使用事务，项目使用 GORM" --files internal/service/user.go
+skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
 skills-seed patterns compact --category business --dry-run
@@ -581,54 +592,6 @@ skills-seed hook --uninstall
 1. 兼容旧用法的 `--install` / `--uninstall` 仍可用，但推荐使用子命令。
 2. `hook uninstall` 只移除 hook 文件，不清理学习数据。
 
-### `skills-seed completion`
-
-#### 命令概述
-
-为指定 shell 生成自动补全脚本。该命令由 Cobra 提供，适合安装到本机 shell 配置中。
-
-#### 命令形式
-
-| 命令形式 | 说明 | 常用示例 | 注意事项 |
-|---|---|---|---|
-| `skills-seed completion bash` | 生成 Bash 补全脚本 | `source <(skills-seed completion bash)` | 依赖 bash-completion |
-| `skills-seed completion zsh` | 生成 Zsh 补全脚本 | `source <(skills-seed completion zsh)` | 如未启用 completion，需要先执行 `autoload -U compinit; compinit` |
-| `skills-seed completion fish` | 生成 Fish 补全脚本 | `skills-seed completion fish \| source` | 可写入 `~/.config/fish/completions/skills-seed.fish` |
-| `skills-seed completion powershell` | 生成 PowerShell 补全脚本 | `skills-seed completion powershell \| Out-String \| Invoke-Expression` | 可写入 PowerShell profile |
-
-#### `completion` 参数
-
-| 参数 | 默认值 | 说明 |
-|---|---:|---|
-| `--help`, `-h` | `false` | 查看 `completion` 帮助 |
-
-#### 子命令参数
-
-| 子命令 | 参数 | 默认值 | 说明 |
-|---|---|---:|---|
-| `completion bash` | `--no-descriptions` | `false` | 禁用补全描述 |
-| `completion bash` | `--help`, `-h` | `false` | 查看 bash 补全帮助 |
-| `completion zsh` | `--no-descriptions` | `false` | 禁用补全描述 |
-| `completion zsh` | `--help`, `-h` | `false` | 查看 zsh 补全帮助 |
-| `completion fish` | `--no-descriptions` | `false` | 禁用补全描述 |
-| `completion fish` | `--help`, `-h` | `false` | 查看 fish 补全帮助 |
-| `completion powershell` | `--no-descriptions` | `false` | 禁用补全描述 |
-| `completion powershell` | `--help`, `-h` | `false` | 查看 powershell 补全帮助 |
-
-#### 常用示例
-
-```bash
-source <(skills-seed completion bash)
-source <(skills-seed completion zsh)
-skills-seed completion fish | source
-skills-seed completion powershell | Out-String | Invoke-Expression
-```
-
-#### 注意事项
-
-1. 永久安装补全脚本时，请参考对应 shell 的 `skills-seed completion <shell> --help`。
-2. macOS/Linux 的补全脚本安装路径由 shell 和包管理器决定。
-
 ### `skills-seed help`
 
 #### 命令概述
@@ -652,7 +615,6 @@ skills-seed completion powershell | Out-String | Invoke-Expression
 ```bash
 skills-seed help init
 skills-seed help learn current
-skills-seed help completion zsh
 ```
 
 #### 注意事项

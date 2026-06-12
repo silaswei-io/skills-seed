@@ -16,9 +16,9 @@ Separate these facts carefully:
 1. Project index: ID, path, responsibility, role, primary language, and key framework/runtime.
 2. Workspace context: product/business context, repository model, and delivery or validation boundaries. Only write facts supported by repository evidence.
 3. Shared paths: code, config, SDKs, generated artifacts, or tooling consumed by multiple projects.
-4. Contract paths: OpenAPI, protobuf, GraphQL schemas, IDL, database schemas, event definitions, or generated-code inputs.
-5. Infrastructure paths: Docker, Kubernetes, Helm, CI/CD, deployment scripts, environment config, gateway, or middleware config.
-6. Dependency direction: frontend to backend, backend to shared library, middleware to service, contract to generated output, deployment config to runtime service.
+4. Contract paths: interface definitions, shared schemas, type definitions, event definitions, data structure definitions, or generated-code inputs.
+5. Infrastructure paths: container, orchestration, deployment, environment, routing, middleware, automation, or release config.
+6. Dependency direction: project to project, project to shared library, adapter to service, contract to derived output, deployment config to runtime service.
 7. Common tasks and validation: record only task entry points and commands confirmed by README files, scripts, CI, build files, or config.
 8. Impact radius: which paths affect multiple projects and which projects must be checked together.
 9. Routing hints: which child `.agents/.claude` skills must be read before editing each path family.
@@ -43,13 +43,13 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 - Do not promote a local child-project convention to a workspace rule unless multiple projects depend on it.
 - If a relationship cannot be confirmed from repository structure, config, README, or build files, record the uncertainty in `summary` or use an empty array. Do not invent facts.
 - The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
-- Preserve paths, commands, config keys, environment variables, protocol names, and file names verbatim.
+- Preserve paths, commands, config keys, environment variables, interface names, and file names verbatim.
 
 # Language Requirements
 
 - All user-facing natural-language fields must be written in English.
 - If workspace input, child project summaries, README text, comments, learned patterns, or user-provided context contain Chinese or another language, summarize or translate the content into English instead of copying non-English prose.
-- Preserve paths, commands, config keys, environment variables, protocol names, file names, project IDs, and code identifiers exactly when needed.
+- Preserve paths, commands, config keys, environment variables, interface names, file names, project IDs, and code identifiers exactly when needed.
 
 # Output Format
 
@@ -62,48 +62,48 @@ Return only a valid JSON object with this structure. The `json` fenced block bel
   "summary": "workspace-level factual summary; may include product context, repository model, delivery boundary, and still-unconfirmed information when supported by repository evidence",
   "projects": [
     {
-      "id": "frontend",
-      "path": "frontend",
-      "type": "frontend",
-      "language": "typescript",
+      "id": "project-a",
+      "path": "project-a",
+      "type": "application",
+      "language": "primary language",
       "responsibility": "specific responsibility",
-      "frameworks": ["React", "Vite"]
+      "frameworks": ["framework or runtime supported by code evidence"]
     }
   ],
   "shared": [
     {
       "path": "shared",
       "description": "shared code or config responsibility",
-      "consumers": ["frontend", "backend"]
+      "consumers": ["project-a", "project-b"]
     }
   ],
   "contracts": [
     {
-      "path": "proto",
+      "path": "contracts",
       "description": "API contract responsibility",
-      "producers": ["backend"],
-      "consumers": ["frontend", "middleware"]
+      "producers": ["producer-project"],
+      "consumers": ["consumer-project", "adapter-project"]
     }
   ],
   "infra": [
     {
-      "path": "deploy",
+      "path": "infra",
       "description": "deployment config responsibility",
-      "affected_projects": ["frontend", "backend"]
+      "affected_projects": ["project-a", "project-b"]
     }
   ],
   "dependencies": [
     {
-      "from": "frontend",
-      "to": "backend",
-      "reason": "API calls or generated client"
+      "from": "project-a",
+      "to": "project-b",
+      "reason": "interface calls or derived artifact dependency"
     }
   ],
   "impact_routes": [
     {
-      "path_pattern": "proto/**",
-      "project_ids": ["frontend", "backend"],
-      "reason": "contract changes require generated clients and server handlers to be checked"
+      "path_pattern": "contracts/**",
+      "project_ids": ["producer-project", "consumer-project"],
+      "reason": "contract changes require producers, consumers, and derived artifacts to be checked"
     }
   ]
 }

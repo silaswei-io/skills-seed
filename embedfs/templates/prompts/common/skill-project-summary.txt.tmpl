@@ -42,6 +42,8 @@
 - 每个分类摘要必须是2-3句包含具体细节的实质性描述
 - 每个使用场景必须具体且可执行
 - 业务规则和最佳实践必须基于实际模式提取，不要使用通用建议
+- 不要把代码证据没有直接体现的产品语义写成业务规则。例如状态流转、禁止操作、权限、重试上限等必须能从 pattern 的规则或代码证据中直接看出；否则只在 `improvement_suggestions` 中说明需要确认。
+- 不要使用“必须/总是/永远/禁止”等强约束词，除非输入 pattern 的 `rule` 和 `good_example` 都支持该约束。
 
 ## 语言要求
 
@@ -57,17 +59,17 @@
   "category_summaries": {
     "business": {
       "category": "business",
-      "summary": "具体的2-3句摘要，描述代码库中实际发现的业务领域模式。例如：'本项目使用分层领域模型，数据访问采用 Repository 模式。业务逻辑封装在 Service 层，与数据操作清晰分离。领域实体遵循 DDD 原则，使用聚合根管理一致性边界。'",
+      "summary": "具体的2-3句摘要，只描述输入模式中真实出现的业务领域模式、边界和约束。",
       "patterns": ["具体模式名称1", "具体模式名称2"],
-      "usage_scenes": ["实现用户认证流程时", "创建订单处理工作流时"],
+      "usage_scenes": ["输入模式支持的具体使用场景1", "输入模式支持的具体使用场景2"],
       "priority": 5,
       "business_methods": [
         {
-          "name": "ProcessPayment",
-          "code_location": {"current_location": "internal/service/payment/service.go"},
-          "description": "处理支付流程，包含验证和错误处理",
-          "function": "验证支付请求，调用支付网关，处理响应，更新订单状态",
-          "usage": "在结账流程中处理支付时使用",
+          "name": "真实业务方法名或代码标识",
+          "code_location": {"current_location": "相对文件路径:行号"},
+          "description": "输入模式支持的业务方法职责",
+          "function": "真实签名或函数职责摘要",
+          "usage": "输入模式支持的调用场景",
           "type": "domain"
         }
       ]
@@ -75,18 +77,18 @@
   },
   "key_patterns": [
     {
-      "name": "Repository 模式实现",
+      "name": "真实关键模式名称",
       "category": "business",
       "importance": "high",
-      "summary": "在所有数据访问层一致使用，采用基于接口的设计",
-      "when_to_use": "为任何领域实体实现新的数据访问时使用"
+      "summary": "从输入模式提炼出的具体摘要",
+      "when_to_use": "输入模式支持的使用时机"
     }
   ],
-  "business_rules": ["具体规则：所有用户输入必须在服务层进行验证", "具体规则：多步骤操作必须使用数据库事务"],
-  "best_practices": ["具体实践：使用依赖注入管理所有服务依赖", "具体实践：记录所有外部 API 调用的请求和响应"],
-  "common_patterns": ["具体模式：使用工厂模式创建领域实体", "具体模式：使用构建者模式构建复杂对象"],
-  "key_insights": ["项目使用整洁架构，关注点清晰分离", "团队倾向于组合而非继承"],
-  "improvement_suggestions": ["考虑为频繁访问的数据添加缓存层", "为 API 响应添加更全面的错误码"]
+  "business_rules": ["输入模式直接支持的具体业务规则"],
+  "best_practices": ["输入模式直接支持的具体实践"],
+  "common_patterns": ["输入模式直接支持的通用模式"],
+  "key_insights": ["输入模式直接支持的关键观察"],
+  "improvement_suggestions": ["输入模式暴露出的待确认或改进项"]
 }
 ```
 

@@ -42,40 +42,9 @@
 
 **不要提取**：简单的 CRUD（GetByID、Save、Delete、Create）
 
-**业务方法示例**：
-```go
-// ✅ 提取这个：包含业务逻辑
-func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error {
-    // 1. 验证订单状态
-    order, err := s.repo.GetByID(ctx, orderID)
-    if err != nil {
-        return fmt.Errorf("order not found: %w", err)
-    }
-    if order.Status != OrderStatusPending {
-        return ErrInvalidOrderStatus
-    }
-
-    // 2. 调用支付网关
-    result, err := s.paymentGateway.Charge(ctx, payment)
-    if err != nil {
-        order.Status = OrderStatusPaymentFailed
-        s.repo.Save(ctx, order)
-        return fmt.Errorf("payment failed: %w", err)
-    }
-
-    // 3. 更新订单状态
-    order.Status = OrderStatusPaid
-    order.PaymentID = result.TransactionID
-    return s.repo.Save(ctx, order)
-}
-
-// ❌ 不提取这个：简单 CRUD
-func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error) {
-    var order Order
-    err := r.db.WithContext(ctx).Where("id = ?", id).First(&order).Error
-    return &order, err
-}
-```
+**业务方法判断示例**：
+- 应提取：同一方法内能看到业务前置校验、状态或阶段推进、跨模块编排、外部依赖调用、失败补偿、错误语义或数据转换。
+- 不应提取：只读取、保存、删除、转发参数、普通字段赋值，且不承载领域规则或工作流语义的方法。
 
 ## 业务模式深挖流程（必须执行）
 
@@ -83,7 +52,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 
 1. 建立**业务候选清单**：
    - 逐个提交分析提交消息、变更文件路径和你读取到的代码证据。
-   - 优先关注 Service、UseCase、Handler、Repository、Client、Job、Consumer、Utils 中新增或修改的方法。
+   - 优先关注入口、编排、领域、数据访问、外部依赖、任务、消息处理和工具模块中新增或修改的方法。
    - 把包含业务语义的方法、流程、规则、状态变化、跨模块调用、外部调用、数据转换、异常处理分支都列为候选。
 
 2. 执行**业务模式展开**：
@@ -91,7 +60,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
    - 根据代码证据拆出多个可复用模式，例如“请求校验模式”“业务状态推进模式”“跨仓储事务编排模式”“外部系统调用模式”“失败补偿/降级模式”“业务错误映射模式”“领域数据转换模式”。
    - **不要把多个业务细节压缩成一个泛化模式**。如果一个方法同时包含领域规则和技术约定，领域规则可输出为 business，事务、查询、路由、错误包装、配置加载、中间件链等必须输出为对应具体分类。
    - 具体分类优先：business 不是默认分类，不要为每个候选强行生成 business 模式。
-   - 业务模式只保留领域规则、状态流转、跨实体业务编排和真实业务工作流；纯技术约定即使位于 Service 或 Handler 中，也不要归为 business。
+   - 业务模式只保留领域规则、状态流转、跨实体业务编排和真实业务工作流；纯技术约定即使位于入口或编排代码中，也不要归为 business。
 
 3. 丰富每个业务模式：
    - `description` 说明业务场景、触发条件、核心步骤和边界。
@@ -109,21 +78,21 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 
 - 事务管理：开启、提交、回滚
 - 查询构建：条件组合、关联加载
-- ORM 使用方式（GORM/Ent/XORM）
+- 数据访问库或查询构建器的实际使用方式
 - 错误处理和重试逻辑
 
 ## 3. 错误处理和日志 ⭐⭐
 
 - 日志记录位置和格式（结构化日志）
-- 错误包装和传播（fmt.Errorf with %w）
+- 错误包装和传播（沿用项目已有错误语义）
 - 自定义错误类型定义
-- HTTP 错误响应格式
+- 对外错误响应格式
 
 ## 4. API 和中间件 ⭐
 
-- 路由注册模式
-- 中间件使用（认证/日志/限流）
-- 请求/响应结构
+- 接口入口注册模式
+- 中间件使用（访问控制/观测/流量控制）
+- 输入/输出结构
 - 参数验证方式
 
 ## 5. 配置和依赖管理
@@ -141,19 +110,18 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 3. 如果多个 API 都使用了相同的中间件 → 提取为"中间件使用模式"
 4. 如果多个 repository 都使用了相同的事务处理 → 提取为"事务管理模式"
 
-**框架特定模式**：
+**框架或库使用模式**：
 
-- **Gin**: 路由注册、中间件链、上下文处理
-- **GORM**: 查询构建、关联加载、事务使用
-- **Zap**: 结构化日志、日志级别使用
-- **Viper**: 配置读取、环境变量绑定
+- 只提取当前代码中有直接证据的框架、库、运行时或工具使用方式
+- 不要因为模板示例、依赖残留、常见名称或推测而输出具体技术栈
+- 记录路由、数据访问、日志、配置、依赖注入、任务调度、消息通信等实际出现的使用约定
 
 # 提取内容（具体分类优先）
 
 从这些分类提取模式：
 - **business**: 领域规则、状态流转、跨实体业务编排、业务工作流
 - **utils**: 辅助函数、工具、完整签名的方法
-- **api**: REST端点、请求/响应格式
+- **api**: 接口入口、输入/输出格式
 - **database**: 查询、事务、数据访问模式
 - **error**: 错误处理、包装、日志
 - **structure**: 代码组织、分层
@@ -179,9 +147,9 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
 8. **confidence**: 0.0到1.0（确定程度）
 9. **frequency**: 在这些提交中出现的次数
 10. **business_method**: 仅用于工具/业务方法：
-    - **name**: 完整方法签名（如"ProcessOrderPayment(ctx, orderID, payment) error"）
-    - **location**: "文件路径.go:行号"
-    - **layer**: "Service/Repository/Handler/Utils"
+    - **name**: 完整方法签名或代码标识
+    - **location**: "相对文件路径:行号"
+    - **layer**: 代码所在职责层或模块类型
     - **function**: 包含参数和返回值的完整签名
     - **prerequisites**: 需要先设置什么（如事务已开启、配置已加载）
     - **returns**: 返回内容包括错误
@@ -189,40 +157,40 @@ func (r *OrderRepository) GetByID(ctx context.Context, id string) (*Order, error
     - **description**: 详细的业务逻辑说明
     - **usage**: 何时调用此方法
 
-# 输出示例
+# 输出结构示例
 
 ```json
 {
   "patterns": [
     {
-      "id": "order-payment-processing",
-      "name": "订单支付处理流程",
+      "id": "domain-workflow-state-transition",
+      "name": "领域工作流状态推进模式",
       "category": "business",
-      "description": "处理订单支付的完整流程，包括状态验证、支付网关调用、订单状态更新",
-      "good_example": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error {\n\t// 1. 验证订单状态\n\torder, err := s.repo.GetByID(ctx, orderID)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"order not found: %w\", err)\n\t}\n\tif order.Status != OrderStatusPending {\n\t\treturn ErrInvalidOrderStatus\n\t}\n\n\t// 2. 调用支付网关\n\tresult, err := s.paymentGateway.Charge(ctx, payment)\n\tif err != nil {\n\t\torder.Status = OrderStatusPaymentFailed\n\t\ts.repo.Save(ctx, order)\n\t\treturn fmt.Errorf(\"payment failed: %w\", err)\n\t}\n\n\t// 3. 更新订单状态\n\torder.Status = OrderStatusPaid\n\torder.PaymentID = result.TransactionID\n\treturn s.repo.Save(ctx, order)\n}",
-      "rule": "订单支付必须包含状态验证、支付网关调用、订单状态更新三个步骤，失败时需回滚订单状态",
+      "description": "从真实代码证据中归纳出的业务流程、触发条件、状态推进和异常分支",
+      "good_example": "从本次已读取源码逐字复制的 5-30 行代码证据；不要输出这段占位文本",
+      "rule": "在相同业务场景下沿用代码证据体现的校验顺序、状态推进和异常处理边界",
       "confidence": 0.95,
       "frequency": 5,
       "business_method": {
-        "name": "OrderService.ProcessOrderPayment(ctx, orderID, payment) error",
-        "code_location": {"current_location": "internal/service/order.go:120"},
-        "layer": "Service",
-        "description": "处理订单支付的完整流程，包含状态验证、支付网关集成、订单状态更新",
-        "function": "func (s *OrderService) ProcessOrderPayment(ctx context.Context, orderID string, payment PaymentInfo) error",
-        "prerequisites": "需要已初始化 OrderRepository 和 PaymentGateway，订单必须存在且为待支付状态",
-        "returns": "成功返回 nil，失败返回包装后的错误（订单不存在、状态错误、支付失败）",
+        "name": "真实方法签名或代码标识",
+        "code_location": {"current_location": "相对文件路径:行号"},
+        "layer": "职责层或模块类型",
+        "description": "从代码证据归纳出的完整业务意图",
+        "function": "真实完整签名",
+        "prerequisites": "代码证据体现的调用前置条件和依赖",
+        "returns": "代码证据体现的返回值和错误语义",
         "type": "domain",
-        "usage": "在用户完成支付选择、点击支付按钮时调用"
+        "usage": "代码证据支持的调用场景"
       }
     },
     {
-      "id": "gorm-transaction-pattern",
-      "name": "GORM 事务处理模式",
+      "id": "transaction-boundary-pattern",
+      "name": "事务边界处理模式",
       "category": "database",
-      "description": "使用 GORM 的 Transaction 方法处理数据库事务，自动提交或回滚",
-      "good_example": "err := s.db.Transaction(func(tx *gorm.DB) error {\n\tif err := tx.Create(&user).Error; err != nil {\n\t\treturn err // 自动回滚\n\t}\n\treturn tx.Create(&profile).Error\n})",
-      "bad_example": "tx := s.db.Begin()\ntx.Create(&user)\nif err != nil {\n\ttx.Rollback()\n\treturn err\n}\ntx.Commit()",
-      "rule": "使用 db.Transaction() 而非手动 Begin/Commit/Rollback",
+      "description": "使用当前项目已有的事务封装处理多步写入，保证失败时回滚",
+      "good_example": "从本次已读取源码逐字复制的 5-30 行事务边界代码证据；不要输出这段占位文本",
+      "bad_example": "",
+      "rule": "多步写入必须沿用项目已有事务边界封装",
       "confidence": 0.90,
       "frequency": 8
     }

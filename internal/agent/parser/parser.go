@@ -28,6 +28,11 @@ type businessMethodPayload struct {
 	Returns       string              `json:"returns"`
 }
 
+type workspaceSpecPayload struct {
+	domain.WorkspaceSpec
+	ChangeOrder []json.RawMessage `json:"change_order"`
+}
+
 func (p *businessMethodPayload) toDomain(now time.Time) *domain.BusinessMethod {
 	if p == nil {
 		return nil
@@ -60,8 +65,8 @@ func ExtractJSON(output string) (string, error) {
 	re := regexp.MustCompile("(?s)```(?:json|JSON)?\\s*\\n?({.*?})\\s*\\n?```")
 	if matches := re.FindStringSubmatch(output); len(matches) > 1 {
 		jsonStr := strings.TrimSpace(matches[1])
-		if err := validateJSON(jsonStr); err == nil {
-			return jsonStr, nil
+		if repaired, err := FixAIJSON(jsonStr); err == nil {
+			return repaired, nil
 		}
 	}
 
@@ -76,19 +81,8 @@ func ExtractJSON(output string) (string, error) {
 
 	end := findMatchingBrace(output, start)
 	if end == -1 {
-		if repairedOutput, repairErr := repairDuplicatedObjectStarts(output); repairErr == nil && repairedOutput != output {
-			if repairedEnd := findMatchingBrace(repairedOutput, start); repairedEnd != -1 {
-				jsonStr := strings.TrimSpace(repairedOutput[start : repairedEnd+1])
-				if err := validateJSON(jsonStr); err == nil {
-					return jsonStr, nil
-				}
-			}
-		}
-		if repairedOutput, repairErr := repairMissingClosingContainers(output[start:]); repairErr == nil {
-			jsonStr := strings.TrimSpace(repairedOutput)
-			if err := validateJSON(jsonStr); err == nil {
-				return jsonStr, nil
-			}
+		if repaired, repairErr := FixAIJSON(output[start:]); repairErr == nil {
+			return repaired, nil
 		}
 		logger.Error(i18n.Get("AgentUnmatchedBraces"),
 			"start", start,
@@ -99,24 +93,38 @@ func ExtractJSON(output string) (string, error) {
 	jsonStr := strings.TrimSpace(output[start : end+1])
 
 	// 3. 验证 JSON 有效性
-	if err := validateJSON(jsonStr); err != nil {
-		if repaired, repairErr := repairDuplicatedObjectStarts(jsonStr); repairErr == nil && repaired != jsonStr {
-			if validateJSON(repaired) == nil {
-				return repaired, nil
-			}
-		}
-		if repaired, repairErr := repairInvalidStringEscapes(jsonStr); repairErr == nil {
-			if validateJSON(repaired) == nil {
-				return repaired, nil
-			}
-		}
+	repaired, err := FixAIJSON(jsonStr)
+	if err != nil {
 		logger.Error(i18n.Get("AgentInvalidJSON"),
 			"error", err,
 			"json_length", len(jsonStr))
 		return "", fmt.Errorf("%s: %w", i18n.Get("AgentInvalidJSONError"), err)
 	}
 
-	return jsonStr, nil
+	return repaired, nil
+}
+
+// ParseSelectFilesResult 解析 AI 文件选择器输出。
+func ParseSelectFilesResult(output string) (*agent.SelectFilesResult, error) {
+	jsonStr, err := ExtractJSON(output)
+	if err != nil {
+		return nil, err
+	}
+	var result struct {
+		Include       []string `json:"include"`
+		Exclude       []string `json:"exclude"`
+		SelectedPaths []string `json:"selected_paths"`
+		Reason        string   `json:"reason"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+	return &agent.SelectFilesResult{
+		Include:       result.Include,
+		Exclude:       result.Exclude,
+		SelectedPaths: result.SelectedPaths,
+		Reason:        result.Reason,
+	}, nil
 }
 
 func repairDuplicatedObjectStarts(jsonStr string) (string, error) {
@@ -737,10 +745,11 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 			Dependents       []string `json:"dependents"`
 			KeyMethods       []string `json:"key_methods"`
 		} `json:"key_modules"`
-		ConfigPatterns  []string                `json:"config_patterns"`
-		Dependencies    []string                `json:"dependencies"`
-		BusinessMethods []businessMethodPayload `json:"business_methods"`
-		Summary         string                  `json:"summary"`
+		ConfigPatterns     []string                   `json:"config_patterns"`
+		Dependencies       []string                   `json:"dependencies"`
+		BusinessMethods    []businessMethodPayload    `json:"business_methods"`
+		ValidationCommands []domain.ValidationCommand `json:"validation_commands"`
+		Summary            string                     `json:"summary"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -758,21 +767,22 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 	}
 
 	analyzeResult := &agent.AnalyzeProjectResult{
-		ProjectName:       result.ProjectName,
-		Language:          result.Language,
-		Frameworks:        result.Frameworks,
-		Architecture:      result.Architecture,
-		Structure:         result.Structure,
-		DependencyGraph:   result.DependencyGraph,
-		DataFlow:          result.DataFlow,
-		FrameworkPatterns: result.FrameworkPatterns,
-		ConfigPatterns:    result.ConfigPatterns,
-		Dependencies:      result.Dependencies,
-		Summary:           result.Summary,
-		Layers:            make([]domain.ArchitectureLayer, len(result.Layers)),
-		CommonUtils:       make([]domain.UtilityFunction, len(result.CommonUtils)),
-		KeyModules:        make([]domain.ModuleInfo, len(result.KeyModules)),
-		BusinessMethods:   make([]domain.BusinessMethod, len(result.BusinessMethods)),
+		ProjectName:        result.ProjectName,
+		Language:           result.Language,
+		Frameworks:         result.Frameworks,
+		Architecture:       result.Architecture,
+		Structure:          result.Structure,
+		DependencyGraph:    result.DependencyGraph,
+		DataFlow:           result.DataFlow,
+		FrameworkPatterns:  result.FrameworkPatterns,
+		ConfigPatterns:     result.ConfigPatterns,
+		Dependencies:       result.Dependencies,
+		ValidationCommands: result.ValidationCommands,
+		Summary:            result.Summary,
+		Layers:             make([]domain.ArchitectureLayer, len(result.Layers)),
+		CommonUtils:        make([]domain.UtilityFunction, len(result.CommonUtils)),
+		KeyModules:         make([]domain.ModuleInfo, len(result.KeyModules)),
+		BusinessMethods:    make([]domain.BusinessMethod, len(result.BusinessMethods)),
 	}
 
 	for i, layer := range result.Layers {
@@ -933,10 +943,12 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
 	}
 
-	var spec domain.WorkspaceSpec
-	if err := json.Unmarshal([]byte(jsonStr), &spec); err != nil {
+	var payload workspaceSpecPayload
+	if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
 	}
+	spec := payload.WorkspaceSpec
+	spec.ChangeOrder = normalizeWorkspaceChangeOrder(payload.ChangeOrder)
 	if spec.Projects == nil {
 		spec.Projects = []domain.WorkspaceProject{}
 	}
@@ -956,6 +968,47 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 		spec.LoadMultipleSkillsWhen = []domain.WorkspaceLoadMultipleSkill{}
 	}
 	return &spec, nil
+}
+
+func normalizeWorkspaceChangeOrder(items []json.RawMessage) []string {
+	if len(items) == 0 {
+		return []string{}
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if value := normalizeWorkspaceChangeOrderItem(item); value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func normalizeWorkspaceChangeOrderItem(item json.RawMessage) string {
+	var text string
+	if err := json.Unmarshal(item, &text); err == nil {
+		return strings.TrimSpace(text)
+	}
+
+	var object struct {
+		Step    int    `json:"step"`
+		Action  string `json:"action"`
+		Details string `json:"details"`
+	}
+	if err := json.Unmarshal(item, &object); err != nil {
+		return ""
+	}
+	action := strings.TrimSpace(object.Action)
+	details := strings.TrimSpace(object.Details)
+	if action == "" {
+		return details
+	}
+	if object.Step > 0 {
+		action = fmt.Sprintf("%d. %s", object.Step, action)
+	}
+	if details == "" {
+		return action
+	}
+	return action + "：" + details
 }
 
 // ParseUserDefinePatternResult 解析用户自定义模式结果

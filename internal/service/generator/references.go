@@ -93,6 +93,15 @@ func categoryReferenceGroups(patterns []domain.Pattern, locale string) []skills.
 			Description: meta.Description,
 			Path:        "./references/patterns/" + category + ".md",
 		})
+		if category == string(domain.CategoryBusiness) {
+			for _, businessGroup := range businessPatternGroups(locale, businessPatterns(patterns)) {
+				group.Items = append(group.Items, skills.ReferenceItem{
+					Title:       businessGroup.Title,
+					Description: businessGroup.Description,
+					Path:        "./references/patterns/business/" + businessGroup.ID + ".md",
+				})
+			}
+		}
 	}
 
 	groups := make([]skills.ReferenceGroup, 0, len(groupOrder))

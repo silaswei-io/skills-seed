@@ -39,7 +39,7 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 
 ### Contract Changes
 
-- Includes API definitions, OpenAPI/Swagger, proto, request/response types, error codes, events, messages, generation inputs, and SDKs.
+- Includes interface definitions, shared schemas, request/response types, error codes, events, messages, generation inputs, and derived artifacts.
 - Update the contract source first, then generated artifacts or adapters.
 - Read producer and consumer child skills together.
 - Verify fields, types, error codes, defaults, compatibility, and tests on both sides.
@@ -53,7 +53,7 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 
 ### Infrastructure Changes
 
-- Includes Dockerfiles, Compose, Kubernetes, Helm, Terraform, Nginx, gateways, middleware, environment variables, CI, and release scripts.
+- Includes container, orchestration, deployment, routing, middleware, environment variable, automation, and release script config.
 - Identify runtime-affected child projects before reading skills.
 - Check ports, path prefixes, health checks, environment variable names, image build args, startup commands, and release order.
 
@@ -69,7 +69,7 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 3. If contracts or shared interfaces are involved, update the contract source, schema, public types, or shared signatures first.
 4. Update producer implementation and tests.
 5. Update consumer calls, generated code, adapters, and tests.
-6. Update infrastructure, environment variables, gateway rules, middleware, or CI.
+6. Update infrastructure, environment variables, routing rules, middleware, or automation.
 7. Verify consistency across generated artifacts, interface shapes, error codes, config keys, build commands, and test scope.
 {{end}}
 
@@ -78,16 +78,16 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 - The changed path is not owned by exactly one child project.
 - The change affects APIs, types, schemas, error codes, events, messages, or generation inputs.
 - The change touches shared libraries, utilities, components, or common config.
-- The change touches deployment, gateway, middleware, CI, environment variables, or release scripts.
-- The change touches root scripts, workspace-level package/go work/build config, or batch commands.
+- The change touches deployment, routing, middleware, automation, environment variables, or release scripts.
+- The change touches root scripts, workspace-level build config, or batch commands.
 {{if .HasContracts}}
-- A recognized contract path changes; read related producer, consumer, middleware, or SDK child skills together.
+- A recognized contract path changes; read related producer, consumer, adapter, or derived-artifact child skills together.
 {{end}}
 {{if .HasShared}}
 - A recognized shared path changes; read every child skill that imports, packages, or generates the shared code.
 {{end}}
 {{if .HasInfra}}
-- A recognized infrastructure path changes; read child skills affected by deployment, config, gateway, or middleware rules.
+- A recognized infrastructure path changes; read child skills affected by deployment, config, routing, or middleware rules.
 {{end}}
 {{if .HasLoadMultipleWhen}}
 {{range .LoadMultipleWhen}}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
@@ -98,6 +99,27 @@ func TestExtractJSON_RepairsInvalidBackslashEscapesInStrings(t *testing.T) {
 	assert.JSONEq(t, `{"good_example": "const path = \"src\\ pages\"\nconst re = /\\s+/"}`, result)
 }
 
+func TestExtractJSON_RepairsUnescapedQuotesInsideCodeStrings(t *testing.T) {
+	input := `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf("%s", "admin")","bad_example":""}]}`
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s\", \"admin\")","bad_example":""}]}`, result)
+}
+
+func TestExtractJSON_RepairsPartiallyEscapedQuotesInsideCodeStrings(t *testing.T) {
+	input := `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】", resp.Extra.Object, req.Username)","bad_example":""}]}`
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】\", resp.Extra.Object, req.Username)","bad_example":""}]}`, result)
+}
+
+func TestFixAIJSON_FixesCommonAIJSONDefectsTogether(t *testing.T) {
+	input := `{{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】", resp.Extra.Object, req.Username)","bad_example":"const path = \"src\ pages\""}]`
+	result, err := FixAIJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】\", resp.Extra.Object, req.Username)","bad_example":"const path = \"src\\ pages\""}]}`, result)
+}
+
 func TestExtractJSON_RepairsMissingClosingContainersAtEnd(t *testing.T) {
 	input := `{"patterns":[{"id":"service","name":"Service"}],"category_summaries":{"structure":{"summary":"layers","patterns":["Service"]}}`
 	result, err := ExtractJSON(input)
@@ -132,6 +154,33 @@ func TestExtractJSON_MultipleCodeBlocks(t *testing.T) {
 	assert.JSONEq(t, `{"key": 1}`, result)
 }
 
+func TestParseWorkspaceSpecAcceptsObjectChangeOrder(t *testing.T) {
+	output := `{
+	  "name": "hsm-workspace",
+	  "root_path": "/workspace",
+	  "routing": [],
+	  "rules": [],
+	  "change_order": [
+	    {
+	      "step": 1,
+	      "action": "确认契约或共享接口稳定",
+	      "details": "修改 proto、API、SDK 前先确认兼容性。"
+	    },
+	    {
+	      "action": "更新消费方",
+	      "details": "同步适配依赖方。"
+	    }
+	  ]
+	}`
+
+	result, err := ParseWorkspaceSpec(output)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"1. 确认契约或共享接口稳定：修改 proto、API、SDK 前先确认兼容性。",
+		"更新消费方：同步适配依赖方。",
+	}, result.ChangeOrder)
+}
+
 func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	output := `{
 	  "project_name": "demo",
@@ -148,6 +197,7 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
   "common_utils": [{"name":"Ptr","file":"internal/utils/ptr.go","signature":"func Ptr[T any](v T) *T","description":"returns pointer","usage":"optional fields"}],
   "config_patterns": ["yaml config"],
   "dependencies": ["bbolt"],
+  "validation_commands": [{"command":"task verify","when":"after changing project code","source":"Taskfile.yml"}],
   "summary": "demo project"
 }`
 
@@ -162,6 +212,9 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	assert.Len(t, result.BusinessMethods, 1)
 	assert.Equal(t, "internal/service/demo.go:10", result.BusinessMethods[0].DisplayLocation())
 	assert.Equal(t, "func Ptr[T any](v T) *T", result.CommonUtils[0].Signature)
+	require.Len(t, result.ValidationCommands, 1)
+	assert.Equal(t, "task verify", result.ValidationCommands[0].Command)
+	assert.Equal(t, "Taskfile.yml", result.ValidationCommands[0].Source)
 }
 
 func TestParseAnalyzeProjectResult_RepairsDuplicatedObjectStart(t *testing.T) {

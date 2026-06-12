@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
 
+Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file selection before analysis. `generate skills` uses dirty state to regenerate only affected targets, with `--force` available for a full regeneration. The root `completion` command has been removed, and Chinese help text is now consistent.
+
 `generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
 
 Starting in 0.7.0, learning and project-profile analysis use an embedded tree-sitter structural pre-scan when bounded inputs exist. It extracts symbols, imports, entry points, and module clues so the Agent can prioritize source files to inspect. It no longer depends on an external CodeGraph command or index; configure it under `analysis.structural`, where `max_symbols` controls emitted symbol count and `max_file_size` controls the per-source-file size limit.
@@ -105,6 +107,8 @@ Starting in 0.7.3, current-code learning commits file-analysis fingerprints only
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/`. Runtime logs keep only output lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Business-method locations now use structured `code_location` metadata throughout, generated business-method references show location status, and project skills/references are more compact so the entry skill guides Agents to read the minimum relevant references for each task.
 
 Starting in 0.9.0, learning and user-added patterns use the `pattern-curate` prompt for pre-storage curation: every candidate must be covered, duplicate rules must be consolidated, code evidence must come from input source, and invalid or low-quality candidates are dropped. The old pre-generation merge flow and `patterns merge` command have been removed; generation remains read-only.
+
+Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers. `patterns delete` also marks affected skills dirty after removing patterns.
 
 Common layout:
 

@@ -52,25 +52,25 @@ The following coding patterns have been learned from the project history. Code s
 {
   "issues": [
     {
-      "file": "path/to/file.go",
+      "file": "path/to/file",
       "line": 42,
       "severity": "warning",
-      "message": "Error handling does not match project pattern: should use fmt.Errorf(\"%w\", err) to wrap errors",
-      "suggestion": "Change to: return fmt.Errorf(\"failed to create user: %w\", err)",
+      "message": "Error handling does not match a learned project pattern",
+      "suggestion": "Apply the learned error handling rule using the local code style",
       "pattern_id": "error-wrapping-pattern"
     },
     {
-      "file": "path/to/another.go",
+      "file": "path/to/another-file",
       "line": 15,
       "severity": "error",
-      "message": "Database operation missing transaction handling",
-      "suggestion": "Wrap multiple database operations with db.Transaction()",
-      "pattern_id": "gorm-transaction-pattern"
+      "message": "Multi-step data change does not follow the learned transaction boundary",
+      "suggestion": "Use the project-local transaction wrapper shown by the matching pattern",
+      "pattern_id": "transaction-boundary-pattern"
     }
   ],
   "suggestions": [
-    "Consider standardizing structured logging format across the project",
-    "Consider adding context.Context parameter to all Service layer methods"
+    "Consider standardizing the learned logging shape across affected files",
+    "Consider aligning this module boundary with the learned structure pattern"
   ],
   "confidence": 0.85
 }

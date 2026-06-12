@@ -299,7 +299,7 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 
 	projectLanguage := configRepo.Get().Project.Language
 	if projectLanguage == "" {
-		projectLanguage = "go"
+		projectLanguage = "unknown"
 	}
 
 	analyzerSvc := analyzer.NewAnalyzerService(nil, configRepo)

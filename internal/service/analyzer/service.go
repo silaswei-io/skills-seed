@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -45,7 +46,7 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerServi
 		configRepo: configRepo,
 	}
 	if configRepo != nil {
-		cfg := configRepo.GetAnalysisConfig().Structural
+		cfg := configRepo.GetCurrentLearningConfig().Structural
 		if cfg.Enabled {
 			svc.structuralCollector = newStructuralCollector(cfg)
 		}
@@ -58,7 +59,7 @@ func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectR
 		return "", nil
 	}
 
-	cfg := s.configRepo.GetAnalysisConfig().Structural
+	cfg := s.configRepo.GetCurrentLearningConfig().Structural
 	if !cfg.Enabled || len(req.SeedPaths) == 0 {
 		return "", nil
 	}
@@ -134,7 +135,7 @@ func (s *AnalyzerService) AnalyzePatterns(ctx context.Context, req *AnalyzePatte
 
 	projectContext := agent.ProjectContext{
 		Name:     "project",
-		Language: "go",
+		Language: "unknown",
 	}
 	if s.configRepo != nil {
 		projectConfig := s.configRepo.GetProjectConfig()
@@ -199,20 +200,21 @@ type AnalyzeProjectRequest struct {
 
 // AnalyzeProjectResult 项目分析结果
 type AnalyzeProjectResult struct {
-	Language          string
-	Frameworks        []string
-	Architecture      string
-	Structure         string
-	Layers            []domain.ArchitectureLayer
-	DependencyGraph   string
-	DataFlow          string
-	FrameworkPatterns []string
-	CommonUtils       []domain.UtilityFunction
-	KeyModules        []domain.ModuleInfo
-	ConfigPatterns    []string
-	Dependencies      []string
-	BusinessMethods   []domain.BusinessMethod
-	Summary           string
+	Language           string
+	Frameworks         []string
+	Architecture       string
+	Structure          string
+	Layers             []domain.ArchitectureLayer
+	DependencyGraph    string
+	DataFlow           string
+	FrameworkPatterns  []string
+	CommonUtils        []domain.UtilityFunction
+	KeyModules         []domain.ModuleInfo
+	ConfigPatterns     []string
+	Dependencies       []string
+	BusinessMethods    []domain.BusinessMethod
+	ValidationCommands []domain.ValidationCommand
+	Summary            string
 }
 
 // AnalyzeProject 分析项目结构和特点
@@ -282,20 +284,21 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	)
 
 	return &AnalyzeProjectResult{
-		Language:          result.Language,
-		Frameworks:        result.Frameworks,
-		Architecture:      result.Architecture,
-		Structure:         result.Structure,
-		Layers:            result.Layers,
-		DependencyGraph:   result.DependencyGraph,
-		DataFlow:          result.DataFlow,
-		FrameworkPatterns: result.FrameworkPatterns,
-		CommonUtils:       result.CommonUtils,
-		KeyModules:        result.KeyModules,
-		ConfigPatterns:    result.ConfigPatterns,
-		Dependencies:      result.Dependencies,
-		BusinessMethods:   result.BusinessMethods,
-		Summary:           result.Summary,
+		Language:           result.Language,
+		Frameworks:         result.Frameworks,
+		Architecture:       result.Architecture,
+		Structure:          result.Structure,
+		Layers:             result.Layers,
+		DependencyGraph:    result.DependencyGraph,
+		DataFlow:           result.DataFlow,
+		FrameworkPatterns:  result.FrameworkPatterns,
+		CommonUtils:        result.CommonUtils,
+		KeyModules:         result.KeyModules,
+		ConfigPatterns:     result.ConfigPatterns,
+		Dependencies:       result.Dependencies,
+		BusinessMethods:    result.BusinessMethods,
+		ValidationCommands: result.ValidationCommands,
+		Summary:            result.Summary,
 	}, nil
 }
 
@@ -447,9 +450,9 @@ func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error
 		indent := strings.Repeat("  ", depth)
 		structure.WriteString(indent)
 		if info.IsDir() {
-			structure.WriteString("📁 ")
+			structure.WriteString("[dir] ")
 		} else {
-			structure.WriteString("📄 ")
+			structure.WriteString("[file] ")
 		}
 		structure.WriteString(info.Name())
 		structure.WriteString("\n")
@@ -570,7 +573,7 @@ func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, pro
 	}
 	structure, _ := s.GetProjectStructure(projectRoot)
 	if len(focusPaths) > 0 {
-		structure = focusedStructure(structure, focusPaths)
+		structure = focusedStructure(focusPaths)
 	}
 
 	// 调用 Agent 分析项目（Agent 会自己探索项目结构）
@@ -634,28 +637,31 @@ func NewProjectProfile(result *AnalyzeProjectResult, projectName, language strin
 	}
 
 	return &domain.ProjectProfile{
-		ProjectName:       projectName,
-		Language:          language,
-		Frameworks:        result.Frameworks,
-		Architecture:      result.Architecture,
-		Structure:         result.Structure,
-		CommonUtils:       result.CommonUtils,
-		KeyModules:        result.KeyModules,
-		ConfigPatterns:    result.ConfigPatterns,
-		Dependencies:      result.Dependencies,
-		Layers:            result.Layers,
-		DependencyGraph:   result.DependencyGraph,
-		DataFlow:          result.DataFlow,
-		FrameworkPatterns: result.FrameworkPatterns,
-		BusinessMethods:   result.BusinessMethods,
-		Summary:           result.Summary,
-		GeneratedAt:       time.Now().Format("2006-01-02 15:04:05"),
+		ProjectName:        projectName,
+		Language:           language,
+		Frameworks:         result.Frameworks,
+		Architecture:       result.Architecture,
+		Structure:          result.Structure,
+		CommonUtils:        result.CommonUtils,
+		KeyModules:         result.KeyModules,
+		ConfigPatterns:     result.ConfigPatterns,
+		Dependencies:       result.Dependencies,
+		Layers:             result.Layers,
+		DependencyGraph:    result.DependencyGraph,
+		DataFlow:           result.DataFlow,
+		FrameworkPatterns:  result.FrameworkPatterns,
+		BusinessMethods:    result.BusinessMethods,
+		ValidationCommands: result.ValidationCommands,
+		Summary:            result.Summary,
+		GeneratedAt:        time.Now().Format("2006-01-02 15:04:05"),
 	}
 }
 
 // AnalyzeCodebaseOptions 控制当前代码学习如何收集上下文。
 type AnalyzeCodebaseOptions struct {
 	FocusPaths         []string
+	SelectedFiles      []domain.FileInfo
+	SelectedFilesSet   bool
 	KnownPatternsJSON  string
 	KnownPatternsCount int
 	UseSnapshotDiffs   bool
@@ -677,28 +683,34 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		"project_name", projectName,
 		"language", language,
 		"focus_paths_count", len(opts.FocusPaths),
+		"selected_files_count", len(opts.SelectedFiles),
 	)
 
 	// 预收集项目数据
 	structure, _ := s.GetProjectStructure(projectRoot)
 	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
 	if len(focusPaths) > 0 {
-		structure = focusedStructure(structure, focusPaths)
+		structure = focusedStructure(focusPaths)
 	}
 	mainFiles := s.FindMainFiles(projectRoot)
 	sampleFiles := s.collectSampleFilesFromRoots(projectRoot, opts.FocusPaths, language)
 	var diffFiles []agent.DiffFileRef
 	var snapshotFlow *snapshotflow.Result
+	var err error
 	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
-		selection, err := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
-			Root:          projectRoot,
-			Policy:        fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot),
-			FocusAbsPaths: opts.FocusPaths,
-		})
-		if err != nil {
-			return nil, nil, err
+		selectedFiles := append([]domain.FileInfo(nil), opts.SelectedFiles...)
+		if len(selectedFiles) == 0 && !opts.SelectedFilesSet {
+			selection, err := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
+				Root:          projectRoot,
+				Policy:        fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot),
+				FocusAbsPaths: opts.FocusPaths,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			selectedFiles = selection.Files
 		}
-		snapshotFlow, err = snapshotflow.BuildScoped(ctx, projectRoot, selection.Files, focusPaths)
+		snapshotFlow, err = snapshotflow.BuildScoped(ctx, projectRoot, selectedFiles, focusPaths)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -871,7 +883,7 @@ func matchesAnySuffix(path string, suffixes []string) bool {
 	return false
 }
 
-func focusedStructure(projectStructure string, focusPaths []string) string {
+func focusedStructure(focusPaths []string) string {
 	var b strings.Builder
 	b.WriteString("Focused scan paths:\n")
 	for _, path := range focusPaths {
@@ -879,9 +891,41 @@ func focusedStructure(projectStructure string, focusPaths []string) string {
 		b.WriteString(path)
 		b.WriteByte('\n')
 	}
-	if projectStructure != "" {
-		b.WriteString("\nProject structure:\n")
-		b.WriteString(projectStructure)
+
+	parentPaths := focusedParentPaths(focusPaths)
+	if len(parentPaths) > 0 {
+		b.WriteString("\nFocused path parents:\n")
+		for _, path := range parentPaths {
+			b.WriteString("- ")
+			b.WriteString(path)
+			b.WriteByte('\n')
+		}
 	}
 	return b.String()
+}
+
+func focusedParentPaths(focusPaths []string) []string {
+	seen := make(map[string]bool)
+	var parents []string
+	for _, path := range focusPaths {
+		path = strings.TrimSpace(filepath.ToSlash(path))
+		path = strings.Trim(path, "/")
+		if path == "" || path == "." {
+			continue
+		}
+		dir := filepath.ToSlash(filepath.Dir(path))
+		for dir != "." && dir != "/" && dir != "" {
+			if !seen[dir] {
+				seen[dir] = true
+				parents = append(parents, dir)
+			}
+			next := filepath.ToSlash(filepath.Dir(dir))
+			if next == dir {
+				break
+			}
+			dir = next
+		}
+	}
+	sort.Strings(parents)
+	return parents
 }

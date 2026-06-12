@@ -57,6 +57,10 @@ func TestNewRepository(t *testing.T) {
 		assert.NotContains(t, string(content), "output:")
 		assert.NotContains(t, string(content), "skills_provider:")
 		assert.NotContains(t, string(content), "skills_paths:")
+		assert.NotContains(t, string(content), "\nanalysis:")
+		assert.NotContains(t, string(content), "ai_file_selector:")
+		assert.NotContains(t, string(content), "\n  max_commits:")
+		assert.NotContains(t, string(content), "\n  batch_size:")
 		assert.Contains(t, string(content), "engine:")
 		assert.Contains(t, string(content), "commands:")
 		assert.Contains(t, string(content), "skills:")
@@ -79,11 +83,13 @@ func TestNewRepository(t *testing.T) {
 		require.NotContains(t, text, "\nproject:")
 		require.Contains(t, text, "########################################################################\n# 工作区\n# 仅 workspace 模式生效，普通 project 子仓通常不需要配置\n########################################################################\nworkspace:")
 		require.Contains(t, text, "# 项目名称，init 时自动填充\n  name: \"\"")
-		require.Contains(t, text, "# 子项目列表，例如 [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects: []")
+		require.Contains(t, text, "# 子项目列表，例如 [{id: \"project-a\", path: \"project-a\", type: \"application\", language: \"primary-language\"}]\n  projects: []")
 		require.NotContains(t, text, `shared:`)
 		require.NotContains(t, text, `contracts:`)
 		require.NotContains(t, text, `infra:`)
-		require.Contains(t, text, "# 启用有边界的结构化分析；无边界输入时不会运行\n    enabled: true")
+		require.Contains(t, text, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
+		require.Contains(t, text, "# 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果\n    select_relevant_files_min_candidates: 200")
+		require.Contains(t, text, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
 		require.Contains(t, text, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
 		assertTopLevelModuleBannersHaveBlankLineBefore(t, text)
 		assertCommentLinesDoNotEndWithFullStops(t, text)
@@ -109,7 +115,7 @@ func TestRepository_Get(t *testing.T) {
 	require.NotNil(t, cfg, "Get() should return non-nil config")
 
 	// 校验来自嵌入模板或硬编码后备配置的默认值。
-	assert.Equal(t, "go", cfg.Project.Language)
+	assert.Empty(t, cfg.Project.Language)
 	assert.Equal(t, "zh-CN", cfg.Project.Locale)
 	assert.Equal(t, "en-US", cfg.Skills.Locale)
 	assert.Equal(t, "claude", cfg.Agent.Engine)
@@ -117,10 +123,13 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
 	assert.False(t, cfg.Agent.AllowUserPlugins)
-	assert.True(t, cfg.Analysis.Structural.Enabled)
-	assert.Equal(t, 30, cfg.Analysis.Structural.MaxSymbols)
-	assert.Equal(t, 512, cfg.Analysis.Structural.MaxFileSize)
-	assert.Equal(t, 50, cfg.Learning.MaxCommits)
+	assert.True(t, cfg.Learning.Current.SelectRelevantFiles)
+	assert.Equal(t, 200, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
+	assert.True(t, cfg.Learning.Current.Structural.Enabled)
+	assert.Equal(t, 30, cfg.Learning.Current.Structural.MaxSymbols)
+	assert.Equal(t, 512, cfg.Learning.Current.Structural.MaxFileSize)
+	assert.Equal(t, 50, cfg.Learning.History.MaxCommits)
+	assert.Equal(t, 5, cfg.Learning.History.BatchSize)
 	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
 	assert.Equal(t, "claude", cfg.Skills.Target)
 	assert.Equal(t, "en-US", cfg.Skills.Locale)
@@ -135,7 +144,7 @@ func TestRepository_GetProjectConfig(t *testing.T) {
 	repo := setupTestConfig(t)
 	projectCfg := repo.GetProjectConfig()
 
-	assert.Equal(t, "go", projectCfg.Language)
+	assert.Empty(t, projectCfg.Language)
 	assert.Equal(t, "zh-CN", projectCfg.Locale)
 	assert.NotEmpty(t, projectCfg.InitializedAt)
 }
@@ -151,7 +160,7 @@ func TestRepository_EffectiveGetterDefaults(t *testing.T) {
 	assert.Equal(t, "claude", repo.GetEffectiveAgentCommand())
 	assert.Equal(t, "claude", repo.GetEffectiveSkillsTarget())
 	assert.Equal(t, ".claude/skills/skills-seed-skills", repo.GetEffectiveSkillsPath())
-	assert.Equal(t, "go", repo.GetCurrentProjectConfig().Language)
+	assert.Empty(t, repo.GetCurrentProjectConfig().Language)
 	assert.Empty(t, repo.GetWorkspaceProjects())
 }
 
@@ -250,7 +259,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			},
 			Timeout: 1800,
 		},
-		Learning: LearningConfig{MaxCommits: 50, BatchSize: 5},
+		Learning: defaultLearningConfig(),
 		AutoFix:  AutoFixConfig{Strategy: "patch", BackupPath: "backups"},
 		Skills: SkillsConfig{Target: "codex", Paths: map[string]string{
 			"claude": ".claude/skills/skills-seed-skills",
@@ -276,16 +285,18 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.NotContains(t, content, `- "**/*.gen.go"`)
 	require.Contains(t, content, `- "dist/**"`)
 	require.Contains(t, content, `- "*.log"`)
-	require.Contains(t, content, `analysis:`)
+	require.NotContains(t, content, `analysis:`)
+	require.NotContains(t, content, `ai_file_selector:`)
+	require.Contains(t, content, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
 	require.Contains(t, content, `enabled: true`)
 	require.Contains(t, content, "# 项目名称，init 时自动填充\n  name: \"demo-workspace\"")
-	require.Contains(t, content, "# 子项目列表，例如 [{id: \"frontend\", path: \"frontend\", type: \"frontend\", language: \"typescript\"}]\n  projects:")
-	require.Contains(t, content, "# 启用有边界的结构化分析；无边界输入时不会运行\n    enabled: true")
+	require.Contains(t, content, "# 子项目列表，例如 [{id: \"project-a\", path: \"project-a\", type: \"application\", language: \"primary-language\"}]\n  projects:")
+	require.Contains(t, content, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
 	require.Contains(t, content, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
 	assertTopLevelModuleBannersHaveBlankLineBefore(t, content)
 	assertCommentLinesDoNotEndWithFullStops(t, content)
 	require.NotContains(t, content, `name: "demo-workspace" #`)
-	require.NotContains(t, content, `analysis: #`)
+	require.NotContains(t, content, `analysis:`)
 	require.NotContains(t, content, `enabled: false #`)
 	require.NotContains(t, content, `exclude: #`)
 	require.NotContains(t, content, `- "dist/**" #`)
@@ -360,12 +371,6 @@ profile:
 workspace:
   projects: [] # 自定义子项目注释
 
-analysis:
-  structural:
-    enabled: true # 自定义结构化分析注释
-    max_symbols: 30
-    max_file_size: 512
-
 agent:
   engine: "claude"
   commands:
@@ -376,8 +381,16 @@ agent:
   parallelism: 0
 
 learning:
-  max_commits: 50
-  batch_size: 5
+  current:
+    select_relevant_files: true
+    select_relevant_files_min_candidates: 25
+    structural:
+      enabled: true # 自定义结构化上下文注释
+      max_symbols: 30
+      max_file_size: 512
+  history:
+    max_commits: 50
+    batch_size: 5
 
 autofix:
   strategy: "patch"
@@ -409,7 +422,9 @@ exclude:
 	cfg.Workspace.Projects = []WorkspaceProjectConfig{
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 	}
-	cfg.Analysis.Structural.Enabled = false
+	cfg.Learning.Current.Structural.Enabled = false
+	cfg.Learning.Current.SelectRelevantFiles = false
+	cfg.Learning.Current.SelectRelevantFilesMinCandidates = 40
 	cfg.Exclude = []string{".*", "dist/**"}
 	require.NoError(t, repo.Update(cfg))
 
@@ -420,14 +435,14 @@ exclude:
 	require.Contains(t, text, "# 自定义项目名称注释\n  name: \"new-name\"")
 	require.Contains(t, text, "# 自定义工作区注释")
 	require.Contains(t, text, "# 自定义子项目注释\n  projects:")
-	require.Contains(t, text, "# 自定义结构化分析注释\n    enabled: false")
+	require.Contains(t, text, "# 自定义结构化上下文注释\n      enabled: false")
 	require.Contains(t, text, "# 保留点号文件注释\n  - \".*\"")
 	require.NotContains(t, text, `name: "new-name" # 自定义项目名称注释`)
 	require.NotContains(t, text, `projects: # 自定义子项目注释`)
 	require.NotContains(t, text, `shared:`)
 	require.NotContains(t, text, `contracts:`)
 	require.NotContains(t, text, `infra:`)
-	require.NotContains(t, text, `analysis: # 自定义子项目注释`)
+	require.NotContains(t, text, `analysis:`)
 	require.NotContains(t, text, `enabled: false # 自定义结构化分析注释`)
 	require.NotContains(t, text, `- ".*" # 保留点号文件注释`)
 
@@ -435,7 +450,9 @@ exclude:
 	require.NoError(t, err)
 	require.Equal(t, "new-name", reloaded.GetProjectConfig().Name)
 	require.Equal(t, "workspace", reloaded.GetProjectConfig().Mode)
-	require.False(t, reloaded.GetAnalysisConfig().Structural.Enabled)
+	require.False(t, reloaded.GetCurrentLearningConfig().Structural.Enabled)
+	require.False(t, reloaded.GetCurrentLearningConfig().SelectRelevantFiles)
+	require.Equal(t, 40, reloaded.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 1)
 	require.Equal(t, []string{".*", "dist/**"}, reloaded.GetExclude())
 }
@@ -456,7 +473,7 @@ func TestNewRepositoryUsesDefaultExcludePatterns(t *testing.T) {
 	require.Contains(t, text, `- "*.log"`)
 }
 
-func TestRepository_NormalizeAnalysisStructuralDefaults(t *testing.T) {
+func TestRepository_NormalizeCurrentLearningDefaults(t *testing.T) {
 	seedPath := t.TempDir()
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
@@ -467,7 +484,8 @@ profile:
 agent:
   engine: "claude"
 learning:
-  max_commits: 50
+  history:
+    max_commits: 50
 autofix:
   strategy: "patch"
 skills:
@@ -480,7 +498,9 @@ exclude: []
 	repo, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 
-	cfg := repo.GetAnalysisConfig().Structural
+	cfg := repo.GetCurrentLearningConfig().Structural
+	require.True(t, repo.GetCurrentLearningConfig().SelectRelevantFiles)
+	require.Equal(t, 200, repo.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.True(t, cfg.Enabled)
 	require.Equal(t, 30, cfg.MaxSymbols)
 	require.Equal(t, 512, cfg.MaxFileSize)
@@ -494,15 +514,17 @@ func TestRepository_PreservesExplicitStructuralDisabled(t *testing.T) {
 profile:
   language: "go"
   locale: "zh-CN"
-analysis:
-  structural:
-    enabled: false
-    max_symbols: 12
-    max_file_size: 256
 agent:
   engine: "claude"
 learning:
-  max_commits: 50
+  current:
+    select_relevant_files: false
+    structural:
+      enabled: false
+      max_symbols: 12
+      max_file_size: 256
+  history:
+    max_commits: 50
 autofix:
   strategy: "patch"
 skills:
@@ -515,7 +537,9 @@ exclude: []
 	repo, err := NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 
-	cfg := repo.GetAnalysisConfig().Structural
+	cfg := repo.GetCurrentLearningConfig().Structural
+	require.False(t, repo.GetCurrentLearningConfig().SelectRelevantFiles)
+	require.Equal(t, 200, repo.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.False(t, cfg.Enabled)
 	require.Equal(t, 12, cfg.MaxSymbols)
 	require.Equal(t, 256, cfg.MaxFileSize)
@@ -553,8 +577,12 @@ func TestRepository_GetLearningConfig(t *testing.T) {
 	repo := setupTestConfig(t)
 	learningCfg := repo.GetLearningConfig()
 
-	assert.Equal(t, 50, learningCfg.MaxCommits)
-	assert.Equal(t, 5, learningCfg.BatchSize)
+	assert.True(t, learningCfg.Current.SelectRelevantFiles)
+	assert.Equal(t, 200, learningCfg.Current.SelectRelevantFilesMinCandidates)
+	assert.True(t, learningCfg.Current.Structural.Enabled)
+	assert.Equal(t, 50, learningCfg.History.MaxCommits)
+	assert.Equal(t, 5, learningCfg.History.BatchSize)
+	assert.Equal(t, learningCfg.Current, repo.GetCurrentLearningConfig())
 }
 
 func TestRepository_SetProjectName(t *testing.T) {
@@ -658,14 +686,14 @@ func TestRepository_Update(t *testing.T) {
 
 	cfg := repo.Get()
 	cfg.Agent.Timeout = 3600
-	cfg.Learning.MaxCommits = 100
+	cfg.Learning.History.MaxCommits = 100
 
 	err := repo.Update(cfg)
 	require.NoError(t, err)
 
 	updated := repo.Get()
 	assert.Equal(t, 3600, updated.Agent.Timeout)
-	assert.Equal(t, 100, updated.Learning.MaxCommits)
+	assert.Equal(t, 100, updated.Learning.History.MaxCommits)
 }
 
 func TestRepository_SetProjectLanguage(t *testing.T) {

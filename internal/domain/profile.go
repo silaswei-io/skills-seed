@@ -3,38 +3,48 @@ package domain
 // ProjectProfile 是学习阶段沉淀的持久化项目级知识。
 // 生成的参考文档会基于该画像渲染。
 type ProjectProfile struct {
-	ProjectName       string              `json:"project_name"`
-	Language          string              `json:"language"`
-	Frameworks        []string            `json:"frameworks"`
-	Architecture      string              `json:"architecture"`
-	Structure         string              `json:"structure"`
-	CommonUtils       []UtilityFunction   `json:"common_utils"`
-	KeyModules        []ModuleInfo        `json:"key_modules"`
-	ConfigPatterns    []string            `json:"config_patterns"`
-	Dependencies      []string            `json:"dependencies"`
-	Layers            []ArchitectureLayer `json:"layers"`
-	DependencyGraph   string              `json:"dependency_graph"`
-	DataFlow          string              `json:"data_flow"`
-	FrameworkPatterns []string            `json:"framework_patterns"`
-	BusinessMethods   []BusinessMethod    `json:"business_methods"`
-	Summary           string              `json:"summary"`
-	GeneratedAt       string              `json:"generated_at"`
+	ProjectName        string              `json:"project_name"`
+	Language           string              `json:"language"`
+	Frameworks         []string            `json:"frameworks"`
+	Architecture       string              `json:"architecture"`
+	Structure          string              `json:"structure"`
+	CommonUtils        []UtilityFunction   `json:"common_utils"`
+	KeyModules         []ModuleInfo        `json:"key_modules"`
+	ConfigPatterns     []string            `json:"config_patterns"`
+	Dependencies       []string            `json:"dependencies"`
+	Layers             []ArchitectureLayer `json:"layers"`
+	DependencyGraph    string              `json:"dependency_graph"`
+	DataFlow           string              `json:"data_flow"`
+	FrameworkPatterns  []string            `json:"framework_patterns"`
+	BusinessMethods    []BusinessMethod    `json:"business_methods"`
+	ValidationCommands []ValidationCommand `json:"validation_commands,omitempty"`
+	Summary            string              `json:"summary"`
+	GeneratedAt        string              `json:"generated_at"`
+}
+
+// ValidationCommand 描述从项目证据中学习到的验证命令。
+type ValidationCommand struct {
+	Command string `json:"command"`
+	When    string `json:"when,omitempty"`
+	Source  string `json:"source,omitempty"`
 }
 
 // ProjectSpec 是由项目画像和已学习模式生成的项目级开发规范
 type ProjectSpec struct {
-	ProjectID         string                   `json:"project_id,omitempty"`
-	ProjectName       string                   `json:"project_name"`
-	ScopePath         string                   `json:"scope_path,omitempty"`
-	WorkspaceRole     string                   `json:"workspace_role,omitempty"`
-	Language          string                   `json:"language"`
-	Summary           string                   `json:"summary,omitempty"`
-	Boundaries        []ProjectSpecBoundary    `json:"boundaries,omitempty"`
-	PatternRules      []ProjectSpecPatternRule `json:"pattern_rules,omitempty"`
-	ConfigPatterns    []string                 `json:"config_patterns,omitempty"`
-	FrameworkPatterns []string                 `json:"framework_patterns,omitempty"`
-	Touchpoints       []ProjectSpecTouchpoint  `json:"touchpoints,omitempty"`
-	GeneratedAt       string                   `json:"generated_at"`
+	ProjectID          string                   `json:"project_id,omitempty"`
+	ProjectName        string                   `json:"project_name"`
+	ScopePath          string                   `json:"scope_path,omitempty"`
+	WorkspaceRole      string                   `json:"workspace_role,omitempty"`
+	Language           string                   `json:"language"`
+	Summary            string                   `json:"summary,omitempty"`
+	Boundaries         []ProjectSpecBoundary    `json:"boundaries,omitempty"`
+	PatternRules       []ProjectSpecPatternRule `json:"pattern_rules,omitempty"`
+	PatternGuidance    []ProjectSpecPatternRule `json:"pattern_guidance,omitempty"`
+	ConfigPatterns     []string                 `json:"config_patterns,omitempty"`
+	FrameworkPatterns  []string                 `json:"framework_patterns,omitempty"`
+	ValidationCommands []ValidationCommand      `json:"validation_commands,omitempty"`
+	Touchpoints        []ProjectSpecTouchpoint  `json:"touchpoints,omitempty"`
+	GeneratedAt        string                   `json:"generated_at"`
 }
 
 // ProjectSpecBoundary 描述项目内需要保护的层次、模块或职责边界

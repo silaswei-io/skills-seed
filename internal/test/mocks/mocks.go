@@ -20,6 +20,7 @@ type MockAgent struct {
 	GenerateSkillsSummaryFn   func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)
 	CuratePatternsFn          func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
 	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
+	SelectFilesFn             func(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error)
 	AnalyzeProjectFn          func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
 	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
@@ -121,6 +122,14 @@ func (m *MockAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefine
 		return m.UserDefinePatternFn(ctx, req)
 	}
 	return &agent.UserDefinePatternResult{}, nil
+}
+
+// SelectFiles 模拟 AI 文件选择器
+func (m *MockAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
+	if m.SelectFilesFn != nil {
+		return m.SelectFilesFn(ctx, req)
+	}
+	return &agent.SelectFilesResult{}, nil
 }
 
 // AnalyzeProject 模拟项目分析
@@ -509,7 +518,6 @@ func (m *MockFileAnalysisTracker) DeleteAnalyzedFiles(ctx context.Context, scope
 type MockConfigReader struct {
 	ProjectCfg   config.ProjectConfig
 	WorkspaceCfg config.WorkspaceConfig
-	AnalysisCfg  config.AnalysisConfig
 	AgentCfg     config.AgentConfig
 	LearningCfg  config.LearningConfig
 	AutoFixCfg   config.AutoFixConfig
@@ -524,14 +532,16 @@ func (m *MockConfigReader) GetProjectConfig() config.ProjectConfig { return m.Pr
 // GetWorkspaceConfig 模拟获取工作区配置
 func (m *MockConfigReader) GetWorkspaceConfig() config.WorkspaceConfig { return m.WorkspaceCfg }
 
-// GetAnalysisConfig 模拟获取分析增强配置
-func (m *MockConfigReader) GetAnalysisConfig() config.AnalysisConfig { return m.AnalysisCfg }
-
 // GetAgentConfig 模拟获取 Agent 配置
 func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentCfg }
 
 // GetLearningConfig 模拟获取学习配置
 func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.LearningCfg }
+
+// GetCurrentLearningConfig 模拟获取 learn current 配置
+func (m *MockConfigReader) GetCurrentLearningConfig() config.CurrentLearningConfig {
+	return m.LearningCfg.Current
+}
 
 // GetAutoFixConfig 模拟获取自动修复配置
 func (m *MockConfigReader) GetAutoFixConfig() config.AutoFixConfig { return m.AutoFixCfg }

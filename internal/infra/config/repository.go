@@ -19,7 +19,6 @@ import (
 type Config struct {
 	Project   ProjectConfig   `yaml:"profile"`
 	Workspace WorkspaceConfig `yaml:"workspace"`
-	Analysis  AnalysisConfig  `yaml:"analysis"`
 	Agent     AgentConfig     `yaml:"agent"`
 	Learning  LearningConfig  `yaml:"learning"`
 	AutoFix   AutoFixConfig   `yaml:"autofix"`
@@ -50,11 +49,6 @@ type WorkspaceProjectConfig struct {
 	Path     string `yaml:"path"`     // 相对工作区根目录的路径
 	Type     string `yaml:"type"`     // 子项目类型，如 frontend、backend、library
 	Language string `yaml:"language"` // 子项目主语言
-}
-
-// AnalysisConfig 控制学习前置的本地代码分析能力。
-type AnalysisConfig struct {
-	Structural StructuralConfig `yaml:"structural"`
 }
 
 // StructuralConfig 结构化分析配置（基于内嵌 tree-sitter）
@@ -148,10 +142,75 @@ func (r RetryConfig) WaitDuration(attempt int) time.Duration {
 	return wait
 }
 
-// LearningConfig 控制从代码和 Git 历史学习项目规范时的默认范围。
+// LearningConfig 控制 learn current 和 learn history 的默认学习范围。
 type LearningConfig struct {
+	Current CurrentLearningConfig `yaml:"current"` // learn current 的文件范围和结构化上下文配置
+	History HistoryLearningConfig `yaml:"history"` // learn history 的提交范围配置
+
+	defaultsApplied bool `yaml:"-"`
+}
+
+func defaultLearningConfig() LearningConfig {
+	return LearningConfig{
+		Current:         defaultCurrentLearningConfig(),
+		History:         defaultHistoryLearningConfig(),
+		defaultsApplied: true,
+	}
+}
+
+// UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
+func (c *LearningConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawLearningConfig LearningConfig
+	defaults := rawLearningConfig(defaultLearningConfig())
+	if err := value.Decode(&defaults); err != nil {
+		return err
+	}
+	*c = LearningConfig(defaults)
+	c.defaultsApplied = true
+	return nil
+}
+
+// CurrentLearningConfig 控制 learn current 的文件选择和结构化上下文。
+type CurrentLearningConfig struct {
+	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否先筛选最值得分析的相关文件
+	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 文件筛选
+	Structural                       StructuralConfig `yaml:"structural"`                           // 结构化上下文配置
+
+	defaultsApplied bool `yaml:"-"`
+}
+
+func defaultCurrentLearningConfig() CurrentLearningConfig {
+	return CurrentLearningConfig{
+		SelectRelevantFiles:              true,
+		SelectRelevantFilesMinCandidates: 200,
+		Structural:                       defaultStructuralConfig(),
+		defaultsApplied:                  true,
+	}
+}
+
+// UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
+func (c *CurrentLearningConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawCurrentLearningConfig CurrentLearningConfig
+	defaults := rawCurrentLearningConfig(defaultCurrentLearningConfig())
+	if err := value.Decode(&defaults); err != nil {
+		return err
+	}
+	*c = CurrentLearningConfig(defaults)
+	c.defaultsApplied = true
+	return nil
+}
+
+// HistoryLearningConfig 控制 learn history 的提交范围。
+type HistoryLearningConfig struct {
 	MaxCommits int `yaml:"max_commits"` // 默认分析的提交数量
-	BatchSize  int `yaml:"batch_size"`  // 批量分析 commit 数量（默认10）
+	BatchSize  int `yaml:"batch_size"`  // 批量分析 commit 数量
+}
+
+func defaultHistoryLearningConfig() HistoryLearningConfig {
+	return HistoryLearningConfig{
+		MaxCommits: 50,
+		BatchSize:  5,
+	}
 }
 
 // AutoFixConfig 控制检查自动修复的修复产物和回滚策略。
@@ -386,14 +445,30 @@ func (r *Repository) defaultConfig(locale string) *Config {
 }
 
 func (r *Repository) normalizeConfig(cfg *Config) {
-	if !cfg.Analysis.Structural.defaultsApplied {
-		cfg.Analysis.Structural = defaultStructuralConfig()
+	if !cfg.Learning.defaultsApplied {
+		cfg.Learning = defaultLearningConfig()
 	}
-	if cfg.Analysis.Structural.MaxSymbols <= 0 {
-		cfg.Analysis.Structural.MaxSymbols = 30
+	if !cfg.Learning.Current.defaultsApplied {
+		cfg.Learning.Current = defaultCurrentLearningConfig()
 	}
-	if cfg.Analysis.Structural.MaxFileSize <= 0 {
-		cfg.Analysis.Structural.MaxFileSize = 512
+	if !cfg.Learning.Current.Structural.defaultsApplied {
+		cfg.Learning.Current.Structural = defaultStructuralConfig()
+	}
+	if cfg.Learning.Current.Structural.MaxSymbols <= 0 {
+		cfg.Learning.Current.Structural.MaxSymbols = 30
+	}
+	if cfg.Learning.Current.Structural.MaxFileSize <= 0 {
+		cfg.Learning.Current.Structural.MaxFileSize = 512
+	}
+	if cfg.Learning.Current.SelectRelevantFilesMinCandidates <= 0 {
+		cfg.Learning.Current.SelectRelevantFilesMinCandidates = 200
+	}
+	cfg.Learning.Current.defaultsApplied = true
+	if cfg.Learning.History.MaxCommits <= 0 {
+		cfg.Learning.History.MaxCommits = 50
+	}
+	if cfg.Learning.History.BatchSize <= 0 {
+		cfg.Learning.History.BatchSize = 5
 	}
 
 	if cfg.Agent.Commands == nil {
@@ -457,7 +532,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 		Project: ProjectConfig{
 			Name:          "project",
 			Mode:          domain.ModeProject,
-			Language:      "go",
+			Language:      "",
 			InitializedAt: time.Now().Format("2006-01-02 15:04:05"),
 			Locale:        locale,
 		},
@@ -470,13 +545,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			AllowUserPlugins: false,
 			Parallelism:      0,
 		},
-		Analysis: AnalysisConfig{
-			Structural: defaultStructuralConfig(),
-		},
-		Learning: LearningConfig{
-			MaxCommits: 50,
-			BatchSize:  5,
-		},
+		Learning: defaultLearningConfig(),
 		AutoFix: AutoFixConfig{
 			Strategy:   "patch",
 			BackupPath: "backups",
@@ -502,9 +571,9 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 type Reader interface {
 	GetProjectConfig() ProjectConfig
 	GetWorkspaceConfig() WorkspaceConfig
-	GetAnalysisConfig() AnalysisConfig
 	GetAgentConfig() AgentConfig
 	GetLearningConfig() LearningConfig
+	GetCurrentLearningConfig() CurrentLearningConfig
 	GetAutoFixConfig() AutoFixConfig
 	GetSkillsConfig() SkillsConfig
 	GetLoggingConfig() LoggingConfig
@@ -530,11 +599,6 @@ func (r *Repository) GetWorkspaceConfig() WorkspaceConfig {
 	return r.config.Workspace
 }
 
-// GetAnalysisConfig 获取分析增强配置
-func (r *Repository) GetAnalysisConfig() AnalysisConfig {
-	return r.config.Analysis
-}
-
 // GetAgentConfig 获取 Agent 配置
 func (r *Repository) GetAgentConfig() AgentConfig {
 	return r.config.Agent
@@ -543,6 +607,11 @@ func (r *Repository) GetAgentConfig() AgentConfig {
 // GetLearningConfig 获取学习配置
 func (r *Repository) GetLearningConfig() LearningConfig {
 	return r.config.Learning
+}
+
+// GetCurrentLearningConfig 获取 learn current 配置。
+func (r *Repository) GetCurrentLearningConfig() CurrentLearningConfig {
+	return r.config.Learning.Current
 }
 
 // GetAutoFixConfig 获取自动修复配置

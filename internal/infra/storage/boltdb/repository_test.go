@@ -557,15 +557,17 @@ func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 
 	records := []domain.FileAnalysisRecord{
 		{
-			ProjectID:      "backend",
-			ScopePath:      "backend",
-			Path:           "internal/app.go",
-			Hash:           "abc",
-			HashAlgorithm:  domain.FileAnalysisHashMD5,
-			Size:           12,
-			ModTime:        "2026-05-26T00:00:00Z",
-			Source:         domain.FileAnalysisSourceCurrentCode,
-			LastAnalyzedAt: "2026-05-26T00:00:01Z",
+			ProjectID:       "backend",
+			ScopePath:       "backend",
+			Path:            "internal/app.go",
+			Hash:            "abc",
+			HashAlgorithm:   domain.FileAnalysisHashMD5,
+			Size:            12,
+			ModTime:         "2026-05-26T00:00:00Z",
+			Source:          domain.FileAnalysisSourceCurrentCode,
+			AnalysisStatus:  domain.FileAnalysisStatusAISkipped,
+			SelectionReason: "generated file",
+			LastAnalyzedAt:  "2026-05-26T00:00:01Z",
 		},
 	}
 
@@ -575,6 +577,8 @@ func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, "abc", got.Hash)
+	assert.Equal(t, domain.FileAnalysisStatusAISkipped, got.AnalysisStatus)
+	assert.Equal(t, "generated file", got.SelectionReason)
 
 	list, err := repo.ListAnalyzedFiles(ctx, scope)
 	require.NoError(t, err)
@@ -584,6 +588,28 @@ func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 	got, err = repo.GetAnalyzedFile(ctx, scope, "internal/app.go")
 	require.NoError(t, err)
 	assert.Nil(t, got)
+}
+
+func TestPatternRepository_SaveAnalyzedFilesDefaultsAnalysisStatus(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+	scope := domain.FileAnalysisScope{ProjectID: "backend", ScopePath: "backend"}
+
+	require.NoError(t, repo.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{
+		{
+			ProjectID:     "backend",
+			ScopePath:     "backend",
+			Path:          "internal/app.go",
+			Hash:          "abc",
+			HashAlgorithm: domain.FileAnalysisHashMD5,
+			Source:        domain.FileAnalysisSourceCurrentCode,
+		},
+	}))
+
+	got, err := repo.GetAnalyzedFile(ctx, scope, "internal/app.go")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, domain.FileAnalysisStatusAnalyzed, got.AnalysisStatus)
 }
 
 func TestPatternRepository_SaveAnalyzedFilesMaintainsTimestamps(t *testing.T) {

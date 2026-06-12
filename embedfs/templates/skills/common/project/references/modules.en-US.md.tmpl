@@ -3,6 +3,11 @@
 This file documents key modules, ownership boundaries, dependencies, and entry methods extracted into the project profile. Check it before changing module structure or adding feature entry points
 
 {{if .KeyModules}}
+## Table Of Contents
+
+{{range .KeyModules}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}
+
 {{range .KeyModules}}
 ## {{.Name}}
 

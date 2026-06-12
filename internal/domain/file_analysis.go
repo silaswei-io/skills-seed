@@ -11,6 +11,12 @@ const (
 	FileAnalysisHashMD5 = "md5"
 	// FileAnalysisSourceCurrentCode 表示记录来自 learn current。
 	FileAnalysisSourceCurrentCode = "current_code"
+	// FileAnalysisStatusAnalyzed 表示文件内容已进入 AI 深度分析范围。
+	FileAnalysisStatusAnalyzed = "analyzed"
+	// FileAnalysisStatusAISkipped 表示文件内容本轮已扫描，但被 AI 文件筛选器判定为低优先级。
+	FileAnalysisStatusAISkipped = "ai_skipped"
+	// FileAnalysisStatusInputDigest 表示记录来自非文件内容的输入摘要。
+	FileAnalysisStatusInputDigest = "input_digest"
 )
 
 // FileAnalysisScope 表示文件分析记录的隔离范围。
@@ -46,17 +52,19 @@ func (s FileAnalysisScope) ContainsPath(path string, focusPaths []string) bool {
 
 // FileAnalysisRecord 保存单个文件最近一次成功分析时的指纹。
 type FileAnalysisRecord struct {
-	ProjectID      string    `json:"project_id,omitempty"`
-	ScopePath      string    `json:"scope_path,omitempty"`
-	Path           string    `json:"path"`
-	Hash           string    `json:"hash"`
-	HashAlgorithm  string    `json:"hash_algorithm"`
-	Size           int64     `json:"size"`
-	ModTime        string    `json:"mod_time"`
-	Source         string    `json:"source"`
-	LastAnalyzedAt string    `json:"last_analyzed_at"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ProjectID       string    `json:"project_id,omitempty"`
+	ScopePath       string    `json:"scope_path,omitempty"`
+	Path            string    `json:"path"`
+	Hash            string    `json:"hash"`
+	HashAlgorithm   string    `json:"hash_algorithm"`
+	Size            int64     `json:"size"`
+	ModTime         string    `json:"mod_time"`
+	Source          string    `json:"source"`
+	AnalysisStatus  string    `json:"analysis_status,omitempty"`
+	SelectionReason string    `json:"selection_reason,omitempty"`
+	LastAnalyzedAt  string    `json:"last_analyzed_at"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 func normalizeAnalysisPath(path string) string {
