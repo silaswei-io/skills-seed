@@ -79,7 +79,11 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 	var patterns []domain.Pattern
 	var err error
 	if req.Category != "" {
-		patterns, err = s.patternRepo.GetByCategory(ctx, domain.Category(req.Category))
+		category := domain.NormalizePatternCategory(domain.Category(req.Category))
+		if !domain.IsValidPatternCategory(category) {
+			return nil, fmt.Errorf("invalid compact category %q", req.Category)
+		}
+		patterns, err = s.patternRepo.GetByCategory(ctx, category)
 	} else {
 		patterns, err = s.patternRepo.GetAll(ctx)
 	}

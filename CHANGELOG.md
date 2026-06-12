@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.3]
+
+### 修复
+
+- 修复直接保存 Pattern 时分类大小写或空白可写入非规范 bucket 的问题，保存和按分类查询都会先归一化分类。
+- 修复历史非规范分类 bucket 中同 ID Pattern 在重新保存后可能残留旧副本、导致统计重复的问题；删除 Pattern 时也会清理所有历史分类副本。
+- 修复相似 Pattern 查找未归一化分类，导致兼容别名或大小写不同的分类无法命中已有规范分类模式的问题。
+- 修复 `patterns compact --category` 对大小写、空白或兼容别名分类无法命中规范分类的问题。
+- 修复 `learn current` 项目初始化 prompt 的 JSON 示例使用说明文字作为 `category` 值的问题，避免模型照抄非法分类字符串。
+
 ## [v0.9.2]
 
 ### 变更

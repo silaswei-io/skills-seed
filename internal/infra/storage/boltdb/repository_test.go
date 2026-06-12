@@ -73,6 +73,73 @@ func TestPatternRepository_SaveAndGet(t *testing.T) {
 	assert.WithinDuration(t, original.CreatedAt, got.CreatedAt, time.Second)
 }
 
+func TestPatternRepository_SaveNormalizesCategoryBeforeBucketWrite(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	pattern := newTestPattern("p-001", "error category normalization", domain.Category(" Error "), 0.9)
+	require.NoError(t, repo.Save(ctx, pattern))
+
+	got, err := repo.Get(ctx, "p-001")
+	require.NoError(t, err)
+	require.Equal(t, domain.CategoryError, got.Category)
+
+	errorPatterns, err := repo.GetByCategory(ctx, domain.CategoryError)
+	require.NoError(t, err)
+	require.Len(t, errorPatterns, 1)
+	require.Equal(t, "p-001", errorPatterns[0].ID)
+
+	rawPatterns, err := repo.GetByCategory(ctx, domain.Category(" Error "))
+	require.NoError(t, err)
+	require.Len(t, rawPatterns, 1)
+	require.Equal(t, domain.CategoryError, rawPatterns[0].Category)
+}
+
+func TestPatternRepository_SaveRejectsNilPattern(t *testing.T) {
+	repo := setupTestDB(t)
+	err := repo.Save(context.Background(), nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid pattern")
+}
+
+func TestPatternRepository_SaveRemovesLegacyCategoryCopies(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	legacy := newTestPattern("p-001", "legacy security copy", domain.Category("security"), 0.8)
+	require.NoError(t, repo.db.Update(func(tx *bolt.Tx) error {
+		mainBucket := tx.Bucket(bucketPatterns)
+		categoryBucket, err := mainBucket.CreateBucketIfNotExists([]byte("security"))
+		if err != nil {
+			return err
+		}
+		data, err := json.Marshal(legacy)
+		if err != nil {
+			return err
+		}
+		return categoryBucket.Put([]byte(legacy.ID), data)
+	}))
+
+	updated := newTestPattern("p-001", "canonical utils copy", domain.Category(" Security "), 0.9)
+	require.NoError(t, repo.Save(ctx, updated))
+
+	all, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, all, 1)
+	require.Equal(t, domain.CategoryUtils, all[0].Category)
+
+	utilsPatterns, err := repo.GetByCategory(ctx, domain.CategoryUtils)
+	require.NoError(t, err)
+	require.Len(t, utilsPatterns, 1)
+
+	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
+		legacyBucket := tx.Bucket(bucketPatterns).Bucket([]byte("security"))
+		require.NotNil(t, legacyBucket)
+		require.Nil(t, legacyBucket.Get([]byte("p-001")))
+		return nil
+	}))
+}
+
 func TestPatternRepository_PreservesPatternCreatedAtOnUpdate(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -413,6 +480,24 @@ func TestPatternRepository_FindSimilar(t *testing.T) {
 	assert.Equal(t, "error-wrap", found.Name)
 }
 
+func TestPatternRepository_FindSimilarNormalizesCategory(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	original := newTestPattern("p-001", "path guard", domain.CategoryUtils, 0.9)
+	require.NoError(t, repo.Save(ctx, original))
+
+	search := &domain.Pattern{
+		Name:     "path guard",
+		Category: domain.Category(" Security "),
+	}
+	found, err := repo.FindSimilar(ctx, search)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	require.Equal(t, "p-001", found.ID)
+	require.Equal(t, domain.Category(" Security "), search.Category)
+}
+
 func TestPatternRepository_FindSimilar_NotFound(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -451,6 +536,34 @@ func TestPatternRepository_Delete(t *testing.T) {
 	_, err = repo.Get(ctx, "p-001")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "pattern not found")
+}
+
+func TestPatternRepository_DeleteRemovesAllCategoryCopies(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	p := newTestPattern("p-001", "duplicated", domain.CategoryUtils, 0.9)
+	require.NoError(t, repo.Save(ctx, p))
+	legacy := newTestPattern("p-001", "duplicated legacy", domain.Category("security"), 0.8)
+	require.NoError(t, repo.db.Update(func(tx *bolt.Tx) error {
+		categoryBucket, err := tx.Bucket(bucketPatterns).CreateBucketIfNotExists([]byte("security"))
+		if err != nil {
+			return err
+		}
+		data, err := json.Marshal(legacy)
+		if err != nil {
+			return err
+		}
+		return categoryBucket.Put([]byte(legacy.ID), data)
+	}))
+
+	require.NoError(t, repo.Delete(ctx, "p-001"))
+
+	all, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	require.Empty(t, all)
+	_, err = repo.Get(ctx, "p-001")
+	require.Error(t, err)
 }
 
 func TestPatternRepository_Count(t *testing.T) {

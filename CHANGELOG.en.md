@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.3]
+
+### Fixes
+
+- Fixed direct Pattern saves writing non-canonical category buckets when categories include uppercase letters or surrounding whitespace; saves and category queries now normalize categories first.
+- Fixed stale same-ID Pattern copies left in legacy non-canonical category buckets after saving again, which could duplicate counts; deleting a Pattern now removes all historical category copies.
+- Fixed similar Pattern lookup missing existing canonical-category patterns when the input category uses compatible aliases, different casing, or whitespace.
+- Fixed `patterns compact --category` missing canonical categories when the input uses different casing, whitespace, or compatible category aliases.
+- Fixed the `learn current` project-init prompt JSON example using explanatory text as the `category` value, reducing the chance that models copy an invalid category string.
+
 ## [v0.9.2]
 
 ### Changes

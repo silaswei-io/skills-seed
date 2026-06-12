@@ -312,3 +312,25 @@ func TestCompactDryRunDoesNotWrite(t *testing.T) {
 	require.Equal(t, 2, result.Summary.TotalExisting)
 	require.Equal(t, 1, result.Summary.TotalWritten)
 }
+
+func TestCompactNormalizesRequestedCategory(t *testing.T) {
+	p1 := domain.NewPattern("p1", "Utility Path Guard", domain.CategoryUtils)
+	p1.Confidence = 0.8
+	p1.SetRule("reject unsafe paths")
+
+	var requested domain.Category
+	repo := &mocks.MockPatternRepository{
+		GetByCategoryFn: func(ctx context.Context, category domain.Category) ([]domain.Pattern, error) {
+			requested = category
+			return []domain.Pattern{*p1}, nil
+		},
+	}
+	svc := NewService(nil, repo)
+
+	result, err := svc.Compact(context.Background(), CompactRequest{Category: " Security ", DryRun: true})
+
+	require.NoError(t, err)
+	require.Equal(t, domain.CategoryUtils, requested)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, domain.CategoryUtils, result.Written[0].Category)
+}

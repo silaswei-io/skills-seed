@@ -763,6 +763,38 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 	}
 }
 
+func TestLoader_RenderProjectInitPromptUsesConcreteCategoryInJSONExample(t *testing.T) {
+	tests := []struct {
+		locale    string
+		forbidden []string
+	}{
+		{
+			locale: "zh-CN",
+			forbidden: []string{
+				`"category": "从可用分类中选择一个：`,
+			},
+		},
+		{
+			locale: "en-US",
+			forbidden: []string{
+				`"category": "choose one allowed category:`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("common", tt.locale, "")
+			prompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
+			require.NoError(t, err)
+			require.Contains(t, prompt, `"category": "error"`)
+			for _, text := range tt.forbidden {
+				require.NotContains(t, prompt, text)
+			}
+		})
+	}
+}
+
 func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing.T) {
 	loader := NewLoader("codex", "zh-CN", "")
 

@@ -150,6 +150,7 @@ func (r *PatternRepository) GetAll(ctx context.Context) ([]domain.Pattern, error
 // GetByCategory 根据分类获取模式
 func (r *PatternRepository) GetByCategory(ctx context.Context, category domain.Category) ([]domain.Pattern, error) {
 	var patterns []domain.Pattern
+	category = domain.NormalizePatternCategory(category)
 
 	err := r.db.View(func(tx *bolt.Tx) error {
 		mainBucket := tx.Bucket(bucketPatterns)
@@ -196,6 +197,10 @@ func (r *PatternRepository) GetHighConfidence(ctx context.Context, threshold flo
 
 // Save 保存模式
 func (r *PatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
+	if p == nil {
+		return fmt.Errorf("invalid pattern")
+	}
+	p.Category = domain.NormalizePatternCategory(p.Category)
 	if !p.IsValid() {
 		return fmt.Errorf("invalid pattern")
 	}
@@ -222,7 +227,10 @@ func (r *PatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
 		if err != nil {
 			return err
 		}
-		return categoryBucket.Put([]byte(p.ID), data)
+		if err := categoryBucket.Put([]byte(p.ID), data); err != nil {
+			return err
+		}
+		return deletePatternCopiesOutsideCategory(mainBucket, p.ID, p.Category)
 	})
 }
 
@@ -457,12 +465,17 @@ func absInt(n int) int {
 // FindSimilar 查找相似的模式
 func (r *PatternRepository) FindSimilar(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error) {
 	var found *domain.Pattern
+	if pattern == nil {
+		return nil, nil
+	}
+	searchPattern := *pattern
+	searchPattern.Category = domain.NormalizePatternCategory(searchPattern.Category)
 
 	err := r.db.View(func(tx *bolt.Tx) error {
 		mainBucket := tx.Bucket(bucketPatterns)
 
 		// 只在相同分类中查找相似模式
-		categoryKey := []byte(pattern.Category)
+		categoryKey := []byte(searchPattern.Category)
 		categoryBucket := mainBucket.Bucket(categoryKey)
 		if categoryBucket == nil {
 			return nil // 该分类不存在
@@ -475,7 +488,7 @@ func (r *PatternRepository) FindSimilar(ctx context.Context, pattern *domain.Pat
 			}
 
 			// 检查是否相似
-			if p.IsSimilar(pattern) {
+			if p.IsSimilar(&searchPattern) {
 				found = &p
 				return nil // 找到了
 			}
@@ -505,11 +518,7 @@ func (r *PatternRepository) Delete(ctx context.Context, id string) error {
 			if categoryBucket == nil {
 				return nil
 			}
-
-			if categoryBucket.Get([]byte(id)) != nil {
-				return categoryBucket.Delete([]byte(id))
-			}
-			return nil
+			return categoryBucket.Delete([]byte(id))
 		})
 	})
 }
@@ -761,6 +770,20 @@ func findPatternInTx(mainBucket *bolt.Bucket, id string) (*domain.Pattern, error
 		return nil
 	})
 	return found, err
+}
+
+func deletePatternCopiesOutsideCategory(mainBucket *bolt.Bucket, id string, keepCategory domain.Category) error {
+	keepKey := []byte(keepCategory)
+	return mainBucket.ForEach(func(categoryKey, _ []byte) error {
+		if bytes.Equal(categoryKey, keepKey) {
+			return nil
+		}
+		categoryBucket := mainBucket.Bucket(categoryKey)
+		if categoryBucket == nil {
+			return nil
+		}
+		return categoryBucket.Delete([]byte(id))
+	})
 }
 
 func readAnalyzedCommitRecords(data []byte) ([]domain.AnalyzedCommitRecord, error) {
