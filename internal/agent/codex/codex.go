@@ -139,6 +139,7 @@ func (c *CodexAgent) LearnFromCommit(ctx context.Context, req *agent.LearnReques
 		"operation", "LearnFromCommit",
 		"patterns_count", len(result.Patterns),
 	)
+	result.LearnedAt = time.Now()
 	return result, nil
 }
 
