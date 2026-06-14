@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.4]
+
+### 修复
+
+- 修复 `SaveAnalyzedFiles` / `DeleteAnalyzedFiles` 路径规范化不一致导致增量学习指纹无法清理的问题。
+- 修复 `ExtractJSON` 非贪婪正则无法正确提取嵌套 JSON 的问题，改用括号计数方式。
+- 修复 `TruncString` 按字节截断在多字节字符中间断开导致中文路径乱码的问题，改为按 rune 截断。
+- 修复 `isRetryableError` 使用字符串匹配可能误判正常输出包含 "429" 为限流的问题，改为基于 HTTP status code 判断。
+- 统一 Claude/Codex 的错误处理策略和限流提示信息。
+- 修复 `repairUnescapedQuotesInStrings` 在字符串内部逗号处误分割的问题。
+- 修复 `extractFinalContent` 只取最后一个 message event 导致多轮输出丢失内容的问题。
+- 修复 Codex `LearnFromCommit` 未设置 `LearnedAt` 时间戳的问题。
+- 修复 `safeRelativePath` 不完全阻止 `foo/..` 等路径遍历的问题。
+
 ## [v0.9.3]
 
 ### 修复
