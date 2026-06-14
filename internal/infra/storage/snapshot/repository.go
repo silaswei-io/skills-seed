@@ -101,8 +101,13 @@ func safeRelativePath(path string) (string, error) {
 	normalized := filepath.ToSlash(strings.TrimSpace(path))
 	normalized = strings.TrimPrefix(normalized, "./")
 	normalized = strings.Trim(normalized, "/")
-	if normalized == "" || filepath.IsAbs(path) || normalized == "." || strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") {
+	if normalized == "" || filepath.IsAbs(path) || normalized == "." || strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") || strings.HasSuffix(normalized, "/..") {
 		return "", fmt.Errorf("unsafe snapshot path: %q", path)
 	}
-	return normalized, nil
+	// Clean the path and verify the result doesn't escape the base directory.
+	cleaned := filepath.Clean(normalized)
+	if cleaned == "." || strings.HasPrefix(cleaned, "..") {
+		return "", fmt.Errorf("unsafe snapshot path: %q", path)
+	}
+	return cleaned, nil
 }
