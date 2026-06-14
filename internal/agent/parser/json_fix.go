@@ -237,9 +237,122 @@ func commaAfterStringValueLooksStructural(s string, commaIndex int, parentKind b
 		return s[next] == '"' && looksLikeObjectKeyAt(s, next)
 	}
 	if parentKind == '[' {
-		return looksLikeJSONValueStart(s[next])
+		return looksLikeArrayValueAt(s, next)
 	}
 	return false
+}
+
+// looksLikeArrayValueAt checks whether the position starts a complete JSON value
+// inside an array. It is stricter than looksLikeJSONValueStart because the
+// surrounding context already guarantees a string just ended, and we need to
+// verify the comma is a structural separator rather than a character inside
+// that string.
+func looksLikeArrayValueAt(s string, index int) bool {
+	if index >= len(s) {
+		return false
+	}
+	ch := s[index]
+	switch ch {
+	case '{', '[':
+		// Container start is always structural.
+		return true
+	case '"':
+		// A quoted string value – verify it terminates before the next comma
+		// or closing bracket.
+		return looksLikeQuotedValueAt(s, index)
+	case 't':
+		return matchLiteral(s, index, "true")
+	case 'f':
+		return matchLiteral(s, index, "false")
+	case 'n':
+		return matchLiteral(s, index, "null")
+	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return looksLikeNumberAt(s, index)
+	default:
+		return false
+	}
+}
+
+// looksLikeQuotedValueAt verifies that a double-quoted string starting at index
+// is followed by a comma, closing bracket, or end-of-input – consistent with
+// the comma being structural rather than inside a preceding string.
+func looksLikeQuotedValueAt(s string, index int) bool {
+	inEscape := false
+	for i := index + 1; i < len(s); i++ {
+		ch := s[i]
+		if inEscape {
+			inEscape = false
+			continue
+		}
+		if ch == '\\' {
+			inEscape = true
+			continue
+		}
+		if ch == '"' {
+			next := nextNonWhitespaceIndex(s, i+1)
+			if next >= len(s) {
+				return true
+			}
+			return s[next] == ',' || s[next] == ']'
+		}
+	}
+	return false
+}
+
+// matchLiteral checks whether s starting at index begins with the given literal
+// followed by a structural character (comma, bracket, whitespace, or EOF).
+func matchLiteral(s string, index int, literal string) bool {
+	if index+len(literal) > len(s) {
+		return false
+	}
+	if s[index:index+len(literal)] != literal {
+		return false
+	}
+	next := index + len(literal)
+	if next >= len(s) {
+		return true
+	}
+	ch := s[next]
+	return isJSONWhitespace(ch) || ch == ',' || ch == ']' || ch == '}'
+}
+
+// looksLikeNumberAt checks whether a numeric literal starts at index and is
+// followed by a structural separator.
+func looksLikeNumberAt(s string, index int) bool {
+	j := index
+	if j < len(s) && s[j] == '-' {
+		j++
+	}
+	digitSeen := false
+	for j < len(s) && (s[j] >= '0' && s[j] <= '9') {
+		digitSeen = true
+		j++
+	}
+	if !digitSeen {
+		return false
+	}
+	// decimal part
+	if j < len(s) && s[j] == '.' {
+		j++
+		for j < len(s) && (s[j] >= '0' && s[j] <= '9') {
+			j++
+		}
+	}
+	// exponent part
+	if j < len(s) && (s[j] == 'e' || s[j] == 'E') {
+		j++
+		if j < len(s) && (s[j] == '+' || s[j] == '-') {
+			j++
+		}
+		for j < len(s) && (s[j] >= '0' && s[j] <= '9') {
+			j++
+		}
+	}
+	if j >= len(s) {
+		return true
+	}
+	ch := s[j]
+	return isJSONWhitespace(ch) || ch == ',' || ch == ']' || ch == '}'
 }
 
 func looksLikeObjectKeyAt(s string, quoteIndex int) bool {
