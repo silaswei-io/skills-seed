@@ -349,9 +349,12 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
 func isRetryableError(stdout, stderr string) bool {
 	combined := stdout + stderr
-	return strings.Contains(combined, "429") ||
-		strings.Contains(combined, "529") ||
-		strings.Contains(combined, "overloaded_error") ||
+	// 使用 HTTP status code 正则匹配，避免正常输出中包含 "429" 等数字被误判
+	if agent.HTTPStatusRetryableRegex.MatchString(combined) {
+		return true
+	}
+	// 非数字类的已知限流/过载信号
+	return strings.Contains(combined, "overloaded_error") ||
 		strings.Contains(combined, "rate limit") ||
 		strings.Contains(combined, "速率限制") ||
 		strings.Contains(combined, "请求频率") ||

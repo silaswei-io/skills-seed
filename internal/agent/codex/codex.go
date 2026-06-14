@@ -532,9 +532,10 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string) (s
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
 func isCodexRetryableError(stdout, stderr string) bool {
 	combined := stdout + stderr
-	return strings.Contains(combined, "429") ||
-		strings.Contains(combined, "529") ||
-		strings.Contains(combined, "overloaded_error") ||
+	if agent.HTTPStatusRetryableRegex.MatchString(combined) {
+		return true
+	}
+	return strings.Contains(combined, "overloaded_error") ||
 		strings.Contains(combined, "rate limit") ||
 		strings.Contains(combined, "速率限制") ||
 		strings.Contains(combined, "请求频率") ||
