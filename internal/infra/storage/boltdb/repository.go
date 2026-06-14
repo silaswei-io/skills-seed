@@ -737,6 +737,7 @@ func (r *PatternRepository) DeleteAnalyzedFiles(ctx context.Context, scope domai
 	return r.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketAnalyzedFiles)
 		for _, path := range paths {
+			path = filepath.ToSlash(filepath.Clean(path))
 			if err := bucket.Delete([]byte(scope.KeyForPath(path))); err != nil {
 				return err
 			}
