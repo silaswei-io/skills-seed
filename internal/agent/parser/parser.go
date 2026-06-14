@@ -383,12 +383,12 @@ func isValidJSONEscape(ch byte) bool {
 	}
 }
 
-// TruncString 截断字符串用于日志输出
+// TruncString 截断字符串用于日志输出（按 rune 截断，不破坏 UTF-8）
 func TruncString(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if len([]rune(s)) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	return string([]rune(s)[:maxLen]) + "..."
 }
 
 // ParseAnalyzeResult 解析代码分析结果
