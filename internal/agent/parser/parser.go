@@ -62,11 +62,13 @@ func ExtractJSON(output string) (string, error) {
 	}
 
 	// 1. 尝试从 markdown 代码块提取
-	re := regexp.MustCompile("(?s)```(?:json|JSON)?\\s*\\n?({.*?})\\s*\\n?```")
-	if matches := re.FindStringSubmatch(output); len(matches) > 1 {
-		jsonStr := strings.TrimSpace(matches[1])
-		if repaired, err := FixAIJSON(jsonStr); err == nil {
-			return repaired, nil
+	re := regexp.MustCompile("(?s)```(?:json|JSON)?\\s*\\n")
+	if re.MatchString(output) {
+		jsonStr := extractJSONFromCodeBlock(output)
+		if jsonStr != "" {
+			if repaired, err := FixAIJSON(jsonStr); err == nil {
+				return repaired, nil
+			}
 		}
 	}
 
@@ -235,6 +237,47 @@ func repairMissingClosingContainers(jsonStr string) (string, error) {
 		b.WriteByte(stack[i])
 	}
 	return b.String(), nil
+}
+
+// extractJSONFromCodeBlock 从 markdown 代码块中提取 JSON，使用括号计数处理嵌套。
+func extractJSONFromCodeBlock(output string) string {
+	// 找到所有代码块的开始位置
+	start := strings.Index(output, "```")
+	for start != -1 {
+		blockStart := start + 3
+		// 跳过 ```json / ```JSON 语言标记
+		for blockStart < len(output) && output[blockStart] != '\n' {
+			blockStart++
+		}
+		if blockStart < len(output) {
+			blockStart++ // skip newline
+		}
+
+		// 找到代码块结束 ```
+		blockEnd := strings.Index(output[blockStart:], "```")
+		if blockEnd == -1 {
+			break
+		}
+		blockEnd += blockStart
+
+		blockContent := strings.TrimSpace(output[blockStart:blockEnd])
+
+		// 尝试提取 JSON 对象
+		jsonStart := strings.Index(blockContent, "{")
+		if jsonStart != -1 {
+			jsonEnd := findMatchingBrace(blockContent, jsonStart)
+			if jsonEnd != -1 {
+				return strings.TrimSpace(blockContent[jsonStart : jsonEnd+1])
+			}
+		}
+
+		// 查找下一个代码块
+		start = strings.Index(output[blockEnd+3:], "```")
+		if start != -1 {
+			start += blockEnd + 3
+		}
+	}
+	return ""
 }
 
 // findMatchingBrace 找到匹配的结束括号
