@@ -371,6 +371,9 @@ other = "Claude CLI call failed"
 [AgentClaudeRateLimited]
 other = "Claude rate limited"
 
+[AgentCodexRateLimited]
+other = "Codex rate limited"
+
 [AgentClaudeRateLimitExhausted]
 other = "Claude rate limit retries exhausted"
 

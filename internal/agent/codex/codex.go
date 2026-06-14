@@ -599,7 +599,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), err)
+			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRateLimited"), err)
 		}
 
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),

@@ -371,6 +371,9 @@ other = "Claude CLI 调用失败"
 [AgentClaudeRateLimited]
 other = "Claude 触发速率限制"
 
+[AgentCodexRateLimited]
+other = "Codex 触发速率限制"
+
 [AgentClaudeRateLimitExhausted]
 other = "Claude 速率限制重试已耗尽"
 
