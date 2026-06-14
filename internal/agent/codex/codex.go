@@ -738,8 +738,12 @@ func codexHomeDir() string {
 
 func extractFinalContent(output string) (string, error) {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	var lastMessageContent string
+	var allParts []string
+
+	// Forward pass: collect all message event contents.
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
@@ -750,8 +754,23 @@ func extractFinalContent(output string) (string, error) {
 		}
 
 		if content := extractCodexEventContent(evt); content != "" {
-			return content, nil
+			lastMessageContent = content
+			allParts = append(allParts, content)
 		}
+	}
+
+	if lastMessageContent != "" {
+		// If there are multiple distinct message events, merge them.
+		// Deduplicate: if the last message contains all previous content,
+		// just return the last one.
+		if len(allParts) <= 1 {
+			return lastMessageContent, nil
+		}
+		merged := strings.Join(allParts, "\n")
+		if strings.Contains(merged, lastMessageContent) && merged != lastMessageContent {
+			return lastMessageContent, nil
+		}
+		return merged, nil
 	}
 
 	return "", fmt.Errorf("%s", i18n.Get("AgentCodexNoFinalMessage"))
