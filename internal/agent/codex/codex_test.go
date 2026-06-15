@@ -117,6 +117,16 @@ func TestExtractFinalContent_CodexItemCompletedAgentMessage(t *testing.T) {
 	require.Equal(t, `{"patterns":[]}`, content)
 }
 
+func TestExtractFinalContent_MergesDistinctAgentMessages(t *testing.T) {
+	output := `{"type":"item.completed","item":{"id":"item_1","type":"agent_message","content":"{\"patterns\":["}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","content":"{\"id\":\"p1\"}]}"}}`
+
+	content, err := extractFinalContent(output)
+
+	require.NoError(t, err)
+	require.Equal(t, "{\"patterns\":[\n{\"id\":\"p1\"}]}", content)
+}
+
 func TestExtractFinalContent_IgnoresCommandExecutionOutput(t *testing.T) {
 	output := `{"type":"item.completed","item":{"id":"item_1","type":"agent_message","content":"final answer"}}
 {"type":"item.completed","item":{"id":"item_2","type":"command_execution","aggregated_output":"not the final answer"}}`

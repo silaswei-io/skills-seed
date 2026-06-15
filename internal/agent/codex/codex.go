@@ -768,7 +768,8 @@ func extractFinalContent(output string) (string, error) {
 			return lastMessageContent, nil
 		}
 		merged := strings.Join(allParts, "\n")
-		if strings.Contains(merged, lastMessageContent) && merged != lastMessageContent {
+		previous := strings.TrimSpace(strings.Join(allParts[:len(allParts)-1], "\n"))
+		if previous != "" && strings.Contains(lastMessageContent, previous) {
 			return lastMessageContent, nil
 		}
 		return merged, nil

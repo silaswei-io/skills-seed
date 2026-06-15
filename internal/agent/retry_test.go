@@ -19,6 +19,15 @@ func TestRetryReasonFromOutputExtractsClaudeAPIError(t *testing.T) {
 	require.NotContains(t, reason, "\n")
 }
 
+func TestHTTPStatusRetryableRegexRequiresHTTPContext(t *testing.T) {
+	require.False(t, HTTPStatusRetryableRegex.MatchString("line 429 in generated output"))
+	require.False(t, HTTPStatusRetryableRegex.MatchString("port 503 is used by the test server"))
+
+	require.True(t, HTTPStatusRetryableRegex.MatchString("HTTP 429 too many requests"))
+	require.True(t, HTTPStatusRetryableRegex.MatchString("status: 503 service unavailable"))
+	require.True(t, HTTPStatusRetryableRegex.MatchString("HTTP/1.1 529 overloaded"))
+}
+
 func TestReportRetryForContextInvokesReporterWithNormalizedReason(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	var got RetryInfo

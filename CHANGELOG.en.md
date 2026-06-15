@@ -2,6 +2,33 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.5]
+
+### Fixes
+
+- Fixed retryable HTTP status detection still treating standalone `429` / `503` / `529` numbers in normal output as rate limits.
+- Fixed Codex multi-part `agent_message` merging still returning only the last message segment.
+- Fixed `ExtractJSON` potentially parsing a non-JSON code block before the later JSON result in multi-language project output.
+
+### Maintenance
+
+- Backfilled the English `CHANGELOG.en.md` entry for `v0.9.4`.
+- Removed scache-specific analysis reports from the repository root so release content stays aligned with the all-language, all-project tool positioning.
+
+## [v0.9.4]
+
+### Fixes
+
+- Fixed inconsistent path normalization between `SaveAnalyzedFiles` and `DeleteAnalyzedFiles`, which could leave stale incremental-learning fingerprints.
+- Fixed `ExtractJSON` failing to extract nested JSON from code blocks by replacing non-greedy regex extraction with brace-counting.
+- Fixed `TruncString` truncating by byte and splitting multi-byte characters; log truncation now uses rune boundaries.
+- Fixed retry detection so normal output containing numbers like "429" is not treated as rate limiting.
+- Unified Claude/Codex error handling and rate-limit messages.
+- Fixed `repairUnescapedQuotesInStrings` incorrectly splitting on commas inside string content.
+- Fixed Codex final-content extraction losing earlier message events when output is split across multiple agent messages.
+- Fixed Codex `LearnFromCommit` not setting `LearnedAt`.
+- Fixed `safeRelativePath` incompletely blocking traversal paths such as `foo/..`.
+
 ## [v0.9.3]
 
 ### Fixes

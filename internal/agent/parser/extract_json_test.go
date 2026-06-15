@@ -154,6 +154,13 @@ func TestExtractJSON_MultipleCodeBlocks(t *testing.T) {
 	assert.JSONEq(t, `{"key": 1}`, result)
 }
 
+func TestExtractJSON_SkipsNonJSONCodeBlockBeforeJSON(t *testing.T) {
+	input := "```go\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n```\n```json\n{\"key\": 1}\n```"
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"key": 1}`, result)
+}
+
 func TestParseWorkspaceSpecAcceptsObjectChangeOrder(t *testing.T) {
 	output := `{
 	  "name": "hsm-workspace",

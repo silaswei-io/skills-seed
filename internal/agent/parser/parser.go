@@ -64,11 +64,8 @@ func ExtractJSON(output string) (string, error) {
 	// 1. 尝试从 markdown 代码块提取
 	re := regexp.MustCompile("(?s)```(?:json|JSON)?\\s*\\n")
 	if re.MatchString(output) {
-		jsonStr := extractJSONFromCodeBlock(output)
-		if jsonStr != "" {
-			if repaired, err := FixAIJSON(jsonStr); err == nil {
-				return repaired, nil
-			}
+		if jsonStr := extractJSONFromCodeBlock(output); jsonStr != "" {
+			return jsonStr, nil
 		}
 	}
 
@@ -267,7 +264,10 @@ func extractJSONFromCodeBlock(output string) string {
 		if jsonStart != -1 {
 			jsonEnd := findMatchingBrace(blockContent, jsonStart)
 			if jsonEnd != -1 {
-				return strings.TrimSpace(blockContent[jsonStart : jsonEnd+1])
+				candidate := strings.TrimSpace(blockContent[jsonStart : jsonEnd+1])
+				if repaired, err := FixAIJSON(candidate); err == nil {
+					return repaired
+				}
 			}
 		}
 
