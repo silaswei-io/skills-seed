@@ -152,7 +152,7 @@ skills-seed learn current --context-file .skills-seed/context.md
 
 如果同一条规则长期有效，写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；如果只是这次运行的解释或限制，使用 `--context` 或 `--context-file`。
 
-`learn current`、`preview` 和结构化分析共用同一套文件选择策略：默认只分析源码、构建配置和依赖配置，继续跳过文档、生成产物、全局 `exclude` 命中的路径以及已生成 Skills 输出目录。
+`learn current`、`preview` 和结构化分析共用同一套文件选择策略：默认只分析源码、构建配置和依赖配置，继续跳过文档、生成产物、Git ignore 命中的路径、全局 `exclude` 命中的路径以及已生成 Skills 输出目录。
 
 ## 快速开始
 

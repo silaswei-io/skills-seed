@@ -66,7 +66,7 @@ func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectR
 
 	collector := s.structuralCollector
 	if treeCollector, ok := collector.(*treesitterCollector); ok {
-		collector = treeCollector.withExclude(fileanalysis.ConfiguredLearnExcludes(s.configRepo, projectRoot))
+		collector = treeCollector.withPolicy(fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot))
 	}
 	contextText, err := collector.Collect(ctx, projectRoot, req)
 	if err == nil {

@@ -112,6 +112,14 @@ logging:
   max_log_files: 30
 
 ########################################################################
+# Global File Filter
+# Controls file boundaries shared by learning, preview, and structural analysis
+########################################################################
+file_filter:
+  # Whether to also filter files ignored by Git ignore rules
+  apply_git_ignore: true
+
+########################################################################
 # Global Exclusions
 # Glob-style patterns (not regex); init writes the default static exclusion rules
 ########################################################################

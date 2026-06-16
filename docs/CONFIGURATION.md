@@ -72,6 +72,9 @@ logging:
   logs_path: "logs"
   max_log_files: 30
 
+file_filter:
+  apply_git_ignore: true
+
 exclude:
   - ".*"
   - "vendor/**"
@@ -178,6 +181,8 @@ exclude:
 0.9.0 起，项目结构摘要、样例文件收集和结构化预扫描都统一使用同一套配置化文件选择策略。除 `.git`、`.skills-seed` 和已配置的 skills 输出目录等内置安全边界外，不再在 analyzer 内额外维护目录名关键字；需要排除依赖、构建产物或项目自定义目录时，应写入 `exclude`。
 
 0.9.1 起，`select_relevant_files` 默认开启；当本地过滤后的候选文件数达到 `select_relevant_files_min_candidates` 时，`learn current` 会先让 AI 从候选文件树和变更元数据中筛出更相关的文件，再进入后续分析。
+
+0.9.11 起，文件选择策略默认还会叠加 Git ignore 规则；如需分析被 `.gitignore` 忽略的文件，可将全局 `file_filter.apply_git_ignore` 设为 `false`。
 
 #### 建议
 
@@ -337,6 +342,16 @@ skills-seed learn history --limit 100 --batch-size 10
 | `logs_path` | `logs` | 日志目录，相对 `.skills-seed` |
 | `max_log_files` | `30` | 最多保留的日志文件数量，超过后自动清理旧日志 |
 
+### `file_filter`
+
+`file_filter` 控制学习、预览、项目结构摘要、样例文件收集和结构化预扫描共享的全局文件边界。
+
+| 字段 | 默认值 | 说明 |
+|---|---:|---|
+| `apply_git_ignore` | `true` | 是否叠加 Git ignore 规则过滤文件，包括 `.gitignore`、`.git/info/exclude` 和全局 Git ignore |
+
+关闭该选项后，文件选择仍会应用内置安全边界、已生成 Skills 输出目录和全局 `exclude`，但不会再跳过被 Git ignore 规则忽略的源码文件。
+
 ### `exclude`
 
 #### 默认值
@@ -366,5 +381,5 @@ skills-seed learn history --limit 100 --batch-size 10
 #### 说明
 
 1. `exclude` 使用 glob 风格匹配，不是正则。不含 `/` 的模式（如 `*.log`）会同时对文件基名和完整路径匹配。
-2. 排除规则会影响学习、预览、项目结构摘要、样例文件收集和结构化预扫描。
+2. 排除规则会影响学习、预览、项目结构摘要、样例文件收集和结构化预扫描；默认还会叠加 `file_filter.apply_git_ignore`。
 3. 生成的 skills 目录默认也会排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。

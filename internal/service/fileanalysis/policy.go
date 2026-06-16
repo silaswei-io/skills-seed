@@ -1,7 +1,10 @@
 package fileanalysis
 
 import (
+	"context"
+
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/gitignore"
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
 	"github.com/silaswei-io/skills-seed/internal/utils/sourcefiles"
 )
@@ -19,6 +22,7 @@ const (
 
 type SelectionPolicy struct {
 	ExcludePatterns []string
+	GitIgnore       *gitignore.Matcher
 	SourceOnly      bool
 }
 
@@ -36,7 +40,15 @@ type Decision struct {
 }
 
 func NewConfiguredSelectionPolicy(configRepo config.Reader, projectRoot string) SelectionPolicy {
-	return NewSelectionPolicy(ConfiguredLearnExcludes(configRepo, projectRoot))
+	policy := NewSelectionPolicy(ConfiguredLearnExcludes(configRepo, projectRoot))
+	if configRepo == nil || !configRepo.GetFileFilterConfig().ApplyGitIgnore {
+		return policy
+	}
+	matcher, err := gitignore.NewMatcher(context.Background(), projectRoot)
+	if err == nil {
+		policy.GitIgnore = matcher
+	}
+	return policy
 }
 
 func (p SelectionPolicy) Include(path string) (bool, SkipReason) {
@@ -61,5 +73,5 @@ func (p SelectionPolicy) Decide(path string) Decision {
 }
 
 func (p SelectionPolicy) IsExcluded(path string) bool {
-	return filefilter.MatchExcluded(path, p.ExcludePatterns)
+	return filefilter.MatchExcluded(path, p.ExcludePatterns) || p.GitIgnore.Match(path)
 }

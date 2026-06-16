@@ -14,7 +14,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 )
 
 // structuralContextRequest 定义结构化分析所需的输入参数。
@@ -35,7 +35,7 @@ type structuralCollector interface {
 type treesitterCollector struct {
 	maxSymbols  int
 	maxFileSize int64
-	exclude     []string
+	policy      fileanalysis.SelectionPolicy
 }
 
 // fileResult 保存单个文件的结构化提取结果。
@@ -61,12 +61,13 @@ func newStructuralCollector(cfg config.StructuralConfig) *treesitterCollector {
 	return &treesitterCollector{
 		maxSymbols:  cfg.MaxSymbols,
 		maxFileSize: maxFileSize,
+		policy:      fileanalysis.NewSelectionPolicy(nil),
 	}
 }
 
-func (c *treesitterCollector) withExclude(exclude []string) *treesitterCollector {
+func (c *treesitterCollector) withPolicy(policy fileanalysis.SelectionPolicy) *treesitterCollector {
 	next := *c
-	next.exclude = append([]string(nil), exclude...)
+	next.policy = policy
 	return &next
 }
 
@@ -142,7 +143,7 @@ func (c *treesitterCollector) collectFile(projectRoot, path string) (fileResult,
 		return fileResult{}, false
 	}
 	relPath = filepath.ToSlash(relPath)
-	if filefilter.MatchExcluded(relPath, c.exclude) {
+	if c.policy.IsExcluded(relPath) {
 		return fileResult{}, false
 	}
 	src, err := os.ReadFile(path)
@@ -216,7 +217,7 @@ func (c *treesitterCollector) parsePolicy(projectRoot string) grammars.ParsePoli
 		if err != nil {
 			return false
 		}
-		return filefilter.MatchExcluded(filepath.ToSlash(relPath), c.exclude)
+		return c.policy.IsExcluded(filepath.ToSlash(relPath))
 	}
 	policy.ShouldParse = func(path string, size int64, _ time.Time) bool {
 		if size > c.maxFileSize {
@@ -226,7 +227,7 @@ func (c *treesitterCollector) parsePolicy(projectRoot string) grammars.ParsePoli
 		if err != nil {
 			return true
 		}
-		return !filefilter.MatchExcluded(filepath.ToSlash(relPath), c.exclude)
+		return !c.policy.IsExcluded(filepath.ToSlash(relPath))
 	}
 	return policy
 }
@@ -250,7 +251,7 @@ func (c *treesitterCollector) boundedSeedRoots(projectRoot string, seedPaths []s
 		}
 		if !info.IsDir() {
 			rel, err := filepath.Rel(projectRoot, absPath)
-			if err != nil || filefilter.MatchExcluded(filepath.ToSlash(rel), c.exclude) || info.Size() > c.maxFileSize {
+			if err != nil || c.policy.IsExcluded(filepath.ToSlash(rel)) || info.Size() > c.maxFileSize {
 				continue
 			}
 		}

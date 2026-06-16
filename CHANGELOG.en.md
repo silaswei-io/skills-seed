@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.11]
+
+### Changes
+
+- Added the global `file_filter.apply_git_ignore` setting, enabled by default. Learning, preview, project-structure summaries, sample-file collection, and structural pre-scan now apply Git ignore rules in addition to `exclude`, and the setting can be disabled when ignored source files should still be analyzed.
+
 ## [v0.9.10]
 
 ### Fixes

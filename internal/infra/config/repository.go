@@ -17,14 +17,15 @@ import (
 
 // Config 应用配置，映射 .skills-seed/config.yaml 的顶层结构。
 type Config struct {
-	Project   ProjectConfig   `yaml:"profile"`
-	Workspace WorkspaceConfig `yaml:"workspace"`
-	Agent     AgentConfig     `yaml:"agent"`
-	Learning  LearningConfig  `yaml:"learning"`
-	AutoFix   AutoFixConfig   `yaml:"autofix"`
-	Skills    SkillsConfig    `yaml:"skills"`
-	Logging   LoggingConfig   `yaml:"logging"`
-	Exclude   []string        `yaml:"exclude"` // 全局排除配置
+	Project    ProjectConfig    `yaml:"profile"`
+	Workspace  WorkspaceConfig  `yaml:"workspace"`
+	Agent      AgentConfig      `yaml:"agent"`
+	Learning   LearningConfig   `yaml:"learning"`
+	AutoFix    AutoFixConfig    `yaml:"autofix"`
+	Skills     SkillsConfig     `yaml:"skills"`
+	Logging    LoggingConfig    `yaml:"logging"`
+	FileFilter FileFilterConfig `yaml:"file_filter"`
+	Exclude    []string         `yaml:"exclude"` // 全局排除配置
 }
 
 // ProjectConfig 保存当前项目或工作区根的身份信息。
@@ -49,6 +50,32 @@ type WorkspaceProjectConfig struct {
 	Path     string `yaml:"path"`     // 相对工作区根目录的路径
 	Type     string `yaml:"type"`     // 子项目类型，如 frontend、backend、library
 	Language string `yaml:"language"` // 子项目主语言
+}
+
+// FileFilterConfig 控制学习、预览和结构化分析共享的全局文件边界。
+type FileFilterConfig struct {
+	ApplyGitIgnore bool `yaml:"apply_git_ignore"` // 是否叠加 Git ignore 规则过滤文件
+
+	defaultsApplied bool `yaml:"-"`
+}
+
+func defaultFileFilterConfig() FileFilterConfig {
+	return FileFilterConfig{
+		ApplyGitIgnore:  true,
+		defaultsApplied: true,
+	}
+}
+
+// UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
+func (c *FileFilterConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawFileFilterConfig FileFilterConfig
+	defaults := rawFileFilterConfig(defaultFileFilterConfig())
+	if err := value.Decode(&defaults); err != nil {
+		return err
+	}
+	*c = FileFilterConfig(defaults)
+	c.defaultsApplied = true
+	return nil
 }
 
 // StructuralConfig 结构化分析配置（基于内嵌 tree-sitter）
@@ -445,6 +472,9 @@ func (r *Repository) defaultConfig(locale string) *Config {
 }
 
 func (r *Repository) normalizeConfig(cfg *Config) {
+	if !cfg.FileFilter.defaultsApplied {
+		cfg.FileFilter = defaultFileFilterConfig()
+	}
 	if !cfg.Learning.defaultsApplied {
 		cfg.Learning = defaultLearningConfig()
 	}
@@ -563,7 +593,8 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			LogsPath:    "logs",
 			MaxLogFiles: 30,
 		},
-		Exclude: DefaultExcludePatterns(),
+		FileFilter: defaultFileFilterConfig(),
+		Exclude:    DefaultExcludePatterns(),
 	}
 }
 
@@ -577,6 +608,7 @@ type Reader interface {
 	GetAutoFixConfig() AutoFixConfig
 	GetSkillsConfig() SkillsConfig
 	GetLoggingConfig() LoggingConfig
+	GetFileFilterConfig() FileFilterConfig
 	GetExclude() []string
 	GetToolLocale() string
 	GetSkillsLocale() string
@@ -627,6 +659,11 @@ func (r *Repository) GetSkillsConfig() SkillsConfig {
 // GetLoggingConfig 获取日志配置
 func (r *Repository) GetLoggingConfig() LoggingConfig {
 	return r.config.Logging
+}
+
+// GetFileFilterConfig 获取全局文件过滤配置。
+func (r *Repository) GetFileFilterConfig() FileFilterConfig {
+	return r.config.FileFilter
 }
 
 // GetExclude 获取排除配置

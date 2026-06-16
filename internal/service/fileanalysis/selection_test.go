@@ -2,9 +2,11 @@ package fileanalysis
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,6 +45,56 @@ func TestSelectFilesKeepsOnlyFocusedAnalyzableFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"cmd/server/main.go"}, selection.Paths())
 	require.Equal(t, 1, selection.SkippedCount(SkipReasonDocument))
+}
+
+func TestConfiguredSelectionPolicyAppliesGitIgnoreByDefault(t *testing.T) {
+	root := t.TempDir()
+	initSelectionGitRepo(t, root)
+	writeSelectionFile(t, root, ".gitignore", "ignored-dir/\n*.tmp\n")
+	writeSelectionFile(t, root, "main.go", "package main\n")
+	writeSelectionFile(t, root, "ignored-dir/generated.go", "package ignored\n")
+	writeSelectionFile(t, root, "debug.tmp", "temporary\n")
+
+	repo, err := config.NewRepository(filepath.Join(root, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+
+	selection, err := SelectFiles(SelectOptions{
+		Root:   root,
+		Policy: NewConfiguredSelectionPolicy(repo, root),
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"main.go"}, selection.Paths())
+	require.Equal(t, 2, selection.SkippedCount(SkipReasonExcluded))
+}
+
+func TestConfiguredSelectionPolicyCanDisableGitIgnore(t *testing.T) {
+	root := t.TempDir()
+	initSelectionGitRepo(t, root)
+	writeSelectionFile(t, root, ".gitignore", "ignored-dir/\n")
+	writeSelectionFile(t, root, "main.go", "package main\n")
+	writeSelectionFile(t, root, "ignored-dir/generated.go", "package ignored\n")
+
+	repo, err := config.NewRepository(filepath.Join(root, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	cfg := repo.Get()
+	cfg.FileFilter.ApplyGitIgnore = false
+	require.NoError(t, repo.Update(cfg))
+
+	selection, err := SelectFiles(SelectOptions{
+		Root:   root,
+		Policy: NewConfiguredSelectionPolicy(repo, root),
+	})
+
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"ignored-dir/generated.go", "main.go"}, selection.Paths())
+}
+
+func initSelectionGitRepo(t *testing.T, root string) {
+	t.Helper()
+	cmd := exec.Command("git", "init", "-q")
+	cmd.Dir = root
+	require.NoError(t, cmd.Run())
 }
 
 func writeSelectionFile(t *testing.T, root, relPath, content string) {
