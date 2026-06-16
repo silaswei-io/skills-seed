@@ -232,6 +232,31 @@ func TestMultiTrackerRendersPerTaskStepCounts(t *testing.T) {
 	}
 }
 
+func TestMultiTrackerAlignsPerTaskProgressPanel(t *testing.T) {
+	tracker := NewMulti([]string{"agent", "cluster-manage"})
+	tracker.enabled = true
+	tracker.SetLabel("学习工作区子项目")
+	tracker.SetTaskTotal(5)
+	tracker.Start("agent", "检测增量文件变化")
+	tracker.Start("cluster-manage", "分析当前代码库")
+
+	tracker.mu.Lock()
+	lines := tracker.renderLinesLocked()
+	tracker.mu.Unlock()
+
+	require.Len(t, lines, 3)
+	require.Contains(t, lines[1], "agent")
+	require.Contains(t, lines[2], "cluster-manage")
+	firstBar := strings.Index(lines[1], "[")
+	secondBar := strings.Index(lines[2], "[")
+	require.NotEqual(t, -1, firstBar)
+	require.Equal(t, firstBar, secondBar)
+	firstStep := strings.Index(lines[1], "1/5")
+	secondStep := strings.Index(lines[2], "1/5")
+	require.NotEqual(t, -1, firstStep)
+	require.Equal(t, firstStep, secondStep)
+}
+
 func TestMultiTrackerRenderKeepsCursorInsideProgressBlock(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := NewMulti([]string{"backend", "front"})
@@ -297,7 +322,7 @@ func TestMultiTrackerCompletedStepStillAnimatesUntilNextStep(t *testing.T) {
 	tracker.mu.Lock()
 	task := tracker.tasks["backend"]
 	task.frame = 1
-	line := formatMultiTaskLineWithTotal(task, tracker.width, tracker.taskTotal)
+	line := formatMultiTaskLineWithTotal(task, tracker.width, tracker.taskTotal, tracker.nameWidth)
 	tracker.mu.Unlock()
 
 	if !strings.Contains(line, "/ backend") {

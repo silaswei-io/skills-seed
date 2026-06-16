@@ -51,6 +51,7 @@ type MultiTracker struct {
 	tasks         map[string]*multiTask
 	order         []string
 	width         int
+	nameWidth     int
 	taskTotal     int
 	enabled       bool
 	lines         int
@@ -85,10 +86,11 @@ func New(total int) *Tracker {
 
 func NewMulti(names []string) *MultiTracker {
 	tracker := &MultiTracker{
-		tasks:   make(map[string]*multiTask, len(names)),
-		order:   append([]string(nil), names...),
-		width:   28,
-		enabled: isTerminal(os.Stdout),
+		tasks:     make(map[string]*multiTask, len(names)),
+		order:     append([]string(nil), names...),
+		width:     28,
+		nameWidth: multiTaskNameWidth(names),
+		enabled:   isTerminal(os.Stdout),
 	}
 	for _, name := range names {
 		tracker.tasks[name] = &multiTask{name: name}
@@ -306,6 +308,9 @@ func (t *MultiTracker) ensureTaskLocked(name string) *multiTask {
 	task := &multiTask{name: name}
 	t.tasks[name] = task
 	t.order = append(t.order, name)
+	if width := runewidth.StringWidth(name); width > t.nameWidth {
+		t.nameWidth = width
+	}
 	return task
 }
 
@@ -319,7 +324,7 @@ func (t *MultiTracker) renderLinesLocked() []string {
 		if task == nil {
 			continue
 		}
-		lines = append(lines, formatMultiTaskLineWithTotal(task, t.width, t.taskTotal))
+		lines = append(lines, formatMultiTaskLineWithTotal(task, t.width, t.taskTotal, t.nameWidth))
 	}
 	return lines
 }
@@ -362,10 +367,10 @@ func formatMultiSummaryLine(label string, done, total, width int) string {
 }
 
 func formatMultiTaskLine(task *multiTask, width int) string {
-	return formatMultiTaskLineWithTotal(task, width, 0)
+	return formatMultiTaskLineWithTotal(task, width, 0, runewidth.StringWidth(task.name))
 }
 
-func formatMultiTaskLineWithTotal(task *multiTask, width int, taskTotal int) string {
+func formatMultiTaskLineWithTotal(task *multiTask, width int, taskTotal int, nameWidth int) string {
 	filled := 0
 	if task.done {
 		filled = width
@@ -399,11 +404,29 @@ func formatMultiTaskLineWithTotal(task *multiTask, width int, taskTotal int) str
 		}
 		stepText = fmt.Sprintf(" %d/%d", currentStep, taskTotal)
 	}
-	line := fmt.Sprintf("[%s] %s %-12s%s %s", bar, frame, task.name, stepText, task.label)
+	line := fmt.Sprintf("[%s] %s %s%s %s", bar, frame, padDisplayRight(task.name, nameWidth), stepText, task.label)
 	if elapsed > 0 {
 		line += fmt.Sprintf(" (%s)", elapsed)
 	}
 	return line
+}
+
+func multiTaskNameWidth(names []string) int {
+	width := 12
+	for _, name := range names {
+		if candidate := runewidth.StringWidth(name); candidate > width {
+			width = candidate
+		}
+	}
+	return width
+}
+
+func padDisplayRight(value string, width int) string {
+	padding := width - runewidth.StringWidth(value)
+	if padding <= 0 {
+		return value
+	}
+	return value + strings.Repeat(" ", padding)
 }
 
 func printMultiLines(lines []string) {

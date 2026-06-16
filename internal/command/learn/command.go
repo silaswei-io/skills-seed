@@ -737,7 +737,9 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	showChildDetails := parallelism == 1
 	var consoleMu sync.Mutex
 	var dirtyMu sync.Mutex
+	var tokenContextsMu sync.Mutex
 	var dirtyProjectIDs []string
+	var tokenContexts []context.Context
 	var multiTracker *progress.MultiTracker
 	if !showChildDetails {
 		multiTracker = progress.NewMulti(commandutil.WorkspaceProjectProgressNames(workspaceConfig.Projects))
@@ -765,12 +767,14 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 			}
 			defer childCont.Close()
 
-			consoleMu.Lock()
-			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectStarted", map[string]interface{}{
-				"ProjectName": project.ID,
-				"LogPath":     workspaceProjectLogDir(childCont),
-			}))
-			consoleMu.Unlock()
+			if showChildDetails {
+				consoleMu.Lock()
+				logger.Info(i18n.GetWithParams("LearnWorkspaceProjectStarted", map[string]interface{}{
+					"ProjectName": project.ID,
+					"LogPath":     workspaceProjectLogDir(childCont),
+				}))
+				consoleMu.Unlock()
+			}
 
 			scope := project.ID
 			if scope == "" {
@@ -807,7 +811,7 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 				}))
 			}
 			consoleMu.Lock()
-			if !showChildDetails {
+			if showChildDetails {
 				logLearnWorkspaceProjectSummary(project.ID, result)
 			}
 			if result.savedCount > 0 {
@@ -815,17 +819,31 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 				dirtyProjectIDs = append(dirtyProjectIDs, scope)
 				dirtyMu.Unlock()
 			}
-			agent.FlushTokenUsageScope(result.tokenContext)
-			logger.Info(i18n.GetWithParams("LearnWorkspaceProjectDelegated", map[string]interface{}{
-				"ProjectName": project.ID,
-				"LogPath":     childLogPath,
-			}))
+			if showChildDetails {
+				agent.FlushTokenUsageScope(result.tokenContext)
+				logger.Info(i18n.GetWithParams("LearnWorkspaceProjectDelegated", map[string]interface{}{
+					"ProjectName": project.ID,
+					"LogPath":     childLogPath,
+				}))
+			} else {
+				tokenContextsMu.Lock()
+				tokenContexts = append(tokenContexts, result.tokenContext)
+				tokenContextsMu.Unlock()
+			}
 			consoleMu.Unlock()
 			return nil
 		})
 	}
 	if err := runProjects(); err != nil {
 		return domain.LearnCurrentResult{}, err
+	}
+	if !showChildDetails {
+		tokenContextsMu.Lock()
+		pendingTokenContexts := append([]context.Context(nil), tokenContexts...)
+		tokenContextsMu.Unlock()
+		for _, tokenContext := range pendingTokenContexts {
+			agent.FlushTokenUsageScope(tokenContext)
+		}
 	}
 
 	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(ctx, cont, workspaceName, projectRoot, workspaceConfig, workspaceRelationshipOptions{

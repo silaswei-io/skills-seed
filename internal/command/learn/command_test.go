@@ -1030,8 +1030,9 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	require.NotContains(t, output, "项目根路径:")
 	require.NotContains(t, output, "增量文件变化:")
 	require.NotContains(t, output, "后续可执行:")
-	require.Contains(t, output, "子项目 backend 独立学习完成")
-	require.Contains(t, output, "子项目 frontend 独立学习完成")
+	require.NotContains(t, output, "正在学习子项目")
+	require.NotContains(t, output, "未检测到可学习文件变化")
+	require.NotContains(t, output, "独立学习完成")
 }
 
 func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.T) {
@@ -1132,11 +1133,15 @@ func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
 	require.Contains(t, output, "backend")
 	require.Contains(t, output, "front")
 	require.Contains(t, output, "分析当前代码库")
-	require.Contains(t, output, "backend      3/5")
+	require.Contains(t, output, "backend")
+	require.Contains(t, output, "3/5")
 	require.Contains(t, output, "完成")
 	require.Contains(t, output, "学习工作区子项目")
 	require.NotContains(t, output, "0/2 | backend")
 	require.NotContains(t, output, "0/2 | front")
+	require.NotContains(t, output, "正在学习子项目")
+	require.NotContains(t, output, "未检测到可学习文件变化")
+	require.NotContains(t, output, "独立学习完成")
 	pauseMu.Lock()
 	require.NotEmpty(t, pauseDurations)
 	require.Equal(t, progress.FastStepPause, pauseDurations[0])

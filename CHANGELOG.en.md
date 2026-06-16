@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.10]
+
+### Fixes
+
+- Improved workspace `learn current` / `sync` output for parallel child-project learning: each child still keeps its own progress bar and step count, child names and step columns are aligned, and detailed child start/skip/completion logs no longer interrupt the progress panel in unchanged runs.
+
 ## [v0.9.9]
 
 ### Fixes
