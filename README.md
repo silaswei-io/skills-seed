@@ -106,6 +106,8 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.8.0 起，Agent 输出会单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
 
+0.9.6 起，`.skills-seed/memory/runtime` 下的调试记录统一使用 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` 文件名前缀，包括 rendered prompt、Agent 输出归档和运行时输入临时目录，便于按时间排序排查一次运行中的上下文与模型输出。
+
 0.9.0 起，学习和用户添加模式时会使用 `pattern-curate` 提示词做入库前策展：候选模式必须覆盖、重复规则必须整合、代码证据只能来自输入源码，非法或低质量候选会被丢弃。旧的生成前合并流程和 `patterns merge` 已移除，生成阶段保持只读。
 
 0.9.1 起，模型输出解析会先经过更稳健的 JSON 修复流程，覆盖重复对象起始、非法转义、字符串内未转义引号和缺失闭合容器等常见异常；`patterns delete` 也会在删除模式后标记相关 skills 待重新生成。

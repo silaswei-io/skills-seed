@@ -21,6 +21,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/utils"
@@ -924,7 +925,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
 		return false, err
 	}
-	tmpDir, err := os.MkdirTemp(runtimeDir, "skills-seed-workspace-learn-*")
+	tmpDir, err := os.MkdirTemp(runtimeDir, runtimefiles.TempPattern("workspace-learn"))
 	if err != nil {
 		return false, err
 	}

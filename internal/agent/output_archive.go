@@ -12,6 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
 // AgentOutputArchive 表示单次 Agent 调用输出归档后的文件路径。
@@ -81,7 +82,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		return AgentOutputArchive{}
 	}
 
-	base := safeAgentOutputName(opts.Agent) + "-" + safeAgentOutputName(opts.Operation) + "-" + time.Now().Format("20060102-150405.000000000")
+	base := runtimefiles.Name("agent-output", opts.Agent, opts.Operation)
 	archive := AgentOutputArchive{}
 	if strings.TrimSpace(opts.Content) != "" {
 		path := filepath.Join(dir, base+".md")
@@ -176,30 +177,4 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		"stderr_length", len(opts.Stderr),
 	)
 	return archive
-}
-
-func safeAgentOutputName(name string) string {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return "unknown"
-	}
-	var b strings.Builder
-	b.Grow(len(name))
-	lastDash := false
-	for _, r := range strings.ToLower(name) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-			lastDash = false
-			continue
-		}
-		if !lastDash {
-			b.WriteByte('-')
-			lastDash = true
-		}
-	}
-	out := strings.Trim(b.String(), "-")
-	if out == "" {
-		return "unknown"
-	}
-	return out
 }

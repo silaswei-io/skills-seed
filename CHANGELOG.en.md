@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.6]
+
+### Changes
+
+- Unified debug record filename prefixes under `.skills-seed/memory/runtime` as `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>`, so rendered prompts, Agent output archives, and runtime temporary input directories can be located by time order.
+
+### Maintenance
+
+- Added the shared `runtimefiles` naming helper to centralize safe runtime filename parts and timestamp prefixes instead of keeping separate naming logic in prompt, Agent, and workspace flows.
+
 ## [v0.9.5]
 
 ### Fixes

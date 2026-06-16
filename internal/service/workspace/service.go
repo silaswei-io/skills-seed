@@ -19,6 +19,7 @@ import (
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
@@ -132,7 +133,7 @@ func (g *WorkspaceGenerator) analyzeWorkspaceForGenerate(ctx context.Context, pr
 	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
 		return nil, nil, err
 	}
-	tmpDir, err := os.MkdirTemp(runtimeDir, "skills-seed-workspace-*")
+	tmpDir, err := os.MkdirTemp(runtimeDir, runtimefiles.TempPattern("workspace-generate"))
 	if err != nil {
 		return nil, nil, err
 	}

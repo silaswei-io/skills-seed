@@ -401,6 +401,7 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 	require.NotNil(t, profileReq)
 	require.NotEmpty(t, profileReq.WorkspaceInputPath)
 	require.Contains(t, filepath.ToSlash(profileReq.WorkspaceInputPath), ".skills-seed/memory/runtime/")
+	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-workspace-generate-\d+$`, filepath.Base(filepath.Dir(profileReq.WorkspaceInputPath)))
 	require.NotNil(t, specReq)
 	require.NotEmpty(t, specReq.WorkspaceInputPath)
 	require.NotEmpty(t, specReq.WorkspaceProfilePath)

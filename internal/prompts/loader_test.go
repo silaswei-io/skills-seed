@@ -239,7 +239,7 @@ func TestLoader_RenderStoresSuccessfulPromptUnderRuntimeMemory(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, renderedName)
-	require.True(t, strings.HasPrefix(renderedName, "learn-analyze-"))
+	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-prompt-learn-analyze\.md$`, renderedName)
 
 	content, err := os.ReadFile(filepath.Join(runtimeDir, renderedName))
 	require.NoError(t, err)

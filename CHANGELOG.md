@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.6]
+
+### 变更
+
+- 统一 `.skills-seed/memory/runtime` 下调试记录的文件名前缀为 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>`，让 rendered prompt、Agent 输出归档和 runtime 临时输入目录都能按时间排序定位。
+
+### 维护
+
+- 新增 `runtimefiles` 命名工具，集中处理 runtime 文件名安全片段和时间前缀，避免 prompt、Agent、workspace 流程各自维护命名逻辑。
+
 ## [v0.9.5]
 
 ### 修复

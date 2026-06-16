@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
 // PromptInputSession 管理单次 Agent 调用的临时提示词输入文件。
@@ -29,7 +31,7 @@ func newPromptInputSessionIn(baseDir, prefix string) (*PromptInputSession, error
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, err
 	}
-	dir, err := os.MkdirTemp(baseDir, strings.TrimSpace(prefix)+"-*")
+	dir, err := os.MkdirTemp(baseDir, runtimefiles.TempPattern("prompt-input", prefix))
 	if err != nil {
 		return nil, err
 	}

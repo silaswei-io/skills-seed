@@ -11,13 +11,13 @@ import (
 	"strings"
 	"sync"
 	"text/template"
-	"time"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
 // Loader 加载内置模板，并叠加项目/自定义提示词片段。
@@ -470,7 +470,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		return
 	}
 
-	filename := safeRenderedPromptName(name) + "-" + time.Now().Format("20060102-150405.000000000") + ".md"
+	filename := runtimefiles.Name("prompt", name) + ".md"
 	path := filepath.Join(dir, filename)
 	if err := os.WriteFile(path, []byte(content+"\n"), 0600); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -508,35 +508,6 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		"manifest_path", manifestPath,
 		"content_length", len(content),
 	)
-}
-
-func safeRenderedPromptName(name string) string {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return "prompt"
-	}
-	var b strings.Builder
-	lastDash := false
-	for _, r := range strings.ToLower(name) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			b.WriteRune(r)
-			lastDash = false
-		case r == '-' || r == '_' || r == '.':
-			b.WriteRune(r)
-			lastDash = false
-		default:
-			if !lastDash {
-				b.WriteByte('-')
-				lastDash = true
-			}
-		}
-	}
-	safe := strings.Trim(b.String(), "-_.")
-	if safe == "" {
-		return "prompt"
-	}
-	return safe
 }
 
 func promptProjectName(data interface{}) string {

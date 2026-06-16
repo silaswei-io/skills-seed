@@ -196,6 +196,8 @@ Rendered prompts are saved by default under `.skills-seed/memory/runtime/rendere
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr.
 
+Starting in 0.9.6, debug records under `.skills-seed/memory/runtime` use the unified `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` filename prefix. `rendered-prompts/`, `agent-outputs/`, and runtime input temporary directories all start with time, making context, output, and temporary inputs from the same run easier to correlate in chronological order.
+
 Starting in 0.9.0, the pattern store renders the `pattern-curate` prompt before storage so AI can deduplicate, consolidate, drop, and self-check candidate patterns against related historical patterns. `generate skills` no longer runs pattern merging, so generation prompts only summarize and produce artifacts.
 
 Starting in 0.9.1, skills generation reads dirty state: learning, pattern deletion, and workspace relationship changes only mark affected targets for regeneration; unchanged and clean targets are skipped. Use `skills-seed generate skills --force` to ignore dirty state and rebuild everything.

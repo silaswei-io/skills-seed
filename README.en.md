@@ -106,6 +106,8 @@ Starting in 0.7.3, current-code learning commits file-analysis fingerprints only
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/`. Runtime logs keep only output lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Business-method locations now use structured `code_location` metadata throughout, generated business-method references show location status, and project skills/references are more compact so the entry skill guides Agents to read the minimum relevant references for each task.
 
+Starting in 0.9.6, debug records under `.skills-seed/memory/runtime` use the unified `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` filename prefix, including rendered prompts, Agent output archives, and runtime input temporary directories, making it easier to sort by time while inspecting context and model outputs from one run.
+
 Starting in 0.9.0, learning and user-added patterns use the `pattern-curate` prompt for pre-storage curation: every candidate must be covered, duplicate rules must be consolidated, code evidence must come from input source, and invalid or low-quality candidates are dropped. The old pre-generation merge flow and `patterns merge` command have been removed; generation remains read-only.
 
 Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers. `patterns delete` also marks affected skills dirty after removing patterns.
