@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.7]
+
+### Changes
+
+- Expanded `skills-seed patterns show <pattern-id>` detail output with good/bad examples, quality metrics, merge/generated state, workspace ownership, business-method fields, code-location history, and language-agnostic symbol snapshots.
+
+### Documentation
+
+- Updated README and the command reference to clarify that `patterns show` without arguments prints the overview, while passing a pattern ID prints the full detail view for one pattern.
+
 ## [v0.9.6]
 
 ### Changes

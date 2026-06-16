@@ -305,7 +305,7 @@ references/
 | `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | `skills-seed patterns delete plugin-source-editing-rule` | workspace 根目录会同步删除已关联子项目模式 |
 | `skills-seed patterns compact` | 调用当前 Agent 策展整理相似 patterns | `skills-seed patterns compact --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
 | `skills-seed patterns stats` | 查看模式质量和 check 命中统计 | `skills-seed patterns stats` | 不调用 AI Agent，不修改数据库 |
-| `skills-seed patterns show [pattern-id]` | 查看 pattern 的 DB 字段、时间和代码位置元数据 | `skills-seed patterns show business-create-order --format json` | 不调用 AI Agent，不修改数据库 |
+| `skills-seed patterns show [pattern-id]` | 无参数查看概览，传入 ID 查看完整详情 | `skills-seed patterns show business-create-order --format json` | 不调用 AI Agent，不修改数据库 |
 
 #### `patterns` 参数
 
@@ -362,6 +362,7 @@ skills-seed patterns compact --category api
 skills-seed patterns compact --category business --dry-run
 skills-seed patterns stats
 skills-seed patterns show
+skills-seed patterns show business-create-order
 skills-seed patterns show business-create-order --format json
 ```
 
@@ -370,7 +371,7 @@ skills-seed patterns show business-create-order --format json
 1. `patterns compact` 会调用当前 `agent.engine` 对应的 CLI。
 2. 不确定整理结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
-4. `patterns show` 读取 DB 中已保存字段，可用于排查 `created_at/updated_at`、代码位置状态和语言无关符号快照。
+4. `patterns show` 无参数时显示模式概览列表；传入 `pattern-id` 时显示单条模式完整详情，包括正/反例、质量指标、workspace 归属、业务方法字段、代码位置历史和语言无关符号快照。
 5. `patterns stats` 和 `patterns show` 不调用 AI，也不修改数据，但仍需要打开 `.skills-seed/memory/project.db`；如果数据库被其他 `skills-seed` 命令占用，CLI 会提示等待当前命令结束或检查残留进程。
 
 ### `skills-seed review`

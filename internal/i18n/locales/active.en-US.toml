@@ -966,10 +966,10 @@ other = "HITS"
 other = "LAST_HIT"
 
 [PatternsShowShort]
-other = "Show learned pattern database fields"
+other = "Show learned pattern overview or full details"
 
 [PatternsShowLongDesc]
-other = "Show learned patterns with stored database fields such as source, timestamps, and code location metadata."
+other = "Show the learned pattern overview without arguments, or pass a pattern ID to inspect full details including examples, quality metrics, workspace ownership, business-method fields, and code-location metadata."
 
 [PatternsShowExample]
 other = "skills-seed patterns show\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
@@ -1034,8 +1034,62 @@ other = "description"
 [PatternsShowFieldRule]
 other = "rule"
 
+[PatternsShowFieldGoodExample]
+other = "good_example"
+
+[PatternsShowFieldBadExample]
+other = "bad_example"
+
+[PatternsShowFieldSpecificity]
+other = "specificity"
+
+[PatternsShowFieldEvidenceCount]
+other = "evidence_count"
+
+[PatternsShowFieldGenericPenalty]
+other = "generic_penalty"
+
+[PatternsShowFieldEffectiveScore]
+other = "effective_score"
+
+[PatternsShowFieldMerged]
+other = "merged"
+
+[PatternsShowFieldMergedFrom]
+other = "merged_from"
+
+[PatternsShowFieldGenerated]
+other = "generated"
+
+[PatternsShowFieldProjectID]
+other = "project_id"
+
+[PatternsShowFieldScopePath]
+other = "scope_path"
+
+[PatternsShowFieldWorkspaceRole]
+other = "workspace_role"
+
 [PatternsShowFieldBusinessMethod]
 other = "business_method"
+
+[PatternsShowFieldBusinessDescription]
+other = "business_description"
+
+[PatternsShowFieldBusinessUsage]
+other = "business_usage"
+
+[PatternsShowFieldBusinessType]
+other = "business_type"
+
+[PatternsShowFieldBusinessFunction]
+other = "business_function"
+
+[PatternsShowFieldBusinessPrerequisites]
+other = "business_prerequisites"
+
+[PatternsShowFieldBusinessReturns]
+other = "business_returns"
 
 [PatternsShowFieldCurrentLocation]
 other = "current_location"
@@ -1090,6 +1144,9 @@ other = "snapshot_body_hash"
 
 [PatternsShowFieldSnapshotDependencies]
 other = "snapshot_dependencies"
+
+[PatternsShowFieldLocationHistory]
+other = "location_history"
 
 # sync
 [SyncShort]

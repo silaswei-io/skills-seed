@@ -346,13 +346,43 @@ func TestShowCmdPrintsSinglePatternDetails(t *testing.T) {
 	p := domain.NewPattern("business-create-order", "创建订单", domain.CategoryBusiness)
 	p.Description = "创建订单并写入业务流水"
 	p.Rule = "订单创建必须经过领域服务"
+	p.GoodExample = "domainService.CreateOrder(ctx, req)"
+	p.BadExample = "db.Insert(order)"
+	p.Frequency = 3
+	p.Metrics = domain.PatternMetrics{
+		SpecificityScore: 0.71,
+		EvidenceCount:    4,
+		GenericPenalty:   0.12,
+		EffectiveScore:   0.82,
+	}
+	p.Merged = true
+	p.MergedFrom = []string{"legacy-create-order", "current-create-order"}
+	p.Generated = true
+	p.ProjectID = "order-service"
+	p.ScopePath = "services/order"
+	p.WorkspaceRole = "backend"
 	p.BusinessMethod = &domain.BusinessMethod{
-		Name: "CreateOrder",
+		Name:          "CreateOrder",
+		Description:   "封装订单创建业务流程",
+		Usage:         "创建订单时复用",
+		Type:          "domain",
+		Function:      "func (s *OrderService) CreateOrder(ctx context.Context, req CreateOrderRequestV2) error",
+		Prerequisites: "已初始化 OrderService",
+		Returns:       "创建失败时返回业务错误",
 		CodeLocation: domain.CodeLocation{
 			HistoricalLocation: "service/order.ts:10",
 			CurrentLocation:    "service/order.ts:20",
 			Status:             domain.CodeLocationStatusChanged,
 			ChangeKinds:        []domain.CodeLocationChangeKind{domain.CodeLocationChangeMoved, domain.CodeLocationChangeInputsChanged},
+			History: []domain.CodeLocationHistory{
+				{
+					Location:    "service/order.ts:10",
+					Status:      domain.CodeLocationStatusMoved,
+					ChangeKinds: []domain.CodeLocationChangeKind{domain.CodeLocationChangeMoved},
+					ChangedAt:   time.Date(2026, 6, 10, 8, 0, 0, 0, time.UTC),
+					Note:        "移动到新的领域服务",
+				},
+			},
 			Snapshot: &domain.SymbolSnapshot{
 				Language:   "typescript",
 				Kind:       "method",
@@ -383,6 +413,41 @@ func TestShowCmdPrintsSinglePatternDetails(t *testing.T) {
 	require.Contains(t, text, "business-create-order")
 	require.Contains(t, text, "描述")
 	require.Contains(t, text, "创建订单并写入业务流水")
+	require.Contains(t, text, "正例")
+	require.Contains(t, text, "domainService.CreateOrder(ctx, req)")
+	require.Contains(t, text, "反例")
+	require.Contains(t, text, "db.Insert(order)")
+	require.Contains(t, text, "具体度")
+	require.Contains(t, text, "0.71")
+	require.Contains(t, text, "证据数")
+	require.Contains(t, text, "4")
+	require.Contains(t, text, "泛化惩罚")
+	require.Contains(t, text, "0.12")
+	require.Contains(t, text, "有效分")
+	require.Contains(t, text, "0.82")
+	require.Contains(t, text, "已合并")
+	require.Contains(t, text, "true")
+	require.Contains(t, text, "合并来源")
+	require.Contains(t, text, "legacy-create-order,current-create-order")
+	require.Contains(t, text, "已生成")
+	require.Contains(t, text, "子项目")
+	require.Contains(t, text, "order-service")
+	require.Contains(t, text, "范围路径")
+	require.Contains(t, text, "services/order")
+	require.Contains(t, text, "工作区角色")
+	require.Contains(t, text, "backend")
+	require.Contains(t, text, "方法说明")
+	require.Contains(t, text, "封装订单创建业务流程")
+	require.Contains(t, text, "使用场景")
+	require.Contains(t, text, "创建订单时复用")
+	require.Contains(t, text, "方法类型")
+	require.Contains(t, text, "domain")
+	require.Contains(t, text, "函数签名")
+	require.Contains(t, text, "func (s *OrderService) CreateOrder")
+	require.Contains(t, text, "前置条件")
+	require.Contains(t, text, "已初始化 OrderService")
+	require.Contains(t, text, "返回值")
+	require.Contains(t, text, "创建失败时返回业务错误")
 	require.Contains(t, text, "当前位置")
 	require.Contains(t, text, "service/order.ts:20")
 	require.Contains(t, text, "历史位置")
@@ -393,6 +458,8 @@ func TestShowCmdPrintsSinglePatternDetails(t *testing.T) {
 	require.Contains(t, text, "typescript")
 	require.Contains(t, text, "输入类型")
 	require.Contains(t, text, "CreateOrderRequestV2")
+	require.Contains(t, text, "位置历史")
+	require.Contains(t, text, "service/order.ts:10 | moved | moved | 2026-06-10 08:00:00 | 移动到新的领域服务")
 }
 
 func TestShowCmdPrintsJSON(t *testing.T) {

@@ -118,8 +118,8 @@ func TestChineseHelpDoesNotExposeEnglishCommandDescriptions(t *testing.T) {
 		{
 			name:    "patterns show",
 			args:    []string{"patterns", "show", "--help"},
-			want:    []string{"查看已学习 pattern 的数据库字段", "输出格式：table 或 json"},
-			notWant: []string{"Show learned pattern database fields", "output format: table or json"},
+			want:    []string{"无参数时查看已学习 pattern 概览", "输出格式：table 或 json"},
+			notWant: []string{"Show learned pattern overview or full details", "output format: table or json"},
 		},
 		{
 			name:    "patterns stats",

@@ -499,6 +499,18 @@ func writePatternDetails(w io.Writer, pattern *domain.Pattern) error {
 		{i18n.Get("PatternsShowFieldUpdatedAt"), formatTime(pattern.UpdatedAt)},
 		{i18n.Get("PatternsShowFieldDescription"), pattern.Description},
 		{i18n.Get("PatternsShowFieldRule"), pattern.Rule},
+		{i18n.Get("PatternsShowFieldGoodExample"), pattern.GoodExample},
+		{i18n.Get("PatternsShowFieldBadExample"), pattern.BadExample},
+		{i18n.Get("PatternsShowFieldSpecificity"), formatOptionalFloat(pattern.Metrics.SpecificityScore)},
+		{i18n.Get("PatternsShowFieldEvidenceCount"), formatOptionalInt(pattern.Metrics.EvidenceCount)},
+		{i18n.Get("PatternsShowFieldGenericPenalty"), formatOptionalFloat(pattern.Metrics.GenericPenalty)},
+		{i18n.Get("PatternsShowFieldEffectiveScore"), formatOptionalFloat(pattern.Metrics.EffectiveScore)},
+		{i18n.Get("PatternsShowFieldMerged"), formatOptionalBool(pattern.Merged)},
+		{i18n.Get("PatternsShowFieldMergedFrom"), strings.Join(pattern.MergedFrom, ",")},
+		{i18n.Get("PatternsShowFieldGenerated"), formatOptionalBool(pattern.Generated)},
+		{i18n.Get("PatternsShowFieldProjectID"), pattern.ProjectID},
+		{i18n.Get("PatternsShowFieldScopePath"), pattern.ScopePath},
+		{i18n.Get("PatternsShowFieldWorkspaceRole"), pattern.WorkspaceRole},
 	}
 	for _, field := range fields {
 		if field.value == "" {
@@ -517,6 +529,12 @@ func writePatternDetails(w io.Writer, pattern *domain.Pattern) error {
 			value string
 		}{
 			{i18n.Get("PatternsShowFieldBusinessMethod"), method.Name},
+			{i18n.Get("PatternsShowFieldBusinessDescription"), method.Description},
+			{i18n.Get("PatternsShowFieldBusinessUsage"), method.Usage},
+			{i18n.Get("PatternsShowFieldBusinessType"), method.Type},
+			{i18n.Get("PatternsShowFieldBusinessFunction"), method.Function},
+			{i18n.Get("PatternsShowFieldBusinessPrerequisites"), method.Prerequisites},
+			{i18n.Get("PatternsShowFieldBusinessReturns"), method.Returns},
 			{i18n.Get("PatternsShowFieldCurrentLocation"), location.CurrentLocation},
 			{i18n.Get("PatternsShowFieldHistoricalLocation"), location.HistoricalLocation},
 			{i18n.Get("PatternsShowFieldLocationStatus"), string(location.Status)},
@@ -557,6 +575,11 @@ func writePatternDetails(w io.Writer, pattern *domain.Pattern) error {
 				if _, err := fmt.Fprintf(tw, "%s\t%s\n", field.key, field.value); err != nil {
 					return err
 				}
+			}
+		}
+		for _, history := range formatLocationHistory(location.History) {
+			if _, err := fmt.Fprintf(tw, "%s\t%s\n", i18n.Get("PatternsShowFieldLocationHistory"), history); err != nil {
+				return err
 			}
 		}
 	}
@@ -614,6 +637,51 @@ func formatOptionalFloat(value float64) string {
 		return ""
 	}
 	return fmt.Sprintf("%.2f", value)
+}
+
+func formatOptionalInt(value int) string {
+	if value == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", value)
+}
+
+func formatOptionalBool(value bool) string {
+	if !value {
+		return ""
+	}
+	return fmt.Sprintf("%t", value)
+}
+
+func formatLocationHistory(history []domain.CodeLocationHistory) []string {
+	lines := make([]string, 0, len(history))
+	for _, item := range history {
+		parts := []string{
+			item.Location,
+			string(item.Status),
+			joinChangeKinds(item.ChangeKinds),
+			formatTime(item.ChangedAt),
+			item.Note,
+		}
+		trimmed := trimRightEmpty(parts)
+		if len(trimmed) == 0 {
+			continue
+		}
+		lines = append(lines, strings.Join(trimmed, " | "))
+	}
+	return lines
+}
+
+func trimRightEmpty(values []string) []string {
+	end := len(values)
+	for end > 0 {
+		value := strings.TrimSpace(values[end-1])
+		if value != "" && value != "-" {
+			break
+		}
+		end--
+	}
+	return values[:end]
 }
 
 func compactCmd(cont *container.Container) *cobra.Command {

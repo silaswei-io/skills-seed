@@ -305,7 +305,7 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern by ID | `skills-seed patterns delete plugin-source-editing-rule` | Workspace root also deletes the linked child project pattern |
 | `skills-seed patterns compact` | Ask the current agent to curate and compact similar patterns | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
-| `skills-seed patterns show [pattern-id]` | Show pattern DB fields, timestamps, and code-location metadata | `skills-seed patterns show business-create-order --format json` | Does not call the AI agent or modify the database |
+| `skills-seed patterns show [pattern-id]` | Show the overview without arguments, or full details for one ID | `skills-seed patterns show business-create-order --format json` | Does not call the AI agent or modify the database |
 
 #### `patterns` Flags
 
@@ -362,6 +362,7 @@ skills-seed patterns compact --category api
 skills-seed patterns compact --category business --dry-run
 skills-seed patterns stats
 skills-seed patterns show
+skills-seed patterns show business-create-order
 skills-seed patterns show business-create-order --format json
 ```
 
@@ -370,7 +371,7 @@ skills-seed patterns show business-create-order --format json
 1. `patterns compact` calls the CLI configured by the current `agent.engine`.
 2. Use `--dry-run` first when you want to inspect the curation result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
-4. `patterns show` reads saved DB fields and helps inspect `created_at/updated_at`, code-location status, and language-agnostic symbol snapshots.
+4. `patterns show` without arguments prints the pattern overview list; passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, business-method fields, code-location history, and language-agnostic symbol snapshots.
 5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/memory/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
 
 ### `skills-seed review`

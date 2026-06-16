@@ -966,10 +966,10 @@ other = "命中数"
 other = "最近命中"
 
 [PatternsShowShort]
-other = "查看已学习 pattern 的数据库字段"
+other = "查看已学习 pattern 的概览或完整详情"
 
 [PatternsShowLongDesc]
-other = "查看已学习 pattern 的数据库字段，例如来源、创建/更新时间和代码位置元数据。"
+other = "无参数时查看已学习 pattern 概览；传入 pattern ID 时查看完整详情，包括示例、质量指标、workspace 归属、业务方法和代码位置元数据。"
 
 [PatternsShowExample]
 other = "skills-seed patterns show\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
@@ -1034,8 +1034,62 @@ other = "描述"
 [PatternsShowFieldRule]
 other = "规则"
 
+[PatternsShowFieldGoodExample]
+other = "正例"
+
+[PatternsShowFieldBadExample]
+other = "反例"
+
+[PatternsShowFieldSpecificity]
+other = "具体度"
+
+[PatternsShowFieldEvidenceCount]
+other = "证据数"
+
+[PatternsShowFieldGenericPenalty]
+other = "泛化惩罚"
+
+[PatternsShowFieldEffectiveScore]
+other = "有效分"
+
+[PatternsShowFieldMerged]
+other = "已合并"
+
+[PatternsShowFieldMergedFrom]
+other = "合并来源"
+
+[PatternsShowFieldGenerated]
+other = "已生成"
+
+[PatternsShowFieldProjectID]
+other = "子项目"
+
+[PatternsShowFieldScopePath]
+other = "范围路径"
+
+[PatternsShowFieldWorkspaceRole]
+other = "工作区角色"
+
 [PatternsShowFieldBusinessMethod]
 other = "业务方法"
+
+[PatternsShowFieldBusinessDescription]
+other = "方法说明"
+
+[PatternsShowFieldBusinessUsage]
+other = "使用场景"
+
+[PatternsShowFieldBusinessType]
+other = "方法类型"
+
+[PatternsShowFieldBusinessFunction]
+other = "函数签名"
+
+[PatternsShowFieldBusinessPrerequisites]
+other = "前置条件"
+
+[PatternsShowFieldBusinessReturns]
+other = "返回值"
 
 [PatternsShowFieldCurrentLocation]
 other = "当前位置"
@@ -1090,6 +1144,9 @@ other = "代码体哈希"
 
 [PatternsShowFieldSnapshotDependencies]
 other = "依赖符号"
+
+[PatternsShowFieldLocationHistory]
+other = "位置历史"
 
 # sync 一条龙
 [SyncShort]

@@ -102,7 +102,7 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.7.2 起，项目画像分析会对模型输出中对象数组里的重复对象起始片段做窄范围 JSON 恢复；如果仍无法解析，会返回错误并保留已有画像，不再把 `unknown/解析失败` 占位画像当作成功结果保存。
 
-0.7.3 起，当前代码学习会在 pattern 保存成功后才提交文件分析指纹，避免保存失败的文件在后续增量学习中被误判为已学习。Pattern、文件指纹、命中和评审评论记录会维护 `created_at/updated_at`，业务方法代码位置会以语言无关的快照元数据保存到 DB，并可通过 `patterns show` 查看。
+0.7.3 起，当前代码学习会在 pattern 保存成功后才提交文件分析指纹，避免保存失败的文件在后续增量学习中被误判为已学习。Pattern、文件指纹、命中和评审评论记录会维护 `created_at/updated_at`，业务方法代码位置会以语言无关的快照元数据保存到 DB；使用 `patterns show <pattern-id>` 可查看单条模式的完整详情。
 
 0.8.0 起，Agent 输出会单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
 

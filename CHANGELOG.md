@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.7]
+
+### 变更
+
+- 扩展 `skills-seed patterns show <pattern-id>` 的详情输出，补齐正/反例、质量指标、合并/生成状态、workspace 归属、业务方法字段、代码位置历史和语言无关符号快照。
+
+### 文档
+
+- 更新 README 和命令参考，明确 `patterns show` 无参数显示概览、传入 pattern ID 显示单条完整详情。
+
 ## [v0.9.6]
 
 ### 变更
