@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.9]
+
+### Fixes
+
+- Fixed workspace `learn current` / `sync` potentially re-analyzing the workspace profile and workspace spec when child repos were unchanged but the CLI version or prompt templates changed. Workspace relationship learning now skips based on relationship facts and this run's one-shot context, and migrates legacy fingerprints when existing artifacts still match.
+
 ## [v0.9.8]
 
 ### Changes

@@ -10,14 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -73,11 +71,14 @@ type workspaceLearnInputProject struct {
 }
 
 type workspaceRelationshipFingerprintInput struct {
-	Kind                string                  `json:"kind"`
-	ProgramVersion      string                  `json:"program_version"`
-	PromptTemplatesHash string                  `json:"prompt_templates_hash"`
-	WorkspaceInput      workspaceLearnInputData `json:"workspace_input"`
-	UserContext         string                  `json:"user_context,omitempty"`
+	Kind           string                  `json:"kind"`
+	WorkspaceInput workspaceLearnInputData `json:"workspace_input"`
+	UserContext    string                  `json:"user_context,omitempty"`
+}
+
+type workspaceRelationshipOptions struct {
+	DirtyProjectIDs []string
+	ProfileMode     string
 }
 
 // Cmd 返回 learn 命令
@@ -827,7 +828,10 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		return domain.LearnCurrentResult{}, err
 	}
 
-	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(ctx, cont, workspaceName, projectRoot, workspaceConfig)
+	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(ctx, cont, workspaceName, projectRoot, workspaceConfig, workspaceRelationshipOptions{
+		DirtyProjectIDs: dirtyProjectIDs,
+		ProfileMode:     opts.profileMode,
+	})
 	if err != nil {
 		return domain.LearnCurrentResult{}, err
 	}
@@ -899,7 +903,7 @@ func pauseAfterFastWorkspaceChildStep(startedAt time.Time) {
 	progress.PauseAfterFastStep(startedAt, sleepAfterWorkspaceChildStep)
 }
 
-func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) (bool, error) {
+func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig, opts workspaceRelationshipOptions) (bool, error) {
 	if cont.WorkspaceProfileRepo == nil && cont.WorkspaceSpecRepo == nil {
 		return false, nil
 	}
@@ -915,16 +919,17 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 	}
 	userContext := runtimecontext.UserContext(ctx)
 	decision, err := domain.PrepareInputFingerprint(ctx, cont.FileTracker, workspaceRelationshipFingerprintScope(), "workspace-relationships.json", workspaceRelationshipFingerprintInput{
-		Kind:                "workspace_relationship_learning",
-		ProgramVersion:      metadata.ProgramVersion,
-		PromptTemplatesHash: metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS)),
-		WorkspaceInput:      input,
-		UserContext:         userContext,
+		Kind:           "workspace_relationship_learning",
+		WorkspaceInput: input,
+		UserContext:    userContext,
 	})
 	if err != nil {
 		return false, err
 	}
-	if decision.ShouldSkip() && workspaceRelationshipArtifactsExist(ctx, cont) {
+	if workspaceRelationshipShouldSkip(ctx, cont, input, decision, opts, userContext) {
+		if err := decision.Commit(ctx, cont.FileTracker); err != nil {
+			return false, err
+		}
 		logger.Info(i18n.Get("LearnWorkspaceRelationshipsSkipped"))
 		return false, nil
 	}
@@ -1018,6 +1023,19 @@ func workspaceRelationshipFingerprintScope() domain.FileAnalysisScope {
 	return domain.FileAnalysisScope{ProjectID: "__workspace__", ScopePath: "learn"}
 }
 
+func workspaceRelationshipShouldSkip(ctx context.Context, cont *container.Container, input workspaceLearnInputData, decision *domain.InputFingerprintDecision, opts workspaceRelationshipOptions, userContext string) bool {
+	if !workspaceRelationshipArtifactsExist(ctx, cont) {
+		return false
+	}
+	if decision.ShouldSkip() {
+		return true
+	}
+	if opts.ProfileMode == learnCurrentProfileRefresh || userContext != "" || len(opts.DirtyProjectIDs) > 0 {
+		return false
+	}
+	return workspaceRelationshipArtifactsMatchInput(ctx, cont, input)
+}
+
 func workspaceRelationshipArtifactsExist(ctx context.Context, cont *container.Container) bool {
 	if cont.WorkspaceProfileRepo != nil {
 		if _, err := cont.WorkspaceProfileRepo.Get(ctx); err != nil {
@@ -1026,6 +1044,52 @@ func workspaceRelationshipArtifactsExist(ctx context.Context, cont *container.Co
 	}
 	if cont.WorkspaceSpecRepo != nil {
 		if _, err := cont.WorkspaceSpecRepo.Get(ctx); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func workspaceRelationshipArtifactsMatchInput(ctx context.Context, cont *container.Container, input workspaceLearnInputData) bool {
+	if cont.WorkspaceProfileRepo != nil {
+		profile, err := cont.WorkspaceProfileRepo.Get(ctx)
+		if err != nil || !workspaceProfileMatchesInput(profile, input) {
+			return false
+		}
+	}
+	if cont.WorkspaceSpecRepo != nil {
+		spec, err := cont.WorkspaceSpecRepo.Get(ctx)
+		if err != nil || !workspaceSpecMatchesInput(spec, input) {
+			return false
+		}
+	}
+	return true
+}
+
+func workspaceProfileMatchesInput(profile *domain.WorkspaceProfile, input workspaceLearnInputData) bool {
+	if profile == nil || profile.Name != input.Name || profile.RootPath != input.RootPath {
+		return false
+	}
+	return workspaceProjectsMatchInput(profile.Projects, input.Projects)
+}
+
+func workspaceSpecMatchesInput(spec *domain.WorkspaceSpec, input workspaceLearnInputData) bool {
+	if spec == nil || spec.Name != input.Name || spec.RootPath != input.RootPath {
+		return false
+	}
+	return workspaceProjectsMatchInput(spec.Projects, input.Projects)
+}
+
+func workspaceProjectsMatchInput(projects []domain.WorkspaceProject, inputProjects []workspaceLearnInputProject) bool {
+	if len(projects) != len(inputProjects) {
+		return false
+	}
+	for i, project := range projects {
+		inputProject := inputProjects[i]
+		if project.ID != inputProject.ID ||
+			project.Path != inputProject.Path ||
+			project.Type != inputProject.Type ||
+			project.Language != inputProject.Language {
 			return false
 		}
 	}

@@ -852,6 +852,53 @@ func TestRunLearnWorkspaceCurrentSkipsWorkspaceArtifactsWhenInputUnchanged(t *te
 	require.Contains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
 }
 
+func TestRunLearnWorkspaceCurrentSkipsWorkspaceArtifactsWhenChildrenUnchangedWithLegacyFingerprint(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	ctx := context.Background()
+	require.NoError(t, cont.FileTracker.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{
+		{
+			ProjectID:      workspaceRelationshipFingerprintScope().ProjectID,
+			ScopePath:      workspaceRelationshipFingerprintScope().ScopePath,
+			Path:           "workspace-relationships.json",
+			Hash:           "legacy-fingerprint",
+			HashAlgorithm:  domain.FileAnalysisHashMD5,
+			Source:         domain.FileAnalysisSourceInputDigest,
+			AnalysisStatus: domain.FileAnalysisStatusInputDigest,
+			LastAnalyzedAt: time.Now().Format(time.RFC3339),
+		},
+	}))
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceProfileFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+		t.Fatal("workspace profile analysis should be skipped when children are unchanged")
+		return nil, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceSpecFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+		t.Fatal("workspace spec analysis should be skipped when children are unchanged")
+		return nil, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Contains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
+	record, err := cont.FileTracker.GetAnalyzedFile(ctx, workspaceRelationshipFingerprintScope(), "workspace-relationships.json")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	require.NotEqual(t, "legacy-fingerprint", record.Hash)
+}
+
 func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
