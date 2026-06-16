@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.8]
+
+### 变更
+
+- 扩展 `skills-seed patterns show <pattern-id>` 的详情输出，补齐正/反例、质量指标、合并/生成状态、workspace 归属、业务方法字段、代码位置历史和语言无关符号快照。
+- 新增模式级证据位置字段；当学习到的模式没有绑定业务方法时，`patterns show` 概览会回退显示模式证据位置，避免新模式没有位置状态和当前位置。
+- 优化 workspace `skills-seed sync`：当所有子项目和 workspace 关系产物都未产生 skills dirty 目标时，学习完成后直接跳过 `generate skills`。
+
+### 文档
+
+- 更新 README 和命令参考，明确 `patterns show` 无参数显示概览、传入 pattern ID 显示单条完整详情，并说明 `sync` 无变化时会跳过生成。
+
 ## [v0.9.7]
 
 ### 变更

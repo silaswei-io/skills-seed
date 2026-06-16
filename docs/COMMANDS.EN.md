@@ -371,7 +371,7 @@ skills-seed patterns show business-create-order --format json
 1. `patterns compact` calls the CLI configured by the current `agent.engine`.
 2. Use `--dry-run` first when you want to inspect the curation result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
-4. `patterns show` without arguments prints the pattern overview list; passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, business-method fields, code-location history, and language-agnostic symbol snapshots.
+4. `patterns show` without arguments prints the pattern overview list. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.
 5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/memory/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
 
 ### `skills-seed review`
@@ -485,7 +485,7 @@ One-step sync: learn current code, then generate skills. When `--add` is provide
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed sync` | Learn current → generate skills | `skills-seed sync` | Equivalent to `learn current`, `generate skills` in sequence |
+| `skills-seed sync` | Learn current → generate skills | `skills-seed sync` | Runs `learn current` first; skips generation when this run did not dirty skills |
 | `skills-seed sync --add <desc>` | patterns add → generate skills | `skills-seed sync --add "Use RESTful API routes"` | Skips learning; good for patterns the AI did not discover |
 
 #### Flags
@@ -510,7 +510,7 @@ skills-seed sync --context "Focus on compatibility boundaries for this run"
 
 #### Notes
 
-1. `sync` without `--add` runs `learn current`, then `generate skills`; pattern curation happens while learned candidates are stored.
+1. `sync` without `--add` runs `learn current` first; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
 2. `sync --add` skips learning and defines a pattern from natural language, useful for patterns the AI missed.
 3. If any step fails, subsequent steps are skipped.
 

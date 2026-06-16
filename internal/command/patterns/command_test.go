@@ -341,6 +341,47 @@ func TestShowCmdPrintsPatternDatabaseFields(t *testing.T) {
 	require.Contains(t, text, "service/order.ts:20")
 }
 
+func TestShowCmdUsesPatternEvidenceLocationWhenBusinessMethodMissing(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	p := domain.NewPattern("error-wrap", "错误包装", domain.CategoryError)
+	p.Source = domain.SourceLearnedCurrent
+	p.Confidence = 0.9
+	p.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "internal/service/config.go", Line: 42, Symbol: "LoadConfig", Kind: "function", Description: "包装配置加载错误", Confidence: 0.88},
+	}
+
+	cont := &container.Container{
+		PatternReader: &mocks.MockPatternRepository{
+			GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+				return []domain.Pattern{*p}, nil
+			},
+			GetFn: func(ctx context.Context, id string) (*domain.Pattern, error) {
+				require.Equal(t, "error-wrap", id)
+				return p, nil
+			},
+		},
+	}
+
+	listCmd := showCmd(cont)
+	var listOut bytes.Buffer
+	listCmd.SetOut(&listOut)
+	listCmd.SetErr(&listOut)
+	require.NoError(t, listCmd.Execute())
+	listText := listOut.String()
+	require.Contains(t, listText, "evidence")
+	require.Contains(t, listText, "internal/service/config.go:42")
+
+	detailCmd := showCmd(cont)
+	detailCmd.SetArgs([]string{"error-wrap"})
+	var detailOut bytes.Buffer
+	detailCmd.SetOut(&detailOut)
+	detailCmd.SetErr(&detailOut)
+	require.NoError(t, detailCmd.Execute())
+	detailText := detailOut.String()
+	require.Contains(t, detailText, "证据位置")
+	require.Contains(t, detailText, "internal/service/config.go:42 | function | LoadConfig | 0.88 | 包装配置加载错误")
+}
+
 func TestShowCmdPrintsSinglePatternDetails(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	p := domain.NewPattern("business-create-order", "创建订单", domain.CategoryBusiness)

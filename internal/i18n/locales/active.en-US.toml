@@ -1040,6 +1040,9 @@ other = "good_example"
 [PatternsShowFieldBadExample]
 other = "bad_example"
 
+[PatternsShowFieldEvidenceLocation]
+other = "evidence_location"
+
 [PatternsShowFieldSpecificity]
 other = "specificity"
 
@@ -1178,6 +1181,9 @@ other = "[sync] Step 1/2: Adding user-defined pattern..."
 
 [SyncStepGenerate]
 other = "[sync] Step 2/2: Generating skills..."
+
+[SyncGenerateSkippedNoChanges]
+other = "[sync] This learn run did not dirty skills; skipped generation"
 
 [SyncComplete]
 other = "[sync] Complete!"

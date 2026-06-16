@@ -104,6 +104,8 @@ Starting in 0.7.2, project-profile analysis performs a narrow JSON recovery for 
 
 Starting in 0.7.3, current-code learning commits file-analysis fingerprints only after patterns are persisted, preventing unsuccessfully learned files from being skipped by later incremental learning. Pattern, file-fingerprint, hit, and review-comment records maintain `created_at/updated_at`; business-method code locations are stored in the DB as language-agnostic snapshot metadata, and `patterns show <pattern-id>` prints the full detail view for one saved pattern.
 
+Starting in 0.9.8, patterns store `evidence_locations` separately as pattern-level source evidence locations. The `patterns show` overview prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first evidence location and the detail view prints the full evidence-location list.
+
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/`. Runtime logs keep only output lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Business-method locations now use structured `code_location` metadata throughout, generated business-method references show location status, and project skills/references are more compact so the entry skill guides Agents to read the minimum relevant references for each task.
 
 Starting in 0.9.6, debug records under `.skills-seed/memory/runtime` use the unified `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` filename prefix, including rendered prompts, Agent output archives, and runtime input temporary directories, making it easier to sort by time while inspecting context and model outputs from one run.
@@ -246,10 +248,10 @@ Built-in targets:
 | `skills-seed generate skills` | Generate skills for the current `skills.target` |
 | `skills-seed patterns add <description>` | Add a user-defined pattern in natural language |
 | `skills-seed patterns compact` | Explicitly compact similar stored patterns |
-| `skills-seed sync` | Run learning or pattern add, then skill generation in one command |
+| `skills-seed sync` | Run learning or pattern add in one command; generate skills when changes require it |
 | `skills-seed check` | Check staged files or Git-tracked files |
 | `skills-seed patterns stats` | Show pattern quality, hit counts, and recent hits |
-| `skills-seed patterns show` | Show pattern timestamps and code-location fields from the DB |
+| `skills-seed patterns show` | Show pattern timestamps, business-method locations, and pattern evidence locations from the DB |
 | `skills-seed review import --from-file` | Import local review comments |
 | `skills-seed hook install` | Install the local pre-commit hook |
 

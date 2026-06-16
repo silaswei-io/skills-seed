@@ -653,6 +653,86 @@ func TestLoader_RenderPatternPromptsIncludePreOutputValidation(t *testing.T) {
 	}
 }
 
+func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
+	tests := []struct {
+		locale string
+		checks map[string][]string
+	}{
+		{
+			locale: "zh-CN",
+			checks: map[string][]string{
+				"skill-project-init": {
+					"`evidence_locations`",
+					"模式级源码证据位置",
+					"不要编造证据路径或行号",
+				},
+				"learn-batch": {
+					"`evidence_locations`",
+					"模式级源码证据位置",
+					"不要编造证据路径或行号",
+				},
+				"pattern-curate": {
+					"`evidence_locations`",
+					"只能保留输入中真实存在的证据位置",
+				},
+				"user-define-pattern": {
+					"`evidence_locations`",
+					"如果有关联文件，填入真实证据位置",
+				},
+			},
+		},
+		{
+			locale: "en-US",
+			checks: map[string][]string{
+				"skill-project-init": {
+					"`evidence_locations`",
+					"pattern-level source evidence locations",
+					"Do not invent evidence paths or line numbers",
+				},
+				"learn-batch": {
+					"`evidence_locations`",
+					"pattern-level source evidence locations",
+					"Do not invent evidence paths or line numbers",
+				},
+				"pattern-curate": {
+					"`evidence_locations`",
+					"may preserve only evidence locations present in the input",
+				},
+				"user-define-pattern": {
+					"`evidence_locations`",
+					"fill real evidence locations when related files are provided",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader("common", tt.locale, "")
+			for name, requiredText := range tt.checks {
+				t.Run(name, func(t *testing.T) {
+					var data interface{}
+					switch name {
+					case "learn-batch":
+						data = sampleBatchLearnData()
+					case "skill-project-init":
+						data = sampleAnalyzeCurrentCodebaseRequest()
+					case "user-define-pattern":
+						data = sampleUserDefinePatternData()
+					case "pattern-curate":
+						data = sampleCuratePatternsData()
+					}
+					prompt, err := loader.Render(name, data)
+					require.NoError(t, err)
+					for _, text := range requiredText {
+						require.Contains(t, prompt, text)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *testing.T) {
 	tests := []struct {
 		locale string

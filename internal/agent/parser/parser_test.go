@@ -37,6 +37,16 @@ func TestParseCuratePatternsResultPreservesCanonicalPatternFields(t *testing.T) 
       "rule": "当跨层返回错误时，应该使用 %w 包装上下文",
       "confidence": 0.91,
       "frequency": 4,
+      "evidence_locations": [
+        {
+          "path": "internal/service/user.go",
+          "line": 42,
+          "symbol": "Create",
+          "kind": "method",
+          "description": "包装仓储错误",
+          "confidence": 0.88
+        }
+      ],
       "merged_from": ["existing-error-handling", "candidate-error-handling"],
       "merge_reason": "规则和场景一致",
       "similarity_score": 0.87,
@@ -74,6 +84,8 @@ func TestParseCuratePatternsResultPreservesCanonicalPatternFields(t *testing.T) 
 	require.Equal(t, "existing-error-handling", pattern.ID)
 	require.Equal(t, 4, pattern.Frequency)
 	require.Equal(t, "learned_current", pattern.Source)
+	require.Len(t, pattern.EvidenceLocations, 1)
+	require.Equal(t, "internal/service/user.go:42", pattern.EvidenceLocations[0].DisplayLocation())
 	require.Equal(t, []string{"existing-error-handling", "candidate-error-handling"}, pattern.MergedFrom)
 	require.Equal(t, "backend", pattern.ProjectID)
 	require.NotNil(t, pattern.BusinessMethod)

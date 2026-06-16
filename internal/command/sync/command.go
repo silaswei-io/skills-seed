@@ -10,6 +10,7 @@ import (
 	learncmd "github.com/silaswei-io/skills-seed/internal/command/learn"
 	patterncmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
@@ -57,18 +58,37 @@ func Cmd(cont *container.Container) *cobra.Command {
 func syncLearn(ctx context.Context, cont *container.Container, userContext string) error {
 	// 步骤 1：学习当前代码。
 	logger.Info(i18n.Get("SyncStepLearn"))
-	if err := learncmd.RunLearnCurrentWithContext(cont, userContext); err != nil {
+	result, err := learncmd.RunLearnCurrentWithContext(cont, userContext)
+	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
+	}
+
+	return syncLearnAfterLearn(result, func() error {
+		return gencmd.RunGenerate(cont)
+	})
+}
+
+func syncLearnAfterLearn(result domain.LearnCurrentResult, generate func() error) error {
+	if syncLearnShouldSkipGenerate(result) {
+		logger.Info(i18n.Get("SyncGenerateSkippedNoChanges"))
+		logger.Info(i18n.Get("SyncComplete"))
+		return nil
 	}
 
 	// 步骤 2：生成 Skills。
 	logger.Info(i18n.Get("SyncStepGenerate"))
-	if err := gencmd.RunGenerate(cont); err != nil {
+	if err := generate(); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 	}
 
 	logger.Info(i18n.Get("SyncComplete"))
 	return nil
+}
+
+func syncLearnShouldSkipGenerate(result domain.LearnCurrentResult) bool {
+	return !result.SkillsDirty.Project &&
+		!result.SkillsDirty.Workspace &&
+		len(result.SkillsDirty.Projects) == 0
 }
 
 // syncWithUserPattern 路径 B：添加模式 → 生成 Skills。

@@ -12,6 +12,7 @@ package domain
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -199,6 +200,28 @@ type PatternMetrics struct {
 	EffectiveScore   float64 // 综合排序分，0.0-1.0
 }
 
+// PatternEvidenceLocation 保存一条模式的源码证据位置。
+type PatternEvidenceLocation struct {
+	Path        string  `json:"path,omitempty"`        // 相对项目根路径
+	Line        int     `json:"line,omitempty"`        // 1-based 行号
+	Symbol      string  `json:"symbol,omitempty"`      // 相关函数、方法、类型或变量名
+	Kind        string  `json:"kind,omitempty"`        // 证据类型，如 function/method/file
+	Description string  `json:"description,omitempty"` // 证据说明
+	Confidence  float64 `json:"confidence,omitempty"`  // 证据位置置信度，0.0-1.0
+}
+
+// DisplayLocation 返回适合 CLI 展示的证据位置。
+func (l PatternEvidenceLocation) DisplayLocation() string {
+	path := strings.TrimSpace(l.Path)
+	if path == "" {
+		return ""
+	}
+	if l.Line > 0 {
+		return path + ":" + strconv.Itoa(l.Line)
+	}
+	return path
+}
+
 // Pattern 代码模式聚合根
 type Pattern struct {
 	ID             string
@@ -216,11 +239,13 @@ type Pattern struct {
 	MergedFrom     []string        // 从哪些模式ID汇总而来
 	Generated      bool            // 是否已生成到 skills
 	BusinessMethod *BusinessMethod // 业务方法信息（可选，仅用于 utils 和 business 分类）
-	ProjectID      string          `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
-	ScopePath      string          `json:"scope_path,omitempty"`     // workspace 模式下的路径范围
-	WorkspaceRole  string          `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"` // 最后更新时间
+	// EvidenceLocations 是模式对应的通用源码证据位置，不等同于 BusinessMethod 的可调用位置。
+	EvidenceLocations []PatternEvidenceLocation `json:"evidence_locations,omitempty"`
+	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
+	ScopePath         string                    `json:"scope_path,omitempty"`     // workspace 模式下的路径范围
+	WorkspaceRole     string                    `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
+	CreatedAt         time.Time                 `json:"created_at"`
+	UpdatedAt         time.Time                 `json:"updated_at"` // 最后更新时间
 }
 
 // NewPattern 创建新的模式

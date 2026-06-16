@@ -150,7 +150,14 @@ For EACH pattern, you MUST provide:
 7. **rule**: When to apply this pattern
 8. **confidence**: 0.0 to 1.0 (how certain you are)
 9. **frequency**: How many times it appears in these commits
-10. **business_method**: For utility/business methods ONLY:
+10. **evidence_locations**: pattern-level source evidence locations. Fill real relative paths and line numbers for each pattern when possible:
+    - **path**: Relative path from the project root
+    - **line**: 1-based line number; omit when the exact line is unknown
+    - **symbol**: Related function, method, type, variable, or file name
+    - **kind**: Evidence type such as "function", "method", "type", or "file"
+    - **description**: How this location supports the pattern
+    - **confidence**: Evidence-location confidence, 0.0 to 1.0
+11. **business_method**: For utility/business methods ONLY:
     - **name**: Full method signature or code identifier
     - **location**: "relative/file/path:line"
     - **layer**: Responsibility layer or module type
@@ -175,6 +182,16 @@ For EACH pattern, you MUST provide:
       "rule": "For the same business scenario, follow the validation order, state progression, and exceptional boundary shown by code evidence",
       "confidence": 0.95,
       "frequency": 5,
+      "evidence_locations": [
+        {
+          "path": "internal/service/order.go",
+          "line": 42,
+          "symbol": "SubmitOrder",
+          "kind": "method",
+          "description": "pattern-level source evidence locations",
+          "confidence": 0.90
+        }
+      ],
       "business_method": {
         "name": "Real method signature or code identifier",
         "code_location": {"current_location": "relative/file/path:line"},
@@ -196,7 +213,17 @@ For EACH pattern, you MUST provide:
       "bad_example": "",
       "rule": "Multi-step writes must use the existing project transaction boundary wrapper",
       "confidence": 0.90,
-      "frequency": 8
+      "frequency": 8,
+      "evidence_locations": [
+        {
+          "path": "internal/repository/order.go",
+          "line": 88,
+          "symbol": "CreateOrderWithItems",
+          "kind": "function",
+          "description": "pattern-level source evidence locations",
+          "confidence": 0.86
+        }
+      ]
     }
   ]
 }
@@ -206,10 +233,11 @@ For EACH pattern, you MUST provide:
 
 1. Return ONLY valid JSON - no markdown code blocks (no ```), no text before/after
 2. Every pattern MUST have `good_example` with code evidence copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, or invent code; if surrounding context must be omitted, mark it explicitly with `// ...`, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering
-3. Use `business_method` ONLY for utility/business methods
-4. **Choose the most specific category first**: database, API, error, config, middleware, structure, and utility patterns must not be labeled business. Skip simple CRUD.
-5. Keep `bad_example` empty if not applicable
-6. Code evidence must be syntactically correct. If it is only an excerpt, mark omitted context with `// ...` and do not present it as a complete implementation
+3. Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Do not invent evidence paths or line numbers; if the exact line is unknown, provide only the real path.
+4. Use `business_method` ONLY for utility/business methods
+5. **Choose the most specific category first**: database, API, error, config, middleware, structure, and utility patterns must not be labeled business. Skip simple CRUD.
+6. Keep `bad_example` empty if not applicable
+7. Code evidence must be syntactically correct. If it is only an excerpt, mark omitted context with `// ...` and do not present it as a complete implementation
 
 # Pre-Output Validation Checklist
 
@@ -217,7 +245,9 @@ Before returning JSON, validate every candidate pattern internally:
 1. Evidence check:
    - `good_example` must be copied verbatim from source code read during this task.
    - `good_example` must be 5-30 lines unless the complete relevant function is shorter.
+   - `evidence_locations` must come from real files read during this task. Include a 1-based line number only when known; otherwise provide only the real path.
    - Do not invent code, paths, signatures, line numbers, or behavior.
+   - Do not invent evidence paths or line numbers. Lower confidence or drop the candidate when evidence is insufficient.
 2. Category check:
    - `category` must be one of the allowed categories: {{.AllowedCategories}}.
    - Use `business` only for domain rules, state transitions, cross-entity workflows, or business invariants.

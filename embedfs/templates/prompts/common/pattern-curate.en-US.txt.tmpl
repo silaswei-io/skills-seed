@@ -37,6 +37,12 @@ Given candidate patterns and related existing patterns, output the final canonic
 {{$p.GoodExample}}
 - **Bad Example**:
 {{$p.BadExample}}
+{{if $p.EvidenceLocations}}
+- **Evidence Locations**:
+{{range $loc := $p.EvidenceLocations}}
+  - path: {{$loc.DisplayLocation}}; symbol: {{$loc.Symbol}}; kind: {{$loc.Kind}}; confidence: {{printf "%.2f" $loc.Confidence}}; description: {{$loc.Description}}
+{{end}}
+{{end}}
 {{if $p.BusinessMethod}}
 - **Business Method**:
   - name: {{$p.BusinessMethod.Name}}
@@ -70,6 +76,12 @@ Given candidate patterns and related existing patterns, output the final canonic
 {{$p.GoodExample}}
 - **Bad Example**:
 {{$p.BadExample}}
+{{if $p.EvidenceLocations}}
+- **Evidence Locations**:
+{{range $loc := $p.EvidenceLocations}}
+  - path: {{$loc.DisplayLocation}}; symbol: {{$loc.Symbol}}; kind: {{$loc.Kind}}; confidence: {{printf "%.2f" $loc.Confidence}}; description: {{$loc.Description}}
+{{end}}
+{{end}}
 {{if $p.BusinessMethod}}
 - **Business Method**:
   - name: {{$p.BusinessMethod.Name}}
@@ -98,6 +110,7 @@ Given candidate patterns and related existing patterns, output the final canonic
 - If merging multiple patterns, `merged_from` must list every merged candidate or existing pattern ID.
 - `good_example` must be selected from existing input examples only. Do not create, complete, rewrite, or synthesize code examples.
 - `bad_example` should also come from input; leave it empty only when input has none.
+- `evidence_locations` may preserve only evidence locations present in the input. Do not invent evidence paths, line numbers, symbols, or descriptions.
 - `business_method` may preserve only real information present in the input. Do not invent signatures, locations, prerequisites, or returns.
 - Categories must come from input patterns and must be one of the allowed categories: {{.AllowedCategories}}. Do not create new categories.
 - `confidence` must be between 0.0 and 1.0. Use a frequency-weighted average or a conservative estimate when merging.
@@ -110,7 +123,7 @@ Before returning JSON, validate internally:
 2. `merged_from` and `dropped.id` may reference only real input IDs.
 3. No two output patterns express the same core rule; duplicate rules must be merged.
 4. Do not keep low-quality, generic, or non-actionable candidates merely to cover them; place them in `dropped`.
-5. All code examples and `business_method` fields come from input. Do not invent them.
+5. All code examples, `evidence_locations`, and `business_method` fields come from input. Do not invent them.
 6. `summary.total_candidates = {{len .CandidatePatterns}}`, `summary.total_existing = {{len .ExistingPatterns}}`, `summary.total_written = len(patterns)`, and `summary.total_dropped = len(dropped)`.
 
 # Output Format
@@ -130,6 +143,16 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
       "rule": "When X, should Y",
       "confidence": 0.86,
       "frequency": 3,
+      "evidence_locations": [
+        {
+          "path": "internal/service/order.go",
+          "line": 42,
+          "symbol": "SubmitOrder",
+          "kind": "method",
+          "description": "may preserve only evidence locations present in the input",
+          "confidence": 0.90
+        }
+      ],
       "merged_from": ["existing-id", "candidate-id"],
       "merge_reason": "Why this is added, updated, or merged",
       "similarity_score": 0.9,

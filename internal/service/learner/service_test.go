@@ -2,6 +2,7 @@ package learner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -25,6 +26,33 @@ func TestNewLearnerService(t *testing.T) {
 
 	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	assert.NotNil(t, svc)
+}
+
+func TestKnownPatternsSnapshotIncludesEvidenceLocations(t *testing.T) {
+	pattern := domain.NewPattern("error-wrap", "Error Wrap", domain.CategoryError)
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "internal/service/config.go", Line: 42, Symbol: "LoadConfig", Kind: "function", Description: "wraps config errors", Confidence: 0.88},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	svc := NewLearnerService(nil, nil, mockPattern, nil, nil)
+
+	snapshot, count := svc.KnownPatternsSnapshot(context.Background())
+
+	require.Equal(t, 1, count)
+	var data []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(snapshot), &data))
+	require.Len(t, data, 1)
+	locations, ok := data[0]["evidence_locations"].([]any)
+	require.True(t, ok)
+	require.Len(t, locations, 1)
+	location, ok := locations[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "internal/service/config.go", location["path"])
+	require.Equal(t, float64(42), location["line"])
 }
 
 func TestLearn_NoCommits(t *testing.T) {

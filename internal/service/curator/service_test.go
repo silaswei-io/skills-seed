@@ -15,6 +15,9 @@ func TestCurateAndStoreAddsNewCandidate(t *testing.T) {
 	candidate := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	candidate.Confidence = 0.9
 	candidate.SetRule("When returning repository errors, wrap them with operation context")
+	candidate.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "internal/service/user.go", Line: 42, Symbol: "LoadUser", Kind: "function", Description: "wraps repository errors", Confidence: 0.86},
+	}
 
 	var saved []*domain.Pattern
 	repo := &mocks.MockPatternRepository{
@@ -37,6 +40,7 @@ func TestCurateAndStoreAddsNewCandidate(t *testing.T) {
 	require.Len(t, result.Written, 1)
 	require.Len(t, saved, 1)
 	require.Equal(t, "p1", saved[0].ID)
+	require.Equal(t, "internal/service/user.go:42", saved[0].EvidenceLocations[0].DisplayLocation())
 }
 
 func TestCurateAndStoreCallsAgentWithoutExistingPatterns(t *testing.T) {

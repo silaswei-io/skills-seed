@@ -102,7 +102,8 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			return runLearnCurrent(cont, currentOpts)
+			_, err := runLearnCurrent(cont, currentOpts)
+			return err
 		},
 	}
 	currentCmd.Flags().StringVarP(&currentOpts.language, "language", "l", "", i18n.Get("LearnFlagLanguage"))
@@ -151,24 +152,24 @@ func historyDefaults(cont *container.Container) (int, int) {
 	return defaultLimit, defaultBatchSize
 }
 
-// RunLearnCurrent 导出：从当前代码库学习（供 sync 调用）
-func RunLearnCurrent(cont *container.Container) error {
+// RunLearnCurrent 导出：从当前代码库学习，并返回本轮 dirty 目标。
+func RunLearnCurrent(cont *container.Container) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto})
 }
 
-// RunLearnCurrentWithContext 导出：从当前代码库学习，并附加一次性用户上下文（供 sync 调用）
-func RunLearnCurrentWithContext(cont *container.Container, userContext string) error {
+// RunLearnCurrentWithContext 导出：从当前代码库学习，附加一次性用户上下文，并返回本轮 dirty 目标。
+func RunLearnCurrentWithContext(cont *container.Container, userContext string) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext})
 }
 
-func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) error {
+func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	if opts.profileMode == "" {
 		opts.profileMode = learnCurrentProfileAuto
 	}
 	if opts.userContext == "" {
 		userContext, err := commandutil.ResolveRuntimeContext(opts.contextText, opts.contextFile)
 		if err != nil {
-			return err
+			return domain.LearnCurrentResult{}, err
 		}
 		opts.userContext = userContext
 	}
@@ -178,8 +179,8 @@ func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) error 
 	return runLearnCurrentProject(cont, opts)
 }
 
-func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions) error {
-	_, err := runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
+func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
+	result, err := runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
 		showProgress:     true,
 		showDetailedLogs: true,
 		userContext:      opts.userContext,
@@ -187,7 +188,13 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 		focusPaths:       opts.focusPaths,
 		profileMode:      opts.profileMode,
 	})
-	return err
+	if err != nil {
+		return domain.LearnCurrentResult{}, err
+	}
+	if result.savedCount > 0 {
+		return domain.LearnCurrentResult{SkillsDirty: domain.SkillsDirtyTarget{Project: true}}, nil
+	}
+	return domain.LearnCurrentResult{}, nil
 }
 
 type learnCurrentProjectOptions struct {
@@ -698,14 +705,14 @@ func intersectPaths(paths []string, allowed []string) []string {
 	return out
 }
 
-func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOptions) error {
+func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	startedAt := time.Now()
 	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
 	if len(workspaceConfig.Projects) == 0 {
-		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
+		return domain.LearnCurrentResult{}, fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
 	}
 
 	projectRoot := projectConfig.RootPath
@@ -713,7 +720,7 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		var err error
 		projectRoot, err = os.Getwd()
 		if err != nil {
-			return err
+			return domain.LearnCurrentResult{}, err
 		}
 	}
 	workspaceName := projectConfig.Name
@@ -722,7 +729,7 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	}
 
 	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
-		return err
+		return domain.LearnCurrentResult{}, err
 	}
 
 	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
@@ -817,22 +824,22 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		})
 	}
 	if err := runProjects(); err != nil {
-		return err
+		return domain.LearnCurrentResult{}, err
 	}
 
 	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(ctx, cont, workspaceName, projectRoot, workspaceConfig)
 	if err != nil {
-		return err
+		return domain.LearnCurrentResult{}, err
 	}
 	dirtyTarget := domain.SkillsDirtyTarget{Workspace: relationshipsChanged, Projects: dirtyProjectIDs}
 	if !skillsDirtyTargetEmpty(dirtyTarget) {
 		if err := markLearnedSkillsDirty(ctx, cont, dirtyTarget); err != nil {
-			return err
+			return domain.LearnCurrentResult{}, err
 		}
 	}
 
 	if err := commandutil.MarkLearned(ctx, cont); err != nil {
-		return err
+		return domain.LearnCurrentResult{}, err
 	}
 
 	logger.Info(i18n.Get("LearnWorkspaceComplete"))
@@ -841,7 +848,7 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		"duration", time.Since(startedAt),
 		"projects_count", len(workspaceConfig.Projects),
 	)
-	return nil
+	return domain.LearnCurrentResult{SkillsDirty: dirtyTarget}, nil
 }
 
 func markLearnedSkillsDirty(ctx context.Context, cont *container.Container, target domain.SkillsDirtyTarget) error {

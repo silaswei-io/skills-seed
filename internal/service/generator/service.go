@@ -304,19 +304,20 @@ func summarizePatternsForAgent(patterns []domain.Pattern, insights map[string]do
 			lastHitAt = insight.LastHitAt.Format(time.RFC3339)
 		}
 		summary = append(summary, map[string]interface{}{
-			"id":              p.ID,
-			"name":            p.Name,
-			"category":        string(p.Category),
-			"description":     p.Description,
-			"rule":            p.Rule,
-			"confidence":      p.Confidence,
-			"frequency":       p.Frequency,
-			"source":          string(p.Source),
-			"business_method": p.BusinessMethod,
-			"metrics":         p.Metrics,
-			"hit_count":       insight.HitCount,
-			"last_hit_at":     lastHitAt,
-			"generation_rank": insight.GenerationRank,
+			"id":                 p.ID,
+			"name":               p.Name,
+			"category":           string(p.Category),
+			"description":        p.Description,
+			"rule":               p.Rule,
+			"confidence":         p.Confidence,
+			"frequency":          p.Frequency,
+			"source":             string(p.Source),
+			"evidence_locations": p.EvidenceLocations,
+			"business_method":    p.BusinessMethod,
+			"metrics":            p.Metrics,
+			"hit_count":          insight.HitCount,
+			"last_hit_at":        lastHitAt,
+			"generation_rank":    insight.GenerationRank,
 		})
 	}
 	return summary

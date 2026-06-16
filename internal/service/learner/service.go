@@ -69,16 +69,17 @@ func (s *LearnerService) marshalKnownPatterns(ctx context.Context) (string, int)
 	exportData := make([]map[string]interface{}, len(patterns))
 	for i, p := range patterns {
 		exportData[i] = map[string]interface{}{
-			"id":              p.ID,
-			"name":            p.Name,
-			"category":        string(p.Category),
-			"description":     p.Description,
-			"rule":            p.Rule,
-			"confidence":      p.Confidence,
-			"frequency":       p.Frequency,
-			"metrics":         p.Metrics,
-			"source":          string(p.Source),
-			"business_method": p.BusinessMethod,
+			"id":                 p.ID,
+			"name":               p.Name,
+			"category":           string(p.Category),
+			"description":        p.Description,
+			"rule":               p.Rule,
+			"confidence":         p.Confidence,
+			"frequency":          p.Frequency,
+			"metrics":            p.Metrics,
+			"source":             string(p.Source),
+			"evidence_locations": p.EvidenceLocations,
+			"business_method":    p.BusinessMethod,
 		}
 	}
 

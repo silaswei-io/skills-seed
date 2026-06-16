@@ -89,6 +89,39 @@ func TestGenerateSkills_AIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "AI")
 }
 
+func TestGenerateSkillsSummaryRequestIncludesEvidenceLocations(t *testing.T) {
+	pattern := domain.NewPattern("error-wrap", "Error Wrap", domain.CategoryError)
+	pattern.Confidence = 0.9
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "internal/service/config.go", Line: 42, Symbol: "LoadConfig", Kind: "function", Description: "wraps config errors", Confidence: 0.88},
+	}
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
+			var data []map[string]any
+			require.NoError(t, json.Unmarshal([]byte(req.PatternsJSON), &data))
+			require.Len(t, data, 1)
+			locations, ok := data[0]["evidence_locations"].([]any)
+			require.True(t, ok)
+			require.Len(t, locations, 1)
+			location, ok := locations[0].(map[string]any)
+			require.True(t, ok)
+			require.Equal(t, "internal/service/config.go", location["path"])
+			require.Equal(t, float64(42), location["line"])
+			return &agent.GenerateSkillsResult{}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+
+	svc := newTestService(mockAgent, mockPattern)
+	require.NoError(t, svc.GenerateSkills(context.Background(), t.TempDir()))
+}
+
 func TestGenerateSkills_FillsMissingCategorySummaries(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9

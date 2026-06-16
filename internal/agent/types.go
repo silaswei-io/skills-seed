@@ -161,23 +161,24 @@ type CuratePatternsRequest struct {
 
 // CuratedPattern 表示 AI 策展后建议写入的规范模式。
 type CuratedPattern struct {
-	ID              string                 // 模式ID
-	Name            string                 // 模式名称
-	Category        string                 // 分类
-	Description     string                 // 描述
-	GoodExample     string                 // 正例代码
-	BadExample      string                 // 反例代码
-	Rule            string                 // 规则
-	Confidence      float64                // 置信度
-	Frequency       int                    // 频率
-	MergedFrom      []string               // 被合并的候选或既有模式ID
-	MergeReason     string                 // 合并理由
-	SimilarityScore float64                // 合并相似度
-	Source          string                 // 来源
-	BusinessMethod  *domain.BusinessMethod // 业务方法信息
-	ProjectID       string                 // workspace 子项目 ID
-	ScopePath       string                 // workspace 路径范围
-	WorkspaceRole   string                 // workspace 角色
+	ID                string                           // 模式ID
+	Name              string                           // 模式名称
+	Category          string                           // 分类
+	Description       string                           // 描述
+	GoodExample       string                           // 正例代码
+	BadExample        string                           // 反例代码
+	Rule              string                           // 规则
+	Confidence        float64                          // 置信度
+	Frequency         int                              // 频率
+	MergedFrom        []string                         // 被合并的候选或既有模式ID
+	MergeReason       string                           // 合并理由
+	SimilarityScore   float64                          // 合并相似度
+	Source            string                           // 来源
+	BusinessMethod    *domain.BusinessMethod           // 业务方法信息
+	EvidenceLocations []domain.PatternEvidenceLocation // 通用源码证据位置
+	ProjectID         string                           // workspace 子项目 ID
+	ScopePath         string                           // workspace 路径范围
+	WorkspaceRole     string                           // workspace 角色
 }
 
 // CuratedDrop 表示不入库的候选模式。

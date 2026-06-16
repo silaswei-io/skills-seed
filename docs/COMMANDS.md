@@ -371,7 +371,7 @@ skills-seed patterns show business-create-order --format json
 1. `patterns compact` 会调用当前 `agent.engine` 对应的 CLI。
 2. 不确定整理结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
-4. `patterns show` 无参数时显示模式概览列表；传入 `pattern-id` 时显示单条模式完整详情，包括正/反例、质量指标、workspace 归属、业务方法字段、代码位置历史和语言无关符号快照。
+4. `patterns show` 无参数时显示模式概览列表；位置列优先使用业务/工具方法的 `code_location`，没有业务方法时回退到模式级 `evidence_locations` 的第一条证据位置。传入 `pattern-id` 时显示单条模式完整详情，包括正/反例、质量指标、workspace 归属、证据位置、业务方法字段、代码位置历史和语言无关符号快照。
 5. `patterns stats` 和 `patterns show` 不调用 AI，也不修改数据，但仍需要打开 `.skills-seed/memory/project.db`；如果数据库被其他 `skills-seed` 命令占用，CLI 会提示等待当前命令结束或检查残留进程。
 
 ### `skills-seed review`
@@ -485,7 +485,7 @@ skills-seed profile refresh --language go
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed sync` | 学习当前代码 → generate skills | `skills-seed sync` | 等效于依次执行 `learn current`、`generate skills` |
+| `skills-seed sync` | 学习当前代码 → generate skills | `skills-seed sync` | 先执行 `learn current`；本轮无 skills 变化时跳过生成 |
 | `skills-seed sync --add <描述>` | patterns add → generate skills | `skills-seed sync --add "API 路由使用 RESTful 风格"` | 跳过学习，适合补充 AI 未自动发现的模式 |
 
 #### 参数
@@ -510,7 +510,7 @@ skills-seed sync --context "本次只关注兼容性边界"
 
 #### 注意事项
 
-1. `sync` 不带 `--add` 时，会先执行 `learn current`，再 `generate skills`；模式策展在学习入库阶段完成。
+1. `sync` 不带 `--add` 时，会先执行 `learn current`；只有本轮学习写入新/更新模式或 workspace 关系产物变化时，才继续执行 `generate skills`。
 2. `sync --add` 跳过学习步骤，直接用自然语言定义模式，适合补充 AI 未自动发现的规则。
 3. 中间步骤失败会中断后续步骤。
 

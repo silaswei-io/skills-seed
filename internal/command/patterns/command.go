@@ -501,6 +501,7 @@ func writePatternDetails(w io.Writer, pattern *domain.Pattern) error {
 		{i18n.Get("PatternsShowFieldRule"), pattern.Rule},
 		{i18n.Get("PatternsShowFieldGoodExample"), pattern.GoodExample},
 		{i18n.Get("PatternsShowFieldBadExample"), pattern.BadExample},
+		{i18n.Get("PatternsShowFieldEvidenceLocation"), formatEvidenceLocations(pattern.EvidenceLocations)},
 		{i18n.Get("PatternsShowFieldSpecificity"), formatOptionalFloat(pattern.Metrics.SpecificityScore)},
 		{i18n.Get("PatternsShowFieldEvidenceCount"), formatOptionalInt(pattern.Metrics.EvidenceCount)},
 		{i18n.Get("PatternsShowFieldGenericPenalty"), formatOptionalFloat(pattern.Metrics.GenericPenalty)},
@@ -599,19 +600,21 @@ func writePatternsJSON(w io.Writer, patterns []domain.Pattern) error {
 }
 
 func patternLocationSummary(pattern domain.Pattern) (string, string) {
-	if pattern.BusinessMethod == nil {
-		return "-", "-"
+	if pattern.BusinessMethod != nil {
+		location := pattern.BusinessMethod.CodeLocation
+		status := string(location.Status)
+		if status == "" {
+			status = "-"
+		}
+		current := pattern.BusinessMethod.DisplayLocation()
+		if current != "" {
+			return status, current
+		}
 	}
-	location := pattern.BusinessMethod.CodeLocation
-	status := string(location.Status)
-	if status == "" {
-		status = "-"
+	if location := firstEvidenceDisplayLocation(pattern.EvidenceLocations); location != "" {
+		return "evidence", location
 	}
-	current := pattern.BusinessMethod.DisplayLocation()
-	if current == "" {
-		current = "-"
-	}
-	return status, current
+	return "-", "-"
 }
 
 func formatTime(t time.Time) string {
@@ -670,6 +673,34 @@ func formatLocationHistory(history []domain.CodeLocationHistory) []string {
 		lines = append(lines, strings.Join(trimmed, " | "))
 	}
 	return lines
+}
+
+func formatEvidenceLocations(locations []domain.PatternEvidenceLocation) string {
+	lines := make([]string, 0, len(locations))
+	for _, location := range locations {
+		display := location.DisplayLocation()
+		if display == "" {
+			continue
+		}
+		parts := []string{
+			display,
+			location.Kind,
+			location.Symbol,
+			formatOptionalFloat(location.Confidence),
+			location.Description,
+		}
+		lines = append(lines, strings.Join(trimRightEmpty(parts), " | "))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func firstEvidenceDisplayLocation(locations []domain.PatternEvidenceLocation) string {
+	for _, location := range locations {
+		if display := location.DisplayLocation(); display != "" {
+			return display
+		}
+	}
+	return ""
 }
 
 func trimRightEmpty(values []string) []string {

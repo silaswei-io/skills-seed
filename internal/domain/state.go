@@ -23,3 +23,8 @@ type SkillsDirtyTarget struct {
 	Workspace bool
 	Projects  []string
 }
+
+// LearnCurrentResult 描述 learn current 本轮是否产生需要重新生成 skills 的变化。
+type LearnCurrentResult struct {
+	SkillsDirty SkillsDirtyTarget
+}

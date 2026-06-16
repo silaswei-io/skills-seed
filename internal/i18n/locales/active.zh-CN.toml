@@ -1040,6 +1040,9 @@ other = "正例"
 [PatternsShowFieldBadExample]
 other = "反例"
 
+[PatternsShowFieldEvidenceLocation]
+other = "证据位置"
+
 [PatternsShowFieldSpecificity]
 other = "具体度"
 
@@ -1178,6 +1181,9 @@ other = "[sync] 步骤 1/2: 添加用户自定义模式..."
 
 [SyncStepGenerate]
 other = "[sync] 步骤 2/2: 生成 skills..."
+
+[SyncGenerateSkippedNoChanges]
+other = "[sync] 本轮学习未产生 skills 变化，已跳过生成"
 
 [SyncComplete]
 other = "[sync] 完成！"

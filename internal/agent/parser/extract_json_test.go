@@ -295,6 +295,50 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
 	assert.Equal(t, "error", result.Patterns[0].BusinessMethod.Returns)
 }
 
+func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
+	output := `{
+  "patterns": [{
+    "id": "error-wrap",
+    "name": "Error Wrap",
+    "category": "error",
+    "description": "wraps errors with operation context",
+    "good_example": "return fmt.Errorf(\"load config: %w\", err)",
+    "bad_example": "",
+    "rule": "Wrap errors at module boundaries",
+    "confidence": 0.9,
+    "frequency": 1,
+    "evidence_locations": [
+      {
+        "path": "internal/service/config.go",
+        "line": 42,
+        "symbol": "LoadConfig",
+        "kind": "function",
+        "description": "wraps config load error",
+        "confidence": 0.88
+      }
+    ],
+    "business_method": null
+  }],
+  "category_summaries": {
+    "error": {"summary": "error wrapping", "patterns": ["Error Wrap"], "priority": 4}
+  },
+  "business_rules": [],
+  "best_practices": [],
+  "common_patterns": [],
+  "summary": "demo project"
+}`
+
+	result, err := ParseAnalyzeCurrentCodebaseResult(output)
+	assert.NoError(t, err)
+	assert.Len(t, result.Patterns, 1)
+	assert.Nil(t, result.Patterns[0].BusinessMethod)
+	assert.Len(t, result.Patterns[0].EvidenceLocations, 1)
+	assert.Equal(t, "internal/service/config.go", result.Patterns[0].EvidenceLocations[0].Path)
+	assert.Equal(t, 42, result.Patterns[0].EvidenceLocations[0].Line)
+	assert.Equal(t, "LoadConfig", result.Patterns[0].EvidenceLocations[0].Symbol)
+	assert.Equal(t, "internal/service/config.go:42", result.Patterns[0].EvidenceLocations[0].DisplayLocation())
+}
+
 func TestParseAnalyzeResultReturnsErrorWhenJSONMissing(t *testing.T) {
 	result, err := ParseAnalyzeResult("plain text without json")
 

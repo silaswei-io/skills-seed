@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -18,6 +19,44 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSyncLearnAfterLearnSkipsGenerateWhenLearnDidNotDirtySkills(t *testing.T) {
+	generateCalled := false
+
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{}, func() error {
+		generateCalled = true
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.False(t, generateCalled)
+}
+
+func TestSyncLearnAfterLearnGeneratesWhenLearnDirtiedSkills(t *testing.T) {
+	generateCalled := false
+
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{
+		SkillsDirty: domain.SkillsDirtyTarget{Workspace: true},
+	}, func() error {
+		generateCalled = true
+		return nil
+	})
+
+	require.NoError(t, err)
+	require.True(t, generateCalled)
+}
+
+func TestSyncLearnAfterLearnWrapsGenerateError(t *testing.T) {
+	errGenerate := errors.New("boom")
+
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{
+		SkillsDirty: domain.SkillsDirtyTarget{Project: true},
+	}, func() error {
+		return errGenerate
+	})
+
+	require.ErrorIs(t, err, errGenerate)
+}
 
 func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 	userContext := "私有化部署，不是 SaaS"

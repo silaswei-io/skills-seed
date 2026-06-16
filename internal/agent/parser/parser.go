@@ -453,16 +453,17 @@ func ParseLearnResult(output string) (*agent.LearnResult, error) {
 
 	var result struct {
 		Patterns []struct {
-			ID             string                 `json:"id"`
-			Name           string                 `json:"name"`
-			Category       string                 `json:"category"`
-			Description    string                 `json:"description"`
-			GoodExample    string                 `json:"good_example"`
-			BadExample     string                 `json:"bad_example"`
-			Rule           string                 `json:"rule"`
-			Confidence     float64                `json:"confidence"`
-			Frequency      int                    `json:"frequency"`
-			BusinessMethod *businessMethodPayload `json:"business_method"`
+			ID                string                           `json:"id"`
+			Name              string                           `json:"name"`
+			Category          string                           `json:"category"`
+			Description       string                           `json:"description"`
+			GoodExample       string                           `json:"good_example"`
+			BadExample        string                           `json:"bad_example"`
+			Rule              string                           `json:"rule"`
+			Confidence        float64                          `json:"confidence"`
+			Frequency         int                              `json:"frequency"`
+			EvidenceLocations []domain.PatternEvidenceLocation `json:"evidence_locations"`
+			BusinessMethod    *businessMethodPayload           `json:"business_method"`
 		} `json:"patterns"`
 	}
 
@@ -473,17 +474,18 @@ func ParseLearnResult(output string) (*agent.LearnResult, error) {
 	patterns := make([]domain.Pattern, len(result.Patterns))
 	for i, p := range result.Patterns {
 		pattern := domain.Pattern{
-			ID:          p.ID,
-			Name:        p.Name,
-			Category:    domain.Category(p.Category),
-			Description: p.Description,
-			GoodExample: p.GoodExample,
-			BadExample:  p.BadExample,
-			Rule:        p.Rule,
-			Confidence:  p.Confidence,
-			Frequency:   p.Frequency,
-			Source:      domain.SourceLearned,
-			CreatedAt:   time.Now(),
+			ID:                p.ID,
+			Name:              p.Name,
+			Category:          domain.Category(p.Category),
+			Description:       p.Description,
+			GoodExample:       p.GoodExample,
+			BadExample:        p.BadExample,
+			Rule:              p.Rule,
+			Confidence:        p.Confidence,
+			Frequency:         p.Frequency,
+			Source:            domain.SourceLearned,
+			CreatedAt:         time.Now(),
+			EvidenceLocations: p.EvidenceLocations,
 		}
 
 		pattern.BusinessMethod = p.BusinessMethod.toDomain(pattern.CreatedAt)
@@ -510,16 +512,17 @@ func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
 
 	var result struct {
 		Patterns []struct {
-			ID             string                 `json:"id"`
-			Name           string                 `json:"name"`
-			Category       string                 `json:"category"`
-			Description    string                 `json:"description"`
-			GoodExample    string                 `json:"good_example"`
-			BadExample     string                 `json:"bad_example"`
-			Rule           string                 `json:"rule"`
-			Confidence     float64                `json:"confidence"`
-			Frequency      int                    `json:"frequency"`
-			BusinessMethod *businessMethodPayload `json:"business_method"`
+			ID                string                           `json:"id"`
+			Name              string                           `json:"name"`
+			Category          string                           `json:"category"`
+			Description       string                           `json:"description"`
+			GoodExample       string                           `json:"good_example"`
+			BadExample        string                           `json:"bad_example"`
+			Rule              string                           `json:"rule"`
+			Confidence        float64                          `json:"confidence"`
+			Frequency         int                              `json:"frequency"`
+			EvidenceLocations []domain.PatternEvidenceLocation `json:"evidence_locations"`
+			BusinessMethod    *businessMethodPayload           `json:"business_method"`
 		} `json:"patterns"`
 	}
 
@@ -530,17 +533,18 @@ func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
 	patterns := make([]domain.Pattern, len(result.Patterns))
 	for i, p := range result.Patterns {
 		pattern := domain.Pattern{
-			ID:          p.ID,
-			Name:        p.Name,
-			Category:    domain.Category(p.Category),
-			Description: p.Description,
-			GoodExample: p.GoodExample,
-			BadExample:  p.BadExample,
-			Rule:        p.Rule,
-			Confidence:  p.Confidence,
-			Frequency:   p.Frequency,
-			Source:      domain.SourceLearned,
-			CreatedAt:   time.Now(),
+			ID:                p.ID,
+			Name:              p.Name,
+			Category:          domain.Category(p.Category),
+			Description:       p.Description,
+			GoodExample:       p.GoodExample,
+			BadExample:        p.BadExample,
+			Rule:              p.Rule,
+			Confidence:        p.Confidence,
+			Frequency:         p.Frequency,
+			Source:            domain.SourceLearned,
+			CreatedAt:         time.Now(),
+			EvidenceLocations: p.EvidenceLocations,
 		}
 		pattern.BusinessMethod = p.BusinessMethod.toDomain(pattern.CreatedAt)
 		patterns[i] = pattern
@@ -669,23 +673,24 @@ func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, erro
 
 	var result struct {
 		Patterns []struct {
-			ID              string                 `json:"id"`
-			Name            string                 `json:"name"`
-			Category        string                 `json:"category"`
-			Description     string                 `json:"description"`
-			GoodExample     string                 `json:"good_example"`
-			BadExample      string                 `json:"bad_example"`
-			Rule            string                 `json:"rule"`
-			Confidence      float64                `json:"confidence"`
-			Frequency       int                    `json:"frequency"`
-			MergedFrom      []string               `json:"merged_from"`
-			MergeReason     string                 `json:"merge_reason"`
-			SimilarityScore float64                `json:"similarity_score"`
-			Source          string                 `json:"source"`
-			BusinessMethod  *businessMethodPayload `json:"business_method"`
-			ProjectID       string                 `json:"project_id"`
-			ScopePath       string                 `json:"scope_path"`
-			WorkspaceRole   string                 `json:"workspace_role"`
+			ID                string                           `json:"id"`
+			Name              string                           `json:"name"`
+			Category          string                           `json:"category"`
+			Description       string                           `json:"description"`
+			GoodExample       string                           `json:"good_example"`
+			BadExample        string                           `json:"bad_example"`
+			Rule              string                           `json:"rule"`
+			Confidence        float64                          `json:"confidence"`
+			Frequency         int                              `json:"frequency"`
+			MergedFrom        []string                         `json:"merged_from"`
+			MergeReason       string                           `json:"merge_reason"`
+			SimilarityScore   float64                          `json:"similarity_score"`
+			Source            string                           `json:"source"`
+			EvidenceLocations []domain.PatternEvidenceLocation `json:"evidence_locations"`
+			BusinessMethod    *businessMethodPayload           `json:"business_method"`
+			ProjectID         string                           `json:"project_id"`
+			ScopePath         string                           `json:"scope_path"`
+			WorkspaceRole     string                           `json:"workspace_role"`
 		} `json:"patterns"`
 		Dropped []struct {
 			ID     string `json:"id"`
@@ -719,23 +724,24 @@ func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, erro
 	now := time.Now()
 	for i, p := range result.Patterns {
 		curateResult.Patterns[i] = agent.CuratedPattern{
-			ID:              p.ID,
-			Name:            p.Name,
-			Category:        p.Category,
-			Description:     p.Description,
-			GoodExample:     p.GoodExample,
-			BadExample:      p.BadExample,
-			Rule:            p.Rule,
-			Confidence:      p.Confidence,
-			Frequency:       p.Frequency,
-			MergedFrom:      p.MergedFrom,
-			MergeReason:     p.MergeReason,
-			SimilarityScore: p.SimilarityScore,
-			Source:          p.Source,
-			BusinessMethod:  p.BusinessMethod.toDomain(now),
-			ProjectID:       p.ProjectID,
-			ScopePath:       p.ScopePath,
-			WorkspaceRole:   p.WorkspaceRole,
+			ID:                p.ID,
+			Name:              p.Name,
+			Category:          p.Category,
+			Description:       p.Description,
+			GoodExample:       p.GoodExample,
+			BadExample:        p.BadExample,
+			Rule:              p.Rule,
+			Confidence:        p.Confidence,
+			Frequency:         p.Frequency,
+			MergedFrom:        p.MergedFrom,
+			MergeReason:       p.MergeReason,
+			SimilarityScore:   p.SimilarityScore,
+			Source:            p.Source,
+			EvidenceLocations: p.EvidenceLocations,
+			BusinessMethod:    p.BusinessMethod.toDomain(now),
+			ProjectID:         p.ProjectID,
+			ScopePath:         p.ScopePath,
+			WorkspaceRole:     p.WorkspaceRole,
 		}
 	}
 	for i, dropped := range result.Dropped {
@@ -880,16 +886,17 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 
 	var result struct {
 		Patterns []struct {
-			ID             string                 `json:"id"`
-			Name           string                 `json:"name"`
-			Category       string                 `json:"category"`
-			Description    string                 `json:"description"`
-			GoodExample    string                 `json:"good_example"`
-			BadExample     string                 `json:"bad_example"`
-			Rule           string                 `json:"rule"`
-			Confidence     float64                `json:"confidence"`
-			Frequency      int                    `json:"frequency"`
-			BusinessMethod *businessMethodPayload `json:"business_method"`
+			ID                string                           `json:"id"`
+			Name              string                           `json:"name"`
+			Category          string                           `json:"category"`
+			Description       string                           `json:"description"`
+			GoodExample       string                           `json:"good_example"`
+			BadExample        string                           `json:"bad_example"`
+			Rule              string                           `json:"rule"`
+			Confidence        float64                          `json:"confidence"`
+			Frequency         int                              `json:"frequency"`
+			EvidenceLocations []domain.PatternEvidenceLocation `json:"evidence_locations"`
+			BusinessMethod    *businessMethodPayload           `json:"business_method"`
 		} `json:"patterns"`
 		CategorySummaries map[string]struct {
 			Summary     string   `json:"summary"`
@@ -910,17 +917,18 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 	patterns := make([]domain.Pattern, len(result.Patterns))
 	for i, p := range result.Patterns {
 		pattern := domain.Pattern{
-			ID:          p.ID,
-			Name:        p.Name,
-			Category:    domain.Category(p.Category),
-			Description: p.Description,
-			GoodExample: p.GoodExample,
-			BadExample:  p.BadExample,
-			Rule:        p.Rule,
-			Confidence:  p.Confidence,
-			Frequency:   p.Frequency,
-			Source:      domain.SourceInit,
-			CreatedAt:   time.Now(),
+			ID:                p.ID,
+			Name:              p.Name,
+			Category:          domain.Category(p.Category),
+			Description:       p.Description,
+			GoodExample:       p.GoodExample,
+			BadExample:        p.BadExample,
+			Rule:              p.Rule,
+			Confidence:        p.Confidence,
+			Frequency:         p.Frequency,
+			Source:            domain.SourceInit,
+			CreatedAt:         time.Now(),
+			EvidenceLocations: p.EvidenceLocations,
 		}
 		pattern.BusinessMethod = p.BusinessMethod.toDomain(pattern.CreatedAt)
 		patterns[i] = pattern
@@ -1062,15 +1070,16 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 	}
 
 	var result struct {
-		ID             string                 `json:"id"`
-		Name           string                 `json:"name"`
-		Category       string                 `json:"category"`
-		Description    string                 `json:"description"`
-		GoodExample    string                 `json:"good_example"`
-		BadExample     string                 `json:"bad_example"`
-		Rule           string                 `json:"rule"`
-		Confidence     float64                `json:"confidence"`
-		BusinessMethod *businessMethodPayload `json:"business_method"`
+		ID                string                           `json:"id"`
+		Name              string                           `json:"name"`
+		Category          string                           `json:"category"`
+		Description       string                           `json:"description"`
+		GoodExample       string                           `json:"good_example"`
+		BadExample        string                           `json:"bad_example"`
+		Rule              string                           `json:"rule"`
+		Confidence        float64                          `json:"confidence"`
+		EvidenceLocations []domain.PatternEvidenceLocation `json:"evidence_locations"`
+		BusinessMethod    *businessMethodPayload           `json:"business_method"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -1078,17 +1087,18 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 	}
 
 	pattern := domain.Pattern{
-		ID:          result.ID,
-		Name:        result.Name,
-		Category:    domain.Category(result.Category),
-		Description: result.Description,
-		GoodExample: result.GoodExample,
-		BadExample:  result.BadExample,
-		Rule:        result.Rule,
-		Confidence:  result.Confidence,
-		Source:      domain.SourceUserDefined,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		ID:                result.ID,
+		Name:              result.Name,
+		Category:          domain.Category(result.Category),
+		Description:       result.Description,
+		GoodExample:       result.GoodExample,
+		BadExample:        result.BadExample,
+		Rule:              result.Rule,
+		Confidence:        result.Confidence,
+		Source:            domain.SourceUserDefined,
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+		EvidenceLocations: result.EvidenceLocations,
 	}
 
 	pattern.BusinessMethod = result.BusinessMethod.toDomain(pattern.CreatedAt)

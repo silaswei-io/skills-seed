@@ -104,6 +104,8 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.7.3 起，当前代码学习会在 pattern 保存成功后才提交文件分析指纹，避免保存失败的文件在后续增量学习中被误判为已学习。Pattern、文件指纹、命中和评审评论记录会维护 `created_at/updated_at`，业务方法代码位置会以语言无关的快照元数据保存到 DB；使用 `patterns show <pattern-id>` 可查看单条模式的完整详情。
 
+0.9.8 起，模式会单独保存 `evidence_locations` 作为模式级源码证据位置；`patterns show` 概览优先展示业务/工具方法的 `code_location`，没有业务方法时回退展示第一条证据位置，并在详情页输出完整证据位置列表。
+
 0.8.0 起，Agent 输出会单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
 
 0.9.6 起，`.skills-seed/memory/runtime` 下的调试记录统一使用 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` 文件名前缀，包括 rendered prompt、Agent 输出归档和运行时输入临时目录，便于按时间排序排查一次运行中的上下文与模型输出。
@@ -246,10 +248,10 @@ skills:
 | `skills-seed generate skills` | 生成当前 `skills.target` 的 skills |
 | `skills-seed patterns add <描述>` | 用自然语言补充用户自定义模式 |
 | `skills-seed patterns compact` | 显式整理已入库的相似 patterns |
-| `skills-seed sync` | 一键执行学习/添加模式，并生成 skills |
+| `skills-seed sync` | 一键执行学习/添加模式；有变化时生成 skills |
 | `skills-seed check` | 检查暂存区或 Git 跟踪文件 |
 | `skills-seed patterns stats` | 查看模式质量、命中次数和最近命中 |
-| `skills-seed patterns show` | 查看 DB 中的 pattern 时间和代码位置字段 |
+| `skills-seed patterns show` | 查看 DB 中的 pattern 时间、业务方法位置和模式证据位置 |
 | `skills-seed review import --from-file` | 导入本地评审评论 |
 | `skills-seed hook install` | 安装本地 pre-commit hook |
 

@@ -133,6 +133,16 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
       "rule": "When to apply this pattern",
       "confidence": 0.9,
       "frequency": 3,
+      "evidence_locations": [
+        {
+          "path": "relative/file/path",
+          "line": 42,
+          "symbol": "real function/method/type/variable name",
+          "kind": "function|method|type|file",
+          "description": "pattern-level source evidence locations",
+          "confidence": 0.88
+        }
+      ],
       "business_method": {
         "name": "Complete method signature",
         "code_location": {"current_location": "file/path:line"},
@@ -187,7 +197,9 @@ Before returning JSON, validate every candidate pattern internally:
 1. Evidence check:
    - `good_example` must be copied verbatim from source code read during this task.
    - `good_example` must match this template's 5-12 line requirement unless the complete relevant function is shorter.
+   - `evidence_locations` contains pattern-level source evidence locations. Fill real relative paths for each pattern when possible; include a 1-based line only when known, otherwise provide only `path`.
    - Do not invent code, paths, signatures, line numbers, call relationships, or behavior.
+   - Do not invent evidence paths or line numbers. Leave `evidence_locations` empty when location evidence is insufficient, and do not put non-business-method locations into `business_method`.
 2. Category check:
    - Use `business` only for domain rules, state transitions, cross-entity workflows, or business invariants.
    - Use `api`, `error`, `config`, `middleware`, `structure`, `utils`, `database`, `concurrency`, or `testing` for technical conventions.
@@ -217,5 +229,6 @@ Your ENTIRE response must be ONLY a valid JSON object.
 - NO markdown code blocks (no ```)
 - NO explanatory text before or after the JSON
 - **Business methods MUST include complete method signatures and file locations**
+- Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Use `business_method` only for real callable business/utility methods; do not mix the two concepts.
 - Each pattern's `good_example` MUST be code evidence copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, or invent code; when excerpting, do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering. If surrounding context must be omitted, mark it explicitly with `// ...`
 - `good_example` and `bad_example` are JSON strings: escape code backslashes as `\\`, double quotes as `\"`, and newlines as `\n`; never emit raw `\s`, `\ `, path backslashes, or regex backslashes inside JSON strings

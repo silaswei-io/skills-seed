@@ -47,8 +47,9 @@
 2. 如果没有提供关联文件，可以输出空示例或风格示例，但不要声称它来自项目源码，也不要填写虚假的 `business_method`。
 3. 分类必须来自可用分类；优先选择最具体技术分类，只有领域规则、状态流转或业务编排才使用 `business`。
 4. `rule` 必须是可执行规则，说明“当 X 时，应该 Y”，不要输出泛化最佳实践。
-5. `business_method` 只能在真实源码证据支持时填写，且必须包含真实签名和位置；否则使用 `null`。
-6. 证据不足或用户描述过泛时，降低 `confidence`，不要补造事实。
+5. `evidence_locations` 是模式级源码证据位置；如果有关联文件，填入真实证据位置，知道准确行号时填写 1-based 行号，不知道时只填真实 path。
+6. `business_method` 只能在真实源码证据支持时填写，且必须包含真实签名和位置；否则使用 `null`。
+7. 证据不足或用户描述过泛时，降低 `confidence`，不要补造事实，不要编造证据路径或行号。
 
 # 输出格式
 
@@ -64,6 +65,16 @@
   "bad_example": "违反模式的代码示例",
   "rule": "可操作的规则（当 X 时，应该 Y）",
   "confidence": 0.85,
+  "evidence_locations": [
+    {
+      "path": "相对文件路径",
+      "line": 42,
+      "symbol": "真实函数/方法/类型/变量名",
+      "kind": "function|method|type|file",
+      "description": "如果有关联文件，填入真实证据位置",
+      "confidence": 0.85
+    }
+  ],
   "business_method": null
 }
 ```

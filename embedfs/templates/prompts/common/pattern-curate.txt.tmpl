@@ -37,6 +37,12 @@
 {{$p.GoodExample}}
 - **Bad Example**:
 {{$p.BadExample}}
+{{if $p.EvidenceLocations}}
+- **Evidence Locations**:
+{{range $loc := $p.EvidenceLocations}}
+  - path: {{$loc.DisplayLocation}}; symbol: {{$loc.Symbol}}; kind: {{$loc.Kind}}; confidence: {{printf "%.2f" $loc.Confidence}}; description: {{$loc.Description}}
+{{end}}
+{{end}}
 {{if $p.BusinessMethod}}
 - **Business Method**:
   - name: {{$p.BusinessMethod.Name}}
@@ -70,6 +76,12 @@
 {{$p.GoodExample}}
 - **Bad Example**:
 {{$p.BadExample}}
+{{if $p.EvidenceLocations}}
+- **Evidence Locations**:
+{{range $loc := $p.EvidenceLocations}}
+  - path: {{$loc.DisplayLocation}}; symbol: {{$loc.Symbol}}; kind: {{$loc.Kind}}; confidence: {{printf "%.2f" $loc.Confidence}}; description: {{$loc.Description}}
+{{end}}
+{{end}}
 {{if $p.BusinessMethod}}
 - **Business Method**:
   - name: {{$p.BusinessMethod.Name}}
@@ -98,6 +110,7 @@
 - 如果合并多个模式，`merged_from` 必须列出所有被合并的候选或既有模式 ID。
 - `good_example` 只能从输入模式已有示例中选择；不要创建、补全、改写或综合新代码示例。
 - `bad_example` 也应来自输入，只有输入为空时才能留空。
+- `evidence_locations` 只能保留输入中真实存在的证据位置；不要发明证据路径、行号、符号或说明。
 - `business_method` 只能保留输入中真实存在的信息；不要发明签名、位置、前置条件或返回值。
 - 分类必须来自输入模式的分类，且必须属于可用分类：{{.AllowedCategories}}。不要创建新分类。
 - `confidence` 必须在 0.0 到 1.0 之间；合并时使用频率加权平均或保守估计。
@@ -110,7 +123,7 @@
 2. `merged_from` 和 `dropped.id` 只能引用输入中真实存在的 ID。
 3. 没有两条输出模式表达同一核心规则；重复规则必须合并。
 4. 没有为了覆盖候选而保留低质量、空泛、不可执行的模式；这种候选应放入 `dropped`。
-5. 所有代码示例和 business_method 字段都来自输入；不得虚构。
+5. 所有代码示例、`evidence_locations` 和 business_method 字段都来自输入；不得虚构。
 6. `summary.total_candidates = {{len .CandidatePatterns}}`，`summary.total_existing = {{len .ExistingPatterns}}`，`summary.total_written = len(patterns)`，`summary.total_dropped = len(dropped)`。
 
 # 输出格式
@@ -130,6 +143,16 @@
       "rule": "当 X 时，应该 Y",
       "confidence": 0.86,
       "frequency": 3,
+      "evidence_locations": [
+        {
+          "path": "internal/service/order.go",
+          "line": 42,
+          "symbol": "SubmitOrder",
+          "kind": "method",
+          "description": "只能保留输入中真实存在的证据位置",
+          "confidence": 0.90
+        }
+      ],
       "merged_from": ["existing-id", "candidate-id"],
       "merge_reason": "新增、更新或合并的原因",
       "similarity_score": 0.9,

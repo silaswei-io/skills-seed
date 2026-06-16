@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.8]
+
+### Changes
+
+- Expanded `skills-seed patterns show <pattern-id>` detail output with good/bad examples, quality metrics, merge/generated state, workspace ownership, business-method fields, code-location history, and language-agnostic symbol snapshots.
+- Added pattern-level evidence locations; when a learned pattern has no business method binding, the `patterns show` overview falls back to evidence locations instead of showing empty location state/current location.
+- Optimized workspace `skills-seed sync`: when all child projects and workspace relationship artifacts produce no skills dirty target, sync skips `generate skills` after learning completes.
+
+### Documentation
+
+- Updated README and the command reference to clarify that `patterns show` without arguments prints the overview, passing a pattern ID prints the full detail view, and unchanged `sync` runs skip generation.
+
 ## [v0.9.7]
 
 ### Changes
