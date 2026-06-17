@@ -27,7 +27,7 @@ func TestBuildFullFilesPreviewSkipsDocumentsButKeepsDocsSource(t *testing.T) {
 	require.NoError(t, err)
 	cfg := configRepo.Get()
 	cfg.Project.RootPath = root
-	cfg.Exclude = append(cfg.Exclude, "internal/generated/**")
+	cfg.Exclude.Paths = append(cfg.Exclude.Paths, "internal/generated/**")
 	require.NoError(t, configRepo.Update(cfg))
 
 	preview, err := buildFilesPreview(context.Background(), &container.Container{

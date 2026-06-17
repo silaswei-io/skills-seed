@@ -517,15 +517,15 @@ func (m *MockFileAnalysisTracker) DeleteAnalyzedFiles(ctx context.Context, scope
 
 // MockConfigReader 模拟配置读取
 type MockConfigReader struct {
-	ProjectCfg    config.ProjectConfig
-	WorkspaceCfg  config.WorkspaceConfig
-	AgentCfg      config.AgentConfig
-	LearningCfg   config.LearningConfig
-	AutoFixCfg    config.AutoFixConfig
-	SkillsCfg     config.SkillsConfig
-	LoggingCfg    config.LoggingConfig
-	FileFilterCfg config.FileFilterConfig
-	Exclude       []string
+	ProjectCfg   config.ProjectConfig
+	WorkspaceCfg config.WorkspaceConfig
+	AgentCfg     config.AgentConfig
+	LearningCfg  config.LearningConfig
+	AutoFixCfg   config.AutoFixConfig
+	SkillsCfg    config.SkillsConfig
+	LoggingCfg   config.LoggingConfig
+	ExcludeCfg   config.ExcludeConfig
+	Exclude      []string
 }
 
 // GetProjectConfig 模拟获取项目配置
@@ -554,8 +554,8 @@ func (m *MockConfigReader) GetSkillsConfig() config.SkillsConfig { return m.Skil
 // GetLoggingConfig 模拟获取日志配置
 func (m *MockConfigReader) GetLoggingConfig() config.LoggingConfig { return m.LoggingCfg }
 
-// GetFileFilterConfig 模拟获取全局文件过滤配置
-func (m *MockConfigReader) GetFileFilterConfig() config.FileFilterConfig { return m.FileFilterCfg }
+// GetExcludeConfig 模拟获取全局排除配置
+func (m *MockConfigReader) GetExcludeConfig() config.ExcludeConfig { return m.ExcludeCfg }
 
 // GetExclude 模拟获取排除配置
 func (m *MockConfigReader) GetExclude() []string { return m.Exclude }

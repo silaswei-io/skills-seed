@@ -90,10 +90,10 @@ func TestNewRepository(t *testing.T) {
 		require.Contains(t, text, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
 		require.Contains(t, text, "# 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果\n    select_relevant_files_min_candidates: 200")
 		require.Contains(t, text, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
-		require.Contains(t, text, "# 全局文件过滤\n# 控制学习、预览、结构化分析等命令共享的文件边界\n########################################################################\nfile_filter:")
-		require.Contains(t, text, "# 是否叠加 Git ignore 规则过滤文件\n  apply_git_ignore: true")
-		require.Contains(t, text, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
-		require.Less(t, strings.Index(text, "\nfile_filter:"), strings.Index(text, "\nexclude:"))
+		require.Contains(t, text, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界\n########################################################################\nexclude:")
+		require.Contains(t, text, "# 是否排除 Git ignore 命中的文件\n  gitignore: true")
+		require.Contains(t, text, "# 需要排除的相对路径或 glob；初始化时写入默认静态排除规则\n  paths:")
+		require.NotContains(t, text, "\nfile_filter:")
 		assertTopLevelModuleBannersHaveBlankLineBefore(t, text)
 		assertCommentLinesDoNotEndWithFullStops(t, text)
 		require.NotContains(t, text, `name: ""                   #`)
@@ -140,7 +140,7 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, ".agents/skills/skills-seed-skills", cfg.Skills.Paths["codex"])
 	assert.Equal(t, "DEBUG", cfg.Logging.Level)
 	assert.Equal(t, "logs", cfg.Logging.LogsPath)
-	assert.True(t, cfg.FileFilter.ApplyGitIgnore)
+	assert.True(t, cfg.Exclude.GitIgnore)
 	assert.NotEmpty(t, cfg.Project.InitializedAt, "initialized_at should be set")
 }
 
@@ -190,7 +190,8 @@ skills:
     codex: ".agents/skills/demo"
 logging:
   level: "DEBUG"
-exclude: []
+exclude:
+  paths: []
 `), 0644))
 
 	repo, err := NewRepository(seedPath, "zh-CN")
@@ -269,9 +270,11 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			"claude": ".claude/skills/skills-seed-skills",
 			"codex":  ".agents/skills/skills-seed-skills",
 		}, Locale: "en-US"},
-		Logging:    LoggingConfig{Level: "DEBUG", LogsPath: "logs", MaxLogFiles: 30},
-		FileFilter: defaultFileFilterConfig(),
-		Exclude:    []string{"dist/**", "*.log"},
+		Logging: LoggingConfig{Level: "DEBUG", LogsPath: "logs", MaxLogFiles: 30},
+		Exclude: ExcludeConfig{
+			GitIgnore: true,
+			Paths:     []string{"dist/**", "*.log"},
+		},
 	}
 
 	content := repo.replaceConfigValues(string(templateData), cfg)
@@ -294,12 +297,12 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.NotContains(t, content, `ai_file_selector:`)
 	require.Contains(t, content, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
 	require.Contains(t, content, `enabled: true`)
-	require.Contains(t, content, "# 全局文件过滤\n# 控制学习、预览、结构化分析等命令共享的文件边界")
-	require.Contains(t, content, "# 是否叠加 Git ignore 规则过滤文件\n  apply_git_ignore: true")
+	require.Contains(t, content, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界")
+	require.Contains(t, content, "# 是否排除 Git ignore 命中的文件\n  gitignore: true")
 	require.Contains(t, content, "# 项目名称，init 时自动填充\n  name: \"demo-workspace\"")
 	require.Contains(t, content, "# 子项目列表，例如 [{id: \"project-a\", path: \"project-a\", type: \"application\", language: \"primary-language\"}]\n  projects:")
 	require.Contains(t, content, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
-	require.Contains(t, content, "# 全局排除\n# glob 风格匹配（不是正则）；初始化时写入默认静态排除规则\n########################################################################\nexclude:")
+	require.Contains(t, content, "# 需要排除的相对路径或 glob；初始化时写入默认静态排除规则\n  paths:")
 	assertTopLevelModuleBannersHaveBlankLineBefore(t, content)
 	assertCommentLinesDoNotEndWithFullStops(t, content)
 	require.NotContains(t, content, `name: "demo-workspace" #`)
@@ -415,12 +418,11 @@ logging:
   logs_path: "logs"
   max_log_files: 30
 
-file_filter:
-  apply_git_ignore: true
-
 exclude:
-  - ".*" # 保留点号文件注释
-  - "*.log"
+  gitignore: true
+  paths:
+    - ".*" # 保留点号文件注释
+    - "*.log"
 `), 0644))
 
 	repo, err := NewRepository(seedPath, "zh-CN")
@@ -435,8 +437,8 @@ exclude:
 	cfg.Learning.Current.Structural.Enabled = false
 	cfg.Learning.Current.SelectRelevantFiles = false
 	cfg.Learning.Current.SelectRelevantFilesMinCandidates = 40
-	cfg.FileFilter.ApplyGitIgnore = false
-	cfg.Exclude = []string{".*", "dist/**"}
+	cfg.Exclude.GitIgnore = false
+	cfg.Exclude.Paths = []string{".*", "dist/**"}
 	require.NoError(t, repo.Update(cfg))
 
 	content, err := os.ReadFile(configPath)
@@ -447,8 +449,9 @@ exclude:
 	require.Contains(t, text, "# 自定义工作区注释")
 	require.Contains(t, text, "# 自定义子项目注释\n  projects:")
 	require.Contains(t, text, "# 自定义结构化上下文注释\n      enabled: false")
-	require.Contains(t, text, "file_filter:\n  apply_git_ignore: false")
-	require.Contains(t, text, "# 保留点号文件注释\n  - \".*\"")
+	require.Contains(t, text, "exclude:\n  gitignore: false")
+	require.Contains(t, text, "# 保留点号文件注释\n    - \".*\"")
+	require.NotContains(t, text, "\nfile_filter:")
 	require.NotContains(t, text, `name: "new-name" # 自定义项目名称注释`)
 	require.NotContains(t, text, `projects: # 自定义子项目注释`)
 	require.NotContains(t, text, `shared:`)
@@ -465,7 +468,7 @@ exclude:
 	require.False(t, reloaded.GetCurrentLearningConfig().Structural.Enabled)
 	require.False(t, reloaded.GetCurrentLearningConfig().SelectRelevantFiles)
 	require.Equal(t, 40, reloaded.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
-	require.False(t, reloaded.GetFileFilterConfig().ApplyGitIgnore)
+	require.False(t, reloaded.GetExcludeConfig().GitIgnore)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 1)
 	require.Equal(t, []string{".*", "dist/**"}, reloaded.GetExclude())
 }
@@ -484,10 +487,68 @@ func TestNewRepositoryUsesDefaultExcludePatterns(t *testing.T) {
 	text := string(content)
 	require.Contains(t, text, `- "vendor/**"`)
 	require.Contains(t, text, `- "*.log"`)
-	require.Contains(t, text, `apply_git_ignore: true`)
+	require.Contains(t, text, `gitignore: true`)
+	require.Contains(t, text, `paths:`)
 }
 
-func TestRepository_NormalizeFileFilterDefaults(t *testing.T) {
+func TestRepository_NormalizeExcludeDefaults(t *testing.T) {
+	seedPath := t.TempDir()
+	configPath := filepath.Join(seedPath, "config.yaml")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+profile:
+  language: "go"
+  locale: "zh-CN"
+agent:
+  engine: "claude"
+learning:
+  history:
+    max_commits: 50
+autofix:
+  strategy: "patch"
+skills:
+  paths: {}
+logging:
+  level: "DEBUG"
+exclude:
+  paths: []
+`), 0644))
+
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	require.True(t, repo.GetExcludeConfig().GitIgnore)
+}
+
+func TestRepository_PreservesExplicitGitIgnoreDisabled(t *testing.T) {
+	seedPath := t.TempDir()
+	configPath := filepath.Join(seedPath, "config.yaml")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+profile:
+  language: "go"
+  locale: "zh-CN"
+agent:
+  engine: "claude"
+learning:
+  history:
+    max_commits: 50
+autofix:
+  strategy: "patch"
+skills:
+  paths: {}
+logging:
+  level: "DEBUG"
+exclude:
+  gitignore: false
+  paths: []
+`), 0644))
+
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	require.False(t, repo.GetExcludeConfig().GitIgnore)
+}
+
+func TestRepository_RejectsLegacyExcludeList(t *testing.T) {
 	seedPath := t.TempDir()
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
@@ -510,11 +571,11 @@ exclude: []
 `), 0644))
 
 	repo, err := NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	require.True(t, repo.GetFileFilterConfig().ApplyGitIgnore)
+	require.Error(t, err)
+	require.Nil(t, repo)
 }
 
-func TestRepository_PreservesExplicitGitIgnoreDisabled(t *testing.T) {
+func TestRepository_RejectsDeprecatedFileFilter(t *testing.T) {
 	seedPath := t.TempDir()
 	configPath := filepath.Join(seedPath, "config.yaml")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
@@ -535,12 +596,13 @@ skills:
   paths: {}
 logging:
   level: "DEBUG"
-exclude: []
+exclude:
+  paths: []
 `), 0644))
 
 	repo, err := NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	require.False(t, repo.GetFileFilterConfig().ApplyGitIgnore)
+	require.Error(t, err)
+	require.Nil(t, repo)
 }
 
 func TestRepository_NormalizeCurrentLearningDefaults(t *testing.T) {
@@ -562,7 +624,8 @@ skills:
   paths: {}
 logging:
   level: "DEBUG"
-exclude: []
+exclude:
+  paths: []
 `), 0644))
 
 	repo, err := NewRepository(seedPath, "zh-CN")
@@ -601,7 +664,8 @@ skills:
   paths: {}
 logging:
   level: "DEBUG"
-exclude: []
+exclude:
+  paths: []
 `), 0644))
 
 	repo, err := NewRepository(seedPath, "zh-CN")

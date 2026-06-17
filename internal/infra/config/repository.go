@@ -17,15 +17,14 @@ import (
 
 // Config 应用配置，映射 .skills-seed/config.yaml 的顶层结构。
 type Config struct {
-	Project    ProjectConfig    `yaml:"profile"`
-	Workspace  WorkspaceConfig  `yaml:"workspace"`
-	Agent      AgentConfig      `yaml:"agent"`
-	Learning   LearningConfig   `yaml:"learning"`
-	AutoFix    AutoFixConfig    `yaml:"autofix"`
-	Skills     SkillsConfig     `yaml:"skills"`
-	Logging    LoggingConfig    `yaml:"logging"`
-	FileFilter FileFilterConfig `yaml:"file_filter"`
-	Exclude    []string         `yaml:"exclude"` // 全局排除配置
+	Project   ProjectConfig   `yaml:"profile"`
+	Workspace WorkspaceConfig `yaml:"workspace"`
+	Agent     AgentConfig     `yaml:"agent"`
+	Learning  LearningConfig  `yaml:"learning"`
+	AutoFix   AutoFixConfig   `yaml:"autofix"`
+	Skills    SkillsConfig    `yaml:"skills"`
+	Logging   LoggingConfig   `yaml:"logging"`
+	Exclude   ExcludeConfig   `yaml:"exclude"` // 全局排除配置
 }
 
 // ProjectConfig 保存当前项目或工作区根的身份信息。
@@ -52,28 +51,30 @@ type WorkspaceProjectConfig struct {
 	Language string `yaml:"language"` // 子项目主语言
 }
 
-// FileFilterConfig 控制学习、预览和结构化分析共享的全局文件边界。
-type FileFilterConfig struct {
-	ApplyGitIgnore bool `yaml:"apply_git_ignore"` // 是否叠加 Git ignore 规则过滤文件
+// ExcludeConfig 控制学习、预览和结构化分析共享的全局排除边界。
+type ExcludeConfig struct {
+	GitIgnore bool     `yaml:"gitignore"` // 是否叠加 Git ignore 规则过滤文件
+	Paths     []string `yaml:"paths"`     // 需要排除的相对路径或 glob
 
 	defaultsApplied bool `yaml:"-"`
 }
 
-func defaultFileFilterConfig() FileFilterConfig {
-	return FileFilterConfig{
-		ApplyGitIgnore:  true,
+func defaultExcludeConfig() ExcludeConfig {
+	return ExcludeConfig{
+		GitIgnore:       true,
+		Paths:           DefaultExcludePatterns(),
 		defaultsApplied: true,
 	}
 }
 
 // UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
-func (c *FileFilterConfig) UnmarshalYAML(value *yaml.Node) error {
-	type rawFileFilterConfig FileFilterConfig
-	defaults := rawFileFilterConfig(defaultFileFilterConfig())
+func (c *ExcludeConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawExcludeConfig ExcludeConfig
+	defaults := rawExcludeConfig(defaultExcludeConfig())
 	if err := value.Decode(&defaults); err != nil {
 		return err
 	}
-	*c = FileFilterConfig(defaults)
+	*c = ExcludeConfig(defaults)
 	c.defaultsApplied = true
 	return nil
 }
@@ -296,7 +297,6 @@ func NewRepository(seedPath string, locale string) (*Repository, error) {
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) || errors.Is(err, os.ErrNotExist) {
 			cfg = repo.defaultConfig(locale)
-			cfg.Exclude = DefaultExcludePatterns()
 			if err := repo.save(cfg); err != nil {
 				return nil, err
 			}
@@ -332,6 +332,9 @@ func (r *Repository) load() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("ConfigReadFailed"), err)
 	}
+	if err := rejectDeprecatedConfigKeys(data); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("ConfigParseFailed"), err)
+	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -340,6 +343,23 @@ func (r *Repository) load() (*Config, error) {
 
 	r.normalizeConfig(&cfg)
 	return &cfg, nil
+}
+
+func rejectDeprecatedConfigKeys(data []byte) error {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return err
+	}
+	doc := configDocument(&root)
+	if doc == nil || doc.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if doc.Content[i].Value == "file_filter" {
+			return fmt.Errorf("deprecated config key file_filter; use exclude.gitignore")
+		}
+	}
+	return nil
 }
 
 // save 保存配置（保留注释）
@@ -472,8 +492,8 @@ func (r *Repository) defaultConfig(locale string) *Config {
 }
 
 func (r *Repository) normalizeConfig(cfg *Config) {
-	if !cfg.FileFilter.defaultsApplied {
-		cfg.FileFilter = defaultFileFilterConfig()
+	if !cfg.Exclude.defaultsApplied {
+		cfg.Exclude = defaultExcludeConfig()
 	}
 	if !cfg.Learning.defaultsApplied {
 		cfg.Learning = defaultLearningConfig()
@@ -593,8 +613,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			LogsPath:    "logs",
 			MaxLogFiles: 30,
 		},
-		FileFilter: defaultFileFilterConfig(),
-		Exclude:    DefaultExcludePatterns(),
+		Exclude: defaultExcludeConfig(),
 	}
 }
 
@@ -608,7 +627,7 @@ type Reader interface {
 	GetAutoFixConfig() AutoFixConfig
 	GetSkillsConfig() SkillsConfig
 	GetLoggingConfig() LoggingConfig
-	GetFileFilterConfig() FileFilterConfig
+	GetExcludeConfig() ExcludeConfig
 	GetExclude() []string
 	GetToolLocale() string
 	GetSkillsLocale() string
@@ -661,14 +680,14 @@ func (r *Repository) GetLoggingConfig() LoggingConfig {
 	return r.config.Logging
 }
 
-// GetFileFilterConfig 获取全局文件过滤配置。
-func (r *Repository) GetFileFilterConfig() FileFilterConfig {
-	return r.config.FileFilter
+// GetExcludeConfig 获取全局排除配置。
+func (r *Repository) GetExcludeConfig() ExcludeConfig {
+	return r.config.Exclude
 }
 
 // GetExclude 获取排除配置
 func (r *Repository) GetExclude() []string {
-	return r.config.Exclude
+	return r.config.Exclude.Paths
 }
 
 // GetToolLocale 返回 CLI 输出和运行界面使用的语言。

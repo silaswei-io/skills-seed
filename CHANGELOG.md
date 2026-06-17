@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.12]
+
+### 变更
+
+- 新增 `exclude.gitignore` 配置，默认开启；学习、预览、项目结构摘要、样例文件收集和结构化预扫描会在 `exclude.paths` 之外叠加 Git ignore 规则过滤文件，可在需要分析被 `.gitignore` 忽略的源码时关闭。
+- 将原有顶层 `exclude` 列表调整为 `exclude.paths`，并把 Git ignore 开关收敛为 `exclude.gitignore`，不再保留独立的 `file_filter` 配置块；旧配置结构会在解析阶段报错，避免静默迁移造成配置含义不清。
+
 ## [v0.9.11]
 
 ### 变更

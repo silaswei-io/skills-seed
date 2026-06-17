@@ -82,8 +82,8 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLString(doc, []string{"logging", "logs_path"}, cfg.Logging.LogsPath)
 	setYAMLInt(doc, []string{"logging", "max_log_files"}, cfg.Logging.MaxLogFiles)
 
-	setYAMLBool(doc, []string{"file_filter", "apply_git_ignore"}, cfg.FileFilter.ApplyGitIgnore)
-	setYAMLStringList(doc, []string{"exclude"}, cfg.Exclude)
+	setYAMLBool(doc, []string{"exclude", "gitignore"}, cfg.Exclude.GitIgnore)
+	setYAMLStringList(doc, []string{"exclude", "paths"}, cfg.Exclude.Paths)
 
 	promoteLineComments(doc)
 }

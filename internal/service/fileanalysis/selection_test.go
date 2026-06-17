@@ -78,7 +78,7 @@ func TestConfiguredSelectionPolicyCanDisableGitIgnore(t *testing.T) {
 	repo, err := config.NewRepository(filepath.Join(root, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	cfg := repo.Get()
-	cfg.FileFilter.ApplyGitIgnore = false
+	cfg.Exclude.GitIgnore = false
 	require.NoError(t, repo.Update(cfg))
 
 	selection, err := SelectFiles(SelectOptions{

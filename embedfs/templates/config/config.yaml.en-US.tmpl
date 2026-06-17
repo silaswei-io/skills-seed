@@ -112,75 +112,71 @@ logging:
   max_log_files: 30
 
 ########################################################################
-# Global File Filter
+# Global Exclusions
 # Controls file boundaries shared by learning, preview, and structural analysis
 ########################################################################
-file_filter:
-  # Whether to also filter files ignored by Git ignore rules
-  apply_git_ignore: true
-
-########################################################################
-# Global Exclusions
-# Glob-style patterns (not regex); init writes the default static exclusion rules
-########################################################################
 exclude:
-  # Dot-prefixed files and directories, such as .github, .cursor, .env
-  - ".*"
-  # Common dependency directory
-  - "vendor/**"
-  # Common dependency directory
-  - "node_modules/**"
-  # Common build output directory
-  - "dist/**"
-  # Common build output directory
-  - "build/**"
-  # Common output directory
-  - "out/**"
-  # Common build output directory
-  - "target/**"
-  # Coverage report directory
-  - "coverage/**"
-  # Cache directory
-  - ".cache/**"
-  # Temporary directory
-  - "tmp/**"
-  # Temporary directory
-  - "temp/**"
-  # Log files
-  - "*.log"
-  # Temporary files
-  - "*.tmp"
-  # Backup files
-  - "*.bak"
-  # Editor swap files
-  - "*.swp"
-  # Archives
-  - "*.zip"
-  # Archives
-  - "*.tar"
-  # Archives
-  - "*.tar.gz"
-  # Archives
-  - "*.tgz"
-  # Archives
-  - "*.rar"
-  # Archives
-  - "*.7z"
-  # Image assets
-  - "*.png"
-  # Image assets
-  - "*.jpg"
-  # Image assets
-  - "*.jpeg"
-  # Image assets
-  - "*.gif"
-  # Image assets
-  - "*.webp"
-  # Icon assets
-  - "*.ico"
-  # Document artifacts
-  - "*.pdf"
-  # Video assets
-  - "*.mp4"
-  # Video assets
-  - "*.mov"
+  # Whether to exclude files matched by Git ignore rules
+  gitignore: true
+  # Relative paths or globs to exclude; init writes the default static exclusion rules
+  paths:
+    # Dot-prefixed files and directories, such as .github, .cursor, .env
+    - ".*"
+    # Common dependency directory
+    - "vendor/**"
+    # Common dependency directory
+    - "node_modules/**"
+    # Common build output directory
+    - "dist/**"
+    # Common build output directory
+    - "build/**"
+    # Common output directory
+    - "out/**"
+    # Common build output directory
+    - "target/**"
+    # Coverage report directory
+    - "coverage/**"
+    # Cache directory
+    - ".cache/**"
+    # Temporary directory
+    - "tmp/**"
+    # Temporary directory
+    - "temp/**"
+    # Log files
+    - "*.log"
+    # Temporary files
+    - "*.tmp"
+    # Backup files
+    - "*.bak"
+    # Editor swap files
+    - "*.swp"
+    # Archives
+    - "*.zip"
+    # Archives
+    - "*.tar"
+    # Archives
+    - "*.tar.gz"
+    # Archives
+    - "*.tgz"
+    # Archives
+    - "*.rar"
+    # Archives
+    - "*.7z"
+    # Image assets
+    - "*.png"
+    # Image assets
+    - "*.jpg"
+    # Image assets
+    - "*.jpeg"
+    # Image assets
+    - "*.gif"
+    # Image assets
+    - "*.webp"
+    # Icon assets
+    - "*.ico"
+    # Document artifacts
+    - "*.pdf"
+    # Video assets
+    - "*.mp4"
+    # Video assets
+    - "*.mov"

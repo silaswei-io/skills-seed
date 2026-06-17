@@ -41,7 +41,7 @@ type Decision struct {
 
 func NewConfiguredSelectionPolicy(configRepo config.Reader, projectRoot string) SelectionPolicy {
 	policy := NewSelectionPolicy(ConfiguredLearnExcludes(configRepo, projectRoot))
-	if configRepo == nil || !configRepo.GetFileFilterConfig().ApplyGitIgnore {
+	if configRepo == nil || !configRepo.GetExcludeConfig().GitIgnore {
 		return policy
 	}
 	matcher, err := gitignore.NewMatcher(context.Background(), projectRoot)

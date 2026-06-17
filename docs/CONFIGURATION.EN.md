@@ -72,40 +72,39 @@ logging:
   logs_path: "logs"
   max_log_files: 30
 
-file_filter:
-  apply_git_ignore: true
-
 exclude:
-  - ".*"
-  - "vendor/**"
-  - "node_modules/**"
-  - "dist/**"
-  - "build/**"
-  - "out/**"
-  - "target/**"
-  - "coverage/**"
-  - ".cache/**"
-  - "tmp/**"
-  - "temp/**"
-  - "*.log"
-  - "*.tmp"
-  - "*.bak"
-  - "*.swp"
-  - "*.zip"
-  - "*.tar"
-  - "*.tar.gz"
-  - "*.tgz"
-  - "*.rar"
-  - "*.7z"
-  - "*.png"
-  - "*.jpg"
-  - "*.jpeg"
-  - "*.gif"
-  - "*.webp"
-  - "*.ico"
-  - "*.pdf"
-  - "*.mp4"
-  - "*.mov"
+  gitignore: true
+  paths:
+    - ".*"
+    - "vendor/**"
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - "out/**"
+    - "target/**"
+    - "coverage/**"
+    - ".cache/**"
+    - "tmp/**"
+    - "temp/**"
+    - "*.log"
+    - "*.tmp"
+    - "*.bak"
+    - "*.swp"
+    - "*.zip"
+    - "*.tar"
+    - "*.tar.gz"
+    - "*.tgz"
+    - "*.rar"
+    - "*.7z"
+    - "*.png"
+    - "*.jpg"
+    - "*.jpeg"
+    - "*.gif"
+    - "*.webp"
+    - "*.ico"
+    - "*.pdf"
+    - "*.mp4"
+    - "*.mov"
 ```
 
 ## Config Sections
@@ -182,7 +181,7 @@ Starting in 0.9.0, project-structure summaries, sample-file collection, and stru
 
 Starting in 0.9.1, `select_relevant_files` is enabled by default. When the locally filtered candidate count reaches `select_relevant_files_min_candidates`, `learn current` asks AI to select the most relevant files from the candidate file tree and change metadata before deeper analysis.
 
-Starting in 0.9.11, file selection also applies Git ignore rules by default. Set global `file_filter.apply_git_ignore` to `false` when files ignored by `.gitignore` should still be analyzed.
+Starting in 0.9.11, file selection also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed.
 
 #### Recommendations
 
@@ -342,17 +341,16 @@ These files are merged with built-in prompts; they do not replace built-in promp
 | `logs_path` | `logs` | Log directory relative to `.skills-seed` |
 | `max_log_files` | `30` | Maximum retained log files; older files are cleaned up automatically |
 
-### `file_filter`
+### `exclude`
 
-`file_filter` controls global file boundaries shared by learning, preview, project-structure summaries, sample-file collection, and structural pre-scan.
+`exclude` controls global file boundaries shared by learning, preview, project-structure summaries, sample-file collection, and structural pre-scan.
 
 | Field | Default | Description |
 |---|---:|---|
-| `apply_git_ignore` | `true` | Also filter files ignored by Git ignore rules, including `.gitignore`, `.git/info/exclude`, and the global Git ignore file |
+| `gitignore` | `true` | Exclude files matched by Git ignore rules, including `.gitignore`, `.git/info/exclude`, and the global Git ignore file |
+| `paths` | See below | Relative paths or globs to exclude |
 
-When disabled, file selection still applies built-in safety boundaries, generated Skills output directories, and global `exclude`, but source files ignored by Git are no longer skipped just because of Git ignore rules.
-
-### `exclude`
+When `gitignore` is disabled, file selection still applies built-in safety boundaries, generated Skills output directories, and `exclude.paths`, but source files ignored by Git are no longer skipped just because of Git ignore rules.
 
 #### Defaults
 
@@ -380,6 +378,6 @@ When disabled, file selection still applies built-in safety boundaries, generate
 
 #### Notes
 
-1. `exclude` uses glob-style patterns, not regular expressions. Patterns without `/` (e.g., `*.log`) match against both the file basename and the full path.
-2. Exclusion rules affect learning, preview, project-structure summaries, sample-file collection, and structural pre-scan; `file_filter.apply_git_ignore` is also applied by default.
+1. `exclude.paths` uses glob-style patterns, not regular expressions. Patterns without `/` (e.g., `*.log`) match against both the file basename and the full path.
+2. Exclusion rules affect learning, preview, project-structure summaries, sample-file collection, and structural pre-scan; `exclude.gitignore` is also applied by default.
 3. Generated skill directories are also excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
