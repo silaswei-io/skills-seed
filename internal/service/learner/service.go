@@ -232,7 +232,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 	)
 
 	if len(unanalyzedCommits) == 0 {
-		fmt.Println(i18n.Get("LearnNoCommits"))
+		logger.Info(i18n.Get("LearnNoCommits"))
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "learner.learn",
 			"duration", time.Since(startedAt),

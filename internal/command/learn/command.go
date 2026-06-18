@@ -1243,52 +1243,6 @@ func writeJSONInput(path string, value interface{}) (string, error) {
 	return path, nil
 }
 
-// workspaceSpecFromConfig 基于根仓配置生成只描述跨子仓关系的工作区规范。
-func workspaceSpecFromConfig(workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig, generatedAt string) *domain.WorkspaceSpec {
-	profile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
-	routing := make([]domain.WorkspaceRoute, 0, len(profile.Projects))
-	for _, project := range profile.Projects {
-		routing = append(routing, domain.WorkspaceRoute{
-			PathPattern: filepath.ToSlash(filepath.Join(project.Path, "**")),
-			ProjectIDs:  []string{project.ID},
-			Reason:      "子项目路径只路由到该子项目的独立 skill",
-		})
-	}
-
-	return &domain.WorkspaceSpec{
-		Name:        workspaceName,
-		RootPath:    projectRoot,
-		Projects:    profile.Projects,
-		Routing:     routing,
-		Rules:       defaultWorkspaceRules(profile.Projects),
-		GeneratedAt: generatedAt,
-	}
-}
-
-func workspaceProjectIDs(projects []domain.WorkspaceProject) []string {
-	ids := make([]string, 0, len(projects))
-	for _, project := range projects {
-		ids = append(ids, project.ID)
-	}
-	return ids
-}
-
-func defaultWorkspaceRules(projects []domain.WorkspaceProject) []domain.WorkspaceRule {
-	projectIDs := workspaceProjectIDs(projects)
-	return []domain.WorkspaceRule{
-		{
-			Title:       "子项目独立学习",
-			Description: "工作区根仓只编排子项目学习并维护跨项目关系；子项目模式、画像和文件指纹保存在各自 .skills-seed 中。",
-			AppliesTo:   projectIDs,
-		},
-		{
-			Title:       "跨项目改动先定边界",
-			Description: "修改契约、共享代码或基础设施前，先确认生产者、消费者和运行时影响，再读取相关子项目 skill。",
-			AppliesTo:   projectIDs,
-		},
-	}
-}
-
 func resolveFocusPaths(projectRoot string, paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil

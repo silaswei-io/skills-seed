@@ -2,6 +2,7 @@ package hook
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,58 +23,65 @@ func Cmd() *cobra.Command {
 		Long:    i18n.Get("HookLongDesc"),
 		Example: i18n.Get("HookExample"),
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if install && uninstall {
-				fmt.Println(i18n.Get("HookBothFlagsError"))
-				os.Exit(1)
+				return fmt.Errorf("%s", i18n.Get("HookBothFlagsError"))
 			}
 
 			if install {
 				if err := installHook(); err != nil {
-					fmt.Println(i18n.GetWithParams("HookInstallFailed", map[string]interface{}{"Error": err.Error()}))
-					os.Exit(1)
+					return fmt.Errorf("%s", i18n.GetWithParams("HookInstallFailed", map[string]interface{}{"Error": err.Error()}))
 				}
-				fmt.Println(i18n.Get("HookInstallSuccess"))
-			} else if uninstall {
-				if err := uninstallHook(); err != nil {
-					fmt.Println(i18n.GetWithParams("HookUninstallFailed", map[string]interface{}{"Error": err.Error()}))
-					os.Exit(1)
-				}
-				fmt.Println(i18n.Get("HookUninstallSuccess"))
-			} else {
-				// 默认执行 pre-commit hook
-				if err := runPreCommitHook(); err != nil {
-					fmt.Println(i18n.GetWithParams("HookRunFailed", map[string]interface{}{"Error": err.Error()}))
-					os.Exit(1)
-				}
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Get("HookInstallSuccess"))
+				return err
 			}
+			if uninstall {
+				if err := uninstallHook(); err != nil {
+					return fmt.Errorf("%s", i18n.GetWithParams("HookUninstallFailed", map[string]interface{}{"Error": err.Error()}))
+				}
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Get("HookUninstallSuccess"))
+				return err
+			}
+			// 默认执行 pre-commit hook
+			if err := runPreCommitHook(cmd.OutOrStdout(), cmd.ErrOrStderr()); err != nil {
+				return fmt.Errorf("%s", i18n.GetWithParams("HookRunFailed", map[string]interface{}{"Error": err.Error()}))
+			}
+			return nil
 		},
 	}
 
 	hookCmd.Flags().BoolVarP(&install, "install", "i", false, i18n.Get("HookFlagInstall"))
 	hookCmd.Flags().BoolVarP(&uninstall, "uninstall", "u", false, i18n.Get("HookFlagUninstall"))
-	hookCmd.AddCommand(hookActionCmd("install", i18n.Get("HookInstallShort"), i18n.Get("HookInstallLongDesc"), i18n.Get("HookInstallExample"), installHook, i18n.Get("HookInstallSuccess")))
-	hookCmd.AddCommand(hookActionCmd("uninstall", i18n.Get("HookUninstallShort"), i18n.Get("HookUninstallLongDesc"), i18n.Get("HookUninstallExample"), uninstallHook, i18n.Get("HookUninstallSuccess")))
-	hookCmd.AddCommand(hookActionCmd("run", i18n.Get("HookRunShort"), i18n.Get("HookRunLongDesc"), i18n.Get("HookRunExample"), runPreCommitHook, ""))
+	hookCmd.AddCommand(hookActionCmd("install", i18n.Get("HookInstallShort"), i18n.Get("HookInstallLongDesc"), i18n.Get("HookInstallExample"), func(cmd *cobra.Command) error {
+		return installHook()
+	}, i18n.Get("HookInstallSuccess")))
+	hookCmd.AddCommand(hookActionCmd("uninstall", i18n.Get("HookUninstallShort"), i18n.Get("HookUninstallLongDesc"), i18n.Get("HookUninstallExample"), func(cmd *cobra.Command) error {
+		return uninstallHook()
+	}, i18n.Get("HookUninstallSuccess")))
+	hookCmd.AddCommand(hookActionCmd("run", i18n.Get("HookRunShort"), i18n.Get("HookRunLongDesc"), i18n.Get("HookRunExample"), func(cmd *cobra.Command) error {
+		return runPreCommitHook(cmd.OutOrStdout(), cmd.ErrOrStderr())
+	}, ""))
 
 	return hookCmd
 }
 
-func hookActionCmd(use, short, long, example string, action func() error, successMessage string) *cobra.Command {
+func hookActionCmd(use, short, long, example string, action func(*cobra.Command) error, successMessage string) *cobra.Command {
 	return &cobra.Command{
 		Use:     use,
 		Short:   short,
 		Long:    long,
 		Example: example,
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			if err := action(); err != nil {
-				fmt.Println(err.Error())
-				os.Exit(1)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := action(cmd); err != nil {
+				return err
 			}
 			if successMessage != "" {
-				fmt.Println(successMessage)
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), successMessage); err != nil {
+					return err
+				}
 			}
+			return nil
 		},
 	}
 }
@@ -155,7 +163,7 @@ func uninstallHook() error {
 	return nil
 }
 
-func runPreCommitHook() error {
+func runPreCommitHook(stdout, stderr io.Writer) error {
 	// 获取暂存的 Go 文件
 	cmd := exec.Command("git", "diff", "--cached", "--name-only", "--diff-filter=ACM")
 	output, err := cmd.Output()
@@ -172,21 +180,21 @@ func runPreCommitHook() error {
 	}
 
 	if len(goFiles) == 0 {
-		fmt.Println(i18n.Get("HookNoStagedFiles"))
+		fmt.Fprintln(stdout, i18n.Get("HookNoStagedFiles"))
 		return nil
 	}
 
-	fmt.Println(i18n.GetWithParams("HookCheckingFiles", map[string]interface{}{"Count": len(goFiles)}))
+	fmt.Fprintln(stdout, i18n.GetWithParams("HookCheckingFiles", map[string]interface{}{"Count": len(goFiles)}))
 
 	// 运行 skills-seed check
 	checkCmd := exec.Command("skills-seed", "check", "--interactive=false")
-	checkCmd.Stdout = os.Stdout
-	checkCmd.Stderr = os.Stderr
+	checkCmd.Stdout = stdout
+	checkCmd.Stderr = stderr
 
 	if err := checkCmd.Run(); err != nil {
 		return fmt.Errorf("%s", i18n.GetWithParams("ErrHookCheckFailed", map[string]interface{}{"Error": err.Error()}))
 	}
 
-	fmt.Println(i18n.Get("HookCheckPassed"))
+	fmt.Fprintln(stdout, i18n.Get("HookCheckPassed"))
 	return nil
 }

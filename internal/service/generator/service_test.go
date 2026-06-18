@@ -13,7 +13,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
@@ -161,17 +160,6 @@ func TestResolveProjectOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
 
 	_, err = resolveProjectOutputPath(projectRoot, "../outside")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), i18n.GetWithParams("GenerateOutputPathOutsideProjectRoot", map[string]interface{}{
-		"OutputPath":  "../outside",
-		"ProjectRoot": projectRoot,
-	}))
-
-	_, err = resolveProjectOutputPath(projectRoot, filepath.Join(parent, "outside"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), i18n.GetWithParams("GenerateOutputPathOutsideProjectRoot", map[string]interface{}{
-		"OutputPath":  filepath.Join(parent, "outside"),
-		"ProjectRoot": projectRoot,
-	}))
 }
 
 func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {

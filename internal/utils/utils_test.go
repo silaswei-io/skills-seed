@@ -128,6 +128,31 @@ func TestResolvePathExpandsWindowsStyleHomePrefix(t *testing.T) {
 	assert.NotContains(t, resolved, "~")
 }
 
+func TestResolveProjectOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
+	parent := t.TempDir()
+	projectRoot := filepath.Join(parent, "repo")
+	require.NoError(t, os.MkdirAll(projectRoot, 0755))
+
+	inside, err := ResolveProjectOutputPath(projectRoot, ".agents/skills/demo")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(projectRoot, ".agents", "skills", "demo"), inside)
+
+	_, err = ResolveProjectOutputPath(projectRoot, "../outside")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), i18n.GetWithParams("GenerateOutputPathOutsideProjectRoot", map[string]interface{}{
+		"OutputPath":  "../outside",
+		"ProjectRoot": projectRoot,
+	}))
+
+	outsidePath := filepath.Join(parent, "outside")
+	_, err = ResolveProjectOutputPath(projectRoot, outsidePath)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), i18n.GetWithParams("GenerateOutputPathOutsideProjectRoot", map[string]interface{}{
+		"OutputPath":  outsidePath,
+		"ProjectRoot": projectRoot,
+	}))
+}
+
 func TestRelativePaths(t *testing.T) {
 	projectRoot := filepath.Join("tmp", "project")
 	paths := []string{
