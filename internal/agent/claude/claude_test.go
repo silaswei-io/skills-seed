@@ -13,7 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/prompts"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
@@ -76,7 +76,7 @@ func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 }
 
 func TestAnalyzeCodeReturnsErrorWhenClaudeCommandMissing(t *testing.T) {
-	loader := prompts.NewLoader("claude", "en-US", "")
+	loader := promptloader.New("claude", "en-US", "")
 	ag := New("__skills_seed_missing_claude__", time.Second, loader, false, config.DefaultRetryConfig())
 
 	_, err := ag.AnalyzeCode(context.Background(), &agent.AnalyzeRequest{
@@ -90,7 +90,7 @@ func TestAnalyzeCodeReturnsErrorWhenClaudeCommandMissing(t *testing.T) {
 }
 
 func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
-	loader := prompts.NewLoader("claude", "zh-CN", "")
+	loader := promptloader.New("claude", "zh-CN", "")
 	ag := New("__skills_seed_missing_claude__", time.Second, loader, false, config.DefaultRetryConfig())
 
 	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
@@ -135,7 +135,7 @@ func TestAnalyzeProjectRepairsMalformedModelJSON(t *testing.T) {
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
 
 	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{\"project_name\":\"demo\",\"common_utils\":[{{\"name\":\"bad\"}]"}`)
-	loader := prompts.NewLoader("claude", "zh-CN", "")
+	loader := promptloader.New("claude", "zh-CN", "")
 	ag := New(commandPath, 5*time.Second, loader, false, config.DefaultRetryConfig())
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
 

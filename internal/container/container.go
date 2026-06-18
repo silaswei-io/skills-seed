@@ -19,7 +19,7 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
-	"github.com/silaswei-io/skills-seed/internal/prompts"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/checker"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
@@ -52,20 +52,20 @@ type Container struct {
 	GeneratorSvc          *generator.GeneratorService
 	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
 	CuratorSvc            *curator.Service
-	PromptLoader          *prompts.Loader
+	PromptLoader          *promptloader.Loader
 	SkillsLoader          *skills.Loader
 }
 
 // AgentFactory 创建指定 engine 的 Agent
-type AgentFactory func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent
+type AgentFactory func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent
 
 var (
 	agentFactoriesMu sync.RWMutex
 	agentFactories   = map[string]AgentFactory{
-		"claude": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+		"claude": func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
 			return claude.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
 		},
-		"codex": func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+		"codex": func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
 			return codex.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
 		},
 	}
@@ -134,7 +134,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	workspaceSpecRepo := workspacestore.NewSpecRepository(seedPath)
 
 	// 5. 创建加载器
-	promptLoader := prompts.NewLoaderWithLocales(cfg.Agent.Engine, configRepo.GetToolLocale(), configRepo.GetSkillsLocale(), seedPath)
+	promptLoader := promptloader.NewWithLocales(cfg.Agent.Engine, configRepo.GetToolLocale(), configRepo.GetSkillsLocale(), seedPath)
 	skillsLoader := skills.NewLoaderForAgent(configRepo.GetEffectiveSkillsTarget(), configRepo.GetSkillsLocale())
 
 	// 6. 创建 Agent
@@ -179,7 +179,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	}, nil
 }
 
-func createAgent(cfg *config.Config, promptLoader *prompts.Loader) (agent.Agent, error) {
+func createAgent(cfg *config.Config, promptLoader *promptloader.Loader) (agent.Agent, error) {
 	timeout := time.Duration(cfg.Agent.Timeout) * time.Second
 	engine := cfg.Agent.Engine
 

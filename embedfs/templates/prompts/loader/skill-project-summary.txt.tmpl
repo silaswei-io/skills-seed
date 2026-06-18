@@ -52,7 +52,7 @@
 
 ## 输出格式
 
-**仅返回一个有效的 JSON 对象**。下面的 `json` 代码块仅用于说明结构；实际回复不要包含 markdown 代码块或额外文本：
+下面的 `json` 代码块用于说明返回结构：
 
 ```json
 {
@@ -101,11 +101,4 @@
 ## 分类优先级（用于 `priority` 字段）
 - business: 5, api/database: 4, naming/structure/error/concurrency: 3, utils/config/middleware/testing: 2
 
-# ⚠️ 关键输出要求
-
-你的整个回复必须只是一个有效的 JSON 对象。
-- 以 `{` 开始，以 `}` 结束
-- 不要使用 markdown 代码块（不要 ```)
-- JSON 前后不要有任何说明文字
-- 不要包含总结、介绍或结论
-- 如果需要添加注释，请放在 JSON 中的 "notes" 字段里
+如需补充说明，请放在 JSON 中的 `notes` 字段里。

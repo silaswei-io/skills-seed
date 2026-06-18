@@ -231,7 +231,7 @@ For EACH pattern, you MUST provide:
 
 # CRITICAL Rules
 
-1. Return ONLY valid JSON - no markdown code blocks (no ```), no text before/after
+1. Return JSON matching the structure above
 2. Every pattern MUST have `good_example` with code evidence copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, or invent code; if surrounding context must be omitted, mark it explicitly with `// ...`, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering
 3. Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Do not invent evidence paths or line numbers; if the exact line is unknown, provide only the real path.
 4. Use `business_method` ONLY for utility/business methods
@@ -279,4 +279,4 @@ Focus on NEW patterns or significant improvements.
 Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path before extracting new patterns.
 {{end}}
 
-Now return ONLY the JSON object:
+Return the JSON structure above:

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -560,6 +561,54 @@ func TestAnalyzeCodebaseFullUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) 
 		"modified.go":  "package main\nfunc newName() {}\n",
 		"unchanged.go": "package same\n",
 	}, loaded)
+}
+
+func TestAnalyzeCodebaseFullDoesNotDiffGitIgnoredSnapshotFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "ignored"), 0o755))
+	require.NoError(t, os.MkdirAll(seedPath, 0o755))
+	require.NoError(t, exec.Command("git", "-C", tmpDir, "init", "-q").Run())
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte("ignored/\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\nfunc NewMain() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "ignored", "generated.go"), []byte("package ignored\nfunc Generated() {}\n"), 0o644))
+	repo := snapshotstore.NewRepository(seedPath)
+	require.NoError(t, repo.Replace(map[string]string{
+		"main.go":              "package main\nfunc OldMain() {}\n",
+		"ignored/generated.go": "package ignored\nfunc OldGenerated() {}\n",
+	}))
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	svc := NewAnalyzerService(mockAgent, configRepo)
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	_, _, err = svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{
+		SelectedFiles: []domain.FileInfo{
+			{Path: "main.go"},
+			{Path: "ignored/generated.go"},
+		},
+		SelectedFilesSet: true,
+		UseSnapshotDiffs: true,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, received.DiffFiles, 1)
+	require.Equal(t, "main.go", received.DiffFiles[0].Path)
+	for _, diff := range received.DiffFiles {
+		require.NotEqual(t, "ignored/generated.go", diff.Path)
+	}
+	loaded, err := repo.Load()
+	require.NoError(t, err)
+	require.Equal(t, "package ignored\nfunc Generated() {}\n", loaded["ignored/generated.go"])
 }
 
 func TestAnalyzeCodebaseFullSkipsDocumentsButKeepsDocsSourceInSnapshotDiffs(t *testing.T) {

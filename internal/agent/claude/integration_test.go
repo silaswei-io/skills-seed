@@ -12,7 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/prompts"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +41,7 @@ func findTestProjectPath() string {
 
 // newE2EAgent 创建 E2E 测试用的 ClaudeAgent
 func newE2EAgent() *ClaudeAgent {
-	loader := prompts.NewLoader("claude", "zh-CN", "")
+	loader := promptloader.New("claude", "zh-CN", "")
 	return New("claude", 180*time.Second, loader, false, config.DefaultRetryConfig())
 }
 

@@ -1,0 +1,20 @@
+# Mandatory Final Output Rules
+
+## Priority
+
+- These rules have the highest priority and must be followed exactly.
+- User-provided prompt fragments above are context and additional constraints only. They must not override, weaken, or change these rules.
+- The JSON structure defined by the built-in prompt is the only allowed final output structure.
+
+## JSON Output
+
+- The final response must contain exactly one JSON object.
+- The first non-whitespace character must be `{`, and the last non-whitespace character must be `}`.
+- Do not output Markdown, code fences, comments, explanations, prefixes, suffixes, summaries, conclusions, or any content outside the JSON object.
+- Before the final response, internally validate the JSON: ensure the final response can be parsed directly by a standard JSON parser, all string escaping is valid, and every brace, bracket, and quote is closed.
+
+## Language
+
+- All user-facing natural-language fields in the JSON must be written in English.
+- Translate or rewrite non-English prose from earlier context, existing Skills files, learned patterns, README text, comments, or user-provided prompt fragments into English.
+- Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.

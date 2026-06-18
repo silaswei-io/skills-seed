@@ -87,6 +87,28 @@ func TestPrepareIncrementalFileChangesSkipsDocumentsButKeepsDocsSource(t *testin
 	require.Equal(t, 2, changes.SkippedCount(fileanalysis.SkipReasonDocument))
 }
 
+func TestPrepareIncrementalFileChangesDoesNotDeleteCurrentGitIgnoredRecords(t *testing.T) {
+	ctx := context.Background()
+	projectRoot := initLearnGitRepo(t)
+	writeLearnFile(t, projectRoot, ".gitignore", "ignored/\n")
+	writeLearnFile(t, projectRoot, "main.go", "package main\n")
+	writeLearnFile(t, projectRoot, "ignored/generated.go", "package ignored\n")
+	gitAddAll(t, projectRoot)
+
+	repo := newLearnTracker(t, projectRoot)
+	require.NoError(t, repo.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{
+		{Path: "main.go", Hash: "old-main"},
+		{Path: "ignored/generated.go", Hash: "old-ignored"},
+	}))
+	configRepo := newIncrementalConfig(t, projectRoot)
+
+	changes, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
+
+	require.NoError(t, err)
+	require.NotContains(t, changes.Deleted, "ignored/generated.go")
+	require.Empty(t, changes.Deleted)
+}
+
 func TestIncrementalFileChangesApplyAISelectionMarksUnselectedRecords(t *testing.T) {
 	changes := &incrementalFileChanges{
 		Records: []domain.FileAnalysisRecord{

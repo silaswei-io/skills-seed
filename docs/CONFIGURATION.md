@@ -181,7 +181,7 @@ exclude:
 
 0.9.1 起，`select_relevant_files` 默认开启；当本地过滤后的候选文件数达到 `select_relevant_files_min_candidates` 时，`learn current` 会先让 AI 从候选文件树和变更元数据中筛出更相关的文件，再进入后续分析。
 
-0.9.11 起，文件选择策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。
+0.9.11 起，文件选择策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。0.9.13 起，快照仍保存完整当前状态，但发送给 AI 的 diff 会按 `exclude.paths` 和 `exclude.gitignore` 过滤，避免被忽略文件作为删除 diff 进入分析。
 
 #### 建议
 
@@ -196,7 +196,7 @@ exclude:
 
 Prompt 片段仍从 `.skills-seed/prompts/` 读取，但 0.7.1 起渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的约束。
 
-渲染后的 prompt 默认保存在 `.skills-seed/memory/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、项目画像、项目补充、workspace 补充、用户指令和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。
+渲染后的 prompt 默认保存在 `.skills-seed/memory/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、项目画像、项目补充、workspace 补充、用户指令和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。0.9.13 起，最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象。
 
 0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。
 

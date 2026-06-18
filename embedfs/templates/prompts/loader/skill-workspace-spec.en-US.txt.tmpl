@@ -69,7 +69,7 @@ The AI call is non-interactive; do not ask the user outside the JSON. If an unco
 
 # Output Format
 
-Return only a valid JSON object with this structure. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response structure:
 
 ```json
 {
@@ -112,9 +112,6 @@ Return only a valid JSON object with this structure. The `json` fenced block bel
 }
 ```
 
-# Strict JSON Output Rules
+# Strict Rules
 
 - Preserve paths, commands, config keys, environment variables, and code identifiers verbatim.
-- The entire response must start with `{` and end with `}`.
-- Do not wrap JSON in markdown fences.
-- Do not add explanatory text before or after the JSON.

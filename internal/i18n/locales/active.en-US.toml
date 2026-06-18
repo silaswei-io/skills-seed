@@ -1832,7 +1832,10 @@ other = "Pattern curation call failed"
 other = "Pattern curation result parsing failed"
 
 [LoggerAgentCuratePatternsValidationFallback]
-other = "Pattern curation result validation failed"
+other = "Pattern curation result has structural issues; continuing with deterministic merge result"
+
+[LoggerAgentCuratePatternsSanitized]
+other = "Pattern curation result contains non-candidate dropped entries; ignored those entries and continued"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"

@@ -23,6 +23,10 @@ type Result struct {
 	Repository   *snapshotstore.Repository
 }
 
+type Options struct {
+	DiffAllowed func(path string) bool
+}
+
 // Build 读取当前文件内容并与已存快照对比，返回 AI 请求需要的新增文件和修改文件 diff 引用。
 func Build(ctx context.Context, projectRoot string, files []domain.FileInfo) (*Result, error) {
 	return BuildScoped(ctx, projectRoot, files, nil)
@@ -30,6 +34,10 @@ func Build(ctx context.Context, projectRoot string, files []domain.FileInfo) (*R
 
 // BuildScoped 与 Build 类似，但 MergedFiles 只替换 scopePaths 内的快照，并保留范围外快照。
 func BuildScoped(ctx context.Context, projectRoot string, files []domain.FileInfo, scopePaths []string) (*Result, error) {
+	return BuildScopedWithOptions(ctx, projectRoot, files, scopePaths, Options{})
+}
+
+func BuildScopedWithOptions(ctx context.Context, projectRoot string, files []domain.FileInfo, scopePaths []string, opts Options) (*Result, error) {
 	seedPath := seedPathFor(ctx, projectRoot)
 	repo := snapshotstore.NewRepository(seedPath)
 	oldSnapshots, err := repo.Load()
@@ -43,7 +51,9 @@ func BuildScoped(ctx context.Context, projectRoot string, files []domain.FileInf
 	}
 
 	runtimeDir := filepath.Join(seedPath, "memory", "runtime")
-	changes, err := snapshotdiff.CompareScoped(currentFiles, oldSnapshots, runtimeDir, scopePaths)
+	diffCurrentFiles := filterFilesForDiff(currentFiles, opts.DiffAllowed)
+	diffOldSnapshots := filterFilesForDiff(oldSnapshots, opts.DiffAllowed)
+	changes, err := snapshotdiff.CompareScoped(diffCurrentFiles, diffOldSnapshots, runtimeDir, scopePaths)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +83,19 @@ func BuildScoped(ctx context.Context, projectRoot string, files []domain.FileInf
 		}
 	}
 	return result, nil
+}
+
+func filterFilesForDiff(files map[string]string, allowed func(path string) bool) map[string]string {
+	if allowed == nil {
+		return files
+	}
+	filtered := make(map[string]string, len(files))
+	for path, content := range files {
+		if allowed(path) {
+			filtered[path] = content
+		}
+	}
+	return filtered
 }
 
 func mergeSnapshots(oldSnapshots, currentFiles map[string]string, scopePaths []string) map[string]string {

@@ -118,7 +118,7 @@ Allowed categories: {{.AllowedCategories}}
 
 # Output Format
 
-Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response structure:
 
 ```json
 {
@@ -222,12 +222,8 @@ Before returning JSON, validate every candidate pattern internally:
 
 If a candidate fails any required validation check, do not output it.
 
-# CRITICAL OUTPUT REQUIREMENTS
+# Critical Quality Requirements
 
-Your ENTIRE response must be ONLY a valid JSON object.
-- Start with `{` and end with `}`
-- NO markdown code blocks (no ```)
-- NO explanatory text before or after the JSON
 - **Business methods MUST include complete method signatures and file locations**
 - Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Use `business_method` only for real callable business/utility methods; do not mix the two concepts.
 - Each pattern's `good_example` MUST be code evidence copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, or invent code; when excerpting, do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering. If surrounding context must be omitted, mark it explicitly with `// ...`

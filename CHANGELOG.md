@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.13]
+
+### 变更
+
+- 将运行时提示词模板从 `embedfs/templates/prompts/common` 拆分到 `loader` 目录，并把尾部追加的最终输出契约移动到独立的 `append` 目录，避免普通 prompt 模板和追加约束混在一起。
+- 统一所有 JSON 型运行时 prompt 的最终输出契约，由 loader 在尾部追加更强制的 JSON 硬约束，要求最终响应只能是单个可解析 JSON 对象并在回复前完成 JSON 自检。
+
+### 修复
+
+- 修复 `.gitignore` 或 `exclude` 命中的历史快照文件仍可能作为删除 diff 发送给 AI 的问题；快照仍保存完整当前状态，但 AI 分析输入中的 diff 会按当前文件过滤策略剔除。
+- 修复模式策展结果中 `dropped` 引用了非候选 ID 时告警不清晰的问题；现在会忽略这类无效 dropped 条目并输出更明确的提示，避免看起来像整体学习失败。
+
 ## [v0.9.12]
 
 ### 变更

@@ -8,6 +8,10 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
+type sanitizeCurateResultReport struct {
+	IgnoredDroppedIDs []string
+}
+
 func validateCandidates(candidates []domain.Pattern) []domain.Pattern {
 	valid := make([]domain.Pattern, 0, len(candidates))
 	for _, candidate := range candidates {
@@ -17,6 +21,25 @@ func validateCandidates(candidates []domain.Pattern) []domain.Pattern {
 		}
 	}
 	return valid
+}
+
+func sanitizeCurateResult(result *agent.CuratePatternsResult, candidates []domain.Pattern) sanitizeCurateResultReport {
+	if result == nil {
+		return sanitizeCurateResultReport{}
+	}
+
+	candidateIDs := patternIDSet(candidates)
+	dropped := result.Dropped[:0]
+	report := sanitizeCurateResultReport{}
+	for _, item := range result.Dropped {
+		if _, ok := candidateIDs[item.ID]; !ok {
+			report.IgnoredDroppedIDs = append(report.IgnoredDroppedIDs, item.ID)
+			continue
+		}
+		dropped = append(dropped, item)
+	}
+	result.Dropped = dropped
+	return report
 }
 
 func validateCurateResult(result *agent.CuratePatternsResult, candidates, existing []domain.Pattern) error {
@@ -71,7 +94,7 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 	droppedIDs := make(map[string]struct{}, len(result.Dropped))
 	for _, dropped := range result.Dropped {
 		if _, ok := candidateIDs[dropped.ID]; !ok {
-			return fmt.Errorf("dropped pattern references unknown candidate id %q", dropped.ID)
+			return fmt.Errorf("dropped pattern id %q is not a current candidate id; dropped may only reference current candidates", dropped.ID)
 		}
 		if _, exists := droppedIDs[dropped.ID]; exists {
 			return fmt.Errorf("duplicate dropped candidate id %q", dropped.ID)

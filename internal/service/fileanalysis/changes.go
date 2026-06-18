@@ -62,6 +62,10 @@ func PrepareCurrentChanges(ctx context.Context, tracker domain.FileAnalysisTrack
 	for _, skipped := range selection.Skipped {
 		changes.Skipped = append(changes.Skipped, skipped.Path)
 	}
+	skippedCurrent := make(map[string]bool, len(selection.Skipped))
+	for _, skipped := range selection.Skipped {
+		skippedCurrent[filepath.ToSlash(filepath.Clean(skipped.Path))] = true
+	}
 
 	for _, file := range selection.Files {
 		relPath := filepath.ToSlash(filepath.Clean(file.Path))
@@ -85,6 +89,9 @@ func PrepareCurrentChanges(ctx context.Context, tracker domain.FileAnalysisTrack
 
 	for path := range previous {
 		if _, ok := current[path]; !ok {
+			if skippedCurrent[path] || policy.IsExcluded(path) {
+				continue
+			}
 			changes.Deleted = append(changes.Deleted, path)
 		}
 	}

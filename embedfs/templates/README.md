@@ -6,7 +6,8 @@ Templates are organized by two different dimensions.
 
 `templates/prompts` stores prompt templates used to ask the AI agent for analysis or generated data.
 
-- `common/` stores runtime agent prompts shared by project and workspace flows.
+- `loader/` stores runtime agent prompts rendered by `internal/prompts/loader`.
+- `append/` stores mandatory fragments appended after runtime prompts, such as final output contracts.
 - `project/` stores templates used to initialize project context files under `.skills-seed/prompts/project` and user instruction files under `.skills-seed/prompts/instructions`.
 - `workspace/` stores templates used to initialize user-editable workspace prompt fragments under `.skills-seed/prompts/workspace`.
 

@@ -82,7 +82,7 @@ If an existing project profile is provided, preserve unchanged modules, utilitie
 
 # Output Format
 
-Return ONLY a valid JSON object matching this schema. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response schema:
 
 ```json
 {
@@ -146,10 +146,3 @@ Return ONLY a valid JSON object matching this schema. The `json` fenced block be
   "summary": "Specific project overview"
 }
 ```
-
-# Critical Output Requirements
-
-- The entire response must be only one valid JSON object
-- Start with `{` and end with `}`
-- Do not wrap the JSON in markdown code fences
-- Do not include explanatory text before or after the JSON

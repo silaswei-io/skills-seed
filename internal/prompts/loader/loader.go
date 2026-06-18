@@ -1,4 +1,4 @@
-package prompts
+package loader
 
 import (
 	"bytes"
@@ -46,13 +46,13 @@ type renderedPromptManifest struct {
 	Parts       []promptPartDebug `json:"parts"`
 }
 
-// NewLoader 创建提示词模板加载器
-func NewLoader(agentName, locale, seedPath string) *Loader {
-	return NewLoaderWithLocales(agentName, locale, "", seedPath)
+// New 创建提示词模板加载器。
+func New(agentName, locale, seedPath string) *Loader {
+	return NewWithLocales(agentName, locale, "", seedPath)
 }
 
-// NewLoaderWithLocales 创建可按提示词用途选择语言的提示词模板加载器。
-func NewLoaderWithLocales(agentName, locale, skillsLocale, seedPath string) *Loader {
+// NewWithLocales 创建可按提示词用途选择语言的提示词模板加载器。
+func NewWithLocales(agentName, locale, skillsLocale, seedPath string) *Loader {
 	if locale == "" {
 		locale = config.DefaultToolLocale
 	}
@@ -119,7 +119,7 @@ func (l *Loader) readEmbeddedTemplateWithLocale(name, locale string) ([]byte, er
 }
 
 func (l *Loader) templateAgentNames() []string {
-	return metadata.TemplateProviderFallbacks(l.agentName)
+	return metadata.PromptTemplateProviderFallbacks(l.agentName)
 }
 
 // Render 渲染指定提示词模板
@@ -158,16 +158,19 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	}
 
 	base := buf.String()
+	contractGuard := l.outputContractGuard(locale, name)
 	if l.seedPath == "" {
+		rendered := l.appendOutputContractGuard(base, contractGuard)
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticPromptRendered"),
 			"template", name,
 			"agent", l.agentName,
 			"locale", locale,
 			"base_length", len(base),
-			"final_length", len(strings.TrimSpace(base)),
+			"output_contract_guard_length", len(contractGuard),
+			"final_length", len(rendered),
 			"has_seed_path", false,
 		)
-		return base, nil
+		return rendered, nil
 	}
 
 	rawProjectProfile := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "project-profile.md"))
@@ -220,7 +223,6 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 	addPart("scoped-project-prompt", rawScopedPrompt, scopedPrompt)
 	addPart("workspace-prompt", rawWorkspacePrompt, workspacePrompt)
 	addPart("instructions-prompt", rawInstructionsPrompt, instructionsPrompt)
-	contractGuard := l.outputContractGuard(locale)
 	if contractGuard != "" {
 		addPart("output-contract-guard", contractGuard, contractGuard)
 	}
@@ -279,12 +281,42 @@ func (l *Loader) readPromptFile(path string) string {
 	return string(data)
 }
 
-func (l *Loader) outputContractGuard(locale string) string {
-	data, err := l.readEmbeddedTemplateWithLocale("output-contract-guard", locale)
+func (l *Loader) outputContractGuard(locale, promptName string) string {
+	if promptName == "output-contract-guard" {
+		return ""
+	}
+	data, err := readAppendTemplateWithLocale("output-contract-guard", locale)
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(string(data))
+}
+
+func readAppendTemplateWithLocale(name, locale string) ([]byte, error) {
+	localizedPath := metadata.PromptAppendTemplatePath(name, locale)
+	data, err := embedfs.FS.ReadFile(localizedPath)
+	if err == nil {
+		return data, nil
+	}
+
+	defaultPath := metadata.PromptAppendTemplatePath(name, "")
+	data, err = embedfs.FS.ReadFile(defaultPath)
+	if err == nil {
+		return data, nil
+	}
+
+	return nil, os.ErrNotExist
+}
+
+func (l *Loader) appendOutputContractGuard(base, contractGuard string) string {
+	base = strings.TrimSpace(base)
+	if contractGuard == "" {
+		return base
+	}
+	if base == "" {
+		return contractGuard
+	}
+	return strings.TrimSpace(base + "\n\n" + contractGuard)
 }
 
 func (l *Loader) localeForPrompt(name string) string {

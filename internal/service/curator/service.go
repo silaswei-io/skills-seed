@@ -46,6 +46,7 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 	}
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
 	curated := s.curate(ctx, req.Operation, candidates, retrieved.related, false, retrieved.existingByCandidate, hooks)
+	logCurateSanitizeReport(req.Operation, sanitizeCurateResult(curated, candidates))
 	if err := validateCurateResult(curated, candidates, retrieved.related); err != nil {
 		logger.Warn(i18n.Get("LoggerAgentCuratePatternsValidationFallback"),
 			"operation", req.Operation,
@@ -107,6 +108,7 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 		}
 	}
 	curated := s.curate(ctx, OperationCompact, patterns, patterns, true, byCandidate, hooks)
+	logCurateSanitizeReport(OperationCompact, sanitizeCurateResult(curated, patterns))
 	if err := validateCurateResult(curated, patterns, patterns); err != nil {
 		logger.Warn(i18n.Get("LoggerAgentCuratePatternsValidationFallback"),
 			"operation", OperationCompact,
@@ -172,6 +174,17 @@ func (s *Service) curate(ctx context.Context, operation string, candidates, exis
 		return fallbackCurate(candidates, existing)
 	}
 	return result
+}
+
+func logCurateSanitizeReport(operation string, report sanitizeCurateResultReport) {
+	if len(report.IgnoredDroppedIDs) == 0 {
+		return
+	}
+	logger.Info(i18n.Get("LoggerAgentCuratePatternsSanitized"),
+		"operation", operation,
+		"ignored_dropped_ids", report.IgnoredDroppedIDs,
+		"reason", "dropped may only reference current candidate pattern ids",
+	)
 }
 
 func curatedPatternsToDomain(patterns []agent.CuratedPattern) []domain.Pattern {

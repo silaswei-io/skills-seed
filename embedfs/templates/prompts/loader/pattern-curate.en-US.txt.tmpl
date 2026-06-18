@@ -128,7 +128,7 @@ Before returning JSON, validate internally:
 
 # Output Format
 
-Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response structure:
 
 ```json
 {
@@ -193,11 +193,3 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
 - All user-facing natural-language fields must be written in English, including `name`, `description`, `rule`, `merge_reason`, `dropped.reason`, and descriptive fields inside `business_method`.
 - If input patterns, comments, README text, or user-provided context contain Chinese or another language, translate or rewrite the content into English.
 - Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.
-
-# Critical Output Requirement
-
-Your entire response must be ONLY a valid JSON object.
-- Start with `{` and end with `}`
-- No markdown code blocks
-- No explanatory text before or after the JSON
-- No summary, introduction, or conclusion

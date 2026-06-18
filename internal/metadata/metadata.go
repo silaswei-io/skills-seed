@@ -13,16 +13,19 @@ import (
 
 const (
 	// ProgramVersion 是 `skills-seed --version` 展示的 CLI 版本
-	ProgramVersion = "v0.9.12"
+	ProgramVersion = "v0.9.13"
 
 	UnavailableHash = "unavailable"
 
 	PromptTemplatesRoot = "templates/prompts"
 	SkillsTemplatesRoot = "templates/skills"
 
-	CommonTemplateProvider    = "common"
-	ProjectTemplateProvider   = "project"
-	WorkspaceTemplateProvider = "workspace"
+	CommonTemplateProvider = "common"
+	LoaderTemplateProvider = "loader"
+	// PromptAppendTemplateProvider 是运行时提示词尾部追加约束模板目录。
+	PromptAppendTemplateProvider = "append"
+	ProjectTemplateProvider      = "project"
+	WorkspaceTemplateProvider    = "workspace"
 
 	PromptTemplateExt        = ".txt.tmpl"
 	ProjectPromptTemplateExt = ".md.tmpl"
@@ -32,6 +35,15 @@ const (
 
 // TemplateProviderFallbacks 返回 provider 模板查找顺序
 func TemplateProviderFallbacks(provider string) []string {
+	return templateProviderFallbacks(provider, CommonTemplateProvider)
+}
+
+// PromptTemplateProviderFallbacks 返回运行时提示词 provider 模板查找顺序。
+func PromptTemplateProviderFallbacks(provider string) []string {
+	return templateProviderFallbacks(provider, LoaderTemplateProvider)
+}
+
+func templateProviderFallbacks(provider, fallback string) []string {
 	var providers []string
 	seen := make(map[string]bool)
 	add := func(name string) {
@@ -44,7 +56,7 @@ func TemplateProviderFallbacks(provider string) []string {
 	}
 
 	add(provider)
-	add(CommonTemplateProvider)
+	add(fallback)
 	return providers
 }
 
@@ -55,6 +67,15 @@ func PromptTemplatePath(provider, name, locale string) string {
 		fileName = name + "." + templateLocaleSuffix(locale) + PromptTemplateExt
 	}
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, provider, fileName))
+}
+
+// PromptAppendTemplatePath 返回运行时提示词尾部追加模板路径。
+func PromptAppendTemplatePath(name, locale string) string {
+	fileName := name + PromptTemplateExt
+	if templateLocaleSuffix(locale) != "" {
+		fileName = name + "." + templateLocaleSuffix(locale) + PromptTemplateExt
+	}
+	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, PromptAppendTemplateProvider, fileName))
 }
 
 // ProjectPromptTemplatePath 返回项目提示词模板路径

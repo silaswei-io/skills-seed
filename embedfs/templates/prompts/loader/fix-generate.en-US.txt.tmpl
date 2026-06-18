@@ -49,7 +49,7 @@ You are a professional code fix expert. Generate precise code fixes based on ana
 
 # Output Format
 
-Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response structure:
 
 ```json
 {
@@ -68,11 +68,4 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
 - **summary**: (optional) Overall fix description
 - **warnings**: (optional) Areas requiring manual review
 
-# ⚠️ CRITICAL OUTPUT REQUIREMENT
-
-Your ENTIRE response must be ONLY a valid JSON object.
-- Start with `{` and end with `}`
-- NO markdown code blocks (no ```)
-- NO explanatory text before or after the JSON
-- NO summary, introduction, or conclusion
-- If you want to add notes, put them inside the JSON as a "notes" field
+If you want to add notes, put them inside the JSON as a `notes` field.

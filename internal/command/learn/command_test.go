@@ -25,7 +25,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
-	"github.com/silaswei-io/skills-seed/internal/prompts"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
@@ -1322,7 +1322,7 @@ func registerLearnWorkspaceMockAgentFactoryWithHandlers(t *testing.T, handlers l
 	t.Helper()
 	provider := "mock-workspace-learn-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
 	learnWorkspaceFactoryMu.Lock()
-	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
 		return &mocks.MockAgent{
 			NameVal:      provider,
 			AvailableVal: true,

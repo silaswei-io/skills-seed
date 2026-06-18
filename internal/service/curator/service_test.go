@@ -205,6 +205,59 @@ func TestCurateAndStoreFallsBackWhenAgentResultInvalid(t *testing.T) {
 	require.Equal(t, "existing", saved[0].ID)
 }
 
+func TestCurateAndStoreIgnoresDroppedIDsOutsideCurrentCandidates(t *testing.T) {
+	candidate := domain.NewPattern("candidate", "Error Handling", domain.CategoryError)
+	candidate.Confidence = 0.9
+	candidate.SetRule("wrap errors with context")
+
+	var saved []*domain.Pattern
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return nil, nil
+		},
+		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
+			saved = append(saved, p)
+			return nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			return &agent.CuratePatternsResult{
+				Patterns: []agent.CuratedPattern{
+					{
+						ID:          "candidate",
+						Name:        "Error Handling",
+						Category:    string(domain.CategoryError),
+						Rule:        "wrap errors with context",
+						Confidence:  0.9,
+						Frequency:   1,
+						MergedFrom:  []string{"candidate"},
+						MergeReason: "new candidate",
+					},
+				},
+				Dropped: []agent.CuratedDrop{
+					{ID: "panic-recovery-cronjob", Reason: "existing pattern already covers this rule"},
+				},
+				Summary: agent.CurateSummary{TotalCandidates: 1, TotalWritten: 1, TotalDropped: 1},
+			}, nil
+		},
+	}
+	svc := NewService(mockAgent, repo)
+
+	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Len(t, saved, 1)
+	require.Equal(t, "candidate", saved[0].ID)
+	require.Empty(t, result.Dropped)
+	require.Equal(t, 0, result.Summary.TotalDropped)
+}
+
 func TestCurateAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testing.T) {
 	candidate := domain.NewPattern("path-traversal-protection", "Path Traversal Protection", domain.Category("security"))
 	candidate.Confidence = 0.9

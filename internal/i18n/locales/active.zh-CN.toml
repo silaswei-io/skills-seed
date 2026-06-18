@@ -1833,7 +1833,10 @@ other = "模式策展调用失败"
 other = "模式策展结果解析失败"
 
 [LoggerAgentCuratePatternsValidationFallback]
-other = "模式策展结果校验失败"
+other = "模式策展结果存在结构性问题，已使用确定性合并结果继续"
+
+[LoggerAgentCuratePatternsSanitized]
+other = "模式策展结果包含非候选 dropped 条目，已忽略该条目并继续"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "项目分析提示词模板渲染失败"

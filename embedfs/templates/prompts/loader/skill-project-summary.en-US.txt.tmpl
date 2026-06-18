@@ -54,7 +54,7 @@ Actions:
 
 ## Output Format
 
-Return ONLY a valid JSON object. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response structure:
 
 ```json
 {
@@ -103,11 +103,4 @@ Return ONLY a valid JSON object. The `json` fenced block below only documents th
 ## Category Priorities (for `priority` field)
 - business: 5, api/database: 4, naming/structure/error/concurrency: 3, utils/config/middleware/testing: 2
 
-# ⚠️ CRITICAL OUTPUT REQUIREMENT
-
-Your ENTIRE response must be ONLY a valid JSON object.
-- Start with `{` and end with `}`
-- NO markdown code blocks (no ```)
-- NO explanatory text before or after the JSON
-- NO summary, introduction, or conclusion
-- If you want to add notes, put them inside the JSON as a "notes" field
+If you want to add notes, put them inside the JSON as a `notes` field.

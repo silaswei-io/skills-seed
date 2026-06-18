@@ -19,7 +19,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
-	"github.com/silaswei-io/skills-seed/internal/prompts"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 )
 
 // ClaudeAgent 实现模型代理
@@ -37,7 +37,7 @@ type promptRenderer interface {
 }
 
 // New 创建代理
-func New(commandPath string, timeout time.Duration, loader *prompts.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) *ClaudeAgent {
+func New(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) *ClaudeAgent {
 	if commandPath == "" {
 		commandPath = "claude"
 	}

@@ -1,15 +1,18 @@
-package prompts
+package loader
 
 import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +21,7 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 		t.Run(agentName, func(t *testing.T) {
 			for _, locale := range []string{"en-US", "zh-CN"} {
 				t.Run(locale, func(t *testing.T) {
-					loader := NewLoader(agentName, locale, "")
+					loader := New(agentName, locale, "")
 					for _, tc := range []struct {
 						name string
 						data interface{}
@@ -46,7 +49,7 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 }
 
 func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
-	loader := NewLoader("claude", "en-US", "")
+	loader := New("claude", "en-US", "")
 
 	_, err := loader.Render("skill-project-summary", map[string]interface{}{
 		"LANGUAGE":             "go",
@@ -60,7 +63,7 @@ func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 }
 
 func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
-	loader := NewLoader("common", "", "")
+	loader := New("loader", "", "")
 
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 
@@ -70,7 +73,7 @@ func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
 }
 
 func TestLoader_RendersSkillsPromptsWithSkillsLocale(t *testing.T) {
-	loader := NewLoaderWithLocales("common", "zh-CN", "en-US", "")
+	loader := NewWithLocales("loader", "zh-CN", "en-US", "")
 
 	skillsPrompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
 	require.NoError(t, err)
@@ -88,11 +91,13 @@ func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "skill-project-summary.md"), []byte("USER SUMMARY INSTRUCTIONS"), 0644))
 
-	loader := NewLoaderWithLocales("common", "zh-CN", "en-US", seedPath)
+	loader := NewWithLocales("loader", "zh-CN", "en-US", seedPath)
 	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "Do not return Markdown, comments, explanations, or code fences")
+	require.Contains(t, prompt, "# Mandatory Final Output Rules")
+	require.Contains(t, prompt, "These rules have the highest priority and must be followed exactly")
+	require.Contains(t, prompt, "The first non-whitespace character must be `{`")
 	require.Contains(t, prompt, "All user-facing natural-language fields in the JSON must be written in English")
 	require.NotContains(t, prompt, "不要使用 markdown 代码块包裹 JSON")
 }
@@ -108,7 +113,7 @@ func TestLoader_RenderMergesProjectWorkspaceAndUserInstructions(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "workspace", "learn-analyze.md"), []byte("WORKSPACE LEARN ANALYZE CONTEXT"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte("USER LEARN ANALYZE INSTRUCTIONS"), 0644))
 
-	loader := NewLoader("common", "zh-CN", seedPath)
+	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
@@ -190,7 +195,7 @@ func TestLoader_RenderSkipsLegacyDefaultPromptScaffolds(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte(legacyInstructions), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"), []byte(profile), 0644))
 
-	loader := NewLoader("common", "zh-CN", seedPath)
+	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
@@ -209,12 +214,12 @@ func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte("USER SAYS RETURN MARKDOWN"), 0644))
 
-	loader := NewLoader("common", "en-US", seedPath)
+	loader := New("loader", "en-US", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
-	guard, err := NewLoader("common", "en-US", "").Render("output-contract-guard", map[string]interface{}{})
+	guardData, err := readAppendTemplateWithLocale("output-contract-guard", "en-US")
 	require.NoError(t, err)
-	guard = strings.TrimSpace(guard)
+	guard := strings.TrimSpace(string(guardData))
 
 	require.Contains(t, prompt, "USER SAYS RETURN MARKDOWN")
 	require.Contains(t, prompt, guard)
@@ -224,7 +229,7 @@ func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 
 func TestLoader_RenderStoresSuccessfulPromptUnderRuntimeMemory(t *testing.T) {
 	seedPath := t.TempDir()
-	loader := NewLoader("common", "en-US", seedPath)
+	loader := New("loader", "en-US", seedPath)
 
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
@@ -255,7 +260,7 @@ func TestLoader_RenderStoresPromptDebugManifest(t *testing.T) {
 这些内容会追加到内置 `+"`learn-analyze`"+` 提示词之后，不会替换内置任务定义、输入约定或输出格式。
 `), 0644))
 
-	loader := NewLoader("common", "zh-CN", seedPath)
+	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
@@ -279,7 +284,7 @@ func TestLoader_RenderStoresPromptDebugManifest(t *testing.T) {
 }
 
 func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	req := sampleAnalyzeCurrentCodebaseRequest()
 	req.SampleFiles = []agent.SampleFile{{
 		Path: "webshell.go",
@@ -293,7 +298,7 @@ func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {
 }
 
 func TestRenderAnalyzeListsFilePathsWithoutEmbeddedContent(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	req := sampleAnalyzeRequest()
 	req.Files = []domain.FileInfo{domain.NewFileInfo("main.go", "package main\nconst secretAnalyzeContent = true\n")}
 	req.Patterns[0].GoodExample = "const secretGoodExample = true"
@@ -309,7 +314,7 @@ func TestRenderAnalyzeListsFilePathsWithoutEmbeddedContent(t *testing.T) {
 }
 
 func TestRenderAnalyzeListsDiffFilePaths(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	req := sampleAnalyzeRequest()
 	req.Files = []domain.FileInfo{domain.NewFileInfo("new.go", "package main\n")}
 	req.DiffFiles = []agent.DiffFileRef{{
@@ -326,7 +331,7 @@ func TestRenderAnalyzeListsDiffFilePaths(t *testing.T) {
 }
 
 func TestRenderInitSkillsListsDiffFilePaths(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	req := sampleAnalyzeCurrentCodebaseRequest()
 	req.DiffFiles = []agent.DiffFileRef{{
 		Path:     "internal/service.go",
@@ -342,7 +347,7 @@ func TestRenderInitSkillsListsDiffFilePaths(t *testing.T) {
 }
 
 func TestRenderGenerateFixesListsFilePathsWithoutEmbeddedContent(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	req := sampleGenerateFixesRequest()
 	req.Files = []domain.FileInfo{domain.NewFileInfo("main.go", "package main\nconst secretFixContent = true\n")}
 
@@ -354,7 +359,7 @@ func TestRenderGenerateFixesListsFilePathsWithoutEmbeddedContent(t *testing.T) {
 }
 
 func TestRenderProjectAnalysisListsReadmePathWithoutEmbeddedContent(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	data := sampleProjectAnalysisData()
 	data["ReadmePath"] = "README.md"
 
@@ -366,7 +371,7 @@ func TestRenderProjectAnalysisListsReadmePathWithoutEmbeddedContent(t *testing.T
 }
 
 func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	data := sampleProjectAnalysisData()
 	data["ExistingProfilePath"] = "/tmp/skills-seed/existing-profile.json"
 	data["FocusPaths"] = []string{"internal/service"}
@@ -400,7 +405,7 @@ func TestRenderProjectAnalysisBoundsStructureToFocusPaths(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("codex", tt.locale, "")
+			loader := New("codex", tt.locale, "")
 			data := sampleProjectAnalysisData()
 			data["FocusPaths"] = []string{"internal/service"}
 
@@ -414,7 +419,7 @@ func TestRenderProjectAnalysisBoundsStructureToFocusPaths(t *testing.T) {
 }
 
 func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	data := sampleProjectAnalysisData()
 	data["StructuralContextPath"] = "/tmp/skills-seed/structural-context.md"
 
@@ -446,7 +451,7 @@ func TestRenderInitSkillsBoundsStructureToFocusPaths(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("codex", tt.locale, "")
+			loader := New("codex", tt.locale, "")
 			req := sampleAnalyzeCurrentCodebaseRequest()
 			req.FocusPaths = []string{"internal/service"}
 
@@ -460,7 +465,7 @@ func TestRenderInitSkillsBoundsStructureToFocusPaths(t *testing.T) {
 }
 
 func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 	req := sampleAnalyzeCurrentCodebaseRequest()
 	req.StructuralContextPath = "/tmp/skills-seed/structural-context.md"
 
@@ -483,7 +488,7 @@ func TestRenderInitSkillsIncludesKnownPatterns(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("codex", tt.locale, "")
+			loader := New("codex", tt.locale, "")
 			req := sampleAnalyzeCurrentCodebaseRequest()
 			req.KnownPatternsPath = "/tmp/skills-seed/known-patterns.json"
 			req.KnownPatternsCount = 1
@@ -525,7 +530,7 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("common", tt.locale, "")
+			loader := New("loader", tt.locale, "")
 
 			for _, tc := range []struct {
 				name string
@@ -580,7 +585,7 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("common", tt.locale, "")
+			loader := New("loader", tt.locale, "")
 
 			for _, tc := range []struct {
 				name string
@@ -633,7 +638,7 @@ func TestLoader_RenderPatternPromptsIncludePreOutputValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("common", tt.locale, "")
+			loader := New("loader", tt.locale, "")
 			for _, tc := range []struct {
 				name string
 				data interface{}
@@ -708,7 +713,7 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("common", tt.locale, "")
+			loader := New("loader", tt.locale, "")
 			for name, requiredText := range tt.checks {
 				t.Run(name, func(t *testing.T) {
 					var data interface{}
@@ -772,7 +777,7 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("common", tt.locale, "")
+			loader := New("loader", tt.locale, "")
 			for name, requiredText := range tt.checks {
 				t.Run(name, func(t *testing.T) {
 					data := interface{}(sampleUserDefinePatternData())
@@ -818,7 +823,7 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("common", tt.locale, "")
+			loader := New("loader", tt.locale, "")
 			for name, requiredText := range tt.checks {
 				t.Run(name, func(t *testing.T) {
 					var data interface{}
@@ -864,7 +869,7 @@ func TestLoader_RenderProjectInitPromptUsesConcreteCategoryInJSONExample(t *test
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			loader := NewLoader("common", tt.locale, "")
+			loader := New("loader", tt.locale, "")
 			prompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
 			require.NoError(t, err)
 			require.Contains(t, prompt, `"category": "error"`)
@@ -876,7 +881,7 @@ func TestLoader_RenderProjectInitPromptUsesConcreteCategoryInJSONExample(t *test
 }
 
 func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 
 	prompt, err := loader.Render("project-analyze", sampleProjectAnalysisData())
 	require.NoError(t, err)
@@ -887,7 +892,7 @@ func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing
 }
 
 func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *testing.T) {
-	loader := NewLoader("codex", "zh-CN", "")
+	loader := New("codex", "zh-CN", "")
 
 	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
 	require.NoError(t, err)
@@ -900,7 +905,7 @@ func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *t
 }
 
 func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing.T) {
-	loader := NewLoader("codex", "en-US", "")
+	loader := New("codex", "en-US", "")
 
 	prompt, err := loader.Render("project-analyze", sampleProjectAnalysisData())
 	require.NoError(t, err)
@@ -911,7 +916,7 @@ func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing
 }
 
 func TestLoader_RenderEnGenerateSkillsSummaryRequiresEnglishNaturalLanguage(t *testing.T) {
-	loader := NewLoader("codex", "en-US", "")
+	loader := New("codex", "en-US", "")
 
 	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
 	require.NoError(t, err)
@@ -922,7 +927,7 @@ func TestLoader_RenderEnGenerateSkillsSummaryRequiresEnglishNaturalLanguage(t *t
 }
 
 func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testing.T) {
-	loader := NewLoader("common", "en-US", "")
+	loader := New("loader", "en-US", "")
 
 	for _, tc := range []struct {
 		name string
@@ -944,45 +949,13 @@ func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testin
 	}
 }
 
-func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
-	data := WorkspacePromptData{
-		WorkspaceName: "hsm-workspace",
-		WorkspaceRoot: "/tmp/hsm-workspace",
-		Projects: []WorkspacePromptProject{
-			{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"},
-		},
-		Locale: "zh-CN",
-	}
-
-	profile, err := renderWorkspaceTemplate("skill-workspace-profile", "zh-CN", data)
-	require.NoError(t, err)
-	spec, err := renderWorkspaceTemplate("skill-workspace-spec", "zh-CN", data)
-	require.NoError(t, err)
-
-	require.Contains(t, profile, "`hsmwebapi`: `hsmwebapi`")
-	require.NotContains(t, profile, "<workspace-input-file>")
-	require.NotContains(t, profile, "<workspace-profile-file>")
-	require.NotContains(t, profile, "<user-context-file>")
-	require.NotContains(t, profile, "workspace-input.json")
-	require.NotContains(t, profile, "workspace-profile.json")
-	require.NotContains(t, profile, "user-context.md")
-	require.NotContains(t, profile, "hsmwebapi 是主后端")
-	require.NotContains(t, spec, "<workspace-input-file>")
-	require.NotContains(t, spec, "<workspace-profile-file>")
-	require.NotContains(t, spec, "<user-context-file>")
-	require.NotContains(t, spec, "workspace-input.json")
-	require.NotContains(t, spec, "workspace-profile.json")
-	require.NotContains(t, spec, "user-context.md")
-	require.NotContains(t, spec, "kmip-go 提供 KMIP 能力")
-}
-
 func TestRenderWorkspacePromptsIncludeLearnUserContextPathWhenProvided(t *testing.T) {
 	profileData := workspacePromptData()
 	profileData["UserContextPath"] = "/tmp/skills-seed/user-context.md"
 	specData := workspaceSpecPromptData()
 	specData["UserContextPath"] = "/tmp/skills-seed/user-context.md"
 
-	loader := NewLoader("common", "zh-CN", "")
+	loader := New("loader", "zh-CN", "")
 	profile, err := loader.Render("skill-workspace-profile", profileData)
 	require.NoError(t, err)
 	spec, err := loader.Render("skill-workspace-spec", specData)
@@ -995,7 +968,7 @@ func TestRenderWorkspacePromptsIncludeLearnUserContextPathWhenProvided(t *testin
 }
 
 func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
-	loader := NewLoader("common", "zh-CN", "")
+	loader := New("loader", "zh-CN", "")
 
 	prompt, err := loader.Render("learn-batch", sampleBatchLearnData())
 	require.NoError(t, err)
@@ -1007,8 +980,8 @@ func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
 	require.NotContains(t, prompt, `"name":"Known Pattern"`)
 }
 
-func TestLoader_RuntimePromptsFenceJSONExamplesButRequireUnfencedResponses(t *testing.T) {
-	loader := NewLoader("common", "zh-CN", "")
+func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testing.T) {
+	loader := New("loader", "zh-CN", "")
 	for _, tc := range []struct {
 		name string
 		data interface{}
@@ -1022,13 +995,109 @@ func TestLoader_RuntimePromptsFenceJSONExamplesButRequireUnfencedResponses(t *te
 			prompt, err := loader.Render(tc.name, tc.data)
 			require.NoError(t, err)
 			require.Contains(t, prompt, "```json")
-			require.Contains(t, prompt, "不要使用 markdown 代码块（不要 ```)")
+			require.Contains(t, prompt, "# 最终输出硬约束")
+			require.Contains(t, prompt, "最终响应必须只包含一个 JSON 对象")
+			require.True(t, strings.LastIndex(prompt, "# 最终输出硬约束") > strings.LastIndex(prompt, "```json"))
 		})
 	}
 }
 
+func TestLoader_RuntimePromptsRequireFinalJSONSelfCheck(t *testing.T) {
+	promptData := map[string]interface{}{
+		"file-select":             map[string]interface{}{"CandidateNum": 1, "FileTree": "main.go", "CandidatesPath": "", "UserContextPath": ""},
+		"learn-analyze":           sampleAnalyzeRequest(),
+		"learn-batch":             sampleBatchLearnData(),
+		"fix-generate":            sampleGenerateFixesRequest(),
+		"skill-project-init":      sampleAnalyzeCurrentCodebaseRequest(),
+		"project-analyze":         sampleProjectAnalysisData(),
+		"pattern-curate":          sampleCuratePatternsData(),
+		"skill-project-summary":   sampleGenerateSkillsData(),
+		"skill-workspace-profile": workspacePromptData(),
+		"skill-workspace-spec":    workspaceSpecPromptData(),
+		"user-define-pattern":     sampleUserDefinePatternData(),
+	}
+	require.ElementsMatch(t, loaderRuntimePromptNames(t), sortedMapKeys(promptData))
+
+	tests := []struct {
+		locale       string
+		requiredText string
+	}{
+		{
+			locale:       "zh-CN",
+			requiredText: "最终回复前必须在内部完成 JSON 自检",
+		},
+		{
+			locale:       "en-US",
+			requiredText: "Before the final response, internally validate the JSON",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := New("loader", tt.locale, "")
+			for _, name := range sortedMapKeys(promptData) {
+				t.Run(name, func(t *testing.T) {
+					prompt, err := loader.Render(name, promptData[name])
+					require.NoError(t, err)
+					require.Contains(t, prompt, tt.requiredText)
+				})
+			}
+		})
+	}
+}
+
+func TestLoader_OutputContractGuardLivesInAppendTemplates(t *testing.T) {
+	_, err := embedfs.FS.ReadFile(metadata.PromptTemplatePath(metadata.LoaderTemplateProvider, "output-contract-guard", "zh-CN"))
+	require.Error(t, err)
+
+	guard, err := readAppendTemplateWithLocale("output-contract-guard", "zh-CN")
+	require.NoError(t, err)
+	require.Contains(t, string(guard), "本节规则优先级最高，必须逐条遵守")
+	require.Contains(t, string(guard), "第一个非空字符必须是 `{`")
+}
+
+func loaderRuntimePromptNames(t *testing.T) []string {
+	t.Helper()
+
+	entries, err := embedfs.FS.ReadDir(filepath.ToSlash(filepath.Join(metadata.PromptTemplatesRoot, metadata.LoaderTemplateProvider)))
+	require.NoError(t, err)
+
+	names := make(map[string]struct{})
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, metadata.PromptTemplateExt) {
+			continue
+		}
+		base := strings.TrimSuffix(name, metadata.PromptTemplateExt)
+		base = strings.TrimSuffix(base, ".en-US")
+		names[base] = struct{}{}
+	}
+	return sortedSetKeys(names)
+}
+
+func sortedMapKeys(values map[string]interface{}) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sortedSetKeys(values map[string]struct{}) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func TestLoader_RuntimePromptsBoundFileReadingScope(t *testing.T) {
-	loader := NewLoader("common", "zh-CN", "")
+	loader := New("loader", "zh-CN", "")
 	tests := []struct {
 		name         string
 		data         interface{}
@@ -1099,7 +1168,7 @@ func TestLoader_RuntimePromptsBoundFileReadingScope(t *testing.T) {
 }
 
 func TestLoader_ProjectInitPromptDoesNotHardCodeFrameworkCatalog(t *testing.T) {
-	loader := NewLoader("common", "zh-CN", "")
+	loader := New("loader", "zh-CN", "")
 
 	prompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
 
@@ -1110,7 +1179,7 @@ func TestLoader_ProjectInitPromptDoesNotHardCodeFrameworkCatalog(t *testing.T) {
 }
 
 func TestLoader_ZhSkillSummaryUsesCorrectConcurrencySpelling(t *testing.T) {
-	loader := NewLoader("common", "zh-CN", "")
+	loader := New("loader", "zh-CN", "")
 
 	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
 

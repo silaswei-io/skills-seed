@@ -46,7 +46,7 @@ The following coding patterns have been learned from the project history. Code s
 
 # Output Format
 
-**Return ONLY a valid JSON object**. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response structure:
 
 ```json
 {
@@ -87,11 +87,4 @@ The following coding patterns have been learned from the project history. Code s
 - **suggestions**: General improvement suggestions for the overall code (not line-specific)
 - **confidence**: Analysis confidence 0.0-1.0
 
-# ⚠️ Critical Output Requirements
-
-Your entire response must be a single valid JSON object.
-- Start with `{` and end with `}`
-- Do NOT use markdown code blocks (no ```)
-- Do NOT include any explanatory text before or after the JSON
-- Do NOT include summaries, introductions, or conclusions
-- If you need to add notes, put them in a "notes" field in the JSON
+If you need to add notes, put them in a `notes` field in the JSON.

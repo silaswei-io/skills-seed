@@ -699,10 +699,11 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 	var err error
 	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
 		selectedFiles := append([]domain.FileInfo(nil), opts.SelectedFiles...)
+		selectionPolicy := fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot)
 		if len(selectedFiles) == 0 && !opts.SelectedFilesSet {
 			selection, err := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
 				Root:          projectRoot,
-				Policy:        fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot),
+				Policy:        selectionPolicy,
 				FocusAbsPaths: opts.FocusPaths,
 			})
 			if err != nil {
@@ -710,7 +711,11 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 			}
 			selectedFiles = selection.Files
 		}
-		snapshotFlow, err = snapshotflow.BuildScoped(ctx, projectRoot, selectedFiles, focusPaths)
+		snapshotFlow, err = snapshotflow.BuildScopedWithOptions(ctx, projectRoot, selectedFiles, focusPaths, snapshotflow.Options{
+			DiffAllowed: func(path string) bool {
+				return !selectionPolicy.IsExcluded(path)
+			},
+		})
 		if err != nil {
 			return nil, nil, err
 		}

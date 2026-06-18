@@ -53,7 +53,7 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 
 # Output Format
 
-Return only a valid JSON object with this structure. The `json` fenced block below only documents the structure; the actual response must not include markdown fences or extra text:
+The `json` fenced block below documents the response structure:
 
 ```json
 {
@@ -113,6 +113,3 @@ Return only a valid JSON object with this structure. The `json` fenced block bel
 
 - Output workspace-level facts only.
 - Do not output generic advice, marketing copy, or best practices unrelated to the current workspace.
-- The entire response must start with `{` and end with `}`.
-- Do not wrap JSON in markdown fences.
-- Do not add explanatory text before or after the JSON.

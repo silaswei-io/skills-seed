@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.13]
+
+### Changes
+
+- Split runtime prompt templates from `embedfs/templates/prompts/common` into the `loader` directory, and moved appended final-output contracts into a separate `append` directory so normal prompt templates and appended constraints stay separate.
+- Centralized the final output contract for all JSON runtime prompts. The loader now appends stronger mandatory JSON rules requiring the final response to be one directly parseable JSON object and to pass an internal JSON self-check before responding.
+
+### Fixes
+
+- Fixed historical snapshot files matched by `.gitignore` or `exclude` still appearing as deleted diffs in AI input. Snapshots still preserve the full current state, but diffs sent for AI analysis now follow the current file-filtering policy.
+- Fixed unclear pattern-curation warnings when `dropped` referenced non-candidate IDs. These invalid dropped entries are now ignored with clearer informational logging instead of making the run look like a full learning failure.
+
 ## [v0.9.12]
 
 ### Changes

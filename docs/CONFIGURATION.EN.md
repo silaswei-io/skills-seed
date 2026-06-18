@@ -181,7 +181,7 @@ Starting in 0.9.0, project-structure summaries, sample-file collection, and stru
 
 Starting in 0.9.1, `select_relevant_files` is enabled by default. When the locally filtered candidate count reaches `select_relevant_files_min_candidates`, `learn current` asks AI to select the most relevant files from the candidate file tree and change metadata before deeper analysis.
 
-Starting in 0.9.11, file selection also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed.
+Starting in 0.9.11, file selection also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed. Starting in 0.9.13, snapshots still preserve the full current state, but diffs sent to AI are filtered by `exclude.paths` and `exclude.gitignore`, preventing ignored files from entering analysis as deleted diffs.
 
 #### Recommendations
 
@@ -196,7 +196,7 @@ Starting in 0.9.11, file selection also applies Git ignore rules by default. Sta
 
 Prompt fragments are still read from `.skills-seed/prompts/`, but starting in 0.7.1 rendering filters default metadata, empty scaffolding, and unfilled placeholder text. Only user-authored constraints are kept.
 
-Rendered prompts are saved by default under `.skills-seed/memory/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, project profile, project fragment, workspace fragment, user instruction, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent.
+Rendered prompts are saved by default under `.skills-seed/memory/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, project profile, project fragment, workspace fragment, user instruction, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent. Starting in 0.9.13, the final output contract is appended from a separate append template and forces JSON prompts to return exactly one parseable JSON object.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr.
 
