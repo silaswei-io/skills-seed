@@ -4,6 +4,75 @@
 
 本文是完整命令参考。所有命令都支持 `--help`。需要读取 `.skills-seed/config.yaml` 的命令必须先执行 `skills-seed init`。
 
+## 命令总览
+
+| 阶段 | 命令 | 用途 | 常见入口 |
+|---|---|---|---|
+| 基础信息 | [`skills-seed`](#skills-seed) | 查看全局帮助、版本和模板 hash | `skills-seed --help` |
+| 初始化 | [`skills-seed init`](#skills-seed-init) | 初始化单项目或 workspace 根仓 | `skills-seed init --mode project` |
+| Workspace | [`skills-seed workspace`](#skills-seed-workspace) | 添加或管理 workspace 子项目 | `skills-seed workspace add .` |
+| 重置 | [`skills-seed reset`](#skills-seed-reset) | 备份并重新初始化 `.skills-seed` | `skills-seed reset --mode workspace` |
+| 学习 | [`skills-seed learn`](#skills-seed-learn) | 从当前代码或 Git 历史学习 patterns | `skills-seed learn current` |
+| 生成 | [`skills-seed generate`](#skills-seed-generate) | 根据画像和 patterns 生成 skills | `skills-seed generate skills` |
+| 预览 | [`skills-seed preview`](#skills-seed-preview) | 预览 full 或 incremental 分析会选中的文件 | `skills-seed preview files` |
+| 模式管理 | [`skills-seed patterns`](#skills-seed-patterns) | 添加、删除、整理和查看 patterns | `skills-seed patterns show` |
+| 评审统计 | [`skills-seed review`](#skills-seed-review) | 导入评审评论并统计 pattern 防漏效果 | `skills-seed review stats` |
+| 项目画像 | [`skills-seed profile`](#skills-seed-profile) | 查看或刷新项目画像 | `skills-seed profile show` |
+| 一键同步 | [`skills-seed sync`](#skills-seed-sync) | 学习当前代码并生成 skills | `skills-seed sync` |
+| 提交检查 | [`skills-seed check`](#skills-seed-check) | 检查暂存区或所有跟踪文件 | `skills-seed check` |
+| Git Hook | [`skills-seed hook`](#skills-seed-hook) | 安装、卸载或手动运行 pre-commit hook | `skills-seed hook install` |
+| 帮助 | [`skills-seed help`](#skills-seed-help) | 查看任意命令路径的帮助 | `skills-seed help learn current` |
+
+## 常见工作流
+
+| 场景 | 推荐命令顺序 | 说明 |
+|---|---|---|
+| 初始化单项目 | `skills-seed init --mode project` → `skills-seed sync` | 创建配置、学习当前代码并生成 skills |
+| 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
+| 日常增量更新 | `skills-seed sync` | 等价于学习当前变更并在有 dirty 目标时生成 skills |
+| 只补充一条规则 | `skills-seed sync --add "<描述>"` | 跳过代码学习，用自然语言添加 pattern 后生成 |
+| 提交前检查 | `skills-seed check` 或 `skills-seed hook install` | 手动检查暂存区，或安装 pre-commit hook 自动检查 |
+| 排查沉淀结果 | `skills-seed patterns show` → `skills-seed profile show` | 查看已学习 patterns 和项目画像是否符合预期 |
+
+<!-- COMMAND_TREE_START -->
+## 自动生成命令索引
+
+> 本节由 Cobra command tree 生成，用于校验命令、子命令和参数默认值是否与 CLI 实现一致；详细场景说明仍以各命令章节为准。
+
+| 命令 | 摘要 | 子命令 | 参数 |
+|---|---|---|---|
+| `skills-seed` | 为 AI 助手培育项目技能 | `check`, `generate`, `hook`, `init`, `learn`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed check` | 检查暂存的文件 | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
+| `skills-seed generate` | 生成 AI Agent skills | `skills` | `--help, -h` = `false` |
+| `skills-seed generate skills` | 生成 AI Agent skills | - | `--force` = `false`<br>`--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
+| `skills-seed hook` | 管理 Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false`<br>`--install, -i` = `false`<br>`--uninstall, -u` = `false` |
+| `skills-seed hook install` | 安装 Git pre-commit hook | - | `--help, -h` = `false` |
+| `skills-seed hook run` | 手动运行 pre-commit hook | - | `--help, -h` = `false` |
+| `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
+| `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed learn` | 从 Git 历史学习 | `current`, `history` | `--help, -h` = `false` |
+| `skills-seed learn current` | 从当前代码学习 | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn history` | 从 Git 历史学习 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
+| `skills-seed patterns` | 管理已学习的 patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
+| `skills-seed patterns add <description>` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed patterns compact` | 整理相似 patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
+| `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | - | `--help, -h` = `false` |
+| `skills-seed patterns show [pattern-id]` | 查看已学习 pattern 的概览或完整详情 | - | `--format` = `table`<br>`--help, -h` = `false` |
+| `skills-seed patterns stats` | 查看 pattern 质量和 check 命中统计 | - | `--help, -h` = `false` |
+| `skills-seed preview` | 预览分析输入 | `files` | `--help, -h` = `false` |
+| `skills-seed preview files` | 预览将被分析的文件 | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
+| `skills-seed profile` | 查看或刷新项目画像 | `refresh`, `show` | `--help, -h` = `false` |
+| `skills-seed profile refresh` | 重新分析项目并保存项目画像 | - | `--help, -h` = `false`<br>`--language, -l` = `` |
+| `skills-seed profile show` | 显示当前项目画像摘要 | - | `--help, -h` = `false` |
+| `skills-seed reset` | 备份并重置 skills-seed 初始化状态 | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
+| `skills-seed review` | 导入评审评论并查看防漏统计 | `import`, `stats` | `--help, -h` = `false` |
+| `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
+| `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
+| `skills-seed sync` | 一键同步：学习或添加模式 + 生成 skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
+| `skills-seed workspace add .\|project-id-or-path...` | 向工作区添加子项目 | - | `--help, -h` = `false` |
+<!-- COMMAND_TREE_END -->
+
 ## 使用约定
 
 ### `skills-seed`
@@ -245,6 +314,7 @@ skills-seed learn history --limit 40 --batch-size 5
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--output`, `-o` | 当前 `skills.target` 的 `skills.paths` | 临时指定 skills 输出目录 |
+| `--no-references` | `false` | 只生成入口 `SKILL.md`，不写入 `references/` 明细文件 |
 | `--force` | `false` | 忽略模式变更状态，强制重新生成所有 skills |
 | `--help`, `-h` | `false` | 查看 `generate skills` 帮助 |
 
@@ -290,6 +360,49 @@ references/
 3. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
 4. `generate skills` 会对生成输入记录 md5；当项目画像、patterns、命中统计、配置、prompt/skills 模板和输出路径未变化，且输出产物完整时，会跳过 Agent 摘要和文件重写。workspace 根 skill 也会用同样机制跳过未变化的根产物。
 5. 需要重新生成所有目标时使用 `skills-seed generate skills --force`。
+
+### `skills-seed preview`
+
+#### 命令概述
+
+预览当前配置下 full 或 incremental 分析会选择的文件，不调用 AI Agent。适合排查 `exclude.paths`、`exclude.gitignore`、focus 路径和文件选择策略是否符合预期。
+
+#### 命令形式
+
+| 命令形式 | 说明 | 常用示例 | 注意事项 |
+|---|---|---|---|
+| `skills-seed preview files` | 预览将被分析的文件 | `skills-seed preview files --mode incremental --focus internal/service` | 只输出文件选择结果，不学习 patterns |
+
+#### `preview` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--help`, `-h` | `false` | 查看 `preview` 帮助 |
+
+#### `preview files` 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--mode` | `full` | 预览模式：`full`/`first` 预览全量选择，`incremental`/`current` 预览当前快照 diff |
+| `--focus`, `-f` | 空 | 只预览这些路径下的文件；可重复使用 |
+| `--limit` | `200` | 最多输出的文件数量 |
+| `--help`, `-h` | `false` | 查看 `preview files` 帮助 |
+
+#### 常用示例
+
+```bash
+skills-seed preview files
+skills-seed preview files --mode full
+skills-seed preview files --mode incremental
+skills-seed preview files --mode incremental --focus internal/service
+skills-seed preview files --limit 500
+```
+
+#### 注意事项
+
+1. `preview files` 和 `learn current` 共用文件选择策略，可用于确认哪些文件会进入学习分析。
+2. `--mode incremental` 会基于当前文件快照展示新增、修改和删除候选；如果还没有快照，结果会接近首次学习范围。
+3. 输出中的 skipped 计数可帮助判断文档、排除规则或 Git ignore 是否过滤了预期文件。
 
 ### `skills-seed patterns`
 

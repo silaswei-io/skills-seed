@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.14]
+
+### Documentation
+
+- Improved the command reference opening with a linked command overview and common workflows so readers can jump to commands by usage scenario.
+- Added the missing `skills-seed preview` command documentation and documented the `generate skills --no-references` flag.
+
+### Maintenance
+
+- Added a command index generated from the Cobra command tree, plus tests that verify the generated sections in both command-reference documents stay aligned with the CLI implementation.
+
 ## [v0.9.13]
 
 ### Changes

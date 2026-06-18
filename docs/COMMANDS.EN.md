@@ -4,6 +4,75 @@
 
 This is the complete command reference. Every command supports `--help`. Commands that read `.skills-seed/config.yaml` require `skills-seed init` first.
 
+## Command Overview
+
+| Stage | Command | Purpose | Common Entry |
+|---|---|---|---|
+| Basics | [`skills-seed`](#skills-seed) | View global help, version, and template hashes | `skills-seed --help` |
+| Initialization | [`skills-seed init`](#skills-seed-init) | Initialize a single project or workspace root | `skills-seed init --mode project` |
+| Workspace | [`skills-seed workspace`](#skills-seed-workspace) | Add or manage workspace child projects | `skills-seed workspace add .` |
+| Reset | [`skills-seed reset`](#skills-seed-reset) | Back up and recreate `.skills-seed` | `skills-seed reset --mode workspace` |
+| Learning | [`skills-seed learn`](#skills-seed-learn) | Learn patterns from current code or Git history | `skills-seed learn current` |
+| Generation | [`skills-seed generate`](#skills-seed-generate) | Generate skills from profiles and patterns | `skills-seed generate skills` |
+| Preview | [`skills-seed preview`](#skills-seed-preview) | Preview files selected for full or incremental analysis | `skills-seed preview files` |
+| Pattern Management | [`skills-seed patterns`](#skills-seed-patterns) | Add, delete, curate, and inspect patterns | `skills-seed patterns show` |
+| Review Metrics | [`skills-seed review`](#skills-seed-review) | Import review comments and measure pattern coverage | `skills-seed review stats` |
+| Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show or refresh the project profile | `skills-seed profile show` |
+| One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
+| Checks | [`skills-seed check`](#skills-seed-check) | Check staged or tracked files | `skills-seed check` |
+| Git Hook | [`skills-seed hook`](#skills-seed-hook) | Install, remove, or manually run the pre-commit hook | `skills-seed hook install` |
+| Help | [`skills-seed help`](#skills-seed-help) | Show help for any command path | `skills-seed help learn current` |
+
+## Common Workflows
+
+| Scenario | Recommended Commands | Notes |
+|---|---|---|
+| Initialize one project | `skills-seed init --mode project` → `skills-seed sync` | Create config, learn current code, and generate skills |
+| Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
+| Daily incremental update | `skills-seed sync` | Learns current changes and generates only dirty targets |
+| Add one missed rule | `skills-seed sync --add "<description>"` | Skips code learning, adds a natural-language pattern, then generates |
+| Pre-commit checking | `skills-seed check` or `skills-seed hook install` | Check staged files manually, or install the pre-commit hook |
+| Inspect learned output | `skills-seed patterns show` → `skills-seed profile show` | Verify learned patterns and the current project profile |
+
+<!-- COMMAND_TREE_START -->
+## Generated Command Index
+
+> This section is generated from the Cobra command tree to keep commands, subcommands, and flag defaults aligned with the CLI implementation. Detailed usage notes remain in the command sections below.
+
+| Command | Summary | Subcommands | Flags |
+|---|---|---|---|
+| `skills-seed` | Growing project skills for AI agents | `check`, `generate`, `hook`, `init`, `learn`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed check` | Check staged files | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
+| `skills-seed generate` | Generate AI Agent outputs | `skills` | `--help, -h` = `false` |
+| `skills-seed generate skills` | Generate AI Agent skills | - | `--force` = `false`<br>`--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
+| `skills-seed hook` | Manage Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false`<br>`--install, -i` = `false`<br>`--uninstall, -u` = `false` |
+| `skills-seed hook install` | Install Git pre-commit hook | - | `--help, -h` = `false` |
+| `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
+| `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
+| `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed learn` | Learn from Git history | `current`, `history` | `--help, -h` = `false` |
+| `skills-seed learn current` | Learn from current codebase | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
+| `skills-seed patterns` | Manage learned patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
+| `skills-seed patterns add <description>` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed patterns compact` | Compact similar patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
+| `skills-seed patterns delete <pattern-id>` | Delete a pattern | - | `--help, -h` = `false` |
+| `skills-seed patterns show [pattern-id]` | Show learned pattern overview or full details | - | `--format` = `table`<br>`--help, -h` = `false` |
+| `skills-seed patterns stats` | Show learned pattern quality and check hit statistics | - | `--help, -h` = `false` |
+| `skills-seed preview` | Preview analysis inputs | `files` | `--help, -h` = `false` |
+| `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
+| `skills-seed profile` | Show or refresh the project profile | `refresh`, `show` | `--help, -h` = `false` |
+| `skills-seed profile refresh` | Re-analyze the project and save the project profile | - | `--help, -h` = `false`<br>`--language, -l` = `` |
+| `skills-seed profile show` | Show the current project profile summary | - | `--help, -h` = `false` |
+| `skills-seed reset` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
+| `skills-seed review` | Import review comments and show prevention statistics | `import`, `stats` | `--help, -h` = `false` |
+| `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
+| `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
+| `skills-seed sync` | One-stop sync: learn or add patterns + generate skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
+| `skills-seed workspace add .\|project-id-or-path...` | Add sub-projects to workspace | - | `--help, -h` = `false` |
+<!-- COMMAND_TREE_END -->
+
 ## Usage Conventions
 
 ### `skills-seed`
@@ -245,6 +314,7 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 | Flag | Default | Description |
 |---|---:|---|
 | `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
+| `--no-references` | `false` | Generate only the entry `SKILL.md` and skip detailed `references/` files |
 | `--force` | `false` | Ignore pattern dirty state and regenerate all skills |
 | `--help`, `-h` | `false` | Show `generate skills` help |
 
@@ -290,6 +360,49 @@ references/
 3. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
 4. `generate skills` records an md5 for generation inputs. When project profile, patterns, hit stats, config, prompt/skill templates, and output path are unchanged, and generated outputs are complete, Skills Seed skips the agent summary and file rewrite. Workspace root skills use the same mechanism for unchanged root outputs.
 5. Use `skills-seed generate skills --force` when every target must be regenerated.
+
+### `skills-seed preview`
+
+#### Command Overview
+
+Preview files selected for full or incremental analysis under the current configuration without calling an AI agent. Use it to debug `exclude.paths`, `exclude.gitignore`, focus paths, and file-selection behavior.
+
+#### Command Forms
+
+| Command Form | Description | Common Example | Notes |
+|---|---|---|---|
+| `skills-seed preview files` | Preview files selected for analysis | `skills-seed preview files --mode incremental --focus internal/service` | Prints file-selection results only; does not learn patterns |
+
+#### `preview` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--help`, `-h` | `false` | Show `preview` help |
+
+#### `preview files` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--mode` | `full` | Preview mode: `full`/`first` for full selection, `incremental`/`current` for current snapshot diffs |
+| `--focus`, `-f` | empty | Preview only files under these paths; may be repeated |
+| `--limit` | `200` | Maximum number of files to print |
+| `--help`, `-h` | `false` | Show `preview files` help |
+
+#### Common Examples
+
+```bash
+skills-seed preview files
+skills-seed preview files --mode full
+skills-seed preview files --mode incremental
+skills-seed preview files --mode incremental --focus internal/service
+skills-seed preview files --limit 500
+```
+
+#### Notes
+
+1. `preview files` shares the file-selection policy used by `learn current`, so it shows which files would enter learning analysis.
+2. `--mode incremental` shows added, modified, and deleted candidates from the current file snapshot. Without an existing snapshot, the result is close to first-run learning scope.
+3. Skipped counts help confirm whether documents, configured excludes, or Git ignore rules filtered the expected files.
 
 ### `skills-seed patterns`
 

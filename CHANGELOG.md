@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.14]
+
+### 文档
+
+- 优化命令参考开头，新增可跳转的命令总览和常见工作流，便于按使用场景定位具体命令。
+- 补齐 `skills-seed preview` 命令说明，并补充 `generate skills --no-references` 参数说明。
+
+### 维护
+
+- 新增基于 Cobra command tree 生成的命令索引区块，并在测试中校验中英文命令文档的自动区块与 CLI 实现保持一致，降低命令和参数文档漂移风险。
+
 ## [v0.9.13]
 
 ### 变更

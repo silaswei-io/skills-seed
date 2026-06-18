@@ -44,6 +44,37 @@ func TestCommandHelpCoverage(t *testing.T) {
 	}
 }
 
+func TestCommandDocsGeneratedSectionsAreCurrent(t *testing.T) {
+	tests := []struct {
+		name   string
+		locale string
+		path   string
+	}{
+		{
+			name:   "zh",
+			locale: "zh-CN",
+			path:   filepath.Join("..", "..", "docs", "COMMANDS.md"),
+		},
+		{
+			name:   "en",
+			locale: "en-US",
+			path:   filepath.Join("..", "..", "docs", "COMMANDS.EN.md"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generated, err := RenderCommandTreeDocs(tt.locale)
+			require.NoError(t, err)
+			document, err := os.ReadFile(tt.path)
+			require.NoError(t, err)
+			actual, ok := extractGeneratedCommandDocsSection(string(document))
+			require.True(t, ok, "%s must contain generated command docs markers", tt.path)
+			require.Equal(t, generated, actual, "%s generated command docs section is stale; refresh the content between %s and %s", tt.path, commandDocsStartMarker, commandDocsEndMarker)
+		})
+	}
+}
+
 func TestRootHelpUsesConciseIntro(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 
@@ -68,6 +99,19 @@ func TestRootHelpUsesConciseIntro(t *testing.T) {
 	require.NotContains(t, helpText, "此工具可集成配置的 AI Agent")
 	require.NotContains(t, helpText, "初始化当前 Git 仓库")
 	require.NotContains(t, helpText, "学习当前代码并生成 skills")
+}
+
+func extractGeneratedCommandDocsSection(document string) (string, bool) {
+	start := strings.Index(document, commandDocsStartMarker)
+	if start < 0 {
+		return "", false
+	}
+	start += len(commandDocsStartMarker)
+	end := strings.Index(document[start:], commandDocsEndMarker)
+	if end < 0 {
+		return "", false
+	}
+	return strings.TrimSpace(document[start : start+end]), true
 }
 
 func TestRootHelpRemovesCompletionAndLocalizesBuiltins(t *testing.T) {
