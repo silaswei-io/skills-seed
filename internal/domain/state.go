@@ -24,7 +24,21 @@ type SkillsDirtyTarget struct {
 	Projects  []string
 }
 
+// LearnCurrentSummary 描述 learn current 的用户可读运行摘要。
+type LearnCurrentSummary struct {
+	ChangedFiles     int
+	DeletedFiles     int
+	SkippedFiles     int
+	PatternsFound    int
+	PatternsSaved    int
+	Projects         int
+	DirtyProjects    int
+	WorkspaceChanged bool
+	NoFileChanges    bool
+}
+
 // LearnCurrentResult 描述 learn current 本轮是否产生需要重新生成 skills 的变化。
 type LearnCurrentResult struct {
 	SkillsDirty SkillsDirtyTarget
+	Summary     LearnCurrentSummary
 }

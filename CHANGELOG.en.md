@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.15]
+
+### Changes
+
+- Added `skills-seed log`, which prints learned and generated changes in a git-log-like format. Change entries are stored in `.skills-seed/memory/change-log.json`, keeping user-facing summaries separate from diagnostic logs.
+- Changed the Git pre-commit hook flow. Installed hooks no longer force checks or learning by default; interactive terminals now show a menu for "sync and generate skills", "learn only", or "skip this time". Non-interactive environments skip directly so IDEs, scripts, and Git automation are not blocked.
+
+### Documentation
+
+- Updated the command reference in both languages for `skills-seed log` and the new hook menu behavior.
+
 ## [v0.9.14]
 
 ### Documentation

@@ -19,6 +19,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Review Metrics | [`skills-seed review`](#skills-seed-review) | Import review comments and measure pattern coverage | `skills-seed review stats` |
 | Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show or refresh the project profile | `skills-seed profile show` |
 | One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
+| Change History | [`skills-seed log`](#skills-seed-log) | Show learned change history | `skills-seed log` |
 | Checks | [`skills-seed check`](#skills-seed-check) | Check staged or tracked files | `skills-seed check` |
 | Git Hook | [`skills-seed hook`](#skills-seed-hook) | Install, remove, or manually run the pre-commit hook | `skills-seed hook install` |
 | Help | [`skills-seed help`](#skills-seed-help) | Show help for any command path | `skills-seed help learn current` |
@@ -31,7 +32,8 @@ This is the complete command reference. Every command supports `--help`. Command
 | Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
 | Daily incremental update | `skills-seed sync` | Learns current changes and generates only dirty targets |
 | Add one missed rule | `skills-seed sync --add "<description>"` | Skips code learning, adds a natural-language pattern, then generates |
-| Pre-commit checking | `skills-seed check` or `skills-seed hook install` | Check staged files manually, or install the pre-commit hook |
+| Pre-commit updates | `skills-seed hook install` | Install the pre-commit hook and choose sync, learn only, or skip before commit |
+| Inspect learned changes | `skills-seed log` | Show recent learned and generated changes in a git-log-like format |
 | Inspect learned output | `skills-seed patterns show` → `skills-seed profile show` | Verify learned patterns and the current project profile |
 
 <!-- COMMAND_TREE_START -->
@@ -41,11 +43,11 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `check`, `generate`, `hook`, `init`, `learn`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed check` | Check staged files | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
 | `skills-seed generate` | Generate AI Agent outputs | `skills` | `--help, -h` = `false` |
 | `skills-seed generate skills` | Generate AI Agent skills | - | `--force` = `false`<br>`--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
-| `skills-seed hook` | Manage Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false`<br>`--install, -i` = `false`<br>`--uninstall, -u` = `false` |
+| `skills-seed hook` | Manage Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed hook install` | Install Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
@@ -53,6 +55,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed learn` | Learn from Git history | `current`, `history` | `--help, -h` = `false` |
 | `skills-seed learn current` | Learn from current codebase | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
+| `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
 | `skills-seed patterns add <description>` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
 | `skills-seed patterns compact` | Compact similar patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
@@ -657,7 +660,7 @@ skills-seed check --interactive=false
 
 #### Notes
 
-1. Pre-commit hooks usually run `skills-seed check --interactive=false`.
+1. Run `skills-seed check --interactive=false` directly when you only need checks.
 2. Without `--all`, only the Git staging area is checked.
 3. When interactive fix generation is used, the agent's fix summary is printed to logs. Files that cannot be safely rewritten in full are surfaced as manual-review warnings instead of being forced into incomplete fixes.
 
@@ -665,22 +668,20 @@ skills-seed check --interactive=false
 
 #### Command Overview
 
-Manage Git pre-commit hooks. Subcommands are recommended; `--install` and `--uninstall` remain for legacy compatibility.
+Manage Git pre-commit hooks. After installation, commits open an interactive menu where the user can sync and generate skills, learn only, or skip this time.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed hook install` | Write `.git/hooks/pre-commit` | `skills-seed hook install` | Runs `skills-seed check --interactive=false` before commit |
+| `skills-seed hook install` | Write `.git/hooks/pre-commit` | `skills-seed hook install` | Opens a selection menu before commit |
 | `skills-seed hook uninstall` | Remove `.git/hooks/pre-commit` | `skills-seed hook uninstall` | Does not remove `.skills-seed` data |
-| `skills-seed hook run` | Manually run hook logic on staged files | `skills-seed hook run` | Useful for local pre-commit verification |
+| `skills-seed hook run` | Open the hook menu manually | `skills-seed hook run` | Non-interactive environments skip directly |
 
 #### `hook` Flags
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--install`, `-i` | `false` | Install Git pre-commit hook; prefer `hook install` |
-| `--uninstall`, `-u` | `false` | Uninstall Git pre-commit hook; prefer `hook uninstall` |
 | `--help`, `-h` | `false` | Show `hook` help |
 
 #### Subcommand Flags
@@ -697,14 +698,42 @@ Manage Git pre-commit hooks. Subcommands are recommended; `--install` and `--uni
 skills-seed hook install
 skills-seed hook uninstall
 skills-seed hook run
-skills-seed hook --install
-skills-seed hook --uninstall
 ```
 
 #### Notes
 
-1. Legacy `--install` / `--uninstall` flags still work, but subcommands are preferred.
-2. `hook uninstall` only removes the hook file; learned data is preserved.
+1. `hook run` defaults to skip, avoiding high-cost AI learning as the default commit action.
+2. Non-interactive terminals skip directly, so scripts, IDEs, and Git automation are not blocked.
+3. `hook uninstall` only removes the hook file; learned data is preserved.
+
+### `skills-seed log`
+
+#### Command Overview
+
+Show recent changes recorded into project skills. This command reads `.skills-seed/memory/change-log.json`, prints a git-log-like history, and does not print diagnostic logs.
+
+#### Command Forms
+
+| Command Form | Description | Common Example | Notes |
+|---|---|---|---|
+| `skills-seed log` | Show recent learned changes | `skills-seed log` | Prints all change records in reverse chronological order |
+
+#### Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--help`, `-h` | `false` | Show `log` help |
+
+#### Common Examples
+
+```bash
+skills-seed log
+```
+
+#### Notes
+
+1. `sync`, `learn current`, and `generate skills` write learned change records.
+2. Detailed diagnostic logs remain under `.skills-seed/logs/` for troubleshooting.
 
 ### `skills-seed help`
 

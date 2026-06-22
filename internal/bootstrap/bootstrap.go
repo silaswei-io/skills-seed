@@ -14,6 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/command/hook"
 	initcmd "github.com/silaswei-io/skills-seed/internal/command/init"
 	"github.com/silaswei-io/skills-seed/internal/command/learn"
+	logcmd "github.com/silaswei-io/skills-seed/internal/command/log"
 	patternscmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	previewcmd "github.com/silaswei-io/skills-seed/internal/command/preview"
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
@@ -170,6 +171,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(learn.Cmd(cont))
 	rootCmd.AddCommand(check.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
+	rootCmd.AddCommand(logcmd.Cmd())
 	rootCmd.AddCommand(patternscmd.Cmd(cont))
 	rootCmd.AddCommand(previewcmd.Cmd(cont))
 	rootCmd.AddCommand(reviewcmd.Cmd(cont))
@@ -191,7 +193,7 @@ func commandNeedsProjectRuntime(args []string) bool {
 	}
 
 	switch cleaned[0] {
-	case "help", "init", "hook":
+	case "help", "init", "hook", "log":
 		return false
 	case "add", "check", "reset", "sync":
 		return true

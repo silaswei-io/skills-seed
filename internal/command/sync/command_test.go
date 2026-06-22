@@ -26,7 +26,7 @@ func TestSyncLearnAfterLearnSkipsGenerateWhenLearnDidNotDirtySkills(t *testing.T
 	err := syncLearnAfterLearn(domain.LearnCurrentResult{}, func() error {
 		generateCalled = true
 		return nil
-	})
+	}, nil)
 
 	require.NoError(t, err)
 	require.False(t, generateCalled)
@@ -40,7 +40,7 @@ func TestSyncLearnAfterLearnGeneratesWhenLearnDirtiedSkills(t *testing.T) {
 	}, func() error {
 		generateCalled = true
 		return nil
-	})
+	}, nil)
 
 	require.NoError(t, err)
 	require.True(t, generateCalled)
@@ -53,7 +53,7 @@ func TestSyncLearnAfterLearnWrapsGenerateError(t *testing.T) {
 		SkillsDirty: domain.SkillsDirtyTarget{Project: true},
 	}, func() error {
 		return errGenerate
-	})
+	}, nil)
 
 	require.ErrorIs(t, err, errGenerate)
 }
@@ -117,7 +117,7 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), mockAgent, configRepo),
 	}
 
-	require.NoError(t, syncWithUserPattern(context.Background(), cont, "所有 API 必须有错误处理", "business", nil, userContext))
+	require.NoError(t, syncWithUserPattern(context.Background(), cont, "所有 API 必须有错误处理", "business", nil, userContext, nil))
 
 	require.Equal(t, userContext, patternContext)
 	require.True(t, generateCalled)

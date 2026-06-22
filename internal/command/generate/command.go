@@ -15,6 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -61,7 +62,12 @@ func skillsCmd(cont *container.Container) *cobra.Command {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
 			opts.outputChanged = cmd.Flags().Changed("output")
-			return runGenerate(cont, opts)
+			if err := runGenerate(cont, opts); err != nil {
+				return err
+			}
+			change := changelog.Start(cont.SeedPath, "generate skills")
+			change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
+			return change.Save(i18n.Get("ChangeLogSummaryGenerateSkills"))
 		},
 	}
 

@@ -19,6 +19,7 @@
 | 评审统计 | [`skills-seed review`](#skills-seed-review) | 导入评审评论并统计 pattern 防漏效果 | `skills-seed review stats` |
 | 项目画像 | [`skills-seed profile`](#skills-seed-profile) | 查看或刷新项目画像 | `skills-seed profile show` |
 | 一键同步 | [`skills-seed sync`](#skills-seed-sync) | 学习当前代码并生成 skills | `skills-seed sync` |
+| 变更记录 | [`skills-seed log`](#skills-seed-log) | 查看学习变更记录 | `skills-seed log` |
 | 提交检查 | [`skills-seed check`](#skills-seed-check) | 检查暂存区或所有跟踪文件 | `skills-seed check` |
 | Git Hook | [`skills-seed hook`](#skills-seed-hook) | 安装、卸载或手动运行 pre-commit hook | `skills-seed hook install` |
 | 帮助 | [`skills-seed help`](#skills-seed-help) | 查看任意命令路径的帮助 | `skills-seed help learn current` |
@@ -31,7 +32,8 @@
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
 | 日常增量更新 | `skills-seed sync` | 等价于学习当前变更并在有 dirty 目标时生成 skills |
 | 只补充一条规则 | `skills-seed sync --add "<描述>"` | 跳过代码学习，用自然语言添加 pattern 后生成 |
-| 提交前检查 | `skills-seed check` 或 `skills-seed hook install` | 手动检查暂存区，或安装 pre-commit hook 自动检查 |
+| 提交前更新 | `skills-seed hook install` | 安装 pre-commit hook，在提交前选择同步、只学习或跳过 |
+| 查看沉淀变化 | `skills-seed log` | 像 `git log` 一样查看最近学习和生成带来的变更 |
 | 排查沉淀结果 | `skills-seed patterns show` → `skills-seed profile show` | 查看已学习 patterns 和项目画像是否符合预期 |
 
 <!-- COMMAND_TREE_START -->
@@ -41,11 +43,11 @@
 
 | 命令 | 摘要 | 子命令 | 参数 |
 |---|---|---|---|
-| `skills-seed` | 为 AI 助手培育项目技能 | `check`, `generate`, `hook`, `init`, `learn`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | 为 AI 助手培育项目技能 | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed check` | 检查暂存的文件 | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
 | `skills-seed generate` | 生成 AI Agent skills | `skills` | `--help, -h` = `false` |
 | `skills-seed generate skills` | 生成 AI Agent skills | - | `--force` = `false`<br>`--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
-| `skills-seed hook` | 管理 Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false`<br>`--install, -i` = `false`<br>`--uninstall, -u` = `false` |
+| `skills-seed hook` | 管理 Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed hook install` | 安装 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | 手动运行 pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
@@ -53,6 +55,7 @@
 | `skills-seed learn` | 从 Git 历史学习 | `current`, `history` | `--help, -h` = `false` |
 | `skills-seed learn current` | 从当前代码学习 | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | 从 Git 历史学习 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
+| `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
 | `skills-seed patterns` | 管理已学习的 patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
 | `skills-seed patterns add <description>` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
 | `skills-seed patterns compact` | 整理相似 patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
@@ -657,7 +660,7 @@ skills-seed check --interactive=false
 
 #### 注意事项
 
-1. pre-commit hook 通常使用 `skills-seed check --interactive=false`。
+1. 需要纯检查时可直接运行 `skills-seed check --interactive=false`。
 2. 未指定 `--all` 时，只检查 Git 暂存区。
 3. 交互式生成修复时，Agent 返回的修复摘要会输出到日志；无法安全完整重写的文件会通过人工审查警告展示，而不会强行写入不完整修复。
 
@@ -665,22 +668,20 @@ skills-seed check --interactive=false
 
 #### 命令概述
 
-管理 Git pre-commit hook。推荐使用子命令，`--install` 和 `--uninstall` 作为兼容旧用法保留。
+管理 Git pre-commit hook。安装后，提交前会打开交互式菜单，可选择同步并生成 skills、只学习或跳过本次。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed hook install` | 写入 `.git/hooks/pre-commit` | `skills-seed hook install` | 提交前执行 `skills-seed check --interactive=false` |
+| `skills-seed hook install` | 写入 `.git/hooks/pre-commit` | `skills-seed hook install` | 提交前打开选择菜单 |
 | `skills-seed hook uninstall` | 删除 `.git/hooks/pre-commit` | `skills-seed hook uninstall` | 不删除 `.skills-seed` 数据 |
-| `skills-seed hook run` | 手动按 hook 逻辑检查暂存区 | `skills-seed hook run` | 适合提交前本地验证 |
+| `skills-seed hook run` | 手动打开 hook 菜单 | `skills-seed hook run` | 非交互式环境会直接跳过 |
 
 #### `hook` 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--install`, `-i` | `false` | 安装 Git pre-commit hook；推荐改用 `hook install` |
-| `--uninstall`, `-u` | `false` | 卸载 Git pre-commit hook；推荐改用 `hook uninstall` |
 | `--help`, `-h` | `false` | 查看 `hook` 帮助 |
 
 #### 子命令参数
@@ -697,14 +698,42 @@ skills-seed check --interactive=false
 skills-seed hook install
 skills-seed hook uninstall
 skills-seed hook run
-skills-seed hook --install
-skills-seed hook --uninstall
 ```
 
 #### 注意事项
 
-1. 兼容旧用法的 `--install` / `--uninstall` 仍可用，但推荐使用子命令。
-2. `hook uninstall` 只移除 hook 文件，不清理学习数据。
+1. `hook run` 的默认选项是跳过，避免提交时默认触发高成本 AI 学习。
+2. 非交互式终端会直接跳过，不阻塞脚本、IDE 或 Git 自动流程。
+3. `hook uninstall` 只移除 hook 文件，不清理学习数据。
+
+### `skills-seed log`
+
+#### 命令概述
+
+查看最近沉淀到项目技能中的变更记录。此命令读取 `.skills-seed/memory/change-log.json`，输出形式类似 `git log`，不打印详细诊断日志。
+
+#### 命令形式
+
+| 命令形式 | 说明 | 常用示例 | 注意事项 |
+|---|---|---|---|
+| `skills-seed log` | 查看最近学习变更 | `skills-seed log` | 按时间倒序输出所有变更记录 |
+
+#### 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--help`, `-h` | `false` | 查看 `log` 帮助 |
+
+#### 常用示例
+
+```bash
+skills-seed log
+```
+
+#### 注意事项
+
+1. `sync`、`learn current`、`generate skills` 会写入学习变更记录。
+2. 详细诊断日志仍保留在 `.skills-seed/logs/`，用于排障。
 
 ### `skills-seed help`
 

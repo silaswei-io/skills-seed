@@ -266,9 +266,6 @@ other = "写入 hook 文件失败"
 [HookRemoveFileFailed]
 other = "删除 hook 文件失败"
 
-[HookGetStagedFilesFailed]
-other = "获取暂存文件失败"
-
 [GeneratorMarshalPatternsFailed]
 other = "序列化模式失败"
 
@@ -579,22 +576,16 @@ other = "已生成到: {{.Path}}"
 other = "管理 Git hooks"
 
 [HookLongDesc]
-other = "管理 Git pre-commit hooks。\n\n此命令可以：\n  • 安装 pre-commit hook\n  • 卸载 pre-commit hook\n  • 手动运行 hook 检查\n\n安装后，每次 git commit 前会自动运行 'skills-seed check --interactive=false'。"
+other = "管理 Git pre-commit hooks。\n\n此命令可以：\n  • 安装 pre-commit hook\n  • 卸载 pre-commit hook\n  • 手动运行 hook 菜单\n\n安装后，每次 git commit 前会弹出选择项，由用户决定是否同步或学习。"
 
 [HookExample]
-other = "  # 推荐写法：安装 pre-commit hook\n  skills-seed hook install\n\n  # 兼容写法：使用 flag 安装\n  skills-seed hook --install\n\n  # 手动执行 hook 检查\n  skills-seed hook run"
-
-[HookFlagInstall]
-other = "安装 Git pre-commit hook（兼容旧用法；推荐使用 hook install）"
-
-[HookFlagUninstall]
-other = "卸载 Git pre-commit hook（兼容旧用法；推荐使用 hook uninstall）"
+other = "  # 安装 pre-commit hook\n  skills-seed hook install\n\n  # 手动打开 hook 菜单\n  skills-seed hook run"
 
 [HookInstallShort]
 other = "安装 Git pre-commit hook"
 
 [HookInstallLongDesc]
-other = "在当前 Git 仓库写入 .git/hooks/pre-commit。生成的 hook 会在提交前执行 skills-seed check --interactive=false，用已学习的 patterns 检查暂存文件。"
+other = "在当前 Git 仓库写入 .git/hooks/pre-commit。生成的 hook 会在提交前打开选择菜单，可选择同步并生成 skills、只学习或跳过本次提交。"
 
 [HookInstallExample]
 other = "  # 在已初始化 skills-seed 的仓库中安装 hook\n  skills-seed hook install"
@@ -612,10 +603,10 @@ other = "  # 卸载 pre-commit hook\n  skills-seed hook uninstall"
 other = "手动运行 pre-commit hook"
 
 [HookRunLongDesc]
-other = "按 pre-commit hook 的逻辑检查当前暂存区。没有暂存的 Go 文件时直接通过；发现问题时返回非零状态。"
+other = "手动运行 pre-commit hook 菜单。交互式终端会展示可选操作；非交互式环境会直接跳过，不阻塞提交。"
 
 [HookRunExample]
-other = "  # 手动执行一次 hook 检查\n  skills-seed hook run"
+other = "  # 手动打开 hook 菜单\n  skills-seed hook run"
 
 [HookInstallSuccess]
 other = "Hook 已安装"
@@ -673,9 +664,6 @@ other = "正在分析 {{.Count}} 个文件..."
 other = "  - {{.File}}"
 
 # 钩子
-[HookBothFlagsError]
-other = "错误: 不能同时使用 --install 和 --uninstall"
-
 [HookInstallFailed]
 other = "Hook 安装失败: {{.Error}}"
 
@@ -684,15 +672,6 @@ other = "Hook 卸载失败: {{.Error}}"
 
 [HookRunFailed]
 other = "Hook 运行失败: {{.Error}}"
-
-[HookNoStagedFiles]
-other = "没有暂存的文件需要检查"
-
-[HookCheckingFiles]
-other = "正在检查 {{.Count}} 个文件..."
-
-[HookCheckPassed]
-other = "检查通过"
 
 # 扫描
 [ScanProjectRoot]
@@ -2125,9 +2104,6 @@ other = "skills-seed 未初始化，请先运行 'skills-seed init'"
 [ErrHookNotFound]
 other = "未找到 pre-commit hook"
 
-[ErrHookCheckFailed]
-other = "检查失败: {{.Error}}"
-
 [ErrInitNotGitRepo]
 other = "不是 Git 仓库: {{.Path}}"
 
@@ -2187,3 +2163,93 @@ other = "  # 重置为单项目模式\n  skills-seed reset --mode project\n\n  #
 
 [ResetBackupFailed]
 other = "备份 .skills-seed 失败"
+
+[LogShort]
+other = "查看学习变更记录"
+
+[LogLongDesc]
+other = "查看 skills-seed 最近沉淀到项目技能中的变更记录。\n\n此命令类似 git log，展示学习、同步和生成带来的可追溯变化，不打印详细诊断日志。"
+
+[LogExample]
+other = "  # 查看最近学习变更\n  skills-seed log"
+
+[LogNoChanges]
+other = "暂无变更记录，记录文件: {{.Path}}"
+
+[ChangeLogSummarySync]
+other = "同步当前代码并更新 skills"
+
+[ChangeLogSummaryUserPatternSync]
+other = "添加用户模式并更新 skills"
+
+[ChangeLogSummaryLearnCurrent]
+other = "学习当前代码"
+
+[ChangeLogSummaryGenerateSkills]
+other = "生成 skills"
+
+[ChangeLogLearnProjectSummary]
+other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}；发现 {{.Patterns}} 个 patterns，保存 {{.Saved}} 个"
+
+[ChangeLogLearnWorkspaceSummary]
+other = "处理 {{.Projects}} 个子项目，{{.DirtyProjects}} 个需要生成 skills"
+
+[ChangeLogLearnNoFileChanges]
+other = "未检测到需要学习的文件变化"
+
+[ChangeLogWorkspaceRelationshipsChanged]
+other = "workspace 关系产物已更新"
+
+[ChangeLogGenerateSkippedNoChanges]
+other = "本轮学习未产生 skills 变化，已跳过生成"
+
+[ChangeLogGenerateCompleted]
+other = "已生成 skills，目标: {{.Target}}"
+
+[ChangeLogGenerateCompletedAll]
+other = "已生成 skills"
+
+[ChangeLogPatternAdded]
+other = "已添加用户模式: {{.PatternName}} [{{.Category}}]"
+
+[ChangeLogDirtyProject]
+other = "当前项目"
+
+[ChangeLogDirtyWorkspace]
+other = "workspace"
+
+[ChangeLogDirtyProjects]
+other = "{{.Count}} 个子项目"
+
+[ChangeLogDirtyNone]
+other = "无"
+
+[HookPromptTitle]
+other = "提交前要更新 skills 吗？"
+
+[HookChoiceSync]
+other = "同步并生成 skills"
+
+[HookChoiceSyncDesc]
+other = "学习当前代码并重新生成 skills，适合架构或规则变化后使用。"
+
+[HookChoiceLearn]
+other = "只学习"
+
+[HookChoiceLearnDesc]
+other = "更新 patterns 和项目画像，但不生成 skills。"
+
+[HookChoiceSkip]
+other = "跳过本次"
+
+[HookChoiceSkipDesc]
+other = "继续提交，不运行 skills-seed。"
+
+[HookNonInteractiveSkip]
+other = "skills-seed hook: 当前不是交互式终端，已跳过。"
+
+[HookSkipped]
+other = "已跳过 skills-seed hook。"
+
+[HookActionFailed]
+other = "Hook 操作失败 (skills-seed {{.Action}}): {{.Error}}"

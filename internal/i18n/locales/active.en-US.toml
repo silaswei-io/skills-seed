@@ -266,9 +266,6 @@ other = "Failed to write hook file"
 [HookRemoveFileFailed]
 other = "Failed to remove hook file"
 
-[HookGetStagedFilesFailed]
-other = "Failed to get staged files"
-
 [GeneratorMarshalPatternsFailed]
 other = "Failed to marshal patterns"
 
@@ -579,22 +576,16 @@ other = "Generated to: {{.Path}}"
 other = "Manage Git hooks"
 
 [HookLongDesc]
-other = "Manage Git pre-commit hooks.\n\nThis command can:\n  • Install pre-commit hook\n  • Uninstall pre-commit hook\n  • Manually run hook check\n\nAfter installation, 'skills-seed check --interactive=false' runs automatically before each git commit."
+other = "Manage Git pre-commit hooks.\n\nThis command can:\n  • Install pre-commit hook\n  • Uninstall pre-commit hook\n  • Manually open the hook menu\n\nAfter installation, each git commit opens a selection menu so the user can choose whether to sync or learn."
 
 [HookExample]
-other = "  # Recommended: install the pre-commit hook\n  skills-seed hook install\n\n  # Compatible legacy form: install by flag\n  skills-seed hook --install\n\n  # Run the hook check manually\n  skills-seed hook run"
-
-[HookFlagInstall]
-other = "Install Git pre-commit hook (legacy-compatible; prefer hook install)"
-
-[HookFlagUninstall]
-other = "Uninstall Git pre-commit hook (legacy-compatible; prefer hook uninstall)"
+other = "  # Install the pre-commit hook\n  skills-seed hook install\n\n  # Open the hook menu manually\n  skills-seed hook run"
 
 [HookInstallShort]
 other = "Install Git pre-commit hook"
 
 [HookInstallLongDesc]
-other = "Write .git/hooks/pre-commit in the current Git repository. The generated hook runs skills-seed check --interactive=false before each commit to check staged files against learned patterns."
+other = "Write .git/hooks/pre-commit in the current Git repository. The generated hook opens a menu before commit: sync and generate skills, learn only, or skip this commit."
 
 [HookInstallExample]
 other = "  # Install the hook in a repository initialized by skills-seed\n  skills-seed hook install"
@@ -612,10 +603,10 @@ other = "  # Uninstall the pre-commit hook\n  skills-seed hook uninstall"
 other = "Run the pre-commit hook manually"
 
 [HookRunLongDesc]
-other = "Run the same check logic used by the pre-commit hook against the current staged files. The command exits successfully when there are no staged Go files; it returns non-zero when checks fail."
+other = "Run the pre-commit hook menu manually. Interactive terminals show selectable actions; non-interactive environments skip without blocking the commit."
 
 [HookRunExample]
-other = "  # Run one hook check manually\n  skills-seed hook run"
+other = "  # Open the hook menu manually\n  skills-seed hook run"
 
 [HookInstallSuccess]
 other = "Hook installed"
@@ -673,9 +664,6 @@ other = "Analyzing {{.Count}} files..."
 other = "  - {{.File}}"
 
 # 钩子
-[HookBothFlagsError]
-other = "Error: cannot use both --install and --uninstall"
-
 [HookInstallFailed]
 other = "Hook install failed: {{.Error}}"
 
@@ -684,15 +672,6 @@ other = "Hook uninstall failed: {{.Error}}"
 
 [HookRunFailed]
 other = "Hook run failed: {{.Error}}"
-
-[HookNoStagedFiles]
-other = "No staged files to check"
-
-[HookCheckingFiles]
-other = "Checking {{.Count}} files..."
-
-[HookCheckPassed]
-other = "Check passed"
 
 # 扫描
 [ScanProjectRoot]
@@ -2124,9 +2103,6 @@ other = "skills-seed not initialized, run 'skills-seed init' first"
 [ErrHookNotFound]
 other = "Pre-commit hook not found"
 
-[ErrHookCheckFailed]
-other = "Check failed: {{.Error}}"
-
 [ErrInitNotGitRepo]
 other = "Not a git repository: {{.Path}}"
 
@@ -2186,3 +2162,93 @@ other = "  # Reset to single-project mode\n  skills-seed reset --mode project\n\
 
 [ResetBackupFailed]
 other = "Failed to back up .skills-seed"
+
+[LogShort]
+other = "Show learned change history"
+
+[LogLongDesc]
+other = "Show recent changes recorded into project skills.\n\nThis command is similar to git log: it shows traceable changes from learning, sync, and generation without printing diagnostic logs."
+
+[LogExample]
+other = "  # Show recent learned changes\n  skills-seed log"
+
+[LogNoChanges]
+other = "No change records yet. Record file: {{.Path}}"
+
+[ChangeLogSummarySync]
+other = "Synced current code and updated skills"
+
+[ChangeLogSummaryUserPatternSync]
+other = "Added a user pattern and updated skills"
+
+[ChangeLogSummaryLearnCurrent]
+other = "Learned current code"
+
+[ChangeLogSummaryGenerateSkills]
+other = "Generated skills"
+
+[ChangeLogLearnProjectSummary]
+other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}; found {{.Patterns}} patterns, saved {{.Saved}}"
+
+[ChangeLogLearnWorkspaceSummary]
+other = "processed {{.Projects}} projects; {{.DirtyProjects}} need skills generation"
+
+[ChangeLogLearnNoFileChanges]
+other = "no learnable file changes detected"
+
+[ChangeLogWorkspaceRelationshipsChanged]
+other = "workspace relationship artifacts updated"
+
+[ChangeLogGenerateSkippedNoChanges]
+other = "no skills changes from learning; generation skipped"
+
+[ChangeLogGenerateCompleted]
+other = "generated skills for {{.Target}}"
+
+[ChangeLogGenerateCompletedAll]
+other = "generated skills"
+
+[ChangeLogPatternAdded]
+other = "added user pattern: {{.PatternName}} [{{.Category}}]"
+
+[ChangeLogDirtyProject]
+other = "current project"
+
+[ChangeLogDirtyWorkspace]
+other = "workspace"
+
+[ChangeLogDirtyProjects]
+other = "{{.Count}} child projects"
+
+[ChangeLogDirtyNone]
+other = "none"
+
+[HookPromptTitle]
+other = "Update skills before commit?"
+
+[HookChoiceSync]
+other = "Sync and generate skills"
+
+[HookChoiceSyncDesc]
+other = "Learn current code and regenerate skills. Best after architecture or rule changes."
+
+[HookChoiceLearn]
+other = "Learn only"
+
+[HookChoiceLearnDesc]
+other = "Update patterns and profile without regenerating skills."
+
+[HookChoiceSkip]
+other = "Skip this time"
+
+[HookChoiceSkipDesc]
+other = "Continue commit without running skills-seed."
+
+[HookNonInteractiveSkip]
+other = "skills-seed hook: no interactive terminal, skipped."
+
+[HookSkipped]
+other = "Skipped skills-seed hook."
+
+[HookActionFailed]
+other = "Hook action failed (skills-seed {{.Action}}): {{.Error}}"

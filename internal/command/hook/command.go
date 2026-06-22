@@ -8,15 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/spf13/cobra"
 )
 
 // Cmd 返回 hook 命令
 func Cmd() *cobra.Command {
-	var install bool
-	var uninstall bool
-
 	hookCmd := &cobra.Command{
 		Use:     "hook",
 		Short:   i18n.Get("HookShort"),
@@ -24,34 +24,10 @@ func Cmd() *cobra.Command {
 		Example: i18n.Get("HookExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if install && uninstall {
-				return fmt.Errorf("%s", i18n.Get("HookBothFlagsError"))
-			}
-
-			if install {
-				if err := installHook(); err != nil {
-					return fmt.Errorf("%s", i18n.GetWithParams("HookInstallFailed", map[string]interface{}{"Error": err.Error()}))
-				}
-				_, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Get("HookInstallSuccess"))
-				return err
-			}
-			if uninstall {
-				if err := uninstallHook(); err != nil {
-					return fmt.Errorf("%s", i18n.GetWithParams("HookUninstallFailed", map[string]interface{}{"Error": err.Error()}))
-				}
-				_, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.Get("HookUninstallSuccess"))
-				return err
-			}
-			// 默认执行 pre-commit hook
-			if err := runPreCommitHook(cmd.OutOrStdout(), cmd.ErrOrStderr()); err != nil {
-				return fmt.Errorf("%s", i18n.GetWithParams("HookRunFailed", map[string]interface{}{"Error": err.Error()}))
-			}
-			return nil
+			return cmd.Help()
 		},
 	}
 
-	hookCmd.Flags().BoolVarP(&install, "install", "i", false, i18n.Get("HookFlagInstall"))
-	hookCmd.Flags().BoolVarP(&uninstall, "uninstall", "u", false, i18n.Get("HookFlagUninstall"))
 	hookCmd.AddCommand(hookActionCmd("install", i18n.Get("HookInstallShort"), i18n.Get("HookInstallLongDesc"), i18n.Get("HookInstallExample"), func(cmd *cobra.Command) error {
 		return installHook()
 	}, i18n.Get("HookInstallSuccess")))
@@ -107,26 +83,7 @@ func installHook() error {
 
 	// 创建 hook 脚本
 	hookPath := filepath.Join(gitDir, "hooks", "pre-commit")
-	hookContent := `#!/bin/bash
-# skills-seed 预提交钩子
-
-# 获取暂存的文件
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$')
-
-if [ -z "$STAGED_FILES" ]; then
-    exit 0
-fi
-
-echo "Running skills-seed check..."
-
-# 运行 skills-seed check。Git hook 通常没有交互式 TTY，必须关闭交互模式。
-if ! skills-seed check --interactive=false; then
-    echo "skills-seed check found issues. Please fix them before committing."
-    exit 1
-fi
-
-exit 0
-`
+	hookContent := preCommitHookContent()
 
 	// 确保 hooks 目录存在
 	hooksDir := filepath.Join(gitDir, "hooks")
@@ -140,6 +97,14 @@ exit 0
 	}
 
 	return nil
+}
+
+func preCommitHookContent() string {
+	return `#!/bin/bash
+# skills-seed pre-commit hook
+
+skills-seed hook run
+`
 }
 
 func uninstallHook() error {
@@ -164,37 +129,134 @@ func uninstallHook() error {
 }
 
 func runPreCommitHook(stdout, stderr io.Writer) error {
-	// 获取暂存的 Go 文件
-	cmd := exec.Command("git", "diff", "--cached", "--name-only", "--diff-filter=ACM")
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("HookGetStagedFilesFailed"), err)
-	}
-
-	files := strings.Split(string(output), "\n")
-	goFiles := []string{}
-	for _, file := range files {
-		if strings.HasSuffix(file, ".go") && file != "" {
-			goFiles = append(goFiles, file)
-		}
-	}
-
-	if len(goFiles) == 0 {
-		fmt.Fprintln(stdout, i18n.Get("HookNoStagedFiles"))
+	if !hasInteractiveTerminal() {
+		fmt.Fprintln(stdout, i18n.Get("HookNonInteractiveSkip"))
 		return nil
 	}
 
-	fmt.Fprintln(stdout, i18n.GetWithParams("HookCheckingFiles", map[string]interface{}{"Count": len(goFiles)}))
+	action, err := selectHookAction()
+	if err != nil {
+		return err
+	}
+	if action == hookActionSkip {
+		fmt.Fprintln(stdout, i18n.Get("HookSkipped"))
+		return nil
+	}
+	return runHookAction(action, stdout, stderr)
+}
 
-	// 运行 skills-seed check
-	checkCmd := exec.Command("skills-seed", "check", "--interactive=false")
-	checkCmd.Stdout = stdout
-	checkCmd.Stderr = stderr
+type hookAction string
 
-	if err := checkCmd.Run(); err != nil {
-		return fmt.Errorf("%s", i18n.GetWithParams("ErrHookCheckFailed", map[string]interface{}{"Error": err.Error()}))
+const (
+	hookActionSync  hookAction = "sync"
+	hookActionLearn hookAction = "learn"
+	hookActionSkip  hookAction = "skip"
+)
+
+type hookChoice struct {
+	action      hookAction
+	title       string
+	description string
+}
+
+func (c hookChoice) FilterValue() string { return c.title }
+func (c hookChoice) Title() string       { return c.title }
+func (c hookChoice) Description() string { return c.description }
+
+type hookSelectModel struct {
+	list     list.Model
+	action   hookAction
+	quitting bool
+}
+
+func (m hookSelectModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m hookSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			m.action = hookActionSkip
+			m.quitting = true
+			return m, tea.Quit
+		case "enter":
+			if selected, ok := m.list.SelectedItem().(hookChoice); ok {
+				m.action = selected.action
+			}
+			m.quitting = true
+			return m, tea.Quit
+		}
 	}
 
-	fmt.Fprintln(stdout, i18n.Get("HookCheckPassed"))
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+func (m hookSelectModel) View() string {
+	if m.quitting {
+		return ""
+	}
+	title := lipgloss.NewStyle().Bold(true).Render(i18n.Get("HookPromptTitle"))
+	return "\n" + title + "\n\n" + m.list.View()
+}
+
+func selectHookAction() (hookAction, error) {
+	choices := []list.Item{
+		hookChoice{action: hookActionSync, title: i18n.Get("HookChoiceSync"), description: i18n.Get("HookChoiceSyncDesc")},
+		hookChoice{action: hookActionLearn, title: i18n.Get("HookChoiceLearn"), description: i18n.Get("HookChoiceLearnDesc")},
+		hookChoice{action: hookActionSkip, title: i18n.Get("HookChoiceSkip"), description: i18n.Get("HookChoiceSkipDesc")},
+	}
+	delegate := list.NewDefaultDelegate()
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("170")).Bold(true)
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("170"))
+
+	selector := list.New(choices, delegate, 80, 8)
+	selector.SetShowStatusBar(false)
+	selector.SetFilteringEnabled(false)
+	selector.SetShowHelp(false)
+	selector.SetShowTitle(false)
+	selector.Select(2)
+
+	program := tea.NewProgram(hookSelectModel{list: selector, action: hookActionSkip}, tea.WithAltScreen())
+	finalModel, err := program.Run()
+	if err != nil {
+		return hookActionSkip, err
+	}
+	return finalModel.(hookSelectModel).action, nil
+}
+
+func hasInteractiveTerminal() bool {
+	stdinInfo, stdinErr := os.Stdin.Stat()
+	stdoutInfo, stdoutErr := os.Stdout.Stat()
+	return stdinErr == nil && stdoutErr == nil &&
+		stdinInfo.Mode()&os.ModeCharDevice != 0 &&
+		stdoutInfo.Mode()&os.ModeCharDevice != 0
+}
+
+func runHookAction(action hookAction, stdout, stderr io.Writer) error {
+	args := hookActionArgs(action)
+	if len(args) == 0 {
+		return nil
+	}
+	cmd := exec.Command("skills-seed", args...)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s", i18n.GetWithParams("HookActionFailed", map[string]interface{}{"Action": strings.Join(args, " "), "Error": err.Error()}))
+	}
 	return nil
+}
+
+func hookActionArgs(action hookAction) []string {
+	switch action {
+	case hookActionSync:
+		return []string{"sync"}
+	case hookActionLearn:
+		return []string{"learn", "current"}
+	default:
+		return nil
+	}
 }

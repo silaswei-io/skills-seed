@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
@@ -12,6 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/spf13/cobra"
@@ -39,10 +41,17 @@ func Cmd(cont *container.Container) *cobra.Command {
 			}
 			ctx := cmd.Context()
 
+			change := changelog.Start(cont.SeedPath, "sync")
 			if addDesc != "" {
-				return syncWithUserPattern(ctx, cont, addDesc, category, files, userContext)
+				if err := syncWithUserPattern(ctx, cont, addDesc, category, files, userContext, change); err != nil {
+					return err
+				}
+				return change.Save(i18n.Get("ChangeLogSummaryUserPatternSync"))
 			}
-			return syncLearn(ctx, cont, userContext)
+			if err := syncLearn(ctx, cont, userContext, change); err != nil {
+				return err
+			}
+			return change.Save(i18n.Get("ChangeLogSummarySync"))
 		},
 	}
 
@@ -55,22 +64,24 @@ func Cmd(cont *container.Container) *cobra.Command {
 }
 
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
-func syncLearn(ctx context.Context, cont *container.Container, userContext string) error {
+func syncLearn(ctx context.Context, cont *container.Container, userContext string, change *changelog.Builder) error {
 	// 步骤 1：学习当前代码。
 	logger.Info(i18n.Get("SyncStepLearn"))
 	result, err := learncmd.RunLearnCurrentWithContext(cont, userContext)
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
+	recordLearnSummary(change, result)
 
 	return syncLearnAfterLearn(result, func() error {
 		return gencmd.RunGenerate(cont)
-	})
+	}, change)
 }
 
-func syncLearnAfterLearn(result domain.LearnCurrentResult, generate func() error) error {
+func syncLearnAfterLearn(result domain.LearnCurrentResult, generate func() error, change *changelog.Builder) error {
 	if syncLearnShouldSkipGenerate(result) {
 		logger.Info(i18n.Get("SyncGenerateSkippedNoChanges"))
+		change.Detail(i18n.Get("ChangeLogGenerateSkippedNoChanges"))
 		logger.Info(i18n.Get("SyncComplete"))
 		return nil
 	}
@@ -80,6 +91,7 @@ func syncLearnAfterLearn(result domain.LearnCurrentResult, generate func() error
 	if err := generate(); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 	}
+	change.Detail(i18n.GetWithParams("ChangeLogGenerateCompleted", map[string]interface{}{"Target": formatDirtyTarget(result.SkillsDirty)}))
 
 	logger.Info(i18n.Get("SyncComplete"))
 	return nil
@@ -92,7 +104,7 @@ func syncLearnShouldSkipGenerate(result domain.LearnCurrentResult) bool {
 }
 
 // syncWithUserPattern 路径 B：添加模式 → 生成 Skills。
-func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, userContext string) error {
+func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, userContext string, change *changelog.Builder) error {
 	// 步骤 1：添加用户自定义模式。
 	logger.Info(i18n.Get("SyncStepAddPattern"))
 	req := &agent.UserDefinePatternRequest{
@@ -134,13 +146,60 @@ func syncWithUserPattern(ctx context.Context, cont *container.Container, descrip
 		"PatternName": result.Pattern.Name,
 		"Category":    string(result.Pattern.Category),
 	}))
+	change.Detail(i18n.GetWithParams("ChangeLogPatternAdded", map[string]interface{}{
+		"PatternName": result.Pattern.Name,
+		"Category":    string(result.Pattern.Category),
+	}))
 
 	// 步骤 2：生成 Skills。
 	logger.Info(i18n.Get("SyncStepGenerate"))
 	if err := gencmd.RunGenerate(cont); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 	}
+	change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
 
 	logger.Info(i18n.Get("SyncComplete"))
 	return nil
+}
+
+func recordLearnSummary(change *changelog.Builder, result domain.LearnCurrentResult) {
+	summary := result.Summary
+	if summary.Projects > 0 {
+		change.Detail(i18n.GetWithParams("ChangeLogLearnWorkspaceSummary", map[string]interface{}{
+			"Projects":      summary.Projects,
+			"DirtyProjects": summary.DirtyProjects,
+		}))
+		if summary.WorkspaceChanged {
+			change.Detail(i18n.Get("ChangeLogWorkspaceRelationshipsChanged"))
+		}
+		return
+	}
+	if summary.NoFileChanges {
+		change.Detail(i18n.Get("ChangeLogLearnNoFileChanges"))
+		return
+	}
+	change.Detail(i18n.GetWithParams("ChangeLogLearnProjectSummary", map[string]interface{}{
+		"Changed":  summary.ChangedFiles,
+		"Deleted":  summary.DeletedFiles,
+		"Skipped":  summary.SkippedFiles,
+		"Patterns": summary.PatternsFound,
+		"Saved":    summary.PatternsSaved,
+	}))
+}
+
+func formatDirtyTarget(target domain.SkillsDirtyTarget) string {
+	parts := make([]string, 0, 3)
+	if target.Project {
+		parts = append(parts, i18n.Get("ChangeLogDirtyProject"))
+	}
+	if target.Workspace {
+		parts = append(parts, i18n.Get("ChangeLogDirtyWorkspace"))
+	}
+	if len(target.Projects) > 0 {
+		parts = append(parts, i18n.GetWithParams("ChangeLogDirtyProjects", map[string]interface{}{"Count": len(target.Projects)}))
+	}
+	if len(parts) == 0 {
+		return i18n.Get("ChangeLogDirtyNone")
+	}
+	return strings.Join(parts, ", ")
 }

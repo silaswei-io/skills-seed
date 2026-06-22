@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.15]
+
+### 变更
+
+- 新增 `skills-seed log`，以类似 `git log` 的格式展示学习和生成带来的变更记录；记录保存在 `.skills-seed/memory/change-log.json`，不再把用户可见摘要混入详细诊断日志。
+- 调整 Git pre-commit hook 行为：安装后的 hook 不再默认强制检查或学习，而是在交互式终端中提供“同步并生成 skills / 只学习 / 跳过本次”的选择菜单；非交互式环境会直接跳过，避免阻塞 IDE、脚本和 Git 自动流程。
+
+### 文档
+
+- 更新中英文命令参考，补充 `skills-seed log` 说明，并同步新的 hook 菜单行为。
+
 ## [v0.9.14]
 
 ### 文档

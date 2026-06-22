@@ -13,6 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -67,8 +68,13 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			_, err := runLearnCurrent(cont, currentOpts)
-			return err
+			result, err := runLearnCurrent(cont, currentOpts)
+			if err != nil {
+				return err
+			}
+			change := changelog.Start(cont.SeedPath, "learn current")
+			recordLearnCurrentSummary(change, result)
+			return change.Save(i18n.Get("ChangeLogSummaryLearnCurrent"))
 		},
 	}
 	currentCmd.Flags().StringVarP(&currentOpts.language, "language", "l", "", i18n.Get("LearnFlagLanguage"))
@@ -156,10 +162,18 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 	if err != nil {
 		return domain.LearnCurrentResult{}, err
 	}
-	if result.savedCount > 0 {
-		return domain.LearnCurrentResult{SkillsDirty: domain.SkillsDirtyTarget{Project: true}}, nil
+	summary := domain.LearnCurrentSummary{
+		ChangedFiles:  result.changedCount,
+		DeletedFiles:  result.deletedCount,
+		SkippedFiles:  result.skippedCount,
+		PatternsFound: result.patternsCount,
+		PatternsSaved: result.savedCount,
+		NoFileChanges: result.skipped,
 	}
-	return domain.LearnCurrentResult{}, nil
+	if result.savedCount > 0 {
+		return domain.LearnCurrentResult{SkillsDirty: domain.SkillsDirtyTarget{Project: true}, Summary: summary}, nil
+	}
+	return domain.LearnCurrentResult{Summary: summary}, nil
 }
 
 type learnCurrentProjectOptions struct {
@@ -654,6 +668,31 @@ func markLearnedSkillsDirty(ctx context.Context, cont *container.Container, targ
 
 func skillsDirtyTargetEmpty(target domain.SkillsDirtyTarget) bool {
 	return !target.Project && !target.Workspace && len(target.Projects) == 0
+}
+
+func recordLearnCurrentSummary(change *changelog.Builder, result domain.LearnCurrentResult) {
+	summary := result.Summary
+	if summary.Projects > 0 {
+		change.Detail(i18n.GetWithParams("ChangeLogLearnWorkspaceSummary", map[string]interface{}{
+			"Projects":      summary.Projects,
+			"DirtyProjects": summary.DirtyProjects,
+		}))
+		if summary.WorkspaceChanged {
+			change.Detail(i18n.Get("ChangeLogWorkspaceRelationshipsChanged"))
+		}
+		return
+	}
+	if summary.NoFileChanges {
+		change.Detail(i18n.Get("ChangeLogLearnNoFileChanges"))
+		return
+	}
+	change.Detail(i18n.GetWithParams("ChangeLogLearnProjectSummary", map[string]interface{}{
+		"Changed":  summary.ChangedFiles,
+		"Deleted":  summary.DeletedFiles,
+		"Skipped":  summary.SkippedFiles,
+		"Patterns": summary.PatternsFound,
+		"Saved":    summary.PatternsSaved,
+	}))
 }
 
 func resolveFocusPaths(projectRoot string, paths []string) ([]string, error) {

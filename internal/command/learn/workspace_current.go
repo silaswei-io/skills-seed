@@ -209,7 +209,15 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		"duration", time.Since(startedAt),
 		"projects_count", len(workspaceConfig.Projects),
 	)
-	return domain.LearnCurrentResult{SkillsDirty: dirtyTarget}, nil
+	return domain.LearnCurrentResult{
+		SkillsDirty: dirtyTarget,
+		Summary: domain.LearnCurrentSummary{
+			Projects:         len(workspaceConfig.Projects),
+			DirtyProjects:    len(dirtyProjectIDs),
+			WorkspaceChanged: relationshipsChanged,
+			NoFileChanges:    skillsDirtyTargetEmpty(dirtyTarget),
+		},
+	}, nil
 }
 
 func runLearnWorkspaceChildProject(ctx context.Context, childCont *container.Container, scope string, showDetails bool, onStepStart func(label string), onStepUpdate func(label string), onStepComplete func(label string), logPath *string, opts learnCurrentOptions) (*learnCurrentProjectResult, error) {
