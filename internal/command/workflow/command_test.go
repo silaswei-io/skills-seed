@@ -72,6 +72,20 @@ func TestWorkflowCommandInWorkspaceCanTargetChildProject(t *testing.T) {
 	require.Equal(t, []string{"backend"}, state.SkillsDirty.Projects)
 }
 
+func TestWorkflowCommandPrintsOptimizeProgress(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cont := newWorkflowWorkspaceContainer(t)
+	defer cont.Close()
+
+	output := captureWorkflowStdout(t, func() {
+		cmd := Cmd(cont)
+		cmd.SetArgs([]string{"--name", "release", "--context", "工作区发布前确认 backend 和部署脚本兼容"})
+		require.NoError(t, cmd.Execute())
+	})
+
+	require.Contains(t, output, "优化用户工作流")
+}
+
 func newWorkflowWorkspaceContainer(t *testing.T) *container.Container {
 	t.Helper()
 
@@ -120,4 +134,24 @@ func initWorkflowChildProject(t *testing.T, workspaceRoot string, project config
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
 	require.NoError(t, configRepo.Update(cfg))
+}
+
+func captureWorkflowStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	tempFile, err := os.CreateTemp(t.TempDir(), "stdout")
+	require.NoError(t, err)
+
+	originalStdout := os.Stdout
+	os.Stdout = tempFile
+	defer func() {
+		os.Stdout = originalStdout
+	}()
+
+	fn()
+
+	require.NoError(t, tempFile.Close())
+	data, err := os.ReadFile(tempFile.Name())
+	require.NoError(t, err)
+	return string(data)
 }

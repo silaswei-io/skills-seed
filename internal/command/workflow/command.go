@@ -7,12 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	workflowservice "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
@@ -45,10 +47,21 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if closeTarget != nil {
 				defer closeTarget()
 			}
-			workflow, err := targetCont.WorkflowSvc.UpsertWorkflow(cmd.Context(), workflowservice.UpsertRequest{
-				Name:    opts.name,
-				Context: opts.context,
-				Append:  opts.append,
+			tracker := progress.New(1)
+			retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+			ctx := retryProgress.WithContext(cmd.Context())
+			label := i18n.Get("ProgressOptimizeWorkflowAI")
+			var workflow *domain.Workflow
+			err = tracker.RunStep(label, func() error {
+				retryProgress.StartStep(label)
+				var callErr error
+				workflow, callErr = targetCont.WorkflowSvc.UpsertWorkflow(ctx, workflowservice.UpsertRequest{
+					Name:    opts.name,
+					Context: opts.context,
+					Append:  opts.append,
+				})
+				retryProgress.FinishStep(label, callErr == nil)
+				return callErr
 			})
 			if err != nil {
 				return err

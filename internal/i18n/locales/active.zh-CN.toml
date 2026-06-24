@@ -67,6 +67,9 @@ other = "子项目 {{.ProjectName}} 必须是 project 模式，当前为 {{.Mode
 [WorkflowSkillsLoaderMissing]
 other = "工作流模板加载器未配置"
 
+[ProgressOptimizeWorkflowAI]
+other = "优化用户工作流"
+
 [InitLongDesc]
 other = "在当前项目中初始化 skills-seed。\n\n此命令将：\n  • 创建 .skills-seed/ 目录\n  • 生成默认配置文件 (config.yaml)\n  • 初始化 BoltDB 数据库\n  • 准备跨 Agent 兼容的 prompt 与 skills 模板\n\n请在 Git 仓库根目录运行此命令。"
 
