@@ -86,7 +86,7 @@ init -> learn current / learn history -> generate skills -> check
 
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
 
-Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file selection before analysis. `generate skills` uses dirty state to regenerate only affected targets, with `--force` available for a full regeneration. The root `completion` command has been removed, and Chinese help text is now consistent.
+Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file selection before analysis. When `generate skills` is run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds it. The root `completion` command has been removed, and Chinese help text is now consistent.
 
 `generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
 
@@ -246,6 +246,7 @@ Built-in targets:
 | `skills-seed learn current` | Incrementally learn rules and profile from current code |
 | `skills-seed learn history` | Learn long-lived rules from Git history |
 | `skills-seed generate skills` | Generate skills for the current `skills.target` |
+| `skills-seed workflow --context "<notes>"` | Optimize and save a user workflow through the Agent; omit `--name` to generate a name, use `--append` to merge notes |
 | `skills-seed patterns add <description>` | Add a user-defined pattern in natural language |
 | `skills-seed patterns compact` | Explicitly compact similar stored patterns |
 | `skills-seed sync` | Run learning or pattern add in one command; generate skills when changes require it |
@@ -256,6 +257,8 @@ Built-in targets:
 | `skills-seed hook install` | Install the local pre-commit hook |
 
 See [Command Reference](docs/COMMANDS.EN.md) for all flags and forms.
+
+Informal workflow notes are optimized by the current Agent into a standard workflow, then saved to `.skills-seed/workflows/<name>/WORKFLOW.md`; original notes and metadata are stored in `metadata.yaml` in the same directory. A workflow with the same name is rewritten by default; add `--append` to merge notes with existing content. Generated skills receive them under `workflows/`, with related scripts under `scripts/workflows/<name>/`.
 
 ## Local And Safety Boundaries
 

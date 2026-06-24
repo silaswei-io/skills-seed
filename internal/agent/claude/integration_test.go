@@ -278,50 +278,6 @@ func TestE2E_GenerateFixes(t *testing.T) {
 	}
 }
 
-// TestE2E_GenerateSkillsSummary 测试 skill-project-summary 模板：渲染 → Claude → 解析
-// 模板绑定: PROJECT_NAME, LANGUAGE, PATTERNS_JSON, PATTERNS_COUNT, EXISTING_SKILLS_PATH
-// 输出格式: {"category_summaries":{...}, "key_patterns":[...], ...}
-func TestE2E_GenerateSkillsSummary(t *testing.T) {
-	ag := skipIfShort(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	patternsJSON := `[{
-		"id": "err-wrap",
-		"name": "Error Wrapping",
-		"category": "error",
-		"description": "Always wrap errors with context",
-		"rule": "Use fmt.Errorf with %w to wrap errors",
-		"confidence": 0.92,
-		"frequency": 10
-	}, {
-		"id": "gorm-transaction",
-		"name": "GORM Transaction",
-		"category": "database",
-		"description": "Use GORM Transaction method",
-		"rule": "Use db.Transaction() for multi-table operations",
-		"confidence": 0.88,
-		"frequency": 6
-	}]`
-
-	req := &agent.GenerateSkillsRequest{
-		PatternsJSON:  patternsJSON,
-		PatternsCount: 2,
-		ProjectName:   "skills-seed",
-		Language:      "go",
-	}
-
-	result, err := ag.GenerateSkillsSummary(ctx, req)
-	require.NoError(t, err, "GenerateSkillsSummary should succeed")
-	require.NotNil(t, result, "Result should not be nil")
-
-	t.Logf("Categories: %d, BusinessRules: %d, BestPractices: %d",
-		len(result.CategorySummaries), len(result.BusinessRules), len(result.BestPractices))
-	t.Logf("KeyPatterns: %d, CommonPatterns: %d",
-		len(result.KeyPatterns), len(result.CommonPatterns))
-}
-
 // TestE2E_CuratePatterns 测试 pattern-curate 模板：渲染 → Claude → 解析
 // 模板绑定: Operation, CandidatePatterns, ExistingPatterns, AllExisting, ExistingByCandidate
 // 输出格式: {"patterns":[...], "dropped":[...], "summary":{...}}

@@ -25,6 +25,48 @@ other = "查看帮助"
 [CobraFlagVersion]
 other = "查看版本信息"
 
+[WorkflowShort]
+other = "添加或更新用户工作流"
+
+[WorkflowLongDesc]
+other = "把用户口语化描述交给当前 Agent 整理成标准工作流，并保存为独立资源。默认会用优化后的 --context 重写同名工作流；需要保留旧内容并合并补充时使用 --append。工作流不属于 profile.mode，也不会影响 project/workspace 模式锁定。"
+
+[WorkflowExample]
+other = "  skills-seed workflow --context \"发布前检查环境变量和构建产物，发布后执行 smoke test\"\n  skills-seed workflow --name deploy --context \"补充：发布前检查数据库迁移和回滚脚本\" --append"
+
+[WorkflowFlagName]
+other = "工作流名称；不提供时由 Agent 根据 context 生成"
+
+[WorkflowFlagContext]
+other = "口语化工作流说明；会先经 Agent 优化为标准工作流，默认重写同名工作流"
+
+[WorkflowFlagAppend]
+other = "把本次 context 与已有工作流合并优化，而不是重写同名工作流"
+
+[WorkflowFlagChild]
+other = "工作区模式下把工作流保存到指定子项目，例如 --child backend"
+
+[WorkflowSaved]
+other = "工作流已保存: {{.Name}} ({{.ID}}) -> {{.Target}}"
+
+[WorkflowChildRequiresWorkspace]
+other = "--child 只能在工作区模式下使用"
+
+[WorkflowChildNotFound]
+other = "未找到工作区子项目: {{.Child}}"
+
+[WorkflowChildNotInitialized]
+other = "子项目 {{.ProjectName}} 尚未初始化 skills-seed: {{.Path}}"
+
+[WorkflowChildNotGitRepo]
+other = "子项目 {{.ProjectName}} 不是 Git 仓库: {{.Path}}"
+
+[WorkflowChildModeInvalid]
+other = "子项目 {{.ProjectName}} 必须是 project 模式，当前为 {{.Mode}}"
+
+[WorkflowSkillsLoaderMissing]
+other = "工作流模板加载器未配置"
+
 [InitLongDesc]
 other = "在当前项目中初始化 skills-seed。\n\n此命令将：\n  • 创建 .skills-seed/ 目录\n  • 生成默认配置文件 (config.yaml)\n  • 初始化 BoltDB 数据库\n  • 准备跨 Agent 兼容的 prompt 与 skills 模板\n\n请在 Git 仓库根目录运行此命令。"
 
@@ -164,11 +206,14 @@ other = "渲染 learn-batch prompt 失败"
 [AgentRenderGenerateFixesPromptFailed]
 other = "渲染 fix-generate prompt 失败"
 
-[AgentRenderGenerateSkillsPromptFailed]
-other = "渲染 skill-project-summary prompt 失败"
-
 [AgentRenderCuratePatternsPromptFailed]
 other = "渲染 pattern-curate prompt 失败"
+
+[AgentRenderOptimizeWorkflowPromptFailed]
+other = "渲染 workflow-optimize prompt 失败"
+
+[AgentOptimizeWorkflowFailed]
+other = "优化工作流失败"
 
 [AgentRenderProjectAnalysisPromptFailed]
 other = "渲染 project-analyze prompt 失败"
@@ -187,9 +232,6 @@ other = "Codex 批量学习失败"
 
 [AgentCodexGenerateFixesFailed]
 other = "Codex 生成修复失败"
-
-[AgentCodexGenerateSkillsFailed]
-other = "Codex 生成技能摘要失败"
 
 [AgentCodexCuratePatternsFailed]
 other = "Codex 策展模式失败"
@@ -352,9 +394,6 @@ other = "Claude 批量学习失败"
 
 [AgentClaudeGenerateFixesFailed]
 other = "Claude 生成修复失败"
-
-[AgentClaudeGenerateSkillsFailed]
-other = "Claude 生成技能摘要失败"
 
 [AgentClaudeCuratePatternsFailed]
 other = "Claude 策展模式失败"
@@ -764,13 +803,13 @@ other = "解析输出目录"
 other = "加载已学习模式"
 
 [ProgressGenerateSummary]
-other = "生成 skills 摘要"
+other = "整理生成数据"
 
 [ProgressGenerateLoadProfile]
 other = "读取项目画像"
 
-[ProgressGenerateCheckFingerprint]
-other = "检查生成输入"
+[ProgressGenerateCheckOutput]
+other = "检查输出目录"
 
 [ProgressGenerateWriteSkills]
 other = "写入技能文件"
@@ -820,12 +859,6 @@ other = "子项目 {{.ProjectName}} skills 生成完成"
 [GenerateWorkspaceChildManualSkillSkipped]
 other = "子项目 {{.ProjectName}} 已存在手写 SKILL.md，跳过覆盖: {{.Path}}"
 
-[GenerateSkillsSkipped]
-other = "生成输入未变化，已跳过写入 skills"
-
-[GenerateWorkspaceRootSkipped]
-other = "工作区根 skills 输入未变化，已跳过写入"
-
 [GenerateWorkspaceChildNotInitialized]
 other = "子项目 {{.ProjectName}} 未初始化，请在 workspace 根仓执行: skills-seed add {{.ProjectName}}"
 
@@ -841,9 +874,6 @@ other = "skills 输出目录（默认使用当前 skills.target 的 skills.paths
 [GenerateFlagNoReferences]
 other = "跳过参考文档生成（不生成 references/ 目录）"
 
-[GenerateFlagForce]
-other = "强制重新生成所有 skills，忽略模式变更状态"
-
 [GenerateFlagContext]
 other = "本次生成的补充说明，会传给 AI Agent 作为额外约束"
 
@@ -855,7 +885,7 @@ other = "从文件读取本次生成的补充说明；适合较长约束"
 other = "管理已学习的 patterns"
 
 [PatternsLongDesc]
-other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 添加用户自定义候选模式，并在入库前完成策展\n  delete  - 删除指定 pattern，并标记关联 skills 待生成\n  compact - 调用当前 Agent 策展已有 patterns，减少重复规则\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量和命中统计。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
+other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 添加用户自定义候选模式，并在入库前完成策展\n  delete  - 删除指定 pattern，并标记关联 skills 待生成\n  compact - 本地整理已有 patterns，减少重复规则；可显式 --ai 进行语义合并\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量和命中统计。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
 
 [PatternsExample]
 other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  # 查看单条 pattern 详情\n  skills-seed patterns show business-create-order\n\n  # 整理所有分类中的相似 patterns\n  skills-seed patterns compact"
@@ -864,16 +894,19 @@ other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  #
 other = "整理相似 patterns"
 
 [PatternsCompactLongDesc]
-other = "使用当前配置的 AI Agent 策展已学习 patterns，将语义重复或高度相似的条目整理为更少、更清晰的 patterns。\n\n默认会写回数据库；使用 --dry-run 可只预览策展摘要。可用 --category 限定分类。"
+other = "默认使用本地确定性规则整理已学习 patterns，将高度相似的条目合并为更少、更清晰的 patterns，不调用 Agent。\n\n默认会写回数据库；使用 --dry-run 可只预览整理摘要。可用 --category 限定分类；需要 AI 语义合并时显式传入 --ai。"
 
 [PatternsCompactExample]
-other = "  # 整理所有相似 patterns 并写回数据库\n  skills-seed patterns compact\n\n  # 只整理 api 分类\n  skills-seed patterns compact --category api\n\n  # 预览整理结果，不写入数据库\n  skills-seed patterns compact --dry-run"
+other = "  # 本地整理所有相似 patterns 并写回数据库\n  skills-seed patterns compact\n\n  # 只整理 api 分类\n  skills-seed patterns compact --category api\n\n  # 预览整理结果，不写入数据库\n  skills-seed patterns compact --dry-run\n\n  # 使用 AI 进行语义合并并预览\n  skills-seed patterns compact --ai --dry-run"
 
 [PatternsCompactFlagCategory]
 other = "只整理指定分类，如 business、api、testing；留空表示所有分类"
 
 [PatternsCompactFlagDryRun]
 other = "只预览整理结果，不写入数据库"
+
+[PatternsCompactFlagAI]
+other = "使用 AI 进行语义合并；默认使用本地确定性合并"
 
 [PatternsCompactComplete]
 other = "Patterns 整理完成: 输入 {{.TotalInput}}，写入 {{.TotalWritten}}，丢弃 {{.TotalDropped}}，合并分组 {{.MergeCount}}"
@@ -1795,15 +1828,6 @@ other = "解析结果失败，返回空结果"
 
 [LoggerAgentParseResultFailedNonFallback]
 other = "解析结果失败"
-
-[LoggerAgentSkillsSummaryEmptyPrompt]
-other = "提示词为空，跳过 Skills 摘要生成"
-
-[LoggerAgentSkillsSummaryCallFailed]
-other = "Skills 摘要生成调用失败"
-
-[LoggerAgentSkillsSummaryParseFallback]
-other = "Skills 摘要解析失败，返回空结果"
 
 [LoggerAgentCuratePatternsCallFailed]
 other = "模式策展调用失败"

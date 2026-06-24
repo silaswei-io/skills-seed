@@ -345,24 +345,6 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 				LearnedAt: time.Now(),
 			}, nil
 		},
-		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			require.Len(t, req.CandidatePatterns, 1)
-			require.Len(t, req.ExistingPatterns, 1)
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{
-						ID:         "e1",
-						Name:       "Error Handling",
-						Category:   string(domain.CategoryError),
-						Rule:       "wrap errors with context",
-						Confidence: 0.85,
-						Frequency:  4,
-						MergedFrom: []string{"e1", "p1"},
-					},
-				},
-				Summary: agent.CurateSummary{TotalCandidates: 1, TotalExisting: 1, TotalWritten: 1},
-			}, nil
-		},
 	}
 	mockTracker := &mocks.MockCommitTracker{}
 	mockCurator := curator.NewService(mockAgent, mockPattern)
@@ -371,8 +353,8 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 	err := svc.LearnFromCommit(context.Background(), domain.CommitInfo{Hash: "abc123"})
 	require.NoError(t, err)
 	assert.Len(t, mergedPatterns, 1)
-	// 应合并到已有模式。
-	assert.Equal(t, "e1", mergedPatterns[0].ID)
+	// 本地合并保留质量得分更高的模式。
+	assert.Equal(t, "p1", mergedPatterns[0].ID)
 }
 
 func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
@@ -394,25 +376,7 @@ func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 			return nil
 		},
 	}
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{
-						ID:         "existing",
-						Name:       "Error Handling",
-						Category:   string(domain.CategoryError),
-						Rule:       "wrap errors with context",
-						Confidence: 0.85,
-						Frequency:  3,
-						MergedFrom: []string{"existing", "new"},
-					},
-				},
-				Summary: agent.CurateSummary{TotalCandidates: 1, TotalExisting: 1, TotalWritten: 1},
-			}, nil
-		},
-	}
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
 	newPattern := domain.NewPattern("new", "Error Handling", domain.CategoryError)
@@ -423,7 +387,7 @@ func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 
 	require.Equal(t, 1, count)
 	require.NotNil(t, saved)
-	require.Equal(t, "existing", saved.ID)
+	require.Equal(t, "new", saved.ID)
 	require.Equal(t, 3, saved.Frequency)
 }
 

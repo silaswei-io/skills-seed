@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.16]
+
+### Changes
+
+- Refactored skills generation so an explicit `generate skills` run no longer skips through generation-input fingerprints or dirty state. It now deletes the old skills-seed generated output directory and fully rebuilds from the current profile, patterns, and workflows; `--force` was removed.
+- Changed pattern storage and `patterns compact` to use local deterministic merging by default. Candidates are processed one by one and the higher-quality pattern is kept as the primary entry; Agent semantic merging is used only with `patterns compact --ai`.
+- Removed automatic workflow extraction. Workflows are now added only through explicit user input with `skills-seed workflow --context ...`; workspace roots can use `--child` to save a workflow into a child project.
+- Skills generation no longer calls the Agent for a summary. It generates directly from curated patterns, profiles, and workflows, reducing generation latency and nondeterminism.
+
+### Documentation
+
+- Updated the Chinese and English README, command reference, and configuration guide to document full regeneration semantics, explicit AI pattern compaction, and user workflow storage/generation.
+
 ## [v0.9.15]
 
 ### Changes

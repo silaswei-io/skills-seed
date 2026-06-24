@@ -493,9 +493,7 @@ func ParseLearnResult(output string) (*agent.LearnResult, error) {
 		patterns[i] = pattern
 	}
 
-	return &agent.LearnResult{
-		Patterns: patterns,
-	}, nil
+	return &agent.LearnResult{Patterns: patterns}, nil
 }
 
 // ParseBatchLearnResult 解析批量学习结果
@@ -550,9 +548,7 @@ func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
 		patterns[i] = pattern
 	}
 
-	return &agent.BatchLearnResult{
-		Patterns: patterns,
-	}, nil
+	return &agent.BatchLearnResult{Patterns: patterns}, nil
 }
 
 // ParseGenerateFixesResult 解析生成修复结果
@@ -587,81 +583,6 @@ func ParseGenerateFixesResult(output string) (*agent.GenerateFixesResult, error)
 		Summary:    result.Summary,
 		Warnings:   result.Warnings,
 	}, nil
-}
-
-// ParseGenerateSkillsResult 解析 Skills 生成结果
-func ParseGenerateSkillsResult(output string) (*agent.GenerateSkillsResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
-	}
-
-	var result struct {
-		CategorySummaries map[string]struct {
-			Category        string                   `json:"category"`
-			Summary         string                   `json:"summary"`
-			Patterns        []string                 `json:"patterns"`
-			UsageScenes     []string                 `json:"usage_scenes"`
-			Priority        int                      `json:"priority"`
-			BusinessMethods []*businessMethodPayload `json:"business_methods"`
-		} `json:"category_summaries"`
-		KeyPatterns []struct {
-			Name       string `json:"name"`
-			Category   string `json:"category"`
-			Importance string `json:"importance"`
-			Summary    string `json:"summary"`
-			WhenToUse  string `json:"when_to_use"`
-		} `json:"key_patterns"`
-		BusinessRules          []string `json:"business_rules"`
-		BestPractices          []string `json:"best_practices"`
-		CommonPatterns         []string `json:"common_patterns"`
-		KeyInsights            []string `json:"key_insights"`
-		ImprovementSuggestions []string `json:"improvement_suggestions"`
-	}
-
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
-	}
-
-	generateResult := &agent.GenerateSkillsResult{
-		CategorySummaries:      make(map[string]agent.CategorySummary),
-		KeyPatterns:            []agent.PatternSummary{},
-		BusinessRules:          result.BusinessRules,
-		BestPractices:          result.BestPractices,
-		CommonPatterns:         result.CommonPatterns,
-		KeyInsights:            result.KeyInsights,
-		ImprovementSuggestions: result.ImprovementSuggestions,
-	}
-
-	for key, summary := range result.CategorySummaries {
-		var businessMethods []*domain.BusinessMethod
-		for _, bm := range summary.BusinessMethods {
-			if method := bm.toDomain(time.Now()); method != nil {
-				businessMethods = append(businessMethods, method)
-			}
-		}
-
-		generateResult.CategorySummaries[key] = agent.CategorySummary{
-			Category:        summary.Category,
-			Summary:         summary.Summary,
-			Patterns:        summary.Patterns,
-			UsageScenes:     summary.UsageScenes,
-			Priority:        summary.Priority,
-			BusinessMethods: businessMethods,
-		}
-	}
-
-	for _, p := range result.KeyPatterns {
-		generateResult.KeyPatterns = append(generateResult.KeyPatterns, agent.PatternSummary{
-			Name:       p.Name,
-			Category:   p.Category,
-			Importance: p.Importance,
-			Summary:    p.Summary,
-			WhenToUse:  p.WhenToUse,
-		})
-	}
-
-	return generateResult, nil
 }
 
 // ParseCuratePatternsResult 解析模式策展结果。
@@ -1104,4 +1025,28 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 	pattern.BusinessMethod = result.BusinessMethod.toDomain(pattern.CreatedAt)
 
 	return &agent.UserDefinePatternResult{Pattern: &pattern}, nil
+}
+
+// ParseOptimizeWorkflowResult 解析工作流优化结果。
+func ParseOptimizeWorkflowResult(output string) (*agent.OptimizeWorkflowResult, error) {
+	jsonStr, err := ExtractJSON(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentNoValidJSONFound"), err)
+	}
+
+	var result struct {
+		Title       string   `json:"title"`
+		Content     string   `json:"content"`
+		Summary     string   `json:"summary"`
+		Suggestions []string `json:"suggestions"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+	return &agent.OptimizeWorkflowResult{
+		Title:       strings.TrimSpace(result.Title),
+		Content:     strings.TrimSpace(result.Content),
+		Summary:     strings.TrimSpace(result.Summary),
+		Suggestions: result.Suggestions,
+	}, nil
 }

@@ -35,21 +35,6 @@ func BatchLearnPromptData(session *PromptInputSession, commits []domain.CommitIn
 	}, nil
 }
 
-// GenerateSkillsPromptData 返回 AI 汇总生成 skills 所需的提示词数据。
-func GenerateSkillsPromptData(session *PromptInputSession, req *GenerateSkillsRequest) (map[string]interface{}, error) {
-	patternsPath, err := session.UsePathOrWrite(req.PatternsPath, "patterns.json", req.PatternsJSON)
-	if err != nil {
-		return nil, fmt.Errorf("write patterns prompt input: %w", err)
-	}
-	return map[string]interface{}{
-		"PROJECT_NAME":         req.ProjectName,
-		"LANGUAGE":             req.Language,
-		"PATTERNS_PATH":        patternsPath,
-		"PATTERNS_COUNT":       req.PatternsCount,
-		"EXISTING_SKILLS_PATH": req.ExistingSkillsPath,
-	}, nil
-}
-
 // UserDefinePatternPromptData 返回用户自定义模式所需的提示词数据。
 func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePatternRequest) (map[string]interface{}, error) {
 	return map[string]interface{}{

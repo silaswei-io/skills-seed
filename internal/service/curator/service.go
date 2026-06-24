@@ -45,7 +45,7 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 		return nil, fmt.Errorf("load existing patterns: %w", err)
 	}
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
-	curated := s.curate(ctx, req.Operation, candidates, retrieved.related, false, retrieved.existingByCandidate, hooks)
+	curated := deterministicCurate(candidates, retrieved.related)
 	logCurateSanitizeReport(req.Operation, sanitizeCurateResult(curated, candidates))
 	if err := validateCurateResult(curated, candidates, retrieved.related); err != nil {
 		logger.Warn(i18n.Get("LoggerAgentCuratePatternsValidationFallback"),
@@ -96,18 +96,23 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 		return &CompactResult{Summary: agent.CurateSummary{}}, nil
 	}
 
-	byCandidate := make(map[string][]string, len(patterns))
-	for _, pattern := range patterns {
-		for _, related := range patterns {
-			if pattern.ID == related.ID {
-				continue
-			}
-			if patternSimilarity(pattern, related) > 0 {
-				byCandidate[pattern.ID] = append(byCandidate[pattern.ID], related.ID)
+	var curated *agent.CuratePatternsResult
+	if req.UseAI {
+		byCandidate := make(map[string][]string, len(patterns))
+		for _, pattern := range patterns {
+			for _, related := range patterns {
+				if pattern.ID == related.ID {
+					continue
+				}
+				if patternSimilarity(pattern, related) > 0 {
+					byCandidate[pattern.ID] = append(byCandidate[pattern.ID], related.ID)
+				}
 			}
 		}
+		curated = s.curate(ctx, OperationCompact, patterns, patterns, true, byCandidate, hooks)
+	} else {
+		curated = deterministicCurate(patterns, nil)
 	}
-	curated := s.curate(ctx, OperationCompact, patterns, patterns, true, byCandidate, hooks)
 	logCurateSanitizeReport(OperationCompact, sanitizeCurateResult(curated, patterns))
 	if err := validateCurateResult(curated, patterns, patterns); err != nil {
 		logger.Warn(i18n.Get("LoggerAgentCuratePatternsValidationFallback"),

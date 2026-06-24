@@ -48,6 +48,16 @@ Applies when: {{.AppliesWhen}}
 ---
 
 {{end}}
+{{if .WorkflowReferences}}
+## User Workflows
+
+{{range .WorkflowReferences}}
+- **[{{.Name}}]({{.Path}})**{{if .Description}} - {{.Description}}{{end}}
+{{end}}
+
+---
+
+{{end}}
 {{if .StateSummaries}}
 ## State And Boundary Notes
 

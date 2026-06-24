@@ -240,6 +240,16 @@ func patternForTemplate(pattern domain.Pattern) domain.Pattern {
 	return pattern
 }
 
+func businessPatterns(patterns []domain.Pattern) []domain.Pattern {
+	result := make([]domain.Pattern, 0)
+	for _, pattern := range patterns {
+		if pattern.Category == domain.CategoryBusiness {
+			result = append(result, patternForTemplate(pattern))
+		}
+	}
+	return result
+}
+
 func cleanProjectProfile(profile *domain.ProjectProfile) *domain.ProjectProfile {
 	return domain.CleanProjectProfile(profile)
 }

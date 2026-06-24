@@ -378,15 +378,15 @@ func TestRunLearnCurrentAutoSkipsExistingProfileWhenNoPatternsSaved(t *testing.T
 	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "main.go", "package main\nconst changed = true\n")
 	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
 
-	patternID := "p1"
 	profileCalls := 0
-	cont.Agent.(*mocks.MockAgent).CuratePatternsFn = func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-		return &agent.CuratePatternsResult{
-			Dropped: []agent.CuratedDrop{{ID: patternID, Reason: "duplicate"}},
-			Summary: agent.CurateSummary{
-				TotalCandidates: len(req.CandidatePatterns),
-				TotalDropped:    len(req.CandidatePatterns),
-			},
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns:          nil,
+			CategorySummaries: map[string]agent.CategorySummary{},
+			BusinessRules:     []string{},
+			BestPractices:     []string{},
+			CommonPatterns:    []string{},
+			Summary:           "no new patterns",
 		}, nil
 	}
 	cont.Agent.(*mocks.MockAgent).AnalyzeProjectFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {

@@ -43,12 +43,11 @@ func TestCurateAndStoreAddsNewCandidate(t *testing.T) {
 	require.Equal(t, "internal/service/user.go:42", saved[0].EvidenceLocations[0].DisplayLocation())
 }
 
-func TestCurateAndStoreCallsAgentWithoutExistingPatterns(t *testing.T) {
+func TestCurateAndStoreUsesLocalCurationWithoutExistingPatterns(t *testing.T) {
 	candidate := domain.NewPattern("candidate", "Error Wrapping", domain.CategoryError)
 	candidate.Confidence = 0.9
 	candidate.SetRule("When repository errors occur, wrap them with operation context")
 
-	var called bool
 	var saved []*domain.Pattern
 	repo := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
@@ -62,26 +61,8 @@ func TestCurateAndStoreCallsAgentWithoutExistingPatterns(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "mock", AvailableVal: true,
 		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			called = true
-			require.Equal(t, OperationLearnCurrent, req.Operation)
-			require.Len(t, req.CandidatePatterns, 1)
-			require.Empty(t, req.ExistingPatterns)
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{
-						ID:          "candidate",
-						Name:        "Error Wrapping",
-						Category:    string(domain.CategoryError),
-						Rule:        "When repository errors occur, wrap them with operation context",
-						Confidence:  0.9,
-						Frequency:   1,
-						MergedFrom:  []string{"candidate"},
-						MergeReason: "new candidate",
-						Source:      string(domain.SourceLearnedCurrent),
-					},
-				},
-				Summary: agent.CurateSummary{TotalCandidates: 1, TotalWritten: 1},
-			}, nil
+			require.Fail(t, "learn curation should not call AI by default")
+			return nil, nil
 		},
 	}
 	svc := NewService(mockAgent, repo)
@@ -92,20 +73,23 @@ func TestCurateAndStoreCallsAgentWithoutExistingPatterns(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.True(t, called)
 	require.Len(t, result.Written, 1)
 	require.Len(t, saved, 1)
 	require.Equal(t, "candidate", saved[0].ID)
 }
 
-func TestCurateAndStoreUsesAgentToMergeRelatedExistingPattern(t *testing.T) {
+func TestCurateAndStoreMergesLocallyAndKeepsHigherQualityPattern(t *testing.T) {
 	existing := domain.NewPattern("existing", "Error Handling", domain.CategoryError)
 	existing.Confidence = 0.7
 	existing.Frequency = 2
 	existing.SetRule("When errors occur, return contextual errors")
 	candidate := domain.NewPattern("candidate", "Error Handling", domain.CategoryError)
 	candidate.Confidence = 0.9
-	candidate.SetRule("When repository errors occur, return contextual errors")
+	candidate.Frequency = 8
+	candidate.SetRule("When errors occur, return contextual errors")
+	candidate.SetDescription("Repository operations return contextual errors")
+	candidate.SetExamples("return fmt.Errorf(\"load user: %w\", err)", "")
+	candidate.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/service/user.go", Line: 42, Symbol: "LoadUser", Kind: "function"}}
 
 	var deleted []string
 	var saved []*domain.Pattern
@@ -125,24 +109,8 @@ func TestCurateAndStoreUsesAgentToMergeRelatedExistingPattern(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "mock", AvailableVal: true,
 		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			require.Len(t, req.CandidatePatterns, 1)
-			require.Len(t, req.ExistingPatterns, 1)
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{
-						ID:          "existing",
-						Name:        "Error Handling",
-						Category:    string(domain.CategoryError),
-						Rule:        "When repository errors occur, return contextual errors",
-						Confidence:  0.85,
-						Frequency:   3,
-						MergedFrom:  []string{"existing", "candidate"},
-						MergeReason: "same rule",
-						Source:      string(domain.SourceLearnedCurrent),
-					},
-				},
-				Summary: agent.CurateSummary{TotalCandidates: 1, TotalExisting: 1, TotalWritten: 1},
-			}, nil
+			require.Fail(t, "learn curation should not call AI by default")
+			return nil, nil
 		},
 	}
 	svc := NewService(mockAgent, repo)
@@ -154,27 +122,39 @@ func TestCurateAndStoreUsesAgentToMergeRelatedExistingPattern(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, result.Written, 1)
-	require.Empty(t, deleted)
+	require.Equal(t, []string{"existing"}, deleted)
 	require.Len(t, saved, 1)
-	require.Equal(t, "existing", saved[0].ID)
+	require.Equal(t, "candidate", saved[0].ID)
 	require.Equal(t, []string{"existing", "candidate"}, saved[0].MergedFrom)
+	require.Equal(t, 10, saved[0].Frequency)
+	require.Equal(t, "internal/service/user.go:42", saved[0].EvidenceLocations[0].DisplayLocation())
 }
 
-func TestCurateAndStoreFallsBackWhenAgentResultInvalid(t *testing.T) {
+func TestCurateAndStoreMergesMultipleDuplicatesLocally(t *testing.T) {
 	existing := domain.NewPattern("existing", "Error Handling", domain.CategoryError)
 	existing.Confidence = 0.8
 	existing.Frequency = 2
 	existing.SetRule("wrap errors with context")
-	candidate := domain.NewPattern("candidate", "Error Handling", domain.CategoryError)
-	candidate.Confidence = 0.9
-	candidate.SetRule("wrap errors with context")
+	existing.SetDescription("wrap errors with context")
+	candidateA := domain.NewPattern("candidate-a", "Error Handling", domain.CategoryError)
+	candidateA.Confidence = 0.9
+	candidateA.SetRule("wrap errors with context")
+	candidateA.SetDescription("wrap errors with context")
+	candidateB := domain.NewPattern("candidate-b", "Error Handling", domain.CategoryError)
+	candidateB.Confidence = 0.95
+	candidateB.Frequency = 8
+	candidateB.SetRule("wrap errors with context")
+	candidateB.SetDescription("wrap errors with context")
+	candidateB.SetExamples("return fmt.Errorf(\"create user: %w\", err)", "")
 
+	var deleted []string
 	var saved []*domain.Pattern
 	repo := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*existing}, nil
 		},
 		DeleteFn: func(ctx context.Context, id string) error {
+			deleted = append(deleted, id)
 			return nil
 		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
@@ -185,27 +165,27 @@ func TestCurateAndStoreFallsBackWhenAgentResultInvalid(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "mock", AvailableVal: true,
 		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{ID: "bad", Name: "Bad", Category: "not-a-category", Confidence: 2, MergedFrom: []string{"missing"}},
-				},
-			}, nil
+			require.Fail(t, "learn curation should not call AI by default")
+			return nil, nil
 		},
 	}
 	svc := NewService(mockAgent, repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
 		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Candidates: []domain.Pattern{*candidateA, *candidateB},
 	})
 
 	require.NoError(t, err)
 	require.Len(t, result.Written, 1)
 	require.Len(t, saved, 1)
-	require.Equal(t, "existing", saved[0].ID)
+	require.Equal(t, "candidate-b", saved[0].ID)
+	require.ElementsMatch(t, []string{"existing", "candidate-a", "candidate-b"}, saved[0].MergedFrom)
+	require.Equal(t, 11, saved[0].Frequency)
+	require.Equal(t, []string{"existing"}, deleted)
 }
 
-func TestCurateAndStoreIgnoresDroppedIDsOutsideCurrentCandidates(t *testing.T) {
+func TestCurateAndStoreDoesNotUseAIDroppedCandidates(t *testing.T) {
 	candidate := domain.NewPattern("candidate", "Error Handling", domain.CategoryError)
 	candidate.Confidence = 0.9
 	candidate.SetRule("wrap errors with context")
@@ -223,24 +203,8 @@ func TestCurateAndStoreIgnoresDroppedIDsOutsideCurrentCandidates(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "mock", AvailableVal: true,
 		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{
-						ID:          "candidate",
-						Name:        "Error Handling",
-						Category:    string(domain.CategoryError),
-						Rule:        "wrap errors with context",
-						Confidence:  0.9,
-						Frequency:   1,
-						MergedFrom:  []string{"candidate"},
-						MergeReason: "new candidate",
-					},
-				},
-				Dropped: []agent.CuratedDrop{
-					{ID: "panic-recovery-cronjob", Reason: "existing pattern already covers this rule"},
-				},
-				Summary: agent.CurateSummary{TotalCandidates: 1, TotalWritten: 1, TotalDropped: 1},
-			}, nil
+			require.Fail(t, "learn curation should not call AI by default")
+			return nil, nil
 		},
 	}
 	svc := NewService(mockAgent, repo)
@@ -266,7 +230,6 @@ func TestCurateAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testi
 	candidate.SetExamples("cleanedTarget := filepath.Clean(targetDir)\ncleanedFile := filepath.Clean(filePath)\nif !strings.HasPrefix(cleanedFile, cleanedTarget+string(os.PathSeparator)) {\n\treturn fmt.Errorf(\"invalid path\")\n}", "")
 
 	var saved []*domain.Pattern
-	var called bool
 	repo := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return nil, nil
@@ -279,28 +242,8 @@ func TestCurateAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testi
 	mockAgent := &mocks.MockAgent{
 		NameVal: "mock", AvailableVal: true,
 		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			called = true
-			require.Len(t, req.CandidatePatterns, 1)
-			require.Equal(t, domain.CategoryUtils, req.CandidatePatterns[0].Category)
-
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{
-						ID:          "path-traversal-protection",
-						Name:        "Path Traversal Protection",
-						Category:    "security",
-						Description: "Validate archive paths before extracting files",
-						GoodExample: candidate.GoodExample,
-						Rule:        "When extracting archive entries, reject paths outside the target directory",
-						Confidence:  0.9,
-						Frequency:   1,
-						MergedFrom:  []string{"path-traversal-protection"},
-						MergeReason: "new candidate",
-						Source:      string(domain.SourceLearnedCurrent),
-					},
-				},
-				Summary: agent.CurateSummary{TotalCandidates: 1, TotalWritten: 1},
-			}, nil
+			require.Fail(t, "learn curation should not call AI by default")
+			return nil, nil
 		},
 	}
 	svc := NewService(mockAgent, repo)
@@ -311,7 +254,6 @@ func TestCurateAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testi
 	})
 
 	require.NoError(t, err)
-	require.True(t, called)
 	require.Len(t, result.Written, 1)
 	require.Len(t, saved, 1)
 	require.Equal(t, domain.CategoryUtils, result.Written[0].Category)
@@ -341,21 +283,38 @@ func TestCompactDryRunDoesNotWrite(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "mock", AvailableVal: true,
 		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			return &agent.CuratePatternsResult{
-				Patterns: []agent.CuratedPattern{
-					{
-						ID:          "p1",
-						Name:        "Error Wrap",
-						Category:    string(domain.CategoryError),
-						Rule:        "wrap errors",
-						Confidence:  0.85,
-						Frequency:   2,
-						MergedFrom:  []string{"p1", "p2"},
-						MergeReason: "same rule",
-					},
-				},
-				Summary: agent.CurateSummary{TotalCandidates: 2, TotalExisting: 2, TotalWritten: 1},
-			}, nil
+			require.Fail(t, "compact should not call AI unless UseAI is true")
+			return nil, nil
+		},
+	}
+	svc := NewService(mockAgent, repo)
+
+	result, err := svc.Compact(context.Background(), CompactRequest{DryRun: true})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, "p2", result.Written[0].ID)
+	require.Equal(t, 2, result.Summary.TotalCandidates)
+	require.Equal(t, 2, result.Summary.TotalExisting)
+	require.Equal(t, 1, result.Summary.TotalWritten)
+}
+
+func TestCompactSinglePatternDoesNotSelfMerge(t *testing.T) {
+	p1 := domain.NewPattern("p1", "Error Wrap", domain.CategoryError)
+	p1.Confidence = 0.8
+	p1.Frequency = 3
+	p1.SetRule("wrap errors with context")
+
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*p1}, nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			require.Fail(t, "compact should not call AI unless UseAI is true")
+			return nil, nil
 		},
 	}
 	svc := NewService(mockAgent, repo)
@@ -365,9 +324,51 @@ func TestCompactDryRunDoesNotWrite(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Written, 1)
 	require.Equal(t, "p1", result.Written[0].ID)
-	require.Equal(t, 2, result.Summary.TotalCandidates)
-	require.Equal(t, 2, result.Summary.TotalExisting)
-	require.Equal(t, 1, result.Summary.TotalWritten)
+	require.False(t, result.Written[0].Merged)
+	require.Equal(t, []string{"p1"}, result.Written[0].MergedFrom)
+	require.Equal(t, 3, result.Written[0].Frequency)
+}
+
+func TestCompactUsesAIWhenRequested(t *testing.T) {
+	p1 := domain.NewPattern("p1", "Error Wrap", domain.CategoryError)
+	p1.Confidence = 0.8
+	p1.SetRule("wrap errors")
+
+	var called bool
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*p1}, nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			called = true
+			require.Equal(t, OperationCompact, req.Operation)
+			require.True(t, req.AllExisting)
+			return &agent.CuratePatternsResult{
+				Patterns: []agent.CuratedPattern{
+					{
+						ID:         "p1",
+						Name:       "Error Wrap",
+						Category:   string(domain.CategoryError),
+						Rule:       "wrap errors",
+						Confidence: 0.8,
+						Frequency:  1,
+						MergedFrom: []string{"p1"},
+					},
+				},
+				Summary: agent.CurateSummary{TotalCandidates: 1, TotalExisting: 1, TotalWritten: 1},
+			}, nil
+		},
+	}
+	svc := NewService(mockAgent, repo)
+
+	result, err := svc.Compact(context.Background(), CompactRequest{DryRun: true, UseAI: true})
+
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Len(t, result.Written, 1)
 }
 
 func TestCompactNormalizesRequestedCategory(t *testing.T) {

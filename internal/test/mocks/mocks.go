@@ -17,7 +17,6 @@ type MockAgent struct {
 	LearnFromCommitFn         func(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error)
 	BatchLearnFromCommitsFn   func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error)
 	GenerateFixesFn           func(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error)
-	GenerateSkillsSummaryFn   func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)
 	CuratePatternsFn          func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
 	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
 	SelectFilesFn             func(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error)
@@ -25,6 +24,7 @@ type MockAgent struct {
 	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
 	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpecFn    func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
+	OptimizeWorkflowFn        func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error)
 }
 
 // Name 返回模拟 Agent 名称
@@ -63,20 +63,6 @@ func (m *MockAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixesR
 		return m.GenerateFixesFn(ctx, req)
 	}
 	return &agent.GenerateFixesResult{Fixes: map[string]string{}, Confidence: 0.8}, nil
-}
-
-// GenerateSkillsSummary 模拟生成 Skills 摘要
-func (m *MockAgent) GenerateSkillsSummary(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-	if m.GenerateSkillsSummaryFn != nil {
-		return m.GenerateSkillsSummaryFn(ctx, req)
-	}
-	return &agent.GenerateSkillsResult{
-		CategorySummaries: map[string]agent.CategorySummary{},
-		KeyPatterns:       []agent.PatternSummary{},
-		BusinessRules:     []string{},
-		BestPractices:     []string{},
-		CommonPatterns:    []string{},
-	}, nil
 }
 
 // CuratePatterns 模拟模式策展
@@ -163,6 +149,22 @@ func (m *MockAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analyze
 		return m.AnalyzeWorkspaceSpecFn(ctx, req)
 	}
 	return &domain.WorkspaceSpec{}, nil
+}
+
+// OptimizeWorkflow 模拟工作流优化。
+func (m *MockAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
+	if m.OptimizeWorkflowFn != nil {
+		return m.OptimizeWorkflowFn(ctx, req)
+	}
+	title := req.Name
+	if title == "" {
+		title = "workflow"
+	}
+	return &agent.OptimizeWorkflowResult{
+		Title:   title,
+		Summary: req.Context,
+		Content: "# " + title + "\n\n## 适用场景\n" + req.Context + "\n",
+	}, nil
 }
 
 // MockGitRepository 模拟 Git 仓储

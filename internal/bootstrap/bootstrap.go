@@ -20,6 +20,7 @@ import (
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
 	reviewcmd "github.com/silaswei-io/skills-seed/internal/command/review"
 	synccmd "github.com/silaswei-io/skills-seed/internal/command/sync"
+	workflowcmd "github.com/silaswei-io/skills-seed/internal/command/workflow"
 	workspacecmd "github.com/silaswei-io/skills-seed/internal/command/workspace"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -168,6 +169,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(initcmd.ResetCmd())
 	rootCmd.AddCommand(workspacecmd.Cmd(cont))
 	rootCmd.AddCommand(synccmd.Cmd(cont))
+	rootCmd.AddCommand(workflowcmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))
 	rootCmd.AddCommand(check.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
@@ -209,6 +211,8 @@ func commandNeedsProjectRuntime(args []string) bool {
 		return len(cleaned) >= 2 && (cleaned[1] == "show" || cleaned[1] == "refresh")
 	case "review":
 		return len(cleaned) >= 2 && (cleaned[1] == "import" || cleaned[1] == "stats")
+	case "workflow":
+		return true
 	case "workspace":
 		return len(cleaned) >= 2 && cleaned[1] == "add"
 	default:

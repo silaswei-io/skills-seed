@@ -2,12 +2,8 @@ package generator
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
@@ -18,6 +14,7 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -29,10 +26,15 @@ type GeneratorService struct {
 	scopedProfileRepo domain.ScopedProjectProfileRepository
 	projectSpecRepo   domain.ProjectSpecRepository
 	scopedSpecRepo    domain.ScopedProjectSpecRepository
+	workflowRepo      domain.WorkflowRepository
 	skillsLoader      *skills.Loader
 	writer            *SkillWriter
-	agent             agent.Agent
 	configRepo        config.Reader
+}
+
+// SetWorkflowRepository 注入用户工作流仓储。
+func (s *GeneratorService) SetWorkflowRepository(repo domain.WorkflowRepository) {
+	s.workflowRepo = repo
 }
 
 // ManualSkillExistsError 表示目标目录已有非 skills-seed 生成的 SKILL.md
@@ -49,7 +51,6 @@ func NewGeneratorService(
 	patternRepo domain.PatternRepository,
 	profileRepo domain.ProjectProfileRepository,
 	skillsLoader *skills.Loader,
-	ag agent.Agent,
 	configRepo config.Reader,
 ) *GeneratorService {
 	scopedProfileRepo, _ := profileRepo.(domain.ScopedProjectProfileRepository)
@@ -65,7 +66,6 @@ func NewGeneratorService(
 		scopedSpecRepo:    scopedSpecRepo,
 		skillsLoader:      skillsLoader,
 		writer:            NewSkillWriter(skillsLoader),
-		agent:             ag,
 		configRepo:        configRepo,
 	}
 }
@@ -140,17 +140,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		return err
 	}
 
-	if len(patterns) == 0 {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "generator.generate_skills",
-			"duration", time.Since(startedAt),
-			"resolved_output_path", resolvedOutputPath,
-			"patterns_count", 0,
-			"skipped", true,
-		)
-		return nil
-	}
-
 	patternInsights, err := s.patternGenerationInsights(ctx, patterns)
 	if err != nil {
 		return err
@@ -170,37 +159,21 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	profile = cleanProjectProfile(profile)
 	spec := s.projectSpecFromProfileAndPatterns(profile, rankedPatterns, config.WorkspaceProjectConfig{})
 
-	var decision *domain.InputFingerprintDecision
-	skipGeneration := false
-	if err := runStep(i18n.Get("ProgressGenerateCheckFingerprint"), func() error {
-		var fingerprintErr error
-		decision, fingerprintErr = s.prepareProjectSkillsFingerprint(ctx, resolvedOutputPath, rankedPatterns, patternInsights, profile)
-		if fingerprintErr != nil {
-			return fingerprintErr
-		}
-		skipGeneration = decision.ShouldSkip() && projectSkillsOutputExists(resolvedOutputPath, rankedPatterns)
-		return nil
+	if err := runStep(i18n.Get("ProgressGenerateCheckOutput"), func() error {
+		return s.ensureGeneratedOutputDirWritable(resolvedOutputPath)
 	}); err != nil {
 		return err
 	}
 
 	var summaryResult *agent.GenerateSkillsResult
 	if err := runStep(i18n.Get("ProgressGenerateSummary"), func() error {
-		if skipGeneration {
-			return nil
-		}
-		var summaryErr error
-		summaryResult, summaryErr = s.generateSkillsSummary(ctx, rankedPatterns, patternInsights, resolvedOutputPath, startedAt)
-		return summaryErr
+		summaryResult = s.buildDeterministicSummary(rankedPatterns, patternInsights)
+		return nil
 	}); err != nil {
 		return err
 	}
 
 	if err := runStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
-		if skipGeneration {
-			logger.Info(i18n.Get("GenerateSkillsSkipped"))
-			return nil
-		}
 		if s.projectSpecRepo != nil {
 			if err := s.projectSpecRepo.SaveSpec(ctx, spec); err != nil {
 				return err
@@ -213,8 +186,14 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		}
 		summaryResult.CategorySummaries = s.ensureCategorySummaries(rankedPatterns, summaryResult.CategorySummaries)
 
-		mainPath := filepath.Join(resolvedOutputPath, "SKILL.md")
-		if err := s.ensureSkillWritable(mainPath); err != nil {
+		workflowReferences, err := s.loadWorkflowReferences()
+		if err != nil {
+			return err
+		}
+		if err := s.rebuildGeneratedOutputDir(resolvedOutputPath); err != nil {
+			return err
+		}
+		if err := s.writeWorkflowOutputs(resolvedOutputPath); err != nil {
 			return err
 		}
 
@@ -226,6 +205,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			ProgramVersion:      metadata.ProgramVersion,
 			SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
 			SkipReferences:      opts.SkipReferences,
+			WorkflowReferences:  workflowReferences,
 		})
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -236,11 +216,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			"error", err,
 		)
 		return err
-	}
-	if !skipGeneration {
-		if err := decision.Commit(ctx, s.fileAnalysisTracker()); err != nil {
-			return err
-		}
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -253,88 +228,26 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	return nil
 }
 
-func (s *GeneratorService) generateSkillsSummary(ctx context.Context, patterns []domain.Pattern, insights map[string]domain.PatternInsight, resolvedOutputPath string, startedAt time.Time) (*agent.GenerateSkillsResult, error) {
-	patternsJSONBytes, err := json.MarshalIndent(summarizePatternsForAgent(patterns, insights), "", "  ")
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.marshal_patterns",
-			"duration", time.Since(startedAt),
-			"patterns_count", len(patterns),
-			"error", err,
-		)
-		return nil, fmt.Errorf("%s: %w", i18n.Get("GeneratorMarshalPatternsFailed"), err)
-	}
-	patternsJSON := string(patternsJSONBytes)
-
-	existingSkillsPath := ""
-	skillPath := filepath.Join(resolvedOutputPath, "SKILL.md")
-	if _, err := os.Stat(skillPath); err == nil {
-		existingSkillsPath = skillPath
-	}
-
-	summaryReq := &agent.GenerateSkillsRequest{
-		PatternsJSON:       patternsJSON,
-		PatternsCount:      len(patterns),
-		ExistingSkillsPath: existingSkillsPath,
-		ProjectName:        s.configRepo.GetProjectConfig().Name,
-		Language:           s.configRepo.GetProjectConfig().Language,
-	}
-
-	summaryResult, err := s.agent.GenerateSkillsSummary(ctx, summaryReq)
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.generate_summary",
-			"duration", time.Since(startedAt),
-			"patterns_count", len(patterns),
-			"patterns_json_length", len(patternsJSON),
-			"existing_skills_path", existingSkillsPath,
-			"error", err,
-		)
-		return nil, fmt.Errorf("%s: %w", i18n.Get("GeneratorGenerateSummaryFailed"), err)
-	}
-	return summaryResult, nil
-}
-
-func summarizePatternsForAgent(patterns []domain.Pattern, insights map[string]domain.PatternInsight) []map[string]interface{} {
-	summary := make([]map[string]interface{}, 0, len(patterns))
-	for _, p := range patterns {
-		insight := insights[p.ID]
-		lastHitAt := ""
-		if !insight.LastHitAt.IsZero() {
-			lastHitAt = insight.LastHitAt.Format(time.RFC3339)
-		}
-		summary = append(summary, map[string]interface{}{
-			"id":                 p.ID,
-			"name":               p.Name,
-			"category":           string(p.Category),
-			"description":        p.Description,
-			"rule":               p.Rule,
-			"confidence":         p.Confidence,
-			"frequency":          p.Frequency,
-			"source":             string(p.Source),
-			"evidence_locations": p.EvidenceLocations,
-			"business_method":    p.BusinessMethod,
-			"metrics":            p.Metrics,
-			"hit_count":          insight.HitCount,
-			"last_hit_at":        lastHitAt,
-			"generation_rank":    insight.GenerationRank,
-		})
-	}
-	return summary
-}
-
-func (s *GeneratorService) ensureSkillWritable(skillPath string) error {
-	content, err := os.ReadFile(skillPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
+func (s *GeneratorService) ensureGeneratedOutputDirWritable(outputPath string) error {
+	if err := skilloutput.EnsureWritable(outputPath); err != nil {
+		var manualErr *skilloutput.ManualSkillExistsError
+		if errors.As(err, &manualErr) {
+			return &ManualSkillExistsError{Path: manualErr.Path}
 		}
 		return err
 	}
-	if strings.Contains(string(content), "generated-by: skills-seed") {
-		return nil
+	return nil
+}
+
+func (s *GeneratorService) rebuildGeneratedOutputDir(outputPath string) error {
+	if err := skilloutput.Rebuild(outputPath); err != nil {
+		var manualErr *skilloutput.ManualSkillExistsError
+		if errors.As(err, &manualErr) {
+			return &ManualSkillExistsError{Path: manualErr.Path}
+		}
+		return err
 	}
-	return &ManualSkillExistsError{Path: skillPath}
+	return nil
 }
 
 func (s *GeneratorService) loadProjectProfile(ctx context.Context) (*domain.ProjectProfile, error) {

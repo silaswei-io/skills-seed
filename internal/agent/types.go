@@ -90,16 +90,6 @@ type GenerateFixesResult struct {
 	GeneratedAt time.Time         // 生成时间
 }
 
-// GenerateSkillsRequest AI汇总生成Skills的请求
-type GenerateSkillsRequest struct {
-	PatternsJSON       string // 模式 JSON（不包含代码示例）
-	PatternsPath       string // 模式 JSON 文件路径
-	PatternsCount      int    // 模式总数（快速参考）
-	ExistingSkillsPath string // 已有 skills 文件路径（如果有）
-	ProjectName        string // 项目名称
-	Language           string // 项目语言
-}
-
 // GenerateSkillsResult AI汇总生成Skills的结果
 type GenerateSkillsResult struct {
 	CategorySummaries      map[string]CategorySummary // 按分类的汇总内容
@@ -325,6 +315,24 @@ type AnalyzeWorkspaceSpecRequest struct {
 	UserContextPath      string // 本次学习传入的一次性用户上下文文件路径
 }
 
+// OptimizeWorkflowRequest 请求把用户口语化说明整理为标准工作流。
+type OptimizeWorkflowRequest struct {
+	ID              string // 工作流 ID
+	Name            string // 工作流名称
+	Context         string // 本次用户输入
+	ExistingContent string // 已有工作流正文；append 时用于合并
+	Append          bool   // 是否追加合并
+	Language        string // 项目主要语言
+}
+
+// OptimizeWorkflowResult 是 AI 优化后的标准工作流。
+type OptimizeWorkflowResult struct {
+	Title       string
+	Content     string
+	Summary     string
+	Suggestions []string
+}
+
 // CodeAnalyzer 代码分析接口
 type CodeAnalyzer interface {
 	AnalyzeCode(ctx context.Context, req *AnalyzeRequest) (*AnalyzeResult, error)
@@ -339,11 +347,6 @@ type PatternLearner interface {
 // FixGenerator 修复生成接口
 type FixGenerator interface {
 	GenerateFixes(ctx context.Context, req *GenerateFixesRequest) (*GenerateFixesResult, error)
-}
-
-// SkillsGenerator Skills生成接口
-type SkillsGenerator interface {
-	GenerateSkillsSummary(ctx context.Context, req *GenerateSkillsRequest) (*GenerateSkillsResult, error)
 }
 
 // PatternCurator 模式策展接口
@@ -369,6 +372,11 @@ type ProjectAnalyzer interface {
 	AnalyzeWorkspaceSpec(ctx context.Context, req *AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 }
 
+// WorkflowOptimizer 工作流优化接口。
+type WorkflowOptimizer interface {
+	OptimizeWorkflow(ctx context.Context, req *OptimizeWorkflowRequest) (*OptimizeWorkflowResult, error)
+}
+
 // Agent AI Agent 接口（组合所有子接口）
 type Agent interface {
 	Name() string
@@ -376,9 +384,9 @@ type Agent interface {
 	CodeAnalyzer
 	PatternLearner
 	FixGenerator
-	SkillsGenerator
 	PatternCurator
 	UserPatternDefiner
 	FileSelector
 	ProjectAnalyzer
+	WorkflowOptimizer
 }

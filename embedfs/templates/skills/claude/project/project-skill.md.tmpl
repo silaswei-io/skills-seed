@@ -48,6 +48,16 @@ description: {{.SkillDescription}}
 ---
 
 {{end}}
+{{if .WorkflowReferences}}
+## 用户工作流
+
+{{range .WorkflowReferences}}
+- **[{{.Name}}]({{.Path}})**{{if .Description}} - {{.Description}}{{end}}
+{{end}}
+
+---
+
+{{end}}
 {{if .StateSummaries}}
 ## 状态与边界速记
 

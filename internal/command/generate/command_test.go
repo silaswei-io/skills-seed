@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
-	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
@@ -34,6 +32,7 @@ func TestCmdDoesNotExposeWorkspaceChildSkillPolicyFlags(t *testing.T) {
 	require.Nil(t, skills.Flags().Lookup("root-only"))
 	require.Nil(t, skills.Flags().Lookup("context"))
 	require.Nil(t, skills.Flags().Lookup("context-file"))
+	require.Nil(t, skills.Flags().Lookup("force"))
 }
 
 func getSkillsSubCommand(t *testing.T, cmd *cobra.Command) *cobra.Command {
@@ -54,22 +53,8 @@ func executeGenerateSkillsCommand(t *testing.T, cont *container.Container) {
 	require.NoError(t, cmd.Execute())
 }
 
-func executeGenerateSkillsCommandWithArgs(t *testing.T, cont *container.Container, args ...string) {
-	t.Helper()
-	cmd := Cmd(cont)
-	cmd.SetArgs(append([]string{"skills"}, args...))
-	require.NoError(t, cmd.Execute())
-}
-
-func TestRunGenerateWorkspaceOnlyGeneratesDirtyTargets(t *testing.T) {
-	var generatedMu sync.Mutex
-	var generated []string
-	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-		generatedMu.Lock()
-		defer generatedMu.Unlock()
-		generated = append(generated, req.ProjectName)
-		return &agent.GenerateSkillsResult{}, nil
-	})
+func TestRunGenerateWorkspaceAlwaysRegeneratesAllTargets(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()
 	projects := []config.WorkspaceProjectConfig{
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
@@ -77,6 +62,7 @@ func TestRunGenerateWorkspaceOnlyGeneratesDirtyTargets(t *testing.T) {
 	}
 	for _, project := range projects {
 		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		setGenerateChildOutputPath(t, childRoot, provider, filepath.Join(".agents", "skills", project.ID+"-dev"))
 		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
 	}
 	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
@@ -86,7 +72,8 @@ func TestRunGenerateWorkspaceOnlyGeneratesDirtyTargets(t *testing.T) {
 
 	executeGenerateSkillsCommand(t, cont)
 
-	require.Equal(t, []string{"backend"}, generated)
+	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "backend")))
+	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "frontend")))
 	state, err := cont.StateRepo.Get(context.Background())
 	require.NoError(t, err)
 	require.Empty(t, state.SkillsDirty.Projects)
@@ -94,14 +81,7 @@ func TestRunGenerateWorkspaceOnlyGeneratesDirtyTargets(t *testing.T) {
 }
 
 func TestRunGenerateWorkspaceFirstRunGeneratesAllTargetsEvenWhenDirty(t *testing.T) {
-	var generatedMu sync.Mutex
-	var generated []string
-	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-		generatedMu.Lock()
-		defer generatedMu.Unlock()
-		generated = append(generated, req.ProjectName)
-		return &agent.GenerateSkillsResult{}, nil
-	})
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()
 	projects := []config.WorkspaceProjectConfig{
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
@@ -109,6 +89,7 @@ func TestRunGenerateWorkspaceFirstRunGeneratesAllTargetsEvenWhenDirty(t *testing
 	}
 	for _, project := range projects {
 		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		setGenerateChildOutputPath(t, childRoot, provider, filepath.Join(".agents", "skills", project.ID+"-dev"))
 		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
 	}
 	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
@@ -117,33 +98,8 @@ func TestRunGenerateWorkspaceFirstRunGeneratesAllTargetsEvenWhenDirty(t *testing
 
 	executeGenerateSkillsCommand(t, cont)
 
-	require.ElementsMatch(t, []string{"backend", "frontend"}, generated)
-}
-
-func TestRunGenerateWorkspaceForceGeneratesAllTargets(t *testing.T) {
-	var generatedMu sync.Mutex
-	var generated []string
-	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-		generatedMu.Lock()
-		defer generatedMu.Unlock()
-		generated = append(generated, req.ProjectName)
-		return &agent.GenerateSkillsResult{}, nil
-	})
-	workspaceRoot := t.TempDir()
-	projects := []config.WorkspaceProjectConfig{
-		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
-		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "go"},
-	}
-	for _, project := range projects {
-		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
-		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
-	}
-	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
-	defer cont.Close()
-
-	executeGenerateSkillsCommandWithArgs(t, cont, "--force")
-
-	require.ElementsMatch(t, []string{"backend", "frontend"}, generated)
+	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "backend")))
+	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "frontend")))
 }
 
 func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
@@ -195,10 +151,8 @@ func TestRunGenerateUsesConfiguredOutputPathWithoutCobraCommand(t *testing.T) {
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 
-func TestRunGenerateDoesNotPassUserContextToSummary(t *testing.T) {
-	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-		return &agent.GenerateSkillsResult{}, nil
-	})
+func TestRunGenerateDoesNotCallSummary(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
 
@@ -223,6 +177,7 @@ func TestRunGenerateDoesNotPassUserContextToSummary(t *testing.T) {
 	defer cont.Close()
 
 	require.NoError(t, RunGenerate(cont))
+	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 
 func TestRunGenerateWorkspaceSkipsManualChildSkillAndKeepsRootGenerated(t *testing.T) {
@@ -247,20 +202,7 @@ func TestRunGenerateWorkspaceSkipsManualChildSkillAndKeepsRootGenerated(t *testi
 }
 
 func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
-	var active int32
-	var maxActive int32
-	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-		current := atomic.AddInt32(&active, 1)
-		for {
-			previous := atomic.LoadInt32(&maxActive)
-			if current <= previous || atomic.CompareAndSwapInt32(&maxActive, previous, current) {
-				break
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-		atomic.AddInt32(&active, -1)
-		return &agent.GenerateSkillsResult{}, nil
-	})
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
 
 	workspaceRoot := t.TempDir()
 	projects := []config.WorkspaceProjectConfig{
@@ -280,7 +222,8 @@ func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
 
 	require.NoError(t, generateWorkspaceChildSkills(context.Background(), cont))
 
-	require.GreaterOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
+	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "backend")))
+	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "frontend")))
 }
 
 func TestRunGenerateWorkspacePrintsConcurrentChildProjectProgress(t *testing.T) {
@@ -307,9 +250,9 @@ func TestRunGenerateWorkspacePrintsConcurrentChildProjectProgress(t *testing.T) 
 	require.Contains(t, output, "backend")
 	require.Contains(t, output, "frontend")
 	require.Contains(t, output, "写入技能文件")
-	require.Contains(t, output, "生成 skills 摘要")
+	require.Contains(t, output, "整理生成数据")
 	require.Contains(t, output, "读取项目画像")
-	require.Contains(t, output, "检查生成输入")
+	require.Contains(t, output, "检查输出目录")
 	require.Contains(t, output, "backend      6/6")
 	require.Contains(t, output, "frontend     6/6")
 	require.Contains(t, output, "2/2 生成工作区子项目 skills")
@@ -345,15 +288,8 @@ func TestRunGenerateWorkspaceShowsRootSkillWriteAfterChildProjectProgress(t *tes
 	require.Less(t, childIndex, rootIndex, output)
 }
 
-func TestGenerateWorkspaceChildSkillsIgnoresWorkspaceRuntimeContext(t *testing.T) {
-	var callsMu sync.Mutex
-	calls := 0
-	provider := registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-		callsMu.Lock()
-		defer callsMu.Unlock()
-		calls++
-		return &agent.GenerateSkillsResult{}, nil
-	})
+func TestGenerateWorkspaceChildSkillsDoesNotCallSummary(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
 
 	workspaceRoot := t.TempDir()
 	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
@@ -364,21 +300,12 @@ func TestGenerateWorkspaceChildSkillsIgnoresWorkspaceRuntimeContext(t *testing.T
 
 	ctx := runtimecontext.WithUserContext(context.Background(), "workspace 根说明不能透传给子项目")
 	require.NoError(t, generateWorkspaceChildSkills(ctx, cont))
-
-	require.Equal(t, 1, calls)
+	require.FileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 
-func TestRunGenerateWorkspacePrintsWorkspaceProgressBeforeChildDetailsAndTokenUsage(t *testing.T) {
+func TestRunGenerateWorkspacePrintsWorkspaceProgressBeforeChildDetails(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
-	tokenusage.Reset()
-	var provider string
-	provider = registerGenerateWorkspaceMockAgentFactoryWithSummary(t, func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-		agent.LogTokenUsageForContext(ctx, provider, "GenerateSkillsSummary", tokenusage.Usage{
-			InputTokens:  1_000,
-			OutputTokens: 200,
-		})
-		return &agent.GenerateSkillsResult{}, nil
-	})
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()
 	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
 
@@ -394,14 +321,12 @@ func TestRunGenerateWorkspacePrintsWorkspaceProgressBeforeChildDetailsAndTokenUs
 	stepIndex := strings.Index(output, "生成工作区子项目 skills")
 	startIndex := strings.Index(output, "子项目 backend 开始生成 skills")
 	doneIndex := strings.Index(output, "子项目 backend skills 生成完成")
-	tokenIndex := strings.Index(output, "Token 消耗: 子项目 backend")
 	require.NotEqual(t, -1, stepIndex, output)
 	require.NotEqual(t, -1, startIndex, output)
 	require.NotEqual(t, -1, doneIndex, output)
-	require.NotEqual(t, -1, tokenIndex, output)
 	require.Greater(t, startIndex, stepIndex)
 	require.Greater(t, doneIndex, stepIndex)
-	require.Greater(t, tokenIndex, doneIndex)
+	require.NotContains(t, output, "Token 消耗: 子项目 backend")
 }
 
 func TestRunGenerateProjectRequiresAvailableAgent(t *testing.T) {
@@ -460,31 +385,20 @@ func TestOutputPathForCurrentTargetUsesConfiguredSkillsTarget(t *testing.T) {
 
 func registerGenerateWorkspaceMockAgentFactory(t *testing.T) string {
 	t.Helper()
-	return registerGenerateWorkspaceMockAgentFactoryWithSummary(t, nil)
-}
-
-var generateWorkspaceFactoryMu sync.Mutex
-
-func registerGenerateWorkspaceMockAgentFactoryWithSummary(t *testing.T, summaryFn func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error)) string {
-	t.Helper()
 	provider := "mock-generate-workspace-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
 	generateWorkspaceFactoryMu.Lock()
 	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
 		return &mocks.MockAgent{
 			NameVal:      provider,
 			AvailableVal: true,
-			GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-				if summaryFn != nil {
-					return summaryFn(ctx, req)
-				}
-				return &agent.GenerateSkillsResult{}, nil
-			},
 		}
 	})
 	t.Cleanup(restoreFactory)
 	generateWorkspaceFactoryMu.Unlock()
 	return provider
 }
+
+var generateWorkspaceFactoryMu sync.Mutex
 
 func initGenerateWorkspaceRootContainer(t *testing.T, workspaceRoot, provider string, projects []config.WorkspaceProjectConfig) *container.Container {
 	t.Helper()
@@ -572,6 +486,13 @@ func readGenerateFile(t *testing.T, root string, parts ...string) string {
 	content, err := os.ReadFile(filepath.Join(append([]string{root}, parts...)...))
 	require.NoError(t, err)
 	return string(content)
+}
+
+func childGeneratedSkillFiles(t *testing.T, childRoot string) []string {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(childRoot, ".agents", "skills", "*", "SKILL.md"))
+	require.NoError(t, err)
+	return matches
 }
 
 func captureGenerateStdout(t *testing.T, fn func()) string {

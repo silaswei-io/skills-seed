@@ -52,6 +52,7 @@ type CurateResult struct {
 type CompactRequest struct {
 	Category string
 	DryRun   bool
+	UseAI    bool
 }
 
 // CompactResult 表示人工整理模式库结果。

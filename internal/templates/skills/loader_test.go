@@ -60,6 +60,9 @@ func TestLoader_Render(t *testing.T) {
 				"Steps":       []string{"修改接口定义。", "运行生成命令。"},
 			},
 		},
+		"WorkflowReferences": []map[string]string{
+			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查"},
+		},
 		"ValidationCommands": []map[string]string{
 			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
 		},
@@ -91,6 +94,7 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "按任务读取最小必要参考")
 	assert.Contains(t, content, "常用工作流")
+	assert.Contains(t, content, "部署工作流")
 	assert.Contains(t, content, "task verify")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")
 	assert.NotContains(t, content, "为外部调用补充超时测试")
@@ -128,6 +132,7 @@ func TestLoader_Render_English(t *testing.T) {
 				"Steps":       []string{"Change the API source files first."},
 			},
 		},
+		"WorkflowReferences": []map[string]string{},
 		"ValidationCommands": []map[string]string{
 			{"Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml"},
 		},
@@ -195,12 +200,13 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 				"SelfManaged":     false,
 			},
 		},
-		"Shared":       []map[string]string{},
-		"Contracts":    []map[string]string{{"Path": "proto"}},
-		"Infra":        []map[string]string{},
-		"HasShared":    false,
-		"HasContracts": true,
-		"HasInfra":     false,
+		"Shared":             []map[string]string{},
+		"Contracts":          []map[string]string{{"Path": "proto"}},
+		"Infra":              []map[string]string{},
+		"HasShared":          false,
+		"HasContracts":       true,
+		"HasInfra":           false,
+		"WorkflowReferences": []map[string]string{},
 	}
 
 	content, err := loader.Render("workspace-skill", data)
@@ -538,6 +544,7 @@ func fullSkillData() map[string]interface{} {
 				"Steps":       []string{"修改接口定义。", "运行生成命令。"},
 			},
 		},
+		"WorkflowReferences": []map[string]string{},
 		"ValidationCommands": []map[string]string{
 			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
 		},

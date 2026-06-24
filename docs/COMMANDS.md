@@ -16,6 +16,7 @@
 | 生成 | [`skills-seed generate`](#skills-seed-generate) | 根据画像和 patterns 生成 skills | `skills-seed generate skills` |
 | 预览 | [`skills-seed preview`](#skills-seed-preview) | 预览 full 或 incremental 分析会选中的文件 | `skills-seed preview files` |
 | 模式管理 | [`skills-seed patterns`](#skills-seed-patterns) | 添加、删除、整理和查看 patterns | `skills-seed patterns show` |
+| 工作流 | [`skills-seed workflow`](#skills-seed-workflow) | 添加或更新用户任务工作流 | `skills-seed workflow --context "..."` |
 | 评审统计 | [`skills-seed review`](#skills-seed-review) | 导入评审评论并统计 pattern 防漏效果 | `skills-seed review stats` |
 | 项目画像 | [`skills-seed profile`](#skills-seed-profile) | 查看或刷新项目画像 | `skills-seed profile show` |
 | 一键同步 | [`skills-seed sync`](#skills-seed-sync) | 学习当前代码并生成 skills | `skills-seed sync` |
@@ -32,6 +33,7 @@
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
 | 日常增量更新 | `skills-seed sync` | 等价于学习当前变更并在有 dirty 目标时生成 skills |
 | 只补充一条规则 | `skills-seed sync --add "<描述>"` | 跳过代码学习，用自然语言添加 pattern 后生成 |
+| 更新任务工作流 | `skills-seed workflow --context "<说明>"` → `skills-seed generate skills` | `--context` 会先经 Agent 优化成标准工作流；未提供 `--name` 时自动生成名称，需要合并补充时指定名称并加 `--append` |
 | 提交前更新 | `skills-seed hook install` | 安装 pre-commit hook，在提交前选择同步、只学习或跳过 |
 | 查看沉淀变化 | `skills-seed log` | 像 `git log` 一样查看最近学习和生成带来的变更 |
 | 排查沉淀结果 | `skills-seed patterns show` → `skills-seed profile show` | 查看已学习 patterns 和项目画像是否符合预期 |
@@ -43,10 +45,10 @@
 
 | 命令 | 摘要 | 子命令 | 参数 |
 |---|---|---|---|
-| `skills-seed` | 为 AI 助手培育项目技能 | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | 为 AI 助手培育项目技能 | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed check` | 检查暂存的文件 | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
 | `skills-seed generate` | 生成 AI Agent skills | `skills` | `--help, -h` = `false` |
-| `skills-seed generate skills` | 生成 AI Agent skills | - | `--force` = `false`<br>`--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
+| `skills-seed generate skills` | 生成 AI Agent skills | - | `--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
 | `skills-seed hook` | 管理 Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed hook install` | 安装 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | 手动运行 pre-commit hook | - | `--help, -h` = `false` |
@@ -58,7 +60,7 @@
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
 | `skills-seed patterns` | 管理已学习的 patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
 | `skills-seed patterns add <description>` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
-| `skills-seed patterns compact` | 整理相似 patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
+| `skills-seed patterns compact` | 整理相似 patterns | - | `--ai` = `false`<br>`--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
 | `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | - | `--help, -h` = `false` |
 | `skills-seed patterns show [pattern-id]` | 查看已学习 pattern 的概览或完整详情 | - | `--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed patterns stats` | 查看 pattern 质量和 check 命中统计 | - | `--help, -h` = `false` |
@@ -72,6 +74,7 @@
 | `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
 | `skills-seed sync` | 一键同步：学习或添加模式 + 生成 skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed workflow` | 添加或更新用户工作流 | - | `--append` = `false`<br>`--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = `` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | 向工作区添加子项目 | - | `--help, -h` = `false` |
 <!-- COMMAND_TREE_END -->
@@ -318,7 +321,6 @@ skills-seed learn history --limit 40 --batch-size 5
 |---|---:|---|
 | `--output`, `-o` | 当前 `skills.target` 的 `skills.paths` | 临时指定 skills 输出目录 |
 | `--no-references` | `false` | 只生成入口 `SKILL.md`，不写入 `references/` 明细文件 |
-| `--force` | `false` | 忽略模式变更状态，强制重新生成所有 skills |
 | `--help`, `-h` | `false` | 查看 `generate skills` 帮助 |
 
 #### 常用示例
@@ -358,11 +360,10 @@ references/
 
 #### 注意事项
 
-1. workspace 模式首次会先用每个子项目自己的配置生成子项目 skill，再生成根仓 workspace skill；之后默认只生成模式或工作区关系变更影响到的目标。
+1. workspace 模式会先用每个子项目自己的配置重新生成子项目 skill，再生成根仓 workspace skill。
 2. 已有手写 `SKILL.md` 没有 `generated-by: skills-seed` 标记时默认不会被覆盖。
 3. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
-4. `generate skills` 会对生成输入记录 md5；当项目画像、patterns、命中统计、配置、prompt/skills 模板和输出路径未变化，且输出产物完整时，会跳过 Agent 摘要和文件重写。workspace 根 skill 也会用同样机制跳过未变化的根产物。
-5. 需要重新生成所有目标时使用 `skills-seed generate skills --force`。
+4. `generate skills` 不做生成输入指纹校验；显式执行时会删除旧的 skills-seed 生成目录并按当前画像、patterns 和工作流完整重建。
 
 ### `skills-seed preview`
 
@@ -419,7 +420,7 @@ skills-seed preview files --limit 500
 |---|---|---|---|
 | `skills-seed patterns add <描述>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add "API 路由使用 RESTful 风格" --category api` | 会调用 AI Agent |
 | `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | `skills-seed patterns delete plugin-source-editing-rule` | workspace 根目录会同步删除已关联子项目模式 |
-| `skills-seed patterns compact` | 调用当前 Agent 策展整理相似 patterns | `skills-seed patterns compact --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
+| `skills-seed patterns compact` | 默认使用本地规则整理相似 patterns，显式 `--ai` 时调用 Agent 语义合并 | `skills-seed patterns compact --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
 | `skills-seed patterns stats` | 查看模式质量和 check 命中统计 | `skills-seed patterns stats` | 不调用 AI Agent，不修改数据库 |
 | `skills-seed patterns show [pattern-id]` | 无参数查看概览，传入 ID 查看完整详情 | `skills-seed patterns show business-create-order --format json` | 不调用 AI Agent，不修改数据库 |
 
@@ -449,6 +450,7 @@ workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
+| `--ai` | `false` | 使用 AI 进行语义合并；默认使用本地确定性合并，不调用 Agent |
 | `--category`, `-c` | 空 | 只整理指定分类，如 `business`、`api`、`testing`；留空表示全部 |
 | `--dry-run` | `false` | 只预览整理结果，不写入数据库 |
 | `--help`, `-h` | `false` | 查看 `patterns compact` 帮助 |
@@ -476,6 +478,7 @@ skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
 skills-seed patterns compact --category business --dry-run
+skills-seed patterns compact --ai --dry-run
 skills-seed patterns stats
 skills-seed patterns show
 skills-seed patterns show business-create-order
@@ -484,7 +487,7 @@ skills-seed patterns show business-create-order --format json
 
 #### 注意事项
 
-1. `patterns compact` 会调用当前 `agent.engine` 对应的 CLI。
+1. `patterns compact` 默认使用本地确定性合并，不调用 Agent；只有传入 `--ai` 时才会调用当前 `agent.engine` 对应的 CLI。
 2. 不确定整理结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
 4. `patterns show` 无参数时显示模式概览列表；位置列优先使用业务/工具方法的 `code_location`，没有业务方法时回退到模式级 `evidence_locations` 的第一条证据位置。传入 `pattern-id` 时显示单条模式完整详情，包括正/反例、质量指标、workspace 归属、证据位置、业务方法字段、代码位置历史和语言无关符号快照。

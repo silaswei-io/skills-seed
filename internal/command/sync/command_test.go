@@ -80,7 +80,6 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 	defer patternRepo.Close()
 
 	var patternContext string
-	generateCalled := false
 	pattern := domain.NewPattern("p1", "Context Boundary", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("description")
@@ -91,10 +90,6 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
 			patternContext = req.UserContext
 			return &agent.UserDefinePatternResult{Pattern: pattern}, nil
-		},
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			generateCalled = true
-			return &agent.GenerateSkillsResult{}, nil
 		},
 	}
 	profileRepo := profilestore.NewRepository(seedPath)
@@ -114,11 +109,11 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 		StateRepo:    statestore.NewRepository(seedPath),
 		Agent:        mockAgent,
 		CuratorSvc:   curator.NewService(mockAgent, patternRepo),
-		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), mockAgent, configRepo),
+		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo),
 	}
 
 	require.NoError(t, syncWithUserPattern(context.Background(), cont, "所有 API 必须有错误处理", "business", nil, userContext, nil))
 
 	require.Equal(t, userContext, patternContext)
-	require.True(t, generateCalled)
+	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-dev", "SKILL.md"))
 }

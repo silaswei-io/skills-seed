@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.16]
+
+### 变更
+
+- 重构 skills 生成链路：显式执行 `generate skills` 时不再做生成输入指纹或 dirty state 跳过，而是删除旧的 skills-seed 生成目录并按当前项目画像、patterns 和工作流完整重建；同时移除 `--force`。
+- 模式入库和 `patterns compact` 默认改为本地确定性合并，逐个处理候选并保留质量分更高的模式；只有显式传入 `patterns compact --ai` 时才调用 Agent 做语义合并。
+- 移除自动工作流提取，工作流只通过 `skills-seed workflow --context ...` 由用户显式添加；workspace 根目录可用 `--child` 将工作流写入指定子项目。
+- 生成 skills 不再调用 Agent 生成摘要，改为基于已整理的 patterns、画像和工作流直接生成，降低生成耗时和不确定性。
+
+### 文档
+
+- 更新中英文 README、命令参考和配置说明，明确 `generate skills` 的完整重建语义、`patterns compact --ai` 的显式 AI 合并策略，以及用户工作流的保存和生成方式。
+
 ## [v0.9.15]
 
 ### 变更

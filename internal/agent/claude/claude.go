@@ -619,65 +619,6 @@ func claudeHomeDir() string {
 	return filepath.Join(userHome, ".claude")
 }
 
-// GenerateSkillsSummary 汇总生成技能内容
-func (c *ClaudeAgent) GenerateSkillsSummary(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-generate")
-	if err != nil {
-		return nil, err
-	}
-	defer session.Cleanup()
-
-	// 1. 准备模板数据
-	data, err := agent.GenerateSkillsPromptData(session, req)
-	if err != nil {
-		return nil, err
-	}
-
-	// 2. 渲染提示词
-	prompt, err := c.promptLoader.Render("skill-project-summary", data)
-	if err != nil || prompt == "" {
-		logger.Warn(i18n.Get("LoggerAgentSkillsSummaryEmptyPrompt"))
-		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderGenerateSkillsPromptFailed"))
-	}
-
-	// 3. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "GenerateSkillsSummary", prompt)
-	if err != nil {
-		logger.Error(i18n.Get("LoggerAgentSkillsSummaryCallFailed"),
-			"error", err,
-		)
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeGenerateSkillsFailed"), err)
-	}
-
-	// 4. 解析结果
-	result, err := parser.ParseGenerateSkillsResult(output)
-	if err != nil {
-		// 解析失败，返回空结果而不是错误
-		logger.Warn(i18n.Get("LoggerAgentSkillsSummaryParseFallback"),
-			"error", err,
-		)
-		return &agent.GenerateSkillsResult{
-			CategorySummaries:      make(map[string]agent.CategorySummary),
-			KeyPatterns:            []agent.PatternSummary{},
-			BusinessRules:          []string{},
-			BestPractices:          []string{},
-			CommonPatterns:         []string{},
-			KeyInsights:            []string{},
-			ImprovementSuggestions: []string{},
-		}, nil
-	}
-
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
-		"agent", c.Name(),
-		"operation", "GenerateSkillsSummary",
-		"category_summaries_count", len(result.CategorySummaries),
-		"key_patterns_count", len(result.KeyPatterns),
-		"business_rules_count", len(result.BusinessRules),
-	)
-
-	return result, nil
-}
-
 // CuratePatterns 策展候选模式并输出规范模式。
 func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
 	data := map[string]interface{}{
@@ -763,6 +704,25 @@ func (c *ClaudeAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefi
 		"category", result.Pattern.Category,
 	)
 
+	return result, nil
+}
+
+// OptimizeWorkflow 将用户工作流说明整理为标准工作流。
+func (c *ClaudeAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
+	prompt, err := c.promptLoader.Render("workflow-optimize", req)
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderOptimizeWorkflowPromptFailed"))
+	}
+
+	output, err := c.callClaude(ctx, "OptimizeWorkflow", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentOptimizeWorkflowFailed"), err)
+	}
+
+	result, err := parser.ParseOptimizeWorkflowResult(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
+	}
 	return result, nil
 }
 

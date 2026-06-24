@@ -18,6 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
@@ -25,6 +26,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/learner"
+	workflowsvc "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	bolt "go.etcd.io/bbolt"
@@ -45,12 +47,14 @@ type Container struct {
 	StateRepo             *statestore.Repository
 	WorkspaceProfileRepo  *workspacestore.ProfileRepository
 	WorkspaceSpecRepo     *workspacestore.SpecRepository
+	WorkflowRepo          *workflowstore.Repository
 	Agent                 agent.Agent
 	AnalyzerSvc           *analyzer.AnalyzerService
 	LearnerSvc            *learner.LearnerService
 	CheckerSvc            *checker.CheckerService
 	GeneratorSvc          *generator.GeneratorService
 	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
+	WorkflowSvc           *workflowsvc.Service
 	CuratorSvc            *curator.Service
 	PromptLoader          *promptloader.Loader
 	SkillsLoader          *skills.Loader
@@ -132,6 +136,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	stateRepo := statestore.NewRepository(seedPath)
 	workspaceProfileRepo := workspacestore.NewProfileRepository(seedPath)
 	workspaceSpecRepo := workspacestore.NewSpecRepository(seedPath)
+	workflowRepo := workflowstore.NewRepository(seedPath)
 
 	// 5. 创建加载器
 	promptLoader := promptloader.NewWithLocales(cfg.Agent.Engine, configRepo.GetToolLocale(), configRepo.GetSkillsLocale(), seedPath)
@@ -150,8 +155,11 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	learnerSvc := learner.NewLearnerService(agentImpl, gitRepo, patternRepo, patternRepo, curatorSvc)
 
 	checkerSvc := checker.NewCheckerService(agentImpl, gitRepo, patternRepo, configRepo)
-	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo)
-	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(patternRepo, profileRepo, skillsLoader, agentImpl, configRepo, workspaceProfileRepo, workspaceSpecRepo)
+	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, cfg.Project.Language)
+	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo)
+	generatorSvc.SetWorkflowRepository(workflowRepo)
+	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(patternRepo, profileRepo, skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo)
+	workspaceGeneratorSvc.SetWorkflowRepository(workflowRepo)
 
 	return &Container{
 		SeedPath:              seedPath,
@@ -167,12 +175,14 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		StateRepo:             stateRepo,
 		WorkspaceProfileRepo:  workspaceProfileRepo,
 		WorkspaceSpecRepo:     workspaceSpecRepo,
+		WorkflowRepo:          workflowRepo,
 		Agent:                 agentImpl,
 		AnalyzerSvc:           analyzerSvc,
 		LearnerSvc:            learnerSvc,
 		CheckerSvc:            checkerSvc,
 		GeneratorSvc:          generatorSvc,
 		WorkspaceGeneratorSvc: workspaceGeneratorSvc,
+		WorkflowSvc:           workflowSvc,
 		CuratorSvc:            curatorSvc,
 		PromptLoader:          promptLoader,
 		SkillsLoader:          skillsLoader,

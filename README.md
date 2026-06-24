@@ -86,7 +86,7 @@ init -> learn current / learn history -> generate skills -> check
 
 0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
 
-0.9.1 起，`learn current` 在候选文件较多时可先通过 AI 文件筛选收敛分析范围；`generate skills` 会根据 dirty state 只生成受影响目标，必要时可用 `--force` 强制全量生成。根命令中的 `completion` 已移除，中文 help 文案已统一。
+0.9.1 起，`learn current` 在候选文件较多时可先通过 AI 文件筛选收敛分析范围；`generate skills` 显式执行时会删除旧的 skills-seed 生成目录并完整重建。根命令中的 `completion` 已移除，中文 help 文案已统一。
 
 `generate skills` 会按模式质量排序：优先沉淀综合分高、check 命中多、置信度高的规则，降低泛化规则和重复规则进入最终 skills 的概率。
 
@@ -246,6 +246,7 @@ skills:
 | `skills-seed learn current` | 从当前代码增量学习规则和画像 |
 | `skills-seed learn history` | 从 Git 历史提交学习长期规则 |
 | `skills-seed generate skills` | 生成当前 `skills.target` 的 skills |
+| `skills-seed workflow --context "<说明>"` | 通过 Agent 优化并保存用户工作流；未提供 `--name` 时自动生成名称，合并补充时使用 `--append` |
 | `skills-seed patterns add <描述>` | 用自然语言补充用户自定义模式 |
 | `skills-seed patterns compact` | 显式整理已入库的相似 patterns |
 | `skills-seed sync` | 一键执行学习/添加模式；有变化时生成 skills |
@@ -256,6 +257,8 @@ skills:
 | `skills-seed hook install` | 安装本地 pre-commit hook |
 
 完整参数见 [命令参考](docs/COMMANDS.md)。
+
+用户输入的口语化工作流会先经当前 Agent 优化为标准工作流，再保存到 `.skills-seed/workflows/<name>/WORKFLOW.md`；原始输入记录和元数据写入同目录 `metadata.yaml`。同名工作流默认重写，合并补充时加 `--append`。生成 skills 时写入 `workflows/`，关联脚本统一放到 `scripts/workflows/<name>/`。
 
 ## 本地与安全边界
 

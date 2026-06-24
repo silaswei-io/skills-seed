@@ -204,7 +204,7 @@ Starting in 0.9.6, debug records under `.skills-seed/memory/runtime` use the uni
 
 Starting in 0.9.0, the pattern store renders the `pattern-curate` prompt before storage so AI can deduplicate, consolidate, drop, and self-check candidate patterns against related historical patterns. `generate skills` no longer runs pattern merging, so generation prompts only summarize and produce artifacts.
 
-Starting in 0.9.1, skills generation reads dirty state: learning, pattern deletion, and workspace relationship changes only mark affected targets for regeneration; unchanged and clean targets are skipped. Use `skills-seed generate skills --force` to ignore dirty state and rebuild everything.
+Starting in 0.9.1, learning, pattern deletion, and workspace relationship changes still record dirty state so `sync` can decide whether this run needs to enter generation. However, an explicit `skills-seed generate skills` no longer checks a generation-input fingerprint; it deletes the old skills-seed generated output directory and fully rebuilds it.
 
 ### Generated Notice
 
@@ -261,6 +261,18 @@ You can also set the agent during initialization:
 skills-seed init --mode project --agent codex
 skills-seed init --workspace --agent codex
 ```
+
+### Workflow Resources
+
+User workflows are not stored in `config.yaml` and are not part of `profile.mode`. The command sends informal notes to the current Agent, optimizes them into a standard workflow, saves the optimized body to `.skills-seed/workflows/<name>/WORKFLOW.md`, and stores original notes plus metadata in `metadata.yaml` in the same directory:
+
+```bash
+skills-seed workflow --context "Check environment variables and build artifacts before release, then run smoke tests after deployment"
+```
+
+When `--name` is omitted, the Agent generates a workflow title from `--context`. An existing workflow with the same name is rewritten by the optimized new `--context` by default. Specify a name and use `--append` for additional notes; the Agent merges old and new content into one unified workflow.
+
+When skills are generated, workflows are written to output `workflows/`, and matching script directories are copied to `scripts/workflows/<name>/`.
 
 ### `learning.history`
 

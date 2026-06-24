@@ -37,15 +37,6 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		"patterns_count", len(patterns),
 	)
 
-	if len(patterns) == 0 {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "generator.write_skills_output",
-			"duration", time.Since(startedAt),
-			"patterns_count", 0,
-			"skipped", true,
-		)
-		return nil
-	}
 	if summaryResult == nil {
 		return fmt.Errorf("%s", i18n.Get("GeneratorGenerateSummaryFailed"))
 	}
@@ -105,6 +96,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		"OverviewReferences":     conditionalProfileReferenceItems(profile, locale, "./references/", references.Enabled),
 		"ReferenceGroups":        conditionalCategoryReferenceGroups(patterns, locale, references.Enabled),
 		"Workflows":              skillWorkflows(profile, patterns, locale),
+		"WorkflowReferences":     opts.WorkflowReferences,
 		"ValidationCommands":     validationCommands(profile, patterns, locale),
 		"StateSummaries":         []string{},
 	}
@@ -508,4 +500,5 @@ type SkillWriteOptions struct {
 	ProgramVersion      string
 	SkillsTemplatesHash string
 	SkipReferences      bool
+	WorkflowReferences  []WorkflowReference
 }

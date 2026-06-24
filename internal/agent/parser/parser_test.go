@@ -6,24 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseGenerateSkillsResultPreservesInsightsAndSuggestions(t *testing.T) {
-	output := `{
-  "category_summaries": {},
-  "key_patterns": [],
-  "business_rules": ["规则"],
-  "best_practices": ["实践"],
-  "common_patterns": ["模式"],
-  "key_insights": ["错误处理是跨层一致性核心"],
-  "improvement_suggestions": ["为外部调用补充超时测试"]
-}`
-
-	result, err := ParseGenerateSkillsResult(output)
-
-	require.NoError(t, err)
-	require.Equal(t, []string{"错误处理是跨层一致性核心"}, result.KeyInsights)
-	require.Equal(t, []string{"为外部调用补充超时测试"}, result.ImprovementSuggestions)
-}
-
 func TestParseCuratePatternsResultPreservesCanonicalPatternFields(t *testing.T) {
 	output := `{
   "patterns": [

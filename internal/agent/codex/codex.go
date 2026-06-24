@@ -227,42 +227,6 @@ func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequ
 	return parser.ParseSelectFilesResult(output)
 }
 
-// GenerateSkillsSummary 汇总生成技能内容
-func (c *CodexAgent) GenerateSkillsSummary(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-generate")
-	if err != nil {
-		return nil, err
-	}
-	defer session.Cleanup()
-
-	data, err := agent.GenerateSkillsPromptData(session, req)
-	if err != nil {
-		return nil, err
-	}
-	prompt, err := c.promptLoader.Render("skill-project-summary", data)
-	if err != nil || prompt == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderGenerateSkillsPromptFailed"))
-	}
-
-	output, err := c.callCodex(ctx, "GenerateSkillsSummary", prompt)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexGenerateSkillsFailed"), err)
-	}
-
-	result, err := parser.ParseGenerateSkillsResult(output)
-	if err != nil {
-		return nil, err
-	}
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
-		"agent", c.Name(),
-		"operation", "GenerateSkillsSummary",
-		"category_summaries_count", len(result.CategorySummaries),
-		"key_patterns_count", len(result.KeyPatterns),
-		"business_rules_count", len(result.BusinessRules),
-	)
-	return result, nil
-}
-
 // CuratePatterns 策展候选模式并输出规范模式。
 func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
 	data := map[string]interface{}{
@@ -407,6 +371,25 @@ func (c *CodexAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefin
 		"pattern_id", result.Pattern.ID,
 	)
 
+	return result, nil
+}
+
+// OptimizeWorkflow 将用户工作流说明整理为标准工作流。
+func (c *CodexAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
+	prompt, err := c.promptLoader.Render("workflow-optimize", req)
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderOptimizeWorkflowPromptFailed"))
+	}
+
+	output, err := c.callCodex(ctx, "OptimizeWorkflow", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentOptimizeWorkflowFailed"), err)
+	}
+
+	result, err := parser.ParseOptimizeWorkflowResult(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
+	}
 	return result, nil
 }
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -14,7 +13,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
@@ -31,7 +29,6 @@ type generateOptions struct {
 	outputPath    string
 	outputChanged bool
 	noReferences  bool
-	force         bool
 }
 
 // Cmd 返回 generate 命令
@@ -79,7 +76,6 @@ func skillsCmd(cont *container.Container) *cobra.Command {
 	opts.outputPath = defaultOutputPath
 	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
 	cmd.Flags().BoolVar(&opts.noReferences, "no-references", false, i18n.Get("GenerateFlagNoReferences"))
-	cmd.Flags().BoolVar(&opts.force, "force", false, i18n.Get("GenerateFlagForce"))
 
 	return cmd
 }
@@ -141,12 +137,6 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 			return err
 		}
 	} else {
-		if shouldSkipProjectGenerate(ctx, cont, opts) {
-			logger.Info(i18n.Get("GenerateSkillsSkipped"))
-			logger.Info(i18n.Get("GenerateSuccessMsg"))
-			logger.Info(i18n.GetWithParams("GenerateOutputPath", map[string]interface{}{"Path": effectiveOutputPath}))
-			return nil
-		}
 		generateLabel := i18n.Get("ProgressGenerateWriteSkills")
 		retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
 		generateCtx := retryProgress.WithContext(ctx)
@@ -176,136 +166,56 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 }
 
 func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts generateOptions) error {
-	state, stateLoaded, err := loadRuntimeState(ctx, cont)
-	if err != nil {
+	projects := cont.ConfigRepo.GetWorkspaceConfig().Projects
+	childProgress := progress.NewMulti(commandutil.WorkspaceProjectProgressNames(projects))
+	childProgress.SetLabel(i18n.Get("ProgressGenerateWorkspaceProjects"))
+	childProgress.SetTaskTotal(ws.GenerateProjectStepTotal)
+	if err := generateWorkspaceChildSkills(ctx, cont, childProgress); err != nil {
+		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 		return err
 	}
-	dirty := domain.SkillsDirtyState{}
-	if stateLoaded {
-		dirty = state.SkillsDirty
-	}
-	selection := workspaceGenerateSelectionForState(stateLoaded && state.SkillsGenerated, dirty, opts.force)
-	if len(selection.projects) > 0 || selection.all {
-		selectedProjects := selection.filter(cont.ConfigRepo.GetWorkspaceConfig().Projects)
-		childProgress := progress.NewMulti(commandutil.WorkspaceProjectProgressNames(selectedProjects))
-		childProgress.SetLabel(i18n.Get("ProgressGenerateWorkspaceProjects"))
-		childProgress.SetTaskTotal(ws.GenerateProjectStepTotal)
-		if err := generateWorkspaceChildSkillsSelected(ctx, cont, selection, childProgress); err != nil {
-			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
-			return err
-		}
-	}
-	shouldGenerateRoot := opts.force || dirty.Workspace || len(dirty.Projects) > 0 || !stateLoaded || !state.SkillsGenerated
-	if shouldGenerateRoot {
-		rootTracker := progress.New(1)
-		rootLabel := i18n.Get("ProgressGenerateWriteRootSkills")
-		retryProgress := agent.NewRetryProgressBinder(rootTracker.UpdateStep)
-		rootCtx := retryProgress.WithContext(ctx)
-		if err := rootTracker.RunStep(rootLabel, func() error {
-			retryProgress.StartStep(rootLabel)
-			callErr := cont.WorkspaceGeneratorSvc.GenerateWorkspaceSkills(rootCtx)
-			retryProgress.FinishStep(rootLabel, callErr == nil)
-			return callErr
-		}); err != nil {
-			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
-			return err
-		}
+	rootTracker := progress.New(1)
+	rootLabel := i18n.Get("ProgressGenerateWriteRootSkills")
+	retryProgress := agent.NewRetryProgressBinder(rootTracker.UpdateStep)
+	rootCtx := retryProgress.WithContext(ctx)
+	if err := rootTracker.RunStep(rootLabel, func() error {
+		retryProgress.StartStep(rootLabel)
+		callErr := cont.WorkspaceGeneratorSvc.GenerateWorkspaceSkills(rootCtx)
+		retryProgress.FinishStep(rootLabel, callErr == nil)
+		return callErr
+	}); err != nil {
+		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
+		return err
 	}
 	if cont.StateRepo != nil {
-		if err := cont.StateRepo.ClearSkillsDirty(ctx, domain.SkillsDirtyTarget{Workspace: shouldGenerateRoot, Projects: dirty.Projects}); err != nil {
+		if err := cont.StateRepo.ClearSkillsDirty(ctx, domain.SkillsDirtyTarget{Workspace: true, Projects: workspaceProjectIDs(projects)}); err != nil {
 			return err
 		}
-	}
-	if !shouldGenerateRoot && len(selection.projects) == 0 && !selection.all {
-		logger.Info(i18n.Get("GenerateWorkspaceRootSkipped"))
 	}
 	return nil
 }
 
-type workspaceGenerateSelection struct {
-	all      bool
-	projects map[string]struct{}
-}
-
-func workspaceGenerateSelectionForState(skillsGenerated bool, dirty domain.SkillsDirtyState, force bool) workspaceGenerateSelection {
-	if force || !skillsGenerated {
-		return workspaceGenerateSelection{all: true}
-	}
-	selected := make(map[string]struct{}, len(dirty.Projects))
-	for _, projectID := range dirty.Projects {
-		projectID = strings.TrimSpace(projectID)
-		if projectID != "" {
-			selected[projectID] = struct{}{}
-		}
-	}
-	return workspaceGenerateSelection{projects: selected}
-}
-
-func (s workspaceGenerateSelection) includes(project config.WorkspaceProjectConfig) bool {
-	if s.all {
-		return true
-	}
-	if len(s.projects) == 0 {
-		return false
-	}
-	if _, ok := s.projects[project.ID]; ok && project.ID != "" {
-		return true
-	}
-	if _, ok := s.projects[project.Path]; ok && project.Path != "" {
-		return true
-	}
-	return false
-}
-
-func (s workspaceGenerateSelection) filter(projects []config.WorkspaceProjectConfig) []config.WorkspaceProjectConfig {
-	selected := make([]config.WorkspaceProjectConfig, 0, len(projects))
+func workspaceProjectIDs(projects []config.WorkspaceProjectConfig) []string {
+	ids := make([]string, 0, len(projects))
 	for _, project := range projects {
-		if s.includes(project) {
-			selected = append(selected, project)
+		if project.ID != "" {
+			ids = append(ids, project.ID)
+			continue
+		}
+		if project.Path != "" {
+			ids = append(ids, project.Path)
 		}
 	}
-	return selected
-}
-
-func shouldSkipProjectGenerate(ctx context.Context, cont *container.Container, opts generateOptions) bool {
-	if opts.force || opts.outputChanged || opts.noReferences || cont == nil || cont.StateRepo == nil {
-		return false
-	}
-	state, stateLoaded, err := loadRuntimeState(ctx, cont)
-	if err != nil || !stateLoaded {
-		return false
-	}
-	return state.SkillsGenerated && !state.SkillsDirty.Project
-}
-
-func loadRuntimeState(ctx context.Context, cont *container.Container) (*domain.RuntimeState, bool, error) {
-	if cont == nil || cont.StateRepo == nil {
-		return nil, false, nil
-	}
-	state, err := cont.StateRepo.Get(ctx)
-	if err != nil {
-		if errors.Is(err, statestore.ErrStateNotFound) {
-			return nil, false, nil
-		}
-		return nil, false, err
-	}
-	return state, true, nil
+	return ids
 }
 
 func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container, trackers ...*progress.MultiTracker) error {
-	return generateWorkspaceChildSkillsSelected(ctx, cont, workspaceGenerateSelection{all: true}, trackers...)
-}
-
-func generateWorkspaceChildSkillsSelected(ctx context.Context, cont *container.Container, selection workspaceGenerateSelection, trackers ...*progress.MultiTracker) error {
 	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
 	if len(workspaceConfig.Projects) == 0 {
 		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
 	}
-	projects := selection.filter(workspaceConfig.Projects)
-	if len(projects) == 0 {
-		return nil
-	}
+	projects := workspaceConfig.Projects
 
 	projectRoot := projectConfig.RootPath
 	if projectRoot == "" {

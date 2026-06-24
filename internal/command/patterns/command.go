@@ -718,6 +718,7 @@ func trimRightEmpty(values []string) []string {
 func compactCmd(cont *container.Container) *cobra.Command {
 	var category string
 	var dryRun bool
+	var useAI bool
 
 	cmd := &cobra.Command{
 		Use:     "compact",
@@ -729,8 +730,10 @@ func compactCmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			if err := commandutil.RequireAgentAvailable(cont); err != nil {
-				return err
+			if useAI {
+				if err := commandutil.RequireAgentAvailable(cont); err != nil {
+					return err
+				}
 			}
 			if cont.CuratorSvc == nil {
 				return fmt.Errorf("pattern curator is not configured")
@@ -739,6 +742,7 @@ func compactCmd(cont *container.Container) *cobra.Command {
 			result, err := cont.CuratorSvc.CompactWithHooks(cmd.Context(), curator.CompactRequest{
 				Category: category,
 				DryRun:   dryRun,
+				UseAI:    useAI,
 			}, curatorProgressHooks(tracker))
 			if err != nil {
 				return err
@@ -764,6 +768,7 @@ func compactCmd(cont *container.Container) *cobra.Command {
 
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsCompactFlagCategory"))
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, i18n.Get("PatternsCompactFlagDryRun"))
+	cmd.Flags().BoolVar(&useAI, "ai", false, i18n.Get("PatternsCompactFlagAI"))
 	return cmd
 }
 

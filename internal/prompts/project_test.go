@@ -3,6 +3,7 @@ package prompts
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/metadata"
@@ -51,6 +52,45 @@ func TestEnsureProjectPromptsUsesCommonProjectPrompt(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"))
 	require.NoError(t, err)
+}
+
+func TestEnsureProjectPromptsRemovesEmptyDeprecatedInstructions(t *testing.T) {
+	seedPath := t.TempDir()
+	instructionsDir := filepath.Join(seedPath, "prompts", "instructions")
+	require.NoError(t, os.MkdirAll(instructionsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(instructionsDir, "skill-project-summary.md"), []byte(strings.TrimSpace(`
+<!-- generated-by: skills-seed v0.9.0 -->
+<!-- prompt-type: skill-project-summary -->
+<!--
+old scaffold
+-->
+`)), 0644))
+
+	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+		ProjectName: "demo",
+		Language:    "go",
+		Locale:      "zh-CN",
+	})
+	require.NoError(t, err)
+
+	require.NoFileExists(t, filepath.Join(instructionsDir, "skill-project-summary.md"))
+}
+
+func TestEnsureProjectPromptsKeepsDeprecatedInstructionsWithBody(t *testing.T) {
+	seedPath := t.TempDir()
+	instructionsDir := filepath.Join(seedPath, "prompts", "instructions")
+	require.NoError(t, os.MkdirAll(instructionsDir, 0755))
+	path := filepath.Join(instructionsDir, "skill-project-summary.md")
+	require.NoError(t, os.WriteFile(path, []byte("用户补充内容"), 0644))
+
+	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+		ProjectName: "demo",
+		Language:    "go",
+		Locale:      "zh-CN",
+	})
+	require.NoError(t, err)
+
+	require.FileExists(t, path)
 }
 
 func TestEnsureProjectPromptsUsesSkillsLocaleForPersistedSkillPrompts(t *testing.T) {

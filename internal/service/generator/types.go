@@ -2,7 +2,6 @@ package generator
 
 import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -59,18 +58,11 @@ type ReferenceAvailability struct {
 	BusinessPatterns bool
 }
 
-type projectSkillsFingerprintInput struct {
-	Kind                string                           `json:"kind"`
-	ProgramVersion      string                           `json:"program_version"`
-	PromptTemplatesHash string                           `json:"prompt_templates_hash"`
-	SkillsTemplatesHash string                           `json:"skills_templates_hash"`
-	OutputPath          string                           `json:"output_path"`
-	ProjectConfig       config.ProjectConfig             `json:"project_config"`
-	AgentConfig         config.AgentConfig               `json:"agent_config"`
-	SkillsConfig        config.SkillsConfig              `json:"skills_config"`
-	Patterns            []domain.Pattern                 `json:"patterns"`
-	PatternInsights     map[string]domain.PatternInsight `json:"pattern_insights,omitempty"`
-	Profile             *domain.ProjectProfile           `json:"profile,omitempty"`
+type WorkflowReference struct {
+	ID          string
+	Name        string
+	Path        string
+	Description string
 }
 
 // Stats 统计信息

@@ -16,6 +16,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Generation | [`skills-seed generate`](#skills-seed-generate) | Generate skills from profiles and patterns | `skills-seed generate skills` |
 | Preview | [`skills-seed preview`](#skills-seed-preview) | Preview files selected for full or incremental analysis | `skills-seed preview files` |
 | Pattern Management | [`skills-seed patterns`](#skills-seed-patterns) | Add, delete, curate, and inspect patterns | `skills-seed patterns show` |
+| Workflow | [`skills-seed workflow`](#skills-seed-workflow) | Add or update user task workflows | `skills-seed workflow --context "..."` |
 | Review Metrics | [`skills-seed review`](#skills-seed-review) | Import review comments and measure pattern coverage | `skills-seed review stats` |
 | Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show or refresh the project profile | `skills-seed profile show` |
 | One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
@@ -32,6 +33,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
 | Daily incremental update | `skills-seed sync` | Learns current changes and generates only dirty targets |
 | Add one missed rule | `skills-seed sync --add "<description>"` | Skips code learning, adds a natural-language pattern, then generates |
+| Update task workflow | `skills-seed workflow --context "<notes>"` → `skills-seed generate skills` | `--context` is optimized by the Agent into a standard workflow; omit `--name` to generate one, specify a name with `--append` to merge notes |
 | Pre-commit updates | `skills-seed hook install` | Install the pre-commit hook and choose sync, learn only, or skip before commit |
 | Inspect learned changes | `skills-seed log` | Show recent learned and generated changes in a git-log-like format |
 | Inspect learned output | `skills-seed patterns show` → `skills-seed profile show` | Verify learned patterns and the current project profile |
@@ -43,10 +45,10 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed check` | Check staged files | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
 | `skills-seed generate` | Generate AI Agent outputs | `skills` | `--help, -h` = `false` |
-| `skills-seed generate skills` | Generate AI Agent skills | - | `--force` = `false`<br>`--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
+| `skills-seed generate skills` | Generate AI Agent skills | - | `--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
 | `skills-seed hook` | Manage Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed hook install` | Install Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
@@ -58,7 +60,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
 | `skills-seed patterns add <description>` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
-| `skills-seed patterns compact` | Compact similar patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
+| `skills-seed patterns compact` | Compact similar patterns | - | `--ai` = `false`<br>`--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern | - | `--help, -h` = `false` |
 | `skills-seed patterns show [pattern-id]` | Show learned pattern overview or full details | - | `--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed patterns stats` | Show learned pattern quality and check hit statistics | - | `--help, -h` = `false` |
@@ -72,6 +74,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
 | `skills-seed sync` | One-stop sync: learn or add patterns + generate skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed workflow` | Add or update a user workflow | - | `--append` = `false`<br>`--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = `` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | Add sub-projects to workspace | - | `--help, -h` = `false` |
 <!-- COMMAND_TREE_END -->
@@ -288,7 +291,7 @@ skills-seed learn history --limit 40 --batch-size 5
 3. The workspace root coordinates learning and does not store child patterns in root storage.
 4. Workspace child projects run with real concurrency according to `agent.parallelism`.
 5. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
-6. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; generated output refreshes are handled by the `generate skills` input fingerprint.
+6. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
 7. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-file` affect only the current command.
 8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
 9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use the embedded tree-sitter structural pre-scan configured by `learning.current.structural`; without bounded inputs, it does not scan the whole repository.
@@ -318,7 +321,6 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 |---|---:|---|
 | `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
 | `--no-references` | `false` | Generate only the entry `SKILL.md` and skip detailed `references/` files |
-| `--force` | `false` | Ignore pattern dirty state and regenerate all skills |
 | `--help`, `-h` | `false` | Show `generate skills` help |
 
 #### Common Examples
@@ -358,11 +360,10 @@ references/
 
 #### Notes
 
-1. Workspace mode generates each child skill using that child's own config first, then generates the workspace root skill on the first run; later runs generate only targets affected by pattern or workspace-relationship changes.
+1. Workspace mode regenerates each child skill using that child's own config first, then regenerates the workspace root skill.
 2. A manual `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
 3. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
-4. `generate skills` records an md5 for generation inputs. When project profile, patterns, hit stats, config, prompt/skill templates, and output path are unchanged, and generated outputs are complete, Skills Seed skips the agent summary and file rewrite. Workspace root skills use the same mechanism for unchanged root outputs.
-5. Use `skills-seed generate skills --force` when every target must be regenerated.
+4. `generate skills` does not check a generation-input fingerprint. When run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds from the current profile, patterns, and workflows.
 
 ### `skills-seed preview`
 
@@ -419,7 +420,7 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 |---|---|---|---|
 | `skills-seed patterns add <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add "Use RESTful API routes" --category api` | Calls the AI agent |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern by ID | `skills-seed patterns delete plugin-source-editing-rule` | Workspace root also deletes the linked child project pattern |
-| `skills-seed patterns compact` | Ask the current agent to curate and compact similar patterns | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
+| `skills-seed patterns compact` | Compact similar patterns locally by default; call the Agent for semantic merging only with `--ai` | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
 | `skills-seed patterns show [pattern-id]` | Show the overview without arguments, or full details for one ID | `skills-seed patterns show business-create-order --format json` | Does not call the AI agent or modify the database |
 
@@ -449,6 +450,7 @@ When run from a workspace root, `patterns add` writes the root pattern first. If
 
 | Flag | Default | Description |
 |---|---:|---|
+| `--ai` | `false` | Use AI for semantic merging; default uses local deterministic merging and does not call the Agent |
 | `--category`, `-c` | empty | Compact only one category, such as `business`, `api`, or `testing`; empty means all |
 | `--dry-run` | `false` | Preview compact results without writing to the database |
 | `--help`, `-h` | `false` | Show `patterns compact` help |
@@ -476,6 +478,7 @@ skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
 skills-seed patterns compact --category business --dry-run
+skills-seed patterns compact --ai --dry-run
 skills-seed patterns stats
 skills-seed patterns show
 skills-seed patterns show business-create-order
@@ -484,7 +487,7 @@ skills-seed patterns show business-create-order --format json
 
 #### Notes
 
-1. `patterns compact` calls the CLI configured by the current `agent.engine`.
+1. `patterns compact` uses local deterministic merging by default and does not call the Agent. It calls the CLI configured by the current `agent.engine` only when `--ai` is set.
 2. Use `--dry-run` first when you want to inspect the curation result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
 4. `patterns show` without arguments prints the pattern overview list. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.

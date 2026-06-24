@@ -29,12 +29,12 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 						{"learn-analyze", sampleAnalyzeRequest()},
 						{"learn-batch", sampleBatchLearnData()},
 						{"fix-generate", sampleGenerateFixesRequest()},
-						{"skill-project-summary", sampleGenerateSkillsData()},
 						{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
 						{"pattern-curate", sampleCuratePatternsData()},
 						{"project-analyze", sampleProjectAnalysisData()},
 						{"skill-workspace-profile", workspacePromptData()},
 						{"skill-workspace-spec", workspaceSpecPromptData()},
+						{"workflow-optimize", sampleOptimizeWorkflowRequest()},
 					} {
 						t.Run(tc.name, func(t *testing.T) {
 							prompt, err := loader.Render(tc.name, tc.data)
@@ -46,20 +46,6 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
-	loader := New("claude", "en-US", "")
-
-	_, err := loader.Render("skill-project-summary", map[string]interface{}{
-		"LANGUAGE":             "go",
-		"PATTERNS_PATH":        "/tmp/skills-seed/patterns.json",
-		"PATTERNS_COUNT":       0,
-		"EXISTING_SKILLS_PATH": "",
-	})
-
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "PROJECT_NAME")
 }
 
 func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
@@ -75,10 +61,10 @@ func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
 func TestLoader_RendersSkillsPromptsWithSkillsLocale(t *testing.T) {
 	loader := NewWithLocales("loader", "zh-CN", "en-US", "")
 
-	skillsPrompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
+	skillsPrompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
 	require.NoError(t, err)
-	require.Contains(t, skillsPrompt, "You are a code pattern analysis expert")
-	require.NotContains(t, skillsPrompt, "你是一位代码模式分析专家")
+	require.Contains(t, skillsPrompt, "All user-facing natural-language fields must be written in English")
+	require.NotContains(t, skillsPrompt, "面向用户阅读的自然语言字段应优先使用简体中文")
 
 	toolPrompt, err := loader.Render("fix-generate", sampleGenerateFixesRequest())
 	require.NoError(t, err)
@@ -89,10 +75,10 @@ func TestLoader_RendersSkillsPromptsWithSkillsLocale(t *testing.T) {
 func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "skill-project-summary.md"), []byte("USER SUMMARY INSTRUCTIONS"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "workflow-optimize.md"), []byte("USER WORKFLOW INSTRUCTIONS"), 0644))
 
 	loader := NewWithLocales("loader", "zh-CN", "en-US", seedPath)
-	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
+	prompt, err := loader.Render("workflow-optimize", sampleOptimizeWorkflowRequest())
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "# Mandatory Final Output Rules")
@@ -891,19 +877,6 @@ func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing
 	require.Contains(t, prompt, "不要从模板示例推断具体技术栈")
 }
 
-func TestLoader_RenderZhGenerateSkillsSummaryRequiresChineseNaturalLanguage(t *testing.T) {
-	loader := New("codex", "zh-CN", "")
-
-	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
-	require.NoError(t, err)
-
-	require.Contains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
-	require.Contains(t, prompt, "允许中英文混合表达技术概念")
-	require.Contains(t, prompt, "英文专有名词可保留原文")
-	require.NotContains(t, prompt, "用户提供的上下文")
-	require.NotContains(t, prompt, "USER_CONTEXT_PATH")
-}
-
 func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing.T) {
 	loader := New("codex", "en-US", "")
 
@@ -913,17 +886,6 @@ func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing
 	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
 	require.Contains(t, prompt, "`framework_patterns` must describe concrete framework or library usage in English")
 	require.Contains(t, prompt, "Do not infer a concrete technology stack from template examples")
-}
-
-func TestLoader_RenderEnGenerateSkillsSummaryRequiresEnglishNaturalLanguage(t *testing.T) {
-	loader := New("codex", "en-US", "")
-
-	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
-	require.NoError(t, err)
-
-	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
-	require.Contains(t, prompt, "If input patterns, existing Skills, README text, code comments, or user-provided context contain Chinese")
-	require.Contains(t, prompt, "Do not output Chinese phrases such as “业务流程”")
 }
 
 func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testing.T) {
@@ -936,7 +898,6 @@ func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testin
 		{"learn-batch", sampleBatchLearnData()},
 		{"pattern-curate", sampleCuratePatternsData()},
 		{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
-		{"skill-project-summary", sampleGenerateSkillsData()},
 		{"skill-workspace-profile", workspacePromptData()},
 		{"skill-workspace-spec", workspaceSpecPromptData()},
 		{"user-define-pattern", sampleUserDefinePatternData()},
@@ -990,6 +951,7 @@ func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testin
 		{"learn-batch", sampleBatchLearnData()},
 		{"fix-generate", sampleGenerateFixesRequest()},
 		{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+		{"workflow-optimize", sampleOptimizeWorkflowRequest()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prompt, err := loader.Render(tc.name, tc.data)
@@ -1011,10 +973,10 @@ func TestLoader_RuntimePromptsRequireFinalJSONSelfCheck(t *testing.T) {
 		"skill-project-init":      sampleAnalyzeCurrentCodebaseRequest(),
 		"project-analyze":         sampleProjectAnalysisData(),
 		"pattern-curate":          sampleCuratePatternsData(),
-		"skill-project-summary":   sampleGenerateSkillsData(),
 		"skill-workspace-profile": workspacePromptData(),
 		"skill-workspace-spec":    workspaceSpecPromptData(),
 		"user-define-pattern":     sampleUserDefinePatternData(),
+		"workflow-optimize":       sampleOptimizeWorkflowRequest(),
 	}
 	require.ElementsMatch(t, loaderRuntimePromptNames(t), sortedMapKeys(promptData))
 
@@ -1178,16 +1140,6 @@ func TestLoader_ProjectInitPromptDoesNotHardCodeFrameworkCatalog(t *testing.T) {
 	require.Contains(t, prompt, "只提取项目实际使用的框架")
 }
 
-func TestLoader_ZhSkillSummaryUsesCorrectConcurrencySpelling(t *testing.T) {
-	loader := New("loader", "zh-CN", "")
-
-	prompt, err := loader.Render("skill-project-summary", sampleGenerateSkillsData())
-
-	require.NoError(t, err)
-	require.Contains(t, prompt, "concurrency")
-	require.NotContains(t, prompt, "conurrency")
-}
-
 func sampleAnalyzeRequest() *agent.AnalyzeRequest {
 	return &agent.AnalyzeRequest{
 		Files: []domain.FileInfo{domain.NewFileInfo("main.go", "package main\nfunc main() {}\n")},
@@ -1233,16 +1185,6 @@ func sampleGenerateFixesRequest() *agent.GenerateFixesRequest {
 			Frameworks:   []string{"cobra"},
 			Dependencies: []string{"bbolt"},
 		},
-	}
-}
-
-func sampleGenerateSkillsData() map[string]interface{} {
-	return map[string]interface{}{
-		"PROJECT_NAME":         "demo",
-		"LANGUAGE":             "go",
-		"PATTERNS_PATH":        "/tmp/skills-seed/patterns.json",
-		"PATTERNS_COUNT":       1,
-		"EXISTING_SKILLS_PATH": "",
 	}
 }
 
@@ -1295,6 +1237,15 @@ func sampleUserDefinePatternData() map[string]interface{} {
 		"Description":       "新增接口时复用现有 mapper",
 		"Category":          "structure",
 		"AllowedCategories": domain.AllowedPatternCategoriesText(),
+	}
+}
+
+func sampleOptimizeWorkflowRequest() *agent.OptimizeWorkflowRequest {
+	return &agent.OptimizeWorkflowRequest{
+		ID:       "deploy",
+		Name:     "deploy",
+		Context:  "发布前检查环境变量和构建产物，发布后执行 smoke test",
+		Language: "go",
 	}
 }
 

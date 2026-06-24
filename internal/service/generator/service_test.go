@@ -2,7 +2,6 @@ package generator
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
@@ -11,66 +10,59 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	workflowsvc "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestService(mockAgent *mocks.MockAgent, mockPattern *mocks.MockPatternRepository) *GeneratorService {
+func newTestService(mockPattern *mocks.MockPatternRepository) *GeneratorService {
 	loader := skills.NewLoader("zh-CN")
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	return NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+	return NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 }
 
 func TestGenerateSkills_NoPatterns(t *testing.T) {
-	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{}, nil
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 	assert.NoError(t, err)
 }
 
 func TestGenerateSkills_RepoError(t *testing.T) {
-	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return nil, errors.New("db error")
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 	assert.Error(t, err)
 }
 
-func TestGenerateSkills_AIError(t *testing.T) {
+func TestGenerateSkillsDoesNotCallAISummary(t *testing.T) {
 	patterns := []domain.Pattern{
 		*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
 	}
 	patterns[0].Confidence = 0.9
 
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return nil, errors.New("AI error")
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return patterns, nil
@@ -81,44 +73,33 @@ func TestGenerateSkills_AIError(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "AI")
+	assert.NoError(t, err)
 }
 
-func TestGenerateSkillsSummaryRequestIncludesEvidenceLocations(t *testing.T) {
+func TestGenerateSkillsRendersEvidenceLocationsWithoutAISummary(t *testing.T) {
 	pattern := domain.NewPattern("error-wrap", "Error Wrap", domain.CategoryError)
 	pattern.Confidence = 0.9
+	pattern.SetDescription("Wrap config load errors")
+	pattern.SetRule("Wrap config errors with path context")
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
 		{Path: "internal/service/config.go", Line: 42, Symbol: "LoadConfig", Kind: "function", Description: "wraps config errors", Confidence: 0.88},
 	}
 
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			var data []map[string]any
-			require.NoError(t, json.Unmarshal([]byte(req.PatternsJSON), &data))
-			require.Len(t, data, 1)
-			locations, ok := data[0]["evidence_locations"].([]any)
-			require.True(t, ok)
-			require.Len(t, locations, 1)
-			location, ok := locations[0].(map[string]any)
-			require.True(t, ok)
-			require.Equal(t, "internal/service/config.go", location["path"])
-			require.Equal(t, float64(42), location["line"])
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
-	require.NoError(t, svc.GenerateSkills(context.Background(), t.TempDir()))
+	svc := newTestService(mockPattern)
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+	content := readGeneratedFile(t, tmpDir, "references", "patterns", "error.md")
+	require.Contains(t, content, "Error Wrap")
+	require.Contains(t, content, "Wrap config errors with path context")
 }
 
 func TestGenerateSkills_FillsMissingCategorySummaries(t *testing.T) {
@@ -127,20 +108,13 @@ func TestGenerateSkills_FillsMissingCategorySummaries(t *testing.T) {
 	pattern.SetDescription("Wrap errors with context")
 	pattern.SetRule("Use fmt.Errorf with %w")
 	pattern.SetExamples("return fmt.Errorf(\"load: %w\", err)", "return err")
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 	assert.NoError(t, err)
@@ -167,13 +141,6 @@ func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Wrap errors with context")
 	pattern.SetRule("Use fmt.Errorf with %w")
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -193,7 +160,7 @@ func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	var started []string
 	var completed []string
@@ -208,14 +175,14 @@ func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
 		"解析输出目录",
 		"加载已学习模式",
 		"读取项目画像",
-		"检查生成输入",
-		"生成 skills 摘要",
+		"检查输出目录",
+		"整理生成数据",
 		"写入技能文件",
 	}, started)
 	require.Equal(t, started, completed)
 }
 
-func TestGenerateSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T) {
+func TestGenerateSkillsRebuildsWhenInputFingerprintUnchanged(t *testing.T) {
 	ctx := context.Background()
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
@@ -228,17 +195,6 @@ func TestGenerateSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T) {
 	defer patternRepo.Close()
 	require.NoError(t, patternRepo.Save(ctx, pattern))
 
-	calls := 0
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			calls++
-			if calls > 1 {
-				t.Fatal("skills summary generation should be skipped when input fingerprint is unchanged")
-			}
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
 			return &domain.ProjectProfile{
@@ -253,12 +209,110 @@ func TestGenerateSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(patternRepo, mockProfile, loader, cfg)
 	outputPath := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
 	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
-	require.Equal(t, 1, calls)
+	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
+}
+
+func TestGenerateSkillsDoesNotSkipWhenWorkflowScriptChanges(t *testing.T) {
+	ctx := context.Background()
+	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Wrap errors with context")
+	pattern.SetRule("Use fmt.Errorf with %w")
+
+	seedPath := t.TempDir()
+	dbPath := filepath.Join(seedPath, "project.db")
+	patternRepo, err := boltdb.NewPatternRepository(dbPath)
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+	}
+	workflowRepo := workflowstore.NewRepository(seedPath)
+	workflowSvc := workflowsvc.NewService(workflowRepo, mockAgent, "go")
+	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{
+		Name:    "deploy",
+		Context: "发布前检查环境变量",
+	})
+	require.NoError(t, err)
+	scriptPath := filepath.Join(seedPath, "workflows", "deploy", "scripts", "smoke-test.sh")
+	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\necho first\n"), 0755))
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				GeneratedAt: "2026-05-19 12:00:00",
+			}, nil
+		},
+	}
+	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	})
+	svc.SetWorkflowRepository(workflowRepo)
+	outputPath := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\necho second\n"), 0755))
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+
+	generatedScript := readGeneratedFile(t, outputPath, "scripts", "workflows", "deploy", "smoke-test.sh")
+	require.Contains(t, generatedScript, "echo second")
+}
+
+func TestGenerateSkillsRemovesDeletedWorkflowOutputs(t *testing.T) {
+	ctx := context.Background()
+	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Wrap errors with context")
+	pattern.SetRule("Use fmt.Errorf with %w")
+
+	seedPath := t.TempDir()
+	dbPath := filepath.Join(seedPath, "project.db")
+	patternRepo, err := boltdb.NewPatternRepository(dbPath)
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	require.NoError(t, patternRepo.Save(ctx, pattern))
+	workflowRepo := workflowstore.NewRepository(seedPath)
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{NameVal: "test", AvailableVal: true}, "go")
+	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{Name: "deploy", Context: "发布前检查环境变量"})
+	require.NoError(t, err)
+	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{Name: "test", Context: "发布后执行 smoke test"})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "workflows", "test", "scripts", "smoke-test.sh"), []byte("#!/bin/sh\necho ok\n"), 0755))
+
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{ProjectName: "test", Language: "go", Summary: "demo"}, nil
+		},
+	}
+	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	})
+	svc.SetWorkflowRepository(workflowRepo)
+	outputPath := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+	require.FileExists(t, filepath.Join(outputPath, "workflows", "deploy.md"))
+	require.FileExists(t, filepath.Join(outputPath, "workflows", "test.md"))
+	require.FileExists(t, filepath.Join(outputPath, "scripts", "workflows", "test", "smoke-test.sh"))
+
+	require.NoError(t, os.RemoveAll(filepath.Join(seedPath, "workflows", "test")))
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+
+	require.FileExists(t, filepath.Join(outputPath, "workflows", "deploy.md"))
+	require.NoFileExists(t, filepath.Join(outputPath, "workflows", "test.md"))
+	require.NoDirExists(t, filepath.Join(outputPath, "scripts", "workflows", "test"))
+	skill := readGeneratedFile(t, outputPath, "SKILL.md")
+	require.Contains(t, skill, "./workflows/deploy.md")
+	require.NotContains(t, skill, "./workflows/test.md")
 }
 
 func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) {
@@ -273,13 +327,6 @@ func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) 
 	require.NoError(t, err)
 	defer patternRepo.Close()
 	require.NoError(t, patternRepo.Save(ctx, pattern))
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockProfile := &mocks.MockProjectProfileRepository{
 		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
 			return &domain.ProjectProfile{
@@ -294,7 +341,7 @@ func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) 
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(patternRepo, mockProfile, loader, cfg)
 	outputPath := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
@@ -311,13 +358,6 @@ func TestGenerateSkillsWithOptionsSkipsReferencesAndReferenceLinks(t *testing.T)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Use existing business rule")
 	pattern.SetRule("Reuse the documented flow")
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -350,7 +390,7 @@ func TestGenerateSkillsWithOptionsSkipsReferencesAndReferenceLinks(t *testing.T)
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 
 	err := svc.GenerateSkillsWithOptions(context.Background(), tmpDir, GenerateOptions{SkipReferences: true})
@@ -364,22 +404,57 @@ func TestGenerateSkillsWithOptionsSkipsReferencesAndReferenceLinks(t *testing.T)
 	assertNoBrokenMarkdownLinks(t, tmpDir)
 }
 
-func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t *testing.T) {
+func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
+	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Wrap errors with context")
+	pattern.SetRule("Use fmt.Errorf with %w")
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{ProjectName: "test", Language: "go", Summary: "demo"}, nil
+		},
+	}
+	seedPath := t.TempDir()
+	workflowRepo := workflowstore.NewRepository(seedPath)
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{NameVal: "test", AvailableVal: true}, "go")
+	_, err := workflowSvc.UpsertWorkflow(context.Background(), workflowsvc.UpsertRequest{
+		Name:    "deploy",
+		Context: "发布前检查环境变量和构建产物，发布后执行 smoke test",
+	})
+	require.NoError(t, err)
+	scriptPath := filepath.Join(seedPath, "workflows", "deploy", "scripts", "smoke-test.sh")
+	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\necho ok\n"), 0755))
+
+	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	})
+	svc.SetWorkflowRepository(workflowRepo)
+	outputPath := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
+
+	skill := readGeneratedFile(t, outputPath, "SKILL.md")
+	require.Contains(t, skill, "## 用户工作流")
+	require.Contains(t, skill, "./workflows/deploy.md")
+	workflowContent := readGeneratedFile(t, outputPath, "workflows", "deploy.md")
+	require.Contains(t, workflowContent, "## 适用场景")
+	require.Contains(t, workflowContent, "发布前检查环境变量")
+	require.FileExists(t, filepath.Join(outputPath, "scripts", "workflows", "deploy", "smoke-test.sh"))
+	assertNoBrokenMarkdownLinks(t, outputPath)
+}
+
+func TestGenerateSkillsRebuildsGeneratedOutputWithoutReadingExistingSkill(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Wrap errors with context")
 	pattern.SetRule("Use fmt.Errorf with %w")
 	pattern.SetExamples("const secretGoodExample = true", "const secretBadExample = true")
 
-	var received *agent.GenerateSkillsRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			copied := *req
-			received = &copied
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -390,20 +465,20 @@ func TestGenerateSkills_SummaryRequestOmitsCodeExamplesAndExistingSkillContent(t
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("<!-- generated-by: skills-seed v0.0.4 -->\nconst secretExistingSkillContent = true"), 0644))
 
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 
 	require.NoError(t, err)
-	require.NotNil(t, received)
-	assert.NotContains(t, received.PatternsJSON, "secretGoodExample")
-	assert.NotContains(t, received.PatternsJSON, "secretBadExample")
-	assert.Equal(t, filepath.Join(tmpDir, "SKILL.md"), received.ExistingSkillsPath)
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	assert.NotContains(t, skill, "secretExistingSkillContent")
+	assert.NotContains(t, skill, "secretGoodExample")
+	assert.NotContains(t, skill, "secretBadExample")
 }
 
-func TestGenerateSkills_SummaryRequestIncludesMetricsAndHitStatsInRankedOrder(t *testing.T) {
+func TestGenerateSkillsDeterministicSummaryUsesMetricsAndHitStatsInRankedOrder(t *testing.T) {
 	generic := domain.NewPattern("generic", "Generic Rule", domain.CategoryError)
 	generic.Confidence = 0.95
 	generic.Frequency = 10
@@ -428,15 +503,6 @@ func TestGenerateSkills_SummaryRequestIncludesMetricsAndHitStatsInRankedOrder(t 
 	specific.SetDescription("Use internal/service/auth/session.go when validating KMC admin sessions")
 	specific.SetRule("Validate KMC admin sessions through SessionService before controller mutations")
 
-	var received *agent.GenerateSkillsRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			copied := *req
-			received = &copied
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*generic, *specific}, nil
@@ -449,22 +515,17 @@ func TestGenerateSkills_SummaryRequestIncludesMetricsAndHitStatsInRankedOrder(t 
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	svc := newTestService(mockPattern)
+	tmpDir := t.TempDir()
 
-	require.NoError(t, svc.GenerateSkills(context.Background(), t.TempDir()))
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
-	require.NotNil(t, received)
-	var payload []map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(received.PatternsJSON), &payload))
-	require.Len(t, payload, 2)
-	assert.Equal(t, "specific", payload[0]["id"])
-	assert.Equal(t, float64(4), payload[0]["hit_count"])
-	assert.Contains(t, payload[0], "metrics")
-	metrics, ok := payload[0]["metrics"].(map[string]interface{})
-	require.True(t, ok)
-	assert.Equal(t, float64(0.88), metrics["EffectiveScore"])
-	assert.Equal(t, float64(5), metrics["EvidenceCount"])
-	assert.Equal(t, "generic", payload[1]["id"])
+	business := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	errorPatterns := readGeneratedFile(t, tmpDir, "references", "patterns", "error.md")
+	assert.Contains(t, business, "KMC Auth Boundary")
+	assert.Contains(t, errorPatterns, "Generic Rule")
+	spec := readGeneratedFile(t, tmpDir, "references", "project-spec.md")
+	assert.Less(t, strings.Index(spec, "KMC Auth Boundary"), strings.Index(spec, "Generic Rule"))
 }
 
 func TestRankPatternsForGenerationUsesEffectiveScoreHitsAndConfidence(t *testing.T) {
@@ -492,21 +553,12 @@ func TestRankPatternsForGenerationUsesEffectiveScoreHitsAndConfidence(t *testing
 	assert.Equal(t, 0.22, insights["low"].GenerationRank)
 }
 
-func TestGenerateSkillsDoesNotPassRuntimeUserContextToAISummary(t *testing.T) {
+func TestGenerateSkillsDoesNotUseRuntimeUserContextDuringGenerate(t *testing.T) {
 	pattern := domain.NewPattern("p1", "HSM Delivery Boundary", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("HSM 私有化交付边界")
 	pattern.SetRule("保留用户说明中的交付边界")
 
-	var received *agent.GenerateSkillsRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			copied := *req
-			received = &copied
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -517,36 +569,19 @@ func TestGenerateSkillsDoesNotPassRuntimeUserContextToAISummary(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。")
 
 	require.NoError(t, svc.GenerateSkills(ctx, t.TempDir()))
 
-	require.NotNil(t, received)
 }
 
-func TestGenerateSkills_AlwaysUsesAISummary(t *testing.T) {
+func TestGenerateSkillsUsesDeterministicSummary(t *testing.T) {
 	pattern := domain.NewPattern("p1", "HSM Delivery Boundary", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("HSM 私有化交付边界")
 	pattern.SetRule("保留用户说明中的交付边界")
 
-	called := false
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			called = true
-			return &agent.GenerateSkillsResult{
-				CategorySummaries: map[string]agent.CategorySummary{
-					"business": {
-						Category: "business",
-						Summary:  "AI 根据用户说明生成的业务边界摘要",
-						Patterns: []string{"HSM Delivery Boundary"},
-					},
-				},
-			}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -556,39 +591,22 @@ func TestGenerateSkills_AlwaysUsesAISummary(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。")
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(ctx, tmpDir))
 
-	require.True(t, called)
-	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "AI 根据用户说明生成的业务边界摘要")
+	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "business 分类包含 1 个项目特定模式")
 	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "other.md"), "HSM Delivery Boundary")
 }
 
-func TestGenerateSkills_AIModeCallsAgentSummary(t *testing.T) {
+func TestGenerateSkillsDoesNotCallAgentSummary(t *testing.T) {
 	pattern := domain.NewPattern("p1", "AI Rule", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("ai mode rule")
 	pattern.SetRule("ask agent for category summary")
 
-	called := false
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			called = true
-			return &agent.GenerateSkillsResult{
-				CategorySummaries: map[string]agent.CategorySummary{
-					"business": {
-						Category: "business",
-						Summary:  "AI generated business summary",
-						Patterns: []string{"AI Rule"},
-					},
-				},
-			}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -598,13 +616,12 @@ func TestGenerateSkills_AIModeCallsAgentSummary(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
-	assert.True(t, called)
-	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "AI generated business summary")
+	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "business 分类包含 1 个项目特定模式")
 	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "other.md"), "AI Rule")
 }
 
@@ -619,7 +636,7 @@ func TestGenerateSkills_DoesNotOverwriteManualSkill(t *testing.T) {
 			return []domain.Pattern{*pattern}, nil
 		},
 	}
-	svc := newTestService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, mockPattern)
+	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("# Manual Skill\n"), 0644))
 
@@ -644,7 +661,7 @@ func TestGenerateSkills_OverwritesGeneratedSkill(t *testing.T) {
 			return []domain.Pattern{*pattern}, nil
 		},
 	}
-	svc := newTestService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, mockPattern)
+	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("<!-- generated-by: skills-seed v0.0.4 -->\nold generated skill\n"), 0644))
 
@@ -661,13 +678,6 @@ func TestGenerateSkills_OverwritesGeneratedSkill(t *testing.T) {
 func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -683,7 +693,7 @@ func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	err := svc.GenerateSkills(context.Background(), t.TempDir())
 	assert.Error(t, err)
@@ -693,13 +703,6 @@ func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
 func TestGenerateSkills_RendersProjectOverviewFromProfile(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -720,7 +723,7 @@ func TestGenerateSkills_RendersProjectOverviewFromProfile(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "references"), 0755))
@@ -745,20 +748,13 @@ func TestGenerateSkills_MainSkillReferencesOnlyGeneratedCategories(t *testing.T)
 	databasePattern.Confidence = 0.8
 	databasePattern.SetDescription("Use repository query helpers")
 	databasePattern.SetRule("Keep database access in repository code")
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*businessPattern, *databasePattern}, nil
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
@@ -780,13 +776,6 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Use the existing business flow")
 	pattern.SetRule("Reuse the documented flow")
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -840,7 +829,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -888,32 +877,6 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	pattern.SetDescription("Use the existing business flow")
 	pattern.SetRule("Reuse the documented flow")
 
-	mockAgent := &mocks.MockAgent{
-		NameVal: "claude", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{
-				CategorySummaries: map[string]agent.CategorySummary{
-					"business": {
-						Category:    "business",
-						Summary:     "Business-specific conventions",
-						Patterns:    []string{"Business Flow"},
-						UsageScenes: []string{"when changing business flows"},
-						Priority:    5,
-						BusinessMethods: []*domain.BusinessMethod{
-							{
-								Name:         "DuplicatedMethod",
-								CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/demo.go:10"},
-								Description:  "method already documented in business-methods.md",
-								Usage:        "business flow reuse",
-								Type:         "domain",
-								Function:     "func DuplicatedMethod() error",
-							},
-						},
-					},
-				},
-			}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -952,7 +915,7 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 		AgentCfg:   config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -993,13 +956,6 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	concurrencyPattern.Confidence = 0.95
 	concurrencyPattern.SetDescription("The service uses mutex protected maps")
 	concurrencyPattern.SetRule("Public methods lock and Locked helpers assume caller holds lock")
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*apiPattern, *businessPattern, *concurrencyPattern}, nil
@@ -1037,7 +993,7 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -1070,12 +1026,6 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 }
 
 func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)}, nil
@@ -1090,7 +1040,7 @@ func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), mockAgent, &mocks.MockConfigReader{
+	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "backend"},
 	})
 	tmpDir := t.TempDir()
@@ -1109,20 +1059,13 @@ func TestGenerateSkills_SkipsEmptyBusinessMethodDetails(t *testing.T) {
 	pattern.SetDescription("Use the existing business flow")
 	pattern.SetRule("Reuse the documented flow")
 	pattern.SetBusinessMethod(&domain.BusinessMethod{})
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
 		},
 	}
 
-	svc := newTestService(mockAgent, mockPattern)
+	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
@@ -1142,20 +1085,6 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 		businessPatternWithLocation("notification-delivery", "Delivery Rule", "Delivery records notification attempts", "Record delivery attempts before retry", "func (s *Service) Deliver(id int64) error {\n\treturn nil\n}", "internal/application/notification/delivery.go:20"),
 	}
 
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{
-				CategorySummaries: map[string]agent.CategorySummary{
-					"business": {
-						Category: "business",
-						Summary:  "业务规则覆盖 billing 和 notification。",
-						Priority: 5,
-					},
-				},
-			}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return patterns, nil
@@ -1188,7 +1117,7 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
@@ -1217,12 +1146,6 @@ func TestGenerateSkills_CodexWritesOpenAIMetadata(t *testing.T) {
 	pattern.SetDescription("Use the existing business flow")
 	pattern.SetRule("Reuse the documented flow")
 
-	mockAgent := &mocks.MockAgent{
-		NameVal: "codex", AvailableVal: true,
-		GenerateSkillsSummaryFn: func(ctx context.Context, req *agent.GenerateSkillsRequest) (*agent.GenerateSkillsResult, error) {
-			return &agent.GenerateSkillsResult{}, nil
-		},
-	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*pattern}, nil
@@ -1233,7 +1156,7 @@ func TestGenerateSkills_CodexWritesOpenAIMetadata(t *testing.T) {
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 		AgentCfg:   config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg)
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
@@ -1365,7 +1288,7 @@ func assertMarkdownTableHasNoBlankLines(t *testing.T, content, heading string) {
 }
 
 func TestCalculateStats(t *testing.T) {
-	svc := newTestService(nil, nil)
+	svc := newTestService(nil)
 
 	patterns := []domain.Pattern{
 		*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
@@ -1388,7 +1311,7 @@ func TestCalculateStats(t *testing.T) {
 }
 
 func TestCalculateStats_Empty(t *testing.T) {
-	svc := newTestService(nil, nil)
+	svc := newTestService(nil)
 	stats := svc.calculateStats([]domain.Pattern{})
 	assert.Equal(t, 0, stats.Total)
 	assert.Equal(t, 0.0, stats.AvgConfidence)

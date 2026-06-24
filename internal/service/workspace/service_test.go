@@ -16,7 +16,9 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	workflowsvc "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +43,7 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -51,7 +53,7 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
 }
 
-func TestGenerateWorkspaceSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T) {
+func TestGenerateWorkspaceSkillsRebuildsGeneratedOutput(t *testing.T) {
 	ctx := context.Background()
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
@@ -69,7 +71,7 @@ func TestGenerateWorkspaceSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T)
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -82,7 +84,7 @@ func TestGenerateWorkspaceSkillsSkipsWhenInputFingerprintUnchanged(t *testing.T)
 
 	stat, err := os.Stat(skillPath)
 	require.NoError(t, err)
-	require.Equal(t, oldTime.UnixNano(), stat.ModTime().UnixNano())
+	require.NotEqual(t, oldTime.UnixNano(), stat.ModTime().UnixNano())
 }
 
 func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) {
@@ -103,7 +105,7 @@ func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *te
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -115,7 +117,7 @@ func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *te
 	require.FileExists(t, missingPath)
 }
 
-func TestGenerateWorkspaceSkillsIncludesRootPatternsInCrossProjectRules(t *testing.T) {
+func TestGenerateWorkspaceSkillsDoesNotUseRootPatternsAsWorkspaceRules(t *testing.T) {
 	ctx := context.Background()
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "hsmwebapi"), 0755))
@@ -142,35 +144,55 @@ func TestGenerateWorkspaceSkillsIncludesRootPatternsInCrossProjectRules(t *testi
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	rulesPath := filepath.Join(projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
 	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
-	require.Contains(t, rules, "插件源码修改规范")
-	require.Contains(t, rules, "改代码时应该改源插件代码")
-	require.Contains(t, rules, "`hsmwebapi`")
+	require.NotContains(t, rules, "插件源码修改规范")
+	require.NotContains(t, rules, "改代码时应该改源插件代码")
+	require.Contains(t, rules, "跨项目改动先定边界")
+}
 
-	oldTime := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	require.NoError(t, os.Chtimes(rulesPath, oldTime, oldTime))
-	pattern.SetRule("改代码时应该改源插件仓库，只有未在 plugins_custom.sh 定义时才改 plugins 目录。")
-	require.NoError(t, patternRepo.Save(ctx, pattern))
+func TestGenerateWorkspaceSkillsWritesWorkspaceWorkflows(t *testing.T) {
+	ctx := context.Background()
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	workflowRepo := workflowstore.NewRepository(seedPath)
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, "go")
+	_, err := workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{
+		Name:    "release",
+		Context: "发布前确认 backend 和部署脚本的兼容性",
+	})
+	require.NoError(t, err)
+
+	loader := skills.NewLoaderForAgent("claude", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
+	}
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc.SetWorkflowRepository(workflowRepo)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	stat, err := os.Stat(rulesPath)
-	require.NoError(t, err)
-	require.NotEqual(t, oldTime.UnixNano(), stat.ModTime().UnixNano())
-	rules = readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
-	require.Contains(t, rules, "只有未在 plugins_custom.sh 定义时才改 plugins 目录")
+	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace")
+	skill := readGeneratedFile(t, outputPath, "SKILL.md")
+	require.Contains(t, skill, "[release](./workflows/release.md)")
+	require.FileExists(t, filepath.Join(outputPath, "workflows", "release.md"))
+	require.Contains(t, readGeneratedFile(t, outputPath, "workflows", "release.md"), "发布前确认 backend")
 }
 
 func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
 
-	mockAgent := &mocks.MockAgent{
+	_ = &mocks.MockAgent{
 		NameVal: "claude", AvailableVal: true,
 		AnalyzeWorkspaceProfileFn: func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
 			require.Fail(t, "persisted workspace profile should be used before AI analysis")
@@ -217,7 +239,7 @@ func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg, profileRepo, specRepo)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, profileRepo, specRepo)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -229,6 +251,71 @@ func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "cross-project-rules.md")
 	require.Contains(t, rules, "离线交付边界")
 	require.Contains(t, rules, "学习阶段沉淀：变更 backend 时必须保留离线安装包验证。")
+}
+
+func TestGenerateWorkspaceSkillsFiltersUnknownWorkspaceProjects(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "front"), 0755))
+
+	profileRepo := &memoryWorkspaceProfileRepo{profile: &domain.WorkspaceProfile{
+		Name:     "demo",
+		RootPath: projectRoot,
+		Summary:  "backend 与 front 组成当前工作区。",
+		Projects: []domain.WorkspaceProject{
+			{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+			{ID: "front", Path: "front", Type: "frontend", Language: "typescript"},
+		},
+		Dependencies: []domain.WorkspaceDependency{
+			{From: "front", To: "backend", Reason: "前端调用后端 API"},
+			{From: "backend", To: "ai-rpc", Reason: "不存在的 RPC 服务"},
+		},
+		ImpactRoutes: []domain.WorkspaceRoute{
+			{PathPattern: "backend/**", ProjectIDs: []string{"backend"}, Reason: "后端内部变更"},
+			{PathPattern: "services/**", ProjectIDs: []string{"ai-rpc", "backend"}, Reason: "不存在服务目录"},
+		},
+	}}
+	specRepo := &memoryWorkspaceSpecRepo{spec: &domain.WorkspaceSpec{
+		Name:     "demo",
+		RootPath: projectRoot,
+		Routing: []domain.WorkspaceRoute{
+			{PathPattern: "backend/**", ProjectIDs: []string{"backend"}, Reason: "后端路径"},
+			{PathPattern: "services/ai-rpc/**/*.proto", ProjectIDs: []string{"ai-rpc", "backend"}, Reason: "不存在 RPC 契约"},
+		},
+		Rules: []domain.WorkspaceRule{
+			{Title: "接口一致性", Description: "backend 和 front 需要保持接口一致。", AppliesTo: []string{"backend", "front"}},
+			{Title: "RPC 同步", Description: "ai-rpc 变更后同步 backend。", AppliesTo: []string{"ai-rpc", "backend"}},
+		},
+		LoadMultipleSkillsWhen: []domain.WorkspaceLoadMultipleSkill{
+			{Condition: "修改 API", ProjectIDs: []string{"backend", "front"}, Reason: "前后端同步"},
+			{Condition: "修改 ai-rpc", ProjectIDs: []string{"ai-rpc", "backend"}, Reason: "RPC 同步"},
+		},
+	}}
+
+	loader := skills.NewLoaderForAgent("claude", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{
+				{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+				{ID: "front", Path: "front", Type: "frontend", Language: "typescript"},
+			},
+		},
+		AgentCfg: config.AgentConfig{Engine: "claude"},
+	}
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, profileRepo, specRepo)
+
+	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
+
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	require.Contains(t, overview, "`front` -> `backend`")
+	require.NotContains(t, overview, "ai-rpc")
+	require.NotContains(t, overview, "services/**")
+
+	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "cross-project-rules.md")
+	require.Contains(t, rules, "接口一致性")
+	require.NotContains(t, rules, "RPC 同步")
+	require.NotContains(t, rules, "services/ai-rpc")
 }
 
 func TestGenerateWorkspaceSkillsRejectsChildOutputOutsideChildRoot(t *testing.T) {
@@ -258,7 +345,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "codex", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 
 	err := svc.GenerateWorkspaceSkills(context.Background())
 
@@ -286,7 +373,7 @@ func TestGenerateWorkspaceSkillsDoesNotPersistRuntimeContextInWorkspaceReference
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), strings.TrimSpace(`
 HSM 工作区用于管理密码设备、密钥服务、KMIP 接入和日志/网络组件。
 hsmwebapi 是管理 API 入口，core-engine 是核心能力库。
@@ -305,81 +392,22 @@ hsmwebapi 是管理 API 入口，core-engine 是核心能力库。
 	require.NotContains(t, overview, "用户提供的工作区说明")
 }
 
-func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *testing.T) {
+func TestGenerateWorkspaceSkills_DoesNotCallWorkspaceAIInGenerate(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "hsmwebapi"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "kmip-go"), 0755))
 
-	var profileReq *agent.AnalyzeWorkspaceProfileRequest
-	var specReq *agent.AnalyzeWorkspaceSpecRequest
-	mockAgent := &mocks.MockAgent{
+	calledProfile := false
+	calledSpec := false
+	_ = &mocks.MockAgent{
 		NameVal: "claude", AvailableVal: true,
 		AnalyzeWorkspaceProfileFn: func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
-			profileReq = req
-			workspaceInput := readFilePath(t, req.WorkspaceInputPath)
-			require.Contains(t, workspaceInput, `"id": "hsmwebapi"`)
-			require.Contains(t, workspaceInput, `"skill_path": "hsmwebapi/.claude/skills/skills-seed-skills/SKILL.md"`)
-			return &domain.WorkspaceProfile{
-				Name:     req.WorkspaceName,
-				RootPath: req.WorkspaceRoot,
-				Summary:  "HSM 工作区负责私有化密码设备管理，hsmwebapi 调用 kmip-go 暴露 KMIP 能力。",
-				Projects: []domain.WorkspaceProject{
-					{
-						ID:             "hsmwebapi",
-						Path:           "hsmwebapi",
-						Type:           "backend",
-						Language:       "go",
-						Responsibility: "主后端，负责管理 API 和调用 KMIP 能力。",
-					},
-					{
-						ID:             "kmip-go",
-						Path:           "kmip-go",
-						Type:           "backend",
-						Language:       "go",
-						Responsibility: "KMIP 协议能力实现。",
-					},
-				},
-				Dependencies: []domain.WorkspaceDependency{
-					{From: "hsmwebapi", To: "kmip-go", Reason: "hsmwebapi 调用 kmip-go 实现 KMIP 能力"},
-				},
-				Shared: []domain.WorkspacePath{
-					{Path: "core-engine", Description: "核心能力库", Consumers: []string{"hsmwebapi", "kmip-go"}},
-				},
-				Contracts: []domain.WorkspacePath{
-					{Path: "kmip-go/proto", Description: "KMIP 契约", Producers: []string{"kmip-go"}, Consumers: []string{"hsmwebapi"}},
-				},
-				Infra: []domain.WorkspacePath{
-					{Path: "base-xengine", Description: "离线安装底座", AffectedProjects: []string{"hsmwebapi", "kmip-go"}},
-				},
-				ImpactRoutes: []domain.WorkspaceRoute{
-					{PathPattern: "kmip-go/**", ProjectIDs: []string{"hsmwebapi", "kmip-go"}, Reason: "KMIP 能力变更需要同步检查调用方"},
-				},
-			}, nil
+			calledProfile = true
+			return nil, errors.New("workspace profile AI should not be called during generate")
 		},
 		AnalyzeWorkspaceSpecFn: func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
-			specReq = req
-			workspaceInput := readFilePath(t, req.WorkspaceInputPath)
-			profileInput := readFilePath(t, req.WorkspaceProfilePath)
-			require.Contains(t, workspaceInput, `"id": "kmip-go"`)
-			require.Contains(t, profileInput, "hsmwebapi 调用 kmip-go")
-			return &domain.WorkspaceSpec{
-				Name:     req.WorkspaceName,
-				RootPath: req.WorkspaceRoot,
-				Routing: []domain.WorkspaceRoute{
-					{PathPattern: "hsmwebapi/**", ProjectIDs: []string{"hsmwebapi"}, Reason: "管理 API 变更先读取 hsmwebapi skill"},
-					{PathPattern: "kmip-go/**", ProjectIDs: []string{"hsmwebapi", "kmip-go"}, Reason: "KMIP 能力变更需同步检查 hsmwebapi 调用"},
-				},
-				Rules: []domain.WorkspaceRule{
-					{Title: "KMIP 能力同步", Description: "修改 kmip-go 后必须检查 hsmwebapi 的调用适配和集成验证。", AppliesTo: []string{"hsmwebapi", "kmip-go"}},
-				},
-				ChangeOrder: []string{
-					"先确认 KMIP 契约和核心能力边界",
-					"再更新 hsmwebapi 调用和验证",
-				},
-				LoadMultipleSkillsWhen: []domain.WorkspaceLoadMultipleSkill{
-					{Condition: "修改 kmip-go/**", ProjectIDs: []string{"hsmwebapi", "kmip-go"}, Reason: "调用方和能力实现必须一起检查"},
-				},
-			}, nil
+			calledSpec = true
+			return nil, errors.New("workspace spec AI should not be called during generate")
 		},
 	}
 	loader := skills.NewLoaderForAgent("claude", "zh-CN")
@@ -393,38 +421,27 @@ func TestGenerateWorkspaceSkills_ContextUsesWorkspaceAIPromptsForRootSkill(t *te
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, mockAgent, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 为主后端，它调用 kmip-go 实现 KMIP 的能力。")
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	require.NotNil(t, profileReq)
-	require.NotEmpty(t, profileReq.WorkspaceInputPath)
-	require.Contains(t, filepath.ToSlash(profileReq.WorkspaceInputPath), ".skills-seed/memory/runtime/")
-	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-workspace-generate-\d+$`, filepath.Base(filepath.Dir(profileReq.WorkspaceInputPath)))
-	require.NotNil(t, specReq)
-	require.NotEmpty(t, specReq.WorkspaceInputPath)
-	require.NotEmpty(t, specReq.WorkspaceProfilePath)
-	require.Contains(t, filepath.ToSlash(specReq.WorkspaceProfilePath), ".skills-seed/memory/runtime/")
-	require.NoFileExists(t, profileReq.WorkspaceInputPath)
-	require.NoFileExists(t, specReq.WorkspaceInputPath)
+	require.False(t, calledProfile)
+	require.False(t, calledSpec)
 
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "workspace-overview.md")
-	require.Contains(t, overview, "HSM 工作区负责私有化密码设备管理")
-	require.Contains(t, overview, "主后端，负责管理 API")
-	require.Contains(t, overview, "hsmwebapi 调用 kmip-go 实现 KMIP 能力")
-	require.Contains(t, overview, "`kmip-go/proto` - KMIP 契约")
-	require.Contains(t, overview, "`core-engine` - 核心能力库")
-	require.Contains(t, overview, "`base-xengine` - 离线安装底座")
-	require.Contains(t, overview, "KMIP 能力变更需要同步检查调用方")
+	require.Contains(t, overview, "hsmwebapi")
+	require.Contains(t, overview, "kmip-go")
+	require.NotContains(t, overview, "HSM 工作区负责私有化密码设备管理")
+	require.NotContains(t, overview, "hsmwebapi 调用 kmip-go 实现 KMIP 能力")
 
 	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
-	require.Contains(t, rules, "KMIP 能力同步")
-	require.Contains(t, rules, "先确认 KMIP 契约和核心能力边界")
-	require.Contains(t, rules, "修改 kmip-go/**")
-	require.Contains(t, rules, "修改已识别契约路径时")
-	require.Contains(t, rules, "修改已识别共享路径时")
-	require.Contains(t, rules, "修改已识别基础设施路径时")
+	require.Contains(t, rules, "hsmwebapi/**")
+	require.Contains(t, rules, "kmip-go/**")
+	require.NotContains(t, rules, "KMIP 能力同步")
+	require.NotContains(t, rules, "先确认 KMIP 契约和核心能力边界")
+	require.Contains(t, rules, "跨项目改动先定边界")
+	require.Contains(t, rules, "子项目路径只路由到该子项目的独立 skill")
 }
 
 func TestGenerateWorkspaceSkills_RootSkillStaysConciseAndRoutesViaOverview(t *testing.T) {
@@ -456,7 +473,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -491,7 +508,7 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -511,7 +528,7 @@ func TestGenerateWorkspaceSkills_DoesNotPersistRuntimeUserContext(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
 
 	ctx := runtimecontext.WithUserContext(context.Background(), "本次运行的一次性原文不能进入 workspace skill")
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
@@ -542,7 +559,7 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 			"codex":  ".agents/skills/skills-seed-skills",
 		}},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
@@ -595,7 +612,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))

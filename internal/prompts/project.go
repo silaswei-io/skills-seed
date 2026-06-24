@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
@@ -19,9 +20,12 @@ var projectPromptNames = []string{
 	"project-analyze",
 	"learn-analyze",
 	"learn-batch",
-	"skill-project-summary",
 	"fix-generate",
 	"pattern-curate",
+}
+
+var deprecatedProjectInstructionNames = []string{
+	"skill-project-summary",
 }
 
 var workspacePromptNames = []string{
@@ -117,6 +121,9 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 		if err := writeIfNotExists(instructionsPath, instructionsContent); err != nil {
 			return err
 		}
+	}
+	if err := cleanupDeprecatedProjectInstructions(seedPath); err != nil {
+		return err
 	}
 
 	return nil
@@ -266,4 +273,42 @@ func writeIfNotExists(path, content string) error {
 		return nil
 	}
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+func cleanupDeprecatedProjectInstructions(seedPath string) error {
+	for _, name := range deprecatedProjectInstructionNames {
+		path := filepath.Join(seedPath, "prompts", "instructions", name+".md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if hasPromptInstructionBody(string(data)) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func hasPromptInstructionBody(content string) bool {
+	var body strings.Builder
+	inComment := false
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "<!--") {
+			inComment = true
+		}
+		if !inComment {
+			body.WriteString(trimmed)
+		}
+		if strings.Contains(trimmed, "-->") {
+			inComment = false
+		}
+	}
+	return strings.TrimSpace(body.String()) != ""
 }
