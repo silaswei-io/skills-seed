@@ -29,10 +29,6 @@ func TestWorkflowCommandInWorkspaceDefaultsToRootWorkflow(t *testing.T) {
 
 	require.FileExists(t, filepath.Join(cont.SeedPath, "workflows", "release", "WORKFLOW.md"))
 	require.NoFileExists(t, filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend", ".skills-seed", "workflows", "release", "WORKFLOW.md"))
-	state, err := cont.StateRepo.Get(context.Background())
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Empty(t, state.SkillsDirty.Projects)
 }
 
 func TestWorkflowCommandGeneratesNameWhenMissing(t *testing.T) {
@@ -45,11 +41,11 @@ func TestWorkflowCommandGeneratesNameWhenMissing(t *testing.T) {
 
 	require.NoError(t, cmd.Execute())
 
-	require.FileExists(t, filepath.Join(cont.SeedPath, "workflows", "workflow", "WORKFLOW.md"))
-	state, err := cont.StateRepo.Get(context.Background())
+	entries, err := os.ReadDir(filepath.Join(cont.SeedPath, "workflows"))
 	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Empty(t, state.SkillsDirty.Projects)
+	require.Len(t, entries, 1)
+	require.Regexp(t, `^workflow-[a-f0-9]{12}$`, entries[0].Name())
+	require.FileExists(t, filepath.Join(cont.SeedPath, "workflows", entries[0].Name(), "WORKFLOW.md"))
 }
 
 func TestWorkflowCommandInWorkspaceCanTargetChildProject(t *testing.T) {
@@ -65,11 +61,6 @@ func TestWorkflowCommandInWorkspaceCanTargetChildProject(t *testing.T) {
 	childSeedPath := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend", ".skills-seed")
 	require.FileExists(t, filepath.Join(childSeedPath, "workflows", "deploy", "WORKFLOW.md"))
 	require.NoFileExists(t, filepath.Join(cont.SeedPath, "workflows", "deploy", "WORKFLOW.md"))
-
-	state, err := cont.StateRepo.Get(context.Background())
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Equal(t, []string{"backend"}, state.SkillsDirty.Projects)
 }
 
 func TestWorkflowCommandPrintsOptimizeProgress(t *testing.T) {
@@ -84,6 +75,16 @@ func TestWorkflowCommandPrintsOptimizeProgress(t *testing.T) {
 	})
 
 	require.Contains(t, output, "优化用户工作流")
+}
+
+func TestWorkflowCommandUsesOverwriteFlagOnly(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cont := newWorkflowWorkspaceContainer(t)
+	defer cont.Close()
+
+	cmd := Cmd(cont)
+	require.NotNil(t, cmd.Flags().Lookup("overwrite"))
+	require.Nil(t, cmd.Flags().Lookup("append"))
 }
 
 func newWorkflowWorkspaceContainer(t *testing.T) *container.Container {

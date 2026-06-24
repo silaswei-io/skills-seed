@@ -14,7 +14,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
-	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
@@ -32,7 +31,7 @@ func TestPlanWorkspacePatternTargetsMatchesProjectMention(t *testing.T) {
 	require.Equal(t, []string{"hsmwebapi"}, plan.Projects)
 }
 
-func TestAddCmdInWorkspaceRootDistributesPatternAndMarksDirtyTargets(t *testing.T) {
+func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	ctx := context.Background()
 	workspaceRoot := t.TempDir()
@@ -66,7 +65,6 @@ func TestAddCmdInWorkspaceRootDistributesPatternAndMarksDirtyTargets(t *testing.
 	rootPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(workspaceRoot, ".skills-seed", "memory", "project.db"))
 	require.NoError(t, err)
 	defer rootPatternRepo.Close()
-	stateRepo := statestore.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"))
 	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
 	pattern.SetDescription("hsmwebapi plugins 应修改源插件代码")
 	pattern.SetRule("当 hsmwebapi 的 plugins 由 plugins_custom.sh 拉取时，应该修改源插件代码")
@@ -83,7 +81,6 @@ func TestAddCmdInWorkspaceRootDistributesPatternAndMarksDirtyTargets(t *testing.
 		Config:      rootConfigRepo.Get(),
 		ConfigRepo:  rootConfigRepo,
 		PatternRepo: rootPatternRepo,
-		StateRepo:   stateRepo,
 		Agent:       mockAgent,
 		CuratorSvc:  curator.NewService(mockAgent, rootPatternRepo),
 	}
@@ -105,10 +102,6 @@ func TestAddCmdInWorkspaceRootDistributesPatternAndMarksDirtyTargets(t *testing.
 	require.Empty(t, childPattern.ProjectID)
 	require.Empty(t, childPattern.ScopePath)
 
-	state, err := stateRepo.Get(ctx)
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Equal(t, []string{"hsmwebapi"}, state.SkillsDirty.Projects)
 }
 
 func TestAddCmdRejectsContextFlag(t *testing.T) {
@@ -132,7 +125,7 @@ func TestAddCmdRequiresDescription(t *testing.T) {
 	require.Contains(t, err.Error(), "需要提供模式描述")
 }
 
-func TestDeleteCmdInProjectDeletesPatternAndMarksProjectDirty(t *testing.T) {
+func TestDeleteCmdInProjectDeletesPattern(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	ctx := context.Background()
 	projectRoot := t.TempDir()
@@ -150,13 +143,11 @@ func TestDeleteCmdInProjectDeletesPatternAndMarksProjectDirty(t *testing.T) {
 	defer patternRepo.Close()
 	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
 	require.NoError(t, patternRepo.Save(ctx, pattern))
-	stateRepo := statestore.NewRepository(seedPath)
 
 	cont := &container.Container{
 		SeedPath:    seedPath,
 		ConfigRepo:  configRepo,
 		PatternRepo: patternRepo,
-		StateRepo:   stateRepo,
 	}
 	cmd := deleteCmd(cont)
 	cmd.SetArgs([]string{"plugin-source-editing-rule"})
@@ -166,11 +157,6 @@ func TestDeleteCmdInProjectDeletesPatternAndMarksProjectDirty(t *testing.T) {
 	deleted, err := patternRepo.Get(ctx, "plugin-source-editing-rule")
 	require.Error(t, err)
 	require.Nil(t, deleted)
-	state, err := stateRepo.Get(ctx)
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Project)
-	require.False(t, state.SkillsDirty.Workspace)
-	require.Empty(t, state.SkillsDirty.Projects)
 }
 
 func TestDeleteCmdRequiresPatternID(t *testing.T) {
@@ -222,12 +208,10 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 	require.NoError(t, childPatternRepo.Save(ctx, childPattern))
 	require.NoError(t, childPatternRepo.Close())
 
-	stateRepo := statestore.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"))
 	cont := &container.Container{
 		SeedPath:    filepath.Join(workspaceRoot, ".skills-seed"),
 		ConfigRepo:  rootConfigRepo,
 		PatternRepo: rootPatternRepo,
-		StateRepo:   stateRepo,
 	}
 	cmd := deleteCmd(cont)
 	cmd.SetArgs([]string{"plugin-source-editing-rule"})
@@ -244,11 +228,6 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 	require.Error(t, err)
 	require.Nil(t, deletedChild)
 
-	state, err := stateRepo.Get(ctx)
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Equal(t, []string{"hsmwebapi"}, state.SkillsDirty.Projects)
-	require.False(t, state.SkillsDirty.Project)
 }
 
 func TestStatsCmdPrintsPatternMetricsAndHits(t *testing.T) {

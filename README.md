@@ -112,7 +112,7 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.9.0 起，学习和用户添加模式时会使用 `pattern-curate` 提示词做入库前策展：候选模式必须覆盖、重复规则必须整合、代码证据只能来自输入源码，非法或低质量候选会被丢弃。旧的生成前合并流程和 `patterns merge` 已移除，生成阶段保持只读。
 
-0.9.1 起，模型输出解析会先经过更稳健的 JSON 修复流程，覆盖重复对象起始、非法转义、字符串内未转义引号和缺失闭合容器等常见异常；`patterns delete` 也会在删除模式后标记相关 skills 待重新生成。
+0.9.1 起，模型输出解析会先经过更稳健的 JSON 修复流程，覆盖重复对象起始、非法转义、字符串内未转义引号和缺失闭合容器等常见异常。
 
 常见目录：
 
@@ -246,10 +246,10 @@ skills:
 | `skills-seed learn current` | 从当前代码增量学习规则和画像 |
 | `skills-seed learn history` | 从 Git 历史提交学习长期规则 |
 | `skills-seed generate skills` | 生成当前 `skills.target` 的 skills |
-| `skills-seed workflow --context "<说明>"` | 通过 Agent 优化并保存用户工作流；未提供 `--name` 时自动生成名称，合并补充时使用 `--append` |
+| `skills-seed workflow --context "<说明>"` | 通过 Agent 从用户传入内容推导并保存工作流；未提供 `--name` 时自动生成名称，同名默认合并，重写使用 `--overwrite` |
 | `skills-seed patterns add <描述>` | 用自然语言补充用户自定义模式 |
 | `skills-seed patterns compact` | 显式整理已入库的相似 patterns |
-| `skills-seed sync` | 一键执行学习/添加模式；有变化时生成 skills |
+| `skills-seed sync` | 一键执行学习/添加模式，然后生成 skills |
 | `skills-seed check` | 检查暂存区或 Git 跟踪文件 |
 | `skills-seed patterns stats` | 查看模式质量、命中次数和最近命中 |
 | `skills-seed patterns show` | 查看 DB 中的 pattern 时间、业务方法位置和模式证据位置 |
@@ -258,7 +258,7 @@ skills:
 
 完整参数见 [命令参考](docs/COMMANDS.md)。
 
-用户输入的口语化工作流会先经当前 Agent 优化为标准工作流，再保存到 `.skills-seed/workflows/<name>/WORKFLOW.md`；原始输入记录和元数据写入同目录 `metadata.yaml`。同名工作流默认重写，合并补充时加 `--append`。生成 skills 时写入 `workflows/`，关联脚本统一放到 `scripts/workflows/<name>/`。
+用户传入的目标、约束、背景、路径或口语化说明会先经当前 Agent 推导为标准工作流，再保存到 `.skills-seed/workflows/<name>/WORKFLOW.md`；原始输入记录和元数据写入同目录 `metadata.yaml`。同名工作流默认合并去重，完全替换时加 `--overwrite`。生成 skills 时写入 `workflows/`，关联脚本统一放到 `scripts/workflows/<name>/`。
 
 ## 本地与安全边界
 

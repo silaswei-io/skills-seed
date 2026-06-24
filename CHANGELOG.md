@@ -2,6 +2,23 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.17]
+
+### 变更
+
+- 删除 skills dirty state 机制：`sync` 在学习或添加模式后始终进入 `generate skills`，显式生成也继续按当前画像、patterns 和工作流完整重建，不再维护或清理 dirty 目标。
+- 调整用户工作流更新语义：同名工作流默认合并去重，只有 `--overwrite` 才完全重写；删除旧的 `--append` 参数。
+- 未指定 `--name` 新增工作流时，自动分配基于 Agent 标题和本次输入的稳定 ID；重复输入追加序号，避免隐式更新已有工作流。
+- 工作流 prompt 从“整理器”调整为“推导器”，支持从用户显式传入的目标、约束、背景、路径或零散说明中推导开发、测试、验收、代码生成和发布流程。
+
+### 修复
+
+- 修复无文件变化但项目画像缺失时 `learn current` 仍跳过画像刷新，导致 workspace 子项目生成 skills 失败后下一次 `sync` 无法补建 profile 的问题。
+
+### 文档
+
+- 更新中英文 README、命令参考和配置说明，移除 skills dirty、`--append` 和 sync 跳过生成相关旧描述。
+
 ## [v0.9.16]
 
 ### 变更

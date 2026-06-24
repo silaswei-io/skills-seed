@@ -31,9 +31,9 @@
 |---|---|---|
 | 初始化单项目 | `skills-seed init --mode project` → `skills-seed sync` | 创建配置、学习当前代码并生成 skills |
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
-| 日常增量更新 | `skills-seed sync` | 等价于学习当前变更并在有 dirty 目标时生成 skills |
+| 日常增量更新 | `skills-seed sync` | 等价于学习当前变更后强制生成 skills |
 | 只补充一条规则 | `skills-seed sync --add "<描述>"` | 跳过代码学习，用自然语言添加 pattern 后生成 |
-| 更新任务工作流 | `skills-seed workflow --context "<说明>"` → `skills-seed generate skills` | `--context` 会先经 Agent 优化成标准工作流；未提供 `--name` 时自动生成名称，需要合并补充时指定名称并加 `--append` |
+| 更新任务工作流 | `skills-seed workflow --context "<说明>"` → `skills-seed generate skills` | `--context` 会先经 Agent 从目标、约束、背景或路径推导标准工作流；未提供 `--name` 时自动生成名称，同名默认合并，完全替换时加 `--overwrite` |
 | 提交前更新 | `skills-seed hook install` | 安装 pre-commit hook，在提交前选择同步、只学习或跳过 |
 | 查看沉淀变化 | `skills-seed log` | 像 `git log` 一样查看最近学习和生成带来的变更 |
 | 排查沉淀结果 | `skills-seed patterns show` → `skills-seed profile show` | 查看已学习 patterns 和项目画像是否符合预期 |
@@ -74,7 +74,7 @@
 | `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
 | `skills-seed sync` | 一键同步：学习或添加模式 + 生成 skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
-| `skills-seed workflow` | 添加或更新用户工作流 | - | `--append` = `false`<br>`--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = `` |
+| `skills-seed workflow` | 添加或更新用户工作流 | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | 向工作区添加子项目 | - | `--help, -h` = `false` |
 <!-- COMMAND_TREE_END -->
@@ -291,7 +291,7 @@ skills-seed learn history --limit 40 --batch-size 5
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
 4. workspace 子项目按 `agent.parallelism` 真并发执行。
 5. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
-6. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。CLI 版本或 prompt 模板变化不会单独触发关系重学，生成产物刷新由 `generate skills` 的输入指纹负责。
+6. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
 7. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
 8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
 9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的内嵌 tree-sitter 结构化预扫描；没有边界输入时不会因此全仓扫描。
@@ -438,7 +438,7 @@ skills-seed preview files --limit 500
 | `--files`, `-f` | 空 | 指定参考文件路径；多个文件需重复传入该参数，AI 会读取文件内容辅助生成 |
 | `--help`, `-h` | `false` | 查看 `patterns add` 帮助 |
 
-workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果描述中命中子项目 id 或 path，也会同步写入对应子项目模式库，并只标记受影响的 skills 目标待生成。
+workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果描述中命中子项目 id 或 path，也会同步写入对应子项目模式库。skills 由 `sync` 或显式 `generate skills` 统一重新生成。
 
 #### `patterns delete` 参数
 
@@ -604,7 +604,7 @@ skills-seed profile refresh --language go
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed sync` | 学习当前代码 → generate skills | `skills-seed sync` | 先执行 `learn current`；本轮无 skills 变化时跳过生成 |
+| `skills-seed sync` | 学习当前代码 → generate skills | `skills-seed sync` | 先执行 `learn current`，然后强制生成 skills |
 | `skills-seed sync --add <描述>` | patterns add → generate skills | `skills-seed sync --add "API 路由使用 RESTful 风格"` | 跳过学习，适合补充 AI 未自动发现的模式 |
 
 #### 参数

@@ -68,19 +68,14 @@ func TestRunGenerateWorkspaceAlwaysRegeneratesAllTargets(t *testing.T) {
 	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
 	defer cont.Close()
 	require.NoError(t, cont.StateRepo.MarkSkillsGenerated(context.Background(), domain.ModeWorkspace))
-	require.NoError(t, cont.StateRepo.MarkSkillsDirty(context.Background(), domain.SkillsDirtyTarget{Projects: []string{"backend"}}))
 
 	executeGenerateSkillsCommand(t, cont)
 
 	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "backend")))
 	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "frontend")))
-	state, err := cont.StateRepo.Get(context.Background())
-	require.NoError(t, err)
-	require.Empty(t, state.SkillsDirty.Projects)
-	require.False(t, state.SkillsDirty.Workspace)
 }
 
-func TestRunGenerateWorkspaceFirstRunGeneratesAllTargetsEvenWhenDirty(t *testing.T) {
+func TestRunGenerateWorkspaceFirstRunGeneratesAllTargets(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()
 	projects := []config.WorkspaceProjectConfig{
@@ -94,7 +89,6 @@ func TestRunGenerateWorkspaceFirstRunGeneratesAllTargetsEvenWhenDirty(t *testing
 	}
 	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
 	defer cont.Close()
-	require.NoError(t, cont.StateRepo.MarkSkillsDirty(context.Background(), domain.SkillsDirtyTarget{Projects: []string{"backend"}}))
 
 	executeGenerateSkillsCommand(t, cont)
 

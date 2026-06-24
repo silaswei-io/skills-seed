@@ -3,7 +3,6 @@ package sync
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
@@ -79,28 +78,15 @@ func syncLearn(ctx context.Context, cont *container.Container, userContext strin
 }
 
 func syncLearnAfterLearn(result domain.LearnCurrentResult, generate func() error, change *changelog.Builder) error {
-	if syncLearnShouldSkipGenerate(result) {
-		logger.Info(i18n.Get("SyncGenerateSkippedNoChanges"))
-		change.Detail(i18n.Get("ChangeLogGenerateSkippedNoChanges"))
-		logger.Info(i18n.Get("SyncComplete"))
-		return nil
-	}
-
 	// 步骤 2：生成 Skills。
 	logger.Info(i18n.Get("SyncStepGenerate"))
 	if err := generate(); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 	}
-	change.Detail(i18n.GetWithParams("ChangeLogGenerateCompleted", map[string]interface{}{"Target": formatDirtyTarget(result.SkillsDirty)}))
+	change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
 
 	logger.Info(i18n.Get("SyncComplete"))
 	return nil
-}
-
-func syncLearnShouldSkipGenerate(result domain.LearnCurrentResult) bool {
-	return !result.SkillsDirty.Project &&
-		!result.SkillsDirty.Workspace &&
-		len(result.SkillsDirty.Projects) == 0
 }
 
 // syncWithUserPattern 路径 B：添加模式 → 生成 Skills。
@@ -166,8 +152,8 @@ func recordLearnSummary(change *changelog.Builder, result domain.LearnCurrentRes
 	summary := result.Summary
 	if summary.Projects > 0 {
 		change.Detail(i18n.GetWithParams("ChangeLogLearnWorkspaceSummary", map[string]interface{}{
-			"Projects":      summary.Projects,
-			"DirtyProjects": summary.DirtyProjects,
+			"Projects":        summary.Projects,
+			"ChangedProjects": summary.ChangedProjects,
 		}))
 		if summary.WorkspaceChanged {
 			change.Detail(i18n.Get("ChangeLogWorkspaceRelationshipsChanged"))
@@ -185,21 +171,4 @@ func recordLearnSummary(change *changelog.Builder, result domain.LearnCurrentRes
 		"Patterns": summary.PatternsFound,
 		"Saved":    summary.PatternsSaved,
 	}))
-}
-
-func formatDirtyTarget(target domain.SkillsDirtyTarget) string {
-	parts := make([]string, 0, 3)
-	if target.Project {
-		parts = append(parts, i18n.Get("ChangeLogDirtyProject"))
-	}
-	if target.Workspace {
-		parts = append(parts, i18n.Get("ChangeLogDirtyWorkspace"))
-	}
-	if len(target.Projects) > 0 {
-		parts = append(parts, i18n.GetWithParams("ChangeLogDirtyProjects", map[string]interface{}{"Count": len(target.Projects)}))
-	}
-	if len(parts) == 0 {
-		return i18n.Get("ChangeLogDirtyNone")
-	}
-	return strings.Join(parts, ", ")
 }

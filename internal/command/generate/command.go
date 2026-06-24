@@ -149,11 +149,6 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 			return err
 		}
-		if cont.StateRepo != nil {
-			if err := cont.StateRepo.ClearSkillsDirty(ctx, domain.SkillsDirtyTarget{Project: true}); err != nil {
-				return err
-			}
-		}
 	}
 
 	logger.Info(i18n.Get("GenerateSuccessMsg"))
@@ -187,26 +182,7 @@ func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts g
 		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 		return err
 	}
-	if cont.StateRepo != nil {
-		if err := cont.StateRepo.ClearSkillsDirty(ctx, domain.SkillsDirtyTarget{Workspace: true, Projects: workspaceProjectIDs(projects)}); err != nil {
-			return err
-		}
-	}
 	return nil
-}
-
-func workspaceProjectIDs(projects []config.WorkspaceProjectConfig) []string {
-	ids := make([]string, 0, len(projects))
-	for _, project := range projects {
-		if project.ID != "" {
-			ids = append(ids, project.ID)
-			continue
-		}
-		if project.Path != "" {
-			ids = append(ids, project.Path)
-		}
-	}
-	return ids
 }
 
 func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container, trackers ...*progress.MultiTracker) error {

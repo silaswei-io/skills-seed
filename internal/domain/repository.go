@@ -106,8 +106,6 @@ type RuntimeStateRepository interface {
 	LockMode(ctx context.Context, mode string) (*RuntimeState, error)
 	MarkLearned(ctx context.Context, mode string) error
 	MarkSkillsGenerated(ctx context.Context, mode string) error
-	MarkSkillsDirty(ctx context.Context, target SkillsDirtyTarget) error
-	ClearSkillsDirty(ctx context.Context, target SkillsDirtyTarget) error
 }
 
 // WorkspaceProfileRepository 保存工作区画像

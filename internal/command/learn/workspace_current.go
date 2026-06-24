@@ -75,9 +75,9 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
 	showChildDetails := parallelism == 1
 	var consoleMu sync.Mutex
-	var dirtyMu sync.Mutex
+	var changedMu sync.Mutex
 	var tokenContextsMu sync.Mutex
-	var dirtyProjectIDs []string
+	var changedProjectIDs []string
 	var tokenContexts []context.Context
 	var multiTracker *progress.MultiTracker
 	if !showChildDetails {
@@ -154,9 +154,9 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 				logLearnWorkspaceProjectSummary(project.ID, result)
 			}
 			if result.savedCount > 0 {
-				dirtyMu.Lock()
-				dirtyProjectIDs = append(dirtyProjectIDs, scope)
-				dirtyMu.Unlock()
+				changedMu.Lock()
+				changedProjectIDs = append(changedProjectIDs, scope)
+				changedMu.Unlock()
 			}
 			if showChildDetails {
 				agent.FlushTokenUsageScope(result.tokenContext)
@@ -186,17 +186,11 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	}
 
 	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(ctx, cont, workspaceName, projectRoot, workspaceConfig, workspaceRelationshipOptions{
-		DirtyProjectIDs: dirtyProjectIDs,
-		ProfileMode:     opts.profileMode,
+		ChangedProjectIDs: changedProjectIDs,
+		ProfileMode:       opts.profileMode,
 	})
 	if err != nil {
 		return domain.LearnCurrentResult{}, err
-	}
-	dirtyTarget := domain.SkillsDirtyTarget{Workspace: relationshipsChanged, Projects: dirtyProjectIDs}
-	if !skillsDirtyTargetEmpty(dirtyTarget) {
-		if err := markLearnedSkillsDirty(ctx, cont, dirtyTarget); err != nil {
-			return domain.LearnCurrentResult{}, err
-		}
 	}
 
 	if err := commandutil.MarkLearned(ctx, cont); err != nil {
@@ -210,12 +204,11 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		"projects_count", len(workspaceConfig.Projects),
 	)
 	return domain.LearnCurrentResult{
-		SkillsDirty: dirtyTarget,
 		Summary: domain.LearnCurrentSummary{
 			Projects:         len(workspaceConfig.Projects),
-			DirtyProjects:    len(dirtyProjectIDs),
+			ChangedProjects:  len(changedProjectIDs),
 			WorkspaceChanged: relationshipsChanged,
-			NoFileChanges:    skillsDirtyTargetEmpty(dirtyTarget),
+			NoFileChanges:    !relationshipsChanged && len(changedProjectIDs) == 0,
 		},
 	}, nil
 }

@@ -162,23 +162,7 @@ func TestRunLearnCurrentWritesSnapshotsAfterFirstLearning(t *testing.T) {
 	require.Equal(t, "package main\n", string(content))
 }
 
-func TestRunLearnCurrentMarksProjectSkillsDirtyWhenPatternsSaved(t *testing.T) {
-	require.NoError(t, i18n.Init("zh-CN"))
-	tokenusage.Reset()
-	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
-
-	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
-
-	requireRunLearnCurrentNoError(t, cont, opts)
-
-	state, err := cont.StateRepo.Get(context.Background())
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Project)
-	require.False(t, state.SkillsDirty.Workspace)
-	require.Empty(t, state.SkillsDirty.Projects)
-}
-
-func TestRunLearnCurrentReportsProjectDirtyWhenPatternsSaved(t *testing.T) {
+func TestRunLearnCurrentReportsProjectSummaryWhenPatternsSaved(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
@@ -188,9 +172,7 @@ func TestRunLearnCurrentReportsProjectDirtyWhenPatternsSaved(t *testing.T) {
 	result, err := runLearnCurrent(cont, opts)
 
 	require.NoError(t, err)
-	require.True(t, result.SkillsDirty.Project)
-	require.False(t, result.SkillsDirty.Workspace)
-	require.Empty(t, result.SkillsDirty.Projects)
+	require.Equal(t, 1, result.Summary.PatternsSaved)
 }
 
 func TestRunLearnCurrentWithFocusUpdatesFocusedSnapshotsAfterAnalysis(t *testing.T) {
@@ -260,29 +242,7 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 	require.Len(t, childRecords, 1)
 }
 
-func TestRunLearnWorkspaceCurrentMarksDirtyTargetsWhenPatternsSaved(t *testing.T) {
-	require.NoError(t, i18n.Init("zh-CN"))
-	tokenusage.Reset()
-	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
-	defer restoreFactory()
-	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
-	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
-	defer restorePause()
-
-	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
-	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
-	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
-
-	requireRunLearnCurrentNoError(t, cont, opts)
-
-	state, err := cont.StateRepo.Get(context.Background())
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Equal(t, []string{"backend"}, state.SkillsDirty.Projects)
-	require.False(t, state.SkillsDirty.Project)
-}
-
-func TestRunLearnCurrentReportsWorkspaceDirtyTargetsWhenPatternsSaved(t *testing.T) {
+func TestRunLearnCurrentReportsWorkspaceChangedProjectsWhenPatternsSaved(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
@@ -298,9 +258,7 @@ func TestRunLearnCurrentReportsWorkspaceDirtyTargetsWhenPatternsSaved(t *testing
 	result, err := runLearnCurrent(cont, opts)
 
 	require.NoError(t, err)
-	require.True(t, result.SkillsDirty.Workspace)
-	require.Equal(t, []string{"backend"}, result.SkillsDirty.Projects)
-	require.False(t, result.SkillsDirty.Project)
+	require.Equal(t, 1, result.Summary.ChangedProjects)
 }
 
 func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
@@ -330,6 +288,36 @@ func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
 	require.Zero(t, analyzeCalls)
 	require.Zero(t, profileCalls)
 	require.Contains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnCurrentRefreshesMissingProfileWhenFilesUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.NoError(t, os.Remove(filepath.Join(cont.SeedPath, "memory", "project-profile.json")))
+
+	analyzeCalls := 0
+	profileCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeProjectFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "rebuilt profile"}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Zero(t, analyzeCalls)
+	require.Equal(t, 1, profileCalls)
+	profile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "rebuilt profile", profile.Summary)
 }
 
 func TestRunLearnCurrentAutoRefreshesExistingProfileWhenPatternsSaved(t *testing.T) {

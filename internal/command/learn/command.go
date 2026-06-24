@@ -123,12 +123,12 @@ func historyDefaults(cont *container.Container) (int, int) {
 	return defaultLimit, defaultBatchSize
 }
 
-// RunLearnCurrent 导出：从当前代码库学习，并返回本轮 dirty 目标。
+// RunLearnCurrent 导出：从当前代码库学习，并返回学习摘要。
 func RunLearnCurrent(cont *container.Container) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto})
 }
 
-// RunLearnCurrentWithContext 导出：从当前代码库学习，附加一次性用户上下文，并返回本轮 dirty 目标。
+// RunLearnCurrentWithContext 导出：从当前代码库学习，附加一次性用户上下文，并返回学习摘要。
 func RunLearnCurrentWithContext(cont *container.Container, userContext string) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext})
 }
@@ -169,9 +169,6 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 		PatternsFound: result.patternsCount,
 		PatternsSaved: result.savedCount,
 		NoFileChanges: result.skipped,
-	}
-	if result.savedCount > 0 {
-		return domain.LearnCurrentResult{SkillsDirty: domain.SkillsDirtyTarget{Project: true}, Summary: summary}, nil
 	}
 	return domain.LearnCurrentResult{Summary: summary}, nil
 }
@@ -450,10 +447,34 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		if err := runStep(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error { return nil }); err != nil {
 			return nil, err
 		}
-		if err := runStep(i18n.Get("ProgressLearnCurrentSkipProfile"), func() error { return nil }); err != nil {
-			return nil, err
+		profileStep := i18n.Get("ProgressLearnCurrentSkipProfile")
+		if refreshProfile {
+			profileStep = i18n.Get("ProgressLearnCurrentSaveProfile")
+		}
+		if err := runStep(profileStep, func() error {
+			if !refreshProfile {
+				return nil
+			}
+			result, err := cont.AnalyzerSvc.AnalyzeProjectFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeProjectOptions{})
+			if err != nil {
+				return err
+			}
+			profile := analyzer.NewProjectProfile(result, projectName, currentLanguage)
+			return cont.ProfileRepo.Save(ctx, profile)
+		}); err != nil {
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+				"operation", "command.learn_current.save_project_profile",
+				"duration", time.Since(detectStartedAt),
+				"error", err,
+			)
+			return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileFailed", map[string]interface{}{"Error": err.Error()}))
 		}
 		if opts.showDetailedLogs {
+			if refreshProfile {
+				logger.Info(i18n.Get("LearnCurrentProfileSaved"))
+			} else {
+				logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
+			}
 			logger.Info(i18n.Get("LearnCurrentComplete"))
 		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -614,11 +635,6 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	if err := commandutil.MarkLearned(ctx, cont); err != nil {
 		return nil, err
 	}
-	if savedCount > 0 {
-		if err := markLearnedSkillsDirty(ctx, cont, domain.SkillsDirtyTarget{Project: true}); err != nil {
-			return nil, err
-		}
-	}
 
 	result := &learnCurrentProjectResult{
 		projectName:   projectName,
@@ -659,23 +675,12 @@ func intersectPaths(paths []string, allowed []string) []string {
 	return out
 }
 
-func markLearnedSkillsDirty(ctx context.Context, cont *container.Container, target domain.SkillsDirtyTarget) error {
-	if cont == nil || cont.StateRepo == nil {
-		return nil
-	}
-	return cont.StateRepo.MarkSkillsDirty(ctx, target)
-}
-
-func skillsDirtyTargetEmpty(target domain.SkillsDirtyTarget) bool {
-	return !target.Project && !target.Workspace && len(target.Projects) == 0
-}
-
 func recordLearnCurrentSummary(change *changelog.Builder, result domain.LearnCurrentResult) {
 	summary := result.Summary
 	if summary.Projects > 0 {
 		change.Detail(i18n.GetWithParams("ChangeLogLearnWorkspaceSummary", map[string]interface{}{
-			"Projects":      summary.Projects,
-			"DirtyProjects": summary.DirtyProjects,
+			"Projects":        summary.Projects,
+			"ChangedProjects": summary.ChangedProjects,
 		}))
 		if summary.WorkspaceChanged {
 			change.Detail(i18n.Get("ChangeLogWorkspaceRelationshipsChanged"))

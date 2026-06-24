@@ -34,9 +34,9 @@ func NewService(repo domain.WorkflowRepository, optimizer Optimizer, language st
 
 // UpsertRequest 描述新增或更新工作流的请求。
 type UpsertRequest struct {
-	Name    string
-	Context string
-	Append  bool
+	Name      string
+	Context   string
+	Overwrite bool
 }
 
 // UpsertWorkflow 创建或更新用户工作流。
@@ -67,8 +67,8 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 		ID:              id,
 		Name:            name,
 		Context:         context,
-		ExistingContent: existingWorkflowContent(existing),
-		Append:          req.Append,
+		ExistingContent: existingWorkflowContent(existing, req.Overwrite),
+		Overwrite:       req.Overwrite,
 		Language:        s.language,
 	})
 	if err != nil {
@@ -86,7 +86,10 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 		return nil, fmt.Errorf("workflow optimizer returned empty title")
 	}
 	if id == "" {
-		id = workflowIDFromTitle(title, context)
+		id, err = s.newGeneratedWorkflowID(title, context)
+		if err != nil {
+			return nil, err
+		}
 		if id == "" {
 			return nil, fmt.Errorf("workflow optimizer returned unsafe title")
 		}
@@ -108,10 +111,10 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 		Content:   context,
 		CreatedAt: now,
 	}
-	if req.Append {
-		workflow.Contexts = append(workflow.Contexts, nextContext)
-	} else {
+	if req.Overwrite {
 		workflow.Contexts = []domain.WorkflowContext{nextContext}
+	} else {
+		workflow.Contexts = append(workflow.Contexts, nextContext)
 	}
 	workflow.Content = optimizedContent
 	workflow.Name = title
@@ -121,19 +124,45 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 	return s.repo.Get(id)
 }
 
-func workflowIDFromTitle(title, context string) string {
-	if id := runtimefiles.SafePart(title, ""); id != "" {
-		return id
+func (s *Service) newGeneratedWorkflowID(title, context string) (string, error) {
+	baseID := workflowIDFromGeneratedTitle(title, context)
+	if baseID == "" {
+		return "", nil
 	}
-	if id := runtimefiles.SafePart(context, ""); id != "" {
-		return id
+	if _, err := s.repo.Get(baseID); errors.Is(err, workflowstore.ErrNotFound) {
+		return baseID, nil
+	} else if err != nil {
+		return "", err
 	}
+
+	workflows, err := s.repo.List()
+	if err != nil {
+		return "", err
+	}
+	used := make(map[string]struct{}, len(workflows))
+	for _, workflow := range workflows {
+		used[workflow.ID] = struct{}{}
+	}
+	for i := 2; ; i++ {
+		id := fmt.Sprintf("%s-%d", baseID, i)
+		if _, ok := used[id]; ok {
+			continue
+		}
+		if _, err := s.repo.Get(id); errors.Is(err, workflowstore.ErrNotFound) {
+			return id, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+}
+
+func workflowIDFromGeneratedTitle(title, context string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(title) + "\n" + strings.TrimSpace(context)))
 	return "workflow-" + hex.EncodeToString(sum[:])[:12]
 }
 
-func existingWorkflowContent(workflow *domain.Workflow) string {
-	if workflow == nil {
+func existingWorkflowContent(workflow *domain.Workflow, overwrite bool) string {
+	if workflow == nil || overwrite {
 		return ""
 	}
 	if strings.TrimSpace(workflow.Content) != "" {

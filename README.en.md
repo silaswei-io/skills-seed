@@ -112,7 +112,7 @@ Starting in 0.9.6, debug records under `.skills-seed/memory/runtime` use the uni
 
 Starting in 0.9.0, learning and user-added patterns use the `pattern-curate` prompt for pre-storage curation: every candidate must be covered, duplicate rules must be consolidated, code evidence must come from input source, and invalid or low-quality candidates are dropped. The old pre-generation merge flow and `patterns merge` command have been removed; generation remains read-only.
 
-Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers. `patterns delete` also marks affected skills dirty after removing patterns.
+Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers.
 
 Common layout:
 
@@ -246,10 +246,10 @@ Built-in targets:
 | `skills-seed learn current` | Incrementally learn rules and profile from current code |
 | `skills-seed learn history` | Learn long-lived rules from Git history |
 | `skills-seed generate skills` | Generate skills for the current `skills.target` |
-| `skills-seed workflow --context "<notes>"` | Optimize and save a user workflow through the Agent; omit `--name` to generate a name, use `--append` to merge notes |
+| `skills-seed workflow --context "<notes>"` | Infer and save a user workflow through the Agent; omit `--name` to generate a name, same-name workflows merge by default, use `--overwrite` to replace |
 | `skills-seed patterns add <description>` | Add a user-defined pattern in natural language |
 | `skills-seed patterns compact` | Explicitly compact similar stored patterns |
-| `skills-seed sync` | Run learning or pattern add in one command; generate skills when changes require it |
+| `skills-seed sync` | Run learning or pattern add in one command, then generate skills |
 | `skills-seed check` | Check staged files or Git-tracked files |
 | `skills-seed patterns stats` | Show pattern quality, hit counts, and recent hits |
 | `skills-seed patterns show` | Show pattern timestamps, business-method locations, and pattern evidence locations from the DB |
@@ -258,7 +258,7 @@ Built-in targets:
 
 See [Command Reference](docs/COMMANDS.EN.md) for all flags and forms.
 
-Informal workflow notes are optimized by the current Agent into a standard workflow, then saved to `.skills-seed/workflows/<name>/WORKFLOW.md`; original notes and metadata are stored in `metadata.yaml` in the same directory. A workflow with the same name is rewritten by default; add `--append` to merge notes with existing content. Generated skills receive them under `workflows/`, with related scripts under `scripts/workflows/<name>/`.
+User-provided goals, constraints, background, paths, or rough notes are inferred by the current Agent into a standard workflow, then saved to `.skills-seed/workflows/<name>/WORKFLOW.md`; original notes and metadata are stored in `metadata.yaml` in the same directory. Same-name workflows merge and deduplicate by default; add `--overwrite` to replace one completely. Generated skills receive workflows under `workflows/`, with related scripts under `scripts/workflows/<name>/`.
 
 ## Local And Safety Boundaries
 

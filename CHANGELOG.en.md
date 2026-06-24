@@ -2,6 +2,23 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.17]
+
+### Changes
+
+- Removed the skills dirty-state mechanism. `sync` now always enters `generate skills` after learning or adding a pattern, and explicit generation continues to fully rebuild from the current profile, patterns, and workflows without maintaining or clearing dirty targets.
+- Changed user workflow update semantics: same-name workflows merge and deduplicate by default, and only `--overwrite` fully replaces one. The old `--append` flag was removed.
+- When `--name` is omitted, new workflows now get a stable ID based on the Agent title and current input. Repeated inputs receive a numbered suffix instead of implicitly updating an existing workflow.
+- Changed the workflow prompt from an organizer to an inferrer. It can infer development, testing, validation, code generation, and release workflows from explicitly provided goals, constraints, background, paths, or rough notes.
+
+### Fixes
+
+- Fixed `learn current` skipping profile refresh when files were unchanged but the project profile was missing, which could leave workspace child skills generation unable to recover after a missing-profile failure.
+
+### Documentation
+
+- Updated the Chinese and English README, command reference, and configuration guide to remove outdated skills dirty, `--append`, and sync generation-skip descriptions.
+
 ## [v0.9.16]
 
 ### Changes

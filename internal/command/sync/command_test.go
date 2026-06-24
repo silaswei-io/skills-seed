@@ -20,24 +20,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSyncLearnAfterLearnSkipsGenerateWhenLearnDidNotDirtySkills(t *testing.T) {
+func TestSyncLearnAfterLearnAlwaysGenerates(t *testing.T) {
 	generateCalled := false
 
 	err := syncLearnAfterLearn(domain.LearnCurrentResult{}, func() error {
-		generateCalled = true
-		return nil
-	}, nil)
-
-	require.NoError(t, err)
-	require.False(t, generateCalled)
-}
-
-func TestSyncLearnAfterLearnGeneratesWhenLearnDirtiedSkills(t *testing.T) {
-	generateCalled := false
-
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{
-		SkillsDirty: domain.SkillsDirtyTarget{Workspace: true},
-	}, func() error {
 		generateCalled = true
 		return nil
 	}, nil)
@@ -49,9 +35,7 @@ func TestSyncLearnAfterLearnGeneratesWhenLearnDirtiedSkills(t *testing.T) {
 func TestSyncLearnAfterLearnWrapsGenerateError(t *testing.T) {
 	errGenerate := errors.New("boom")
 
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{
-		SkillsDirty: domain.SkillsDirtyTarget{Project: true},
-	}, func() error {
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{}, func() error {
 		return errGenerate
 	}, nil)
 

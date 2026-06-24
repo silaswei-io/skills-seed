@@ -9,30 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRepositoryTracksSkillsDirtyTargets(t *testing.T) {
+func TestRepositoryTracksLearnedAndGeneratedState(t *testing.T) {
 	ctx := context.Background()
 	repo := NewRepository(filepath.Join(t.TempDir(), ".skills-seed"))
 
-	require.NoError(t, repo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Project: true, Workspace: true}))
-	require.NoError(t, repo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Projects: []string{"hsmwebapi", "cluster-manage", "hsmwebapi"}}))
+	require.NoError(t, repo.MarkLearned(ctx, domain.ModeProject))
+	require.NoError(t, repo.MarkSkillsGenerated(ctx, domain.ModeProject))
 
 	state, err := repo.Get(ctx)
 	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Project)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Equal(t, []string{"cluster-manage", "hsmwebapi"}, state.SkillsDirty.Projects)
-
-	require.NoError(t, repo.ClearSkillsDirty(ctx, domain.SkillsDirtyTarget{Projects: []string{"hsmwebapi"}}))
-	state, err = repo.Get(ctx)
-	require.NoError(t, err)
-	require.True(t, state.SkillsDirty.Project)
-	require.True(t, state.SkillsDirty.Workspace)
-	require.Equal(t, []string{"cluster-manage"}, state.SkillsDirty.Projects)
-
-	require.NoError(t, repo.ClearSkillsDirty(ctx, domain.SkillsDirtyTarget{Project: true, Workspace: true, Projects: []string{"cluster-manage"}}))
-	state, err = repo.Get(ctx)
-	require.NoError(t, err)
-	require.False(t, state.SkillsDirty.Project)
-	require.False(t, state.SkillsDirty.Workspace)
-	require.Empty(t, state.SkillsDirty.Projects)
+	require.Equal(t, domain.ModeProject, state.Mode)
+	require.True(t, state.ModeLocked)
+	require.True(t, state.Learned)
+	require.True(t, state.SkillsGenerated)
 }

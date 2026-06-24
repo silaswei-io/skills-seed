@@ -124,21 +124,12 @@ func resolveAddPatternDescription(args []string) (string, error) {
 	return "", fmt.Errorf("%s", i18n.Get("PatternsAddRequireDescription"))
 }
 
-// StoreUserDefinedPattern 保存用户定义模式，并按当前运行模式标记需要重新生成的 skills 目标。
+// StoreUserDefinedPattern 保存用户定义模式。
 func StoreUserDefinedPattern(ctx context.Context, cont *container.Container, description string, pattern domain.Pattern) (domain.Pattern, error) {
 	if cont.ConfigRepo != nil && cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
 		return storeWorkspaceUserDefinedPattern(ctx, cont, description, pattern)
 	}
-	written, err := curateAndStoreUserDefinedPattern(ctx, cont.CuratorSvc, pattern)
-	if err != nil {
-		return domain.Pattern{}, err
-	}
-	if cont.StateRepo != nil {
-		if err := cont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Project: true}); err != nil {
-			return domain.Pattern{}, err
-		}
-	}
-	return written, nil
+	return curateAndStoreUserDefinedPattern(ctx, cont.CuratorSvc, pattern)
 }
 
 func storeWorkspaceUserDefinedPattern(ctx context.Context, cont *container.Container, description string, pattern domain.Pattern) (domain.Pattern, error) {
@@ -161,11 +152,6 @@ func storeWorkspaceUserDefinedPattern(ctx context.Context, cont *container.Conta
 	}
 	for _, projectID := range plan.Projects {
 		if err := storeWorkspaceChildPattern(ctx, cont, projectID, written); err != nil {
-			return domain.Pattern{}, err
-		}
-	}
-	if cont.StateRepo != nil {
-		if err := cont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Workspace: plan.Workspace, Projects: plan.Projects}); err != nil {
 			return domain.Pattern{}, err
 		}
 	}
@@ -234,7 +220,7 @@ func deleteCmd(cont *container.Container) *cobra.Command {
 	return cmd
 }
 
-// DeletePattern 删除模式，并按当前运行模式标记需要重新生成的 skills 目标。
+// DeletePattern 删除模式。
 func DeletePattern(ctx context.Context, cont *container.Container, patternID string) error {
 	patternID = strings.TrimSpace(patternID)
 	if patternID == "" {
@@ -250,9 +236,6 @@ func DeletePattern(ctx context.Context, cont *container.Container, patternID str
 	if cont.ConfigRepo != nil && cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
 		return deleteWorkspacePattern(ctx, cont, patternID, pattern)
 	}
-	if cont.StateRepo != nil {
-		return cont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Project: true})
-	}
 	return nil
 }
 
@@ -263,9 +246,6 @@ func deleteWorkspacePattern(ctx context.Context, cont *container.Container, patt
 		if err := deleteWorkspaceChildPattern(ctx, cont, pattern.ProjectID, patternID); err != nil {
 			return err
 		}
-	}
-	if cont.StateRepo != nil {
-		return cont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Workspace: true, Projects: projects})
 	}
 	return nil
 }
@@ -746,15 +726,6 @@ func compactCmd(cont *container.Container) *cobra.Command {
 			}, curatorProgressHooks(tracker))
 			if err != nil {
 				return err
-			}
-			if !dryRun && result.Summary.TotalWritten > 0 && cont.StateRepo != nil {
-				target := domain.SkillsDirtyTarget{Project: true}
-				if cont.ConfigRepo != nil && cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
-					target = domain.SkillsDirtyTarget{Workspace: true}
-				}
-				if err := cont.StateRepo.MarkSkillsDirty(cmd.Context(), target); err != nil {
-					return err
-				}
 			}
 			logger.Info(i18n.GetWithParams("PatternsCompactComplete", map[string]interface{}{
 				"TotalInput":   result.Summary.TotalCandidates,

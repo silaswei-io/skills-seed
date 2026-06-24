@@ -46,8 +46,8 @@ type workspaceRelationshipFingerprintInput struct {
 }
 
 type workspaceRelationshipOptions struct {
-	DirtyProjectIDs []string
-	ProfileMode     string
+	ChangedProjectIDs []string
+	ProfileMode       string
 }
 
 func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig, opts workspaceRelationshipOptions) (bool, error) {
@@ -177,7 +177,7 @@ func workspaceRelationshipShouldSkip(ctx context.Context, cont *container.Contai
 	if decision.ShouldSkip() {
 		return true
 	}
-	if opts.ProfileMode == learnCurrentProfileRefresh || userContext != "" || len(opts.DirtyProjectIDs) > 0 {
+	if opts.ProfileMode == learnCurrentProfileRefresh || userContext != "" || len(opts.ChangedProjectIDs) > 0 {
 		return false
 	}
 	return workspaceRelationshipArtifactsMatchInput(ctx, cont, input)

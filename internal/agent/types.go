@@ -320,8 +320,8 @@ type OptimizeWorkflowRequest struct {
 	ID              string // 工作流 ID
 	Name            string // 工作流名称
 	Context         string // 本次用户输入
-	ExistingContent string // 已有工作流正文；append 时用于合并
-	Append          bool   // 是否追加合并
+	ExistingContent string // 已有工作流正文；默认合并时用于去重整合
+	Overwrite       bool   // 是否重写同名工作流
 	Language        string // 项目主要语言
 }
 

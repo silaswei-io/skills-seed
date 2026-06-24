@@ -21,10 +21,10 @@ import (
 )
 
 type options struct {
-	name    string
-	context string
-	append  bool
-	child   string
+	name      string
+	context   string
+	overwrite bool
+	child     string
 }
 
 // Cmd 返回 workflow 命令。
@@ -56,9 +56,9 @@ func Cmd(cont *container.Container) *cobra.Command {
 				retryProgress.StartStep(label)
 				var callErr error
 				workflow, callErr = targetCont.WorkflowSvc.UpsertWorkflow(ctx, workflowservice.UpsertRequest{
-					Name:    opts.name,
-					Context: opts.context,
-					Append:  opts.append,
+					Name:      opts.name,
+					Context:   opts.context,
+					Overwrite: opts.overwrite,
 				})
 				retryProgress.FinishStep(label, callErr == nil)
 				return callErr
@@ -71,19 +71,12 @@ func Cmd(cont *container.Container) *cobra.Command {
 				"ID":     workflow.ID,
 				"Target": targetName,
 			}))
-			dirtyChild := opts.child
-			if strings.TrimSpace(dirtyChild) != "" {
-				dirtyChild = targetName
-			}
-			if err := markWorkflowTargetDirty(cmd.Context(), cont, targetCont, dirtyChild); err != nil {
-				return err
-			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&opts.name, "name", "", i18n.Get("WorkflowFlagName"))
 	cmd.Flags().StringVar(&opts.context, "context", "", i18n.Get("WorkflowFlagContext"))
-	cmd.Flags().BoolVar(&opts.append, "append", false, i18n.Get("WorkflowFlagAppend"))
+	cmd.Flags().BoolVar(&opts.overwrite, "overwrite", false, i18n.Get("WorkflowFlagOverwrite"))
 	cmd.Flags().StringVar(&opts.child, "child", "", i18n.Get("WorkflowFlagChild"))
 	return cmd
 }
@@ -151,26 +144,4 @@ func workflowTargetName(cont *container.Container) string {
 		return strings.TrimSpace(project.Name)
 	}
 	return "project"
-}
-
-func markWorkflowTargetDirty(ctx context.Context, rootCont, targetCont *container.Container, child string) error {
-	child = strings.TrimSpace(child)
-	if child != "" {
-		if targetCont != nil && targetCont.StateRepo != nil {
-			if err := targetCont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Project: true}); err != nil {
-				return err
-			}
-		}
-		if rootCont != nil && rootCont.StateRepo != nil {
-			return rootCont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Projects: []string{child}, Workspace: true})
-		}
-		return nil
-	}
-	if targetCont == nil || targetCont.StateRepo == nil || targetCont.ConfigRepo == nil {
-		return nil
-	}
-	if targetCont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
-		return targetCont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Workspace: true})
-	}
-	return targetCont.StateRepo.MarkSkillsDirty(ctx, domain.SkillsDirtyTarget{Project: true})
 }
