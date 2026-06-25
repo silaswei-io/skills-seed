@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
@@ -421,7 +422,15 @@ func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
 	}
 	seedPath := t.TempDir()
 	workflowRepo := workflowstore.NewRepository(seedPath)
-	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{NameVal: "test", AvailableVal: true}, "go")
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		OptimizeWorkflowFn: func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
+			return &agent.OptimizeWorkflowResult{
+				Title:   req.Name,
+				Content: "# " + req.Name + "\n\n## 适用场景\n发布流程覆盖上线前环境与产物核验，以及上线后的冒烟验证。\n",
+			}, nil
+		},
+	}, "go")
 	_, err := workflowSvc.UpsertWorkflow(context.Background(), workflowsvc.UpsertRequest{
 		Name:    "deploy",
 		Context: "发布前检查环境变量和构建产物，发布后执行 smoke test",
@@ -441,9 +450,11 @@ func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
 	skill := readGeneratedFile(t, outputPath, "SKILL.md")
 	require.Contains(t, skill, "## 用户工作流")
 	require.Contains(t, skill, "./workflows/deploy.md")
+	require.Contains(t, skill, "发布流程覆盖上线前环境与产物核验，以及上线后的冒烟验证。")
+	require.NotContains(t, skill, "发布前检查环境变量和构建产物，发布后执行 smoke test")
 	workflowContent := readGeneratedFile(t, outputPath, "workflows", "deploy.md")
 	require.Contains(t, workflowContent, "## 适用场景")
-	require.Contains(t, workflowContent, "发布前检查环境变量")
+	require.Contains(t, workflowContent, "发布流程覆盖上线前环境与产物核验")
 	require.FileExists(t, filepath.Join(outputPath, "scripts", "workflows", "deploy", "smoke-test.sh"))
 	assertNoBrokenMarkdownLinks(t, outputPath)
 }

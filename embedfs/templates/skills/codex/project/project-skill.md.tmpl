@@ -114,7 +114,7 @@ description: {{.SkillDescription}}
 - 如果参考中已有项目特定业务方法或工具方法，优先复用
 {{if .References.ProjectSpec}}- 派生产物、接口模型、适配层和配置约定以 [项目规范](./references/project-spec.md) 为准{{else}}- 派生产物、接口模型、适配层和配置约定以当前代码和项目配置为准{{end}}
 - 只有带代码证据的 pattern 规则可视为硬约束；参考观察不能覆盖当前代码行为
-- references 与实际代码不一致时，以当前代码为准，并重新学习/生成技能
+- references 与实际代码不一致时，以当前代码为准
 
 {{if .KeyInsights}}
 ### 关键洞察
@@ -130,19 +130,6 @@ description: {{.SkillDescription}}
 - **模式总数**: {{.PatternCount}}
 - **平均置信度**: {{printf "%.2f" .AvgConfidence}}%
 - **分类数量**: {{.Categories}}
-
----
-
-## 持续学习
-
-通过分析最近的提交来更新模式
-```bash
-# 从最近的提交学习
-skills-seed learn history --since=7d
-
-# 按当前 provider 配置的输出路径重新生成技能文件
-skills-seed generate skills
-```
 
 {{if includeSkillsSeedGeneratedNotice}}
 ---

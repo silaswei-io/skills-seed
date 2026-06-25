@@ -6,7 +6,7 @@ import (
 )
 
 func (s *GeneratorService) loadWorkflowReferences() ([]WorkflowReference, error) {
-	return LoadWorkflowReferences(s.workflowRepo)
+	return LoadWorkflowReferences(s.workflowRepo, s.skillsLoader.GetLocale())
 }
 
 func (s *GeneratorService) writeWorkflowOutputs(outputPath string) error {
@@ -14,8 +14,8 @@ func (s *GeneratorService) writeWorkflowOutputs(outputPath string) error {
 }
 
 // LoadWorkflowReferences 读取当前目标的工作流引用，供项目和工作区 skill 共用。
-func LoadWorkflowReferences(repo domain.WorkflowRepository) ([]WorkflowReference, error) {
-	refs, err := workflowoutput.LoadReferences(repo)
+func LoadWorkflowReferences(repo domain.WorkflowRepository, locale string) ([]WorkflowReference, error) {
+	refs, err := workflowoutput.LoadReferences(repo, locale)
 	if err != nil {
 		return nil, err
 	}

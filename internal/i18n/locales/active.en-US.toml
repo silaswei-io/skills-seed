@@ -70,6 +70,15 @@ other = "workflow skills template loader is not configured"
 [ProgressOptimizeWorkflowAI]
 other = "Optimizing user workflow"
 
+[WorkflowOutputContextHeading]
+other = "Context"
+
+[WorkflowOutputScriptsHeading]
+other = "Scripts"
+
+[WorkflowOutputSummaryHeadingCandidates]
+other = "Applies When|When to use|Goal|Summary|Description"
+
 [InitLongDesc]
 other = "Initialize skills-seed in your project.\n\nThis command will:\n  • Create .skills-seed/ directory\n  • Generate default configuration (config.yaml)\n  • Initialize BoltDB database\n  • Prepare cross-agent compatible prompt and skills templates\n\nPlease run this command in the root directory of a Git repository."
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 )
 
@@ -24,7 +25,7 @@ type Reference struct {
 }
 
 // LoadReferences 读取当前目标的工作流引用。
-func LoadReferences(repo domain.WorkflowRepository) ([]Reference, error) {
+func LoadReferences(repo domain.WorkflowRepository, locale string) ([]Reference, error) {
 	if repo == nil {
 		return nil, nil
 	}
@@ -41,7 +42,7 @@ func LoadReferences(repo domain.WorkflowRepository) ([]Reference, error) {
 			ID:          workflow.ID,
 			Name:        workflowDisplayName(workflow),
 			Path:        workflowReferencePath(workflow.ID),
-			Description: workflowDescription(workflow),
+			Description: workflowDescription(workflow, locale),
 		})
 	}
 	return refs, nil
@@ -95,13 +96,13 @@ func renderWorkflowOutput(workflow domain.Workflow, locale string) string {
 	b.WriteString("# ")
 	b.WriteString(workflowDisplayName(workflow))
 	b.WriteString("\n\n")
-	if description := workflowDescription(workflow); description != "" {
+	if description := workflowDescription(workflow, locale); description != "" {
 		b.WriteString(description)
 		b.WriteString("\n\n")
 	}
 	if len(workflow.Contexts) > 0 {
 		b.WriteString("## ")
-		b.WriteString(localizedText(locale, "上下文", "Context"))
+		b.WriteString(localized(locale, "WorkflowOutputContextHeading"))
 		b.WriteString("\n\n")
 		for _, item := range workflow.Contexts {
 			if strings.TrimSpace(item.Content) == "" {
@@ -128,7 +129,7 @@ func appendWorkflowScripts(b *strings.Builder, workflow domain.Workflow, locale 
 		return
 	}
 	b.WriteString("## ")
-	b.WriteString(localizedText(locale, "脚本", "Scripts"))
+	b.WriteString(localized(locale, "WorkflowOutputScriptsHeading"))
 	b.WriteString("\n\n")
 	for _, script := range workflow.Scripts {
 		if strings.TrimSpace(script.Path) == "" {
@@ -197,25 +198,84 @@ func workflowDisplayName(workflow domain.Workflow) string {
 	return workflow.ID
 }
 
-func workflowDescription(workflow domain.Workflow) string {
-	for _, item := range workflow.Contexts {
-		content := strings.TrimSpace(item.Content)
-		if content == "" {
-			continue
-		}
-		return firstLine(content)
+func workflowDescription(workflow domain.Workflow, locale string) string {
+	if description := summarizedWorkflowDescription(workflow.Content, locale); description != "" {
+		return description
 	}
 	return ""
 }
 
-func firstLine(content string) string {
-	for _, line := range strings.Split(content, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			return line
+func summarizedWorkflowDescription(content, locale string) string {
+	lines := strings.Split(content, "\n")
+	for _, heading := range workflowSummaryHeadingCandidates(locale) {
+		if description := firstContentAfterHeading(lines, heading); description != "" {
+			return truncateDescription(description, 120)
+		}
+	}
+	for _, line := range lines {
+		if description := normalizedContentLine(line); description != "" {
+			return truncateDescription(description, 120)
 		}
 	}
 	return ""
+}
+
+func isMarkdownFence(line string) bool {
+	return strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~")
+}
+
+func workflowSummaryHeadingCandidates(locale string) []string {
+	raw := localized(locale, "WorkflowOutputSummaryHeadingCandidates")
+	parts := strings.Split(raw, "|")
+	headings := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if heading := normalizeHeading(part); heading != "" {
+			headings = append(headings, heading)
+		}
+	}
+	return headings
+}
+
+func firstContentAfterHeading(lines []string, heading string) string {
+	for i, line := range lines {
+		if normalizeHeading(line) != heading {
+			continue
+		}
+		for _, candidate := range lines[i+1:] {
+			if normalized := normalizedContentLine(candidate); normalized != "" {
+				return normalized
+			}
+		}
+	}
+	return ""
+}
+
+func normalizeHeading(line string) string {
+	line = strings.TrimSpace(line)
+	line = strings.TrimLeft(line, "#")
+	line = strings.TrimSpace(line)
+	line = strings.TrimSuffix(line, "：")
+	line = strings.TrimSuffix(line, ":")
+	return strings.TrimSpace(line)
+}
+
+func normalizedContentLine(line string) string {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") || isMarkdownFence(line) {
+		return ""
+	}
+	line = strings.TrimSpace(strings.TrimPrefix(line, "-"))
+	line = strings.TrimSpace(strings.TrimPrefix(line, "*"))
+	line = strings.TrimSpace(strings.TrimPrefix(line, ">"))
+	return strings.TrimSpace(line)
+}
+
+func truncateDescription(content string, limit int) string {
+	runes := []rune(strings.TrimSpace(content))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit]) + "..."
 }
 
 func workflowReferencePath(id string) string {
@@ -238,9 +298,6 @@ func workflowScriptReferencePath(id, scriptPath string) string {
 	return "../" + filepath.ToSlash(filepath.Join(scriptOutputDirName, workflowOutputDirName, id, scriptPath))
 }
 
-func localizedText(locale, zh, en string) string {
-	if strings.HasPrefix(strings.ToLower(locale), "en") {
-		return en
-	}
-	return zh
+func localized(locale, key string) string {
+	return i18n.GetForLocale(locale, key)
 }

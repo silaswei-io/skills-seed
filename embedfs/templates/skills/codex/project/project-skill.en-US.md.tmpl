@@ -114,7 +114,7 @@ Choose the smallest command set that matches the change:
 - Use project-specific business methods and utilities from the references when they exist
 {{if .References.ProjectSpec}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by [Project Spec](./references/project-spec.md){{else}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by current code and project configuration{{end}}
 - Only pattern rules backed by code evidence should be treated as hard constraints; reference observations cannot override current code behavior
-- If references and current code disagree, trust current code and rerun learning/generation
+- If references and current code disagree, trust current code
 
 {{if .KeyInsights}}
 ### Key Insights
@@ -130,19 +130,6 @@ Choose the smallest command set that matches the change:
 - **Total Patterns**: {{.PatternCount}}
 - **Average Confidence**: {{printf "%.2f" .AvgConfidence}}%
 - **Categories**: {{.Categories}}
-
----
-
-## Continuous Learning
-
-Update patterns by analyzing recent commits
-```bash
-# Learn from recent commits
-skills-seed learn history --since=7d
-
-# Regenerate skill files using the configured provider output path
-skills-seed generate skills
-```
 
 {{if includeSkillsSeedGeneratedNotice}}
 ---

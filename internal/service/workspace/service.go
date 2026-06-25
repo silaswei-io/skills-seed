@@ -304,7 +304,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 	rules = filterWorkspaceRules(rules, knownProjects, unknownProjects)
 	parallelGuidance = filterWorkspaceParallelGuidance(parallelGuidance, unknownProjects)
 	loadMultipleWhen = filterWorkspaceLoadMultiple(loadMultipleWhen, knownProjects, unknownProjects)
-	workflowReferences, err := generator.LoadWorkflowReferences(g.workflowRepo)
+	workflowReferences, err := generator.LoadWorkflowReferences(g.workflowRepo, g.skillsLoader.GetLocale())
 	if err != nil {
 		return workspaceSkillTemplateData{}, err
 	}

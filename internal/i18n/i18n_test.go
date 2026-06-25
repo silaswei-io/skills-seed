@@ -63,6 +63,14 @@ func TestGetEnglish(t *testing.T) {
 	assert.NotEmpty(t, result)
 }
 
+func TestGetForLocaleDoesNotMutateGlobalLocale(t *testing.T) {
+	err := Init("zh-CN")
+	assert.NoError(t, err)
+
+	assert.Equal(t, "Scripts", GetForLocale("en-US", "WorkflowOutputScriptsHeading"))
+	assert.Equal(t, "脚本", Get("WorkflowOutputScriptsHeading"))
+}
+
 func TestGetWithoutInit(t *testing.T) {
 	// 未初始化时应自动初始化并返回结果
 	// 重置 localizer 为 nil 模拟未初始化

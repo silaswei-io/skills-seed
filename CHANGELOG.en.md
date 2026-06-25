@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.19]
+
+### Changes
+
+- Generated project `SKILL.md` workflow descriptions now summarize the Agent-organized workflow body instead of echoing the user's original notes.
+- Project skill entry files no longer embed maintenance commands such as `skills-seed learn history` or `skills-seed generate skills`, keeping the skill focused on the learned project itself; configuration-controlled generated notices are unchanged.
+
+### Fixes
+
+- Workflow output context, script, and summary-heading text now comes from i18n messages, avoiding hard-coded Chinese or English headings during workflow description extraction.
+
 ## [v0.9.18]
 
 ### Changes

@@ -378,7 +378,8 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 					mainContent, err := loader.Render("project-skill", fullSkillData())
 					require.NoError(t, err)
 					require.NotEmpty(t, mainContent)
-					require.Contains(t, mainContent, "skills-seed generate skills")
+					require.NotContains(t, mainContent, "skills-seed learn history")
+					require.NotContains(t, mainContent, "skills-seed generate skills")
 					require.NotContains(t, mainContent, "skills-seed generate-skills")
 
 					overview, err := loader.Render("project-reference-overview", projectOverviewData())
@@ -389,6 +390,8 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 						referenceContent, err := loader.Render("project-reference-"+reference, projectOverviewData())
 						require.NoError(t, err)
 						require.NotEmpty(t, referenceContent)
+						require.NotContains(t, referenceContent, "skills-seed learn current")
+						require.NotContains(t, referenceContent, "skills-seed generate skills")
 						require.NotContains(t, referenceContent, "skills-seed generate-skills")
 					}
 
