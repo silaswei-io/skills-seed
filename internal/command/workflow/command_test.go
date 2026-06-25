@@ -44,7 +44,7 @@ func TestWorkflowCommandGeneratesNameWhenMissing(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join(cont.SeedPath, "workflows"))
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
-	require.Regexp(t, `^workflow-[a-f0-9]{12}$`, entries[0].Name())
+	require.Equal(t, "workflow", entries[0].Name())
 	require.FileExists(t, filepath.Join(cont.SeedPath, "workflows", entries[0].Name(), "WORKFLOW.md"))
 }
 

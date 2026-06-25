@@ -258,7 +258,7 @@ Built-in targets:
 
 See [Command Reference](docs/COMMANDS.EN.md) for all flags and forms.
 
-User-provided goals, constraints, background, paths, or rough notes are inferred by the current Agent into a standard workflow, then saved to `.skills-seed/workflows/<name>/WORKFLOW.md`; original notes and metadata are stored in `metadata.yaml` in the same directory. Same-name workflows merge and deduplicate by default; add `--overwrite` to replace one completely. Generated skills receive workflows under `workflows/`, with related scripts under `scripts/workflows/<name>/`.
+User-provided goals, constraints, background, paths, or rough notes are inferred by the current Agent into a standard workflow, then saved to `.skills-seed/workflows/<id>/WORKFLOW.md`; when `--name` is omitted, `<id>` comes from the Agent-generated English title slug, and repeated titles receive a numbered suffix. Original notes and metadata are stored in `metadata.yaml` in the same directory. Same-name workflows merge and deduplicate by default; add `--overwrite` to replace one completely. Generated skills receive workflows under `workflows/`, with related scripts under `scripts/workflows/<id>/`.
 
 ## Local And Safety Boundaries
 

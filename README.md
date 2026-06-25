@@ -258,7 +258,7 @@ skills:
 
 完整参数见 [命令参考](docs/COMMANDS.md)。
 
-用户传入的目标、约束、背景、路径或口语化说明会先经当前 Agent 推导为标准工作流，再保存到 `.skills-seed/workflows/<name>/WORKFLOW.md`；原始输入记录和元数据写入同目录 `metadata.yaml`。同名工作流默认合并去重，完全替换时加 `--overwrite`。生成 skills 时写入 `workflows/`，关联脚本统一放到 `scripts/workflows/<name>/`。
+用户传入的目标、约束、背景、路径或口语化说明会先经当前 Agent 推导为标准工作流，再保存到 `.skills-seed/workflows/<id>/WORKFLOW.md`；未提供 `--name` 时，`<id>` 来自 Agent 生成的英文标题 slug，重复标题会追加序号。原始输入记录和元数据写入同目录 `metadata.yaml`。同名工作流默认合并去重，完全替换时加 `--overwrite`。生成 skills 时写入 `workflows/`，关联脚本统一放到 `scripts/workflows/<id>/`。
 
 ## 本地与安全边界
 

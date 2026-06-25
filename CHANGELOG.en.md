@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.9.18]
+
+### Changes
+
+- When `--name` is omitted, new workflows now get a readable ID from the Agent-generated English title. Repeated titles receive a numbered suffix instead of implicitly updating an existing workflow.
+
+### Documentation
+
+- Updated the Chinese and English README and configuration guide to clarify that workflow storage directories use `<id>`, generated from the Agent's English title slug when no explicit name is provided.
+
 ## [v0.9.17]
 
 ### Changes

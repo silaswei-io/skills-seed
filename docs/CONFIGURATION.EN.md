@@ -264,15 +264,15 @@ skills-seed init --workspace --agent codex
 
 ### Workflow Resources
 
-User workflows are not stored in `config.yaml` and are not part of `profile.mode`. The command sends explicitly provided goals, constraints, background, or paths to the current Agent, infers a standard workflow from them, saves the inferred body to `.skills-seed/workflows/<name>/WORKFLOW.md`, and stores original notes plus metadata in `metadata.yaml` in the same directory:
+User workflows are not stored in `config.yaml` and are not part of `profile.mode`. The command sends explicitly provided goals, constraints, background, or paths to the current Agent, infers a standard workflow from them, saves the inferred body to `.skills-seed/workflows/<id>/WORKFLOW.md`, and stores original notes plus metadata in `metadata.yaml` in the same directory:
 
 ```bash
 skills-seed workflow --context "Check environment variables and build artifacts before release, then run smoke tests after deployment"
 ```
 
-When `--name` is omitted, the Agent generates a workflow title from `--context`. `--context` can be a goal, constraint, background note, path, or rough description; the Agent infers a standard workflow from that explicit input. Existing same-name workflows are merged and deduplicated by default; use `--overwrite` to replace one completely.
+When `--name` is omitted, the Agent generates an English workflow title from `--context` and uses its slug as `<id>`; repeated titles receive a numbered suffix. `--context` can be a goal, constraint, background note, path, or rough description; the Agent infers a standard workflow from that explicit input. Existing same-name workflows are merged and deduplicated by default; use `--overwrite` to replace one completely.
 
-When skills are generated, workflows are written to output `workflows/`, and matching script directories are copied to `scripts/workflows/<name>/`.
+When skills are generated, workflows are written to output `workflows/`, and matching script directories are copied to `scripts/workflows/<id>/`.
 
 ### `learning.history`
 

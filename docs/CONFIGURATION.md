@@ -264,15 +264,15 @@ skills-seed init --workspace --agent codex
 
 ### 工作流资源
 
-用户工作流不写入 `config.yaml`，也不属于 `profile.mode`。使用命令把用户显式传入的目标、约束、背景或路径交给当前 Agent 推导为标准工作流，推导后的正文保存到 `.skills-seed/workflows/<name>/WORKFLOW.md`，原始输入记录和元数据保存到同目录 `metadata.yaml`：
+用户工作流不写入 `config.yaml`，也不属于 `profile.mode`。使用命令把用户显式传入的目标、约束、背景或路径交给当前 Agent 推导为标准工作流，推导后的正文保存到 `.skills-seed/workflows/<id>/WORKFLOW.md`，原始输入记录和元数据保存到同目录 `metadata.yaml`：
 
 ```bash
 skills-seed workflow --context "发布前检查环境变量和构建产物，发布后执行 smoke test"
 ```
 
-未提供 `--name` 时，Agent 会根据 `--context` 生成工作流标题；`--context` 可以是目标、约束、背景、路径或零散说明，Agent 会从这些显式输入推导标准工作流。同名工作流默认会与已有内容合并去重；需要完全替换时使用 `--overwrite`。
+未提供 `--name` 时，Agent 会根据 `--context` 生成英文工作流标题，并用标题 slug 作为 `<id>`；标题重复时自动追加序号。`--context` 可以是目标、约束、背景、路径或零散说明，Agent 会从这些显式输入推导标准工作流。同名工作流默认会与已有内容合并去重；需要完全替换时使用 `--overwrite`。
 
-生成 skills 时，工作流会写入输出目录的 `workflows/`，对应脚本目录会复制到 `scripts/workflows/<name>/`。
+生成 skills 时，工作流会写入输出目录的 `workflows/`，对应脚本目录会复制到 `scripts/workflows/<id>/`。
 
 ### `learning.history`
 

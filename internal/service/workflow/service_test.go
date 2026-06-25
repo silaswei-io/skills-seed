@@ -16,7 +16,7 @@ type mockOptimizer struct{}
 func (m mockOptimizer) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
 	title := req.Name
 	if title == "" {
-		title = "自动发布流程"
+		title = "Release Workflow"
 	}
 	content := "# " + title + "\n\n## 适用场景\n" + req.Context
 	if !req.Overwrite && req.ExistingContent != "" {
@@ -34,7 +34,7 @@ func (m *captureOptimizer) OptimizeWorkflow(ctx context.Context, req *agent.Opti
 	m.requests = append(m.requests, &copied)
 	title := req.Name
 	if title == "" {
-		title = "自动发布流程"
+		title = "Release Workflow"
 	}
 	return &agent.OptimizeWorkflowResult{Title: title, Content: "# " + title + "\n\n## 适用场景\n" + req.Context}, nil
 }
@@ -188,8 +188,8 @@ func TestUpsertWorkflowGeneratesNameWhenMissing(t *testing.T) {
 
 	workflow, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{Context: "发布前检查环境变量"})
 	require.NoError(t, err)
-	require.Equal(t, "自动发布流程", workflow.Name)
-	require.Regexp(t, `^workflow-[a-f0-9]{12}$`, workflow.ID)
+	require.Equal(t, "Release Workflow", workflow.Name)
+	require.Equal(t, "release-workflow", workflow.ID)
 	require.FileExists(t, filepath.Join(seedPath, "workflows", workflow.ID, "WORKFLOW.md"))
 }
 
@@ -205,8 +205,7 @@ func TestUpsertWorkflowWithoutNameDoesNotUpdateExistingTitleID(t *testing.T) {
 	created, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{Context: "补充待确认事项"})
 	require.NoError(t, err)
 	require.Equal(t, "deploy", created.Name)
-	require.Regexp(t, `^workflow-[a-f0-9]{12}$`, created.ID)
-	require.NotEqual(t, "deploy", created.ID)
+	require.Equal(t, "deploy-2", created.ID)
 
 	unchanged, err := repo.Get("deploy")
 	require.NoError(t, err)
@@ -217,7 +216,7 @@ func TestUpsertWorkflowWithoutNameDoesNotUpdateExistingTitleID(t *testing.T) {
 func TestUpsertWorkflowWithoutNameAlwaysCreatesNewWorkflow(t *testing.T) {
 	seedPath := t.TempDir()
 	repo := workflowstore.NewRepository(seedPath)
-	svc := NewService(repo, fixedTitleOptimizer{title: "jzero 开发工作流"}, "go")
+	svc := NewService(repo, fixedTitleOptimizer{title: "Jzero Development Workflow"}, "go")
 
 	first, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{Context: "改元文件后执行 jzero gen"})
 	require.NoError(t, err)
@@ -226,7 +225,7 @@ func TestUpsertWorkflowWithoutNameAlwaysCreatesNewWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEqual(t, first.ID, second.ID)
-	require.Regexp(t, `^workflow-[a-f0-9]{12}$`, first.ID)
+	require.Equal(t, "jzero-development-workflow", first.ID)
 	require.Equal(t, first.ID+"-2", second.ID)
 
 	workflows, err := repo.List()

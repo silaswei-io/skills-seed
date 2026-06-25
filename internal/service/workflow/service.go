@@ -2,8 +2,6 @@ package workflow
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -125,7 +123,7 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 }
 
 func (s *Service) newGeneratedWorkflowID(title, context string) (string, error) {
-	baseID := workflowIDFromGeneratedTitle(title, context)
+	baseID := workflowIDFromGeneratedTitle(title)
 	if baseID == "" {
 		return "", nil
 	}
@@ -156,9 +154,8 @@ func (s *Service) newGeneratedWorkflowID(title, context string) (string, error) 
 	}
 }
 
-func workflowIDFromGeneratedTitle(title, context string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(title) + "\n" + strings.TrimSpace(context)))
-	return "workflow-" + hex.EncodeToString(sum[:])[:12]
+func workflowIDFromGeneratedTitle(title string) string {
+	return runtimefiles.SafePart(title, "")
 }
 
 func existingWorkflowContent(workflow *domain.Workflow, overwrite bool) string {
