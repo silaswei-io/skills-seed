@@ -158,6 +158,8 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"ProjectName":           req.ProjectName,
 		"RootPath":              req.RootPath,
 		"Language":              req.Language,
+		"RuntimeLabel":          req.RuntimeLabel,
+		"AnalysisUnit":          req.AnalysisUnit,
 		"FocusPaths":            req.FocusPaths,
 		"StructurePath":         structurePath,
 		"StructuralContextPath": structuralContextPath,

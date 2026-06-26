@@ -169,6 +169,8 @@ type CuratedPattern struct {
 	ProjectID         string                           // workspace 子项目 ID
 	ScopePath         string                           // workspace 路径范围
 	WorkspaceRole     string                           // workspace 角色
+	AnalysisUnitID    string                           // learn current 分析单元 ID
+	AnalysisUnitName  string                           // learn current 分析单元名称
 }
 
 // CuratedDrop 表示不入库的候选模式。
@@ -263,9 +265,11 @@ type SampleFile struct {
 
 // AnalyzeCurrentCodebaseRequest 分析当前代码库请求
 type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName           string        // 项目名称
-	RootPath              string        // 项目根路径
-	Language              string        // 主要语言
+	ProjectName           string // 项目名称
+	RootPath              string // 项目根路径
+	Language              string // 主要语言
+	RuntimeLabel          string // runtime 文件名标签，用于关联本次 prompt 和输出
+	AnalysisUnit          domain.AnalysisUnit
 	FocusPaths            []string      // 指定扫描范围（相对项目根）
 	Structure             string        // 目录结构
 	StructurePath         string        // 目录结构文件路径

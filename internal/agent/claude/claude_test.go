@@ -153,6 +153,43 @@ func TestAnalyzeProjectRepairsMalformedModelJSON(t *testing.T) {
 	require.Equal(t, "bad", result.CommonUtils[0].Name)
 }
 
+func TestSelectFilesStoresPromptAndOutputWithSharedRuntimeName(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+
+	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{\"include\":[\"internal/auth/login.go\"],\"selected_paths\":[\"internal/auth/login.go\"],\"reason\":\"auth\"}"}`)
+	loader := promptloader.New("claude", "zh-CN", seedPath)
+	ag := New(commandPath, 5*time.Second, loader, false, config.DefaultRetryConfig())
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	_, err := ag.SelectFiles(ctx, &agent.SelectFilesRequest{
+		FileTree:     "internal/auth/login.go",
+		Candidates:   []agent.FileSelectionCandidate{{Path: "internal/auth/login.go", Changed: true}},
+		CandidateNum: 1,
+	})
+	require.NoError(t, err)
+
+	promptEntries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "rendered-prompts"))
+	require.NoError(t, err)
+	outputEntries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "agent-outputs"))
+	require.NoError(t, err)
+
+	var promptName, outputName string
+	for _, entry := range promptEntries {
+		if strings.HasSuffix(entry.Name(), ".md") {
+			promptName = entry.Name()
+		}
+	}
+	for _, entry := range outputEntries {
+		if strings.HasSuffix(entry.Name(), ".md") {
+			outputName = entry.Name()
+		}
+	}
+	require.Regexp(t, `^\d{8}-\d{6}-file-select\.md$`, promptName)
+	require.Equal(t, strings.TrimSuffix(promptName, "-file-select.md")+"-claude-file-select.md", outputName)
+}
+
 func TestParseClaudeOutput_ExtractsResultAndTokenUsage(t *testing.T) {
 	output, usage := parseClaudeOutput(`{
   "type": "result",
@@ -210,5 +247,9 @@ type failingPromptRenderer struct {
 }
 
 func (f failingPromptRenderer) Render(string, interface{}) (string, error) {
+	return "", f.err
+}
+
+func (f failingPromptRenderer) RenderForRuntimeTask(string, interface{}, promptloader.RuntimeTask) (string, error) {
 	return "", f.err
 }

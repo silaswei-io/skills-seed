@@ -99,9 +99,15 @@ func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pat
 
 // SavePatternsStrict 策展并保存多个候选模式，失败时返回错误。
 func (s *LearnerService) SavePatternsStrict(ctx context.Context, patterns []domain.Pattern, operation string) (int, error) {
+	return s.SavePatternsStrictWithMetadata(ctx, patterns, operation, domain.AnalysisUnit{})
+}
+
+// SavePatternsStrictWithMetadata 策展并保存候选模式，同时补充本次学习范围元数据。
+func (s *LearnerService) SavePatternsStrictWithMetadata(ctx context.Context, patterns []domain.Pattern, operation string, unit domain.AnalysisUnit) (int, error) {
 	if s.curatorSvc == nil {
 		return 0, fmt.Errorf("pattern curator is not configured")
 	}
+	patterns = attachAnalysisUnit(patterns, unit)
 	result, err := s.curatorSvc.CurateAndStore(ctx, curator.CurateRequest{
 		Operation:  operation,
 		Candidates: patterns,
@@ -110,6 +116,22 @@ func (s *LearnerService) SavePatternsStrict(ctx context.Context, patterns []doma
 		return 0, err
 	}
 	return len(result.Written), nil
+}
+
+func attachAnalysisUnit(patterns []domain.Pattern, unit domain.AnalysisUnit) []domain.Pattern {
+	if unit.ID == "" && unit.Name == "" {
+		return patterns
+	}
+	out := append([]domain.Pattern(nil), patterns...)
+	for i := range out {
+		if out[i].AnalysisUnitID == "" {
+			out[i].AnalysisUnitID = unit.ID
+		}
+		if out[i].AnalysisUnitName == "" {
+			out[i].AnalysisUnitName = unit.Name
+		}
+	}
+	return out
 }
 
 // KnownPatternsSnapshot 返回给当前代码学习使用的已知模式摘要。

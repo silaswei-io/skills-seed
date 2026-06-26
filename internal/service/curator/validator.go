@@ -144,6 +144,8 @@ func normalizeCandidate(pattern domain.Pattern) domain.Pattern {
 	pattern.ProjectID = strings.TrimSpace(pattern.ProjectID)
 	pattern.ScopePath = strings.TrimSpace(pattern.ScopePath)
 	pattern.WorkspaceRole = strings.TrimSpace(pattern.WorkspaceRole)
+	pattern.AnalysisUnitID = strings.TrimSpace(pattern.AnalysisUnitID)
+	pattern.AnalysisUnitName = strings.TrimSpace(pattern.AnalysisUnitName)
 	pattern.Category = domain.NormalizePatternCategory(pattern.Category)
 	if pattern.Source == "" {
 		pattern.Source = domain.SourceLearned

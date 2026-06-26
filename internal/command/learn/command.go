@@ -13,6 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
@@ -38,6 +39,7 @@ type learnCurrentOptions struct {
 	contextText string
 	contextFile string
 	userContext string
+	stateScope  string
 	force       bool
 }
 
@@ -135,6 +137,11 @@ func RunLearnCurrentWithContext(cont *container.Container, userContext string) (
 	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext})
 }
 
+// RunLearnCurrentWithStateScope 从当前代码库学习，并使用指定恢复状态 scope。
+func RunLearnCurrentWithStateScope(cont *container.Container, stateScope string, userContext string) (domain.LearnCurrentResult, error) {
+	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext, stateScope: stateScope})
+}
+
 func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	if opts.profileMode == "" {
 		opts.profileMode = learnCurrentProfileAuto
@@ -160,6 +167,7 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 		language:         opts.language,
 		focusPaths:       opts.focusPaths,
 		profileMode:      opts.profileMode,
+		stateScope:       opts.stateScope,
 		force:            opts.force,
 	})
 	if err != nil {
@@ -187,6 +195,7 @@ type learnCurrentProjectOptions struct {
 	language         string
 	focusPaths       []string
 	profileMode      string
+	stateScope       string
 	force            bool
 }
 
@@ -214,9 +223,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	if err := commandutil.RequireAgentAvailable(cont); err != nil {
 		return nil, err
 	}
-	if cont.AnalysisPlanRepo == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("ErrAnalysisPlanRepoUnavailable"))
-	}
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, opts.stateScope)
 
 	ctx := agent.WithTokenUsageScope(context.Background(), opts.tokenScope)
 	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
@@ -350,9 +357,28 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	var effectiveFocusPaths []string
 	var selectedFiles []domain.FileInfo
 	var selectionSummary aiFileSelectionSummary
+	var stateSession *currentStateSession
 	detectStartedAt := time.Now()
 	if err := runStep(i18n.Get("ProgressLearnCurrentDetectChanges"), func() error {
-		var err error
+		session, err := restoreCurrentState(ctx, stateRepo, cont.FileTracker, projectName, currentLanguage, opts.userContext)
+		if err != nil {
+			return err
+		}
+		if session != nil {
+			stateSession = session
+			incrementalChanges = session.Changes
+			focusRelPaths := analysisCandidatePaths(incrementalChanges)
+			effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, focusRelPaths)
+			selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, incrementalChanges.AddedOrModified))
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+				"operation", "command.learn_current.resume_state",
+				"state_scope", stateRepo.Command(),
+				"inputs_count", len(session.State.Inputs),
+				"pending_count", len(incrementalChanges.AddedOrModified)+len(incrementalChanges.Deleted),
+				"units_count", len(session.State.Units),
+			)
+			return nil
+		}
 		incrementalChanges, err = prepareIncrementalFileChangesWithOptions(ctx, cont.FileTracker, cont.ConfigRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, resolvedFocusPaths, fileanalysis.CurrentChangeOptions{
 			Force: opts.force,
 		})
@@ -448,6 +474,9 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	savedCount := 0
 
 	if !incrementalChanges.HasChanges() {
+		if stateSession != nil {
+			_ = stateRepo.Clear()
+		}
 		if opts.showDetailedLogs {
 			logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
 		}
@@ -511,14 +540,20 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
 	analyzeStartedAt := time.Now()
 	if err := runStep(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error {
-		planRepo := cont.AnalysisPlanRepo
 		focusRelPaths := analysisCandidatePaths(incrementalChanges)
-		plan, err := loadOrCreateAnalysisPlan(ctx, planRepo, cont.AnalyzerSvc, projectName, projectRoot, currentLanguage, focusRelPaths, incrementalChanges, opts.userContext)
-		if err != nil {
-			return err
+		state := (*commandstate.State)(nil)
+		if stateSession != nil {
+			state = stateSession.State
+		}
+		if state == nil {
+			var err error
+			state, err = loadOrCreateCurrentState(ctx, stateRepo, cont.AnalyzerSvc, projectName, projectRoot, currentLanguage, focusRelPaths, incrementalChanges, opts.userContext)
+			if err != nil {
+				return err
+			}
 		}
 
-		plannedUnits := pendingAnalysisUnits(plan, incrementalChanges)
+		plannedUnits := pendingAnalysisUnits(state, incrementalChanges)
 		if len(plannedUnits) == 0 {
 			return nil
 		}
@@ -535,8 +570,11 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			knownPatternsJSON, knownPatternsCount := cont.LearnerSvc.KnownPatternsSnapshot(ctx)
 			unitFocusAbsPaths := resolveIncrementalFocusPaths(projectRoot, unitFocusRelPaths)
 			unitSelected := unitSelectedFiles(unit, selectedFiles, incrementalChanges)
+			unitLabel := agent.RuntimeLabelFromAnalysisUnit(unit.ID, unit.Name)
 			analyzeResult, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeCodebaseOptions{
 				FocusPaths:         unitFocusAbsPaths,
+				RuntimeLabel:       unitLabel,
+				AnalysisUnit:       unit,
 				SelectedFiles:      unitSelected,
 				SelectedFilesSet:   true,
 				KnownPatternsJSON:  knownPatternsJSON,
@@ -547,7 +585,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 				return err
 			}
 			if len(learnedPatterns) > 0 {
-				saved, err := cont.LearnerSvc.SavePatternsStrict(ctx, learnedPatterns, "learn_current")
+				saved, err := cont.LearnerSvc.SavePatternsStrictWithMetadata(ctx, learnedPatterns, "learn_current", unit)
 				if err != nil {
 					return err
 				}
@@ -570,7 +608,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			existingProfile = mergedProfile
 		}
 		if completedUnits == len(plannedUnits) {
-			_ = planRepo.Clear()
+			_ = stateRepo.Clear()
 		}
 		return nil
 	}); err != nil {

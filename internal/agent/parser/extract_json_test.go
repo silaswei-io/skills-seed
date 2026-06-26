@@ -323,6 +323,8 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
     "rule": "Wrap errors at module boundaries",
     "confidence": 0.9,
     "frequency": 1,
+    "analysis_unit_id": "auth",
+    "analysis_unit_name": "Authentication",
     "evidence_locations": [
       {
         "path": "internal/service/config.go",
@@ -344,6 +346,8 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
 	assert.Len(t, result.Patterns, 1)
 	assert.Nil(t, result.Patterns[0].BusinessMethod)
 	assert.Len(t, result.Patterns[0].EvidenceLocations, 1)
+	assert.Equal(t, "auth", result.Patterns[0].AnalysisUnitID)
+	assert.Equal(t, "Authentication", result.Patterns[0].AnalysisUnitName)
 	assert.Equal(t, "internal/service/config.go", result.Patterns[0].EvidenceLocations[0].Path)
 	assert.Equal(t, 42, result.Patterns[0].EvidenceLocations[0].Line)
 	assert.Equal(t, "LoadConfig", result.Patterns[0].EvidenceLocations[0].Symbol)

@@ -93,7 +93,8 @@ func patternSimilarity(left, right domain.Pattern) float64 {
 func sameScope(left, right domain.Pattern) bool {
 	return strings.TrimSpace(left.ProjectID) == strings.TrimSpace(right.ProjectID) &&
 		strings.TrimSpace(left.ScopePath) == strings.TrimSpace(right.ScopePath) &&
-		strings.TrimSpace(left.WorkspaceRole) == strings.TrimSpace(right.WorkspaceRole)
+		strings.TrimSpace(left.WorkspaceRole) == strings.TrimSpace(right.WorkspaceRole) &&
+		strings.TrimSpace(left.AnalysisUnitID) == strings.TrimSpace(right.AnalysisUnitID)
 }
 
 func businessMethodOverlap(left, right *domain.BusinessMethod) bool {

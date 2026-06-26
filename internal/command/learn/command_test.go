@@ -19,8 +19,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/git"
-	"github.com/silaswei-io/skills-seed/internal/infra/storage/analysisplan"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
@@ -677,8 +677,12 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 		}}, nil
 	}
 	var analyzed [][]string
+	var labels []string
+	var units []string
 	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 		analyzed = append(analyzed, append([]string{}, req.FocusPaths...))
+		labels = append(labels, req.RuntimeLabel)
+		units = append(units, req.AnalysisUnit.ID)
 		if len(analyzed) == 2 {
 			return nil, errors.New("rate limited")
 		}
@@ -690,24 +694,38 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
 	require.Equal(t, [][]string{{"internal/auth/login.go"}, {"internal/key/create.go"}}, analyzed)
+	require.Equal(t, []string{"unit-auth", "unit-key"}, labels)
+	require.Equal(t, []string{"auth", "key"}, units)
 
-	planBytes, err := os.ReadFile(analysisplan.NewRepository(cont.SeedPath).Path())
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	stateBytes, err := os.ReadFile(stateRepo.Path())
 	require.NoError(t, err)
-	var cachedPlan analysisplan.Plan
-	require.NoError(t, json.Unmarshal(planBytes, &cachedPlan))
-	require.Len(t, cachedPlan.Units, 2)
+	var cachedState commandstate.State
+	require.NoError(t, json.Unmarshal(stateBytes, &cachedState))
+	require.Equal(t, commandStateLearnCurrent, cachedState.Command)
+	require.Len(t, cachedState.Units, 2)
 
 	analyzed = nil
+	labels = nil
+	units = nil
+	mockAgent.SelectFilesFn = func(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
+		t.Fatal("SelectFiles should not be called when resuming cached command state")
+		return nil, nil
+	}
 	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 		analyzed = append(analyzed, append([]string{}, req.FocusPaths...))
+		labels = append(labels, req.RuntimeLabel)
+		units = append(units, req.AnalysisUnit.ID)
 		pattern := domain.NewPattern("p-resumed", "Resumed Pattern", domain.CategoryBusiness)
 		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
 	}
 
 	requireRunLearnCurrentNoError(t, cont, opts)
-	require.Equal(t, 1, planCalls, "cached plan should be reused without replanning")
+	require.Equal(t, 1, planCalls, "cached state should be reused without replanning")
 	require.Equal(t, [][]string{{"internal/key/create.go"}}, analyzed)
-	require.NoFileExists(t, analysisplan.NewRepository(cont.SeedPath).Path())
+	require.Equal(t, []string{"unit-key"}, labels)
+	require.Equal(t, []string{"key"}, units)
+	require.NoFileExists(t, stateRepo.Path())
 }
 
 func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
@@ -1360,7 +1378,6 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		StateRepo:            statestore.NewRepository(seedPath),
 		WorkspaceProfileRepo: workspacestore.NewProfileRepository(seedPath),
 		WorkspaceSpecRepo:    workspacestore.NewSpecRepository(seedPath),
-		AnalysisPlanRepo:     analysisplan.NewRepository(seedPath),
 		Agent:                mockAgent,
 		AnalyzerSvc:          analyzer.NewAnalyzerService(mockAgent, configRepo),
 		LearnerSvc:           servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, curatorSvc),

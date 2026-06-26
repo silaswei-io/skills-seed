@@ -2,12 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
-## [v0.10.1]
+## [v0.10.2]
 
 ### Changes
 
 - Refactored `learn current` into a business analysis unit plan plus unit-level learning flow: the Agent first plans units by business capability, then each unit is analyzed and immediately persists patterns and file fingerprints so failed runs can continue from already stored results.
-- Added `.skills-seed/cache/analysis/current/plan.json` as a deletable, rebuildable current-learning plan cache. Authoritative learning facts remain in `store/project.db`, while `runtime` only stores prompts, Agent outputs, logs, and other disposable diagnostics.
+- Added `.skills-seed/cache/commands/<command>/state.json` as deletable, rebuildable command resume state. Authoritative learning facts remain in `store/project.db`, while `runtime` only stores prompts, Agent outputs, logs, and other disposable diagnostics.
 - Clarified `.skills-seed` directory semantics: `store/documents` stores persistent readable documents such as profiles, specs, state, and changelog; `cache` stores rebuildable caches; `runtime` stores disposable run artifacts.
 - Split and renamed current-learning prompts so project initialization, project profile analysis, current-code business learning, and business-unit planning each do one job. Prompts and skill templates remain template/i18n driven instead of hard-coded in code.
 - Improved generated project skills so business pattern overviews, business methods, touchpoint indexes, and pattern details focus more on how requesters describe business needs instead of only code structure.

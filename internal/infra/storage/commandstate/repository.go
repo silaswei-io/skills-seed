@@ -1,4 +1,4 @@
-package analysisplan
+package commandstate
 
 import (
 	"context"
@@ -19,18 +19,19 @@ import (
 
 const schemaVersion = 1
 
-var ErrPlanNotFound = errors.New("analysis plan not found")
+var ErrStateNotFound = errors.New("command state not found")
 
-// FileInput 记录 plan 覆盖文件的输入摘要。
+// FileInput 记录命令状态覆盖文件的输入摘要。
 type FileInput struct {
 	Path   string `json:"path"`
 	Hash   string `json:"hash,omitempty"`
 	Status string `json:"status"`
 }
 
-// Plan 是 learn current 当前未完成分析计划的可重建缓存。
-type Plan struct {
+// State 是命令未完成执行的可恢复状态。
+type State struct {
 	SchemaVersion int                   `json:"schema_version"`
+	Command       string                `json:"command"`
 	ProjectName   string                `json:"project_name"`
 	Language      string                `json:"language"`
 	UserContext   string                `json:"user_context_hash,omitempty"`
@@ -39,38 +40,51 @@ type Plan struct {
 	Units         []domain.AnalysisUnit `json:"units"`
 }
 
-// Repository 读写 .skills-seed/cache/analysis/current/plan.json。
+// Repository 读写某个命令的恢复状态。
 type Repository struct {
-	path string
+	path    string
+	command string
 }
 
-// NewRepository 创建 analysis plan cache 仓储。
-func NewRepository(seedPath string) *Repository {
-	return &Repository{path: layout.New(seedPath).CurrentAnalysisPlan()}
+// NewRepository 创建命令状态仓储。
+func NewRepository(seedPath, command string) *Repository {
+	command = normalizeCommand(command)
+	return &Repository{
+		path:    layout.New(seedPath).CommandState(command),
+		command: command,
+	}
 }
 
-// Path 返回 plan cache 文件路径。
+// Path 返回命令状态文件路径。
 func (r *Repository) Path() string {
 	return r.path
 }
 
-// Load 读取当前分析计划。
-func (r *Repository) Load(ctx context.Context) (*Plan, error) {
-	return planStore(r.path).Get(ctx)
+// Command 返回该仓储对应的命令 scope。
+func (r *Repository) Command() string {
+	return r.command
 }
 
-// Save 写入当前分析计划。
-func (r *Repository) Save(ctx context.Context, plan *Plan) error {
-	if plan.SchemaVersion == 0 {
-		plan.SchemaVersion = schemaVersion
-	}
-	if strings.TrimSpace(plan.CreatedAt) == "" {
-		plan.CreatedAt = time.Now().Format(time.RFC3339)
-	}
-	return planStore(r.path).Save(ctx, plan)
+// Load 读取命令状态。
+func (r *Repository) Load(ctx context.Context) (*State, error) {
+	return stateStore(r.path).Get(ctx)
 }
 
-// Clear 删除当前分析计划。
+// Save 写入命令状态。
+func (r *Repository) Save(ctx context.Context, state *State) error {
+	if state.SchemaVersion == 0 {
+		state.SchemaVersion = schemaVersion
+	}
+	if strings.TrimSpace(state.Command) == "" {
+		state.Command = r.command
+	}
+	if strings.TrimSpace(state.CreatedAt) == "" {
+		state.CreatedAt = time.Now().Format(time.RFC3339)
+	}
+	return stateStore(r.path).Save(ctx, state)
+}
+
+// Clear 删除命令状态。
 func (r *Repository) Clear() error {
 	if err := os.Remove(r.path); err != nil && !os.IsNotExist(err) {
 		return err
@@ -78,10 +92,11 @@ func (r *Repository) Clear() error {
 	return nil
 }
 
-// NewPlan 创建规范化 plan。
-func NewPlan(projectName, language, userContext string, inputs []FileInput, units []domain.AnalysisUnit) *Plan {
-	return &Plan{
+// NewState 创建规范化命令状态。
+func NewState(command, projectName, language, userContext string, inputs []FileInput, units []domain.AnalysisUnit) *State {
+	return &State{
 		SchemaVersion: schemaVersion,
+		Command:       normalizeCommand(command),
 		ProjectName:   projectName,
 		Language:      language,
 		UserContext:   HashText(userContext),
@@ -97,19 +112,49 @@ func HashText(text string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func planStore(path string) jsonfile.Store[Plan] {
-	return jsonfile.Store[Plan]{
+func stateStore(path string) jsonfile.Store[State] {
+	return jsonfile.Store[State]{
 		Path:     path,
-		NotFound: ErrPlanNotFound,
-		NilValue: errors.New("analysis plan is nil"),
+		NotFound: ErrStateNotFound,
+		NilValue: errors.New("command state is nil"),
 		Labels: jsonfile.Labels{
-			Read:      "read analysis plan failed",
-			Parse:     "parse analysis plan failed",
-			CreateDir: "create analysis plan directory failed",
-			Marshal:   "marshal analysis plan failed",
-			Write:     "write analysis plan failed",
+			Read:      "read command state failed",
+			Parse:     "parse command state failed",
+			CreateDir: "create command state directory failed",
+			Marshal:   "marshal command state failed",
+			Write:     "write command state failed",
 		},
 	}
+}
+
+func normalizeCommand(command string) string {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return "default"
+	}
+	var b strings.Builder
+	b.Grow(len(command))
+	lastDash := false
+	for _, r := range strings.ToLower(command) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		case r == '-' || r == '_' || r == '.':
+			b.WriteRune(r)
+			lastDash = false
+		default:
+			if !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	out := strings.Trim(b.String(), "-_.")
+	if out == "" {
+		return "default"
+	}
+	return out
 }
 
 func normalizeInputs(inputs []FileInput) []FileInput {
@@ -178,14 +223,14 @@ func unitPaths(unit domain.AnalysisUnit) []string {
 	return normalizePaths(paths)
 }
 
-// MarshalJSON keeps nil slices encoded as [] for stable cache files.
-func (p Plan) MarshalJSON() ([]byte, error) {
-	type alias Plan
-	if p.Inputs == nil {
-		p.Inputs = []FileInput{}
+// MarshalJSON keeps nil slices encoded as [] for stable state files.
+func (s State) MarshalJSON() ([]byte, error) {
+	type alias State
+	if s.Inputs == nil {
+		s.Inputs = []FileInput{}
 	}
-	if p.Units == nil {
-		p.Units = []domain.AnalysisUnit{}
+	if s.Units == nil {
+		s.Units = []domain.AnalysisUnit{}
 	}
-	return json.Marshal(alias(p))
+	return json.Marshal(alias(s))
 }

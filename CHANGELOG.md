@@ -2,12 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
-## [v0.10.1]
+## [v0.10.2]
 
 ### 变更
 
 - 重构 `learn current` 为业务分析单元计划 + 单元级学习流程：先由 Agent 按业务能力规划 unit，再逐 unit 分析并即时保存 patterns 与文件指纹，失败后可基于已落库结果继续。
-- 新增 `.skills-seed/cache/analysis/current/plan.json` 作为可删除、可重建的当前学习计划缓存；业务学习事实仍以 `store/project.db` 为准，`runtime` 仅保存 prompt、Agent 输出和日志等临时调试产物。
+- 新增 `.skills-seed/cache/commands/<command>/state.json` 作为可删除、可重建的命令续跑状态；业务学习事实仍以 `store/project.db` 为准，`runtime` 仅保存 prompt、Agent 输出和日志等临时调试产物。
 - 调整 `.skills-seed` 目录语义：`store/documents` 保存项目画像、规范、状态和 changelog 等持久文档，`cache` 保存可重建缓存，`runtime` 保存可删除运行产物。
 - 拆分并重命名当前学习相关 prompt：项目初始化、项目画像分析、当前代码业务学习、业务单元规划各自只做一个任务；提示词和 skill 模板继续走 i18n/template，不在代码中硬编码。
 - 优化生成的 project skills，使业务模式总览、业务方法、触点索引和模式详情更聚焦“需求方会如何描述业务”，减少纯工程结构视角。

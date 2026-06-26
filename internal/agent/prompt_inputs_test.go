@@ -65,5 +65,5 @@ func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T
 
 	require.FileExists(t, inputPath)
 	require.Contains(t, filepath.ToSlash(inputPath), ".skills-seed/runtime")
-	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-prompt-input-skills-seed-project-profile-\d+$`, filepath.Base(filepath.Dir(inputPath)))
+	require.Regexp(t, `^\d{8}-\d{6}-prompt-input-skills-seed-project-profile-\d+$`, filepath.Base(filepath.Dir(inputPath)))
 }

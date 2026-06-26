@@ -224,9 +224,6 @@ other = "渲染 pattern-curate prompt 失败"
 [AgentRenderAnalysisPlanPromptFailed]
 other = "渲染 analysis-plan prompt 失败"
 
-[ErrAnalysisPlanRepoUnavailable]
-other = "analysis plan 缓存仓储不可用"
-
 [AgentRenderOptimizeWorkflowPromptFailed]
 other = "渲染 workflow-optimize prompt 失败"
 

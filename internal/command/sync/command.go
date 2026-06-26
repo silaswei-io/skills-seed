@@ -39,6 +39,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 				return err
 			}
 			ctx := cmd.Context()
+			stateScope := commandutil.CommandStateScopeForCobra(cmd)
 
 			change := changelog.Start(cont.SeedPath, "sync")
 			if addDesc != "" {
@@ -47,7 +48,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 				}
 				return change.Save(i18n.Get("ChangeLogSummaryUserPatternSync"))
 			}
-			if err := syncLearn(ctx, cont, userContext, change); err != nil {
+			if err := syncLearn(ctx, cont, stateScope, userContext, change); err != nil {
 				return err
 			}
 			return change.Save(i18n.Get("ChangeLogSummarySync"))
@@ -63,10 +64,10 @@ func Cmd(cont *container.Container) *cobra.Command {
 }
 
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
-func syncLearn(ctx context.Context, cont *container.Container, userContext string, change *changelog.Builder) error {
+func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, change *changelog.Builder) error {
 	// 步骤 1：学习当前代码。
 	logger.Info(i18n.Get("SyncStepLearn"))
-	result, err := learncmd.RunLearnCurrentWithContext(cont, userContext)
+	result, err := learncmd.RunLearnCurrentWithStateScope(cont, stateScope, userContext)
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}

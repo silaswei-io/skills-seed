@@ -34,6 +34,7 @@ type ClaudeAgent struct {
 // promptRenderer 是 Agent 依赖的最小提示词渲染能力，便于测试渲染错误链路
 type promptRenderer interface {
 	Render(name string, data interface{}) (string, error)
+	RenderForRuntimeTask(name string, data interface{}, task promptloader.RuntimeTask) (string, error)
 }
 
 // New 创建代理
@@ -265,6 +266,7 @@ func (c *ClaudeAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixe
 
 // SelectFiles 基于候选文件树选择当前代码学习范围。
 func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
+	task := agent.NewRuntimeTask(agent.RuntimeSlug("file-select", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-file-select")
 	if err != nil {
 		return nil, err
@@ -275,12 +277,12 @@ func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesReq
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("file-select", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("file-select", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "SelectFiles", prompt)
+	output, err := c.callClaude(ctx, "SelectFiles", prompt, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeAnalyzeFailed"), err)
 	}
@@ -288,7 +290,7 @@ func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesReq
 }
 
 // 调用外部命令行程序（含速率限制自动重试）
-func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) (string, error) {
+func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string, task ...agent.RuntimeTask) (string, error) {
 	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
 		return "", err
@@ -306,7 +308,7 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string) 
 				MaxRetries: maxRetries,
 			})
 		}
-		output, callDuration, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attemptNumber, workDir)
+		output, callDuration, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attemptNumber, workDir, firstRuntimeTask(task))
 		if err == nil {
 			if retried {
 				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
@@ -362,7 +364,7 @@ func isRetryableError(stdout, stderr string) bool {
 }
 
 // 执行单次命令行调用
-func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string, attempt int, workDir string) (string, time.Duration, bool, error) {
+func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string, attempt int, workDir string, task agent.RuntimeTask) (string, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -398,6 +400,8 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 			Agent:     c.Name(),
 			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
 			Attempt:   attempt,
 			RawOutput: stdoutStr,
 			Stderr:    stderrStr,
@@ -440,6 +444,8 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 		Agent:           c.Name(),
 		Operation:       operation,
+		RuntimeID:       task.ID,
+		Slug:            task.Slug,
 		Attempt:         attempt,
 		Content:         output,
 		RawOutput:       rawOutput,
@@ -463,6 +469,17 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
 	return output, duration, false, nil
+}
+
+func firstRuntimeTask(tasks []agent.RuntimeTask) agent.RuntimeTask {
+	if len(tasks) == 0 {
+		return agent.RuntimeTask{}
+	}
+	return tasks[0]
+}
+
+func promptRuntimeTask(task agent.RuntimeTask) promptloader.RuntimeTask {
+	return promptloader.RuntimeTask{ID: task.ID, Slug: task.Slug}
 }
 
 func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage) {
@@ -783,7 +800,9 @@ func (c *ClaudeAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProj
 
 // AnalyzeCurrentCodebase 分析当前代码库，提取初始模式
 func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-pattern-learn-current")
+	operation := agent.AnalyzeCurrentCodebaseOperation(req)
+	task := agent.NewRuntimeTask(agent.RuntimeSlug("pattern-learn-current", req.RuntimeLabel))
+	session, err := agent.NewPromptInputSessionForContext(ctx, agent.RuntimePromptInputPrefix("skills-seed-pattern-learn-current", req.RuntimeLabel))
 	if err != nil {
 		return nil, err
 	}
@@ -794,16 +813,16 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("pattern-learn-current", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-learn-current", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
 
 	// 2. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "AnalyzeCurrentCodebase", prompt)
+	output, err := c.callClaude(ctx, operation, prompt, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
-			"method", "AnalyzeCurrentCodebase",
+			"method", operation,
 			"error", err,
 		)
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
@@ -813,7 +832,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 	result, err := parser.ParseAnalyzeCurrentCodebaseResult(output)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
-			"method", "AnalyzeCurrentCodebase",
+			"method", operation,
 			"error", err,
 			"output_length", len(output),
 		)
@@ -822,7 +841,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
 		"agent", c.Name(),
-		"operation", "AnalyzeCurrentCodebase",
+		"operation", operation,
 		"patterns_count", len(result.Patterns),
 		"profile_delta", !result.ProfileDelta.IsZero(),
 		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
@@ -833,6 +852,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 
 // PlanAnalysisUnits 将当前待学习文件拆成可续跑的业务分析单元。
 func (c *ClaudeAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+	task := agent.NewRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-analysis-plan")
 	if err != nil {
 		return nil, err
@@ -843,12 +863,12 @@ func (c *ClaudeAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnal
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("analysis-plan", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("analysis-plan", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalysisPlanPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "PlanAnalysisUnits", prompt)
+	output, err := c.callClaude(ctx, "PlanAnalysisUnits", prompt, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", "PlanAnalysisUnits",

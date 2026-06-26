@@ -2,19 +2,27 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/git"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
+	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
@@ -40,6 +48,75 @@ func TestSyncLearnAfterLearnWrapsGenerateError(t *testing.T) {
 	}, nil)
 
 	require.ErrorIs(t, err, errGenerate)
+}
+
+func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
+	userContext := "sync context"
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.RootPath = projectRoot
+	cfg.Project.Language = "go"
+	cfg.Agent.Engine = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
+	require.NoError(t, configRepo.Update(cfg))
+	require.NoError(t, exec.Command("git", "-C", projectRoot, "init", "-q").Run())
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "internal"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "internal", "key.go"), []byte("package internal\n"), 0644))
+	require.NoError(t, exec.Command("git", "-C", projectRoot, "add", "-A").Run())
+
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
+	gitRepo := git.NewRepository(projectRoot)
+	curatorSvc := curator.NewService(mockAgent, patternRepo)
+	cont := &container.Container{
+		SeedPath:    seedPath,
+		Config:      configRepo.Get(),
+		ConfigRepo:  configRepo,
+		GitRepo:     gitRepo,
+		PatternRepo: patternRepo,
+		FileTracker: patternRepo,
+		ProfileRepo: profilestore.NewRepository(seedPath),
+		Agent:       mockAgent,
+		AnalyzerSvc: analyzer.NewAnalyzerService(mockAgent, configRepo),
+		LearnerSvc:  servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, curatorSvc),
+	}
+	staleLearnState := commandstate.NewState("learn-current", "demo", "go", userContext, []commandstate.FileInput{
+		{Path: "internal/stale.go", Hash: "stale", Status: "present"},
+	}, []domain.AnalysisUnit{{ID: "stale", EntryPaths: []string{"internal/stale.go"}}})
+	require.NoError(t, commandstate.NewRepository(seedPath, "learn-current").Save(context.Background(), staleLearnState))
+
+	planCalls := 0
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		planCalls++
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}},
+		}}, nil
+	}
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		return nil, errors.New("stop before state is cleared")
+	}
+	stateScope := commandutil.CommandStateScope("sync")
+
+	err = syncLearn(context.Background(), cont, stateScope, userContext, nil)
+
+	require.Error(t, err)
+	require.Equal(t, 1, planCalls)
+	syncStateBytes, readErr := os.ReadFile(commandstate.NewRepository(seedPath, stateScope).Path())
+	require.NoError(t, readErr)
+	var syncState commandstate.State
+	require.NoError(t, json.Unmarshal(syncStateBytes, &syncState))
+	require.Equal(t, "sync", syncState.Command)
+	require.Equal(t, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}}, syncState.Units)
+	require.FileExists(t, commandstate.NewRepository(seedPath, "learn-current").Path())
 }
 
 func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {

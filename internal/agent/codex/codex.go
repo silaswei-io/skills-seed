@@ -36,6 +36,7 @@ type CodexAgent struct {
 // promptRenderer 是 Agent 依赖的最小提示词渲染能力，便于测试渲染错误链路
 type promptRenderer interface {
 	Render(name string, data interface{}) (string, error)
+	RenderForRuntimeTask(name string, data interface{}, task promptloader.RuntimeTask) (string, error)
 }
 
 // New 创建代理
@@ -205,6 +206,7 @@ func (c *CodexAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixes
 
 // SelectFiles 基于候选文件树选择当前代码学习范围。
 func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
+	task := agent.NewRuntimeTask(agent.RuntimeSlug("file-select", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-file-select")
 	if err != nil {
 		return nil, err
@@ -215,12 +217,12 @@ func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequ
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("file-select", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("file-select", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "SelectFiles", prompt)
+	output, err := c.callCodex(ctx, "SelectFiles", prompt, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexAnalyzeFailed"), err)
 	}
@@ -307,7 +309,9 @@ func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProje
 
 // AnalyzeCurrentCodebase 分析当前代码库，提取初始模式
 func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-pattern-learn-current")
+	operation := agent.AnalyzeCurrentCodebaseOperation(req)
+	task := agent.NewRuntimeTask(agent.RuntimeSlug("pattern-learn-current", req.RuntimeLabel))
+	session, err := agent.NewPromptInputSessionForContext(ctx, agent.RuntimePromptInputPrefix("skills-seed-pattern-learn-current", req.RuntimeLabel))
 	if err != nil {
 		return nil, err
 	}
@@ -317,12 +321,12 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("pattern-learn-current", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-learn-current", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "AnalyzeCurrentCodebase", prompt)
+	output, err := c.callCodex(ctx, operation, prompt, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCodebaseAnalysisFailed"), err)
 	}
@@ -333,7 +337,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
 		"agent", c.Name(),
-		"operation", "AnalyzeCurrentCodebase",
+		"operation", operation,
 		"patterns_count", len(result.Patterns),
 		"profile_delta", !result.ProfileDelta.IsZero(),
 		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
@@ -343,6 +347,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 
 // PlanAnalysisUnits 将当前待学习文件拆成可续跑的业务分析单元。
 func (c *CodexAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+	task := agent.NewRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-analysis-plan")
 	if err != nil {
 		return nil, err
@@ -353,12 +358,12 @@ func (c *CodexAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnaly
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("analysis-plan", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("analysis-plan", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalysisPlanPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "PlanAnalysisUnits", prompt)
+	output, err := c.callCodex(ctx, "PlanAnalysisUnits", prompt, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCodebaseAnalysisFailed"), err)
 	}
@@ -492,7 +497,7 @@ func workspacePromptData(workspaceName, workspaceRoot, workspaceInputPath, works
 	}
 }
 
-func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string) (string, error) {
+func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string, task ...agent.RuntimeTask) (string, error) {
 	maxRetries := c.retryCfg.EffectiveMaxRetries()
 	retried := false
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -505,7 +510,7 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string) (s
 				MaxRetries: maxRetries,
 			})
 		}
-		output, callDuration, isRetryable, err := c.doCallCodex(ctx, operation, prompt, attemptNumber)
+		output, callDuration, isRetryable, err := c.doCallCodex(ctx, operation, prompt, attemptNumber, firstRuntimeTask(task))
 		if err == nil {
 			if retried {
 				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
@@ -559,7 +564,7 @@ func isCodexRetryableError(stdout, stderr string) bool {
 }
 
 // doCallCodex 执行单次 Codex CLI 调用
-func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, attempt int) (string, time.Duration, bool, error) {
+func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, attempt int, task agent.RuntimeTask) (string, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -596,6 +601,8 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 			Agent:     c.Name(),
 			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
 			Attempt:   attempt,
 			RawOutput: stdoutStr,
 			Stderr:    stderrStr,
@@ -650,6 +657,8 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 			Agent:           c.Name(),
 			Operation:       operation,
+			RuntimeID:       task.ID,
+			Slug:            task.Slug,
 			Attempt:         attempt,
 			RawOutput:       rawOutput,
 			Stderr:          stderr.String(),
@@ -669,6 +678,8 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 		Agent:           c.Name(),
 		Operation:       operation,
+		RuntimeID:       task.ID,
+		Slug:            task.Slug,
 		Attempt:         attempt,
 		Content:         content,
 		RawOutput:       rawOutput,
@@ -704,6 +715,17 @@ func codexExecArgs(allowUserPlugins bool) []string {
 		args = append(codexDisableUserPluginArgs(), args...)
 	}
 	return args
+}
+
+func firstRuntimeTask(tasks []agent.RuntimeTask) agent.RuntimeTask {
+	if len(tasks) == 0 {
+		return agent.RuntimeTask{}
+	}
+	return tasks[0]
+}
+
+func promptRuntimeTask(task agent.RuntimeTask) promptloader.RuntimeTask {
+	return promptloader.RuntimeTask{ID: task.ID, Slug: task.Slug}
 }
 
 func codexDisableUserPluginArgs() []string {

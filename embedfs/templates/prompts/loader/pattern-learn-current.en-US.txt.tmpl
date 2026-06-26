@@ -24,6 +24,27 @@ Project structure, architecture narrative, and tech-stack overview are context f
   - {{.}}
 {{- end}}
 {{- end}}
+{{- if .AnalysisUnit.Name}}
+- **Current Analysis Unit**: {{.AnalysisUnit.Name}}{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}
+{{- if .AnalysisUnit.ScopeReason}}
+- **Unit Scope Reason**: {{.AnalysisUnit.ScopeReason}}
+{{- end}}
+{{- if .AnalysisUnit.RouteTerms}}
+- **Unit Route Terms**: {{range .AnalysisUnit.RouteTerms}}`{{.}}` {{end}}
+{{- end}}
+{{- if .AnalysisUnit.EntryPaths}}
+- **Unit Entry Paths**:
+{{range .AnalysisUnit.EntryPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- if .AnalysisUnit.RelatedPaths}}
+- **Unit Related Paths**:
+{{range .AnalysisUnit.RelatedPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- end}}
 {{- if .StructurePath}}
 
 # Project Directory Structure
@@ -82,6 +103,17 @@ Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path. 
 Based on the project information and the code files you read, perform the following analysis:
 
 Allowed categories: {{.AllowedCategories}}
+
+{{- if .AnalysisUnit.Name}}
+
+## Current Analysis Unit Boundary (Highest Priority)
+
+- This run may learn only rules, patterns, business entries, and project-profile deltas that belong to the current analysis unit `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}.
+- Read and output only this unit's `FocusPaths`, entry paths, related paths, and adjacent files strictly required to confirm direct call relationships.
+- Do not output other analysis units, other business domains, or whole-project generic conclusions. Other modules seen in structural context or the directory structure are boundary clues only.
+- Every output pattern must be attributable to this analysis unit through its paths, route terms, entry symbols, or business terms. Drop any candidate whose unit ownership is unclear.
+- `profile_delta` may contain only facts clearly added or changed by evidence from this unit. Do not use this unit to refresh the whole project profile.
+{{- end}}
 
 1. **Identify frameworks and tech stack**:
    - Extract only frameworks, runtimes, data access tools, config systems, observability tools, dependency management, or build tools actually used by this project.
@@ -150,6 +182,8 @@ The `json` fenced block below documents the response structure:
       "rule": "When to apply this pattern",
       "confidence": 0.9,
       "frequency": 3,
+      "analysis_unit_id": "{{.AnalysisUnit.ID}}",
+      "analysis_unit_name": "{{.AnalysisUnit.Name}}",
       "evidence_locations": [
         {
           "path": "relative/file/path",

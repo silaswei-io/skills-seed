@@ -200,7 +200,7 @@ Rendered prompts are saved by default under `.skills-seed/runtime/rendered-promp
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr.
 
-Starting in 0.9.6, debug records under `.skills-seed/runtime` use the unified `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` filename prefix. `rendered-prompts/`, `agent-outputs/`, and runtime input temporary directories all start with time, making context, output, and temporary inputs from the same run easier to correlate in chronological order.
+In the current version, debug records under `.skills-seed/runtime` use the `YYYYMMDD-HHMMSS-<semantic-name>` filename prefix. `rendered-prompts/` and their matching `agent-outputs/` share the same date-time ID and semantic name; Agent output files only add the Agent name, making each prompt/output pair easy to correlate.
 
 Starting in 0.9.0, the pattern store renders the `pattern-curate` prompt before storage so AI can deduplicate, consolidate, drop, and self-check candidate patterns against related historical patterns. `generate skills` no longer runs pattern merging, so generation prompts only summarize and produce artifacts.
 
@@ -300,7 +300,7 @@ Command flags affect only the current run and do not rewrite the config file.
 | `.skills-seed/store/project.db` | Indexed data such as patterns, hit stats, file fingerprints, and reviews |
 | `.skills-seed/store/documents/` | Readable JSON documents such as profiles, specs, state, and changelog |
 | `.skills-seed/cache/snapshots/` | Rebuildable file snapshot cache |
-| `.skills-seed/cache/analysis/current/plan.json` | Business analysis unit plan for an unfinished `learn current`; safe to delete, then planning runs again |
+| `.skills-seed/cache/commands/<command>/state.json` | Resumable state for an unfinished command, such as `learn-current` or `sync`; safe to delete, then that command detects changes and plans again |
 | `.skills-seed/runtime/logs/` | Runtime logs |
 | `.skills-seed/runtime/rendered-prompts/` | Rendered prompts and manifests |
 | `.skills-seed/runtime/agent-outputs/` | Archived Agent outputs |

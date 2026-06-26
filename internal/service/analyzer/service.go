@@ -307,6 +307,8 @@ type AnalyzeCurrentCodebaseRequest struct {
 	ProjectName        string
 	RootPath           string
 	Language           string
+	RuntimeLabel       string
+	AnalysisUnit       domain.AnalysisUnit
 	FocusPaths         []string
 	Structure          string
 	StructuralContext  string
@@ -398,6 +400,8 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		ProjectName:        req.ProjectName,
 		RootPath:           req.RootPath,
 		Language:           req.Language,
+		RuntimeLabel:       req.RuntimeLabel,
+		AnalysisUnit:       req.AnalysisUnit,
 		FocusPaths:         req.FocusPaths,
 		Structure:          req.Structure,
 		StructuralContext:  structuralContext,
@@ -693,6 +697,8 @@ func NewProjectProfile(result *AnalyzeProjectResult, projectName, language strin
 // AnalyzeCodebaseOptions 控制当前代码学习如何收集上下文。
 type AnalyzeCodebaseOptions struct {
 	FocusPaths         []string
+	RuntimeLabel       string
+	AnalysisUnit       domain.AnalysisUnit
 	SelectedFiles      []domain.FileInfo
 	SelectedFilesSet   bool
 	KnownPatternsJSON  string
@@ -769,6 +775,8 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		ProjectName:        projectName,
 		RootPath:           projectRoot,
 		Language:           language,
+		RuntimeLabel:       opts.RuntimeLabel,
+		AnalysisUnit:       opts.AnalysisUnit,
 		FocusPaths:         focusPaths,
 		Structure:          structure,
 		MainFiles:          mainFiles,
@@ -787,6 +795,14 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 			"error", err,
 		)
 		return nil, nil, err
+	}
+	for i := range result.Patterns {
+		if result.Patterns[i].AnalysisUnitID == "" {
+			result.Patterns[i].AnalysisUnitID = opts.AnalysisUnit.ID
+		}
+		if result.Patterns[i].AnalysisUnitName == "" {
+			result.Patterns[i].AnalysisUnitName = opts.AnalysisUnit.Name
+		}
 	}
 	if snapshotFlow != nil {
 		if err := snapshotFlow.Repository.Replace(snapshotFlow.MergedFiles); err != nil {

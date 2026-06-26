@@ -407,6 +407,32 @@ func TestSavePatternsStrictReturnsErrorWhenSaveFails(t *testing.T) {
 	require.Contains(t, err.Error(), "db closed")
 }
 
+func TestSavePatternsStrictWithMetadataPersistsAnalysisUnit(t *testing.T) {
+	var saved *domain.Pattern
+	mockPattern := &mocks.MockPatternRepository{
+		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
+			saved = p
+			return nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
+	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
+	pattern := domain.NewPattern("new", "Auth Pattern", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetRule("apply to auth flows")
+
+	count, err := svc.SavePatternsStrictWithMetadata(context.Background(), []domain.Pattern{*pattern}, "learn_current", domain.AnalysisUnit{
+		ID:   "auth",
+		Name: "Authentication",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	require.NotNil(t, saved)
+	require.Equal(t, "auth", saved.AnalysisUnitID)
+	require.Equal(t, "Authentication", saved.AnalysisUnitName)
+}
+
 func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 	t.Run("new patterns", func(t *testing.T) {
 		mockPattern := &mocks.MockPatternRepository{

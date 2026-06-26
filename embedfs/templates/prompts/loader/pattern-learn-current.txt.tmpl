@@ -24,6 +24,27 @@
   - {{.}}
 {{- end}}
 {{- end}}
+{{- if .AnalysisUnit.Name}}
+- **当前分析单元**: {{.AnalysisUnit.Name}}{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}
+{{- if .AnalysisUnit.ScopeReason}}
+- **单元范围说明**: {{.AnalysisUnit.ScopeReason}}
+{{- end}}
+{{- if .AnalysisUnit.RouteTerms}}
+- **单元路由词**: {{range .AnalysisUnit.RouteTerms}}`{{.}}` {{end}}
+{{- end}}
+{{- if .AnalysisUnit.EntryPaths}}
+- **单元入口路径**:
+{{range .AnalysisUnit.EntryPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- if .AnalysisUnit.RelatedPaths}}
+- **单元相关路径**:
+{{range .AnalysisUnit.RelatedPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- end}}
 {{- if .StructurePath}}
 
 # 项目目录结构
@@ -82,6 +103,17 @@
 根据上述项目信息和你读取到的代码文件，执行以下分析：
 
 可用分类：{{.AllowedCategories}}
+
+{{- if .AnalysisUnit.Name}}
+
+## 当前分析单元边界（最高优先级）
+
+- 本次只允许学习当前分析单元 `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}} 涉及的规则、模式、业务入口和项目画像增量。
+- 只读取和输出该单元的 `FocusPaths`、入口路径、相关路径以及为了确认直接调用关系所必需的邻近文件。
+- 不要输出其它分析单元、其它业务域或全项目通用模板化结论；即使在结构化上下文或目录结构中看到其它模块，也只能作为边界判断线索。
+- 每个输出的 pattern 必须能用当前分析单元的路径、路由词、入口符号或业务术语解释其归属；无法说明归属的候选必须丢弃。
+- `profile_delta` 只能包含当前单元证据明确新增或改变的事实；不要借本单元刷新全项目画像。
+{{- end}}
 
 1. **识别框架和技术栈**：
    - 只提取项目实际使用的框架、运行时、数据访问工具、配置系统、观测工具、依赖管理或构建工具。
@@ -150,6 +182,8 @@
       "rule": "何时应用此模式",
       "confidence": 0.9,
       "frequency": 3,
+      "analysis_unit_id": "{{.AnalysisUnit.ID}}",
+      "analysis_unit_name": "{{.AnalysisUnit.Name}}",
       "evidence_locations": [
         {
           "path": "相对文件路径",

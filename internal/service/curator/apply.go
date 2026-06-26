@@ -37,6 +37,8 @@ func curatedToDomain(pattern agent.CuratedPattern) domain.Pattern {
 		ProjectID:         pattern.ProjectID,
 		ScopePath:         pattern.ScopePath,
 		WorkspaceRole:     pattern.WorkspaceRole,
+		AnalysisUnitID:    pattern.AnalysisUnitID,
+		AnalysisUnitName:  pattern.AnalysisUnitName,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
@@ -187,6 +189,12 @@ func mergeKeepingBestPattern(left, right domain.Pattern) domain.Pattern {
 	if primary.WorkspaceRole == "" {
 		primary.WorkspaceRole = secondary.WorkspaceRole
 	}
+	if primary.AnalysisUnitID == "" {
+		primary.AnalysisUnitID = secondary.AnalysisUnitID
+	}
+	if primary.AnalysisUnitName == "" {
+		primary.AnalysisUnitName = secondary.AnalysisUnitName
+	}
 	if primary.BusinessMethod == nil {
 		primary.BusinessMethod = secondary.BusinessMethod
 	}
@@ -266,6 +274,8 @@ func domainToCurated(pattern domain.Pattern, mergedFrom []string, similarity flo
 		ProjectID:         pattern.ProjectID,
 		ScopePath:         pattern.ScopePath,
 		WorkspaceRole:     pattern.WorkspaceRole,
+		AnalysisUnitID:    pattern.AnalysisUnitID,
+		AnalysisUnitName:  pattern.AnalysisUnitName,
 	}
 }
 

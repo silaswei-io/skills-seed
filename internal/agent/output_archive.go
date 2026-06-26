@@ -26,6 +26,9 @@ type AgentOutputArchive struct {
 type agentOutputManifest struct {
 	Agent            string `json:"agent"`
 	Operation        string `json:"operation"`
+	RuntimeID        string `json:"runtime_id,omitempty"`
+	Slug             string `json:"slug,omitempty"`
+	Label            string `json:"label,omitempty"`
 	Attempt          int    `json:"attempt"`
 	ContentPath      string `json:"content_path,omitempty"`
 	RawPath          string `json:"raw_path,omitempty"`
@@ -42,6 +45,9 @@ type agentOutputManifest struct {
 type AgentOutputArchiveOptions struct {
 	Agent           string
 	Operation       string
+	RuntimeID       string
+	Slug            string
+	Label           string
 	Attempt         int
 	Content         string
 	RawOutput       string
@@ -55,6 +61,9 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	seedPath := runtimecontext.SeedPath(ctx)
 	if strings.TrimSpace(seedPath) == "" {
 		return AgentOutputArchive{}
+	}
+	if opts.Label == "" {
+		opts.Label = OperationLabel(opts.Operation)
 	}
 
 	dir := layout.New(seedPath).Runtime("agent-outputs")
@@ -83,7 +92,11 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		return AgentOutputArchive{}
 	}
 
-	base := runtimefiles.Name("agent-output", opts.Agent, opts.Operation)
+	slug := strings.TrimSpace(opts.Slug)
+	if slug == "" {
+		slug = RuntimeSlug(OperationName(opts.Operation), opts.Label)
+	}
+	base := runtimefiles.NameWithID(opts.RuntimeID, opts.Agent, slug)
 	archive := AgentOutputArchive{}
 	if strings.TrimSpace(opts.Content) != "" {
 		path := filepath.Join(dir, base+".md")
@@ -132,6 +145,9 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	manifest := agentOutputManifest{
 		Agent:            opts.Agent,
 		Operation:        opts.Operation,
+		RuntimeID:        opts.RuntimeID,
+		Slug:             slug,
+		Label:            opts.Label,
 		Attempt:          opts.Attempt,
 		ContentPath:      archive.ContentPath,
 		RawPath:          archive.RawPath,
@@ -168,6 +184,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		"operation", "agent.output.write",
 		"agent", opts.Agent,
 		"agent_operation", opts.Operation,
+		"label", opts.Label,
 		"attempt", opts.Attempt,
 		"path", archive.ContentPath,
 		"raw_path", archive.RawPath,
@@ -178,4 +195,19 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		"stderr_length", len(opts.Stderr),
 	)
 	return archive
+}
+
+// OperationLabel 从分层 operation 中提取 runtime 标签。
+func OperationLabel(operation string) string {
+	_, label, ok := strings.Cut(strings.TrimSpace(operation), "/")
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(label)
+}
+
+// OperationName 从分层 operation 中提取稳定操作名。
+func OperationName(operation string) string {
+	name, _, _ := strings.Cut(strings.TrimSpace(operation), "/")
+	return strings.TrimSpace(name)
 }

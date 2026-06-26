@@ -230,7 +230,7 @@ func TestLoader_RenderStoresSuccessfulPromptUnderRuntimeMemory(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, renderedName)
-	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-prompt-learn-analyze\.md$`, renderedName)
+	require.Regexp(t, `^\d{8}-\d{6}-learn-analyze\.md$`, renderedName)
 
 	content, err := os.ReadFile(filepath.Join(runtimeDir, renderedName))
 	require.NoError(t, err)
@@ -267,6 +267,69 @@ func TestLoader_RenderStoresPromptDebugManifest(t *testing.T) {
 	require.Equal(t, "learn-analyze", manifest["template"])
 	require.EqualValues(t, len(prompt), manifest["final_length"])
 	require.NotEmpty(t, manifest["parts"])
+}
+
+func TestLoader_RenderStoresRuntimeLabelInPromptNameAndManifest(t *testing.T) {
+	seedPath := t.TempDir()
+	loader := New("loader", "zh-CN", seedPath)
+	req := sampleAnalyzeCurrentCodebaseRequest()
+	req.RuntimeLabel = "unit-auth"
+	session, err := agent.NewPromptInputSession("loader-test")
+	require.NoError(t, err)
+	defer session.Cleanup()
+	data, err := agent.AnalyzeCurrentCodebasePromptData(session, req)
+	require.NoError(t, err)
+
+	_, err = loader.Render("pattern-learn-current", data)
+	require.NoError(t, err)
+
+	runtimeDir := filepath.Join(seedPath, "runtime", "rendered-prompts")
+	entries, err := os.ReadDir(runtimeDir)
+	require.NoError(t, err)
+	var manifestPath string
+	var promptName string
+	for _, entry := range entries {
+		switch {
+		case strings.HasSuffix(entry.Name(), ".manifest.json"):
+			manifestPath = filepath.Join(runtimeDir, entry.Name())
+		case strings.HasSuffix(entry.Name(), ".md"):
+			promptName = entry.Name()
+		}
+	}
+	require.Regexp(t, `^\d{8}-\d{6}-pattern-learn-current-unit-auth\.md$`, promptName)
+	require.NotEmpty(t, manifestPath)
+	dataBytes, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	var manifest map[string]interface{}
+	require.NoError(t, json.Unmarshal(dataBytes, &manifest))
+	require.Equal(t, "unit-auth", manifest["label"])
+}
+
+func TestLoader_RenderStoresSharedRuntimeTaskName(t *testing.T) {
+	seedPath := t.TempDir()
+	loader := New("loader", "zh-CN", seedPath)
+	req := sampleAnalyzeCurrentCodebaseRequest()
+	session, err := agent.NewPromptInputSession("loader-test")
+	require.NoError(t, err)
+	defer session.Cleanup()
+	data, err := agent.AnalyzeCurrentCodebasePromptData(session, req)
+	require.NoError(t, err)
+
+	_, err = loader.RenderForRuntimeTask("pattern-learn-current", data, RuntimeTask{
+		ID:   "20260626-183633",
+		Slug: "pattern-learn-current-unit-auth",
+	})
+	require.NoError(t, err)
+
+	runtimeDir := filepath.Join(seedPath, "runtime", "rendered-prompts")
+	require.FileExists(t, filepath.Join(runtimeDir, "20260626-183633-pattern-learn-current-unit-auth.md"))
+	manifestPath := filepath.Join(runtimeDir, "20260626-183633-pattern-learn-current-unit-auth.manifest.json")
+	dataBytes, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	var manifest map[string]interface{}
+	require.NoError(t, json.Unmarshal(dataBytes, &manifest))
+	require.Equal(t, "20260626-183633", manifest["runtime_id"])
+	require.Equal(t, "pattern-learn-current-unit-auth", manifest["slug"])
 }
 
 func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {

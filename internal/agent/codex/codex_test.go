@@ -144,3 +144,7 @@ type failingPromptRenderer struct {
 func (f failingPromptRenderer) Render(string, interface{}) (string, error) {
 	return "", f.err
 }
+
+func (f failingPromptRenderer) RenderForRuntimeTask(string, interface{}, promptloader.RuntimeTask) (string, error) {
+	return "", f.err
+}

@@ -224,9 +224,6 @@ other = "Failed to render pattern-curate prompt"
 [AgentRenderAnalysisPlanPromptFailed]
 other = "Failed to render analysis-plan prompt"
 
-[ErrAnalysisPlanRepoUnavailable]
-other = "analysis plan cache repository is unavailable"
-
 [AgentRenderOptimizeWorkflowPromptFailed]
 other = "Failed to render workflow-optimize prompt"
 

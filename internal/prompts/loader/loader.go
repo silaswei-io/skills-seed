@@ -43,8 +43,17 @@ type renderedPromptManifest struct {
 	Template    string            `json:"template"`
 	Agent       string            `json:"agent"`
 	Locale      string            `json:"locale"`
+	RuntimeID   string            `json:"runtime_id,omitempty"`
+	Slug        string            `json:"slug,omitempty"`
+	Label       string            `json:"label,omitempty"`
 	FinalLength int               `json:"final_length"`
 	Parts       []promptPartDebug `json:"parts"`
+}
+
+// RuntimeTask 标识一次 agent 调用共用的 runtime 文件名前缀。
+type RuntimeTask struct {
+	ID   string
+	Slug string
 }
 
 // New 创建提示词模板加载器。
@@ -125,6 +134,11 @@ func (l *Loader) templateAgentNames() []string {
 
 // Render 渲染指定提示词模板
 func (l *Loader) Render(name string, data interface{}) (string, error) {
+	return l.RenderForRuntimeTask(name, data, RuntimeTask{})
+}
+
+// RenderForRuntimeTask 渲染提示词并使用指定 runtime 任务名保存调试文件。
+func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task RuntimeTask) (string, error) {
 	locale := l.localeForPrompt(name)
 	cacheKey := templateCacheKey(locale, name)
 	l.mu.RLock()
@@ -250,6 +264,9 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 		Template:    name,
 		Agent:       l.agentName,
 		Locale:      locale,
+		RuntimeID:   task.ID,
+		Slug:        task.Slug,
+		Label:       promptRuntimeLabel(data),
 		FinalLength: len(rendered),
 		Parts:       debugParts,
 	})
@@ -503,7 +520,15 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		return
 	}
 
-	filename := runtimefiles.Name("prompt", name) + ".md"
+	slug := strings.TrimSpace(manifest.Slug)
+	if slug == "" {
+		parts := []string{name}
+		if strings.TrimSpace(manifest.Label) != "" {
+			parts = append(parts, manifest.Label)
+		}
+		slug = strings.Join(parts, "-")
+	}
+	filename := runtimefiles.NameWithID(manifest.RuntimeID, slug) + ".md"
 	path := filepath.Join(dir, filename)
 	if err := os.WriteFile(path, []byte(content+"\n"), 0600); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -539,11 +564,20 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		"template", name,
 		"path", path,
 		"manifest_path", manifestPath,
+		"label", manifest.Label,
 		"content_length", len(content),
 	)
 }
 
 func promptProjectName(data interface{}) string {
+	return promptStringField(data, "ProjectName")
+}
+
+func promptRuntimeLabel(data interface{}) string {
+	return promptStringField(data, "RuntimeLabel")
+}
+
+func promptStringField(data interface{}, fieldName string) string {
 	if data == nil {
 		return ""
 	}
@@ -556,7 +590,8 @@ func promptProjectName(data interface{}) string {
 	}
 	if value.Kind() == reflect.Map {
 		for _, key := range value.MapKeys() {
-			if fmt.Sprint(key.Interface()) == "ProjectName" || fmt.Sprint(key.Interface()) == "PROJECT_NAME" {
+			keyText := fmt.Sprint(key.Interface())
+			if keyText == fieldName || keyText == strings.ToUpper(fieldName) {
 				mapValue := value.MapIndex(key)
 				if mapValue.IsValid() {
 					return fmt.Sprint(mapValue.Interface())
@@ -568,7 +603,7 @@ func promptProjectName(data interface{}) string {
 	if value.Kind() != reflect.Struct {
 		return ""
 	}
-	field := value.FieldByName("ProjectName")
+	field := value.FieldByName(fieldName)
 	if field.IsValid() && field.Kind() == reflect.String {
 		return field.String()
 	}

@@ -78,9 +78,9 @@ func (l Layout) Snapshots() string {
 	return l.Cache("snapshots")
 }
 
-// CurrentAnalysisPlan returns the current learn-current analysis plan cache path.
-func (l Layout) CurrentAnalysisPlan() string {
-	return l.Cache("analysis", "current", "plan.json")
+// CommandState returns a command-scoped resumable state path.
+func (l Layout) CommandState(command string) string {
+	return l.Cache("commands", command, "state.json")
 }
 
 // RuntimeLogs returns the default runtime log directory.

@@ -244,6 +244,8 @@ type Pattern struct {
 	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
 	ScopePath         string                    `json:"scope_path,omitempty"`     // workspace 模式下的路径范围
 	WorkspaceRole     string                    `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
+	AnalysisUnitID    string                    `json:"analysis_unit_id,omitempty"`
+	AnalysisUnitName  string                    `json:"analysis_unit_name,omitempty"`
 	CreatedAt         time.Time                 `json:"created_at"`
 	UpdatedAt         time.Time                 `json:"updated_at"` // 最后更新时间
 }
@@ -458,6 +460,8 @@ func (p *Pattern) evidenceCount() int {
 		p.ProjectID,
 		p.ScopePath,
 		p.WorkspaceRole,
+		p.AnalysisUnitID,
+		p.AnalysisUnitName,
 	}, "\n")
 
 	count := 0
@@ -483,6 +487,9 @@ func (p *Pattern) evidenceCount() int {
 		count++
 	}
 	if p.ScopePath != "" {
+		count++
+	}
+	if p.AnalysisUnitID != "" || p.AnalysisUnitName != "" {
 		count++
 	}
 	return count
@@ -550,7 +557,8 @@ func (p *Pattern) IsSimilar(other *Pattern) bool {
 	return p.Name == other.Name &&
 		p.Category == other.Category &&
 		p.ProjectID == other.ProjectID &&
-		p.ScopePath == other.ScopePath
+		p.ScopePath == other.ScopePath &&
+		p.AnalysisUnitID == other.AnalysisUnitID
 }
 
 // ==================== 问题 ====================
