@@ -59,7 +59,7 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
 	require.NoError(t, configRepo.Update(cfg))
 
-	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
 	require.NoError(t, err)
 	defer patternRepo.Close()
 

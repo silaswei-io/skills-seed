@@ -15,6 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
@@ -478,7 +479,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		return
 	}
 
-	dir := filepath.Join(l.seedPath, "memory", "runtime", "rendered-prompts")
+	dir := layout.New(l.seedPath).Runtime("rendered-prompts")
 	if config.DefaultAutoDeleteRenderedPrompts {
 		if err := os.RemoveAll(dir); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),

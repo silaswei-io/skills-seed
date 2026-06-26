@@ -59,6 +59,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		return fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
 	}
 	profile = domain.CleanProjectProfile(profile)
+	profile = profileForSkillTemplates(profile, patterns)
 	if skillName == "" {
 		skillName = generatedSkillName(opts.ProjectName)
 	}
@@ -407,7 +408,9 @@ func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary
 		data := map[string]interface{}{
 			"Category":          summary.Category,
 			"GroupTitle":        group.Title,
-			"GroupSummary":      group.Description,
+			"GroupSummary":      group.Summary,
+			"GroupLocations":    group.Locations,
+			"GroupSignals":      group.Signals,
 			"PatternObjects":    group.Patterns,
 			"PatternCount":      len(group.Patterns),
 			"Confidence":        calculatePatternConfidence(group.Patterns) * 100,

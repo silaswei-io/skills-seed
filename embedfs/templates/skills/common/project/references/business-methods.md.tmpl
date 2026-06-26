@@ -1,6 +1,6 @@
-# {{.ProjectName}} 强业务方法
+# {{.ProjectName}} 入口方法索引
 
-本文件记录项目画像中提取的复杂业务逻辑方法。修改业务流程、复用领域能力或生成新业务代码前，优先检查这里是否已有可复用方法
+本文件记录项目级业务入口、跨模块编排入口或高价值工具入口。它是入口索引，不替代业务规则；修改业务流程时先读业务模式，再用本文件定位可复用能力
 
 {{if .HasBusinessPatterns}}相关业务规则见 [业务模式](./patterns/business.md)
 {{end}}
@@ -41,7 +41,7 @@
 
 {{end}}{{end}}
 {{else}}
-*业务方法信息尚未提取*
+*入口方法信息尚未提取*
 {{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}

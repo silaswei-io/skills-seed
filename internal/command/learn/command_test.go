@@ -2,6 +2,7 @@ package learn
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/git"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/analysisplan"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
@@ -73,6 +75,9 @@ func TestCmd_CurrentIncludesFocusAndProfileFlags(t *testing.T) {
 
 	contextFileFlag := currentCmd.Flags().Lookup("context-file")
 	require.NotNil(t, contextFileFlag)
+
+	forceFlag := currentCmd.Flags().Lookup("force")
+	require.NotNil(t, forceFlag)
 }
 
 func TestResolveFocusPaths(t *testing.T) {
@@ -157,7 +162,7 @@ func TestRunLearnCurrentWritesSnapshotsAfterFirstLearning(t *testing.T) {
 
 	requireRunLearnCurrentNoError(t, cont, opts)
 
-	content, err := os.ReadFile(filepath.Join(cont.SeedPath, "memory", "snapshots", "main.go"))
+	content, err := os.ReadFile(filepath.Join(cont.SeedPath, "cache", "snapshots", "main.go"))
 	require.NoError(t, err)
 	require.Equal(t, "package main\n", string(content))
 }
@@ -175,6 +180,25 @@ func TestRunLearnCurrentReportsProjectSummaryWhenPatternsSaved(t *testing.T) {
 	require.Equal(t, 1, result.Summary.PatternsSaved)
 }
 
+func TestRunLearnCurrentForceRelearnsUnchangedFiles(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	opts.force = true
+	output := captureLearnStdout(t, func() {
+		result := requireRunLearnCurrentNoError(t, cont, opts)
+		require.False(t, result.Summary.NoFileChanges)
+		require.Greater(t, result.Summary.ChangedFiles, 0)
+		require.Greater(t, result.Summary.PatternsSaved, 0)
+	})
+
+	require.NotContains(t, output, "未检测到可学习文件变化")
+}
+
 func TestRunLearnCurrentWithFocusUpdatesFocusedSnapshotsAfterAnalysis(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
@@ -187,7 +211,7 @@ func TestRunLearnCurrentWithFocusUpdatesFocusedSnapshotsAfterAnalysis(t *testing
 
 	require.NoError(t, os.Remove(filepath.Join(projectRoot, "internal", "deleted.go")))
 	gitAddAll(t, projectRoot)
-	snapshotDir := filepath.Join(cont.SeedPath, "memory", "snapshots")
+	snapshotDir := filepath.Join(cont.SeedPath, "cache", "snapshots")
 	require.NoError(t, os.WriteFile(filepath.Join(snapshotDir, "stale.go"), []byte("stale snapshot\n"), 0644))
 
 	opts := learnCurrentOptionsForTest("", []string{"main.go", "internal"}, learnCurrentProfileSkip)
@@ -234,7 +258,7 @@ func TestRunLearnWorkspaceCurrentPrintsProjectTokenUsageAfterProjectLogs(t *test
 	require.NoError(t, err)
 	require.Empty(t, rootRecords)
 
-	childRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	childRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	defer func() { require.NoError(t, childRepo.Close()) }()
 	childRecords, err := childRepo.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{})
@@ -298,7 +322,7 @@ func TestRunLearnCurrentRefreshesMissingProfileWhenFilesUnchanged(t *testing.T) 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 
 	requireRunLearnCurrentNoError(t, cont, opts)
-	require.NoError(t, os.Remove(filepath.Join(cont.SeedPath, "memory", "project-profile.json")))
+	require.NoError(t, os.Remove(filepath.Join(cont.SeedPath, "store", "documents", "project-profile.json")))
 
 	analyzeCalls := 0
 	profileCalls := 0
@@ -320,7 +344,7 @@ func TestRunLearnCurrentRefreshesMissingProfileWhenFilesUnchanged(t *testing.T) 
 	require.Equal(t, "rebuilt profile", profile.Summary)
 }
 
-func TestRunLearnCurrentAutoRefreshesExistingProfileWhenPatternsSaved(t *testing.T) {
+func TestRunLearnCurrentAutoMergesProfileDeltaWithoutFullRefresh(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
@@ -335,21 +359,34 @@ func TestRunLearnCurrentAutoRefreshesExistingProfileWhenPatternsSaved(t *testing
 	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
 
 	var patternFocus []string
-	var profileFocus []string
+	profileCalls := 0
 	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 		patternFocus = append([]string{}, req.FocusPaths...)
 		pattern := domain.NewPattern("p2", "Changed File Pattern", domain.CategoryStructure)
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{*pattern},
+			ProfileDelta: domain.ProjectProfileDelta{
+				Summary: "merged profile delta",
+				KeyModules: []domain.ModuleInfo{
+					{Name: "main", Path: "main.go", Description: "changed entry"},
+				},
+			},
+		}, nil
 	}
 	cont.Agent.(*mocks.MockAgent).AnalyzeProjectFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-		profileFocus = append([]string{}, req.FocusPaths...)
+		profileCalls++
 		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
 	}
 
 	requireRunLearnCurrentNoError(t, cont, opts)
 
 	require.Equal(t, []string{"main.go"}, patternFocus)
-	require.Equal(t, []string{"main.go"}, profileFocus)
+	require.Zero(t, profileCalls)
+	profile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "merged profile delta", profile.Summary)
+	require.Len(t, profile.KeyModules, 1)
+	require.Equal(t, "main.go", profile.KeyModules[0].Path)
 }
 
 func TestRunLearnCurrentAutoSkipsExistingProfileWhenNoPatternsSaved(t *testing.T) {
@@ -369,12 +406,7 @@ func TestRunLearnCurrentAutoSkipsExistingProfileWhenNoPatternsSaved(t *testing.T
 	profileCalls := 0
 	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 		return &agent.AnalyzeCurrentCodebaseResult{
-			Patterns:          nil,
-			CategorySummaries: map[string]agent.CategorySummary{},
-			BusinessRules:     []string{},
-			BestPractices:     []string{},
-			CommonPatterns:    []string{},
-			Summary:           "no new patterns",
+			Patterns: nil,
 		}, nil
 	}
 	cont.Agent.(*mocks.MockAgent).AnalyzeProjectFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
@@ -624,6 +656,60 @@ func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternStoreFails(t *tes
 	require.Contains(t, err.Error(), "patterns")
 }
 
+func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	planCalls := 0
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		planCalls++
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	var analyzed [][]string
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzed = append(analyzed, append([]string{}, req.FocusPaths...))
+		if len(analyzed) == 2 {
+			return nil, errors.New("rate limited")
+		}
+		pattern := domain.NewPattern("p-"+strings.ReplaceAll(req.FocusPaths[0], "/", "-"), "Unit Pattern", domain.CategoryBusiness)
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+
+	_, err := runLearnCurrent(cont, opts)
+	require.Error(t, err)
+	require.Equal(t, 1, planCalls)
+	require.Equal(t, [][]string{{"internal/auth/login.go"}, {"internal/key/create.go"}}, analyzed)
+
+	planBytes, err := os.ReadFile(analysisplan.NewRepository(cont.SeedPath).Path())
+	require.NoError(t, err)
+	var cachedPlan analysisplan.Plan
+	require.NoError(t, json.Unmarshal(planBytes, &cachedPlan))
+	require.Len(t, cachedPlan.Units, 2)
+
+	analyzed = nil
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzed = append(analyzed, append([]string{}, req.FocusPaths...))
+		pattern := domain.NewPattern("p-resumed", "Resumed Pattern", domain.CategoryBusiness)
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.Equal(t, 1, planCalls, "cached plan should be reused without replanning")
+	require.Equal(t, [][]string{{"internal/key/create.go"}}, analyzed)
+	require.NoFileExists(t, analysisplan.NewRepository(cont.SeedPath).Path())
+}
+
 func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
@@ -664,7 +750,7 @@ func TestRunLearnCurrentWithContextPassesUserContextToAnalysis(t *testing.T) {
 		receivedContext = req.UserContext
 		pattern := domain.NewPattern("p-context", "Context Boundary", domain.CategoryBusiness)
 		pattern.Confidence = 0.9
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}, Summary: "summary"}, nil
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
 	}
 
 	_, err := RunLearnCurrentWithContext(cont, "私有化部署，不是 SaaS")
@@ -900,7 +986,7 @@ func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
 	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 
-	workspaceLogDir := filepath.Join(cont.SeedPath, "logs")
+	workspaceLogDir := filepath.Join(cont.SeedPath, "runtime/logs")
 	require.NoError(t, logger.InitWithRetention(workspaceLogDir, "learn", logger.INFO, 0))
 	workspaceLogPath := logger.CurrentLogPath()
 	defer logger.Close()
@@ -909,7 +995,7 @@ func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 		requireRunLearnCurrentNoError(t, cont, opts)
 	})
 
-	childLogs := readLearnLogFiles(t, filepath.Join(childRoot, ".skills-seed", "logs"))
+	childLogs := readLearnLogFiles(t, filepath.Join(childRoot, ".skills-seed", "runtime/logs"))
 	require.NotEmpty(t, childLogs)
 	require.Contains(t, strings.Join(childLogs, "\n"), `"operation":"command.learn_current"`)
 
@@ -920,7 +1006,7 @@ func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
 	require.Contains(t, string(workspaceLog), "正在学习子项目 backend")
 	require.Contains(t, string(workspaceLog), "子项目 backend 独立学习完成")
 	require.Contains(t, output, "正在学习子项目 backend")
-	require.Contains(t, output, filepath.Join(childRoot, ".skills-seed", "logs"))
+	require.Contains(t, output, filepath.Join(childRoot, ".skills-seed", "runtime/logs"))
 }
 
 func TestRunLearnWorkspaceCurrentUsesConfiguredParallelism(t *testing.T) {
@@ -944,7 +1030,7 @@ func TestRunLearnWorkspaceCurrentUsesConfiguredParallelism(t *testing.T) {
 		atomic.AddInt32(&active, -1)
 		pattern := domain.NewPattern(req.ProjectName+"-pattern", "Error Handling", domain.CategoryError)
 		pattern.Confidence = 0.9
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}, Summary: "summary"}, nil
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
 	})
 
 	projects := []config.WorkspaceProjectConfig{
@@ -1056,7 +1142,6 @@ func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.
 		pattern.Confidence = 0.9
 		return &agent.AnalyzeCurrentCodebaseResult{
 			Patterns: []domain.Pattern{*pattern},
-			Summary:  "summary",
 		}, nil
 	})
 	projects := []config.WorkspaceProjectConfig{
@@ -1234,7 +1319,7 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 	cfg.Workspace.Projects = projects
 	require.NoError(t, configRepo.Update(cfg))
 
-	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, patternRepo.Close()) })
 
@@ -1249,7 +1334,6 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 			pattern := domain.NewPattern("p1", "Error Handling", domain.CategoryError)
 			return &agent.AnalyzeCurrentCodebaseResult{
 				Patterns: []domain.Pattern{*pattern},
-				Summary:  "summary",
 			}, nil
 		},
 		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
@@ -1276,6 +1360,7 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		StateRepo:            statestore.NewRepository(seedPath),
 		WorkspaceProfileRepo: workspacestore.NewProfileRepository(seedPath),
 		WorkspaceSpecRepo:    workspacestore.NewSpecRepository(seedPath),
+		AnalysisPlanRepo:     analysisplan.NewRepository(seedPath),
 		Agent:                mockAgent,
 		AnalyzerSvc:          analyzer.NewAnalyzerService(mockAgent, configRepo),
 		LearnerSvc:           servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, curatorSvc),
@@ -1327,7 +1412,6 @@ func registerLearnWorkspaceMockAgentFactoryWithHandlers(t *testing.T, handlers l
 				pattern.Confidence = 0.9
 				return &agent.AnalyzeCurrentCodebaseResult{
 					Patterns: []domain.Pattern{*pattern},
-					Summary:  "summary",
 				}, nil
 			},
 			AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {

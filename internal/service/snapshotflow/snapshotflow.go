@@ -9,6 +9,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	snapshotdiff "github.com/silaswei-io/skills-seed/internal/snapshot"
@@ -50,7 +51,7 @@ func BuildScopedWithOptions(ctx context.Context, projectRoot string, files []dom
 		return nil, err
 	}
 
-	runtimeDir := filepath.Join(seedPath, "memory", "runtime")
+	runtimeDir := layout.New(seedPath).Runtime()
 	diffCurrentFiles := filterFilesForDiff(currentFiles, opts.DiffAllowed)
 	diffOldSnapshots := filterFilesForDiff(oldSnapshots, opts.DiffAllowed)
 	changes, err := snapshotdiff.CompareScoped(diffCurrentFiles, diffOldSnapshots, runtimeDir, scopePaths)

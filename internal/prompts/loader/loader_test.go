@@ -29,9 +29,9 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 						{"learn-analyze", sampleAnalyzeRequest()},
 						{"learn-batch", sampleBatchLearnData()},
 						{"fix-generate", sampleGenerateFixesRequest()},
-						{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+						{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
 						{"pattern-curate", sampleCuratePatternsData()},
-						{"project-analyze", sampleProjectAnalysisData()},
+						{"project-profile", sampleProjectAnalysisData()},
 						{"skill-workspace-profile", workspacePromptData()},
 						{"skill-workspace-spec", workspaceSpecPromptData()},
 						{"workflow-optimize", sampleOptimizeWorkflowRequest()},
@@ -61,7 +61,7 @@ func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
 func TestLoader_RendersSkillsPromptsWithSkillsLocale(t *testing.T) {
 	loader := NewWithLocales("loader", "zh-CN", "en-US", "")
 
-	skillsPrompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
+	skillsPrompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
 	require.NoError(t, err)
 	require.Contains(t, skillsPrompt, "All user-facing natural-language fields must be written in English")
 	require.NotContains(t, skillsPrompt, "面向用户阅读的自然语言字段应优先使用简体中文")
@@ -220,7 +220,7 @@ func TestLoader_RenderStoresSuccessfulPromptUnderRuntimeMemory(t *testing.T) {
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
-	runtimeDir := filepath.Join(seedPath, "memory", "runtime", "rendered-prompts")
+	runtimeDir := filepath.Join(seedPath, "runtime", "rendered-prompts")
 	entries, err := os.ReadDir(runtimeDir)
 	require.NoError(t, err)
 	var renderedName string
@@ -250,7 +250,7 @@ func TestLoader_RenderStoresPromptDebugManifest(t *testing.T) {
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
-	runtimeDir := filepath.Join(seedPath, "memory", "runtime", "rendered-prompts")
+	runtimeDir := filepath.Join(seedPath, "runtime", "rendered-prompts")
 	entries, err := os.ReadDir(runtimeDir)
 	require.NoError(t, err)
 	var manifestPath string
@@ -276,7 +276,7 @@ func TestRenderInitSkillsListsSamplePathsWithoutEmbeddedContent(t *testing.T) {
 		Path: "webshell.go",
 	}}
 
-	prompt, err := loader.Render("skill-project-init", req)
+	prompt, err := loader.Render("pattern-learn-current", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "webshell.go")
@@ -324,7 +324,7 @@ func TestRenderInitSkillsListsDiffFilePaths(t *testing.T) {
 		DiffPath: "/tmp/skills-seed/runtime/diffs/internal/service.go.diff",
 	}}
 
-	prompt, err := loader.Render("skill-project-init", req)
+	prompt, err := loader.Render("pattern-learn-current", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "变更文件 Diff (1 个)")
@@ -349,7 +349,7 @@ func TestRenderProjectAnalysisListsReadmePathWithoutEmbeddedContent(t *testing.T
 	data := sampleProjectAnalysisData()
 	data["ReadmePath"] = "README.md"
 
-	prompt, err := loader.Render("project-analyze", data)
+	prompt, err := loader.Render("project-profile", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "README.md")
@@ -362,7 +362,7 @@ func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	data["ExistingProfilePath"] = "/tmp/skills-seed/existing-profile.json"
 	data["FocusPaths"] = []string{"internal/service"}
 
-	prompt, err := loader.Render("project-analyze", data)
+	prompt, err := loader.Render("project-profile", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "已有项目画像")
@@ -395,7 +395,7 @@ func TestRenderProjectAnalysisBoundsStructureToFocusPaths(t *testing.T) {
 			data := sampleProjectAnalysisData()
 			data["FocusPaths"] = []string{"internal/service"}
 
-			prompt, err := loader.Render("project-analyze", data)
+			prompt, err := loader.Render("project-profile", data)
 
 			require.NoError(t, err)
 			require.Contains(t, prompt, tt.label)
@@ -409,7 +409,7 @@ func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
 	data := sampleProjectAnalysisData()
 	data["StructuralContextPath"] = "/tmp/skills-seed/structural-context.md"
 
-	prompt, err := loader.Render("project-analyze", data)
+	prompt, err := loader.Render("project-profile", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "结构化上下文")
@@ -441,7 +441,7 @@ func TestRenderInitSkillsBoundsStructureToFocusPaths(t *testing.T) {
 			req := sampleAnalyzeCurrentCodebaseRequest()
 			req.FocusPaths = []string{"internal/service"}
 
-			prompt, err := loader.Render("skill-project-init", req)
+			prompt, err := loader.Render("pattern-learn-current", req)
 
 			require.NoError(t, err)
 			require.Contains(t, prompt, tt.label)
@@ -455,7 +455,7 @@ func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
 	req := sampleAnalyzeCurrentCodebaseRequest()
 	req.StructuralContextPath = "/tmp/skills-seed/structural-context.md"
 
-	prompt, err := loader.Render("skill-project-init", req)
+	prompt, err := loader.Render("pattern-learn-current", req)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "结构化上下文")
@@ -479,7 +479,7 @@ func TestRenderInitSkillsIncludesKnownPatterns(t *testing.T) {
 			req.KnownPatternsPath = "/tmp/skills-seed/known-patterns.json"
 			req.KnownPatternsCount = 1
 
-			prompt, err := loader.Render("skill-project-init", req)
+			prompt, err := loader.Render("pattern-learn-current", req)
 
 			require.NoError(t, err)
 			require.Contains(t, prompt, tt.label)
@@ -522,7 +522,7 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 				name string
 				data interface{}
 			}{
-				{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
 				{"learn-batch", sampleBatchLearnData()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -577,7 +577,7 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 				name string
 				data interface{}
 			}{
-				{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
 				{"learn-batch", sampleBatchLearnData()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -592,6 +592,153 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 						require.NotContains(t, lowerPrompt, strings.ToLower(text))
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestLoader_RenderLearningPromptsPreserveDomainOperationBusinessSignals(t *testing.T) {
+	tests := []struct {
+		locale       string
+		requiredText []string
+	}{
+		{
+			locale: "zh-CN",
+			requiredText: []string{
+				"领域操作提取",
+				"业务子域总览",
+				"项目自己的源码词表",
+				"业务覆盖矩阵",
+				"需求路由词",
+				"非 API 业务入口",
+				"资源生命周期",
+				"外部依赖交互",
+				"不要只输出顶层流程",
+				"不要仅因为它是“外部客户端调用”就降级为通用工具",
+			},
+		},
+		{
+			locale: "en-US",
+			requiredText: []string{
+				"domain-operation extraction",
+				"business subdomain overview",
+				"project's own source vocabulary",
+				"business coverage matrix",
+				"request routing terms",
+				"non-API business entries",
+				"resource lifecycles",
+				"external dependency interactions",
+				"Do not output only top-level flows",
+				"Do not demote it to a generic utility solely because it is an external-client call",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := New("loader", tt.locale, "")
+
+			for _, tc := range []struct {
+				name string
+				data interface{}
+			}{
+				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+				{"learn-batch", sampleBatchLearnData()},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					prompt, err := loader.Render(tc.name, tc.data)
+					require.NoError(t, err)
+
+					for _, text := range tt.requiredText {
+						require.Contains(t, prompt, text)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestLoader_ProjectProfilePromptKeepsDomainEntriesOutOfCommonUtils(t *testing.T) {
+	tests := []struct {
+		locale       string
+		requiredText []string
+	}{
+		{
+			locale: "zh-CN",
+			requiredText: []string{
+				"由项目源码词表确认的核心领域操作",
+				"不要仅因其位于 `pkg`、`utils`、`helper`、`client`、适配层或 SDK 封装层就放入 `common_utils`",
+				"承载产品领域行为的领域操作、协议/命令封装或外部依赖交互入口应优先放入 business_methods",
+			},
+		},
+		{
+			locale: "en-US",
+			requiredText: []string{
+				"Core domain operations, resource lifecycles, policy execution",
+				"Do not place them in `common_utils` solely because they live under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper",
+				"external dependency interaction entries that carry product-domain behavior should prefer business_methods",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := New("loader", tt.locale, "")
+
+			prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())
+			require.NoError(t, err)
+			for _, text := range tt.requiredText {
+				require.Contains(t, prompt, text)
+			}
+		})
+	}
+}
+
+func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
+	tests := []struct {
+		locale       string
+		requiredText []string
+	}{
+		{
+			locale: "zh-CN",
+			requiredText: []string{
+				"业务覆盖优先",
+				"候选业务子域",
+				"业务覆盖矩阵",
+				"后台/异步/周期性流程",
+				"产品运行期行为",
+				"规则策略",
+				"外部依赖约束",
+			},
+		},
+		{
+			locale: "en-US",
+			requiredText: []string{
+				"business coverage first",
+				"candidate business subdomains",
+				"business coverage matrix",
+				"background/async/periodic flows",
+				"runtime product behavior",
+				"rules or policies",
+				"external dependency constraints",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := New("loader", tt.locale, "")
+			prompt, err := loader.Render("file-select", map[string]interface{}{
+				"CandidateNum":    3,
+				"FileTree":        "internal/order/create.go\ninternal/billing/rule.go\ninternal/worker/task.go",
+				"CandidatesPath":  "/tmp/skills-seed/candidates.json",
+				"UserContextPath": "",
+			})
+			require.NoError(t, err)
+
+			lowerPrompt := strings.ToLower(prompt)
+			for _, text := range tt.requiredText {
+				require.Contains(t, lowerPrompt, strings.ToLower(text))
 			}
 		})
 	}
@@ -630,7 +777,7 @@ func TestLoader_RenderPatternPromptsIncludePreOutputValidation(t *testing.T) {
 				data interface{}
 			}{
 				{"learn-batch", sampleBatchLearnData()},
-				{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					prompt, err := loader.Render(tc.name, tc.data)
@@ -652,7 +799,7 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 		{
 			locale: "zh-CN",
 			checks: map[string][]string{
-				"skill-project-init": {
+				"pattern-learn-current": {
 					"`evidence_locations`",
 					"模式级源码证据位置",
 					"不要编造证据路径或行号",
@@ -675,7 +822,7 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 		{
 			locale: "en-US",
 			checks: map[string][]string{
-				"skill-project-init": {
+				"pattern-learn-current": {
 					"`evidence_locations`",
 					"pattern-level source evidence locations",
 					"Do not invent evidence paths or line numbers",
@@ -706,7 +853,7 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 					switch name {
 					case "learn-batch":
 						data = sampleBatchLearnData()
-					case "skill-project-init":
+					case "pattern-learn-current":
 						data = sampleAnalyzeCurrentCodebaseRequest()
 					case "user-define-pattern":
 						data = sampleUserDefinePatternData()
@@ -790,19 +937,19 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 		{
 			locale: "zh-CN",
 			checks: map[string]string{
-				"learn-batch":         "可用分类：" + allowedCategories,
-				"skill-project-init":  "可用分类：" + allowedCategories,
-				"user-define-pattern": "可用分类：" + allowedCategories,
-				"pattern-curate":      "可用分类：" + allowedCategories,
+				"learn-batch":           "可用分类：" + allowedCategories,
+				"pattern-learn-current": "可用分类：" + allowedCategories,
+				"user-define-pattern":   "可用分类：" + allowedCategories,
+				"pattern-curate":        "可用分类：" + allowedCategories,
 			},
 		},
 		{
 			locale: "en-US",
 			checks: map[string]string{
-				"learn-batch":         "Allowed categories: " + allowedCategories,
-				"skill-project-init":  "Allowed categories: " + allowedCategories,
-				"user-define-pattern": "Allowed categories: " + allowedCategories,
-				"pattern-curate":      "Allowed categories: " + allowedCategories,
+				"learn-batch":           "Allowed categories: " + allowedCategories,
+				"pattern-learn-current": "Allowed categories: " + allowedCategories,
+				"user-define-pattern":   "Allowed categories: " + allowedCategories,
+				"pattern-curate":        "Allowed categories: " + allowedCategories,
 			},
 		},
 	}
@@ -816,7 +963,7 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 					switch name {
 					case "learn-batch":
 						data = sampleBatchLearnData()
-					case "skill-project-init":
+					case "pattern-learn-current":
 						data = sampleAnalyzeCurrentCodebaseRequest()
 					case "user-define-pattern":
 						data = sampleUserDefinePatternData()
@@ -856,7 +1003,7 @@ func TestLoader_RenderProjectInitPromptUsesConcreteCategoryInJSONExample(t *test
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
 			loader := New("loader", tt.locale, "")
-			prompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
+			prompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
 			require.NoError(t, err)
 			require.Contains(t, prompt, `"category": "error"`)
 			for _, text := range tt.forbidden {
@@ -869,7 +1016,7 @@ func TestLoader_RenderProjectInitPromptUsesConcreteCategoryInJSONExample(t *test
 func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing.T) {
 	loader := New("codex", "zh-CN", "")
 
-	prompt, err := loader.Render("project-analyze", sampleProjectAnalysisData())
+	prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
@@ -880,7 +1027,7 @@ func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing
 func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing.T) {
 	loader := New("codex", "en-US", "")
 
-	prompt, err := loader.Render("project-analyze", sampleProjectAnalysisData())
+	prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
@@ -897,7 +1044,7 @@ func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testin
 	}{
 		{"learn-batch", sampleBatchLearnData()},
 		{"pattern-curate", sampleCuratePatternsData()},
-		{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+		{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
 		{"skill-workspace-profile", workspacePromptData()},
 		{"skill-workspace-spec", workspaceSpecPromptData()},
 		{"user-define-pattern", sampleUserDefinePatternData()},
@@ -950,7 +1097,7 @@ func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testin
 		{"learn-analyze", sampleAnalyzeRequest()},
 		{"learn-batch", sampleBatchLearnData()},
 		{"fix-generate", sampleGenerateFixesRequest()},
-		{"skill-project-init", sampleAnalyzeCurrentCodebaseRequest()},
+		{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
 		{"workflow-optimize", sampleOptimizeWorkflowRequest()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -966,12 +1113,13 @@ func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testin
 
 func TestLoader_RuntimePromptsRequireFinalJSONSelfCheck(t *testing.T) {
 	promptData := map[string]interface{}{
+		"analysis-plan":           sampleAnalysisPlanData(),
 		"file-select":             map[string]interface{}{"CandidateNum": 1, "FileTree": "main.go", "CandidatesPath": "", "UserContextPath": ""},
 		"learn-analyze":           sampleAnalyzeRequest(),
 		"learn-batch":             sampleBatchLearnData(),
 		"fix-generate":            sampleGenerateFixesRequest(),
-		"skill-project-init":      sampleAnalyzeCurrentCodebaseRequest(),
-		"project-analyze":         sampleProjectAnalysisData(),
+		"pattern-learn-current":   sampleAnalyzeCurrentCodebaseRequest(),
+		"project-profile":         sampleProjectAnalysisData(),
 		"pattern-curate":          sampleCuratePatternsData(),
 		"skill-workspace-profile": workspacePromptData(),
 		"skill-workspace-spec":    workspaceSpecPromptData(),
@@ -1090,7 +1238,7 @@ func TestLoader_RuntimePromptsBoundFileReadingScope(t *testing.T) {
 			},
 		},
 		{
-			name: "skill-project-init",
+			name: "pattern-learn-current",
 			data: sampleAnalyzeCurrentCodebaseRequest(),
 			requiredText: []string{
 				"优先读取结构化上下文",
@@ -1132,12 +1280,102 @@ func TestLoader_RuntimePromptsBoundFileReadingScope(t *testing.T) {
 func TestLoader_ProjectInitPromptDoesNotHardCodeFrameworkCatalog(t *testing.T) {
 	loader := New("loader", "zh-CN", "")
 
-	prompt, err := loader.Render("skill-project-init", sampleAnalyzeCurrentCodebaseRequest())
+	prompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
 
 	require.NoError(t, err)
 	require.NotContains(t, prompt, "Gin/Echo/Beego/Fiber/Spring Boot/Express/Django")
 	require.NotContains(t, prompt, "GORM/Ent/XORM/SQLAlchemy/TypeORM/MyBatis")
 	require.Contains(t, prompt, "只提取项目实际使用的框架")
+}
+
+func TestLoader_PromptResponsibilityContracts(t *testing.T) {
+	tests := []struct {
+		name       string
+		data       interface{}
+		requiredZH []string
+		requiredEN []string
+		forbid     []string
+	}{
+		{
+			name: "project-profile",
+			data: sampleProjectAnalysisData(),
+			requiredZH: []string{
+				"本模板只负责项目画像",
+				"不要在这里学习或归纳业务模式",
+				"`business_methods` 不是业务模式库",
+			},
+			requiredEN: []string{
+				"This template is only for the project profile",
+				"Do not learn or summarize business patterns here",
+				"`business_methods` is not the business pattern store",
+			},
+			forbid: []string{
+				`"patterns"`,
+				`"profile_delta"`,
+			},
+		},
+		{
+			name: "pattern-learn-current",
+			data: sampleAnalyzeCurrentCodebaseRequest(),
+			requiredZH: []string{
+				`"patterns"`,
+				`"profile_delta"`,
+				`"profile_refresh_recommended"`,
+				"项目结构、架构说明和技术栈概览不是本模板的主要产物",
+			},
+			requiredEN: []string{
+				`"patterns"`,
+				`"profile_delta"`,
+				`"profile_refresh_recommended"`,
+				"Project structure, architecture narrative, and tech-stack overview are context for this template",
+			},
+			forbid: []string{
+				`"category_summaries"`,
+				`"business_rules"`,
+				`"best_practices"`,
+				`"common_patterns"`,
+			},
+		},
+		{
+			name: "learn-batch",
+			data: sampleBatchLearnData(),
+			requiredZH: []string{
+				`"patterns"`,
+				"只输出可执行、可复用、可验证的 patterns",
+			},
+			requiredEN: []string{
+				`"patterns"`,
+				"Only output executable, reusable, verifiable patterns",
+			},
+			forbid: []string{
+				`"profile_delta"`,
+				`"project_name"`,
+				`"architecture"`,
+			},
+		},
+	}
+
+	for _, locale := range []string{"zh-CN", "en-US"} {
+		t.Run(locale, func(t *testing.T) {
+			loader := New("loader", locale, "")
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					prompt, err := loader.Render(tc.name, tc.data)
+					require.NoError(t, err)
+					required := tc.requiredZH
+					if locale == "en-US" {
+						required = tc.requiredEN
+					}
+					for _, text := range required {
+						require.Contains(t, prompt, text)
+					}
+					for _, text := range tc.forbid {
+						require.NotContains(t, prompt, text)
+					}
+				})
+			}
+		})
+	}
 }
 
 func sampleAnalyzeRequest() *agent.AnalyzeRequest {
@@ -1196,6 +1434,17 @@ func sampleAnalyzeCurrentCodebaseRequest() *agent.AnalyzeCurrentCodebaseRequest 
 		StructurePath: "/tmp/skills-seed/project-structure.txt",
 		MainFiles:     []string{"cmd/demo/main.go"},
 		SampleFiles:   []agent.SampleFile{{Path: "cmd/demo/main.go"}},
+	}
+}
+
+func sampleAnalysisPlanData() map[string]interface{} {
+	return map[string]interface{}{
+		"ProjectName":           "demo",
+		"RootPath":              "/tmp/demo",
+		"Language":              "go",
+		"FocusPaths":            []string{"internal/auth/login.go", "internal/key/create.go"},
+		"StructuralContextPath": "/tmp/skills-seed/structural-context.md",
+		"UserContextPath":       "",
 	}
 }
 

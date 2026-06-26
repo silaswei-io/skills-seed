@@ -1,4 +1,4 @@
-# business 模式索引
+# 业务模式地图
 
 **模式数量**: {{.PatternCount}}
 **置信度**: {{printf "%.2f" .Confidence}}%
@@ -6,12 +6,22 @@
 
 {{if .Summary}}{{.Summary}}{{end}}
 
-## 读取方式
+## 新需求定位方式
 
-先按任务选择下方最相关的子域详情文件；不要一次性读取所有业务详情。
+先从需求里的业务名词、用户动作、状态变化、规则策略、入口渠道、外部依赖、异常现象或改动文件路径匹配下方子域；不要只按代码包名或技术缩写匹配。只读取最相关的详情文件，再回到当前代码确认行为。
 
 {{range .Groups}}
-- **[{{.Title}}]({{.Path}})** - {{.Description}}（{{len .Patterns}} 个模式）
+- **[{{.Title}}]({{.Path}})** - {{.Summary.Description}}（{{len .Patterns}} 个模式）
+  - 何时读取：{{if .Summary.IsFallback}}需求描述无法匹配具体子域，但涉及业务规则、状态变化、运行期行为或跨模块流程时读取。{{else}}需求提到 {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}，出现同义业务动作/状态变化，或改动路径位于 {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}} 时读取。{{end}}
+  {{if .Summary.PrimaryPath}}- 主要证据路径：`{{.Summary.PrimaryPath}}`{{end}}
+  {{if .Summary.Keywords}}- 关键词：{{range .Summary.Keywords}}`{{.}}` {{end}}{{end}}
+{{end}}
+
+## 子域总览
+
+| 子域 | 模式 | 主要路径 | 关键词 |
+|---|---:|---|---|
+{{range .Groups}}| [{{.Title}}]({{.Path}}) | {{len .Patterns}} | {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}-{{end}} | {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}-{{end}} |
 {{end}}
 
 {{if .UsageScenes}}

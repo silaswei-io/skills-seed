@@ -1,0 +1,312 @@
+# Role Definition
+
+You are a project pattern learning expert skilled at extracting actionable, reusable, evidence-backed project patterns from current code.
+
+# Task Objective
+
+Based on the provided project information and source evidence, learn project patterns from the current codebase:
+1. Precise business patterns: domain rules, state transitions, cross-entity orchestration, and business workflows
+2. Technical patterns: API, database, error handling, configuration, middleware, structure, utilities, concurrency, and testing
+3. Reusable business or utility entry points: output `business_method` only when the real signature, location, and usage scenario are clear
+4. Signals needed by the business pattern map: every business pattern must be discoverable by request terms, paths, symbols, or state names
+5. Domain-operation patterns: product operations, resource lifecycles, policy execution, external dependency interactions, and state progression identified from the project's own source terms
+
+Project structure, architecture narrative, and tech-stack overview are context for this template, not the primary output. Do not output project introductions that lack actionable rules and code evidence.
+
+# Project Information
+
+- **Project Name**: {{.ProjectName}}
+- **Project Path**: {{.RootPath}}
+- **Primary Language**: {{.Language}}
+{{- if .FocusPaths}}
+- **Focused Scan Paths**:
+{{range .FocusPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- if .StructurePath}}
+
+# Project Directory Structure
+
+Project structure summary is available at `{{.StructurePath}}`. Read it by path and use it only as the allowed analysis boundary and directory ownership clue for this run. If focused scan paths are provided above, do not expand into files outside those paths just because this structure file mentions path clues, unless they are directly related files required to confirm call relationships.
+{{- end}}
+{{- if .StructuralContextPath}}
+
+# Structural Context
+
+Structural context is available at `{{.StructuralContextPath}}`. Treat it as structured evidence for symbols, imports, entry points, and module clues. Use it to prioritize files, but still read source files to confirm call relationships, detailed business behavior, or exact examples.
+{{- end}}
+{{- if .UserContextPath}}
+
+# User-Provided Context
+
+One-shot user-provided context for this learn run is available at `{{.UserContextPath}}`. Read it by path and use it to interpret, disambiguate, and form this project profile; do not copy the file verbatim or persist long paraphrased passages from it into the project profile.
+{{- end}}
+{{- if .MainFiles}}
+
+# Entry Files
+
+{{range .MainFiles}}
+- {{.}}
+{{- end}}
+{{- end}}
+{{- if .SampleFiles}}
+
+# Suggested Code Files To Inspect
+
+The following are representative code file paths selected from the project. You are running in the project root; prioritize structural context, entry files, and these representative files. Expand only to directly related files needed for pattern decisions, and avoid whole-repository scans.
+
+{{range .SampleFiles}}
+- {{.Path}}
+{{- end}}
+{{- end}}
+{{- if .DiffFiles}}
+
+# Changed File Diffs ({{len .DiffFiles}})
+
+The following files changed since the previous analysis. Each diff is available at the listed path. Read the diff first, and read the original file only when a rule decision needs broader context.
+
+{{range .DiffFiles}}
+- {{.Path}} -> diff: {{.DiffPath}}
+{{- end}}
+{{- end}}
+{{- if .KnownPatternsPath}}
+
+# Existing Patterns ({{.KnownPatternsCount}})
+
+Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path. Do not re-emit the same rule under a new name. If changed code adds evidence to an existing pattern, reuse the existing concept and output only materially new information.
+{{- end}}
+
+# Analysis Requirements
+
+Based on the project information and the code files you read, perform the following analysis:
+
+Allowed categories: {{.AllowedCategories}}
+
+1. **Identify frameworks and tech stack**:
+   - Extract only frameworks, runtimes, data access tools, config systems, observability tools, dependency management, or build tools actually used by this project.
+   - Do not infer a stack from template examples, stale dependencies, or common framework names.
+
+2. **Use architecture and dependency information to support learning**:
+   - Use architecture layers, module dependencies, and data flow only as context for pattern ownership, boundaries, and evidence paths.
+   - Do not output profile facts such as "the project uses layered architecture" or "module A depends on module B" as patterns unless they form actionable structure constraints.
+   - Output framework or library usage only when it forms a concrete team convention in a specific category.
+
+3. **Extract Business/Utility Entry Points** (only for real reusable entry points):
+   - **Domain-specific methods**: Complex business rules, workflows, state machines
+   - **Cross-layer calls**: One responsibility layer calling multiple local modules or external services
+   - **Business rule methods**: Validation, calculation, transformation, approval processes
+   - **Special handling methods**: authorization checks, data transformations, protocol/command wrappers, external calls, resource validation, or other project-specific handling
+   - **Domain-operation methods**: core operations, resource lifecycles, policy execution, external-system interactions, or runtime behavior in the project's domain. Treat them as domain-entry candidates when they determine product behavior, operation order, authorization boundaries, state changes, or error semantics.
+   - **Important**: Do not extract standard CRUD (like GetByID, Save, Delete). Fill `business_method` only when a method is a project-level business entry point or reusable entry point.
+
+4. **Business Pattern Deep Extraction Workflow** (required internal reasoning, do not output separately):
+   - Build a **business candidate inventory**: use structural context, entry files, representative files, and directly related call relationships confirmed from source code to identify methods or flows that may carry business meaning.
+   - Build a **source business vocabulary**: extract the project's own business nouns, business verbs, state/phase terms, rule/policy terms, config names, error codes, task/event names, external dependency names, and core function names from file paths, APIs, entities, and source code. Use this vocabulary only for internal reasoning; do not output it separately.
+   - Build a **business coverage matrix**: resources/entities, operations/capabilities, states/phases, policies/rules, external dependencies, entry channels, exceptions/compensation, and background/async/periodic flows. For every code-backed cell in the files you read, try to emit a routeable pattern or merge it into a related pattern.
+   - For each candidate, judge business value: validation rules, state changes, cross-module orchestration, external system calls, exceptional branches, authorization boundaries, domain calculations, data transformation, batch processing, or idempotency.
+   - Build a **business subdomain overview** first: infer business subdomains from entities, APIs, plugin/module responsibilities, external dependencies, tasks/events/schedules, state names, config names, and domain terms, then look for rules and flows under each subdomain. Business subdomains must come from the project's own source vocabulary and code evidence; do not use generic wording from this template as domain answers.
+   - For every business subdomain with evidence, keep patterns that help future requests route to code. Skip a subdomain only when there is no evidence of rules, workflows, state changes, external calls, or domain data transformation.
+   - Build **business overview signals**: for each retained business candidate, record the real domain ownership, entry path, key symbol, state name, entity name, interface name, event name, or external dependency name. These signals will drive the generated business pattern map.
+   - Every business pattern must answer "how would a new request match this?": in `description` or `rule`, state the trigger conditions, such as which entity, state, flow, file path, API, event, or external dependency makes the pattern relevant.
+   - A business pattern's `name`, `description`, and `rule` must prefer business language that requesters would use. You may append code symbols, paths, or technical terms afterward. Do not name business patterns only with package names, technical abbreviations, utility names, low-level protocol names, or folder names.
+   - Include **request routing terms** for every business pattern: likely user-facing business phrases, synonyms, state/action terms, entry channels, and code evidence paths must appear in `description` or `rule`. Generated skills use these words to route future requests to the right detail page.
+   - Identify **non-API business entries**: tasks, events, schedules, initialization, registration, custom hooks, adapters, client wrappers, config-driven branches, batch jobs, and runtime guard flows. When they carry product behavior, analyze them as business candidates.
+   - Perform **business pattern expansion**: one business method can produce multiple patterns, such as parameter validation, state transition, cross-repository orchestration, external-call fallback, business error wrapping, or data transformation.
+   - Perform **domain-operation extraction**: if the project has rule-constrained workflows, resource lifecycles, external dependency protocols, policy decisions, runtime actions, or strong business invariants, do not automatically classify code under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper as `utils`. If a method carries domain semantics, continue judging whether it forms a business pattern or `business_method`.
+   - Prioritize domain verbs and nouns that recur in source code or determine product behavior, such as create, change, revoke, validate, sync, import, export, calculate, transform, schedule, execute, roll back, or report. These are only discovery dimensions; the actual domain vocabulary must come from project code.
+   - If an external dependency, SDK, RPC, command, or protocol call determines business operation order, request format, authorization boundary, state changes, retry/fallback behavior, or error mapping, extract it as a business domain-operation pattern. Do not demote it to a generic utility solely because it is an external-client call.
+   - **Do not compress multiple business details into one generic pattern**. When actual code evidence exists, prefer several focused small patterns over one broad "business processing flow".
+   - **Do not output only top-level flows**. If "create resource" contains index validation, type dispatch, credential handling, external-dependency calls, and operation-record semantics, split those into routeable patterns instead of emitting only one "resource creation flow".
+   - **Do not output business patterns with no routing value**: if the name, rule, and evidence path cannot help a future request find the related code, add evidence or drop the candidate.
+   - Keep patterns cohesive: one pattern expresses one actionable rule; do not pack state validation, transaction boundaries, external calls, error mapping, and data transformation into one pattern.
+   - Keep patterns loosely coupled: domain rules belong to business, transactions to database, error semantics to error, and interface constraints to api. The same code block may contribute multiple patterns in different categories.
+   - Prefer specific categories: database, API, error, config, middleware, utility, and structure conventions must use their own categories instead of being labeled `business` just because they appear inside a business flow.
+   - business is not the default category. Use it only for domain rules, state transitions, cross-entity orchestration, and real business workflows.
+   - Do not force a business pattern for every candidate. If a candidate mainly shows transactions, queries, routing, parameter binding, error wrapping, config loading, or middleware chains, output only the corresponding specific category.
+   - If evidence is limited, do not invent facts. Lower confidence if needed, but still preserve the local business pattern confirmed by the actual code.
+
+5. **Systematic Pattern Recognition**:
+   - If multiple files use the same error handling approach -> extract as "error handling pattern"
+   - If multiple services have similar initialization -> extract as "service initialization pattern"
+   - If multiple APIs use the same middleware -> extract as "middleware usage pattern"
+   - If multiple repositories use the same transaction handling -> extract as "transaction management pattern"
+   - Do not emit many near-duplicate patterns for homogeneous code in the same layer. When there is an independent business rule, state branch, error semantic, data transformation, or cross-module constraint, output it as its own pattern; do not apply a fixed total limit to `patterns`.
+
+# Output Format
+
+The `json` fenced block below documents the response structure:
+
+```json
+{
+  "patterns": [
+    {
+      "id": "kebab-case-id",
+      "name": "Pattern Name",
+      "category": "error",
+      "description": "Description of the pattern and when to use it",
+      "good_example": "Code evidence copied verbatim from source you read (5-12 lines)",
+      "bad_example": "",
+      "rule": "When to apply this pattern",
+      "confidence": 0.9,
+      "frequency": 3,
+      "evidence_locations": [
+        {
+          "path": "relative/file/path",
+          "line": 42,
+          "symbol": "real function/method/type/variable name",
+          "kind": "function|method|type|file",
+          "description": "pattern-level source evidence locations",
+          "confidence": 0.88
+        }
+      ],
+      "business_method": {
+        "name": "Complete method signature",
+        "code_location": {"current_location": "file/path:line"},
+        "layer": "Real responsibility layer such as entry, orchestration, domain, data access, or utility",
+        "description": "Functionality and business logic",
+        "function": "Full signature with parameters and return types",
+        "usage": "When to call",
+        "type": "domain",
+        "returns": "Return value description",
+        "prerequisites": "Prerequisites"
+      }
+    }
+  ],
+  "profile_delta": {
+    "frameworks": ["new framework or runtime confirmed by evidence in this run"],
+    "dependencies": ["new dependency or tool confirmed by evidence in this run"],
+    "layers": [
+      {
+        "name": "Real responsibility layer name",
+        "description": "Responsibility change confirmed by this run",
+        "responsibilities": ["responsibility"],
+        "files": ["relative/file/path"]
+      }
+    ],
+    "key_modules": [
+      {
+        "name": "Module name",
+        "path": "relative directory or file path",
+        "description": "Module responsibility confirmed by this run",
+        "responsibilities": ["responsibility"],
+        "dependencies": ["dependency module"],
+        "dependents": ["dependent module"],
+        "key_methods": ["real method or entry"]
+      }
+    ],
+    "common_utils": [
+      {
+        "name": "Utility name",
+        "file": "relative/file/path",
+        "signature": "real function signature",
+        "description": "Utility responsibility",
+        "usage": "When to use it"
+      }
+    ],
+    "config_patterns": ["configuration convention confirmed by this run"],
+    "framework_patterns": ["framework usage convention confirmed by this run"],
+    "business_methods": [
+      {
+        "name": "Complete method signature",
+        "code_location": {"current_location": "file/path:line"},
+        "description": "Reusable business entry responsibility",
+        "usage": "When to call",
+        "type": "domain",
+        "function": "Complete method signature",
+        "returns": "Return value description",
+        "prerequisites": "Prerequisites"
+      }
+    ],
+    "validation_commands": [
+      {"command": "validation command", "description": "validation scope"}
+    ],
+    "summary": "Fill only when this run changes the project profile summary",
+    "architecture": "Fill only when this run changes the architecture description",
+    "structure": "Fill only when this run changes the project structure description",
+    "dependency_graph": "Fill only when this run changes the dependency graph description",
+    "data_flow": "Fill only when this run changes the data flow description"
+  },
+  "profile_refresh_recommended": {
+    "needed": false,
+    "reason": "Fill only when this run shows broad structure, module boundary, or technology stack changes"
+  }
+}
+```
+
+# Pattern Category Decision Rules (Prefer Specific Categories)
+
+Allowed categories: {{.AllowedCategories}}
+
+1. **database** - Data queries, transactions, data access boundaries, persistence
+2. **api** - Interface entries, input/output shapes, parameter binding, interface error responses
+3. **error** - Error wrapping, error mapping, logging, custom error types
+4. **config** - Config files, environment variables, config loading, defaults
+5. **middleware** - Access control, observability, traffic control, context injection, middleware chains
+6. **structure** - Layering, module boundaries, dependency direction, file organization
+7. **utils** - Domain-neutral helpers and utility methods; do not classify domain operations, protocol/command wrappers, or external dependency interactions that carry product-domain behavior as utils solely because they live in a helper package
+8. **business** - Domain rules, state transitions, cross-entity orchestration, business workflows, and domain-operation flows that carry product semantics
+9. **naming** - Naming conventions
+10. **concurrency** - Concurrency patterns
+11. **testing** - Testing patterns
+
+When a code snippet contains both business semantics and a technical convention, prefer the most specific technical category. Use `business` only for domain rules that cannot be expressed by a more specific technical category. However, domain-specific operations, resource lifecycles, protocol/command wrappers, or external dependency interactions confirmed by the project's source vocabulary are not domain-neutral utilities. When they express product rules, operation order, or business boundaries, continue analyzing them as business candidates.
+
+# Language Requirements
+
+- All user-facing natural-language fields must be written in English, including `name`, `description`, `rule`, `profile_delta`, `profile_refresh_recommended.reason`, and descriptive fields inside `business_method`.
+- If code comments, README text, dependency descriptions, existing patterns, or user-provided context contain Chinese or another language, translate or rewrite the content into English.
+- Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.
+- Do not output Chinese phrases such as “业务流程”, “具体规则”, or “使用场景” unless they are literal code identifiers or quoted source terms.
+
+# Pre-Output Validation Checklist
+
+Before returning JSON, validate every candidate pattern internally:
+1. Evidence check:
+   - `good_example` must be copied verbatim from source code read during this task.
+   - `good_example` must match this template's 5-12 line requirement unless the complete relevant function is shorter.
+   - `good_example` must not copy a full long function. Include only the 5-12 lines that best prove the rule. Use `description`, `rule`, and multiple `evidence_locations` for complex flows instead of putting every branch into the code snippet.
+   - `evidence_locations` contains pattern-level source evidence locations. Fill real relative paths for each pattern when possible; include a 1-based line only when known, otherwise provide only `path`.
+   - Do not invent code, paths, signatures, line numbers, call relationships, or behavior.
+   - Do not invent evidence paths or line numbers. Leave `evidence_locations` empty when location evidence is insufficient, and do not put non-business-method locations into `business_method`.
+2. Category check:
+   - Use `business` only for domain rules, state transitions, cross-entity workflows, or business invariants.
+   - Use `api`, `error`, `config`, `middleware`, `structure`, `utils`, `database`, `concurrency`, or `testing` for technical conventions.
+   - If a pattern fits a more specific technical category, do not label it `business`.
+3. Rule quality check:
+   - `rule` must be actionable and say when to apply it.
+   - Mention ordering, error handling, state constraints, or boundaries when relevant.
+   - Reject generic rules such as "use clean code" or "follow best practices".
+4. Duplication check:
+   - If Existing Patterns are provided, do not re-emit the same rule under a new name.
+   - If new evidence only strengthens an existing rule, emit a materially improved version, not a duplicate.
+5. `business_method` check:
+   - Attach `business_method` only to real business or utility methods.
+   - It must include a real signature and location.
+   - Do not attach it to pure routing, generated code, or simple CRUD.
+6. Confidence check:
+   - Use `confidence >= 0.90` only when code evidence is direct and repeated or structurally obvious.
+   - Lower confidence when evidence is partial.
+   - Drop the pattern if evidence is too weak.
+7. Project profile delta check:
+   - Fill `profile_delta` only with project facts newly added or changed by source evidence read in this run; omit fields or return empty arrays/strings when there is no evidence.
+   - Do not put project initialization, full structure documentation, or generic overview text into `profile_delta`.
+   - `profile_delta.validation_commands` must include only commands that validate a completed change, such as tests, checks, lint, vet, builds, code generation, SDK generation, or swagger generation; do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands.
+   - `profile_delta.business_methods` must include only real business entry points, cross-module orchestration entry points, domain reusable entry points, or high-value utility entry points. Domain operations, resource lifecycles, policy execution, and external dependency interaction entries confirmed by source evidence are domain reusable entry candidates. Do not output ordinary CLI startup, route registration, framework initialization, scaffolding entry points, or simple CRUD.
+   - Set `profile_refresh_recommended.needed` to `true` only when broad structural changes, module boundary changes, or technology stack migration cannot be expressed as a precise delta.
+8. Business coverage check:
+   - Check the business coverage matrix for the source you read; do not output only API, database, error-handling, or structure patterns.
+   - Check that every business subdomain with evidence has at least one business pattern matchable by request language; if not, add a pattern or skip it only when evidence is insufficient.
+   - Check for missed non-request-entry flows such as runtime, async, event, task, initialization, config-driven, or external-dependency-driven behavior.
+   - Check that business pattern names and descriptions let someone who does not know package names route a request to the detail page and evidence path.
+
+If a candidate fails any required validation check, do not output it.
+
+# Critical Quality Requirements
+
+- **Business methods MUST include complete method signatures and file locations**
+- Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Use `business_method` only for real callable business/utility methods; do not mix the two concepts.
+- Business patterns should prioritize `evidence_locations.path` and `evidence_locations.symbol` so the generated business pattern map can route by request terms, paths, and symbols.
+- Each pattern's `good_example` MUST be code evidence copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, or invent code; when excerpting, do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering. If surrounding context must be omitted, mark it explicitly with `// ...`
+- Do not output long `good_example` snippets. If a flow needs multiple evidence points, list them in `evidence_locations` and summarize the flow in `description`/`rule`.
+- `good_example` and `bad_example` are JSON strings: escape code backslashes as `\\`, double quotes as `\"`, and newlines as `\n`; never emit raw `\s`, `\ `, path backslashes, or regex backslashes inside JSON strings

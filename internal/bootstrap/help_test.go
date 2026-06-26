@@ -344,7 +344,7 @@ func TestRunHelpDoesNotOpenLockedProjectRuntime(t *testing.T) {
 	cfg.Project.RootPath = projectRoot
 	require.NoError(t, configRepo.Update(cfg))
 
-	lockedRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	lockedRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
 	require.NoError(t, err)
 	defer lockedRepo.Close()
 
@@ -376,7 +376,7 @@ func TestInitContainerAndLoggerReportsLockedPatternDBHint(t *testing.T) {
 	cfg.Project.RootPath = projectRoot
 	require.NoError(t, configRepo.Update(cfg))
 
-	lockedRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	lockedRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
 	require.NoError(t, err)
 	defer lockedRepo.Close()
 

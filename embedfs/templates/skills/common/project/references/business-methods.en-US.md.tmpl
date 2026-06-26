@@ -1,6 +1,6 @@
-# {{.ProjectName}} Business Methods
+# {{.ProjectName}} Entry Method Index
 
-This file documents complex business logic methods extracted into the project profile. Check it before changing business flows, reusing domain behavior, or generating new business code
+This file indexes project-level business entry points, cross-module orchestration entry points, or high-value utility entry points. It does not replace business rules; read business patterns first when changing a business flow, then use this file to locate reusable behavior
 
 {{if .HasBusinessPatterns}}Related business rules: [Business Patterns](./patterns/business.md)
 {{end}}
@@ -41,7 +41,7 @@ This file documents complex business logic methods extracted into the project pr
 
 {{end}}{{end}}
 {{else}}
-*Business method information has not been extracted yet*
+*Entry method information has not been extracted yet*
 {{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}

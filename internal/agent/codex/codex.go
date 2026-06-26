@@ -263,7 +263,7 @@ func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatter
 
 // AnalyzeProject 分析项目结构
 func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-project-analyze")
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-project-profile")
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProje
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("project-analyze", data)
+	prompt, err := c.promptLoader.Render("project-profile", data)
 	if err != nil || prompt == "" {
 		logger.Error(i18n.Get("LoggerAgentProjectPromptRenderFailed"),
 			"project", req.ProjectName,
@@ -307,7 +307,7 @@ func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProje
 
 // AnalyzeCurrentCodebase 分析当前代码库，提取初始模式
 func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-skill-project-init")
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-pattern-learn-current")
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.Render("skill-project-init", data)
+	prompt, err := c.promptLoader.Render("pattern-learn-current", data)
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
@@ -335,10 +335,42 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 		"agent", c.Name(),
 		"operation", "AnalyzeCurrentCodebase",
 		"patterns_count", len(result.Patterns),
-		"category_summaries_count", len(result.CategorySummaries),
-		"business_rules_count", len(result.BusinessRules),
-		"best_practices_count", len(result.BestPractices),
-		"common_patterns_count", len(result.CommonPatterns),
+		"profile_delta", !result.ProfileDelta.IsZero(),
+		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
+	)
+	return result, nil
+}
+
+// PlanAnalysisUnits 将当前待学习文件拆成可续跑的业务分析单元。
+func (c *CodexAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-analysis-plan")
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.PlanAnalysisUnitsPromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := c.promptLoader.Render("analysis-plan", data)
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalysisPlanPromptFailed"))
+	}
+
+	output, err := c.callCodex(ctx, "PlanAnalysisUnits", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCodebaseAnalysisFailed"), err)
+	}
+
+	result, err := parser.ParsePlanAnalysisUnitsResult(output)
+	if err != nil {
+		return nil, err
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
+		"agent", c.Name(),
+		"operation", "PlanAnalysisUnits",
+		"units_count", len(result.Units),
 	)
 	return result, nil
 }

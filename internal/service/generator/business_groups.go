@@ -8,19 +8,23 @@ import (
 	"unicode"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 const (
 	businessFallbackGroupID = "other"
 	maxBusinessGroupWords   = 4
+	maxBusinessGroupSignals = 5
 )
 
 type patternGroup struct {
-	ID          string
-	Title       string
-	Description string
-	Path        string
-	Patterns    []domain.Pattern
+	ID        string
+	Title     string
+	Path      string
+	Summary   businessGroupSummary
+	Patterns  []domain.Pattern
+	Locations []businessLocation
+	Signals   []string
 }
 
 func businessPatternGroups(locale string, patterns []domain.Pattern) []patternGroup {
@@ -35,15 +39,16 @@ func businessPatternGroups(locale string, patterns []domain.Pattern) []patternGr
 		group, ok := groupsByID[key.ID]
 		if !ok {
 			group = &patternGroup{
-				ID:          key.ID,
-				Title:       key.Title,
-				Description: businessGroupDescription(locale, key.ID, key.Title),
-				Path:        "./business/" + key.ID + ".md",
+				ID:    key.ID,
+				Title: key.Title,
+				Path:  "./business/" + key.ID + ".md",
 			}
 			groupsByID[key.ID] = group
 			order = append(order, key.ID)
 		}
 		group.Patterns = append(group.Patterns, pattern)
+		group.Locations = mergeBusinessLocations(group.Locations, businessPatternLocations(pattern))
+		group.Signals = mergeBusinessSignals(group.Signals, businessPatternSignals(pattern))
 	}
 
 	sort.SliceStable(order, func(i, j int) bool {
@@ -58,6 +63,9 @@ func businessPatternGroups(locale string, patterns []domain.Pattern) []patternGr
 	groups := make([]patternGroup, 0, len(order))
 	for _, id := range order {
 		group := groupsByID[id]
+		sortBusinessLocations(group.Locations)
+		group.Signals = limitStrings(group.Signals, maxBusinessGroupSignals)
+		group.Summary = buildBusinessGroupSummary(locale, *group)
 		groups = append(groups, *group)
 	}
 	return groups
@@ -72,8 +80,14 @@ func businessPatternGroupKey(pattern domain.Pattern) businessGroupKey {
 	if key := businessGroupKeyFromPath(pattern); key.ID != "" {
 		return key
 	}
+	if key := businessGroupKeyFromEvidence(pattern); key.ID != "" {
+		return key
+	}
 	if pattern.ScopePath != "" {
 		return businessGroupKeyFromPathText(pattern.ScopePath)
+	}
+	if key := businessGroupKeyFromPatternText(pattern); key.ID != "" {
+		return key
 	}
 	return businessGroupKey{}
 }
@@ -83,6 +97,20 @@ func businessGroupKeyFromPath(pattern domain.Pattern) businessGroupKey {
 		return businessGroupKey{}
 	}
 	return businessGroupKeyFromPathText(pattern.BusinessMethod.DisplayLocation())
+}
+
+func businessGroupKeyFromEvidence(pattern domain.Pattern) businessGroupKey {
+	for _, location := range pattern.EvidenceLocations {
+		if key := businessGroupKeyFromPathText(location.DisplayLocation()); key.ID != "" {
+			return key
+		}
+	}
+	return businessGroupKey{}
+}
+
+func businessGroupKeyFromPatternText(pattern domain.Pattern) businessGroupKey {
+	text := firstNonEmptyString(pattern.Name, pattern.ID, pattern.Rule, pattern.Description)
+	return businessGroupKeyFromName(text)
 }
 
 func businessGroupKeyFromPathText(location string) businessGroupKey {
@@ -177,17 +205,11 @@ func titleFromWords(words []string) string {
 
 func businessGroupDescription(locale, id, title string) string {
 	if id == businessFallbackGroupID {
-		return localizedText(
-			locale,
-			"没有稳定代码位置或子域归属的业务规则",
-			"Business rules without a stable code location or domain ownership",
-		)
+		return i18n.GetForLocale(locale, "GeneratorBusinessGroupFallbackDescription")
 	}
-	return localizedText(
-		locale,
-		"与 "+title+" 相关的业务规则、状态约束、错误语义和数据转换证据",
-		"Business rules, state constraints, error semantics, and data transformation evidence related to "+title,
-	)
+	return i18n.GetForLocaleWithParams(locale, "GeneratorBusinessGroupDescription", map[string]interface{}{
+		"Title": title,
+	})
 }
 
 func businessFallbackGroupKey(locale string) businessGroupKey {
@@ -223,4 +245,138 @@ func isGenericBusinessNameWord(word string) bool {
 		"strategy": true, "use": true, "workflow": true,
 	}
 	return generic[strings.ToLower(word)]
+}
+
+type businessGroupSummary struct {
+	Description string
+	Keywords    []string
+	PrimaryPath string
+	IsFallback  bool
+}
+
+type businessLocation struct {
+	Path        string
+	Symbol      string
+	Kind        string
+	Description string
+	Confidence  float64
+}
+
+func buildBusinessGroupSummary(locale string, group patternGroup) businessGroupSummary {
+	summary := businessGroupSummary{
+		Description: businessGroupDescription(locale, group.ID, group.Title),
+		Keywords:    businessGroupKeywords(group),
+		IsFallback:  group.ID == businessFallbackGroupID,
+	}
+	if len(group.Locations) > 0 {
+		summary.PrimaryPath = group.Locations[0].Path
+	}
+	return summary
+}
+
+func businessGroupKeywords(group patternGroup) []string {
+	keywords := splitBusinessGroupWords(group.Title)
+	if len(keywords) == 0 {
+		keywords = splitBusinessGroupWords(group.ID)
+	}
+	for _, signal := range group.Signals {
+		keywords = append(keywords, splitBusinessGroupWords(signal)...)
+	}
+	return limitStrings(uniqueStrings(keywords), maxBusinessGroupSignals)
+}
+
+func businessPatternLocations(pattern domain.Pattern) []businessLocation {
+	locations := make([]businessLocation, 0, len(pattern.EvidenceLocations)+1)
+	if pattern.BusinessMethod != nil && pattern.BusinessMethod.DisplayLocation() != "" {
+		locations = append(locations, businessLocation{
+			Path:        pattern.BusinessMethod.DisplayLocation(),
+			Symbol:      pattern.BusinessMethod.Name,
+			Kind:        "method",
+			Description: pattern.BusinessMethod.Description,
+			Confidence:  pattern.BusinessMethod.CodeLocation.Confidence,
+		})
+	}
+	for _, evidence := range pattern.EvidenceLocations {
+		if evidence.DisplayLocation() == "" {
+			continue
+		}
+		locations = append(locations, businessLocation{
+			Path:        evidence.DisplayLocation(),
+			Symbol:      evidence.Symbol,
+			Kind:        evidence.Kind,
+			Description: evidence.Description,
+			Confidence:  evidence.Confidence,
+		})
+	}
+	if pattern.ScopePath != "" {
+		locations = append(locations, businessLocation{Path: pattern.ScopePath, Kind: "scope"})
+	}
+	return locations
+}
+
+func businessPatternSignals(pattern domain.Pattern) []string {
+	return uniqueStrings([]string{
+		pattern.Name,
+		pattern.ID,
+		pattern.Rule,
+		pattern.Description,
+	})
+}
+
+func mergeBusinessLocations(left, right []businessLocation) []businessLocation {
+	seen := make(map[string]bool, len(left)+len(right))
+	result := make([]businessLocation, 0, len(left)+len(right))
+	add := func(location businessLocation) {
+		key := strings.Join([]string{location.Path, location.Symbol, location.Kind}, "\x00")
+		if strings.TrimSpace(location.Path) == "" || seen[key] {
+			return
+		}
+		seen[key] = true
+		result = append(result, location)
+	}
+	for _, location := range left {
+		add(location)
+	}
+	for _, location := range right {
+		add(location)
+	}
+	return result
+}
+
+func sortBusinessLocations(locations []businessLocation) {
+	sort.SliceStable(locations, func(i, j int) bool {
+		if locations[i].Confidence != locations[j].Confidence {
+			return locations[i].Confidence > locations[j].Confidence
+		}
+		return locations[i].Path < locations[j].Path
+	})
+}
+
+func mergeBusinessSignals(left, right []string) []string {
+	return uniqueStrings(append(append([]string{}, left...), right...))
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		key := strings.ToLower(value)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, value)
+	}
+	return result
+}
+
+func limitStrings(values []string, limit int) []string {
+	if limit > 0 && len(values) > limit {
+		return values[:limit]
+	}
+	return values
 }

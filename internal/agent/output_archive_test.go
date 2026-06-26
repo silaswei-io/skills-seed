@@ -27,9 +27,9 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 		TokenUsageKnown: true,
 	})
 
-	require.Contains(t, filepath.ToSlash(archive.ContentPath), ".skills-seed/memory/runtime/agent-outputs/")
-	require.Contains(t, filepath.ToSlash(archive.RawPath), ".skills-seed/memory/runtime/agent-outputs/")
-	require.Contains(t, filepath.ToSlash(archive.StderrPath), ".skills-seed/memory/runtime/agent-outputs/")
+	require.Contains(t, filepath.ToSlash(archive.ContentPath), ".skills-seed/runtime/agent-outputs/")
+	require.Contains(t, filepath.ToSlash(archive.RawPath), ".skills-seed/runtime/agent-outputs/")
+	require.Contains(t, filepath.ToSlash(archive.StderrPath), ".skills-seed/runtime/agent-outputs/")
 	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-agent-output-claude-analyzecurrentcodebase\.md$`, filepath.Base(archive.ContentPath))
 	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-agent-output-claude-analyzecurrentcodebase\.raw\.txt$`, filepath.Base(archive.RawPath))
 	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-agent-output-claude-analyzecurrentcodebase\.stderr\.txt$`, filepath.Base(archive.StderrPath))
@@ -38,13 +38,13 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "{\"patterns\":[]}\n", string(content))
 
-	entries, err := os.ReadDir(filepath.Join(seedPath, "memory", "runtime", "agent-outputs"))
+	entries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "agent-outputs"))
 	require.NoError(t, err)
 	var manifestPath string
 	for _, entry := range entries {
 		if strings.HasSuffix(entry.Name(), ".manifest.json") {
 			require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-agent-output-claude-analyzecurrentcodebase\.manifest\.json$`, entry.Name())
-			manifestPath = filepath.Join(seedPath, "memory", "runtime", "agent-outputs", entry.Name())
+			manifestPath = filepath.Join(seedPath, "runtime", "agent-outputs", entry.Name())
 		}
 	}
 	require.NotEmpty(t, manifestPath)

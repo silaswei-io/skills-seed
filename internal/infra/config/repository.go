@@ -610,7 +610,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 		Workspace: WorkspaceConfig{},
 		Logging: LoggingConfig{
 			Level:       "DEBUG",
-			LogsPath:    "logs",
+			LogsPath:    "runtime/logs",
 			MaxLogFiles: 30,
 		},
 		Exclude: defaultExcludeConfig(),

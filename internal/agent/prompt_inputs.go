@@ -4,20 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	textutil "github.com/silaswei-io/skills-seed/internal/utils/text"
 )
 
-// NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/memory/runtime 下。
+// NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/runtime 下。
 func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*PromptInputSession, error) {
 	seedPath := runtimecontext.SeedPath(ctx)
 	if seedPath == "" {
 		return NewPromptInputSession(prefix)
 	}
-	return newPromptInputSessionIn(filepath.Join(seedPath, "memory", "runtime"), prefix)
+	return newPromptInputSessionIn(layout.New(seedPath).Runtime(), prefix)
 }
 
 // BatchLearnPromptData 返回提交学习所需的提示词数据。
@@ -71,6 +71,26 @@ func mustJSON(value interface{}) string {
 		return "[]"
 	}
 	return string(data)
+}
+
+// PlanAnalysisUnitsPromptData 返回业务分析单元规划所需的提示词数据。
+func PlanAnalysisUnitsPromptData(session *PromptInputSession, req *PlanAnalysisUnitsRequest) (map[string]interface{}, error) {
+	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
+	if err != nil {
+		return nil, fmt.Errorf("write analysis plan structural context: %w", err)
+	}
+	userContextPath, err := session.Write("user-context.md", req.UserContext)
+	if err != nil {
+		return nil, fmt.Errorf("write analysis plan user context: %w", err)
+	}
+	return map[string]interface{}{
+		"ProjectName":           req.ProjectName,
+		"RootPath":              req.RootPath,
+		"Language":              req.Language,
+		"FocusPaths":            req.FocusPaths,
+		"StructuralContextPath": structuralContextPath,
+		"UserContextPath":       userContextPath,
+	}, nil
 }
 
 // CheckPromptData 返回检查场景所需的提示词数据。

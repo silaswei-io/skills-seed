@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/jsonfile"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
 // ErrProfileNotFound 表示工作区画像文件不存在。
@@ -24,7 +24,7 @@ type ProfileRepository struct {
 
 // NewProfileRepository 创建工作区画像仓储
 func NewProfileRepository(seedPath string) *ProfileRepository {
-	return &ProfileRepository{path: filepath.Join(seedPath, "memory", "workspace-profile.json")}
+	return &ProfileRepository{path: layout.New(seedPath).WorkspaceProfile()}
 }
 
 // Get 读取工作区画像
@@ -44,7 +44,7 @@ type SpecRepository struct {
 
 // NewSpecRepository 创建工作区规范仓储
 func NewSpecRepository(seedPath string) *SpecRepository {
-	return &SpecRepository{path: filepath.Join(seedPath, "memory", "workspace-spec.json")}
+	return &SpecRepository{path: layout.New(seedPath).WorkspaceSpec()}
 }
 
 // Get 读取工作区规范

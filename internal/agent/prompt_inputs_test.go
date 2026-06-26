@@ -56,7 +56,7 @@ func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
 
-	session, err := NewPromptInputSessionForContext(ctx, "skills-seed-project-analyze")
+	session, err := NewPromptInputSessionForContext(ctx, "skills-seed-project-profile")
 	require.NoError(t, err)
 	inputPath, err := session.Write("project-structure.txt", "demo\n  main.go")
 	require.NoError(t, err)
@@ -64,6 +64,6 @@ func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T
 	session.Cleanup()
 
 	require.FileExists(t, inputPath)
-	require.Contains(t, filepath.ToSlash(inputPath), ".skills-seed/memory/runtime")
-	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-prompt-input-skills-seed-project-analyze-\d+$`, filepath.Base(filepath.Dir(inputPath)))
+	require.Contains(t, filepath.ToSlash(inputPath), ".skills-seed/runtime")
+	require.Regexp(t, `^\d{8}-\d{6}\.\d{9}-prompt-input-skills-seed-project-profile-\d+$`, filepath.Base(filepath.Dir(inputPath)))
 }

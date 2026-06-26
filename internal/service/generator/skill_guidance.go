@@ -110,7 +110,7 @@ func skillWorkflows(profile *domain.ProjectProfile, patterns []domain.Pattern, l
 			Title:       localizedText(locale, "修改业务流程", "Change Business Flow"),
 			AppliesWhen: localizedText(locale, "涉及状态流转、缓存 key、任务重试、幂等或跨实体业务编排", "State transitions, cache keys, task retry, idempotency, or cross-entity business orchestration change"),
 			Steps: []string{
-				localizedText(locale, "先读强业务方法和对应业务模式详情，只把有代码证据的规则当作硬约束", "Read Business Methods and the matching business pattern detail first; treat only code-backed rules as hard constraints"),
+				localizedText(locale, "先读业务模式地图和命中的业务详情；需要复用入口时再读入口方法索引", "Read the Business Pattern Map and matching business detail first; read the Entry Method Index next only when reusing an entry point"),
 				localizedText(locale, "对照当前代码确认锁、状态、错误分支和缓存/任务顺序；引用与代码冲突时以代码为准", "Verify locks, states, error branches, and cache/task ordering against current code; current code wins over references"),
 				localizedText(locale, "新增产品语义前确认现有代码是否已经实现；没有证据时把它标记为待确认需求，而不是项目规则", "Before adding product semantics, confirm the current code already implements them; if not, mark them as requirements to confirm, not project rules"),
 			},

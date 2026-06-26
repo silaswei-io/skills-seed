@@ -55,7 +55,7 @@
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | 从 Git 历史学习 | `current`, `history` | `--help, -h` = `false` |
-| `skills-seed learn current` | 从当前代码学习 | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | 从当前代码学习 | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | 从 Git 历史学习 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
 | `skills-seed patterns` | 管理已学习的 patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
@@ -234,7 +234,7 @@ skills-seed reset --workspace
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed learn current` | 从当前代码库增量学习 | `skills-seed learn current --focus internal/service --profile skip` | 会比较文件 md5，只学习新增、修改或删除的文件 |
+| `skills-seed learn current` | 从当前代码库增量学习 | `skills-seed learn current --focus internal/service --profile skip` | 会比较文件 md5，只学习新增、修改或删除的文件；提示词或模板升级后可加 `--force` 重新学习当前扫描范围 |
 | `skills-seed learn history` | 从 Git 提交历史学习 | `skills-seed learn history --limit 50 --batch-size 5` | 已学习过的 commit 会跳过 |
 
 #### `learn` 参数
@@ -276,6 +276,7 @@ skills-seed reset --workspace
 ```bash
 skills-seed learn current
 skills-seed learn current --focus internal/service --profile skip
+skills-seed learn current --force --profile refresh
 skills-seed learn current -f internal/agent -f internal/service
 skills-seed learn current --context "只关注兼容性边界"
 skills-seed learn current --context-file .skills-seed/context.md
@@ -491,7 +492,7 @@ skills-seed patterns show business-create-order --format json
 2. 不确定整理结果时先使用 `--dry-run`。
 3. `patterns stats` 使用已记录的 check 命中数据，只有执行过带 `PatternID` 的检查后才会出现命中次数。
 4. `patterns show` 无参数时显示模式概览列表；位置列优先使用业务/工具方法的 `code_location`，没有业务方法时回退到模式级 `evidence_locations` 的第一条证据位置。传入 `pattern-id` 时显示单条模式完整详情，包括正/反例、质量指标、workspace 归属、证据位置、业务方法字段、代码位置历史和语言无关符号快照。
-5. `patterns stats` 和 `patterns show` 不调用 AI，也不修改数据，但仍需要打开 `.skills-seed/memory/project.db`；如果数据库被其他 `skills-seed` 命令占用，CLI 会提示等待当前命令结束或检查残留进程。
+5. `patterns stats` 和 `patterns show` 不调用 AI，也不修改数据，但仍需要打开 `.skills-seed/store/project.db`；如果数据库被其他 `skills-seed` 命令占用，CLI 会提示等待当前命令结束或检查残留进程。
 
 ### `skills-seed review`
 
@@ -559,7 +560,7 @@ skills-seed review stats --line-window 5
 
 #### 命令概述
 
-查看或刷新项目画像。项目画像位于 `.skills-seed/memory/project-profile.json`，用于生成 `references/project-overview.md`。
+查看或刷新项目画像。项目画像位于 `.skills-seed/store/documents/project-profile.json`，用于生成 `references/project-overview.md`。
 
 #### 命令形式
 
@@ -713,7 +714,7 @@ skills-seed hook run
 
 #### 命令概述
 
-查看最近沉淀到项目技能中的变更记录。此命令读取 `.skills-seed/memory/change-log.json`，输出形式类似 `git log`，不打印详细诊断日志。
+查看最近沉淀到项目技能中的变更记录。此命令读取 `.skills-seed/store/documents/change-log.json`，输出形式类似 `git log`，不打印详细诊断日志。
 
 #### 命令形式
 
@@ -736,7 +737,7 @@ skills-seed log
 #### 注意事项
 
 1. `sync`、`learn current`、`generate skills` 会写入学习变更记录。
-2. 详细诊断日志仍保留在 `.skills-seed/logs/`，用于排障。
+2. 详细诊断日志仍保留在 `.skills-seed/runtime/logs/`，用于排障。
 
 ### `skills-seed help`
 

@@ -21,6 +21,7 @@ type MockAgent struct {
 	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
 	SelectFilesFn             func(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error)
 	AnalyzeProjectFn          func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
+	PlanAnalysisUnitsFn       func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error)
 	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
 	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpecFn    func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
@@ -125,6 +126,14 @@ func (m *MockAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjec
 		return m.AnalyzeProjectFn(ctx, req)
 	}
 	return &agent.AnalyzeProjectResult{}, nil
+}
+
+// PlanAnalysisUnits 模拟业务分析单元规划。
+func (m *MockAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+	if m.PlanAnalysisUnitsFn != nil {
+		return m.PlanAnalysisUnitsFn(ctx, req)
+	}
+	return &agent.PlanAnalysisUnitsResult{}, nil
 }
 
 // AnalyzeCurrentCodebase 模拟当前代码库分析

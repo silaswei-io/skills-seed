@@ -62,7 +62,7 @@ func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 	childCfg.Agent.Commands = map[string]string{"mock": "mock"}
 	require.NoError(t, childConfigRepo.Update(childCfg))
 
-	rootPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(workspaceRoot, ".skills-seed", "memory", "project.db"))
+	rootPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(workspaceRoot, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	defer rootPatternRepo.Close()
 	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
@@ -94,7 +94,7 @@ func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 	require.Equal(t, "hsmwebapi", rootPattern.ProjectID)
 	require.Equal(t, "hsmwebapi", rootPattern.ScopePath)
 
-	childPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	childPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	defer childPatternRepo.Close()
 	childPattern, err := childPatternRepo.Get(ctx, "plugin-source-editing-rule")
@@ -138,7 +138,7 @@ func TestDeleteCmdInProjectDeletesPattern(t *testing.T) {
 	cfg.Project.RootPath = projectRoot
 	require.NoError(t, configRepo.Update(cfg))
 
-	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
 	require.NoError(t, err)
 	defer patternRepo.Close()
 	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
@@ -194,7 +194,7 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 	childCfg.Project.RootPath = childRoot
 	require.NoError(t, childConfigRepo.Update(childCfg))
 
-	rootPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(workspaceRoot, ".skills-seed", "memory", "project.db"))
+	rootPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(workspaceRoot, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	defer rootPatternRepo.Close()
 	rootPattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
@@ -202,7 +202,7 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 	rootPattern.ScopePath = "hsmwebapi"
 	require.NoError(t, rootPatternRepo.Save(ctx, rootPattern))
 
-	childPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	childPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	childPattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
 	require.NoError(t, childPatternRepo.Save(ctx, childPattern))
@@ -221,7 +221,7 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 	deletedRoot, err := rootPatternRepo.Get(ctx, "plugin-source-editing-rule")
 	require.Error(t, err)
 	require.Nil(t, deletedRoot)
-	childPatternRepo, err = boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	childPatternRepo, err = boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	defer childPatternRepo.Close()
 	deletedChild, err := childPatternRepo.Get(ctx, "plugin-source-editing-rule")

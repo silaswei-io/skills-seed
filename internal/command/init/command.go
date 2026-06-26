@@ -12,6 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
@@ -173,10 +174,12 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	}()
 
 	// 创建目录结构
+	seedLayout := layout.New(seedPath)
 	dirs := []string{
 		seedPath,
-		filepath.Join(seedPath, "memory"),
-		filepath.Join(seedPath, "logs"),
+		seedLayout.StoreDocuments(),
+		seedLayout.Cache(),
+		seedLayout.Runtime(),
 	}
 
 	for _, dir := range dirs {

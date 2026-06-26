@@ -76,6 +76,19 @@ func GetWithParams(key string, params map[string]interface{}) string {
 	return msg
 }
 
+// GetForLocaleWithParams 按指定语言获取带参数的翻译，不改变全局语言状态。
+func GetForLocaleWithParams(lang, key string, params map[string]interface{}) string {
+	loc := newLocalizer(lang)
+	msg, err := loc.Localize(&i18n.LocalizeConfig{
+		MessageID:    key,
+		TemplateData: params,
+	})
+	if err != nil {
+		return key
+	}
+	return msg
+}
+
 func ensureLocalizer(lang string) *i18n.Localizer {
 	mu.RLock()
 	loc := localizer

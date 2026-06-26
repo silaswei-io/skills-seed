@@ -5,7 +5,27 @@
 **置信度**: {{printf "%.2f" .Confidence}}%
 **最后更新**: {{.LastUpdated}}
 
-{{.GroupSummary}}
+{{.GroupSummary.Description}}
+
+## 需求匹配
+
+{{if .GroupSummary.IsFallback}}当需求涉及业务规则、状态变化、运行期行为或跨模块流程，但无法从需求词或路径匹配到稳定子域时，读取本页。{{else}}当需求提到 {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}，出现同义业务动作、状态变化、规则策略、入口渠道或外部依赖，或改动路径位于 {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}本子域相关代码{{end}} 时，优先读取本页。{{end}}
+
+{{if .GroupLocations}}
+## 代码证据入口
+
+{{range .GroupLocations}}
+- `{{.Path}}`{{if .Symbol}} - {{.Symbol}}{{end}}{{if .Description}}：{{.Description}}{{end}}{{if .Confidence}}（置信度 {{printf "%.2f" (mul .Confidence 100)}}%）{{end}}
+{{end}}
+{{end}}
+
+{{if .GroupSignals}}
+## 相关信号
+
+{{range .GroupSignals}}
+- {{.}}
+{{end}}
+{{end}}
 
 {{if .PatternObjects}}
 ## 详细模式
@@ -18,6 +38,8 @@
 **描述**: {{.Description}}
 
 **规则**: {{.Rule}}
+
+**定位提示**: 如果需求中的业务说法、同义动作、状态变化、入口渠道或异常现象与上方描述/规则匹配，先按本模式的证据路径定位代码，再确认当前实现。
 
 **证据**: 置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，来源 {{.Source}}
 

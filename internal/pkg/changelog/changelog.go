@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
 const fileName = "change-log.json"
@@ -112,7 +113,7 @@ func Recent(seedPath string, limit int) ([]Entry, error) {
 
 // Path 返回变更记录文件路径。
 func Path(seedPath string) string {
-	return filepath.Join(seedPath, "memory", fileName)
+	return layout.New(seedPath).ChangeLog()
 }
 
 type file struct {

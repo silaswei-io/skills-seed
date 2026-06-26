@@ -13,22 +13,23 @@ description: {{.SkillDescription}}
 **已学习模式**: {{.PatternCount}}
 **平均置信度**: {{printf "%.2f" .AvgConfidence}}%
 
----
+这是项目入口 skill，只负责判断任务应读取哪些项目参考、确认约束来源和选择验证命令。业务规则、架构细节、代码证据和示例必须进入对应 references 后再决策。
 
 ## 使用方式
 
-按任务读取最小必要参考：
-{{if .References.Enabled}}{{if .References.BusinessMethods}}- 改业务流程或复用项目方法：读 [强业务方法](./references/business-methods.md)，再读相关分类模式
-{{else if .References.BusinessPatterns}}- 改业务流程：读相关业务模式详情，再回到当前代码确认
-{{else}}- 改业务流程：直接检查当前代码，并复用附近已有实现
-{{end}}- 新增或调整接口、合约、适配层或派生产物：读 [项目规范](./references/project-spec.md) 和结构/API 模式
-{{if .References.KeyModules}}- 调整架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md) 和 [关键模块](./references/modules.md)
-{{else}}- 调整架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md)
-{{end}}- 改工具、配置、中间件或并发逻辑：只读对应分类模式
-{{else}}- 本次生成未写入 references；直接读取当前代码，并优先沿用附近已有实现
+1. 先按任务类型读取最小必要参考；不要一次性读取所有 references。
+{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. 业务规则、状态流转或跨实体流程：先读 [业务模式地图](./references/patterns/business.md)，再进入命中的业务详情页。
+{{else}}2. 业务规则、状态流转或跨实体流程：先检查当前代码，复用附近已有实现。
+{{end}}{{if .References.BusinessMethods}}3. 需要复用项目级业务入口、跨模块编排入口或工具入口时，再读 [入口方法索引](./references/business-methods.md)。
+{{else}}3. 需要复用项目级入口时，直接从当前代码和模块入口确认。
+{{end}}4. API、合约、适配层、派生产物或配置约定：读 [项目规范](./references/project-spec.md) 和相关分类模式。
+{{if .References.KeyModules}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md) 和 [关键模块](./references/modules.md)。
+{{else}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md)。
+{{end}}6. 工具、配置、中间件、并发或测试：只读对应分类模式。
+{{else}}2. 本次生成未写入 references；直接读取当前代码，并优先沿用附近已有实现。
 {{end}}
 
-优先沿用当前代码和有代码证据的高置信度项目模式；中等置信度或缺少代码证据的模式只作为参考观察。缺少依据时明确说明缺口，不要编造产品规则或实现细节。
+只有带代码证据的高置信度模式可作为硬约束。references 与当前代码冲突时，以当前代码为准；缺少依据时说明缺口，不要补造产品规则。
 
 ---
 
@@ -111,7 +112,7 @@ description: {{.SkillDescription}}
 ## 项目规则
 
 - 引入新模式或抽象前，先检查附近已有代码
-- 如果参考中已有项目特定业务方法或工具方法，优先复用
+- 如果参考中已有项目特定入口方法或工具方法，优先复用
 {{if .References.ProjectSpec}}- 派生产物、接口模型、适配层和配置约定以 [项目规范](./references/project-spec.md) 为准{{else}}- 派生产物、接口模型、适配层和配置约定以当前代码和项目配置为准{{end}}
 - 只有带代码证据的 pattern 规则可视为硬约束；参考观察不能覆盖当前代码行为
 - references 与实际代码不一致时，以当前代码为准

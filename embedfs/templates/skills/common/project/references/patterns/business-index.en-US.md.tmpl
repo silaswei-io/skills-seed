@@ -1,4 +1,4 @@
-# business Pattern Index
+# Business Pattern Map
 
 **Pattern Count**: {{.PatternCount}}
 **Confidence**: {{printf "%.2f" .Confidence}}%
@@ -6,12 +6,22 @@
 
 {{if .Summary}}{{.Summary}}{{end}}
 
-## How To Read
+## Route A New Request
 
-Choose the most relevant domain detail file below for the task; do not read every business detail file by default.
+Match the request's business nouns, user actions, state changes, rules or policies, entry channels, external dependencies, exception symptoms, or changed file paths to the domains below. Do not match only by package names or technical abbreviations. Read only the most relevant detail file first, then confirm behavior against current code.
 
 {{range .Groups}}
-- **[{{.Title}}]({{.Path}})** - {{.Description}} ({{len .Patterns}} patterns)
+- **[{{.Title}}]({{.Path}})** - {{.Summary.Description}} ({{len .Patterns}} patterns)
+  - When to read: {{if .Summary.IsFallback}}Read when the task cannot be mapped to a specific domain but changes business rules, state transitions, runtime behavior, or cross-module flows.{{else}}Read when the task mentions {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}, uses synonymous business actions or state changes, or changes code under {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}}.{{end}}
+  {{if .Summary.PrimaryPath}}- Primary evidence path: `{{.Summary.PrimaryPath}}`{{end}}
+  {{if .Summary.Keywords}}- Keywords: {{range .Summary.Keywords}}`{{.}}` {{end}}{{end}}
+{{end}}
+
+## Domain Overview
+
+| Domain | Patterns | Primary Path | Keywords |
+|---|---:|---|---|
+{{range .Groups}}| [{{.Title}}]({{.Path}}) | {{len .Patterns}} | {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}-{{end}} | {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}-{{end}} |
 {{end}}
 
 {{if .UsageScenes}}

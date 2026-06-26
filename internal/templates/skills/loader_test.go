@@ -51,7 +51,7 @@ func TestLoader_Render(t *testing.T) {
 			"为外部调用补充超时测试",
 		},
 		"OverviewReferences": []ReferenceItem{
-			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
+			{Title: "业务方法", Path: "./references/business-methods.md", Description: "项目级业务入口和可复用方法索引"},
 		},
 		"Workflows": []map[string]interface{}{
 			{
@@ -92,7 +92,8 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "10")
 	assert.Contains(t, content, "generated-by: skills-seed v0.0.1")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
-	assert.Contains(t, content, "按任务读取最小必要参考")
+	assert.Contains(t, content, "项目入口 skill")
+	assert.Contains(t, content, "业务模式地图")
 	assert.Contains(t, content, "常用工作流")
 	assert.Contains(t, content, "部署工作流")
 	assert.Contains(t, content, "task verify")
@@ -147,7 +148,7 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.NotEmpty(t, content)
 	assert.Contains(t, content, "test-project")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
-	assert.Contains(t, content, "Read the smallest relevant reference set")
+	assert.Contains(t, content, "project entry skill")
 	assert.Contains(t, content, "Common Workflows")
 	assert.Contains(t, content, "task verify")
 	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
@@ -305,6 +306,100 @@ func TestLoader_RenderReferencesUseConfiguredCodeFenceLanguage(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, content, "```typescript")
 	require.NotContains(t, content, "```go")
+}
+
+func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing.T) {
+	tests := []struct {
+		locale       string
+		indexChecks  []string
+		detailChecks []string
+	}{
+		{
+			locale: "zh-CN",
+			indexChecks: []string{
+				"用户动作",
+				"规则策略",
+				"不要只按代码包名或技术缩写匹配",
+				"同义业务动作/状态变化",
+			},
+			detailChecks: []string{
+				"同义业务动作",
+				"入口渠道或外部依赖",
+				"定位提示",
+				"先按本模式的证据路径定位代码",
+			},
+		},
+		{
+			locale: "en-US",
+			indexChecks: []string{
+				"user actions",
+				"rules or policies",
+				"Do not match only by package names or technical abbreviations",
+				"synonymous business actions or state changes",
+			},
+			detailChecks: []string{
+				"synonymous business actions",
+				"entry channels, or external dependencies",
+				"Routing Hint",
+				"locate code through this pattern's evidence path first",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale, func(t *testing.T) {
+			loader := NewLoader(tt.locale)
+			pattern := domain.NewPattern("resource-approval", "资源审批策略", domain.CategoryBusiness)
+			pattern.Description = "需求提到审批、通过、拒绝或待处理状态时读取 internal/service/resource.go"
+			pattern.Rule = "调整资源审批时先检查状态流转和外部依赖回调。"
+
+			data := map[string]interface{}{
+				"PatternCount":      1,
+				"Confidence":        90.0,
+				"LastUpdated":       "2026-06-26 00:00:00",
+				"Summary":           "",
+				"UsageScenes":       []string{},
+				"Category":          "business",
+				"CodeFenceLanguage": "go",
+				"Groups": []map[string]interface{}{
+					{
+						"ID":    "resource",
+						"Title": "Resource",
+						"Path":  "./business/resource.md",
+						"Summary": map[string]interface{}{
+							"Description": "资源业务规则",
+							"Keywords":    []string{"审批", "状态"},
+							"PrimaryPath": "internal/service/resource.go",
+							"IsFallback":  false,
+						},
+						"Patterns": []domain.Pattern{*pattern},
+					},
+				},
+				"GroupTitle": "Resource",
+				"GroupSummary": map[string]interface{}{
+					"Description": "资源业务规则",
+					"Keywords":    []string{"审批", "状态"},
+					"PrimaryPath": "internal/service/resource.go",
+					"IsFallback":  false,
+				},
+				"GroupLocations": []interface{}{},
+				"GroupSignals":   []string{},
+				"PatternObjects": []domain.Pattern{*pattern},
+			}
+
+			index, err := loader.RenderRelative("project/references/patterns/business-index", data)
+			require.NoError(t, err)
+			for _, text := range tt.indexChecks {
+				require.Contains(t, index, text)
+			}
+
+			detail, err := loader.RenderRelative("project/references/patterns/business-detail", data)
+			require.NoError(t, err)
+			for _, text := range tt.detailChecks {
+				require.Contains(t, detail, text)
+			}
+		})
+	}
 }
 
 func TestLoader_RenderPatternFallsBackToDefaultTemplate(t *testing.T) {

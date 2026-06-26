@@ -78,6 +78,13 @@ func TestExtractJSON_JSONWithTextBefore(t *testing.T) {
 	assert.JSONEq(t, `{"key": 1}`, result)
 }
 
+func TestExtractJSON_PrefersStructuredResultObjectAfterCodeLikePrefix(t *testing.T) {
+	input := `分析完成：func Demo() { return nil } {"patterns":[{"id":"p1","name":"Pattern"}]}`
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"id":"p1","name":"Pattern"}]}`, result)
+}
+
 func TestExtractJSON_JSONWithTextAfter(t *testing.T) {
 	input := `{"key": 1} some text`
 	result, err := ExtractJSON(input)
@@ -277,13 +284,20 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
       "returns": "error"
     }
   }],
-  "category_summaries": {
-    "business": {"summary": "business workflows", "patterns": ["Business Run"], "priority": 5}
+  "profile_delta": {
+    "summary": "demo project",
+    "business_methods": [{
+      "name": "Run",
+      "code_location": {"current_location":"internal/service/demo.go:10"},
+      "description": "runs demo workflow",
+      "usage": "demo flow",
+      "type": "domain",
+      "function": "func Run() error",
+      "prerequisites": "config loaded",
+      "returns": "error"
+    }]
   },
-  "business_rules": ["validate before run"],
-  "best_practices": ["wrap errors"],
-  "common_patterns": ["service orchestration"],
-  "summary": "demo project"
+  "profile_refresh_recommended": {"needed": false}
 }`
 
 	result, err := ParseAnalyzeCurrentCodebaseResult(output)
@@ -293,6 +307,8 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
 	assert.Equal(t, "internal/service/demo.go:10", result.Patterns[0].BusinessMethod.DisplayLocation())
 	assert.Equal(t, "config loaded", result.Patterns[0].BusinessMethod.Prerequisites)
 	assert.Equal(t, "error", result.Patterns[0].BusinessMethod.Returns)
+	assert.Equal(t, "demo project", result.ProfileDelta.Summary)
+	assert.Len(t, result.ProfileDelta.BusinessMethods, 1)
 }
 
 func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
@@ -319,13 +335,8 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
     ],
     "business_method": null
   }],
-  "category_summaries": {
-    "error": {"summary": "error wrapping", "patterns": ["Error Wrap"], "priority": 4}
-  },
-  "business_rules": [],
-  "best_practices": [],
-  "common_patterns": [],
-  "summary": "demo project"
+  "profile_delta": {},
+  "profile_refresh_recommended": {"needed": false}
 }`
 
 	result, err := ParseAnalyzeCurrentCodebaseResult(output)

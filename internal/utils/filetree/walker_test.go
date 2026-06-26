@@ -25,7 +25,7 @@ func TestWalkReturnsRelativeFilesAndFiltersExcludedPaths(t *testing.T) {
 
 func TestWalkSkipsDotPrefixedExcludedDirectories(t *testing.T) {
 	root := t.TempDir()
-	writeWalkFile(t, root, ".skills-seed/memory/runtime/input.txt", "runtime\n")
+	writeWalkFile(t, root, ".skills-seed/runtime/input.txt", "runtime\n")
 	writeWalkFile(t, root, "internal/service.go", "package internal\n")
 
 	files, err := Walk(root, []string{".*"})

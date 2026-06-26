@@ -7,16 +7,18 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
-// Repository 将完整文件快照保存到 .skills-seed/memory/snapshots 下。
+// Repository 将完整文件快照保存到 .skills-seed/cache/snapshots 下。
 type Repository struct {
 	dir string
 }
 
 // NewRepository 创建以 seedPath 为根的快照仓储。
 func NewRepository(seedPath string) *Repository {
-	return &Repository{dir: filepath.Join(seedPath, "memory", "snapshots")}
+	return &Repository{dir: layout.New(seedPath).Snapshots()}
 }
 
 // Load 读取所有快照，返回“路径 -> 内容”；快照目录不存在时返回空集合。

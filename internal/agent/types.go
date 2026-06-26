@@ -290,12 +290,31 @@ func (r *AnalyzeCurrentCodebaseRequest) AllowedCategories() string {
 
 // AnalyzeCurrentCodebaseResult 分析当前代码库结果
 type AnalyzeCurrentCodebaseResult struct {
-	Patterns          []domain.Pattern           // 提取的编码模式
-	CategorySummaries map[string]CategorySummary // 按分类的汇总内容
-	BusinessRules     []string                   // 业务规则
-	BestPractices     []string                   // 最佳实践
-	CommonPatterns    []string                   // 通用模式
-	Summary           string                     // 总结
+	Patterns                  []domain.Pattern             // 提取的候选模式
+	ProfileDelta              domain.ProjectProfileDelta   // 本次代码证据明确改变的项目画像增量
+	ProfileRefreshRecommended ProfileRefreshRecommendation // 是否建议执行完整项目画像刷新
+}
+
+// PlanAnalysisUnitsRequest 请求按业务能力拆分当前待学习文件。
+type PlanAnalysisUnitsRequest struct {
+	ProjectName           string
+	RootPath              string
+	Language              string
+	FocusPaths            []string
+	StructuralContext     string // tree-sitter 结构化分析上下文
+	StructuralContextPath string // tree-sitter 结构化分析上下文文件路径
+	UserContext           string
+}
+
+// PlanAnalysisUnitsResult 是 AI 生成的业务分析单元计划。
+type PlanAnalysisUnitsResult struct {
+	Units []domain.AnalysisUnit `json:"units"`
+}
+
+// ProfileRefreshRecommendation 描述是否需要额外刷新完整项目画像。
+type ProfileRefreshRecommendation struct {
+	Needed bool   `json:"needed"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // AnalyzeWorkspaceProfileRequest 请求生成工作区事实画像
@@ -367,6 +386,7 @@ type FileSelector interface {
 // ProjectAnalyzer 项目分析接口
 type ProjectAnalyzer interface {
 	AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
+	PlanAnalysisUnits(ctx context.Context, req *PlanAnalysisUnitsRequest) (*PlanAnalysisUnitsResult, error)
 	AnalyzeCurrentCodebase(ctx context.Context, req *AnalyzeCurrentCodebaseRequest) (*AnalyzeCurrentCodebaseResult, error)
 	AnalyzeWorkspaceProfile(ctx context.Context, req *AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpec(ctx context.Context, req *AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)

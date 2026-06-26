@@ -69,7 +69,7 @@ skills:
 
 logging:
   level: "DEBUG"
-  logs_path: "logs"
+  logs_path: "runtime/logs"
   max_log_files: 30
 
 exclude:
@@ -196,11 +196,11 @@ exclude:
 
 Prompt 片段仍从 `.skills-seed/prompts/` 读取，但 0.7.1 起渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的约束。
 
-渲染后的 prompt 默认保存在 `.skills-seed/memory/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、项目画像、项目补充、workspace 补充、用户指令和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。0.9.13 起，最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象。
+渲染后的 prompt 默认保存在 `.skills-seed/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、项目画像、项目补充、workspace 补充、用户指令和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。0.9.13 起，最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象。
 
-0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。
+0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。
 
-0.9.6 起，`.skills-seed/memory/runtime` 下的调试记录统一使用 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` 文件名前缀。`rendered-prompts/`、`agent-outputs/` 以及运行时输入临时目录都会以时间开头，方便把同一次运行中的上下文、输出和临时输入按时间顺序关联起来。
+0.9.6 起，`.skills-seed/runtime` 下的调试记录统一使用 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` 文件名前缀。`rendered-prompts/`、`agent-outputs/` 以及运行时输入临时目录都会以时间开头，方便把同一次运行中的上下文、输出和临时输入按时间顺序关联起来。
 
 0.9.0 起，模式库入库前会渲染 `pattern-curate` prompt，让 AI 对候选模式和相关历史模式做去重、整合、丢弃和输出前自检。`generate skills` 不再执行模式合并，因此生成阶段的 prompt 只负责摘要和产物生成。
 
@@ -291,6 +291,20 @@ skills-seed learn history --limit 100 --batch-size 10
 
 命令参数只影响本次执行，不会改写配置文件。
 
+### `.skills-seed` 目录结构
+
+`.skills-seed/store/` 是持久化数据目录，不应删除；`.skills-seed/cache/` 是可重建缓存；`.skills-seed/runtime/` 只保存日志、渲染 prompt、Agent 输出和临时输入等运行时产物，可以在不需要排障时删除。
+
+| 路径 | 作用 |
+|---|---|
+| `.skills-seed/store/project.db` | patterns、命中统计、文件指纹、评审等索引数据 |
+| `.skills-seed/store/documents/` | 画像、规范、状态和变更记录等可读 JSON 文档 |
+| `.skills-seed/cache/snapshots/` | 可重建的文件快照缓存 |
+| `.skills-seed/cache/analysis/current/plan.json` | 未完成 `learn current` 的业务分析单元计划，可删除，删除后会重新规划 |
+| `.skills-seed/runtime/logs/` | 运行日志 |
+| `.skills-seed/runtime/rendered-prompts/` | 渲染后的 prompt 和 manifest |
+| `.skills-seed/runtime/agent-outputs/` | Agent 输出归档 |
+
 ### `.skills-seed/prompts/`
 
 `.skills-seed/prompts/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑运行时提示词片段。它用于长期生效的项目说明、workspace 约束和用户补充指令。
@@ -350,7 +364,7 @@ skills-seed learn history --limit 100 --batch-size 10
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `level` | `DEBUG` | 日志级别：`DEBUG`、`INFO`、`WARN`、`ERROR` |
-| `logs_path` | `logs` | 日志目录，相对 `.skills-seed` |
+| `logs_path` | `runtime/logs` | 日志目录，相对 `.skills-seed` |
 | `max_log_files` | `30` | 最多保留的日志文件数量，超过后自动清理旧日志 |
 
 ### `exclude`

@@ -10,6 +10,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
@@ -49,14 +50,14 @@ type AgentOutputArchiveOptions struct {
 	TokenUsageKnown bool
 }
 
-// SaveAgentOutputForContext 把 Agent 输出保存到当前项目 .skills-seed/memory/runtime/agent-outputs。
+// SaveAgentOutputForContext 把 Agent 输出保存到当前项目 .skills-seed/runtime/agent-outputs。
 func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptions) AgentOutputArchive {
 	seedPath := runtimecontext.SeedPath(ctx)
 	if strings.TrimSpace(seedPath) == "" {
 		return AgentOutputArchive{}
 	}
 
-	dir := filepath.Join(seedPath, "memory", "runtime", "agent-outputs")
+	dir := layout.New(seedPath).Runtime("agent-outputs")
 	if config.DefaultAutoDeleteAgentOutputs {
 		if err := os.RemoveAll(dir); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),

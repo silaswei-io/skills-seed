@@ -18,6 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
@@ -269,7 +270,7 @@ func openWorkspaceChildPatternRepo(cont *container.Container, projectID string) 
 	}
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
 	childRoot := filepath.Join(projectRoot, filepath.FromSlash(project.Path))
-	return boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "memory", "project.db"))
+	return boltdb.NewPatternRepository(layout.New(filepath.Join(childRoot, ".skills-seed")).ProjectDB())
 }
 
 func workspaceProjectByID(projects []config.WorkspaceProjectConfig, projectID string) (config.WorkspaceProjectConfig, bool) {

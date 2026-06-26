@@ -16,8 +16,9 @@ import (
 )
 
 var projectPromptNames = []string{
-	"skill-project-init",
-	"project-analyze",
+	"analysis-plan",
+	"pattern-learn-current",
+	"project-profile",
 	"learn-analyze",
 	"learn-batch",
 	"fix-generate",
@@ -26,6 +27,8 @@ var projectPromptNames = []string{
 
 var deprecatedProjectInstructionNames = []string{
 	"skill-project-summary",
+	"skill-project-init",
+	"project-analyze",
 }
 
 var workspacePromptNames = []string{

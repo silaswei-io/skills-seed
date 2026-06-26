@@ -1,5 +1,7 @@
 You are a code pattern extractor. Analyze these Git commits and extract patterns.
 
+This template is responsible only for pattern learning from commit history. Only output executable, reusable, verifiable patterns; do not output project profiles, project initialization results, or profile deltas.
+
 # Changes to Analyze
 
 {{if .CommitFiles}}
@@ -31,14 +33,15 @@ Reading scope control:
 
 # Pattern Types to Extract
 
-## 1. Strong Business Methods (only for real domain logic)
+## 1. Business/Utility Entry Points (only for real reusable entry points)
 
 Prioritize extracting methods with **complex business logic**:
 
 - **Business rule methods**: Validation rules, calculation logic, state transitions, approval processes
 - **Cross-entity operations**: Business operations involving multiple domain entities
 - **Workflow methods**: Multi-step business processes, state machine implementations
-- **Special handling**: Encryption/decryption, signature verification, authorization, data transformation
+- **Special handling**: authorization checks, data transformations, protocol/command wrappers, external calls, resource validation, or other project-specific handling
+- **Domain operations**: core operations, resource lifecycles, policy execution, external-system interactions, or runtime behavior in the project's domain. Treat them as domain-entry candidates when they determine product behavior, operation order, authorization boundaries, state changes, or error semantics.
 
 **Don't extract**: Simple CRUD (GetByID, Save, Delete, Create)
 
@@ -54,17 +57,31 @@ Before returning JSON, complete these steps internally:
    - Analyze each commit message, changed file, and visible code evidence.
    - Prioritize added or modified methods in entry, orchestration, domain, data access, external dependency, task, message handling, and utility modules.
    - Treat methods, flows, rules, state changes, cross-module calls, external calls, data transformations, and exceptional branches with business meaning as candidates.
+   - Build a **source business vocabulary**: extract the project's own business nouns, business verbs, state/phase terms, rule/policy terms, config names, error codes, task/event names, external dependency names, and core function names from changed paths, APIs, entities, and source code. Use this vocabulary only for internal reasoning; do not output it separately.
+   - Build a **business coverage matrix**: resources/entities, operations/capabilities, states/phases, policies/rules, external dependencies, entry channels, exceptions/compensation, and background/async/periodic flows. For every code-backed cell in the files you read, try to emit a routeable pattern or merge it into a related pattern.
+   - Build a **business subdomain overview** first: infer business subdomains from entities, APIs, plugin/module responsibilities, external dependencies, tasks/events/schedules, state names, config names, and domain terms, then look for rules and flows under each subdomain. Business subdomains must come from the project's own source vocabulary and code evidence; do not use generic wording from this template as domain answers.
+   - For every business subdomain with evidence, keep patterns that help future requests route to code. Skip a subdomain only when there is no evidence of rules, workflows, state changes, external calls, or domain data transformation.
 
 2. Perform **business pattern expansion**:
    - Do not output only one broad pattern for a business method.
    - Split code-backed details into reusable patterns such as request validation, business state progression, cross-repository transaction orchestration, external system calls, failure compensation/fallback, business error mapping, or domain data transformation.
+   - Perform **domain-operation extraction**: if the project has rule-constrained workflows, resource lifecycles, external dependency protocols, policy decisions, runtime actions, or strong business invariants, do not automatically classify code under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper as `utils`. If a method carries domain semantics, continue judging whether it forms a business pattern or `business_method`.
+   - Prioritize domain verbs and nouns that recur in source code or determine product behavior, such as create, change, revoke, validate, sync, import, export, calculate, transform, schedule, execute, roll back, or report. These are only discovery dimensions; the actual domain vocabulary must come from project code.
+   - If an external dependency, SDK, RPC, command, or protocol call determines business operation order, request format, authorization boundary, state changes, retry/fallback behavior, or error mapping, extract it as a business domain-operation pattern. Do not demote it to a generic utility solely because it is an external-client call.
    - **Do not compress multiple business details into one generic pattern**. If a method contains both domain rules and technical conventions, domain rules may be `business`, while transactions, queries, routing, error wrapping, config loading, and middleware chains must use their specific categories.
+   - **Do not output only top-level flows**. If "create resource" contains index validation, type dispatch, credential handling, external-dependency calls, and operation-record semantics, split those into routeable patterns instead of emitting only one "resource creation flow".
    - Prefer specific categories: business is not the default category. Do not force a business pattern for every candidate.
    - Keep business patterns only for domain rules, state transitions, cross-entity orchestration, and real business workflows. Pure technical conventions do not become business patterns just because they appear in entry or orchestration code.
+   - Keep patterns cohesive: one pattern expresses one actionable rule. Do not mix state validation, transaction boundaries, external calls, error mapping, and data transformation into one pattern.
+   - Keep patterns loosely coupled: the same code block may produce business, database, error, api, or other category patterns, but each pattern must have its own rule and evidence.
 
 3. Enrich every business pattern:
    - `description` must explain the business scenario, trigger, core steps, and boundary.
    - `rule` must be an actionable team convention covering when to use it, ordering requirements, and error handling requirements.
+   - Include routing signals: entity, state, flow, API, event, external dependency, key symbol, or file path so generated skills can place it in the business pattern overview.
+   - A business pattern's `name`, `description`, and `rule` must prefer business language that requesters would use. You may append code symbols, paths, or technical terms afterward. Do not name business patterns only with package names, technical abbreviations, utility names, low-level protocol names, or folder names.
+   - Include **request routing terms** for every business pattern: likely user-facing business phrases, synonyms, state/action terms, entry channels, and code evidence paths must appear in `description` or `rule`. Generated skills use these words to route future requests to the right detail page.
+   - Identify **non-API business entries**: tasks, events, schedules, initialization, registration, custom hooks, adapters, client wrappers, config-driven branches, batch jobs, and runtime guard flows. When they carry product behavior, analyze them as business candidates.
    - `good_example` must use code evidence copied verbatim from source you read, preferably the 5-30 lines that best show the business rule. Do not complete, rewrite, synthesize, or invent code, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering.
    - `business_method.description` must explain the full business intent, not just repeat the function name.
    - `business_method.prerequisites` and `returns` must describe setup, dependencies, return values, and error semantics.
@@ -73,6 +90,9 @@ Before returning JSON, complete these steps internally:
    - Extract only from commit and code evidence. Do not invent business behavior.
    - Do not drop new details just because a similar pattern already exists. If this commit adds a new branch, state, error, or call scenario, output it as a new pattern or significant improvement.
    - Do not treat low-value CRUD, plain field assignment, or pure forwarding as business patterns unless they participate in a larger business flow.
+   - Check the business coverage matrix; do not output only API, database, error-handling, or structure patterns.
+   - Check for missed non-request-entry flows such as runtime, async, event, task, initialization, config-driven, or external-dependency-driven behavior.
+   - Check that business pattern names and descriptions let someone who does not know package names route a request to the detail page and evidence path.
 
 ## 2. Database Operation Patterns ⭐⭐
 
@@ -122,7 +142,7 @@ Allowed categories: {{.AllowedCategories}}
 
 Extract patterns in these categories:
 - **business**: Domain rules, state transitions, cross-entity orchestration, business workflows
-- **utils**: Helper functions, utilities, tools with full signatures
+- **utils**: Domain-neutral helper functions, utilities, and tools with full signatures; do not classify domain operations, protocol/command wrappers, or external dependency interactions that carry product-domain behavior as utils solely because they live in a helper package
 - **api**: Interface entries and input/output formats
 - **database**: Queries, transactions, data access patterns
 - **error**: Error handling, wrapping, logging
@@ -157,6 +177,7 @@ For EACH pattern, you MUST provide:
     - **kind**: Evidence type such as "function", "method", "type", or "file"
     - **description**: How this location supports the pattern
     - **confidence**: Evidence-location confidence, 0.0 to 1.0
+    - business patterns must prioritize path and symbol; missing these fields makes the generated business overview less useful for routing
 11. **business_method**: For utility/business methods ONLY:
     - **name**: Full method signature or code identifier
     - **location**: "relative/file/path:line"
@@ -235,7 +256,7 @@ For EACH pattern, you MUST provide:
 2. Every pattern MUST have `good_example` with code evidence copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, or invent code; if surrounding context must be omitted, mark it explicitly with `// ...`, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering
 3. Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Do not invent evidence paths or line numbers; if the exact line is unknown, provide only the real path.
 4. Use `business_method` ONLY for utility/business methods
-5. **Choose the most specific category first**: database, API, error, config, middleware, structure, and utility patterns must not be labeled business. Skip simple CRUD.
+5. **Choose the most specific category first**: database, API, error, config, middleware, structure, and domain-neutral utility patterns must not be labeled business. Domain-specific operations, resource lifecycles, protocol/command wrappers, or external dependency interactions confirmed by the project's source vocabulary are not domain-neutral utilities. Skip simple CRUD.
 6. Keep `bad_example` empty if not applicable
 7. Code evidence must be syntactically correct. If it is only an excerpt, mark omitted context with `// ...` and do not present it as a complete implementation
 
@@ -245,6 +266,7 @@ Before returning JSON, validate every candidate pattern internally:
 1. Evidence check:
    - `good_example` must be copied verbatim from source code read during this task.
    - `good_example` must be 5-30 lines unless the complete relevant function is shorter.
+   - `good_example` must not copy a full long function. Prefer the 5-12 lines that best prove the rule. Use `description`, `rule`, and multiple `evidence_locations` for complex flows.
    - `evidence_locations` must come from real files read during this task. Include a 1-based line number only when known; otherwise provide only the real path.
    - Do not invent code, paths, signatures, line numbers, or behavior.
    - Do not invent evidence paths or line numbers. Lower confidence or drop the candidate when evidence is insufficient.

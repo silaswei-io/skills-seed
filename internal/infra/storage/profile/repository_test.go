@@ -55,7 +55,7 @@ func TestRepository_SaveAndGetForProject(t *testing.T) {
 	assert.Equal(t, "backend", got.ProjectName)
 	assert.Equal(t, "go", got.Language)
 
-	data, err := os.ReadFile(filepath.Join(seedPath, "memory", "projects", "backend", "project-profile.json"))
+	data, err := os.ReadFile(filepath.Join(seedPath, "store", "documents", "projects", "backend", "project-profile.json"))
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "\n  \"project_name\": \"backend\"")
 	assert.Equal(t, byte('\n'), data[len(data)-1])

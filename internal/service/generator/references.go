@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -97,7 +98,7 @@ func categoryReferenceGroups(patterns []domain.Pattern, locale string) []skills.
 			for _, businessGroup := range businessPatternGroups(locale, businessPatterns(patterns)) {
 				group.Items = append(group.Items, skills.ReferenceItem{
 					Title:       businessGroup.Title,
-					Description: businessGroup.Description,
+					Description: businessGroup.Summary.Description,
 					Path:        "./references/patterns/business/" + businessGroup.ID + ".md",
 				})
 			}
@@ -204,8 +205,8 @@ func profileReferenceItems(profile *domain.ProjectProfile, locale, prefix string
 	items := make([]skills.ReferenceItem, 0, 3)
 	if len(profile.BusinessMethods) > 0 {
 		items = append(items, skills.ReferenceItem{
-			Title:       localizedText(locale, "强业务方法", "Business Methods"),
-			Description: localizedText(locale, "复杂业务逻辑方法完整清单", "Full list of complex business logic methods"),
+			Title:       localizedText(locale, "入口方法索引", "Entry Method Index"),
+			Description: localizedText(locale, "项目级业务入口、跨模块编排入口和高价值工具入口索引", "Project-level business, cross-module orchestration, and high-value utility entry points"),
 			Path:        prefix + "business-methods.md",
 		})
 	}
@@ -252,6 +253,70 @@ func businessPatterns(patterns []domain.Pattern) []domain.Pattern {
 
 func cleanProjectProfile(profile *domain.ProjectProfile) *domain.ProjectProfile {
 	return domain.CleanProjectProfile(profile)
+}
+
+func profileForSkillTemplates(profile *domain.ProjectProfile, patterns []domain.Pattern) *domain.ProjectProfile {
+	if profile == nil {
+		return nil
+	}
+	filtered := *profile
+	filtered.CommonUtils = filterCommonUtilsCoveredByBusinessPatterns(profile.CommonUtils, patterns)
+	return &filtered
+}
+
+func filterCommonUtilsCoveredByBusinessPatterns(utils []domain.UtilityFunction, patterns []domain.Pattern) []domain.UtilityFunction {
+	if len(utils) == 0 || len(patterns) == 0 {
+		return utils
+	}
+	covered := businessPatternEvidenceIndex(patterns)
+	if len(covered) == 0 {
+		return utils
+	}
+	out := make([]domain.UtilityFunction, 0, len(utils))
+	for _, utility := range utils {
+		if covered[normalizeReferencePath(utility.File)] {
+			continue
+		}
+		if covered[normalizeReferencePath(utility.Signature)] {
+			continue
+		}
+		out = append(out, utility)
+	}
+	return out
+}
+
+func businessPatternEvidenceIndex(patterns []domain.Pattern) map[string]bool {
+	covered := map[string]bool{}
+	for _, pattern := range patterns {
+		if pattern.Category != domain.CategoryBusiness {
+			continue
+		}
+		for _, location := range pattern.EvidenceLocations {
+			if key := normalizeReferencePath(location.Path); key != "" {
+				covered[key] = true
+			}
+		}
+		if pattern.BusinessMethod != nil {
+			if key := normalizeReferencePath(pattern.BusinessMethod.Function); key != "" {
+				covered[key] = true
+			}
+			if key := normalizeReferencePath(pattern.BusinessMethod.DisplayLocation()); key != "" {
+				covered[key] = true
+			}
+		}
+	}
+	return covered
+}
+
+func normalizeReferencePath(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if idx := strings.Index(value, ":"); idx > 0 && strings.Contains(value[:idx], "/") {
+		value = value[:idx]
+	}
+	return strings.ToLower(strings.Trim(filepath.ToSlash(value), "` "))
 }
 
 func localizedText(locale, zhCN, enUS string) string {

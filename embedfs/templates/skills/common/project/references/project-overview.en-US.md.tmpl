@@ -13,7 +13,7 @@
 - [Module Dependencies](#module-dependencies)
 - [Main Frameworks](#main-frameworks)
 - [Key Modules](#key-modules)
-- [Business Methods](#business-methods)
+- [Business Entry Methods](#business-entry-methods)
 - [Common Utilities](#common-utilities)
 - [Configuration Patterns](#configuration-patterns)
 {{if .ValidationCommands}}- [Validation Commands](#validation-commands)
@@ -107,12 +107,12 @@ Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 *Key module information has not been extracted yet*
 {{end}}
 
-## Strong Business Methods
+## Business Entry Methods
 
 {{if .BusinessMethods}}
-{{len .BusinessMethods}} strong business methods were extracted. See [Business Methods](./business-methods.md) for method signatures, prerequisites, and usage scenarios
+{{len .BusinessMethods}} project-level business, cross-module orchestration, or high-value utility entry methods were recorded. See [Entry Method Index](./business-methods.md) for signatures, prerequisites, and usage scenarios. Business rules are governed by the [Business Pattern Map](./patterns/business.md).
 {{else}}
-*Business method information has not been extracted yet*
+*Business entry methods have not been recorded yet*
 {{end}}
 
 ## Common Utilities

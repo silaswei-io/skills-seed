@@ -456,7 +456,7 @@ func seedGenerateChildMemory(t *testing.T, childRoot, patternName string) {
 	ctx := context.Background()
 	seedPath := filepath.Join(childRoot, ".skills-seed")
 
-	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "memory", "project.db"))
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
 	require.NoError(t, err)
 	defer patternRepo.Close()
 

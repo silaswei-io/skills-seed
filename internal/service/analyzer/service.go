@@ -320,12 +320,50 @@ type AnalyzeCurrentCodebaseRequest struct {
 
 // AnalyzeCurrentCodebaseResult 当前代码库分析结果
 type AnalyzeCurrentCodebaseResult struct {
-	Patterns          []domain.Pattern
-	CategorySummaries map[string]agent.CategorySummary
-	BusinessRules     []string
-	BestPractices     []string
-	CommonPatterns    []string
-	Summary           string
+	Patterns                  []domain.Pattern
+	ProfileDelta              domain.ProjectProfileDelta
+	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
+}
+
+// PlanAnalysisUnitsRequest 请求按业务能力规划当前待学习文件。
+type PlanAnalysisUnitsRequest struct {
+	ProjectName       string
+	RootPath          string
+	Language          string
+	FocusPaths        []string
+	StructuralContext string
+	UserContext       string
+}
+
+// PlanAnalysisUnits 按业务能力拆分当前待学习文件。
+func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalysisUnitsRequest) ([]domain.AnalysisUnit, error) {
+	structuralContext := req.StructuralContext
+	if structuralContext == "" {
+		var err error
+		structuralContext, err = s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
+			ProjectName: req.ProjectName,
+			Language:    req.Language,
+			Purpose:     "current codebase analysis planning",
+			FocusPaths:  req.FocusPaths,
+			SeedPaths:   req.FocusPaths,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	agentReq := &agent.PlanAnalysisUnitsRequest{
+		ProjectName:       req.ProjectName,
+		RootPath:          req.RootPath,
+		Language:          req.Language,
+		FocusPaths:        req.FocusPaths,
+		StructuralContext: structuralContext,
+		UserContext:       req.UserContext,
+	}
+	result, err := s.agent.PlanAnalysisUnits(ctx, agentReq)
+	if err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
+	return result.Units, nil
 }
 
 // AnalyzeCurrentCodebase 分析当前代码库
@@ -389,19 +427,14 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		"operation", "analyzer.analyze_current_codebase",
 		"duration", time.Since(startedAt),
 		"patterns_count", len(result.Patterns),
-		"category_summaries_count", len(result.CategorySummaries),
-		"business_rules_count", len(result.BusinessRules),
-		"best_practices_count", len(result.BestPractices),
-		"common_patterns_count", len(result.CommonPatterns),
+		"profile_delta", !result.ProfileDelta.IsZero(),
+		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
 	)
 
 	return &AnalyzeCurrentCodebaseResult{
-		Patterns:          result.Patterns,
-		CategorySummaries: result.CategorySummaries,
-		BusinessRules:     result.BusinessRules,
-		BestPractices:     result.BestPractices,
-		CommonPatterns:    result.CommonPatterns,
-		Summary:           result.Summary,
+		Patterns:                  result.Patterns,
+		ProfileDelta:              result.ProfileDelta,
+		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
 	}, nil
 }
 

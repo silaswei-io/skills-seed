@@ -105,11 +105,11 @@ func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "__skills_seed_missing_claude__")
 	require.NotContains(t, err.Error(), "StructuralContext")
-	require.NotContains(t, err.Error(), "project-analyze prompt")
+	require.NotContains(t, err.Error(), "project-profile prompt")
 }
 
 func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
-	renderErr := fmt.Errorf("template: project-analyze:18:7: missing StructuralContext")
+	renderErr := fmt.Errorf("template: project-profile:18:7: missing StructuralContext")
 	ag := &ClaudeAgent{
 		commandPath:  "__skills_seed_missing_claude__",
 		timeout:      time.Second,
@@ -124,7 +124,7 @@ func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "渲染 project-analyze prompt 失败")
+	require.Contains(t, err.Error(), "渲染 project-profile prompt 失败")
 	require.Contains(t, err.Error(), "template:")
 	require.ErrorIs(t, err, renderErr)
 }

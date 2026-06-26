@@ -139,7 +139,7 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Skills.Paths["claude"])
 	assert.Equal(t, ".agents/skills/skills-seed-skills", cfg.Skills.Paths["codex"])
 	assert.Equal(t, "DEBUG", cfg.Logging.Level)
-	assert.Equal(t, "logs", cfg.Logging.LogsPath)
+	assert.Equal(t, "runtime/logs", cfg.Logging.LogsPath)
 	assert.True(t, cfg.Exclude.GitIgnore)
 	assert.NotEmpty(t, cfg.Project.InitializedAt, "initialized_at should be set")
 }
@@ -270,7 +270,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			"claude": ".claude/skills/skills-seed-skills",
 			"codex":  ".agents/skills/skills-seed-skills",
 		}, Locale: "en-US"},
-		Logging: LoggingConfig{Level: "DEBUG", LogsPath: "logs", MaxLogFiles: 30},
+		Logging: LoggingConfig{Level: "DEBUG", LogsPath: "runtime/logs", MaxLogFiles: 30},
 		Exclude: ExcludeConfig{
 			GitIgnore: true,
 			Paths:     []string{"dist/**", "*.log"},
@@ -415,7 +415,7 @@ skills:
 
 logging:
   level: "DEBUG"
-  logs_path: "logs"
+  logs_path: "runtime/logs"
   max_log_files: 30
 
 exclude:
@@ -797,7 +797,7 @@ func TestRepository_GetLoggingConfig(t *testing.T) {
 	loggingCfg := repo.GetLoggingConfig()
 
 	assert.Equal(t, "DEBUG", loggingCfg.Level)
-	assert.Equal(t, "logs", loggingCfg.LogsPath)
+	assert.Equal(t, "runtime/logs", loggingCfg.LogsPath)
 	assert.Equal(t, 30, loggingCfg.MaxLogFiles)
 }
 

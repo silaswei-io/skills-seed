@@ -279,10 +279,9 @@ func TestAnalyzeCurrentCodebase(t *testing.T) {
 				Patterns: []domain.Pattern{
 					*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
 				},
-				BusinessRules:  []string{"Always wrap errors"},
-				BestPractices:  []string{"Use structured logging"},
-				CommonPatterns: []string{"Repository pattern"},
-				Summary:        "Test codebase summary",
+				ProfileDelta: domain.ProjectProfileDelta{
+					ConfigPatterns: []string{"Always wrap errors"},
+				},
 			}, nil
 		},
 	}
@@ -294,7 +293,7 @@ func TestAnalyzeCurrentCodebase(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, result.Patterns, 1)
-	assert.Contains(t, result.BusinessRules, "Always wrap errors")
+	assert.Contains(t, result.ProfileDelta.ConfigPatterns, "Always wrap errors")
 }
 
 func TestAnalyzeCurrentCodebaseAddsStructuralContext(t *testing.T) {
@@ -394,7 +393,6 @@ func TestAnalyzeCodebaseFull(t *testing.T) {
 				Patterns: []domain.Pattern{
 					*domain.NewPattern("p1", "Test Pattern", domain.CategoryNaming),
 				},
-				Summary: "Extracted patterns",
 			}, nil
 		},
 	}

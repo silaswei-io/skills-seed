@@ -98,7 +98,7 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 `skills-seed init` 会生成 `.skills-seed/prompts/`。这些文件不是用来替换内置 prompt 的完整模板，而是会与内置 prompt 合并，作为项目上下文、workspace 约束或用户补充指令参与学习和生成。
 
-0.7.1 起，默认 prompt 文件中的生成元数据、空脚手架和未填写占位内容会在渲染时自动过滤；只有用户实际写入的约束会进入 Agent 输入。每次渲染后的 prompt 会保存在 `.skills-seed/memory/runtime/rendered-prompts/`，同目录 `.manifest.json` 会记录 base、project、workspace、instructions 等片段是否参与合并和各自长度，便于排查上下文来源。
+0.7.1 起，默认 prompt 文件中的生成元数据、空脚手架和未填写占位内容会在渲染时自动过滤；只有用户实际写入的约束会进入 Agent 输入。每次渲染后的 prompt 会保存在 `.skills-seed/runtime/rendered-prompts/`，同目录 `.manifest.json` 会记录 base、project、workspace、instructions 等片段是否参与合并和各自长度，便于排查上下文来源。
 
 0.7.2 起，项目画像分析会对模型输出中对象数组里的重复对象起始片段做窄范围 JSON 恢复；如果仍无法解析，会返回错误并保留已有画像，不再把 `unknown/解析失败` 占位画像当作成功结果保存。
 
@@ -106,9 +106,9 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.9.8 起，模式会单独保存 `evidence_locations` 作为模式级源码证据位置；`patterns show` 概览优先展示业务/工具方法的 `code_location`，没有业务方法时回退展示第一条证据位置，并在详情页输出完整证据位置列表。
 
-0.8.0 起，Agent 输出会单独保存在 `.skills-seed/memory/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
+0.8.0 起，Agent 输出会单独保存在 `.skills-seed/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
 
-0.9.6 起，`.skills-seed/memory/runtime` 下的调试记录统一使用 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` 文件名前缀，包括 rendered prompt、Agent 输出归档和运行时输入临时目录，便于按时间排序排查一次运行中的上下文与模型输出。
+0.9.6 起，`.skills-seed/runtime` 下的调试记录统一使用 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` 文件名前缀，包括 rendered prompt、Agent 输出归档和运行时输入临时目录，便于按时间排序排查一次运行中的上下文与模型输出。
 
 0.9.0 起，学习和用户添加模式时会使用 `pattern-curate` 提示词做入库前策展：候选模式必须覆盖、重复规则必须整合、代码证据只能来自输入源码，非法或低质量候选会被丢弃。旧的生成前合并流程和 `patterns merge` 已移除，生成阶段保持只读。
 
@@ -117,6 +117,15 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 常见目录：
 
 ```text
+.skills-seed/
+├── config.yaml                 # 工具配置
+├── prompts/                    # 可编辑 prompt 片段
+├── store/                      # 持久化数据，不应删除
+│   ├── project.db              # patterns、命中、指纹、评审等索引数据
+│   └── documents/              # 可读 JSON 文档，例如画像、规范、状态和变更记录
+├── cache/                      # 可重建缓存，例如文件快照和未完成分析计划
+└── runtime/                    # 可删除运行时产物，例如日志、渲染 prompt 和 Agent 输出
+
 .skills-seed/prompts/
 ├── project/
 │   ├── project-profile.md      # 项目事实画像，所有相关 prompt 都会参考
@@ -264,7 +273,7 @@ skills:
 
 - 默认不上传项目代码到远端知识库；学习结果写入当前仓库的 `.skills-seed`。
 - `check` 和 `generate skills` 会调用配置中的 Agent CLI，因此是否联网取决于你使用的 `claude` / `codex` CLI。
-- `.skills-seed/memory/project.db` 是本地 BoltDB 文件，同一时间只能被一个 `skills-seed` 进程写入或打开；如果另一个命令正在学习、整理或查看 patterns，新的命令可能提示数据库正在被占用，等待当前命令结束后重试即可。
+- `.skills-seed/store/project.db` 是本地 BoltDB 文件，同一时间只能被一个 `skills-seed` 进程写入或打开；如果另一个命令正在学习、整理或查看 patterns，新的命令可能提示数据库正在被占用，等待当前命令结束后重试即可。
 - 生成的 skills 目录、`.git/**`、`.skills-seed/**` 以及常见构建产物默认会被排除，避免生成内容回流到下一轮学习。
 - 手写 `SKILL.md` 如果没有 `generated-by: skills-seed` 标记，默认不会被覆盖。
 

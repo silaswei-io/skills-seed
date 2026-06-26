@@ -11,6 +11,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
 // ErrStateNotFound 表示运行状态文件尚不存在
@@ -19,14 +20,14 @@ var ErrStateNotFound = errors.New("runtime state not found")
 // ErrModeLocked 表示配置中的模式与已锁定模式不一致
 var ErrModeLocked = errors.New("project mode is locked")
 
-// Repository 把运行状态保存到 .skills-seed/memory
+// Repository 把运行状态保存到持久化 store。
 type Repository struct {
 	path string
 }
 
 // NewRepository 创建运行状态仓储
 func NewRepository(seedPath string) *Repository {
-	return &Repository{path: filepath.Join(seedPath, "memory", "state.json")}
+	return &Repository{path: layout.New(seedPath).State()}
 }
 
 // Path 返回状态文件路径

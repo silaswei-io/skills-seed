@@ -15,7 +15,9 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/git"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/analysisplan"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
@@ -48,6 +50,7 @@ type Container struct {
 	WorkspaceProfileRepo  *workspacestore.ProfileRepository
 	WorkspaceSpecRepo     *workspacestore.SpecRepository
 	WorkflowRepo          *workflowstore.Repository
+	AnalysisPlanRepo      *analysisplan.Repository
 	Agent                 agent.Agent
 	AnalyzerSvc           *analyzer.AnalyzerService
 	LearnerSvc            *learner.LearnerService
@@ -126,7 +129,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	gitRepo := git.NewRepository(projectRoot)
 
 	// 4. 创建 BoltDB 仓储
-	dbPath := filepath.Join(seedPath, "memory", "project.db")
+	dbPath := layout.New(seedPath).ProjectDB()
 	patternRepo, err := boltdb.NewPatternRepository(dbPath)
 	if err != nil {
 		return nil, patternRepositoryError(err)
@@ -137,6 +140,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	workspaceProfileRepo := workspacestore.NewProfileRepository(seedPath)
 	workspaceSpecRepo := workspacestore.NewSpecRepository(seedPath)
 	workflowRepo := workflowstore.NewRepository(seedPath)
+	analysisPlanRepo := analysisplan.NewRepository(seedPath)
 
 	// 5. 创建加载器
 	promptLoader := promptloader.NewWithLocales(cfg.Agent.Engine, configRepo.GetToolLocale(), configRepo.GetSkillsLocale(), seedPath)
@@ -176,6 +180,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		WorkspaceProfileRepo:  workspaceProfileRepo,
 		WorkspaceSpecRepo:     workspaceSpecRepo,
 		WorkflowRepo:          workflowRepo,
+		AnalysisPlanRepo:      analysisPlanRepo,
 		Agent:                 agentImpl,
 		AnalyzerSvc:           analyzerSvc,
 		LearnerSvc:            learnerSvc,

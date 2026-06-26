@@ -5,7 +5,27 @@
 **Confidence**: {{printf "%.2f" .Confidence}}%
 **Last Updated**: {{.LastUpdated}}
 
-{{.GroupSummary}}
+{{.GroupSummary.Description}}
+
+## Request Matching
+
+{{if .GroupSummary.IsFallback}}Read this page when the task changes business rules, state transitions, runtime behavior, or cross-module flows but cannot be mapped to a stable domain from request terms or paths.{{else}}Read this page first when the request mentions {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}, uses synonymous business actions, state changes, rules or policies, entry channels, or external dependencies, or changes code under {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}this domain's related code{{end}}.{{end}}
+
+{{if .GroupLocations}}
+## Code Evidence Entry Points
+
+{{range .GroupLocations}}
+- `{{.Path}}`{{if .Symbol}} - {{.Symbol}}{{end}}{{if .Description}}: {{.Description}}{{end}}{{if .Confidence}} (confidence {{printf "%.2f" (mul .Confidence 100)}}%){{end}}
+{{end}}
+{{end}}
+
+{{if .GroupSignals}}
+## Related Signals
+
+{{range .GroupSignals}}
+- {{.}}
+{{end}}
+{{end}}
 
 {{if .PatternObjects}}
 ## Detailed Patterns
@@ -18,6 +38,8 @@ Rules are inferred from code evidence and learned patterns. Product semantics no
 **Description**: {{.Description}}
 
 **Rule**: {{.Rule}}
+
+**Routing Hint**: If the request's business wording, synonymous action, state change, entry channel, or exception symptom matches the description/rule above, locate code through this pattern's evidence path first, then confirm current behavior.
 
 **Evidence**: confidence {{printf "%.2f" (mul .Confidence 100)}}%, occurrences {{.Frequency}}, source {{.Source}}
 

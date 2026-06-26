@@ -12,6 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -80,7 +81,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		logger.Info(i18n.Get("LearnWorkspaceRelationshipsSkipped"))
 		return false, nil
 	}
-	runtimeDir := filepath.Join(projectRoot, ".skills-seed", "memory", "runtime")
+	runtimeDir := layout.New(filepath.Join(projectRoot, ".skills-seed")).Runtime()
 	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
 		return false, err
 	}
@@ -276,8 +277,9 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 			return workspaceLearnInputData{}, err
 		}
 		childSeedPath := filepath.Join(projectRootPath, ".skills-seed")
-		projectProfilePath := filepath.Join(childSeedPath, "memory", "project-profile.json")
-		projectSpecPath := filepath.Join(childSeedPath, "memory", "project-spec.json")
+		childLayout := layout.New(childSeedPath)
+		projectProfilePath := childLayout.ProjectProfile()
+		projectSpecPath := childLayout.ProjectSpec()
 		skillPath := workspaceChildSkillPath(projectRootPath, childSeedPath, cont.ConfigRepo)
 		child := workspaceLearnInputProject{
 			ID:                 project.ID,

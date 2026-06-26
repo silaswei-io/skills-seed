@@ -33,7 +33,7 @@ func TestRepositoryLoadAndReplaceSnapshots(t *testing.T) {
 	require.Equal(t, map[string]string{
 		"main.go": "package changed\n",
 	}, loaded)
-	require.NoFileExists(t, filepath.Join(seedPath, "memory", "snapshots", "internal", "service", "app.go"))
+	require.NoFileExists(t, filepath.Join(seedPath, "cache", "snapshots", "internal", "service", "app.go"))
 }
 
 func TestRepositoryLoadMissingDirectoryReturnsEmptyMap(t *testing.T) {
@@ -63,7 +63,7 @@ func TestRepositoryWritesSnapshotsUnderMemorySnapshots(t *testing.T) {
 		"main.go": "package main\n",
 	}))
 
-	content, err := os.ReadFile(filepath.Join(seedPath, "memory", "snapshots", "main.go"))
+	content, err := os.ReadFile(filepath.Join(seedPath, "cache", "snapshots", "main.go"))
 	require.NoError(t, err)
 	require.Equal(t, "package main\n", string(content))
 }

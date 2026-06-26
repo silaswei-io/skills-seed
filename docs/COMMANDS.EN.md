@@ -55,7 +55,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | Learn from Git history | `current`, `history` | `--help, -h` = `false` |
-| `skills-seed learn current` | Learn from current codebase | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | Learn from current codebase | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
@@ -234,7 +234,7 @@ Learn coding patterns, business methods, and best practices from the current cod
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed learn current` | Incrementally learn from the current codebase | `skills-seed learn current --focus internal/service --profile skip` | Compares file md5 values and learns only added, modified, or deleted files |
+| `skills-seed learn current` | Incrementally learn from the current codebase | `skills-seed learn current --focus internal/service --profile skip` | Compares file md5 values and learns only added, modified, or deleted files; add `--force` after prompt or template upgrades to relearn the current scan scope |
 | `skills-seed learn history` | Learn from Git commit history | `skills-seed learn history --limit 50 --batch-size 5` | Already learned commits are skipped |
 
 #### `learn` Flags
@@ -276,6 +276,7 @@ Learn coding patterns, business methods, and best practices from the current cod
 ```bash
 skills-seed learn current
 skills-seed learn current --focus internal/service --profile skip
+skills-seed learn current --force --profile refresh
 skills-seed learn current -f internal/agent -f internal/service
 skills-seed learn current --context "Focus on compatibility boundaries"
 skills-seed learn current --context-file .skills-seed/context.md
@@ -491,7 +492,7 @@ skills-seed patterns show business-create-order --format json
 2. Use `--dry-run` first when you want to inspect the curation result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
 4. `patterns show` without arguments prints the pattern overview list. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.
-5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/memory/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
+5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/store/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
 
 ### `skills-seed review`
 
@@ -559,7 +560,7 @@ skills-seed review stats --line-window 5
 
 #### Command Overview
 
-Show or refresh the project profile. The profile is stored at `.skills-seed/memory/project-profile.json` and is used to generate `references/project-overview.md`.
+Show or refresh the project profile. The profile is stored at `.skills-seed/store/documents/project-profile.json` and is used to generate `references/project-overview.md`.
 
 #### Command Forms
 
@@ -713,7 +714,7 @@ skills-seed hook run
 
 #### Command Overview
 
-Show recent changes recorded into project skills. This command reads `.skills-seed/memory/change-log.json`, prints a git-log-like history, and does not print diagnostic logs.
+Show recent changes recorded into project skills. This command reads `.skills-seed/store/documents/change-log.json`, prints a git-log-like history, and does not print diagnostic logs.
 
 #### Command Forms
 
@@ -736,7 +737,7 @@ skills-seed log
 #### Notes
 
 1. `sync`, `learn current`, and `generate skills` write learned change records.
-2. Detailed diagnostic logs remain under `.skills-seed/logs/` for troubleshooting.
+2. Detailed diagnostic logs remain under `.skills-seed/runtime/logs/` for troubleshooting.
 
 ### `skills-seed help`
 

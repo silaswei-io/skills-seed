@@ -17,40 +17,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
-type businessMethodPayload struct {
-	Name          string              `json:"name"`
-	CodeLocation  domain.CodeLocation `json:"code_location"`
-	Description   string              `json:"description"`
-	Usage         string              `json:"usage"`
-	Type          string              `json:"type"`
-	Function      string              `json:"function"`
-	Prerequisites string              `json:"prerequisites"`
-	Returns       string              `json:"returns"`
-}
-
-type workspaceSpecPayload struct {
-	domain.WorkspaceSpec
-	ChangeOrder []json.RawMessage `json:"change_order"`
-}
-
-func (p *businessMethodPayload) toDomain(now time.Time) *domain.BusinessMethod {
-	if p == nil {
-		return nil
-	}
-	method := &domain.BusinessMethod{
-		Name:          p.Name,
-		Description:   p.Description,
-		Usage:         p.Usage,
-		Type:          p.Type,
-		Function:      p.Function,
-		Prerequisites: p.Prerequisites,
-		Returns:       p.Returns,
-		CodeLocation:  p.CodeLocation,
-	}
-	method.NormalizeCodeLocation(nil, now)
-	return method
-}
-
 // ExtractJSON 从 AI 输出中提取 JSON
 func ExtractJSON(output string) (string, error) {
 	trimmed := strings.TrimSpace(output)
@@ -69,8 +35,9 @@ func ExtractJSON(output string) (string, error) {
 		}
 	}
 
-	// 2. 找到第一个 { 和匹配的 }
-	start := strings.Index(output, "{")
+	// 2. 优先寻找带结构化结果 key 的 JSON 对象起点。AI 常会在 JSON
+	// 前输出说明文字或代码片段，直接取第一个 `{` 容易命中代码块。
+	start := findLikelyJSONObjectStart(output)
 	if start == -1 {
 		logger.Error(i18n.Get("AgentNoJSONFound"),
 			"output_length", len(output),
@@ -101,6 +68,45 @@ func ExtractJSON(output string) (string, error) {
 	}
 
 	return repaired, nil
+}
+
+func findLikelyJSONObjectStart(output string) int {
+	targetKeys := map[string]bool{
+		"patterns":     true,
+		"issues":       true,
+		"fixes":        true,
+		"project_name": true,
+		"include":      true,
+		"name":         true,
+	}
+	for idx, ch := range output {
+		if ch != '{' {
+			continue
+		}
+		pos := idx + 1
+		for pos < len(output) {
+			switch output[pos] {
+			case ' ', '\n', '\r', '\t':
+				pos++
+			default:
+				goto keyStart
+			}
+		}
+	keyStart:
+		if pos >= len(output) || output[pos] != '"' {
+			continue
+		}
+		pos++
+		keyEnd := strings.IndexByte(output[pos:], '"')
+		if keyEnd < 0 {
+			continue
+		}
+		key := output[pos : pos+keyEnd]
+		if targetKeys[key] {
+			return idx
+		}
+	}
+	return strings.Index(output, "{")
 }
 
 // ParseSelectFilesResult 解析 AI 文件选择器输出。
@@ -684,113 +690,13 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
 	}
 
-	var result struct {
-		ProjectName  string   `json:"project_name"`
-		Language     string   `json:"language"`
-		Frameworks   []string `json:"frameworks"`
-		Architecture string   `json:"architecture"`
-		Structure    string   `json:"structure"`
-		Layers       []struct {
-			Name             string   `json:"name"`
-			Description      string   `json:"description"`
-			Responsibilities []string `json:"responsibilities"`
-			Files            []string `json:"files"`
-		} `json:"layers"`
-		DependencyGraph   string   `json:"dependency_graph"`
-		DataFlow          string   `json:"data_flow"`
-		FrameworkPatterns []string `json:"framework_patterns"`
-		CommonUtils       []struct {
-			Name        string `json:"name"`
-			File        string `json:"file"`
-			Signature   string `json:"signature"`
-			Description string `json:"description"`
-			Usage       string `json:"usage"`
-		} `json:"common_utils"`
-		KeyModules []struct {
-			Name             string   `json:"name"`
-			Path             string   `json:"path"`
-			Description      string   `json:"description"`
-			Responsibilities []string `json:"responsibilities"`
-			Dependencies     []string `json:"dependencies"`
-			Dependents       []string `json:"dependents"`
-			KeyMethods       []string `json:"key_methods"`
-		} `json:"key_modules"`
-		ConfigPatterns     []string                   `json:"config_patterns"`
-		Dependencies       []string                   `json:"dependencies"`
-		BusinessMethods    []businessMethodPayload    `json:"business_methods"`
-		ValidationCommands []domain.ValidationCommand `json:"validation_commands"`
-		Summary            string                     `json:"summary"`
-	}
+	var result projectProfilePayload
 
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
 	}
 
-	if result.Frameworks == nil {
-		result.Frameworks = []string{}
-	}
-	if result.Dependencies == nil {
-		result.Dependencies = []string{}
-	}
-	if result.ConfigPatterns == nil {
-		result.ConfigPatterns = []string{}
-	}
-
-	analyzeResult := &agent.AnalyzeProjectResult{
-		ProjectName:        result.ProjectName,
-		Language:           result.Language,
-		Frameworks:         result.Frameworks,
-		Architecture:       result.Architecture,
-		Structure:          result.Structure,
-		DependencyGraph:    result.DependencyGraph,
-		DataFlow:           result.DataFlow,
-		FrameworkPatterns:  result.FrameworkPatterns,
-		ConfigPatterns:     result.ConfigPatterns,
-		Dependencies:       result.Dependencies,
-		ValidationCommands: result.ValidationCommands,
-		Summary:            result.Summary,
-		Layers:             make([]domain.ArchitectureLayer, len(result.Layers)),
-		CommonUtils:        make([]domain.UtilityFunction, len(result.CommonUtils)),
-		KeyModules:         make([]domain.ModuleInfo, len(result.KeyModules)),
-		BusinessMethods:    make([]domain.BusinessMethod, len(result.BusinessMethods)),
-	}
-
-	for i, layer := range result.Layers {
-		analyzeResult.Layers[i] = domain.ArchitectureLayer{
-			Name:             layer.Name,
-			Description:      layer.Description,
-			Responsibilities: layer.Responsibilities,
-			Files:            layer.Files,
-		}
-	}
-
-	for i, util := range result.CommonUtils {
-		analyzeResult.CommonUtils[i] = domain.UtilityFunction{
-			Name:        util.Name,
-			File:        util.File,
-			Signature:   util.Signature,
-			Description: util.Description,
-			Usage:       util.Usage,
-		}
-	}
-
-	for i, module := range result.KeyModules {
-		analyzeResult.KeyModules[i] = domain.ModuleInfo{
-			Name:             module.Name,
-			Path:             module.Path,
-			Description:      module.Description,
-			Responsibilities: module.Responsibilities,
-			Dependencies:     module.Dependencies,
-			Dependents:       module.Dependents,
-			KeyMethods:       module.KeyMethods,
-		}
-	}
-
-	for i, method := range result.BusinessMethods {
-		analyzeResult.BusinessMethods[i] = *method.toDomain(time.Now())
-	}
-
-	return analyzeResult, nil
+	return result.toAnalyzeProjectResult(time.Now()), nil
 }
 
 // ParseAnalyzeCurrentCodebaseResult 解析当前代码库分析结果
@@ -805,7 +711,7 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
-	var result struct {
+	var payload struct {
 		Patterns []struct {
 			ID                string                           `json:"id"`
 			Name              string                           `json:"name"`
@@ -819,24 +725,17 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 			EvidenceLocations []domain.PatternEvidenceLocation `json:"evidence_locations"`
 			BusinessMethod    *businessMethodPayload           `json:"business_method"`
 		} `json:"patterns"`
-		CategorySummaries map[string]struct {
-			Summary     string   `json:"summary"`
-			Patterns    []string `json:"patterns"`
-			UsageScenes []string `json:"usage_scenes"`
-			Priority    int      `json:"priority"`
-		} `json:"category_summaries"`
-		BusinessRules  []string `json:"business_rules"`
-		BestPractices  []string `json:"best_practices"`
-		CommonPatterns []string `json:"common_patterns"`
-		Summary        string   `json:"summary"`
+		ProfileDelta              projectProfilePayload              `json:"profile_delta"`
+		ProfileRefreshRecommended agent.ProfileRefreshRecommendation `json:"profile_refresh_recommended"`
 	}
 
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+	if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
 	}
 
-	patterns := make([]domain.Pattern, len(result.Patterns))
-	for i, p := range result.Patterns {
+	now := time.Now()
+	patterns := make([]domain.Pattern, len(payload.Patterns))
+	for i, p := range payload.Patterns {
 		pattern := domain.Pattern{
 			ID:                p.ID,
 			Name:              p.Name,
@@ -848,32 +747,34 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 			Confidence:        p.Confidence,
 			Frequency:         p.Frequency,
 			Source:            domain.SourceInit,
-			CreatedAt:         time.Now(),
+			CreatedAt:         now,
 			EvidenceLocations: p.EvidenceLocations,
 		}
 		pattern.BusinessMethod = p.BusinessMethod.toDomain(pattern.CreatedAt)
 		patterns[i] = pattern
 	}
 
-	categorySummaries := make(map[string]agent.CategorySummary)
-	for category, summary := range result.CategorySummaries {
-		categorySummaries[category] = agent.CategorySummary{
-			Category:    category,
-			Summary:     summary.Summary,
-			Patterns:    summary.Patterns,
-			UsageScenes: summary.UsageScenes,
-			Priority:    summary.Priority,
-		}
+	return &agent.AnalyzeCurrentCodebaseResult{
+		Patterns:                  patterns,
+		ProfileDelta:              payload.ProfileDelta.toProjectProfileDelta(now),
+		ProfileRefreshRecommended: payload.ProfileRefreshRecommended,
+	}, nil
+}
+
+// ParsePlanAnalysisUnitsResult 解析业务分析单元规划结果。
+func ParsePlanAnalysisUnitsResult(output string) (*agent.PlanAnalysisUnitsResult, error) {
+	jsonStr, err := ExtractJSON(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
-	return &agent.AnalyzeCurrentCodebaseResult{
-		Patterns:          patterns,
-		CategorySummaries: categorySummaries,
-		BusinessRules:     result.BusinessRules,
-		BestPractices:     result.BestPractices,
-		CommonPatterns:    result.CommonPatterns,
-		Summary:           result.Summary,
-	}, nil
+	var payload struct {
+		Units []domain.AnalysisUnit `json:"units"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+	return &agent.PlanAnalysisUnitsResult{Units: payload.Units}, nil
 }
 
 // ParseWorkspaceProfile 解析工作区画像结果

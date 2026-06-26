@@ -2,6 +2,8 @@
 
 You are a senior software architect. Analyze the provided project context and return a structured project overview for generated skill documentation.
 
+This template is only for the project profile: project purpose, directory structure, architecture layers, module responsibilities, dependency relationships, entry files, configuration, and validation commands. Do not learn or summarize business patterns here; business rules, state transitions, and cross-entity orchestration belong to the learn templates.
+
 # Project Information
 
 - **Project Name**: {{.ProjectName}}
@@ -63,15 +65,19 @@ Identify:
 1. Technology stack, frameworks, and important dependencies.
 2. Architecture layers and module responsibilities.
 3. Module dependency graph and key data flow.
-4. Important business methods with complete signatures and file locations.
-5. Common utilities and configuration patterns.
-6. Validation commands explicitly documented by project evidence.
+4. Common utilities and configuration patterns.
+5. Validation commands explicitly documented by project evidence.
+6. If an existing project profile already contains `business_methods`, preserve entries that are still supported by evidence; otherwise record only real reusable business or utility entry points, and do not add ordinary startup, scaffolding, or infrastructure methods just to fill the profile.
 
 You are running in the project root; read entry files, the README, and necessary source files by path. Do not invent unsupported facts. If information is not visible from the project, leave the related array empty or use a concise TODO-style note in the relevant description
 
 Validation commands must come only from explicit repository evidence or user-provided context, such as README files, scripts, task configuration, CI configuration, build configuration, or an existing project profile. Preserve the command text exactly as evidenced. Do not infer default commands from language, framework, file extension, or common practice. Use a repository-relative path for `source`; if the evidence only comes from user-provided context, write `user_context`. If there is no explicit evidence, return an empty `validation_commands` array.
 
-If an existing project profile is provided, preserve unchanged modules, utilities, business methods, validation commands, dependencies, and architecture details from it. Update, add, or remove profile entries only when the focused paths or directly related files provide clear evidence. The output must still be a complete project profile, not a partial patch
+`validation_commands` must include only commands that validate a completed change, such as tests, checks, lint, vet, builds, code generation, SDK generation, or swagger generation. Do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands; those are operating instructions, not validation commands.
+
+If an existing project profile is provided, preserve unchanged modules, utilities, business methods, validation commands, dependencies, and architecture details from it. Update, add, or remove profile entries only when the focused paths or directly related files provide clear evidence. The output must still be a complete project profile, not a partial patch.
+
+`business_methods` is not the business pattern store, and it is not a startup function list. Output a method only when source code directly confirms it is a project-level business entry point, cross-module orchestration entry point, domain reusable entry point, or high-value utility entry point, and its full signature and location are clear. Core domain operations, resource lifecycles, policy execution, protocol/command wrappers, and external dependency interaction entries confirmed by the project's source vocabulary are domain reusable entry candidates. Do not place them in `common_utils` solely because they live under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper. Do not output ordinary CLI startup, route registration, framework initialization, scaffolding entry points, or simple CRUD. Do not put business rules, state transitions, or workflow details into the profile as a substitute for patterns.
 
 # Language Requirements
 
@@ -117,8 +123,8 @@ The `json` fenced block below documents the response schema:
     {
       "name": "MethodName",
       "code_location": {"current_location": "file/path:line"},
-      "description": "Business logic description",
-      "usage": "When to call this method",
+      "description": "Short responsibility of a project-level entry point or reusable method; do not summarize business patterns here",
+      "usage": "When to locate this entry point or reuse this method",
       "type": "domain|common",
       "function": "Full method signature",
       "prerequisites": "Required setup or dependencies",
@@ -130,7 +136,7 @@ The `json` fenced block below documents the response schema:
       "name": "FunctionName",
       "file": "file/path",
       "signature": "Real function or method signature",
-      "description": "What this utility does",
+      "description": "What this domain-neutral utility does; domain operations, protocol/command wrappers, or external dependency interaction entries that carry product-domain behavior should prefer business_methods",
       "usage": "When to use it"
     }
   ],

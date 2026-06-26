@@ -13,22 +13,23 @@ description: {{.SkillDescription}}
 **Patterns Learned**: {{.PatternCount}}
 **Average Confidence**: {{printf "%.2f" .AvgConfidence}}%
 
----
+This is the project entry skill. It only routes the task to the right project references, confirms constraint sources, and selects validation commands. Business rules, architecture details, code evidence, and examples must be read from the matching references before implementation decisions.
 
 ## How To Use This Skill
 
-Read the smallest relevant reference set for the task:
-{{if .References.Enabled}}{{if .References.BusinessMethods}}- Business flow or project method reuse: read [Business Methods](./references/business-methods.md), then the related category patterns
-{{else if .References.BusinessPatterns}}- Business flow changes: read the related business pattern details, then verify against current code
-{{else}}- Business flow changes: inspect current code and reuse nearby implementations
-{{end}}- API, contracts, adapters, or derived artifacts: read [Project Spec](./references/project-spec.md) and structure/API patterns
-{{if .References.KeyModules}}- Architecture, module boundary, or dependency changes: read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md)
-{{else}}- Architecture, module boundary, or dependency changes: read [Project Overview](./references/project-overview.md)
-{{end}}- Utilities, config, middleware, or concurrency: read only the matching category pattern
-{{else}}- References were not written in this generation; inspect current code directly and reuse nearby implementations
+1. Read the smallest relevant reference set for the task; do not read every reference by default.
+{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. Business rules, state transitions, or cross-entity flows: read the [Business Pattern Map](./references/patterns/business.md) first, then open the matching business detail page.
+{{else}}2. Business rules, state transitions, or cross-entity flows: inspect current code and reuse nearby implementations.
+{{end}}{{if .References.BusinessMethods}}3. When reusing project-level business entry points, cross-module orchestration entry points, or utility entry points, read [Entry Method Index](./references/business-methods.md) next.
+{{else}}3. When reusing project-level entry points, confirm them from current code and module entry points.
+{{end}}4. API, contracts, adapters, derived artifacts, or configuration conventions: read [Project Spec](./references/project-spec.md) and related category patterns.
+{{if .References.KeyModules}}5. Architecture, module boundaries, or dependency relationships: read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md).
+{{else}}5. Architecture, module boundaries, or dependency relationships: read [Project Overview](./references/project-overview.md).
+{{end}}6. Utilities, config, middleware, concurrency, or tests: read only the matching category pattern.
+{{else}}2. References were not written in this generation; inspect current code directly and reuse nearby implementations.
 {{end}}
 
-Prefer current code and high-confidence project patterns backed by code evidence; treat medium-confidence patterns or patterns without code evidence as reference observations. If evidence is missing, state the gap instead of inventing product rules or implementation details.
+Only high-confidence patterns backed by code evidence are hard constraints. If references and current code disagree, trust current code; if evidence is missing, state the gap instead of inventing product rules.
 
 ---
 

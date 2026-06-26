@@ -2,6 +2,26 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.1]
+
+### 变更
+
+- 重构 `learn current` 为业务分析单元计划 + 单元级学习流程：先由 Agent 按业务能力规划 unit，再逐 unit 分析并即时保存 patterns 与文件指纹，失败后可基于已落库结果继续。
+- 新增 `.skills-seed/cache/analysis/current/plan.json` 作为可删除、可重建的当前学习计划缓存；业务学习事实仍以 `store/project.db` 为准，`runtime` 仅保存 prompt、Agent 输出和日志等临时调试产物。
+- 调整 `.skills-seed` 目录语义：`store/documents` 保存项目画像、规范、状态和 changelog 等持久文档，`cache` 保存可重建缓存，`runtime` 保存可删除运行产物。
+- 拆分并重命名当前学习相关 prompt：项目初始化、项目画像分析、当前代码业务学习、业务单元规划各自只做一个任务；提示词和 skill 模板继续走 i18n/template，不在代码中硬编码。
+- 优化生成的 project skills，使业务模式总览、业务方法、触点索引和模式详情更聚焦“需求方会如何描述业务”，减少纯工程结构视角。
+
+### 修复
+
+- 修复当前学习中 AI 文件选择后仍把 `ai_skipped` 文件纳入业务单元规划输入的问题。
+- 修复分单元学习时项目画像增量只保留最后一个 unit 的风险，现在会聚合本轮所有成功 unit 的画像增量。
+- 修复单元学习成功后后续 unit 仍使用旧 known patterns 快照的问题，后续 unit 会读取最新已保存模式。
+
+### 文档
+
+- 更新 README、命令参考和配置说明，说明新的 `store/cache/runtime` 边界、当前学习计划缓存以及 prompt/skill 生成职责。
+
 ## [v0.9.19]
 
 ### 变更
@@ -57,7 +77,7 @@
 
 ### 变更
 
-- 新增 `skills-seed log`，以类似 `git log` 的格式展示学习和生成带来的变更记录；记录保存在 `.skills-seed/memory/change-log.json`，不再把用户可见摘要混入详细诊断日志。
+- 新增 `skills-seed log`，以类似 `git log` 的格式展示学习和生成带来的变更记录；记录保存在 `.skills-seed/store/documents/change-log.json`，不再把用户可见摘要混入详细诊断日志。
 - 调整 Git pre-commit hook 行为：安装后的 hook 不再默认强制检查或学习，而是在交互式终端中提供“同步并生成 skills / 只学习 / 跳过本次”的选择菜单；非交互式环境会直接跳过，避免阻塞 IDE、脚本和 Git 自动流程。
 
 ### 文档
@@ -138,7 +158,7 @@
 
 ### 变更
 
-- 统一 `.skills-seed/memory/runtime` 下调试记录的文件名前缀为 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>`，让 rendered prompt、Agent 输出归档和 runtime 临时输入目录都能按时间排序定位。
+- 统一 `.skills-seed/runtime` 下调试记录的文件名前缀为 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>`，让 rendered prompt、Agent 输出归档和 runtime 临时输入目录都能按时间排序定位。
 
 ### 维护
 
@@ -261,7 +281,7 @@
 
 ### 功能
 
-- Agent 调用输出会单独归档到 `.skills-seed/memory/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest，便于排查模型返回而不污染运行日志。
+- Agent 调用输出会单独归档到 `.skills-seed/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest，便于排查模型返回而不污染运行日志。
 - 业务方法代码位置全面改为 `code_location` 结构化元数据，保留当前位置、历史位置、状态和语言无关符号快照；生成的 business methods reference 会展示位置状态。
 
 ### 变更
@@ -279,7 +299,7 @@
 
 ### 修复
 
-- 优化项目数据库被占用时的错误提示。当 BoltDB 无法在超时时间内获取 `.skills-seed/memory/project.db` 锁时，CLI 会提示数据库可能正在被其他 `skills-seed` 命令使用，并给出等待或检查残留进程的处理建议。
+- 优化项目数据库被占用时的错误提示。当 BoltDB 无法在超时时间内获取 `.skills-seed/store/project.db` 锁时，CLI 会提示数据库可能正在被其他 `skills-seed` 命令使用，并给出等待或检查残留进程的处理建议。
 
 ## [v0.7.3]
 
@@ -649,7 +669,7 @@
 
 ### 体验
 
-- Agent 调用的大型输入改为写入 `.skills-seed/memory/runtime` 下的临时文件，减少提示词正文体积
+- Agent 调用的大型输入改为写入 `.skills-seed/runtime` 下的临时文件，减少提示词正文体积
 - workspace 生成对子项目执行时会屏蔽根级一次性上下文，避免根 workspace 说明误注入子项目 skill
 - 当用户上下文存在时，即使默认模板生成模式也会要求可用 Agent，用于把上下文并入生成结果
 

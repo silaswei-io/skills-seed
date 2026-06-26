@@ -26,7 +26,15 @@ type FileChanges struct {
 	ExcludedGeneratedSkillDirs []string
 }
 
+type CurrentChangeOptions struct {
+	Force bool
+}
+
 func PrepareCurrentChanges(ctx context.Context, tracker domain.FileAnalysisTracker, configRepo config.Reader, repoRoot string, scanRoot string, scope domain.FileAnalysisScope, focusAbsPaths []string) (*FileChanges, error) {
+	return PrepareCurrentChangesWithOptions(ctx, tracker, configRepo, repoRoot, scanRoot, scope, focusAbsPaths, CurrentChangeOptions{})
+}
+
+func PrepareCurrentChangesWithOptions(ctx context.Context, tracker domain.FileAnalysisTracker, configRepo config.Reader, repoRoot string, scanRoot string, scope domain.FileAnalysisScope, focusAbsPaths []string, opts CurrentChangeOptions) (*FileChanges, error) {
 	_ = repoRoot
 	if tracker == nil {
 		return nil, fmt.Errorf("file analysis tracker is nil")
@@ -79,7 +87,7 @@ func PrepareCurrentChanges(ctx context.Context, tracker domain.FileAnalysisTrack
 			continue
 		}
 		current[relPath] = record
-		if prev, ok := previous[relPath]; !ok || prev.Hash != record.Hash {
+		if prev, ok := previous[relPath]; opts.Force || !ok || prev.Hash != record.Hash {
 			changes.AddedOrModified = append(changes.AddedOrModified, relPath)
 			changes.Records = append(changes.Records, record)
 		} else {

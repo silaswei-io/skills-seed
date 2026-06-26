@@ -167,7 +167,7 @@ func gitAddAll(t *testing.T, root string) {
 
 func newLearnTracker(t *testing.T, root string) *boltdb.PatternRepository {
 	t.Helper()
-	repo, err := boltdb.NewPatternRepository(filepath.Join(root, ".skills-seed", "memory", "project.db"))
+	repo, err := boltdb.NewPatternRepository(filepath.Join(root, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, repo.Close()) })
 	return repo

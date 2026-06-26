@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/jsonfile"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
 // ErrProfileNotFound 表示项目画像不存在
@@ -17,32 +17,32 @@ var ErrProfileNotFound = errors.New("project profile not found")
 // ErrSpecNotFound 表示项目开发规范不存在
 var ErrSpecNotFound = errors.New("project spec not found")
 
-// Repository 将项目画像以可读 JSON 文档保存到 .skills-seed 下
+// Repository 将项目画像和项目规范保存为持久化 JSON 文档。
 type Repository struct {
-	path string
+	layout layout.Layout
 }
 
 // NewRepository 创建项目画像仓储
 func NewRepository(seedPath string) *Repository {
 	return &Repository{
-		path: filepath.Join(seedPath, "memory", "project-profile.json"),
+		layout: layout.New(seedPath),
 	}
 }
 
 // Path 返回项目画像文件路径
 func (r *Repository) Path() string {
-	return r.path
+	return r.layout.ProjectProfile()
 }
 
 // Get 读取项目画像
 func (r *Repository) Get(ctx context.Context) (*domain.ProjectProfile, error) {
-	return profileStore(r.path).Get(ctx)
+	return profileStore(r.layout.ProjectProfile()).Get(ctx)
 }
 
 // Save 保存项目画像
 func (r *Repository) Save(ctx context.Context, projectProfile *domain.ProjectProfile) error {
 	projectProfile = domain.CleanProjectProfile(projectProfile)
-	return profileStore(r.path).Save(ctx, projectProfile)
+	return profileStore(r.layout.ProjectProfile()).Save(ctx, projectProfile)
 }
 
 // GetForProject 读取工作区子项目画像
@@ -57,17 +57,17 @@ func (r *Repository) SaveForProject(ctx context.Context, projectID string, proje
 }
 
 func (r *Repository) projectPath(projectID string) string {
-	return filepath.Join(filepath.Dir(r.path), "projects", projectID, "project-profile.json")
+	return r.layout.ProjectDocument(projectID, "project-profile.json")
 }
 
 // GetSpec 读取单项目开发规范
 func (r *Repository) GetSpec(ctx context.Context) (*domain.ProjectSpec, error) {
-	return r.readSpec(ctx, filepath.Join(filepath.Dir(r.path), "project-spec.json"))
+	return r.readSpec(ctx, r.layout.ProjectSpec())
 }
 
 // SaveSpec 保存单项目开发规范
 func (r *Repository) SaveSpec(ctx context.Context, spec *domain.ProjectSpec) error {
-	return r.writeSpec(ctx, filepath.Join(filepath.Dir(r.path), "project-spec.json"), spec)
+	return r.writeSpec(ctx, r.layout.ProjectSpec(), spec)
 }
 
 // GetSpecForProject 读取工作区子项目开发规范
@@ -89,7 +89,7 @@ func (r *Repository) writeSpec(ctx context.Context, path string, spec *domain.Pr
 }
 
 func (r *Repository) projectSpecPath(projectID string) string {
-	return filepath.Join(filepath.Dir(r.path), "projects", projectID, "project-spec.json")
+	return r.layout.ProjectDocument(projectID, "project-spec.json")
 }
 
 func profileStore(path string) jsonfile.Store[domain.ProjectProfile] {
