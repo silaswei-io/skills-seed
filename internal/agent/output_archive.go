@@ -100,7 +100,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	archive := AgentOutputArchive{}
 	if strings.TrimSpace(opts.Content) != "" {
 		path := filepath.Join(dir, base+".md")
-		if err := os.WriteFile(path, []byte(opts.Content+"\n"), 0600); err != nil {
+		if err := os.WriteFile(path, []byte(renderAgentOutputContent(opts.Content)+"\n"), 0600); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "agent.output.write",
 				"agent", opts.Agent,
@@ -210,4 +210,17 @@ func OperationLabel(operation string) string {
 func OperationName(operation string) string {
 	name, _, _ := strings.Cut(strings.TrimSpace(operation), "/")
 	return strings.TrimSpace(name)
+}
+
+func renderAgentOutputContent(content string) string {
+	trimmed := strings.TrimSpace(content)
+	if trimmed != "" && json.Valid([]byte(trimmed)) {
+		var value any
+		if err := json.Unmarshal([]byte(trimmed), &value); err == nil {
+			if data, err := json.MarshalIndent(value, "", "  "); err == nil {
+				return "```json\n" + string(data) + "\n```"
+			}
+		}
+	}
+	return strings.TrimRight(content, "\n")
 }

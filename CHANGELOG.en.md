@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.3]
+
+### Changes
+
+- Agent output archives still use `.md`, but valid JSON final content is now formatted as a readable fenced `json` block for easier inspection under `runtime/agent-outputs`.
+- Strengthened the final output contract for JSON prompts so the Agent must fix invalid JSON internally before returning the final object.
+
+### Fixes
+
+- Relaxed runtime filename semantic-part length so labels such as `pattern-learn-current-unit-auth-admin-login` are no longer truncated into incomplete names like `...auth-admi`.
+
 ## [v0.10.2]
 
 ### Changes

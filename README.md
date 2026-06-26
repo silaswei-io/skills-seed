@@ -106,7 +106,7 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.9.8 起，模式会单独保存 `evidence_locations` 作为模式级源码证据位置；`patterns show` 概览优先展示业务/工具方法的 `code_location`，没有业务方法时回退展示第一条证据位置，并在详情页输出完整证据位置列表。
 
-0.8.0 起，Agent 输出会单独保存在 `.skills-seed/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
+0.8.0 起，Agent 输出会单独保存在 `.skills-seed/runtime/agent-outputs/`，运行日志只记录输出长度和归档路径，不再写入模型回复预览或 stdout/stderr 明文。0.10.3 起，合法 JSON 输出会在 `.md` 归档中格式化为可读的 `json` 代码块。业务方法位置统一使用 `code_location` 结构化元数据，生成的 business methods reference 会展示位置状态；项目 skill 和 references 也更紧凑，入口文档会引导 Agent 按任务读取最小必要参考。
 
 0.9.6 起，`.skills-seed/runtime` 下的调试记录统一使用 `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` 文件名前缀，包括 rendered prompt、Agent 输出归档和运行时输入临时目录，便于按时间排序排查一次运行中的上下文与模型输出。
 

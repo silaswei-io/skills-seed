@@ -36,7 +36,7 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 
 	content, err := os.ReadFile(archive.ContentPath)
 	require.NoError(t, err)
-	require.Equal(t, "{\"patterns\":[]}\n", string(content))
+	require.Equal(t, "```json\n{\n  \"patterns\": []\n}\n```\n", string(content))
 
 	entries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "agent-outputs"))
 	require.NoError(t, err)
@@ -135,6 +135,41 @@ func TestSaveAgentOutputForContextUsesSharedRuntimeTask(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &manifest))
 	require.Equal(t, "20260626-183633", manifest.RuntimeID)
 	require.Equal(t, "file-select", manifest.Slug)
+}
+
+func TestSaveAgentOutputForContextKeepsReadableUnitSlug(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
+		Agent:     "claude",
+		Operation: "AnalyzeCurrentCodebase/unit-auth-admin-login",
+		RuntimeID: "20260626-192529",
+		Slug:      RuntimeSlug("pattern-learn-current", "unit-auth-admin-login"),
+		Attempt:   1,
+		Content:   `{"patterns":[]}`,
+	})
+
+	require.Equal(t, "20260626-192529-claude-pattern-learn-current-unit-auth-admin-login.md", filepath.Base(archive.ContentPath))
+}
+
+func TestSaveAgentOutputForContextKeepsNonJSONContentAsMarkdown(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
+		Agent:     "claude",
+		Operation: "Explain",
+		RuntimeID: "20260626-192529",
+		Content:   "plain text",
+	})
+
+	require.Equal(t, "20260626-192529-claude-explain.md", filepath.Base(archive.ContentPath))
+	content, err := os.ReadFile(archive.ContentPath)
+	require.NoError(t, err)
+	require.Equal(t, "plain text\n", string(content))
 }
 
 func TestSaveAgentOutputForContextSkipsWhenSeedPathMissing(t *testing.T) {

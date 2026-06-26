@@ -12,6 +12,7 @@
 - The first non-whitespace character must be `{`, and the last non-whitespace character must be `}`.
 - Do not output Markdown, code fences, comments, explanations, prefixes, suffixes, summaries, conclusions, or any content outside the JSON object.
 - Before the final response, internally validate the JSON: ensure the final response can be parsed directly by a standard JSON parser, all string escaping is valid, and every brace, bracket, and quote is closed.
+- If validation finds that the final response is not valid JSON, fix it internally before responding; do not write validation steps, repair notes, or failure reasons outside the JSON.
 
 ## Language
 

@@ -9,7 +9,7 @@ import (
 const timestampLayout = "20060102-150405"
 
 // MaxSafePartLength 限制单个业务片段长度，避免 runtime 文件名过长。
-const MaxSafePartLength = 36
+const MaxSafePartLength = 64
 
 // Name 生成 runtime 记录文件名前缀，统一以时间开头，方便按目录排序定位。
 func Name(kind string, parts ...string) string {

@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.3]
+
+### 变更
+
+- Agent 输出归档继续使用 `.md`，但当最终内容是合法 JSON 时会格式化为可读的 `json` 代码块，便于直接查看 `runtime/agent-outputs` 调试结果。
+- 加强 JSON 型 prompt 的最终输出契约，要求 Agent 在内部自检失败时先修正为合法 JSON，再输出最终对象。
+
+### 修复
+
+- 放宽 runtime 文件名语义片段长度，避免 `pattern-learn-current-unit-auth-admin-login` 被截断成 `...auth-admi` 这类不完整标签。
+
 ## [v0.10.2]
 
 ### 变更

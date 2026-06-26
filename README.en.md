@@ -98,7 +98,7 @@ When an AI Agent hits retryable errors such as 429 / 529 / overloaded, Skills Se
 
 `skills-seed init` creates `.skills-seed/prompts/`. These files are not full replacements for the built-in prompts. They are merged with built-in prompts as project context, workspace constraints, or user instructions for learning and generation.
 
-Starting in 0.7.1, generated metadata, empty scaffolding, and unfilled placeholder text in default prompt files are filtered during rendering. Only user-authored constraints enter the Agent input. Each rendered prompt is saved under `.skills-seed/memory/runtime/rendered-prompts/`; the neighboring `.manifest.json` records whether base, project, workspace, and instruction fragments were included and their lengths, making context provenance easier to debug.
+Starting in 0.7.1, generated metadata, empty scaffolding, and unfilled placeholder text in default prompt files are filtered during rendering. Only user-authored constraints enter the Agent input. Each rendered prompt is saved under `.skills-seed/runtime/rendered-prompts/`; the neighboring `.manifest.json` records whether base, project, workspace, and instruction fragments were included and their lengths, making context provenance easier to debug.
 
 Starting in 0.7.2, project-profile analysis performs a narrow JSON recovery for duplicated object-start fragments inside object arrays in model output. If parsing still fails, it returns an error and keeps the existing profile instead of saving an `unknown/parse failed` placeholder as a successful result.
 
@@ -106,9 +106,9 @@ Starting in 0.7.3, current-code learning commits file-analysis fingerprints only
 
 Starting in 0.9.8, patterns store `evidence_locations` separately as pattern-level source evidence locations. The `patterns show` overview prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first evidence location and the detail view prints the full evidence-location list.
 
-Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/memory/runtime/agent-outputs/`. Runtime logs keep only output lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Business-method locations now use structured `code_location` metadata throughout, generated business-method references show location status, and project skills/references are more compact so the entry skill guides Agents to read the minimum relevant references for each task.
+Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/`. Runtime logs keep only output lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Starting in 0.10.3, valid JSON output is formatted as a readable fenced `json` block inside the `.md` archive. Business-method locations now use structured `code_location` metadata throughout, generated business-method references show location status, and project skills/references are more compact so the entry skill guides Agents to read the minimum relevant references for each task.
 
-Starting in 0.9.6, debug records under `.skills-seed/memory/runtime` use the unified `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` filename prefix, including rendered prompts, Agent output archives, and runtime input temporary directories, making it easier to sort by time while inspecting context and model outputs from one run.
+Starting in 0.9.6, debug records under `.skills-seed/runtime` use the unified `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` filename prefix, including rendered prompts, Agent output archives, and runtime input temporary directories, making it easier to sort by time while inspecting context and model outputs from one run.
 
 Starting in 0.9.0, learning and user-added patterns use the `pattern-curate` prompt for pre-storage curation: every candidate must be covered, duplicate rules must be consolidated, code evidence must come from input source, and invalid or low-quality candidates are dropped. The old pre-generation merge flow and `patterns merge` command have been removed; generation remains read-only.
 
