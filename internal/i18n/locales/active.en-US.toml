@@ -924,7 +924,7 @@ other = "Read additional guidance for this generate run from a file; useful for 
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern and curate it before storage\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules; use --ai explicitly for semantic merging\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern through --context and curate it before storage\n  update  - Update a specific pattern through --context\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules; use --ai explicitly for semantic merging\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
 
 [PatternsExample]
 other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Compact similar patterns in all categories\n  skills-seed patterns compact"
@@ -954,22 +954,49 @@ other = "Patterns compacted: input {{.TotalInput}}, written {{.TotalWritten}}, d
 other = "Add a user-defined pattern using natural language"
 
 [PatternsAddLongDesc]
-other = "Describe a coding convention or pattern in natural language, and AI will generate a structured Pattern combined with project code.\n\nAI auto-infers category, generates good/bad examples and actionable rules. Use --files to specify related files for more accurate examples."
+other = "Describe a coding convention or pattern in natural language through --context, and AI will generate a structured Pattern combined with project code.\n\nAI auto-infers category, generates good/bad examples and actionable rules. Use --files to specify related files or directories for more accurate examples."
 
 [PatternsAddExample]
-other = "  # Minimal usage\n  skills-seed patterns add \"All service methods must return domain error\"\n\n  # Specify category and files\n  skills-seed patterns add \"Use limit/offset for pagination\" --category api --files internal/handler/pagination.go"
+other = "  # Minimal usage\n  skills-seed patterns add --context \"All service methods must return domain error\"\n\n  # Specify category and related files or directories\n  skills-seed patterns add --context \"Use limit/offset for pagination\" --category api --files internal/handler"
 
 [PatternsAddFlagCategory]
 other = "Category: naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
 
 [PatternsAddFlagFiles]
-other = "Related file paths; may be repeated for multiple files"
+other = "Related file or directory paths; may be repeated"
 
-[PatternsAddRequireDescription]
-other = "pattern description required: skills-seed patterns add \"rule description\""
+[PatternsAddFlagContext]
+other = "Natural-language pattern description from the user"
+
+[PatternsAddRequireContext]
+other = "pattern description required through --context: skills-seed patterns add --context \"rule description\""
 
 [PatternsAddComplete]
 other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
+
+[PatternsUpdateShort]
+other = "Update a pattern"
+
+[PatternsUpdateLongDesc]
+other = "Update a specific pattern using natural language through --context. The command reads the current pattern, asks AI to regenerate structured content from the update request, and preserves the original pattern ID, creation time, and workspace ownership. Use --files to specify related files or directories."
+
+[PatternsUpdateExample]
+other = "  # Update one pattern\n  skills-seed patterns update resp-extra-update-logging --context \"Require audit logging when response extra fields change\"\n\n  # Specify a related directory\n  skills-seed patterns update resp-extra-update-logging --context \"Clarify logging fields\" --files internal/service"
+
+[PatternsUpdateFlagContext]
+other = "Natural-language update request from the user"
+
+[PatternsUpdateRequireID]
+other = "pattern ID required: skills-seed patterns update <pattern-id> --context \"update request\""
+
+[PatternsUpdateRequireContext]
+other = "update request required through --context: skills-seed patterns update <pattern-id> --context \"update request\""
+
+[PatternsUpdateComplete]
+other = "Pattern updated: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
+
+[PatternsUserDefineNoPattern]
+other = "AI did not return a writable pattern"
 
 [PatternsDeleteShort]
 other = "Delete a pattern"
@@ -1023,13 +1050,19 @@ other = "Show learned pattern overview or full details"
 other = "Show the learned pattern overview without arguments, or pass a pattern ID to inspect full details including examples, quality metrics, workspace ownership, business-method fields, and code-location metadata."
 
 [PatternsShowExample]
-other = "skills-seed patterns show\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
+other = "skills-seed patterns show\nskills-seed patterns show --sort score\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
 
 [PatternsShowFlagFormat]
 other = "output format: table or json"
 
+[PatternsShowFlagSort]
+other = "overview sort: updated, score, hits, or category; default updated"
+
 [PatternsShowUnsupportedFormat]
 other = "unsupported format {{.Format}}"
+
+[PatternsShowUnsupportedSort]
+other = "unsupported sort {{.Sort}}"
 
 [PatternsShowHeaderID]
 other = "ID"
@@ -1207,22 +1240,19 @@ other = "location_history"
 other = "One-stop sync: learn or add patterns + generate skills"
 
 [SyncLongDesc]
-other = "Run the full pipeline in one command:\n\n  Path A (default): learn current → generate skills\n  Path B (--add): patterns add → generate skills\n\nLearning and adding patterns curate candidates before storing them; generate skills only reads stored patterns."
+other = "Run the full pipeline in one command:\n\n  Path A (default): learn current → generate skills\n  Path B (--context): patterns add → generate skills\n\nLearning and adding patterns curate candidates before storing them; generate skills only reads stored patterns."
 
 [SyncExample]
-other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add user pattern + generate\n  skills-seed sync --add \"All APIs must handle errors\" --category api\n\n  # With related files\n  skills-seed sync --add \"Use limit/offset for pagination\" --files internal/handler/pagination.go"
-
-[SyncFlagAdd]
-other = "Add a user-defined pattern (triggers Path B)"
+other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add user pattern + generate\n  skills-seed sync --context \"All APIs must handle errors\" --category api\n\n  # With related files or directories\n  skills-seed sync --context \"Use limit/offset for pagination\" --files internal/handler"
 
 [SyncFlagCategory]
-other = "Category for user pattern (used with --add)"
+other = "Category for user pattern (used with --context)"
 
 [SyncFlagFiles]
-other = "Related file paths; may be repeated (used with --add)"
+other = "Related file or directory paths; may be repeated (used with --context)"
 
 [SyncFlagContext]
-other = "Additional context; plain sync passes it to learning, --add passes it to user pattern generation"
+other = "Natural-language pattern description from the user; triggers patterns add → generate skills"
 
 [SyncStepLearn]
 other = "[sync] Step 1/2: Learning from current codebase..."

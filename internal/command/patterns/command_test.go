@@ -85,7 +85,7 @@ func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 		CuratorSvc:  curator.NewService(mockAgent, rootPatternRepo),
 	}
 	cmd := addCmd(cont)
-	cmd.SetArgs([]string{"hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码"})
+	cmd.SetArgs([]string{"--context", "hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码"})
 
 	require.NoError(t, cmd.Execute())
 
@@ -104,15 +104,15 @@ func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 
 }
 
-func TestAddCmdRejectsContextFlag(t *testing.T) {
+func TestAddCmdRejectsPositionalDescription(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	cmd := addCmd(&container.Container{})
-	cmd.SetArgs([]string{"--context", "hsmwebapi 的 plugins 来自 plugins_custom.sh"})
+	cmd.SetArgs([]string{"hsmwebapi 的 plugins 来自 plugins_custom.sh"})
 
 	err := cmd.Execute()
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "unknown flag: --context")
+	require.Contains(t, err.Error(), "unknown command")
 }
 
 func TestAddCmdRequiresDescription(t *testing.T) {
@@ -122,7 +122,78 @@ func TestAddCmdRequiresDescription(t *testing.T) {
 	err := cmd.Execute()
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "需要提供模式描述")
+	require.Contains(t, err.Error(), "需要通过 --context 提供模式描述")
+}
+
+func TestUpdateCmdRevisesExistingPatternAndPreservesIdentity(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	createdAt := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	existing := domain.NewPattern("resp-extra-update-logging", "响应扩展字段日志", domain.CategoryBusiness)
+	existing.Description = "响应扩展字段更新需要记录日志"
+	existing.Rule = "当响应扩展字段变化时，应该记录操作日志"
+	existing.Source = domain.SourceLearnedCurrent
+	existing.ProjectID = "admin"
+	existing.ScopePath = "ntls_admin_go"
+	existing.CreatedAt = createdAt
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	require.NoError(t, patternRepo.Save(context.Background(), existing))
+	mockAgent := &mocks.MockAgent{
+		NameVal:      "mock",
+		AvailableVal: true,
+		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+			require.Contains(t, req.Description, "Update existing pattern")
+			require.Contains(t, req.Description, "补充审计日志")
+			require.Equal(t, "business", req.Category)
+			require.Equal(t, []string{"internal/service"}, req.Files)
+			revised := domain.NewPattern("agent-generated-id", "响应扩展字段审计日志", domain.CategoryBusiness)
+			revised.Description = "响应扩展字段更新必须记录审计日志"
+			revised.Rule = "当响应扩展字段发生新增、修改或删除时，应该记录审计日志"
+			revised.Confidence = 0.91
+			return &agent.UserDefinePatternResult{Pattern: revised}, nil
+		},
+	}
+	cont := &container.Container{
+		Config: &config.Config{
+			Project: config.ProjectConfig{RootPath: "/tmp/project", Language: "go"},
+		},
+		PatternRepo: patternRepo,
+		Agent:       mockAgent,
+	}
+	cmd := updateCmd(cont)
+	cmd.SetArgs([]string{"resp-extra-update-logging", "--context", "补充审计日志", "--files", "internal/service"})
+
+	require.NoError(t, cmd.Execute())
+
+	saved, err := patternRepo.Get(context.Background(), "resp-extra-update-logging")
+	require.NoError(t, err)
+	require.Equal(t, "resp-extra-update-logging", saved.ID)
+	require.Equal(t, createdAt, saved.CreatedAt)
+	require.Equal(t, domain.SourceLearnedCurrent, saved.Source)
+	require.Equal(t, "admin", saved.ProjectID)
+	require.Equal(t, "ntls_admin_go", saved.ScopePath)
+	require.Equal(t, "响应扩展字段审计日志", saved.Name)
+}
+
+func TestUpdateCmdRequiresContext(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	projectRoot := t.TempDir()
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(projectRoot, ".skills-seed", "store", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	cmd := updateCmd(&container.Container{
+		PatternRepo: patternRepo,
+		Agent:       &mocks.MockAgent{AvailableVal: true},
+	})
+	cmd.SetArgs([]string{"resp-extra-update-logging"})
+
+	err = cmd.Execute()
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "需要通过 --context 提供修订说明")
 }
 
 func TestDeleteCmdInProjectDeletesPattern(t *testing.T) {
@@ -318,6 +389,28 @@ func TestShowCmdPrintsPatternDatabaseFields(t *testing.T) {
 	require.Contains(t, text, "2026-06-09")
 	require.Contains(t, text, "changed")
 	require.Contains(t, text, "service/order.ts:20")
+}
+
+func TestSortPatternsDefaultsToUpdatedDescending(t *testing.T) {
+	older := domain.NewPattern("older", "旧模式", domain.CategoryError)
+	older.UpdatedAt = time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	newer := domain.NewPattern("newer", "新模式", domain.CategoryAPI)
+	newer.UpdatedAt = time.Date(2026, 6, 3, 9, 0, 0, 0, time.UTC)
+	patterns := []domain.Pattern{*older, *newer}
+
+	sortPatterns(patterns, "")
+
+	require.Equal(t, []string{"newer", "older"}, []string{patterns[0].ID, patterns[1].ID})
+}
+
+func TestSortPatternsCanUseCategory(t *testing.T) {
+	errorPattern := domain.NewPattern("error-wrap", "错误包装", domain.CategoryError)
+	apiPattern := domain.NewPattern("api-route", "API 路由", domain.CategoryAPI)
+	patterns := []domain.Pattern{*errorPattern, *apiPattern}
+
+	sortPatterns(patterns, "category")
+
+	require.Equal(t, []string{"api-route", "error-wrap"}, []string{patterns[0].ID, patterns[1].ID})
 }
 
 func TestShowCmdUsesPatternEvidenceLocationWhenBusinessMethodMissing(t *testing.T) {

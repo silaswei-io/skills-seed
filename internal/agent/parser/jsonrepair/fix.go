@@ -1,4 +1,4 @@
-package parser
+package jsonrepair
 
 import (
 	"encoding/json"
@@ -51,12 +51,17 @@ func FixAIJSON(jsonStr string) (string, error) {
 
 	var lastErr error
 	repairs := []func(string) (string, error){
+		repairJSONComments,
 		repairDuplicatedObjectStarts,
+		repairSingleQuotedStrings,
+		repairPythonLiterals,
 		repairRawControlCharactersInStrings,
 		repairBareObjectKeys,
 		repairMissingObjectStartsInArrays,
+		repairMissingCommas,
 		repairUnescapedQuotesInStrings,
 		repairInvalidStringEscapes,
+		repairTrailingCommas,
 		repairMissingClosingContainers,
 	}
 	for round := 0; round < 3; round++ {
@@ -543,6 +548,50 @@ func repairRawControlCharactersInStrings(jsonStr string) (string, error) {
 	return b.String(), nil
 }
 
+func repairTrailingCommas(jsonStr string) (string, error) {
+	var b strings.Builder
+	b.Grow(len(jsonStr))
+
+	inString := false
+	escapeNext := false
+	repaired := false
+	for i := 0; i < len(jsonStr); i++ {
+		ch := jsonStr[i]
+		if escapeNext {
+			b.WriteByte(ch)
+			escapeNext = false
+			continue
+		}
+		if ch == '\\' {
+			b.WriteByte(ch)
+			if inString {
+				escapeNext = true
+			}
+			continue
+		}
+		if ch == '"' {
+			b.WriteByte(ch)
+			inString = !inString
+			continue
+		}
+		if !inString && ch == ',' {
+			next := nextNonWhitespaceIndex(jsonStr, i+1)
+			if next < len(jsonStr) && (jsonStr[next] == '}' || jsonStr[next] == ']') {
+				repaired = true
+				continue
+			}
+		}
+		b.WriteByte(ch)
+	}
+	if inString {
+		return "", fmt.Errorf("unterminated JSON string")
+	}
+	if !repaired {
+		return jsonStr, nil
+	}
+	return b.String(), nil
+}
+
 func writeEscapedControlCharacter(b *strings.Builder, ch byte) {
 	switch ch {
 	case '\n':
@@ -640,7 +689,7 @@ func quoteTerminatesJSONString(s string, quoteIndex int, stringRole jsonRepairSt
 	case ']':
 		return parentKind == '[' || parentKind == 0
 	default:
-		return false
+		return missingCommaAfterStringValueLooksStructural(s, next, parentKind)
 	}
 }
 
@@ -655,6 +704,16 @@ func commaAfterStringValueLooksStructural(s string, commaIndex int, parentKind b
 		}
 		_, _, ok := parseBareObjectKey(s, next)
 		return ok
+	}
+	if parentKind == '[' {
+		return looksLikeArrayValueAt(s, next)
+	}
+	return false
+}
+
+func missingCommaAfterStringValueLooksStructural(s string, next int, parentKind byte) bool {
+	if parentKind == '{' {
+		return looksLikeObjectKeyAt(s, next)
 	}
 	if parentKind == '[' {
 		return looksLikeArrayValueAt(s, next)

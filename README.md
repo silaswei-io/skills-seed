@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 0.10.6 起，无参数执行 `skills-seed init` 会进入交互式初始化流程，逐步选择工具语言、项目模式、Skills 语言、Agent 类型和 Skills 类型；无参数执行 `skills-seed sync` 会在发现未完成状态时提示继续执行或重新开始。脚本中可使用 `--no-interactive` 关闭交互，`sync --resume` / `sync --restart` 可显式控制续跑策略。
 
+0.10.7 起，`patterns add` 和 `sync` 添加用户模式时统一使用 `--context` 传入自然语言描述，`patterns update <id> --context "<说明>"` 可修订指定 pattern 并保留原 ID 与 workspace 归属；`patterns show` 支持 `--sort updated|score|hits|category`。模型输出解析进一步修复尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号等非标准 JSON。
+
 0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
 
 0.10.4 起，默认入库策展使用本地确定性合并，并在内部按 pattern ID 维护唯一集合；当候选模式复用已有 ID，或历史模式库存在重复 ID 时，会先收敛为单条更高质量的模式再写入，避免重复 curated pattern ID 触发结构校验降级。
@@ -118,7 +120,7 @@ AI Agent 遇到 429 / 529 / overloaded 这类可重试错误时会按 `agent.ret
 
 0.9.0 起，学习和用户添加模式时会使用 `pattern-curate` 提示词做入库前策展：候选模式必须覆盖、重复规则必须整合、代码证据只能来自输入源码，非法或低质量候选会被丢弃。旧的生成前合并流程和 `patterns merge` 已移除，生成阶段保持只读。
 
-0.9.1 起，模型输出解析会先经过更稳健的 JSON 修复流程，覆盖重复对象起始、非法转义、字符串内未转义引号和缺失闭合容器等常见异常。0.10.5 起，该流程进一步覆盖字符串内原始换行/控制字符、裸对象键和数组项缺失对象起始符等长上下文输出异常。
+0.9.1 起，模型输出解析会先经过更稳健的 JSON 修复流程，覆盖重复对象起始、非法转义、字符串内未转义引号和缺失闭合容器等常见异常。0.10.5 起，该流程进一步覆盖字符串内原始换行/控制字符、裸对象键和数组项缺失对象起始符等长上下文输出异常；0.10.7 起继续覆盖尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号。
 
 常见目录：
 
@@ -262,7 +264,8 @@ skills:
 | `skills-seed learn history` | 从 Git 历史提交学习长期规则 |
 | `skills-seed generate skills` | 生成当前 `skills.target` 的 skills |
 | `skills-seed workflow --context "<说明>"` | 通过 Agent 从用户传入内容推导并保存工作流；未提供 `--name` 时自动生成名称，同名默认合并，重写使用 `--overwrite` |
-| `skills-seed patterns add <描述>` | 用自然语言补充用户自定义模式 |
+| `skills-seed patterns add --context "<描述>"` | 用自然语言补充用户自定义模式，可用 `--files` 指定文件或目录 |
+| `skills-seed patterns update <id> --context "<说明>"` | 修订指定用户模式 |
 | `skills-seed patterns compact` | 显式整理已入库的相似 patterns |
 | `skills-seed sync` | 一键执行学习/添加模式，然后生成 skills |
 | `skills-seed check` | 检查暂存区或 Git 跟踪文件 |

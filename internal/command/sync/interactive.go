@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func shouldRunInteractiveSync(cmd *cobra.Command, addDesc, category string, files []string, userContext string, noInteractive bool) bool {
+func shouldRunInteractiveSync(cmd *cobra.Command, category string, files []string, userContext string, noInteractive bool) bool {
 	if noInteractive || !interactive.IsTerminal() {
 		return false
 	}
-	if addDesc != "" || category != "" || len(files) > 0 || userContext != "" {
+	if category != "" || len(files) > 0 || userContext != "" {
 		return false
 	}
 	for _, name := range []string{"resume", "restart"} {

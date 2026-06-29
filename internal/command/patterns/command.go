@@ -35,6 +35,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	}
 
 	patternsCmd.AddCommand(addCmd(cont))
+	patternsCmd.AddCommand(updateCmd(cont))
 	patternsCmd.AddCommand(compactCmd(cont))
 	patternsCmd.AddCommand(deleteCmd(cont))
 	patternsCmd.AddCommand(statsCmd(cont))
@@ -45,13 +46,14 @@ func Cmd(cont *container.Container) *cobra.Command {
 func addCmd(cont *container.Container) *cobra.Command {
 	var category string
 	var files []string
+	var userContext string
 
 	cmd := &cobra.Command{
-		Use:     "add <description>",
+		Use:     "add --context <description>",
 		Short:   i18n.Get("PatternsAddShort"),
 		Long:    i18n.Get("PatternsAddLongDesc"),
 		Example: i18n.Get("PatternsAddExample"),
-		Args:    cobra.ArbitraryArgs,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
@@ -60,29 +62,16 @@ func addCmd(cont *container.Container) *cobra.Command {
 				return err
 			}
 
-			description, err := resolveAddPatternDescription(args)
+			description, err := resolvePatternContext(userContext, i18n.Get("PatternsAddRequireContext"))
 			if err != nil {
 				return err
 			}
-			req := &agent.UserDefinePatternRequest{
+			result, err := runUserDefinePattern(cmd.Context(), cont, agent.UserDefinePatternRequest{
 				Description: description,
 				Category:    category,
 				Files:       files,
 				WorkDir:     cont.Config.Project.RootPath,
 				Language:    cont.Config.Project.Language,
-			}
-
-			tracker := progress.New(1)
-			retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
-			ctx := retryProgress.WithContext(cmd.Context())
-			label := i18n.Get("ProgressUserDefinePatternAI")
-			var result *agent.UserDefinePatternResult
-			err = tracker.RunStep(label, func() error {
-				retryProgress.StartStep(label)
-				var callErr error
-				result, callErr = cont.Agent.UserDefinePattern(ctx, req)
-				retryProgress.FinishStep(label, callErr == nil)
-				return callErr
 			})
 			if err != nil {
 				return err
@@ -91,7 +80,7 @@ func addCmd(cont *container.Container) *cobra.Command {
 				return fmt.Errorf("pattern curator is not configured")
 			}
 
-			written, err := StoreUserDefinedPattern(ctx, cont, description, *result.Pattern)
+			written, err := StoreUserDefinedPattern(cmd.Context(), cont, description, *result.Pattern)
 			if err != nil {
 				return err
 			}
@@ -109,6 +98,7 @@ func addCmd(cont *container.Container) *cobra.Command {
 
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsAddFlagCategory"))
 	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("PatternsAddFlagFiles"))
+	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("PatternsAddFlagContext"))
 	return cmd
 }
 
@@ -117,12 +107,124 @@ type workspacePatternTargetPlan struct {
 	Projects  []string
 }
 
-func resolveAddPatternDescription(args []string) (string, error) {
-	description := strings.TrimSpace(strings.Join(args, " "))
+func updateCmd(cont *container.Container) *cobra.Command {
+	var category string
+	var files []string
+	var userContext string
+
+	cmd := &cobra.Command{
+		Use:     "update <pattern-id> --context <description>",
+		Short:   i18n.Get("PatternsUpdateShort"),
+		Long:    i18n.Get("PatternsUpdateLongDesc"),
+		Example: i18n.Get("PatternsUpdateExample"),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 1 || strings.TrimSpace(args[0]) == "" {
+				return fmt.Errorf("%s", i18n.Get("PatternsUpdateRequireID"))
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cont == nil {
+				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+			}
+			if cont.PatternRepo == nil {
+				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+			}
+			if err := commandutil.RequireAgentAvailable(cont); err != nil {
+				return err
+			}
+			description, err := resolvePatternContext(userContext, i18n.Get("PatternsUpdateRequireContext"))
+			if err != nil {
+				return err
+			}
+			patternID := strings.TrimSpace(args[0])
+			existing, err := cont.PatternRepo.Get(cmd.Context(), patternID)
+			if err != nil {
+				return err
+			}
+			result, err := runUserDefinePattern(cmd.Context(), cont, agent.UserDefinePatternRequest{
+				Description: updatePatternDescription(description, existing),
+				Category:    choosePatternCategory(category, existing),
+				Files:       files,
+				WorkDir:     cont.Config.Project.RootPath,
+				Language:    cont.Config.Project.Language,
+			})
+			if err != nil {
+				return err
+			}
+			written, err := UpdateUserDefinedPattern(cmd.Context(), cont, *existing, *result.Pattern)
+			if err != nil {
+				return err
+			}
+			logger.Info(i18n.GetWithParams("PatternsUpdateComplete", map[string]interface{}{
+				"PatternID":   written.ID,
+				"PatternName": written.Name,
+				"Category":    string(written.Category),
+				"Source":      string(written.Source),
+			}))
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsAddFlagCategory"))
+	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("PatternsAddFlagFiles"))
+	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("PatternsUpdateFlagContext"))
+	return cmd
+}
+
+func resolvePatternContext(contextValue, message string) (string, error) {
+	description := strings.TrimSpace(contextValue)
 	if description != "" {
 		return description, nil
 	}
-	return "", fmt.Errorf("%s", i18n.Get("PatternsAddRequireDescription"))
+	return "", fmt.Errorf("%s", message)
+}
+
+func runUserDefinePattern(ctx context.Context, cont *container.Container, req agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+	tracker := progress.New(1)
+	retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+	ctx = retryProgress.WithContext(ctx)
+	label := i18n.Get("ProgressUserDefinePatternAI")
+	var result *agent.UserDefinePatternResult
+	err := tracker.RunStep(label, func() error {
+		retryProgress.StartStep(label)
+		var callErr error
+		result, callErr = cont.Agent.UserDefinePattern(ctx, &req)
+		retryProgress.FinishStep(label, callErr == nil)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || result.Pattern == nil {
+		return nil, fmt.Errorf("%s", i18n.Get("PatternsUserDefineNoPattern"))
+	}
+	return result, nil
+}
+
+func updatePatternDescription(description string, existing *domain.Pattern) string {
+	if existing == nil {
+		return description
+	}
+	return strings.TrimSpace(fmt.Sprintf(
+		"Update existing pattern %q (%s).\n\nCurrent description:\n%s\n\nCurrent rule:\n%s\n\nRequested update:\n%s",
+		existing.ID,
+		existing.Name,
+		existing.Description,
+		existing.Rule,
+		description,
+	))
+}
+
+func choosePatternCategory(category string, existing *domain.Pattern) string {
+	category = strings.TrimSpace(category)
+	if category != "" {
+		return category
+	}
+	if existing == nil {
+		return ""
+	}
+	return string(existing.Category)
 }
 
 // StoreUserDefinedPattern 保存用户定义模式。
@@ -176,6 +278,37 @@ func curateAndStoreUserDefinedPattern(ctx context.Context, svc *curator.Service,
 		return domain.Pattern{}, fmt.Errorf("%s", reason)
 	}
 	return curated.Written[0], nil
+}
+
+// UpdateUserDefinedPattern 保存用户对既有模式的修订。
+func UpdateUserDefinedPattern(ctx context.Context, cont *container.Container, existing, revised domain.Pattern) (domain.Pattern, error) {
+	revised.ID = existing.ID
+	if revised.Name == "" {
+		revised.Name = existing.Name
+	}
+	if revised.Category == "" {
+		revised.Category = existing.Category
+	}
+	revised.Source = existing.Source
+	revised.ProjectID = existing.ProjectID
+	revised.ScopePath = existing.ScopePath
+	revised.WorkspaceRole = existing.WorkspaceRole
+	revised.AnalysisUnitID = existing.AnalysisUnitID
+	revised.AnalysisUnitName = existing.AnalysisUnitName
+	revised.CreatedAt = existing.CreatedAt
+	revised.Generated = existing.Generated
+	if len(revised.MergedFrom) == 0 {
+		revised.MergedFrom = existing.MergedFrom
+	}
+	if err := cont.PatternRepo.Save(ctx, &revised); err != nil {
+		return domain.Pattern{}, err
+	}
+	if cont.ConfigRepo != nil && cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace && existing.ProjectID != "" {
+		if err := storeWorkspaceChildPattern(ctx, cont, existing.ProjectID, revised); err != nil {
+			return domain.Pattern{}, err
+		}
+	}
+	return revised, nil
 }
 
 func storeWorkspaceChildPattern(ctx context.Context, cont *container.Container, projectID string, pattern domain.Pattern) error {
@@ -328,6 +461,7 @@ func statsCmd(cont *container.Container) *cobra.Command {
 
 func showCmd(cont *container.Container) *cobra.Command {
 	var format string
+	var sortBy string
 
 	cmd := &cobra.Command{
 		Use:     "show [pattern-id]",
@@ -342,6 +476,9 @@ func showCmd(cont *container.Container) *cobra.Command {
 			}
 			if format != "" && format != "table" && format != "json" {
 				return fmt.Errorf("%s", i18n.GetWithParams("PatternsShowUnsupportedFormat", map[string]interface{}{"Format": format}))
+			}
+			if !isValidPatternSort(sortBy) {
+				return fmt.Errorf("%s", i18n.GetWithParams("PatternsShowUnsupportedSort", map[string]interface{}{"Sort": sortBy}))
 			}
 			if len(args) == 1 {
 				pattern, err := repo.Get(context.Background(), args[0])
@@ -364,11 +501,21 @@ func showCmd(cont *container.Container) *cobra.Command {
 			if format == "json" {
 				return writePatternsJSON(cmd.OutOrStdout(), patterns)
 			}
-			return writePatternList(cmd.OutOrStdout(), patterns)
+			return writePatternList(cmd.OutOrStdout(), patterns, sortBy)
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "table", i18n.Get("PatternsShowFlagFormat"))
+	cmd.Flags().StringVar(&sortBy, "sort", "updated", i18n.Get("PatternsShowFlagSort"))
 	return cmd
+}
+
+func isValidPatternSort(sortBy string) bool {
+	switch sortBy {
+	case "", "updated", "score", "hits", "category":
+		return true
+	default:
+		return false
+	}
 }
 
 func requirePatternRepository(cont *container.Container) (domain.PatternRepository, error) {
@@ -421,13 +568,8 @@ func writeStats(w io.Writer, stats []domain.PatternHitStats) error {
 	return tw.Flush()
 }
 
-func writePatternList(w io.Writer, patterns []domain.Pattern) error {
-	sort.Slice(patterns, func(i, j int) bool {
-		if patterns[i].Category != patterns[j].Category {
-			return patterns[i].Category < patterns[j].Category
-		}
-		return patterns[i].ID < patterns[j].ID
-	})
+func writePatternList(w io.Writer, patterns []domain.Pattern, sortBy string) error {
+	sortPatterns(patterns, sortBy)
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	if _, err := fmt.Fprintf(
@@ -462,6 +604,47 @@ func writePatternList(w io.Writer, patterns []domain.Pattern) error {
 		}
 	}
 	return tw.Flush()
+}
+
+func sortPatterns(patterns []domain.Pattern, sortBy string) {
+	if sortBy == "" {
+		sortBy = "updated"
+	}
+	sort.SliceStable(patterns, func(i, j int) bool {
+		switch sortBy {
+		case "score":
+			if patterns[i].Metrics.EffectiveScore != patterns[j].Metrics.EffectiveScore {
+				return patterns[i].Metrics.EffectiveScore > patterns[j].Metrics.EffectiveScore
+			}
+			if patterns[i].Confidence != patterns[j].Confidence {
+				return patterns[i].Confidence > patterns[j].Confidence
+			}
+		case "hits":
+			if patterns[i].Frequency != patterns[j].Frequency {
+				return patterns[i].Frequency > patterns[j].Frequency
+			}
+			if patterns[i].Metrics.EffectiveScore != patterns[j].Metrics.EffectiveScore {
+				return patterns[i].Metrics.EffectiveScore > patterns[j].Metrics.EffectiveScore
+			}
+		case "category":
+			if patterns[i].Category != patterns[j].Category {
+				return patterns[i].Category < patterns[j].Category
+			}
+		default:
+			left := patterns[i].UpdatedAt
+			right := patterns[j].UpdatedAt
+			if !left.Equal(right) {
+				return left.After(right)
+			}
+			if patterns[i].CreatedAt != patterns[j].CreatedAt {
+				return patterns[i].CreatedAt.After(patterns[j].CreatedAt)
+			}
+		}
+		if patterns[i].Category != patterns[j].Category {
+			return patterns[i].Category < patterns[j].Category
+		}
+		return patterns[i].ID < patterns[j].ID
+	})
 }
 
 func writePatternDetails(w io.Writer, pattern *domain.Pattern) error {

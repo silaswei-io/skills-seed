@@ -924,7 +924,7 @@ other = "从文件读取本次生成的补充说明；适合较长约束"
 other = "管理已学习的 patterns"
 
 [PatternsLongDesc]
-other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 添加用户自定义候选模式，并在入库前完成策展\n  delete  - 删除指定 pattern\n  compact - 本地整理已有 patterns，减少重复规则；可显式 --ai 进行语义合并\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量和命中统计。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
+other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 通过 --context 添加用户自定义候选模式，并在入库前完成策展\n  update  - 通过 --context 修订指定 pattern\n  delete  - 删除指定 pattern\n  compact - 本地整理已有 patterns，减少重复规则；可显式 --ai 进行语义合并\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量和命中统计。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
 
 [PatternsExample]
 other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  # 查看单条 pattern 详情\n  skills-seed patterns show business-create-order\n\n  # 整理所有分类中的相似 patterns\n  skills-seed patterns compact"
@@ -954,22 +954,49 @@ other = "Patterns 整理完成: 输入 {{.TotalInput}}，写入 {{.TotalWritten}
 other = "用自然语言添加用户自定义模式"
 
 [PatternsAddLongDesc]
-other = "使用自然语言描述编码规范或模式，AI 结合项目代码生成结构化 Pattern。\n\nAI 会根据描述自动推断分类、生成正例/反例代码和可操作规则。\n可用 --files 指定关联文件，AI 会读取这些文件生成更精准的示例。"
+other = "通过 --context 使用自然语言描述编码规范或模式，AI 结合项目代码生成结构化 Pattern。\n\nAI 会根据描述自动推断分类、生成正例/反例代码和可操作规则。\n可用 --files 指定关联文件或目录，AI 会读取这些范围生成更精准的示例。"
 
 [PatternsAddExample]
-other = "  # 最简用法\n  skills-seed patterns add \"所有 service 方法必须返回 domain error\"\n\n  # 指定分类和关联文件\n  skills-seed patterns add \"分页查询统一使用 limit/offset\" --category api --files internal/handler/pagination.go"
+other = "  # 最简用法\n  skills-seed patterns add --context \"所有 service 方法必须返回 domain error\"\n\n  # 指定分类和关联文件或目录\n  skills-seed patterns add --context \"分页查询统一使用 limit/offset\" --category api --files internal/handler"
 
 [PatternsAddFlagCategory]
 other = "指定分类：naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
 
 [PatternsAddFlagFiles]
-other = "关联文件路径，可重复传入；AI 会读取这些文件生成精准示例"
+other = "关联文件或目录路径，可重复传入；AI 会读取这些范围生成精准示例"
 
-[PatternsAddRequireDescription]
-other = "需要提供模式描述：skills-seed patterns add \"规则描述\""
+[PatternsAddFlagContext]
+other = "用户输入的自然语言模式描述"
+
+[PatternsAddRequireContext]
+other = "需要通过 --context 提供模式描述：skills-seed patterns add --context \"规则描述\""
 
 [PatternsAddComplete]
 other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, 来源: {{.Source}})"
+
+[PatternsUpdateShort]
+other = "修订指定 pattern"
+
+[PatternsUpdateLongDesc]
+other = "通过 --context 使用自然语言修订指定 pattern。命令会读取现有 pattern，让 AI 根据修订说明重新生成结构化内容，并保留原 pattern ID、创建时间和 workspace 归属。可用 --files 指定关联文件或目录。"
+
+[PatternsUpdateExample]
+other = "  # 修订指定 pattern\n  skills-seed patterns update resp-extra-update-logging --context \"补充响应额外字段更新时必须记录审计日志\"\n\n  # 指定关联目录\n  skills-seed patterns update resp-extra-update-logging --context \"补充日志字段要求\" --files internal/service"
+
+[PatternsUpdateFlagContext]
+other = "用户输入的自然语言修订说明"
+
+[PatternsUpdateRequireID]
+other = "需要提供 pattern ID：skills-seed patterns update <pattern-id> --context \"修订说明\""
+
+[PatternsUpdateRequireContext]
+other = "需要通过 --context 提供修订说明：skills-seed patterns update <pattern-id> --context \"修订说明\""
+
+[PatternsUpdateComplete]
+other = "Pattern 已更新: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, 来源: {{.Source}})"
+
+[PatternsUserDefineNoPattern]
+other = "AI 未返回可写入的 pattern"
 
 [PatternsDeleteShort]
 other = "删除指定 pattern"
@@ -1023,13 +1050,19 @@ other = "查看已学习 pattern 的概览或完整详情"
 other = "无参数时查看已学习 pattern 概览；传入 pattern ID 时查看完整详情，包括示例、质量指标、workspace 归属、业务方法和代码位置元数据。"
 
 [PatternsShowExample]
-other = "skills-seed patterns show\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
+other = "skills-seed patterns show\nskills-seed patterns show --sort score\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
 
 [PatternsShowFlagFormat]
 other = "输出格式：table 或 json"
 
+[PatternsShowFlagSort]
+other = "概览排序：updated、score、hits 或 category；默认 updated"
+
 [PatternsShowUnsupportedFormat]
 other = "不支持的输出格式 {{.Format}}"
+
+[PatternsShowUnsupportedSort]
+other = "不支持的排序方式 {{.Sort}}"
 
 [PatternsShowHeaderID]
 other = "ID"
@@ -1207,22 +1240,19 @@ other = "位置历史"
 other = "一键同步：学习或添加模式 + 生成 skills"
 
 [SyncLongDesc]
-other = "一键完成完整流程，自动执行所有步骤：\n\n  路径 A（默认）: learn current → generate skills\n  路径 B（--add）: patterns add → generate skills\n\n学习和添加模式时会先完成模式策展入库，generate skills 只读取已入库模式并生成 skills。"
+other = "一键完成完整流程，自动执行所有步骤：\n\n  路径 A（默认）: learn current → generate skills\n  路径 B（--context）: patterns add → generate skills\n\n学习和添加模式时会先完成模式策展入库，generate skills 只读取已入库模式并生成 skills。"
 
 [SyncExample]
-other = "  # 完整流程：学习 + 生成\n  skills-seed sync\n\n  # 添加用户模式 + 生成\n  skills-seed sync --add \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件\n  skills-seed sync --add \"分页查询使用 limit/offset\" --files internal/handler/pagination.go"
-
-[SyncFlagAdd]
-other = "添加用户自定义模式（触发路径 B）"
+other = "  # 完整流程：学习 + 生成\n  skills-seed sync\n\n  # 添加用户模式 + 生成\n  skills-seed sync --context \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件或目录\n  skills-seed sync --context \"分页查询使用 limit/offset\" --files internal/handler"
 
 [SyncFlagCategory]
-other = "用户模式的分类（配合 --add 使用）"
+other = "用户模式的分类（配合 --context 使用）"
 
 [SyncFlagFiles]
-other = "关联文件路径，可重复传入（配合 --add 使用）"
+other = "关联文件或目录路径，可重复传入（配合 --context 使用）"
 
 [SyncFlagContext]
-other = "额外上下文说明；普通 sync 传给学习阶段，--add 时传给用户模式生成"
+other = "用户输入的自然语言模式描述；传入后执行 patterns add → generate skills"
 
 [SyncStepLearn]
 other = "[sync] 步骤 1/2: 学习当前代码库..."

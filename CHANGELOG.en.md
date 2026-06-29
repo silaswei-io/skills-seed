@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.7]
+
+### Changes
+
+- Changed `patterns add` to require `--context` for the natural-language pattern description, with `--files` accepting related files or directories. `sync --context` is now the unified path for adding a user pattern and regenerating skills, replacing the old `sync --add` semantics.
+- Added `patterns update <pattern-id> --context <request>` so an Agent can regenerate structured pattern content while preserving the original pattern ID, creation time, and workspace ownership.
+- `patterns show` now sorts overview output by latest update by default and supports `--sort updated|score|hits|category` for quality, hit-count, or category-oriented inspection.
+- Reorganized `internal/agent/parser`: JSON extraction and repair now live under the `jsonrepair` subpackage, while result parsing, payload conversion, and workspace parsing are grouped by responsibility.
+
+### Fixes
+
+- Strengthened Agent JSON output repair for trailing commas, comments, single-quoted strings, Python-style `True`/`False`/`None`, and missing commas between object fields or array values.
+- Made business-method parsing tolerate `prerequisites` and `returns` returned as string arrays, preventing valid JSON with minor field-type drift from interrupting `learn current`.
+
 ## [v0.10.6]
 
 ### Changes

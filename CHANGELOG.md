@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.7]
+
+### 变更
+
+- `patterns add` 改为显式使用 `--context` 传入自然语言模式描述，并支持 `--files` 指定关联文件或目录；`sync --context` 统一作为“添加用户模式后生成 skills”的入口，移除旧的 `sync --add` 语义。
+- 新增 `patterns update <pattern-id> --context <说明>`，可在保留原 pattern ID、创建时间和 workspace 归属的前提下，让 Agent 根据修订说明重新生成结构化模式内容。
+- `patterns show` 概览默认按最近更新时间排序，并新增 `--sort updated|score|hits|category`，方便按质量、命中次数或分类查看已沉淀规则。
+- 调整 `internal/agent/parser` 结构，将 JSON 提取与修复逻辑收敛到 `jsonrepair` 子包，解析入口、payload 转换和 workspace 解析按职责重新内聚。
+
+### 修复
+
+- 加强 Agent JSON 输出修复，新增对尾随逗号、注释、单引号字符串、Python 风格 `True`/`False`/`None`、对象字段/数组元素漏逗号等常见非标准 JSON 的恢复。
+- 业务方法字段解析兼容 `prerequisites` 和 `returns` 返回字符串数组的情况，避免合法 JSON 因字段类型轻微漂移导致 `learn current` 中断。
+
 ## [v0.10.6]
 
 ### 变更

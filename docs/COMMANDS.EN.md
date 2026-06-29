@@ -32,7 +32,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Initialize one project | `skills-seed init --mode project` → `skills-seed sync` | Create config, learn current code, and generate skills |
 | Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
 | Daily incremental update | `skills-seed sync` | Learns current changes, then fully regenerates skills |
-| Add one missed rule | `skills-seed sync --add "<description>"` | Skips code learning, adds a natural-language pattern, then generates |
+| Add one missed rule | `skills-seed sync --context "<description>"` | Skips code learning, adds a natural-language pattern, then generates |
 | Update task workflow | `skills-seed workflow --context "<notes>"` → `skills-seed generate skills` | `--context` is inferred by the Agent from goals, constraints, background, or paths; omit `--name` to generate one, same-name workflows merge by default, and `--overwrite` replaces one completely |
 | Pre-commit updates | `skills-seed hook install` | Install the pre-commit hook and choose sync, learn only, or skip before commit |
 | Inspect learned changes | `skills-seed log` | Show recent learned and generated changes in a git-log-like format |
@@ -58,12 +58,13 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed learn current` | Learn from current codebase | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
-| `skills-seed patterns` | Manage learned patterns | `add <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats` | `--help, -h` = `false` |
-| `skills-seed patterns add <description>` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed patterns` | Manage learned patterns | `add --context <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> --context <description>` | `--help, -h` = `false` |
+| `skills-seed patterns add --context <description>` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
 | `skills-seed patterns compact` | Compact similar patterns | - | `--ai` = `false`<br>`--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern | - | `--help, -h` = `false` |
-| `skills-seed patterns show [pattern-id]` | Show learned pattern overview or full details | - | `--format` = `table`<br>`--help, -h` = `false` |
+| `skills-seed patterns show [pattern-id]` | Show learned pattern overview or full details | - | `--format` = `table`<br>`--help, -h` = `false`<br>`--sort` = `updated` |
 | `skills-seed patterns stats` | Show learned pattern quality and check hit statistics | - | `--help, -h` = `false` |
+| `skills-seed patterns update <pattern-id> --context <description>` | Update a pattern | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
 | `skills-seed preview` | Preview analysis inputs | `files` | `--help, -h` = `false` |
 | `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
 | `skills-seed profile` | Show or refresh the project profile | `refresh`, `show` | `--help, -h` = `false` |
@@ -73,7 +74,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed review` | Import review comments and show prevention statistics | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | One-stop sync: learn or add patterns + generate skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed sync` | One-stop sync: learn or add patterns + generate skills | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | Add or update a user workflow | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | Add sub-projects to workspace | - | `--help, -h` = `false` |
@@ -419,7 +420,8 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed patterns add <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add "Use RESTful API routes" --category api` | Calls the AI agent |
+| `skills-seed patterns add --context <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add --context "Use RESTful API routes" --category api` | Calls the AI agent |
+| `skills-seed patterns update <pattern-id> --context <request>` | Update one pattern while preserving its original ID and ownership | `skills-seed patterns update resp-extra-update-logging --context "Require audit logging"` | Calls the AI agent |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern by ID | `skills-seed patterns delete plugin-source-editing-rule` | Workspace root also deletes the linked child project pattern |
 | `skills-seed patterns compact` | Compact similar patterns locally by default; call the Agent for semantic merging only with `--ai` | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
@@ -436,10 +438,20 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 | Flag | Default | Description |
 |---|---:|---|
 | `--category`, `-c` | empty | Specify a category, such as `business`, `api`, or `testing`; leave empty for AI auto-detection |
-| `--files`, `-f` | empty | Reference file path; repeat this flag for multiple files. AI reads the files to help generate the pattern |
+| `--context` | empty | User-provided natural-language pattern description; required |
+| `--files`, `-f` | empty | Related file or directory path; repeat this flag for multiple ranges. AI reads the content to help generate the pattern |
 | `--help`, `-h` | `false` | Show `patterns add` help |
 
 When run from a workspace root, `patterns add` writes the root pattern first. If the description mentions a child project id or path, it also writes the child project's pattern database. Skills are regenerated by `sync` or an explicit `generate skills` run.
+
+#### `patterns update` Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--category`, `-c` | empty | Specify the revised category; empty keeps the existing category |
+| `--context` | empty | User-provided natural-language update request; required |
+| `--files`, `-f` | empty | Related file or directory path; repeat this flag for multiple ranges |
+| `--help`, `-h` | `false` | Show `patterns update` help |
 
 #### `patterns delete` Flags
 
@@ -468,13 +480,15 @@ When run from a workspace root, `patterns add` writes the root pattern first. If
 |---|---:|---|
 | `--format` | `table` | Output format: `table` or `json` |
 | `--help`, `-h` | `false` | Show `patterns show` help |
+| `--sort` | `updated` | Overview sort: `updated`, `score`, `hits`, or `category` |
 
 #### Common Examples
 
 ```bash
-skills-seed patterns add "All API routes use RESTful style"
-skills-seed patterns add "Errors must wrap context" --category error
-skills-seed patterns add "Database operations use transactions; project uses GORM" --files internal/service/user.go
+skills-seed patterns add --context "All API routes use RESTful style"
+skills-seed patterns add --context "Errors must wrap context" --category error
+skills-seed patterns add --context "Database operations use transactions; project uses GORM" --files internal/service
+skills-seed patterns update resp-extra-update-logging --context "Require audit logging for response extra field updates"
 skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
@@ -482,6 +496,7 @@ skills-seed patterns compact --category business --dry-run
 skills-seed patterns compact --ai --dry-run
 skills-seed patterns stats
 skills-seed patterns show
+skills-seed patterns show --sort score
 skills-seed patterns show business-create-order
 skills-seed patterns show business-create-order --format json
 ```
@@ -491,7 +506,7 @@ skills-seed patterns show business-create-order --format json
 1. `patterns compact` uses local deterministic merging by default and does not call the Agent. It calls the CLI configured by the current `agent.engine` only when `--ai` is set.
 2. Use `--dry-run` first when you want to inspect the curation result.
 3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
-4. `patterns show` without arguments prints the pattern overview list. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.
+4. `patterns show` without arguments prints the pattern overview list, sorted by latest update by default. Use `--sort score` for high-value rules, `--sort hits` for frequently hit rules, and `--sort category` for category grouping. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.
 5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/store/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
 
 ### `skills-seed review`
@@ -599,39 +614,37 @@ skills-seed profile refresh --language go
 
 #### Command Overview
 
-One-step sync: learn current code, then generate skills. When `--add` is provided, learning is skipped and a user-defined pattern is created before generation.
+One-step sync: learn current code, then generate skills. When `--context` is provided, learning is skipped and a user-defined pattern is created before generation.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed sync` | Learn current → generate skills | `skills-seed sync` | Runs `learn current` first, then fully regenerates skills |
-| `skills-seed sync --add <desc>` | patterns add → generate skills | `skills-seed sync --add "Use RESTful API routes"` | Skips learning; good for patterns the AI did not discover |
+| `skills-seed sync --context <desc>` | patterns add → generate skills | `skills-seed sync --context "Use RESTful API routes"` | Skips learning; good for patterns the AI did not discover |
 
 #### Flags
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--add` | empty | Natural language pattern description; triggers patterns add → generate |
-| `--category`, `-c` | empty | Category for `--add` mode |
-| `--files`, `-f` | empty | Reference file path for `--add` mode; repeat this flag for multiple files |
-| `--context` | empty | Additional context; plain `sync` passes it to `learn current`, while `sync --add` passes it to user pattern generation |
+| `--category`, `-c` | empty | Category for `--context` mode |
+| `--files`, `-f` | empty | Related file or directory path for `--context` mode; repeat this flag for multiple ranges |
+| `--context` | empty | Natural-language pattern description from the user; triggers patterns add → generate |
 | `--help`, `-h` | `false` | Show `sync` help |
 
 #### Common Examples
 
 ```bash
 skills-seed sync
-skills-seed sync --add "All API routes use RESTful style"
-skills-seed sync --add "Errors must wrap context" --category error
-skills-seed sync --add "Database operations use transactions" --files internal/service/user.go
-skills-seed sync --context "Focus on compatibility boundaries for this run"
+skills-seed sync --context "All API routes use RESTful style"
+skills-seed sync --context "Errors must wrap context" --category error
+skills-seed sync --context "Database operations use transactions" --files internal/service
 ```
 
 #### Notes
 
-1. `sync` without `--add` runs `learn current` first; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
-2. `sync --add` skips learning and defines a pattern from natural language, useful for patterns the AI missed.
+1. `sync` without `--context` runs `learn current` first; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
+2. `sync --context` skips learning and defines a pattern from natural language, useful for patterns the AI missed.
 3. If any step fails, subsequent steps are skipped.
 
 ### `skills-seed check`

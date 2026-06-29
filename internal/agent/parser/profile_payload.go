@@ -1,52 +1,27 @@
 package parser
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-type stringList []string
-
-func (l *stringList) UnmarshalJSON(data []byte) error {
-	var values []string
-	if err := json.Unmarshal(data, &values); err == nil {
-		*l = values
-		return nil
-	}
-	var value string
-	if err := json.Unmarshal(data, &value); err == nil {
-		if value == "" {
-			*l = []string{}
-		} else {
-			*l = []string{value}
-		}
-		return nil
-	}
-	return json.Unmarshal(data, &values)
-}
-
-func (l stringList) strings() []string {
-	return nonNilStrings([]string(l))
-}
-
 type projectProfilePayload struct {
-	ProjectName  string     `json:"project_name"`
-	Language     string     `json:"language"`
-	Frameworks   stringList `json:"frameworks"`
-	Architecture string     `json:"architecture"`
-	Structure    string     `json:"structure"`
+	ProjectName  string             `json:"project_name"`
+	Language     string             `json:"language"`
+	Frameworks   flexibleStringList `json:"frameworks"`
+	Architecture string             `json:"architecture"`
+	Structure    string             `json:"structure"`
 	Layers       []struct {
-		Name             string     `json:"name"`
-		Description      string     `json:"description"`
-		Responsibilities stringList `json:"responsibilities"`
-		Files            stringList `json:"files"`
+		Name             string             `json:"name"`
+		Description      string             `json:"description"`
+		Responsibilities flexibleStringList `json:"responsibilities"`
+		Files            flexibleStringList `json:"files"`
 	} `json:"layers"`
-	DependencyGraph   string     `json:"dependency_graph"`
-	DataFlow          string     `json:"data_flow"`
-	FrameworkPatterns stringList `json:"framework_patterns"`
+	DependencyGraph   string             `json:"dependency_graph"`
+	DataFlow          string             `json:"data_flow"`
+	FrameworkPatterns flexibleStringList `json:"framework_patterns"`
 	CommonUtils       []struct {
 		Name        string `json:"name"`
 		File        string `json:"file"`
@@ -55,16 +30,16 @@ type projectProfilePayload struct {
 		Usage       string `json:"usage"`
 	} `json:"common_utils"`
 	KeyModules []struct {
-		Name             string     `json:"name"`
-		Path             string     `json:"path"`
-		Description      string     `json:"description"`
-		Responsibilities stringList `json:"responsibilities"`
-		Dependencies     stringList `json:"dependencies"`
-		Dependents       stringList `json:"dependents"`
-		KeyMethods       stringList `json:"key_methods"`
+		Name             string             `json:"name"`
+		Path             string             `json:"path"`
+		Description      string             `json:"description"`
+		Responsibilities flexibleStringList `json:"responsibilities"`
+		Dependencies     flexibleStringList `json:"dependencies"`
+		Dependents       flexibleStringList `json:"dependents"`
+		KeyMethods       flexibleStringList `json:"key_methods"`
 	} `json:"key_modules"`
-	ConfigPatterns     stringList                 `json:"config_patterns"`
-	Dependencies       stringList                 `json:"dependencies"`
+	ConfigPatterns     flexibleStringList         `json:"config_patterns"`
+	Dependencies       flexibleStringList         `json:"dependencies"`
 	BusinessMethods    []businessMethodPayload    `json:"business_methods"`
 	ValidationCommands []domain.ValidationCommand `json:"validation_commands"`
 	Summary            string                     `json:"summary"`

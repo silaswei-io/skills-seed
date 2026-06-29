@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 Starting in 0.10.6, running `skills-seed init` without flags opens an interactive initialization flow for tool language, project mode, Skills language, Agent type, and Skills type. Running `skills-seed sync` without flags prompts to resume or restart when unfinished state exists. Use `--no-interactive` in scripts, and `sync --resume` / `sync --restart` to control resume behavior explicitly.
 
+Starting in 0.10.7, `patterns add` and user-pattern sync use `--context` for the natural-language description, `patterns update <id> --context "<request>"` can revise one pattern while preserving its ID and workspace ownership, and `patterns show` supports `--sort updated|score|hits|category`. Model-output parsing now also repairs trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
+
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
 
 Starting in 0.10.4, default pre-storage curation uses local deterministic merging and keeps its internal pattern set unique by pattern ID. When a candidate reuses an existing ID, or a historical store already contains duplicate IDs, the merger first collapses them into one higher-quality pattern before writing, avoiding duplicate curated pattern IDs during structural validation.
@@ -118,7 +120,7 @@ Starting in 0.9.6, debug records under `.skills-seed/runtime` use the unified `Y
 
 Starting in 0.9.0, learning and user-added patterns use the `pattern-curate` prompt for pre-storage curation: every candidate must be covered, duplicate rules must be consolidated, code evidence must come from input source, and invalid or low-quality candidates are dropped. The old pre-generation merge flow and `patterns merge` command have been removed; generation remains read-only.
 
-Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers. Starting in 0.10.5, the repair flow also handles raw newlines/control characters inside strings, bare object keys, and array items missing an object-start marker.
+Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers. Starting in 0.10.5, the repair flow also handles raw newlines/control characters inside strings, bare object keys, and array items missing an object-start marker; starting in 0.10.7, it also handles trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
 
 Common layout:
 
@@ -253,7 +255,8 @@ Built-in targets:
 | `skills-seed learn history` | Learn long-lived rules from Git history |
 | `skills-seed generate skills` | Generate skills for the current `skills.target` |
 | `skills-seed workflow --context "<notes>"` | Infer and save a user workflow through the Agent; omit `--name` to generate a name, same-name workflows merge by default, use `--overwrite` to replace |
-| `skills-seed patterns add <description>` | Add a user-defined pattern in natural language |
+| `skills-seed patterns add --context "<description>"` | Add a user-defined pattern in natural language; use `--files` for files or directories |
+| `skills-seed patterns update <id> --context "<request>"` | Update a specific user pattern |
 | `skills-seed patterns compact` | Explicitly compact similar stored patterns |
 | `skills-seed sync` | Run learning or pattern add in one command, then generate skills |
 | `skills-seed check` | Check staged files or Git-tracked files |

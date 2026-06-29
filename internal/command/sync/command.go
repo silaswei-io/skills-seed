@@ -31,7 +31,6 @@ const (
 
 // Cmd 返回 sync 命令
 func Cmd(cont *container.Container) *cobra.Command {
-	var addDesc string
 	var category string
 	var files []string
 	userContext := ""
@@ -58,7 +57,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if shouldRunInteractiveSync(cmd, addDesc, category, files, userContext, noInteractive) {
+			if shouldRunInteractiveSync(cmd, category, files, userContext, noInteractive) {
 				mode, err := resolveInteractiveSync(ctx, cmd, cont, stateScope)
 				if err != nil {
 					if errors.Is(err, interactive.ErrCanceled) {
@@ -68,15 +67,15 @@ func Cmd(cont *container.Container) *cobra.Command {
 				}
 				resolvedMode = mode
 			}
-			if resolvedMode == syncRunRestart && addDesc == "" {
+			if resolvedMode == syncRunRestart && userContext == "" {
 				if err := commandstate.NewRepository(cont.SeedPath, stateScope).Clear(); err != nil {
 					return err
 				}
 			}
 
 			change := changelog.Start(cont.SeedPath, "sync")
-			if addDesc != "" {
-				if err := syncWithUserPattern(ctx, cont, addDesc, category, files, userContext, change); err != nil {
+			if userContext != "" {
+				if err := syncWithUserPattern(ctx, cont, userContext, category, files, change); err != nil {
 					return err
 				}
 				return change.Save(i18n.Get("ChangeLogSummaryUserPatternSync"))
@@ -88,7 +87,6 @@ func Cmd(cont *container.Container) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&addDesc, "add", "", i18n.Get("SyncFlagAdd"))
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("SyncFlagCategory"))
 	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("SyncFlagFiles"))
 	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("SyncFlagContext"))
@@ -140,14 +138,13 @@ func syncLearnAfterLearn(result domain.LearnCurrentResult, generate func() error
 }
 
 // syncWithUserPattern 路径 B：添加模式 → 生成 Skills。
-func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, userContext string, change *changelog.Builder) error {
+func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, change *changelog.Builder) error {
 	// 步骤 1：添加用户自定义模式。
 	logger.Info(i18n.Get("SyncStepAddPattern"))
 	req := &agent.UserDefinePatternRequest{
 		Description: description,
 		Category:    category,
 		Files:       files,
-		UserContext: userContext,
 		WorkDir:     cont.Config.Project.RootPath,
 		Language:    cont.Config.Project.Language,
 	}

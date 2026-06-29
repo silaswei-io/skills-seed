@@ -173,7 +173,7 @@ func TestSyncRestartClearsOnlySyncCommandState(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
+func TestSyncWithUserPatternUsesContextAsPatternDescription(t *testing.T) {
 	userContext := "私有化部署，不是 SaaS"
 	projectRoot := t.TempDir()
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
@@ -194,6 +194,7 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 	require.NoError(t, err)
 	defer patternRepo.Close()
 
+	var patternDescription string
 	var patternContext string
 	pattern := domain.NewPattern("p1", "Context Boundary", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
@@ -203,6 +204,7 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 		NameVal:      "mock",
 		AvailableVal: true,
 		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+			patternDescription = req.Description
 			patternContext = req.UserContext
 			return &agent.UserDefinePatternResult{Pattern: pattern}, nil
 		},
@@ -227,8 +229,9 @@ func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo),
 	}
 
-	require.NoError(t, syncWithUserPattern(context.Background(), cont, "所有 API 必须有错误处理", "business", nil, userContext, nil))
+	require.NoError(t, syncWithUserPattern(context.Background(), cont, userContext, "business", []string{"internal/service"}, nil))
 
-	require.Equal(t, userContext, patternContext)
+	require.Equal(t, userContext, patternDescription)
+	require.Empty(t, patternContext)
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-dev", "SKILL.md"))
 }
