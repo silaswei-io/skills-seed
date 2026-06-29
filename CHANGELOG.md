@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.6]
+
+### 变更
+
+- 新增统一的交互式命令入口：无参数执行 `init` 时会进入终端选择流程，按工具语言、项目模式、Skills 语言、Agent 类型和 Skills 类型逐步确认；无参数执行 `sync` 时会根据未完成状态提示继续执行或重新开始。
+- `init` 启动横幅改为统一的终端 banner，展示 CLI 版本和内置 prompt 模板版本短 hash，移除 `open-source` 标签，保持文案为英文版本元数据。
+- `check`、`hook`、`init` 和 `sync` 复用统一的终端选择组件，减少各命令重复 UI 逻辑。
+- 抽取命令行步骤进度 runner，统一 `learn current` 阶段细节、Agent 重试状态和失败标签展示。
+
+### 修复
+
+- `sync` 新增 `--resume`、`--restart` 和 `--no-interactive`，可显式继续未完成学习状态、清理命令状态后重新执行，或在脚本环境中关闭交互。
+- 项目画像 JSON 解析兼容字符串或数组两种列表字段，降低 Agent 输出轻微漂移导致画像解析失败的概率。
+
 ## [v0.10.5]
 
 ### 变更

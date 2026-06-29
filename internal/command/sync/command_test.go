@@ -119,6 +119,60 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	require.FileExists(t, commandstate.NewRepository(seedPath, "learn-current").Path())
 }
 
+func TestHasSyncCommandState(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	repo := commandstate.NewRepository(seedPath, "sync")
+
+	hasState, err := hasSyncCommandState(context.Background(), seedPath, "sync")
+	require.NoError(t, err)
+	require.False(t, hasState)
+
+	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []commandstate.FileInput{
+		{Path: "main.go", Hash: "hash", Status: "present"},
+	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
+
+	hasState, err = hasSyncCommandState(context.Background(), seedPath, "sync")
+	require.NoError(t, err)
+	require.True(t, hasState)
+}
+
+func TestSyncModeFromFlagsRejectsConflict(t *testing.T) {
+	_, err := syncModeFromFlags(true, true)
+	require.Error(t, err)
+}
+
+func TestSyncModeFromFlagsResolvesExplicitModes(t *testing.T) {
+	mode, err := syncModeFromFlags(true, false)
+	require.NoError(t, err)
+	require.Equal(t, syncRunResume, mode)
+
+	mode, err = syncModeFromFlags(false, true)
+	require.NoError(t, err)
+	require.Equal(t, syncRunRestart, mode)
+
+	mode, err = syncModeFromFlags(false, false)
+	require.NoError(t, err)
+	require.Equal(t, syncRunAuto, mode)
+}
+
+func TestSyncRestartClearsOnlySyncCommandState(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	syncRepo := commandstate.NewRepository(seedPath, "sync")
+	learnRepo := commandstate.NewRepository(seedPath, "learn-current")
+	state := commandstate.NewState("sync", "demo", "go", "", []commandstate.FileInput{
+		{Path: "main.go", Hash: "hash", Status: "present"},
+	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})
+	require.NoError(t, syncRepo.Save(context.Background(), state))
+	require.NoError(t, learnRepo.Save(context.Background(), state))
+
+	require.NoError(t, commandstate.NewRepository(seedPath, "sync").Clear())
+
+	_, err := syncRepo.Load(context.Background())
+	require.ErrorIs(t, err, commandstate.ErrStateNotFound)
+	_, err = learnRepo.Load(context.Background())
+	require.NoError(t, err)
+}
+
 func TestSyncWithUserPatternPassesContextOnlyToPatternDefinition(t *testing.T) {
 	userContext := "私有化部署，不是 SaaS"
 	projectRoot := t.TempDir()

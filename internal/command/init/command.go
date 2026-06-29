@@ -2,6 +2,7 @@ package initcmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
@@ -23,12 +25,13 @@ import (
 )
 
 type commandOptions struct {
-	locale       string
-	skillsLocale string
-	mode         string
-	agent        string
-	skills       string
-	workspace    bool
+	locale        string
+	skillsLocale  string
+	mode          string
+	agent         string
+	skills        string
+	workspace     bool
+	noInteractive bool
 }
 
 // Cmd 返回 init 命令
@@ -41,6 +44,16 @@ func Cmd() *cobra.Command {
 		Example: i18n.Get("InitExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if shouldRunInteractiveInit(cmd, opts) {
+				resolved, err := resolveInteractiveInit(cmd, opts)
+				if err != nil {
+					if errors.Is(err, interactive.ErrCanceled) {
+						return nil
+					}
+					return err
+				}
+				opts = resolved
+			}
 			// 验证 locale 参数
 			if !isValidLocale(opts.locale) {
 				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
@@ -68,6 +81,7 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().StringVar(&opts.agent, "agent", "", i18n.Get("InitFlagAgent"))
 	initCmd.Flags().StringVar(&opts.skills, "skills", "", i18n.Get("InitFlagSkills"))
 	initCmd.Flags().BoolVar(&opts.workspace, "workspace", false, i18n.Get("InitFlagWorkspace"))
+	initCmd.Flags().BoolVar(&opts.noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
 
 	return initCmd
 }

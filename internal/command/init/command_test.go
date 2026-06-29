@@ -60,6 +60,35 @@ func TestInitializeWorkspaceWithoutDetectedChildrenKeepsRootSeed(t *testing.T) {
 	require.Empty(t, configRepo.GetWorkspaceConfig().Projects)
 }
 
+func TestInteractiveInitDefaultsMatchNoArgDefaults(t *testing.T) {
+	opts := withInitDefaults(commandOptions{mode: domain.ModeProject})
+
+	require.Equal(t, "zh-CN", opts.locale)
+	require.Equal(t, "en-US", opts.skillsLocale)
+	require.Equal(t, domain.ModeProject, opts.mode)
+	require.False(t, opts.workspace)
+	require.Equal(t, "claude", opts.agent)
+	require.Equal(t, "claude", opts.skills)
+}
+
+func TestInteractiveInitWorkspaceDefaultNormalizesMode(t *testing.T) {
+	opts := withInitDefaults(commandOptions{workspace: true})
+
+	require.Equal(t, domain.ModeWorkspace, opts.mode)
+	require.True(t, opts.workspace)
+}
+
+func TestBannerTagsUseVersionMetadata(t *testing.T) {
+	tags := bannerTags()
+
+	require.Len(t, tags, 2)
+	require.Equal(t, "cli "+metadata.ProgramVersion, tags[0].Label)
+	require.NotContains(t, tags[0].Label, "open-source")
+	require.NotContains(t, tags[1].Label, "open-source")
+	require.True(t, strings.HasPrefix(tags[1].Label, "prompts "))
+	require.Len(t, strings.TrimPrefix(tags[1].Label, "prompts "), 8)
+}
+
 func TestInitializeProjectWithAgentSetsEngine(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)

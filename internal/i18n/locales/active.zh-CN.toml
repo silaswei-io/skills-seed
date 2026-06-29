@@ -2307,3 +2307,96 @@ other = "暂未归属到稳定代码子域的业务规则"
 
 [GeneratorBusinessGroupDescription]
 other = "围绕 {{.Title}} 的规则、状态约束、编排和数据转换证据"
+
+[InteractiveFlagNoInteractive]
+other = "禁用交互式向导，按命令参数和默认值直接执行"
+
+[InteractiveYes]
+other = "是"
+
+[InteractiveNo]
+other = "否"
+
+[InteractiveCancel]
+other = "取消"
+
+[InteractiveConfirmExecute]
+other = "确认执行"
+
+[InteractiveInitToolLocale]
+other = "选择工具语言"
+
+[InteractiveInitMode]
+other = "选择初始化类型"
+
+[InteractiveInitModeProject]
+other = "项目"
+
+[InteractiveInitModeProjectDesc]
+other = "初始化当前 Git 仓库为单项目模式。"
+
+[InteractiveInitModeWorkspace]
+other = "工作区"
+
+[InteractiveInitModeWorkspaceDesc]
+other = "初始化当前 Git 仓库为工作区，并处理检测到的子项目。"
+
+[InteractiveInitSkillsLocale]
+other = "选择 Skills 语言"
+
+[InteractiveInitAgent]
+other = "选择 Agent"
+
+[InteractiveInitSkills]
+other = "选择 Skills 类型"
+
+[InteractiveInitSummaryTitle]
+other = "即将执行"
+
+[InteractiveInitSummaryMode]
+other = "初始化类型"
+
+[InteractiveInitSummaryToolLocale]
+other = "工具语言"
+
+[InteractiveInitSummarySkillsLocale]
+other = "Skills 语言"
+
+[InteractiveInitSummaryAgent]
+other = "Agent"
+
+[InteractiveInitSummarySkills]
+other = "Skills 类型"
+
+[SyncFlagResume]
+other = "继续上一次未完成的 sync 状态"
+
+[SyncFlagRestart]
+other = "清理本次 sync 的可恢复状态并重新开始"
+
+[SyncRunModeConflict]
+other = "--resume 与 --restart 不能同时使用"
+
+[InteractiveSyncInterruptedTitle]
+other = "检测到上一次 sync 未完成，本次如何执行？"
+
+[InteractiveSyncRunMode]
+other = "选择本次 sync 执行方式"
+
+[InteractiveSyncResume]
+other = "继续上次未完成的同步"
+
+[InteractiveSyncResumeDesc]
+other = "复用已有运行状态，跳过已完成单元，继续未完成任务。"
+
+[InteractiveSyncRestart]
+other = "重新开始同步"
+
+[InteractiveSyncRestartDesc]
+other = "只清理本次 sync 的运行状态，重新计算变更和执行计划。"
+
+[InteractiveSyncAuto]
+other = "按当前状态同步"
+
+[InteractiveSyncAutoDesc]
+other = "保持 sync 默认行为，按当前变更决定学习、生成或跳过。"

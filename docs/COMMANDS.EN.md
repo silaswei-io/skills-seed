@@ -53,7 +53,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook install` | Install Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
-| `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | Learn from Git history | `current`, `history` | `--help, -h` = `false` |
 | `skills-seed learn current` | Learn from current codebase | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
@@ -73,7 +73,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed review` | Import review comments and show prevention statistics | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | One-stop sync: learn or add patterns + generate skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed sync` | One-stop sync: learn or add patterns + generate skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | Add or update a user workflow | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | Add sub-projects to workspace | - | `--help, -h` = `false` |

@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -12,10 +13,20 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/spf13/cobra"
+)
+
+type syncRunMode string
+
+const (
+	syncRunAuto    syncRunMode = "auto"
+	syncRunResume  syncRunMode = "resume"
+	syncRunRestart syncRunMode = "restart"
 )
 
 // Cmd 返回 sync 命令
@@ -24,6 +35,9 @@ func Cmd(cont *container.Container) *cobra.Command {
 	var category string
 	var files []string
 	userContext := ""
+	resume := false
+	restart := false
+	noInteractive := false
 
 	cmd := &cobra.Command{
 		Use:     "sync",
@@ -40,6 +54,25 @@ func Cmd(cont *container.Container) *cobra.Command {
 			}
 			ctx := cmd.Context()
 			stateScope := commandutil.CommandStateScopeForCobra(cmd)
+			resolvedMode, err := syncModeFromFlags(resume, restart)
+			if err != nil {
+				return err
+			}
+			if shouldRunInteractiveSync(cmd, addDesc, category, files, userContext, noInteractive) {
+				mode, err := resolveInteractiveSync(ctx, cmd, cont, stateScope)
+				if err != nil {
+					if errors.Is(err, interactive.ErrCanceled) {
+						return nil
+					}
+					return err
+				}
+				resolvedMode = mode
+			}
+			if resolvedMode == syncRunRestart && addDesc == "" {
+				if err := commandstate.NewRepository(cont.SeedPath, stateScope).Clear(); err != nil {
+					return err
+				}
+			}
 
 			change := changelog.Start(cont.SeedPath, "sync")
 			if addDesc != "" {
@@ -59,8 +92,24 @@ func Cmd(cont *container.Container) *cobra.Command {
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("SyncFlagCategory"))
 	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("SyncFlagFiles"))
 	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("SyncFlagContext"))
+	cmd.Flags().BoolVar(&resume, "resume", false, i18n.Get("SyncFlagResume"))
+	cmd.Flags().BoolVar(&restart, "restart", false, i18n.Get("SyncFlagRestart"))
+	cmd.Flags().BoolVar(&noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
 
 	return cmd
+}
+
+func syncModeFromFlags(resume, restart bool) (syncRunMode, error) {
+	if resume && restart {
+		return syncRunAuto, fmt.Errorf("%s", i18n.Get("SyncRunModeConflict"))
+	}
+	if resume {
+		return syncRunResume, nil
+	}
+	if restart {
+		return syncRunRestart, nil
+	}
+	return syncRunAuto, nil
 }
 
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。

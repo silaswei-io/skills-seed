@@ -148,6 +148,42 @@ func TestFixAIJSON_RepairsMissingObjectStartInArray(t *testing.T) {
 	assert.JSONEq(t, `{"profile_delta":{"layers":[{"name":"Handler层","files":["handler.go"]},{"name":"Logic层","files":["logic.go"]},{"name":"数据访问层","description":"通过Model层访问数据库配置表","responsibilities":["条件查询"],"files":["model.go"]}]}}`, result)
 }
 
+func TestParseAnalyzeCurrentCodebaseResultAcceptsProfileStringLists(t *testing.T) {
+	input := `{
+		"patterns": [],
+		"profile_delta": {
+			"frameworks": "cobra",
+			"layers": [{
+				"name": "命令层",
+				"description": "CLI 编排",
+				"responsibilities": "组织 learn current 流程",
+				"files": "internal/command/learn/command.go"
+			}],
+			"key_modules": [{
+				"name": "parser",
+				"path": "internal/agent/parser",
+				"description": "解析 Agent 输出",
+				"responsibilities": "兼容模型输出类型漂移",
+				"dependencies": "encoding/json",
+				"dependents": "learn current",
+				"key_methods": "ParseAnalyzeCurrentCodebaseResult"
+			}]
+		},
+		"profile_refresh_recommended": {"needed": false, "reason": ""}
+	}`
+
+	result, err := ParseAnalyzeCurrentCodebaseResult(input)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"cobra"}, result.ProfileDelta.Frameworks)
+	require.Equal(t, []string{"组织 learn current 流程"}, result.ProfileDelta.Layers[0].Responsibilities)
+	require.Equal(t, []string{"internal/command/learn/command.go"}, result.ProfileDelta.Layers[0].Files)
+	require.Equal(t, []string{"兼容模型输出类型漂移"}, result.ProfileDelta.KeyModules[0].Responsibilities)
+	require.Equal(t, []string{"encoding/json"}, result.ProfileDelta.KeyModules[0].Dependencies)
+	require.Equal(t, []string{"learn current"}, result.ProfileDelta.KeyModules[0].Dependents)
+	require.Equal(t, []string{"ParseAnalyzeCurrentCodebaseResult"}, result.ProfileDelta.KeyModules[0].KeyMethods)
+}
+
 func TestExtractJSON_RepairsBareObjectKeyInCodeBlock(t *testing.T) {
 	input := "```json\n{\"patterns\":[{\"evidence_locations\":[{\"path\":\"internal/logic/access_grant/config.go\", line\": 253, \"symbol\":\"Config\"}]}]}\n```"
 	result, err := ExtractJSON(input)

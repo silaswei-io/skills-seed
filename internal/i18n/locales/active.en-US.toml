@@ -2306,3 +2306,96 @@ other = "Business rules not yet mapped to a stable code domain"
 
 [GeneratorBusinessGroupDescription]
 other = "Rules, state constraints, orchestration, and data transformation evidence around {{.Title}}"
+
+[InteractiveFlagNoInteractive]
+other = "Disable the interactive wizard and run directly from flags and defaults"
+
+[InteractiveYes]
+other = "Yes"
+
+[InteractiveNo]
+other = "No"
+
+[InteractiveCancel]
+other = "Cancel"
+
+[InteractiveConfirmExecute]
+other = "Confirm execution"
+
+[InteractiveInitToolLocale]
+other = "Select tool language"
+
+[InteractiveInitMode]
+other = "Select initialization type"
+
+[InteractiveInitModeProject]
+other = "Project"
+
+[InteractiveInitModeProjectDesc]
+other = "Initialize the current Git repository as a single project."
+
+[InteractiveInitModeWorkspace]
+other = "Workspace"
+
+[InteractiveInitModeWorkspaceDesc]
+other = "Initialize the current Git repository as a workspace and process detected child projects."
+
+[InteractiveInitSkillsLocale]
+other = "Select Skills language"
+
+[InteractiveInitAgent]
+other = "Select Agent"
+
+[InteractiveInitSkills]
+other = "Select Skills type"
+
+[InteractiveInitSummaryTitle]
+other = "Execution plan"
+
+[InteractiveInitSummaryMode]
+other = "Initialization type"
+
+[InteractiveInitSummaryToolLocale]
+other = "Tool language"
+
+[InteractiveInitSummarySkillsLocale]
+other = "Skills language"
+
+[InteractiveInitSummaryAgent]
+other = "Agent"
+
+[InteractiveInitSummarySkills]
+other = "Skills type"
+
+[SyncFlagResume]
+other = "Resume the previous incomplete sync state"
+
+[SyncFlagRestart]
+other = "Clear this sync command's resumable state and start again"
+
+[SyncRunModeConflict]
+other = "--resume and --restart cannot be used together"
+
+[InteractiveSyncInterruptedTitle]
+other = "A previous sync did not finish. How should this run proceed?"
+
+[InteractiveSyncRunMode]
+other = "Select sync run mode"
+
+[InteractiveSyncResume]
+other = "Resume the incomplete sync"
+
+[InteractiveSyncResumeDesc]
+other = "Reuse the existing run state, skip completed units, and continue pending work."
+
+[InteractiveSyncRestart]
+other = "Restart sync"
+
+[InteractiveSyncRestartDesc]
+other = "Clear only this sync run state, then recalculate changes and the execution plan."
+
+[InteractiveSyncAuto]
+other = "Sync current state"
+
+[InteractiveSyncAutoDesc]
+other = "Keep the default sync behavior and decide whether to learn, generate, or skip from current changes."

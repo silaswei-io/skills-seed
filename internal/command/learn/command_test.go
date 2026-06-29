@@ -762,6 +762,37 @@ func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {
 	require.Contains(t, output, "分析当前代码库 · 提交指纹 2/2 · 密钥创建")
 }
 
+func TestRunLearnCurrentIncludesAnalysisUnitInFailure(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+		}}, nil
+	}
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		return nil, assertAnError("解析结果失败")
+	}
+
+	var runErr error
+	output := captureLearnStdout(t, func() {
+		_, runErr = runLearnCurrent(cont, opts)
+	})
+
+	require.Error(t, runErr)
+	require.Contains(t, runErr.Error(), "分析当前代码库 · 单元 1/1 · 认证登录")
+	require.Contains(t, runErr.Error(), "解析结果失败")
+	require.Contains(t, output, "分析当前代码库 · 单元 1/1 · 认证登录")
+}
+
 func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()

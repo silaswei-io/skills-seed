@@ -8,10 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/spf13/cobra"
 )
 
@@ -129,7 +127,7 @@ func uninstallHook() error {
 }
 
 func runPreCommitHook(stdout, stderr io.Writer) error {
-	if !hasInteractiveTerminal() {
+	if !interactive.IsTerminal() {
 		fmt.Fprintln(stdout, i18n.Get("HookNonInteractiveSkip"))
 		return nil
 	}
@@ -153,87 +151,16 @@ const (
 	hookActionSkip  hookAction = "skip"
 )
 
-type hookChoice struct {
-	action      hookAction
-	title       string
-	description string
-}
-
-func (c hookChoice) FilterValue() string { return c.title }
-func (c hookChoice) Title() string       { return c.title }
-func (c hookChoice) Description() string { return c.description }
-
-type hookSelectModel struct {
-	list     list.Model
-	action   hookAction
-	quitting bool
-}
-
-func (m hookSelectModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m hookSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q", "esc":
-			m.action = hookActionSkip
-			m.quitting = true
-			return m, tea.Quit
-		case "enter":
-			if selected, ok := m.list.SelectedItem().(hookChoice); ok {
-				m.action = selected.action
-			}
-			m.quitting = true
-			return m, tea.Quit
-		}
-	}
-
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
-}
-
-func (m hookSelectModel) View() string {
-	if m.quitting {
-		return ""
-	}
-	title := lipgloss.NewStyle().Bold(true).Render(i18n.Get("HookPromptTitle"))
-	return "\n" + title + "\n\n" + m.list.View()
-}
-
 func selectHookAction() (hookAction, error) {
-	choices := []list.Item{
-		hookChoice{action: hookActionSync, title: i18n.Get("HookChoiceSync"), description: i18n.Get("HookChoiceSyncDesc")},
-		hookChoice{action: hookActionLearn, title: i18n.Get("HookChoiceLearn"), description: i18n.Get("HookChoiceLearnDesc")},
-		hookChoice{action: hookActionSkip, title: i18n.Get("HookChoiceSkip"), description: i18n.Get("HookChoiceSkipDesc")},
-	}
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.Foreground(lipgloss.Color("170")).Bold(true)
-	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.Foreground(lipgloss.Color("170"))
-
-	selector := list.New(choices, delegate, 80, 8)
-	selector.SetShowStatusBar(false)
-	selector.SetFilteringEnabled(false)
-	selector.SetShowHelp(false)
-	selector.SetShowTitle(false)
-	selector.Select(2)
-
-	program := tea.NewProgram(hookSelectModel{list: selector, action: hookActionSkip}, tea.WithAltScreen())
-	finalModel, err := program.Run()
+	action, err := interactive.Select(i18n.Get("HookPromptTitle"), []interactive.Option[hookAction]{
+		{Value: hookActionSync, Title: i18n.Get("HookChoiceSync"), Description: i18n.Get("HookChoiceSyncDesc")},
+		{Value: hookActionLearn, Title: i18n.Get("HookChoiceLearn"), Description: i18n.Get("HookChoiceLearnDesc")},
+		{Value: hookActionSkip, Title: i18n.Get("HookChoiceSkip"), Description: i18n.Get("HookChoiceSkipDesc")},
+	}, hookActionSkip)
 	if err != nil {
 		return hookActionSkip, err
 	}
-	return finalModel.(hookSelectModel).action, nil
-}
-
-func hasInteractiveTerminal() bool {
-	stdinInfo, stdinErr := os.Stdin.Stat()
-	stdoutInfo, stdoutErr := os.Stdout.Stat()
-	return stdinErr == nil && stdoutErr == nil &&
-		stdinInfo.Mode()&os.ModeCharDevice != 0 &&
-		stdoutInfo.Mode()&os.ModeCharDevice != 0
+	return action, nil
 }
 
 func runHookAction(action hookAction, stdout, stderr io.Writer) error {

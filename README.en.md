@@ -84,6 +84,8 @@ init -> learn current / learn history -> generate skills -> check
 | Generate skills | `skills-seed generate skills` | `SKILL.md`, project overview, specs, pattern references |
 | Check later changes | `skills-seed check` | issues, fix suggestions, and pattern hits based on learned rules |
 
+Starting in 0.10.6, running `skills-seed init` without flags opens an interactive initialization flow for tool language, project mode, Skills language, Agent type, and Skills type. Running `skills-seed sync` without flags prompts to resume or restart when unfinished state exists. Use `--no-interactive` in scripts, and `sync --resume` / `sync --restart` to control resume behavior explicitly.
+
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
 
 Starting in 0.10.4, default pre-storage curation uses local deterministic merging and keeps its internal pattern set unique by pattern ID. When a candidate reuses an existing ID, or a historical store already contains duplicate IDs, the merger first collapses them into one higher-quality pattern before writing, avoiding duplicate curated pattern IDs during structural validation.

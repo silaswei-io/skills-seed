@@ -53,7 +53,7 @@
 | `skills-seed hook install` | 安装 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | 手动运行 pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
-| `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | 从 Git 历史学习 | `current`, `history` | `--help, -h` = `false` |
 | `skills-seed learn current` | 从当前代码学习 | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | 从 Git 历史学习 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
@@ -73,7 +73,7 @@
 | `skills-seed review` | 导入评审评论并查看防漏统计 | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | 一键同步：学习或添加模式 + 生成 skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed sync` | 一键同步：学习或添加模式 + 生成 skills | - | `--add` = ``<br>`--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | 添加或更新用户工作流 | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | 向工作区添加子项目 | - | `--help, -h` = `false` |

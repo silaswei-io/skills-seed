@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.6]
+
+### Changes
+
+- Added a unified interactive command entrypoint. Running `init` without flags now opens a terminal selection flow for tool language, project mode, Skills language, Agent type, and Skills type; running `sync` without flags now prompts to resume unfinished state or restart when applicable.
+- Updated the `init` startup banner to show CLI version and embedded prompt-template short hash, removing the `open-source` tag while keeping version metadata in English.
+- Reused the shared terminal selector across `check`, `hook`, `init`, and `sync`, reducing duplicated command UI logic.
+- Extracted a reusable console step runner for `learn current`, unifying stage details, Agent retry status, and failure labels.
+
+### Fixes
+
+- Added `sync --resume`, `sync --restart`, and `sync --no-interactive` so users can explicitly continue unfinished learning state, clear command state before rerunning, or disable prompts in scripts.
+- Made project-profile JSON parsing tolerate list fields returned either as strings or arrays, reducing failures from minor Agent output drift.
+
 ## [v0.10.5]
 
 ### Changes

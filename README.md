@@ -84,6 +84,8 @@ init -> learn current / learn history -> generate skills -> check
 | 生成 skills | `skills-seed generate skills` | `SKILL.md`、项目概览、规范、patterns references |
 | 检查后续改动 | `skills-seed check` | 基于已学习规则的问题、修复建议和 pattern hits |
 
+0.10.6 起，无参数执行 `skills-seed init` 会进入交互式初始化流程，逐步选择工具语言、项目模式、Skills 语言、Agent 类型和 Skills 类型；无参数执行 `skills-seed sync` 会在发现未完成状态时提示继续执行或重新开始。脚本中可使用 `--no-interactive` 关闭交互，`sync --resume` / `sync --restart` 可显式控制续跑策略。
+
 0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
 
 0.10.4 起，默认入库策展使用本地确定性合并，并在内部按 pattern ID 维护唯一集合；当候选模式复用已有 ID，或历史模式库存在重复 ID 时，会先收敛为单条更高质量的模式再写入，避免重复 curated pattern ID 触发结构校验降级。
