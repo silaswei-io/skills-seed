@@ -88,6 +88,8 @@ Starting in 0.9.0, pattern deduplication and consolidation happen before storage
 
 Starting in 0.10.4, default pre-storage curation uses local deterministic merging and keeps its internal pattern set unique by pattern ID. When a candidate reuses an existing ID, or a historical store already contains duplicate IDs, the merger first collapses them into one higher-quality pattern before writing, avoiding duplicate curated pattern IDs during structural validation.
 
+Starting in 0.10.5, `learn current` unit analysis no longer injects the existing pattern store into every unit prompt, preventing context from growing with the number of saved patterns. Post-learning deduplication remains handled by local deterministic merging; use `skills-seed patterns compact --ai` when explicit semantic compaction is needed.
+
 Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file selection before analysis. When `generate skills` is run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds it. The root `completion` command has been removed, and Chinese help text is now consistent.
 
 `generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
@@ -114,7 +116,7 @@ Starting in 0.9.6, debug records under `.skills-seed/runtime` use the unified `Y
 
 Starting in 0.9.0, learning and user-added patterns use the `pattern-curate` prompt for pre-storage curation: every candidate must be covered, duplicate rules must be consolidated, code evidence must come from input source, and invalid or low-quality candidates are dropped. The old pre-generation merge flow and `patterns merge` command have been removed; generation remains read-only.
 
-Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers.
+Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow for common issues such as duplicated object starts, invalid escapes, unescaped quotes inside strings, and missing closing containers. Starting in 0.10.5, the repair flow also handles raw newlines/control characters inside strings, bare object keys, and array items missing an object-start marker.
 
 Common layout:
 

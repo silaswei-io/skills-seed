@@ -486,7 +486,7 @@ func TestAnalyzeCodebaseFullWithFocusPathsOnlyDiffsFocusedFiles(t *testing.T) {
 	require.Equal(t, "package unchanged\n", loaded["internal/unchanged/keep.go"])
 }
 
-func TestAnalyzeCodebaseFullPassesKnownPatterns(t *testing.T) {
+func TestAnalyzeCodebaseFullDoesNotPassKnownPatternsToCurrentAnalysis(t *testing.T) {
 	var received agent.AnalyzeCurrentCodebaseRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal:      "mock",
@@ -506,8 +506,8 @@ func TestAnalyzeCodebaseFullPassesKnownPatterns(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, `[{"id":"known"}]`, received.KnownPatternsJSON)
-	require.Equal(t, 1, received.KnownPatternsCount)
+	require.Empty(t, received.KnownPatternsJSON)
+	require.Zero(t, received.KnownPatternsCount)
 }
 
 func TestAnalyzeCodebaseFullUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) {

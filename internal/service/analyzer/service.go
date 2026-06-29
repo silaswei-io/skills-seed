@@ -397,20 +397,18 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 	}
 
 	agentReq := &agent.AnalyzeCurrentCodebaseRequest{
-		ProjectName:        req.ProjectName,
-		RootPath:           req.RootPath,
-		Language:           req.Language,
-		RuntimeLabel:       req.RuntimeLabel,
-		AnalysisUnit:       req.AnalysisUnit,
-		FocusPaths:         req.FocusPaths,
-		Structure:          req.Structure,
-		StructuralContext:  structuralContext,
-		MainFiles:          req.MainFiles,
-		SampleFiles:        req.SampleFiles,
-		DiffFiles:          req.DiffFiles,
-		KnownPatternsJSON:  req.KnownPatternsJSON,
-		KnownPatternsCount: req.KnownPatternsCount,
-		UserContext:        req.UserContext,
+		ProjectName:       req.ProjectName,
+		RootPath:          req.RootPath,
+		Language:          req.Language,
+		RuntimeLabel:      req.RuntimeLabel,
+		AnalysisUnit:      req.AnalysisUnit,
+		FocusPaths:        req.FocusPaths,
+		Structure:         req.Structure,
+		StructuralContext: structuralContext,
+		MainFiles:         req.MainFiles,
+		SampleFiles:       req.SampleFiles,
+		DiffFiles:         req.DiffFiles,
+		UserContext:       req.UserContext,
 	}
 
 	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
@@ -772,19 +770,17 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 	)
 
 	req := &AnalyzeCurrentCodebaseRequest{
-		ProjectName:        projectName,
-		RootPath:           projectRoot,
-		Language:           language,
-		RuntimeLabel:       opts.RuntimeLabel,
-		AnalysisUnit:       opts.AnalysisUnit,
-		FocusPaths:         focusPaths,
-		Structure:          structure,
-		MainFiles:          mainFiles,
-		SampleFiles:        sampleFiles,
-		DiffFiles:          diffFiles,
-		KnownPatternsJSON:  opts.KnownPatternsJSON,
-		KnownPatternsCount: opts.KnownPatternsCount,
-		UserContext:        runtimecontext.UserContext(ctx),
+		ProjectName:  projectName,
+		RootPath:     projectRoot,
+		Language:     language,
+		RuntimeLabel: opts.RuntimeLabel,
+		AnalysisUnit: opts.AnalysisUnit,
+		FocusPaths:   focusPaths,
+		Structure:    structure,
+		MainFiles:    mainFiles,
+		SampleFiles:  sampleFiles,
+		DiffFiles:    diffFiles,
+		UserContext:  runtimecontext.UserContext(ctx),
 	}
 
 	result, err := s.AnalyzeCurrentCodebase(ctx, req)

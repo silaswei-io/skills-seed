@@ -169,116 +169,6 @@ func ParseSelectFilesResult(output string) (*agent.SelectFilesResult, error) {
 	}, nil
 }
 
-func repairDuplicatedObjectStarts(jsonStr string) (string, error) {
-	var b strings.Builder
-	b.Grow(len(jsonStr))
-
-	inString := false
-	escapeNext := false
-	repaired := false
-
-	for i := 0; i < len(jsonStr); i++ {
-		ch := jsonStr[i]
-		if escapeNext {
-			b.WriteByte(ch)
-			escapeNext = false
-			continue
-		}
-
-		if ch == '\\' {
-			b.WriteByte(ch)
-			if inString {
-				escapeNext = true
-			}
-			continue
-		}
-
-		if ch == '"' {
-			b.WriteByte(ch)
-			inString = !inString
-			continue
-		}
-
-		if !inString && ch == '{' && i+2 < len(jsonStr) && jsonStr[i+1] == '{' && jsonStr[i+2] == '"' {
-			b.WriteByte(ch)
-			repaired = true
-			i++
-			continue
-		}
-		if !inString && ch == '{' && i+3 < len(jsonStr) && jsonStr[i+1] == '"' && jsonStr[i+2] == '{' && jsonStr[i+3] == '"' {
-			b.WriteByte(ch)
-			repaired = true
-			i += 2
-			continue
-		}
-
-		b.WriteByte(ch)
-	}
-	if inString {
-		return "", fmt.Errorf("unterminated JSON string")
-	}
-	if !repaired {
-		return jsonStr, nil
-	}
-	return b.String(), nil
-}
-
-func repairMissingClosingContainers(jsonStr string) (string, error) {
-	jsonStr = strings.TrimSpace(jsonStr)
-	if jsonStr == "" || jsonStr[0] != '{' {
-		return "", fmt.Errorf("JSON object start not found")
-	}
-
-	stack := make([]byte, 0, 8)
-	inString := false
-	escapeNext := false
-	for i := 0; i < len(jsonStr); i++ {
-		ch := jsonStr[i]
-		if escapeNext {
-			escapeNext = false
-			continue
-		}
-		if ch == '\\' {
-			if inString {
-				escapeNext = true
-			}
-			continue
-		}
-		if ch == '"' {
-			inString = !inString
-			continue
-		}
-		if inString {
-			continue
-		}
-		switch ch {
-		case '{':
-			stack = append(stack, '}')
-		case '[':
-			stack = append(stack, ']')
-		case '}', ']':
-			if len(stack) == 0 || stack[len(stack)-1] != ch {
-				return "", fmt.Errorf("JSON containers are mismatched")
-			}
-			stack = stack[:len(stack)-1]
-		}
-	}
-	if inString {
-		return "", fmt.Errorf("unterminated JSON string")
-	}
-	if len(stack) == 0 {
-		return jsonStr, nil
-	}
-
-	var b strings.Builder
-	b.Grow(len(jsonStr) + len(stack))
-	b.WriteString(jsonStr)
-	for i := len(stack) - 1; i >= 0; i-- {
-		b.WriteByte(stack[i])
-	}
-	return b.String(), nil
-}
-
 // extractJSONFromCodeBlock 从 markdown 代码块中提取 JSON，使用括号计数处理嵌套。
 func extractJSONFromCodeBlock(output string) string {
 	// 找到所有代码块的开始位置
@@ -311,6 +201,8 @@ func extractJSONFromCodeBlock(output string) string {
 				if repaired, err := FixAIJSON(candidate); err == nil {
 					return repaired
 				}
+			} else if repaired, err := FixAIJSON(blockContent[jsonStart:]); err == nil {
+				return repaired
 			}
 		}
 
@@ -362,68 +254,6 @@ func findMatchingBrace(s string, start int) int {
 	}
 
 	return -1
-}
-
-func validateJSON(jsonStr string) error {
-	var js interface{}
-	return json.Unmarshal([]byte(jsonStr), &js)
-}
-
-func repairInvalidStringEscapes(jsonStr string) (string, error) {
-	var b strings.Builder
-	b.Grow(len(jsonStr))
-
-	inString := false
-	for i := 0; i < len(jsonStr); i++ {
-		ch := jsonStr[i]
-		if !inString {
-			b.WriteByte(ch)
-			if ch == '"' {
-				inString = true
-			}
-			continue
-		}
-
-		switch ch {
-		case '"':
-			b.WriteByte(ch)
-			inString = false
-		case '\\':
-			if i+1 >= len(jsonStr) {
-				b.WriteString(`\\`)
-				continue
-			}
-			next := jsonStr[i+1]
-			if isValidJSONEscape(next) {
-				b.WriteByte(ch)
-				b.WriteByte(next)
-				i++
-				if next == 'u' {
-					for j := 0; j < 4 && i+1 < len(jsonStr); j++ {
-						i++
-						b.WriteByte(jsonStr[i])
-					}
-				}
-				continue
-			}
-			b.WriteString(`\\`)
-		default:
-			b.WriteByte(ch)
-		}
-	}
-	if inString {
-		return "", fmt.Errorf("unterminated JSON string")
-	}
-	return b.String(), nil
-}
-
-func isValidJSONEscape(ch byte) bool {
-	switch ch {
-	case '"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u':
-		return true
-	default:
-		return false
-	}
 }
 
 // TruncString 截断字符串用于日志输出（按 rune 截断，不破坏 UTF-8）

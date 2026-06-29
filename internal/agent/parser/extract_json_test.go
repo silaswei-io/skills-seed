@@ -127,6 +127,34 @@ func TestFixAIJSON_FixesCommonAIJSONDefectsTogether(t *testing.T) {
 	assert.JSONEq(t, `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】\", resp.Extra.Object, req.Username)","bad_example":"const path = \"src\\ pages\""}]}`, result)
 }
 
+func TestFixAIJSON_RepairsBareObjectKey(t *testing.T) {
+	input := `{"evidence_locations":[{"path":"internal/logic/access_grant/config.go", line": 253, "symbol":"Config"}]}`
+	result, err := FixAIJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"evidence_locations":[{"path":"internal/logic/access_grant/config.go","line":253,"symbol":"Config"}]}`, result)
+}
+
+func TestFixAIJSON_RepairsRawNewlineInsideString(t *testing.T) {
+	input := "{\"patterns\":[{\"good_example\":\"line1\nline2\"}]}"
+	result, err := FixAIJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"good_example":"line1\nline2"}]}`, result)
+}
+
+func TestFixAIJSON_RepairsMissingObjectStartInArray(t *testing.T) {
+	input := `{"profile_delta":{"layers":[{"name":"Handler层","files":["handler.go"]},{"name":"Logic层","files":["logic.go"]},"name":"数据访问层","description":"通过Model层访问数据库配置表","responsibilities":["条件查询"],"files":["model.go"]]}}`
+	result, err := FixAIJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"profile_delta":{"layers":[{"name":"Handler层","files":["handler.go"]},{"name":"Logic层","files":["logic.go"]},{"name":"数据访问层","description":"通过Model层访问数据库配置表","responsibilities":["条件查询"],"files":["model.go"]}]}}`, result)
+}
+
+func TestExtractJSON_RepairsBareObjectKeyInCodeBlock(t *testing.T) {
+	input := "```json\n{\"patterns\":[{\"evidence_locations\":[{\"path\":\"internal/logic/access_grant/config.go\", line\": 253, \"symbol\":\"Config\"}]}]}\n```"
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"evidence_locations":[{"path":"internal/logic/access_grant/config.go","line":253,"symbol":"Config"}]}]}`, result)
+}
+
 func TestExtractJSON_RepairsMissingClosingContainersAtEnd(t *testing.T) {
 	input := `{"patterns":[{"id":"service","name":"Service"}],"category_summaries":{"structure":{"summary":"layers","patterns":["Service"]}}`
 	result, err := ExtractJSON(input)

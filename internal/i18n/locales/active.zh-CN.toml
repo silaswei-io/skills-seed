@@ -753,8 +753,32 @@ other = "准备项目上下文"
 [ProgressLearnCurrentDetectChanges]
 other = "检测增量文件变化"
 
+[ProgressLearnCurrentDetectRestoreState]
+other = "{{.Label}}：检查可恢复计划"
+
+[ProgressLearnCurrentDetectScanFiles]
+other = "{{.Label}}：扫描文件指纹"
+
+[ProgressLearnCurrentDetectSelectFiles]
+other = "{{.Label}}：AI 选择相关文件 {{.Candidates}} 个"
+
 [ProgressLearnCurrentAnalyzeCodebase]
 other = "分析当前代码库"
+
+[ProgressLearnCurrentAnalyzePlanUnits]
+other = "{{.Label}}：规划分析单元"
+
+[ProgressLearnCurrentAnalyzeResumePlan]
+other = "{{.Label}}：恢复分析单元计划 {{.Units}} 个"
+
+[ProgressLearnCurrentAnalyzeUnit]
+other = "{{.Label}} · 单元 {{.Current}}/{{.Total}} · {{.Name}}"
+
+[ProgressLearnCurrentAnalyzeSaveUnitPatterns]
+other = "{{.Label}} · 保存模式 {{.Current}}/{{.Total}} · {{.Name}}"
+
+[ProgressLearnCurrentAnalyzeCommitUnit]
+other = "{{.Label}} · 提交指纹 {{.Current}}/{{.Total}} · {{.Name}}"
 
 [ProgressLearnCurrentSavePatterns]
 other = "保存学习到的模式"
@@ -2008,6 +2032,9 @@ other = "指定扫描范围: {{.Focus}}\n项目画像策略: {{.ProfileMode}}"
 
 [LearnCurrentIncrementalSummary]
 other = "增量文件变化:\n  • 新增或修改: {{.Changed}}\n  • 删除: {{.Deleted}}\n  • 未变化跳过: {{.Unchanged}}\n  • 排除: {{.Skipped}}"
+
+[LearnCurrentResumeSummary]
+other = "从上次中断的 {{.Command}} 计划恢复:\n  • 计划创建时间: {{.CreatedAt}}\n  • 计划输入文件: {{.Inputs}}\n  • 待继续处理: {{.Pending}}\n  • 分析单元: {{.Units}}\n  • AI 跳过文件: {{.AISkipped}}\n  • 本次不会重新执行文件扫描、排除统计和 AI 文件选择"
 
 [LearnCurrentNoFileChanges]
 other = "未检测到可学习文件变化，已跳过 patterns 学习和项目画像刷新"

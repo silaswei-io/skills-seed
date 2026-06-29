@@ -527,7 +527,7 @@ func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
 	require.Contains(t, prompt, "结构化")
 }
 
-func TestRenderInitSkillsIncludesKnownPatterns(t *testing.T) {
+func TestRenderCurrentLearningOmitsKnownPatterns(t *testing.T) {
 	tests := []struct {
 		locale string
 		label  string
@@ -545,8 +545,8 @@ func TestRenderInitSkillsIncludesKnownPatterns(t *testing.T) {
 			prompt, err := loader.Render("pattern-learn-current", req)
 
 			require.NoError(t, err)
-			require.Contains(t, prompt, tt.label)
-			require.Contains(t, prompt, "/tmp/skills-seed/known-patterns.json")
+			require.NotContains(t, prompt, tt.label)
+			require.NotContains(t, prompt, "/tmp/skills-seed/known-patterns.json")
 			require.NotContains(t, prompt, `"name":"Known Pattern"`)
 		})
 	}

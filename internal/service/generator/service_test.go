@@ -790,6 +790,50 @@ func TestGenerateSkills_RendersProjectOverviewFromProfile(t *testing.T) {
 	assert.NotContains(t, string(content), "old overview")
 }
 
+func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t *testing.T) {
+	pattern := domain.NewPattern("p1", "Home Pattern", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName:  "hsmwebapi",
+				Language:     "go",
+				Summary:      "home-info单元使用go-zero框架实现首页仪表盘功能",
+				Architecture: "home-info单元采用典型的go-zero分层架构",
+				GeneratedAt:  "2026-05-19 12:00:00",
+				KeyModules: []domain.ModuleInfo{
+					{Name: "home", Path: "internal/logic/home"},
+					{Name: "key-manage", Path: "plugins/key_manage"},
+				},
+			}, nil
+		},
+	}
+
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "references", "project-overview.md"))
+	require.NoError(t, err)
+	text := string(content)
+	require.Contains(t, text, "## 项目概览摘要")
+	require.Contains(t, text, "当前已学习到 2 个模块/业务域")
+	require.Contains(t, text, "home")
+	require.Contains(t, text, "key-manage")
+	require.NotContains(t, text, "## 项目概览摘要\n\nhome-info单元")
+	require.NotContains(t, text, "## 技术架构\n\nhome-info单元")
+}
+
 func TestGenerateSkills_MainSkillReferencesOnlyGeneratedCategories(t *testing.T) {
 	businessPattern := domain.NewPattern("p1", "Business Flow", domain.CategoryBusiness)
 	businessPattern.Confidence = 0.9

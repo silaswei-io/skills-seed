@@ -20,7 +20,9 @@ type GenerateOptions struct {
 
 type projectOverviewTemplateData struct {
 	domain.ProjectProfile
-	OverviewReferences []skills.ReferenceItem
+	OverviewReferences  []skills.ReferenceItem
+	OverviewSummary     string
+	ArchitectureSummary string
 }
 
 type profileReferenceTemplateData struct {

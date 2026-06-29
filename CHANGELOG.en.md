@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.5]
+
+### Changes
+
+- `learn current` unit analysis no longer injects the existing pattern store into every unit prompt, preventing prompt context from growing with stored pattern count. Deduplication remains handled by local deterministic post-storage merging, with `patterns compact --ai` still available for explicit semantic compaction.
+- Improved learning progress output in both single-project and workspace modes. Progress lines now show concrete sub-actions inside the current stage and use the full planned unit count, for example `Analyze current codebase · unit 6/7 · NTLS API Gateway`.
+- Generated `project-overview.md` now uses a more conservative project overview summary instead of promoting unit-scoped profile summaries into whole-project facts.
+
+### Fixes
+
+- Strengthened Agent JSON output repair for raw newlines/control characters inside strings, bare object keys, and array items missing an object-start marker, reducing parse failures during long-context learning runs.
+
 ## [v0.10.4]
 
 ### Fixes

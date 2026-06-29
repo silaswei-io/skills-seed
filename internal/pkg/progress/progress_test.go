@@ -122,6 +122,17 @@ func TestUpdateStepRefreshesActiveProgressLabel(t *testing.T) {
 	}
 }
 
+func TestUpdateStepPrintsDetailWhenProgressDisabled(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := New(1)
+		tracker.enabled = false
+
+		tracker.UpdateStep("分析当前代码库 · 单元 2/17 · registry-management")
+	})
+
+	require.Contains(t, output, "分析当前代码库 · 单元 2/17 · registry-management")
+}
+
 func TestPrintConsoleLineAfterProgressPrintsAfterCompletedStep(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := New(1)

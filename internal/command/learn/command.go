@@ -32,6 +32,8 @@ const (
 
 var sleepAfterWorkspaceChildStep = time.Sleep
 
+const learnCurrentProgressSubjectMaxRunes = 36
+
 type learnCurrentOptions struct {
 	language    string
 	focusPaths  []string
@@ -219,6 +221,48 @@ type aiFileSelectionSummary struct {
 	Reason         string
 }
 
+func learnCurrentProgressDetail(baseLabel, detailKey string, params map[string]interface{}) string {
+	if params == nil {
+		params = map[string]interface{}{}
+	}
+	params["Label"] = baseLabel
+	return i18n.GetWithParams(detailKey, params)
+}
+
+func learnCurrentProgressSubject(unit domain.AnalysisUnit) string {
+	subject := strings.TrimSpace(unit.Name)
+	if subject == "" {
+		subject = strings.TrimSpace(unit.ID)
+	}
+	if subject == "" {
+		subject = "unit"
+	}
+	runes := []rune(subject)
+	if len(runes) <= learnCurrentProgressSubjectMaxRunes {
+		return subject
+	}
+	return string(runes[:learnCurrentProgressSubjectMaxRunes]) + "..."
+}
+
+func learnCurrentUnitProgress(state *commandstate.State, fallbackIndex, fallbackTotal int, unit domain.AnalysisUnit) (int, int) {
+	if state == nil || len(state.Units) == 0 {
+		return fallbackIndex, fallbackTotal
+	}
+	for index, planned := range state.Units {
+		if analysisUnitSame(planned, unit) {
+			return index + 1, len(state.Units)
+		}
+	}
+	return fallbackIndex, len(state.Units)
+}
+
+func analysisUnitSame(a, b domain.AnalysisUnit) bool {
+	if a.ID != "" || b.ID != "" {
+		return a.ID == b.ID
+	}
+	return a.Name == b.Name
+}
+
 func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
 	if err := commandutil.RequireAgentAvailable(cont); err != nil {
 		return nil, err
@@ -230,15 +274,20 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	startedAt := time.Now()
 	tracker := progress.New(5)
-	retryProgress := agent.NewRetryProgressBinder(func(label string) {
+	updateStepDisplay := func(label string) {
 		if opts.onStepUpdate != nil {
 			opts.onStepUpdate(label)
 		}
 		if opts.showProgress {
 			tracker.UpdateStep(label)
 		}
-	})
+	}
+	retryProgress := agent.NewRetryProgressBinder(updateStepDisplay)
 	ctx = retryProgress.WithContext(ctx)
+	setStepDetail := func(label string) {
+		retryProgress.StartStep(label)
+		updateStepDisplay(label)
+	}
 	runStep := func(label string, fn func() error) error {
 		retryProgress.StartStep(label)
 		if opts.onStepStart != nil {
@@ -358,8 +407,11 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	var selectedFiles []domain.FileInfo
 	var selectionSummary aiFileSelectionSummary
 	var stateSession *currentStateSession
+	var resumeSummary *learnCurrentResumeSummary
 	detectStartedAt := time.Now()
-	if err := runStep(i18n.Get("ProgressLearnCurrentDetectChanges"), func() error {
+	detectLabel := i18n.Get("ProgressLearnCurrentDetectChanges")
+	if err := runStep(detectLabel, func() error {
+		setStepDetail(learnCurrentProgressDetail(detectLabel, "ProgressLearnCurrentDetectRestoreState", nil))
 		session, err := restoreCurrentState(ctx, stateRepo, cont.FileTracker, projectName, currentLanguage, opts.userContext)
 		if err != nil {
 			return err
@@ -370,6 +422,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			focusRelPaths := analysisCandidatePaths(incrementalChanges)
 			effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, focusRelPaths)
 			selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, incrementalChanges.AddedOrModified))
+			resumeSummary = buildLearnCurrentResumeSummary(session)
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 				"operation", "command.learn_current.resume_state",
 				"state_scope", stateRepo.Command(),
@@ -379,6 +432,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			)
 			return nil
 		}
+		setStepDetail(learnCurrentProgressDetail(detectLabel, "ProgressLearnCurrentDetectScanFiles", nil))
 		incrementalChanges, err = prepareIncrementalFileChangesWithOptions(ctx, cont.FileTracker, cont.ConfigRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, resolvedFocusPaths, fileanalysis.CurrentChangeOptions{
 			Force: opts.force,
 		})
@@ -392,6 +446,9 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		shouldSelectRelevantFiles := currentLearningConfig.SelectRelevantFiles &&
 			len(focusRelPaths) >= currentLearningConfig.SelectRelevantFilesMinCandidates
 		if shouldSelectRelevantFiles {
+			setStepDetail(learnCurrentProgressDetail(detectLabel, "ProgressLearnCurrentDetectSelectFiles", map[string]interface{}{
+				"Candidates": len(focusRelPaths),
+			}))
 			selectionResult, selectErr := fileanalysis.ApplyAIFileSelector(ctx, cont.Agent, fileanalysis.AISelectorOptions{
 				ProjectRoot: projectRoot,
 				Candidates:  focusRelPaths,
@@ -437,26 +494,37 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		return nil, err
 	}
 	if opts.showDetailedLogs {
-		logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{
-			"Changed":   len(incrementalChanges.AddedOrModified),
-			"Deleted":   len(incrementalChanges.Deleted),
-			"Unchanged": len(incrementalChanges.Unchanged),
-			"Skipped":   len(incrementalChanges.Skipped),
-		}))
-		if len(incrementalChanges.ExcludedGeneratedSkillDirs) > 0 {
-			logger.Info(i18n.GetWithParams("LearnCurrentGeneratedSkillsExcluded", map[string]interface{}{
-				"Paths": strings.Join(incrementalChanges.ExcludedGeneratedSkillDirs, ", "),
+		if resumeSummary != nil {
+			logger.Info(i18n.GetWithParams("LearnCurrentResumeSummary", map[string]interface{}{
+				"Command":   resumeSummary.Command,
+				"CreatedAt": resumeSummary.CreatedAt,
+				"Inputs":    resumeSummary.Inputs,
+				"Pending":   resumeSummary.Pending,
+				"Units":     resumeSummary.Units,
+				"AISkipped": resumeSummary.AISkipped,
 			}))
-		}
-		if selectionSummary.Applied {
-			logger.Info(i18n.GetWithParams("LearnCurrentAIFileSelectionSummary", map[string]interface{}{
-				"Candidates": selectionSummary.CandidateCount,
-				"Selected":   selectionSummary.SelectedCount,
-				"Skipped":    selectionSummary.SkippedCount,
+		} else {
+			logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{
+				"Changed":   len(incrementalChanges.AddedOrModified),
+				"Deleted":   len(incrementalChanges.Deleted),
+				"Unchanged": len(incrementalChanges.Unchanged),
+				"Skipped":   len(incrementalChanges.Skipped),
 			}))
-			logger.Info(i18n.GetWithParams("LearnCurrentFingerprintCommitPlan", map[string]interface{}{
-				"Records": len(incrementalChanges.Records),
-			}))
+			if len(incrementalChanges.ExcludedGeneratedSkillDirs) > 0 {
+				logger.Info(i18n.GetWithParams("LearnCurrentGeneratedSkillsExcluded", map[string]interface{}{
+					"Paths": strings.Join(incrementalChanges.ExcludedGeneratedSkillDirs, ", "),
+				}))
+			}
+			if selectionSummary.Applied {
+				logger.Info(i18n.GetWithParams("LearnCurrentAIFileSelectionSummary", map[string]interface{}{
+					"Candidates": selectionSummary.CandidateCount,
+					"Selected":   selectionSummary.SelectedCount,
+					"Skipped":    selectionSummary.SkippedCount,
+				}))
+				logger.Info(i18n.GetWithParams("LearnCurrentFingerprintCommitPlan", map[string]interface{}{
+					"Records": len(incrementalChanges.Records),
+				}))
+			}
 		}
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -539,18 +607,24 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 
 	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
 	analyzeStartedAt := time.Now()
-	if err := runStep(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error {
+	analyzeLabel := i18n.Get("ProgressLearnCurrentAnalyzeCodebase")
+	if err := runStep(analyzeLabel, func() error {
 		focusRelPaths := analysisCandidatePaths(incrementalChanges)
 		state := (*commandstate.State)(nil)
 		if stateSession != nil {
 			state = stateSession.State
 		}
 		if state == nil {
+			setStepDetail(learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzePlanUnits", nil))
 			var err error
 			state, err = loadOrCreateCurrentState(ctx, stateRepo, cont.AnalyzerSvc, projectName, projectRoot, currentLanguage, focusRelPaths, incrementalChanges, opts.userContext)
 			if err != nil {
 				return err
 			}
+		} else {
+			setStepDetail(learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeResumePlan", map[string]interface{}{
+				"Units": len(state.Units),
+			}))
 		}
 
 		plannedUnits := pendingAnalysisUnits(state, incrementalChanges)
@@ -562,29 +636,35 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			mergedProfile = &copyProfile
 		}
 		completedUnits := 0
-		for _, unit := range plannedUnits {
+		totalUnits := len(plannedUnits)
+		for unitIndex, unit := range plannedUnits {
 			unitFocusRelPaths := unitFocusPaths(unit, incrementalChanges)
 			if len(unitFocusRelPaths) == 0 {
 				continue
 			}
-			knownPatternsJSON, knownPatternsCount := cont.LearnerSvc.KnownPatternsSnapshot(ctx)
+			currentUnit, allUnits := learnCurrentUnitProgress(state, unitIndex+1, totalUnits, unit)
+			unitProgressParams := map[string]interface{}{
+				"Current": currentUnit,
+				"Total":   allUnits,
+				"Name":    learnCurrentProgressSubject(unit),
+			}
+			setStepDetail(learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", unitProgressParams))
 			unitFocusAbsPaths := resolveIncrementalFocusPaths(projectRoot, unitFocusRelPaths)
 			unitSelected := unitSelectedFiles(unit, selectedFiles, incrementalChanges)
 			unitLabel := agent.RuntimeLabelFromAnalysisUnit(unit.ID, unit.Name)
 			analyzeResult, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeCodebaseOptions{
-				FocusPaths:         unitFocusAbsPaths,
-				RuntimeLabel:       unitLabel,
-				AnalysisUnit:       unit,
-				SelectedFiles:      unitSelected,
-				SelectedFilesSet:   true,
-				KnownPatternsJSON:  knownPatternsJSON,
-				KnownPatternsCount: knownPatternsCount,
-				UseSnapshotDiffs:   true,
+				FocusPaths:       unitFocusAbsPaths,
+				RuntimeLabel:     unitLabel,
+				AnalysisUnit:     unit,
+				SelectedFiles:    unitSelected,
+				SelectedFilesSet: true,
+				UseSnapshotDiffs: true,
 			})
 			if err != nil {
 				return err
 			}
 			if len(learnedPatterns) > 0 {
+				setStepDetail(learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeSaveUnitPatterns", unitProgressParams))
 				saved, err := cont.LearnerSvc.SavePatternsStrictWithMetadata(ctx, learnedPatterns, "learn_current", unit)
 				if err != nil {
 					return err
@@ -599,6 +679,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 				profileRefreshRecommended = analyzeResult.ProfileRefreshRecommended
 			}
 			patterns = append(patterns, learnedPatterns...)
+			setStepDetail(learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeCommitUnit", unitProgressParams))
 			if err := commitUnitFileRecords(ctx, cont.FileTracker, unitCommittedRecords(unit, incrementalChanges)); err != nil {
 				return err
 			}

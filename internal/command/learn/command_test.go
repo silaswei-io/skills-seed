@@ -384,7 +384,7 @@ func TestRunLearnCurrentAutoMergesProfileDeltaWithoutFullRefresh(t *testing.T) {
 	require.Zero(t, profileCalls)
 	profile, err := cont.ProfileRepo.Get(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "merged profile delta", profile.Summary)
+	require.Equal(t, "profile", profile.Summary)
 	require.Len(t, profile.KeyModules, 1)
 	require.Equal(t, "main.go", profile.KeyModules[0].Path)
 }
@@ -720,12 +720,46 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
 	}
 
-	requireRunLearnCurrentNoError(t, cont, opts)
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
 	require.Equal(t, 1, planCalls, "cached state should be reused without replanning")
 	require.Equal(t, [][]string{{"internal/key/create.go"}}, analyzed)
 	require.Equal(t, []string{"unit-key"}, labels)
 	require.Equal(t, []string{"key"}, units)
+	require.Contains(t, output, "从上次中断的 learn-current 计划恢复")
+	require.Contains(t, output, "待继续处理: 2")
+	require.Contains(t, output, "分析当前代码库 · 单元 2/2 · 密钥创建")
+	require.NotContains(t, output, "增量文件变化:")
 	require.NoFileExists(t, stateRepo.Path())
+}
+
+func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Contains(t, output, "分析当前代码库：规划分析单元")
+	require.Contains(t, output, "分析当前代码库 · 单元 1/2 · 认证登录")
+	require.Contains(t, output, "分析当前代码库 · 提交指纹 2/2 · 密钥创建")
 }
 
 func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
@@ -1119,6 +1153,8 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	require.Contains(t, output, "frontend")
 	require.Contains(t, output, "准备项目上下文")
 	require.Contains(t, output, "检测增量文件变化")
+	require.Contains(t, output, "分析当前代码库：规划分析单元")
+	require.Contains(t, output, "分析当前代码库 · 单元 1/1 · 当前代码变更")
 	require.NotContains(t, output, "项目根路径:")
 	require.NotContains(t, output, "增量文件变化:")
 	require.NotContains(t, output, "后续可执行:")
@@ -1178,15 +1214,15 @@ func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.
 		requireRunLearnCurrentNoError(t, cont, opts)
 	})
 
-	retryLabel := "分析当前代码库（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）"
-	attemptLabel := "分析当前代码库（第2次尝试）"
+	retryLabel := "分析当前代码库 · 单元 1/1 · 当前代码变更（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）"
+	attemptLabel := "分析当前代码库 · 单元 1/1 · 当前代码变更（第2次尝试）"
 	require.Contains(t, output, retryLabel)
 	require.Contains(t, output, attemptLabel)
 	afterRetry := output[strings.Index(output, retryLabel)+len(retryLabel):]
 	attemptIndex := strings.Index(afterRetry, attemptLabel)
 	require.NotEqual(t, -1, attemptIndex, "expected retry attempt progress label after retry wait, got %q", output)
 	afterAttempt := afterRetry[attemptIndex+len(attemptLabel):]
-	restoreIndex := strings.Index(afterAttempt, "3/5 分析当前代码库\n")
+	restoreIndex := strings.Index(afterAttempt, "3/5 分析当前代码库 · 单元 1/1 · 当前代码变更\n")
 	require.NotEqual(t, -1, restoreIndex, "expected retry progress label to be restored after a successful retry, got %q", output)
 }
 

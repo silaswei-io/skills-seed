@@ -21,11 +21,40 @@ type currentStateSession struct {
 	Resumed bool
 }
 
+type learnCurrentResumeSummary struct {
+	Command   string
+	CreatedAt string
+	Inputs    int
+	Pending   int
+	Units     int
+	AISkipped int
+}
+
 func learnCurrentStateRepo(seedPath, scope string) *commandstate.Repository {
 	if strings.TrimSpace(scope) == "" {
 		scope = commandStateLearnCurrent
 	}
 	return commandstate.NewRepository(seedPath, scope)
+}
+
+func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentResumeSummary {
+	if session == nil || session.State == nil || session.Changes == nil {
+		return nil
+	}
+	aiSkipped := 0
+	for _, input := range session.State.Inputs {
+		if input.Status == domain.FileAnalysisStatusAISkipped {
+			aiSkipped++
+		}
+	}
+	return &learnCurrentResumeSummary{
+		Command:   session.State.Command,
+		CreatedAt: session.State.CreatedAt,
+		Inputs:    len(session.State.Inputs),
+		Pending:   len(session.Changes.AddedOrModified) + len(session.Changes.Deleted),
+		Units:     len(session.State.Units),
+		AISkipped: aiSkipped,
+	}
 }
 
 func buildStateInputs(changes *incrementalFileChanges) []commandstate.FileInput {

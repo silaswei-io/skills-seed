@@ -70,19 +70,19 @@ func ApplyProjectProfileDelta(base *ProjectProfile, delta ProjectProfileDelta, p
 	merged.BusinessMethods = mergeBusinessMethods(merged.BusinessMethods, delta.BusinessMethods)
 	merged.ValidationCommands = CleanValidationCommands(append(merged.ValidationCommands, delta.ValidationCommands...))
 
-	if delta.Summary != "" {
+	if merged.Summary == "" && delta.Summary != "" {
 		merged.Summary = delta.Summary
 	}
-	if delta.Architecture != "" {
+	if merged.Architecture == "" && delta.Architecture != "" {
 		merged.Architecture = delta.Architecture
 	}
-	if delta.Structure != "" {
+	if merged.Structure == "" && delta.Structure != "" {
 		merged.Structure = delta.Structure
 	}
-	if delta.DependencyGraph != "" {
+	if merged.DependencyGraph == "" && delta.DependencyGraph != "" {
 		merged.DependencyGraph = delta.DependencyGraph
 	}
-	if delta.DataFlow != "" {
+	if merged.DataFlow == "" && delta.DataFlow != "" {
 		merged.DataFlow = delta.DataFlow
 	}
 	merged.GeneratedAt = time.Now().Format("2006-01-02 15:04:05")

@@ -511,13 +511,18 @@ func (t *Tracker) CompleteStep(label string) {
 
 func (t *Tracker) UpdateStep(label string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	t.label = label
-	if !t.enabled || !t.active {
+	if !t.enabled {
+		t.mu.Unlock()
+		PrintConsoleLine(label)
+		return
+	}
+	if !t.active {
+		t.mu.Unlock()
 		return
 	}
 	t.renderLocked(false)
+	t.mu.Unlock()
 }
 
 // FailStep 结束当前步骤并保留当前进度行，错误文案由调用方负责输出

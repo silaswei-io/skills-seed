@@ -261,8 +261,10 @@ func (w *SkillWriter) generateProjectOverview(refsPath string, profile *domain.P
 	overviewPath := filepath.Join(refsPath, "project-overview.md")
 
 	data := projectOverviewTemplateData{
-		ProjectProfile:     *profile,
-		OverviewReferences: profileReferenceItems(profile, w.skillsLoader.GetLocale(), "./"),
+		ProjectProfile:      *profile,
+		OverviewReferences:  profileReferenceItems(profile, w.skillsLoader.GetLocale(), "./"),
+		OverviewSummary:     projectOverviewSummary(profile, w.skillsLoader.GetLocale()),
+		ArchitectureSummary: projectArchitectureSummary(profile, w.skillsLoader.GetLocale()),
 	}
 	content, err := w.skillsLoader.RenderProjectOverview(data)
 	if err != nil {

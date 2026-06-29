@@ -753,8 +753,32 @@ other = "Preparing project context"
 [ProgressLearnCurrentDetectChanges]
 other = "Detecting incremental file changes"
 
+[ProgressLearnCurrentDetectRestoreState]
+other = "{{.Label}}: checking resumable plan"
+
+[ProgressLearnCurrentDetectScanFiles]
+other = "{{.Label}}: scanning file fingerprints"
+
+[ProgressLearnCurrentDetectSelectFiles]
+other = "{{.Label}}: AI selecting {{.Candidates}} relevant files"
+
 [ProgressLearnCurrentAnalyzeCodebase]
 other = "Analyzing current codebase"
+
+[ProgressLearnCurrentAnalyzePlanUnits]
+other = "{{.Label}}: planning analysis units"
+
+[ProgressLearnCurrentAnalyzeResumePlan]
+other = "{{.Label}}: resuming {{.Units}} planned analysis units"
+
+[ProgressLearnCurrentAnalyzeUnit]
+other = "{{.Label}} · unit {{.Current}}/{{.Total}} · {{.Name}}"
+
+[ProgressLearnCurrentAnalyzeSaveUnitPatterns]
+other = "{{.Label}} · saving patterns {{.Current}}/{{.Total}} · {{.Name}}"
+
+[ProgressLearnCurrentAnalyzeCommitUnit]
+other = "{{.Label}} · committing fingerprints {{.Current}}/{{.Total}} · {{.Name}}"
 
 [ProgressLearnCurrentSavePatterns]
 other = "Saving learned patterns"
@@ -2007,6 +2031,9 @@ other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMod
 
 [LearnCurrentIncrementalSummary]
 other = "Incremental file changes:\n  • added or modified: {{.Changed}}\n  • deleted: {{.Deleted}}\n  • unchanged skipped: {{.Unchanged}}\n  • excluded: {{.Skipped}}"
+
+[LearnCurrentResumeSummary]
+other = "Resuming unfinished {{.Command}} plan:\n  • plan created at: {{.CreatedAt}}\n  • planned input files: {{.Inputs}}\n  • pending files: {{.Pending}}\n  • analysis units: {{.Units}}\n  • AI-skipped files: {{.AISkipped}}\n  • this run will not repeat file scanning, exclusion statistics, or AI file selection"
 
 [LearnCurrentNoFileChanges]
 other = "No learnable file changes detected; skipped pattern learning and project profile refresh"

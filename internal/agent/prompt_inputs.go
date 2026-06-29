@@ -146,10 +146,6 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 	if err != nil {
 		return nil, fmt.Errorf("write structural context prompt input: %w", err)
 	}
-	knownPatternsPath, err := session.UsePathOrWrite(req.KnownPatternsPath, "known-patterns.json", req.KnownPatternsJSON)
-	if err != nil {
-		return nil, fmt.Errorf("write known patterns prompt input: %w", err)
-	}
 	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
 	if err != nil {
 		return nil, fmt.Errorf("write user context prompt input: %w", err)
@@ -166,8 +162,6 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"MainFiles":             req.MainFiles,
 		"SampleFiles":           req.SampleFiles,
 		"DiffFiles":             req.DiffFiles,
-		"KnownPatternsPath":     knownPatternsPath,
-		"KnownPatternsCount":    req.KnownPatternsCount,
 		"FileCount":             req.FileCount,
 		"DirCount":              req.DirCount,
 		"UserContextPath":       userContextPath,

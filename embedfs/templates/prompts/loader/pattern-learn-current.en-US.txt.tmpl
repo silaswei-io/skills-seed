@@ -91,13 +91,6 @@ The following files changed since the previous analysis. Each diff is available 
 - {{.Path}} -> diff: {{.DiffPath}}
 {{- end}}
 {{- end}}
-{{- if .KnownPatternsPath}}
-
-# Existing Patterns ({{.KnownPatternsCount}})
-
-Existing patterns are available at `{{.KnownPatternsPath}}`. Read them by path. Do not re-emit the same rule under a new name. If changed code adds evidence to an existing pattern, reuse the existing concept and output only materially new information.
-{{- end}}
-
 # Analysis Requirements
 
 Based on the project information and the code files you read, perform the following analysis:
@@ -312,8 +305,8 @@ Before returning JSON, validate every candidate pattern internally:
    - Mention ordering, error handling, state constraints, or boundaries when relevant.
    - Reject generic rules such as "use clean code" or "follow best practices".
 4. Duplication check:
-   - If Existing Patterns are provided, do not re-emit the same rule under a new name.
-   - If new evidence only strengthens an existing rule, emit a materially improved version, not a duplicate.
+   - Do not re-emit the same rule under different names within this response.
+   - If multiple evidence points only strengthen the same rule, merge them into one pattern instead of outputting duplicates.
 5. `business_method` check:
    - Attach `business_method` only to real business or utility methods.
    - It must include a real signature and location.
