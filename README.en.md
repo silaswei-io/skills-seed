@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
 
+Starting in 0.10.4, default pre-storage curation uses local deterministic merging and keeps its internal pattern set unique by pattern ID. When a candidate reuses an existing ID, or a historical store already contains duplicate IDs, the merger first collapses them into one higher-quality pattern before writing, avoiding duplicate curated pattern IDs during structural validation.
+
 Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file selection before analysis. When `generate skills` is run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds it. The root `completion` command has been removed, and Chinese help text is now consistent.
 
 `generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.

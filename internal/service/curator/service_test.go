@@ -185,6 +185,68 @@ func TestCurateAndStoreMergesMultipleDuplicatesLocally(t *testing.T) {
 	require.Equal(t, []string{"existing"}, deleted)
 }
 
+func TestCurateAndStoreUpdatesExistingPatternWithSameIDOnce(t *testing.T) {
+	const patternID = "status-wrap-error-handling"
+
+	existing := domain.NewPattern(patternID, "Status Wrap Error Handling", domain.CategoryError)
+	existing.Confidence = 0.7
+	existing.Frequency = 2
+	existing.SetRule("return status wrapped errors with context")
+	candidate := domain.NewPattern(patternID, "Status Wrap Error Handling", domain.CategoryError)
+	candidate.Confidence = 0.9
+	candidate.Frequency = 3
+	candidate.SetRule("return status wrapped errors with context")
+	candidate.SetExamples("return api.StatusError(ctx, status.Code(err), \"load cluster\", err)", "")
+
+	var saved []*domain.Pattern
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*existing}, nil
+		},
+		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
+			saved = append(saved, p)
+			return nil
+		},
+	}
+	svc := NewService(nil, repo)
+
+	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Len(t, saved, 1)
+	require.Equal(t, patternID, saved[0].ID)
+	require.Equal(t, []string{patternID}, saved[0].MergedFrom)
+	require.Equal(t, 5, saved[0].Frequency)
+	require.Equal(t, "return api.StatusError(ctx, status.Code(err), \"load cluster\", err)", saved[0].GoodExample)
+}
+
+func TestDeterministicCurateDeduplicatesExistingPatternsByID(t *testing.T) {
+	const existingID = "same-id"
+
+	existingA := domain.NewPattern(existingID, "Error Wrap", domain.CategoryError)
+	existingA.Confidence = 0.6
+	existingA.Frequency = 1
+	existingA.SetRule("wrap errors with context")
+	existingB := domain.NewPattern(existingID, "Error Wrap", domain.CategoryError)
+	existingB.Confidence = 0.9
+	existingB.Frequency = 2
+	existingB.SetRule("wrap errors with context")
+	candidate := domain.NewPattern("candidate", "Error Wrap", domain.CategoryError)
+	candidate.Confidence = 0.8
+	candidate.Frequency = 1
+	candidate.SetRule("wrap errors with context")
+
+	result := deterministicCurate([]domain.Pattern{*candidate}, []domain.Pattern{*existingA, *existingB})
+
+	require.NoError(t, validateCurateResult(result, []domain.Pattern{*candidate}, []domain.Pattern{*existingA, *existingB}))
+	require.Len(t, result.Patterns, 1)
+	require.ElementsMatch(t, []string{existingID, "candidate"}, result.Patterns[0].MergedFrom)
+}
+
 func TestCurateAndStoreDoesNotUseAIDroppedCandidates(t *testing.T) {
 	candidate := domain.NewPattern("candidate", "Error Handling", domain.CategoryError)
 	candidate.Confidence = 0.9

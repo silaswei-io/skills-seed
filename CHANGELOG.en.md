@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.4]
+
+### Fixes
+
+- Fixed deterministic pattern merging potentially emitting duplicate curated pattern IDs when a candidate reused an existing pattern ID, preventing `learn current` from falling back after structural validation.
+- Fixed malformed historical pattern stores with duplicate IDs from producing structurally invalid local merge results; deterministic merging now keeps its accepted set unique by ID internally.
+
+### Documentation
+
+- Updated the README and configuration guide to describe local deterministic pre-storage merging and same-ID deduplication.
+
 ## [v0.10.3]
 
 ### Changes

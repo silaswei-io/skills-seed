@@ -104,33 +104,65 @@ func deterministicCurate(candidates, existing []domain.Pattern) *agent.CuratePat
 }
 
 type deterministicMerger struct {
-	accepted []domain.Pattern
-	output   map[string]agent.CuratedPattern
+	accepted  []domain.Pattern
+	indexByID map[string]int
+	output    map[string]agent.CuratedPattern
 }
 
 func newDeterministicMerger(existing []domain.Pattern, candidateCount int) *deterministicMerger {
-	accepted := make([]domain.Pattern, 0, len(existing)+candidateCount)
+	merger := &deterministicMerger{
+		accepted:  make([]domain.Pattern, 0, len(existing)+candidateCount),
+		indexByID: make(map[string]int, len(existing)+candidateCount),
+		output:    make(map[string]agent.CuratedPattern, candidateCount),
+	}
 	for _, pattern := range existing {
-		accepted = append(accepted, normalizeCandidate(pattern))
+		merger.upsertAccepted(normalizeCandidate(pattern))
 	}
-	return &deterministicMerger{
-		accepted: accepted,
-		output:   make(map[string]agent.CuratedPattern, candidateCount),
-	}
+	return merger
 }
 
 func (m *deterministicMerger) Add(candidate domain.Pattern) {
 	candidate = normalizeCandidate(candidate)
-	bestIndex, bestScore := m.bestMatch(candidate)
-	if bestIndex >= 0 && bestScore >= deterministicMergeThreshold {
-		merged := mergeKeepingBestPattern(m.accepted[bestIndex], candidate)
-		m.accepted[bestIndex] = merged
-		m.removeMergedOutputs(merged.MergedFrom, merged.ID)
-		m.output[merged.ID] = domainToCurated(merged, merged.MergedFrom, bestScore, "deterministic merge")
+	if index, ok := m.indexByID[candidate.ID]; ok {
+		m.recordMerged(index, candidate, 1, "deterministic update")
 		return
 	}
-	m.accepted = append(m.accepted, candidate)
+	bestIndex, bestScore := m.bestMatch(candidate)
+	if bestIndex >= 0 && bestScore >= deterministicMergeThreshold {
+		m.recordMerged(bestIndex, candidate, bestScore, "deterministic merge")
+		return
+	}
+	m.appendAccepted(candidate)
 	m.output[candidate.ID] = domainToCurated(candidate, []string{candidate.ID}, 1, "new candidate")
+}
+
+func (m *deterministicMerger) upsertAccepted(pattern domain.Pattern) {
+	if index, ok := m.indexByID[pattern.ID]; ok {
+		m.replaceAccepted(index, mergeKeepingBestPattern(m.accepted[index], pattern))
+		return
+	}
+	m.appendAccepted(pattern)
+}
+
+func (m *deterministicMerger) recordMerged(index int, candidate domain.Pattern, similarity float64, reason string) {
+	merged := mergeKeepingBestPattern(m.accepted[index], candidate)
+	m.replaceAccepted(index, merged)
+	m.removeMergedOutputs(merged.MergedFrom, merged.ID)
+	m.output[merged.ID] = domainToCurated(merged, merged.MergedFrom, similarity, reason)
+}
+
+func (m *deterministicMerger) appendAccepted(pattern domain.Pattern) {
+	m.indexByID[pattern.ID] = len(m.accepted)
+	m.accepted = append(m.accepted, pattern)
+}
+
+func (m *deterministicMerger) replaceAccepted(index int, pattern domain.Pattern) {
+	previousID := m.accepted[index].ID
+	if previousID != pattern.ID {
+		delete(m.indexByID, previousID)
+	}
+	m.accepted[index] = pattern
+	m.indexByID[pattern.ID] = index
 }
 
 func (m *deterministicMerger) bestMatch(candidate domain.Pattern) (int, float64) {

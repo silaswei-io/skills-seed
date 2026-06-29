@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.10.4]
+
+### 修复
+
+- 修复确定性模式合并在候选模式与已有模式 ID 相同时可能输出重复 curated pattern ID 的问题，避免 `learn current` 因结构校验失败降级重走 fallback。
+- 修复异常历史模式库中重复 ID 可能让本地合并结果无法通过结构校验的问题；确定性合并现在会在内部按 ID 维护唯一 accepted 集合。
+
+### 文档
+
+- 更新 README 和配置说明，补充模式入库阶段的本地确定性合并与同 ID 去重行为。
+
 ## [v0.10.3]
 
 ### 变更

@@ -86,6 +86,8 @@ init -> learn current / learn history -> generate skills -> check
 
 0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
 
+0.10.4 起，默认入库策展使用本地确定性合并，并在内部按 pattern ID 维护唯一集合；当候选模式复用已有 ID，或历史模式库存在重复 ID 时，会先收敛为单条更高质量的模式再写入，避免重复 curated pattern ID 触发结构校验降级。
+
 0.9.1 起，`learn current` 在候选文件较多时可先通过 AI 文件筛选收敛分析范围；`generate skills` 显式执行时会删除旧的 skills-seed 生成目录并完整重建。根命令中的 `completion` 已移除，中文 help 文案已统一。
 
 `generate skills` 会按模式质量排序：优先沉淀综合分高、check 命中多、置信度高的规则，降低泛化规则和重复规则进入最终 skills 的概率。
