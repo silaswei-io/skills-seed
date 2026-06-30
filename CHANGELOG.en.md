@@ -12,11 +12,6 @@
 - Entry method indexes now add receiver, module, or path context for generic entry names such as `Run`, `main`, `Start`, and `Init`, improving readability and navigation precision.
 - Reference generation now validates evidence, business-entry, and module paths against the project root before rendering, reducing incorrect navigation links.
 
-### Tests
-
-- Added a business quality baseline covering generation health, parse stability, reference routing, business-pattern coverage, source evidence, and navigation precision.
-- Added acceptance assertions for real business flows so generated skills can be checked for recognizing key workflows and routing to trustworthy source evidence.
-
 ## [v0.10.7]
 
 ### Changes
