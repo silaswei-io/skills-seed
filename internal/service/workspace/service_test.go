@@ -53,6 +53,52 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
 }
 
+func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+
+	loader := skills.NewLoaderForAgent("codex", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "codex"},
+	}
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+
+	require.NoError(t, svc.GenerateWorkspaceSkillsWithOptions(context.Background(), WorkspaceGenerateOptions{
+		RootOutputPath: "custom/root-skill",
+	}))
+
+	require.FileExists(t, filepath.Join(projectRoot, "custom", "root-skill", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
+}
+
+func TestGenerateWorkspaceSkillsWithOptionsSkipsReferences(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+
+	loader := skills.NewLoaderForAgent("codex", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "codex"},
+	}
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+
+	require.NoError(t, svc.GenerateWorkspaceSkillsWithOptions(context.Background(), WorkspaceGenerateOptions{SkipReferences: true}))
+
+	outputPath := filepath.Join(projectRoot, ".agents", "skills", "demo-workspace")
+	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
+	require.NoDirExists(t, filepath.Join(outputPath, "references"))
+	rootSkill := readGeneratedFile(t, projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md")
+	require.Contains(t, rootSkill, "本次生成未写入 references")
+	require.NotContains(t, rootSkill, "./references/workspace-overview.md")
+}
+
 func TestGenerateWorkspaceSkillsRebuildsGeneratedOutput(t *testing.T) {
 	ctx := context.Background()
 	projectRoot := t.TempDir()

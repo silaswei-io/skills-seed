@@ -41,7 +41,7 @@ agent:
   timeout: 1800
   # 是否允许 Agent 加载用户插件；默认关闭以避免批处理被插件干扰
   allow_user_plugins: false
-  # 并发 Agent 数；0 表示自动(project=1, workspace=子项目数并带上限)
+  # 工作区子项目并发数；仅 workspace 根配置生效，0 表示自动
   parallelism: 0
   # 可重试错误，如 429、529 过载等的重试配置
   retry:
@@ -60,6 +60,10 @@ learning:
   current:
     # 学习模式：fast 更快，normal 默认平衡，deep 更深入
     mode: "normal"
+    # 分析单元切分范围：domain 按业务域合并，flow 按流程拆分，module 按模块/插件更细拆分
+    scope: "flow"
+    # 项目内分析单元并发数；普通项目或 workspace 子项目生效，1 表示串行
+    parallelism: 1
     # 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围
     select_relevant_files: true
     # 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果

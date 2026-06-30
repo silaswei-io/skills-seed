@@ -334,6 +334,7 @@ type PlanAnalysisUnitsRequest struct {
 	RootPath          string
 	Language          string
 	LearningMode      config.LearningMode
+	LearningScope     config.LearningScope
 	FocusPaths        []string
 	StructuralContext string
 	UserContext       string
@@ -360,6 +361,7 @@ func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalys
 		RootPath:          req.RootPath,
 		Language:          req.Language,
 		LearningMode:      req.LearningMode,
+		LearningScope:     req.LearningScope,
 		FocusPaths:        req.FocusPaths,
 		StructuralContext: structuralContext,
 		UserContext:       req.UserContext,

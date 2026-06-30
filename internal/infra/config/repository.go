@@ -219,9 +219,32 @@ func NormalizeLearningMode(mode string) LearningMode {
 	}
 }
 
+// LearningScope 控制 learn current 规划分析单元时采用的切分范围。
+type LearningScope string
+
+const (
+	LearningScopeDomain LearningScope = "domain" // 优先按业务域合并能力，跨插件/接口/模块也尽量归并
+	LearningScopeFlow   LearningScope = "flow"   // 按业务流程、资源动作或外部系统职责拆分
+	LearningScopeModule LearningScope = "module" // 允许按插件、接口、子模块等工程边界更细拆分
+)
+
+// NormalizeLearningScope 把配置中的学习范围归一化为受支持取值。
+func NormalizeLearningScope(scope string) LearningScope {
+	switch LearningScope(strings.ToLower(strings.TrimSpace(scope))) {
+	case LearningScopeDomain:
+		return LearningScopeDomain
+	case LearningScopeModule:
+		return LearningScopeModule
+	default:
+		return LearningScopeFlow
+	}
+}
+
 // CurrentLearningConfig 控制 learn current 的文件选择和结构化上下文。
 type CurrentLearningConfig struct {
 	Mode                             LearningMode     `yaml:"mode"`                                 // 学习模式：fast、normal、deep
+	Scope                            LearningScope    `yaml:"scope"`                                // 分析单元切分范围：domain、flow、module
+	Parallelism                      int              `yaml:"parallelism"`                          // 单项目分析单元并发数，0 或 1 表示串行
 	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否先筛选最值得分析的相关文件
 	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 文件筛选
 	Structural                       StructuralConfig `yaml:"structural"`                           // 结构化上下文配置
@@ -232,6 +255,8 @@ type CurrentLearningConfig struct {
 func defaultCurrentLearningConfig() CurrentLearningConfig {
 	return CurrentLearningConfig{
 		Mode:                             LearningModeNormal,
+		Scope:                            LearningScopeFlow,
+		Parallelism:                      1,
 		SelectRelevantFiles:              true,
 		SelectRelevantFilesMinCandidates: 200,
 		Structural:                       defaultStructuralConfig(),
@@ -528,6 +553,10 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 		cfg.Learning.Current.Structural = defaultStructuralConfig()
 	}
 	cfg.Learning.Current.Mode = NormalizeLearningMode(string(cfg.Learning.Current.Mode))
+	cfg.Learning.Current.Scope = NormalizeLearningScope(string(cfg.Learning.Current.Scope))
+	if cfg.Learning.Current.Parallelism < 0 {
+		cfg.Learning.Current.Parallelism = 1
+	}
 	if cfg.Learning.Current.Structural.MaxSymbols <= 0 {
 		cfg.Learning.Current.Structural.MaxSymbols = 30
 	}

@@ -131,6 +131,20 @@ func TestFixAIJSON_RepairsBareObjectKey(t *testing.T) {
 	assert.JSONEq(t, `{"evidence_locations":[{"path":"internal/logic/access_grant/config.go","line":253,"symbol":"Config"}]}`, result)
 }
 
+func TestFixAIJSON_RepairsNumericLineRange(t *testing.T) {
+	input := `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29-43,"symbol":"service cipher_machine"}]}]}`
+	result, err := FixAIJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29,"symbol":"service cipher_machine"}]}]}`, result)
+}
+
+func TestExtractJSON_RepairsNumericLineRangeAfterTextPrefix(t *testing.T) {
+	input := `基于源码分析，输出如下。{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29-43,"symbol":"service cipher_machine"}]}]}`
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29,"symbol":"service cipher_machine"}]}]}`, result)
+}
+
 func TestFixAIJSON_RepairsRawNewlineInsideString(t *testing.T) {
 	input := "{\"patterns\":[{\"good_example\":\"line1\nline2\"}]}"
 	result, err := FixAIJSON(input)

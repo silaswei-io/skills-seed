@@ -12,12 +12,31 @@ This is the workspace entry skill. It only decides task ownership, selects child
 
 ## Usage
 
+{{if not .SkipReferences}}
 1. Read [Workspace Overview](./references/workspace-overview.md) first; use its routing table to confirm path ownership, child skill locations, and the default write boundary.
 2. For a single child project task, enter only that child project's `SKILL.md` and `references/project-spec.md`; do not read or edit other child projects as a side effect.
 3. For contracts, shared code, infrastructure, root scripts, or multi-child tasks, read [Cross-Project Rules](./references/cross-project-rules.md) before choosing the execution order.
 {{if .WorkflowReferences}}4. When a stored workspace workflow matches the task, read that workflow first, then execute with the overview and cross-project rules.
 5. If the overview, child skill, workflow, or config cannot confirm product boundaries, project responsibility, delivery model, validation commands, or cross-project dependencies, ask the user instead of inventing details.
 {{else}}4. If the overview, child skill, or config cannot confirm product boundaries, project responsibility, delivery model, validation commands, or cross-project dependencies, ask the user instead of inventing details.
+{{end}}
+{{else}}
+1. References were not written in this generation; use the child project list below and current workspace config to determine path ownership.
+2. For a single child project task, enter only that child project's `SKILL.md`, then follow that skill to inspect code or references.
+3. For contracts, shared code, infrastructure, root scripts, or multi-child tasks, confirm boundaries from current code and config before choosing execution order.
+{{if .WorkflowReferences}}4. When a stored workspace workflow matches the task, read that workflow first, then execute with current code and config.
+5. If the child skill, workflow, or config cannot confirm product boundaries, project responsibility, delivery model, validation commands, or cross-project dependencies, ask the user instead of inventing details.
+{{else}}4. If the child skill or config cannot confirm product boundaries, project responsibility, delivery model, validation commands, or cross-project dependencies, ask the user instead of inventing details.
+{{end}}
+{{end}}
+
+{{if .SkipReferences}}
+## Child Projects
+
+{{range .Projects}}
+- `{{.ID}}`: `{{.Path}}`, skill `{{.SkillPath}}`
+{{end}}
+
 {{end}}
 
 {{if .WorkflowReferences}}
@@ -31,5 +50,9 @@ This is the workspace entry skill. It only decides task ownership, selects child
 
 ## References
 
+{{if not .SkipReferences}}
 - [Workspace Overview](./references/workspace-overview.md): child projects, routing table, repository-backed dependencies, and impact radius.
 - [Cross-Project Rules](./references/cross-project-rules.md): multi-project changes, contract/shared/infrastructure changes, parallel boundaries, and validation order.
+{{else}}
+*References were not written in this generation.*
+{{end}}

@@ -311,6 +311,7 @@ type PlanAnalysisUnitsRequest struct {
 	StructuralContextPath string // tree-sitter 结构化分析上下文文件路径
 	UserContext           string
 	LearningMode          config.LearningMode
+	LearningScope         config.LearningScope
 }
 
 // PlanAnalysisUnitsResult 是 AI 生成的业务分析单元计划。

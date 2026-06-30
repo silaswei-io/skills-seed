@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -69,6 +70,34 @@ func Confirm(title, yesLabel, noLabel string, defaultYes bool) (bool, error) {
 		return false, err
 	}
 	return value, nil
+}
+
+// Int 显示整数输入框并返回用户输入值。
+func Int(title string, defaultValue, minValue int) (int, error) {
+	text := strconv.Itoa(defaultValue)
+	err := huh.NewInput().
+		Title(title).
+		Value(&text).
+		Validate(func(value string) error {
+			parsed, err := strconv.Atoi(strings.TrimSpace(value))
+			if err != nil {
+				return fmt.Errorf("invalid integer")
+			}
+			if parsed < minValue {
+				return fmt.Errorf("must be at least %d", minValue)
+			}
+			return nil
+		}).
+		WithWidth(promptWidth()).
+		WithTheme(promptTheme()).
+		Run()
+	if err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return 0, ErrCanceled
+		}
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(text))
 }
 
 // SummaryItem 是执行前摘要中的一行键值。

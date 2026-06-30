@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.1]
+
+### 变更
+
+- `learn current` 支持项目内分析单元并发，新增 `learning.current.parallelism`；workspace 模式下根配置的 `agent.parallelism` 控制子项目并发，子项目内单元并发由 `learning.current.parallelism` 控制。
+- 初始化交互改为常用路径优先：默认只确认工具语言、初始化类型、Agent、总并发和执行计划；分析深度、切分范围、Skills 语言和 Skills 类型收敛到可选高级配置。
+- 初始化时填写 Agent 总并发数后会自动分配并写入项目单元并发或 workspace 子项目/单元并发，并在摘要中展示最终配置。
+- 新增 `learning.current.scope`，支持 `domain`、`flow`、`module` 三种单元切分范围，规划分析单元时可按业务域、业务流程或模块/插件粒度引导切分。
+- 并发分析进度会展示当前进度和运行中的单元列表，workspace 学习输出会同时展示子项目并发和子项目内单元并发。
+
+### 修复
+
+- 续跑状态纳入 `learning.current.scope`，切换分析深度或切分范围后不会复用旧分析单元计划。
+- Agent JSON 修复新增对 `"line": 29-43` 这类非法数值范围的容错，并强化学习提示词，要求证据行号只能输出单个整数。
+- 并发单元失败时不再把最后的进度行刷新为 `运行中 []`，避免掩盖失败时正在处理的单元。
+
 ## [v0.11.0]
 
 ### 变更

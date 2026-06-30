@@ -132,10 +132,13 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	}
 
 	// 生成 Skills
+	generatedOutputPath := effectiveOutputPath
 	if isWorkspaceMode {
-		if err := runGenerateWorkspace(ctx, cont, opts); err != nil {
+		rootOutputPath, err := runGenerateWorkspace(ctx, cont, opts)
+		if err != nil {
 			return err
 		}
+		generatedOutputPath = rootOutputPath
 	} else {
 		generateLabel := i18n.Get("ProgressGenerateWriteSkills")
 		retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
@@ -152,7 +155,7 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	}
 
 	logger.Info(i18n.Get("GenerateSuccessMsg"))
-	logger.Info(i18n.GetWithParams("GenerateOutputPath", map[string]interface{}{"Path": effectiveOutputPath}))
+	logger.Info(i18n.GetWithParams("GenerateOutputPath", map[string]interface{}{"Path": generatedOutputPath}))
 	if err := commandutil.MarkSkillsGenerated(ctx, cont); err != nil {
 		return err
 	}
@@ -160,14 +163,19 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	return nil
 }
 
-func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts generateOptions) error {
+func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts generateOptions) (string, error) {
+	workspaceOpts := workspaceGenerateOptions(opts)
+	rootOutputPath, err := cont.WorkspaceGeneratorSvc.ResolveWorkspaceRootOutputPath(workspaceOpts)
+	if err != nil {
+		return "", err
+	}
 	projects := cont.ConfigRepo.GetWorkspaceConfig().Projects
 	childProgress := progress.NewMulti(commandutil.WorkspaceProjectProgressNames(projects))
 	childProgress.SetLabel(i18n.Get("ProgressGenerateWorkspaceProjects"))
 	childProgress.SetTaskTotal(ws.GenerateProjectStepTotal)
-	if err := generateWorkspaceChildSkills(ctx, cont, childProgress); err != nil {
+	if err := generateWorkspaceChildSkillsWithOptions(ctx, cont, opts, childProgress); err != nil {
 		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
-		return err
+		return "", err
 	}
 	rootTracker := progress.New(1)
 	rootLabel := i18n.Get("ProgressGenerateWriteRootSkills")
@@ -175,17 +183,29 @@ func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts g
 	rootCtx := retryProgress.WithContext(ctx)
 	if err := rootTracker.RunStep(rootLabel, func() error {
 		retryProgress.StartStep(rootLabel)
-		callErr := cont.WorkspaceGeneratorSvc.GenerateWorkspaceSkills(rootCtx)
+		callErr := cont.WorkspaceGeneratorSvc.GenerateWorkspaceSkillsWithOptions(rootCtx, workspaceOpts)
 		retryProgress.FinishStep(rootLabel, callErr == nil)
 		return callErr
 	}); err != nil {
 		logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
-		return err
+		return "", err
 	}
-	return nil
+	return rootOutputPath, nil
+}
+
+func workspaceGenerateOptions(opts generateOptions) ws.WorkspaceGenerateOptions {
+	workspaceOpts := ws.WorkspaceGenerateOptions{SkipReferences: opts.noReferences}
+	if opts.outputChanged {
+		workspaceOpts.RootOutputPath = opts.outputPath
+	}
+	return workspaceOpts
 }
 
 func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container, trackers ...*progress.MultiTracker) error {
+	return generateWorkspaceChildSkillsWithOptions(ctx, cont, generateOptions{}, trackers...)
+}
+
+func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *container.Container, opts generateOptions, trackers ...*progress.MultiTracker) error {
 	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
 	if len(workspaceConfig.Projects) == 0 {
@@ -266,7 +286,7 @@ func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container
 			OnStepStart:    startStep,
 			OnStepUpdate:   updateStep,
 			OnStepComplete: completeStep,
-		}, generator.GenerateOptions{}); err != nil {
+		}, generator.GenerateOptions{SkipReferences: opts.noReferences}); err != nil {
 			var manualErr *generator.ManualSkillExistsError
 			if errors.As(err, &manualErr) {
 				logger.Warn(i18n.GetWithParams("GenerateWorkspaceChildManualSkillSkipped", map[string]interface{}{

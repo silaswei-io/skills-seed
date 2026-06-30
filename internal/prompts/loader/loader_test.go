@@ -722,10 +722,16 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 			data: func() map[string]interface{} {
 				data := sampleAnalysisPlanData()
 				data["LearningMode"] = "fast"
+				data["LearningScope"] = "domain"
 				return data
 			}(),
 			requiredText: []string{
 				"学习模式: fast",
+				"切分范围: domain",
+				"切分范围策略",
+				"`domain`",
+				"`flow`",
+				"`module`",
 				"模式策略",
 				"完整的语义闭环",
 				"如果需要频繁依赖另一个 unit 才能讲清楚，就合并",
@@ -738,10 +744,16 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 			data: func() map[string]interface{} {
 				data := sampleAnalysisPlanData()
 				data["LearningMode"] = "deep"
+				data["LearningScope"] = "module"
 				return data
 			}(),
 			requiredText: []string{
 				"Learning mode: deep",
+				"Scope: module",
+				"Scope Strategy",
+				"`domain`",
+				"`flow`",
+				"`module`",
 				"Mode Strategy",
 				"complete semantic loop",
 				"merge units that would need frequent cross-reading",
@@ -1587,6 +1599,7 @@ func sampleAnalysisPlanData() map[string]interface{} {
 		"RootPath":              "/tmp/demo",
 		"Language":              "go",
 		"LearningMode":          "normal",
+		"LearningScope":         "flow",
 		"FocusPaths":            []string{"internal/auth/login.go", "internal/key/create.go"},
 		"StructuralContextPath": "/tmp/skills-seed/structural-context.md",
 		"UserContextPath":       "",

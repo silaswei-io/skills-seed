@@ -771,6 +771,9 @@ other = "{{.Label}}：规划分析单元"
 [ProgressLearnCurrentAnalyzeResumePlan]
 other = "{{.Label}}：恢复分析单元计划 {{.Units}} 个"
 
+[ProgressLearnCurrentAnalyzeParallelUnits]
+other = "{{.Label}}：当前进度 {{.Current}}/{{.Total}}，运行中 {{.Running}}，单元并发 {{.Parallelism}}"
+
 [ProgressLearnCurrentAnalyzeUnit]
 other = "{{.Label}} · 单元 {{.Current}}/{{.Total}} · {{.Name}}"
 
@@ -2090,6 +2093,9 @@ other = "无效的项目画像策略 {{.Mode}}，可选值为 auto、skip 或 re
 [LearnCurrentResult]
 other = "分析完成:\n  • 模式数量: {{.PatternsCount}}\n  • 项目画像增量: {{.ProfileDelta}}"
 
+[LearnCurrentAnalyzeParallelUnits]
+other = "开始并发分析项目单元：当前进度 {{.Current}}/{{.Total}}，单元并发 {{.Parallelism}}"
+
 [LearnCurrentSavePatternFailed]
 other = "保存模式失败 [{{.ID}}]: {{.Error}}"
 
@@ -2106,7 +2112,7 @@ other = "已跳过项目画像刷新"
 other = "生成项目画像失败: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "开始学习工作区子项目：{{.Projects}} 个项目，并发 {{.Parallelism}}"
+other = "开始学习工作区子项目：{{.Projects}} 个项目，子项目并发 {{.Parallelism}}，每个子项目单元并发 {{.UnitParallelism}}"
 
 [LearnWorkspaceProjectInfo]
 other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}\n子项目路径: {{.Path}}"
@@ -2380,6 +2386,42 @@ other = "选择 Agent"
 [InteractiveInitSkills]
 other = "选择 Skills 类型"
 
+[InteractiveInitAgentTotalParallelism]
+other = "填写 Agent 总并发数"
+
+[InteractiveInitCustomizeAdvanced]
+other = "是否自定义分析深度、切分范围或 Skills 配置？"
+
+[InteractiveInitParallelismPlanProject]
+other = "单项目：learning.current.parallelism={{.UnitParallelism}}"
+
+[InteractiveInitParallelismPlanWorkspace]
+other = "工作区：检测到 {{.Projects}} 个子项目，agent.parallelism={{.WorkspaceParallelism}}，learning.current.parallelism={{.UnitParallelism}}"
+
+[InteractiveInitLearningMode]
+other = "选择分析深度"
+
+[InteractiveInitLearningModeFastDesc]
+other = "更快，合并更多相近能力，只学习高价值稳定模式。"
+
+[InteractiveInitLearningModeNormalDesc]
+other = "默认平衡质量和速度。"
+
+[InteractiveInitLearningModeDeepDesc]
+other = "更深入，保留更多业务边界和异常路径。"
+
+[InteractiveInitLearningScope]
+other = "选择单元切分范围"
+
+[InteractiveInitLearningScopeDomainDesc]
+other = "按业务域合并，跨插件、接口或模块也尽量归入同一业务域。"
+
+[InteractiveInitLearningScopeFlowDesc]
+other = "按业务流程、资源动作或外部系统职责拆分。"
+
+[InteractiveInitLearningScopeModuleDesc]
+other = "允许按模块、插件或接口更细拆分。"
+
 [InteractiveInitSummaryTitle]
 other = "即将执行"
 
@@ -2397,6 +2439,18 @@ other = "Agent"
 
 [InteractiveInitSummarySkills]
 other = "Skills 类型"
+
+[InteractiveInitSummaryAgentTotalParallelism]
+other = "Agent 总并发数"
+
+[InteractiveInitSummaryParallelismPlan]
+other = "并发配置"
+
+[InteractiveInitSummaryLearningMode]
+other = "分析深度"
+
+[InteractiveInitSummaryLearningScope]
+other = "切分范围"
 
 [SyncFlagResume]
 other = "继续上一次未完成的 sync 状态"

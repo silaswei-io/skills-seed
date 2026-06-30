@@ -771,6 +771,9 @@ other = "{{.Label}}: planning analysis units"
 [ProgressLearnCurrentAnalyzeResumePlan]
 other = "{{.Label}}: resuming {{.Units}} planned analysis units"
 
+[ProgressLearnCurrentAnalyzeParallelUnits]
+other = "{{.Label}}: current progress {{.Current}}/{{.Total}}, running {{.Running}}, unit parallelism {{.Parallelism}}"
+
 [ProgressLearnCurrentAnalyzeUnit]
 other = "{{.Label}} · unit {{.Current}}/{{.Total}} · {{.Name}}"
 
@@ -2089,6 +2092,9 @@ other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or ref
 [LearnCurrentResult]
 other = "Analysis completed:\n  • Patterns: {{.PatternsCount}}\n  • Project profile delta: {{.ProfileDelta}}"
 
+[LearnCurrentAnalyzeParallelUnits]
+other = "Starting concurrent project-unit learning: current progress {{.Current}}/{{.Total}}, unit parallelism {{.Parallelism}}"
+
 [LearnCurrentSavePatternFailed]
 other = "Failed to save pattern [{{.ID}}]: {{.Error}}"
 
@@ -2105,7 +2111,7 @@ other = "Skipped project profile refresh"
 other = "Failed to generate project profile: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "Starting workspace project learning: {{.Projects}} projects, parallelism {{.Parallelism}}"
+other = "Starting workspace project learning: {{.Projects}} projects, project parallelism {{.Parallelism}}, unit parallelism per project {{.UnitParallelism}}"
 
 [LearnWorkspaceProjectInfo]
 other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}\nChild project path: {{.Path}}"
@@ -2379,6 +2385,42 @@ other = "Select Agent"
 [InteractiveInitSkills]
 other = "Select Skills type"
 
+[InteractiveInitAgentTotalParallelism]
+other = "Enter total Agent parallelism"
+
+[InteractiveInitCustomizeAdvanced]
+other = "Customize analysis depth, split scope, or Skills settings?"
+
+[InteractiveInitParallelismPlanProject]
+other = "Project: learning.current.parallelism={{.UnitParallelism}}"
+
+[InteractiveInitParallelismPlanWorkspace]
+other = "Workspace: detected {{.Projects}} child projects, agent.parallelism={{.WorkspaceParallelism}}, learning.current.parallelism={{.UnitParallelism}}"
+
+[InteractiveInitLearningMode]
+other = "Select analysis depth"
+
+[InteractiveInitLearningModeFastDesc]
+other = "Faster; merges nearby capabilities and learns only high-value stable patterns."
+
+[InteractiveInitLearningModeNormalDesc]
+other = "Default balance between quality and speed."
+
+[InteractiveInitLearningModeDeepDesc]
+other = "More thorough; keeps more business boundaries and exceptional paths."
+
+[InteractiveInitLearningScope]
+other = "Select unit split scope"
+
+[InteractiveInitLearningScopeDomainDesc]
+other = "Group by business domain, even across plugins, APIs, or modules."
+
+[InteractiveInitLearningScopeFlowDesc]
+other = "Split by business workflow, resource action, or external-system responsibility."
+
+[InteractiveInitLearningScopeModuleDesc]
+other = "Allow finer splits by module, plugin, or API."
+
 [InteractiveInitSummaryTitle]
 other = "Execution plan"
 
@@ -2396,6 +2438,18 @@ other = "Agent"
 
 [InteractiveInitSummarySkills]
 other = "Skills type"
+
+[InteractiveInitSummaryAgentTotalParallelism]
+other = "Total Agent parallelism"
+
+[InteractiveInitSummaryParallelismPlan]
+other = "Parallelism config"
+
+[InteractiveInitSummaryLearningMode]
+other = "Analysis depth"
+
+[InteractiveInitSummaryLearningScope]
+other = "Split scope"
 
 [SyncFlagResume]
 other = "Resume the previous incomplete sync state"

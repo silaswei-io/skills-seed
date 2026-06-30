@@ -25,13 +25,16 @@ import (
 )
 
 type commandOptions struct {
-	locale        string
-	skillsLocale  string
-	mode          string
-	agent         string
-	skills        string
-	workspace     bool
-	noInteractive bool
+	locale                string
+	skillsLocale          string
+	mode                  string
+	agent                 string
+	skills                string
+	workspace             bool
+	noInteractive         bool
+	agentTotalParallelism int
+	learningMode          config.LearningMode
+	learningScope         config.LearningScope
 }
 
 // Cmd 返回 init 命令
@@ -67,7 +70,7 @@ func Cmd() *cobra.Command {
 				effectiveMode = domain.ModeWorkspace
 			}
 
-			if err := initializeSkillWithWorkspaceChildren(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills); err != nil {
+			if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
 				return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 			}
 			return nil
@@ -128,26 +131,36 @@ func initializeSkill(locale, mode string) error {
 }
 
 func initializeSkillWithWorkspaceChildren(locale, skillsLocale, mode, agentEngine, skillsTarget string) error {
+	return initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, skillsTarget, 0, "", "")
+}
+
+func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int, learningMode config.LearningMode, learningScope config.LearningScope) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
 	}
 	return initializeSkillWithOptions(projectRoot, locale, mode, initializeSkillOptions{
-		initLogger:      true,
-		showUserSummary: true,
-		agentEngine:     agentEngine,
-		skillsTarget:    skillsTarget,
-		skillsLocale:    skillsLocale,
+		initLogger:            true,
+		showUserSummary:       true,
+		agentEngine:           agentEngine,
+		skillsTarget:          skillsTarget,
+		skillsLocale:          skillsLocale,
+		agentTotalParallelism: agentTotalParallelism,
+		learningMode:          learningMode,
+		learningScope:         learningScope,
 	})
 }
 
 type initializeSkillOptions struct {
-	initLogger      bool
-	showUserSummary bool
-	language        string
-	agentEngine     string
-	skillsTarget    string
-	skillsLocale    string
+	initLogger            bool
+	showUserSummary       bool
+	language              string
+	agentEngine           string
+	skillsTarget          string
+	skillsLocale          string
+	agentTotalParallelism int
+	learningMode          config.LearningMode
+	learningScope         config.LearningScope
 }
 
 func initializeSkillAt(projectRoot, locale, mode string) error {
@@ -313,6 +326,26 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 			return err
 		}
 	}
+	if opts.learningMode != "" || opts.learningScope != "" {
+		cfg := configRepo.Get()
+		if opts.learningMode != "" {
+			cfg.Learning.Current.Mode = config.NormalizeLearningMode(string(opts.learningMode))
+		}
+		if opts.learningScope != "" {
+			cfg.Learning.Current.Scope = config.NormalizeLearningScope(string(opts.learningScope))
+		}
+		if err := configRepo.Update(cfg); err != nil {
+			return err
+		}
+	}
+	if opts.agentTotalParallelism > 0 && mode == domain.ModeProject {
+		cfg := configRepo.Get()
+		cfg.Agent.Parallelism = 0
+		cfg.Learning.Current.Parallelism = opts.agentTotalParallelism
+		if err := configRepo.Update(cfg); err != nil {
+			return err
+		}
+	}
 
 	projectLanguage := configRepo.Get().Project.Language
 	if projectLanguage == "" {
@@ -343,6 +376,15 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		workspaceConfig.Projects = projects
 		if err := configRepo.SetWorkspaceConfig(workspaceConfig); err != nil {
 			return err
+		}
+		if opts.agentTotalParallelism > 0 {
+			workspaceParallelism, unitParallelism := allocateWorkspaceParallelism(opts.agentTotalParallelism, len(projects))
+			cfg := configRepo.Get()
+			cfg.Agent.Parallelism = workspaceParallelism
+			cfg.Learning.Current.Parallelism = unitParallelism
+			if err := configRepo.Update(cfg); err != nil {
+				return err
+			}
 		}
 		if err := ensureWorkspacePromptFiles(seedPath, projectRoot, projectName, configRepo); err != nil {
 			logger.Error(i18n.Get("InitCreateProjectPromptsFailed"), "error", err)
@@ -425,6 +467,27 @@ func relativeSeedPath(projectRoot, seedPath string) string {
 	return filepath.ToSlash(relPath)
 }
 
+func allocateWorkspaceParallelism(totalParallelism, projectCount int) (workspaceParallelism, unitParallelism int) {
+	if totalParallelism <= 0 {
+		return 0, 1
+	}
+	if projectCount <= 0 {
+		return 0, totalParallelism
+	}
+	workspaceParallelism = totalParallelism
+	if workspaceParallelism > projectCount {
+		workspaceParallelism = projectCount
+	}
+	if workspaceParallelism < 1 {
+		workspaceParallelism = 1
+	}
+	unitParallelism = totalParallelism / workspaceParallelism
+	if unitParallelism < 1 {
+		unitParallelism = 1
+	}
+	return workspaceParallelism, unitParallelism
+}
+
 func versionedReadmeURL() string {
 	version := strings.TrimSpace(metadata.ProgramVersion)
 	if version == "" {
@@ -495,7 +558,9 @@ func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspacePr
 	}
 	childConfig := childConfigRepo.Get()
 	childConfig.Agent = rootConfigRepo.GetAgentConfig()
+	childConfig.Agent.Parallelism = 0
 	childConfig.Skills = rootConfigRepo.GetSkillsConfig()
+	childConfig.Learning.Current = rootConfigRepo.GetCurrentLearningConfig()
 	if err := childConfigRepo.Update(childConfig); err != nil {
 		return err
 	}

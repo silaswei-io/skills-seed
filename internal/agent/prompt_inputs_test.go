@@ -38,6 +38,7 @@ func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	planData, err := PlanAnalysisUnitsPromptData(session, &PlanAnalysisUnitsRequest{})
 	require.NoError(t, err)
 	require.Equal(t, config.LearningModeNormal, planData["LearningMode"])
+	require.Equal(t, config.LearningScopeFlow, planData["LearningScope"])
 
 	currentData, err := AnalyzeCurrentCodebasePromptData(session, &AnalyzeCurrentCodebaseRequest{
 		LearningMode: config.LearningModeDeep,

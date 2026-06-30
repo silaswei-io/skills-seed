@@ -214,6 +214,7 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 		"HasContracts":       true,
 		"HasInfra":           false,
 		"WorkflowReferences": []map[string]string{},
+		"SkipReferences":     false,
 	}
 
 	content, err := loader.Render("workspace-skill", data)

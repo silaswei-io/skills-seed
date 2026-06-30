@@ -75,10 +75,21 @@ const GenerateProjectStepTotal = generator.GenerateProjectStepTotal
 
 // GenerateWorkspaceSkills 只生成工作区根 skill，子项目 skill 由各子仓自己生成
 func (g *WorkspaceGenerator) GenerateWorkspaceSkills(ctx context.Context) error {
-	return g.generateWorkspaceSkills(ctx)
+	return g.GenerateWorkspaceSkillsWithOptions(ctx, WorkspaceGenerateOptions{})
 }
 
-func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context) error {
+// GenerateWorkspaceSkillsWithOptions 按指定选项生成工作区根 skill。
+func (g *WorkspaceGenerator) GenerateWorkspaceSkillsWithOptions(ctx context.Context, opts WorkspaceGenerateOptions) error {
+	return g.generateWorkspaceSkills(ctx, opts)
+}
+
+// ResolveWorkspaceRootOutputPath 解析工作区根 skill 最终输出目录。
+func (g *WorkspaceGenerator) ResolveWorkspaceRootOutputPath(opts WorkspaceGenerateOptions) (string, error) {
+	projectConfig := g.configRepo.GetProjectConfig()
+	return g.resolveWorkspaceRootOutputPath(projectConfig.RootPath, projectConfig.Name, opts)
+}
+
+func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context, opts WorkspaceGenerateOptions) error {
 	startedAt := time.Now()
 	projectConfig := g.configRepo.GetProjectConfig()
 	workspaceConfig := g.configRepo.GetWorkspaceConfig()
@@ -87,7 +98,7 @@ func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context) error 
 	}
 
 	projectRoot := projectConfig.RootPath
-	rootOutputPath, err := g.workspaceRootOutputPath(projectRoot, projectConfig.Name)
+	rootOutputPath, err := g.resolveWorkspaceRootOutputPath(projectRoot, projectConfig.Name, opts)
 	if err != nil {
 		return err
 	}
@@ -95,7 +106,7 @@ func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context) error 
 	if err != nil {
 		return err
 	}
-	if err := g.writeWorkspaceRootSkill(ctx, rootOutputPath, projectConfig, workspaceConfig, profile, spec); err != nil {
+	if err := g.writeWorkspaceRootSkill(ctx, rootOutputPath, projectConfig, workspaceConfig, profile, spec, opts); err != nil {
 		return err
 	}
 
@@ -105,6 +116,13 @@ func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context) error 
 		"projects_count", len(workspaceConfig.Projects),
 	)
 	return nil
+}
+
+func (g *WorkspaceGenerator) resolveWorkspaceRootOutputPath(projectRoot, workspaceName string, opts WorkspaceGenerateOptions) (string, error) {
+	if strings.TrimSpace(opts.RootOutputPath) != "" {
+		return resolveProjectOutputPath(projectRoot, opts.RootOutputPath)
+	}
+	return g.workspaceRootOutputPath(projectRoot, workspaceName)
 }
 
 func (g *WorkspaceGenerator) analyzeWorkspaceForGenerate(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig) (*domain.WorkspaceProfile, *domain.WorkspaceSpec, error) {
@@ -181,8 +199,8 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, outputPath string, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec) error {
-	data, err := g.workspaceTemplateData(ctx, projectConfig, workspaceConfig, profile, spec)
+func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, outputPath string, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec, opts WorkspaceGenerateOptions) error {
+	data, err := g.workspaceTemplateData(ctx, projectConfig, workspaceConfig, profile, spec, opts)
 	if err != nil {
 		return err
 	}
@@ -196,9 +214,6 @@ func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, output
 		}
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(outputPath, "references"), 0755); err != nil {
-		return err
-	}
 	if err := generator.WriteWorkflowOutputs(g.workflowRepo, outputPath, g.skillsLoader.GetLocale()); err != nil {
 		return err
 	}
@@ -210,6 +225,12 @@ func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, output
 		return err
 	}
 	if err := g.writer.GenerateAgentMetadata(outputPath, data); err != nil {
+		return err
+	}
+	if opts.SkipReferences {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Join(outputPath, "references"), 0755); err != nil {
 		return err
 	}
 	overview, err := g.skillsLoader.Render("workspace-reference-overview", data)
@@ -240,7 +261,7 @@ func ensureGeneratedOutputDirWritable(outputPath string) error {
 	return nil
 }
 
-func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec) (workspaceSkillTemplateData, error) {
+func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec, opts WorkspaceGenerateOptions) (workspaceSkillTemplateData, error) {
 	name := workspaceNameOrDefault(projectConfig.Name)
 	projects := make([]workspaceProjectTemplateData, 0, len(workspaceConfig.Projects))
 	for _, project := range workspaceConfig.Projects {
@@ -332,6 +353,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		ParallelGuidance:    parallelGuidance,
 		LoadMultipleWhen:    loadMultipleWhen,
 		WorkflowReferences:  workflowReferences,
+		SkipReferences:      opts.SkipReferences,
 		HasWorkspaceFacts:   summary != "",
 		HasShared:           len(shared) > 0,
 		HasContracts:        len(contracts) > 0,

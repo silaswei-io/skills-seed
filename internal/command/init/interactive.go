@@ -2,6 +2,7 @@ package initcmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -9,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
+	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -59,32 +61,64 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 	resolved.mode = mode
 	resolved.workspace = mode == domain.ModeWorkspace
 
-	skillsLocale, err := interactive.Select(i18n.Get("InteractiveInitSkillsLocale"), []interactive.Option[string]{
-		{Value: i18n.LocaleEnglish, Title: "en-US"},
-		{Value: i18n.LocaleChinese, Title: "zh-CN"},
-	}, resolved.skillsLocale)
-	if err != nil {
-		return resolved, err
-	}
-	resolved.skillsLocale = skillsLocale
-
 	agent, err := interactive.Select(i18n.Get("InteractiveInitAgent"), agentOptions(), resolved.agent)
 	if err != nil {
 		return resolved, err
 	}
 	resolved.agent = agent
+	if opts.skills == "" {
+		resolved.skills = agent
+	}
 
-	skills, err := interactive.Select(i18n.Get("InteractiveInitSkills"), agentOptions(), resolved.skills)
+	totalParallelism, err := interactive.Int(i18n.Get("InteractiveInitAgentTotalParallelism"), resolved.agentTotalParallelism, 1)
 	if err != nil {
 		return resolved, err
 	}
-	resolved.skills = skills
+	resolved.agentTotalParallelism = totalParallelism
 
+	customizeAdvanced, err := interactive.Confirm(i18n.Get("InteractiveInitCustomizeAdvanced"), i18n.Get("InteractiveYes"), i18n.Get("InteractiveNo"), false)
+	if err != nil {
+		return resolved, err
+	}
+	if customizeAdvanced {
+		learningMode, err := interactive.Select(i18n.Get("InteractiveInitLearningMode"), learningModeOptions(), resolved.learningMode)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.learningMode = learningMode
+
+		learningScope, err := interactive.Select(i18n.Get("InteractiveInitLearningScope"), learningScopeOptions(), resolved.learningScope)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.learningScope = learningScope
+
+		skillsLocale, err := interactive.Select(i18n.Get("InteractiveInitSkillsLocale"), []interactive.Option[string]{
+			{Value: i18n.LocaleEnglish, Title: "en-US"},
+			{Value: i18n.LocaleChinese, Title: "zh-CN"},
+		}, resolved.skillsLocale)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.skillsLocale = skillsLocale
+
+		skills, err := interactive.Select(i18n.Get("InteractiveInitSkills"), agentOptions(), resolved.skills)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.skills = skills
+	}
+
+	projectCount := detectedWorkspaceProjectCount(resolved.mode)
 	interactive.PrintSummary(cmd.OutOrStdout(), i18n.Get("InteractiveInitSummaryTitle"), []interactive.SummaryItem{
 		{Label: i18n.Get("InteractiveInitSummaryMode"), Value: localizedInitMode(resolved.mode)},
 		{Label: i18n.Get("InteractiveInitSummaryToolLocale"), Value: resolved.locale},
 		{Label: i18n.Get("InteractiveInitSummarySkillsLocale"), Value: resolved.skillsLocale},
 		{Label: i18n.Get("InteractiveInitSummaryAgent"), Value: resolved.agent},
+		{Label: i18n.Get("InteractiveInitSummaryAgentTotalParallelism"), Value: fmt.Sprintf("%d", resolved.agentTotalParallelism)},
+		{Label: i18n.Get("InteractiveInitSummaryParallelismPlan"), Value: initParallelismPlanSummary(resolved.mode, resolved.agentTotalParallelism, projectCount)},
+		{Label: i18n.Get("InteractiveInitSummaryLearningMode"), Value: string(resolved.learningMode)},
+		{Label: i18n.Get("InteractiveInitSummaryLearningScope"), Value: string(resolved.learningScope)},
 		{Label: i18n.Get("InteractiveInitSummarySkills"), Value: resolved.skills},
 	})
 
@@ -96,6 +130,33 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		return resolved, interactive.ErrCanceled
 	}
 	return resolved, nil
+}
+
+func detectedWorkspaceProjectCount(mode string) int {
+	if mode != domain.ModeWorkspace {
+		return 0
+	}
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		return 0
+	}
+	return len(workspacediscovery.DiscoverProjects(projectRoot))
+}
+
+func initParallelismPlanSummary(mode string, totalParallelism, projectCount int) string {
+	if mode != domain.ModeWorkspace {
+		return i18n.GetWithParams("InteractiveInitParallelismPlanProject", map[string]interface{}{
+			"Total":           totalParallelism,
+			"UnitParallelism": totalParallelism,
+		})
+	}
+	workspaceParallelism, unitParallelism := allocateWorkspaceParallelism(totalParallelism, projectCount)
+	return i18n.GetWithParams("InteractiveInitParallelismPlanWorkspace", map[string]interface{}{
+		"Total":                totalParallelism,
+		"Projects":             projectCount,
+		"WorkspaceParallelism": workspaceParallelism,
+		"UnitParallelism":      unitParallelism,
+	})
 }
 
 func bannerTags() []interactive.BannerTag {
@@ -122,6 +183,17 @@ func withInitDefaults(opts commandOptions) commandOptions {
 	if opts.skills == "" {
 		opts.skills = defaultInitSkills
 	}
+	if opts.agentTotalParallelism <= 0 {
+		opts.agentTotalParallelism = 1
+	}
+	if opts.learningMode == "" {
+		opts.learningMode = config.LearningModeNormal
+	}
+	opts.learningMode = config.NormalizeLearningMode(string(opts.learningMode))
+	if opts.learningScope == "" {
+		opts.learningScope = config.LearningScopeFlow
+	}
+	opts.learningScope = config.NormalizeLearningScope(string(opts.learningScope))
 	opts.workspace = opts.mode == domain.ModeWorkspace || opts.workspace
 	if opts.workspace {
 		opts.mode = domain.ModeWorkspace
@@ -133,6 +205,22 @@ func agentOptions() []interactive.Option[string] {
 	return []interactive.Option[string]{
 		{Value: "claude", Title: "claude"},
 		{Value: "codex", Title: "codex"},
+	}
+}
+
+func learningModeOptions() []interactive.Option[config.LearningMode] {
+	return []interactive.Option[config.LearningMode]{
+		{Value: config.LearningModeNormal, Title: "normal", Description: i18n.Get("InteractiveInitLearningModeNormalDesc")},
+		{Value: config.LearningModeFast, Title: "fast", Description: i18n.Get("InteractiveInitLearningModeFastDesc")},
+		{Value: config.LearningModeDeep, Title: "deep", Description: i18n.Get("InteractiveInitLearningModeDeepDesc")},
+	}
+}
+
+func learningScopeOptions() []interactive.Option[config.LearningScope] {
+	return []interactive.Option[config.LearningScope]{
+		{Value: config.LearningScopeFlow, Title: "flow", Description: i18n.Get("InteractiveInitLearningScopeFlowDesc")},
+		{Value: config.LearningScopeDomain, Title: "domain", Description: i18n.Get("InteractiveInitLearningScopeDomainDesc")},
+		{Value: config.LearningScopeModule, Title: "module", Description: i18n.Get("InteractiveInitLearningScopeModuleDesc")},
 	}
 }
 

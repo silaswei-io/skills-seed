@@ -58,6 +58,12 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 	}
 }
 
+func learnCurrentStateMode(mode, scope string) string {
+	mode = string(config.NormalizeLearningMode(mode))
+	scope = string(config.NormalizeLearningScope(scope))
+	return mode + "|scope=" + scope
+}
+
 func buildStateInputs(changes *incrementalFileChanges) []commandstate.FileInput {
 	if changes == nil {
 		return nil
@@ -239,6 +245,7 @@ func loadOrCreateCurrentState(
 	projectRoot string,
 	language string,
 	mode string,
+	scope string,
 	focusRelPaths []string,
 	changes *incrementalFileChanges,
 	userContext string,
@@ -247,16 +254,18 @@ func loadOrCreateCurrentState(
 	if err != nil && err != commandstate.ErrStateNotFound {
 		return nil, err
 	}
-	if canReuseCurrentState(state, changes, projectName, language, mode, userContext) {
+	stateMode := learnCurrentStateMode(mode, scope)
+	if canReuseCurrentState(state, changes, projectName, language, stateMode, userContext) {
 		return state, nil
 	}
 	units, err := analyzerSvc.PlanAnalysisUnits(ctx, &analyzer.PlanAnalysisUnitsRequest{
-		ProjectName:  projectName,
-		RootPath:     projectRoot,
-		Language:     language,
-		LearningMode: config.LearningMode(mode),
-		FocusPaths:   focusRelPaths,
-		UserContext:  userContext,
+		ProjectName:   projectName,
+		RootPath:      projectRoot,
+		Language:      language,
+		LearningMode:  config.NormalizeLearningMode(mode),
+		LearningScope: config.NormalizeLearningScope(scope),
+		FocusPaths:    focusRelPaths,
+		UserContext:   userContext,
 	})
 	if err != nil {
 		return nil, err
@@ -264,7 +273,7 @@ func loadOrCreateCurrentState(
 	if len(units) == 0 {
 		units = []domain.AnalysisUnit{fallbackAnalysisUnit(focusRelPaths)}
 	}
-	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, mode, userContext, buildStateInputs(changes), units)
+	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateInputs(changes), units)
 	if err := repo.Save(ctx, state); err != nil {
 		return nil, err
 	}

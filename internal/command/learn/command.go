@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -212,12 +214,139 @@ type learnCurrentProjectResult struct {
 	tokenContext  context.Context
 }
 
+type learnCurrentUnitResult struct {
+	index            int
+	unit             domain.AnalysisUnit
+	patterns         []domain.Pattern
+	savedCount       int
+	profileDelta     domain.ProjectProfileDelta
+	refreshRecommend agent.ProfileRefreshRecommendation
+	completed        bool
+}
+
+type learnCurrentRunningUnits struct {
+	mu        sync.Mutex
+	labels    map[int]string
+	order     []int
+	completed int
+	total     int
+}
+
+func newLearnCurrentRunningUnits(state *commandstate.State, plannedUnits []domain.AnalysisUnit) *learnCurrentRunningUnits {
+	_, total := learnCurrentPendingUnitProgress(state, plannedUnits)
+	return &learnCurrentRunningUnits{
+		labels: make(map[int]string),
+		total:  total,
+	}
+}
+
+func (r *learnCurrentRunningUnits) start(index int, label string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.labels[index]; !exists {
+		r.order = append(r.order, index)
+		sort.Ints(r.order)
+	}
+	r.labels[index] = label
+	return r.runningTextLocked()
+}
+
+func (r *learnCurrentRunningUnits) finish(index int, completed bool) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.labels, index)
+	if completed {
+		r.completed++
+	}
+	out := r.order[:0]
+	for _, candidate := range r.order {
+		if _, exists := r.labels[candidate]; exists {
+			out = append(out, candidate)
+		}
+	}
+	r.order = out
+	return r.runningTextLocked()
+}
+
+func (r *learnCurrentRunningUnits) runningText() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.runningTextLocked()
+}
+
+func (r *learnCurrentRunningUnits) progressParams(parallelism int) map[string]interface{} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	current := r.completed + 1
+	if current > r.total {
+		current = r.total
+	}
+	if current < 1 {
+		current = 1
+	}
+	return map[string]interface{}{
+		"Current":     current,
+		"Total":       r.total,
+		"Parallelism": parallelism,
+		"Running":     r.runningTextLocked(),
+	}
+}
+
+func (r *learnCurrentRunningUnits) runningTextLocked() string {
+	if len(r.order) == 0 {
+		return "[]"
+	}
+	names := make([]string, 0, len(r.order))
+	for _, index := range r.order {
+		if label := r.labels[index]; label != "" {
+			names = append(names, label)
+		}
+	}
+	if len(names) == 0 {
+		return "[]"
+	}
+	return "[" + strings.Join(names, ", ") + "]"
+}
+
 type aiFileSelectionSummary struct {
 	Applied        bool
 	CandidateCount int
 	SelectedCount  int
 	SkippedCount   int
 	Reason         string
+}
+
+type learnCurrentProjectRun struct {
+	cont      *container.Container
+	opts      learnCurrentProjectOptions
+	stateRepo *commandstate.Repository
+	ctx       context.Context
+	startedAt time.Time
+	steps     *commandutil.ConsoleStepRunner
+
+	projectRoot        string
+	projectName        string
+	currentLanguage    string
+	learningMode       string
+	learningScope      string
+	resolvedFocusPaths []string
+	refreshProfile     bool
+	existingProfile    *domain.ProjectProfile
+
+	incrementalChanges  *incrementalFileChanges
+	effectiveFocusPaths []string
+	selectedFiles       []domain.FileInfo
+	selectionSummary    aiFileSelectionSummary
+	stateSession        *currentStateSession
+	resumeSummary       *learnCurrentResumeSummary
+
+	patterns                  []domain.Pattern
+	profileDelta              domain.ProjectProfileDelta
+	profileRefreshRecommended agent.ProfileRefreshRecommendation
+	mergedProfile             *domain.ProjectProfile
+	savedCount                int
+	patternSaveMu             sync.Mutex
+	progressDetailMu          sync.Mutex
 }
 
 func learnCurrentProgressDetail(baseLabel, detailKey string, params map[string]interface{}) string {
@@ -255,6 +384,14 @@ func learnCurrentUnitProgress(state *commandstate.State, fallbackIndex, fallback
 	return fallbackIndex, len(state.Units)
 }
 
+func learnCurrentPendingUnitProgress(state *commandstate.State, plannedUnits []domain.AnalysisUnit) (int, int) {
+	total := len(plannedUnits)
+	if state != nil && len(state.Units) > 0 {
+		total = len(state.Units)
+	}
+	return len(plannedUnits), total
+}
+
 func analysisUnitSame(a, b domain.AnalysisUnit) bool {
 	if a.ID != "" || b.ID != "" {
 		return a.ID == b.ID
@@ -266,12 +403,14 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	if err := commandutil.RequireAgentAvailable(cont); err != nil {
 		return nil, err
 	}
-	stateRepo := learnCurrentStateRepo(cont.SeedPath, opts.stateScope)
+	run := newLearnCurrentProjectRun(cont, opts)
+	return run.execute()
+}
 
+func newLearnCurrentProjectRun(cont *container.Container, opts learnCurrentProjectOptions) *learnCurrentProjectRun {
 	ctx := agent.WithTokenUsageScope(context.Background(), opts.tokenScope)
 	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
-	startedAt := time.Now()
 	steps := commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
 		TotalSteps:     5,
 		ShowProgress:   opts.showProgress,
@@ -280,393 +419,404 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		OnStepUpdate:   opts.onStepUpdate,
 	})
 	ctx = steps.WithContext(ctx)
-	setStepDetail := func(baseLabel, detailKey string, params map[string]interface{}) string {
-		return steps.Detail(baseLabel, learnCurrentProgressDetail(baseLabel, detailKey, params))
+
+	return &learnCurrentProjectRun{
+		cont:      cont,
+		opts:      opts,
+		stateRepo: learnCurrentStateRepo(cont.SeedPath, opts.stateScope),
+		ctx:       ctx,
+		startedAt: time.Now(),
+		steps:     steps,
 	}
+}
 
-	var projectRoot string
-	var projectName string
-	var currentLanguage string
-	var learningMode string
-	var resolvedFocusPaths []string
-	var refreshProfile bool
-	var existingProfile *domain.ProjectProfile
-
-	if opts.showDetailedLogs {
+func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
+	if r.opts.showDetailedLogs {
 		logger.Info(i18n.Get("LearnCurrentStart"))
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "command.learn_current",
-		"agent", cont.Agent.Name(),
-		"seed_path", cont.SeedPath,
+		"agent", r.cont.Agent.Name(),
+		"seed_path", r.cont.SeedPath,
 	)
 
+	if err := r.prepareProject(); err != nil {
+		return nil, err
+	}
+	if err := r.detectChanges(); err != nil {
+		return nil, err
+	}
+	if !r.incrementalChanges.HasChanges() {
+		return r.finishWithoutChanges()
+	}
+	if err := r.analyzeCodebase(); err != nil {
+		return nil, err
+	}
+	if err := r.savePatternsStep(); err != nil {
+		return nil, err
+	}
+	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed && r.profileDelta.IsZero() {
+		r.refreshProfile = true
+	}
+	if err := r.saveProfileIfNeeded(); err != nil {
+		return nil, err
+	}
+
+	if err := r.cont.FileTracker.DeleteAnalyzedFiles(r.ctx, r.incrementalChanges.Scope, r.incrementalChanges.Deleted); err != nil {
+		return nil, err
+	}
+
+	if r.opts.showDetailedLogs {
+		logger.Info(i18n.Get("LearnCurrentComplete"))
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "command.learn_current",
+		"duration", time.Since(r.startedAt),
+		"patterns_count", len(r.patterns),
+		"saved_count", r.savedCount,
+	)
+	if err := commandutil.MarkLearned(r.ctx, r.cont); err != nil {
+		return nil, err
+	}
+
+	return r.buildResult(false), nil
+}
+
+func (r *learnCurrentProjectRun) detail(baseLabel, detailKey string, params map[string]interface{}) string {
+	r.progressDetailMu.Lock()
+	defer r.progressDetailMu.Unlock()
+	return r.steps.Detail(baseLabel, learnCurrentProgressDetail(baseLabel, detailKey, params))
+}
+
+func (r *learnCurrentProjectRun) prepareProject() error {
 	// 解析项目上下文可能访问 Git 和配置文件，单独作为第一步展示，避免用户以为命令无响应
 	prepareStartedAt := time.Now()
-	if err := steps.Run(i18n.Get("ProgressLearnCurrentPrepareProject"), func() error {
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentPrepareProject"), func() error {
 		var err error
-		projectRoot, err = cont.GitRepo.GetProjectRoot(ctx)
+		r.projectRoot, err = r.cont.GitRepo.GetProjectRoot(r.ctx)
 		if err != nil {
-			projectRoot = cont.ConfigRepo.GetProjectConfig().RootPath
+			r.projectRoot = r.cont.ConfigRepo.GetProjectConfig().RootPath
 		}
-		if projectRoot == "" {
-			projectRoot, err = os.Getwd()
+		if r.projectRoot == "" {
+			r.projectRoot, err = os.Getwd()
 			if err != nil {
 				return err
 			}
 		}
 
-		projectName = filepath.Base(projectRoot)
-		if configuredName := cont.ConfigRepo.GetProjectConfig().Name; configuredName != "" {
-			projectName = configuredName
+		r.projectName = filepath.Base(r.projectRoot)
+		if configuredName := r.cont.ConfigRepo.GetProjectConfig().Name; configuredName != "" {
+			r.projectName = configuredName
 		}
 
-		currentLanguage = opts.language
-		if currentLanguage == "" {
-			currentLanguage = cont.ConfigRepo.GetProjectConfig().Language
+		r.currentLanguage = r.opts.language
+		if r.currentLanguage == "" {
+			r.currentLanguage = r.cont.ConfigRepo.GetProjectConfig().Language
 		}
-		if currentLanguage == "" {
-			currentLanguage = "unknown"
+		if r.currentLanguage == "" {
+			r.currentLanguage = "unknown"
 		}
-		learningMode = string(cont.ConfigRepo.GetCurrentLearningConfig().Mode)
+		currentLearningConfig := r.cont.ConfigRepo.GetCurrentLearningConfig()
+		r.learningMode = string(currentLearningConfig.Mode)
+		r.learningScope = string(currentLearningConfig.Scope)
 
-		resolvedFocusPaths, err = resolveFocusPaths(projectRoot, opts.focusPaths)
+		r.resolvedFocusPaths, err = resolveFocusPaths(r.projectRoot, r.opts.focusPaths)
 		if err != nil {
 			return err
 		}
 		profileExists := false
-		if cont.ProfileRepo != nil {
-			if profile, getErr := cont.ProfileRepo.Get(ctx); getErr == nil {
-				existingProfile = profile
+		if r.cont.ProfileRepo != nil {
+			if profile, getErr := r.cont.ProfileRepo.Get(r.ctx); getErr == nil {
+				r.existingProfile = profile
 				profileExists = true
 			}
 		}
-		refreshProfile, err = shouldRefreshProfile(projectRoot, resolvedFocusPaths, opts.profileMode, profileExists)
-		if err != nil {
-			return err
-		}
-		return nil
+		r.refreshProfile, err = shouldRefreshProfile(r.projectRoot, r.resolvedFocusPaths, r.opts.profileMode, profileExists)
+		return err
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.prepare_project",
 			"duration", time.Since(prepareStartedAt),
 			"error", err,
 		)
-		return nil, fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToGetCurrentDir", map[string]interface{}{"Error": err.Error()}))
+		return fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToGetCurrentDir", map[string]interface{}{"Error": err.Error()}))
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.prepare_project",
 		"duration", time.Since(prepareStartedAt),
-		"project_root", projectRoot,
-		"project_name", projectName,
-		"language", currentLanguage,
-		"focus_paths", strings.Join(utils.RelativePaths(projectRoot, resolvedFocusPaths), ","),
-		"profile_mode", opts.profileMode,
-		"refresh_profile", refreshProfile,
+		"project_root", r.projectRoot,
+		"project_name", r.projectName,
+		"language", r.currentLanguage,
+		"focus_paths", strings.Join(utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths), ","),
+		"profile_mode", r.opts.profileMode,
+		"refresh_profile", r.refreshProfile,
 	)
-	if opts.showDetailedLogs {
+	if r.opts.showDetailedLogs {
 		logger.Info(i18n.GetWithParams("LearnCurrentInfo", map[string]interface{}{
-			"ProjectRoot": projectRoot,
-			"ProjectName": projectName,
-			"Language":    currentLanguage,
+			"ProjectRoot": r.projectRoot,
+			"ProjectName": r.projectName,
+			"Language":    r.currentLanguage,
 		}))
-		if len(resolvedFocusPaths) > 0 {
+		if len(r.resolvedFocusPaths) > 0 {
 			logger.Info(i18n.GetWithParams("LearnCurrentFocusInfo", map[string]interface{}{
-				"Focus":       strings.Join(utils.RelativePaths(projectRoot, resolvedFocusPaths), ", "),
-				"ProfileMode": opts.profileMode,
+				"Focus":       strings.Join(utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths), ", "),
+				"ProfileMode": r.opts.profileMode,
 			}))
 		}
 	}
+	return nil
+}
 
-	var incrementalChanges *incrementalFileChanges
-	var effectiveFocusPaths []string
-	var selectedFiles []domain.FileInfo
-	var selectionSummary aiFileSelectionSummary
-	var stateSession *currentStateSession
-	var resumeSummary *learnCurrentResumeSummary
+func (r *learnCurrentProjectRun) detectChanges() error {
 	detectStartedAt := time.Now()
 	detectLabel := i18n.Get("ProgressLearnCurrentDetectChanges")
-	if err := steps.Run(detectLabel, func() error {
-		setStepDetail(detectLabel, "ProgressLearnCurrentDetectRestoreState", nil)
-		session, err := restoreCurrentState(ctx, stateRepo, cont.FileTracker, projectName, currentLanguage, learningMode, opts.userContext)
-		if err != nil {
+	if err := r.steps.Run(detectLabel, func() error {
+		if err := r.restoreOrDetectChanges(detectLabel); err != nil {
 			return err
 		}
-		if session != nil {
-			stateSession = session
-			incrementalChanges = session.Changes
-			focusRelPaths := analysisCandidatePaths(incrementalChanges)
-			effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, focusRelPaths)
-			selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, incrementalChanges.AddedOrModified))
-			resumeSummary = buildLearnCurrentResumeSummary(session)
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-				"operation", "command.learn_current.resume_state",
-				"state_scope", stateRepo.Command(),
-				"inputs_count", len(session.State.Inputs),
-				"pending_count", len(incrementalChanges.AddedOrModified)+len(incrementalChanges.Deleted),
-				"units_count", len(session.State.Units),
-			)
+		return r.selectRelevantFilesIfNeeded(detectLabel)
+	}); err != nil {
+		return err
+	}
+	r.logDetectedChanges(detectStartedAt)
+	return nil
+}
+
+func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) error {
+	r.detail(detectLabel, "ProgressLearnCurrentDetectRestoreState", nil)
+	session, err := restoreCurrentState(r.ctx, r.stateRepo, r.cont.FileTracker, r.projectName, r.currentLanguage, learnCurrentStateMode(r.learningMode, r.learningScope), r.opts.userContext)
+	if err != nil {
+		return err
+	}
+	if session != nil {
+		r.stateSession = session
+		r.incrementalChanges = session.Changes
+		focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
+		r.effectiveFocusPaths = resolveIncrementalFocusPaths(r.projectRoot, focusRelPaths)
+		r.selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, r.incrementalChanges.AddedOrModified))
+		r.resumeSummary = buildLearnCurrentResumeSummary(session)
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+			"operation", "command.learn_current.resume_state",
+			"state_scope", r.stateRepo.Command(),
+			"inputs_count", len(session.State.Inputs),
+			"pending_count", len(r.incrementalChanges.AddedOrModified)+len(r.incrementalChanges.Deleted),
+			"units_count", len(session.State.Units),
+		)
+		return nil
+	}
+
+	r.detail(detectLabel, "ProgressLearnCurrentDetectScanFiles", nil)
+	r.incrementalChanges, err = prepareIncrementalFileChangesWithOptions(r.ctx, r.cont.FileTracker, r.cont.ConfigRepo, r.projectRoot, r.projectRoot, domain.FileAnalysisScope{}, r.resolvedFocusPaths, fileanalysis.CurrentChangeOptions{
+		Force: r.opts.force,
+	})
+	if err != nil {
+		return err
+	}
+	focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
+	r.effectiveFocusPaths = resolveIncrementalFocusPaths(r.projectRoot, focusRelPaths)
+	r.selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, r.incrementalChanges.AddedOrModified))
+	return nil
+}
+
+func (r *learnCurrentProjectRun) selectRelevantFilesIfNeeded(detectLabel string) error {
+	focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
+	currentLearningConfig := r.cont.ConfigRepo.GetCurrentLearningConfig()
+	if !currentLearningConfig.SelectRelevantFiles {
+		return nil
+	}
+	if len(focusRelPaths) < currentLearningConfig.SelectRelevantFilesMinCandidates {
+		if len(focusRelPaths) == 0 {
 			return nil
 		}
-		setStepDetail(detectLabel, "ProgressLearnCurrentDetectScanFiles", nil)
-		incrementalChanges, err = prepareIncrementalFileChangesWithOptions(ctx, cont.FileTracker, cont.ConfigRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, resolvedFocusPaths, fileanalysis.CurrentChangeOptions{
-			Force: opts.force,
-		})
-		if err != nil {
-			return err
-		}
-		focusRelPaths := analysisCandidatePaths(incrementalChanges)
-		effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, focusRelPaths)
-		selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, incrementalChanges.AddedOrModified))
-		currentLearningConfig := cont.ConfigRepo.GetCurrentLearningConfig()
-		shouldSelectRelevantFiles := currentLearningConfig.SelectRelevantFiles &&
-			len(focusRelPaths) >= currentLearningConfig.SelectRelevantFilesMinCandidates
-		if shouldSelectRelevantFiles {
-			setStepDetail(detectLabel, "ProgressLearnCurrentDetectSelectFiles", map[string]interface{}{
-				"Candidates": len(focusRelPaths),
-			})
-			selectionResult, selectErr := fileanalysis.ApplyAIFileSelector(ctx, cont.Agent, fileanalysis.AISelectorOptions{
-				ProjectRoot: projectRoot,
-				Candidates:  focusRelPaths,
-				Changes:     incrementalChanges,
-				UserContext: opts.userContext,
-			})
-			if selectErr != nil {
-				logger.Warn("AI file selector failed; falling back to all candidate files")
-				logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-					"operation", "command.learn_current.select_relevant_files",
-					"error", selectErr,
-					"candidate_count", len(focusRelPaths),
-				)
-			} else if selectionResult != nil && len(selectionResult.SelectedPaths) > 0 {
-				effectiveFocusPaths = resolveIncrementalFocusPaths(projectRoot, selectionResult.SelectedPaths)
-				selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(selectionResult.SelectedPaths, incrementalChanges.AddedOrModified))
-				incrementalChanges.ApplyAISelection(selectionResult.SelectedPaths, selectionResult.Reason)
-				selectionSummary = aiFileSelectionSummary{
-					Applied:        true,
-					CandidateCount: len(focusRelPaths),
-					SelectedCount:  len(selectionResult.SelectedPaths),
-					SkippedCount:   len(selectionResult.SkippedPaths),
-					Reason:         selectionResult.Reason,
-				}
-				logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-					"operation", "command.learn_current.select_relevant_files",
-					"candidate_count", len(focusRelPaths),
-					"selected_count", len(selectionResult.SelectedPaths),
-					"skipped_count", len(selectionResult.SkippedPaths),
-					"reason", selectionResult.Reason,
-				)
-			}
-		} else if currentLearningConfig.SelectRelevantFiles && len(focusRelPaths) > 0 {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-				"operation", "command.learn_current.select_relevant_files",
-				"candidate_count", len(focusRelPaths),
-				"min_candidates", currentLearningConfig.SelectRelevantFilesMinCandidates,
-				"skipped", true,
-			)
-		}
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+			"operation", "command.learn_current.select_relevant_files",
+			"candidate_count", len(focusRelPaths),
+			"min_candidates", currentLearningConfig.SelectRelevantFilesMinCandidates,
+			"skipped", true,
+		)
 		return nil
-	}); err != nil {
-		return nil, err
 	}
-	if opts.showDetailedLogs {
-		if resumeSummary != nil {
+
+	r.detail(detectLabel, "ProgressLearnCurrentDetectSelectFiles", map[string]interface{}{
+		"Candidates": len(focusRelPaths),
+	})
+	selectionResult, selectErr := fileanalysis.ApplyAIFileSelector(r.ctx, r.cont.Agent, fileanalysis.AISelectorOptions{
+		ProjectRoot: r.projectRoot,
+		Candidates:  focusRelPaths,
+		Changes:     r.incrementalChanges,
+		UserContext: r.opts.userContext,
+	})
+	if selectErr != nil {
+		logger.Warn("AI file selector failed; falling back to all candidate files")
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "command.learn_current.select_relevant_files",
+			"error", selectErr,
+			"candidate_count", len(focusRelPaths),
+		)
+		return nil
+	}
+	if selectionResult == nil || len(selectionResult.SelectedPaths) == 0 {
+		return nil
+	}
+
+	r.effectiveFocusPaths = resolveIncrementalFocusPaths(r.projectRoot, selectionResult.SelectedPaths)
+	r.selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(selectionResult.SelectedPaths, r.incrementalChanges.AddedOrModified))
+	r.incrementalChanges.ApplyAISelection(selectionResult.SelectedPaths, selectionResult.Reason)
+	r.selectionSummary = aiFileSelectionSummary{
+		Applied:        true,
+		CandidateCount: len(focusRelPaths),
+		SelectedCount:  len(selectionResult.SelectedPaths),
+		SkippedCount:   len(selectionResult.SkippedPaths),
+		Reason:         selectionResult.Reason,
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "command.learn_current.select_relevant_files",
+		"candidate_count", len(focusRelPaths),
+		"selected_count", len(selectionResult.SelectedPaths),
+		"skipped_count", len(selectionResult.SkippedPaths),
+		"reason", selectionResult.Reason,
+	)
+	return nil
+}
+
+func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
+	if r.opts.showDetailedLogs {
+		if r.resumeSummary != nil {
 			logger.Info(i18n.GetWithParams("LearnCurrentResumeSummary", map[string]interface{}{
-				"Command":   resumeSummary.Command,
-				"CreatedAt": resumeSummary.CreatedAt,
-				"Inputs":    resumeSummary.Inputs,
-				"Pending":   resumeSummary.Pending,
-				"Units":     resumeSummary.Units,
-				"AISkipped": resumeSummary.AISkipped,
+				"Command":   r.resumeSummary.Command,
+				"CreatedAt": r.resumeSummary.CreatedAt,
+				"Inputs":    r.resumeSummary.Inputs,
+				"Pending":   r.resumeSummary.Pending,
+				"Units":     r.resumeSummary.Units,
+				"AISkipped": r.resumeSummary.AISkipped,
 			}))
 		} else {
 			logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{
-				"Changed":   len(incrementalChanges.AddedOrModified),
-				"Deleted":   len(incrementalChanges.Deleted),
-				"Unchanged": len(incrementalChanges.Unchanged),
-				"Skipped":   len(incrementalChanges.Skipped),
+				"Changed":   len(r.incrementalChanges.AddedOrModified),
+				"Deleted":   len(r.incrementalChanges.Deleted),
+				"Unchanged": len(r.incrementalChanges.Unchanged),
+				"Skipped":   len(r.incrementalChanges.Skipped),
 			}))
-			if len(incrementalChanges.ExcludedGeneratedSkillDirs) > 0 {
+			if len(r.incrementalChanges.ExcludedGeneratedSkillDirs) > 0 {
 				logger.Info(i18n.GetWithParams("LearnCurrentGeneratedSkillsExcluded", map[string]interface{}{
-					"Paths": strings.Join(incrementalChanges.ExcludedGeneratedSkillDirs, ", "),
+					"Paths": strings.Join(r.incrementalChanges.ExcludedGeneratedSkillDirs, ", "),
 				}))
 			}
-			if selectionSummary.Applied {
+			if r.selectionSummary.Applied {
 				logger.Info(i18n.GetWithParams("LearnCurrentAIFileSelectionSummary", map[string]interface{}{
-					"Candidates": selectionSummary.CandidateCount,
-					"Selected":   selectionSummary.SelectedCount,
-					"Skipped":    selectionSummary.SkippedCount,
+					"Candidates": r.selectionSummary.CandidateCount,
+					"Selected":   r.selectionSummary.SelectedCount,
+					"Skipped":    r.selectionSummary.SkippedCount,
 				}))
 				logger.Info(i18n.GetWithParams("LearnCurrentFingerprintCommitPlan", map[string]interface{}{
-					"Records": len(incrementalChanges.Records),
+					"Records": len(r.incrementalChanges.Records),
 				}))
 			}
 		}
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.detect_changes",
-		"duration", time.Since(detectStartedAt),
-		"changed_count", len(incrementalChanges.AddedOrModified),
-		"deleted_count", len(incrementalChanges.Deleted),
-		"unchanged_count", len(incrementalChanges.Unchanged),
-		"skipped_count", len(incrementalChanges.Skipped),
+		"duration", time.Since(startedAt),
+		"changed_count", len(r.incrementalChanges.AddedOrModified),
+		"deleted_count", len(r.incrementalChanges.Deleted),
+		"unchanged_count", len(r.incrementalChanges.Unchanged),
+		"skipped_count", len(r.incrementalChanges.Skipped),
 	)
-	var patterns []domain.Pattern
-	var profileDelta domain.ProjectProfileDelta
-	var profileRefreshRecommended agent.ProfileRefreshRecommendation
-	var mergedProfile *domain.ProjectProfile
-	savedCount := 0
+}
 
-	if !incrementalChanges.HasChanges() {
-		if stateSession != nil {
-			_ = stateRepo.Clear()
-		}
-		if opts.showDetailedLogs {
-			logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
-		}
-		if err := steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
-			return nil, err
-		}
-		if err := steps.Run(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error { return nil }); err != nil {
-			return nil, err
-		}
-		profileStep := i18n.Get("ProgressLearnCurrentSkipProfile")
-		if refreshProfile {
-			profileStep = i18n.Get("ProgressLearnCurrentSaveProfile")
-		}
-		if err := steps.Run(profileStep, func() error {
-			if !refreshProfile {
-				return nil
-			}
-			profile, err := analyzeProjectProfile(ctx, cont, projectRoot, projectName, currentLanguage, nil, nil)
-			if err != nil {
-				return err
-			}
-			return cont.ProfileRepo.Save(ctx, profile)
-		}); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-				"operation", "command.learn_current.save_project_profile",
-				"duration", time.Since(detectStartedAt),
-				"error", err,
-			)
-			return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileFailed", map[string]interface{}{"Error": err.Error()}))
-		}
-		if opts.showDetailedLogs {
-			if refreshProfile {
-				logger.Info(i18n.Get("LearnCurrentProfileSaved"))
-			} else {
-				logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
-			}
-			logger.Info(i18n.Get("LearnCurrentComplete"))
-		}
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "command.learn_current",
-			"duration", time.Since(startedAt),
-			"patterns_count", 0,
-			"saved_count", 0,
-			"skipped", true,
-		)
-		result := &learnCurrentProjectResult{
-			projectName:  projectName,
-			changedCount: len(incrementalChanges.AddedOrModified),
-			deletedCount: len(incrementalChanges.Deleted),
-			skippedCount: len(incrementalChanges.Skipped),
-			skipped:      true,
-			duration:     time.Since(startedAt),
-			tokenContext: ctx,
-		}
-		if opts.showDetailedLogs {
-			agent.FlushTokenUsageScope(ctx)
-		}
-		return result, nil
+func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectResult, error) {
+	if r.stateSession != nil {
+		_ = r.stateRepo.Clear()
 	}
+	if r.opts.showDetailedLogs {
+		logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
+	}
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
+		return nil, err
+	}
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error { return nil }); err != nil {
+		return nil, err
+	}
+	profileStartedAt := time.Now()
+	profileStep := i18n.Get("ProgressLearnCurrentSkipProfile")
+	if r.refreshProfile {
+		profileStep = i18n.Get("ProgressLearnCurrentSaveProfile")
+	}
+	if err := r.steps.Run(profileStep, func() error {
+		if !r.refreshProfile {
+			return nil
+		}
+		profile, err := analyzeProjectProfile(r.ctx, r.cont, r.projectRoot, r.projectName, r.currentLanguage, nil, nil)
+		if err != nil {
+			return err
+		}
+		return r.cont.ProfileRepo.Save(r.ctx, profile)
+	}); err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "command.learn_current.save_project_profile",
+			"duration", time.Since(profileStartedAt),
+			"error", err,
+		)
+		return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileFailed", map[string]interface{}{"Error": err.Error()}))
+	}
+	if r.opts.showDetailedLogs {
+		if r.refreshProfile {
+			logger.Info(i18n.Get("LearnCurrentProfileSaved"))
+		} else {
+			logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
+		}
+		logger.Info(i18n.Get("LearnCurrentComplete"))
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "command.learn_current",
+		"duration", time.Since(r.startedAt),
+		"patterns_count", 0,
+		"saved_count", 0,
+		"skipped", true,
+	)
+	return r.buildResult(true), nil
+}
 
+func (r *learnCurrentProjectRun) analyzeCodebase() error {
 	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
 	analyzeStartedAt := time.Now()
 	analyzeLabel := i18n.Get("ProgressLearnCurrentAnalyzeCodebase")
-	if err := steps.Run(analyzeLabel, func() error {
-		focusRelPaths := analysisCandidatePaths(incrementalChanges)
+	if err := r.steps.Run(analyzeLabel, func() error {
+		focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
 		state := (*commandstate.State)(nil)
-		if stateSession != nil {
-			state = stateSession.State
+		if r.stateSession != nil {
+			state = r.stateSession.State
 		}
 		if state == nil {
-			setStepDetail(analyzeLabel, "ProgressLearnCurrentAnalyzePlanUnits", nil)
+			r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzePlanUnits", nil)
 			var err error
-			state, err = loadOrCreateCurrentState(ctx, stateRepo, cont.AnalyzerSvc, projectName, projectRoot, currentLanguage, learningMode, focusRelPaths, incrementalChanges, opts.userContext)
+			state, err = loadOrCreateCurrentState(r.ctx, r.stateRepo, r.cont.AnalyzerSvc, r.projectName, r.projectRoot, r.currentLanguage, r.learningMode, r.learningScope, focusRelPaths, r.incrementalChanges, r.opts.userContext)
 			if err != nil {
 				return err
 			}
 		} else {
-			setStepDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeResumePlan", map[string]interface{}{
+			r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeResumePlan", map[string]interface{}{
 				"Units": len(state.Units),
 			})
 		}
 
-		plannedUnits := pendingAnalysisUnits(state, incrementalChanges)
+		plannedUnits := pendingAnalysisUnits(state, r.incrementalChanges)
 		if len(plannedUnits) == 0 {
 			return nil
 		}
-		if existingProfile != nil {
-			copyProfile := *existingProfile
-			mergedProfile = &copyProfile
+		if r.existingProfile != nil {
+			copyProfile := *r.existingProfile
+			r.mergedProfile = &copyProfile
 		}
-		completedUnits := 0
-		totalUnits := len(plannedUnits)
-		for unitIndex, unit := range plannedUnits {
-			unitFocusRelPaths := unitFocusPaths(unit, incrementalChanges)
-			if len(unitFocusRelPaths) == 0 {
-				continue
-			}
-			currentUnit, allUnits := learnCurrentUnitProgress(state, unitIndex+1, totalUnits, unit)
-			unitProgressParams := map[string]interface{}{
-				"Current": currentUnit,
-				"Total":   allUnits,
-				"Name":    learnCurrentProgressSubject(unit),
-			}
-			unitProgressLabel := setStepDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", unitProgressParams)
-			unitFocusAbsPaths := resolveIncrementalFocusPaths(projectRoot, unitFocusRelPaths)
-			unitSelected := unitSelectedFiles(unit, selectedFiles, incrementalChanges)
-			unitLabel := agent.RuntimeLabelFromAnalysisUnit(unit.ID, unit.Name)
-			analyzeResult, learnedPatterns, err := cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, currentLanguage, analyzer.AnalyzeCodebaseOptions{
-				FocusPaths:       unitFocusAbsPaths,
-				RuntimeLabel:     unitLabel,
-				AnalysisUnit:     unit,
-				LearningMode:     cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-				SelectedFiles:    unitSelected,
-				SelectedFilesSet: true,
-				UseSnapshotDiffs: true,
-			})
-			if err != nil {
-				return fmt.Errorf("%s: %w", unitProgressLabel, err)
-			}
-			if len(learnedPatterns) > 0 {
-				saveProgressLabel := setStepDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeSaveUnitPatterns", unitProgressParams)
-				saved, err := cont.LearnerSvc.SavePatternsStrictWithMetadata(ctx, learnedPatterns, "learn_current", unit)
-				if err != nil {
-					return fmt.Errorf("%s: %w", saveProgressLabel, err)
-				}
-				savedCount += saved
-			}
-			if !analyzeResult.ProfileDelta.IsZero() {
-				profileDelta = analyzeResult.ProfileDelta
-				mergedProfile = domain.ApplyProjectProfileDelta(mergedProfile, analyzeResult.ProfileDelta, projectName, currentLanguage)
-			}
-			if analyzeResult.ProfileRefreshRecommended.Needed {
-				profileRefreshRecommended = analyzeResult.ProfileRefreshRecommended
-			}
-			patterns = append(patterns, learnedPatterns...)
-			commitProgressLabel := setStepDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeCommitUnit", unitProgressParams)
-			if err := commitUnitFileRecords(ctx, cont.FileTracker, unitCommittedRecords(unit, incrementalChanges)); err != nil {
-				return fmt.Errorf("%s: %w", commitProgressLabel, err)
-			}
-			completedUnits++
+		completedUnits, err := r.analyzePlannedUnits(analyzeLabel, state, plannedUnits)
+		if err != nil {
+			return err
 		}
-		if mergedProfile != nil {
-			existingProfile = mergedProfile
+		if r.mergedProfile != nil {
+			r.existingProfile = r.mergedProfile
 		}
 		if completedUnits == len(plannedUnits) {
-			_ = stateRepo.Clear()
+			_ = r.stateRepo.Clear()
 		}
 		return nil
 	}); err != nil {
@@ -675,115 +825,312 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 			"duration", time.Since(analyzeStartedAt),
 			"error", err,
 		)
-		return nil, fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToAnalyzeCodebase", map[string]interface{}{"Error": err.Error()}))
+		return fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToAnalyzeCodebase", map[string]interface{}{"Error": err.Error()}))
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.analyze_codebase",
 		"duration", time.Since(analyzeStartedAt),
-		"patterns_count", len(patterns),
-		"profile_delta", !profileDelta.IsZero(),
-		"profile_refresh_recommended", profileRefreshRecommended.Needed,
+		"patterns_count", len(r.patterns),
+		"profile_delta", !r.profileDelta.IsZero(),
+		"profile_refresh_recommended", r.profileRefreshRecommended.Needed,
 	)
 
-	if opts.showDetailedLogs {
+	if r.opts.showDetailedLogs {
 		logger.Info(i18n.GetWithParams("LearnCurrentResult", map[string]interface{}{
-			"PatternsCount": len(patterns),
-			"ProfileDelta":  !profileDelta.IsZero(),
+			"PatternsCount": len(r.patterns),
+			"ProfileDelta":  !r.profileDelta.IsZero(),
 		}))
 	}
+	return nil
+}
 
+func (r *learnCurrentProjectRun) analyzePlannedUnits(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit) (int, error) {
+	parallelism := r.effectiveUnitParallelism(len(plannedUnits))
+	if parallelism <= 1 {
+		return r.analyzePlannedUnitsSerial(analyzeLabel, state, plannedUnits)
+	}
+	return r.analyzePlannedUnitsParallel(analyzeLabel, state, plannedUnits, parallelism)
+}
+
+func (r *learnCurrentProjectRun) effectiveUnitParallelism(unitCount int) int {
+	if unitCount <= 1 {
+		return 1
+	}
+	parallelism := r.cont.ConfigRepo.GetCurrentLearningConfig().Parallelism
+	if parallelism <= 1 {
+		return 1
+	}
+	if parallelism > unitCount {
+		return unitCount
+	}
+	return parallelism
+}
+
+func (r *learnCurrentProjectRun) analyzePlannedUnitsSerial(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit) (int, error) {
+	completedUnits := 0
+	totalUnits := len(plannedUnits)
+	for unitIndex, unit := range plannedUnits {
+		params := r.unitProgressParams(state, unit, unitIndex+1, totalUnits)
+		result, err := r.analyzeSingleUnit(r.ctx, analyzeLabel, unit, unitIndex, params, true)
+		if err != nil {
+			return completedUnits, err
+		}
+		if result.completed {
+			completedUnits++
+		}
+		r.mergeUnitResult(result)
+	}
+	return completedUnits, nil
+}
+
+func (r *learnCurrentProjectRun) analyzePlannedUnitsParallel(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit, parallelism int) (int, error) {
+	running := newLearnCurrentRunningUnits(state, plannedUnits)
+	if r.opts.showDetailedLogs {
+		logger.Info(i18n.GetWithParams("LearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism)))
+	}
+	r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism))
+
+	type indexedUnit struct {
+		index int
+		unit  domain.AnalysisUnit
+	}
+
+	ctx, cancel := context.WithCancel(r.ctx)
+	defer cancel()
+
+	jobs := make(chan indexedUnit)
+	results := make(chan learnCurrentUnitResult, len(plannedUnits))
+	errs := make(chan error, len(plannedUnits))
+	var wg sync.WaitGroup
+	_, totalUnits := learnCurrentPendingUnitProgress(state, plannedUnits)
+
+	for i := 0; i < parallelism; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				params := r.unitProgressParams(state, job.unit, job.index+1, totalUnits)
+				running.start(job.index, learnCurrentProgressSubject(job.unit))
+				r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism))
+				result, err := r.analyzeSingleUnit(ctx, analyzeLabel, job.unit, job.index, params, false)
+				if err != nil {
+					errs <- err
+					cancel()
+					return
+				}
+				running.finish(job.index, result.completed)
+				r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism))
+				results <- result
+			}
+		}()
+	}
+
+	for index, unit := range plannedUnits {
+		select {
+		case <-ctx.Done():
+			close(jobs)
+			wg.Wait()
+			close(results)
+			close(errs)
+			return r.collectParallelUnitResults(results, errs)
+		case jobs <- indexedUnit{index: index, unit: unit}:
+		}
+	}
+	close(jobs)
+	wg.Wait()
+	close(results)
+	close(errs)
+	return r.collectParallelUnitResults(results, errs)
+}
+
+func (r *learnCurrentProjectRun) collectParallelUnitResults(results <-chan learnCurrentUnitResult, errs <-chan error) (int, error) {
+	for err := range errs {
+		if err != nil {
+			return 0, err
+		}
+	}
+	completedUnits := 0
+	collected := make([]learnCurrentUnitResult, 0)
+	for result := range results {
+		collected = append(collected, result)
+		if result.completed {
+			completedUnits++
+		}
+	}
+	sort.Slice(collected, func(i, j int) bool {
+		return collected[i].index < collected[j].index
+	})
+	for _, result := range collected {
+		r.mergeUnitResult(result)
+	}
+	return completedUnits, nil
+}
+
+func (r *learnCurrentProjectRun) unitProgressParams(state *commandstate.State, unit domain.AnalysisUnit, current, total int) map[string]interface{} {
+	currentUnit, allUnits := learnCurrentUnitProgress(state, current, total, unit)
+	return map[string]interface{}{
+		"Current": currentUnit,
+		"Total":   allUnits,
+		"Name":    learnCurrentProgressSubject(unit),
+	}
+}
+
+func (r *learnCurrentProjectRun) analyzeSingleUnit(ctx context.Context, analyzeLabel string, unit domain.AnalysisUnit, index int, params map[string]interface{}, showDetails bool) (learnCurrentUnitResult, error) {
+	unitFocusRelPaths := unitFocusPaths(unit, r.incrementalChanges)
+	if len(unitFocusRelPaths) == 0 {
+		return learnCurrentUnitResult{index: index, unit: unit}, nil
+	}
+
+	unitProgressLabel := learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", params)
+	if showDetails {
+		unitProgressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", params)
+	}
+	unitFocusAbsPaths := resolveIncrementalFocusPaths(r.projectRoot, unitFocusRelPaths)
+	unitSelected := unitSelectedFiles(unit, r.selectedFiles, r.incrementalChanges)
+	unitLabel := agent.RuntimeLabelFromAnalysisUnit(unit.ID, unit.Name)
+	analyzeResult, learnedPatterns, err := r.cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCodebaseOptions{
+		FocusPaths:       unitFocusAbsPaths,
+		RuntimeLabel:     unitLabel,
+		AnalysisUnit:     unit,
+		LearningMode:     r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		SelectedFiles:    unitSelected,
+		SelectedFilesSet: true,
+		UseSnapshotDiffs: true,
+	})
+	if err != nil {
+		return learnCurrentUnitResult{}, fmt.Errorf("%s: %w", unitProgressLabel, err)
+	}
+
+	saved := 0
+	if len(learnedPatterns) > 0 {
+		saveProgressLabel := learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeSaveUnitPatterns", params)
+		if showDetails {
+			saveProgressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeSaveUnitPatterns", params)
+		}
+		r.patternSaveMu.Lock()
+		saved, err = r.cont.LearnerSvc.SavePatternsStrictWithMetadata(ctx, learnedPatterns, "learn_current", unit)
+		r.patternSaveMu.Unlock()
+		if err != nil {
+			return learnCurrentUnitResult{}, fmt.Errorf("%s: %w", saveProgressLabel, err)
+		}
+	}
+
+	commitProgressLabel := learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeCommitUnit", params)
+	if showDetails {
+		commitProgressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeCommitUnit", params)
+	}
+	if err := commitUnitFileRecords(ctx, r.cont.FileTracker, unitCommittedRecords(unit, r.incrementalChanges)); err != nil {
+		return learnCurrentUnitResult{}, fmt.Errorf("%s: %w", commitProgressLabel, err)
+	}
+
+	result := learnCurrentUnitResult{
+		index:            index,
+		unit:             unit,
+		patterns:         learnedPatterns,
+		savedCount:       saved,
+		refreshRecommend: analyzeResult.ProfileRefreshRecommended,
+		completed:        true,
+	}
+	if !analyzeResult.ProfileDelta.IsZero() {
+		result.profileDelta = analyzeResult.ProfileDelta
+	}
+	return result, nil
+}
+
+func (r *learnCurrentProjectRun) mergeUnitResult(result learnCurrentUnitResult) {
+	if len(result.patterns) > 0 {
+		r.patterns = append(r.patterns, result.patterns...)
+	}
+	r.savedCount += result.savedCount
+	if !result.profileDelta.IsZero() {
+		r.profileDelta = result.profileDelta
+		r.mergedProfile = domain.ApplyProjectProfileDelta(r.mergedProfile, result.profileDelta, r.projectName, r.currentLanguage)
+	}
+	if result.refreshRecommend.Needed {
+		r.profileRefreshRecommended = result.refreshRecommend
+	}
+}
+
+func (r *learnCurrentProjectRun) savePatternsStep() error {
 	saveStartedAt := time.Now()
-	if err := steps.Run(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error { return nil }); err != nil {
-		return nil, err
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error { return nil }); err != nil {
+		return err
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.save_patterns",
 		"duration", time.Since(saveStartedAt),
-		"patterns_count", len(patterns),
-		"saved_count", savedCount,
+		"patterns_count", len(r.patterns),
+		"saved_count", r.savedCount,
 	)
-	if opts.showDetailedLogs && len(patterns) > 0 {
-		logger.Info(i18n.GetWithParams("LearnCurrentPatternsSaved", map[string]interface{}{"Count": savedCount}))
+	if r.opts.showDetailedLogs && len(r.patterns) > 0 {
+		logger.Info(i18n.GetWithParams("LearnCurrentPatternsSaved", map[string]interface{}{"Count": r.savedCount}))
 	}
-	if opts.profileMode == learnCurrentProfileAuto && profileRefreshRecommended.Needed && profileDelta.IsZero() {
-		refreshProfile = true
-	}
+	return nil
+}
 
+func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	profileStartedAt := time.Now()
-	saveProfileFromDelta := !profileDelta.IsZero() && opts.profileMode != learnCurrentProfileRefresh
-	if refreshProfile || saveProfileFromDelta {
-		if err := steps.Run(i18n.Get("ProgressLearnCurrentSaveProfile"), func() error {
+	saveProfileFromDelta := !r.profileDelta.IsZero() && r.opts.profileMode != learnCurrentProfileRefresh
+	if r.refreshProfile || saveProfileFromDelta {
+		if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSaveProfile"), func() error {
 			if saveProfileFromDelta {
-				return cont.ProfileRepo.Save(ctx, mergedProfile)
+				return r.cont.ProfileRepo.Save(r.ctx, r.mergedProfile)
 			}
-			profile, err := analyzeProjectProfile(ctx, cont, projectRoot, projectName, currentLanguage, effectiveFocusPaths, existingProfile)
+			profile, err := analyzeProjectProfile(r.ctx, r.cont, r.projectRoot, r.projectName, r.currentLanguage, r.effectiveFocusPaths, r.existingProfile)
 			if err != nil {
 				return err
 			}
-			return cont.ProfileRepo.Save(ctx, profile)
+			return r.cont.ProfileRepo.Save(r.ctx, profile)
 		}); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "command.learn_current.save_project_profile",
 				"duration", time.Since(profileStartedAt),
 				"error", err,
 			)
-			return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileFailed", map[string]interface{}{"Error": err.Error()}))
+			return fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileFailed", map[string]interface{}{"Error": err.Error()}))
 		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current.save_project_profile",
 			"duration", time.Since(profileStartedAt),
-			"profile_mode", opts.profileMode,
+			"profile_mode", r.opts.profileMode,
 			"profile_delta", saveProfileFromDelta,
-			"incremental_profile", existingProfile != nil && len(resolvedFocusPaths) > 0,
+			"incremental_profile", r.existingProfile != nil && len(r.resolvedFocusPaths) > 0,
 		)
-		if opts.showDetailedLogs {
+		if r.opts.showDetailedLogs {
 			logger.Info(i18n.Get("LearnCurrentProfileSaved"))
 		}
 	} else {
-		if err := steps.Run(i18n.Get("ProgressLearnCurrentSkipProfile"), func() error { return nil }); err != nil {
-			return nil, err
+		if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSkipProfile"), func() error { return nil }); err != nil {
+			return err
 		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current.skip_project_profile",
 			"duration", time.Since(profileStartedAt),
-			"profile_mode", opts.profileMode,
+			"profile_mode", r.opts.profileMode,
 		)
-		if opts.showDetailedLogs {
+		if r.opts.showDetailedLogs {
 			logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
 		}
 	}
+	return nil
+}
 
-	if err := cont.FileTracker.DeleteAnalyzedFiles(ctx, incrementalChanges.Scope, incrementalChanges.Deleted); err != nil {
-		return nil, err
-	}
-
-	if opts.showDetailedLogs {
-		logger.Info(i18n.Get("LearnCurrentComplete"))
-	}
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "command.learn_current",
-		"duration", time.Since(startedAt),
-		"patterns_count", len(patterns),
-		"saved_count", savedCount,
-	)
-	if err := commandutil.MarkLearned(ctx, cont); err != nil {
-		return nil, err
-	}
-
+func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectResult {
 	result := &learnCurrentProjectResult{
-		projectName:   projectName,
-		changedCount:  len(incrementalChanges.AddedOrModified),
-		deletedCount:  len(incrementalChanges.Deleted),
-		skippedCount:  len(incrementalChanges.Skipped),
-		patternsCount: len(patterns),
-		savedCount:    savedCount,
-		duration:      time.Since(startedAt),
-		tokenContext:  ctx,
+		projectName:   r.projectName,
+		changedCount:  len(r.incrementalChanges.AddedOrModified),
+		deletedCount:  len(r.incrementalChanges.Deleted),
+		skippedCount:  len(r.incrementalChanges.Skipped),
+		patternsCount: len(r.patterns),
+		savedCount:    r.savedCount,
+		skipped:       skipped,
+		duration:      time.Since(r.startedAt),
+		tokenContext:  r.ctx,
 	}
-	if opts.showDetailedLogs {
-		agent.FlushTokenUsageScope(ctx)
+	if r.opts.showDetailedLogs {
+		agent.FlushTokenUsageScope(r.ctx)
 	}
-	return result, nil
+	return result
 }
 
 func analyzeProjectProfile(

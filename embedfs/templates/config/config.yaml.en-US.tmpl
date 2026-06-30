@@ -41,7 +41,7 @@ agent:
   timeout: 1800
   # Whether agents may load user plugins; disabled by default for batch stability
   allow_user_plugins: false
-  # Number of concurrent agents; 0 means automatic (project=1, workspace=project count with cap)
+  # Workspace child project parallelism; only used by workspace root configs, 0 means automatic
   parallelism: 0
   # Retry configuration for retryable errors such as 429 and 529 overloaded
   retry:
@@ -60,6 +60,10 @@ learning:
   current:
     # Learning mode: fast is quicker, normal balances quality and speed, deep is more thorough
     mode: "normal"
+    # Analysis unit scope: domain groups by business domain, flow splits by workflow, module splits finer by module/plugin
+    scope: "flow"
+    # In-project analysis-unit parallelism; used by ordinary projects and workspace child projects, 1 means serial
+    parallelism: 1
     # Enable relevant-file selection to narrow learn current scope from the candidate file tree
     select_relevant_files: true
     # Only call AI file selection when candidate files reach this threshold; smaller projects use local filtering

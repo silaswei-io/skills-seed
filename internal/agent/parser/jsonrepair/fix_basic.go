@@ -3,6 +3,7 @@ package jsonrepair
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 func repairJSONComments(jsonStr string) (string, error) {
@@ -212,6 +213,101 @@ func repairPythonLiterals(jsonStr string) (string, error) {
 		return jsonStr, nil
 	}
 	return b.String(), nil
+}
+
+func repairNumericRanges(jsonStr string) (string, error) {
+	var b strings.Builder
+	b.Grow(len(jsonStr))
+
+	inString := false
+	escapeNext := false
+	repaired := false
+	for i := 0; i < len(jsonStr); i++ {
+		ch := jsonStr[i]
+		if escapeNext {
+			b.WriteByte(ch)
+			escapeNext = false
+			continue
+		}
+		if ch == '\\' {
+			b.WriteByte(ch)
+			if inString {
+				escapeNext = true
+			}
+			continue
+		}
+		if ch == '"' {
+			b.WriteByte(ch)
+			inString = !inString
+			continue
+		}
+		if inString || !isDigitByte(ch) {
+			b.WriteByte(ch)
+			continue
+		}
+
+		valueStart := i
+		valueEnd := consumeDigits(jsonStr, i)
+		if !numericRangeHasValuePrefix(jsonStr, valueStart) || valueEnd >= len(jsonStr) || jsonStr[valueEnd] != '-' {
+			b.WriteString(jsonStr[valueStart:valueEnd])
+			i = valueEnd - 1
+			continue
+		}
+		nextStart := valueEnd + 1
+		nextEnd := consumeDigits(jsonStr, nextStart)
+		if nextEnd == nextStart || !numericRangeHasValueSuffix(jsonStr, nextEnd) {
+			b.WriteString(jsonStr[valueStart:valueEnd])
+			i = valueEnd - 1
+			continue
+		}
+
+		b.WriteString(jsonStr[valueStart:valueEnd])
+		i = nextEnd - 1
+		repaired = true
+	}
+	if inString {
+		return "", fmt.Errorf("unterminated JSON string")
+	}
+	if !repaired {
+		return jsonStr, nil
+	}
+	return b.String(), nil
+}
+
+func consumeDigits(s string, index int) int {
+	for index < len(s) && isDigitByte(s[index]) {
+		index++
+	}
+	return index
+}
+
+func numericRangeHasValuePrefix(s string, index int) bool {
+	for i := index - 1; i >= 0; i-- {
+		if unicode.IsSpace(rune(s[i])) {
+			continue
+		}
+		return s[i] == ':'
+	}
+	return false
+}
+
+func numericRangeHasValueSuffix(s string, index int) bool {
+	for i := index; i < len(s); i++ {
+		if unicode.IsSpace(rune(s[i])) {
+			continue
+		}
+		switch s[i] {
+		case ',', '}', ']':
+			return true
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func isDigitByte(ch byte) bool {
+	return ch >= '0' && ch <= '9'
 }
 
 func matchIdentifierToken(s string, index int, token string) bool {

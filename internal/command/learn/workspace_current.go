@@ -73,6 +73,10 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	}
 
 	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
+	unitParallelism := cont.ConfigRepo.GetCurrentLearningConfig().Parallelism
+	if unitParallelism <= 0 {
+		unitParallelism = 1
+	}
 	showChildDetails := parallelism == 1
 	var consoleMu sync.Mutex
 	var changedMu sync.Mutex
@@ -86,9 +90,10 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 		multiTracker.SetTaskTotal(5)
 	}
 	logger.Info(i18n.GetWithParams("LearnWorkspaceStart", map[string]interface{}{
-		"Projects":    len(workspaceConfig.Projects),
-		"Parallelism": parallelism,
-	}), "projects", len(workspaceConfig.Projects), "parallelism", parallelism)
+		"Projects":        len(workspaceConfig.Projects),
+		"Parallelism":     parallelism,
+		"UnitParallelism": unitParallelism,
+	}), "projects", len(workspaceConfig.Projects), "parallelism", parallelism, "unit_parallelism", unitParallelism)
 
 	runProjects := func() error {
 		return workspacediscovery.RunProjectTasks(ctx, workspaceConfig.Projects, parallelism, func(ctx context.Context, project config.WorkspaceProjectConfig) error {

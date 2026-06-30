@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.1]
+
+### Changes
+
+- `learn current` now supports in-project analysis-unit concurrency through `learning.current.parallelism`; in workspace mode, root `agent.parallelism` controls child-project concurrency while `learning.current.parallelism` controls unit concurrency inside each child project.
+- Interactive init now prioritizes the common path: by default it asks only for tool language, initialization type, Agent, total parallelism, and the execution plan; analysis depth, split scope, Skills language, and Skills type are grouped under optional advanced settings.
+- Init now accepts total Agent parallelism, automatically writes the derived project-unit or workspace project/unit concurrency settings, and shows the final config in the summary.
+- Added `learning.current.scope` with `domain`, `flow`, and `module` to guide analysis-unit planning by business domain, workflow, or module/plugin granularity.
+- Concurrent analysis progress now shows the current progress and running units, and workspace learning output shows both child-project concurrency and per-project unit concurrency.
+
+### Fixes
+
+- Resume state now includes `learning.current.scope`, so changing analysis depth or split scope no longer reuses stale analysis-unit plans.
+- Agent JSON repair now tolerates invalid numeric line ranges such as `"line": 29-43`, and learning prompts now require evidence line numbers to be a single integer.
+- Failed concurrent units no longer refresh the final progress line to `running []`, preserving the last useful running-unit context.
+
 ## [v0.11.0]
 
 ### Changes

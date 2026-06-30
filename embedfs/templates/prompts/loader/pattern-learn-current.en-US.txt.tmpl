@@ -261,7 +261,7 @@ Before returning JSON, validate every candidate pattern internally:
    - `good_example` must be copied verbatim from source code read during this task.
    - `good_example` must match this template's 5-12 line requirement unless the complete relevant function is shorter.
    - `good_example` must not copy a full long function. Include only the 5-12 lines that best prove the rule. Use `description`, `rule`, and multiple `evidence_locations` for complex flows instead of putting every branch into the code snippet.
-   - `evidence_locations` contains pattern-level source evidence locations. Fill real relative paths for each pattern when possible; include a 1-based line only when known, otherwise provide only `path`.
+   - `evidence_locations` contains pattern-level source evidence locations. Fill real relative paths for each pattern when possible; `line` must be a single 1-based integer, never a range expression such as `29-43`; when the exact line is unknown, provide only `path` and put range notes in `description`.
    - Do not invent code, paths, signatures, line numbers, call relationships, or behavior.
    - Do not invent evidence paths or line numbers. Leave `evidence_locations` empty when location evidence is insufficient, and do not put non-business-method locations into `business_method`.
 2. Category check:

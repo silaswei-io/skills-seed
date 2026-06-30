@@ -16,6 +16,10 @@ func promptLearningMode(mode config.LearningMode) config.LearningMode {
 	return config.NormalizeLearningMode(string(mode))
 }
 
+func promptLearningScope(scope config.LearningScope) config.LearningScope {
+	return config.NormalizeLearningScope(string(scope))
+}
+
 // NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/runtime 下。
 func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*PromptInputSession, error) {
 	seedPath := runtimecontext.SeedPath(ctx)
@@ -96,6 +100,7 @@ func PlanAnalysisUnitsPromptData(session *PromptInputSession, req *PlanAnalysisU
 		"StructuralContextPath": structuralContextPath,
 		"UserContextPath":       userContextPath,
 		"LearningMode":          promptLearningMode(req.LearningMode),
+		"LearningScope":         promptLearningScope(req.LearningScope),
 	}, nil
 }
 

@@ -703,7 +703,7 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	var cachedState commandstate.State
 	require.NoError(t, json.Unmarshal(stateBytes, &cachedState))
 	require.Equal(t, commandStateLearnCurrent, cachedState.Command)
-	require.Equal(t, string(config.LearningModeNormal), cachedState.Mode)
+	require.Equal(t, learnCurrentStateMode(string(config.LearningModeNormal), string(config.LearningScopeFlow)), cachedState.Mode)
 	require.Len(t, cachedState.Units, 2)
 
 	analyzed = nil

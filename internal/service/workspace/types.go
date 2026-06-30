@@ -6,6 +6,12 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 )
 
+// WorkspaceGenerateOptions 控制工作区根 skill 的生成行为。
+type WorkspaceGenerateOptions struct {
+	RootOutputPath string // 覆盖工作区根 skill 输出目录；为空时使用配置推导路径。
+	SkipReferences bool   // 是否跳过 references/ 明细文档生成。
+}
+
 type workspaceSkillTemplateData struct {
 	ProgramVersion      string
 	SkillsTemplatesHash string
@@ -26,6 +32,7 @@ type workspaceSkillTemplateData struct {
 	ParallelGuidance    []domain.WorkspaceParallelGuidance
 	LoadMultipleWhen    []domain.WorkspaceLoadMultipleSkill
 	WorkflowReferences  []generator.WorkflowReference
+	SkipReferences      bool
 	HasWorkspaceFacts   bool
 	HasShared           bool
 	HasContracts        bool

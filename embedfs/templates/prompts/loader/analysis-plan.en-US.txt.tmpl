@@ -8,6 +8,7 @@ You are a codebase business-analysis planner. Your only task is to split the cur
 - Project path: {{.RootPath}}
 - Primary language: {{.Language}}
 - Learning mode: {{.LearningMode}}
+- Scope: {{.LearningScope}}
 
 # Files To Learn
 
@@ -40,6 +41,12 @@ The user context is at `{{.UserContextPath}}`. Read it only if it helps decide b
 - `fast`: Prefer merging nearby capabilities into larger business-domain units; split only units that can independently produce core, frequent, high-value patterns.
 - `normal`: Default balanced strategy; split by business capability while merging thin interfaces, simple CRUD, pure models, and utilities with no business rules.
 - `deep`: Allow finer business units for capabilities with independent rules, state transitions, external dependencies, or exceptional paths, but still do not split mechanically by file.
+
+# Scope Strategy
+
+- `domain`: Prefer grouping by business domain, product capability, or external-system family. If files serve the same business domain, keep them in one unit even when they span multiple plugins, APIs, submodules, or directories.
+- `flow`: Split by business workflow, resource action, state transition, or external-system responsibility. This is the balanced default; a single domain may contain a few independent flows.
+- `module`: Allow finer splits by plugin, API, submodule, or engineering responsibility, but every unit must still explain business rules independently; do not create mechanical units for purely technical files.
 
 # Output Format
 

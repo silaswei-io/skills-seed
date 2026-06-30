@@ -46,6 +46,9 @@ agent:
 
 learning:
   current:
+    mode: "normal"
+    scope: "flow"
+    parallelism: 1
     select_relevant_files: true
     select_relevant_files_min_candidates: 200
     structural:
@@ -165,6 +168,9 @@ exclude:
 
 | Field | Default | Description |
 |---|---:|---|
+| `mode` | `normal` | Analysis depth: `fast` is quicker and merges nearby capabilities, `normal` balances quality and speed, `deep` is more thorough and keeps more business boundaries |
+| `scope` | `flow` | Unit split scope: `domain` groups by business domain, `flow` splits by workflow/resource action, `module` allows finer module/plugin/API splits |
+| `parallelism` | `1` | In-project analysis-unit parallelism; used by ordinary projects and workspace child projects, `1` means serial |
 | `select_relevant_files` | `true` | Select the most relevant files from the candidate file tree before AI analysis to reduce noisy inputs |
 | `select_relevant_files_min_candidates` | `200` | Only call AI file selection when the candidate count reaches this threshold; smaller projects use local filtering to avoid an extra AI call |
 | `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
@@ -202,6 +208,10 @@ Starting in 0.10.5, `learn current` unit analysis no longer writes the existing 
 
 Starting in 0.11.0, `learning.current.mode` can be set to `fast`, `normal`, or `deep` to choose between learning speed and pattern coverage quality; the mode is included in resume-state fingerprints. Generated skills now render related-reference routing, importance layers, validation matrices, grouped entry indexes, and path-validated source evidence.
 
+Starting in 0.11.1, `learning.current.scope` can be set to `domain`, `flow`, or `module` to guide analysis-unit splitting by business domain, workflow, or module/plugin granularity, and it participates in resume-state fingerprints together with `mode`. Model-output parsing also repairs evidence line range expressions, normalizing invalid JSON such as `"line": 29-43` to a single line number.
+
+The interactive init prompt asks for total Agent parallelism and writes concrete config fields automatically. In project mode it writes `learning.current.parallelism`; in workspace mode it splits the value across root `agent.parallelism` (child-project parallelism) and `learning.current.parallelism` (analysis-unit parallelism inside each child project), keeping their product within the total.
+
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Starting in 0.10.3, valid JSON final content is formatted as a readable fenced `json` block inside the `.md` archive.
 
 Starting in 0.9.6, debug records under `.skills-seed/runtime` use the `YYYYMMDD-HHMMSS.NNNNNNNNN-<kind>-<name>` filename prefix. `rendered-prompts/` and their matching `agent-outputs/` share the same date-time ID and semantic name; Agent output files only add the Agent name, making each prompt/output pair easy to correlate. Starting in 0.10.3, valid JSON output is formatted as a readable fenced `json` block inside the `.md` archive.
@@ -224,14 +234,14 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 | `commands` | `claude: claude`, `codex: codex` | Engine-to-CLI command mapping |
 | `timeout` | `1800` | AI request timeout in seconds |
 | `allow_user_plugins` | `false` | Whether agents may load user plugins; disabled by default for stable batch runs |
-| `parallelism` | `0` | Number of concurrent agents; `0` means automatic |
+| `parallelism` | `0` | Workspace child project parallelism in workspace root configs; it does not control project-unit parallelism, `0` means automatic |
 | `retry.max_retries` | `3` | Maximum retry attempts for retryable errors; `0` uses the default `3` |
 | `retry.initial_interval` | `15` | Initial retry wait in seconds; `0` uses the default `15` |
 | `retry.max_interval` | `120` | Maximum exponential-backoff wait in seconds; `0` uses the default `120` |
 
 #### `parallelism` Notes
 
-1. In `project` mode, automatic parallelism is `1`.
+1. In `project` mode, `agent.parallelism` does not control in-project unit concurrency; use `learning.current.parallelism`.
 2. In `workspace` mode, automatic parallelism is the child project count, capped at `6`.
 3. A positive value is used as the explicit concurrency limit.
 4. The implementation is real concurrency: child project tasks run through a goroutine worker pool.

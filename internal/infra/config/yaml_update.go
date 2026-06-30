@@ -57,6 +57,8 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
 
 	setYAMLString(doc, []string{"learning", "current", "mode"}, string(cfg.Learning.Current.Mode))
+	setYAMLString(doc, []string{"learning", "current", "scope"}, string(cfg.Learning.Current.Scope))
+	setYAMLInt(doc, []string{"learning", "current", "parallelism"}, cfg.Learning.Current.Parallelism)
 	setYAMLBool(doc, []string{"learning", "current", "select_relevant_files"}, cfg.Learning.Current.SelectRelevantFiles)
 	setYAMLInt(doc, []string{"learning", "current", "select_relevant_files_min_candidates"}, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
 	setYAMLBool(doc, []string{"learning", "current", "structural", "enabled"}, cfg.Learning.Current.Structural.Enabled)

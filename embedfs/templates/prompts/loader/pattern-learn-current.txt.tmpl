@@ -259,7 +259,7 @@
    - `good_example` 必须来自本次已读取源码的逐字复制代码。
    - `good_example` 必须符合本模板要求的 5-12 行；完整相关函数更短时可保留完整短函数。
    - `good_example` 严禁复制完整长函数；只截取最能证明规则的一小段 5-12 行代码。复杂流程用 `description`、`rule` 和多个 `evidence_locations` 表达，不要把所有分支塞进代码片段。
-   - `evidence_locations` 是模式级源码证据位置，每个模式都应尽量填写真实相对路径；知道准确行号时填写 1-based 行号，不知道时只填 path。
+   - `evidence_locations` 是模式级源码证据位置，每个模式都应尽量填写真实相对路径；`line` 只能填写单个 1-based 整数，严禁填写 `29-43` 这类范围表达式；不知道准确行号时只填 path，范围说明可写到 `description`。
    - 不要编造代码、路径、签名、行号、调用关系或行为。
    - 不要编造证据路径或行号；证据位置不足时可留空 `evidence_locations`，但不要把非业务方法位置塞进 `business_method`。
 2. 分类校验：

@@ -96,6 +96,44 @@ func TestRunGenerateWorkspaceFirstRunGeneratesAllTargets(t *testing.T) {
 	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "frontend")))
 }
 
+func TestRunGenerateWorkspaceUsesOutputFlagForRootSkill(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	workspaceRoot := t.TempDir()
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+	seedGenerateChildMemory(t, childRoot, "Backend Rule")
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
+	defer cont.Close()
+
+	cmd := Cmd(cont)
+	cmd.SetArgs([]string{"skills", "--output", "custom/workspace-root"})
+	require.NoError(t, cmd.Execute())
+
+	require.FileExists(t, filepath.Join(workspaceRoot, "custom", "workspace-root", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
+}
+
+func TestRunGenerateWorkspaceNoReferencesSkipsRootAndChildReferences(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	workspaceRoot := t.TempDir()
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+	seedGenerateChildMemory(t, childRoot, "Backend Rule")
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
+	defer cont.Close()
+
+	cmd := Cmd(cont)
+	cmd.SetArgs([]string{"skills", "--no-references"})
+	require.NoError(t, cmd.Execute())
+
+	rootOutputPath := filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace")
+	childOutputPath := filepath.Join(childRoot, ".agents", "skills", "backend-dev")
+	require.FileExists(t, filepath.Join(rootOutputPath, "SKILL.md"))
+	require.NoDirExists(t, filepath.Join(rootOutputPath, "references"))
+	require.FileExists(t, filepath.Join(childOutputPath, "SKILL.md"))
+	require.NoDirExists(t, filepath.Join(childOutputPath, "references"))
+}
+
 func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()
