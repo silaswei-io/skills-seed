@@ -14,8 +14,8 @@
 
 ### Tests
 
-- Added a local `.test` quality gate using `front_gateway` as the business baseline project to check generation health, parse stability, reference routing, business coverage, source evidence, and navigation precision.
-- The `front_gateway` business baseline covers TP1 certificate issuance, TP3 decrypt/GAS/AEP flow, async tasks, HSM session pooling, AK/SK auth, and external service boundaries.
+- Added a business quality baseline covering generation health, parse stability, reference routing, business-pattern coverage, source evidence, and navigation precision.
+- Added acceptance assertions for real business flows so generated skills can be checked for recognizing key workflows and routing to trustworthy source evidence.
 
 ## [v0.10.7]
 
