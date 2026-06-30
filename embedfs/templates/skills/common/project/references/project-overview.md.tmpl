@@ -136,6 +136,13 @@
 {{if .ValidationCommands}}
 ## 验证命令
 
+{{if .ValidationMatrix}}
+| 改动范围 | 建议命令 | 证据 |
+|---|---|---|
+{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{end}}
+
+{{end}}
 {{range .ValidationCommands}}
 - `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}
 {{end}}

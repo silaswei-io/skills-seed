@@ -12,7 +12,34 @@
 
 {{.Summary}}
 
+{{if .RelatedReferences}}
+## Related References
+
+This page only covers {{.Category}} category conventions. If the task crosses one of these boundaries, continue with the matching reference.
+
+{{range .RelatedReferences}}
+- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{end}}
+{{end}}
+
 {{if .PatternObjects}}
+{{if .ImportanceGroups}}
+## Importance Layers
+
+Use these layers to decide which rules deserve priority as development constraints and which are only navigation hints. Current code remains the source of truth.
+
+{{range .ImportanceGroups}}
+### {{.Title}}
+
+{{.Description}}
+
+{{range .Patterns}}
+- **{{.Name}}** ({{printf "%.2f" (mul .Confidence 100)}}%, x{{.Frequency}})
+{{end}}
+
+{{end}}
+{{end}}
+
 ## Detailed Patterns
 
 Rules are inferred from code evidence and learned patterns. Product semantics not covered by the evidence snippets must be confirmed against current code or requirements.

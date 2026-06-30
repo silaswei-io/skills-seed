@@ -93,8 +93,6 @@ The following files changed since the previous analysis. Each diff is available 
 {{- end}}
 # Analysis Requirements
 
-Based on the project information and the code files you read, perform the following analysis:
-
 Allowed categories: {{.AllowedCategories}}
 
 {{- if .AnalysisUnit.Name}}
@@ -108,55 +106,25 @@ Allowed categories: {{.AllowedCategories}}
 - `profile_delta` may contain only facts clearly added or changed by evidence from this unit. Do not use this unit to refresh the whole project profile.
 {{- end}}
 
-1. **Identify frameworks and tech stack**:
-   - Extract only frameworks, runtimes, data access tools, config systems, observability tools, dependency management, or build tools actually used by this project.
-   - Do not infer a stack from template examples, stale dependencies, or common framework names.
+# Learning Mode Strategy
 
-2. **Use architecture and dependency information to support learning**:
-   - Use architecture layers, module dependencies, and data flow only as context for pattern ownership, boundaries, and evidence paths.
-   - Do not output profile facts such as "the project uses layered architecture" or "module A depends on module B" as patterns unless they form actionable structure constraints.
-   - Output framework or library usage only when it forms a concrete team convention in a specific category.
+- `fast`: Prioritize entry points, structural context, and direct evidence. Output stable, frequent, request-routing patterns; merge low-value details and homogeneous repeated rules.
+- `normal`: Default strategy. Cover the unit's main business capabilities, key technical conventions, important exceptional paths, and reusable entries without generic or duplicate patterns.
+- `deep`: Explore evidenced business subdomains, state branches, external dependencies, exception/compensation flows, and cross-module constraints more thoroughly. More focused patterns are allowed, but each still needs routing value and source evidence.
 
-3. **Extract Business/Utility Entry Points** (only for real reusable entry points):
-   - **Domain-specific methods**: Complex business rules, workflows, state machines
-   - **Cross-layer calls**: One responsibility layer calling multiple local modules or external services
-   - **Business rule methods**: Validation, calculation, transformation, approval processes
-   - **Special handling methods**: authorization checks, data transformations, protocol/command wrappers, external calls, resource validation, or other project-specific handling
-   - **Domain-operation methods**: core operations, resource lifecycles, policy execution, external-system interactions, or runtime behavior in the project's domain. Treat them as domain-entry candidates when they determine product behavior, operation order, authorization boundaries, state changes, or error semantics.
-   - **Important**: Do not extract standard CRUD (like GetByID, Save, Delete). Fill `business_method` only when a method is a project-level business entry point or reusable entry point.
+# Pattern Discovery Principles
 
-4. **Business Pattern Deep Extraction Workflow** (required internal reasoning, do not output separately):
-   - Build a **business candidate inventory**: use structural context, entry files, representative files, and directly related call relationships confirmed from source code to identify methods or flows that may carry business meaning.
-   - Build a **source business vocabulary**: extract the project's own business nouns, business verbs, state/phase terms, rule/policy terms, config names, error codes, task/event names, external dependency names, and core function names from file paths, APIs, entities, and source code. Use this vocabulary only for internal reasoning; do not output it separately.
-   - Build a **business coverage matrix**: resources/entities, operations/capabilities, states/phases, policies/rules, external dependencies, entry channels, exceptions/compensation, and background/async/periodic flows. For every code-backed cell in the files you read, try to emit a routeable pattern or merge it into a related pattern.
-   - For each candidate, judge business value: validation rules, state changes, cross-module orchestration, external system calls, exceptional branches, authorization boundaries, domain calculations, data transformation, batch processing, or idempotency.
-   - Build a **business subdomain overview** first: infer business subdomains from entities, APIs, plugin/module responsibilities, external dependencies, tasks/events/schedules, state names, config names, and domain terms, then look for rules and flows under each subdomain. Business subdomains must come from the project's own source vocabulary and code evidence; do not use generic wording from this template as domain answers.
-   - For every business subdomain with evidence, keep patterns that help future requests route to code. Skip a subdomain only when there is no evidence of rules, workflows, state changes, external calls, or domain data transformation.
-   - Build **business overview signals**: for each retained business candidate, record the real domain ownership, entry path, key symbol, state name, entity name, interface name, event name, or external dependency name. These signals will drive the generated business pattern map.
-   - Every business pattern must answer "how would a new request match this?": in `description` or `rule`, state the trigger conditions, such as which entity, state, flow, file path, API, event, or external dependency makes the pattern relevant.
-   - A business pattern's `name`, `description`, and `rule` must prefer business language that requesters would use. You may append code symbols, paths, or technical terms afterward. Do not name business patterns only with package names, technical abbreviations, utility names, low-level protocol names, or folder names.
-   - Include **request routing terms** for every business pattern: likely user-facing business phrases, synonyms, state/action terms, entry channels, and code evidence paths must appear in `description` or `rule`. Generated skills use these words to route future requests to the right detail page.
-   - Identify **non-API business entries**: tasks, events, schedules, initialization, registration, custom hooks, adapters, client wrappers, config-driven branches, batch jobs, and runtime guard flows. When they carry product behavior, analyze them as business candidates.
-   - Perform **business pattern expansion**: one business method can produce multiple patterns, such as parameter validation, state transition, cross-repository orchestration, external-call fallback, business error wrapping, or data transformation.
-   - Perform **domain-operation extraction**: if the project has rule-constrained workflows, resource lifecycles, external dependency protocols, policy decisions, runtime actions, or strong business invariants, do not automatically classify code under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper as `utils`. If a method carries domain semantics, continue judging whether it forms a business pattern or `business_method`.
-   - Prioritize domain verbs and nouns that recur in source code or determine product behavior, such as create, change, revoke, validate, sync, import, export, calculate, transform, schedule, execute, roll back, or report. These are only discovery dimensions; the actual domain vocabulary must come from project code.
-   - If an external dependency, SDK, RPC, command, or protocol call determines business operation order, request format, authorization boundary, state changes, retry/fallback behavior, or error mapping, extract it as a business domain-operation pattern. Do not demote it to a generic utility solely because it is an external-client call.
-   - **Do not compress multiple business details into one generic pattern**. When actual code evidence exists, prefer several focused small patterns over one broad "business processing flow".
-   - **Do not output only top-level flows**. If "create resource" contains index validation, type dispatch, credential handling, external-dependency calls, and operation-record semantics, split those into routeable patterns instead of emitting only one "resource creation flow".
-   - **Do not output business patterns with no routing value**: if the name, rule, and evidence path cannot help a future request find the related code, add evidence or drop the candidate.
-   - Keep patterns cohesive: one pattern expresses one actionable rule; do not pack state validation, transaction boundaries, external calls, error mapping, and data transformation into one pattern.
-   - Keep patterns loosely coupled: domain rules belong to business, transactions to database, error semantics to error, and interface constraints to api. The same code block may contribute multiple patterns in different categories.
-   - Prefer specific categories: database, API, error, config, middleware, utility, and structure conventions must use their own categories instead of being labeled `business` just because they appear inside a business flow.
-   - business is not the default category. Use it only for domain rules, state transitions, cross-entity orchestration, and real business workflows.
-   - Do not force a business pattern for every candidate. If a candidate mainly shows transactions, queries, routing, parameter binding, error wrapping, config loading, or middleware chains, output only the corresponding specific category.
-   - If evidence is limited, do not invent facts. Lower confidence if needed, but still preserve the local business pattern confirmed by the actual code.
+Recommended analysis order: build a business candidate inventory and source business vocabulary, group them by business subdomain into a coverage matrix, judge business value, then expand evidenced candidates into routeable patterns. Use this for internal reasoning only; do not output it separately.
 
-5. **Systematic Pattern Recognition**:
-   - If multiple files use the same error handling approach -> extract as "error handling pattern"
-   - If multiple services have similar initialization -> extract as "service initialization pattern"
-   - If multiple APIs use the same middleware -> extract as "middleware usage pattern"
-   - If multiple repositories use the same transaction handling -> extract as "transaction management pattern"
-   - Do not emit many near-duplicate patterns for homogeneous code in the same layer. When there is an independent business rule, state branch, error semantic, data transformation, or cross-module constraint, output it as its own pattern; do not apply a fixed total limit to `patterns`.
+1. Build this unit's business subdomains, source vocabulary, and business coverage matrix from structural context, entry paths, representative files, and diffs. Business terms, states, entities, APIs, events, config, and external dependencies must come from source evidence.
+2. Each pattern should express one actionable rule and state when to use it, which paths/symbols to inspect, and which constraints must hold. Do not output project introductions, best-practice slogans, or generic conclusions that cannot route a future request to code.
+3. Use business patterns only for domain rules, state transitions, cross-entity orchestration, resource lifecycles, policy execution, external dependency interactions, or runtime flows that carry product meaning. Prefer concrete categories for API, database, error, config, middleware, structure, utility, concurrency, and testing conventions.
+4. Do not classify code as utils solely because it lives under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper. If it decides product rules, operation order, authorization boundaries, state changes, or error semantics, keep analyzing it as a domain-operation candidate.
+5. Identify non-API entries too: tasks, events, schedules, initialization, registration, hooks, adapters, client wrappers, config-driven branches, batch jobs, and guard flows may form business patterns or `business_method` when they decide product behavior or boundaries.
+6. Optional expansion directions: a business candidate may split into focused patterns for parameter validation, state transition, cross-repository orchestration, external-call fallback, business error wrapping, data transformation, authorization boundary, idempotency, or compensation. Do not compress independent details into one generic flow.
+7. Use `business_method` only for real reusable business entries, cross-module orchestration entries, domain-operation entries, or high-value utility entries. It must include a real signature and file location. Do not attach it to pure routing, generated code, framework initialization, or simple CRUD.
+8. Extract only frameworks, dependencies, architecture layers, module boundaries, and data flows actually used by the project. Output them only when they form actionable team conventions or clearly change the project profile; do not infer facts from templates, stale dependencies, or common names.
+9. Merge homogeneous evidence into one pattern. Split independent business rules, state branches, error semantics, data transformations, or cross-module constraints into focused patterns. Do not apply a fixed total limit to `patterns`.
 
 # Output Format
 
@@ -277,7 +245,7 @@ Allowed categories: {{.AllowedCategories}}
 10. **concurrency** - Concurrency patterns
 11. **testing** - Testing patterns
 
-When a code snippet contains both business semantics and a technical convention, prefer the most specific technical category. Use `business` only for domain rules that cannot be expressed by a more specific technical category. However, domain-specific operations, resource lifecycles, protocol/command wrappers, or external dependency interactions confirmed by the project's source vocabulary are not domain-neutral utilities. When they express product rules, operation order, or business boundaries, continue analyzing them as business candidates.
+When a code snippet contains both business semantics and a technical convention, prefer the most specific technical category. business is not the default category; use `business` only for domain rules that cannot be expressed by a more specific technical category. However, domain-specific operations, resource lifecycles, protocol/command wrappers, or external dependency interactions confirmed by the project's source vocabulary are not domain-neutral utilities. When they express product rules, operation order, or business boundaries, continue analyzing them as business candidates.
 
 # Language Requirements
 

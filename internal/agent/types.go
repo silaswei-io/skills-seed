@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 )
 
 // ProjectContext 项目上下文
@@ -285,6 +286,7 @@ type AnalyzeCurrentCodebaseRequest struct {
 	DirCount              int           // 目录总数
 	UserContext           string        // 本次学习传入的一次性用户上下文
 	UserContextPath       string        // 本次学习传入的一次性用户上下文文件路径
+	LearningMode          config.LearningMode
 }
 
 // AllowedCategories 返回提示词可展示的合法模式分类列表。
@@ -308,6 +310,7 @@ type PlanAnalysisUnitsRequest struct {
 	StructuralContext     string // tree-sitter 结构化分析上下文
 	StructuralContextPath string // tree-sitter 结构化分析上下文文件路径
 	UserContext           string
+	LearningMode          config.LearningMode
 }
 
 // PlanAnalysisUnitsResult 是 AI 生成的业务分析单元计划。

@@ -6,10 +6,15 @@ import (
 	"fmt"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	textutil "github.com/silaswei-io/skills-seed/internal/utils/text"
 )
+
+func promptLearningMode(mode config.LearningMode) config.LearningMode {
+	return config.NormalizeLearningMode(string(mode))
+}
 
 // NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/runtime 下。
 func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*PromptInputSession, error) {
@@ -90,6 +95,7 @@ func PlanAnalysisUnitsPromptData(session *PromptInputSession, req *PlanAnalysisU
 		"FocusPaths":            req.FocusPaths,
 		"StructuralContextPath": structuralContextPath,
 		"UserContextPath":       userContextPath,
+		"LearningMode":          promptLearningMode(req.LearningMode),
 	}, nil
 }
 
@@ -166,5 +172,6 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"DirCount":              req.DirCount,
 		"UserContextPath":       userContextPath,
 		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
+		"LearningMode":          promptLearningMode(req.LearningMode),
 	}, nil
 }

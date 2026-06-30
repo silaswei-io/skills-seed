@@ -88,6 +88,8 @@ init -> learn current / learn history -> generate skills -> check
 
 0.10.7 起，`patterns add` 和 `sync` 添加用户模式时统一使用 `--context` 传入自然语言描述，`patterns update <id> --context "<说明>"` 可修订指定 pattern 并保留原 ID 与 workspace 归属；`patterns show` 支持 `--sort updated|score|hits|category`。模型输出解析进一步修复尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号等非标准 JSON。
 
+0.11.0 起，`learning.current.mode` 支持 `fast`、`normal`、`deep` 三档学习策略；生成的 skills 会包含相关参考路由、业务模式重要性分层、按改动范围组织的验证矩阵和按模块分组的入口方法索引。生成前还会校验源码证据路径，减少 references 指向不存在文件的情况。
+
 0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
 
 0.10.4 起，默认入库策展使用本地确定性合并，并在内部按 pattern ID 维护唯一集合；当候选模式复用已有 ID，或历史模式库存在重复 ID 时，会先收敛为单条更高质量的模式再写入，避免重复 curated pattern ID 触发结构校验降级。

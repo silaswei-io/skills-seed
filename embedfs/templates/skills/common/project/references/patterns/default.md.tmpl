@@ -12,7 +12,34 @@
 
 {{.Summary}}
 
+{{if .RelatedReferences}}
+## 相关参考
+
+本页只覆盖 {{.Category}} 分类约定；如果任务跨到下列边界，继续读取对应 reference。
+
+{{range .RelatedReferences}}
+- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{end}}
+{{end}}
+
 {{if .PatternObjects}}
+{{if .ImportanceGroups}}
+## 重要性分层
+
+用于判断哪些规则可以优先作为开发约束，哪些只适合作为定位线索。具体行为仍以当前代码为准。
+
+{{range .ImportanceGroups}}
+### {{.Title}}
+
+{{.Description}}
+
+{{range .Patterns}}
+- **{{.Name}}** ({{printf "%.2f" (mul .Confidence 100)}}%, x{{.Frequency}})
+{{end}}
+
+{{end}}
+{{end}}
+
 ## 详细模式
 
 规则是从代码证据和已学习模式归纳而来。证据片段没有覆盖的产品语义，需要回到当前代码或需求确认。

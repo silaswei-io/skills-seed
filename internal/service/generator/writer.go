@@ -59,6 +59,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		return fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
 	}
 	profile = domain.CleanProjectProfile(profile)
+	profile, patterns = sanitizeGenerationInputs(profile, patterns, opts.ProjectRoot)
 	profile = profileForSkillTemplates(profile, patterns)
 	if skillName == "" {
 		skillName = generatedSkillName(opts.ProjectName)
@@ -99,6 +100,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		"Workflows":              skillWorkflows(profile, patterns, locale),
 		"WorkflowReferences":     opts.WorkflowReferences,
 		"ValidationCommands":     validationCommands(profile, patterns, locale),
+		"ValidationMatrix":       validationMatrix(profile, patterns, locale),
 		"StateSummaries":         []string{},
 	}
 
@@ -219,14 +221,14 @@ func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath str
 		return err
 	}
 	if spec != nil {
-		if err := w.generateProjectSpec(refsPath, spec, references); err != nil {
+		if err := w.generateProjectSpec(refsPath, spec, profile, patterns, references); err != nil {
 			return err
 		}
 	}
 
 	for _, categoryName := range categoriesWithPatterns {
 		summary := summaries[categoryName]
-		if err := w.generateCategoryPattern(patternsPath, categoryName, summary, patterns, profile.Language); err != nil {
+		if err := w.generateCategoryPattern(patternsPath, categoryName, summary, patterns, categoriesWithPatterns, profile.Language); err != nil {
 			return err
 		}
 	}
@@ -240,9 +242,14 @@ func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath str
 	return nil
 }
 
-func (w *SkillWriter) generateProjectSpec(refsPath string, spec *domain.ProjectSpec, references ReferenceAvailability) error {
+func (w *SkillWriter) generateProjectSpec(refsPath string, spec *domain.ProjectSpec, profile *domain.ProjectProfile, patterns []domain.Pattern, references ReferenceAvailability) error {
 	specPath := filepath.Join(refsPath, "project-spec.md")
-	content, err := w.skillsLoader.RenderReferenceFile("project-spec", projectSpecTemplateData{ProjectSpec: *spec, References: references, SourceOfTruth: []SourceOfTruthItem{}})
+	content, err := w.skillsLoader.RenderReferenceFile("project-spec", projectSpecTemplateData{
+		ProjectSpec:      *spec,
+		References:       references,
+		SourceOfTruth:    []SourceOfTruthItem{},
+		ValidationMatrix: validationMatrix(profile, patterns, w.skillsLoader.GetLocale()),
+	})
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("ProjectSpecRenderFailed"), err)
 	}
@@ -265,6 +272,7 @@ func (w *SkillWriter) generateProjectOverview(refsPath string, profile *domain.P
 		OverviewReferences:  profileReferenceItems(profile, w.skillsLoader.GetLocale(), "./"),
 		OverviewSummary:     projectOverviewSummary(profile, w.skillsLoader.GetLocale()),
 		ArchitectureSummary: projectArchitectureSummary(profile, w.skillsLoader.GetLocale()),
+		ValidationMatrix:    validationMatrix(profile, nil, w.skillsLoader.GetLocale()),
 	}
 	content, err := w.skillsLoader.RenderProjectOverview(data)
 	if err != nil {
@@ -292,6 +300,7 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 		HasBusinessPatterns: categorySet[string(domain.CategoryBusiness)],
 		HasUtilityPatterns:  categorySet[string(domain.CategoryUtils)],
 		CodeFenceLanguage:   codeFenceLanguage(profile.Language),
+		BusinessMethodIndex: buildBusinessMethodIndex(profile.BusinessMethods, w.skillsLoader.GetLocale()),
 	}
 	files := []struct {
 		templateName string
@@ -325,7 +334,7 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 	return nil
 }
 
-func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string, summary agent.CategorySummary, allPatterns []domain.Pattern, language string) error {
+func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string, summary agent.CategorySummary, allPatterns []domain.Pattern, allCategories []string, language string) error {
 	var categoryPatterns []domain.Pattern
 	for _, p := range allPatterns {
 		if string(p.Category) == categoryName {
@@ -339,7 +348,7 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 	}
 
 	if categoryName == string(domain.CategoryBusiness) {
-		return w.generateSplitBusinessPatterns(patternsPath, summary, categoryPatterns, allPatterns, language)
+		return w.generateSplitBusinessPatterns(patternsPath, summary, categoryPatterns, allPatterns, allCategories, language)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerGeneratorGeneratingPatternFile"),
@@ -354,6 +363,7 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 		"Summary":           summary.Summary,
 		"Patterns":          summary.Patterns,
 		"PatternObjects":    categoryPatterns,
+		"ImportanceGroups":  patternImportanceGroups(categoryPatterns, w.skillsLoader.GetLocale()),
 		"UsageScenes":       summary.UsageScenes,
 		"Priority":          summary.Priority,
 		"PatternCount":      len(categoryPatterns),
@@ -361,6 +371,7 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 		"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
 		"BusinessMethods":   domain.ValidBusinessMethods(summary.BusinessMethods),
 		"CodeFenceLanguage": codeFenceLanguage(language),
+		"RelatedReferences": categoryReferenceLinks(categoryName, allCategories, w.skillsLoader.GetLocale(), "./"),
 	}
 
 	content, err := w.skillsLoader.RenderPattern(templateCategoryName(categoryName), data)
@@ -381,21 +392,23 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 	return nil
 }
 
-func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary agent.CategorySummary, categoryPatterns, allPatterns []domain.Pattern, language string) error {
+func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary agent.CategorySummary, categoryPatterns, allPatterns []domain.Pattern, allCategories []string, language string) error {
 	groups := businessPatternGroups(w.skillsLoader.GetLocale(), categoryPatterns)
 	if err := os.MkdirAll(filepath.Join(patternsPath, string(domain.CategoryBusiness)), 0755); err != nil {
 		return err
 	}
 
 	indexData := map[string]interface{}{
-		"Category":     summary.Category,
-		"Summary":      summary.Summary,
-		"UsageScenes":  summary.UsageScenes,
-		"Priority":     summary.Priority,
-		"PatternCount": len(categoryPatterns),
-		"Confidence":   calculateCategoryConfidence(allPatterns, string(domain.CategoryBusiness)) * 100,
-		"LastUpdated":  time.Now().Format("2006-01-02 15:04:05"),
-		"Groups":       groups,
+		"Category":          summary.Category,
+		"Summary":           summary.Summary,
+		"UsageScenes":       summary.UsageScenes,
+		"Priority":          summary.Priority,
+		"PatternCount":      len(categoryPatterns),
+		"Confidence":        calculateCategoryConfidence(allPatterns, string(domain.CategoryBusiness)) * 100,
+		"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
+		"Groups":            groups,
+		"ImportanceGroups":  patternImportanceGroups(categoryPatterns, w.skillsLoader.GetLocale()),
+		"RelatedReferences": businessPatternReferenceLinks(allCategories, w.skillsLoader.GetLocale(), "./"),
 	}
 
 	indexContent, err := w.skillsLoader.RenderRelative("project/references/patterns/business-index", indexData)
@@ -418,6 +431,7 @@ func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary
 			"Confidence":        calculatePatternConfidence(group.Patterns) * 100,
 			"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
 			"CodeFenceLanguage": codeFenceLanguage(language),
+			"RelatedReferences": businessPatternReferenceLinks(allCategories, w.skillsLoader.GetLocale(), "../"),
 		}
 		content, err := w.skillsLoader.RenderRelative("project/references/patterns/business-detail", data)
 		if err != nil {
@@ -506,4 +520,5 @@ type SkillWriteOptions struct {
 	SkillsTemplatesHash string
 	SkipReferences      bool
 	WorkflowReferences  []WorkflowReference
+	ProjectRoot         string
 }

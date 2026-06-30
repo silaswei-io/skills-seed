@@ -72,6 +72,15 @@
 {{if .ValidationCommands}}
 ## 验证命令
 
+{{if .ValidationMatrix}}
+| 改动范围 | 建议命令 | 触发条件 | 证据 |
+|---|---|---|---|
+{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{end}}
+
+其他已学习命令：
+
+{{end}}
 {{range .ValidationCommands}}
 - `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}
 {{end}}

@@ -58,6 +58,8 @@ agent:
 ########################################################################
 learning:
   current:
+    # 学习模式：fast 更快，normal 默认平衡，deep 更深入
+    mode: "normal"
     # 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围
     select_relevant_files: true
     # 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果

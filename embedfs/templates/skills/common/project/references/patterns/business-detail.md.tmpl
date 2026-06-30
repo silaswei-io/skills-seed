@@ -11,6 +11,16 @@
 
 {{if .GroupSummary.IsFallback}}当需求涉及业务规则、状态变化、运行期行为或跨模块流程，但无法从需求词或路径匹配到稳定子域时，读取本页。{{else}}当需求提到 {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}，出现同义业务动作、状态变化、规则策略、入口渠道或外部依赖，或改动路径位于 {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}本子域相关代码{{end}} 时，优先读取本页。{{end}}
 
+{{if .RelatedReferences}}
+## 相关参考
+
+本页只覆盖业务子域规则；如果任务涉及接口返回、持久化、错误语义等跨边界约定，继续读取对应 reference。
+
+{{range .RelatedReferences}}
+- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{end}}
+{{end}}
+
 {{if .GroupLocations}}
 ## 代码证据入口
 

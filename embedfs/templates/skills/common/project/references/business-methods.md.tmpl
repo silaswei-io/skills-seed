@@ -5,21 +5,29 @@
 {{if .HasBusinessPatterns}}相关业务规则见 [业务模式](./patterns/business.md)
 {{end}}
 
-{{if .BusinessMethods}}
+{{if .BusinessMethodIndex.Groups}}
 ## 目录
 
-{{range .BusinessMethods}}{{if .Name}}- [{{.Name}}](#{{anchor .Name}})
+{{range .BusinessMethodIndex.Groups}}- {{.Title}}
+{{range .Methods}}  - [{{.DisplayName}}](#{{.Anchor}})
 {{end}}{{end}}
 {{end}}
 
-{{if .BusinessMethods}}
-{{range .BusinessMethods}}{{if .Name}}
-## {{.Name}}
+{{if .BusinessMethodIndex.Groups}}
+{{range .BusinessMethodIndex.Groups}}
+## {{.Title}}
+
+{{if .Summary}}{{.Summary}}{{end}}
+
+{{range .Methods}}
+### {{.DisplayName}}
 
 - **当前位置**: `{{.DisplayLocation}}`
 {{if .LocationStatus}}- **位置状态**: `{{.LocationStatus}}`
 {{end}}{{if .HistoricalDisplayLocation}}- **历史位置**: `{{.HistoricalDisplayLocation}}`
 {{end}}
+{{if .Module}}- **归属模块**: `{{.Module}}`{{end}}
+{{if ne .DisplayName .Name}}- **原始方法名**: `{{.Name}}`{{end}}
 {{if .Type}}- **类型**: {{.Type}}{{end}}
 - **功能**: {{.Description}}
 {{if .Function}}

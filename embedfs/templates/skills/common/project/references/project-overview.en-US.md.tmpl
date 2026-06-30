@@ -136,6 +136,13 @@ Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 {{if .ValidationCommands}}
 ## Validation Commands
 
+{{if .ValidationMatrix}}
+| Change Scope | Suggested Command | Evidence |
+|---|---|---|
+{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{end}}
+
+{{end}}
 {{range .ValidationCommands}}
 - `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}
 {{end}}

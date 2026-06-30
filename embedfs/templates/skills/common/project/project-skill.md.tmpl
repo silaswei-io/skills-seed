@@ -17,7 +17,7 @@ description: {{.SkillDescription}}
 
 ## 使用方式
 
-1. 先按任务类型读取最小必要参考；不要一次性读取所有 references。
+1. 先按任务类型读取最小必要参考；不要一次性读取所有 references。进入任何分类模式后，先检查其中的“相关参考”，任务命中跨边界提示时必须继续读取对应 reference。
 {{if .References.Enabled}}{{if .References.BusinessPatterns}}2. 业务规则、状态流转或跨实体流程：先读 [业务模式地图](./references/patterns/business.md)，再进入命中的业务详情页。
 {{else}}2. 业务规则、状态流转或跨实体流程：先检查当前代码，复用附近已有实现。
 {{end}}{{if .References.BusinessMethods}}3. 需要复用项目级业务入口、跨模块编排入口或工具入口时，再读 [入口方法索引](./references/business-methods.md)。
@@ -74,6 +74,15 @@ description: {{.SkillDescription}}
 
 按改动范围选择最小必要命令：
 
+{{if .ValidationMatrix}}
+| 改动范围 | 建议命令 | 触发条件 | 证据 |
+|---|---|---|---|
+{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{end}}
+
+其他已学习命令：
+
+{{end}}
 {{range .ValidationCommands}}
 - `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}
 {{end}}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +30,20 @@ func TestAnalyzeCurrentCodebasePromptDataNormalizesStructureInputFile(t *testing
 	require.NotContains(t, text, "\u00a0")
 	require.NotContains(t, text, "&nbsp;")
 	require.NotContains(t, text, "main.go   ")
+}
+
+func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+
+	planData, err := PlanAnalysisUnitsPromptData(session, &PlanAnalysisUnitsRequest{})
+	require.NoError(t, err)
+	require.Equal(t, config.LearningModeNormal, planData["LearningMode"])
+
+	currentData, err := AnalyzeCurrentCodebasePromptData(session, &AnalyzeCurrentCodebaseRequest{
+		LearningMode: config.LearningModeDeep,
+	})
+	require.NoError(t, err)
+	require.Equal(t, config.LearningModeDeep, currentData["LearningMode"])
 }
 
 func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {

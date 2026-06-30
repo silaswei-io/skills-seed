@@ -58,6 +58,8 @@ agent:
 ########################################################################
 learning:
   current:
+    # Learning mode: fast is quicker, normal balances quality and speed, deep is more thorough
+    mode: "normal"
     # Enable relevant-file selection to narrow learn current scope from the candidate file tree
     select_relevant_files: true
     # Only call AI file selection when candidate files reach this threshold; smaller projects use local filtering

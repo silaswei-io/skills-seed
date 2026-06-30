@@ -12,6 +12,16 @@
 
 {{.Summary}}
 
+{{if .RelatedReferences}}
+## 相关参考
+
+本页只覆盖 {{.Category}} 分类约定；如果任务跨到下列边界，继续读取对应 reference。
+
+{{range .RelatedReferences}}
+- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{end}}
+{{end}}
+
 {{if .PatternObjects}}
 ## 详细工具模式
 

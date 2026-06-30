@@ -307,6 +307,7 @@ type AnalyzeCurrentCodebaseRequest struct {
 	ProjectName        string
 	RootPath           string
 	Language           string
+	LearningMode       config.LearningMode
 	RuntimeLabel       string
 	AnalysisUnit       domain.AnalysisUnit
 	FocusPaths         []string
@@ -332,6 +333,7 @@ type PlanAnalysisUnitsRequest struct {
 	ProjectName       string
 	RootPath          string
 	Language          string
+	LearningMode      config.LearningMode
 	FocusPaths        []string
 	StructuralContext string
 	UserContext       string
@@ -357,6 +359,7 @@ func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalys
 		ProjectName:       req.ProjectName,
 		RootPath:          req.RootPath,
 		Language:          req.Language,
+		LearningMode:      req.LearningMode,
 		FocusPaths:        req.FocusPaths,
 		StructuralContext: structuralContext,
 		UserContext:       req.UserContext,
@@ -400,6 +403,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		ProjectName:       req.ProjectName,
 		RootPath:          req.RootPath,
 		Language:          req.Language,
+		LearningMode:      req.LearningMode,
 		RuntimeLabel:      req.RuntimeLabel,
 		AnalysisUnit:      req.AnalysisUnit,
 		FocusPaths:        req.FocusPaths,
@@ -697,6 +701,7 @@ type AnalyzeCodebaseOptions struct {
 	FocusPaths         []string
 	RuntimeLabel       string
 	AnalysisUnit       domain.AnalysisUnit
+	LearningMode       config.LearningMode
 	SelectedFiles      []domain.FileInfo
 	SelectedFilesSet   bool
 	KnownPatternsJSON  string
@@ -773,6 +778,7 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		ProjectName:  projectName,
 		RootPath:     projectRoot,
 		Language:     language,
+		LearningMode: opts.LearningMode,
 		RuntimeLabel: opts.RuntimeLabel,
 		AnalysisUnit: opts.AnalysisUnit,
 		FocusPaths:   focusPaths,

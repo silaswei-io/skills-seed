@@ -88,6 +88,7 @@ func TestNewRepository(t *testing.T) {
 		require.NotContains(t, text, `contracts:`)
 		require.NotContains(t, text, `infra:`)
 		require.Contains(t, text, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
+		require.Contains(t, text, "# 学习模式：fast 更快，normal 默认平衡，deep 更深入\n    mode: \"normal\"")
 		require.Contains(t, text, "# 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果\n    select_relevant_files_min_candidates: 200")
 		require.Contains(t, text, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
 		require.Contains(t, text, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界\n########################################################################\nexclude:")
@@ -466,6 +467,7 @@ exclude:
 	require.Equal(t, "new-name", reloaded.GetProjectConfig().Name)
 	require.Equal(t, "workspace", reloaded.GetProjectConfig().Mode)
 	require.False(t, reloaded.GetCurrentLearningConfig().Structural.Enabled)
+	require.Equal(t, LearningModeNormal, reloaded.GetCurrentLearningConfig().Mode)
 	require.False(t, reloaded.GetCurrentLearningConfig().SelectRelevantFiles)
 	require.Equal(t, 40, reloaded.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.False(t, reloaded.GetExcludeConfig().GitIgnore)
@@ -632,6 +634,7 @@ exclude:
 	require.NoError(t, err)
 
 	cfg := repo.GetCurrentLearningConfig().Structural
+	require.Equal(t, LearningModeNormal, repo.GetCurrentLearningConfig().Mode)
 	require.True(t, repo.GetCurrentLearningConfig().SelectRelevantFiles)
 	require.Equal(t, 200, repo.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.True(t, cfg.Enabled)
@@ -672,11 +675,60 @@ exclude:
 	require.NoError(t, err)
 
 	cfg := repo.GetCurrentLearningConfig().Structural
+	require.Equal(t, LearningModeNormal, repo.GetCurrentLearningConfig().Mode)
 	require.False(t, repo.GetCurrentLearningConfig().SelectRelevantFiles)
 	require.Equal(t, 200, repo.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.False(t, cfg.Enabled)
 	require.Equal(t, 12, cfg.MaxSymbols)
 	require.Equal(t, 256, cfg.MaxFileSize)
+}
+
+func TestRepository_NormalizesCurrentLearningMode(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want LearningMode
+	}{
+		{name: "fast", raw: "fast", want: LearningModeFast},
+		{name: "normal", raw: "normal", want: LearningModeNormal},
+		{name: "deep", raw: "deep", want: LearningModeDeep},
+		{name: "invalid", raw: "maximum", want: LearningModeNormal},
+		{name: "blank", raw: "", want: LearningModeNormal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seedPath := t.TempDir()
+			configPath := filepath.Join(seedPath, "config.yaml")
+			require.NoError(t, os.MkdirAll(seedPath, 0755))
+			require.NoError(t, os.WriteFile(configPath, []byte(`
+profile:
+  language: "go"
+  locale: "zh-CN"
+agent:
+  engine: "claude"
+learning:
+  current:
+    mode: "`+tt.raw+`"
+    structural:
+      enabled: true
+  history:
+    max_commits: 50
+autofix:
+  strategy: "patch"
+skills:
+  paths: {}
+logging:
+  level: "DEBUG"
+exclude:
+  paths: []
+`), 0644))
+
+			repo, err := NewRepository(seedPath, "zh-CN")
+			require.NoError(t, err)
+			require.Equal(t, tt.want, repo.GetCurrentLearningConfig().Mode)
+		})
+	}
 }
 
 func TestRepository_GetAgentConfig(t *testing.T) {

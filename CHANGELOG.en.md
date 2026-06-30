@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.0]
+
+### Changes
+
+- Added `learning.current.mode` with `fast`, `normal`, and `deep` strategies. The selected mode now participates in resume-state fingerprints so runs do not reuse stale analysis units from another mode.
+- Simplified and abstracted current-code learning prompts while preserving key quality constraints for business subdomains, coverage matrices, candidate filtering, business expansion directions, and utils misclassification prevention.
+- Generated project skills now include related-reference routing, business-pattern importance layers, change-scope validation matrices, and module-grouped entry method indexes.
+- Entry method indexes now add receiver, module, or path context for generic entry names such as `Run`, `main`, `Start`, and `Init`, improving readability and navigation precision.
+- Reference generation now validates evidence, business-entry, and module paths against the project root before rendering, reducing incorrect navigation links.
+
+### Tests
+
+- Added a local `.test` quality gate using `front_gateway` as the business baseline project to check generation health, parse stability, reference routing, business coverage, source evidence, and navigation precision.
+- The `front_gateway` business baseline covers TP1 certificate issuance, TP3 decrypt/GAS/AEP flow, async tasks, HSM session pooling, AK/SK auth, and external service boundaries.
+
 ## [v0.10.7]
 
 ### Changes

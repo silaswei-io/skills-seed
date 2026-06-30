@@ -12,6 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/stretchr/testify/require"
 )
@@ -560,18 +561,19 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"业务候选清单",
-				"业务模式展开",
-				"不要把多个业务细节压缩成一个泛化模式",
+				"业务覆盖矩阵",
+				"非 api",
+				"资源生命周期",
+				"外部依赖交互",
 				"允许中英文混合表达技术概念",
 			},
 		},
 		{
 			locale: "en-US",
 			requiredText: []string{
-				"business candidate inventory",
-				"business pattern expansion",
-				"Do not compress multiple business details into one generic pattern",
+				"business coverage matrix",
+				"resource lifecycles",
+				"external dependency interactions",
 				"All user-facing natural-language fields must be written in English",
 			},
 		},
@@ -613,7 +615,6 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 			requiredText: []string{
 				"具体分类优先",
 				"business 不是默认分类",
-				"不要为每个候选强行生成 business 模式",
 			},
 			forbidden: []string{
 				"对每个业务候选至少尝试提取 1 个 `business` 模式",
@@ -623,8 +624,6 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 			locale: "en-US",
 			requiredText: []string{
 				"Prefer specific categories",
-				"business is not the default category",
-				"Do not force a business pattern for every candidate",
 			},
 			forbidden: []string{
 				"try to extract at least one `business` pattern",
@@ -668,31 +667,20 @@ func TestLoader_RenderLearningPromptsPreserveDomainOperationBusinessSignals(t *t
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"领域操作提取",
-				"业务子域总览",
-				"项目自己的源码词表",
+				"领域操作",
 				"业务覆盖矩阵",
-				"需求路由词",
-				"非 API 业务入口",
+				"非 API",
 				"资源生命周期",
 				"外部依赖交互",
-				"不要只输出顶层流程",
-				"不要仅因为它是“外部客户端调用”就降级为通用工具",
 			},
 		},
 		{
 			locale: "en-US",
 			requiredText: []string{
-				"domain-operation extraction",
-				"business subdomain overview",
-				"project's own source vocabulary",
+				"Domain operations",
 				"business coverage matrix",
-				"request routing terms",
-				"non-API business entries",
 				"resource lifecycles",
 				"external dependency interactions",
-				"Do not output only top-level flows",
-				"Do not demote it to a generic utility solely because it is an external-client call",
 			},
 		},
 	}
@@ -716,6 +704,99 @@ func TestLoader_RenderLearningPromptsPreserveDomainOperationBusinessSignals(t *t
 						require.Contains(t, prompt, text)
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
+	tests := []struct {
+		locale       string
+		name         string
+		data         interface{}
+		requiredText []string
+	}{
+		{
+			locale: "zh-CN",
+			name:   "analysis-plan",
+			data: func() map[string]interface{} {
+				data := sampleAnalysisPlanData()
+				data["LearningMode"] = "fast"
+				return data
+			}(),
+			requiredText: []string{
+				"学习模式: fast",
+				"模式策略",
+				"完整的语义闭环",
+				"如果需要频繁依赖另一个 unit 才能讲清楚，就合并",
+				"`deep`",
+			},
+		},
+		{
+			locale: "en-US",
+			name:   "analysis-plan",
+			data: func() map[string]interface{} {
+				data := sampleAnalysisPlanData()
+				data["LearningMode"] = "deep"
+				return data
+			}(),
+			requiredText: []string{
+				"Learning mode: deep",
+				"Mode Strategy",
+				"complete semantic loop",
+				"merge units that would need frequent cross-reading",
+				"`fast`",
+			},
+		},
+		{
+			locale: "zh-CN",
+			name:   "pattern-learn-current",
+			data: func() *agent.AnalyzeCurrentCodebaseRequest {
+				req := sampleAnalyzeCurrentCodebaseRequest()
+				req.LearningMode = config.LearningModeDeep
+				return req
+			}(),
+			requiredText: []string{
+				"学习模式策略",
+				"`fast`",
+				"`normal`",
+				"`deep`",
+				"推荐分析顺序",
+				"业务子域",
+				"可选拆解方向",
+				"`pkg`、`utils`、`helper`、`client`",
+				"路由价值和代码证据",
+			},
+		},
+		{
+			locale: "en-US",
+			name:   "pattern-learn-current",
+			data: func() *agent.AnalyzeCurrentCodebaseRequest {
+				req := sampleAnalyzeCurrentCodebaseRequest()
+				req.LearningMode = config.LearningModeFast
+				return req
+			}(),
+			requiredText: []string{
+				"Learning Mode Strategy",
+				"`fast`",
+				"`normal`",
+				"`deep`",
+				"Recommended analysis order",
+				"business subdomains",
+				"Optional expansion directions",
+				"`pkg`, `utils`, `helper`, `client`",
+				"routing value and source evidence",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.locale+"/"+tt.name, func(t *testing.T) {
+			loader := New("loader", tt.locale, "")
+			prompt, err := loader.Render(tt.name, tt.data)
+			require.NoError(t, err)
+			for _, text := range tt.requiredText {
+				require.Contains(t, prompt, text)
 			}
 		})
 	}
@@ -1505,6 +1586,7 @@ func sampleAnalysisPlanData() map[string]interface{} {
 		"ProjectName":           "demo",
 		"RootPath":              "/tmp/demo",
 		"Language":              "go",
+		"LearningMode":          "normal",
 		"FocusPaths":            []string{"internal/auth/login.go", "internal/key/create.go"},
 		"StructuralContextPath": "/tmp/skills-seed/structural-context.md",
 		"UserContextPath":       "",

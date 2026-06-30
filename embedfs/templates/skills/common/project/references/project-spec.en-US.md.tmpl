@@ -72,6 +72,15 @@ These items come from learned patterns, but do not have enough direct code evide
 {{if .ValidationCommands}}
 ## Validation Commands
 
+{{if .ValidationMatrix}}
+| Change Scope | Suggested Command | Trigger | Evidence |
+|---|---|---|---|
+{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{end}}
+
+Other learned commands:
+
+{{end}}
 {{range .ValidationCommands}}
 - `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}
 {{end}}

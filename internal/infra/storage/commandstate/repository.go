@@ -34,6 +34,7 @@ type State struct {
 	Command       string                `json:"command"`
 	ProjectName   string                `json:"project_name"`
 	Language      string                `json:"language"`
+	Mode          string                `json:"mode,omitempty"`
 	UserContext   string                `json:"user_context_hash,omitempty"`
 	CreatedAt     string                `json:"created_at"`
 	Inputs        []FileInput           `json:"inputs"`
@@ -94,11 +95,17 @@ func (r *Repository) Clear() error {
 
 // NewState 创建规范化命令状态。
 func NewState(command, projectName, language, userContext string, inputs []FileInput, units []domain.AnalysisUnit) *State {
+	return NewStateWithMode(command, projectName, language, "", userContext, inputs, units)
+}
+
+// NewStateWithMode 创建包含学习模式的命令状态。
+func NewStateWithMode(command, projectName, language, mode, userContext string, inputs []FileInput, units []domain.AnalysisUnit) *State {
 	return &State{
 		SchemaVersion: schemaVersion,
 		Command:       normalizeCommand(command),
 		ProjectName:   projectName,
 		Language:      language,
+		Mode:          strings.TrimSpace(mode),
 		UserContext:   HashText(userContext),
 		CreatedAt:     time.Now().Format(time.RFC3339),
 		Inputs:        normalizeInputs(inputs),

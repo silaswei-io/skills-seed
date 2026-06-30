@@ -198,8 +198,30 @@ func (c *LearningConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// LearningMode 控制 learn current 在速度和学习深度之间的取舍。
+type LearningMode string
+
+const (
+	LearningModeFast   LearningMode = "fast"   // 更快，合并更多相近能力，只学习高价值稳定模式
+	LearningModeNormal LearningMode = "normal" // 默认，兼顾质量和速度
+	LearningModeDeep   LearningMode = "deep"   // 更深入，保留更多业务边界和细节
+)
+
+// NormalizeLearningMode 把配置中的学习模式归一化为受支持的取值。
+func NormalizeLearningMode(mode string) LearningMode {
+	switch LearningMode(strings.ToLower(strings.TrimSpace(mode))) {
+	case LearningModeFast:
+		return LearningModeFast
+	case LearningModeDeep:
+		return LearningModeDeep
+	default:
+		return LearningModeNormal
+	}
+}
+
 // CurrentLearningConfig 控制 learn current 的文件选择和结构化上下文。
 type CurrentLearningConfig struct {
+	Mode                             LearningMode     `yaml:"mode"`                                 // 学习模式：fast、normal、deep
 	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否先筛选最值得分析的相关文件
 	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 文件筛选
 	Structural                       StructuralConfig `yaml:"structural"`                           // 结构化上下文配置
@@ -209,6 +231,7 @@ type CurrentLearningConfig struct {
 
 func defaultCurrentLearningConfig() CurrentLearningConfig {
 	return CurrentLearningConfig{
+		Mode:                             LearningModeNormal,
 		SelectRelevantFiles:              true,
 		SelectRelevantFilesMinCandidates: 200,
 		Structural:                       defaultStructuralConfig(),
@@ -504,6 +527,7 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if !cfg.Learning.Current.Structural.defaultsApplied {
 		cfg.Learning.Current.Structural = defaultStructuralConfig()
 	}
+	cfg.Learning.Current.Mode = NormalizeLearningMode(string(cfg.Learning.Current.Mode))
 	if cfg.Learning.Current.Structural.MaxSymbols <= 0 {
 		cfg.Learning.Current.Structural.MaxSymbols = 30
 	}

@@ -12,6 +12,16 @@
 
 {{.Summary}}
 
+{{if .RelatedReferences}}
+## Related References
+
+This page only covers {{.Category}} category conventions. If the task crosses one of these boundaries, continue with the matching reference.
+
+{{range .RelatedReferences}}
+- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{end}}
+{{end}}
+
 {{if .PatternObjects}}
 ## Detailed Utility Patterns
 

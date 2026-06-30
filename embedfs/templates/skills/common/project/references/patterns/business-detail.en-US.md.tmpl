@@ -11,6 +11,16 @@
 
 {{if .GroupSummary.IsFallback}}Read this page when the task changes business rules, state transitions, runtime behavior, or cross-module flows but cannot be mapped to a stable domain from request terms or paths.{{else}}Read this page first when the request mentions {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}, uses synonymous business actions, state changes, rules or policies, entry channels, or external dependencies, or changes code under {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}this domain's related code{{end}}.{{end}}
 
+{{if .RelatedReferences}}
+## Related References
+
+This page only covers business-domain rules. If the task touches cross-boundary conventions such as API returns, persistence, or error semantics, continue with the matching reference.
+
+{{range .RelatedReferences}}
+- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{end}}
+{{end}}
+
 {{if .GroupLocations}}
 ## Code Evidence Entry Points
 

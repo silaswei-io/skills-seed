@@ -14,6 +14,7 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
@@ -157,6 +158,9 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		return err
 	}
 	profile = cleanProjectProfile(profile)
+	projectConfig := s.configRepo.GetProjectConfig()
+	projectRoot := firstNonEmptyString(projectConfig.RootPath, runtimecontext.ProjectRoot(ctx))
+	profile, rankedPatterns = sanitizeGenerationInputs(profile, rankedPatterns, projectRoot)
 	spec := s.projectSpecFromProfileAndPatterns(profile, rankedPatterns, config.WorkspaceProjectConfig{})
 
 	if err := runStep(i18n.Get("ProgressGenerateCheckOutput"), func() error {
@@ -197,7 +201,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			return err
 		}
 
-		projectConfig := s.configRepo.GetProjectConfig()
 		return s.writer.WriteSkillsOutput(ctx, resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, SkillWriteOptions{
 			SkillName:           generatedSkillName(projectConfig.Name),
 			ProjectName:         projectConfig.Name,
@@ -206,6 +209,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
 			SkipReferences:      opts.SkipReferences,
 			WorkflowReferences:  workflowReferences,
+			ProjectRoot:         projectRoot,
 		})
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),

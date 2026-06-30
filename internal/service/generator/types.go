@@ -18,11 +18,16 @@ type GenerateOptions struct {
 	SkipReferences bool
 }
 
+type skillRenderContext struct {
+	ProjectRoot string
+}
+
 type projectOverviewTemplateData struct {
 	domain.ProjectProfile
 	OverviewReferences  []skills.ReferenceItem
 	OverviewSummary     string
 	ArchitectureSummary string
+	ValidationMatrix    []ValidationMatrixItem
 }
 
 type profileReferenceTemplateData struct {
@@ -30,12 +35,14 @@ type profileReferenceTemplateData struct {
 	HasBusinessPatterns bool
 	HasUtilityPatterns  bool
 	CodeFenceLanguage   string
+	BusinessMethodIndex businessMethodIndex
 }
 
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
-	References    ReferenceAvailability
-	SourceOfTruth []SourceOfTruthItem
+	References       ReferenceAvailability
+	SourceOfTruth    []SourceOfTruthItem
+	ValidationMatrix []ValidationMatrixItem
 }
 
 type SourceOfTruthItem struct {
@@ -48,6 +55,26 @@ type categoryReferenceMeta struct {
 	Group       string
 	Title       string
 	Description string
+}
+
+type PatternReferenceLink struct {
+	Title  string
+	Path   string
+	Reason string
+}
+
+type PatternImportanceGroup struct {
+	Title       string
+	Description string
+	Patterns    []domain.Pattern
+}
+
+type ValidationMatrixItem struct {
+	Area     string
+	Command  string
+	When     string
+	Source   string
+	Evidence []string
 }
 
 type ReferenceAvailability struct {

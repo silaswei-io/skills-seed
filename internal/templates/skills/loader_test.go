@@ -66,6 +66,9 @@ func TestLoader_Render(t *testing.T) {
 		"ValidationCommands": []map[string]string{
 			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
 		},
+		"ValidationMatrix": []map[string]interface{}{
+			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
+		},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
 		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
@@ -136,6 +139,9 @@ func TestLoader_Render_English(t *testing.T) {
 		"WorkflowReferences": []map[string]string{},
 		"ValidationCommands": []map[string]string{
 			{"Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml"},
+		},
+		"ValidationMatrix": []map[string]interface{}{
+			{"Area": "Business Flow / State / Orchestration", "Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
 		},
 		"StateSummaries":  []string{"Task: preserve task state transitions."},
 		"References":      fullReferenceAvailability(),
@@ -232,8 +238,10 @@ func TestLoader_OmitsVisibleSkillsSeedGeneratedNoticeByDefault(t *testing.T) {
 		"LastUpdated":       "2026-06-08 12:00:00",
 		"Summary":           "业务模式",
 		"PatternObjects":    []domain.Pattern{*domain.NewPattern("p1", "业务规则", domain.CategoryBusiness)},
+		"ImportanceGroups":  []interface{}{},
 		"UsageScenes":       []string{},
 		"CodeFenceLanguage": "go",
+		"RelatedReferences": []interface{}{},
 	})
 	require.NoError(t, err)
 
@@ -257,6 +265,8 @@ func TestLoader_RenderReference(t *testing.T) {
 		"LastUpdated":       "2026-03-25 15:00:00",
 		"BusinessMethods":   []interface{}{}, // 添加业务方法
 		"CodeFenceLanguage": "go",
+		"RelatedReferences": []interface{}{},
+		"ImportanceGroups":  []interface{}{},
 	}
 
 	content, err := loader.RenderPattern("api", data)
@@ -382,9 +392,17 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 					"PrimaryPath": "internal/service/resource.go",
 					"IsFallback":  false,
 				},
-				"GroupLocations": []interface{}{},
-				"GroupSignals":   []string{},
-				"PatternObjects": []domain.Pattern{*pattern},
+				"GroupLocations":   []interface{}{},
+				"GroupSignals":     []string{},
+				"PatternObjects":   []domain.Pattern{*pattern},
+				"ImportanceGroups": []interface{}{},
+				"RelatedReferences": []interface{}{
+					map[string]string{
+						"Title":  "API 模式",
+						"Path":   "../api.md",
+						"Reason": "接口字段跨边界时读取。",
+					},
+				},
 			}
 
 			index, err := loader.RenderRelative("project/references/patterns/business-index", data)
@@ -417,6 +435,8 @@ func TestLoader_RenderPatternFallsBackToDefaultTemplate(t *testing.T) {
 		"LastUpdated":       "2026-05-21 00:00:00",
 		"BusinessMethods":   []*domain.BusinessMethod{},
 		"CodeFenceLanguage": "go",
+		"RelatedReferences": []interface{}{},
+		"ImportanceGroups":  []interface{}{},
 	})
 
 	require.NoError(t, err)
@@ -646,6 +666,9 @@ func fullSkillData() map[string]interface{} {
 		"ValidationCommands": []map[string]string{
 			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
 		},
+		"ValidationMatrix": []map[string]interface{}{
+			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
+		},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
 		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
@@ -695,6 +718,8 @@ func categoryData(category string) map[string]interface{} {
 		"BusinessMethods":   []*domain.BusinessMethod{method},
 		"SamplePatterns":    []string{"Demo Pattern"},
 		"CodeFenceLanguage": "go",
+		"RelatedReferences": []interface{}{},
+		"ImportanceGroups":  []interface{}{},
 	}
 }
 
@@ -727,6 +752,9 @@ func projectOverviewData() map[string]interface{} {
 		"ValidationCommands": []domain.ValidationCommand{
 			{Command: "task verify", When: "项目代码变化后", Source: "Taskfile.yml"},
 		},
+		"ValidationMatrix": []map[string]interface{}{
+			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
+		},
 		"CodeFenceLanguage":   "go",
 		"ProjectID":           "demo",
 		"ScopePath":           "demo",
@@ -747,6 +775,33 @@ func projectOverviewData() map[string]interface{} {
 		},
 		"SourceOfTruth": []map[string]string{
 			{"Area": "业务规则", "Edit": "`internal/service`", "DoNotEdit": "generated files"},
+		},
+		"BusinessMethodIndex": map[string]interface{}{
+			"Total": 1,
+			"Groups": []map[string]interface{}{
+				{
+					"ID":      "demo",
+					"Title":   "Demo",
+					"Summary": "demo entry points",
+					"Methods": []map[string]interface{}{
+						{
+							"DisplayName":               "Demo",
+							"Anchor":                    "demo",
+							"Module":                    "demo",
+							"Name":                      "Demo",
+							"DisplayLocation":           "internal/demo.go:10",
+							"LocationStatus":            "",
+							"HistoricalDisplayLocation": "",
+							"Type":                      "domain",
+							"Description":               "demo",
+							"Function":                  "func Demo()",
+							"Prerequisites":             "",
+							"Returns":                   "",
+							"Usage":                     "demo",
+						},
+					},
+				},
+			},
 		},
 	}
 }

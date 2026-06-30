@@ -287,6 +287,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	var projectRoot string
 	var projectName string
 	var currentLanguage string
+	var learningMode string
 	var resolvedFocusPaths []string
 	var refreshProfile bool
 	var existingProfile *domain.ProjectProfile
@@ -327,6 +328,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		if currentLanguage == "" {
 			currentLanguage = "unknown"
 		}
+		learningMode = string(cont.ConfigRepo.GetCurrentLearningConfig().Mode)
 
 		resolvedFocusPaths, err = resolveFocusPaths(projectRoot, opts.focusPaths)
 		if err != nil {
@@ -386,7 +388,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 	detectLabel := i18n.Get("ProgressLearnCurrentDetectChanges")
 	if err := steps.Run(detectLabel, func() error {
 		setStepDetail(detectLabel, "ProgressLearnCurrentDetectRestoreState", nil)
-		session, err := restoreCurrentState(ctx, stateRepo, cont.FileTracker, projectName, currentLanguage, opts.userContext)
+		session, err := restoreCurrentState(ctx, stateRepo, cont.FileTracker, projectName, currentLanguage, learningMode, opts.userContext)
 		if err != nil {
 			return err
 		}
@@ -591,7 +593,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 		if state == nil {
 			setStepDetail(analyzeLabel, "ProgressLearnCurrentAnalyzePlanUnits", nil)
 			var err error
-			state, err = loadOrCreateCurrentState(ctx, stateRepo, cont.AnalyzerSvc, projectName, projectRoot, currentLanguage, focusRelPaths, incrementalChanges, opts.userContext)
+			state, err = loadOrCreateCurrentState(ctx, stateRepo, cont.AnalyzerSvc, projectName, projectRoot, currentLanguage, learningMode, focusRelPaths, incrementalChanges, opts.userContext)
 			if err != nil {
 				return err
 			}
@@ -630,6 +632,7 @@ func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurr
 				FocusPaths:       unitFocusAbsPaths,
 				RuntimeLabel:     unitLabel,
 				AnalysisUnit:     unit,
+				LearningMode:     cont.ConfigRepo.GetCurrentLearningConfig().Mode,
 				SelectedFiles:    unitSelected,
 				SelectedFilesSet: true,
 				UseSnapshotDiffs: true,

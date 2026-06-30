@@ -703,6 +703,7 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	var cachedState commandstate.State
 	require.NoError(t, json.Unmarshal(stateBytes, &cachedState))
 	require.Equal(t, commandStateLearnCurrent, cachedState.Command)
+	require.Equal(t, string(config.LearningModeNormal), cachedState.Mode)
 	require.Len(t, cachedState.Units, 2)
 
 	analyzed = nil
@@ -732,6 +733,61 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	require.Contains(t, output, "分析当前代码库 · 单元 2/2 · 密钥创建")
 	require.NotContains(t, output, "增量文件变化:")
 	require.NoFileExists(t, stateRepo.Path())
+}
+
+func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	cfg := cont.ConfigRepo.Get()
+	cfg.Learning.Current.Mode = config.LearningModeDeep
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	planModes := []config.LearningMode{}
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		planModes = append(planModes, req.LearningMode)
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	analyzeModes := []config.LearningMode{}
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeModes = append(analyzeModes, req.LearningMode)
+		if len(analyzeModes) == 2 {
+			return nil, errors.New("stop after cached state is written")
+		}
+		pattern := domain.NewPattern("p-"+req.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+
+	_, err := runLearnCurrent(cont, opts)
+	require.Error(t, err)
+	require.Equal(t, []config.LearningMode{config.LearningModeDeep}, planModes)
+	require.Equal(t, []config.LearningMode{config.LearningModeDeep, config.LearningModeDeep}, analyzeModes)
+
+	cfg = cont.ConfigRepo.Get()
+	cfg.Learning.Current.Mode = config.LearningModeFast
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+
+	analyzeModes = nil
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeModes = append(analyzeModes, req.LearningMode)
+		pattern := domain.NewPattern("p-"+req.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.Equal(t, []config.LearningMode{config.LearningModeDeep, config.LearningModeFast}, planModes)
+	require.Equal(t, []config.LearningMode{config.LearningModeFast}, analyzeModes)
 }
 
 func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {

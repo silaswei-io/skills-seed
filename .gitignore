@@ -28,6 +28,7 @@ Thumbs.db
 # Project specific
 *.db
 *.log
+.test/
 .skills-seed/
 .claude/skills/
 .agents/skills/

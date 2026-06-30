@@ -867,6 +867,96 @@ func TestGenerateSkills_MainSkillReferencesOnlyGeneratedCategories(t *testing.T)
 	}
 }
 
+func TestGenerateSkills_RendersRelatedReferencesForCategoryBoundaries(t *testing.T) {
+	businessPattern := domain.NewPattern("operate-log", "Operate Log Domain Rule", domain.CategoryBusiness)
+	businessPattern.Confidence = 0.9
+	businessPattern.SetDescription("操作日志保存审计域规则")
+	businessPattern.SetRule("记录操作日志时保持审计语义完整")
+
+	apiPattern := domain.NewPattern("operation-extra", "Operation Log Response Extra", domain.CategoryAPI)
+	apiPattern.Confidence = 0.92
+	apiPattern.SetDescription("接口响应 Extra 字段承载操作日志 Before/After 数据")
+	apiPattern.SetRule("响应 Extra 使用当前 API 映射约定填充")
+
+	databasePattern := domain.NewPattern("audit-save", "Audit Persistence", domain.CategoryDatabase)
+	databasePattern.Confidence = 0.88
+	databasePattern.SetDescription("审计记录需要持久化")
+	databasePattern.SetRule("持久化审计记录时复用仓储层约定")
+
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*businessPattern, *apiPattern, *databasePattern}, nil
+		},
+	}
+
+	svc := newTestService(mockPattern)
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	assert.Contains(t, skill, "进入任何分类模式后，先检查其中的“相关参考”")
+
+	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, businessIndex, "## 相关参考")
+	assert.Contains(t, businessIndex, "[API 模式](./api.md)")
+	assert.Contains(t, businessIndex, "Extra/Before/After")
+	assert.Contains(t, businessIndex, "[数据库模式](./database.md)")
+	assert.NotContains(t, businessIndex, "./error.md")
+
+	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "operate-log.md")
+	assert.Contains(t, businessDetail, "## 相关参考")
+	assert.Contains(t, businessDetail, "[API 模式](../api.md)")
+	assert.Contains(t, businessDetail, "接口返回")
+
+	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
+	assert.Contains(t, api, "## 相关参考")
+	assert.Contains(t, api, "[业务模式](./business.md)")
+	assert.Contains(t, api, "操作日志 Extra")
+	assert.NotContains(t, api, "./middleware.md")
+
+	assertNoBrokenMarkdownLinks(t, tmpDir)
+}
+
+func TestGenerateSkills_RendersEnglishRelatedReferences(t *testing.T) {
+	apiPattern := domain.NewPattern("api-extra", "API Extra", domain.CategoryAPI)
+	apiPattern.Confidence = 0.9
+	apiPattern.SetDescription("API returns Extra payloads")
+	apiPattern.SetRule("Populate Extra from mapped response models")
+
+	businessPattern := domain.NewPattern("audit-domain", "Audit Domain", domain.CategoryBusiness)
+	businessPattern.Confidence = 0.9
+	businessPattern.SetDescription("Audit rules are domain behavior")
+	businessPattern.SetRule("Preserve audit semantics")
+
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*apiPattern, *businessPattern}, nil
+		},
+	}
+	loader := skills.NewLoader("en-US")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	}
+	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	tmpDir := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	assert.Contains(t, skill, `check its "Related References" section first`)
+
+	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
+	assert.Contains(t, api, "## Related References")
+	assert.Contains(t, api, "[Business Patterns](./business.md)")
+	assert.Contains(t, api, "operation-log Extra")
+
+	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "audit.md")
+	assert.Contains(t, businessDetail, "## Related References")
+	assert.Contains(t, businessDetail, "[API Patterns](../api.md)")
+
+	assertNoBrokenMarkdownLinks(t, tmpDir)
+}
+
 func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Business Flow", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
@@ -1097,12 +1187,16 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	apiPattern := domain.NewPattern("api", "JZero Code Generation Convention", domain.CategoryAPI)
 	apiPattern.Confidence = 0.95
+	apiPattern.Frequency = 2
 	apiPattern.SetDescription("jzero generates handlers and types from .api files")
 	apiPattern.SetRule("Do not hand-edit generated handlers or types")
+	apiPattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/gen/api.go", Line: 10, Symbol: "GenerateAPI", Kind: "function", Confidence: 0.9}}
 	businessPattern := domain.NewPattern("business", "Plan Lifecycle State Machine", domain.CategoryBusiness)
 	businessPattern.Confidence = 0.95
+	businessPattern.Frequency = 2
 	businessPattern.SetDescription("Only one plan can be active")
 	businessPattern.SetRule("Deactivate existing active plans before creating or activating a plan")
+	businessPattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/application/vocab/service.go", Line: 1, Symbol: "ActivatePlan", Kind: "method", Confidence: 0.9}}
 	concurrencyPattern := domain.NewPattern("concurrency", "Mutex Guarded In-Memory Store", domain.CategoryConcurrency)
 	concurrencyPattern.Confidence = 0.95
 	concurrencyPattern.SetDescription("The service uses mutex protected maps")
@@ -1155,6 +1249,8 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	assert.Contains(t, skill, "修改业务流程")
 	assert.Contains(t, skill, "接入或调整外部依赖")
 	assert.Contains(t, skill, "## 验证命令")
+	assert.Contains(t, skill, "| 改动范围 | 建议命令 | 触发条件 | 证据 |")
+	assert.Contains(t, skill, "业务流程 / 状态 / 编排")
 	assert.Contains(t, skill, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
 	assert.NotContains(t, skill, "`jzero gen`")
 	assert.NotContains(t, skill, "`go test ./...`")
@@ -1166,6 +1262,7 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	assert.NotContains(t, spec, "## 修改来源")
 	assert.Contains(t, spec, "## 参考观察")
 	assert.Contains(t, spec, "## 验证命令")
+	assert.Contains(t, spec, "| 改动范围 | 建议命令 | 触发条件 | 证据 |")
 	assert.Contains(t, spec, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
 	assert.Contains(t, spec, "以下内容来自已学习模式，但缺少足够直接的代码证据")
 	assert.Contains(t, spec, "Do not hand-edit generated handlers or types")
@@ -1173,7 +1270,126 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 
 	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
 	assert.Contains(t, overview, "## 验证命令")
+	assert.Contains(t, overview, "| 改动范围 | 建议命令 | 证据 |")
 	assert.Contains(t, overview, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
+
+	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
+	assert.Contains(t, api, "## 重要性分层")
+	assert.Contains(t, api, "核心开发路径")
+
+	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, businessIndex, "## 重要性分层")
+	assert.Contains(t, businessIndex, "Plan Lifecycle State Machine")
+}
+
+func TestGenerateSkills_GroupsBusinessMethodsAndDisambiguatesGenericNames(t *testing.T) {
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "backend",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				BusinessMethods: []domain.BusinessMethod{
+					{
+						Name:         "Run",
+						CodeLocation: domain.CodeLocation{CurrentLocation: "cmd/server.go:20"},
+						Description:  "starts the server",
+						Function:     "func (s *Server) Run(ctx context.Context) error",
+						Type:         "domain",
+					},
+					{
+						Name:         "Run",
+						CodeLocation: domain.CodeLocation{CurrentLocation: "internal/plugin/vpn/run.go:12"},
+						Description:  "runs VPN plugin command",
+						Function:     "func (p *Plugin) Run(ctx context.Context) error",
+						Type:         "domain",
+					},
+				},
+			}, nil
+		},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "backend"},
+	})
+	tmpDir := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	methods := readGeneratedFile(t, tmpDir, "references", "business-methods.md")
+	assert.Contains(t, methods, "## 项目入口")
+	assert.Contains(t, methods, "### Server.Run")
+	assert.Contains(t, methods, "- **原始方法名**: `Run`")
+	assert.Contains(t, methods, "## Vpn")
+	assert.Contains(t, methods, "- **归属模块**: `vpn`")
+	assert.Contains(t, methods, "### Plugin.Run")
+}
+
+func TestGenerateSkills_FiltersMissingEvidencePaths(t *testing.T) {
+	existingPath := "internal/service/existing.go"
+	missingPath := "internal/logic/missing.go"
+	pattern := domain.NewPattern("p1", "Node Metrics", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Collects metrics")
+	pattern.SetRule("Use existing metrics flow")
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: existingPath, Line: 12, Symbol: "Existing", Kind: "function", Confidence: 0.9},
+		{Path: missingPath, Line: 33, Symbol: "Missing", Kind: "function", Confidence: 0.9},
+	}
+	pattern.SetBusinessMethod(&domain.BusinessMethod{
+		Name:         "Metrics",
+		CodeLocation: domain.CodeLocation{CurrentLocation: missingPath + ":33"},
+		Description:  "missing metrics method",
+		Function:     "func Metrics()",
+		Type:         "domain",
+	})
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "internal/service"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, existingPath), []byte("package service\n"), 0644))
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "backend",
+				Language:    "go",
+				BusinessMethods: []domain.BusinessMethod{{
+					Name:         "Metrics",
+					CodeLocation: domain.CodeLocation{CurrentLocation: missingPath + ":33"},
+					Description:  "missing metrics method",
+					Function:     "func Metrics()",
+					Type:         "domain",
+				}},
+				KeyModules: []domain.ModuleInfo{{
+					Name: "missing",
+					Path: missingPath,
+				}},
+			}, nil
+		},
+	}
+	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("en-US"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go", RootPath: projectRoot},
+	})
+	tmpDir := filepath.Join(projectRoot, ".agents", "skills", "backend-dev")
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	require.Contains(t, businessIndex, existingPath+":12")
+	require.NotContains(t, businessIndex, missingPath)
+
+	methods := readGeneratedFile(t, tmpDir, "references", "business-methods.md")
+	require.NotContains(t, methods, missingPath)
+
+	spec := readGeneratedFile(t, tmpDir, "references", "project-spec.md")
+	require.NotContains(t, spec, missingPath)
 }
 
 func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {

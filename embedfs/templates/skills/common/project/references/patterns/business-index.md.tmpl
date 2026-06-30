@@ -6,9 +6,36 @@
 
 {{if .Summary}}{{.Summary}}{{end}}
 
+{{if .RelatedReferences}}
+## 相关参考
+
+本页用于定位业务规则和领域流程；接口字段、持久化、错误语义等跨边界问题还需要继续读取对应 reference。
+
+{{range .RelatedReferences}}
+- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{end}}
+{{end}}
+
 ## 新需求定位方式
 
 先从需求里的业务名词、用户动作、状态变化、规则策略、入口渠道、外部依赖、异常现象或改动文件路径匹配下方子域；不要只按代码包名或技术缩写匹配。只读取最相关的详情文件，再回到当前代码确认行为。
+
+{{if .ImportanceGroups}}
+## 重要性分层
+
+业务规则不是同等强度。优先读取核心开发路径；局部模块经验只在命中相邻路径或同类需求时使用。
+
+{{range .ImportanceGroups}}
+### {{.Title}}
+
+{{.Description}}
+
+{{range .Patterns}}
+- **{{.Name}}** ({{printf "%.2f" (mul .Confidence 100)}}%, x{{.Frequency}})
+{{end}}
+
+{{end}}
+{{end}}
 
 {{range .Groups}}
 - **[{{.Title}}]({{.Path}})** - {{.Summary.Description}}（{{len .Patterns}} 个模式）

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 )
@@ -83,11 +84,11 @@ func buildStateInputs(changes *incrementalFileChanges) []commandstate.FileInput 
 	return inputs
 }
 
-func canReuseCurrentState(state *commandstate.State, changes *incrementalFileChanges, projectName, language, userContext string) bool {
+func canReuseCurrentState(state *commandstate.State, changes *incrementalFileChanges, projectName, language, mode, userContext string) bool {
 	if state == nil || changes == nil {
 		return false
 	}
-	if state.ProjectName != projectName || state.Language != language || state.UserContext != commandstate.HashText(userContext) {
+	if state.ProjectName != projectName || state.Language != language || state.Mode != mode || state.UserContext != commandstate.HashText(userContext) {
 		return false
 	}
 	planned := map[string]commandstate.FileInput{}
@@ -103,10 +104,11 @@ func canReuseCurrentState(state *commandstate.State, changes *incrementalFileCha
 	return len(state.Units) > 0
 }
 
-func canResumeCurrentState(state *commandstate.State, projectName, language, userContext string) bool {
+func canResumeCurrentState(state *commandstate.State, projectName, language, mode, userContext string) bool {
 	return state != nil &&
 		state.ProjectName == projectName &&
 		state.Language == language &&
+		state.Mode == mode &&
 		state.UserContext == commandstate.HashText(userContext) &&
 		len(state.Units) > 0 &&
 		len(state.Inputs) > 0
@@ -205,6 +207,7 @@ func restoreCurrentState(
 	tracker domain.FileAnalysisTracker,
 	projectName string,
 	language string,
+	mode string,
 	userContext string,
 ) (*currentStateSession, error) {
 	state, err := repo.Load(ctx)
@@ -214,7 +217,7 @@ func restoreCurrentState(
 		}
 		return nil, err
 	}
-	if !canResumeCurrentState(state, projectName, language, userContext) {
+	if !canResumeCurrentState(state, projectName, language, mode, userContext) {
 		return nil, nil
 	}
 	analyzedRecords, err := tracker.ListAnalyzedFiles(ctx, domain.FileAnalysisScope{})
@@ -235,6 +238,7 @@ func loadOrCreateCurrentState(
 	projectName string,
 	projectRoot string,
 	language string,
+	mode string,
 	focusRelPaths []string,
 	changes *incrementalFileChanges,
 	userContext string,
@@ -243,15 +247,16 @@ func loadOrCreateCurrentState(
 	if err != nil && err != commandstate.ErrStateNotFound {
 		return nil, err
 	}
-	if canReuseCurrentState(state, changes, projectName, language, userContext) {
+	if canReuseCurrentState(state, changes, projectName, language, mode, userContext) {
 		return state, nil
 	}
 	units, err := analyzerSvc.PlanAnalysisUnits(ctx, &analyzer.PlanAnalysisUnitsRequest{
-		ProjectName: projectName,
-		RootPath:    projectRoot,
-		Language:    language,
-		FocusPaths:  focusRelPaths,
-		UserContext: userContext,
+		ProjectName:  projectName,
+		RootPath:     projectRoot,
+		Language:     language,
+		LearningMode: config.LearningMode(mode),
+		FocusPaths:   focusRelPaths,
+		UserContext:  userContext,
 	})
 	if err != nil {
 		return nil, err
@@ -259,7 +264,7 @@ func loadOrCreateCurrentState(
 	if len(units) == 0 {
 		units = []domain.AnalysisUnit{fallbackAnalysisUnit(focusRelPaths)}
 	}
-	state = commandstate.NewState(repo.Command(), projectName, language, userContext, buildStateInputs(changes), units)
+	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, mode, userContext, buildStateInputs(changes), units)
 	if err := repo.Save(ctx, state); err != nil {
 		return nil, err
 	}
