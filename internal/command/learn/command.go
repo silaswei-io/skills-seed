@@ -228,6 +228,16 @@ type learnCurrentUnitResult struct {
 	completed        bool
 }
 
+type learnCurrentBatch struct {
+	index int
+	units []indexedAnalysisUnit
+}
+
+type indexedAnalysisUnit struct {
+	index int
+	unit  domain.AnalysisUnit
+}
+
 type learnCurrentRunningUnits struct {
 	mu        sync.Mutex
 	labels    map[int]string
@@ -356,8 +366,10 @@ type learnCurrentProjectRun struct {
 	hasProfileDelta           bool
 	profileRefreshRecommended agent.ProfileRefreshRecommendation
 	mergedProfile             *domain.ProjectProfile
+	codebaseRunContext        *analyzer.CodebaseRunContext
 	savedCount                int
 	patternSaveMu             sync.Mutex
+	snapshotCommitMu          sync.Mutex
 	progressDetailMu          sync.Mutex
 }
 
@@ -842,6 +854,11 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 			copyProfile := *r.existingProfile
 			r.mergedProfile = &copyProfile
 		}
+		runContext, err := r.buildCodebaseRunContext()
+		if err != nil {
+			return err
+		}
+		r.codebaseRunContext = runContext
 		completedUnits, err := r.analyzePlannedUnits(analyzeLabel, state, plannedUnits)
 		if err != nil {
 			return err
@@ -879,11 +896,12 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 }
 
 func (r *learnCurrentProjectRun) analyzePlannedUnits(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit) (int, error) {
-	parallelism := r.effectiveUnitParallelism(len(plannedUnits))
+	batches := r.planAnalysisBatches(plannedUnits)
+	parallelism := r.effectiveUnitParallelism(len(batches))
 	if parallelism <= 1 {
-		return r.analyzePlannedUnitsSerial(analyzeLabel, state, plannedUnits)
+		return r.analyzePlannedBatchesSerial(analyzeLabel, state, batches)
 	}
-	return r.analyzePlannedUnitsParallel(analyzeLabel, state, plannedUnits, parallelism)
+	return r.analyzePlannedBatchesParallel(analyzeLabel, state, plannedUnits, batches, parallelism)
 }
 
 func (r *learnCurrentProjectRun) effectiveUnitParallelism(unitCount int) int {
@@ -900,66 +918,95 @@ func (r *learnCurrentProjectRun) effectiveUnitParallelism(unitCount int) int {
 	return parallelism
 }
 
-func (r *learnCurrentProjectRun) analyzePlannedUnitsSerial(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit) (int, error) {
+func (r *learnCurrentProjectRun) buildCodebaseRunContext() (*analyzer.CodebaseRunContext, error) {
+	return r.cont.AnalyzerSvc.BuildCodebaseRunContext(r.ctx, r.projectRoot, r.currentLanguage, analyzer.AnalyzeCodebaseOptions{
+		FocusPaths:       r.effectiveFocusPaths,
+		SelectedFiles:    r.selectedFiles,
+		SelectedFilesSet: true,
+		UseSnapshotDiffs: true,
+	})
+}
+
+func (r *learnCurrentProjectRun) planAnalysisBatches(plannedUnits []domain.AnalysisUnit) []learnCurrentBatch {
+	maxUnits := r.maxUnitsPerBatch()
+	if maxUnits < 1 {
+		maxUnits = 1
+	}
+	batches := make([]learnCurrentBatch, 0, (len(plannedUnits)+maxUnits-1)/maxUnits)
+	for start := 0; start < len(plannedUnits); start += maxUnits {
+		end := start + maxUnits
+		if end > len(plannedUnits) {
+			end = len(plannedUnits)
+		}
+		batch := learnCurrentBatch{index: len(batches)}
+		for i := start; i < end; i++ {
+			batch.units = append(batch.units, indexedAnalysisUnit{index: i, unit: plannedUnits[i]})
+		}
+		batches = append(batches, batch)
+	}
+	return batches
+}
+
+func (r *learnCurrentProjectRun) maxUnitsPerBatch() int {
+	maxUnits := r.cont.ConfigRepo.GetCurrentLearningConfig().MaxUnitsPerCall
+	if maxUnits < 1 {
+		return 1
+	}
+	return maxUnits
+}
+
+func (r *learnCurrentProjectRun) analyzePlannedBatchesSerial(analyzeLabel string, state *commandstate.State, batches []learnCurrentBatch) (int, error) {
 	completedUnits := 0
-	totalUnits := len(plannedUnits)
-	for unitIndex, unit := range plannedUnits {
-		params := r.unitProgressParams(state, unit, unitIndex+1, totalUnits)
-		result, err := r.analyzeSingleUnit(r.ctx, analyzeLabel, unit, unitIndex, params, true)
+	for _, batch := range batches {
+		results, err := r.analyzeBatch(r.ctx, analyzeLabel, state, batch, true)
 		if err != nil {
 			return completedUnits, err
 		}
-		if result.completed {
-			completedUnits++
-		}
-		r.mergeUnitResult(result)
+		completedUnits += r.mergeUnitResults(results)
 	}
 	return completedUnits, nil
 }
 
-func (r *learnCurrentProjectRun) analyzePlannedUnitsParallel(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit, parallelism int) (int, error) {
+func (r *learnCurrentProjectRun) analyzePlannedBatchesParallel(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit, batches []learnCurrentBatch, parallelism int) (int, error) {
 	running := newLearnCurrentRunningUnits(state, plannedUnits)
 	if r.opts.showDetailedLogs {
 		logger.Info(i18n.GetWithParams("LearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism)))
 	}
 	r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism))
 
-	type indexedUnit struct {
-		index int
-		unit  domain.AnalysisUnit
-	}
-
 	ctx, cancel := context.WithCancel(r.ctx)
 	defer cancel()
 
-	jobs := make(chan indexedUnit)
-	results := make(chan learnCurrentUnitResult, len(plannedUnits))
-	errs := make(chan error, len(plannedUnits))
+	jobs := make(chan learnCurrentBatch)
+	results := make(chan []learnCurrentUnitResult, len(batches))
+	errs := make(chan error, len(batches))
 	var wg sync.WaitGroup
-	_, totalUnits := learnCurrentPendingUnitProgress(state, plannedUnits)
 
 	for i := 0; i < parallelism; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for job := range jobs {
-				params := r.unitProgressParams(state, job.unit, job.index+1, totalUnits)
-				running.start(job.index, learnCurrentProgressSubject(job.unit))
+			for batch := range jobs {
+				for _, job := range batch.units {
+					running.start(job.index, learnCurrentProgressSubject(job.unit))
+				}
 				r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism))
-				result, err := r.analyzeSingleUnit(ctx, analyzeLabel, job.unit, job.index, params, false)
+				batchResults, err := r.analyzeBatch(ctx, analyzeLabel, state, batch, false)
 				if err != nil {
 					errs <- err
 					cancel()
 					return
 				}
-				running.finish(job.index, result.completed)
+				for _, result := range batchResults {
+					running.finish(result.index, result.completed)
+				}
 				r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeParallelUnits", running.progressParams(parallelism))
-				results <- result
+				results <- batchResults
 			}
 		}()
 	}
 
-	for index, unit := range plannedUnits {
+	for _, batch := range batches {
 		select {
 		case <-ctx.Done():
 			close(jobs)
@@ -967,7 +1014,7 @@ func (r *learnCurrentProjectRun) analyzePlannedUnitsParallel(analyzeLabel string
 			close(results)
 			close(errs)
 			return r.collectParallelUnitResults(results, errs)
-		case jobs <- indexedUnit{index: index, unit: unit}:
+		case jobs <- batch:
 		}
 	}
 	close(jobs)
@@ -977,7 +1024,7 @@ func (r *learnCurrentProjectRun) analyzePlannedUnitsParallel(analyzeLabel string
 	return r.collectParallelUnitResults(results, errs)
 }
 
-func (r *learnCurrentProjectRun) collectParallelUnitResults(results <-chan learnCurrentUnitResult, errs <-chan error) (int, error) {
+func (r *learnCurrentProjectRun) collectParallelUnitResults(results <-chan []learnCurrentUnitResult, errs <-chan error) (int, error) {
 	for err := range errs {
 		if err != nil {
 			return 0, err
@@ -985,10 +1032,12 @@ func (r *learnCurrentProjectRun) collectParallelUnitResults(results <-chan learn
 	}
 	completedUnits := 0
 	collected := make([]learnCurrentUnitResult, 0)
-	for result := range results {
-		collected = append(collected, result)
-		if result.completed {
-			completedUnits++
+	for batchResults := range results {
+		for _, result := range batchResults {
+			collected = append(collected, result)
+			if result.completed {
+				completedUnits++
+			}
 		}
 	}
 	sort.Slice(collected, func(i, j int) bool {
@@ -1009,32 +1058,91 @@ func (r *learnCurrentProjectRun) unitProgressParams(state *commandstate.State, u
 	}
 }
 
-func (r *learnCurrentProjectRun) analyzeSingleUnit(ctx context.Context, analyzeLabel string, unit domain.AnalysisUnit, index int, params map[string]interface{}, showDetails bool) (learnCurrentUnitResult, error) {
-	unitFocusRelPaths := unitFocusPaths(unit, r.incrementalChanges)
-	if len(unitFocusRelPaths) == 0 {
-		return learnCurrentUnitResult{index: index, unit: unit}, nil
+func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool) ([]learnCurrentUnitResult, error) {
+	var batchUnits []analyzer.AnalyzeCurrentCodebaseBatchUnit
+	results := make([]learnCurrentUnitResult, 0, len(batch.units))
+	pendingByID := make(map[string]indexedAnalysisUnit, len(batch.units))
+	pendingByName := make(map[string]indexedAnalysisUnit, len(batch.units))
+	progressLabelByID := make(map[string]string, len(batch.units))
+	for _, indexed := range batch.units {
+		unitFocusRelPaths := unitFocusPaths(indexed.unit, r.incrementalChanges)
+		if len(unitFocusRelPaths) == 0 {
+			results = append(results, learnCurrentUnitResult{index: indexed.index, unit: indexed.unit})
+			continue
+		}
+		params := r.batchUnitProgressParams(state, indexed)
+		progressLabel := learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", params)
+		if showDetails {
+			progressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", params)
+		}
+		batchUnits = append(batchUnits, analyzer.AnalyzeCurrentCodebaseBatchUnit{
+			AnalysisUnit:  indexed.unit,
+			FocusAbsPaths: resolveIncrementalFocusPaths(r.projectRoot, unitFocusRelPaths),
+		})
+		pendingByID[indexed.unit.ID] = indexed
+		pendingByName[indexed.unit.Name] = indexed
+		progressLabelByID[indexed.unit.ID] = progressLabel
+	}
+	if len(batchUnits) == 0 {
+		return results, nil
 	}
 
-	unitProgressLabel := learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", params)
-	if showDetails {
-		unitProgressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeUnit", params)
-	}
-	unitFocusAbsPaths := resolveIncrementalFocusPaths(r.projectRoot, unitFocusRelPaths)
-	unitSelected := unitSelectedFiles(unit, r.selectedFiles, r.incrementalChanges)
-	unitLabel := agent.RuntimeLabelFromAnalysisUnit(unit.ID, unit.Name)
-	analyzeResult, learnedPatterns, err := r.cont.AnalyzerSvc.AnalyzeCodebaseFullWithOptions(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCodebaseOptions{
-		FocusPaths:       unitFocusAbsPaths,
-		RuntimeLabel:     unitLabel,
-		AnalysisUnit:     unit,
-		LearningMode:     r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-		SelectedFiles:    unitSelected,
-		SelectedFilesSet: true,
-		UseSnapshotDiffs: true,
+	batchLabel := fmt.Sprintf("batch-%03d", batch.index+1)
+	analyzeResult, err := r.cont.AnalyzerSvc.AnalyzeCurrentCodebaseBatch(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCurrentCodebaseBatchOptions{
+		RuntimeLabel: batchLabel,
+		LearningMode: r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		RunContext:   r.codebaseRunContext,
+		Units:        batchUnits,
 	})
 	if err != nil {
-		return learnCurrentUnitResult{}, fmt.Errorf("%s: %w", unitProgressLabel, err)
+		if len(batchUnits) == 1 {
+			unitID := batchUnits[0].AnalysisUnit.ID
+			if progressLabel := progressLabelByID[unitID]; progressLabel != "" {
+				return nil, fmt.Errorf("%s: %w", progressLabel, err)
+			}
+		}
+		return nil, err
 	}
 
+	seen := make(map[string]bool, len(analyzeResult.Units))
+	for _, unitResult := range analyzeResult.Units {
+		indexed, ok := pendingByID[unitResult.AnalysisUnit.ID]
+		if !ok && unitResult.AnalysisUnit.Name != "" {
+			indexed, ok = pendingByName[unitResult.AnalysisUnit.Name]
+		}
+		if !ok {
+			return nil, fmt.Errorf("batch returned unknown analysis unit %q", unitResult.AnalysisUnit.ID)
+		}
+		params := r.batchUnitProgressParams(state, indexed)
+		result, err := r.saveAnalyzedUnit(ctx, analyzeLabel, indexed.unit, indexed.index, params, unitResult.Patterns, unitResult.ProfileDelta, unitResult.ProfileRefreshRecommended, showDetails)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+		seen[indexed.unit.ID] = true
+	}
+	for _, indexed := range batch.units {
+		unitFocusRelPaths := unitFocusPaths(indexed.unit, r.incrementalChanges)
+		if len(unitFocusRelPaths) == 0 {
+			continue
+		}
+		if !seen[indexed.unit.ID] {
+			return nil, fmt.Errorf("batch missed analysis unit %q", indexed.unit.ID)
+		}
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].index < results[j].index })
+	return results, nil
+}
+
+func (r *learnCurrentProjectRun) batchUnitProgressParams(state *commandstate.State, indexed indexedAnalysisUnit) map[string]interface{} {
+	total := indexed.index + 1
+	if state != nil && len(state.Units) > 0 {
+		total = len(state.Units)
+	}
+	return r.unitProgressParams(state, indexed.unit, indexed.index+1, total)
+}
+
+func (r *learnCurrentProjectRun) saveAnalyzedUnit(ctx context.Context, analyzeLabel string, unit domain.AnalysisUnit, index int, params map[string]interface{}, learnedPatterns []domain.Pattern, profileDelta domain.ProjectProfileDelta, refreshRecommend agent.ProfileRefreshRecommendation, showDetails bool) (learnCurrentUnitResult, error) {
 	saved := 0
 	if len(learnedPatterns) > 0 {
 		saveProgressLabel := learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeSaveUnitPatterns", params)
@@ -1042,6 +1150,7 @@ func (r *learnCurrentProjectRun) analyzeSingleUnit(ctx context.Context, analyzeL
 			saveProgressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeSaveUnitPatterns", params)
 		}
 		r.patternSaveMu.Lock()
+		var err error
 		saved, err = r.cont.LearnerSvc.SavePatternsStrictWithMetadata(ctx, learnedPatterns, "learn_current", unit)
 		r.patternSaveMu.Unlock()
 		if err != nil {
@@ -1053,7 +1162,7 @@ func (r *learnCurrentProjectRun) analyzeSingleUnit(ctx context.Context, analyzeL
 	if showDetails {
 		commitProgressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeCommitUnit", params)
 	}
-	if err := commitUnitFileRecords(ctx, r.cont.FileTracker, unitCommittedRecords(unit, r.incrementalChanges)); err != nil {
+	if err := r.commitUnitSuccess(ctx, unit); err != nil {
 		return learnCurrentUnitResult{}, fmt.Errorf("%s: %w", commitProgressLabel, err)
 	}
 
@@ -1062,13 +1171,36 @@ func (r *learnCurrentProjectRun) analyzeSingleUnit(ctx context.Context, analyzeL
 		unit:             unit,
 		patterns:         learnedPatterns,
 		savedCount:       saved,
-		refreshRecommend: analyzeResult.ProfileRefreshRecommended,
+		refreshRecommend: refreshRecommend,
 		completed:        true,
 	}
-	if !analyzeResult.ProfileDelta.IsZero() {
-		result.profileDelta = analyzeResult.ProfileDelta
+	if !profileDelta.IsZero() {
+		result.profileDelta = profileDelta
 	}
 	return result, nil
+}
+
+func (r *learnCurrentProjectRun) mergeUnitResults(results []learnCurrentUnitResult) int {
+	completed := 0
+	for _, result := range results {
+		if result.completed {
+			completed++
+		}
+		r.mergeUnitResult(result)
+	}
+	return completed
+}
+
+func (r *learnCurrentProjectRun) commitUnitSuccess(ctx context.Context, unit domain.AnalysisUnit) error {
+	if err := commitUnitFileRecords(ctx, r.cont.FileTracker, unitCommittedRecords(unit, r.incrementalChanges)); err != nil {
+		return err
+	}
+	if r.codebaseRunContext == nil || r.codebaseRunContext.SnapshotFlow == nil {
+		return nil
+	}
+	r.snapshotCommitMu.Lock()
+	defer r.snapshotCommitMu.Unlock()
+	return r.codebaseRunContext.SnapshotFlow.CommitScoped(unitFocusPaths(unit, r.incrementalChanges))
 }
 
 func (r *learnCurrentProjectRun) mergeUnitResult(result learnCurrentUnitResult) {

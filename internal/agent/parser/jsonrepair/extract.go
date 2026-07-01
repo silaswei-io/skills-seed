@@ -66,6 +66,7 @@ func ExtractJSON(output string) (string, error) {
 func findLikelyJSONObjectStart(output string) int {
 	targetKeys := map[string]bool{
 		"patterns":     true,
+		"units":        true,
 		"issues":       true,
 		"fixes":        true,
 		"project_name": true,

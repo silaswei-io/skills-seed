@@ -480,8 +480,8 @@ func TestAnalyzeCodebaseFullWithFocusPathsOnlyDiffsFocusedFiles(t *testing.T) {
 	require.Empty(t, received.SampleFiles)
 	loaded, err := repo.Load()
 	require.NoError(t, err)
-	require.Equal(t, "package agent\nfunc NewAgent() {}\n", loaded["internal/agent/agent.go"])
-	require.NotContains(t, loaded, "internal/agent/deleted.go")
+	require.Equal(t, "package agent\nfunc OldAgent() {}\n", loaded["internal/agent/agent.go"])
+	require.Equal(t, "package agent\nfunc Deleted() {}\n", loaded["internal/agent/deleted.go"])
 	require.Equal(t, "package prompts\nfunc OldLoader() {}\n", loaded["internal/prompts/loader.go"])
 	require.Equal(t, "package unchanged\n", loaded["internal/unchanged/keep.go"])
 }
@@ -510,7 +510,7 @@ func TestAnalyzeCodebaseFullDoesNotPassKnownPatternsToCurrentAnalysis(t *testing
 	require.Zero(t, received.KnownPatternsCount)
 }
 
-func TestAnalyzeCodebaseFullUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) {
+func TestAnalyzeCodebaseFullUsesSnapshotDiffsWithoutCommittingSnapshots(t *testing.T) {
 	tmpDir := t.TempDir()
 	seedPath := filepath.Join(tmpDir, ".skills-seed")
 	require.NoError(t, os.MkdirAll(seedPath, 0o755))
@@ -555,10 +555,61 @@ func TestAnalyzeCodebaseFullUsesSnapshotDiffsAndReplacesSnapshots(t *testing.T) 
 	loaded, err := repo.Load()
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"added.go":     "package added\n",
-		"modified.go":  "package main\nfunc newName() {}\n",
+		"modified.go":  "package main\nfunc oldName() {}\n",
 		"unchanged.go": "package same\n",
 	}, loaded)
+}
+
+func TestAnalyzeCodebaseFullWithExternalRunContextDoesNotCommitSnapshots(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	require.NoError(t, os.MkdirAll(seedPath, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "auth"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "key"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "auth", "login.go"), []byte("package auth\nfunc NewLogin() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "key", "create.go"), []byte("package key\nfunc NewCreate() {}\n"), 0o644))
+	repo := snapshotstore.NewRepository(seedPath)
+	require.NoError(t, repo.Replace(map[string]string{
+		"internal/auth/login.go": "package auth\nfunc OldLogin() {}\n",
+		"internal/key/create.go": "package key\nfunc OldCreate() {}\n",
+	}))
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			received = *req
+			return &agent.AnalyzeCurrentCodebaseResult{}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
+		Exclude:    []string{".*"},
+	})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	runContext, err := svc.BuildCodebaseRunContext(ctx, tmpDir, "go", AnalyzeCodebaseOptions{
+		SelectedFiles: []domain.FileInfo{
+			{Path: "internal/auth/login.go"},
+			{Path: "internal/key/create.go"},
+		},
+		SelectedFilesSet: true,
+		UseSnapshotDiffs: true,
+	})
+	require.NoError(t, err)
+
+	_, _, err = svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{
+		FocusPaths:       []string{filepath.Join(tmpDir, "internal", "auth")},
+		UseSnapshotDiffs: true,
+		RunContext:       runContext,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, received.DiffFiles, 1)
+	require.Equal(t, "internal/auth/login.go", received.DiffFiles[0].Path)
+	loaded, err := repo.Load()
+	require.NoError(t, err)
+	require.Equal(t, "package auth\nfunc OldLogin() {}\n", loaded["internal/auth/login.go"])
+	require.Equal(t, "package key\nfunc OldCreate() {}\n", loaded["internal/key/create.go"])
 }
 
 func TestAnalyzeCodebaseFullDoesNotDiffGitIgnoredSnapshotFiles(t *testing.T) {
@@ -606,7 +657,7 @@ func TestAnalyzeCodebaseFullDoesNotDiffGitIgnoredSnapshotFiles(t *testing.T) {
 	}
 	loaded, err := repo.Load()
 	require.NoError(t, err)
-	require.Equal(t, "package ignored\nfunc Generated() {}\n", loaded["ignored/generated.go"])
+	require.Equal(t, "package ignored\nfunc OldGenerated() {}\n", loaded["ignored/generated.go"])
 }
 
 func TestAnalyzeCodebaseFullSkipsDocumentsButKeepsDocsSourceInSnapshotDiffs(t *testing.T) {

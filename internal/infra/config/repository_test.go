@@ -89,6 +89,7 @@ func TestNewRepository(t *testing.T) {
 		require.NotContains(t, text, `infra:`)
 		require.Contains(t, text, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
 		require.Contains(t, text, "# 学习模式：fast 更快，normal 默认平衡，deep 更深入\n    mode: \"normal\"")
+		require.Contains(t, text, "# 单次 AI 调用最多分析的单元数；1 表示不合批，降低单次输出过大和跨单元串扰风险\n    max_units_per_call: 1")
 		require.Contains(t, text, "# 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果\n    select_relevant_files_min_candidates: 200")
 		require.Contains(t, text, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
 		require.Contains(t, text, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界\n########################################################################\nexclude:")
@@ -127,6 +128,7 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
 	assert.False(t, cfg.Agent.AllowUserPlugins)
+	assert.Equal(t, 1, cfg.Learning.Current.MaxUnitsPerCall)
 	assert.True(t, cfg.Learning.Current.SelectRelevantFiles)
 	assert.Equal(t, 200, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
 	assert.True(t, cfg.Learning.Current.Structural.Enabled)
@@ -436,6 +438,7 @@ exclude:
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 	}
 	cfg.Learning.Current.Structural.Enabled = false
+	cfg.Learning.Current.MaxUnitsPerCall = 3
 	cfg.Learning.Current.SelectRelevantFiles = false
 	cfg.Learning.Current.SelectRelevantFilesMinCandidates = 40
 	cfg.Exclude.GitIgnore = false
@@ -450,6 +453,7 @@ exclude:
 	require.Contains(t, text, "# 自定义工作区注释")
 	require.Contains(t, text, "# 自定义子项目注释\n  projects:")
 	require.Contains(t, text, "# 自定义结构化上下文注释\n      enabled: false")
+	require.Contains(t, text, "max_units_per_call: 3")
 	require.Contains(t, text, "exclude:\n  gitignore: false")
 	require.Contains(t, text, "# 保留点号文件注释\n    - \".*\"")
 	require.NotContains(t, text, "\nfile_filter:")
@@ -468,6 +472,7 @@ exclude:
 	require.Equal(t, "workspace", reloaded.GetProjectConfig().Mode)
 	require.False(t, reloaded.GetCurrentLearningConfig().Structural.Enabled)
 	require.Equal(t, LearningModeNormal, reloaded.GetCurrentLearningConfig().Mode)
+	require.Equal(t, 3, reloaded.GetCurrentLearningConfig().MaxUnitsPerCall)
 	require.False(t, reloaded.GetCurrentLearningConfig().SelectRelevantFiles)
 	require.Equal(t, 40, reloaded.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.False(t, reloaded.GetExcludeConfig().GitIgnore)

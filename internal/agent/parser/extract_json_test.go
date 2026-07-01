@@ -52,6 +52,54 @@ func TestParseAnalyzeCurrentCodebaseResultAcceptsProfileStringLists(t *testing.T
 	require.Equal(t, []string{"ParseAnalyzeCurrentCodebaseResult"}, result.ProfileDelta.KeyModules[0].KeyMethods)
 }
 
+func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) {
+	output := `{
+  "units": [
+    {
+      "unit_id": "auth-login-flow",
+      "unit_name": "认证登录流程",
+      "patterns": [
+        {
+          "id": "login-failure-lock-mechanism",
+          "name": "登录失败锁定机制",
+          "category": "business",
+          "description": "登录失败后锁定账号",
+          "good_example": "func loginFailed() error {\n  return nil\n}",
+          "bad_example": "",
+          "rule": "登录失败达到阈值时锁定账号",
+          "confidence": 0.9,
+          "frequency": 1,
+          "analysis_unit_id": "auth-login-flow",
+          "analysis_unit_name": "认证登录流程"
+        }
+      ],
+      "profile_delta": {
+        "layers": [
+          {
+            "name": "服务层",
+            "description": "核心登录业务逻辑",
+            "responsibilities": ["密码验证"],
+            "files": ["internal/service/system/admin/login.go"]
+          }
+        ]
+      },
+      "profile_refresh_recommended": {"needed": false, "reason": ""}
+    }
+  ]
+}`
+
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
+
+	require.NoError(t, err)
+	require.Len(t, result.Units, 1)
+	assert.Equal(t, "auth-login-flow", result.Units[0].UnitID)
+	assert.Equal(t, "认证登录流程", result.Units[0].UnitName)
+	require.Len(t, result.Units[0].Patterns, 1)
+	assert.Equal(t, "login-failure-lock-mechanism", result.Units[0].Patterns[0].ID)
+	require.Len(t, result.Units[0].ProfileDelta.Layers, 1)
+	assert.Equal(t, "服务层", result.Units[0].ProfileDelta.Layers[0].Name)
+}
+
 func TestParseWorkspaceSpecAcceptsObjectChangeOrder(t *testing.T) {
 	output := `{
 	  "name": "hsm-workspace",

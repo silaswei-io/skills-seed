@@ -42,16 +42,16 @@ Use these layers to decide which rules deserve priority as development constrain
 
 ## Detailed Patterns
 
-Rules are inferred from code evidence and learned patterns. Product semantics not covered by the evidence snippets must be confirmed against current code or requirements.
+Rules are inferred from code evidence and learned patterns. Only high-confidence patterns that repeat and are backed by multiple evidence points should be treated as hard constraints; low-frequency or local evidence is a routing hint and review checklist.
 
 {{range .PatternObjects}}
 ### {{.Name}}
 
 {{if .Description}}**Description**: {{.Description}}{{end}}
 
-{{if .Rule}}**Rule**: {{.Rule}}{{end}}
+{{if .Rule}}**Applicable Rule**: {{.Rule}}{{end}}
 
-**Evidence**: confidence {{printf "%.2f" (mul .Confidence 100)}}%, occurrences {{.Frequency}}, source {{.Source}}
+**Evidence**: confidence {{printf "%.2f" (mul .Confidence 100)}}%, occurrences {{.Frequency}}, source {{.Source}}. When occurrences are low or evidence is concentrated in one path, verify current code before applying it.
 
 {{if .GoodExample}}
 #### Code Evidence

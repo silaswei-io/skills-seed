@@ -850,6 +850,52 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 	return result, nil
 }
 
+// AnalyzeCurrentCodebaseBatch 批量分析当前代码库，按分析单元返回候选模式。
+func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+	operation := agent.AnalyzeCurrentCodebaseBatchOperation(req)
+	task := agent.NewRuntimeTask(agent.RuntimeSlug("pattern-learn-current-batch", req.RuntimeLabel))
+	session, err := agent.NewPromptInputSessionForContext(ctx, agent.RuntimePromptInputPrefix("skills-seed-pattern-learn-current-batch", req.RuntimeLabel))
+	if err != nil {
+		return nil, err
+	}
+	defer session.Cleanup()
+
+	data, err := agent.AnalyzeCurrentCodebaseBatchPromptData(session, req)
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-learn-current-batch", data, promptRuntimeTask(task))
+	if err != nil || prompt == "" {
+		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
+	}
+
+	output, err := c.callClaude(ctx, operation, prompt, task)
+	if err != nil {
+		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
+			"method", operation,
+			"error", err,
+		)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
+	}
+
+	result, err := parser.ParseAnalyzeCurrentCodebaseBatchResult(output)
+	if err != nil {
+		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
+			"method", operation,
+			"error", err,
+			"output_length", len(output),
+		)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
+	}
+
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
+		"agent", c.Name(),
+		"operation", operation,
+		"units_count", len(result.Units),
+	)
+	return result, nil
+}
+
 // PlanAnalysisUnits 将当前待学习文件拆成可续跑的业务分析单元。
 func (c *ClaudeAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))

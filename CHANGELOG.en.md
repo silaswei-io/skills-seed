@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.2]
+
+### Changes
+
+- Added `learning.current.max_units_per_call` to control how many analysis units may be grouped into one AI call. The default is `1`, keeping per-unit calls by default to reduce oversized-output parse failures and cross-unit conclusion bleed.
+- `learn current` can now analyze multiple units in one batch while reusing the same codebase snapshot context; progress, pattern storage, file-fingerprint commits, and profile-delta merging still land per unit.
+- Generated skills now use stricter core-rule layering: only patterns with enough confidence, frequency, and evidence become strong constraints, while low-frequency or local evidence is rendered as reference guidance instead of a hard standard.
+
+### Fixes
+
+- JSON extraction now recognizes top-level `units` in batch analysis results, preventing valid batch responses from failing because the outer key was not detected.
+- Current-code learning prompts now harden the JSON type contract for profile-layer fields, requiring `layers` to be an object array instead of a string and reducing parse failures from `profile_delta.layers` type drift.
+
 ## [v0.11.1]
 
 ### Changes

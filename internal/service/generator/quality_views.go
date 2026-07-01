@@ -51,13 +51,13 @@ func patternImportanceIndex(pattern domain.Pattern) int {
 	if pattern.Metrics.EvidenceCount > evidenceCount {
 		evidenceCount = pattern.Metrics.EvidenceCount
 	}
-	if pattern.Confidence >= 0.85 && (pattern.Frequency >= 2 || evidenceCount >= 2 || pattern.Category == domain.CategoryBusiness || pattern.Category == domain.CategoryAPI) {
+	if pattern.Confidence >= 0.90 && pattern.Frequency >= 2 && evidenceCount >= 2 {
 		return 0
 	}
-	if pattern.Confidence >= 0.75 && (pattern.Frequency >= 1 || evidenceCount >= 1) {
+	if pattern.Confidence >= 0.85 && (pattern.Frequency >= 2 || evidenceCount >= 2) {
 		return 1
 	}
-	if evidenceCount >= 1 || strings.TrimSpace(pattern.ScopePath) != "" {
+	if pattern.Confidence >= 0.70 && (evidenceCount >= 1 || strings.TrimSpace(pattern.ScopePath) != "") {
 		return 2
 	}
 	return 3

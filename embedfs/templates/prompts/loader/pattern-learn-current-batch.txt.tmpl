@@ -1,10 +1,12 @@
 # 角色定义
 
-你是一位项目模式学习专家，擅长从当前代码中提取可执行、可复用、带证据的项目模式。
+你是一位项目模式学习专家，擅长在一次运行中分析多个独立代码单元，并从当前代码中提取可执行、可复用、带证据的项目模式。
 
 # 任务目标
 
-根据提供的项目信息和源码证据，学习当前代码库中的项目模式：
+根据共享项目信息和每个分析单元的源码证据，分别学习当前代码库中的项目模式。每个单元必须独立判断、独立输出，不能把一个单元的结论写入另一个单元。
+
+需要提取：
 1. 精准业务模式：领域规则、状态流转、跨实体编排、业务工作流
 2. 技术模式：接口、数据访问、错误处理、配置、横切处理、结构、工具、并发和测试
 3. 可复用业务/工具入口：仅在真实签名、位置和调用场景明确时输出 `business_method`
@@ -19,43 +21,16 @@
 - 不要把模板中的示例词当作项目事实写入输出。输出中的技术名词、业务名词、路径、命令和工具名必须来自本次读取的源码、配置、结构化上下文或用户上下文证据。
 - 当代码位于看似通用的目录、包、组件或外部依赖封装中时，仍按代码行为判断它是领域入口、技术约定还是领域无关工具；不要根据目录名或常见生态命名直接分类。
 
-# 项目信息
+# 共享项目信息
 
 - **项目名称**: {{.ProjectName}}
 - **项目路径**: {{.RootPath}}
 - **主要语言**: {{.Language}}
-{{- if .FocusPaths}}
-- **指定扫描范围**:
-{{range .FocusPaths}}
-  - {{.}}
-{{- end}}
-{{- end}}
-{{- if .AnalysisUnit.Name}}
-- **当前分析单元**: {{.AnalysisUnit.Name}}{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}
-{{- if .AnalysisUnit.ScopeReason}}
-- **单元范围说明**: {{.AnalysisUnit.ScopeReason}}
-{{- end}}
-{{- if .AnalysisUnit.RouteTerms}}
-- **单元路由词**: {{range .AnalysisUnit.RouteTerms}}`{{.}}` {{end}}
-{{- end}}
-{{- if .AnalysisUnit.EntryPaths}}
-- **单元入口路径**:
-{{range .AnalysisUnit.EntryPaths}}
-  - {{.}}
-{{- end}}
-{{- end}}
-{{- if .AnalysisUnit.RelatedPaths}}
-- **单元相关路径**:
-{{range .AnalysisUnit.RelatedPaths}}
-  - {{.}}
-{{- end}}
-{{- end}}
-{{- end}}
 {{- if .StructurePath}}
 
 # 项目目录结构
 
-项目目录结构摘要位于 `{{.StructurePath}}`。请按路径读取，并仅把它作为本次允许分析范围和目录归属线索；如果上方提供了指定扫描范围，不要因为该文件中出现路径线索而扩展到未列入范围的文件，除非它们是判断调用关系所必需的直接相关文件。
+项目目录结构摘要位于 `{{.StructurePath}}`。请按路径读取，并仅把它作为本次允许分析范围和目录归属线索。
 {{- end}}
 {{- if .StructuralContextPath}}
 
@@ -77,40 +52,63 @@
 - {{.}}
 {{- end}}
 {{- end}}
+
+# 分析单元
+
+以下每个单元都是独立边界。只允许读取和输出该单元的 `FocusPaths`、入口路径、相关路径以及为了确认直接调用关系所必需的邻近文件。不要因为共享上下文中出现其它模块，就把其它单元或全项目泛化结论写入当前单元。
+
+{{range .Units}}
+## {{.AnalysisUnit.Name}}{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}
+{{- if .AnalysisUnit.ScopeReason}}
+
+- **单元范围说明**: {{.AnalysisUnit.ScopeReason}}
+{{- end}}
+{{- if .AnalysisUnit.RouteTerms}}
+- **单元路由词**: {{range .AnalysisUnit.RouteTerms}}`{{.}}` {{end}}
+{{- end}}
+{{- if .AnalysisUnit.EntryPaths}}
+- **单元入口路径**:
+{{range .AnalysisUnit.EntryPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- if .AnalysisUnit.RelatedPaths}}
+- **单元相关路径**:
+{{range .AnalysisUnit.RelatedPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- if .FocusPaths}}
+- **本单元聚焦路径**:
+{{range .FocusPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
 {{- if .SampleFiles}}
-
-# 建议优先查看的代码文件
-
-以下是从项目中选取的代表性代码文件路径。你运行在项目根目录中；优先读取结构化上下文、入口文件和这些代表性文件，只扩展到能支持模式判断的直接相关文件，避免全仓库扫描。
-
+- **建议优先查看的代码文件**:
 {{range .SampleFiles}}
-- {{.Path}}
+  - {{.Path}}
 {{- end}}
 {{- end}}
 {{- if .DiffFiles}}
-
-# 变更文件 Diff ({{len .DiffFiles}} 个)
-
-以下文件自上次分析后发生变更，diff 文件位于对应路径。请优先读取 diff，仅在规则判断需要更完整上下文时读取原文件。
-
+- **本单元变更文件 Diff**:
 {{range .DiffFiles}}
-- {{.Path}} -> diff: {{.DiffPath}}
+  - {{.Path}} -> diff: {{.DiffPath}}
 {{- end}}
 {{- end}}
+
+{{end}}
 # 分析要求
 
 可用分类：{{.AllowedCategories}}
 
-{{- if .AnalysisUnit.Name}}
+# 单元边界（最高优先级）
 
-## 当前分析单元边界（最高优先级）
-
-- 本次只允许学习当前分析单元 `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}} 涉及的规则、模式、业务入口和项目画像增量。
-- 只读取和输出该单元的 `FocusPaths`、入口路径、相关路径以及为了确认直接调用关系所必需的邻近文件。
-- 不要输出其它分析单元、其它业务域或全项目通用模板化结论；即使在结构化上下文或目录结构中看到其它模块，也只能作为边界判断线索。
-- 每个输出的 pattern 必须能用当前分析单元的路径、路由词、入口符号或业务术语解释其归属；无法说明归属的候选必须丢弃。
-- `profile_delta` 只能包含当前单元证据明确新增或改变的事实；不要借本单元刷新全项目画像。
-{{- end}}
+- 每个输出单元必须对应输入中的一个 `unit_id`，不得新增、改名或遗漏有证据的输入单元。
+- 每个 pattern 必须写入对应的 `analysis_unit_id` 和 `analysis_unit_name`。
+- 每个 pattern 必须能用当前单元的路径、路由词、入口符号或业务术语解释其归属；无法说明归属的候选必须丢弃。
+- `profile_delta` 只能包含当前单元证据明确新增或改变的事实；不要借任一单元刷新全项目画像。
+- 共享目录结构、结构化上下文和入口文件只用于减少重复读取，不是输出全局架构摘要的理由。
 
 # 学习模式策略
 
@@ -120,7 +118,7 @@
 
 # 模式识别原则
 
-推荐分析顺序：先建立业务候选清单和源码业务词表，再按业务子域形成覆盖矩阵，随后判断业务价值，最后把有证据的候选展开为可路由 pattern。这个流程用于内部思考，不需要单独输出。
+推荐分析顺序：先建立每个单元各自的业务候选清单和源码业务词表，再按业务子域形成覆盖矩阵，随后判断业务价值，最后把有证据的候选展开为可路由 pattern。这个流程用于内部思考，不需要单独输出。
 
 1. 从结构化上下文、入口路径、代表性文件和 diff 建立当前单元的业务子域、源码业务词表与业务覆盖矩阵；业务词、状态、实体、接口、事件、配置和外部依赖必须来自源码证据。
 2. 每个 pattern 只表达一个可执行规则，并能说明“什么时候用、看哪些路径/符号、哪些约束必须遵守”。不要输出项目介绍、最佳实践口号或无法路由到代码的泛化结论。
@@ -136,9 +134,10 @@
 
 ## JSON 类型硬性约束
 
-- 最终响应必须是可直接解析的 JSON 对象，不要输出 Markdown、解释文字、注释、尾随逗号或多余代码块。
-- `patterns` 必须是数组；没有模式时返回 `[]`，不要返回字符串、对象或 `null`。
-- `profile_delta` 必须是对象；没有增量事实时返回 `{}` 或只返回空数组字段，不能返回字符串摘要。
+- 最终响应必须是可直接解析的 JSON 对象，顶层字段只能按需包含 `units`，不要输出 Markdown、解释文字、注释、尾随逗号或多余代码块。
+- `units` 必须是数组；每个元素必须是对象，并且必须包含输入中的 `unit_id` 和 `unit_name`。
+- 每个单元的 `patterns` 必须是数组；没有模式时返回 `[]`，不要返回字符串、对象或 `null`。
+- 每个单元的 `profile_delta` 必须是对象；没有增量事实时返回 `{}` 或只返回空数组字段，不能返回字符串摘要。
 - `profile_delta.frameworks`、`dependencies`、`config_patterns`、`framework_patterns` 必须是字符串数组；没有证据时返回 `[]` 或省略字段。
 - `profile_delta.layers` 必须是对象数组；每个元素只能是包含 `name`、`description`、`responsibilities`、`files` 的对象，不能写成字符串、字符串数组或自然语言段落。没有可靠架构层增量时返回 `[]`。
 - `profile_delta.key_modules`、`common_utils`、`business_methods`、`validation_commands` 必须是对象数组；没有证据时返回 `[]` 或省略字段。
@@ -149,103 +148,88 @@
 
 ```json
 {
-  "patterns": [
+  "units": [
     {
-      "id": "kebab-case-id",
-      "name": "模式名称",
-      "category": "error",
-      "description": "功能描述和使用时机",
-      "good_example": "从已读取源码逐字复制的代码证据（5-12行）",
-      "bad_example": "",
-      "rule": "何时应用此模式",
-      "confidence": 0.9,
-      "frequency": 3,
-      "analysis_unit_id": "{{.AnalysisUnit.ID}}",
-      "analysis_unit_name": "{{.AnalysisUnit.Name}}",
-      "evidence_locations": [
+      "unit_id": "input-unit-id",
+      "unit_name": "输入单元名称",
+      "patterns": [
         {
-          "path": "相对文件路径",
-          "line": 42,
-          "symbol": "真实函数/方法/类型/变量名",
-          "kind": "function|method|type|file",
-          "description": "模式级源码证据位置说明",
-          "confidence": 0.88
+          "id": "kebab-case-id",
+          "name": "模式名称",
+          "category": "error",
+          "description": "功能描述和使用时机",
+          "good_example": "从已读取源码逐字复制的代码证据（5-12行）",
+          "bad_example": "",
+          "rule": "何时应用此模式",
+          "confidence": 0.9,
+          "frequency": 3,
+          "analysis_unit_id": "input-unit-id",
+          "analysis_unit_name": "输入单元名称",
+          "evidence_locations": [
+            {
+              "path": "相对文件路径",
+              "line": 42,
+              "symbol": "真实函数/方法/类型/变量名",
+              "kind": "function|method|type|file",
+              "description": "模式级源码证据位置说明",
+              "confidence": 0.88
+            }
+          ],
+          "business_method": {
+            "name": "完整方法签名",
+            "code_location": {"current_location": "文件路径:行号"},
+            "layer": "入口/编排/领域/数据访问/工具等真实职责层；必须来自代码证据或项目词表",
+            "description": "功能和业务逻辑",
+            "function": "包含参数和返回类型的完整签名",
+            "usage": "何时调用",
+            "type": "domain",
+            "returns": "返回值说明",
+            "prerequisites": "前置条件"
+          }
         }
       ],
-      "business_method": {
-        "name": "完整方法签名",
-        "code_location": {"current_location": "文件路径:行号"},
-        "layer": "入口/编排/领域/数据访问/工具等真实职责层；必须来自代码证据或项目词表",
-        "description": "功能和业务逻辑",
-        "function": "包含参数和返回类型的完整签名",
-        "usage": "何时调用",
-        "type": "domain",
-        "returns": "返回值说明",
-        "prerequisites": "前置条件"
+      "profile_delta": {
+        "frameworks": ["本单元证据明确出现的新框架或运行时"],
+        "dependencies": ["本单元证据明确出现的新依赖或工具"],
+        "layers": [
+          {
+            "name": "真实职责层名称",
+            "description": "本单元证据确认的职责变化",
+            "responsibilities": ["职责"],
+            "files": ["相对文件路径"]
+          }
+        ],
+        "key_modules": [
+          {
+            "name": "模块名",
+            "path": "相对目录或文件路径",
+            "description": "本单元证据确认的模块职责",
+            "responsibilities": ["职责"],
+            "dependencies": ["依赖模块"],
+            "dependents": ["被依赖方"],
+            "key_methods": ["真实方法或入口"]
+          }
+        ],
+        "common_utils": [
+          {
+            "name": "工具名",
+            "file": "相对文件路径",
+            "signature": "真实函数签名",
+            "description": "工具职责",
+            "usage": "何时使用"
+          }
+        ],
+        "config_patterns": [],
+        "framework_patterns": [],
+        "business_methods": [],
+        "validation_commands": []
+      },
+      "profile_refresh_recommended": {
+        "needed": false,
+        "reason": "仅当本单元证据显示项目结构、模块边界或技术栈发生大范围变化时填写原因"
       }
     }
-  ],
-  "profile_delta": {
-    "frameworks": ["本次证据明确出现的新框架或运行时"],
-    "dependencies": ["本次证据明确出现的新依赖或工具"],
-    "layers": [
-      {
-        "name": "真实职责层名称",
-        "description": "本次证据确认的职责变化",
-        "responsibilities": ["职责"],
-        "files": ["相对文件路径"]
-      }
-    ],
-    "key_modules": [
-      {
-        "name": "模块名",
-        "path": "相对目录或文件路径",
-        "description": "本次证据确认的模块职责",
-        "responsibilities": ["职责"],
-        "dependencies": ["依赖模块"],
-        "dependents": ["被依赖方"],
-        "key_methods": ["真实方法或入口"]
-      }
-    ],
-    "common_utils": [
-      {
-        "name": "工具名",
-        "file": "相对文件路径",
-        "signature": "真实函数签名",
-        "description": "工具职责",
-        "usage": "何时使用"
-      }
-    ],
-    "config_patterns": ["本次证据明确的配置约定"],
-    "framework_patterns": ["本次证据明确的框架使用约定"],
-    "business_methods": [
-      {
-        "name": "完整方法签名",
-        "code_location": {"current_location": "文件路径:行号"},
-        "description": "可复用业务入口职责",
-        "usage": "何时调用",
-        "type": "domain",
-        "function": "完整方法签名",
-        "returns": "返回值说明",
-        "prerequisites": "前置条件"
-      }
-    ],
-    "validation_commands": [
-      {
-        "command": "证据中出现的完整验证命令",
-        "when": "何时运行该命令",
-        "source": "仓库相对路径或 user_context",
-        "workdir": "命令应在哪个仓库相对目录运行；项目根目录可留空",
-        "scope_paths": ["该命令实际覆盖的相对路径或目录"],
-        "evidence": ["证明该命令适用范围的相对路径"],
-        "type": "test|build|lint|generate|contract|check"
-      }
-    ]
-  },
-  "profile_refresh_recommended": {
-    "needed": false,
-    "reason": "仅当本次证据显示项目结构、模块边界或技术栈发生大范围变化时填写原因"
-  }
+  ]
 }
 ```
 
@@ -291,8 +275,7 @@
    - 相关时必须写清顺序、错误处理、状态约束或模块边界。
    - 丢弃“保持代码整洁”“遵循最佳实践”等泛化规则。
 4. 去重校验：
-   - 不要在本次输出中把同一规则换名重复输出。
-   - 如果多个证据只是在强化同一规则，应合并为一条模式，不要输出重复版本。
+   - 不要在同一单元或跨单元中把同一规则换名重复输出；跨单元确有相同规则时，必须保留各自证据和单元归属。
 5. `business_method` 校验：
    - 只允许挂在真实业务方法或工具方法上。
    - 必须包含真实签名和真实位置。
@@ -305,15 +288,15 @@
    - 证据局部、不完整或只出现一次时降低置信度。
    - 证据不足时丢弃该候选。
 7. 项目画像增量校验：
-   - `profile_delta` 只填写本次读取代码证据明确新增或改变的结构化项目事实；没有证据的字段省略或返回空数组/空字符串。
+   - `profile_delta` 只填写本单元读取代码证据明确新增或改变的结构化项目事实；没有证据的字段省略或返回空数组/空字符串。
    - `profile_delta` 内所有数组字段必须保持 JSON 数组类型；`layers`、`key_modules`、`common_utils`、`business_methods` 和 `validation_commands` 必须是对象数组，严禁用字符串摘要代替。
    - `profile_delta.layers` 的每个元素必须是对象：`{"name":"","description":"","responsibilities":[],"files":[]}`；如果只能写出一句架构描述，说明证据不足，应返回 `[]`。
    - 不要把项目初始化、完整结构说明、整体架构摘要、数据流总述或泛化概述写入 `profile_delta`；这些只能由完整项目画像刷新生成。
-   - `profile_delta.validation_commands` 只填写用于验证改动结果的命令，例如仓库证据明确记录的测试、检查、静态分析、构建、代码生成或契约生成命令；不要输出安装工具、创建新项目、启动服务、部署、调试、拉取依赖、运行 demo 或一次性环境准备命令。必须填写 `scope_paths` 或 `evidence` 来说明命令适用范围；无法确定作用域时不要输出该命令。
-   - `profile_delta.business_methods` 只填写真实业务入口、跨模块编排入口、领域复用入口或高价值工具入口；由源码证据确认的领域操作、资源生命周期、策略执行和外部依赖交互入口属于领域复用入口候选；不要输出普通启动、路由/入口注册、框架初始化、脚手架入口或简单记录操作。
+   - `profile_delta.validation_commands` 只填写用于验证改动结果的命令，例如仓库证据明确记录的测试、检查、静态分析、构建、代码生成或契约生成命令；不要输出安装工具、创建新项目、启动服务、部署、调试、拉取依赖、运行 demo 或一次性环境准备命令。
+   - `profile_delta.business_methods` 只填写真实业务入口、跨模块编排入口、领域复用入口或高价值工具入口；不要输出普通启动、路由/入口注册、框架初始化、脚手架入口或简单记录操作。
    - `profile_refresh_recommended.needed` 仅在增量无法表达大范围结构变化、跨模块重组或技术栈迁移时为 `true`。
 8. 业务覆盖校验：
-   - 检查已读源码中的业务覆盖矩阵，不要只输出接口、数据访问、错误处理或结构模式。
+   - 检查每个单元已读源码中的业务覆盖矩阵，不要只输出接口、数据访问、错误处理或结构模式。
    - 检查每个有证据的业务子域是否至少有一个可通过需求语言命中的 business pattern；如果没有，补充模式或在证据不足时跳过。
    - 检查是否漏掉非请求入口的运行期、异步、事件、任务、初始化、配置驱动或外部依赖驱动流程。
    - 检查业务模式名称和描述是否能让“不知道代码包名的人”根据需求定位到详情页和证据路径。
@@ -322,9 +305,11 @@
 
 # 关键质量要求
 
+- 最终响应必须只包含一个 JSON 对象，顶层字段必须是 `units`
+- **必须为每个有证据的输入单元返回一个结果对象**
 - **业务方法必须包含完整的方法签名和文件位置**
 - 每个模式应尽量填写 `evidence_locations` 作为模式级源码证据位置；`business_method` 只用于真实可调用的业务/工具方法，两者不要混用
 - business pattern 必须优先填写 `evidence_locations.path` 和 `evidence_locations.symbol`，让生成出的业务模式地图可以按需求词、路径和符号定位到相关详情
-- 每个模式的 `good_example` 必须从已读取源码中逐字复制代码证据（5-12行），不要补全、改写、综合或伪造代码；截取时不能省略错误处理、fallback、状态更新、锁释放、缓存/任务顺序等语义关键分支，必须省略上下文时用 `// ...` 明确标注
-- 不要输出超长 `good_example`；如果一个流程需要多处证据，用多个 `evidence_locations` 指向代码位置，并在 `description`/`rule` 总结流程
+- 每个模式的 `good_example` 必须从已读取源码中逐字复制代码证据（5-12行），不要补全、改写、综合或伪造代码
+- 不要输出超长 `good_example`
 - `good_example` 和 `bad_example` 是 JSON 字符串：代码中的反斜杠必须写成 `\\`，双引号必须写成 `\"`，换行必须写成 `\n`，不要输出未转义的 `\s`、`\ `、路径反斜杠或正则反斜杠

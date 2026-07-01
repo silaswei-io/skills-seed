@@ -92,6 +92,8 @@ init -> learn current / learn history -> generate skills -> check
 
 0.11.1 起，`learn current` 支持 `learning.current.parallelism` 控制项目内分析单元并发，workspace 根配置的 `agent.parallelism` 只控制子项目并发；`learning.current.scope` 支持 `domain`、`flow`、`module` 引导分析单元按业务域、流程或模块粒度切分。模型输出解析还会修复证据行号中的非法范围表达式，例如将 `"line": 29-43` 归一为单个行号。
 
+0.11.2 起，`learning.current.max_units_per_call` 控制一次 AI 调用最多分析的单元数，默认 `1` 表示不合批；需要降低调用次数时可显式调高。批量分析结果解析会识别顶层 `units`，当前代码学习提示词也强化了 `profile_delta.layers` 等字段的 JSON 类型契约。生成 skills 时，低频或局部证据不再进入强约束层，避免把一两次出现的写法固化成必须遵守的硬标准。
+
 0.9.0 起，模式去重和整合前移到入库阶段。`learn current`、`learn history` 和 `patterns add` 产生的候选模式会先经过 AI 策展和服务端校验，再写入本地模式库；`generate skills` 只读取已入库数据，不再承担合并或修正模式库的职责。需要显式整理历史模式库时，使用 `skills-seed patterns compact`。
 
 0.10.4 起，默认入库策展使用本地确定性合并，并在内部按 pattern ID 维护唯一集合；当候选模式复用已有 ID，或历史模式库存在重复 ID 时，会先收敛为单条更高质量的模式再写入，避免重复 curated pattern ID 触发结构校验降级。

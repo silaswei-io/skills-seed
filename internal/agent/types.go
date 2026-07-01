@@ -301,6 +301,50 @@ type AnalyzeCurrentCodebaseResult struct {
 	ProfileRefreshRecommended ProfileRefreshRecommendation // 是否建议执行完整项目画像刷新
 }
 
+// AnalyzeCurrentCodebaseBatchUnit 描述批量当前代码学习中的单个分析单元输入。
+type AnalyzeCurrentCodebaseBatchUnit struct {
+	AnalysisUnit domain.AnalysisUnit
+	FocusPaths   []string
+	SampleFiles  []SampleFile
+	DiffFiles    []DiffFileRef
+}
+
+// AnalyzeCurrentCodebaseBatchRequest 请求在一次 Agent 调用中分析多个业务单元。
+type AnalyzeCurrentCodebaseBatchRequest struct {
+	ProjectName           string
+	RootPath              string
+	Language              string
+	RuntimeLabel          string
+	Units                 []AnalyzeCurrentCodebaseBatchUnit
+	Structure             string
+	StructurePath         string
+	StructuralContext     string
+	StructuralContextPath string
+	MainFiles             []string
+	UserContext           string
+	UserContextPath       string
+	LearningMode          config.LearningMode
+}
+
+// AllowedCategories 返回提示词可展示的合法模式分类列表。
+func (r *AnalyzeCurrentCodebaseBatchRequest) AllowedCategories() string {
+	return domain.AllowedPatternCategoriesText()
+}
+
+// AnalyzeCurrentCodebaseUnitResult 是批量当前代码学习返回的单个分析单元结果。
+type AnalyzeCurrentCodebaseUnitResult struct {
+	UnitID                    string
+	UnitName                  string
+	Patterns                  []domain.Pattern
+	ProfileDelta              domain.ProjectProfileDelta
+	ProfileRefreshRecommended ProfileRefreshRecommendation
+}
+
+// AnalyzeCurrentCodebaseBatchResult 是批量当前代码学习的结果。
+type AnalyzeCurrentCodebaseBatchResult struct {
+	Units []AnalyzeCurrentCodebaseUnitResult
+}
+
 // PlanAnalysisUnitsRequest 请求按业务能力拆分当前待学习文件。
 type PlanAnalysisUnitsRequest struct {
 	ProjectName           string
@@ -396,6 +440,7 @@ type ProjectAnalyzer interface {
 	AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
 	PlanAnalysisUnits(ctx context.Context, req *PlanAnalysisUnitsRequest) (*PlanAnalysisUnitsResult, error)
 	AnalyzeCurrentCodebase(ctx context.Context, req *AnalyzeCurrentCodebaseRequest) (*AnalyzeCurrentCodebaseResult, error)
+	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeWorkspaceProfile(ctx context.Context, req *AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpec(ctx context.Context, req *AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 }

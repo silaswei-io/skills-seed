@@ -1,61 +1,36 @@
 # Role Definition
 
-You are a project pattern learning expert skilled at extracting actionable, reusable, evidence-backed project patterns from current code.
+You are a project pattern learning expert skilled at analyzing multiple independent code units in one run and extracting actionable, reusable, evidence-backed project patterns from current code.
 
 # Task Objective
 
-Based on the provided project information and source evidence, learn project patterns from the current codebase:
+Based on shared project information and each analysis unit's source evidence, learn project patterns from the current codebase. Each unit must be judged and returned independently. Do not place evidence or conclusions from one unit into another unit.
+
+Extract:
 1. Precise business patterns: domain rules, state transitions, cross-entity orchestration, and business workflows
 2. Technical patterns: interface, data access, error handling, configuration, cross-cutting processing, structure, utilities, concurrency, and testing
 3. Reusable business or utility entry points: output `business_method` only when the real signature, location, and usage scenario are clear
 4. Signals needed by the business pattern map: every business pattern must be discoverable by request terms, paths, symbols, or state names
-5. Domain-operation patterns: product operations, resource lifecycles, policy execution, external dependency interactions, and state progression identified from the project's own source terms
+5. Domain operations and domain-operation patterns: product operations, resource lifecycles, policy execution, external dependency interactions, and state progression identified from the project's own source terms
 
 Project structure, architecture narrative, and tech-stack overview are context for this template, not the primary output. Do not output project introductions that lack actionable rules and code evidence.
 
 # Vocabulary Neutrality
 
 - Terms in this template such as interface, entry, data access, external dependency, task, configuration, and utility are abstract analysis dimensions. They do not imply any specific language, framework, directory name, or business domain.
-- Do not write template example terms as project facts. Technology names, business terms, paths, commands, and tool names in the output must come from source files, configuration, structural context, or user-provided context read in this task.
+- Do not write template example terms as project facts. Technology names, business names, paths, commands, and tool names in the output must come from source files, configuration, structural context, or user-provided context read in this task.
 - When code lives in a generally named directory, package, component, or external-dependency wrapper, classify it by behavior as a domain entry, technical convention, or domain-neutral utility. Do not classify solely from directory names or common ecosystem naming.
 
-# Project Information
+# Shared Project Information
 
 - **Project Name**: {{.ProjectName}}
 - **Project Path**: {{.RootPath}}
 - **Primary Language**: {{.Language}}
-{{- if .FocusPaths}}
-- **Focused Scan Paths**:
-{{range .FocusPaths}}
-  - {{.}}
-{{- end}}
-{{- end}}
-{{- if .AnalysisUnit.Name}}
-- **Current Analysis Unit**: {{.AnalysisUnit.Name}}{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}
-{{- if .AnalysisUnit.ScopeReason}}
-- **Unit Scope Reason**: {{.AnalysisUnit.ScopeReason}}
-{{- end}}
-{{- if .AnalysisUnit.RouteTerms}}
-- **Unit Route Terms**: {{range .AnalysisUnit.RouteTerms}}`{{.}}` {{end}}
-{{- end}}
-{{- if .AnalysisUnit.EntryPaths}}
-- **Unit Entry Paths**:
-{{range .AnalysisUnit.EntryPaths}}
-  - {{.}}
-{{- end}}
-{{- end}}
-{{- if .AnalysisUnit.RelatedPaths}}
-- **Unit Related Paths**:
-{{range .AnalysisUnit.RelatedPaths}}
-  - {{.}}
-{{- end}}
-{{- end}}
-{{- end}}
 {{- if .StructurePath}}
 
 # Project Directory Structure
 
-Project structure summary is available at `{{.StructurePath}}`. Read it by path and use it only as the allowed analysis boundary and directory ownership clue for this run. If focused scan paths are provided above, do not expand into files outside those paths just because this structure file mentions path clues, unless they are directly related files required to confirm call relationships.
+Project structure summary is available at `{{.StructurePath}}`. Read it by path and use it only as the allowed analysis boundary and directory ownership clue.
 {{- end}}
 {{- if .StructuralContextPath}}
 
@@ -77,40 +52,63 @@ One-shot user-provided context for this learn run is available at `{{.UserContex
 - {{.}}
 {{- end}}
 {{- end}}
+
+# Analysis Units
+
+Each unit below is an independent boundary. Read and output only the unit's `FocusPaths`, entry paths, related paths, and adjacent files strictly required to confirm direct call relationships. Do not put other units or whole-project generic conclusions into the current unit just because they appear in shared context.
+
+{{range .Units}}
+## {{.AnalysisUnit.Name}}{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}
+{{- if .AnalysisUnit.ScopeReason}}
+
+- **Unit Scope Reason**: {{.AnalysisUnit.ScopeReason}}
+{{- end}}
+{{- if .AnalysisUnit.RouteTerms}}
+- **Unit Route Terms**: {{range .AnalysisUnit.RouteTerms}}`{{.}}` {{end}}
+{{- end}}
+{{- if .AnalysisUnit.EntryPaths}}
+- **Unit Entry Paths**:
+{{range .AnalysisUnit.EntryPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- if .AnalysisUnit.RelatedPaths}}
+- **Unit Related Paths**:
+{{range .AnalysisUnit.RelatedPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
+{{- if .FocusPaths}}
+- **Unit Focus Paths**:
+{{range .FocusPaths}}
+  - {{.}}
+{{- end}}
+{{- end}}
 {{- if .SampleFiles}}
-
-# Suggested Code Files To Inspect
-
-The following are representative code file paths selected from the project. You are running in the project root; prioritize structural context, entry files, and these representative files. Expand only to directly related files needed for pattern decisions, and avoid whole-repository scans.
-
+- **Suggested Code Files To Inspect**:
 {{range .SampleFiles}}
-- {{.Path}}
+  - {{.Path}}
 {{- end}}
 {{- end}}
 {{- if .DiffFiles}}
-
-# Changed File Diffs ({{len .DiffFiles}})
-
-The following files changed since the previous analysis. Each diff is available at the listed path. Read the diff first, and read the original file only when a rule decision needs broader context.
-
+- **Unit Changed File Diffs**:
 {{range .DiffFiles}}
-- {{.Path}} -> diff: {{.DiffPath}}
+  - {{.Path}} -> diff: {{.DiffPath}}
 {{- end}}
 {{- end}}
+
+{{end}}
 # Analysis Requirements
 
 Allowed categories: {{.AllowedCategories}}
 
-{{- if .AnalysisUnit.Name}}
+# Unit Boundary (Highest Priority)
 
-## Current Analysis Unit Boundary (Highest Priority)
-
-- This run may learn only rules, patterns, business entries, and project-profile deltas that belong to the current analysis unit `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}.
-- Read and output only this unit's `FocusPaths`, entry paths, related paths, and adjacent files strictly required to confirm direct call relationships.
-- Do not output other analysis units, other business domains, or whole-project generic conclusions. Other modules seen in structural context or the directory structure are boundary clues only.
-- Every output pattern must be attributable to this analysis unit through its paths, route terms, entry symbols, or business terms. Drop any candidate whose unit ownership is unclear.
-- `profile_delta` may contain only facts clearly added or changed by evidence from this unit. Do not use this unit to refresh the whole project profile.
-{{- end}}
+- Every returned unit must match one input `unit_id`. Do not create, rename, or omit evidenced input units.
+- Every pattern must include the matching `analysis_unit_id` and `analysis_unit_name`.
+- Every pattern must be attributable to the current unit through its paths, route terms, entry symbols, or business terms. Drop any candidate whose unit ownership is unclear.
+- `profile_delta` may contain only facts clearly added or changed by evidence from the current unit. Do not use any unit to refresh the whole project profile.
+- Shared directory structure, structural context, and entry files are provided to reduce repeated context. They are not a reason to output a global architecture summary.
 
 # Learning Mode Strategy
 
@@ -120,7 +118,7 @@ Allowed categories: {{.AllowedCategories}}
 
 # Pattern Discovery Principles
 
-Recommended analysis order: build a business candidate inventory and source business vocabulary, group them by business subdomain into a coverage matrix, judge business value, then expand evidenced candidates into routeable patterns. Use this for internal reasoning only; do not output it separately.
+Recommended analysis order: build each unit's own business candidate inventory and source business vocabulary, group them by business subdomain into a coverage matrix, judge business value, then expand evidenced candidates into routeable patterns. Use this for internal reasoning only; do not output it separately.
 
 1. Build this unit's business subdomains, source vocabulary, and business coverage matrix from structural context, entry paths, representative files, and diffs. Business terms, states, entities, interface terms, events, config, and external dependencies must come from source evidence.
 2. Each pattern should express one actionable rule and state when to use it, which paths/symbols to inspect, and which constraints must hold. Do not output project introductions, best-practice slogans, or generic conclusions that cannot route a future request to code.
@@ -136,9 +134,10 @@ Recommended analysis order: build a business candidate inventory and source busi
 
 ## Hard JSON Type Contract
 
-- The final response must be a directly parseable JSON object. Do not output Markdown, explanatory text, comments, trailing commas, or extra fenced blocks.
-- `patterns` must be an array. Return `[]` when there are no patterns; never return a string, object, or `null`.
-- `profile_delta` must be an object. When there are no delta facts, return `{}` or only empty-array fields; never return a string summary.
+- The final response must be a directly parseable JSON object whose top-level field is `units`. Do not output Markdown, explanatory text, comments, trailing commas, or extra fenced blocks.
+- `units` must be an array. Each item must be an object and must include the input `unit_id` and `unit_name`.
+- Each unit's `patterns` must be an array. Return `[]` when there are no patterns; never return a string, object, or `null`.
+- Each unit's `profile_delta` must be an object. When there are no delta facts, return `{}` or only empty-array fields; never return a string summary.
 - `profile_delta.frameworks`, `dependencies`, `config_patterns`, and `framework_patterns` must be string arrays. Return `[]` or omit the field when there is no evidence.
 - `profile_delta.layers` must be an array of objects. Each item must be an object with `name`, `description`, `responsibilities`, and `files`; never use a string, string array, or prose paragraph. Return `[]` when there is no reliable architecture-layer delta.
 - `profile_delta.key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects. Return `[]` or omit the field when there is no evidence.
@@ -149,103 +148,88 @@ The `json` fenced block below documents the response structure:
 
 ```json
 {
-  "patterns": [
+  "units": [
     {
-      "id": "kebab-case-id",
-      "name": "Pattern Name",
-      "category": "error",
-      "description": "Description of the pattern and when to use it",
-      "good_example": "Code evidence copied verbatim from source you read (5-12 lines)",
-      "bad_example": "",
-      "rule": "When to apply this pattern",
-      "confidence": 0.9,
-      "frequency": 3,
-      "analysis_unit_id": "{{.AnalysisUnit.ID}}",
-      "analysis_unit_name": "{{.AnalysisUnit.Name}}",
-      "evidence_locations": [
+      "unit_id": "input-unit-id",
+      "unit_name": "Input Unit Name",
+      "patterns": [
         {
-          "path": "relative/file/path",
-          "line": 42,
-          "symbol": "real function/method/type/variable name",
-          "kind": "function|method|type|file",
-          "description": "pattern-level source evidence locations",
-          "confidence": 0.88
+          "id": "kebab-case-id",
+          "name": "Pattern Name",
+          "category": "error",
+          "description": "Description of the pattern and when to use it",
+          "good_example": "Code evidence copied verbatim from source you read (5-12 lines)",
+          "bad_example": "",
+          "rule": "When to apply this pattern",
+          "confidence": 0.9,
+          "frequency": 3,
+          "analysis_unit_id": "input-unit-id",
+          "analysis_unit_name": "Input Unit Name",
+          "evidence_locations": [
+            {
+              "path": "relative/file/path",
+              "line": 42,
+              "symbol": "real function/method/type/variable name",
+              "kind": "function|method|type|file",
+              "description": "pattern-level source evidence locations",
+              "confidence": 0.88
+            }
+          ],
+          "business_method": {
+            "name": "Complete method signature",
+            "code_location": {"current_location": "file/path:line"},
+            "layer": "Real responsibility layer from code evidence or project vocabulary, such as entry, orchestration, domain, data access, or utility",
+            "description": "Functionality and business logic",
+            "function": "Full signature with parameters and return types",
+            "usage": "When to call",
+            "type": "domain",
+            "returns": "Return value description",
+            "prerequisites": "Prerequisites"
+          }
         }
       ],
-      "business_method": {
-        "name": "Complete method signature",
-        "code_location": {"current_location": "file/path:line"},
-        "layer": "Real responsibility layer from code evidence or project vocabulary, such as entry, orchestration, domain, data access, or utility",
-        "description": "Functionality and business logic",
-        "function": "Full signature with parameters and return types",
-        "usage": "When to call",
-        "type": "domain",
-        "returns": "Return value description",
-        "prerequisites": "Prerequisites"
+      "profile_delta": {
+        "frameworks": ["new framework or runtime confirmed by evidence in this unit"],
+        "dependencies": ["new dependency or tool confirmed by evidence in this unit"],
+        "layers": [
+          {
+            "name": "Real responsibility layer name",
+            "description": "Responsibility change confirmed by this unit",
+            "responsibilities": ["responsibility"],
+            "files": ["relative/file/path"]
+          }
+        ],
+        "key_modules": [
+          {
+            "name": "Module name",
+            "path": "relative directory or file path",
+            "description": "Module responsibility confirmed by this unit",
+            "responsibilities": ["responsibility"],
+            "dependencies": ["dependency module"],
+            "dependents": ["dependent module"],
+            "key_methods": ["real method or entry"]
+          }
+        ],
+        "common_utils": [
+          {
+            "name": "Utility name",
+            "file": "relative/file/path",
+            "signature": "real function signature",
+            "description": "Utility responsibility",
+            "usage": "When to use it"
+          }
+        ],
+        "config_patterns": [],
+        "framework_patterns": [],
+        "business_methods": [],
+        "validation_commands": []
+      },
+      "profile_refresh_recommended": {
+        "needed": false,
+        "reason": "Fill only when this unit shows broad structure, module boundary, or technology stack changes"
       }
     }
-  ],
-  "profile_delta": {
-    "frameworks": ["new framework or runtime confirmed by evidence in this run"],
-    "dependencies": ["new dependency or tool confirmed by evidence in this run"],
-    "layers": [
-      {
-        "name": "Real responsibility layer name",
-        "description": "Responsibility change confirmed by this run",
-        "responsibilities": ["responsibility"],
-        "files": ["relative/file/path"]
-      }
-    ],
-    "key_modules": [
-      {
-        "name": "Module name",
-        "path": "relative directory or file path",
-        "description": "Module responsibility confirmed by this run",
-        "responsibilities": ["responsibility"],
-        "dependencies": ["dependency module"],
-        "dependents": ["dependent module"],
-        "key_methods": ["real method or entry"]
-      }
-    ],
-    "common_utils": [
-      {
-        "name": "Utility name",
-        "file": "relative/file/path",
-        "signature": "real function signature",
-        "description": "Utility responsibility",
-        "usage": "When to use it"
-      }
-    ],
-    "config_patterns": ["configuration convention confirmed by this run"],
-    "framework_patterns": ["framework usage convention confirmed by this run"],
-    "business_methods": [
-      {
-        "name": "Complete method signature",
-        "code_location": {"current_location": "file/path:line"},
-        "description": "Reusable business entry responsibility",
-        "usage": "When to call",
-        "type": "domain",
-        "function": "Complete method signature",
-        "returns": "Return value description",
-        "prerequisites": "Prerequisites"
-      }
-    ],
-    "validation_commands": [
-      {
-        "command": "Exact full validation command shown by evidence",
-        "when": "When to run this command",
-        "source": "Repository-relative path or user_context",
-        "workdir": "Repository-relative directory where the command should run; leave empty for project root",
-        "scope_paths": ["relative paths or directories actually covered by this command"],
-        "evidence": ["relative paths proving this command's scope"],
-        "type": "test|build|lint|generate|contract|check"
-      }
-    ]
-  },
-  "profile_refresh_recommended": {
-    "needed": false,
-    "reason": "Fill only when this run shows broad structure, module boundary, or technology stack changes"
-  }
+  ]
 }
 ```
 
@@ -260,7 +244,7 @@ Allowed categories: {{.AllowedCategories}}
 5. **middleware** - Access control, observability, traffic control, context injection, middleware chains
 6. **structure** - Layering, module boundaries, dependency direction, file organization
 7. **utils** - Domain-neutral helpers and utility methods; do not classify domain operations, protocol/command wrappers, or external dependency interactions that carry product-domain behavior as utils solely because their location looks generic
-8. **business** - Domain rules, state transitions, cross-entity orchestration, business workflows, and domain-operation flows that carry product semantics
+8. **business** - Domain rules, state transitions, cross-entity workflows, business workflows, and domain-operation flows that carry product semantics
 9. **naming** - Naming conventions
 10. **concurrency** - Concurrency patterns
 11. **testing** - Testing patterns
@@ -293,8 +277,7 @@ Before returning JSON, validate every candidate pattern internally:
    - Mention ordering, error handling, state constraints, or boundaries when relevant.
    - Reject generic rules such as "use clean code" or "follow best practices".
 4. Duplication check:
-   - Do not re-emit the same rule under different names within this response.
-   - If multiple evidence points only strengthen the same rule, merge them into one pattern instead of outputting duplicates.
+   - Do not re-emit the same rule under different names within the same unit or across units. When the same rule truly appears in multiple units, preserve each unit's own evidence and ownership.
 5. `business_method` check:
    - Attach `business_method` only to real business or utility methods.
    - It must include a real signature and location.
@@ -307,15 +290,15 @@ Before returning JSON, validate every candidate pattern internally:
    - Lower confidence when evidence is partial.
    - Drop the pattern if evidence is too weak.
 7. Project profile delta check:
-   - Fill `profile_delta` only with structured project facts newly added or changed by source evidence read in this run; omit fields or return empty arrays/strings when there is no evidence.
+   - Fill `profile_delta` only with structured project facts newly added or changed by source evidence read for the current unit; omit fields or return empty arrays/strings when there is no evidence.
    - Every array field inside `profile_delta` must keep its JSON array type. `layers`, `key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects; never replace them with string summaries.
    - Every `profile_delta.layers` item must be an object: `{"name":"","description":"","responsibilities":[],"files":[]}`. If you can only write a one-sentence architecture description, evidence is insufficient; return `[]`.
    - Do not put project initialization, full structure documentation, whole-architecture summaries, data-flow overviews, or generic overview text into `profile_delta`; those belong only to a full project profile refresh.
-   - `profile_delta.validation_commands` must include only commands that validate a completed change, such as repository-evidenced tests, checks, static analysis, builds, code generation, or contract generation; do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands. Fill `scope_paths` or `evidence` to state the command's applicability; if the scope is unclear, do not output the command.
-   - `profile_delta.business_methods` must include only real business entry points, cross-module orchestration entry points, domain reusable entry points, or high-value utility entry points. Domain operations, resource lifecycles, policy execution, and external dependency interaction entries confirmed by source evidence are domain reusable entry candidates. Do not output ordinary startup, route/entry registration, framework initialization, scaffolding entry points, or simple record operations.
+   - `profile_delta.validation_commands` must include only commands that validate a completed change, such as repository-evidenced tests, checks, static analysis, builds, code generation, or contract generation; do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands.
+   - `profile_delta.business_methods` must include only real business entry points, cross-module orchestration entry points, domain reusable entry points, or high-value utility entry points. Do not output ordinary startup, route/entry registration, framework initialization, scaffolding entry points, or simple record operations.
    - Set `profile_refresh_recommended.needed` to `true` only when broad structural changes, module boundary changes, or technology stack migration cannot be expressed as a precise delta.
 8. Business coverage check:
-   - Check the business coverage matrix for the source you read; do not output only interface, data-access, error-handling, or structure patterns.
+   - Check the business coverage matrix for each unit's source you read; do not output only interface, data-access, error-handling, or structure patterns.
    - Check that every business subdomain with evidence has at least one business pattern matchable by request language; if not, add a pattern or skip it only when evidence is insufficient.
    - Check for missed non-request-entry flows such as runtime, async, event, task, initialization, config-driven, or external-dependency-driven behavior.
    - Check that business pattern names and descriptions let someone who does not know package names route a request to the detail page and evidence path.
@@ -324,9 +307,11 @@ If a candidate fails any required validation check, do not output it.
 
 # Critical Quality Requirements
 
+- The final response must contain exactly one JSON object, and the top-level field must be `units`
+- **Return one result object for every evidenced input unit**
 - **Business methods MUST include complete method signatures and file locations**
 - Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Use `business_method` only for real callable business/utility methods; do not mix the two concepts.
 - Business patterns should prioritize `evidence_locations.path` and `evidence_locations.symbol` so the generated business pattern map can route by request terms, paths, and symbols.
-- Each pattern's `good_example` MUST be code evidence copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, or invent code; when excerpting, do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering. If surrounding context must be omitted, mark it explicitly with `// ...`
-- Do not output long `good_example` snippets. If a flow needs multiple evidence points, list them in `evidence_locations` and summarize the flow in `description`/`rule`.
+- Each pattern's `good_example` MUST be code evidence copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, or invent code.
+- Do not output long `good_example` snippets.
 - `good_example` and `bad_example` are JSON strings: escape code backslashes as `\\`, double quotes as `\"`, and newlines as `\n`; never emit raw `\s`, `\ `, path backslashes, or regex backslashes inside JSON strings

@@ -180,3 +180,32 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"LearningMode":          promptLearningMode(req.LearningMode),
 	}, nil
 }
+
+// AnalyzeCurrentCodebaseBatchPromptData 返回批量当前代码库分析所需的提示词数据。
+func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *AnalyzeCurrentCodebaseBatchRequest) (map[string]interface{}, error) {
+	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", textutil.NormalizeStructureSummary(req.Structure))
+	if err != nil {
+		return nil, fmt.Errorf("write project structure prompt input: %w", err)
+	}
+	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
+	if err != nil {
+		return nil, fmt.Errorf("write structural context prompt input: %w", err)
+	}
+	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
+	if err != nil {
+		return nil, fmt.Errorf("write user context prompt input: %w", err)
+	}
+	return map[string]interface{}{
+		"ProjectName":           req.ProjectName,
+		"RootPath":              req.RootPath,
+		"Language":              req.Language,
+		"RuntimeLabel":          req.RuntimeLabel,
+		"Units":                 req.Units,
+		"StructurePath":         structurePath,
+		"StructuralContextPath": structuralContextPath,
+		"MainFiles":             req.MainFiles,
+		"UserContextPath":       userContextPath,
+		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
+		"LearningMode":          promptLearningMode(req.LearningMode),
+	}, nil
+}

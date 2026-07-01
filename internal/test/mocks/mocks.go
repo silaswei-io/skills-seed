@@ -23,6 +23,7 @@ type MockAgent struct {
 	AnalyzeProjectFn          func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	PlanAnalysisUnitsFn       func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error)
 	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
+	AnalyzeCurrentBatchFn     func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpecFn    func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 	OptimizeWorkflowFn        func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error)
@@ -142,6 +143,51 @@ func (m *MockAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Analy
 		return m.AnalyzeCurrentCodebaseFn(ctx, req)
 	}
 	return &agent.AnalyzeCurrentCodebaseResult{}, nil
+}
+
+// AnalyzeCurrentCodebaseBatch 模拟当前代码库批量分析。
+func (m *MockAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+	if m.AnalyzeCurrentBatchFn != nil {
+		return m.AnalyzeCurrentBatchFn(ctx, req)
+	}
+	units := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(req.Units))
+	for _, unit := range req.Units {
+		if m.AnalyzeCurrentCodebaseFn != nil {
+			result, err := m.AnalyzeCurrentCodebaseFn(ctx, &agent.AnalyzeCurrentCodebaseRequest{
+				ProjectName:       req.ProjectName,
+				RootPath:          req.RootPath,
+				Language:          req.Language,
+				RuntimeLabel:      req.RuntimeLabel,
+				AnalysisUnit:      unit.AnalysisUnit,
+				FocusPaths:        unit.FocusPaths,
+				Structure:         req.Structure,
+				StructurePath:     req.StructurePath,
+				StructuralContext: req.StructuralContext,
+				MainFiles:         req.MainFiles,
+				SampleFiles:       unit.SampleFiles,
+				DiffFiles:         unit.DiffFiles,
+				UserContext:       req.UserContext,
+				UserContextPath:   req.UserContextPath,
+				LearningMode:      req.LearningMode,
+			})
+			if err != nil {
+				return nil, err
+			}
+			units = append(units, agent.AnalyzeCurrentCodebaseUnitResult{
+				UnitID:                    unit.AnalysisUnit.ID,
+				UnitName:                  unit.AnalysisUnit.Name,
+				Patterns:                  result.Patterns,
+				ProfileDelta:              result.ProfileDelta,
+				ProfileRefreshRecommended: result.ProfileRefreshRecommended,
+			})
+			continue
+		}
+		units = append(units, agent.AnalyzeCurrentCodebaseUnitResult{
+			UnitID:   unit.AnalysisUnit.ID,
+			UnitName: unit.AnalysisUnit.Name,
+		})
+	}
+	return &agent.AnalyzeCurrentCodebaseBatchResult{Units: units}, nil
 }
 
 // AnalyzeWorkspaceProfile 模拟工作区画像分析

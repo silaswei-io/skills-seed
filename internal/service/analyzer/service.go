@@ -328,6 +328,29 @@ type AnalyzeCurrentCodebaseResult struct {
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
 }
 
+type AnalyzeCurrentCodebaseBatchUnit struct {
+	AnalysisUnit  domain.AnalysisUnit
+	FocusAbsPaths []string
+}
+
+type AnalyzeCurrentCodebaseBatchOptions struct {
+	RuntimeLabel string
+	LearningMode config.LearningMode
+	RunContext   *CodebaseRunContext
+	Units        []AnalyzeCurrentCodebaseBatchUnit
+}
+
+type AnalyzeCurrentCodebaseUnitResult struct {
+	AnalysisUnit              domain.AnalysisUnit
+	Patterns                  []domain.Pattern
+	ProfileDelta              domain.ProjectProfileDelta
+	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
+}
+
+type AnalyzeCurrentCodebaseBatchResult struct {
+	Units []AnalyzeCurrentCodebaseUnitResult
+}
+
 // PlanAnalysisUnitsRequest 请求按业务能力规划当前待学习文件。
 type PlanAnalysisUnitsRequest struct {
 	ProjectName       string
@@ -444,6 +467,95 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		ProfileDelta:              result.ProfileDelta,
 		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
 	}, nil
+}
+
+func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCurrentCodebaseBatchOptions) (*AnalyzeCurrentCodebaseBatchResult, error) {
+	startedAt := time.Now()
+	runContext := opts.RunContext
+	if runContext == nil {
+		var err error
+		runContext, err = s.BuildCodebaseRunContext(ctx, projectRoot, language, AnalyzeCodebaseOptions{UseSnapshotDiffs: true})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	units := make([]agent.AnalyzeCurrentCodebaseBatchUnit, 0, len(opts.Units))
+	unitByID := make(map[string]domain.AnalysisUnit, len(opts.Units))
+	for _, unit := range opts.Units {
+		focusPaths := utils.RelativePaths(projectRoot, unit.FocusAbsPaths)
+		units = append(units, agent.AnalyzeCurrentCodebaseBatchUnit{
+			AnalysisUnit: unit.AnalysisUnit,
+			FocusPaths:   focusPaths,
+			SampleFiles:  filterSampleFilesByFocus(runContext.SampleFiles, focusPaths),
+			DiffFiles:    filterDiffFilesByFocus(runContext.DiffFiles, focusPaths),
+		})
+		unitByID[unit.AnalysisUnit.ID] = unit.AnalysisUnit
+	}
+
+	agentReq := &agent.AnalyzeCurrentCodebaseBatchRequest{
+		ProjectName:       projectName,
+		RootPath:          projectRoot,
+		Language:          language,
+		LearningMode:      opts.LearningMode,
+		RuntimeLabel:      opts.RuntimeLabel,
+		Units:             units,
+		Structure:         runContext.ProjectStructure,
+		MainFiles:         append([]string(nil), runContext.MainFiles...),
+		UserContext:       runtimecontext.UserContext(ctx),
+		StructuralContext: "",
+	}
+
+	structuralContext, err := s.collectStructuralContext(ctx, projectRoot, structuralContextRequest{
+		ProjectName: projectName,
+		Language:    language,
+		Purpose:     "current codebase batch pattern extraction",
+		FocusPaths:  batchFocusPaths(units),
+		SeedPaths:   batchSeedPaths(units, runContext.MainFiles),
+	})
+	if err != nil {
+		return nil, err
+	}
+	agentReq.StructuralContext = structuralContext
+
+	result, err := s.agent.AnalyzeCurrentCodebaseBatch(ctx, agentReq)
+	if err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "analyzer.analyze_current_codebase_batch",
+			"duration", time.Since(startedAt),
+			"error", err,
+		)
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
+
+	out := make([]AnalyzeCurrentCodebaseUnitResult, 0, len(result.Units))
+	for _, unitResult := range result.Units {
+		unit := unitByID[unitResult.UnitID]
+		if unit.ID == "" && len(opts.Units) == 1 {
+			unit = opts.Units[0].AnalysisUnit
+		}
+		patterns := unitResult.Patterns
+		for i := range patterns {
+			if patterns[i].AnalysisUnitID == "" {
+				patterns[i].AnalysisUnitID = unit.ID
+			}
+			if patterns[i].AnalysisUnitName == "" {
+				patterns[i].AnalysisUnitName = unit.Name
+			}
+		}
+		out = append(out, AnalyzeCurrentCodebaseUnitResult{
+			AnalysisUnit:              unit,
+			Patterns:                  patterns,
+			ProfileDelta:              unitResult.ProfileDelta,
+			ProfileRefreshRecommended: unitResult.ProfileRefreshRecommended,
+		})
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "analyzer.analyze_current_codebase_batch",
+		"duration", time.Since(startedAt),
+		"units_count", len(out),
+	)
+	return &AnalyzeCurrentCodebaseBatchResult{Units: out}, nil
 }
 
 // GetProjectStructure 获取项目目录结构
@@ -709,9 +821,62 @@ type AnalyzeCodebaseOptions struct {
 	KnownPatternsJSON  string
 	KnownPatternsCount int
 	UseSnapshotDiffs   bool
+	RunContext         *CodebaseRunContext
 }
 
 const maxSampleFiles = 15
+
+// CodebaseRunContext 保存一次 learn current 运行内可复用的代码库上下文。
+type CodebaseRunContext struct {
+	ProjectStructure string
+	MainFiles        []string
+	SampleFiles      []agent.SampleFile
+	DiffFiles        []agent.DiffFileRef
+	SnapshotFlow     *snapshotflow.Result
+}
+
+// BuildCodebaseRunContext 预收集 learn current 中多个分析单元可复用的上下文。
+func (s *AnalyzerService) BuildCodebaseRunContext(ctx context.Context, projectRoot, language string, opts AnalyzeCodebaseOptions) (*CodebaseRunContext, error) {
+	structure, _ := s.GetProjectStructure(projectRoot)
+	mainFiles := s.FindMainFiles(projectRoot)
+	sampleFiles := s.collectSampleFilesFromRoots(projectRoot, opts.FocusPaths, language)
+	var diffFiles []agent.DiffFileRef
+	var snapshotFlow *snapshotflow.Result
+	var err error
+	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
+	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
+		selectedFiles := append([]domain.FileInfo(nil), opts.SelectedFiles...)
+		selectionPolicy := fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot)
+		if len(selectedFiles) == 0 && !opts.SelectedFilesSet {
+			selection, selectErr := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
+				Root:          projectRoot,
+				Policy:        selectionPolicy,
+				FocusAbsPaths: opts.FocusPaths,
+			})
+			if selectErr != nil {
+				return nil, selectErr
+			}
+			selectedFiles = selection.Files
+		}
+		snapshotFlow, err = snapshotflow.BuildScopedWithOptions(ctx, projectRoot, selectedFiles, focusPaths, snapshotflow.Options{
+			DiffAllowed: func(path string) bool {
+				return !selectionPolicy.IsExcluded(path)
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		sampleFiles = sampleFilesFromFileInfos(snapshotFlow.AddedFiles)
+		diffFiles = snapshotFlow.DiffFiles
+	}
+	return &CodebaseRunContext{
+		ProjectStructure: structure,
+		MainFiles:        append([]string(nil), mainFiles...),
+		SampleFiles:      append([]agent.SampleFile(nil), sampleFiles...),
+		DiffFiles:        append([]agent.DiffFileRef(nil), diffFiles...),
+		SnapshotFlow:     snapshotFlow,
+	}, nil
+}
 
 // AnalyzeCodebaseFull 完整代码库分析（提取模式并转换为 domain.Pattern）
 func (s *AnalyzerService) AnalyzeCodebaseFull(ctx context.Context, projectRoot, projectName, language string) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
@@ -730,42 +895,23 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 		"selected_files_count", len(opts.SelectedFiles),
 	)
 
-	// 预收集项目数据
-	structure, _ := s.GetProjectStructure(projectRoot)
+	runContext := opts.RunContext
+	if runContext == nil {
+		var err error
+		runContext, err = s.BuildCodebaseRunContext(ctx, projectRoot, language, opts)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	structure := runContext.ProjectStructure
 	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
 	if len(focusPaths) > 0 {
 		structure = focusedStructure(focusPaths)
 	}
-	mainFiles := s.FindMainFiles(projectRoot)
-	sampleFiles := s.collectSampleFilesFromRoots(projectRoot, opts.FocusPaths, language)
-	var diffFiles []agent.DiffFileRef
-	var snapshotFlow *snapshotflow.Result
-	var err error
-	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
-		selectedFiles := append([]domain.FileInfo(nil), opts.SelectedFiles...)
-		selectionPolicy := fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot)
-		if len(selectedFiles) == 0 && !opts.SelectedFilesSet {
-			selection, err := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
-				Root:          projectRoot,
-				Policy:        selectionPolicy,
-				FocusAbsPaths: opts.FocusPaths,
-			})
-			if err != nil {
-				return nil, nil, err
-			}
-			selectedFiles = selection.Files
-		}
-		snapshotFlow, err = snapshotflow.BuildScopedWithOptions(ctx, projectRoot, selectedFiles, focusPaths, snapshotflow.Options{
-			DiffAllowed: func(path string) bool {
-				return !selectionPolicy.IsExcluded(path)
-			},
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		sampleFiles = sampleFilesFromFileInfos(snapshotFlow.AddedFiles)
-		diffFiles = snapshotFlow.DiffFiles
-	}
+	mainFiles := append([]string(nil), runContext.MainFiles...)
+	sampleFiles := filterSampleFilesByFocus(runContext.SampleFiles, focusPaths)
+	diffFiles := filterDiffFilesByFocus(runContext.DiffFiles, focusPaths)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.collect_codebase_context",
 		"duration", time.Since(startedAt),
@@ -808,11 +954,6 @@ func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, pr
 			result.Patterns[i].AnalysisUnitName = opts.AnalysisUnit.Name
 		}
 	}
-	if snapshotFlow != nil {
-		if err := snapshotFlow.Repository.Replace(snapshotFlow.MergedFiles); err != nil {
-			return nil, nil, err
-		}
-	}
 
 	// Patterns 已经是 []domain.Pattern，直接使用
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -836,6 +977,100 @@ func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
 		samples = append(samples, agent.SampleFile{Path: file.Path})
 	}
 	return samples
+}
+
+func batchFocusPaths(units []agent.AnalyzeCurrentCodebaseBatchUnit) []string {
+	seen := make(map[string]bool)
+	var paths []string
+	for _, unit := range units {
+		for _, path := range unit.FocusPaths {
+			path = normalizeRelPath(path)
+			if path == "" || seen[path] {
+				continue
+			}
+			seen[path] = true
+			paths = append(paths, path)
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+func batchSeedPaths(units []agent.AnalyzeCurrentCodebaseBatchUnit, mainFiles []string) []string {
+	seen := make(map[string]bool)
+	var paths []string
+	add := func(path string) {
+		path = normalizeRelPath(path)
+		if path == "" || seen[path] {
+			return
+		}
+		seen[path] = true
+		paths = append(paths, path)
+	}
+	for _, path := range mainFiles {
+		add(path)
+	}
+	for _, unit := range units {
+		for _, path := range unit.FocusPaths {
+			add(path)
+		}
+		for _, file := range unit.SampleFiles {
+			add(file.Path)
+		}
+		for _, file := range unit.DiffFiles {
+			add(file.Path)
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+func filterSampleFilesByFocus(files []agent.SampleFile, focusPaths []string) []agent.SampleFile {
+	out := make([]agent.SampleFile, 0, len(files))
+	for _, file := range files {
+		if pathInFocus(file.Path, focusPaths) {
+			out = append(out, file)
+		}
+	}
+	return out
+}
+
+func filterDiffFilesByFocus(files []agent.DiffFileRef, focusPaths []string) []agent.DiffFileRef {
+	out := make([]agent.DiffFileRef, 0, len(files))
+	for _, file := range files {
+		if pathInFocus(file.Path, focusPaths) {
+			out = append(out, file)
+		}
+	}
+	return out
+}
+
+func pathInFocus(path string, focusPaths []string) bool {
+	path = normalizeRelPath(path)
+	if path == "" {
+		return false
+	}
+	if len(focusPaths) == 0 {
+		return true
+	}
+	for _, focus := range focusPaths {
+		focus = normalizeRelPath(focus)
+		if focus == "" {
+			continue
+		}
+		if path == focus || strings.HasPrefix(path, focus+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeRelPath(path string) string {
+	path = strings.TrimSpace(filepath.ToSlash(filepath.Clean(path)))
+	if path == "." {
+		return ""
+	}
+	return strings.TrimPrefix(path, "./")
 }
 
 // collectSampleFiles 收集项目中的代表性代码文件

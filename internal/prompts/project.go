@@ -18,6 +18,7 @@ import (
 var projectPromptNames = []string{
 	"analysis-plan",
 	"pattern-learn-current",
+	"pattern-learn-current-batch",
 	"project-profile",
 	"learn-analyze",
 	"learn-batch",

@@ -31,6 +31,7 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 						{"learn-batch", sampleBatchLearnData()},
 						{"fix-generate", sampleGenerateFixesRequest()},
 						{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+						{"pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest()},
 						{"pattern-curate", sampleCuratePatternsData()},
 						{"project-profile", sampleProjectAnalysisData()},
 						{"skill-workspace-profile", workspacePromptData()},
@@ -559,13 +560,13 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 		requiredText []string
 	}{
 		{
-				locale: "zh-CN",
-				requiredText: []string{
-					"业务覆盖矩阵",
-					"非请求接口",
-					"资源生命周期",
-					"外部依赖交互",
-					"允许中英文混合表达技术概念",
+			locale: "zh-CN",
+			requiredText: []string{
+				"业务覆盖矩阵",
+				"非请求接口",
+				"资源生命周期",
+				"外部依赖交互",
+				"允许中英文混合表达技术概念",
 			},
 		},
 		{
@@ -588,6 +589,7 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 				data interface{}
 			}{
 				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+				{"pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest()},
 				{"learn-batch", sampleBatchLearnData()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -640,6 +642,7 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 				data interface{}
 			}{
 				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+				{"pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest()},
 				{"learn-batch", sampleBatchLearnData()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -665,13 +668,13 @@ func TestLoader_RenderLearningPromptsPreserveDomainOperationBusinessSignals(t *t
 		requiredText []string
 	}{
 		{
-				locale: "zh-CN",
-				requiredText: []string{
-					"领域操作",
-					"业务覆盖矩阵",
-					"非请求接口",
-					"资源生命周期",
-					"外部依赖交互",
+			locale: "zh-CN",
+			requiredText: []string{
+				"领域操作",
+				"业务覆盖矩阵",
+				"非请求接口",
+				"资源生命周期",
+				"外部依赖交互",
 			},
 		},
 		{
@@ -694,6 +697,7 @@ func TestLoader_RenderLearningPromptsPreserveDomainOperationBusinessSignals(t *t
 				data interface{}
 			}{
 				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+				{"pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest()},
 				{"learn-batch", sampleBatchLearnData()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -772,13 +776,13 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 				"学习模式策略",
 				"`fast`",
 				"`normal`",
-					"`deep`",
-					"推荐分析顺序",
-					"业务子域",
-					"可选拆解方向",
-					"通用命名目录、公共包、适配层或外部依赖封装",
-					"路由价值和代码证据",
-				},
+				"`deep`",
+				"推荐分析顺序",
+				"业务子域",
+				"可选拆解方向",
+				"通用命名目录、公共包、适配层或外部依赖封装",
+				"路由价值和代码证据",
+			},
 		},
 		{
 			locale: "en-US",
@@ -792,13 +796,13 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 				"Learning Mode Strategy",
 				"`fast`",
 				"`normal`",
-					"`deep`",
-					"Recommended analysis order",
-					"business subdomains",
-					"Optional expansion directions",
-					"generally named directories, shared packages, adapters, or external-dependency wrappers",
-					"routing value and source evidence",
-				},
+				"`deep`",
+				"Recommended analysis order",
+				"business subdomains",
+				"Optional expansion directions",
+				"generally named directories, shared packages, adapters, or external-dependency wrappers",
+				"routing value and source evidence",
+			},
 		},
 	}
 
@@ -820,20 +824,20 @@ func TestLoader_ProjectProfilePromptKeepsDomainEntriesOutOfCommonUtils(t *testin
 		requiredText []string
 	}{
 		{
-				locale: "zh-CN",
-				requiredText: []string{
-					"由项目源码词表确认的核心领域操作",
-					"不要仅因其位于通用命名目录、公共包、适配层或外部依赖封装中就放入 `common_utils`",
-					"承载产品领域行为的领域操作、协议/命令封装或外部依赖交互入口应优先放入 business_methods",
-				},
+			locale: "zh-CN",
+			requiredText: []string{
+				"由项目源码词表确认的核心领域操作",
+				"不要仅因其位于通用命名目录、公共包、适配层或外部依赖封装中就放入 `common_utils`",
+				"承载产品领域行为的领域操作、协议/命令封装或外部依赖交互入口应优先放入 business_methods",
+			},
 		},
 		{
 			locale: "en-US",
-				requiredText: []string{
-					"Core domain operations, resource lifecycles, policy execution",
-					"Do not place them in `common_utils` solely because they live in generally named directories, shared packages, adapters, or external-dependency wrappers",
-					"external dependency interaction entries that carry product-domain behavior should prefer business_methods",
-				},
+			requiredText: []string{
+				"Core domain operations, resource lifecycles, policy execution",
+				"Do not place them in `common_utils` solely because they live in generally named directories, shared packages, adapters, or external-dependency wrappers",
+				"external dependency interaction entries that carry product-domain behavior should prefer business_methods",
+			},
 		},
 	}
 
@@ -940,6 +944,7 @@ func TestLoader_RenderPatternPromptsIncludePreOutputValidation(t *testing.T) {
 			}{
 				{"learn-batch", sampleBatchLearnData()},
 				{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+				{"pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					prompt, err := loader.Render(tc.name, tc.data)
@@ -966,6 +971,11 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 					"模式级源码证据位置",
 					"不要编造证据路径或行号",
 				},
+				"pattern-learn-current-batch": {
+					"`evidence_locations`",
+					"模式级源码证据位置",
+					"不要编造证据路径或行号",
+				},
 				"learn-batch": {
 					"`evidence_locations`",
 					"模式级源码证据位置",
@@ -985,6 +995,11 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 			locale: "en-US",
 			checks: map[string][]string{
 				"pattern-learn-current": {
+					"`evidence_locations`",
+					"pattern-level source evidence locations",
+					"Do not invent evidence paths or line numbers",
+				},
+				"pattern-learn-current-batch": {
 					"`evidence_locations`",
 					"pattern-level source evidence locations",
 					"Do not invent evidence paths or line numbers",
@@ -1017,6 +1032,8 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 						data = sampleBatchLearnData()
 					case "pattern-learn-current":
 						data = sampleAnalyzeCurrentCodebaseRequest()
+					case "pattern-learn-current-batch":
+						data = sampleAnalyzeCurrentCodebaseBatchRequest()
 					case "user-define-pattern":
 						data = sampleUserDefinePatternData()
 					case "pattern-curate":
@@ -1075,9 +1092,18 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 			loader := New("loader", tt.locale, "")
 			for name, requiredText := range tt.checks {
 				t.Run(name, func(t *testing.T) {
-					data := interface{}(sampleUserDefinePatternData())
-					if name == "pattern-curate" {
+					var data interface{}
+					switch name {
+					case "learn-batch":
+						data = sampleBatchLearnData()
+					case "pattern-learn-current":
+						data = sampleAnalyzeCurrentCodebaseRequest()
+					case "pattern-learn-current-batch":
+						data = sampleAnalyzeCurrentCodebaseBatchRequest()
+					case "pattern-curate":
 						data = sampleCuratePatternsData()
+					case "user-define-pattern":
+						data = sampleUserDefinePatternData()
 					}
 					prompt, err := loader.Render(name, data)
 					require.NoError(t, err)
@@ -1099,19 +1125,21 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 		{
 			locale: "zh-CN",
 			checks: map[string]string{
-				"learn-batch":           "可用分类：" + allowedCategories,
-				"pattern-learn-current": "可用分类：" + allowedCategories,
-				"user-define-pattern":   "可用分类：" + allowedCategories,
-				"pattern-curate":        "可用分类：" + allowedCategories,
+				"learn-batch":                 "可用分类：" + allowedCategories,
+				"pattern-learn-current":       "可用分类：" + allowedCategories,
+				"pattern-learn-current-batch": "可用分类：" + allowedCategories,
+				"user-define-pattern":         "可用分类：" + allowedCategories,
+				"pattern-curate":              "可用分类：" + allowedCategories,
 			},
 		},
 		{
 			locale: "en-US",
 			checks: map[string]string{
-				"learn-batch":           "Allowed categories: " + allowedCategories,
-				"pattern-learn-current": "Allowed categories: " + allowedCategories,
-				"user-define-pattern":   "Allowed categories: " + allowedCategories,
-				"pattern-curate":        "Allowed categories: " + allowedCategories,
+				"learn-batch":                 "Allowed categories: " + allowedCategories,
+				"pattern-learn-current":       "Allowed categories: " + allowedCategories,
+				"pattern-learn-current-batch": "Allowed categories: " + allowedCategories,
+				"user-define-pattern":         "Allowed categories: " + allowedCategories,
+				"pattern-curate":              "Allowed categories: " + allowedCategories,
 			},
 		},
 	}
@@ -1127,6 +1155,8 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 						data = sampleBatchLearnData()
 					case "pattern-learn-current":
 						data = sampleAnalyzeCurrentCodebaseRequest()
+					case "pattern-learn-current-batch":
+						data = sampleAnalyzeCurrentCodebaseBatchRequest()
 					case "user-define-pattern":
 						data = sampleUserDefinePatternData()
 					case "pattern-curate":
@@ -1260,6 +1290,7 @@ func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testin
 		{"learn-batch", sampleBatchLearnData()},
 		{"fix-generate", sampleGenerateFixesRequest()},
 		{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+		{"pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest()},
 		{"workflow-optimize", sampleOptimizeWorkflowRequest()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1275,18 +1306,19 @@ func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testin
 
 func TestLoader_RuntimePromptsRequireFinalJSONSelfCheck(t *testing.T) {
 	promptData := map[string]interface{}{
-		"analysis-plan":           sampleAnalysisPlanData(),
-		"file-select":             map[string]interface{}{"CandidateNum": 1, "FileTree": "main.go", "CandidatesPath": "", "UserContextPath": ""},
-		"learn-analyze":           sampleAnalyzeRequest(),
-		"learn-batch":             sampleBatchLearnData(),
-		"fix-generate":            sampleGenerateFixesRequest(),
-		"pattern-learn-current":   sampleAnalyzeCurrentCodebaseRequest(),
-		"project-profile":         sampleProjectAnalysisData(),
-		"pattern-curate":          sampleCuratePatternsData(),
-		"skill-workspace-profile": workspacePromptData(),
-		"skill-workspace-spec":    workspaceSpecPromptData(),
-		"user-define-pattern":     sampleUserDefinePatternData(),
-		"workflow-optimize":       sampleOptimizeWorkflowRequest(),
+		"analysis-plan":               sampleAnalysisPlanData(),
+		"file-select":                 map[string]interface{}{"CandidateNum": 1, "FileTree": "main.go", "CandidatesPath": "", "UserContextPath": ""},
+		"learn-analyze":               sampleAnalyzeRequest(),
+		"learn-batch":                 sampleBatchLearnData(),
+		"fix-generate":                sampleGenerateFixesRequest(),
+		"pattern-learn-current":       sampleAnalyzeCurrentCodebaseRequest(),
+		"pattern-learn-current-batch": sampleAnalyzeCurrentCodebaseBatchRequest(),
+		"project-profile":             sampleProjectAnalysisData(),
+		"pattern-curate":              sampleCuratePatternsData(),
+		"skill-workspace-profile":     workspacePromptData(),
+		"skill-workspace-spec":        workspaceSpecPromptData(),
+		"user-define-pattern":         sampleUserDefinePatternData(),
+		"workflow-optimize":           sampleOptimizeWorkflowRequest(),
 	}
 	require.ElementsMatch(t, loaderRuntimePromptNames(t), sortedMapKeys(promptData))
 
@@ -1596,6 +1628,36 @@ func sampleAnalyzeCurrentCodebaseRequest() *agent.AnalyzeCurrentCodebaseRequest 
 		StructurePath: "/tmp/skills-seed/project-structure.txt",
 		MainFiles:     []string{"cmd/demo/main.go"},
 		SampleFiles:   []agent.SampleFile{{Path: "cmd/demo/main.go"}},
+	}
+}
+
+func sampleAnalyzeCurrentCodebaseBatchRequest() *agent.AnalyzeCurrentCodebaseBatchRequest {
+	return &agent.AnalyzeCurrentCodebaseBatchRequest{
+		ProjectName:   "demo",
+		RootPath:      "/tmp/demo",
+		Language:      "go",
+		StructurePath: "/tmp/skills-seed/project-structure.txt",
+		MainFiles:     []string{"cmd/demo/main.go"},
+		Units: []agent.AnalyzeCurrentCodebaseBatchUnit{
+			{
+				AnalysisUnit: domain.AnalysisUnit{
+					ID:         "auth",
+					Name:       "认证登录",
+					EntryPaths: []string{"internal/auth/login.go"},
+				},
+				FocusPaths:  []string{"internal/auth/login.go"},
+				SampleFiles: []agent.SampleFile{{Path: "internal/auth/login.go"}},
+			},
+			{
+				AnalysisUnit: domain.AnalysisUnit{
+					ID:         "key",
+					Name:       "密钥创建",
+					EntryPaths: []string{"internal/key/create.go"},
+				},
+				FocusPaths:  []string{"internal/key/create.go"},
+				SampleFiles: []agent.SampleFile{{Path: "internal/key/create.go"}},
+			},
+		},
 	}
 }
 

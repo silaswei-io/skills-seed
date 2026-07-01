@@ -33,3 +33,11 @@ func AnalyzeCurrentCodebaseOperation(req *AnalyzeCurrentCodebaseRequest) string 
 	}
 	return "AnalyzeCurrentCodebase/" + req.RuntimeLabel
 }
+
+// AnalyzeCurrentCodebaseBatchOperation 返回当前代码库批量分析的可读运行操作名。
+func AnalyzeCurrentCodebaseBatchOperation(req *AnalyzeCurrentCodebaseBatchRequest) string {
+	if req == nil || strings.TrimSpace(req.RuntimeLabel) == "" {
+		return "AnalyzeCurrentCodebaseBatch"
+	}
+	return "AnalyzeCurrentCodebaseBatch/" + req.RuntimeLabel
+}

@@ -679,22 +679,29 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	var analyzed [][]string
 	var labels []string
 	var units []string
-	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-		analyzed = append(analyzed, append([]string{}, req.FocusPaths...))
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 		labels = append(labels, req.RuntimeLabel)
-		units = append(units, req.AnalysisUnit.ID)
-		if len(analyzed) == 2 {
-			return nil, errors.New("rate limited")
+		results := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, 1)
+		for _, unit := range req.Units {
+			analyzed = append(analyzed, append([]string{}, unit.FocusPaths...))
+			units = append(units, unit.AnalysisUnit.ID)
+			if unit.AnalysisUnit.ID == "auth" {
+				pattern := domain.NewPattern("p-"+strings.ReplaceAll(unit.FocusPaths[0], "/", "-"), "Unit Pattern", domain.CategoryBusiness)
+				results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+					UnitID:   unit.AnalysisUnit.ID,
+					UnitName: unit.AnalysisUnit.Name,
+					Patterns: []domain.Pattern{*pattern},
+				})
+			}
 		}
-		pattern := domain.NewPattern("p-"+strings.ReplaceAll(req.FocusPaths[0], "/", "-"), "Unit Pattern", domain.CategoryBusiness)
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
 	}
 
 	_, err := runLearnCurrent(cont, opts)
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
 	require.Equal(t, [][]string{{"internal/auth/login.go"}, {"internal/key/create.go"}}, analyzed)
-	require.Equal(t, []string{"unit-auth", "unit-key"}, labels)
+	require.Equal(t, []string{"batch-001", "batch-002"}, labels)
 	require.Equal(t, []string{"auth", "key"}, units)
 
 	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
@@ -713,12 +720,20 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 		t.Fatal("SelectFiles should not be called when resuming cached command state")
 		return nil, nil
 	}
-	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-		analyzed = append(analyzed, append([]string{}, req.FocusPaths...))
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 		labels = append(labels, req.RuntimeLabel)
-		units = append(units, req.AnalysisUnit.ID)
-		pattern := domain.NewPattern("p-resumed", "Resumed Pattern", domain.CategoryBusiness)
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+		results := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(req.Units))
+		for _, unit := range req.Units {
+			analyzed = append(analyzed, append([]string{}, unit.FocusPaths...))
+			units = append(units, unit.AnalysisUnit.ID)
+			pattern := domain.NewPattern("p-resumed", "Resumed Pattern", domain.CategoryBusiness)
+			results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+				UnitID:   unit.AnalysisUnit.ID,
+				UnitName: unit.AnalysisUnit.Name,
+				Patterns: []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
 	}
 
 	output := captureLearnStdout(t, func() {
@@ -726,13 +741,69 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	})
 	require.Equal(t, 1, planCalls, "cached state should be reused without replanning")
 	require.Equal(t, [][]string{{"internal/key/create.go"}}, analyzed)
-	require.Equal(t, []string{"unit-key"}, labels)
+	require.Equal(t, []string{"batch-001"}, labels)
 	require.Equal(t, []string{"key"}, units)
 	require.Contains(t, output, "从上次中断的 learn-current 计划恢复")
 	require.Contains(t, output, "待继续处理: 2")
 	require.Contains(t, output, "分析当前代码库 · 单元 2/2 · 密钥创建")
 	require.NotContains(t, output, "增量文件变化:")
 	require.NoFileExists(t, stateRepo.Path())
+}
+
+func TestRunLearnCurrentCommitsSnapshotsOnlyForSuccessfulUnits(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\nconst login = false\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\nconst create = false\n")
+	gitAddAll(t, projectRoot)
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\nconst login = true\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\nconst create = true\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	receivedDiffs := map[string][]string{}
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		var results []agent.AnalyzeCurrentCodebaseUnitResult
+		for _, unit := range req.Units {
+			for _, diff := range unit.DiffFiles {
+				receivedDiffs[unit.AnalysisUnit.ID] = append(receivedDiffs[unit.AnalysisUnit.ID], diff.Path)
+			}
+			if unit.AnalysisUnit.ID == "auth" {
+				pattern := domain.NewPattern("p-"+unit.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
+				results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+					UnitID:   unit.AnalysisUnit.ID,
+					UnitName: unit.AnalysisUnit.Name,
+					Patterns: []domain.Pattern{*pattern},
+				})
+			}
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
+	}
+
+	_, err := runLearnCurrent(cont, opts)
+
+	require.Error(t, err)
+	require.Equal(t, []string{"internal/auth/login.go"}, receivedDiffs["auth"])
+	require.Equal(t, []string{"internal/key/create.go"}, receivedDiffs["key"])
+	snapshotDir := filepath.Join(cont.SeedPath, "cache", "snapshots")
+	authSnapshot, err := os.ReadFile(filepath.Join(snapshotDir, "internal", "auth", "login.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package auth\nconst login = true\n", string(authSnapshot))
+	keySnapshot, err := os.ReadFile(filepath.Join(snapshotDir, "internal", "key", "create.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package key\nconst create = false\n", string(keySnapshot))
 }
 
 func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
@@ -760,13 +831,21 @@ func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
 		}}, nil
 	}
 	analyzeModes := []config.LearningMode{}
-	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 		analyzeModes = append(analyzeModes, req.LearningMode)
-		if len(analyzeModes) == 2 {
-			return nil, errors.New("stop after cached state is written")
+		results := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, 1)
+		for _, unit := range req.Units {
+			if unit.AnalysisUnit.ID != "auth" {
+				continue
+			}
+			pattern := domain.NewPattern("p-"+unit.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
+			results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+				UnitID:   unit.AnalysisUnit.ID,
+				UnitName: unit.AnalysisUnit.Name,
+				Patterns: []domain.Pattern{*pattern},
+			})
 		}
-		pattern := domain.NewPattern("p-"+req.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
 	}
 
 	_, err := runLearnCurrent(cont, opts)
@@ -779,15 +858,114 @@ func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
 	require.NoError(t, cont.ConfigRepo.Update(cfg))
 
 	analyzeModes = nil
-	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 		analyzeModes = append(analyzeModes, req.LearningMode)
-		pattern := domain.NewPattern("p-"+req.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+		results := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(req.Units))
+		for _, unit := range req.Units {
+			pattern := domain.NewPattern("p-"+unit.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
+			results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+				UnitID:   unit.AnalysisUnit.ID,
+				UnitName: unit.AnalysisUnit.Name,
+				Patterns: []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
 	}
 
 	requireRunLearnCurrentNoError(t, cont, opts)
 	require.Equal(t, []config.LearningMode{config.LearningModeDeep, config.LearningModeFast}, planModes)
 	require.Equal(t, []config.LearningMode{config.LearningModeFast}, analyzeModes)
+}
+
+func TestRunLearnCurrentAnalyzesPlannedUnitsOnePerCallByDefault(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	var batches []agent.AnalyzeCurrentCodebaseBatchRequest
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		batches = append(batches, *req)
+		results := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(req.Units))
+		for _, unit := range req.Units {
+			pattern := domain.NewPattern("p-"+unit.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
+			results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+				UnitID:   unit.AnalysisUnit.ID,
+				UnitName: unit.AnalysisUnit.Name,
+				Patterns: []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Len(t, batches, 2)
+	require.Equal(t, "batch-001", batches[0].RuntimeLabel)
+	require.Len(t, batches[0].Units, 1)
+	require.Equal(t, "auth", batches[0].Units[0].AnalysisUnit.ID)
+	require.Equal(t, []string{"internal/auth/login.go"}, batches[0].Units[0].FocusPaths)
+	require.Equal(t, "batch-002", batches[1].RuntimeLabel)
+	require.Len(t, batches[1].Units, 1)
+	require.Equal(t, "key", batches[1].Units[0].AnalysisUnit.ID)
+	require.Equal(t, []string{"internal/key/create.go"}, batches[1].Units[0].FocusPaths)
+}
+
+func TestRunLearnCurrentAnalyzesPlannedUnitsInBatchWhenConfigured(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	cfg := cont.ConfigRepo.Get()
+	cfg.Learning.Current.MaxUnitsPerCall = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	var batches []agent.AnalyzeCurrentCodebaseBatchRequest
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		batches = append(batches, *req)
+		results := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(req.Units))
+		for _, unit := range req.Units {
+			pattern := domain.NewPattern("p-"+unit.AnalysisUnit.ID, "Unit Pattern", domain.CategoryBusiness)
+			results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+				UnitID:   unit.AnalysisUnit.ID,
+				UnitName: unit.AnalysisUnit.Name,
+				Patterns: []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Len(t, batches, 1)
+	require.Equal(t, "batch-001", batches[0].RuntimeLabel)
+	require.Len(t, batches[0].Units, 2)
+	require.Equal(t, "auth", batches[0].Units[0].AnalysisUnit.ID)
+	require.Equal(t, "key", batches[0].Units[1].AnalysisUnit.ID)
 }
 
 func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {

@@ -64,6 +64,8 @@ learning:
     scope: "flow"
     # In-project analysis-unit parallelism; used by ordinary projects and workspace child projects, 1 means serial
     parallelism: 1
+    # Maximum analysis units per AI call; 1 disables batching to reduce oversized outputs and cross-unit bleed
+    max_units_per_call: 1
     # Enable relevant-file selection to narrow learn current scope from the candidate file tree
     select_relevant_files: true
     # Only call AI file selection when candidate files reach this threshold; smaller projects use local filtering

@@ -245,6 +245,7 @@ type CurrentLearningConfig struct {
 	Mode                             LearningMode     `yaml:"mode"`                                 // 学习模式：fast、normal、deep
 	Scope                            LearningScope    `yaml:"scope"`                                // 分析单元切分范围：domain、flow、module
 	Parallelism                      int              `yaml:"parallelism"`                          // 单项目分析单元并发数，0 或 1 表示串行
+	MaxUnitsPerCall                  int              `yaml:"max_units_per_call"`                   // 单次 AI 调用最多分析的单元数，1 表示不合批
 	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否先筛选最值得分析的相关文件
 	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 文件筛选
 	Structural                       StructuralConfig `yaml:"structural"`                           // 结构化上下文配置
@@ -257,6 +258,7 @@ func defaultCurrentLearningConfig() CurrentLearningConfig {
 		Mode:                             LearningModeNormal,
 		Scope:                            LearningScopeFlow,
 		Parallelism:                      1,
+		MaxUnitsPerCall:                  1,
 		SelectRelevantFiles:              true,
 		SelectRelevantFilesMinCandidates: 200,
 		Structural:                       defaultStructuralConfig(),
@@ -556,6 +558,9 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	cfg.Learning.Current.Scope = NormalizeLearningScope(string(cfg.Learning.Current.Scope))
 	if cfg.Learning.Current.Parallelism < 0 {
 		cfg.Learning.Current.Parallelism = 1
+	}
+	if cfg.Learning.Current.MaxUnitsPerCall <= 0 {
+		cfg.Learning.Current.MaxUnitsPerCall = 1
 	}
 	if cfg.Learning.Current.Structural.MaxSymbols <= 0 {
 		cfg.Learning.Current.Structural.MaxSymbols = 30

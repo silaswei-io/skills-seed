@@ -64,6 +64,8 @@ learning:
     scope: "flow"
     # 项目内分析单元并发数；普通项目或 workspace 子项目生效，1 表示串行
     parallelism: 1
+    # 单次 AI 调用最多分析的单元数；1 表示不合批，降低单次输出过大和跨单元串扰风险
+    max_units_per_call: 1
     # 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围
     select_relevant_files: true
     # 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果

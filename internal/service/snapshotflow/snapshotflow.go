@@ -20,7 +20,6 @@ type Result struct {
 	AddedFiles   []domain.FileInfo
 	DiffFiles    []agent.DiffFileRef
 	CurrentFiles map[string]string
-	MergedFiles  map[string]string
 	Repository   *snapshotstore.Repository
 }
 
@@ -69,7 +68,6 @@ func BuildScopedWithOptions(ctx context.Context, projectRoot string, files []dom
 		AddedFiles:   []domain.FileInfo{},
 		DiffFiles:    []agent.DiffFileRef{},
 		CurrentFiles: currentFiles,
-		MergedFiles:  mergeSnapshots(oldSnapshots, currentFiles, scopePaths),
 		Repository:   repo,
 	}
 	for _, change := range changes {
@@ -84,6 +82,18 @@ func BuildScopedWithOptions(ctx context.Context, projectRoot string, files []dom
 		}
 	}
 	return result, nil
+}
+
+// CommitScoped 将指定范围内的当前文件内容提交为快照，并保留范围外快照。
+func (r *Result) CommitScoped(scopePaths []string) error {
+	if r == nil || r.Repository == nil {
+		return nil
+	}
+	latest, err := r.Repository.Load()
+	if err != nil {
+		return err
+	}
+	return r.Repository.Replace(mergeSnapshots(latest, r.CurrentFiles, scopePaths))
 }
 
 func filterFilesForDiff(files map[string]string, allowed func(path string) bool) map[string]string {
@@ -111,6 +121,9 @@ func mergeSnapshots(oldSnapshots, currentFiles map[string]string, scopePaths []s
 		merged[path] = content
 	}
 	for path, content := range currentFiles {
+		if !pathInScope(path, scopePaths) {
+			continue
+		}
 		merged[path] = content
 	}
 	return merged

@@ -272,6 +272,45 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 	}, nil
 }
 
+// ParseAnalyzeCurrentCodebaseBatchResult 解析当前代码库批量分析结果。
+func ParseAnalyzeCurrentCodebaseBatchResult(output string) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+	jsonStr, err := ExtractJSON(output)
+	if err != nil {
+		logger.Warn(i18n.Get("LoggerAgentExtractJSONFallback"),
+			"method", "ParseAnalyzeCurrentCodebaseBatchResult",
+			"error", err,
+			"output_length", len(output),
+		)
+		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
+	}
+
+	var payload struct {
+		Units []struct {
+			UnitID                    string                             `json:"unit_id"`
+			UnitName                  string                             `json:"unit_name"`
+			Patterns                  []patternPayload                   `json:"patterns"`
+			ProfileDelta              projectProfilePayload              `json:"profile_delta"`
+			ProfileRefreshRecommended agent.ProfileRefreshRecommendation `json:"profile_refresh_recommended"`
+		} `json:"units"`
+	}
+	if err := parseJSONPayload(jsonStr, &payload); err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	units := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(payload.Units))
+	for _, unit := range payload.Units {
+		units = append(units, agent.AnalyzeCurrentCodebaseUnitResult{
+			UnitID:                    unit.UnitID,
+			UnitName:                  unit.UnitName,
+			Patterns:                  patternsToDomain(unit.Patterns, domain.SourceInit, now),
+			ProfileDelta:              unit.ProfileDelta.toProjectProfileDelta(now),
+			ProfileRefreshRecommended: unit.ProfileRefreshRecommended,
+		})
+	}
+	return &agent.AnalyzeCurrentCodebaseBatchResult{Units: units}, nil
+}
+
 // ParseOptimizeWorkflowResult 解析工作流优化结果。
 func ParseOptimizeWorkflowResult(output string) (*agent.OptimizeWorkflowResult, error) {
 	jsonStr, err := ExtractJSON(output)

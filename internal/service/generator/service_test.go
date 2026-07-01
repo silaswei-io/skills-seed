@@ -1275,7 +1275,7 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 
 	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
 	assert.Contains(t, api, "## 重要性分层")
-	assert.Contains(t, api, "核心开发路径")
+	assert.Contains(t, api, "常用项目约定")
 
 	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.Contains(t, businessIndex, "## 重要性分层")

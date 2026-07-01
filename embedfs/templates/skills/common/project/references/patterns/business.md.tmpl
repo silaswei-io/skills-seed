@@ -20,9 +20,9 @@
 
 **描述**: {{.Description}}
 
-**规则**: {{.Rule}}
+**适用规则**: {{.Rule}}
 
-**证据**: 置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，来源 {{.Source}}
+**证据**: 置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，来源 {{.Source}}。出现次数少或证据集中在单一路径时，先按当前代码复核后再执行。
 
 {{if .GoodExample}}
 #### ✅ 代码证据
