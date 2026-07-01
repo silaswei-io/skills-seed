@@ -31,13 +31,15 @@ User context is available at `{{.UserContextPath}}`. Read it by path and use it 
 1. Prefer business coverage first: infer candidate business subdomains from paths, filenames, module names, and metadata before selecting files; do not select only a few modules that look central.
 2. For each candidate business subdomain with handwritten logic, keep representative files that show entries, orchestration, rules, state changes, external dependency interactions, or exceptional behavior.
 3. Internally build a business coverage matrix: resources/entities, operations/capabilities, states/phases, policies/rules, external dependencies, entry channels, exceptions/compensation, and background/async/periodic flows. Select files that cover different cells of this matrix.
-4. Do not select files only from request entries or APIs. Tasks, events, schedules, initialization, registration, custom hooks, adapters, client wrappers, and config-driven branches may also carry business behavior.
+4. Do not select files only from request entries or interface boundaries. Tasks, events, schedules, initialization, registration, extension points, adapters, external-dependency wrappers, and config-driven branches may also carry business behavior.
 5. Select files most likely to contain handwritten implementation, domain behavior, core flows, architecture boundaries, integration logic, configuration conventions, validation, error handling, data flow, or reusable patterns.
-6. Do not lower priority only because a directory looks like a plugin, adapter, task, client, utility, or initialization area. If it carries runtime product behavior, rules or policies, state/phase progression, external dependency constraints, or business exception semantics, keep it as a candidate.
+6. Do not lower priority only because a directory looks like a component, adapter, task, external-dependency wrapper, utility, or initialization area. If it carries runtime product behavior, rules or policies, state/phase progression, external dependency constraints, or business exception semantics, keep it as a candidate.
 7. Lower the priority of machine-generated files, derived artifacts, dependency directories, build outputs, pure documentation, pure specification outputs, pure type declarations, snapshots, fixtures, lock files, and large repetitive files.
 8. Do not make assumptions from any specific language, framework, project name, or business domain; judge only from paths, filenames, metadata, and user context.
 9. Do not select files outside local exclusion rules; do not return absolute paths; do not return `..` paths.
 10. When uncertain, prefer files that cover more business subdomains and have higher information density. Keep necessary entry points, initialization, core modules, and cross-boundary adapter files.
+11. The same candidate input, metadata, and user context should produce a stable selection. Do not expand or shrink the scope because of wording, ordering, or temporary preference changes.
+12. When files can be listed explicitly, prefer `selected_paths` with relative file paths sorted lexicographically. Use `include`/`exclude` only for clearly broad directories or patterns; do not use vague globs as a substitute for known files.
 
 # Output Format
 

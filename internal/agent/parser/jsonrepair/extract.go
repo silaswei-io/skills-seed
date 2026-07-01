@@ -47,6 +47,11 @@ func ExtractJSON(output string) (string, error) {
 	}
 
 	jsonStr := strings.TrimSpace(output[start : end+1])
+	if strings.TrimSpace(output[end+1:]) != "" {
+		if repaired, repairErr := FixAIJSON(output[start:]); repairErr == nil {
+			return repaired, nil
+		}
+	}
 	repaired, err := FixAIJSON(jsonStr)
 	if err != nil {
 		logger.Error(i18n.Get("AgentInvalidJSON"),

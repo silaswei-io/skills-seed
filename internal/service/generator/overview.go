@@ -64,17 +64,49 @@ func hasBroadProfileEvidence(profile *domain.ProjectProfile) bool {
 }
 
 func learnedCoverageSummary(profile *domain.ProjectProfile, locale string) string {
-	domains := learnedDomainNames(profile, 8)
+	const previewLimit = 8
+	domains := learnedDomainNames(profile, previewLimit)
+	total := learnedDomainTotal(profile)
 	switch {
 	case strings.HasPrefix(strings.ToLower(locale), "zh") && len(domains) > 0:
-		return fmt.Sprintf("当前已学习到 %d 个模块/业务域：%s。本节用于快速定位项目范围和参考入口；具体业务规则、架构边界和实现细节需结合当前代码、项目规范和分类模式确认，不能把单个业务域摘要当作完整项目事实。", len(domains), strings.Join(domains, "、"))
+		if total > len(domains) {
+			return fmt.Sprintf("当前项目画像已覆盖 %d 个模块/业务域；此处仅列出前 %d 个用于导航：%s。完整列表见关键模块、入口方法和分类模式；具体业务规则、架构边界和实现细节需结合当前代码确认，不能把局部摘要当作完整项目事实。", total, len(domains), strings.Join(domains, "、"))
+		}
+		return fmt.Sprintf("当前项目画像已覆盖 %d 个模块/业务域：%s。本节用于快速定位项目范围和参考入口；具体业务规则、架构边界和实现细节需结合当前代码、项目规范和分类模式确认，不能把单个业务域摘要当作完整项目事实。", total, strings.Join(domains, "、"))
 	case len(domains) > 0:
-		return fmt.Sprintf("The learned project overview currently covers %d modules or business domains: %s. Use this section to quickly locate project scope and reference entry points; confirm concrete business rules, architecture boundaries, and implementation details against current code, Project Spec, and category patterns instead of promoting one domain summary to whole-project fact.", len(domains), strings.Join(domains, ", "))
+		if total > len(domains) {
+			return fmt.Sprintf("The learned project profile currently covers %d modules or business domains; this preview lists the first %d for navigation: %s. Use Key Modules, entry methods, and category patterns for the full reference set; confirm concrete business rules, architecture boundaries, and implementation details against current code instead of promoting one local summary to whole-project fact.", total, len(domains), strings.Join(domains, ", "))
+		}
+		return fmt.Sprintf("The learned project profile currently covers %d modules or business domains: %s. Use this section to quickly locate project scope and reference entry points; confirm concrete business rules, architecture boundaries, and implementation details against current code, Project Spec, and category patterns instead of promoting one domain summary to whole-project fact.", total, strings.Join(domains, ", "))
 	case strings.HasPrefix(strings.ToLower(locale), "zh"):
 		return "项目概览摘要尚未从完整项目画像中稳定提取；请结合当前代码、项目规范和分类模式确认全局结论。"
 	default:
 		return "A stable whole-project overview summary has not been extracted yet; confirm global conclusions against current code, Project Spec, and category patterns."
 	}
+}
+
+func learnedDomainTotal(profile *domain.ProjectProfile) int {
+	if profile == nil {
+		return 0
+	}
+	seen := map[string]bool{}
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		seen[strings.ToLower(value)] = true
+	}
+	for _, module := range profile.KeyModules {
+		add(firstNonEmptyString(module.Name, module.Path))
+	}
+	for _, method := range profile.BusinessMethods {
+		add(method.Name)
+	}
+	for _, layer := range profile.Layers {
+		add(layer.Name)
+	}
+	return len(seen)
 }
 
 func learnedDomainNames(profile *domain.ProjectProfile, limit int) []string {

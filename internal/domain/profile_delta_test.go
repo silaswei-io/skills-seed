@@ -29,12 +29,12 @@ func TestApplyProjectProfileDeltaKeepsExistingGlobalNarrative(t *testing.T) {
 	require.Equal(t, "internal/logic/home", merged.KeyModules[0].Path)
 }
 
-func TestApplyProjectProfileDeltaBackfillsMissingGlobalNarrative(t *testing.T) {
+func TestApplyProjectProfileDeltaIgnoresGlobalNarrativeFromDelta(t *testing.T) {
 	merged := ApplyProjectProfileDelta(&ProjectProfile{}, ProjectProfileDelta{
 		Summary:      "first learned summary",
 		Architecture: "first learned architecture",
 	}, "demo", "go")
 
-	require.Equal(t, "first learned summary", merged.Summary)
-	require.Equal(t, "first learned architecture", merged.Architecture)
+	require.Empty(t, merged.Summary)
+	require.Empty(t, merged.Architecture)
 }

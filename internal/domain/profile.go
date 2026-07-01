@@ -24,9 +24,13 @@ type ProjectProfile struct {
 
 // ValidationCommand 描述从项目证据中学习到的验证命令。
 type ValidationCommand struct {
-	Command string `json:"command"`
-	When    string `json:"when,omitempty"`
-	Source  string `json:"source,omitempty"`
+	Command    string   `json:"command"`
+	When       string   `json:"when,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	Workdir    string   `json:"workdir,omitempty"`
+	ScopePaths []string `json:"scope_paths,omitempty"`
+	Evidence   []string `json:"evidence,omitempty"`
+	Type       string   `json:"type,omitempty"`
 }
 
 // ProjectSpec 是由项目画像和已学习模式生成的项目级开发规范
@@ -94,6 +98,7 @@ type UtilityFunction struct {
 // ModuleInfo 描述项目中的关键模块
 type ModuleInfo struct {
 	Name             string   `json:"name"`
+	DisplayName      string   `json:"display_name,omitempty"`
 	Path             string   `json:"path"`
 	Description      string   `json:"description"`
 	Responsibilities []string `json:"responsibilities"`

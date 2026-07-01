@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func shouldRunInteractiveSync(cmd *cobra.Command, category string, files []string, userContext string, noInteractive bool) bool {
+func shouldRunInteractiveSync(cmd *cobra.Command, category string, files []string, patternDescription string, userContext string, noInteractive bool) bool {
 	if noInteractive || !interactive.IsTerminal() {
 		return false
 	}
-	if category != "" || len(files) > 0 || userContext != "" {
+	if category != "" || len(files) > 0 || patternDescription != "" || userContext != "" {
 		return false
 	}
 	for _, name := range []string{"resume", "restart"} {
@@ -68,4 +68,15 @@ func hasSyncCommandState(ctx context.Context, seedPath, stateScope string) (bool
 		return false, nil
 	}
 	return false, err
+}
+
+func hasResumableSyncCommandState(ctx context.Context, seedPath, stateScope string) (bool, error) {
+	state, err := commandstate.NewRepository(seedPath, stateScope).Load(ctx)
+	if err != nil {
+		if err == commandstate.ErrStateNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return state != nil && len(state.Inputs) > 0 && len(state.Units) > 0, nil
 }

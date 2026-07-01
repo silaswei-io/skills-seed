@@ -12,7 +12,7 @@
 
 - 本规范只保留当前项目的可执行约束、生成/配置约定和改动触点。
 - 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，业务入口读 [入口方法索引](./business-methods.md){{end}}。
-- “规则”只包含当前 pattern 中带代码证据的约束；没有直接代码证据的内容会降级为“参考观察”。
+- “规则”只包含当前 pattern 中带代码证据的约束；局部或证据不足的内容会降级为“参考观察”。
 - 当本规范和实际代码不一致时，以当前代码为准。
 
 ## 目录
@@ -46,10 +46,10 @@
 {{if .PatternGuidance}}
 ## 参考观察
 
-以下内容来自已学习模式，但缺少足够直接的代码证据，不能覆盖当前代码行为：
+以下内容来自已学习模式，只能作为定位线索和复核清单，不能覆盖当前代码行为：
 
 {{range .PatternGuidance}}
-- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Description}}{{.Description}}{{else}}{{.Name}}{{end}}
 {{end}}
 {{end}}
 
@@ -82,7 +82,7 @@
 
 {{end}}
 {{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}{{if .Workdir}}，工作目录：`{{.Workdir}}`{{end}}{{if .ScopePaths}}，作用域：{{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}，证据：{{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}，类型：{{.Type}}{{end}}
 {{end}}
 {{end}}
 

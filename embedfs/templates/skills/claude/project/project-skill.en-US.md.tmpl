@@ -84,7 +84,7 @@ Other learned commands:
 
 {{end}}
 {{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}{{if .Workdir}}, workdir: `{{.Workdir}}`{{end}}{{if .ScopePaths}}, scope: {{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}, evidence: {{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}, type: {{.Type}}{{end}}
 {{end}}
 
 ---

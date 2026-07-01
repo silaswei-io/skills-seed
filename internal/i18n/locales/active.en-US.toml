@@ -753,6 +753,9 @@ other = "Preparing project context"
 [ProgressLearnCurrentDetectChanges]
 other = "Detecting incremental file changes"
 
+[ProgressLearnCurrentResumeState]
+other = "Resuming previous analysis plan"
+
 [ProgressLearnCurrentDetectRestoreState]
 other = "{{.Label}}: checking resumable plan"
 
@@ -772,7 +775,7 @@ other = "{{.Label}}: planning analysis units"
 other = "{{.Label}}: resuming {{.Units}} planned analysis units"
 
 [ProgressLearnCurrentAnalyzeParallelUnits]
-other = "{{.Label}}: current progress {{.Current}}/{{.Total}}, running {{.Running}}, unit parallelism {{.Parallelism}}"
+other = "{{.Label}}: {{.Current}}/{{.Total}}, {{.RunningCount}} running ({{.Running}}), parallelism {{.Parallelism}}"
 
 [ProgressLearnCurrentAnalyzeUnit]
 other = "{{.Label}} · unit {{.Current}}/{{.Total}} · {{.Name}}"
@@ -1240,21 +1243,24 @@ other = "location_history"
 
 # sync
 [SyncShort]
-other = "One-stop sync: learn or add patterns + generate skills"
+other = "Sync skills"
 
 [SyncLongDesc]
-other = "Run the full pipeline in one command:\n\n  Path A (default): learn current → generate skills\n  Path B (--context): patterns add → generate skills\n\nLearning and adding patterns curate candidates before storing them; generate skills only reads stored patterns."
+other = "Run learn current → generate skills in one command.\n\nBy default, sync resumes the previous unfinished analysis plan when one exists; use --restart to discard it and rescan.\n--context is passed only as extra background for this learning run.\nUse --pattern to manually add a user pattern, which runs patterns add → generate skills."
 
 [SyncExample]
-other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add user pattern + generate\n  skills-seed sync --context \"All APIs must handle errors\" --category api\n\n  # With related files or directories\n  skills-seed sync --context \"Use limit/offset for pagination\" --files internal/handler"
+other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add background for this learning run\n  skills-seed sync --context \"On-prem deployment, not SaaS\"\n\n  # Add user pattern + generate\n  skills-seed sync --pattern \"All APIs must handle errors\" --category api\n\n  # With related files or directories\n  skills-seed sync --pattern \"Use limit/offset for pagination\" --files internal/handler"
 
 [SyncFlagCategory]
-other = "Category for user pattern (used with --context)"
+other = "Category for user pattern (used with --pattern)"
 
 [SyncFlagFiles]
-other = "Related file or directory paths; may be repeated (used with --context)"
+other = "Related file or directory paths; may be repeated (used with --pattern)"
 
 [SyncFlagContext]
+other = "Extra background for this learning run; only affects learn current prompts"
+
+[SyncFlagPattern]
 other = "Natural-language pattern description from the user; triggers patterns add → generate skills"
 
 [SyncStepLearn]
@@ -1265,6 +1271,9 @@ other = "[sync] Step 1/2: Adding user-defined pattern..."
 
 [SyncStepGenerate]
 other = "[sync] Step 2/2: Generating skills..."
+
+[SyncGenerateSkippedNoChanges]
+other = "[sync] No learned changes detected; skipping skills generation"
 
 [SyncComplete]
 other = "[sync] Complete!"
@@ -1280,6 +1289,9 @@ other = "Add user pattern failed"
 
 [SyncSavePatternFailed]
 other = "Save user pattern failed"
+
+[PatternCuratorNotConfigured]
+other = "pattern curator service is not configured"
 
 [SyncPatternAdded]
 other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}})"
@@ -2077,6 +2089,9 @@ other = "Excluded generated skills directories: {{.Paths}}"
 [LearnCurrentAIFileSelectionSummary]
 other = "AI file selection:\n  • candidates: {{.Candidates}}\n  • selected for analysis: {{.Selected}}\n  • skipped by AI: {{.Skipped}}"
 
+[LearnCurrentAIFileSelectorFallback]
+other = "AI file selection failed; falling back to all candidate files"
+
 [LearnCurrentFingerprintCommitPlan]
 other = "Will commit {{.Records}} file fingerprints after this run succeeds, including AI-skipped file status"
 
@@ -2093,7 +2108,7 @@ other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or ref
 other = "Analysis completed:\n  • Patterns: {{.PatternsCount}}\n  • Project profile delta: {{.ProfileDelta}}"
 
 [LearnCurrentAnalyzeParallelUnits]
-other = "Starting concurrent project-unit learning: current progress {{.Current}}/{{.Total}}, unit parallelism {{.Parallelism}}"
+other = "Starting concurrent project-unit learning: {{.Total}} units, parallelism {{.Parallelism}}"
 
 [LearnCurrentSavePatternFailed]
 other = "Failed to save pattern [{{.ID}}]: {{.Error}}"
@@ -2304,6 +2319,9 @@ other = "workspace relationship artifacts updated"
 [ChangeLogGenerateCompletedAll]
 other = "generated skills"
 
+[ChangeLogGenerateSkippedNoChanges]
+other = "no learned changes detected; skipped skills generation"
+
 [ChangeLogPatternAdded]
 other = "added user pattern: {{.PatternName}} [{{.Category}}]"
 
@@ -2459,6 +2477,18 @@ other = "Clear this sync command's resumable state and start again"
 
 [SyncRunModeConflict]
 other = "--resume and --restart cannot be used together"
+
+[SyncPatternResumeConflict]
+other = "--pattern is a one-shot user-pattern write and cannot be used with --resume; remove --resume or run sync without --pattern to resume learning"
+
+[SyncPatternOptionsRequirePattern]
+other = "--category and --files only apply to --pattern; remove them when learning current code"
+
+[SyncResumeStateMissing]
+other = "No resumable sync state was found; remove --resume to sync normally, or use --restart to start over"
+
+[SyncInvalidPatternFile]
+other = "--files only accepts project-relative paths: {{.Path}}"
 
 [InteractiveSyncInterruptedTitle]
 other = "A previous sync did not finish. How should this run proceed?"

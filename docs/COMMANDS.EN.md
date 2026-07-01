@@ -31,8 +31,8 @@ This is the complete command reference. Every command supports `--help`. Command
 |---|---|---|
 | Initialize one project | `skills-seed init --mode project` → `skills-seed sync` | Create config, learn current code, and generate skills |
 | Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
-| Daily incremental update | `skills-seed sync` | Learns current changes, then fully regenerates skills |
-| Add one missed rule | `skills-seed sync --context "<description>"` | Skips code learning, adds a natural-language pattern, then generates |
+| Daily incremental update | `skills-seed sync` | Learns current changes and generates skills only when learning changed output |
+| Add one missed rule | `skills-seed sync --pattern "<description>"` | Adds a natural-language pattern, then generates |
 | Update task workflow | `skills-seed workflow --context "<notes>"` → `skills-seed generate skills` | `--context` is inferred by the Agent from goals, constraints, background, or paths; omit `--name` to generate one, same-name workflows merge by default, and `--overwrite` replaces one completely |
 | Pre-commit updates | `skills-seed hook install` | Install the pre-commit hook and choose sync, learn only, or skip before commit |
 | Inspect learned changes | `skills-seed log` | Show recent learned and generated changes in a git-log-like format |
@@ -74,7 +74,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed review` | Import review comments and show prevention statistics | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | One-stop sync: learn or add patterns + generate skills | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed sync` | Sync skills | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--pattern` = ``<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | Add or update a user workflow | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | Add sub-projects to workspace | - | `--help, -h` = `false` |
@@ -614,38 +614,42 @@ skills-seed profile refresh --language go
 
 #### Command Overview
 
-One-step sync: learn current code, then generate skills. When `--context` is provided, learning is skipped and a user-defined pattern is created before generation.
+One-step sync: learn current code, then generate skills. `--context` is passed only as background for this learning run. Use `--pattern` to add a user-defined pattern from natural language.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed sync` | Learn current → generate skills | `skills-seed sync` | Runs `learn current` first, then fully regenerates skills |
-| `skills-seed sync --context <desc>` | patterns add → generate skills | `skills-seed sync --context "Use RESTful API routes"` | Skips learning; good for patterns the AI did not discover |
+| `skills-seed sync` | learn current → generate skills | `skills-seed sync` | Resumes unfinished sync state first; generates skills when learning changed output |
+| `skills-seed sync --context <background>` | learn current with context → generate skills | `skills-seed sync --context "On-prem deployment, not SaaS"` | Provides one-shot analysis background and does not write a user pattern |
+| `skills-seed sync --pattern <description>` | patterns add → generate skills | `skills-seed sync --pattern "Use RESTful API routes"` | Good for patterns the AI did not discover |
 
 #### Flags
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--category`, `-c` | empty | Category for `--context` mode |
-| `--files`, `-f` | empty | Related file or directory path for `--context` mode; repeat this flag for multiple ranges |
-| `--context` | empty | Natural-language pattern description from the user; triggers patterns add → generate |
+| `--category`, `-c` | empty | Category for `--pattern` mode |
+| `--files`, `-f` | empty | Related file or directory path for `--pattern` mode; repeat this flag for multiple ranges |
+| `--context` | empty | Extra background for this learning run; only affects learn current prompts |
+| `--pattern` | empty | Natural-language pattern description from the user; triggers patterns add → generate |
 | `--help`, `-h` | `false` | Show `sync` help |
 
 #### Common Examples
 
 ```bash
 skills-seed sync
-skills-seed sync --context "All API routes use RESTful style"
-skills-seed sync --context "Errors must wrap context" --category error
-skills-seed sync --context "Database operations use transactions" --files internal/service
+skills-seed sync --context "On-prem deployment, not SaaS"
+skills-seed sync --pattern "All API routes use RESTful style"
+skills-seed sync --pattern "Errors must wrap context" --category error
+skills-seed sync --pattern "Database operations use transactions" --files internal/service
 ```
 
 #### Notes
 
-1. `sync` without `--context` runs `learn current` first; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
-2. `sync --context` skips learning and defines a pattern from natural language, useful for patterns the AI missed.
-3. If any step fails, subsequent steps are skipped.
+1. `sync` runs `learn current` first by default; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
+2. `sync --context` does not add a user pattern; it only affects this learning analysis.
+3. `sync --pattern` skips learning and defines a pattern from natural language, useful for patterns the AI missed.
+4. If any step fails, subsequent steps are skipped.
 
 ### `skills-seed check`
 

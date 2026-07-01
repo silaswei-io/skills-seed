@@ -12,7 +12,7 @@
 
 - This spec keeps executable constraints, generated/config conventions, and change touchpoints only.
 - For architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for entry methods read [Entry Method Index](./business-methods.md){{end}}.
-- "Rules" only include constraints backed by code evidence in the current pattern set; content without direct code evidence is downgraded to "Reference Observations."
+- "Rules" only include constraints backed by code evidence in the current pattern set; local or weaker findings are downgraded to "Reference Observations."
 - If this spec conflicts with the current code, trust the current code.
 
 ## Table Of Contents
@@ -46,10 +46,10 @@
 {{if .PatternGuidance}}
 ## Reference Observations
 
-These items come from learned patterns, but do not have enough direct code evidence to override current code behavior:
+These items come from learned patterns and are only navigation hints and review checklists; they must not override current code behavior:
 
 {{range .PatternGuidance}}
-- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Description}}{{.Description}}{{else}}{{.Name}}{{end}}
 {{end}}
 {{end}}
 
@@ -82,7 +82,7 @@ Other learned commands:
 
 {{end}}
 {{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}{{if .Workdir}}, workdir: `{{.Workdir}}`{{end}}{{if .ScopePaths}}, scope: {{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}, evidence: {{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}, type: {{.Type}}{{end}}
 {{end}}
 {{end}}
 

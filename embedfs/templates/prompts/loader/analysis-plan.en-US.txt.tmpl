@@ -31,22 +31,22 @@ The user context is at `{{.UserContextPath}}`. Read it only if it helps decide b
 # Planning Rules
 
 1. Output only business analysis units. Do not output patterns, project profile facts, code suggestions, or summaries.
-2. Split by business capability, workflow, domain entity, external system, or plugin responsibility; do not mechanically split by file count, directory depth, or code type.
-3. A unit should cover a reasonably complete semantic loop: entry/API, types/responses, service logic, models, config, utilities, or middleware directly related to the capability. Create a standalone unit only when the files can independently produce high-value business patterns; merge units that would need frequent cross-reading to explain themselves.
-4. Do not create standalone units for thin interfaces, simple CRUD, pure models, pure route registration, generic initialization, or utilities with no business rules unless they decide product behavior or business boundaries.
+2. Split by business capability, workflow, domain entity, external system, or component responsibility; do not mechanically split by file count, directory depth, or code type.
+3. A unit should cover a reasonably complete semantic loop: entry/interface, types/responses, business orchestration, data models, config, utilities, or cross-cutting processing directly related to the capability. Create a standalone unit only when the files can independently produce high-value business patterns; merge units that would need frequent cross-reading to explain themselves.
+4. Do not create standalone units for thin interfaces, simple record operations, pure models, pure dispatch registration, generic initialization, or utilities with no business rules unless they decide product behavior or business boundaries.
 5. Every unit must include at least one `entry_paths` or `related_paths` item, and every path must come from the file list. `route_terms` should use requester-facing business words, action words, state words, resource names, or external system names. `scope_reason` briefly explains ownership.
 
 # Mode Strategy
 
 - `fast`: Prefer merging nearby capabilities into larger business-domain units; split only units that can independently produce core, frequent, high-value patterns.
-- `normal`: Default balanced strategy; split by business capability while merging thin interfaces, simple CRUD, pure models, and utilities with no business rules.
+- `normal`: Default balanced strategy; split by business capability while merging thin interfaces, simple record operations, pure models, and utilities with no business rules.
 - `deep`: Allow finer business units for capabilities with independent rules, state transitions, external dependencies, or exceptional paths, but still do not split mechanically by file.
 
 # Scope Strategy
 
-- `domain`: Prefer grouping by business domain, product capability, or external-system family. If files serve the same business domain, keep them in one unit even when they span multiple plugins, APIs, submodules, or directories.
+- `domain`: Prefer grouping by business domain, product capability, or external-system family. If files serve the same business domain, keep them in one unit even when they span multiple components, interfaces, submodules, or directories.
 - `flow`: Split by business workflow, resource action, state transition, or external-system responsibility. This is the balanced default; a single domain may contain a few independent flows.
-- `module`: Allow finer splits by plugin, API, submodule, or engineering responsibility, but every unit must still explain business rules independently; do not create mechanical units for purely technical files.
+- `module`: Allow finer splits by component, interface, submodule, or engineering responsibility, but every unit must still explain business rules independently; do not create mechanical units for purely technical files.
 
 # Output Format
 

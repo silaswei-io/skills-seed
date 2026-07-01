@@ -753,6 +753,9 @@ other = "准备项目上下文"
 [ProgressLearnCurrentDetectChanges]
 other = "检测增量文件变化"
 
+[ProgressLearnCurrentResumeState]
+other = "恢复上次分析计划"
+
 [ProgressLearnCurrentDetectRestoreState]
 other = "{{.Label}}：检查可恢复计划"
 
@@ -772,7 +775,7 @@ other = "{{.Label}}：规划分析单元"
 other = "{{.Label}}：恢复分析单元计划 {{.Units}} 个"
 
 [ProgressLearnCurrentAnalyzeParallelUnits]
-other = "{{.Label}}：当前进度 {{.Current}}/{{.Total}}，运行中 {{.Running}}，单元并发 {{.Parallelism}}"
+other = "{{.Label}}：{{.Current}}/{{.Total}}，运行中 {{.RunningCount}} 个（{{.Running}}），并发 {{.Parallelism}}"
 
 [ProgressLearnCurrentAnalyzeUnit]
 other = "{{.Label}} · 单元 {{.Current}}/{{.Total}} · {{.Name}}"
@@ -1240,21 +1243,24 @@ other = "位置历史"
 
 # sync 一条龙
 [SyncShort]
-other = "一键同步：学习或添加模式 + 生成 skills"
+other = "一键同步 skills"
 
 [SyncLongDesc]
-other = "一键完成完整流程，自动执行所有步骤：\n\n  路径 A（默认）: learn current → generate skills\n  路径 B（--context）: patterns add → generate skills\n\n学习和添加模式时会先完成模式策展入库，generate skills 只读取已入库模式并生成 skills。"
+other = "一键完成完整流程，自动执行 learn current → generate skills。\n\n默认会优先恢复上一次未完成的 sync 分析计划；需要放弃恢复状态时使用 --restart。\n--context 只作为本次学习的额外背景传给分析提示词。\n需要手动添加用户模式时使用 --pattern，它会执行 patterns add → generate skills。"
 
 [SyncExample]
-other = "  # 完整流程：学习 + 生成\n  skills-seed sync\n\n  # 添加用户模式 + 生成\n  skills-seed sync --context \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件或目录\n  skills-seed sync --context \"分页查询使用 limit/offset\" --files internal/handler"
+other = "  # 完整流程：学习 + 生成\n  skills-seed sync\n\n  # 附加本次学习背景\n  skills-seed sync --context \"私有化部署，不是 SaaS\"\n\n  # 添加用户模式 + 生成\n  skills-seed sync --pattern \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件或目录\n  skills-seed sync --pattern \"分页查询使用 limit/offset\" --files internal/handler"
 
 [SyncFlagCategory]
-other = "用户模式的分类（配合 --context 使用）"
+other = "用户模式的分类（配合 --pattern 使用）"
 
 [SyncFlagFiles]
-other = "关联文件或目录路径，可重复传入（配合 --context 使用）"
+other = "关联文件或目录路径，可重复传入（配合 --pattern 使用）"
 
 [SyncFlagContext]
+other = "本次学习的额外背景，只影响 learn current 提示词"
+
+[SyncFlagPattern]
 other = "用户输入的自然语言模式描述；传入后执行 patterns add → generate skills"
 
 [SyncStepLearn]
@@ -1265,6 +1271,9 @@ other = "[sync] 步骤 1/2: 添加用户自定义模式..."
 
 [SyncStepGenerate]
 other = "[sync] 步骤 2/2: 生成 skills..."
+
+[SyncGenerateSkippedNoChanges]
+other = "[sync] 未检测到学习变化，跳过 skills 生成"
 
 [SyncComplete]
 other = "[sync] 完成！"
@@ -1280,6 +1289,9 @@ other = "添加用户模式失败"
 
 [SyncSavePatternFailed]
 other = "保存用户模式失败"
+
+[PatternCuratorNotConfigured]
+other = "模式策展服务未配置"
 
 [SyncPatternAdded]
 other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}})"
@@ -2078,6 +2090,9 @@ other = "已排除生成的 skills 目录:\n {{.Paths}}"
 [LearnCurrentAIFileSelectionSummary]
 other = "AI 文件选择结果:\n  • 候选: {{.Candidates}}\n  • 实际分析: {{.Selected}}\n  • AI 跳过: {{.Skipped}}"
 
+[LearnCurrentAIFileSelectorFallback]
+other = "AI 文件选择失败，回退为分析全部候选文件"
+
 [LearnCurrentFingerprintCommitPlan]
 other = "本轮成功后将提交 {{.Records}} 条文件指纹（含 AI 跳过文件状态）"
 
@@ -2094,7 +2109,7 @@ other = "无效的项目画像策略 {{.Mode}}，可选值为 auto、skip 或 re
 other = "分析完成:\n  • 模式数量: {{.PatternsCount}}\n  • 项目画像增量: {{.ProfileDelta}}"
 
 [LearnCurrentAnalyzeParallelUnits]
-other = "开始并发分析项目单元：当前进度 {{.Current}}/{{.Total}}，单元并发 {{.Parallelism}}"
+other = "开始并发分析项目单元：{{.Total}} 个单元，并发 {{.Parallelism}}"
 
 [LearnCurrentSavePatternFailed]
 other = "保存模式失败 [{{.ID}}]: {{.Error}}"
@@ -2305,6 +2320,9 @@ other = "workspace 关系产物已更新"
 [ChangeLogGenerateCompletedAll]
 other = "已生成 skills"
 
+[ChangeLogGenerateSkippedNoChanges]
+other = "未检测到学习变化，跳过 skills 生成"
+
 [ChangeLogPatternAdded]
 other = "已添加用户模式: {{.PatternName}} [{{.Category}}]"
 
@@ -2460,6 +2478,18 @@ other = "清理本次 sync 的可恢复状态并重新开始"
 
 [SyncRunModeConflict]
 other = "--resume 与 --restart 不能同时使用"
+
+[SyncPatternResumeConflict]
+other = "--pattern 是一次性写入用户模式的操作，不能与 --resume 同时使用；请去掉 --resume 或改用 sync 恢复学习流程"
+
+[SyncPatternOptionsRequirePattern]
+other = "--category 和 --files 只适用于 --pattern；如果要学习当前代码，请去掉这些参数"
+
+[SyncResumeStateMissing]
+other = "没有可恢复的 sync 状态；请去掉 --resume 正常同步，或使用 --restart 重新开始"
+
+[SyncInvalidPatternFile]
+other = "--files 只能使用项目内相对路径: {{.Path}}"
 
 [InteractiveSyncInterruptedTitle]
 other = "检测到上一次 sync 未完成，本次如何执行？"

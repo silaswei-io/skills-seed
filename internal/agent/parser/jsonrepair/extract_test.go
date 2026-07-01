@@ -207,6 +207,13 @@ func TestFixAIJSON_RepairsMissingCommaBetweenArrayValues(t *testing.T) {
 	assert.JSONEq(t, `{"frameworks":["cobra","bubbletea",{"name":"custom"},true,null,3]}`, result)
 }
 
+func TestExtractJSON_RemovesExtraClosingContainerInsideArray(t *testing.T) {
+	input := `{"patterns":[{"id":"a","evidence_locations":[{"path":"p","line":1}]}},{"id":"b"}],"profile_refresh_recommended":{"needed":false}}`
+	result, err := ExtractJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"patterns":[{"id":"a","evidence_locations":[{"path":"p","line":1}]},{"id":"b"}],"profile_refresh_recommended":{"needed":false}}`, result)
+}
+
 func TestExtractJSON_RepairsCommonNonstandardJSONInCodeBlock(t *testing.T) {
 	input := "```json\n{\n  // comment\n  'patterns': [{'id': 'service',}],\n  'profile_refresh_recommended': {'needed': False, 'reason': None,},\n}\n```"
 	result, err := ExtractJSON(input)

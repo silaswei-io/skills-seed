@@ -306,17 +306,18 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 		templateName string
 		outputName   string
 		enabled      bool
+		data         any
 	}{
-		{templateName: "business-methods", outputName: "business-methods.md", enabled: len(profile.BusinessMethods) > 0},
-		{templateName: "modules", outputName: "modules.md", enabled: len(profile.KeyModules) > 0},
-		{templateName: "common-utils", outputName: "common-utils.md", enabled: len(profile.CommonUtils) > 0},
+		{templateName: "business-methods", outputName: "business-methods.md", enabled: len(profile.BusinessMethods) > 0, data: data},
+		{templateName: "modules", outputName: "modules.md", enabled: len(profile.KeyModules) > 0, data: moduleReferenceData(profile)},
+		{templateName: "common-utils", outputName: "common-utils.md", enabled: len(profile.CommonUtils) > 0, data: data},
 	}
 
 	for _, file := range files {
 		if !file.enabled {
 			continue
 		}
-		content, err := w.skillsLoader.RenderReferenceFile(file.templateName, data)
+		content, err := w.skillsLoader.RenderReferenceFile(file.templateName, file.data)
 		if err != nil {
 			return fmt.Errorf("%s: reference=%s: %w", i18n.Get("InitGenerateOverviewFailed"), file.templateName, err)
 		}
@@ -332,6 +333,42 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 		)
 	}
 	return nil
+}
+
+func moduleReferenceData(profile *domain.ProjectProfile) moduleReferenceTemplateData {
+	data := moduleReferenceTemplateData{ProjectProfile: *profile}
+	nameCounts := make(map[string]int, len(profile.KeyModules))
+	for _, module := range profile.KeyModules {
+		name := strings.TrimSpace(module.Name)
+		if name == "" {
+			name = strings.TrimSpace(module.Path)
+		}
+		nameCounts[strings.ToLower(name)]++
+	}
+	for _, module := range profile.KeyModules {
+		displayName := strings.TrimSpace(module.Name)
+		if displayName == "" {
+			displayName = strings.TrimSpace(module.Path)
+		}
+		if nameCounts[strings.ToLower(displayName)] > 1 {
+			displayName = disambiguatedModuleName(displayName, module.Path)
+		}
+		module.DisplayName = displayName
+		data.KeyModules = append(data.KeyModules, module)
+	}
+	return data
+}
+
+func disambiguatedModuleName(name, path string) string {
+	path = strings.Trim(strings.TrimSpace(filepath.ToSlash(path)), "/")
+	if path == "" {
+		return name
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) >= 2 {
+		return name + " (" + strings.Join(parts[len(parts)-2:], "/") + ")"
+	}
+	return name + " (" + path + ")"
 }
 
 func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string, summary agent.CategorySummary, allPatterns []domain.Pattern, allCategories []string, language string) error {

@@ -63,8 +63,8 @@ func TestLoader_Render(t *testing.T) {
 		"WorkflowReferences": []map[string]string{
 			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查"},
 		},
-		"ValidationCommands": []map[string]string{
-			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
+		"ValidationCommands": []map[string]interface{}{
+			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
 		},
 		"ValidationMatrix": []map[string]interface{}{
 			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
@@ -137,8 +137,8 @@ func TestLoader_Render_English(t *testing.T) {
 			},
 		},
 		"WorkflowReferences": []map[string]string{},
-		"ValidationCommands": []map[string]string{
-			{"Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml"},
+		"ValidationCommands": []map[string]interface{}{
+			{"Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
 		},
 		"ValidationMatrix": []map[string]interface{}{
 			{"Area": "Business Flow / State / Orchestration", "Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
@@ -664,8 +664,8 @@ func fullSkillData() map[string]interface{} {
 			},
 		},
 		"WorkflowReferences": []map[string]string{},
-		"ValidationCommands": []map[string]string{
-			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml"},
+		"ValidationCommands": []map[string]interface{}{
+			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
 		},
 		"ValidationMatrix": []map[string]interface{}{
 			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},

@@ -5,11 +5,11 @@
 {{if .KeyModules}}
 ## 目录
 
-{{range .KeyModules}}- [{{.Name}}](#{{anchor .Name}})
+{{range .KeyModules}}- [{{.DisplayName}}](#{{anchor .DisplayName}})
 {{end}}
 
 {{range .KeyModules}}
-## {{.Name}}
+## {{.DisplayName}}
 
 - **路径**: `{{.Path}}`
 {{if .Description}}

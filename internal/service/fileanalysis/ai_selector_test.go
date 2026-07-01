@@ -2,21 +2,29 @@ package fileanalysis
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/stretchr/testify/require"
 )
 
 type fakeFileSelector struct {
 	result *agent.SelectFilesResult
 	req    *agent.SelectFilesRequest
+	calls  int
+	err    error
 }
 
 func (f *fakeFileSelector) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
+	f.calls++
 	f.req = req
+	if f.err != nil {
+		return nil, f.err
+	}
 	return f.result, nil
 }
 
@@ -73,4 +81,133 @@ func TestApplyAIFileSelectorHandlesNilAIResult(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"a.go", "b.go"}, result.SelectedPaths)
 	require.Empty(t, result.SkippedPaths)
+}
+
+func TestApplyAIFileSelectorReusesCachedSelectionForSameInput(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "a.go"), []byte("package demo"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "b.go"), []byte("package demo"), 0644))
+	cachePath := filepath.Join(t.TempDir(), "selection.json")
+
+	firstSelector := &fakeFileSelector{result: &agent.SelectFilesResult{
+		SelectedPaths: []string{"a.go"},
+		Reason:        "stable high-signal selection",
+	}}
+	first, err := ApplyAIFileSelector(context.Background(), firstSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"b.go", "a.go"},
+		UserContext: "prefer runtime behavior",
+		CachePath:   cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"a.go"}, first.SelectedPaths)
+	require.Equal(t, 1, firstSelector.calls)
+
+	secondSelector := &fakeFileSelector{err: fmt.Errorf("selector should not be called")}
+	second, err := ApplyAIFileSelector(context.Background(), secondSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go"},
+		UserContext: "prefer runtime behavior",
+		CachePath:   cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"a.go"}, second.SelectedPaths)
+	require.Equal(t, []string{"b.go"}, second.SkippedPaths)
+	require.Equal(t, "stable high-signal selection", second.Reason)
+	require.Zero(t, secondSelector.calls)
+}
+
+func TestApplyAIFileSelectorInvalidatesCacheWhenCandidatesChange(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "a.go"), []byte("package demo"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "b.go"), []byte("package demo"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "c.go"), []byte("package demo"), 0644))
+	cachePath := filepath.Join(t.TempDir(), "selection.json")
+
+	firstSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"a.go"}}}
+	_, err := ApplyAIFileSelector(context.Background(), firstSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go"},
+		CachePath:   cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, firstSelector.calls)
+
+	secondSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"c.go"}}}
+	second, err := ApplyAIFileSelector(context.Background(), secondSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go", "c.go"},
+		CachePath:   cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"c.go"}, second.SelectedPaths)
+	require.Equal(t, 1, secondSelector.calls)
+}
+
+func TestApplyAIFileSelectorInvalidatesCacheWhenUserContextChanges(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "a.go"), []byte("package demo"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "b.go"), []byte("package demo"), 0644))
+	cachePath := filepath.Join(t.TempDir(), "selection.json")
+
+	firstSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"a.go"}}}
+	_, err := ApplyAIFileSelector(context.Background(), firstSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go"},
+		UserContext: "prefer entry points",
+		CachePath:   cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, firstSelector.calls)
+
+	secondSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"b.go"}}}
+	second, err := ApplyAIFileSelector(context.Background(), secondSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go"},
+		UserContext: "prefer background jobs",
+		CachePath:   cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"b.go"}, second.SelectedPaths)
+	require.Equal(t, 1, secondSelector.calls)
+}
+
+func TestApplyAIFileSelectorInvalidatesCacheWhenChangeHashChanges(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "a.go"), []byte("package demo"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "b.go"), []byte("package demo"), 0644))
+	cachePath := filepath.Join(t.TempDir(), "selection.json")
+
+	firstSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"a.go"}}}
+	_, err := ApplyAIFileSelector(context.Background(), firstSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go"},
+		Changes: &FileChanges{
+			AddedOrModified: []string{"a.go", "b.go"},
+			Records: []domain.FileAnalysisRecord{
+				{Path: "a.go", Hash: "hash-a-1"},
+				{Path: "b.go", Hash: "hash-b-1"},
+			},
+		},
+		CachePath: cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, firstSelector.calls)
+
+	secondSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"b.go"}}}
+	second, err := ApplyAIFileSelector(context.Background(), secondSelector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go"},
+		Changes: &FileChanges{
+			AddedOrModified: []string{"a.go", "b.go"},
+			Records: []domain.FileAnalysisRecord{
+				{Path: "a.go", Hash: "hash-a-2"},
+				{Path: "b.go", Hash: "hash-b-1"},
+			},
+		},
+		CachePath: cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"b.go"}, second.SelectedPaths)
+	require.Equal(t, 1, secondSelector.calls)
 }

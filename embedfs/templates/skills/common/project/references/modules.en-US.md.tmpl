@@ -5,11 +5,11 @@ This file documents key modules, ownership boundaries, dependencies, and entry m
 {{if .KeyModules}}
 ## Table Of Contents
 
-{{range .KeyModules}}- [{{.Name}}](#{{anchor .Name}})
+{{range .KeyModules}}- [{{.DisplayName}}](#{{anchor .DisplayName}})
 {{end}}
 
 {{range .KeyModules}}
-## {{.Name}}
+## {{.DisplayName}}
 
 - **Path**: `{{.Path}}`
 {{if .Description}}

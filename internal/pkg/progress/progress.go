@@ -240,8 +240,8 @@ func (t *MultiTracker) Render() {
 	}
 
 	t.mu.Lock()
-	lines := t.renderLinesLocked()
 	width := terminalWidth()
+	lines := clipLinesToTerminal(t.renderLinesLocked(), width)
 	previousPhysicalLines := t.physicalLines
 	t.lines = len(lines)
 	t.physicalLines = renderedPhysicalLineCount(lines, width)
@@ -600,10 +600,11 @@ func (t *Tracker) renderLocked(newline bool) {
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 
-	fmt.Fprintf(os.Stdout, "\r\033[2K[%s] %d/%d %s %s", bar, step, t.total, frame, t.label)
+	line := fmt.Sprintf("[%s] %d/%d %s %s", bar, step, t.total, frame, t.label)
 	if elapsed > 0 {
-		fmt.Fprintf(os.Stdout, " (%s)", elapsed)
+		line += fmt.Sprintf(" (%s)", elapsed)
 	}
+	fmt.Fprintf(os.Stdout, "\r\033[2K%s", clipToDisplayWidth(line, terminalWidth()))
 	if newline {
 		fmt.Fprintln(os.Stdout)
 		progressActive = false
@@ -613,6 +614,47 @@ func (t *Tracker) renderLocked(newline bool) {
 	}
 	progressActive = true
 	progressLineOpen = true
+}
+
+func clipLinesToTerminal(lines []string, width int) []string {
+	clipped := make([]string, 0, len(lines))
+	for _, line := range lines {
+		clipped = append(clipped, clipToDisplayWidth(line, width))
+	}
+	return clipped
+}
+
+func clipToDisplayWidth(value string, width int) string {
+	if width <= 0 {
+		width = 80
+	}
+	if width > 1 {
+		width--
+	}
+	if runewidth.StringWidth(value) <= width {
+		return value
+	}
+	if width <= 1 {
+		return ""
+	}
+	ellipsis := "…"
+	ellipsisWidth := runewidth.StringWidth(ellipsis)
+	target := width - ellipsisWidth
+	if target <= 0 {
+		return ellipsis
+	}
+	var builder strings.Builder
+	used := 0
+	for _, r := range value {
+		w := runewidth.RuneWidth(r)
+		if used+w > target {
+			break
+		}
+		builder.WriteRune(r)
+		used += w
+	}
+	builder.WriteString(ellipsis)
+	return builder.String()
 }
 
 // PrintConsoleLine 输出普通控制台消息；如果当前有正在刷新的进度行，会延迟到步骤结束后输出

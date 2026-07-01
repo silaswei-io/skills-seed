@@ -42,6 +42,19 @@ func (d ProjectProfileDelta) IsZero() bool {
 		d.DataFlow == ""
 }
 
+// HasMergeableFacts 判断 delta 是否包含可从局部分析单元安全合并的结构化事实。
+func (d ProjectProfileDelta) HasMergeableFacts() bool {
+	return len(d.Frameworks) > 0 ||
+		len(d.Dependencies) > 0 ||
+		len(d.Layers) > 0 ||
+		len(d.KeyModules) > 0 ||
+		len(d.CommonUtils) > 0 ||
+		len(d.ConfigPatterns) > 0 ||
+		len(d.FrameworkPatterns) > 0 ||
+		len(d.BusinessMethods) > 0 ||
+		len(d.ValidationCommands) > 0
+}
+
 // ApplyProjectProfileDelta 把本次学习得到的增量事实合并到已有项目画像。
 func ApplyProjectProfileDelta(base *ProjectProfile, delta ProjectProfileDelta, projectName, language string) *ProjectProfile {
 	if base == nil {
@@ -70,21 +83,6 @@ func ApplyProjectProfileDelta(base *ProjectProfile, delta ProjectProfileDelta, p
 	merged.BusinessMethods = mergeBusinessMethods(merged.BusinessMethods, delta.BusinessMethods)
 	merged.ValidationCommands = CleanValidationCommands(append(merged.ValidationCommands, delta.ValidationCommands...))
 
-	if merged.Summary == "" && delta.Summary != "" {
-		merged.Summary = delta.Summary
-	}
-	if merged.Architecture == "" && delta.Architecture != "" {
-		merged.Architecture = delta.Architecture
-	}
-	if merged.Structure == "" && delta.Structure != "" {
-		merged.Structure = delta.Structure
-	}
-	if merged.DependencyGraph == "" && delta.DependencyGraph != "" {
-		merged.DependencyGraph = delta.DependencyGraph
-	}
-	if merged.DataFlow == "" && delta.DataFlow != "" {
-		merged.DataFlow = delta.DataFlow
-	}
 	merged.GeneratedAt = time.Now().Format("2006-01-02 15:04:05")
 	return CleanProjectProfile(&merged)
 }

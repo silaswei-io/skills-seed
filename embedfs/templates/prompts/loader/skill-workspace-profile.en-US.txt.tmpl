@@ -15,7 +15,7 @@ Separate these facts carefully:
 
 1. Project index: ID, path, responsibility, role, primary language, and key framework/runtime.
 2. Workspace context: product/business context, repository model, and delivery or validation boundaries. Only write facts supported by repository evidence.
-3. Shared paths: code, config, SDKs, generated artifacts, or tooling consumed by multiple projects.
+3. Shared paths: code, config, shared artifacts, generated artifacts, or tooling consumed by multiple projects.
 4. Contract paths: interface definitions, shared schemas, type definitions, event definitions, data structure definitions, or generated-code inputs.
 5. Infrastructure paths: container, orchestration, deployment, environment, routing, middleware, automation, or release config.
 6. Dependency direction: project to project, project to shared library, adapter to service, contract to derived output, deployment config to runtime service.
@@ -80,7 +80,7 @@ The `json` fenced block below documents the response structure:
   "contracts": [
     {
       "path": "contracts",
-      "description": "API contract responsibility",
+      "description": "interface contract responsibility",
       "producers": ["producer-project"],
       "consumers": ["consumer-project", "adapter-project"]
     }

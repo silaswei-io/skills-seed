@@ -31,8 +31,8 @@
 |---|---|---|
 | 初始化单项目 | `skills-seed init --mode project` → `skills-seed sync` | 创建配置、学习当前代码并生成 skills |
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
-| 日常增量更新 | `skills-seed sync` | 等价于学习当前变更后强制生成 skills |
-| 只补充一条规则 | `skills-seed sync --context "<描述>"` | 跳过代码学习，用自然语言添加 pattern 后生成 |
+| 日常增量更新 | `skills-seed sync` | 学习当前变更，有实际学习变化时生成 skills |
+| 只补充一条规则 | `skills-seed sync --pattern "<描述>"` | 用自然语言添加 pattern 后生成 |
 | 更新任务工作流 | `skills-seed workflow --context "<说明>"` → `skills-seed generate skills` | `--context` 会先经 Agent 从目标、约束、背景或路径推导标准工作流；未提供 `--name` 时自动生成名称，同名默认合并，完全替换时加 `--overwrite` |
 | 提交前更新 | `skills-seed hook install` | 安装 pre-commit hook，在提交前选择同步、只学习或跳过 |
 | 查看沉淀变化 | `skills-seed log` | 像 `git log` 一样查看最近学习和生成带来的变更 |
@@ -74,7 +74,7 @@
 | `skills-seed review` | 导入评审评论并查看防漏统计 | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | 一键同步：学习或添加模式 + 生成 skills | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed sync` | 一键同步 skills | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--pattern` = ``<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | 添加或更新用户工作流 | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | 向工作区添加子项目 | - | `--help, -h` = `false` |
@@ -614,38 +614,42 @@ skills-seed profile refresh --language go
 
 #### 命令概述
 
-一键同步：学习当前代码 → 生成 skills。如果传入 `--context` 参数，则跳过学习步骤，改为用自然语言定义模式后直接生成。
+一键同步：学习当前代码 → 生成 skills。`--context` 只作为本次学习背景传给分析提示词；需要用自然语言补充用户模式时使用 `--pattern`。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed sync` | 学习当前代码 → generate skills | `skills-seed sync` | 先执行 `learn current`，然后强制生成 skills |
-| `skills-seed sync --context <描述>` | patterns add → generate skills | `skills-seed sync --context "API 路由使用 RESTful 风格"` | 跳过学习，适合补充 AI 未自动发现的模式 |
+| `skills-seed sync` | learn current → generate skills | `skills-seed sync` | 优先恢复未完成的 sync 状态；有学习变化时生成 skills |
+| `skills-seed sync --context <背景>` | learn current with context → generate skills | `skills-seed sync --context "私有化部署，不是 SaaS"` | 给本次分析提供一次性背景，不写入用户模式 |
+| `skills-seed sync --pattern <描述>` | patterns add → generate skills | `skills-seed sync --pattern "API 路由使用 RESTful 风格"` | 适合补充 AI 未自动发现的模式 |
 
 #### 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--category`, `-c` | 空 | `--context` 模式下指定模式分类 |
-| `--files`, `-f` | 空 | `--context` 模式下指定参考文件或目录路径；多个范围需重复传入该参数 |
-| `--context` | 空 | 用户输入的自然语言模式描述；传入后执行 patterns add → generate |
+| `--category`, `-c` | 空 | `--pattern` 模式下指定模式分类 |
+| `--files`, `-f` | 空 | `--pattern` 模式下指定参考文件或目录路径；多个范围需重复传入该参数 |
+| `--context` | 空 | 本次学习的额外背景，只影响 learn current 提示词 |
+| `--pattern` | 空 | 用户输入的自然语言模式描述；传入后执行 patterns add → generate |
 | `--help`, `-h` | `false` | 查看 `sync` 帮助 |
 
 #### 常用示例
 
 ```bash
 skills-seed sync
-skills-seed sync --context "所有 API 路由使用 RESTful 风格"
-skills-seed sync --context "错误必须包装上下文" --category error
-skills-seed sync --context "数据库操作使用事务" --files internal/service
+skills-seed sync --context "私有化部署，不是 SaaS"
+skills-seed sync --pattern "所有 API 路由使用 RESTful 风格"
+skills-seed sync --pattern "错误必须包装上下文" --category error
+skills-seed sync --pattern "数据库操作使用事务" --files internal/service
 ```
 
 #### 注意事项
 
-1. `sync` 不带 `--context` 时，会先执行 `learn current`；只有本轮学习写入新/更新模式或 workspace 关系产物变化时，才继续执行 `generate skills`。
-2. `sync --context` 跳过学习步骤，直接用自然语言定义模式，适合补充 AI 未自动发现的规则。
-3. 中间步骤失败会中断后续步骤。
+1. `sync` 默认会先执行 `learn current`；只有本轮学习写入新/更新模式或 workspace 关系产物变化时，才继续执行 `generate skills`。
+2. `sync --context` 不会添加用户模式，只影响本次学习分析。
+3. `sync --pattern` 跳过学习步骤，直接用自然语言定义模式，适合补充 AI 未自动发现的规则。
+4. 中间步骤失败会中断后续步骤。
 
 ### `skills-seed check`
 

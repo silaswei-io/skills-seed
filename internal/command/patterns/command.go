@@ -77,7 +77,7 @@ func addCmd(cont *container.Container) *cobra.Command {
 				return err
 			}
 			if cont.CuratorSvc == nil {
-				return fmt.Errorf("pattern curator is not configured")
+				return fmt.Errorf("%s", i18n.Get("PatternCuratorNotConfigured"))
 			}
 
 			written, err := StoreUserDefinedPattern(cmd.Context(), cont, description, *result.Pattern)
@@ -900,7 +900,7 @@ func compactCmd(cont *container.Container) *cobra.Command {
 				}
 			}
 			if cont.CuratorSvc == nil {
-				return fmt.Errorf("pattern curator is not configured")
+				return fmt.Errorf("%s", i18n.Get("PatternCuratorNotConfigured"))
 			}
 			tracker := progress.New(1)
 			result, err := cont.CuratorSvc.CompactWithHooks(cmd.Context(), curator.CompactRequest{

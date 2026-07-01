@@ -86,7 +86,7 @@ init -> learn current / learn history -> generate skills -> check
 
 0.10.6 起，无参数执行 `skills-seed init` 会进入交互式初始化流程；0.11.1 起默认只确认工具语言、初始化类型、Agent、Agent 总并发数和执行计划，分析深度、单元切分范围、Skills 语言和 Skills 类型收敛到可选高级配置。无参数执行 `skills-seed sync` 会在发现未完成状态时提示继续执行或重新开始。脚本中可使用 `--no-interactive` 关闭交互，`sync --resume` / `sync --restart` 可显式控制续跑策略。
 
-0.10.7 起，`patterns add` 和 `sync` 添加用户模式时统一使用 `--context` 传入自然语言描述，`patterns update <id> --context "<说明>"` 可修订指定 pattern 并保留原 ID 与 workspace 归属；`patterns show` 支持 `--sort updated|score|hits|category`。模型输出解析进一步修复尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号等非标准 JSON。
+0.10.7 起，`patterns add` 使用 `--context` 传入自然语言描述；`sync` 中 `--context` 只作为本次学习背景，添加用户模式使用 `--pattern`。`patterns update <id> --context "<说明>"` 可修订指定 pattern 并保留原 ID 与 workspace 归属；`patterns show` 支持 `--sort updated|score|hits|category`。模型输出解析进一步修复尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号等非标准 JSON。
 
 0.11.0 起，`learning.current.mode` 支持 `fast`、`normal`、`deep` 三档学习策略；生成的 skills 会包含相关参考路由、业务模式重要性分层、按改动范围组织的验证矩阵和按模块分组的入口方法索引。生成前还会校验源码证据路径，减少 references 指向不存在文件的情况。
 
@@ -271,7 +271,7 @@ skills:
 | `skills-seed patterns add --context "<描述>"` | 用自然语言补充用户自定义模式，可用 `--files` 指定文件或目录 |
 | `skills-seed patterns update <id> --context "<说明>"` | 修订指定用户模式 |
 | `skills-seed patterns compact` | 显式整理已入库的相似 patterns |
-| `skills-seed sync` | 一键执行学习/添加模式，然后生成 skills |
+| `skills-seed sync` | 一键学习当前代码，有学习变化时生成 skills |
 | `skills-seed check` | 检查暂存区或 Git 跟踪文件 |
 | `skills-seed patterns stats` | 查看模式质量、命中次数和最近命中 |
 | `skills-seed patterns show` | 查看 DB 中的 pattern 时间、业务方法位置和模式证据位置 |

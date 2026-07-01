@@ -2,6 +2,12 @@ You are a code pattern extractor. Analyze these Git commits and extract patterns
 
 This template is responsible only for pattern learning from commit history. Only output executable, reusable, verifiable patterns; do not output project profiles, project initialization results, or profile deltas.
 
+# Vocabulary Neutrality
+
+- Terms in this template such as interface, entry, data access, external dependency, task, configuration, and utility are abstract analysis dimensions. They do not imply any specific language, framework, directory name, or business domain.
+- Do not write template example terms as project facts. Technology names, business terms, paths, commands, and tool names in the output must come from commits, source files, configuration, or user-provided context read in this task.
+- When code lives in a generally named directory, package, component, or external-dependency wrapper, classify it by behavior as a domain entry, technical convention, or domain-neutral utility. Do not classify solely from directory names or common ecosystem naming.
+
 # Changes to Analyze
 
 {{if .CommitFiles}}
@@ -43,7 +49,7 @@ Prioritize extracting methods with **complex business logic**:
 - **Special handling**: authorization checks, data transformations, protocol/command wrappers, external calls, resource validation, or other project-specific handling
 - **Domain operations**: core operations, resource lifecycles, policy execution, external-system interactions, or runtime behavior in the project's domain. Treat them as domain-entry candidates when they determine product behavior, operation order, authorization boundaries, state changes, or error semantics.
 
-**Don't extract**: Simple CRUD (GetByID, Save, Delete, Create)
+**Don't extract**: simple record operations that only read, save, delete, create, or forward parameters.
 
 **Business method judgment examples**:
 - Extract: a method or flow that shows domain preconditions, state or phase progression, cross-module orchestration, external dependency calls, failure compensation, error semantics, or data transformation.
@@ -57,19 +63,19 @@ Before returning JSON, complete these steps internally:
    - Analyze each commit message, changed file, and visible code evidence.
    - Prioritize added or modified methods in entry, orchestration, domain, data access, external dependency, task, message handling, and utility modules.
    - Treat methods, flows, rules, state changes, cross-module calls, external calls, data transformations, and exceptional branches with business meaning as candidates.
-   - Build a **source business vocabulary**: extract the project's own business nouns, business verbs, state/phase terms, rule/policy terms, config names, error codes, task/event names, external dependency names, and core function names from changed paths, APIs, entities, and source code. Use this vocabulary only for internal reasoning; do not output it separately.
+   - Build a **source business vocabulary**: extract the project's own business nouns, business verbs, state/phase terms, rule/policy terms, config names, error codes, task/event names, external dependency names, and core function names from changed paths, interface terms, entities, and source code. Use this vocabulary only for internal reasoning; do not output it separately.
    - Build a **business coverage matrix**: resources/entities, operations/capabilities, states/phases, policies/rules, external dependencies, entry channels, exceptions/compensation, and background/async/periodic flows. For every code-backed cell in the files you read, try to emit a routeable pattern or merge it into a related pattern.
-   - Build a **business subdomain overview** first: infer business subdomains from entities, APIs, plugin/module responsibilities, external dependencies, tasks/events/schedules, state names, config names, and domain terms, then look for rules and flows under each subdomain. Business subdomains must come from the project's own source vocabulary and code evidence; do not use generic wording from this template as domain answers.
+   - Build a **business subdomain overview** first: infer business subdomains from entities, interfaces, component/module responsibilities, external dependencies, tasks/events/schedules, state names, config names, and domain terms, then look for rules and flows under each subdomain. Business subdomains must come from the project's own source vocabulary and code evidence; do not use generic wording from this template as domain answers.
    - For every business subdomain with evidence, keep patterns that help future requests route to code. Skip a subdomain only when there is no evidence of rules, workflows, state changes, external calls, or domain data transformation.
 
 2. Perform **business pattern expansion**:
    - Do not output only one broad pattern for a business method.
    - Split code-backed details into reusable patterns such as request validation, business state progression, cross-repository transaction orchestration, external system calls, failure compensation/fallback, business error mapping, or domain data transformation.
-   - Perform **domain-operation extraction**: if the project has rule-constrained workflows, resource lifecycles, external dependency protocols, policy decisions, runtime actions, or strong business invariants, do not automatically classify code under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper as `utils`. If a method carries domain semantics, continue judging whether it forms a business pattern or `business_method`.
+   - Perform **domain-operation extraction**: if the project has rule-constrained workflows, resource lifecycles, external dependency protocols, policy decisions, runtime actions, or strong business invariants, do not automatically classify code in generally named directories, shared packages, adapters, or external-dependency wrappers as `utils`. If a method carries domain semantics, continue judging whether it forms a business pattern or `business_method`.
    - Prioritize domain verbs and nouns that recur in source code or determine product behavior, such as create, change, revoke, validate, sync, import, export, calculate, transform, schedule, execute, roll back, or report. These are only discovery dimensions; the actual domain vocabulary must come from project code.
-   - If an external dependency, SDK, RPC, command, or protocol call determines business operation order, request format, authorization boundary, state changes, retry/fallback behavior, or error mapping, extract it as a business domain-operation pattern. Do not demote it to a generic utility solely because it is an external-client call.
-   - **Do not compress multiple business details into one generic pattern**. If a method contains both domain rules and technical conventions, domain rules may be `business`, while transactions, queries, routing, error wrapping, config loading, and middleware chains must use their specific categories.
-   - **Do not output only top-level flows**. If "create resource" contains index validation, type dispatch, credential handling, external-dependency calls, and operation-record semantics, split those into routeable patterns instead of emitting only one "resource creation flow".
+   - If an external dependency, remote interaction, command execution, or protocol call determines business operation order, request format, authorization boundary, state changes, retry/fallback behavior, or error mapping, extract it as a business domain-operation pattern. Do not demote it to a generic utility solely because it is an external-dependency call.
+   - **Do not compress multiple business details into one generic pattern**. If a method contains both domain rules and technical conventions, domain rules may be `business`, while data-consistency boundaries, queries, interface dispatch, error wrapping, config loading, and cross-cutting processing chains must use their specific categories.
+   - **Do not output only top-level flows**. If a resource operation contains identifier validation, type dispatch, credential handling, external-dependency calls, and operation-record semantics, split those into routeable patterns instead of emitting only one generic flow.
    - Prefer specific categories: business is not the default category. Do not force a business pattern for every candidate.
    - Keep business patterns only for domain rules, state transitions, cross-entity orchestration, and real business workflows. Pure technical conventions do not become business patterns just because they appear in entry or orchestration code.
    - Keep patterns cohesive: one pattern expresses one actionable rule. Do not mix state validation, transaction boundaries, external calls, error mapping, and data transformation into one pattern.
@@ -78,10 +84,10 @@ Before returning JSON, complete these steps internally:
 3. Enrich every business pattern:
    - `description` must explain the business scenario, trigger, core steps, and boundary.
    - `rule` must be an actionable team convention covering when to use it, ordering requirements, and error handling requirements.
-   - Include routing signals: entity, state, flow, API, event, external dependency, key symbol, or file path so generated skills can place it in the business pattern overview.
+   - Include routing signals: entity, state, flow, interface term, event, external dependency, key symbol, or file path so generated skills can place it in the business pattern overview.
    - A business pattern's `name`, `description`, and `rule` must prefer business language that requesters would use. You may append code symbols, paths, or technical terms afterward. Do not name business patterns only with package names, technical abbreviations, utility names, low-level protocol names, or folder names.
    - Include **request routing terms** for every business pattern: likely user-facing business phrases, synonyms, state/action terms, entry channels, and code evidence paths must appear in `description` or `rule`. Generated skills use these words to route future requests to the right detail page.
-   - Identify **non-API business entries**: tasks, events, schedules, initialization, registration, custom hooks, adapters, client wrappers, config-driven branches, batch jobs, and runtime guard flows. When they carry product behavior, analyze them as business candidates.
+   - Identify **non-request-interface business entries**: tasks, events, schedules, initialization, registration, extension points, adapters, external-dependency wrappers, config-driven branches, batch jobs, and runtime guard flows. When they carry product behavior, analyze them as business candidates.
    - `good_example` must use code evidence copied verbatim from source you read, preferably the 5-30 lines that best show the business rule. Do not complete, rewrite, synthesize, or invent code, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering.
    - `business_method.description` must explain the full business intent, not just repeat the function name.
    - `business_method.prerequisites` and `returns` must describe setup, dependencies, return values, and error semantics.
@@ -89,12 +95,12 @@ Before returning JSON, complete these steps internally:
 4. Control quality:
    - Extract only from commit and code evidence. Do not invent business behavior.
    - Do not drop new details just because a similar pattern already exists. If this commit adds a new branch, state, error, or call scenario, output it as a new pattern or significant improvement.
-   - Do not treat low-value CRUD, plain field assignment, or pure forwarding as business patterns unless they participate in a larger business flow.
-   - Check the business coverage matrix; do not output only API, database, error-handling, or structure patterns.
+   - Do not treat low-value simple record operations, plain field assignment, or pure forwarding as business patterns unless they participate in a larger business flow.
+   - Check the business coverage matrix; do not output only interface, data-access, error-handling, or structure patterns.
    - Check for missed non-request-entry flows such as runtime, async, event, task, initialization, config-driven, or external-dependency-driven behavior.
    - Check that business pattern names and descriptions let someone who does not know package names route a request to the detail page and evidence path.
 
-## 2. Database Operation Patterns ⭐⭐
+## 2. Data Access Patterns ⭐⭐
 
 - Transaction management: begin, commit, rollback
 - Query building: condition combination, relation loading
@@ -108,7 +114,7 @@ Before returning JSON, complete these steps internally:
 - Custom error type definitions
 - External error response formats
 
-## 4. API and Middleware ⭐
+## 4. Interfaces and Cross-Cutting Processing ⭐
 
 - Interface entry registration patterns
 - Middleware usage (auth/logging/rate limiting)
@@ -127,7 +133,7 @@ Before returning JSON, complete these steps internally:
 
 1. If multiple files use the same error handling approach → Extract "error handling pattern"
 2. If multiple services have similar initialization → Extract "service initialization pattern"
-3. If multiple APIs use the same middleware → Extract "middleware usage pattern"
+3. If multiple interface entries use the same cross-cutting processing chain → Extract "cross-cutting processing usage pattern"
 4. If multiple repositories use the same transaction handling → Extract "transaction management pattern"
 
 **Framework or library usage patterns**:
@@ -142,8 +148,8 @@ Allowed categories: {{.AllowedCategories}}
 
 Extract patterns in these categories:
 - **business**: Domain rules, state transitions, cross-entity orchestration, business workflows
-- **utils**: Domain-neutral helper functions, utilities, and tools with full signatures; do not classify domain operations, protocol/command wrappers, or external dependency interactions that carry product-domain behavior as utils solely because they live in a helper package
-- **api**: Interface entries and input/output formats
+- **utils**: Domain-neutral helper functions, utilities, and tools with full signatures; do not classify domain operations, protocol/command wrappers, or external dependency interactions that carry product-domain behavior as utils solely because their location looks generic
+- **api**: Interface boundaries, input/output formats, request or message entries; not limited to Web APIs
 - **database**: Queries, transactions, data access patterns
 - **error**: Error handling, wrapping, logging
 - **structure**: Code organization, layering
@@ -205,9 +211,9 @@ For EACH pattern, you MUST provide:
       "frequency": 5,
       "evidence_locations": [
         {
-          "path": "internal/service/order.go",
+          "path": "path/to/domain_component.go",
           "line": 42,
-          "symbol": "SubmitOrder",
+          "symbol": "AdvanceDomainState",
           "kind": "method",
           "description": "pattern-level source evidence locations",
           "confidence": 0.90
@@ -226,20 +232,20 @@ For EACH pattern, you MUST provide:
       }
     },
     {
-      "id": "transaction-boundary-pattern",
-      "name": "Transaction Boundary Pattern",
+      "id": "consistency-boundary-pattern",
+      "name": "Consistency Boundary Pattern",
       "category": "database",
-      "description": "Use the project's existing transaction wrapper for multi-step writes so failures roll back consistently",
-      "good_example": "Transaction-boundary code evidence copied verbatim from source you read (5-30 lines); do not output this placeholder",
+      "description": "Use the project's existing data-consistency boundary for multi-step state changes so failures are reverted or marked according to project semantics",
+      "good_example": "Consistency-boundary code evidence copied verbatim from source you read (5-30 lines); do not output this placeholder",
       "bad_example": "",
-      "rule": "Multi-step writes must use the existing project transaction boundary wrapper",
+      "rule": "Multi-step state changes must use the project's existing consistency-boundary wrapper",
       "confidence": 0.90,
       "frequency": 8,
       "evidence_locations": [
         {
-          "path": "internal/repository/order.go",
+          "path": "path/to/persistence_component.go",
           "line": 88,
-          "symbol": "CreateOrderWithItems",
+          "symbol": "ApplyDomainChange",
           "kind": "function",
           "description": "pattern-level source evidence locations",
           "confidence": 0.86
@@ -256,7 +262,7 @@ For EACH pattern, you MUST provide:
 2. Every pattern MUST have `good_example` with code evidence copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, or invent code; if surrounding context must be omitted, mark it explicitly with `// ...`, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering
 3. Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Do not invent evidence paths or line numbers; if the exact line is unknown, provide only the real path.
 4. Use `business_method` ONLY for utility/business methods
-5. **Choose the most specific category first**: database, API, error, config, middleware, structure, and domain-neutral utility patterns must not be labeled business. Domain-specific operations, resource lifecycles, protocol/command wrappers, or external dependency interactions confirmed by the project's source vocabulary are not domain-neutral utilities. Skip simple CRUD.
+5. **Choose the most specific category first**: data access, interface, error, config, cross-cutting processing, structure, and domain-neutral utility patterns must not be labeled business. Domain-specific operations, resource lifecycles, protocol/command wrappers, or external dependency interactions confirmed by the project's source vocabulary are not domain-neutral utilities. Skip simple record operations.
 6. Keep `bad_example` empty if not applicable
 7. Code evidence must be syntactically correct. If it is only an excerpt, mark omitted context with `// ...` and do not present it as a complete implementation
 
@@ -273,7 +279,7 @@ Before returning JSON, validate every candidate pattern internally:
 2. Category check:
    - `category` must be one of the allowed categories: {{.AllowedCategories}}.
    - Use `business` only for domain rules, state transitions, cross-entity workflows, or business invariants.
-   - Use `api`, `error`, `config`, `middleware`, `structure`, `utils`, `database`, `concurrency`, or `testing` for technical conventions.
+   - Use the most specific available category for technical conventions, such as interface, error, configuration, cross-cutting processing, structure, utility, data access, concurrency, or testing.
    - If a pattern fits a more specific technical category, do not label it `business`.
 3. Rule quality check:
    - `rule` must be actionable and say when to apply it.
@@ -285,7 +291,7 @@ Before returning JSON, validate every candidate pattern internally:
 5. `business_method` check:
    - Attach `business_method` only to real business or utility methods.
    - It must include a real signature and location.
-   - Do not attach it to pure routing, generated code, or simple CRUD.
+   - Do not attach it to pure dispatch entries, generated code, or simple record operations.
 6. Confidence check:
    - Use `confidence >= 0.90` only when code evidence is direct and repeated or structurally obvious.
    - Lower confidence when evidence is partial.

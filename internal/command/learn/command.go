@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -33,7 +34,10 @@ const (
 
 var sleepAfterWorkspaceChildStep = time.Sleep
 
-const learnCurrentProgressSubjectMaxRunes = 36
+const (
+	learnCurrentProgressSubjectMaxRunes = 36
+	learnCurrentRunningSubjectMaxRunes  = 18
+)
 
 type learnCurrentOptions struct {
 	language    string
@@ -285,27 +289,34 @@ func (r *learnCurrentRunningUnits) progressParams(parallelism int) map[string]in
 		current = 1
 	}
 	return map[string]interface{}{
-		"Current":     current,
-		"Total":       r.total,
-		"Parallelism": parallelism,
-		"Running":     r.runningTextLocked(),
+		"Current":      current,
+		"Total":        r.total,
+		"Parallelism":  parallelism,
+		"Running":      r.runningTextLocked(),
+		"RunningCount": len(r.order),
 	}
 }
 
 func (r *learnCurrentRunningUnits) runningTextLocked() string {
 	if len(r.order) == 0 {
-		return "[]"
+		return "-"
 	}
-	names := make([]string, 0, len(r.order))
+	names := make([]string, 0, 2)
 	for _, index := range r.order {
 		if label := r.labels[index]; label != "" {
-			names = append(names, label)
+			names = append(names, shortenRunes(label, learnCurrentRunningSubjectMaxRunes))
+		}
+		if len(names) >= 2 {
+			break
 		}
 	}
 	if len(names) == 0 {
-		return "[]"
+		return "-"
 	}
-	return "[" + strings.Join(names, ", ") + "]"
+	if extra := len(r.order) - len(names); extra > 0 {
+		names = append(names, fmt.Sprintf("+%d", extra))
+	}
+	return strings.Join(names, ", ")
 }
 
 type aiFileSelectionSummary struct {
@@ -342,6 +353,7 @@ type learnCurrentProjectRun struct {
 
 	patterns                  []domain.Pattern
 	profileDelta              domain.ProjectProfileDelta
+	hasProfileDelta           bool
 	profileRefreshRecommended agent.ProfileRefreshRecommendation
 	mergedProfile             *domain.ProjectProfile
 	savedCount                int
@@ -365,11 +377,21 @@ func learnCurrentProgressSubject(unit domain.AnalysisUnit) string {
 	if subject == "" {
 		subject = "unit"
 	}
-	runes := []rune(subject)
-	if len(runes) <= learnCurrentProgressSubjectMaxRunes {
-		return subject
+	return shortenRunes(subject, learnCurrentProgressSubjectMaxRunes)
+}
+
+func shortenRunes(value string, maxRunes int) string {
+	if maxRunes <= 0 {
+		return ""
 	}
-	return string(runes[:learnCurrentProgressSubjectMaxRunes]) + "..."
+	runes := []rune(value)
+	if len(runes) <= maxRunes {
+		return value
+	}
+	if maxRunes <= 3 {
+		return string(runes[:maxRunes])
+	}
+	return string(runes[:maxRunes-3]) + "..."
 }
 
 func learnCurrentUnitProgress(state *commandstate.State, fallbackIndex, fallbackTotal int, unit domain.AnalysisUnit) (int, int) {
@@ -455,7 +477,7 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if err := r.savePatternsStep(); err != nil {
 		return nil, err
 	}
-	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed && r.profileDelta.IsZero() {
+	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed {
 		r.refreshProfile = true
 	}
 	if err := r.saveProfileIfNeeded(); err != nil {
@@ -570,6 +592,9 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 func (r *learnCurrentProjectRun) detectChanges() error {
 	detectStartedAt := time.Now()
 	detectLabel := i18n.Get("ProgressLearnCurrentDetectChanges")
+	if r.hasRestorableCurrentState() {
+		detectLabel = i18n.Get("ProgressLearnCurrentResumeState")
+	}
 	if err := r.steps.Run(detectLabel, func() error {
 		if err := r.restoreOrDetectChanges(detectLabel); err != nil {
 			return err
@@ -580,6 +605,14 @@ func (r *learnCurrentProjectRun) detectChanges() error {
 	}
 	r.logDetectedChanges(detectStartedAt)
 	return nil
+}
+
+func (r *learnCurrentProjectRun) hasRestorableCurrentState() bool {
+	state, err := r.stateRepo.Load(r.ctx)
+	if err != nil {
+		return false
+	}
+	return canResumeCurrentState(state, r.projectName, r.currentLanguage, learnCurrentStateMode(r.learningMode, r.learningScope), r.opts.userContext)
 }
 
 func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) error {
@@ -645,9 +678,10 @@ func (r *learnCurrentProjectRun) selectRelevantFilesIfNeeded(detectLabel string)
 		Candidates:  focusRelPaths,
 		Changes:     r.incrementalChanges,
 		UserContext: r.opts.userContext,
+		CachePath:   layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
 	})
 	if selectErr != nil {
-		logger.Warn("AI file selector failed; falling back to all candidate files")
+		logger.Warn(i18n.Get("LearnCurrentAIFileSelectorFallback"))
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.select_relevant_files",
 			"error", selectErr,
@@ -1042,8 +1076,9 @@ func (r *learnCurrentProjectRun) mergeUnitResult(result learnCurrentUnitResult) 
 		r.patterns = append(r.patterns, result.patterns...)
 	}
 	r.savedCount += result.savedCount
-	if !result.profileDelta.IsZero() {
+	if result.profileDelta.HasMergeableFacts() {
 		r.profileDelta = result.profileDelta
+		r.hasProfileDelta = true
 		r.mergedProfile = domain.ApplyProjectProfileDelta(r.mergedProfile, result.profileDelta, r.projectName, r.currentLanguage)
 	}
 	if result.refreshRecommend.Needed {
@@ -1070,7 +1105,10 @@ func (r *learnCurrentProjectRun) savePatternsStep() error {
 
 func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	profileStartedAt := time.Now()
-	saveProfileFromDelta := !r.profileDelta.IsZero() && r.opts.profileMode != learnCurrentProfileRefresh
+	saveProfileFromDelta := r.hasProfileDelta && r.opts.profileMode != learnCurrentProfileRefresh && !r.refreshProfile && r.existingProfile != nil
+	if r.hasProfileDelta && r.opts.profileMode == learnCurrentProfileAuto && r.existingProfile == nil {
+		r.refreshProfile = true
+	}
 	if r.refreshProfile || saveProfileFromDelta {
 		if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSaveProfile"), func() error {
 			if saveProfileFromDelta {

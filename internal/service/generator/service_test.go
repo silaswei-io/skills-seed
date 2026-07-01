@@ -576,8 +576,6 @@ func TestGenerateSkillsDeterministicSummaryUsesMetricsAndHitStatsInRankedOrder(t
 	errorPatterns := readGeneratedFile(t, tmpDir, "references", "patterns", "error.md")
 	assert.Contains(t, business, "KMC Auth Boundary")
 	assert.Contains(t, errorPatterns, "Generic Rule")
-	spec := readGeneratedFile(t, tmpDir, "references", "project-spec.md")
-	assert.Less(t, strings.Index(spec, "KMC Auth Boundary"), strings.Index(spec, "Generic Rule"))
 }
 
 func TestRankPatternsForGenerationUsesEffectiveScoreHitsAndConfidence(t *testing.T) {
@@ -827,7 +825,7 @@ func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t 
 	require.NoError(t, err)
 	text := string(content)
 	require.Contains(t, text, "## 项目概览摘要")
-	require.Contains(t, text, "当前已学习到 2 个模块/业务域")
+	require.Contains(t, text, "当前项目画像已覆盖 2 个模块/业务域")
 	require.Contains(t, text, "home")
 	require.Contains(t, text, "key-manage")
 	require.NotContains(t, text, "## 项目概览摘要\n\nhome-info单元")
@@ -1264,9 +1262,11 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	assert.Contains(t, spec, "## 验证命令")
 	assert.Contains(t, spec, "| 改动范围 | 建议命令 | 触发条件 | 证据 |")
 	assert.Contains(t, spec, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
-	assert.Contains(t, spec, "以下内容来自已学习模式，但缺少足够直接的代码证据")
-	assert.Contains(t, spec, "Do not hand-edit generated handlers or types")
-	assert.Contains(t, spec, "Deactivate existing active plans before creating or activating a plan")
+	assert.Contains(t, spec, "以下内容来自已学习模式，只能作为定位线索和复核清单")
+	assert.Contains(t, spec, "jzero generates handlers and types from .api files")
+	assert.Contains(t, spec, "Only one plan can be active")
+	assert.NotContains(t, spec, "Do not hand-edit generated handlers or types")
+	assert.NotContains(t, spec, "Deactivate existing active plans before creating or activating a plan")
 
 	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
 	assert.Contains(t, overview, "## 验证命令")
@@ -1280,6 +1280,43 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.Contains(t, businessIndex, "## 重要性分层")
 	assert.Contains(t, businessIndex, "Plan Lifecycle State Machine")
+	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "vocab.md")
+	assert.Contains(t, businessDetail, "Deactivate existing active plans before creating or activating a plan")
+}
+
+func TestGenerateSkills_DisambiguatesDuplicateModuleHeadings(t *testing.T) {
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			pattern := domain.NewPattern("p1", "Business Flow", domain.CategoryBusiness)
+			pattern.Confidence = 0.9
+			pattern.Frequency = 2
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "demo",
+				Language:    "go",
+				KeyModules: []domain.ModuleInfo{
+					{Name: "home", Path: "internal/handler/home", Description: "handler layer"},
+					{Name: "home", Path: "internal/logic/home", Description: "logic layer"},
+				},
+			}, nil
+		},
+	}
+
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{ProjectCfg: config.ProjectConfig{Name: "demo", Language: "go"}}
+	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	tmpDir := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	modules := readGeneratedFile(t, tmpDir, "references", "modules.md")
+	assert.NotContains(t, modules, "## home\n")
+	assert.Contains(t, modules, "## home (handler/home)")
+	assert.Contains(t, modules, "## home (logic/home)")
 }
 
 func TestGenerateSkills_GroupsBusinessMethodsAndDisambiguatesGenericNames(t *testing.T) {

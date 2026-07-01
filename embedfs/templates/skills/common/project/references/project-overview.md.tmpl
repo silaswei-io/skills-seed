@@ -144,7 +144,7 @@
 
 {{end}}
 {{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}
+- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}{{if .Workdir}}，工作目录：`{{.Workdir}}`{{end}}{{if .ScopePaths}}，作用域：{{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}，证据：{{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}，类型：{{.Type}}{{end}}
 {{end}}
 {{end}}
 

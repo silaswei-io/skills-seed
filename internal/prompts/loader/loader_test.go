@@ -559,13 +559,13 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 		requiredText []string
 	}{
 		{
-			locale: "zh-CN",
-			requiredText: []string{
-				"业务覆盖矩阵",
-				"非 api",
-				"资源生命周期",
-				"外部依赖交互",
-				"允许中英文混合表达技术概念",
+				locale: "zh-CN",
+				requiredText: []string{
+					"业务覆盖矩阵",
+					"非请求接口",
+					"资源生命周期",
+					"外部依赖交互",
+					"允许中英文混合表达技术概念",
 			},
 		},
 		{
@@ -665,13 +665,13 @@ func TestLoader_RenderLearningPromptsPreserveDomainOperationBusinessSignals(t *t
 		requiredText []string
 	}{
 		{
-			locale: "zh-CN",
-			requiredText: []string{
-				"领域操作",
-				"业务覆盖矩阵",
-				"非 API",
-				"资源生命周期",
-				"外部依赖交互",
+				locale: "zh-CN",
+				requiredText: []string{
+					"领域操作",
+					"业务覆盖矩阵",
+					"非请求接口",
+					"资源生命周期",
+					"外部依赖交互",
 			},
 		},
 		{
@@ -772,13 +772,13 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 				"学习模式策略",
 				"`fast`",
 				"`normal`",
-				"`deep`",
-				"推荐分析顺序",
-				"业务子域",
-				"可选拆解方向",
-				"`pkg`、`utils`、`helper`、`client`",
-				"路由价值和代码证据",
-			},
+					"`deep`",
+					"推荐分析顺序",
+					"业务子域",
+					"可选拆解方向",
+					"通用命名目录、公共包、适配层或外部依赖封装",
+					"路由价值和代码证据",
+				},
 		},
 		{
 			locale: "en-US",
@@ -792,13 +792,13 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 				"Learning Mode Strategy",
 				"`fast`",
 				"`normal`",
-				"`deep`",
-				"Recommended analysis order",
-				"business subdomains",
-				"Optional expansion directions",
-				"`pkg`, `utils`, `helper`, `client`",
-				"routing value and source evidence",
-			},
+					"`deep`",
+					"Recommended analysis order",
+					"business subdomains",
+					"Optional expansion directions",
+					"generally named directories, shared packages, adapters, or external-dependency wrappers",
+					"routing value and source evidence",
+				},
 		},
 	}
 
@@ -820,20 +820,20 @@ func TestLoader_ProjectProfilePromptKeepsDomainEntriesOutOfCommonUtils(t *testin
 		requiredText []string
 	}{
 		{
-			locale: "zh-CN",
-			requiredText: []string{
-				"由项目源码词表确认的核心领域操作",
-				"不要仅因其位于 `pkg`、`utils`、`helper`、`client`、适配层或 SDK 封装层就放入 `common_utils`",
-				"承载产品领域行为的领域操作、协议/命令封装或外部依赖交互入口应优先放入 business_methods",
-			},
+				locale: "zh-CN",
+				requiredText: []string{
+					"由项目源码词表确认的核心领域操作",
+					"不要仅因其位于通用命名目录、公共包、适配层或外部依赖封装中就放入 `common_utils`",
+					"承载产品领域行为的领域操作、协议/命令封装或外部依赖交互入口应优先放入 business_methods",
+				},
 		},
 		{
 			locale: "en-US",
-			requiredText: []string{
-				"Core domain operations, resource lifecycles, policy execution",
-				"Do not place them in `common_utils` solely because they live under `pkg`, `utils`, `helper`, `client`, an adapter, or an SDK wrapper",
-				"external dependency interaction entries that carry product-domain behavior should prefer business_methods",
-			},
+				requiredText: []string{
+					"Core domain operations, resource lifecycles, policy execution",
+					"Do not place them in `common_utils` solely because they live in generally named directories, shared packages, adapters, or external-dependency wrappers",
+					"external dependency interaction entries that carry product-domain behavior should prefer business_methods",
+				},
 		},
 	}
 
@@ -865,6 +865,9 @@ func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
 				"产品运行期行为",
 				"规则策略",
 				"外部依赖约束",
+				"相同候选输入",
+				"稳定选择",
+				"selected_paths",
 			},
 		},
 		{
@@ -877,6 +880,9 @@ func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
 				"runtime product behavior",
 				"rules or policies",
 				"external dependency constraints",
+				"same candidate input",
+				"stable selection",
+				"selected_paths",
 			},
 		},
 	}

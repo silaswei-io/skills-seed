@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
@@ -29,10 +32,15 @@ const (
 	syncRunRestart syncRunMode = "restart"
 )
 
+var (
+	errSyncInvalidUserPattern = errors.New("invalid user pattern result")
+)
+
 // Cmd 返回 sync 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	var category string
 	var files []string
+	var patternDescription string
 	userContext := ""
 	resume := false
 	restart := false
@@ -53,11 +61,20 @@ func Cmd(cont *container.Container) *cobra.Command {
 			}
 			ctx := cmd.Context()
 			stateScope := commandutil.CommandStateScopeForCobra(cmd)
+			inputs, err := normalizeSyncInputs(syncInputs{
+				Category:           category,
+				Files:              files,
+				PatternDescription: patternDescription,
+				UserContext:        userContext,
+			})
+			if err != nil {
+				return err
+			}
 			resolvedMode, err := syncModeFromFlags(resume, restart)
 			if err != nil {
 				return err
 			}
-			if shouldRunInteractiveSync(cmd, category, files, userContext, noInteractive) {
+			if shouldRunInteractiveSync(cmd, inputs.Category, inputs.Files, inputs.PatternDescription, inputs.UserContext, noInteractive) {
 				mode, err := resolveInteractiveSync(ctx, cmd, cont, stateScope)
 				if err != nil {
 					if errors.Is(err, interactive.ErrCanceled) {
@@ -67,20 +84,35 @@ func Cmd(cont *container.Container) *cobra.Command {
 				}
 				resolvedMode = mode
 			}
-			if resolvedMode == syncRunRestart && userContext == "" {
+			if inputs.PatternDescription != "" && resolvedMode == syncRunResume {
+				return fmt.Errorf("%s", i18n.Get("SyncPatternResumeConflict"))
+			}
+			if resolvedMode == syncRunRestart {
 				if err := commandstate.NewRepository(cont.SeedPath, stateScope).Clear(); err != nil {
 					return err
 				}
 			}
+			if resolvedMode == syncRunResume {
+				resumable, err := hasResumableSyncCommandState(ctx, cont.SeedPath, stateScope)
+				if err != nil {
+					return err
+				}
+				if !resumable {
+					return fmt.Errorf("%s", i18n.Get("SyncResumeStateMissing"))
+				}
+			}
+			if inputs.PatternDescription == "" && (inputs.Category != "" || len(inputs.Files) > 0) {
+				return fmt.Errorf("%s", i18n.Get("SyncPatternOptionsRequirePattern"))
+			}
 
 			change := changelog.Start(cont.SeedPath, "sync")
-			if userContext != "" {
-				if err := syncWithUserPattern(ctx, cont, userContext, category, files, change); err != nil {
+			if inputs.PatternDescription != "" {
+				if err := syncWithUserPattern(ctx, cont, inputs.PatternDescription, inputs.Category, inputs.Files, inputs.UserContext, change); err != nil {
 					return err
 				}
 				return change.Save(i18n.Get("ChangeLogSummaryUserPatternSync"))
 			}
-			if err := syncLearn(ctx, cont, stateScope, userContext, change); err != nil {
+			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, change); err != nil {
 				return err
 			}
 			return change.Save(i18n.Get("ChangeLogSummarySync"))
@@ -90,6 +122,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("SyncFlagCategory"))
 	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("SyncFlagFiles"))
 	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("SyncFlagContext"))
+	cmd.Flags().StringVar(&patternDescription, "pattern", "", i18n.Get("SyncFlagPattern"))
 	cmd.Flags().BoolVar(&resume, "resume", false, i18n.Get("SyncFlagResume"))
 	cmd.Flags().BoolVar(&restart, "restart", false, i18n.Get("SyncFlagRestart"))
 	cmd.Flags().BoolVar(&noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
@@ -110,6 +143,42 @@ func syncModeFromFlags(resume, restart bool) (syncRunMode, error) {
 	return syncRunAuto, nil
 }
 
+type syncInputs struct {
+	Category           string
+	Files              []string
+	PatternDescription string
+	UserContext        string
+}
+
+func normalizeSyncInputs(inputs syncInputs) (syncInputs, error) {
+	inputs.Category = strings.TrimSpace(inputs.Category)
+	inputs.PatternDescription = strings.TrimSpace(inputs.PatternDescription)
+	inputs.UserContext = strings.TrimSpace(inputs.UserContext)
+	files := make([]string, 0, len(inputs.Files))
+	for _, file := range inputs.Files {
+		file = cleanSyncRelativePath(file)
+		if file == "" {
+			continue
+		}
+		if filepath.IsAbs(file) || strings.HasPrefix(file, "../") || strings.Contains(file, "/../") {
+			return syncInputs{}, fmt.Errorf("%s", i18n.GetWithParams("SyncInvalidPatternFile", map[string]interface{}{"Path": file}))
+		}
+		files = append(files, file)
+	}
+	inputs.Files = files
+	return inputs, nil
+}
+
+func cleanSyncRelativePath(path string) string {
+	path = strings.TrimSpace(filepath.ToSlash(path))
+	path = strings.TrimPrefix(path, "./")
+	path = strings.Trim(path, "/")
+	if path == "" || path == "." {
+		return ""
+	}
+	return filepath.ToSlash(filepath.Clean(path))
+}
+
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
 func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, change *changelog.Builder) error {
 	// 步骤 1：学习当前代码。
@@ -120,31 +189,68 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 	}
 	recordLearnSummary(change, result)
 
-	return syncLearnAfterLearn(result, func() error {
+	return syncLearnAfterLearn(result, syncGeneratedSkillMissing(cont), func() error {
 		return gencmd.RunGenerate(cont)
 	}, change)
 }
 
-func syncLearnAfterLearn(result domain.LearnCurrentResult, generate func() error, change *changelog.Builder) error {
+func syncLearnAfterLearn(result domain.LearnCurrentResult, outputMissing bool, generate func() error, change *changelog.Builder) error {
+	if !syncShouldGenerateAfterLearn(result) && !outputMissing {
+		if change != nil {
+			change.Detail(i18n.Get("ChangeLogGenerateSkippedNoChanges"))
+		}
+		logger.Info(i18n.Get("SyncGenerateSkippedNoChanges"))
+		logger.Info(i18n.Get("SyncComplete"))
+		return nil
+	}
 	// 步骤 2：生成 Skills。
 	logger.Info(i18n.Get("SyncStepGenerate"))
 	if err := generate(); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 	}
-	change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
+	if change != nil {
+		change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
+	}
 
 	logger.Info(i18n.Get("SyncComplete"))
 	return nil
 }
 
+func syncShouldGenerateAfterLearn(result domain.LearnCurrentResult) bool {
+	summary := result.Summary
+	if summary.Projects > 0 {
+		return summary.ChangedProjects > 0 || summary.WorkspaceChanged
+	}
+	if summary.NoFileChanges {
+		return false
+	}
+	return summary.ChangedFiles > 0 || summary.DeletedFiles > 0 || summary.PatternsFound > 0 || summary.PatternsSaved > 0
+}
+
+func syncGeneratedSkillMissing(cont *container.Container) bool {
+	if cont == nil || cont.ConfigRepo == nil {
+		return false
+	}
+	outputPath := strings.TrimSpace(cont.ConfigRepo.GetEffectiveSkillsPath())
+	if outputPath == "" {
+		return false
+	}
+	if !filepath.IsAbs(outputPath) {
+		outputPath = filepath.Join(cont.Config.Project.RootPath, filepath.FromSlash(outputPath))
+	}
+	_, err := os.Stat(filepath.Join(outputPath, "SKILL.md"))
+	return errors.Is(err, os.ErrNotExist)
+}
+
 // syncWithUserPattern 路径 B：添加模式 → 生成 Skills。
-func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, change *changelog.Builder) error {
+func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, userContext string, change *changelog.Builder) error {
 	// 步骤 1：添加用户自定义模式。
 	logger.Info(i18n.Get("SyncStepAddPattern"))
 	req := &agent.UserDefinePatternRequest{
 		Description: description,
 		Category:    category,
 		Files:       files,
+		UserContext: userContext,
 		WorkDir:     cont.Config.Project.RootPath,
 		Language:    cont.Config.Project.Language,
 	}
@@ -165,7 +271,10 @@ func syncWithUserPattern(ctx context.Context, cont *container.Container, descrip
 		return fmt.Errorf("%s: %w", i18n.Get("SyncAddPatternFailed"), err)
 	}
 	if cont.CuratorSvc == nil {
-		return fmt.Errorf("%s: %s", i18n.Get("SyncSavePatternFailed"), "pattern curator is not configured")
+		return fmt.Errorf("%s: %s", i18n.Get("SyncSavePatternFailed"), i18n.Get("PatternCuratorNotConfigured"))
+	}
+	if result == nil || result.Pattern == nil {
+		return fmt.Errorf("%s: %w", i18n.Get("SyncAddPatternFailed"), errSyncInvalidUserPattern)
 	}
 
 	written, err := patterncmd.StoreUserDefinedPattern(ctx, cont, description, *result.Pattern)

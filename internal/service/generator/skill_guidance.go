@@ -14,9 +14,13 @@ type skillWorkflow struct {
 }
 
 type validationCommand struct {
-	Command string
-	When    string
-	Source  string
+	Command    string
+	When       string
+	Source     string
+	Workdir    string
+	ScopePaths []string
+	Evidence   []string
+	Type       string
 }
 
 func skillTriggerDescription(projectName, language, locale string, profile *domain.ProjectProfile) string {
@@ -150,9 +154,13 @@ func validationCommands(profile *domain.ProjectProfile, _ []domain.Pattern, _ st
 	commands := make([]validationCommand, 0, len(learned))
 	for _, learnedCommand := range learned {
 		commands = append(commands, validationCommand{
-			Command: learnedCommand.Command,
-			When:    learnedCommand.When,
-			Source:  learnedCommand.Source,
+			Command:    learnedCommand.Command,
+			When:       learnedCommand.When,
+			Source:     learnedCommand.Source,
+			Workdir:    learnedCommand.Workdir,
+			ScopePaths: append([]string(nil), learnedCommand.ScopePaths...),
+			Evidence:   append([]string(nil), learnedCommand.Evidence...),
+			Type:       learnedCommand.Type,
 		})
 	}
 	return commands

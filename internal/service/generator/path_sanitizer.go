@@ -108,8 +108,8 @@ func (s projectPathSanitizer) exists(location string) bool {
 		return false
 	}
 	fullPath := filepath.Join(s.root, path)
-	info, err := os.Stat(fullPath)
-	return err == nil && !info.IsDir()
+	_, err := os.Stat(fullPath)
+	return err == nil
 }
 
 func referencePathOnly(location string) string {

@@ -429,3 +429,64 @@ func stateAfterInsertedComma(stack []jsonRepairContext) jsonRepairState {
 	}
 	return jsonRepairStateExpectKeyOrEnd
 }
+
+func repairExtraClosingContainers(jsonStr string) (string, error) {
+	var b strings.Builder
+	b.Grow(len(jsonStr))
+
+	stack := make([]byte, 0, 8)
+	inString := false
+	escapeNext := false
+	repaired := false
+
+	for i := 0; i < len(jsonStr); i++ {
+		ch := jsonStr[i]
+		if escapeNext {
+			b.WriteByte(ch)
+			escapeNext = false
+			continue
+		}
+		if ch == '\\' {
+			b.WriteByte(ch)
+			if inString {
+				escapeNext = true
+			}
+			continue
+		}
+		if ch == '"' {
+			b.WriteByte(ch)
+			inString = !inString
+			continue
+		}
+		if inString {
+			b.WriteByte(ch)
+			continue
+		}
+
+		switch ch {
+		case '{', '[':
+			stack = append(stack, ch)
+			b.WriteByte(ch)
+		case '}', ']':
+			if len(stack) == 0 || !closingMatchesOpening(stack[len(stack)-1], ch) {
+				repaired = true
+				continue
+			}
+			stack = stack[:len(stack)-1]
+			b.WriteByte(ch)
+		default:
+			b.WriteByte(ch)
+		}
+	}
+	if inString {
+		return "", fmt.Errorf("unterminated JSON string")
+	}
+	if !repaired {
+		return jsonStr, nil
+	}
+	return b.String(), nil
+}
+
+func closingMatchesOpening(opening, closing byte) bool {
+	return (opening == '{' && closing == '}') || (opening == '[' && closing == ']')
+}

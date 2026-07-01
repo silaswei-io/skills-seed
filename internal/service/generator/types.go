@@ -38,6 +38,11 @@ type profileReferenceTemplateData struct {
 	BusinessMethodIndex businessMethodIndex
 }
 
+type moduleReferenceTemplateData struct {
+	domain.ProjectProfile
+	KeyModules []domain.ModuleInfo
+}
+
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
 	References       ReferenceAvailability

@@ -587,6 +587,11 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 	cmd := exec.CommandContext(ctx, c.commandPath, args...)
 	cmd.Dir = workDir
 	cmd.Stdin = strings.NewReader(prompt)
+	configureCommandProcessGroup(cmd)
+	stopProcessGroupKill := context.AfterFunc(ctx, func() {
+		terminateCommandProcessGroup(cmd)
+	})
+	defer stopProcessGroupKill()
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -798,6 +803,9 @@ func extractFinalContent(output string) (string, error) {
 	}
 
 	if lastMessageContent != "" {
+		if looksLikeJSONContent(lastMessageContent) && !hasEarlierJSONContent(allParts) {
+			return lastMessageContent, nil
+		}
 		// If there are multiple distinct message events, merge them.
 		// Deduplicate: if the last message contains all previous content,
 		// just return the last one.
@@ -813,6 +821,23 @@ func extractFinalContent(output string) (string, error) {
 	}
 
 	return "", fmt.Errorf("%s", i18n.Get("AgentCodexNoFinalMessage"))
+}
+
+func looksLikeJSONContent(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	return strings.HasPrefix(trimmed, "{")
+}
+
+func hasEarlierJSONContent(parts []string) bool {
+	if len(parts) <= 1 {
+		return false
+	}
+	for _, part := range parts[:len(parts)-1] {
+		if looksLikeJSONContent(part) {
+			return true
+		}
+	}
+	return false
 }
 
 func extractCodexEventContent(evt map[string]interface{}) string {

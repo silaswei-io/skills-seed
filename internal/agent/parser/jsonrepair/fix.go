@@ -62,6 +62,7 @@ func FixAIJSON(jsonStr string) (string, error) {
 		repairNumericRanges,
 		repairUnescapedQuotesInStrings,
 		repairInvalidStringEscapes,
+		repairExtraClosingContainers,
 		repairTrailingCommas,
 		repairMissingClosingContainers,
 	}

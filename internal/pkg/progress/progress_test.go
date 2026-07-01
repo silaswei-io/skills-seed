@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattn/go-runewidth"
 	"github.com/stretchr/testify/require"
 )
 
@@ -117,9 +118,29 @@ func TestUpdateStepRefreshesActiveProgressLabel(t *testing.T) {
 		tracker.CompleteStep("分析当前代码库")
 	})
 
-	if !strings.Contains(output, "分析当前代码库（API Error: 529，本次调用 3m37s，15s 后重试）") {
+	if !strings.Contains(output, "分析当前代码库（API Error: 529") || !strings.Contains(output, "…") {
 		t.Fatalf("expected updated progress label, got %q", output)
 	}
+}
+
+func TestRenderClipsLongProgressLineToTerminalWidth(t *testing.T) {
+	oldTerminalWidth := terminalWidth
+	terminalWidth = func() int { return 42 }
+	defer func() { terminalWidth = oldTerminalWidth }()
+
+	output := captureStdout(t, func() {
+		tracker := New(1)
+		tracker.enabled = true
+		tracker.active = true
+		tracker.label = strings.Repeat("很长的业务分析单元", 10)
+		tracker.startedAt = time.Now()
+
+		tracker.renderLocked(false)
+	})
+
+	line := strings.TrimPrefix(output, "\r\x1b[2K")
+	require.LessOrEqual(t, runewidth.StringWidth(line), 41)
+	require.Contains(t, line, "…")
 }
 
 func TestUpdateStepPrintsDetailWhenProgressDisabled(t *testing.T) {
@@ -299,7 +320,7 @@ func TestMultiTrackerRenderKeepsCursorInsideProgressBlock(t *testing.T) {
 	}
 }
 
-func TestMultiTrackerRenderMovesByWrappedPhysicalLines(t *testing.T) {
+func TestMultiTrackerRenderClipsLongLinesBeforeTheyWrap(t *testing.T) {
 	restore := setTerminalWidthForTest(80)
 	defer restore()
 
@@ -315,11 +336,12 @@ func TestMultiTrackerRenderMovesByWrappedPhysicalLines(t *testing.T) {
 		tracker.Render()
 	})
 
-	if !strings.Contains(output, "\x1b[5F") && !strings.Contains(output, "\x1b[6F") {
-		t.Fatalf("expected wrapped progress render to move back across wrapped physical lines, got %q", output)
+	for _, movement := range []string{"\x1b[3F", "\x1b[4F", "\x1b[5F", "\x1b[6F"} {
+		require.NotContains(t, output, movement)
 	}
 	require.Contains(t, output, "\x1b[J")
-	require.Contains(t, output, "request_id")
+	require.Contains(t, output, "…")
+	require.NotContains(t, output, "request_id")
 }
 
 func TestMultiTrackerCompletedStepStillAnimatesUntilNextStep(t *testing.T) {

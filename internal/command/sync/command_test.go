@@ -28,10 +28,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSyncLearnAfterLearnAlwaysGenerates(t *testing.T) {
+func TestSyncLearnAfterLearnGeneratesWhenLearnChanged(t *testing.T) {
 	generateCalled := false
 
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{}, func() error {
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{ChangedFiles: 1}}, false, func() error {
 		generateCalled = true
 		return nil
 	}, nil)
@@ -40,14 +40,61 @@ func TestSyncLearnAfterLearnAlwaysGenerates(t *testing.T) {
 	require.True(t, generateCalled)
 }
 
+func TestSyncLearnAfterLearnSkipsGenerateWhenNoFileChanges(t *testing.T) {
+	generateCalled := false
+
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, false, func() error {
+		generateCalled = true
+		return nil
+	}, nil)
+
+	require.NoError(t, err)
+	require.False(t, generateCalled)
+}
+
 func TestSyncLearnAfterLearnWrapsGenerateError(t *testing.T) {
 	errGenerate := errors.New("boom")
 
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{}, func() error {
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{ChangedFiles: 1}}, false, func() error {
 		return errGenerate
 	}, nil)
 
 	require.ErrorIs(t, err, errGenerate)
+}
+
+func TestSyncLearnAfterLearnGeneratesWhenOutputMissing(t *testing.T) {
+	generateCalled := false
+
+	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, true, func() error {
+		generateCalled = true
+		return nil
+	}, nil)
+
+	require.NoError(t, err)
+	require.True(t, generateCalled)
+}
+
+func TestSyncGeneratedSkillMissing(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.RootPath = projectRoot
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo")}
+	require.NoError(t, configRepo.Update(cfg))
+	cont := &container.Container{
+		Config:     configRepo.Get(),
+		ConfigRepo: configRepo,
+	}
+
+	require.True(t, syncGeneratedSkillMissing(cont))
+
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".agents", "skills", "demo"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, ".agents", "skills", "demo", "SKILL.md"), []byte("# skill\n"), 0644))
+
+	require.False(t, syncGeneratedSkillMissing(cont))
 }
 
 func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
@@ -136,6 +183,44 @@ func TestHasSyncCommandState(t *testing.T) {
 	require.True(t, hasState)
 }
 
+func TestHasResumableSyncCommandStateRequiresInputsAndUnits(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	repo := commandstate.NewRepository(seedPath, "sync")
+
+	resumable, err := hasResumableSyncCommandState(context.Background(), seedPath, "sync")
+	require.NoError(t, err)
+	require.False(t, resumable)
+
+	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", nil, nil)))
+	resumable, err = hasResumableSyncCommandState(context.Background(), seedPath, "sync")
+	require.NoError(t, err)
+	require.False(t, resumable)
+
+	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []commandstate.FileInput{
+		{Path: "main.go", Hash: "hash", Status: "present"},
+	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
+	resumable, err = hasResumableSyncCommandState(context.Background(), seedPath, "sync")
+	require.NoError(t, err)
+	require.True(t, resumable)
+}
+
+func TestNormalizeSyncInputsTrimsAndRejectsUnsafeFiles(t *testing.T) {
+	inputs, err := normalizeSyncInputs(syncInputs{
+		Category:           " business ",
+		Files:              []string{" ./internal/service/ ", "", "."},
+		PatternDescription: " rule ",
+		UserContext:        " context ",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "business", inputs.Category)
+	require.Equal(t, []string{"internal/service"}, inputs.Files)
+	require.Equal(t, "rule", inputs.PatternDescription)
+	require.Equal(t, "context", inputs.UserContext)
+
+	_, err = normalizeSyncInputs(syncInputs{Files: []string{"../secret"}})
+	require.Error(t, err)
+}
+
 func TestSyncModeFromFlagsRejectsConflict(t *testing.T) {
 	_, err := syncModeFromFlags(true, true)
 	require.Error(t, err)
@@ -173,7 +258,8 @@ func TestSyncRestartClearsOnlySyncCommandState(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSyncWithUserPatternUsesContextAsPatternDescription(t *testing.T) {
+func TestSyncWithUserPatternUsesPatternDescriptionAndContext(t *testing.T) {
+	inputPatternDescription := "所有 API 必须有错误处理"
 	userContext := "私有化部署，不是 SaaS"
 	projectRoot := t.TempDir()
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
@@ -194,7 +280,7 @@ func TestSyncWithUserPatternUsesContextAsPatternDescription(t *testing.T) {
 	require.NoError(t, err)
 	defer patternRepo.Close()
 
-	var patternDescription string
+	var requestPatternDescription string
 	var patternContext string
 	pattern := domain.NewPattern("p1", "Context Boundary", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
@@ -204,7 +290,7 @@ func TestSyncWithUserPatternUsesContextAsPatternDescription(t *testing.T) {
 		NameVal:      "mock",
 		AvailableVal: true,
 		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
-			patternDescription = req.Description
+			requestPatternDescription = req.Description
 			patternContext = req.UserContext
 			return &agent.UserDefinePatternResult{Pattern: pattern}, nil
 		},
@@ -229,9 +315,44 @@ func TestSyncWithUserPatternUsesContextAsPatternDescription(t *testing.T) {
 		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo),
 	}
 
-	require.NoError(t, syncWithUserPattern(context.Background(), cont, userContext, "business", []string{"internal/service"}, nil))
+	require.NoError(t, syncWithUserPattern(context.Background(), cont, inputPatternDescription, "business", []string{"internal/service"}, userContext, nil))
 
-	require.Equal(t, userContext, patternDescription)
-	require.Empty(t, patternContext)
+	require.Equal(t, inputPatternDescription, requestPatternDescription)
+	require.Equal(t, userContext, patternContext)
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-dev", "SKILL.md"))
+}
+
+func TestSyncWithUserPatternRejectsNilPatternResult(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.RootPath = projectRoot
+	cfg.Project.Language = "go"
+	cfg.Agent.Engine = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
+	require.NoError(t, configRepo.Update(cfg))
+
+	cont := &container.Container{
+		SeedPath:   seedPath,
+		Config:     configRepo.Get(),
+		ConfigRepo: configRepo,
+		Agent: &mocks.MockAgent{
+			NameVal:      "mock",
+			AvailableVal: true,
+			UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+				return &agent.UserDefinePatternResult{}, nil
+			},
+		},
+		CuratorSvc: curator.NewService(&mocks.MockAgent{NameVal: "mock", AvailableVal: true}, nil),
+	}
+
+	err = syncWithUserPattern(context.Background(), cont, "rule", "", nil, "", nil)
+
+	require.ErrorIs(t, err, errSyncInvalidUserPattern)
 }

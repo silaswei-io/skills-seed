@@ -137,6 +137,17 @@ func TestExtractFinalContent_IgnoresCommandExecutionOutput(t *testing.T) {
 	require.Equal(t, "final answer", content)
 }
 
+func TestExtractFinalContent_PrefersLastJSONMessageOverProgressMessages(t *testing.T) {
+	output := `{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"我会先读取源码证据。"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"继续补充邻近定义。"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"{\"patterns\":[],\"profile_refresh_recommended\":{\"needed\":false}}"}}`
+
+	content, err := extractFinalContent(output)
+
+	require.NoError(t, err)
+	require.Equal(t, `{"patterns":[],"profile_refresh_recommended":{"needed":false}}`, content)
+}
+
 type failingPromptRenderer struct {
 	err error
 }
