@@ -11,7 +11,7 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-[快速开始](#快速开始) · [它会生成什么](#它会生成什么) · [常用命令](#常用命令) · [Workspace](#workspace) · [文档](#文档) · [HTML 页面](docs/skills-seed.html)
+[快速开始](#快速开始) · [它会生成什么](#它会生成什么) · [常用命令](#常用命令) · [Workspace](#workspace) · [文档](#文档) · [HTML 页面](docs/html/skills-seed.html)
 
 </div>
 
@@ -107,8 +107,13 @@ existing code / git history / check hits
     ├── modules.md
     └── patterns/
         ├── business.md
+        ├── concurrency.md
+        ├── config.md
+        ├── database.md
         ├── error.md
-        └── testing.md
+        ├── middleware.md
+        ├── structure.md
+        └── utils.md
 ```
 
 `SKILL.md` 是 Agent 入口；`references/` 保存更完整的项目画像、规范、业务入口和模式细节。Agent 先读入口，再按任务深入相关参考文件，避免一次性加载过多上下文。
@@ -232,7 +237,7 @@ Skills Seed 不维护远端知识库；学习结果默认写入当前仓库。`s
 
 面向使用者的静态介绍页可直接在浏览器打开：
 
-[打开 `docs/skills-seed.html`](docs/skills-seed.html)
+[打开 `docs/html/skills-seed.html`](docs/html/skills-seed.html)
 
 ## 文档
 

@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.5]
+
+### Changes
+
+- Moved the HTML overview page to `docs/html/skills-seed.html` and updated the README entry links to the new location.
+- Split the HTML overview page into standalone CSS and JS, added light/dark theme switching and Chinese/English switching, and made README links open the matching GitHub README.
+
+### Fixes
+
+- Fixed the generated Skills structure examples in the docs by removing the nonexistent `testing.md` entry and listing the currently generated pattern categories.
+
 ## [v0.11.4]
 
 ### Changes

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Skills Seed - Project Skills for AI Agents</title>
+  <link rel="stylesheet" href="./skills-seed.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <div class="nav-wrap">
+        <a class="brand" href="#top" aria-label="Skills Seed">
+          <span class="brand-mark">SS</span>
+          <span class="brand-text">Skills Seed</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary navigation">
+          <a href="#start" data-i18n="navStart">快速开始</a>
+          <a href="#output" data-i18n="navOutput">产物结构</a>
+          <a href="#commands" data-i18n="navCommands">命令</a>
+          <a href="#workspace">Workspace</a>
+          <a data-doc-link="readme" href="https://github.com/silaswei-io/skills-seed/blob/main/README.md" target="_blank" rel="noopener">README</a>
+        </nav>
+        <div class="nav-actions" aria-label="Page settings">
+          <button class="icon-button" type="button" data-theme-toggle aria-label="Toggle color theme">
+            <span data-theme-icon>◐</span>
+          </button>
+          <button class="lang-button" type="button" data-lang-toggle aria-label="Switch language">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero-section">
+        <div class="hero-copy">
+          <p class="eyebrow" data-i18n="eyebrow">Local skills for Claude Code and Codex</p>
+          <h1 data-i18n="heroTitle">让 AI Agent 先理解项目规则，再开始改代码。</h1>
+          <p class="hero-lead" data-i18n="heroLead">Skills Seed 从已有代码、Git 历史和检查命中里提取团队真实实践，生成本地可加载的 Skills，让 Agent 按你的项目边界、业务入口和测试习惯工作。</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#start" data-i18n="primaryCta">两步开始</a>
+            <a class="button" data-doc-link="commands" href="../COMMANDS.md" data-i18n="secondaryCta">查看命令参考</a>
+          </div>
+        </div>
+
+        <div class="product-panel" aria-label="Skills Seed workflow preview">
+          <div class="panel-top">
+            <span class="window-dot red"></span>
+            <span class="window-dot amber"></span>
+            <span class="window-dot green"></span>
+            <span class="panel-title">skills-seed</span>
+          </div>
+          <div class="terminal-lines">
+            <span class="line muted"># <span data-i18n="terminalComment">在已有 Git 项目根目录执行</span></span>
+            <span class="line">cd your-project</span>
+            <span class="line accent">skills-seed init</span>
+            <span class="line accent">skills-seed sync</span>
+          </div>
+          <div class="skill-card">
+            <div class="skill-card-head">
+              <span>SKILL.md</span>
+              <strong data-i18n="skillEntry">Agent 入口</strong>
+            </div>
+            <div class="skill-routes">
+              <span>project-overview.md</span>
+              <span>project-spec.md</span>
+              <span>business-methods.md</span>
+              <span>patterns/*.md</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="start" class="content-band">
+        <div class="section-heading">
+          <p class="section-kicker" data-i18n="startKicker">Workflow</p>
+          <h2 data-i18n="startTitle">两个命令跑完整个流程</h2>
+          <p data-i18n-html="startLead"><code>init</code> 和 <code>sync</code> 都会根据当前仓库状态动态切换：首次运行进入配置流程，再次运行会提供查看、重置、续跑或重新同步。</p>
+        </div>
+        <div class="step-grid">
+          <article class="step-item">
+            <span class="step-index">01</span>
+            <h3 data-i18n="stepInitTitle">初始化</h3>
+            <p data-i18n="stepInitText">首次运行选择单项目或 workspace、Agent、语言和执行计划；再次运行可查看当前配置或重新初始化。</p>
+          </article>
+          <article class="step-item">
+            <span class="step-index">02</span>
+            <h3 data-i18n="stepSyncTitle">同步</h3>
+            <p data-i18n="stepSyncText">首次同步建立第一版上下文；已有产物后执行增量学习；存在未完成状态时可续跑或重来。</p>
+          </article>
+          <article class="step-item">
+            <span class="step-index">03</span>
+            <h3 data-i18n="stepUseTitle">使用</h3>
+            <p data-i18n="stepUseText">打开 Claude Code 或 Codex，Agent 会按生成的入口文件读取最小必要项目上下文。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section">
+        <div class="section-heading">
+          <p class="section-kicker" data-i18n="valueKicker">What it captures</p>
+          <h2 data-i18n="valueTitle">沉淀真实项目经验</h2>
+          <p data-i18n="valueLead">它面向已有项目，不要求你先手写完整规范。仓库事实、团队补充和检查命中会一起形成可持续刷新的 Agent 上下文。</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3 data-i18n="featureLearnTitle">项目规则学习</h3>
+            <p data-i18n="featureLearnText">从当前代码和 Git 历史中提取 patterns、业务方法、工具方法、测试策略和项目画像。</p>
+          </article>
+          <article class="feature-card">
+            <h3 data-i18n="featureOutputTitle">Agent 可加载产物</h3>
+            <p data-i18n-html="featureOutputText">生成 <code>SKILL.md</code> 和 references，让 Claude Code / Codex 按任务读取最小必要上下文。</p>
+          </article>
+          <article class="feature-card">
+            <h3 data-i18n="featureWorkspaceTitle">Workspace 路由</h3>
+            <p data-i18n="featureWorkspaceText">根仓负责路由和跨项目关系，子项目独立学习，避免上下文互相污染。</p>
+          </article>
+          <article class="feature-card">
+            <h3 data-i18n="featureCheckTitle">变更检查</h3>
+            <p data-i18n="featureCheckText">用已学习规则检查当前改动，记录 pattern hits，让真正有用的规则更容易进入最终 Skills。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="output" class="content-band output-band">
+        <div class="output-copy">
+          <p class="section-kicker" data-i18n="outputKicker">Generated output</p>
+          <h2 data-i18n="outputTitle">生成的 Skills 结构</h2>
+          <p data-i18n-html="outputLead"><code>SKILL.md</code> 是 Agent 入口，references 保存更完整的项目画像、规范、业务入口和模式细节。Agent 先读入口，再按任务深入相关参考文件。</p>
+          <div class="pill-row" aria-label="Output highlights">
+            <span class="pill">SKILL.md</span>
+            <span class="pill">references/</span>
+            <span class="pill">agents/openai.yaml</span>
+          </div>
+        </div>
+        <div class="file-tree" aria-label="Generated Skills file tree">
+          <div class="tree-head">
+            <span data-i18n="treeTitle">Codex 默认输出</span>
+            <code>.agents/skills</code>
+          </div>
+          <pre>.agents/skills/skills-seed-skills/
+├── SKILL.md
+├── agents/
+│   └── openai.yaml
+└── references/
+    ├── project-overview.md
+    ├── project-spec.md
+    ├── business-methods.md
+    ├── modules.md
+    └── patterns/
+        ├── business.md
+        ├── concurrency.md
+        ├── config.md
+        ├── database.md
+        ├── error.md
+        ├── middleware.md
+        ├── structure.md
+        └── utils.md</pre>
+        </div>
+      </section>
+
+      <section id="commands" class="content-section">
+        <div class="section-heading">
+          <p class="section-kicker" data-i18n="commandsKicker">CLI</p>
+          <h2 data-i18n="commandsTitle">主命令索引</h2>
+          <p data-i18n="commandsLead">首页保留常用入口；完整子命令和参数由命令参考维护。</p>
+        </div>
+        <div class="command-list">
+          <div><code>skills-seed init</code><span data-i18n="cmdInit">交互式初始化当前项目或 workspace。</span></div>
+          <div><code>skills-seed sync</code><span data-i18n="cmdSync">交互式学习当前代码并刷新 Skills。</span></div>
+          <div><code>skills-seed workspace</code><span data-i18n="cmdWorkspace">管理 workspace 子项目。</span></div>
+          <div><code>skills-seed patterns</code><span data-i18n="cmdPatterns">查看、补充、修订或整理模式规则。</span></div>
+          <div><code>skills-seed workflow</code><span data-i18n="cmdWorkflow">添加或更新团队常用任务流程。</span></div>
+          <div><code>skills-seed check</code><span data-i18n="cmdCheck">用已学习规则检查当前改动。</span></div>
+        </div>
+      </section>
+
+      <section id="workspace" class="workspace-section">
+        <div class="workspace-copy">
+          <p class="section-kicker">Workspace</p>
+          <h2 data-i18n="workspaceTitle">多项目仓库也能保持上下文边界</h2>
+          <p data-i18n="workspaceLead">一个根目录下有多个独立 Git 子项目时，选择 workspace 模式。根仓负责编排、路由和跨项目关系，子项目独立保存自己的学习结果。</p>
+        </div>
+        <div class="workspace-code">
+          <pre>cd your-workspace
+skills-seed init
+skills-seed sync
+
+# workspace
+skills-seed workspace --help</pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        <span data-i18n="footerPrefix">更多细节见</span>
+        <a data-doc-link="readme" href="https://github.com/silaswei-io/skills-seed/blob/main/README.md" target="_blank" rel="noopener">README</a>,
+        <a data-doc-link="commands" href="../COMMANDS.md" data-i18n="footerCommands">命令参考</a>
+        <span data-i18n="footerAnd">和</span>
+        <a data-doc-link="config" href="../CONFIGURATION.md" data-i18n="footerConfig">配置参考</a>.
+      </p>
+    </footer>
+  </div>
+
+  <script src="./skills-seed.js"></script>
+</body>
+</html>

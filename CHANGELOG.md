@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.5]
+
+### 变更
+
+- HTML 介绍页迁移到 `docs/html/skills-seed.html`，README 中的页面入口同步指向新位置。
+- HTML 介绍页拆分独立 CSS 和 JS，支持深色/浅色模式切换、中英文切换，并让 README 链接跳转到 GitHub 上对应语言的 README。
+
+### 修复
+
+- 修正文档中“生成的 Skills 结构”示例，移除不存在的 `testing.md`，补齐当前实际生成的 patterns 分类。
+
 ## [v0.11.4]
 
 ### 变更

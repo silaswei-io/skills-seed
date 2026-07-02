@@ -64,8 +64,13 @@ After `generate skills`, the default output looks like this:
     ├── modules.md
     └── patterns/
         ├── business.md
+        ├── concurrency.md
+        ├── config.md
+        ├── database.md
         ├── error.md
-        └── testing.md
+        ├── middleware.md
+        ├── structure.md
+        └── utils.md
 ```
 
 `SKILL.md` is the Agent entry point. `references/` keeps the fuller project profile, specs, and pattern details. The Agent can read references when it needs depth, instead of loading every detail into the entry document.
