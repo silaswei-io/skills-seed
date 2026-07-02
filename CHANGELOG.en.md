@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.6]
+
+### Changes
+
+- Tightened current-code and history-learning prompts with a Candidate Admission Gate and Facts Are Not Patterns rules, requiring direct source evidence, project specificity, actionability, routeability, and conservative confidence before emitting a pattern.
+- Reframed the business coverage matrix as a missed-candidate check instead of a force-output rule; low-frequency, local, or fact-only candidates are now dropped first instead of filling space with weak evidence.
+- Optimized learning read-scope guidance so Agents expand only to directly related files that can prove a candidate rule, avoiding broader reads just to strengthen weak candidates.
+
 ## [v0.11.5]
 
 ### Changes

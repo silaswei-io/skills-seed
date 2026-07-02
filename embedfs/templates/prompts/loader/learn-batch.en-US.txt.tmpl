@@ -33,9 +33,32 @@ Message: {{$c.Message}}
 You are running in the project root. First inspect changed files and diffs by commit hash/path before extracting patterns; do not infer from file names alone.
 
 Reading scope control:
-- Read changed files first; expand only to direct callers, direct callees, or same-directory tests when evidence is insufficient.
+- Read changed files first; expand to direct callers, direct callees, or same-directory tests only when those files can prove a candidate rule.
 - Prefer commit hashes, changed paths, existing pattern files, and actual code evidence.
-- Do not scan the whole repository. If evidence remains insufficient, lower confidence or skip the candidate.
+- Do not scan the whole repository. If evidence remains insufficient, prefer skipping the candidate instead of broadening reads to strengthen weak evidence.
+
+# Candidate Admission Gate
+
+Output a pattern only when the candidate satisfies all conditions below. Otherwise return an empty array or drop the candidate; do not use weak low-confidence patterns to fill space:
+
+1. **Direct evidence**: The candidate must be directly supported by commit diffs or source snippets read in this task, real paths, real symbols, and explicit behavior. Commit messages, directory structure, file names, comments, or README text alone are not sufficient rule evidence.
+2. **Project-specific**: The candidate must capture this project's business semantics, module boundary, state/error/data constraint, configuration convention, external dependency interaction, or repeatedly used implementation choice. Drop language, framework, or engineering common sense.
+3. **Actionable**: `rule` must guide a future change, such as which paths/symbols to inspect and which order, state, error, or data boundary to preserve. A description of what this commit changed is not a pattern by itself.
+4. **Routeable**: The candidate must include request terms, source terms, paths, or symbols that help a future task route to code. Drop candidates that cannot be reached from request language.
+5. **Non-duplicate**: If multiple candidates express the same core rule, keep only the strongest and most routeable one, and merge evidence locations into it.
+6. **Conservative confidence**: A local implementation that appears once in one file or one method is usually not a project-level pattern. Unless it expresses a clear business invariant or critical boundary, drop it or keep it as a low-confidence local reference.
+
+# Facts Are Not Patterns
+
+Do not output the following as patterns even when they are true, unless you can further prove they are project conventions that future changes must preserve:
+
+- A responsibility summary of what a file, package, type, or function does.
+- A list of which helpers a function calls, which fields it returns, or which config it reads.
+- Common engineering practice, such as wrapping errors, layering code, loading config, using repositories, writing tests, or logging.
+- One-off local flow, compatibility branch, simple if/else branch, or ordinary parameter forwarding.
+- A conclusion inferred from commit messages, directory names, file names, comments, or structural context without direct source behavior evidence.
+
+A fact may become a pattern only when it can be rewritten as an order, boundary, invariant, error semantic, state constraint, or data constraint that future changes to similar capability should preserve.
 
 # Pattern Types to Extract
 
@@ -64,18 +87,18 @@ Before returning JSON, complete these steps internally:
    - Prioritize added or modified methods in entry, orchestration, domain, data access, external dependency, task, message handling, and utility modules.
    - Treat methods, flows, rules, state changes, cross-module calls, external calls, data transformations, and exceptional branches with business meaning as candidates.
    - Build a **source business vocabulary**: extract the project's own business nouns, business verbs, state/phase terms, rule/policy terms, config names, error codes, task/event names, external dependency names, and core function names from changed paths, interface terms, entities, and source code. Use this vocabulary only for internal reasoning; do not output it separately.
-   - Build a **business coverage matrix**: resources/entities, operations/capabilities, states/phases, policies/rules, external dependencies, entry channels, exceptions/compensation, and background/async/periodic flows. For every code-backed cell in the files you read, try to emit a routeable pattern or merge it into a related pattern.
+   - Build a **business coverage matrix**: resources/entities, operations/capabilities, states/phases, policies/rules, external dependencies, entry channels, exceptions/compensation, and background/async/periodic flows. Use the business coverage matrix only to avoid missing strong candidates, not to force output. Emit or merge a routeable pattern only when a code-backed cell has a rule that passes the Candidate Admission Gate.
    - Build a **business subdomain overview** first: infer business subdomains from entities, interfaces, component/module responsibilities, external dependencies, tasks/events/schedules, state names, config names, and domain terms, then look for rules and flows under each subdomain. Business subdomains must come from the project's own source vocabulary and code evidence; do not use generic wording from this template as domain answers.
-   - For every business subdomain with evidence, keep patterns that help future requests route to code. Skip a subdomain only when there is no evidence of rules, workflows, state changes, external calls, or domain data transformation.
+   - For every business subdomain with evidence, check whether it has a strong candidate that helps future requests route to code. Keep it only when it passes the Candidate Admission Gate; otherwise skip it instead of outputting weak patterns for subdomain coverage.
 
 2. Perform **business pattern expansion**:
-   - Do not output only one broad pattern for a business method.
-   - Split code-backed details into reusable patterns such as request validation, business state progression, cross-repository transaction orchestration, external system calls, failure compensation/fallback, business error mapping, or domain data transformation.
+   - Do not output only one broad pattern for a business method, and do not split local facts just to produce more patterns.
+   - Split code-backed details into reusable patterns such as request validation, business state progression, cross-repository transaction orchestration, external system calls, failure compensation/fallback, business error mapping, or domain data transformation only when each sub-rule independently passes the Candidate Admission Gate.
    - Perform **domain-operation extraction**: if the project has rule-constrained workflows, resource lifecycles, external dependency protocols, policy decisions, runtime actions, or strong business invariants, do not automatically classify code in generally named directories, shared packages, adapters, or external-dependency wrappers as `utils`. If a method carries domain semantics, continue judging whether it forms a business pattern or `business_method`.
    - Prioritize domain verbs and nouns that recur in source code or determine product behavior, such as create, change, revoke, validate, sync, import, export, calculate, transform, schedule, execute, roll back, or report. These are only discovery dimensions; the actual domain vocabulary must come from project code.
    - If an external dependency, remote interaction, command execution, or protocol call determines business operation order, request format, authorization boundary, state changes, retry/fallback behavior, or error mapping, extract it as a business domain-operation pattern. Do not demote it to a generic utility solely because it is an external-dependency call.
    - **Do not compress multiple business details into one generic pattern**. If a method contains both domain rules and technical conventions, domain rules may be `business`, while data-consistency boundaries, queries, interface dispatch, error wrapping, config loading, and cross-cutting processing chains must use their specific categories.
-   - **Do not output only top-level flows**. If a resource operation contains identifier validation, type dispatch, credential handling, external-dependency calls, and operation-record semantics, split those into routeable patterns instead of emitting only one generic flow.
+   - **Do not output only top-level flows**. If a resource operation contains identifier validation, type dispatch, credential handling, external-dependency calls, and operation-record semantics, split those into routeable patterns only when each one forms an actionable constraint and passes the Candidate Admission Gate. Otherwise merge or drop it.
    - Prefer specific categories: business is not the default category. Do not force a business pattern for every candidate.
    - Keep business patterns only for domain rules, state transitions, cross-entity orchestration, and real business workflows. Pure technical conventions do not become business patterns just because they appear in entry or orchestration code.
    - Keep patterns cohesive: one pattern expresses one actionable rule. Do not mix state validation, transaction boundaries, external calls, error mapping, and data transformation into one pattern.
@@ -94,9 +117,9 @@ Before returning JSON, complete these steps internally:
 
 4. Control quality:
    - Extract only from commit and code evidence. Do not invent business behavior.
-   - Do not drop new details just because a similar pattern already exists. If this commit adds a new branch, state, error, or call scenario, output it as a new pattern or significant improvement.
+   - Do not drop truly rule-changing new details just because a similar pattern already exists. If this commit adds a new branch, state, error, or call scenario, output it as a new pattern or significant improvement only when it changes an order, boundary, invariant, error semantic, state constraint, or data constraint future changes must preserve.
    - Do not treat low-value simple record operations, plain field assignment, or pure forwarding as business patterns unless they participate in a larger business flow.
-   - Check the business coverage matrix; do not output only interface, data-access, error-handling, or structure patterns.
+   - Check the business coverage matrix; do not output only interface, data-access, error-handling, or structure patterns just because those are easiest to identify. Use the matrix only to avoid missing strong candidates, not to force output.
    - Check for missed non-request-entry flows such as runtime, async, event, task, initialization, config-driven, or external-dependency-driven behavior.
    - Check that business pattern names and descriptions let someone who does not know package names route a request to the detail page and evidence path.
 
@@ -269,13 +292,18 @@ For EACH pattern, you MUST provide:
 # Pre-Output Validation Checklist
 
 Before returning JSON, validate every candidate pattern internally:
+0. Candidate admission check:
+   - The candidate must satisfy direct evidence, project-specificity, actionability, routeability, non-duplication, and conservative confidence.
+   - Do not output candidates that are only commit summaries, source summaries, directory/file responsibility descriptions, language/framework common practice, one-off local implementations, or observations that cannot guide future changes.
+   - Do not output weak patterns just to make this analysis look productive. Return `patterns: []` when there is no strong candidate.
+   - If you cannot state in one sentence what project-specific risk a future change would create by violating it, do not output it.
 1. Evidence check:
    - `good_example` must be copied verbatim from source code read during this task.
    - `good_example` must be 5-30 lines unless the complete relevant function is shorter.
    - `good_example` must not copy a full long function. Prefer the 5-12 lines that best prove the rule. Use `description`, `rule`, and multiple `evidence_locations` for complex flows.
    - `evidence_locations` must come from real files read during this task. Include a 1-based line number only when known; otherwise provide only the real path.
    - Do not invent code, paths, signatures, line numbers, or behavior.
-   - Do not invent evidence paths or line numbers. Lower confidence or drop the candidate when evidence is insufficient.
+   - Do not invent evidence paths or line numbers. Prefer dropping the candidate when evidence is insufficient.
 2. Category check:
    - `category` must be one of the allowed categories: {{.AllowedCategories}}.
    - Use `business` only for domain rules, state transitions, cross-entity workflows, or business invariants.
@@ -294,7 +322,8 @@ Before returning JSON, validate every candidate pattern internally:
    - Do not attach it to pure dispatch entries, generated code, or simple record operations.
 6. Confidence check:
    - Use `confidence >= 0.90` only when code evidence is direct and repeated or structurally obvious.
-   - Lower confidence when evidence is partial.
+   - When evidence appears only once, comes from a single file/method, or only describes the current local flow, `confidence` must be below `0.85`, and `rule` must not be written as a global hard standard using wording like "must", "never", "always", or "all cases".
+   - Prefer dropping low-frequency or local evidence. Only when it protects a clear business invariant or critical boundary may `rule` be written as "when changing adjacent capability, first reference/review/reuse the current implementation"; do not promote it to a project-wide mandate.
    - Drop the pattern if evidence is too weak.
 
 If a candidate fails any required validation check, do not output it.

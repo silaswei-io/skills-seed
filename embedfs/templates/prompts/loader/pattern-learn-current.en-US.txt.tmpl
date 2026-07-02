@@ -114,9 +114,40 @@ Allowed categories: {{.AllowedCategories}}
 
 # Learning Mode Strategy
 
-- `fast`: Prioritize entry points, structural context, and direct evidence. Output stable, frequent, request-routing patterns; merge low-value details and homogeneous repeated rules.
-- `normal`: Default strategy. Cover the unit's main business capabilities, key technical conventions, important exceptional paths, and reusable entries without generic or duplicate patterns.
-- `deep`: Explore evidenced business subdomains, state branches, external dependencies, exception/compensation flows, and cross-module constraints more thoroughly. More focused patterns are allowed, but each still needs routing value and source evidence.
+- `fast`: Prioritize entry points, structural context, and direct evidence. Output only stable, frequent, request-routing core patterns; merge low-value details and homogeneous repeated rules.
+- `normal`: Default strategy. Cover the unit's main business capabilities, key technical conventions, important exceptional paths, and reusable entries, but do not lower the evidence gate for coverage.
+- `deep`: Read deeper state branches, external dependencies, exception/compensation flows, and cross-module constraints when needed. `deep` permits deeper verification; it does not permit more weak-evidence patterns. Every output still needs routing value and source evidence.
+
+# Time-Saving Reading Strategy
+
+- Read structural context, diffs, entry paths, and suggested code files first. Continue to direct callers, callees, or neighboring implementations only when those files are required to prove a candidate rule.
+- Do not scan the whole repository to find more patterns. Once the unit's business vocabulary, entries, and core state/error/data boundaries are sufficient to judge candidate quality, stop expanding reads.
+- Quickly reject thin wrappers, pure forwarding, simple field mapping, ordinary initialization, repeated boilerplate, and code that only reflects language or framework common sense. Do not keep expanding around them.
+- If a candidate needs many indirect files before it becomes plausible, it is not direct enough. Prefer dropping it instead of broadening exploration.
+- Read only the smallest evidence chain needed to prove or disprove each candidate. Do not broaden reading to strengthen a weak candidate.
+
+# Candidate Admission Gate
+
+Output a pattern only when the candidate satisfies all conditions below. Otherwise return an empty array or drop the candidate; do not use weak low-confidence patterns to fill space:
+
+1. **Direct evidence**: The candidate must be directly supported by concrete source snippets, real paths, real symbols, and explicit behavior read in this task. Directory structure, file names, comments, README text, or structural context alone are not sufficient rule evidence.
+2. **Project-specific**: The candidate must capture this project's business semantics, module boundary, state/error/data constraint, configuration convention, external dependency interaction, or repeatedly used implementation choice. Drop Go/CLI/framework common sense.
+3. **Actionable**: `rule` must guide a future change, such as which paths/symbols to inspect and which order, state, error, or data boundary to preserve. A description of what the code currently does is not a pattern by itself.
+4. **Routeable**: The candidate must include request terms, source terms, paths, or symbols that help a future task route to code. Drop candidates that cannot be reached from request language.
+5. **Non-duplicate**: If multiple candidates express the same core rule, keep only the strongest and most routeable one, and merge evidence locations into it.
+6. **Conservative confidence**: A local implementation that appears once in one file or one method is usually not a project-level pattern. Unless it expresses a clear business invariant or critical boundary, drop it or keep it as a low-confidence local reference.
+
+# Facts Are Not Patterns
+
+Do not output the following as patterns even when they are true, unless you can further prove they are project conventions that future changes must preserve:
+
+- A responsibility summary of what a file, package, type, or function does.
+- A list of which helpers a function calls, which fields it returns, or which config it reads.
+- Common engineering practice, such as wrapping errors, layering code, loading config, using repositories, writing tests, or logging.
+- One-off local flow, compatibility branch, simple if/else branch, or ordinary parameter forwarding.
+- A conclusion inferred from directory names, file names, comments, or structural context without direct source behavior evidence.
+
+A fact may become a pattern only when it can be rewritten as an order, boundary, invariant, error semantic, state constraint, or data constraint that future changes to similar capability should preserve.
 
 # Pattern Discovery Principles
 
@@ -127,10 +158,10 @@ Recommended analysis order: build a business candidate inventory and source busi
 3. Use business patterns only for domain rules, state transitions, cross-entity orchestration, resource lifecycles, policy execution, external dependency interactions, or runtime flows that carry product meaning. Prefer concrete categories for interface, data access, error, config, cross-cutting processing, structure, utility, concurrency, and testing conventions.
 4. Do not classify code as utils solely because it lives in generally named directories, shared packages, adapters, or external-dependency wrappers. If it decides product rules, operation order, authorization boundaries, state changes, or error semantics, keep analyzing it as a domain-operation candidate.
 5. Identify non-request-interface entries too: tasks, events, schedules, initialization, registration, extension points, adapters, external-dependency wrappers, config-driven branches, batch jobs, and guard flows may form business patterns or `business_method` when they decide product behavior or boundaries.
-6. Optional expansion directions: a business candidate may split into focused patterns for parameter validation, state transition, cross-data-consistency-boundary orchestration, external-call fallback, business error wrapping, data transformation, authorization boundary, idempotency, or compensation. Do not compress independent details into one generic flow.
+6. Optional expansion directions: split a business candidate into focused patterns for parameter validation, state transition, cross-data-consistency-boundary orchestration, external-call fallback, business error wrapping, data transformation, authorization boundary, idempotency, or compensation only when each sub-rule independently passes the Candidate Admission Gate. Otherwise merge or drop it.
 7. Use `business_method` only for real reusable business entries, cross-module orchestration entries, domain-operation entries, or high-value utility entries. It must include a real signature and file location. Do not attach it to pure dispatch entries, generated code, framework initialization, or simple record operations.
 8. Extract only frameworks, dependencies, architecture layers, module boundaries, and data flows actually used by the project. Output them only when they form actionable team conventions or clearly change the project profile; do not infer facts from templates, stale dependencies, or common names.
-9. Merge homogeneous evidence into one pattern. Split independent business rules, state branches, error semantics, data transformations, or cross-module constraints into focused patterns. Do not apply a fixed total limit to `patterns`.
+9. Merge homogeneous evidence into one pattern. Independent business rules, state branches, error semantics, data transformations, or cross-module constraints may be split into focused patterns, but every pattern must pass the Candidate Admission Gate. Do not apply a fixed output count, and do not output weak-evidence patterns for coverage.
 
 # Output Format
 
@@ -278,6 +309,11 @@ When a code snippet contains both business semantics and a technical convention,
 # Pre-Output Validation Checklist
 
 Before returning JSON, validate every candidate pattern internally:
+0. Candidate admission check:
+   - The candidate must satisfy direct evidence, project-specificity, actionability, routeability, non-duplication, and conservative confidence.
+   - Do not output candidates that are only source summaries, directory/file responsibility descriptions, language/framework common practice, one-off local implementations, or observations that cannot guide future changes.
+   - Do not output weak patterns just to make this analysis look productive. Return `patterns: []` when there is no strong candidate.
+   - If you cannot state in one sentence what project-specific risk a future change would create by violating it, do not output it.
 1. Evidence check:
    - `good_example` must be copied verbatim from source code read during this task.
    - `good_example` must match this template's 5-12 line requirement unless the complete relevant function is shorter.
@@ -303,7 +339,7 @@ Before returning JSON, validate every candidate pattern internally:
 6. Confidence check:
    - Use `confidence >= 0.90` only when code evidence is direct and repeated, or when cross-file evidence makes the structure very clear.
    - When evidence appears only once, comes from a single file/method, or only describes the current local flow, `confidence` must be below `0.85`, and `rule` must not be written as a global hard standard using wording like "must", "never", "always", or "all cases".
-   - For low-frequency or local evidence, write `rule` as "when changing adjacent capability, first reference/review/reuse the current implementation" instead of promoting it to a project-wide mandate.
+   - Prefer dropping low-frequency or local evidence. Only when it protects a clear business invariant or critical boundary may `rule` be written as "when changing adjacent capability, first reference/review/reuse the current implementation"; do not promote it to a project-wide mandate.
    - `frequency` must reflect independent evidence occurrences; do not count adjacent snippets from the same file as multiple occurrences.
    - Lower confidence when evidence is partial.
    - Drop the pattern if evidence is too weak.
@@ -317,8 +353,9 @@ Before returning JSON, validate every candidate pattern internally:
    - `profile_delta.business_methods` must include only real business entry points, cross-module orchestration entry points, domain reusable entry points, or high-value utility entry points. Domain operations, resource lifecycles, policy execution, and external dependency interaction entries confirmed by source evidence are domain reusable entry candidates. Do not output ordinary startup, route/entry registration, framework initialization, scaffolding entry points, or simple record operations.
    - Set `profile_refresh_recommended.needed` to `true` only when broad structural changes, module boundary changes, or technology stack migration cannot be expressed as a precise delta.
 8. Business coverage check:
-   - Check the business coverage matrix for the source you read; do not output only interface, data-access, error-handling, or structure patterns.
-   - Check that every business subdomain with evidence has at least one business pattern matchable by request language; if not, add a pattern or skip it only when evidence is insufficient.
+   - Check the business coverage matrix for the source you read; do not output only interface, data-access, error-handling, or structure patterns just because those are easiest to identify.
+   - Use the business coverage matrix only to avoid missing strong candidates, not to force output. Output a business pattern only when the business subdomain has a rule that passes the Candidate Admission Gate.
+   - Check whether each evidenced business subdomain has a strong candidate matchable by request language; output it only when it passes the Candidate Admission Gate, otherwise skip it.
    - Check for missed non-request-entry flows such as runtime, async, event, task, initialization, config-driven, or external-dependency-driven behavior.
    - Check that business pattern names and descriptions let someone who does not know package names route a request to the detail page and evidence path.
 
