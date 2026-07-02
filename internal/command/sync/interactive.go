@@ -45,11 +45,8 @@ func resolveInteractiveSync(ctx context.Context, _ *cobra.Command, cont *contain
 		return mode, nil
 	}
 
-	mode, err := interactive.Select(i18n.Get("InteractiveSyncRunMode"), []interactive.Option[syncRunMode]{
-		{Value: syncRunAuto, Title: i18n.Get("InteractiveSyncAuto"), Description: i18n.Get("InteractiveSyncAutoDesc")},
-		{Value: syncRunRestart, Title: i18n.Get("InteractiveSyncRestart"), Description: i18n.Get("InteractiveSyncRestartDesc")},
-		{Value: "", Title: i18n.Get("InteractiveCancel")},
-	}, syncRunAuto)
+	title, options := interactiveSyncRunModeOptions(syncGeneratedSkillMissing(cont))
+	mode, err := interactive.Select(title, options, syncRunAuto)
 	if err != nil {
 		return syncRunAuto, err
 	}
@@ -57,6 +54,20 @@ func resolveInteractiveSync(ctx context.Context, _ *cobra.Command, cont *contain
 		return syncRunAuto, interactive.ErrCanceled
 	}
 	return mode, nil
+}
+
+func interactiveSyncRunModeOptions(firstRun bool) (string, []interactive.Option[syncRunMode]) {
+	if firstRun {
+		return i18n.Get("InteractiveSyncFirstRunTitle"), []interactive.Option[syncRunMode]{
+			{Value: syncRunAuto, Title: i18n.Get("InteractiveSyncFirstRun"), Description: i18n.Get("InteractiveSyncFirstRunDesc")},
+			{Value: "", Title: i18n.Get("InteractiveCancel")},
+		}
+	}
+	return i18n.Get("InteractiveSyncRunMode"), []interactive.Option[syncRunMode]{
+		{Value: syncRunAuto, Title: i18n.Get("InteractiveSyncAuto"), Description: i18n.Get("InteractiveSyncAutoDesc")},
+		{Value: syncRunRestart, Title: i18n.Get("InteractiveSyncRestart"), Description: i18n.Get("InteractiveSyncRestartDesc")},
+		{Value: "", Title: i18n.Get("InteractiveCancel")},
+	}
 }
 
 func hasSyncCommandState(ctx context.Context, seedPath, stateScope string) (bool, error) {

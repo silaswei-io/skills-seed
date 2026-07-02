@@ -2458,6 +2458,24 @@ other = "分析深度"
 [InteractiveInitSummaryLearningScope]
 other = "切分范围"
 
+[InteractiveInitAlreadyInitializedTitle]
+other = "当前仓库已初始化 skills-seed，本次要做什么？"
+
+[InteractiveInitInspect]
+other = "查看当前初始化配置"
+
+[InteractiveInitInspectDesc]
+other = "显示当前配置摘要，不修改 {{.Path}}。"
+
+[InteractiveInitReset]
+other = "重新初始化"
+
+[InteractiveInitResetDesc]
+other = "先备份现有 .skills-seed，再重新选择模式、Agent、语言和执行计划。"
+
+[InteractiveInitExistingSummaryTitle]
+other = "当前初始化配置"
+
 [SyncFlagResume]
 other = "继续上一次未完成的 sync 状态"
 
@@ -2475,6 +2493,15 @@ other = "检测到上一次 sync 未完成，本次如何执行？"
 
 [InteractiveSyncRunMode]
 other = "选择本次 sync 执行方式"
+
+[InteractiveSyncFirstRunTitle]
+other = "尚未生成 Skills，本次将建立第一版上下文"
+
+[InteractiveSyncFirstRun]
+other = "开始首次同步"
+
+[InteractiveSyncFirstRunDesc]
+other = "学习当前代码并在有学习结果时生成第一版 Skills。"
 
 [InteractiveSyncResume]
 other = "继续上次未完成的同步"

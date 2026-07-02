@@ -3,6 +3,7 @@ package initcmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -19,8 +20,26 @@ const (
 	defaultInitSkills = "claude"
 )
 
+type initExistingAction string
+
+const (
+	initExistingInspect initExistingAction = "inspect"
+	initExistingReset   initExistingAction = "reset"
+)
+
 func shouldRunInteractiveInit(cmd *cobra.Command, opts commandOptions) bool {
 	return interactive.IsTerminal() && !opts.noInteractive && !hasAnyChangedInitFlag(cmd)
+}
+
+func isProjectInitialized(projectRoot string) (bool, error) {
+	_, err := os.Stat(filepath.Join(projectRoot, ".skills-seed"))
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func hasAnyChangedInitFlag(cmd *cobra.Command) bool {
@@ -130,6 +149,23 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		return resolved, interactive.ErrCanceled
 	}
 	return resolved, nil
+}
+
+func resolveInteractiveExistingInit(cmd *cobra.Command, projectRoot string) (initExistingAction, error) {
+	interactive.PrintBanner(cmd.OutOrStdout(), "skills-seed", "Project skills for AI agents", bannerTags())
+	configPath := filepath.Join(projectRoot, ".skills-seed", "config.yaml")
+	action, err := interactive.Select(i18n.Get("InteractiveInitAlreadyInitializedTitle"), []interactive.Option[initExistingAction]{
+		{Value: initExistingInspect, Title: i18n.Get("InteractiveInitInspect"), Description: i18n.GetWithParams("InteractiveInitInspectDesc", map[string]interface{}{"Path": configPath})},
+		{Value: initExistingReset, Title: i18n.Get("InteractiveInitReset"), Description: i18n.Get("InteractiveInitResetDesc")},
+		{Value: "", Title: i18n.Get("InteractiveCancel")},
+	}, initExistingInspect)
+	if err != nil {
+		return "", err
+	}
+	if action == "" {
+		return "", interactive.ErrCanceled
+	}
+	return action, nil
 }
 
 func detectedWorkspaceProjectCount(mode string) int {

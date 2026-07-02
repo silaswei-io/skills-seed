@@ -14,6 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/git"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
@@ -302,6 +303,23 @@ func TestSyncCmdOnlyExposesSyncFlags(t *testing.T) {
 	require.Nil(t, cmd.Flags().Lookup("pattern"))
 	require.Nil(t, cmd.Flags().Lookup("files"))
 	require.Nil(t, cmd.Flags().Lookup("category"))
+}
+
+func TestInteractiveSyncRunModeOptionsDifferForFirstRun(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	title, options := interactiveSyncRunModeOptions(true)
+	require.Contains(t, title, "第一版")
+	require.Len(t, options, 2)
+	require.Equal(t, syncRunAuto, options[0].Value)
+	require.Equal(t, syncRunMode(""), options[1].Value)
+
+	title, options = interactiveSyncRunModeOptions(false)
+	require.Contains(t, title, "sync")
+	require.Len(t, options, 3)
+	require.Equal(t, syncRunAuto, options[0].Value)
+	require.Equal(t, syncRunRestart, options[1].Value)
+	require.Equal(t, syncRunMode(""), options[2].Value)
 }
 
 func TestSyncContextPathFlagIsRepeatable(t *testing.T) {

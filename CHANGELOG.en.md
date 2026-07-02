@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.4]
+
+### Changes
+
+- `init` now adapts to repository state: first runs still open the setup flow, while later interactive runs offer inspecting the current configuration, reinitializing, or canceling instead of repeating first-run prompts or silently overwriting config.
+- `sync` now distinguishes first sync, normal incremental sync, and unfinished resumable state: missing generated Skills shows a first-context flow, existing output offers current-state sync or restart, and unfinished state still offers resume or restart.
+
+### Fixes
+
+- Reinitialization now reuses the reset backup flow while preserving the Agent, Skills target, parallelism, analysis depth, and split-scope choices selected during the interactive reset.
+
 ## [v0.11.3]
 
 ### Changes

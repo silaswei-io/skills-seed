@@ -2457,6 +2457,24 @@ other = "Analysis depth"
 [InteractiveInitSummaryLearningScope]
 other = "Split scope"
 
+[InteractiveInitAlreadyInitializedTitle]
+other = "This repository is already initialized. What should init do?"
+
+[InteractiveInitInspect]
+other = "Show current initialization"
+
+[InteractiveInitInspectDesc]
+other = "Print the current configuration summary without modifying {{.Path}}."
+
+[InteractiveInitReset]
+other = "Reinitialize"
+
+[InteractiveInitResetDesc]
+other = "Back up the existing .skills-seed directory, then choose mode, Agent, language, and execution plan again."
+
+[InteractiveInitExistingSummaryTitle]
+other = "Current initialization"
+
 [SyncFlagResume]
 other = "Resume the previous incomplete sync state"
 
@@ -2474,6 +2492,15 @@ other = "A previous sync did not finish. How should this run proceed?"
 
 [InteractiveSyncRunMode]
 other = "Select sync run mode"
+
+[InteractiveSyncFirstRunTitle]
+other = "No Skills have been generated yet. This run will build the first context."
+
+[InteractiveSyncFirstRun]
+other = "Start first sync"
+
+[InteractiveSyncFirstRunDesc]
+other = "Learn current code and generate the first Skills when learning produces output."
 
 [InteractiveSyncResume]
 other = "Resume the incomplete sync"

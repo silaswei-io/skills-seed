@@ -166,6 +166,44 @@ func TestInteractiveInitWorkspaceDefaultNormalizesMode(t *testing.T) {
 	require.True(t, opts.workspace)
 }
 
+func TestIsProjectInitialized(t *testing.T) {
+	projectRoot := t.TempDir()
+
+	initialized, err := isProjectInitialized(projectRoot)
+	require.NoError(t, err)
+	require.False(t, initialized)
+
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".skills-seed"), 0755))
+	initialized, err = isProjectInitialized(projectRoot)
+	require.NoError(t, err)
+	require.True(t, initialized)
+}
+
+func TestPrintExistingInitSummaryDoesNotModifyConfig(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      false,
+		showUserSummary: false,
+		agentEngine:     "codex",
+		skillsTarget:    "codex",
+	}))
+
+	cmd := Cmd()
+	output := captureInitStdout(t, func() {
+		require.NoError(t, printExistingInitSummary(projectRoot, cmd))
+	})
+
+	require.Contains(t, output, "当前初始化配置")
+	require.Contains(t, output, "codex")
+	require.Contains(t, output, filepath.Join(".skills-seed", "config.yaml"))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "codex", configRepo.GetAgentConfig().Engine)
+	require.Equal(t, "codex", configRepo.GetSkillsConfig().Target)
+}
+
 func TestBannerTagsUseVersionMetadata(t *testing.T) {
 	tags := bannerTags()
 

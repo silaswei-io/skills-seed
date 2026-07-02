@@ -47,6 +47,51 @@ func Cmd() *cobra.Command {
 		Example: i18n.Get("InitExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			projectRoot, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
+			}
+			initialized, err := isProjectInitialized(projectRoot)
+			if err != nil {
+				return err
+			}
+			if initialized && shouldRunInteractiveInit(cmd, opts) {
+				action, err := resolveInteractiveExistingInit(cmd, projectRoot)
+				if err != nil {
+					if errors.Is(err, interactive.ErrCanceled) {
+						return nil
+					}
+					return err
+				}
+				switch action {
+				case initExistingInspect:
+					return printExistingInitSummary(projectRoot, cmd)
+				case initExistingReset:
+					resolved, err := resolveInteractiveInit(cmd, opts)
+					if err != nil {
+						if errors.Is(err, interactive.ErrCanceled) {
+							return nil
+						}
+						return err
+					}
+					opts = resolved
+					if !isValidLocale(opts.locale) {
+						return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
+					}
+					if !isValidLocale(opts.skillsLocale) {
+						return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
+					}
+					effectiveMode := opts.mode
+					if opts.workspace {
+						effectiveMode = domain.ModeWorkspace
+					}
+					if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
+						return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
+					}
+					return nil
+				}
+				return nil
+			}
 			if shouldRunInteractiveInit(cmd, opts) {
 				resolved, err := resolveInteractiveInit(cmd, opts)
 				if err != nil {
@@ -87,6 +132,28 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().BoolVar(&opts.noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
 
 	return initCmd
+}
+
+func printExistingInitSummary(projectRoot string, cmd *cobra.Command) error {
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configPath := filepath.Join(seedPath, "config.yaml")
+	if _, err := os.Stat(configPath); err != nil {
+		return err
+	}
+	configRepo, err := config.NewRepository(seedPath, "")
+	if err != nil {
+		return err
+	}
+	cfg := configRepo.Get()
+	interactive.PrintSummary(cmd.OutOrStdout(), i18n.Get("InteractiveInitExistingSummaryTitle"), []interactive.SummaryItem{
+		{Label: i18n.Get("InteractiveInitSummaryMode"), Value: localizedInitMode(cfg.Project.Mode)},
+		{Label: i18n.Get("InteractiveInitSummaryToolLocale"), Value: configRepo.GetToolLocale()},
+		{Label: i18n.Get("InteractiveInitSummarySkillsLocale"), Value: configRepo.GetSkillsLocale()},
+		{Label: i18n.Get("InteractiveInitSummaryAgent"), Value: cfg.Agent.Engine},
+		{Label: i18n.Get("InteractiveInitSummarySkills"), Value: cfg.Skills.Target},
+		{Label: "config", Value: filepath.Join(".skills-seed", "config.yaml")},
+	})
+	return nil
 }
 
 func isValidLocale(locale string) bool {
@@ -603,6 +670,10 @@ func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSe
 }
 
 func resetSkill(locale, skillsLocale, mode string) error {
+	return resetSkillWithOptions(locale, skillsLocale, mode, "", "", 0, "", "")
+}
+
+func resetSkillWithOptions(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int, learningMode config.LearningMode, learningScope config.LearningScope) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -620,9 +691,14 @@ func resetSkill(locale, skillsLocale, mode string) error {
 		}
 	}
 	return initializeSkillWithOptions(projectRoot, locale, mode, initializeSkillOptions{
-		initLogger:      true,
-		showUserSummary: true,
-		skillsLocale:    skillsLocale,
+		initLogger:            true,
+		showUserSummary:       true,
+		agentEngine:           agentEngine,
+		skillsTarget:          skillsTarget,
+		skillsLocale:          skillsLocale,
+		agentTotalParallelism: agentTotalParallelism,
+		learningMode:          learningMode,
+		learningScope:         learningScope,
 	})
 }
 
