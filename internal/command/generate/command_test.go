@@ -31,7 +31,6 @@ func TestCmdDoesNotExposeWorkspaceChildSkillPolicyFlags(t *testing.T) {
 	require.Nil(t, skills.Flags().Lookup("overwrite"))
 	require.Nil(t, skills.Flags().Lookup("root-only"))
 	require.Nil(t, skills.Flags().Lookup("context"))
-	require.Nil(t, skills.Flags().Lookup("context-file"))
 	require.Nil(t, skills.Flags().Lookup("force"))
 }
 

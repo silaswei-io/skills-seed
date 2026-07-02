@@ -123,7 +123,7 @@ func TestValidationMatrixDoesNotPromoteNarrowCommandAcrossBroadEvidence(t *testi
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
-				Command: "jzero check",
+				Command: "project check",
 				When:    "检查 API 契约或生成链路。",
 				Type:    "check",
 			},
@@ -133,7 +133,7 @@ func TestValidationMatrixDoesNotPromoteNarrowCommandAcrossBroadEvidence(t *testi
 				Type:    "build",
 			},
 			{
-				Command:    "jzero gen swagger",
+				Command:    "codegen generate swagger",
 				When:       "修改插件 API 契约后生成插件 swagger 文档。",
 				Workdir:    "plugins/key_manage",
 				ScopePaths: []string{"plugins/key_manage/desc/api", "plugins/key_manage/desc/swagger"},
@@ -160,15 +160,15 @@ func TestValidationMatrixDoesNotPromoteNarrowCommandAcrossBroadEvidence(t *testi
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
 	require.NotEmpty(t, matrix)
-	assert.Equal(t, "jzero check", matrix[0].Command)
-	assert.NotEqual(t, "jzero gen swagger", matrix[0].Command)
+	assert.Equal(t, "project check", matrix[0].Command)
+	assert.NotEqual(t, "codegen generate swagger", matrix[0].Command)
 }
 
 func TestValidationMatrixDoesNotUseNarrowSemanticCommandForMixedEvidence(t *testing.T) {
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
-				Command:  "jzero check",
+				Command:  "project check",
 				When:     "检查项目配置、API 契约或生成链路。",
 				Evidence: []string{"README.md"},
 				Type:     "check",
@@ -194,7 +194,7 @@ func TestValidationMatrixDoesNotUseNarrowSemanticCommandForMixedEvidence(t *test
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
 	require.NotEmpty(t, matrix)
-	assert.Equal(t, "jzero check", matrix[0].Command)
+	assert.Equal(t, "project check", matrix[0].Command)
 	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
 }
 
@@ -202,7 +202,7 @@ func TestValidationMatrixPrefersGenericCheckBeforeBroadBuildForMixedEvidence(t *
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
-				Command: "jzero check",
+				Command: "project check",
 				When:    "检查项目配置、API 契约或生成链路。",
 				Type:    "check",
 			},
@@ -226,7 +226,7 @@ func TestValidationMatrixPrefersGenericCheckBeforeBroadBuildForMixedEvidence(t *
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
 	require.NotEmpty(t, matrix)
-	assert.Equal(t, "jzero check", matrix[0].Command)
+	assert.Equal(t, "project check", matrix[0].Command)
 	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
 }
 
@@ -234,7 +234,7 @@ func TestValidationMatrixTreatsSingleKeywordGenericCommandAsFallback(t *testing.
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
-				Command: "jzero check",
+				Command: "project check",
 				When:    "检查项目配置是否符合工具要求。",
 				Type:    "check",
 			},
@@ -252,7 +252,7 @@ func TestValidationMatrixTreatsSingleKeywordGenericCommandAsFallback(t *testing.
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
 	require.NotEmpty(t, matrix)
-	assert.Equal(t, "jzero check", matrix[0].Command)
+	assert.Equal(t, "project check", matrix[0].Command)
 	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
 }
 
@@ -281,6 +281,39 @@ func TestValidationMatrixMarksBroadBuildAsFallback(t *testing.T) {
 	require.NotEmpty(t, matrix)
 	assert.Equal(t, "GOOS=$GOOS GOARCH=$GOARCH go build -tags no_k8s -o app main.go", matrix[0].Command)
 	assert.Contains(t, matrix[0].When, "覆盖范围较宽")
+}
+
+func TestValidationMatrixDoesNotUseGenerateCommandForBusinessFlow(t *testing.T) {
+	profile := &domain.ProjectProfile{
+		ValidationCommands: []domain.ValidationCommand{
+			{
+				Command:    "codegen generate api",
+				When:       "修改 API 契约或生成链路后运行。",
+				ScopePaths: []string{"desc/api"},
+				Type:       "generate",
+			},
+			{
+				Command: "go test ./...",
+				When:    "修改业务逻辑后运行。",
+				Type:    "test",
+			},
+		},
+	}
+	pattern := domain.NewPattern("order-state", "Order State Transition", domain.CategoryBusiness)
+	pattern.Confidence = 0.94
+	pattern.Frequency = 3
+	pattern.SetRule("业务状态流转必须经过领域服务校验并持久化。")
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path:   "internal/service/order/transition.go",
+		Line:   42,
+		Symbol: "ApplyTransition",
+	}}
+
+	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
+
+	require.NotEmpty(t, matrix)
+	assert.Equal(t, "go test ./...", matrix[0].Command)
+	assert.NotEqual(t, "codegen generate api", matrix[0].Command)
 }
 
 func TestValidationCommandPaths(t *testing.T) {

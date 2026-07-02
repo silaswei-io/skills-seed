@@ -214,6 +214,8 @@ Starting in 0.11.1, `learning.current.scope` can be set to `domain`, `flow`, or 
 
 Starting in 0.11.2, `learning.current.max_units_per_call` controls how many analysis units one AI call may process, with the default `1` disabling batching. Raising it groups multiple units into one call and requires the response to return top-level `units`. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer, so incidental examples are not rendered as mandatory project standards.
 
+AI file selection now acts as a relevance recommendation plus a local stable policy: identical inputs still reuse fingerprinted cache entries; explicit user focus files are force-kept, and large candidate sets with overly narrow AI recommendations are deterministically filled to a minimum budget so important files are less likely to be skipped and coverage swings less across runs.
+
 The interactive init prompt asks for total Agent parallelism and writes concrete config fields automatically. In project mode it writes `learning.current.parallelism`; in workspace mode it splits the value across root `agent.parallelism` (child-project parallelism) and `learning.current.parallelism` (analysis-unit parallelism inside each child project), keeping their product within the total.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Starting in 0.10.3, valid JSON final content is formatted as a readable fenced `json` block inside the `.md` archive.
@@ -222,7 +224,7 @@ Starting in 0.9.6, debug records under `.skills-seed/runtime` use the `YYYYMMDD-
 
 Starting in 0.9.0, the pattern store renders the `pattern-curate` prompt before storage so AI can deduplicate, consolidate, drop, and self-check candidate patterns against related historical patterns. Starting in 0.10.4, default pre-storage curation uses local deterministic merging and keeps its internal accepted set unique by pattern ID; candidates that reuse existing IDs, or historical stores that already contain duplicate IDs, are collapsed into one higher-quality pattern before writing. `generate skills` no longer runs pattern merging, so generation prompts only summarize and produce artifacts.
 
-The current version no longer maintains skills dirty state. `sync` generates skills immediately after learning or adding a pattern, and explicit `skills-seed generate skills` deletes the old skills-seed generated output directory and fully rebuilds it.
+The current version no longer maintains skills dirty state. `sync` generates skills only when the learning run changes learned output. Explicit `skills-seed generate skills` deletes the old skills-seed generated output directory and fully rebuilds it; after manually adding a user pattern, run this command to refresh generated artifacts.
 
 ### Generated Notice
 
@@ -339,7 +341,7 @@ Common paths:
 
 These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
 
-`--context` and `--context-file` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/prompts/`, and are not passed to `generate skills`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `learn current --context` or `learn current --context-file` for temporary guidance.
+`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/prompts/`, and are not passed to `generate skills`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `learn current --context` or `learn current --context-path` for temporary guidance.
 
 ### `autofix`
 

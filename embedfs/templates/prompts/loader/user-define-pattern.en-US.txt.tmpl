@@ -5,14 +5,6 @@ You are a code pattern analysis expert. Your task is to generate a structured co
 # Project Information
 
 - **Language**: {{.Language}}
-{{- if .Files}}
-
-# Related Files
-
-{{range .Files}}
-Read the file `{{.}}` and extract code snippets relevant to the user's description.
-{{- end}}
-{{- end}}
 {{- if .UserContext}}
 
 # Additional Context
@@ -30,11 +22,9 @@ Suggested category: {{.Category}}
 # Analysis Steps
 
 1. Understand the user's natural language description and identify the coding convention or pattern they want to express
-{{- if .Files}}
-2. Read the related files and find code snippets that conform to and violate the pattern as good and bad examples
-{{- end}}
-3. Infer the most appropriate category (if not specified by the user)
-4. Generate a clear, actionable rule description
+2. Use the visible project context to decide the best category
+3. Generate a clear, actionable rule description
+4. Fill source evidence, business methods, and project code examples only when real project-code evidence is available
 
 # Available Categories
 
@@ -43,11 +33,11 @@ Allowed categories: {{.AllowedCategories}}
 # Pre-Output Validation Checklist
 
 Before returning JSON, validate the result internally:
-1. If related files are provided, `good_example` and `bad_example` must come from files you read or closely match the project's real code style. Do not invent file paths, line numbers, or method signatures.
-2. If no related files are provided, examples may be empty or illustrative style examples, but do not claim they came from project source and do not fill a fake `business_method`.
+1. `good_example` and `bad_example` may be empty or illustrative style examples; claim source-code origin only when real project-code evidence is available.
+2. Do not invent file paths, line numbers, method signatures, business methods, or source evidence.
 3. Category must be one of the available categories. Prefer the most specific technical category; use `business` only for domain rules, state transitions, or business orchestration.
 4. `rule` must be actionable and explain "when X, do Y"; do not output generic best practices.
-5. `evidence_locations` contains pattern-level source evidence locations. Fill real evidence locations when related files are provided; include a 1-based line number only when known, otherwise provide only the real path.
+5. `evidence_locations` contains pattern-level source evidence locations. Return an empty array when there is no real evidence. Include a 1-based line number only when known; otherwise provide only the real path.
 6. Fill `business_method` only when real source evidence supports it, and include a real signature and location. Otherwise use `null`.
 7. Lower `confidence` when evidence is weak or the user description is broad. Do not invent facts, evidence paths, or line numbers.
 

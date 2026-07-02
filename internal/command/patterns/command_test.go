@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -122,7 +123,40 @@ func TestAddCmdRequiresDescription(t *testing.T) {
 	err := cmd.Execute()
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "需要通过 --context 提供模式描述")
+	require.Contains(t, err.Error(), "需要通过 --context 或 --context-path 提供模式描述")
+}
+
+func TestAddCmdReadsContextPath(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	projectRoot := t.TempDir()
+	contextPath := filepath.Join(projectRoot, "pattern-notes.md")
+	require.NoError(t, os.WriteFile(contextPath, []byte("分页查询统一使用 limit/offset"), 0644))
+	pattern := domain.NewPattern("pagination-limit-offset", "分页查询规范", domain.CategoryAPI)
+	pattern.SetDescription("分页查询统一使用 limit/offset")
+	pattern.SetRule("当实现分页查询时，应该使用 limit/offset")
+	pattern.Confidence = 0.9
+	mockAgent := &mocks.MockAgent{
+		NameVal:      "mock",
+		AvailableVal: true,
+		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+			require.Equal(t, "分页查询统一使用 limit/offset", req.Description)
+			require.Equal(t, "api", req.Category)
+			return &agent.UserDefinePatternResult{Pattern: pattern}, nil
+		},
+	}
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(projectRoot, ".skills-seed", "store", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	cont := &container.Container{
+		Config:     &config.Config{Project: config.ProjectConfig{RootPath: projectRoot, Language: "go"}},
+		Agent:      mockAgent,
+		CuratorSvc: curator.NewService(mockAgent, patternRepo),
+	}
+	cmd := addCmd(cont)
+	cmd.SetArgs([]string{"--context-path", contextPath, "--category", "api"})
+
+	require.NoError(t, cmd.Execute())
+	require.Nil(t, cmd.Flags().Lookup("files"))
 }
 
 func TestUpdateCmdRevisesExistingPatternAndPreservesIdentity(t *testing.T) {
@@ -148,7 +182,6 @@ func TestUpdateCmdRevisesExistingPatternAndPreservesIdentity(t *testing.T) {
 			require.Contains(t, req.Description, "Update existing pattern")
 			require.Contains(t, req.Description, "补充审计日志")
 			require.Equal(t, "business", req.Category)
-			require.Equal(t, []string{"internal/service"}, req.Files)
 			revised := domain.NewPattern("agent-generated-id", "响应扩展字段审计日志", domain.CategoryBusiness)
 			revised.Description = "响应扩展字段更新必须记录审计日志"
 			revised.Rule = "当响应扩展字段发生新增、修改或删除时，应该记录审计日志"
@@ -164,9 +197,10 @@ func TestUpdateCmdRevisesExistingPatternAndPreservesIdentity(t *testing.T) {
 		Agent:       mockAgent,
 	}
 	cmd := updateCmd(cont)
-	cmd.SetArgs([]string{"resp-extra-update-logging", "--context", "补充审计日志", "--files", "internal/service"})
+	cmd.SetArgs([]string{"resp-extra-update-logging", "--context", "补充审计日志"})
 
 	require.NoError(t, cmd.Execute())
+	require.Nil(t, cmd.Flags().Lookup("files"))
 
 	saved, err := patternRepo.Get(context.Background(), "resp-extra-update-logging")
 	require.NoError(t, err)
@@ -176,6 +210,41 @@ func TestUpdateCmdRevisesExistingPatternAndPreservesIdentity(t *testing.T) {
 	require.Equal(t, "admin", saved.ProjectID)
 	require.Equal(t, "ntls_admin_go", saved.ScopePath)
 	require.Equal(t, "响应扩展字段审计日志", saved.Name)
+}
+
+func TestUpdateCmdReadsContextPath(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	projectRoot := t.TempDir()
+	contextPath := filepath.Join(projectRoot, "pattern-update.md")
+	require.NoError(t, os.WriteFile(contextPath, []byte("补充审计日志字段"), 0644))
+	existing := domain.NewPattern("resp-extra-update-logging", "响应扩展字段日志", domain.CategoryBusiness)
+	existing.SetDescription("响应扩展字段更新需要记录日志")
+	existing.SetRule("当响应扩展字段变化时，应该记录操作日志")
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(projectRoot, ".skills-seed", "store", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	require.NoError(t, patternRepo.Save(context.Background(), existing))
+	mockAgent := &mocks.MockAgent{
+		NameVal:      "mock",
+		AvailableVal: true,
+		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
+			require.Contains(t, req.Description, "补充审计日志字段")
+			revised := domain.NewPattern("agent-generated-id", "响应扩展字段审计日志", domain.CategoryBusiness)
+			revised.SetDescription("响应扩展字段更新必须记录审计日志字段")
+			revised.SetRule("当响应扩展字段变化时，应该记录审计日志字段")
+			revised.Confidence = 0.9
+			return &agent.UserDefinePatternResult{Pattern: revised}, nil
+		},
+	}
+	cmd := updateCmd(&container.Container{
+		Config:      &config.Config{Project: config.ProjectConfig{RootPath: projectRoot, Language: "go"}},
+		PatternRepo: patternRepo,
+		Agent:       mockAgent,
+	})
+	cmd.SetArgs([]string{"resp-extra-update-logging", "--context-path", contextPath})
+
+	require.NoError(t, cmd.Execute())
+	require.Nil(t, cmd.Flags().Lookup("files"))
 }
 
 func TestUpdateCmdRequiresContext(t *testing.T) {
@@ -193,7 +262,7 @@ func TestUpdateCmdRequiresContext(t *testing.T) {
 	err = cmd.Execute()
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "需要通过 --context 提供修订说明")
+	require.Contains(t, err.Error(), "需要通过 --context 或 --context-path 提供修订说明")
 }
 
 func TestDeleteCmdInProjectDeletesPattern(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
@@ -324,6 +325,10 @@ func localizedText(locale, zhCN, enUS string) string {
 		return zhCN
 	}
 	return enUS
+}
+
+func generatorText(locale, key string) string {
+	return i18n.GetForLocale(locale, key)
 }
 
 func generatedSkillName(projectName string) string {

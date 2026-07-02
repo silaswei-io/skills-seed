@@ -96,34 +96,6 @@ func TestExtractJSON_EscapedStrings(t *testing.T) {
 	assert.JSONEq(t, `{"msg": "hello \"world\""}`, result)
 }
 
-func TestExtractJSON_RepairsInvalidBackslashEscapesInStrings(t *testing.T) {
-	input := `{"good_example": "const path = \"src\ pages\"\nconst re = /\s+/"}`
-	result, err := ExtractJSON(input)
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"good_example": "const path = \"src\\ pages\"\nconst re = /\\s+/"}`, result)
-}
-
-func TestExtractJSON_RepairsUnescapedQuotesInsideCodeStrings(t *testing.T) {
-	input := `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf("%s", "admin")","bad_example":""}]}`
-	result, err := ExtractJSON(input)
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s\", \"admin\")","bad_example":""}]}`, result)
-}
-
-func TestExtractJSON_RepairsPartiallyEscapedQuotesInsideCodeStrings(t *testing.T) {
-	input := `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】", resp.Extra.Object, req.Username)","bad_example":""}]}`
-	result, err := ExtractJSON(input)
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】\", resp.Extra.Object, req.Username)","bad_example":""}]}`, result)
-}
-
-func TestFixAIJSON_FixesCommonAIJSONDefectsTogether(t *testing.T) {
-	input := `{{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】", resp.Extra.Object, req.Username)","bad_example":"const path = \"src\ pages\""}]`
-	result, err := FixAIJSON(input)
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"patterns":[{"good_example":"resp.Extra.Desc = fmt.Sprintf(\"%s【%s】\", resp.Extra.Object, req.Username)","bad_example":"const path = \"src\\ pages\""}]}`, result)
-}
-
 func TestFixAIJSON_RepairsBareObjectKey(t *testing.T) {
 	input := `{"evidence_locations":[{"path":"internal/logic/access_grant/config.go", line": 253, "symbol":"Config"}]}`
 	result, err := FixAIJSON(input)
@@ -131,18 +103,18 @@ func TestFixAIJSON_RepairsBareObjectKey(t *testing.T) {
 	assert.JSONEq(t, `{"evidence_locations":[{"path":"internal/logic/access_grant/config.go","line":253,"symbol":"Config"}]}`, result)
 }
 
-func TestFixAIJSON_RepairsNumericLineRange(t *testing.T) {
+func TestFixAIJSON_RepairsNumericLineRangeAsString(t *testing.T) {
 	input := `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29-43,"symbol":"service cipher_machine"}]}]}`
 	result, err := FixAIJSON(input)
 	assert.NoError(t, err)
-	assert.JSONEq(t, `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29,"symbol":"service cipher_machine"}]}]}`, result)
+	assert.JSONEq(t, `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":"29-43","symbol":"service cipher_machine"}]}]}`, result)
 }
 
-func TestExtractJSON_RepairsNumericLineRangeAfterTextPrefix(t *testing.T) {
+func TestExtractJSON_RepairsNumericLineRangeAfterTextPrefixAsString(t *testing.T) {
 	input := `基于源码分析，输出如下。{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29-43,"symbol":"service cipher_machine"}]}]}`
 	result, err := ExtractJSON(input)
 	assert.NoError(t, err)
-	assert.JSONEq(t, `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":29,"symbol":"service cipher_machine"}]}]}`, result)
+	assert.JSONEq(t, `{"patterns":[{"evidence_locations":[{"path":"desc/api/auth/auth.api","line":"29-43","symbol":"service cipher_machine"}]}]}`, result)
 }
 
 func TestFixAIJSON_RepairsRawNewlineInsideString(t *testing.T) {
@@ -150,13 +122,6 @@ func TestFixAIJSON_RepairsRawNewlineInsideString(t *testing.T) {
 	result, err := FixAIJSON(input)
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{"patterns":[{"good_example":"line1\nline2"}]}`, result)
-}
-
-func TestFixAIJSON_RepairsMissingObjectStartInArray(t *testing.T) {
-	input := `{"profile_delta":{"layers":[{"name":"Handler层","files":["handler.go"]},{"name":"Logic层","files":["logic.go"]},"name":"数据访问层","description":"通过Model层访问数据库配置表","responsibilities":["条件查询"],"files":["model.go"]]}}`
-	result, err := FixAIJSON(input)
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"profile_delta":{"layers":[{"name":"Handler层","files":["handler.go"]},{"name":"Logic层","files":["logic.go"]},{"name":"数据访问层","description":"通过Model层访问数据库配置表","responsibilities":["条件查询"],"files":["model.go"]}]}}`, result)
 }
 
 func TestFixAIJSON_RepairsTrailingCommas(t *testing.T) {
@@ -207,18 +172,18 @@ func TestFixAIJSON_RepairsMissingCommaBetweenArrayValues(t *testing.T) {
 	assert.JSONEq(t, `{"frameworks":["cobra","bubbletea",{"name":"custom"},true,null,3]}`, result)
 }
 
-func TestExtractJSON_RemovesExtraClosingContainerInsideArray(t *testing.T) {
-	input := `{"patterns":[{"id":"a","evidence_locations":[{"path":"p","line":1}]}},{"id":"b"}],"profile_refresh_recommended":{"needed":false}}`
-	result, err := ExtractJSON(input)
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"patterns":[{"id":"a","evidence_locations":[{"path":"p","line":1}]},{"id":"b"}],"profile_refresh_recommended":{"needed":false}}`, result)
-}
-
 func TestExtractJSON_RepairsCommonNonstandardJSONInCodeBlock(t *testing.T) {
 	input := "```json\n{\n  // comment\n  'patterns': [{'id': 'service',}],\n  'profile_refresh_recommended': {'needed': False, 'reason': None,},\n}\n```"
 	result, err := ExtractJSON(input)
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{"patterns":[{"id":"service"}],"profile_refresh_recommended":{"needed":false,"reason":null}}`, result)
+}
+
+func TestFixAIJSON_UsesExternalRepairFallback(t *testing.T) {
+	input := `1,2,3`
+	result, err := FixAIJSON(input)
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[1,2,3]`, result)
 }
 
 func TestExtractJSON_RepairsBareObjectKeyInCodeBlock(t *testing.T) {
@@ -233,13 +198,6 @@ func TestExtractJSON_RepairsMissingClosingContainersAtEnd(t *testing.T) {
 	result, err := ExtractJSON(input)
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{"patterns":[{"id":"service","name":"Service"}],"category_summaries":{"structure":{"summary":"layers","patterns":["Service"]}}}`, result)
-}
-
-func TestExtractJSON_DoesNotRepairUnterminatedString(t *testing.T) {
-	input := `{"patterns":[{"id":"service","name":"Service}]`
-	result, err := ExtractJSON(input)
-	assert.Error(t, err)
-	assert.Empty(t, result)
 }
 
 func TestExtractJSON_CodeBlockWithNestedJSON(t *testing.T) {

@@ -922,9 +922,6 @@ other = "Skip generating reference documents (references/ directory)"
 [GenerateFlagContext]
 other = "Additional guidance for this generate run, passed to the AI agent as extra constraints"
 
-[GenerateFlagContextFile]
-other = "Read additional guidance for this generate run from a file; useful for longer constraints"
-
 # 模式
 [PatternsShort]
 other = "Manage learned patterns"
@@ -960,22 +957,22 @@ other = "Patterns compacted: input {{.TotalInput}}, written {{.TotalWritten}}, d
 other = "Add a user-defined pattern using natural language"
 
 [PatternsAddLongDesc]
-other = "Describe a coding convention or pattern in natural language through --context, and AI will generate a structured Pattern combined with project code.\n\nAI auto-infers category, generates good/bad examples and actionable rules. Use --files to specify related files or directories for more accurate examples."
+other = "Describe a coding convention or pattern in natural language through --context or --context-path, and AI will generate a structured Pattern combined with project context.\n\nAI auto-infers category, generates examples, and writes actionable rules. --context-path reads files or directories and is useful for longer notes, draft conventions, or one-shot reference material."
 
 [PatternsAddExample]
-other = "  # Minimal usage\n  skills-seed patterns add --context \"All service methods must return domain error\"\n\n  # Specify category and related files or directories\n  skills-seed patterns add --context \"Use limit/offset for pagination\" --category api --files internal/handler"
+other = "  # Pass a description directly\n  skills-seed patterns add --context \"All service methods must return domain error\"\n\n  # Specify category\n  skills-seed patterns add --context \"Use limit/offset for pagination\" --category api\n\n  # Read longer context from files or directories; repeat --context-path for multiple sources\n  skills-seed patterns add --context-path docs/plan.md --context-path docs/specs --category api"
 
 [PatternsAddFlagCategory]
 other = "Category: naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
 
-[PatternsAddFlagFiles]
-other = "Related file or directory paths; may be repeated"
-
 [PatternsAddFlagContext]
 other = "Natural-language pattern description from the user"
 
+[PatternsAddFlagContextPath]
+other = "Read natural-language pattern description or one-shot reference material from files or directories; may be repeated"
+
 [PatternsAddRequireContext]
-other = "pattern description required through --context: skills-seed patterns add --context \"rule description\""
+other = "pattern description required through --context or --context-path: skills-seed patterns add --context \"rule description\""
 
 [PatternsAddComplete]
 other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
@@ -984,19 +981,22 @@ other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, s
 other = "Update a pattern"
 
 [PatternsUpdateLongDesc]
-other = "Update a specific pattern using natural language through --context. The command reads the current pattern, asks AI to regenerate structured content from the update request, and preserves the original pattern ID, creation time, and workspace ownership. Use --files to specify related files or directories."
+other = "Update a specific pattern using natural language through --context or --context-path. The command reads the current pattern, asks AI to regenerate structured content from the update request, and preserves the original pattern ID, creation time, and workspace ownership."
 
 [PatternsUpdateExample]
-other = "  # Update one pattern\n  skills-seed patterns update resp-extra-update-logging --context \"Require audit logging when response extra fields change\"\n\n  # Specify a related directory\n  skills-seed patterns update resp-extra-update-logging --context \"Clarify logging fields\" --files internal/service"
+other = "  # Update one pattern\n  skills-seed patterns update resp-extra-update-logging --context \"Require audit logging when response extra fields change\"\n\n  # Read the update request from files or directories; repeat --context-path for multiple sources\n  skills-seed patterns update resp-extra-update-logging --context-path docs/plan.md --context-path docs/specs"
 
 [PatternsUpdateFlagContext]
 other = "Natural-language update request from the user"
+
+[PatternsUpdateFlagContextPath]
+other = "Read natural-language update request or one-shot reference material from files or directories; may be repeated"
 
 [PatternsUpdateRequireID]
 other = "pattern ID required: skills-seed patterns update <pattern-id> --context \"update request\""
 
 [PatternsUpdateRequireContext]
-other = "update request required through --context: skills-seed patterns update <pattern-id> --context \"update request\""
+other = "update request required through --context or --context-path: skills-seed patterns update <pattern-id> --context \"update request\""
 
 [PatternsUpdateComplete]
 other = "Pattern updated: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
@@ -1246,28 +1246,19 @@ other = "location_history"
 other = "Sync skills"
 
 [SyncLongDesc]
-other = "Run learn current → generate skills in one command.\n\nBy default, sync resumes the previous unfinished analysis plan when one exists; use --restart to discard it and rescan.\n--context is passed only as extra background for this learning run.\nUse --pattern to manually add a user pattern, which runs patterns add → generate skills."
+other = "Run learn current → generate skills in one command.\n\nBy default, sync resumes the previous unfinished analysis plan when one exists; use --restart to discard it and rescan.\n--context is passed only as extra background for this learning run. To manually add a user pattern, use patterns add or patterns update."
 
 [SyncExample]
-other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add background for this learning run\n  skills-seed sync --context \"On-prem deployment, not SaaS\"\n\n  # Add user pattern + generate\n  skills-seed sync --pattern \"All APIs must handle errors\" --category api\n\n  # With related files or directories\n  skills-seed sync --pattern \"Use limit/offset for pagination\" --files internal/handler"
-
-[SyncFlagCategory]
-other = "Category for user pattern (used with --pattern)"
-
-[SyncFlagFiles]
-other = "Related file or directory paths; may be repeated (used with --pattern)"
+other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add background for this learning run\n  skills-seed sync --context \"On-prem deployment, not SaaS\"\n\n  # Read background from multiple files or directories\n  skills-seed sync --context-path docs/plan.md --context-path docs/specs\n\n  # Discard unfinished state and relearn\n  skills-seed sync --restart"
 
 [SyncFlagContext]
 other = "Extra background for this learning run; only affects learn current prompts"
 
-[SyncFlagPattern]
-other = "Natural-language pattern description from the user; triggers patterns add → generate skills"
+[SyncFlagContextPath]
+other = "Read extra background for this learning run from files or directories; may be repeated"
 
 [SyncStepLearn]
 other = "[sync] Step 1/2: Learning from current codebase..."
-
-[SyncStepAddPattern]
-other = "[sync] Step 1/2: Adding user-defined pattern..."
 
 [SyncStepGenerate]
 other = "[sync] Step 2/2: Generating skills..."
@@ -1284,17 +1275,8 @@ other = "Learn failed"
 [SyncGenerateFailed]
 other = "Generate skills failed"
 
-[SyncAddPatternFailed]
-other = "Add user pattern failed"
-
-[SyncSavePatternFailed]
-other = "Save user pattern failed"
-
 [PatternCuratorNotConfigured]
 other = "pattern curator service is not configured"
-
-[SyncPatternAdded]
-other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}})"
 
 [PreviewShort]
 other = "Preview analysis inputs"
@@ -2026,7 +2008,7 @@ other = "Learn from current codebase"
 other = "Analyze current codebase and extract coding patterns, business methods, best practices, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/store/documents/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate skills"
 
 [LearnCurrentExample]
-other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip profile refresh\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance for this run from a file\n  skills-seed learn current --context-file .skills-seed/context.md"
+other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip profile refresh\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance from multiple files or directories\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
 [LearnHistoryShort]
 other = "Learn from Git history"
@@ -2058,8 +2040,8 @@ other = "Project profile refresh strategy: auto refreshes when missing or when t
 [LearnFlagContext]
 other = "Additional guidance for this learn run, passed to the AI agent as extra constraints"
 
-[LearnFlagContextFile]
-other = "Read additional guidance for this learn run from a file; useful for longer constraints"
+[LearnFlagContextPath]
+other = "Read additional guidance for this learn run from files or directories; may be repeated"
 
 [LearnFlagForce]
 other = "Ignore file fingerprints and relearn the current scan scope"
@@ -2295,8 +2277,11 @@ other = "No change records yet. Record file: {{.Path}}"
 [ChangeLogSummarySync]
 other = "Synced current code and updated skills"
 
-[ChangeLogSummaryUserPatternSync]
-other = "Added a user pattern and updated skills"
+[ChangeLogSummaryPatternsAdd]
+other = "Added a user pattern"
+
+[ChangeLogSummaryPatternsUpdate]
+other = "Updated a user pattern"
 
 [ChangeLogSummaryLearnCurrent]
 other = "Learned current code"
@@ -2324,6 +2309,9 @@ other = "no learned changes detected; skipped skills generation"
 
 [ChangeLogPatternAdded]
 other = "added user pattern: {{.PatternName}} [{{.Category}}]"
+
+[ChangeLogPatternUpdated]
+other = "updated user pattern: {{.PatternName}} [{{.Category}}]"
 
 [HookPromptTitle]
 other = "Update skills before commit?"
@@ -2478,17 +2466,8 @@ other = "Clear this sync command's resumable state and start again"
 [SyncRunModeConflict]
 other = "--resume and --restart cannot be used together"
 
-[SyncPatternResumeConflict]
-other = "--pattern is a one-shot user-pattern write and cannot be used with --resume; remove --resume or run sync without --pattern to resume learning"
-
-[SyncPatternOptionsRequirePattern]
-other = "--category and --files only apply to --pattern; remove them when learning current code"
-
 [SyncResumeStateMissing]
 other = "No resumable sync state was found; remove --resume to sync normally, or use --restart to start over"
-
-[SyncInvalidPatternFile]
-other = "--files only accepts project-relative paths: {{.Path}}"
 
 [InteractiveSyncInterruptedTitle]
 other = "A previous sync did not finish. How should this run proceed?"
@@ -2513,3 +2492,27 @@ other = "Sync current state"
 
 [InteractiveSyncAutoDesc]
 other = "Keep the default sync behavior and decide whether to learn, generate, or skip from current changes."
+
+[GeneratorBusinessEntrySectionTitle]
+other = "Business & Orchestration Entry Points"
+
+[GeneratorBusinessEntrySectionDescription]
+other = "Prioritizes domain flows, state transitions, authorization checks, persistence orchestration, and other entry points likely to be reused in everyday business work."
+
+[GeneratorSupportingEntrySectionTitle]
+other = "Supporting & Utility Entry Points"
+
+[GeneratorSupportingEntrySectionDescription]
+other = "Infrastructure, generation tools, test helpers, external client wrappers, or shared utilities; read when the change touches those areas."
+
+[GeneratorTriggerHintBusinessEntry]
+other = "business entry points and orchestration"
+
+[GeneratorTriggerHintAuthorizationPolicy]
+other = "authorization and policy"
+
+[GeneratorTriggerHintStateTransition]
+other = "state transitions"
+
+[GeneratorTriggerHintPersistenceOrchestration]
+other = "persistence orchestration"

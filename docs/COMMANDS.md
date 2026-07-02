@@ -32,7 +32,7 @@
 | 初始化单项目 | `skills-seed init --mode project` → `skills-seed sync` | 创建配置、学习当前代码并生成 skills |
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
 | 日常增量更新 | `skills-seed sync` | 学习当前变更，有实际学习变化时生成 skills |
-| 只补充一条规则 | `skills-seed sync --pattern "<描述>"` | 用自然语言添加 pattern 后生成 |
+| 只补充一条规则 | `skills-seed patterns add --context "<描述>"` → `skills-seed generate skills` | 用自然语言添加 pattern 后重新生成 |
 | 更新任务工作流 | `skills-seed workflow --context "<说明>"` → `skills-seed generate skills` | `--context` 会先经 Agent 从目标、约束、背景或路径推导标准工作流；未提供 `--name` 时自动生成名称，同名默认合并，完全替换时加 `--overwrite` |
 | 提交前更新 | `skills-seed hook install` | 安装 pre-commit hook，在提交前选择同步、只学习或跳过 |
 | 查看沉淀变化 | `skills-seed log` | 像 `git log` 一样查看最近学习和生成带来的变更 |
@@ -55,16 +55,16 @@
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | 从 Git 历史学习 | `current`, `history` | `--help, -h` = `false` |
-| `skills-seed learn current` | 从当前代码学习 | - | `--context-file` = ``<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | 从 Git 历史学习 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
-| `skills-seed patterns` | 管理已学习的 patterns | `add --context <description>`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> --context <description>` | `--help, -h` = `false` |
-| `skills-seed patterns add --context <description>` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed patterns` | 管理已学习的 patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
+| `skills-seed patterns add (--context <description> \| --context-path <path>)` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
 | `skills-seed patterns compact` | 整理相似 patterns | - | `--ai` = `false`<br>`--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
 | `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | - | `--help, -h` = `false` |
 | `skills-seed patterns show [pattern-id]` | 查看已学习 pattern 的概览或完整详情 | - | `--format` = `table`<br>`--help, -h` = `false`<br>`--sort` = `updated` |
 | `skills-seed patterns stats` | 查看 pattern 质量和 check 命中统计 | - | `--help, -h` = `false` |
-| `skills-seed patterns update <pattern-id> --context <description>` | 修订指定 pattern | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false` |
+| `skills-seed patterns update <pattern-id> (--context <description> \| --context-path <path>)` | 修订指定 pattern | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | 预览分析输入 | `files` | `--help, -h` = `false` |
 | `skills-seed preview files` | 预览将被分析的文件 | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
 | `skills-seed profile` | 查看或刷新项目画像 | `refresh`, `show` | `--help, -h` = `false` |
@@ -74,7 +74,7 @@
 | `skills-seed review` | 导入评审评论并查看防漏统计 | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | 一键同步 skills | - | `--category, -c` = ``<br>`--context` = ``<br>`--files, -f` = `[]`<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--pattern` = ``<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed sync` | 一键同步 skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | 添加或更新用户工作流 | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | 向工作区添加子项目 | - | `--help, -h` = `false` |
@@ -252,7 +252,7 @@ skills-seed reset --workspace
 | `--focus`, `-f` | 空 | 只学习指定目录或文件；可重复使用，路径必须在项目根目录内 |
 | `--profile` | `auto` | 项目画像刷新策略：`auto`、`skip`、`refresh` |
 | `--context` | 空 | 本次学习的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/prompts/` |
-| `--context-file` | 空 | 从文件读取本次学习的一次性补充说明，不写入 `.skills-seed/prompts/` |
+| `--context-path` | 空 | 从文件或目录读取本次学习的一次性补充说明；可重复传入，不写入 `.skills-seed/prompts/` |
 | `--help`, `-h` | `false` | 查看 `learn current` 帮助 |
 
 #### `learn history` 参数
@@ -280,7 +280,7 @@ skills-seed learn current --focus internal/service --profile skip
 skills-seed learn current --force --profile refresh
 skills-seed learn current -f internal/agent -f internal/service
 skills-seed learn current --context "只关注兼容性边界"
-skills-seed learn current --context-file .skills-seed/context.md
+skills-seed learn current --context-path .skills-seed/context.md
 skills-seed learn history --limit 50
 skills-seed learn history --since 30d
 skills-seed learn history --limit 40 --batch-size 5
@@ -294,7 +294,7 @@ skills-seed learn history --limit 40 --batch-size 5
 4. workspace 子项目按 `agent.parallelism` 真并发执行。
 5. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
 6. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
-7. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-file` 只影响本次命令。
+7. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-path` 只影响本次命令。
 8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
 9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的内嵌 tree-sitter 结构化预扫描；没有边界输入时不会因此全仓扫描。
 10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
@@ -332,7 +332,7 @@ skills-seed generate skills
 skills-seed generate skills --output .agents/skills/my-project
 ```
 
-一次性补充说明只在学习阶段使用，例如 `skills-seed learn current --context-file .skills-seed/context.md`。`generate skills` 只消费已沉淀的项目画像、workspace 画像/spec 和 patterns。
+一次性补充说明只在学习阶段使用，例如 `skills-seed learn current --context-path .skills-seed/context.md`。`generate skills` 只消费已沉淀的项目画像、workspace 画像/spec 和 patterns。
 
 #### Prompt 合并说明
 
@@ -439,7 +439,7 @@ skills-seed preview files --limit 500
 |---|---:|---|
 | `--category`, `-c` | 空 | 指定模式分类，如 `business`、`api`、`testing`；留空由 AI 自动推断 |
 | `--context` | 空 | 用户输入的自然语言模式描述，必填 |
-| `--files`, `-f` | 空 | 指定参考文件或目录路径；多个范围需重复传入该参数，AI 会读取内容辅助生成 |
+| `--context-path` | 空 | 从文件或目录读取自然语言模式描述或一次性参考材料；可重复传入 |
 | `--help`, `-h` | `false` | 查看 `patterns add` 帮助 |
 
 workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果描述中命中子项目 id 或 path，也会同步写入对应子项目模式库。skills 由 `sync` 或显式 `generate skills` 统一重新生成。
@@ -450,7 +450,7 @@ workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果
 |---|---:|---|
 | `--category`, `-c` | 空 | 指定修订后的模式分类；留空沿用现有分类 |
 | `--context` | 空 | 用户输入的自然语言修订说明，必填 |
-| `--files`, `-f` | 空 | 指定参考文件或目录路径；多个范围需重复传入该参数 |
+| `--context-path` | 空 | 从文件或目录读取自然语言修订说明或一次性参考材料；可重复传入 |
 | `--help`, `-h` | `false` | 查看 `patterns update` 帮助 |
 
 #### `patterns delete` 参数
@@ -487,8 +487,9 @@ workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果
 ```bash
 skills-seed patterns add --context "所有 API 路由使用 RESTful 风格"
 skills-seed patterns add --context "错误必须包装上下文" --category error
-skills-seed patterns add --context "数据库操作使用事务，项目使用 GORM" --files internal/service
+skills-seed patterns add --context-path docs/pattern-notes.md --category database
 skills-seed patterns update resp-extra-update-logging --context "补充响应额外字段更新的审计日志要求"
+skills-seed patterns update resp-extra-update-logging --context-path docs/pattern-update.md
 skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
@@ -614,7 +615,7 @@ skills-seed profile refresh --language go
 
 #### 命令概述
 
-一键同步：学习当前代码 → 生成 skills。`--context` 只作为本次学习背景传给分析提示词；需要用自然语言补充用户模式时使用 `--pattern`。
+一键同步：学习当前代码 → 生成 skills。`--context` 和 `--context-path` 只作为本次学习背景传给分析提示词；需要用自然语言补充用户模式时使用 `patterns add/update`。
 
 #### 命令形式
 
@@ -622,16 +623,12 @@ skills-seed profile refresh --language go
 |---|---|---|---|
 | `skills-seed sync` | learn current → generate skills | `skills-seed sync` | 优先恢复未完成的 sync 状态；有学习变化时生成 skills |
 | `skills-seed sync --context <背景>` | learn current with context → generate skills | `skills-seed sync --context "私有化部署，不是 SaaS"` | 给本次分析提供一次性背景，不写入用户模式 |
-| `skills-seed sync --pattern <描述>` | patterns add → generate skills | `skills-seed sync --pattern "API 路由使用 RESTful 风格"` | 适合补充 AI 未自动发现的模式 |
-
 #### 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--category`, `-c` | 空 | `--pattern` 模式下指定模式分类 |
-| `--files`, `-f` | 空 | `--pattern` 模式下指定参考文件或目录路径；多个范围需重复传入该参数 |
 | `--context` | 空 | 本次学习的额外背景，只影响 learn current 提示词 |
-| `--pattern` | 空 | 用户输入的自然语言模式描述；传入后执行 patterns add → generate |
+| `--context-path` | 空 | 从文件或目录读取本次学习的额外背景；可重复传入 |
 | `--help`, `-h` | `false` | 查看 `sync` 帮助 |
 
 #### 常用示例
@@ -639,17 +636,15 @@ skills-seed profile refresh --language go
 ```bash
 skills-seed sync
 skills-seed sync --context "私有化部署，不是 SaaS"
-skills-seed sync --pattern "所有 API 路由使用 RESTful 风格"
-skills-seed sync --pattern "错误必须包装上下文" --category error
-skills-seed sync --pattern "数据库操作使用事务" --files internal/service
+skills-seed sync --context-path docs/plan.md --context-path docs/specs
+skills-seed sync --restart
 ```
 
 #### 注意事项
 
 1. `sync` 默认会先执行 `learn current`；只有本轮学习写入新/更新模式或 workspace 关系产物变化时，才继续执行 `generate skills`。
-2. `sync --context` 不会添加用户模式，只影响本次学习分析。
-3. `sync --pattern` 跳过学习步骤，直接用自然语言定义模式，适合补充 AI 未自动发现的规则。
-4. 中间步骤失败会中断后续步骤。
+2. `sync --context` 不会添加用户模式，只影响本次学习分析；需要补充用户模式时使用 `patterns add` 或 `patterns update`。
+3. 中间步骤失败会中断后续步骤。
 
 ### `skills-seed check`
 

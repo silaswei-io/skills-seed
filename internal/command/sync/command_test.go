@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
@@ -153,7 +154,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	}
 	stateScope := commandutil.CommandStateScope("sync")
 
-	err = syncLearn(context.Background(), cont, stateScope, userContext, nil)
+	err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil)
 
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
@@ -164,6 +165,84 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	require.Equal(t, "sync", syncState.Command)
 	require.Equal(t, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}}, syncState.Units)
 	require.FileExists(t, commandstate.NewRepository(seedPath, "learn-current").Path())
+}
+
+func TestSyncRestartForcesCurrentLearning(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.RootPath = projectRoot
+	cfg.Project.Language = "go"
+	cfg.Agent.Engine = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
+	require.NoError(t, configRepo.Update(cfg))
+	require.NoError(t, exec.Command("git", "-C", projectRoot, "init", "-q").Run())
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "main.go"), []byte("package main\nfunc main() {}\n"), 0644))
+	require.NoError(t, exec.Command("git", "-C", projectRoot, "add", "-A").Run())
+
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
+	require.NoError(t, err)
+	defer patternRepo.Close()
+	record := domain.FileAnalysisRecord{
+		Path:           "main.go",
+		Hash:           "a071a7bc9d4fd44b32558cc706a5a698",
+		HashAlgorithm:  domain.FileAnalysisHashMD5,
+		Source:         domain.FileAnalysisSourceCurrentCode,
+		AnalysisStatus: domain.FileAnalysisStatusAnalyzed,
+		LastAnalyzedAt: "2026-01-01T00:00:00Z",
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+	require.NoError(t, patternRepo.SaveAnalyzedFiles(context.Background(), []domain.FileAnalysisRecord{record}))
+
+	planCalls := 0
+	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		planCalls++
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{{ID: "main", Name: "Main", EntryPaths: []string{"main.go"}}}}, nil
+	}
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		pattern := domain.NewPattern("sync-restart-pattern", "Restart Pattern", domain.CategoryBusiness)
+		pattern.Confidence = 0.9
+		pattern.SetDescription("description")
+		pattern.SetRule("rule")
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+
+	profileRepo := profilestore.NewRepository(seedPath)
+	require.NoError(t, profileRepo.Save(context.Background(), &domain.ProjectProfile{
+		ProjectName: "demo",
+		Language:    "go",
+		Summary:     "profile",
+		GeneratedAt: "2026-01-01 00:00:00",
+	}))
+	curatorSvc := curator.NewService(mockAgent, patternRepo)
+	cont := &container.Container{
+		SeedPath:     seedPath,
+		Config:       configRepo.Get(),
+		ConfigRepo:   configRepo,
+		GitRepo:      git.NewRepository(projectRoot),
+		PatternRepo:  patternRepo,
+		FileTracker:  patternRepo,
+		ProfileRepo:  profileRepo,
+		StateRepo:    statestore.NewRepository(seedPath),
+		Agent:        mockAgent,
+		AnalyzerSvc:  analyzer.NewAnalyzerService(mockAgent, configRepo),
+		LearnerSvc:   servicelearner.NewLearnerService(mockAgent, git.NewRepository(projectRoot), patternRepo, patternRepo, curatorSvc),
+		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo),
+	}
+
+	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, 1, planCalls)
+	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-dev", "SKILL.md"))
 }
 
 func TestHasSyncCommandState(t *testing.T) {
@@ -206,19 +285,44 @@ func TestHasResumableSyncCommandStateRequiresInputsAndUnits(t *testing.T) {
 
 func TestNormalizeSyncInputsTrimsAndRejectsUnsafeFiles(t *testing.T) {
 	inputs, err := normalizeSyncInputs(syncInputs{
-		Category:           " business ",
-		Files:              []string{" ./internal/service/ ", "", "."},
-		PatternDescription: " rule ",
-		UserContext:        " context ",
+		UserContext: " context ",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "business", inputs.Category)
-	require.Equal(t, []string{"internal/service"}, inputs.Files)
-	require.Equal(t, "rule", inputs.PatternDescription)
 	require.Equal(t, "context", inputs.UserContext)
+}
 
-	_, err = normalizeSyncInputs(syncInputs{Files: []string{"../secret"}})
+func TestSyncCmdOnlyExposesSyncFlags(t *testing.T) {
+	cmd := Cmd(&container.Container{})
+
+	require.NotNil(t, cmd.Flags().Lookup("context"))
+	require.NotNil(t, cmd.Flags().Lookup("context-path"))
+	require.NotNil(t, cmd.Flags().Lookup("resume"))
+	require.NotNil(t, cmd.Flags().Lookup("restart"))
+	require.NotNil(t, cmd.Flags().Lookup("no-interactive"))
+	require.Nil(t, cmd.Flags().Lookup("pattern"))
+	require.Nil(t, cmd.Flags().Lookup("files"))
+	require.Nil(t, cmd.Flags().Lookup("category"))
+}
+
+func TestSyncContextPathFlagIsRepeatable(t *testing.T) {
+	cmd := Cmd(&container.Container{})
+
+	err := cmd.ParseFlags([]string{"--context-path", "docs/plan.md", "--context-path", "docs/specs"})
+
+	require.NoError(t, err)
+	values, err := cmd.Flags().GetStringArray("context-path")
+	require.NoError(t, err)
+	require.Equal(t, []string{"docs/plan.md", "docs/specs"}, values)
+}
+
+func TestSyncContextPathDoesNotConsumePositionalArgs(t *testing.T) {
+	cmd := Cmd(&container.Container{})
+	cmd.SetArgs([]string{"--context-path", "docs/plan.md", "docs/specs"})
+
+	err := cmd.Execute()
+
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown command")
 }
 
 func TestSyncModeFromFlagsRejectsConflict(t *testing.T) {
@@ -256,103 +360,4 @@ func TestSyncRestartClearsOnlySyncCommandState(t *testing.T) {
 	require.ErrorIs(t, err, commandstate.ErrStateNotFound)
 	_, err = learnRepo.Load(context.Background())
 	require.NoError(t, err)
-}
-
-func TestSyncWithUserPatternUsesPatternDescriptionAndContext(t *testing.T) {
-	inputPatternDescription := "所有 API 必须有错误处理"
-	userContext := "私有化部署，不是 SaaS"
-	projectRoot := t.TempDir()
-	seedPath := filepath.Join(projectRoot, ".skills-seed")
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	cfg.Project.Name = "demo"
-	cfg.Project.Mode = domain.ModeProject
-	cfg.Project.RootPath = projectRoot
-	cfg.Project.Language = "go"
-	cfg.Agent.Engine = "mock"
-	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Skills.Target = "codex"
-	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
-	require.NoError(t, configRepo.Update(cfg))
-
-	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
-	require.NoError(t, err)
-	defer patternRepo.Close()
-
-	var requestPatternDescription string
-	var patternContext string
-	pattern := domain.NewPattern("p1", "Context Boundary", domain.CategoryBusiness)
-	pattern.Confidence = 0.9
-	pattern.SetDescription("description")
-	pattern.SetRule("rule")
-	mockAgent := &mocks.MockAgent{
-		NameVal:      "mock",
-		AvailableVal: true,
-		UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
-			requestPatternDescription = req.Description
-			patternContext = req.UserContext
-			return &agent.UserDefinePatternResult{Pattern: pattern}, nil
-		},
-	}
-	profileRepo := profilestore.NewRepository(seedPath)
-	require.NoError(t, profileRepo.Save(context.Background(), &domain.ProjectProfile{
-		ProjectName: "demo",
-		Language:    "go",
-		Summary:     "profile",
-		GeneratedAt: "2026-06-04 00:00:00",
-	}))
-
-	cont := &container.Container{
-		SeedPath:     seedPath,
-		Config:       configRepo.Get(),
-		ConfigRepo:   configRepo,
-		PatternRepo:  patternRepo,
-		ProfileRepo:  profileRepo,
-		StateRepo:    statestore.NewRepository(seedPath),
-		Agent:        mockAgent,
-		CuratorSvc:   curator.NewService(mockAgent, patternRepo),
-		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo),
-	}
-
-	require.NoError(t, syncWithUserPattern(context.Background(), cont, inputPatternDescription, "business", []string{"internal/service"}, userContext, nil))
-
-	require.Equal(t, inputPatternDescription, requestPatternDescription)
-	require.Equal(t, userContext, patternContext)
-	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-dev", "SKILL.md"))
-}
-
-func TestSyncWithUserPatternRejectsNilPatternResult(t *testing.T) {
-	projectRoot := t.TempDir()
-	seedPath := filepath.Join(projectRoot, ".skills-seed")
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	cfg.Project.Name = "demo"
-	cfg.Project.Mode = domain.ModeProject
-	cfg.Project.RootPath = projectRoot
-	cfg.Project.Language = "go"
-	cfg.Agent.Engine = "mock"
-	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Skills.Target = "codex"
-	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
-	require.NoError(t, configRepo.Update(cfg))
-
-	cont := &container.Container{
-		SeedPath:   seedPath,
-		Config:     configRepo.Get(),
-		ConfigRepo: configRepo,
-		Agent: &mocks.MockAgent{
-			NameVal:      "mock",
-			AvailableVal: true,
-			UserDefinePatternFn: func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
-				return &agent.UserDefinePatternResult{}, nil
-			},
-		},
-		CuratorSvc: curator.NewService(&mocks.MockAgent{NameVal: "mock", AvailableVal: true}, nil),
-	}
-
-	err = syncWithUserPattern(context.Background(), cont, "rule", "", nil, "", nil)
-
-	require.ErrorIs(t, err, errSyncInvalidUserPattern)
 }

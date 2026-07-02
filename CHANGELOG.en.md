@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.3]
+
+### Changes
+
+- Replaced the in-tree JSON repair implementation with `github.com/silaswei-io/jsonrepair-go`, and added a structured fallback that can recover JSON from text when direct unmarshalling fails.
+- Unified one-shot context input across `learn current`, `patterns add/update`, and `sync` with repeatable `--context-path`, supporting files or directories. The old single-file `--context-file` and `patterns --files` semantics are now folded into context paths.
+- Narrowed `sync` to learning current code and generating skills when needed. User-pattern creation is now handled by `patterns add/update`, which also records changelog entries.
+- Added a local stable policy for AI file selection: explicit focus paths are force-kept, and overly narrow AI recommendations on large candidate sets are deterministically filled to a minimum budget to reduce coverage swings across runs.
+- Generated business-method indexes now separate business entries from supporting entries, trigger hints use business-method signals for authorization, state-transition, and persistence scenarios, and validation command selection is weighted by change area.
+- Updated the README, command/configuration docs, and added an HTML overview page for `--context-path`, the stable file-selection policy, and the new `sync` / `patterns` split.
+
+### Fixes
+
+- Pattern and business-method payload parsing now tolerates string code locations, string line numbers, and string confidence values, reducing failures from minor Agent output type drift.
+- Resumed `learn current` progress now starts from the completed unit count instead of miscounting pending units as completed.
+
 ## [v0.11.2]
 
 ### Changes

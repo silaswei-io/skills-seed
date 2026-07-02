@@ -7,29 +7,36 @@ type validationCommandSelector struct {
 }
 
 func (selector validationCommandSelector) Choose(area validationArea) validationCommandChoice {
-	if command := selector.chooseByEvidence(area.Evidence, true); command.Command != "" {
+	if command := selector.chooseByEvidenceForArea(area, true); command.Command != "" {
 		return validationCommandChoice{Command: command, Match: validationCommandMatchScoped}
 	}
-	if command := selector.chooseByEvidence(area.Evidence, false); command.Command != "" && !validationCommandLooksHeavy(command) {
+	if command := selector.chooseByEvidenceForArea(area, false); command.Command != "" && !validationCommandLooksHeavy(command) {
 		return validationCommandChoice{Command: command, Match: validationCommandMatchBroad}
 	}
 	if command := selector.chooseByText(area); command.Command != "" {
 		return validationCommandChoice{Command: command, Match: validationCommandMatchSemantic}
 	}
-	if command := selector.chooseGeneric(); command.Command != "" {
+	if command := selector.chooseGenericForArea(area); command.Command != "" {
 		return validationCommandChoice{Command: command, Match: validationCommandMatchGeneric}
 	}
-	if command := selector.chooseByEvidence(area.Evidence, false); command.Command != "" {
+	if command := selector.chooseByEvidenceForArea(area, false); command.Command != "" {
 		return validationCommandChoice{Command: command, Match: validationCommandMatchBroad}
 	}
 	return validationCommandChoice{}
 }
 
 func (selector validationCommandSelector) chooseByEvidence(evidence []string, narrowOnly bool) validationCommand {
+	return selector.chooseByEvidenceForArea(validationArea{Evidence: evidence}, narrowOnly)
+}
+
+func (selector validationCommandSelector) chooseByEvidenceForArea(area validationArea, narrowOnly bool) validationCommand {
 	best := validationCommand{}
 	bestScore := 0
-	evidenceRoots := validationPathRoots(evidence)
+	evidenceRoots := validationPathRoots(area.Evidence)
 	for _, command := range selector.commands {
+		if !validationCommandAppliesToArea(command, area) {
+			continue
+		}
 		commandPaths := validationCommandScopePaths(command)
 		if len(commandPaths) == 0 {
 			continue
@@ -40,15 +47,15 @@ func (selector validationCommandSelector) chooseByEvidence(evidence []string, na
 		if !validationCommandSharesEvidenceRoot(commandPaths, evidenceRoots) {
 			continue
 		}
-		score := validationCommandEvidenceScore(commandPaths, evidence)
+		score := validationCommandEvidenceScore(commandPaths, area.Evidence)
 		if score == 0 {
 			continue
 		}
-		coverage := validationCommandEvidenceCoverage(commandPaths, evidence)
-		if !validationCommandCoverageAllowed(command, coverage, len(evidence)) {
+		coverage := validationCommandEvidenceCoverage(commandPaths, area.Evidence)
+		if !validationCommandCoverageAllowed(command, coverage, len(area.Evidence)) {
 			continue
 		}
-		score += validationCommandTypeScore(command)
+		score += validationCommandTypeScoreForArea(command, area)
 		score += int(coverage * 10)
 		if score > bestScore {
 			bestScore = score
@@ -63,6 +70,9 @@ func (selector validationCommandSelector) chooseByText(area validationArea) vali
 	bestScore := 0
 	evidenceRoots := validationPathRoots(area.Evidence)
 	for _, command := range selector.commands {
+		if !validationCommandAppliesToArea(command, area) {
+			continue
+		}
 		if validationCommandLooksHeavy(command) {
 			continue
 		}
@@ -82,7 +92,7 @@ func (selector validationCommandSelector) chooseByText(area validationArea) vali
 		if len(declaredPaths) == 0 && !validationCommandHasSpecificSemanticMatch(command, semanticScore) {
 			continue
 		}
-		score := validationCommandTypeScore(command) + semanticScore
+		score := validationCommandTypeScoreForArea(command, area) + semanticScore
 		if len(declaredPaths) == 0 {
 			score += 2
 		}
@@ -95,13 +105,20 @@ func (selector validationCommandSelector) chooseByText(area validationArea) vali
 }
 
 func (selector validationCommandSelector) chooseGeneric() validationCommand {
+	return selector.chooseGenericForArea(validationArea{})
+}
+
+func (selector validationCommandSelector) chooseGenericForArea(area validationArea) validationCommand {
 	best := validationCommand{}
 	bestScore := 0
 	for _, command := range selector.commands {
 		if strings.TrimSpace(command.Command) == "" || len(validationCommandDeclaredScopePaths(command)) > 0 {
 			continue
 		}
-		score := validationCommandTypeScore(command)
+		if !validationCommandAppliesToArea(command, area) {
+			continue
+		}
+		score := validationCommandTypeScoreForArea(command, area)
 		if validationCommandLooksHeavy(command) {
 			score--
 		}
@@ -225,6 +242,66 @@ func validationCommandTypeScore(command validationCommand) int {
 		return 1
 	default:
 		return 0
+	}
+}
+
+func validationCommandTypeScoreForArea(command validationCommand, area validationArea) int {
+	score := validationCommandTypeScore(command)
+	if area.Kind == "" {
+		return score
+	}
+	commandKind := validationCommandKind(command)
+	switch area.Kind {
+	case validationAreaBusiness, validationAreaPersistence:
+		if commandKind == "test" {
+			score += 4
+		}
+		if commandKind == "check" {
+			score += 1
+		}
+	case validationAreaRuntime:
+		if commandKind == "test" || commandKind == "check" {
+			score += 2
+		}
+	case validationAreaAPI:
+		if commandKind == "test" || commandKind == "check" || commandKind == "generate" {
+			score += 2
+		}
+	}
+	return score
+}
+
+func validationCommandAppliesToArea(command validationCommand, area validationArea) bool {
+	if area.Kind == "" {
+		return true
+	}
+	commandKind := validationCommandKind(command)
+	if commandKind == "generate" && area.Kind != validationAreaAPI {
+		return false
+	}
+	if commandKind == "generate" {
+		text := validationCommandText(command)
+		return containsAny(text,
+			"api", "contract", "schema", "proto", "swagger", "openapi", "route", "handler", "desc",
+			"generate", "generated", "codegen", "gen", "契约", "接口", "生成", "路由",
+		)
+	}
+	return true
+}
+
+func validationCommandKind(command validationCommand) string {
+	text := strings.ToLower(command.Type + " " + command.Command + " " + command.When)
+	switch {
+	case containsAny(text, "test", "测试"):
+		return "test"
+	case containsAny(text, "check", "lint", "vet", "检查"):
+		return "check"
+	case containsAny(text, "generate", " gen", "codegen", "生成"):
+		return "generate"
+	case containsAny(text, "build", "编译", "构建"):
+		return "build"
+	default:
+		return "other"
 	}
 }
 

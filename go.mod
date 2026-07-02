@@ -12,6 +12,7 @@ require (
 	github.com/odvcencio/gotreesitter v0.20.2
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pmezard/go-difflib v1.0.0
+	github.com/silaswei-io/jsonrepair-go v1.1.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.10.0

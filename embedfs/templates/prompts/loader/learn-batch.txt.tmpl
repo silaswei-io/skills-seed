@@ -176,7 +176,7 @@
 9. **frequency**: 在这些提交中出现的次数
 10. **evidence_locations**: 模式级源码证据位置，尽量为每个模式填写真实相对路径和行号：
     - **path**: 相对项目根路径
-    - **line**: 1-based 行号；不知道准确行号时省略
+    - **line**: 1-based 单个整数行号；不知道准确行号时省略，不能填写 `"29-43"`、`29-43` 或其他范围表达式
     - **symbol**: 相关函数、方法、类型、变量或文件名
     - **kind**: "function"、"method"、"type"、"file" 等证据类型
     - **description**: 该位置如何支撑该模式
@@ -184,7 +184,7 @@
     - business pattern 必须优先填写 path 和 symbol；缺少这两个字段会降低后续业务总览的可定位性
 11. **business_method**: 仅用于工具/业务方法：
     - **name**: 完整方法签名或代码标识
-    - **location**: "相对文件路径:行号"
+    - **code_location**: 只能是对象 `{"current_location":"相对文件路径:行号"}`，不能写成字符串，也不能写成 `location`
     - **layer**: 代码所在职责层或模块类型
     - **function**: 包含参数和返回值的完整签名
     - **prerequisites**: 需要先设置什么（如事务已开启、配置已加载）

@@ -922,9 +922,6 @@ other = "跳过参考文档生成（不生成 references/ 目录）"
 [GenerateFlagContext]
 other = "本次生成的补充说明，会传给 AI Agent 作为额外约束"
 
-[GenerateFlagContextFile]
-other = "从文件读取本次生成的补充说明；适合较长约束"
-
 # 模式
 [PatternsShort]
 other = "管理已学习的 patterns"
@@ -960,22 +957,22 @@ other = "Patterns 整理完成: 输入 {{.TotalInput}}，写入 {{.TotalWritten}
 other = "用自然语言添加用户自定义模式"
 
 [PatternsAddLongDesc]
-other = "通过 --context 使用自然语言描述编码规范或模式，AI 结合项目代码生成结构化 Pattern。\n\nAI 会根据描述自动推断分类、生成正例/反例代码和可操作规则。\n可用 --files 指定关联文件或目录，AI 会读取这些范围生成更精准的示例。"
+other = "通过 --context 或 --context-path 使用自然语言描述编码规范或模式，AI 结合项目上下文生成结构化 Pattern。\n\nAI 会根据描述自动推断分类、生成示例和可操作规则。--context-path 可读取文件或目录，适合传入较长的说明、规范草稿或一次性参考材料。"
 
 [PatternsAddExample]
-other = "  # 最简用法\n  skills-seed patterns add --context \"所有 service 方法必须返回 domain error\"\n\n  # 指定分类和关联文件或目录\n  skills-seed patterns add --context \"分页查询统一使用 limit/offset\" --category api --files internal/handler"
+other = "  # 直接传入描述\n  skills-seed patterns add --context \"所有 service 方法必须返回 domain error\"\n\n  # 指定分类\n  skills-seed patterns add --context \"分页查询统一使用 limit/offset\" --category api\n\n  # 从文件或目录读取较长上下文；多个来源重复传入 --context-path\n  skills-seed patterns add --context-path docs/plan.md --context-path docs/specs --category api"
 
 [PatternsAddFlagCategory]
 other = "指定分类：naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
 
-[PatternsAddFlagFiles]
-other = "关联文件或目录路径，可重复传入；AI 会读取这些范围生成精准示例"
-
 [PatternsAddFlagContext]
 other = "用户输入的自然语言模式描述"
 
+[PatternsAddFlagContextPath]
+other = "从文件或目录读取自然语言模式描述或一次性参考材料，可重复传入"
+
 [PatternsAddRequireContext]
-other = "需要通过 --context 提供模式描述：skills-seed patterns add --context \"规则描述\""
+other = "需要通过 --context 或 --context-path 提供模式描述：skills-seed patterns add --context \"规则描述\""
 
 [PatternsAddComplete]
 other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, 来源: {{.Source}})"
@@ -984,19 +981,22 @@ other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}}
 other = "修订指定 pattern"
 
 [PatternsUpdateLongDesc]
-other = "通过 --context 使用自然语言修订指定 pattern。命令会读取现有 pattern，让 AI 根据修订说明重新生成结构化内容，并保留原 pattern ID、创建时间和 workspace 归属。可用 --files 指定关联文件或目录。"
+other = "通过 --context 或 --context-path 使用自然语言修订指定 pattern。命令会读取现有 pattern，让 AI 根据修订说明重新生成结构化内容，并保留原 pattern ID、创建时间和 workspace 归属。"
 
 [PatternsUpdateExample]
-other = "  # 修订指定 pattern\n  skills-seed patterns update resp-extra-update-logging --context \"补充响应额外字段更新时必须记录审计日志\"\n\n  # 指定关联目录\n  skills-seed patterns update resp-extra-update-logging --context \"补充日志字段要求\" --files internal/service"
+other = "  # 修订指定 pattern\n  skills-seed patterns update resp-extra-update-logging --context \"补充响应额外字段更新时必须记录审计日志\"\n\n  # 从文件或目录读取修订内容；多个来源重复传入 --context-path\n  skills-seed patterns update resp-extra-update-logging --context-path docs/plan.md --context-path docs/specs"
 
 [PatternsUpdateFlagContext]
 other = "用户输入的自然语言修订说明"
+
+[PatternsUpdateFlagContextPath]
+other = "从文件或目录读取自然语言修订说明或一次性参考材料，可重复传入"
 
 [PatternsUpdateRequireID]
 other = "需要提供 pattern ID：skills-seed patterns update <pattern-id> --context \"修订说明\""
 
 [PatternsUpdateRequireContext]
-other = "需要通过 --context 提供修订说明：skills-seed patterns update <pattern-id> --context \"修订说明\""
+other = "需要通过 --context 或 --context-path 提供修订说明：skills-seed patterns update <pattern-id> --context \"修订说明\""
 
 [PatternsUpdateComplete]
 other = "Pattern 已更新: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, 来源: {{.Source}})"
@@ -1246,28 +1246,19 @@ other = "位置历史"
 other = "一键同步 skills"
 
 [SyncLongDesc]
-other = "一键完成完整流程，自动执行 learn current → generate skills。\n\n默认会优先恢复上一次未完成的 sync 分析计划；需要放弃恢复状态时使用 --restart。\n--context 只作为本次学习的额外背景传给分析提示词。\n需要手动添加用户模式时使用 --pattern，它会执行 patterns add → generate skills。"
+other = "一键完成完整流程，自动执行 learn current → generate skills。\n\n默认会优先恢复上一次未完成的 sync 分析计划；需要放弃恢复状态时使用 --restart。\n--context 只作为本次学习的额外背景传给分析提示词。需要手动添加用户模式时，请使用 patterns add 或 patterns update。"
 
 [SyncExample]
-other = "  # 完整流程：学习 + 生成\n  skills-seed sync\n\n  # 附加本次学习背景\n  skills-seed sync --context \"私有化部署，不是 SaaS\"\n\n  # 添加用户模式 + 生成\n  skills-seed sync --pattern \"所有 API 必须有错误处理\" --category api\n\n  # 带关联文件或目录\n  skills-seed sync --pattern \"分页查询使用 limit/offset\" --files internal/handler"
-
-[SyncFlagCategory]
-other = "用户模式的分类（配合 --pattern 使用）"
-
-[SyncFlagFiles]
-other = "关联文件或目录路径，可重复传入（配合 --pattern 使用）"
+other = "  # 完整流程：学习 + 生成\n  skills-seed sync\n\n  # 附加本次学习背景\n  skills-seed sync --context \"私有化部署，不是 SaaS\"\n\n  # 从多个文件或目录读取本次学习背景\n  skills-seed sync --context-path docs/plan.md --context-path docs/specs\n\n  # 放弃未完成状态并重新学习\n  skills-seed sync --restart"
 
 [SyncFlagContext]
 other = "本次学习的额外背景，只影响 learn current 提示词"
 
-[SyncFlagPattern]
-other = "用户输入的自然语言模式描述；传入后执行 patterns add → generate skills"
+[SyncFlagContextPath]
+other = "从文件或目录读取本次学习的额外背景，可重复传入"
 
 [SyncStepLearn]
 other = "[sync] 步骤 1/2: 学习当前代码库..."
-
-[SyncStepAddPattern]
-other = "[sync] 步骤 1/2: 添加用户自定义模式..."
 
 [SyncStepGenerate]
 other = "[sync] 步骤 2/2: 生成 skills..."
@@ -1284,17 +1275,8 @@ other = "学习失败"
 [SyncGenerateFailed]
 other = "生成 skills 失败"
 
-[SyncAddPatternFailed]
-other = "添加用户模式失败"
-
-[SyncSavePatternFailed]
-other = "保存用户模式失败"
-
 [PatternCuratorNotConfigured]
 other = "模式策展服务未配置"
-
-[SyncPatternAdded]
-other = "用户模式已添加: {{.PatternName}} [{{.Category}}] ({{.PatternID}})"
 
 [PreviewShort]
 other = "预览分析输入"
@@ -2027,7 +2009,7 @@ other = "从当前代码学习"
 other = "分析当前代码库，提取编码模式、业务方法、最佳实践与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备完整 project-overview 输入"
 
 [LearnCurrentExample]
-other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不刷新项目画像\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从文件读取本次学习补充说明\n  skills-seed learn current --context-file .skills-seed/context.md"
+other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不刷新项目画像\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
 [LearnHistoryShort]
 other = "从 Git 历史学习"
@@ -2059,8 +2041,8 @@ other = "项目画像刷新策略：auto 缺失或本次写入新模式时刷新
 [LearnFlagContext]
 other = "本次学习的补充说明，会传给 AI Agent 作为额外约束"
 
-[LearnFlagContextFile]
-other = "从文件读取本次学习的补充说明；适合较长约束"
+[LearnFlagContextPath]
+other = "从文件或目录读取本次学习的补充说明，可重复传入；适合较长约束"
 
 [LearnFlagForce]
 other = "忽略文件指纹，强制重新学习当前扫描范围"
@@ -2296,8 +2278,11 @@ other = "暂无变更记录，记录文件: {{.Path}}"
 [ChangeLogSummarySync]
 other = "同步当前代码并更新 skills"
 
-[ChangeLogSummaryUserPatternSync]
-other = "添加用户模式并更新 skills"
+[ChangeLogSummaryPatternsAdd]
+other = "添加用户模式"
+
+[ChangeLogSummaryPatternsUpdate]
+other = "更新用户模式"
 
 [ChangeLogSummaryLearnCurrent]
 other = "学习当前代码"
@@ -2325,6 +2310,9 @@ other = "未检测到学习变化，跳过 skills 生成"
 
 [ChangeLogPatternAdded]
 other = "已添加用户模式: {{.PatternName}} [{{.Category}}]"
+
+[ChangeLogPatternUpdated]
+other = "已更新用户模式: {{.PatternName}} [{{.Category}}]"
 
 [HookPromptTitle]
 other = "提交前要更新 skills 吗？"
@@ -2479,17 +2467,8 @@ other = "清理本次 sync 的可恢复状态并重新开始"
 [SyncRunModeConflict]
 other = "--resume 与 --restart 不能同时使用"
 
-[SyncPatternResumeConflict]
-other = "--pattern 是一次性写入用户模式的操作，不能与 --resume 同时使用；请去掉 --resume 或改用 sync 恢复学习流程"
-
-[SyncPatternOptionsRequirePattern]
-other = "--category 和 --files 只适用于 --pattern；如果要学习当前代码，请去掉这些参数"
-
 [SyncResumeStateMissing]
 other = "没有可恢复的 sync 状态；请去掉 --resume 正常同步，或使用 --restart 重新开始"
-
-[SyncInvalidPatternFile]
-other = "--files 只能使用项目内相对路径: {{.Path}}"
 
 [InteractiveSyncInterruptedTitle]
 other = "检测到上一次 sync 未完成，本次如何执行？"
@@ -2514,3 +2493,27 @@ other = "按当前状态同步"
 
 [InteractiveSyncAutoDesc]
 other = "保持 sync 默认行为，按当前变更决定学习、生成或跳过。"
+
+[GeneratorBusinessEntrySectionTitle]
+other = "业务与编排入口"
+
+[GeneratorBusinessEntrySectionDescription]
+other = "优先展示领域流程、状态流转、权限校验、持久化编排等日常业务开发最可能复用的入口。"
+
+[GeneratorSupportingEntrySectionTitle]
+other = "支撑与工具入口"
+
+[GeneratorSupportingEntrySectionDescription]
+other = "工程设施、生成工具、测试辅助、外部客户端封装或通用工具入口；命中相关改动时再读取。"
+
+[GeneratorTriggerHintBusinessEntry]
+other = "业务入口与编排"
+
+[GeneratorTriggerHintAuthorizationPolicy]
+other = "权限与策略"
+
+[GeneratorTriggerHintStateTransition]
+other = "状态流转"
+
+[GeneratorTriggerHintPersistenceOrchestration]
+other = "持久化编排"

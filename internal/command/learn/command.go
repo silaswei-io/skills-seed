@@ -44,7 +44,7 @@ type learnCurrentOptions struct {
 	focusPaths  []string
 	profileMode string
 	contextText string
-	contextFile string
+	contextPath []string
 	userContext string
 	stateScope  string
 	force       bool
@@ -91,7 +91,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	currentCmd.Flags().StringArrayVarP(&currentOpts.focusPaths, "focus", "f", nil, i18n.Get("LearnFlagFocus"))
 	currentCmd.Flags().StringVar(&currentOpts.profileMode, "profile", learnCurrentProfileAuto, i18n.Get("LearnFlagProfile"))
 	currentCmd.Flags().StringVar(&currentOpts.contextText, "context", "", i18n.Get("LearnFlagContext"))
-	currentCmd.Flags().StringVar(&currentOpts.contextFile, "context-file", "", i18n.Get("LearnFlagContextFile"))
+	currentCmd.Flags().StringArrayVar(&currentOpts.contextPath, "context-path", nil, i18n.Get("LearnFlagContextPath"))
 	currentCmd.Flags().BoolVar(&currentOpts.force, "force", false, i18n.Get("LearnFlagForce"))
 
 	// learn history 子命令
@@ -149,12 +149,28 @@ func RunLearnCurrentWithStateScope(cont *container.Container, stateScope string,
 	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext, stateScope: stateScope})
 }
 
+// CurrentRunOptions 描述外部命令调用 learn current 时允许覆盖的执行选项。
+type CurrentRunOptions struct {
+	// Force 表示忽略已保存的文件指纹，重新学习当前扫描范围。
+	Force bool
+}
+
+// RunLearnCurrentWithStateScopeOptions 从当前代码库学习，并允许调用方指定运行选项。
+func RunLearnCurrentWithStateScopeOptions(cont *container.Container, stateScope string, userContext string, opts CurrentRunOptions) (domain.LearnCurrentResult, error) {
+	return runLearnCurrent(cont, learnCurrentOptions{
+		profileMode: learnCurrentProfileAuto,
+		userContext: userContext,
+		stateScope:  stateScope,
+		force:       opts.Force,
+	})
+}
+
 func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	if opts.profileMode == "" {
 		opts.profileMode = learnCurrentProfileAuto
 	}
 	if opts.userContext == "" {
-		userContext, err := commandutil.ResolveRuntimeContext(opts.contextText, opts.contextFile)
+		userContext, err := commandutil.ResolveRuntimeContext(opts.contextText, opts.contextPath...)
 		if err != nil {
 			return domain.LearnCurrentResult{}, err
 		}
@@ -247,10 +263,11 @@ type learnCurrentRunningUnits struct {
 }
 
 func newLearnCurrentRunningUnits(state *commandstate.State, plannedUnits []domain.AnalysisUnit) *learnCurrentRunningUnits {
-	_, total := learnCurrentPendingUnitProgress(state, plannedUnits)
+	completed, total := learnCurrentPendingUnitProgress(state, plannedUnits)
 	return &learnCurrentRunningUnits{
-		labels: make(map[int]string),
-		total:  total,
+		labels:    make(map[int]string),
+		completed: completed,
+		total:     total,
 	}
 }
 
@@ -423,7 +440,11 @@ func learnCurrentPendingUnitProgress(state *commandstate.State, plannedUnits []d
 	if state != nil && len(state.Units) > 0 {
 		total = len(state.Units)
 	}
-	return len(plannedUnits), total
+	completed := total - len(plannedUnits)
+	if completed < 0 {
+		completed = 0
+	}
+	return completed, total
 }
 
 func analysisUnitSame(a, b domain.AnalysisUnit) bool {
@@ -686,11 +707,12 @@ func (r *learnCurrentProjectRun) selectRelevantFilesIfNeeded(detectLabel string)
 		"Candidates": len(focusRelPaths),
 	})
 	selectionResult, selectErr := fileanalysis.ApplyAIFileSelector(r.ctx, r.cont.Agent, fileanalysis.AISelectorOptions{
-		ProjectRoot: r.projectRoot,
-		Candidates:  focusRelPaths,
-		Changes:     r.incrementalChanges,
-		UserContext: r.opts.userContext,
-		CachePath:   layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
+		ProjectRoot:   r.projectRoot,
+		Candidates:    focusRelPaths,
+		Changes:       r.incrementalChanges,
+		UserContext:   r.opts.userContext,
+		CachePath:     layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
+		RequiredPaths: utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
 	})
 	if selectErr != nil {
 		logger.Warn(i18n.Get("LearnCurrentAIFileSelectorFallback"))

@@ -178,7 +178,7 @@ For EACH pattern, you MUST provide:
 9. **frequency**: How many times it appears in these commits
 10. **evidence_locations**: pattern-level source evidence locations. Fill real relative paths and line numbers for each pattern when possible:
     - **path**: Relative path from the project root
-    - **line**: 1-based line number; omit when the exact line is unknown
+    - **line**: Single 1-based integer line number; omit when the exact line is unknown. Never output `"29-43"`, `29-43`, or any other range expression.
     - **symbol**: Related function, method, type, variable, or file name
     - **kind**: Evidence type such as "function", "method", "type", or "file"
     - **description**: How this location supports the pattern
@@ -186,7 +186,7 @@ For EACH pattern, you MUST provide:
     - business patterns must prioritize path and symbol; missing these fields makes the generated business overview less useful for routing
 11. **business_method**: For utility/business methods ONLY:
     - **name**: Full method signature or code identifier
-    - **location**: "relative/file/path:line"
+    - **code_location**: Must be an object `{"current_location":"relative/file/path:line"}`. Never output a string and never rename it to `location`.
     - **layer**: Responsibility layer or module type
     - **function**: Complete signature with params and returns
     - **prerequisites**: What needs to be set up first (e.g., transaction opened, config loaded)

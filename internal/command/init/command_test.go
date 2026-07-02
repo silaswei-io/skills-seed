@@ -544,7 +544,7 @@ func TestEnsureWorkspacePromptFilesDoesNotWriteRuntimePathPlaceholders(t *testin
 		require.Contains(t, text, "hsmwebapi")
 		require.NotContains(t, text, "<workspace-input-file>")
 		require.NotContains(t, text, "<workspace-profile-file>")
-		require.NotContains(t, text, "<user-context-file>")
+		require.NotContains(t, text, "<user-context-path>")
 	}
 }
 

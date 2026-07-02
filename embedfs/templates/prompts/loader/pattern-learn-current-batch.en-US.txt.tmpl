@@ -141,6 +141,7 @@ Recommended analysis order: build each unit's own business candidate inventory a
 - `profile_delta.frameworks`, `dependencies`, `config_patterns`, and `framework_patterns` must be string arrays. Return `[]` or omit the field when there is no evidence.
 - `profile_delta.layers` must be an array of objects. Each item must be an object with `name`, `description`, `responsibilities`, and `files`; never use a string, string array, or prose paragraph. Return `[]` when there is no reliable architecture-layer delta.
 - `profile_delta.key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects. Return `[]` or omit the field when there is no evidence.
+- `business_methods[].code_location` must be an object, for example `{"current_location":"file/path:line"}`; never use a `"file/path:line"` string.
 - Plural fields such as `responsibilities`, `files`, `dependencies`, `dependents`, `key_methods`, `scope_paths`, and `evidence` must be string arrays. Put a single value in a one-element array.
 - When unsure about a field's structure, omit the field or return an empty array instead of explaining it with a string.
 
@@ -293,6 +294,7 @@ Before returning JSON, validate every candidate pattern internally:
    - Fill `profile_delta` only with structured project facts newly added or changed by source evidence read for the current unit; omit fields or return empty arrays/strings when there is no evidence.
    - Every array field inside `profile_delta` must keep its JSON array type. `layers`, `key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects; never replace them with string summaries.
    - Every `profile_delta.layers` item must be an object: `{"name":"","description":"","responsibilities":[],"files":[]}`. If you can only write a one-sentence architecture description, evidence is insufficient; return `[]`.
+   - Every `profile_delta.business_methods[].code_location` must be an object: `{"current_location":"file/path:line"}`. Do not output a string for brevity.
    - Do not put project initialization, full structure documentation, whole-architecture summaries, data-flow overviews, or generic overview text into `profile_delta`; those belong only to a full project profile refresh.
    - `profile_delta.validation_commands` must include only commands that validate a completed change, such as repository-evidenced tests, checks, static analysis, builds, code generation, or contract generation; do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands.
    - `profile_delta.business_methods` must include only real business entry points, cross-module orchestration entry points, domain reusable entry points, or high-value utility entry points. Do not output ordinary startup, route/entry registration, framework initialization, scaffolding entry points, or simple record operations.

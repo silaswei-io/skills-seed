@@ -13,6 +13,9 @@
 - Do not output Markdown, code fences, comments, explanations, prefixes, suffixes, summaries, conclusions, or any content outside the JSON object.
 - Before the final response, internally validate the JSON: ensure the final response can be parsed directly by a standard JSON parser, all string escaping is valid, and every brace, bracket, and quote is closed.
 - If validation finds that the final response is not valid JSON, fix it internally before responding; do not write validation steps, repair notes, or failure reasons outside the JSON.
+- Strictly follow the field names, object shapes, and array shapes defined by the built-in prompt. Do not shorten object fields into strings, and do not shorten array fields into comma-separated strings or prose summaries.
+- If a field is an object in the built-in prompt's JSON example, the final output must keep it as an object. If a field is an array in the example, the final output must keep it as an array. When evidence is missing, prefer omitting the field or returning an empty array instead of explaining it with a string.
+- Do not rename fields, substitute fields, or output equivalent-looking JSON with a different structure for brevity.
 
 ## Language
 

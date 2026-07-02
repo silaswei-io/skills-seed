@@ -5,22 +5,28 @@
 {{if .HasBusinessPatterns}}相关业务规则见 [业务模式](./patterns/business.md)
 {{end}}
 
-{{if .BusinessMethodIndex.Groups}}
+{{if .BusinessMethodIndex.Sections}}
 ## 目录
 
-{{range .BusinessMethodIndex.Groups}}- {{.Title}}
-{{range .Methods}}  - [{{.DisplayName}}](#{{.Anchor}})
-{{end}}{{end}}
+{{range .BusinessMethodIndex.Sections}}- {{.Title}}
+{{range .Groups}}  - {{.Title}}
+{{range .Methods}}    - [{{.DisplayName}}](#{{.Anchor}})
+{{end}}{{end}}{{end}}
 {{end}}
 
-{{if .BusinessMethodIndex.Groups}}
-{{range .BusinessMethodIndex.Groups}}
+{{if .BusinessMethodIndex.Sections}}
+{{range .BusinessMethodIndex.Sections}}
 ## {{.Title}}
+
+{{if .Description}}{{.Description}}{{end}}
+
+{{range .Groups}}
+### {{.Title}}
 
 {{if .Summary}}{{.Summary}}{{end}}
 
 {{range .Methods}}
-### {{.DisplayName}}
+#### {{.DisplayName}}
 
 - **当前位置**: `{{.DisplayLocation}}`
 {{if .LocationStatus}}- **位置状态**: `{{.LocationStatus}}`
@@ -47,7 +53,7 @@
 **使用场景**: {{.Usage}}
 {{end}}
 
-{{end}}{{end}}
+{{end}}{{end}}{{end}}
 {{else}}
 *入口方法信息尚未提取*
 {{end}}

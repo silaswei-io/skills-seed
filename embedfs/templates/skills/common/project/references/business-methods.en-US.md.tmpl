@@ -5,22 +5,28 @@ This file indexes project-level business entry points, cross-module orchestratio
 {{if .HasBusinessPatterns}}Related business rules: [Business Patterns](./patterns/business.md)
 {{end}}
 
-{{if .BusinessMethodIndex.Groups}}
+{{if .BusinessMethodIndex.Sections}}
 ## Table Of Contents
 
-{{range .BusinessMethodIndex.Groups}}- {{.Title}}
-{{range .Methods}}  - [{{.DisplayName}}](#{{.Anchor}})
-{{end}}{{end}}
+{{range .BusinessMethodIndex.Sections}}- {{.Title}}
+{{range .Groups}}  - {{.Title}}
+{{range .Methods}}    - [{{.DisplayName}}](#{{.Anchor}})
+{{end}}{{end}}{{end}}
 {{end}}
 
-{{if .BusinessMethodIndex.Groups}}
-{{range .BusinessMethodIndex.Groups}}
+{{if .BusinessMethodIndex.Sections}}
+{{range .BusinessMethodIndex.Sections}}
 ## {{.Title}}
+
+{{if .Description}}{{.Description}}{{end}}
+
+{{range .Groups}}
+### {{.Title}}
 
 {{if .Summary}}{{.Summary}}{{end}}
 
 {{range .Methods}}
-### {{.DisplayName}}
+#### {{.DisplayName}}
 
 - **Current Location**: `{{.DisplayLocation}}`
 {{if .LocationStatus}}- **Location Status**: `{{.LocationStatus}}`
@@ -47,7 +53,7 @@ This file indexes project-level business entry points, cross-module orchestratio
 **Usage**: {{.Usage}}
 {{end}}
 
-{{end}}{{end}}
+{{end}}{{end}}{{end}}
 {{else}}
 *Entry method information has not been extracted yet*
 {{end}}

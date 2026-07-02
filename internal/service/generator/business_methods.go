@@ -10,8 +10,16 @@ import (
 )
 
 type businessMethodIndex struct {
-	Groups []businessMethodGroup
-	Total  int
+	Sections []businessMethodSection
+	Groups   []businessMethodGroup
+	Total    int
+}
+
+type businessMethodSection struct {
+	ID          string
+	Title       string
+	Description string
+	Groups      []businessMethodGroup
 }
 
 type businessMethodGroup struct {
@@ -26,7 +34,16 @@ type businessMethodView struct {
 	DisplayName string
 	Anchor      string
 	Module      string
+	Role        businessMethodRole
+	Score       int
 }
+
+type businessMethodRole string
+
+const (
+	businessMethodRoleBusiness   businessMethodRole = "business"
+	businessMethodRoleSupporting businessMethodRole = "supporting"
+)
 
 var genericBusinessMethodNames = map[string]bool{
 	"execute": true,
@@ -39,8 +56,26 @@ var genericBusinessMethodNames = map[string]bool{
 }
 
 func buildBusinessMethodIndex(methods []domain.BusinessMethod, locale string) businessMethodIndex {
-	groupsByID := map[string]*businessMethodGroup{}
-	order := make([]string, 0)
+	sections := []businessMethodSection{
+		{
+			ID:          string(businessMethodRoleBusiness),
+			Title:       generatorText(locale, "GeneratorBusinessEntrySectionTitle"),
+			Description: generatorText(locale, "GeneratorBusinessEntrySectionDescription"),
+		},
+		{
+			ID:          string(businessMethodRoleSupporting),
+			Title:       generatorText(locale, "GeneratorSupportingEntrySectionTitle"),
+			Description: generatorText(locale, "GeneratorSupportingEntrySectionDescription"),
+		},
+	}
+	groupsBySection := map[businessMethodRole]map[string]*businessMethodGroup{
+		businessMethodRoleBusiness:   {},
+		businessMethodRoleSupporting: {},
+	}
+	orderBySection := map[businessMethodRole][]string{
+		businessMethodRoleBusiness:   {},
+		businessMethodRoleSupporting: {},
+	}
 	for _, method := range methods {
 		if strings.TrimSpace(method.Name) == "" {
 			continue
@@ -50,6 +85,8 @@ func buildBusinessMethodIndex(methods []domain.BusinessMethod, locale string) bu
 		if id == "" {
 			id = "project"
 		}
+		role, score := businessMethodClassify(method)
+		groupsByID := groupsBySection[role]
 		group, ok := groupsByID[id]
 		if !ok {
 			group = &businessMethodGroup{
@@ -57,37 +94,111 @@ func buildBusinessMethodIndex(methods []domain.BusinessMethod, locale string) bu
 				Title: businessMethodGroupTitle(module, locale),
 			}
 			groupsByID[id] = group
-			order = append(order, id)
+			orderBySection[role] = append(orderBySection[role], id)
 		}
 		view := businessMethodView{
 			BusinessMethod: method,
 			DisplayName:    businessMethodDisplayName(method, module),
 			Module:         module,
+			Role:           role,
+			Score:          score,
 		}
 		view.Anchor = businessMethodAnchor(view.DisplayName)
 		group.Methods = append(group.Methods, view)
 	}
 
-	sort.SliceStable(order, func(i, j int) bool {
-		left := groupsByID[order[i]]
-		right := groupsByID[order[j]]
-		if len(left.Methods) != len(right.Methods) {
-			return len(left.Methods) > len(right.Methods)
-		}
-		return left.Title < right.Title
-	})
-
-	index := businessMethodIndex{Groups: make([]businessMethodGroup, 0, len(order))}
-	for _, id := range order {
-		group := groupsByID[id]
-		sort.SliceStable(group.Methods, func(i, j int) bool {
-			return group.Methods[i].DisplayName < group.Methods[j].DisplayName
+	index := businessMethodIndex{}
+	for sectionIndex := range sections {
+		role := businessMethodRole(sections[sectionIndex].ID)
+		groupsByID := groupsBySection[role]
+		order := orderBySection[role]
+		sort.SliceStable(order, func(i, j int) bool {
+			left := groupsByID[order[i]]
+			right := groupsByID[order[j]]
+			leftScore := businessMethodGroupScore(left)
+			rightScore := businessMethodGroupScore(right)
+			if leftScore != rightScore {
+				return leftScore > rightScore
+			}
+			if len(left.Methods) != len(right.Methods) {
+				return len(left.Methods) > len(right.Methods)
+			}
+			return left.Title < right.Title
 		})
-		group.Summary = businessMethodGroupSummary(*group, locale)
-		index.Total += len(group.Methods)
-		index.Groups = append(index.Groups, *group)
+		for _, id := range order {
+			group := groupsByID[id]
+			sort.SliceStable(group.Methods, func(i, j int) bool {
+				if group.Methods[i].Score != group.Methods[j].Score {
+					return group.Methods[i].Score > group.Methods[j].Score
+				}
+				return group.Methods[i].DisplayName < group.Methods[j].DisplayName
+			})
+			group.Summary = businessMethodGroupSummary(*group, locale)
+			index.Total += len(group.Methods)
+			sections[sectionIndex].Groups = append(sections[sectionIndex].Groups, *group)
+			index.Groups = append(index.Groups, *group)
+		}
+		if len(sections[sectionIndex].Groups) > 0 {
+			index.Sections = append(index.Sections, sections[sectionIndex])
+		}
 	}
 	return index
+}
+
+func businessMethodGroupScore(group *businessMethodGroup) int {
+	if group == nil {
+		return 0
+	}
+	score := 0
+	for _, method := range group.Methods {
+		score += method.Score
+	}
+	return score
+}
+
+func businessMethodClassify(method domain.BusinessMethod) (businessMethodRole, int) {
+	text := strings.ToLower(strings.Join([]string{
+		method.Name,
+		method.Description,
+		method.Usage,
+		method.Type,
+		method.Function,
+		method.Prerequisites,
+		method.Returns,
+		method.DisplayLocation(),
+	}, " "))
+	score := 0
+	if strings.EqualFold(strings.TrimSpace(method.Type), "domain") {
+		score += 4
+	}
+	if containsAny(text,
+		"business", "domain", "service", "workflow", "process", "orchestr", "state", "status",
+		"permission", "auth", "access", "policy", "rule", "validate", "repository", "transaction",
+		"usecase", "业务", "领域", "流程", "编排", "状态", "权限", "校验", "规则", "事务", "持久化",
+	) {
+		score += 3
+	}
+	if containsAny(text, "handler", "controller", "endpoint", "route", "api") {
+		score += 1
+	}
+	if businessMethodHasInfrastructureSignal(text) {
+		score -= 4
+	}
+	if containsAny(text, "/test", "_test.go", "mock", "fixture", "tools/", "cmd/", "script", "generate", "gen_", "codegen", "swagger", "curl") {
+		score -= 3
+	}
+	if score >= 2 {
+		return businessMethodRoleBusiness, score
+	}
+	return businessMethodRoleSupporting, score
+}
+
+func businessMethodHasInfrastructureSignal(text string) bool {
+	return containsAny(text,
+		" util", "utils", "helper", "common", "client", "rest", "http client", "rpc", "sdk",
+		"middleware", "config", "bootstrap", "startup", "route", "router", "model layer",
+		"工具", "通用", "客户端", "中间件", "配置", "启动", "路由", "生成",
+	)
 }
 
 func businessMethodGroupTitle(module, locale string) string {

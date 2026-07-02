@@ -1060,8 +1060,8 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 			checks: map[string][]string{
 				"user-define-pattern": {
 					"输出前验证清单",
-					"如果提供了关联文件",
-					"不要填写虚假的 `business_method`",
+					"只有在确有项目代码依据时才声称来自源码",
+					"不要编造文件路径、行号、方法签名、业务方法或源码证据",
 				},
 				"pattern-curate": {
 					"输出前验证清单",
@@ -1075,8 +1075,8 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 			checks: map[string][]string{
 				"user-define-pattern": {
 					"Pre-Output Validation Checklist",
-					"If related files are provided",
-					"do not fill a fake `business_method`",
+					"claim source-code origin only when real project-code evidence is available",
+					"Do not invent file paths, line numbers, method signatures, business methods, or source evidence",
 				},
 				"pattern-curate": {
 					"Pre-Output Validation Checklist",

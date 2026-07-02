@@ -94,6 +94,8 @@ Starting in 0.11.1, `learn current` supports `learning.current.parallelism` for 
 
 Starting in 0.11.2, `learning.current.max_units_per_call` controls how many units one AI call may analyze, with the default `1` meaning no batching; raise it explicitly when reducing call count matters more. Batch result parsing recognizes top-level `units`, and current-code learning prompts now harden JSON type contracts such as `profile_delta.layers`. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer so one-off examples are not promoted into mandatory standards.
 
+AI file selection only provides relevance recommendations; the final analysis scope is decided by a local stable policy that merges recommendations, cache entries, and explicit user focus paths. Identical inputs reuse the selection cache; explicit focus files cannot be excluded by an AI recommendation, and large candidate sets with overly narrow recommendations are deterministically filled to a minimum budget to reduce large swings in analyzed file counts across runs.
+
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
 
 Starting in 0.10.4, default pre-storage curation uses local deterministic merging and keeps its internal pattern set unique by pattern ID. When a candidate reuses an existing ID, or a historical store already contains duplicate IDs, the merger first collapses them into one higher-quality pattern before writing, avoiding duplicate curated pattern IDs during structural validation.
@@ -157,14 +159,14 @@ built-in prompt
 
 Use `instructions/<prompt-id>.md` for stable team requirements, such as "ignore temporary debugging code while learning commits" or "prioritize API compatibility rules when generating skills". These instructions are appended after the built-in prompt, but they must not change the JSON / Markdown output format required by the built-in prompt. Skills Seed appends a non-editable final output contract after user fragments to protect parser-facing output.
 
-`--context` and `--context-file` are one-time guidance for the current `learn current` command. They are not written to `.skills-seed/prompts/`, and they are not passed as temporary input to `generate skills`. Use them for temporary instructions:
+`--context` and `--context-path` are one-time guidance for the current `learn current` command. They are not written to `.skills-seed/prompts/`, and they are not passed as temporary input to `generate skills`. Use them for temporary instructions:
 
 ```bash
 skills-seed learn current --context "Focus only on compatibility boundaries"
-skills-seed learn current --context-file .skills-seed/context.md
+skills-seed learn current --context-path .skills-seed/context.md
 ```
 
-If a rule should apply across future runs, put it in `.skills-seed/prompts/instructions/<prompt-id>.md`. If it only explains or limits one run, use `--context` or `--context-file`.
+If a rule should apply across future runs, put it in `.skills-seed/prompts/instructions/<prompt-id>.md`. If it only explains or limits one run, use `--context` or `--context-path`.
 
 `learn current`, `preview`, and structural analysis now share one file-selection policy: by default they analyze source files, build config, and dependency config while continuing to skip documents, generated outputs, paths ignored by Git, paths matched by global `exclude`, and generated Skills output directories.
 
@@ -261,10 +263,10 @@ Built-in targets:
 | `skills-seed learn history` | Learn long-lived rules from Git history |
 | `skills-seed generate skills` | Generate skills for the current `skills.target` |
 | `skills-seed workflow --context "<notes>"` | Infer and save a user workflow through the Agent; omit `--name` to generate a name, same-name workflows merge by default, use `--overwrite` to replace |
-| `skills-seed patterns add --context "<description>"` | Add a user-defined pattern in natural language; use `--files` for files or directories |
+| `skills-seed patterns add --context "<description>"` | Add a user-defined pattern in natural language; use `--context-path` for longer notes |
 | `skills-seed patterns update <id> --context "<request>"` | Update a specific user pattern |
 | `skills-seed patterns compact` | Explicitly compact similar stored patterns |
-| `skills-seed sync` | Run learning or pattern add in one command, then generate skills |
+| `skills-seed sync` | Learn current code in one command and generate skills when changes are found |
 | `skills-seed check` | Check staged files or Git-tracked files |
 | `skills-seed patterns stats` | Show pattern quality, hit counts, and recent hits |
 | `skills-seed patterns show` | Show pattern timestamps, business-method locations, and pattern evidence locations from the DB |

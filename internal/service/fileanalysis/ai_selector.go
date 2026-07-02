@@ -18,16 +18,17 @@ import (
 
 const (
 	aiFileSelectionCacheSchemaVersion = 1
-	aiFileSelectionPromptVersion      = "file-select-stable-selection-v1"
+	aiFileSelectionPromptVersion      = "file-select-stable-policy-v1"
 )
 
 // AISelectorOptions 描述 AI 文件选择器的本地输入。
 type AISelectorOptions struct {
-	ProjectRoot string
-	Candidates  []string
-	Changes     *FileChanges
-	UserContext string
-	CachePath   string
+	ProjectRoot   string
+	Candidates    []string
+	Changes       *FileChanges
+	UserContext   string
+	CachePath     string
+	RequiredPaths []string
 }
 
 // AISelectorResult 描述 AI 文件选择器应用后的本地结果。
@@ -35,6 +36,8 @@ type AISelectorResult struct {
 	SelectedPaths []string
 	SkippedPaths  []string
 	Reason        string
+	ForcedPaths   []string
+	AIPaths       []string
 }
 
 // ApplyAIFileSelector 让 AI 基于候选文件树收敛本次 learn current 的分析范围。
@@ -50,7 +53,7 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 		UserContext:  opts.UserContext,
 		CandidateNum: len(candidates),
 	}
-	fingerprint := aiFileSelectionFingerprint(req, opts.Changes)
+	fingerprint := aiFileSelectionFingerprint(req, opts.Changes, opts.RequiredPaths)
 	if opts.CachePath != "" {
 		if selected, reason, ok := readAIFileSelectionCache(opts.CachePath, fingerprint, candidates); ok {
 			return &AISelectorResult{
@@ -70,7 +73,12 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 		aiResult = &agent.SelectFilesResult{}
 	}
 	cacheable = cacheable && hasAISelectionDirective(aiResult)
-	selected := applyAISelection(candidates, aiResult)
+	aiSelected := applyAISelection(candidates, aiResult)
+	selected, forced := applyStableSelectionPolicy(stableSelectionOptions{
+		Candidates:    candidates,
+		AISelected:    aiSelected,
+		RequiredPaths: opts.RequiredPaths,
+	})
 	if len(selected) == 0 {
 		selected = candidates
 		cacheable = false
@@ -79,6 +87,8 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 		SelectedPaths: selected,
 		SkippedPaths:  subtractPaths(candidates, selected),
 		Reason:        strings.TrimSpace(aiResult.Reason),
+		ForcedPaths:   forced,
+		AIPaths:       aiSelected,
 	}
 	if opts.CachePath != "" && cacheable {
 		_ = writeAIFileSelectionCache(opts.CachePath, aiFileSelectionCache{
@@ -105,6 +115,7 @@ type aiFileSelectionFingerprintInput struct {
 	Candidates      []agent.FileSelectionCandidate `json:"candidates"`
 	Changes         aiFileSelectionChangesInput    `json:"changes,omitempty"`
 	UserContextHash string                         `json:"user_context_hash,omitempty"`
+	RequiredPaths   []string                       `json:"required_paths,omitempty"`
 }
 
 type aiFileSelectionChangesInput struct {
@@ -118,7 +129,7 @@ type aiFileSelectionChangeRecordInput struct {
 	Hash string `json:"hash,omitempty"`
 }
 
-func aiFileSelectionFingerprint(req *agent.SelectFilesRequest, changes *FileChanges) string {
+func aiFileSelectionFingerprint(req *agent.SelectFilesRequest, changes *FileChanges, requiredPaths []string) string {
 	if req == nil {
 		return ""
 	}
@@ -129,6 +140,7 @@ func aiFileSelectionFingerprint(req *agent.SelectFilesRequest, changes *FileChan
 		Candidates:      append([]agent.FileSelectionCandidate{}, req.Candidates...),
 		Changes:         aiFileSelectionChangesFingerprintInput(changes),
 		UserContextHash: hashText(req.UserContext),
+		RequiredPaths:   normalizeCandidatePaths(requiredPaths),
 	}
 	data, err := json.Marshal(input)
 	if err != nil {

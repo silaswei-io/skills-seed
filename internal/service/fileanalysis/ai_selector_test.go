@@ -56,6 +56,68 @@ func TestApplyAIFileSelectorAppliesIncludeExcludeSafely(t *testing.T) {
 	require.NotContains(t, selector.req.FileTree, "/tmp/outside")
 }
 
+func TestApplyAIFileSelectorKeepsRequiredPaths(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "logic"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "types"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "internal", "logic", "create.go"), []byte("package logic"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "internal", "types", "types.go"), []byte("package types"), 0644))
+
+	selector := &fakeFileSelector{result: &agent.SelectFilesResult{
+		SelectedPaths: []string{"internal/logic/create.go"},
+		Exclude:       []string{"internal/types/**"},
+		Reason:        "prefer implementation",
+	}}
+
+	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
+		ProjectRoot:   root,
+		Candidates:    []string{"internal/logic/create.go", "internal/types/types.go"},
+		RequiredPaths: []string{"internal/types/types.go"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"internal/logic/create.go", "internal/types/types.go"}, result.SelectedPaths)
+	require.Empty(t, result.SkippedPaths)
+	require.Equal(t, []string{"internal/types/types.go"}, result.ForcedPaths)
+	require.Equal(t, []string{"internal/logic/create.go"}, result.AIPaths)
+}
+
+func TestApplyAIFileSelectorStillNarrowsWithoutRequiredPaths(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "a.go"), []byte("package demo"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "b.go"), []byte("package demo"), 0644))
+
+	selector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"a.go"}}}
+	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"a.go", "b.go"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"a.go"}, result.SelectedPaths)
+	require.Equal(t, []string{"b.go"}, result.SkippedPaths)
+	require.Empty(t, result.ForcedPaths)
+}
+
+func TestApplyAIFileSelectorFillsMinimumBudgetForLargeCandidateSets(t *testing.T) {
+	root := t.TempDir()
+	candidates := make([]string, 0, 120)
+	for i := 0; i < 120; i++ {
+		path := fmt.Sprintf("pkg/f%03d.go", i)
+		candidates = append(candidates, path)
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "pkg"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, path), []byte("package pkg"), 0644))
+	}
+
+	selector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"pkg/f119.go"}}}
+	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  candidates,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.SelectedPaths, stableSelectionMinCount)
+	require.Contains(t, result.SelectedPaths, "pkg/f119.go")
+	require.Contains(t, result.SelectedPaths, "pkg/f000.go")
+}
+
 func TestApplyAIFileSelectorFallsBackWhenAISelectsNothing(t *testing.T) {
 	selector := &fakeFileSelector{result: &agent.SelectFilesResult{
 		Include: []string{"../bad"},
@@ -169,6 +231,35 @@ func TestApplyAIFileSelectorInvalidatesCacheWhenUserContextChanges(t *testing.T)
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"b.go"}, second.SelectedPaths)
+	require.Equal(t, 1, secondSelector.calls)
+}
+
+func TestApplyAIFileSelectorInvalidatesCacheWhenRequiredPathsChange(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "a.go"), []byte("package demo"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "b.go"), []byte("package demo"), 0644))
+	cachePath := filepath.Join(t.TempDir(), "selection.json")
+
+	firstSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"a.go"}}}
+	first, err := ApplyAIFileSelector(context.Background(), firstSelector, AISelectorOptions{
+		ProjectRoot:   root,
+		Candidates:    []string{"a.go", "b.go"},
+		RequiredPaths: []string{"a.go"},
+		CachePath:     cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"a.go"}, first.SelectedPaths)
+	require.Equal(t, 1, firstSelector.calls)
+
+	secondSelector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"a.go"}}}
+	second, err := ApplyAIFileSelector(context.Background(), secondSelector, AISelectorOptions{
+		ProjectRoot:   root,
+		Candidates:    []string{"a.go", "b.go"},
+		RequiredPaths: []string{"b.go"},
+		CachePath:     cachePath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"a.go", "b.go"}, second.SelectedPaths)
 	require.Equal(t, 1, secondSelector.calls)
 }
 

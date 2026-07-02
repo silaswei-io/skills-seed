@@ -163,7 +163,7 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	assert.Equal(t, "Taskfile.yml", result.ValidationCommands[0].Source)
 }
 
-func TestParseAnalyzeProjectResult_RepairsDuplicatedObjectStart(t *testing.T) {
+func TestParseAnalyzeProjectResult_AcceptsStringValidationCommands(t *testing.T) {
 	output := `{
   "project_name": "demo",
   "language": "go",
@@ -176,21 +176,51 @@ func TestParseAnalyzeProjectResult_RepairsDuplicatedObjectStart(t *testing.T) {
   "structure": "internal/",
   "key_modules": [],
   "business_methods": [],
-  "common_utils": [
-    {"name":"QuoteWithFlavor","file":"core/stores/condition/adaptor.go","signature":"func QuoteWithFlavor(flavor sqlbuilder.Flavor, str string) string","description":"按数据库方言对字段名加引号","usage":"生成 SQL 时确保字段名按方言正确引用"},
-    {"{"name":"RawFieldNames","file":"core/stores/condition/adaptor.go","signature":"func RawFieldNames(in any) []string","description":"从结构体提取 db tag 对应的字段名列表","usage":"将 Go 结构体字段转为数据库列名列表"}
-  ],
+  "common_utils": [],
   "config_patterns": [],
   "dependencies": [],
+  "validation_commands": ["go test ./...", "go vet ./..."],
   "summary": "demo project"
+}`
+
+	result, err := ParseAnalyzeProjectResult(output)
+
+	require.NoError(t, err)
+	require.Len(t, result.ValidationCommands, 2)
+	assert.Equal(t, "go test ./...", result.ValidationCommands[0].Command)
+	assert.Equal(t, "go vet ./...", result.ValidationCommands[1].Command)
+}
+
+func TestParseAnalyzeProjectResult_RepairsNonstandardJSON(t *testing.T) {
+	output := `{
+  // project profile returned by model
+  project_name: 'demo',
+  language: 'go',
+  frameworks: ['cobra',],
+  architecture: 'layered',
+  layers: [],
+  dependency_graph: 'command -> service',
+  data_flow: 'request -> response',
+  framework_patterns: [],
+  structure: 'internal/',
+  key_modules: [],
+  business_methods: [],
+  common_utils: [
+    {name:'RawFieldNames', file:'core/stores/condition/adaptor.go', signature:'func RawFieldNames(in any) []string', description:'从结构体提取 db tag 对应的字段名列表', usage:'将 Go 结构体字段转为数据库列名列表'},
+  ],
+  config_patterns: [],
+  dependencies: [],
+  summary: 'demo project',
 }`
 
 	result, err := ParseAnalyzeProjectResult(output)
 	if !assert.NoError(t, err) {
 		return
 	}
-	assert.Len(t, result.CommonUtils, 2)
-	assert.Equal(t, "RawFieldNames", result.CommonUtils[1].Name)
+	assert.Equal(t, "demo", result.ProjectName)
+	assert.Equal(t, []string{"cobra"}, result.Frameworks)
+	assert.Len(t, result.CommonUtils, 1)
+	assert.Equal(t, "RawFieldNames", result.CommonUtils[0].Name)
 }
 
 func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
@@ -241,6 +271,78 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
 	assert.Equal(t, "error", result.Patterns[0].BusinessMethod.Returns)
 	assert.Equal(t, "demo project", result.ProfileDelta.Summary)
 	assert.Len(t, result.ProfileDelta.BusinessMethods, 1)
+}
+
+func TestParseAnalyzeCurrentCodebaseResult_AcceptsStringCodeLocation(t *testing.T) {
+	output := `{
+  "patterns": [{
+    "id": "business-run",
+    "name": "Business Run",
+    "category": "business",
+    "description": "runs a business workflow",
+    "good_example": "func Run() error {\n  return nil\n}",
+    "bad_example": "",
+    "rule": "Use for business orchestration",
+    "confidence": 0.9,
+    "frequency": 1,
+    "business_method": {
+      "name": "Run",
+      "code_location": "internal/service/demo.go:10",
+      "description": "runs demo workflow",
+      "usage": "demo flow",
+      "type": "domain",
+      "function": "func Run() error"
+    }
+  }],
+  "profile_delta": {
+    "business_methods": [{
+      "name": "Run",
+      "code_location": "internal/service/demo.go:10",
+      "description": "runs demo workflow",
+      "usage": "demo flow",
+      "type": "domain",
+      "function": "func Run() error"
+    }]
+  },
+  "profile_refresh_recommended": {"needed": false}
+}`
+
+	result, err := ParseAnalyzeCurrentCodebaseResult(output)
+
+	require.NoError(t, err)
+	require.Len(t, result.Patterns, 1)
+	require.NotNil(t, result.Patterns[0].BusinessMethod)
+	assert.Equal(t, "internal/service/demo.go:10", result.Patterns[0].BusinessMethod.DisplayLocation())
+	require.Len(t, result.ProfileDelta.BusinessMethods, 1)
+	assert.Equal(t, "internal/service/demo.go:10", result.ProfileDelta.BusinessMethods[0].DisplayLocation())
+}
+
+func TestParseAnalyzeCurrentCodebaseBatchResult_AcceptsStringCodeLocation(t *testing.T) {
+	output := `{
+  "units": [{
+    "unit_id": "tools",
+    "unit_name": "辅助工具",
+    "patterns": [],
+    "profile_delta": {
+      "business_methods": [{
+        "name": "RunTool",
+        "code_location": "internal/tools/run.go:27",
+        "description": "runs tool workflow",
+        "usage": "tool flow",
+        "type": "domain",
+        "function": "func RunTool() error"
+      }]
+    },
+    "profile_refresh_recommended": {"needed": false}
+  }]
+}`
+
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
+
+	require.NoError(t, err)
+	require.Len(t, result.Units, 1)
+	require.Len(t, result.Units[0].ProfileDelta.BusinessMethods, 1)
+	assert.Equal(t, "internal/tools/run.go:27", result.Units[0].ProfileDelta.BusinessMethods[0].DisplayLocation())
 }
 
 func TestParseAnalyzeCurrentCodebaseResult_AcceptsBusinessMethodTextArrays(t *testing.T) {
@@ -335,6 +437,35 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
 	assert.Equal(t, 42, result.Patterns[0].EvidenceLocations[0].Line)
 	assert.Equal(t, "LoadConfig", result.Patterns[0].EvidenceLocations[0].Symbol)
 	assert.Equal(t, "internal/service/config.go:42", result.Patterns[0].EvidenceLocations[0].DisplayLocation())
+}
+
+func TestParseAnalyzeCurrentCodebaseResult_AcceptsStringLineRanges(t *testing.T) {
+	output := `{
+  "patterns": [{
+    "id": "error-wrap",
+    "name": "Error Wrap",
+    "category": "error",
+    "description": "wraps errors",
+    "good_example": "return fmt.Errorf(\"load config: %w\", err)",
+    "bad_example": "",
+    "rule": "Wrap errors at module boundaries",
+    "confidence": 0.9,
+    "frequency": 1,
+    "evidence_locations": [
+      {"path": "internal/service/config.go", "line": "29-43", "symbol": "LoadConfig"}
+    ],
+    "business_method": null
+  }],
+  "profile_delta": {},
+  "profile_refresh_recommended": {"needed": false}
+}`
+
+	result, err := ParseAnalyzeCurrentCodebaseResult(output)
+
+	require.NoError(t, err)
+	require.Len(t, result.Patterns, 1)
+	require.Len(t, result.Patterns[0].EvidenceLocations, 1)
+	assert.Equal(t, 29, result.Patterns[0].EvidenceLocations[0].Line)
 }
 
 func TestParseAnalyzeResultReturnsErrorWhenJSONMissing(t *testing.T) {

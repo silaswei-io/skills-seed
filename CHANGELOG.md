@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.11.3]
+
+### 变更
+
+- JSON 修复逻辑改为复用 `github.com/silaswei-io/jsonrepair-go`，并在结构化解析失败时尝试从文本中恢复 JSON，减少维护自研修复器的复杂度。
+- `learn current`、`patterns add/update` 和 `sync` 统一支持可重复的 `--context-path`，可从文件或目录读取一次性上下文；旧的单文件 `--context-file` 和 `patterns --files` 语义收敛为上下文路径。
+- `sync` 聚焦为“学习当前代码并按需生成 skills”的入口，移除直接添加用户模式的 `--pattern` 路径；补充或修订用户模式改由 `patterns add/update` 负责，并记录 changelog。
+- AI 文件选择增加本地稳定策略：显式 focus 路径强制保留，大候选集下对过窄 AI 建议按确定性预算补足，降低多次学习的覆盖面波动。
+- 生成的业务方法索引按业务入口和支撑入口分层，触发提示会结合业务方法信号补充授权、状态流转和持久化编排场景；验证命令选择也会按改动类型过滤和加权。
+- 更新 README、命令/配置文档和新增 HTML 介绍页，说明 `--context-path`、稳定文件选择策略以及新的 `sync` / `patterns` 分工。
+
+### 修复
+
+- 解析 pattern 和业务方法 payload 时兼容字符串形式的代码位置、字符串数值行号和字符串置信度，降低 Agent 输出轻微类型漂移导致的中断。
+- `learn current` 续跑进度会从已完成单元数开始显示，避免恢复运行时进度从当前待处理数量误算。
+
 ## [v0.11.2]
 
 ### 变更

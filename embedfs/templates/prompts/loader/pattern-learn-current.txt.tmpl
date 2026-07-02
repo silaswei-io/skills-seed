@@ -142,6 +142,7 @@
 - `profile_delta.frameworks`、`dependencies`、`config_patterns`、`framework_patterns` 必须是字符串数组；没有证据时返回 `[]` 或省略字段。
 - `profile_delta.layers` 必须是对象数组；每个元素只能是包含 `name`、`description`、`responsibilities`、`files` 的对象，不能写成字符串、字符串数组或自然语言段落。没有可靠架构层增量时返回 `[]`。
 - `profile_delta.key_modules`、`common_utils`、`business_methods`、`validation_commands` 必须是对象数组；没有证据时返回 `[]` 或省略字段。
+- `business_methods[].code_location` 必须是对象，例如 `{"current_location":"文件路径:行号"}`；不能写成 `"文件路径:行号"` 字符串。
 - `responsibilities`、`files`、`dependencies`、`dependents`、`key_methods`、`scope_paths`、`evidence` 等复数字段必须是字符串数组；单个值也要写成数组。
 - 不确定字段结构时宁可省略该字段或返回空数组，不要用字符串解释。
 
@@ -308,6 +309,7 @@
    - `profile_delta` 只填写本次读取代码证据明确新增或改变的结构化项目事实；没有证据的字段省略或返回空数组/空字符串。
    - `profile_delta` 内所有数组字段必须保持 JSON 数组类型；`layers`、`key_modules`、`common_utils`、`business_methods` 和 `validation_commands` 必须是对象数组，严禁用字符串摘要代替。
    - `profile_delta.layers` 的每个元素必须是对象：`{"name":"","description":"","responsibilities":[],"files":[]}`；如果只能写出一句架构描述，说明证据不足，应返回 `[]`。
+   - `profile_delta.business_methods[].code_location` 必须是对象：`{"current_location":"文件路径:行号"}`；不要为了简写而输出字符串。
    - 不要把项目初始化、完整结构说明、整体架构摘要、数据流总述或泛化概述写入 `profile_delta`；这些只能由完整项目画像刷新生成。
    - `profile_delta.validation_commands` 只填写用于验证改动结果的命令，例如仓库证据明确记录的测试、检查、静态分析、构建、代码生成或契约生成命令；不要输出安装工具、创建新项目、启动服务、部署、调试、拉取依赖、运行 demo 或一次性环境准备命令。必须填写 `scope_paths` 或 `evidence` 来说明命令适用范围；无法确定作用域时不要输出该命令。
    - `profile_delta.business_methods` 只填写真实业务入口、跨模块编排入口、领域复用入口或高价值工具入口；由源码证据确认的领域操作、资源生命周期、策略执行和外部依赖交互入口属于领域复用入口候选；不要输出普通启动、路由/入口注册、框架初始化、脚手架入口或简单记录操作。

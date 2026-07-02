@@ -49,7 +49,6 @@ func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePat
 	return map[string]interface{}{
 		"Description":       req.Description,
 		"Category":          req.Category,
-		"Files":             req.Files,
 		"UserContext":       req.UserContext,
 		"Language":          req.Language,
 		"AllowedCategories": domain.AllowedPatternCategoriesText(),

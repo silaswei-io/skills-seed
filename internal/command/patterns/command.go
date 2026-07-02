@@ -19,6 +19,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
+	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
@@ -45,11 +46,11 @@ func Cmd(cont *container.Container) *cobra.Command {
 
 func addCmd(cont *container.Container) *cobra.Command {
 	var category string
-	var files []string
 	var userContext string
+	var contextPath []string
 
 	cmd := &cobra.Command{
-		Use:     "add --context <description>",
+		Use:     "add (--context <description> | --context-path <path>)",
 		Short:   i18n.Get("PatternsAddShort"),
 		Long:    i18n.Get("PatternsAddLongDesc"),
 		Example: i18n.Get("PatternsAddExample"),
@@ -62,14 +63,17 @@ func addCmd(cont *container.Container) *cobra.Command {
 				return err
 			}
 
-			description, err := resolvePatternContext(userContext, i18n.Get("PatternsAddRequireContext"))
+			description, err := commandutil.ResolveRuntimeContext(userContext, contextPath...)
+			if err != nil {
+				return err
+			}
+			description, err = resolvePatternContext(description, i18n.Get("PatternsAddRequireContext"))
 			if err != nil {
 				return err
 			}
 			result, err := runUserDefinePattern(cmd.Context(), cont, agent.UserDefinePatternRequest{
 				Description: description,
 				Category:    category,
-				Files:       files,
 				WorkDir:     cont.Config.Project.RootPath,
 				Language:    cont.Config.Project.Language,
 			})
@@ -92,13 +96,18 @@ func addCmd(cont *container.Container) *cobra.Command {
 				"Category":    string(result.Pattern.Category),
 				"Source":      string(result.Pattern.Source),
 			}))
-			return nil
+			change := changelog.Start(cont.SeedPath, "patterns add")
+			change.Detail(i18n.GetWithParams("ChangeLogPatternAdded", map[string]interface{}{
+				"PatternName": result.Pattern.Name,
+				"Category":    string(result.Pattern.Category),
+			}))
+			return change.Save(i18n.Get("ChangeLogSummaryPatternsAdd"))
 		},
 	}
 
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsAddFlagCategory"))
-	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("PatternsAddFlagFiles"))
 	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("PatternsAddFlagContext"))
+	cmd.Flags().StringArrayVar(&contextPath, "context-path", nil, i18n.Get("PatternsAddFlagContextPath"))
 	return cmd
 }
 
@@ -109,11 +118,11 @@ type workspacePatternTargetPlan struct {
 
 func updateCmd(cont *container.Container) *cobra.Command {
 	var category string
-	var files []string
 	var userContext string
+	var contextPath []string
 
 	cmd := &cobra.Command{
-		Use:     "update <pattern-id> --context <description>",
+		Use:     "update <pattern-id> (--context <description> | --context-path <path>)",
 		Short:   i18n.Get("PatternsUpdateShort"),
 		Long:    i18n.Get("PatternsUpdateLongDesc"),
 		Example: i18n.Get("PatternsUpdateExample"),
@@ -133,7 +142,11 @@ func updateCmd(cont *container.Container) *cobra.Command {
 			if err := commandutil.RequireAgentAvailable(cont); err != nil {
 				return err
 			}
-			description, err := resolvePatternContext(userContext, i18n.Get("PatternsUpdateRequireContext"))
+			description, err := commandutil.ResolveRuntimeContext(userContext, contextPath...)
+			if err != nil {
+				return err
+			}
+			description, err = resolvePatternContext(description, i18n.Get("PatternsUpdateRequireContext"))
 			if err != nil {
 				return err
 			}
@@ -145,7 +158,6 @@ func updateCmd(cont *container.Container) *cobra.Command {
 			result, err := runUserDefinePattern(cmd.Context(), cont, agent.UserDefinePatternRequest{
 				Description: updatePatternDescription(description, existing),
 				Category:    choosePatternCategory(category, existing),
-				Files:       files,
 				WorkDir:     cont.Config.Project.RootPath,
 				Language:    cont.Config.Project.Language,
 			})
@@ -162,13 +174,18 @@ func updateCmd(cont *container.Container) *cobra.Command {
 				"Category":    string(written.Category),
 				"Source":      string(written.Source),
 			}))
-			return nil
+			change := changelog.Start(cont.SeedPath, "patterns update")
+			change.Detail(i18n.GetWithParams("ChangeLogPatternUpdated", map[string]interface{}{
+				"PatternName": written.Name,
+				"Category":    string(written.Category),
+			}))
+			return change.Save(i18n.Get("ChangeLogSummaryPatternsUpdate"))
 		},
 	}
 
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsAddFlagCategory"))
-	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("PatternsAddFlagFiles"))
 	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("PatternsUpdateFlagContext"))
+	cmd.Flags().StringArrayVar(&contextPath, "context-path", nil, i18n.Get("PatternsUpdateFlagContextPath"))
 	return cmd
 }
 

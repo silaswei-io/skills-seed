@@ -123,12 +123,11 @@ type PatternSummary struct {
 
 // UserDefinePatternRequest 用户自定义模式请求
 type UserDefinePatternRequest struct {
-	Description string   // 用户自然语言描述
-	Category    string   // 可选，用户指定的分类
-	Files       []string // 可选，关联的文件路径
-	UserContext string   // 可选，额外上下文
-	WorkDir     string   // 项目根目录
-	Language    string   // 项目语言
+	Description string // 用户自然语言描述
+	Category    string // 可选，用户指定的分类
+	UserContext string // 可选，额外上下文
+	WorkDir     string // 项目根目录
+	Language    string // 项目语言
 }
 
 // AllowedCategories 返回提示词可展示的合法模式分类列表。

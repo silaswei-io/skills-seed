@@ -8,11 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	gencmd "github.com/silaswei-io/skills-seed/internal/command/generate"
 	learncmd "github.com/silaswei-io/skills-seed/internal/command/learn"
-	patterncmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -20,7 +18,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -32,16 +29,10 @@ const (
 	syncRunRestart syncRunMode = "restart"
 )
 
-var (
-	errSyncInvalidUserPattern = errors.New("invalid user pattern result")
-)
-
 // Cmd 返回 sync 命令
 func Cmd(cont *container.Container) *cobra.Command {
-	var category string
-	var files []string
-	var patternDescription string
 	userContext := ""
+	contextPath := []string{}
 	resume := false
 	restart := false
 	noInteractive := false
@@ -61,11 +52,12 @@ func Cmd(cont *container.Container) *cobra.Command {
 			}
 			ctx := cmd.Context()
 			stateScope := commandutil.CommandStateScopeForCobra(cmd)
+			resolvedContext, err := commandutil.ResolveRuntimeContext(userContext, contextPath...)
+			if err != nil {
+				return err
+			}
 			inputs, err := normalizeSyncInputs(syncInputs{
-				Category:           category,
-				Files:              files,
-				PatternDescription: patternDescription,
-				UserContext:        userContext,
+				UserContext: resolvedContext,
 			})
 			if err != nil {
 				return err
@@ -74,7 +66,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if shouldRunInteractiveSync(cmd, inputs.Category, inputs.Files, inputs.PatternDescription, inputs.UserContext, noInteractive) {
+			if shouldRunInteractiveSync(cmd, inputs.UserContext, noInteractive) {
 				mode, err := resolveInteractiveSync(ctx, cmd, cont, stateScope)
 				if err != nil {
 					if errors.Is(err, interactive.ErrCanceled) {
@@ -83,9 +75,6 @@ func Cmd(cont *container.Container) *cobra.Command {
 					return err
 				}
 				resolvedMode = mode
-			}
-			if inputs.PatternDescription != "" && resolvedMode == syncRunResume {
-				return fmt.Errorf("%s", i18n.Get("SyncPatternResumeConflict"))
 			}
 			if resolvedMode == syncRunRestart {
 				if err := commandstate.NewRepository(cont.SeedPath, stateScope).Clear(); err != nil {
@@ -101,28 +90,16 @@ func Cmd(cont *container.Container) *cobra.Command {
 					return fmt.Errorf("%s", i18n.Get("SyncResumeStateMissing"))
 				}
 			}
-			if inputs.PatternDescription == "" && (inputs.Category != "" || len(inputs.Files) > 0) {
-				return fmt.Errorf("%s", i18n.Get("SyncPatternOptionsRequirePattern"))
-			}
-
 			change := changelog.Start(cont.SeedPath, "sync")
-			if inputs.PatternDescription != "" {
-				if err := syncWithUserPattern(ctx, cont, inputs.PatternDescription, inputs.Category, inputs.Files, inputs.UserContext, change); err != nil {
-					return err
-				}
-				return change.Save(i18n.Get("ChangeLogSummaryUserPatternSync"))
-			}
-			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, change); err != nil {
+			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, resolvedMode, change); err != nil {
 				return err
 			}
 			return change.Save(i18n.Get("ChangeLogSummarySync"))
 		},
 	}
 
-	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("SyncFlagCategory"))
-	cmd.Flags().StringArrayVarP(&files, "files", "f", nil, i18n.Get("SyncFlagFiles"))
 	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("SyncFlagContext"))
-	cmd.Flags().StringVar(&patternDescription, "pattern", "", i18n.Get("SyncFlagPattern"))
+	cmd.Flags().StringArrayVar(&contextPath, "context-path", nil, i18n.Get("SyncFlagContextPath"))
 	cmd.Flags().BoolVar(&resume, "resume", false, i18n.Get("SyncFlagResume"))
 	cmd.Flags().BoolVar(&restart, "restart", false, i18n.Get("SyncFlagRestart"))
 	cmd.Flags().BoolVar(&noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
@@ -144,46 +121,21 @@ func syncModeFromFlags(resume, restart bool) (syncRunMode, error) {
 }
 
 type syncInputs struct {
-	Category           string
-	Files              []string
-	PatternDescription string
-	UserContext        string
+	UserContext string
 }
 
 func normalizeSyncInputs(inputs syncInputs) (syncInputs, error) {
-	inputs.Category = strings.TrimSpace(inputs.Category)
-	inputs.PatternDescription = strings.TrimSpace(inputs.PatternDescription)
 	inputs.UserContext = strings.TrimSpace(inputs.UserContext)
-	files := make([]string, 0, len(inputs.Files))
-	for _, file := range inputs.Files {
-		file = cleanSyncRelativePath(file)
-		if file == "" {
-			continue
-		}
-		if filepath.IsAbs(file) || strings.HasPrefix(file, "../") || strings.Contains(file, "/../") {
-			return syncInputs{}, fmt.Errorf("%s", i18n.GetWithParams("SyncInvalidPatternFile", map[string]interface{}{"Path": file}))
-		}
-		files = append(files, file)
-	}
-	inputs.Files = files
 	return inputs, nil
 }
 
-func cleanSyncRelativePath(path string) string {
-	path = strings.TrimSpace(filepath.ToSlash(path))
-	path = strings.TrimPrefix(path, "./")
-	path = strings.Trim(path, "/")
-	if path == "" || path == "." {
-		return ""
-	}
-	return filepath.ToSlash(filepath.Clean(path))
-}
-
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
-func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, change *changelog.Builder) error {
+func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder) error {
 	// 步骤 1：学习当前代码。
 	logger.Info(i18n.Get("SyncStepLearn"))
-	result, err := learncmd.RunLearnCurrentWithStateScope(cont, stateScope, userContext)
+	result, err := learncmd.RunLearnCurrentWithStateScopeOptions(cont, stateScope, userContext, learncmd.CurrentRunOptions{
+		Force: mode == syncRunRestart,
+	})
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
@@ -242,69 +194,10 @@ func syncGeneratedSkillMissing(cont *container.Container) bool {
 	return errors.Is(err, os.ErrNotExist)
 }
 
-// syncWithUserPattern 路径 B：添加模式 → 生成 Skills。
-func syncWithUserPattern(ctx context.Context, cont *container.Container, description, category string, files []string, userContext string, change *changelog.Builder) error {
-	// 步骤 1：添加用户自定义模式。
-	logger.Info(i18n.Get("SyncStepAddPattern"))
-	req := &agent.UserDefinePatternRequest{
-		Description: description,
-		Category:    category,
-		Files:       files,
-		UserContext: userContext,
-		WorkDir:     cont.Config.Project.RootPath,
-		Language:    cont.Config.Project.Language,
-	}
-
-	tracker := progress.New(1)
-	retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
-	ctx = retryProgress.WithContext(ctx)
-	label := i18n.Get("ProgressUserDefinePatternAI")
-	var result *agent.UserDefinePatternResult
-	err := tracker.RunStep(label, func() error {
-		retryProgress.StartStep(label)
-		var callErr error
-		result, callErr = cont.Agent.UserDefinePattern(ctx, req)
-		retryProgress.FinishStep(label, callErr == nil)
-		return callErr
-	})
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncAddPatternFailed"), err)
-	}
-	if cont.CuratorSvc == nil {
-		return fmt.Errorf("%s: %s", i18n.Get("SyncSavePatternFailed"), i18n.Get("PatternCuratorNotConfigured"))
-	}
-	if result == nil || result.Pattern == nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncAddPatternFailed"), errSyncInvalidUserPattern)
-	}
-
-	written, err := patterncmd.StoreUserDefinedPattern(ctx, cont, description, *result.Pattern)
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncSavePatternFailed"), err)
-	}
-	result.Pattern = &written
-
-	logger.Info(i18n.GetWithParams("SyncPatternAdded", map[string]interface{}{
-		"PatternID":   result.Pattern.ID,
-		"PatternName": result.Pattern.Name,
-		"Category":    string(result.Pattern.Category),
-	}))
-	change.Detail(i18n.GetWithParams("ChangeLogPatternAdded", map[string]interface{}{
-		"PatternName": result.Pattern.Name,
-		"Category":    string(result.Pattern.Category),
-	}))
-
-	// 步骤 2：生成 Skills。
-	logger.Info(i18n.Get("SyncStepGenerate"))
-	if err := gencmd.RunGenerate(cont); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
-	}
-	change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
-
-	logger.Info(i18n.Get("SyncComplete"))
-	return nil
-}
-
 func recordLearnSummary(change *changelog.Builder, result domain.LearnCurrentResult) {
+	if change == nil {
+		return
+	}
 	summary := result.Summary
 	if summary.Projects > 0 {
 		change.Detail(i18n.GetWithParams("ChangeLogLearnWorkspaceSummary", map[string]interface{}{

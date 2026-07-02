@@ -1,6 +1,7 @@
 package learn
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -67,4 +68,27 @@ func TestFilterCompletedStateChangesKeepsChangedHashPending(t *testing.T) {
 
 	require.Equal(t, []string{"internal/key/create.go"}, filtered.AddedOrModified)
 	require.Len(t, filtered.Records, 1)
+}
+
+func TestRunningUnitsProgressStartsFromCompletedOriginalPlan(t *testing.T) {
+	units := make([]domain.AnalysisUnit, 0, 19)
+	for i := 1; i <= 19; i++ {
+		units = append(units, domain.AnalysisUnit{
+			ID:         "unit-" + strconv.Itoa(i),
+			Name:       "单元 " + strconv.Itoa(i),
+			EntryPaths: []string{"internal/unit" + strconv.Itoa(i) + ".go"},
+		})
+	}
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, units)
+	pending := units[17:]
+
+	running := newLearnCurrentRunningUnits(state, pending)
+
+	params := running.progressParams(2)
+	require.Equal(t, 18, params["Current"])
+	require.Equal(t, 19, params["Total"])
+	running.start(0, "单元 18")
+	require.Equal(t, 18, running.progressParams(2)["Current"])
+	running.finish(0, true)
+	require.Equal(t, 19, running.progressParams(2)["Current"])
 }

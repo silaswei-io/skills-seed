@@ -73,8 +73,8 @@ func TestCmd_CurrentIncludesFocusAndProfileFlags(t *testing.T) {
 	contextFlag := currentCmd.Flags().Lookup("context")
 	require.NotNil(t, contextFlag)
 
-	contextFileFlag := currentCmd.Flags().Lookup("context-file")
-	require.NotNil(t, contextFileFlag)
+	contextPathFlag := currentCmd.Flags().Lookup("context-path")
+	require.NotNil(t, contextPathFlag)
 
 	forceFlag := currentCmd.Flags().Lookup("force")
 	require.NotNil(t, forceFlag)

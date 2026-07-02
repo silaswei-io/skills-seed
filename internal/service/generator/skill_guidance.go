@@ -70,6 +70,24 @@ func projectSpecificTriggerHints(profile *domain.ProjectProfile, locale string) 
 		hints = append(hints, value)
 	}
 
+	if len(profile.BusinessMethods) > 0 {
+		add(generatorText(locale, "GeneratorTriggerHintBusinessEntry"))
+	}
+	for _, method := range profile.BusinessMethods {
+		text := strings.ToLower(method.Name + " " + method.Description + " " + method.Usage + " " + method.Type + " " + method.Function + " " + method.DisplayLocation())
+		switch {
+		case containsAny(text, "auth", "permission", "access", "policy", "role", "权限", "授权", "访问", "策略", "角色"):
+			add(generatorText(locale, "GeneratorTriggerHintAuthorizationPolicy"))
+		case containsAny(text, "state", "status", "workflow", "transition", "lifecycle", "状态", "流程", "流转", "生命周期"):
+			add(generatorText(locale, "GeneratorTriggerHintStateTransition"))
+		case containsAny(text, "repo", "repository", "store", "database", "transaction", "query", "持久化", "数据库", "事务", "查询"):
+			add(generatorText(locale, "GeneratorTriggerHintPersistenceOrchestration"))
+		}
+		if len(hints) >= 4 {
+			return hints
+		}
+	}
+
 	for _, module := range profile.KeyModules {
 		name := strings.TrimSpace(module.Name)
 		lower := strings.ToLower(name + " " + module.Path + " " + module.Description)

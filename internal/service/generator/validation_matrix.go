@@ -11,7 +11,17 @@ type validationArea struct {
 	Needles  []string
 	When     string
 	Evidence []string
+	Kind     validationAreaKind
 }
+
+type validationAreaKind string
+
+const (
+	validationAreaAPI         validationAreaKind = "api"
+	validationAreaBusiness    validationAreaKind = "business"
+	validationAreaPersistence validationAreaKind = "persistence"
+	validationAreaRuntime     validationAreaKind = "runtime"
+)
 
 type validationCommandMatch string
 
@@ -68,21 +78,25 @@ func validationAreas(profile *domain.ProjectProfile, patterns []domain.Pattern, 
 			Name:    localizedText(locale, "接口 / 契约 / 生成链路", "API / Contract / Generation Chain"),
 			Needles: []string{"api", "contract", "route", "handler", "generate", "generated", "proto", "swagger", "接口", "契约", "路由", "生成"},
 			When:    localizedText(locale, "接口、路由、请求响应类型、生成物或适配层变化后运行。", "Run after changing APIs, routes, request/response types, generated artifacts, or adapters."),
+			Kind:    validationAreaAPI,
 		},
 		{
 			Name:    localizedText(locale, "业务流程 / 状态 / 编排", "Business Flow / State / Orchestration"),
 			Needles: []string{"business", "domain", "workflow", "state", "orchestr", "service", "业务", "领域", "流程", "状态", "编排"},
 			When:    localizedText(locale, "业务规则、状态流转、跨模块编排或幂等逻辑变化后运行。", "Run after changing business rules, state transitions, cross-module orchestration, or idempotency logic."),
+			Kind:    validationAreaBusiness,
 		},
 		{
 			Name:    localizedText(locale, "持久化 / 查询 / 迁移", "Persistence / Query / Migration"),
 			Needles: []string{"db", "database", "store", "repo", "model", "migrate", "sql", "query", "数据库", "持久化", "查询", "迁移"},
 			When:    localizedText(locale, "模型、查询、事务、迁移或缓存持久化边界变化后运行。", "Run after changing models, queries, transactions, migrations, or persistence/cache boundaries."),
+			Kind:    validationAreaPersistence,
 		},
 		{
 			Name:    localizedText(locale, "配置 / 中间件 / 启动链路", "Config / Middleware / Startup"),
 			Needles: []string{"config", "middleware", "server", "bootstrap", "startup", "plugin", "配置", "中间件", "启动", "插件"},
 			When:    localizedText(locale, "配置结构、中间件注册、启动参数或插件装配变化后运行。", "Run after changing config structs, middleware registration, startup parameters, or plugin wiring."),
+			Kind:    validationAreaRuntime,
 		},
 	}
 	for i := range areas {

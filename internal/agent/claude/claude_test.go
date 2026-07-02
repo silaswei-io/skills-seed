@@ -134,7 +134,7 @@ func TestAnalyzeProjectRepairsMalformedModelJSON(t *testing.T) {
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
 
-	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{\"project_name\":\"demo\",\"common_utils\":[{{\"name\":\"bad\"}]"}`)
+	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{project_name:'demo', common_utils:[{name:'bad',}],}"}`)
 	loader := promptloader.New("claude", "zh-CN", "")
 	ag := New(commandPath, 5*time.Second, loader, false, config.DefaultRetryConfig())
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)

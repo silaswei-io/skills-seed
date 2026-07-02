@@ -779,6 +779,37 @@ func projectOverviewData() map[string]interface{} {
 		},
 		"BusinessMethodIndex": map[string]interface{}{
 			"Total": 1,
+			"Sections": []map[string]interface{}{
+				{
+					"ID":          "business",
+					"Title":       "业务与编排入口",
+					"Description": "业务入口",
+					"Groups": []map[string]interface{}{
+						{
+							"ID":      "demo",
+							"Title":   "Demo",
+							"Summary": "demo entry points",
+							"Methods": []map[string]interface{}{
+								{
+									"DisplayName":               "Demo",
+									"Anchor":                    "demo",
+									"Module":                    "demo",
+									"Name":                      "Demo",
+									"DisplayLocation":           "internal/demo.go:10",
+									"LocationStatus":            "",
+									"HistoricalDisplayLocation": "",
+									"Type":                      "domain",
+									"Description":               "demo",
+									"Function":                  "func Demo()",
+									"Prerequisites":             "",
+									"Returns":                   "",
+									"Usage":                     "demo",
+								},
+							},
+						},
+					},
+				},
+			},
 			"Groups": []map[string]interface{}{
 				{
 					"ID":      "demo",
