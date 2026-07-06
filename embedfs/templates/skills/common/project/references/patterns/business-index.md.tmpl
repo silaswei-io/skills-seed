@@ -20,18 +20,21 @@
 
 先从需求里的业务名词、用户动作、状态变化、规则策略、入口渠道、外部依赖、异常现象或改动文件路径匹配下方子域；不要只按代码包名或技术缩写匹配。只读取最相关的详情文件，再回到当前代码确认行为。
 
-{{if .ImportanceGroups}}
-## 重要性分层
+{{if .ClaimGroups}}
+## 规则断言
 
 业务规则不是同等强度。优先读取核心开发路径；局部模块经验只在命中相邻路径或同类需求时使用。
 
-{{range .ImportanceGroups}}
+{{range .ClaimGroups}}
 ### {{.Title}}
 
 {{.Description}}
 
-{{range .Patterns}}
-- **{{.Name}}** ({{printf "%.2f" (mul .Confidence 100)}}%, x{{.Frequency}})
+{{range .Claims}}
+- **{{.Title}}**: {{.Text}}
+  - 证据：置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，证据 {{.EvidenceCount}} 处{{if .Scope}}，范围 `{{.Scope}}`{{end}}
+  - 使用：{{.Usage}}
+  {{if .Locations}}- 位置：{{range .Locations}}`{{.}}` {{end}}{{end}}
 {{end}}
 
 {{end}}

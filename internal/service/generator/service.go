@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
+	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -29,7 +30,8 @@ type GeneratorService struct {
 	scopedSpecRepo    domain.ScopedProjectSpecRepository
 	workflowRepo      domain.WorkflowRepository
 	skillsLoader      *skills.Loader
-	writer            *SkillWriter
+	planBuilder       *planBuilder
+	renderer          *skillgen.Renderer
 	configRepo        config.Reader
 }
 
@@ -66,7 +68,8 @@ func NewGeneratorService(
 		projectSpecRepo:   projectSpecRepo,
 		scopedSpecRepo:    scopedSpecRepo,
 		skillsLoader:      skillsLoader,
-		writer:            NewSkillWriter(skillsLoader),
+		planBuilder:       newPlanBuilder(skillsLoader),
+		renderer:          skillgen.NewRenderer(skillsLoader),
 		configRepo:        configRepo,
 	}
 }
@@ -201,7 +204,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			return err
 		}
 
-		return s.writer.WriteSkillsOutput(ctx, resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, SkillWriteOptions{
+		plan, err := s.planBuilder.Build(resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, PlanOptions{
 			SkillName:           generatedSkillName(projectConfig.Name),
 			ProjectName:         projectConfig.Name,
 			Language:            projectConfig.Language,
@@ -211,6 +214,10 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			WorkflowReferences:  workflowReferences,
 			ProjectRoot:         projectRoot,
 		})
+		if err != nil {
+			return err
+		}
+		return s.renderer.Render(ctx, plan)
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.generate_skills",

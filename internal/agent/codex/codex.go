@@ -663,7 +663,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRateLimited"), err)
+			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRateLimited"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 		}
 
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -675,7 +675,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 			"raw_output_path", archive.RawPath,
 			"stderr_path", archive.StderrPath,
 		)
-		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), err)
+		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 	}
 	duration := time.Since(startedAt)
 
@@ -714,7 +714,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 			"raw_output_path", archive.RawPath,
 			"stderr_path", archive.StderrPath,
 		)
-		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), err)
+		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, err, rawOutput, archive))
 	}
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 		Agent:           c.Name(),

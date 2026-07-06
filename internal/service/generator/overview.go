@@ -1,7 +1,6 @@
 package generator
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -29,10 +28,9 @@ func projectArchitectureSummary(profile *domain.ProjectProfile, locale string) s
 	if len(profile.Layers) == 0 {
 		return ""
 	}
-	if strings.HasPrefix(strings.ToLower(locale), "zh") {
-		return fmt.Sprintf("已从当前代码学习到 %d 个架构层次；本节用于导航已沉淀的结构事实，具体职责以“架构层次”和“关键模块”章节为准。", len(profile.Layers))
-	}
-	return fmt.Sprintf("The current codebase has %d learned architecture layers. This section is a navigation summary; use the Architecture Layers and Key Modules sections for concrete responsibilities.", len(profile.Layers))
+	return generatorTextWithParams(locale, "GeneratorOverviewArchitectureSummary", map[string]interface{}{
+		"Count": len(profile.Layers),
+	})
 }
 
 func looksLikeUnitScopedOverview(value string, profile *domain.ProjectProfile) bool {
@@ -68,20 +66,20 @@ func learnedCoverageSummary(profile *domain.ProjectProfile, locale string) strin
 	domains := learnedDomainNames(profile, previewLimit)
 	total := learnedDomainTotal(profile)
 	switch {
-	case strings.HasPrefix(strings.ToLower(locale), "zh") && len(domains) > 0:
-		if total > len(domains) {
-			return fmt.Sprintf("当前项目画像已覆盖 %d 个模块/业务域；此处仅列出前 %d 个用于导航：%s。完整列表见关键模块、入口方法和分类模式；具体业务规则、架构边界和实现细节需结合当前代码确认，不能把局部摘要当作完整项目事实。", total, len(domains), strings.Join(domains, "、"))
-		}
-		return fmt.Sprintf("当前项目画像已覆盖 %d 个模块/业务域：%s。本节用于快速定位项目范围和参考入口；具体业务规则、架构边界和实现细节需结合当前代码、项目规范和分类模式确认，不能把单个业务域摘要当作完整项目事实。", total, strings.Join(domains, "、"))
 	case len(domains) > 0:
 		if total > len(domains) {
-			return fmt.Sprintf("The learned project profile currently covers %d modules or business domains; this preview lists the first %d for navigation: %s. Use Key Modules, entry methods, and category patterns for the full reference set; confirm concrete business rules, architecture boundaries, and implementation details against current code instead of promoting one local summary to whole-project fact.", total, len(domains), strings.Join(domains, ", "))
+			return generatorTextWithParams(locale, "GeneratorOverviewCoveragePreview", map[string]interface{}{
+				"Total":   total,
+				"Preview": len(domains),
+				"Domains": generatorListJoin(locale, domains),
+			})
 		}
-		return fmt.Sprintf("The learned project profile currently covers %d modules or business domains: %s. Use this section to quickly locate project scope and reference entry points; confirm concrete business rules, architecture boundaries, and implementation details against current code, Project Spec, and category patterns instead of promoting one domain summary to whole-project fact.", total, strings.Join(domains, ", "))
-	case strings.HasPrefix(strings.ToLower(locale), "zh"):
-		return "项目概览摘要尚未从完整项目画像中稳定提取；请结合当前代码、项目规范和分类模式确认全局结论。"
+		return generatorTextWithParams(locale, "GeneratorOverviewCoverageFull", map[string]interface{}{
+			"Total":   total,
+			"Domains": generatorListJoin(locale, domains),
+		})
 	default:
-		return "A stable whole-project overview summary has not been extracted yet; confirm global conclusions against current code, Project Spec, and category patterns."
+		return generatorText(locale, "GeneratorOverviewCoverageMissing")
 	}
 }
 

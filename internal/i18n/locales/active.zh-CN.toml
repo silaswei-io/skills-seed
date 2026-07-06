@@ -467,6 +467,9 @@ other = "JSON 无效"
 [AgentNoValidJSONFound]
 other = "输出中未找到有效 JSON"
 
+[AgentDiagnosticError]
+other = "Agent 诊断: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
+
 [AgentExtractJSONError]
 other = "提取 JSON 失败"
 
@@ -2350,6 +2353,75 @@ other = "暂未归属到稳定代码子域的业务规则"
 [GeneratorBusinessGroupDescription]
 other = "围绕 {{.Title}} 的规则、状态约束、编排和数据转换证据"
 
+[KnowledgePolicyGroupCoreTitle]
+other = "核心开发路径"
+
+[KnowledgePolicyGroupCoreDescription]
+other = "高置信、跨文件或高频出现，改动相关能力时应优先读取。"
+
+[KnowledgePolicyGroupConventionTitle]
+other = "常用项目约定"
+
+[KnowledgePolicyGroupConventionDescription]
+other = "覆盖常见开发动作，但需要结合当前改动范围判断是否适用。"
+
+[KnowledgePolicyGroupLocalTitle]
+other = "局部模块经验"
+
+[KnowledgePolicyGroupLocalDescription]
+other = "证据集中在少数模块，适合命中相邻路径时参考。"
+
+[KnowledgePolicyGroupObservationTitle]
+other = "参考观察"
+
+[KnowledgePolicyGroupObservationDescription]
+other = "证据较弱或偏归纳，只能作为导航线索，不能作为硬约束。"
+
+[KnowledgeClaimUsageCore]
+other = "可作为优先开发约束；改动相关能力前先读取并对照当前代码执行。"
+
+[KnowledgeClaimUsageConvention]
+other = "可作为常用项目约定；确认改动范围命中后再应用。"
+
+[KnowledgeClaimUsageLocal]
+other = "只在命中相邻路径、同类模块或同类需求时参考。"
+
+[KnowledgeClaimUsageObservation]
+other = "只能作为导航线索或复核清单，不能直接当作硬约束。"
+
+[KnowledgeRoutingBusinessFallbackTitle]
+other = "其他业务规则"
+
+[KnowledgeValidationAreaAPIName]
+other = "接口 / 契约 / 生成链路"
+
+[KnowledgeValidationAreaAPIWhen]
+other = "接口、路由、请求响应类型、生成物或适配层变化后运行。"
+
+[KnowledgeValidationAreaBusinessName]
+other = "业务流程 / 状态 / 编排"
+
+[KnowledgeValidationAreaBusinessWhen]
+other = "业务规则、状态流转、跨模块编排或幂等逻辑变化后运行。"
+
+[KnowledgeValidationAreaPersistenceName]
+other = "持久化 / 查询 / 迁移"
+
+[KnowledgeValidationAreaPersistenceWhen]
+other = "模型、查询、事务、迁移或缓存持久化边界变化后运行。"
+
+[KnowledgeValidationAreaRuntimeName]
+other = "配置 / 中间件 / 启动链路"
+
+[KnowledgeValidationAreaRuntimeWhen]
+other = "配置结构、中间件注册、启动参数或插件装配变化后运行。"
+
+[KnowledgeValidationFallbackBroad]
+other = "未找到覆盖该范围的专用验证命令；此命令覆盖范围较宽，仅作为兜底验证，不能替代专项测试。"
+
+[KnowledgeValidationFallbackGeneric]
+other = "未找到覆盖该范围的专用验证命令；先运行通用检查，但不能替代该范围的专项测试。"
+
 [InteractiveFlagNoInteractive]
 other = "禁用交互式向导，按命令参数和默认值直接执行"
 
@@ -2544,3 +2616,330 @@ other = "状态流转"
 
 [GeneratorTriggerHintPersistenceOrchestration]
 other = "持久化编排"
+
+[SkillRendererLoaderMissing]
+other = "Skills 渲染器缺少模板加载器"
+
+[SkillRendererPlanMissing]
+other = "Skills 渲染器缺少生成计划"
+
+[SkillRendererTemplateKindUnsupported]
+other = "不支持的 Skills 模板类型"
+
+[GeneratorListSeparator]
+other = "、"
+
+[GeneratorDefaultProjectName]
+other = "project"
+
+[GeneratorDefaultLanguageName]
+other = "code"
+
+[GeneratorSkillDescriptionDefault]
+other = "修改、审查或扩展 {{.Project}} {{.Language}} 代码且需要遵循该项目已学习的架构、业务流、派生产物或仓库约定时使用"
+
+[GeneratorSkillDescriptionWithHints]
+other = "修改、审查或扩展 {{.Project}} {{.Language}} 代码且涉及 {{.Hints}} 等项目特定约定时使用"
+
+[GeneratorTriggerHintCoreBusinessFlow]
+other = "核心业务流"
+
+[GeneratorTriggerHintBoundaryTransformation]
+other = "边界转换"
+
+[GeneratorTriggerHintExternalDependencyWrapper]
+other = "外部依赖封装"
+
+[GeneratorWorkflowAPITitle]
+other = "新增或调整 API"
+
+[GeneratorWorkflowAPIWhen]
+other = "涉及接口、路由、请求/响应类型、转换逻辑或派生产物"
+
+[GeneratorWorkflowAPIStepRegenerateArtifacts]
+other = "先修改接口契约源文件，再重新生成派生产物"
+
+[GeneratorWorkflowAPIStepReadSpec]
+other = "先读项目规范和接口/结构模式，确认契约来源、响应形态、转换层和派生产物边界"
+
+[GeneratorWorkflowAPIStepKeepBoundaries]
+other = "修改手写逻辑时保持入口层、编排层和领域实现的职责边界"
+
+[GeneratorWorkflowAPIStepCheckTransform]
+other = "新增或改变对外字段时同步检查转换逻辑和接口类型，避免直接暴露内部模型"
+
+[GeneratorWorkflowBusinessTitle]
+other = "修改业务流程"
+
+[GeneratorWorkflowBusinessWhen]
+other = "涉及状态流转、缓存 key、任务重试、幂等或跨实体业务编排"
+
+[GeneratorWorkflowBusinessStepReadMap]
+other = "先读业务模式地图和命中的业务详情；需要复用入口时再读入口方法索引"
+
+[GeneratorWorkflowBusinessStepVerifyCode]
+other = "对照当前代码确认锁、状态、错误分支和缓存/任务顺序；引用与代码冲突时以代码为准"
+
+[GeneratorWorkflowBusinessStepConfirmSemantics]
+other = "新增产品语义前确认现有代码是否已经实现；没有证据时把它标记为待确认需求，而不是项目规则"
+
+[GeneratorWorkflowExternalDependencyTitle]
+other = "接入或调整外部依赖"
+
+[GeneratorWorkflowExternalDependencyWhen]
+other = "涉及远程客户端、外部服务调用或共享上下文注入"
+
+[GeneratorWorkflowExternalDependencyStepReadStructure]
+other = "先读结构模式和项目规范，确认封装层、接口别名和上下文注入约定"
+
+[GeneratorWorkflowExternalDependencyStepKeepInfraBoundary]
+other = "把连接或客户端初始化集中在既有基础设施边界，业务代码通过领域化接口调用"
+
+[GeneratorWorkflowConfigTitle]
+other = "修改配置或热加载"
+
+[GeneratorWorkflowConfigWhen]
+other = "涉及配置结构、配置文件、运行时可更新字段或配置监听器"
+
+[GeneratorWorkflowConfigStepReadPatterns]
+other = "先读配置模式，确认配置结构、默认文件和热加载监听边界"
+
+[GeneratorWorkflowConfigStepHandleReloadErrors]
+other = "新增运行时可更新字段时同步处理 listener 错误路径，不能让 reload 失败导致服务崩溃"
+
+[GeneratorCategorySummary]
+other = "{{.Category}} 分类包含 {{.Count}} 个项目特定模式：{{.Patterns}}。"
+
+[GeneratorReferenceGroupArchitecture]
+other = "架构与结构"
+
+[GeneratorReferenceGroupBusiness]
+other = "业务与领域"
+
+[GeneratorReferenceGroupTechnical]
+other = "技术模式"
+
+[GeneratorReferenceGroupAdvanced]
+other = "高级主题"
+
+[GeneratorReferenceGroupOther]
+other = "其他模式"
+
+[GeneratorCategoryStructureTitle]
+other = "结构模式"
+
+[GeneratorCategoryStructureDescription]
+other = "代码组织模式"
+
+[GeneratorCategoryNamingTitle]
+other = "命名模式"
+
+[GeneratorCategoryNamingDescription]
+other = "命名约定"
+
+[GeneratorCategoryBusinessTitle]
+other = "业务模式"
+
+[GeneratorCategoryBusinessDescription]
+other = "业务逻辑模式"
+
+[GeneratorCategoryDatabaseTitle]
+other = "数据库模式"
+
+[GeneratorCategoryDatabaseDescription]
+other = "数据库操作"
+
+[GeneratorCategoryAPITitle]
+other = "API 模式"
+
+[GeneratorCategoryAPIDescription]
+other = "API 设计"
+
+[GeneratorCategoryErrorTitle]
+other = "错误处理"
+
+[GeneratorCategoryErrorDescription]
+other = "错误处理模式"
+
+[GeneratorCategoryMiddlewareTitle]
+other = "中间件模式"
+
+[GeneratorCategoryMiddlewareDescription]
+other = "中间件设计"
+
+[GeneratorCategoryConfigTitle]
+other = "配置模式"
+
+[GeneratorCategoryConfigDescription]
+other = "配置管理"
+
+[GeneratorCategoryUtilsTitle]
+other = "工具模式"
+
+[GeneratorCategoryUtilsDescription]
+other = "工具方法"
+
+[GeneratorCategoryConcurrencyTitle]
+other = "并发编程"
+
+[GeneratorCategoryConcurrencyDescription]
+other = "并发编程模式"
+
+[GeneratorCategoryTestingTitle]
+other = "测试模式"
+
+[GeneratorCategoryTestingDescription]
+other = "测试约定"
+
+[GeneratorCategoryDefaultDescription]
+other = "项目特定模式"
+
+[GeneratorProfileReferenceBusinessMethodsTitle]
+other = "入口方法索引"
+
+[GeneratorProfileReferenceBusinessMethodsDescription]
+other = "项目级业务入口、跨模块编排入口和高价值工具入口索引"
+
+[GeneratorProfileReferenceModulesTitle]
+other = "关键模块"
+
+[GeneratorProfileReferenceModulesDescription]
+other = "关键模块职责、依赖和入口方法"
+
+[GeneratorProfileReferenceCommonUtilsTitle]
+other = "通用工具"
+
+[GeneratorProfileReferenceCommonUtilsDescription]
+other = "通用工具方法及使用场景"
+
+[GeneratorBusinessMethodProjectGroupTitle]
+other = "项目入口"
+
+[GeneratorBusinessMethodProjectGroupSummary]
+other = "未能稳定归属到具体模块的项目级入口。"
+
+[GeneratorBusinessMethodModuleGroupSummary]
+other = "同一模块或相邻路径下的入口方法，优先按本组定位复用能力。"
+
+[GeneratorInsightDeterministicGeneration]
+other = "skills 由已入库模式、项目画像和工作流确定性生成；生成阶段不调用 AI。"
+
+[GeneratorInsightCoveredCategories]
+other = "已覆盖模式分类：{{.Categories}}"
+
+[GeneratorInsightCheckHitOrdering]
+other = "已结合 check 命中统计排序。"
+
+[GeneratorOverviewArchitectureSummary]
+other = "已从当前代码学习到 {{.Count}} 个架构层次；本节用于导航已沉淀的结构事实，具体职责以“架构层次”和“关键模块”章节为准。"
+
+[GeneratorOverviewCoveragePreview]
+other = "当前项目画像已覆盖 {{.Total}} 个模块/业务域；此处仅列出前 {{.Preview}} 个用于导航：{{.Domains}}。完整列表见关键模块、入口方法和分类模式；具体业务规则、架构边界和实现细节需结合当前代码确认，不能把局部摘要当作完整项目事实。"
+
+[GeneratorOverviewCoverageFull]
+other = "当前项目画像已覆盖 {{.Total}} 个模块/业务域：{{.Domains}}。本节用于快速定位项目范围和参考入口；具体业务规则、架构边界和实现细节需结合当前代码、项目规范和分类模式确认，不能把单个业务域摘要当作完整项目事实。"
+
+[GeneratorOverviewCoverageMissing]
+other = "项目概览摘要尚未从完整项目画像中稳定提取；请结合当前代码、项目规范和分类模式确认全局结论。"
+
+[GeneratorReferenceLinkBusinessAPI]
+other = "涉及接口输入输出、响应字段、Extra/Before/After 数据或适配层返回时继续阅读。"
+
+[GeneratorReferenceLinkBusinessDatabase]
+other = "涉及持久化、事务、查询条件或数据模型字段落库时继续阅读。"
+
+[GeneratorReferenceLinkBusinessError]
+other = "涉及错误码、错误包装、失败分支或用户可见错误语义时继续阅读。"
+
+[GeneratorReferenceLinkAPIBusiness]
+other = "接口字段承载业务状态、操作日志 Extra、Before/After 快照或跨实体规则时继续阅读。"
+
+[GeneratorReferenceLinkAPIError]
+other = "接口需要返回错误码、错误响应结构或失败语义时继续阅读。"
+
+[GeneratorReferenceLinkAPIMiddleware]
+other = "接口行为依赖鉴权、拦截器、上下文注入或请求链路处理时继续阅读。"
+
+[GeneratorReferenceLinkAPIConfig]
+other = "接口或派生产物受配置开关、路由配置或生成配置影响时继续阅读。"
+
+[GeneratorReferenceLinkDatabaseBusiness]
+other = "数据库读写表达业务状态、生命周期、审计或跨实体约束时继续阅读。"
+
+[GeneratorReferenceLinkDatabaseConcurrency]
+other = "数据修改涉及锁、幂等、并发更新或一致性窗口时继续阅读。"
+
+[GeneratorReferenceLinkDatabaseError]
+other = "查询或事务失败需要特定错误语义、包装或降级处理时继续阅读。"
+
+[GeneratorReferenceLinkMiddlewareAPI]
+other = "中间件影响接口请求、响应、上下文或鉴权入口时继续阅读。"
+
+[GeneratorReferenceLinkMiddlewareConfig]
+other = "中间件由配置开关、注册顺序或环境参数控制时继续阅读。"
+
+[GeneratorReferenceLinkMiddlewareError]
+other = "中间件需要统一错误响应、拦截失败或恢复 panic 时继续阅读。"
+
+[GeneratorReferenceLinkConfigAPI]
+other = "配置影响接口、路由、派生产物或客户端契约时继续阅读。"
+
+[GeneratorReferenceLinkConfigMiddleware]
+other = "配置影响中间件启停、注册顺序或请求链路行为时继续阅读。"
+
+[GeneratorReferenceLinkConfigDatabase]
+other = "配置影响数据库连接、迁移、表名、查询或持久化行为时继续阅读。"
+
+[GeneratorReferenceLinkErrorAPI]
+other = "错误需要映射为接口响应、错误码或客户端可见结构时继续阅读。"
+
+[GeneratorReferenceLinkErrorBusiness]
+other = "错误分支表达业务规则、状态限制或审计语义时继续阅读。"
+
+[GeneratorReferenceLinkErrorDatabase]
+other = "错误来自查询、事务、唯一约束或持久化失败时继续阅读。"
+
+[GeneratorReferenceLinkUtilsBusiness]
+other = "工具函数承载领域规则、审计数据或业务字段格式时继续阅读。"
+
+[GeneratorReferenceLinkUtilsAPI]
+other = "工具函数用于接口模型转换、响应字段或客户端契约时继续阅读。"
+
+[GeneratorReferenceLinkUtilsTesting]
+other = "工具函数改动需要复用项目测试约定、fixture 或断言模式时继续阅读。"
+
+[GeneratorReferenceLinkConcurrencyDatabase]
+other = "并发控制影响数据一致性、事务边界或持久化顺序时继续阅读。"
+
+[GeneratorReferenceLinkConcurrencyBusiness]
+other = "锁、队列或异步流程承载业务状态变化时继续阅读。"
+
+[GeneratorReferenceLinkConcurrencyTesting]
+other = "并发行为需要 race、时序或重试类测试约定时继续阅读。"
+
+[GeneratorReferenceLinkTestingBusiness]
+other = "测试断言业务规则、状态流转或跨实体行为时继续阅读。"
+
+[GeneratorReferenceLinkTestingAPI]
+other = "测试覆盖接口契约、响应字段、生成代码或适配层时继续阅读。"
+
+[GeneratorReferenceLinkTestingDatabase]
+other = "测试依赖数据库 fixture、事务隔离或持久化断言时继续阅读。"
+
+[GeneratorReferenceLinkStructureBusiness]
+other = "结构调整影响领域边界、入口编排或跨模块业务流时继续阅读。"
+
+[GeneratorReferenceLinkStructureAPI]
+other = "结构调整影响接口层、适配层、生成目录或契约文件时继续阅读。"
+
+[GeneratorReferenceLinkStructureConfig]
+other = "结构调整需要同步配置路径、注册点或加载约定时继续阅读。"
+
+[GeneratorReferenceLinkNamingAPI]
+other = "命名影响接口字段、路径、错误码或客户端契约时继续阅读。"
+
+[GeneratorReferenceLinkNamingDatabase]
+other = "命名影响表、列、索引、查询方法或持久化模型时继续阅读。"
+
+[GeneratorReferenceLinkNamingBusiness]
+other = "命名承载领域概念、状态名称或业务动作时继续阅读。"

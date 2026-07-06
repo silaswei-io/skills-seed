@@ -1,7 +1,6 @@
 package generator
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -38,7 +37,15 @@ func (s *GeneratorService) ensureCategorySummaries(
 			summary.Patterns = domain.PatternNames(categoryPatterns)
 		}
 		if summary.Summary == "" {
-			summary.Summary = fmt.Sprintf("%s 分类包含 %d 个项目特定模式：%s。", category, len(categoryPatterns), strings.Join(summary.Patterns, "、"))
+			locale := ""
+			if s.skillsLoader != nil {
+				locale = s.skillsLoader.GetLocale()
+			}
+			summary.Summary = generatorTextWithParams(locale, "GeneratorCategorySummary", map[string]interface{}{
+				"Category": category,
+				"Count":    len(categoryPatterns),
+				"Patterns": generatorListJoin(locale, summary.Patterns),
+			})
 		}
 		summaries[category] = summary
 	}
@@ -73,11 +80,11 @@ func referenceAvailability(profile *domain.ProjectProfile, patterns []domain.Pat
 
 func categoryReferenceGroups(patterns []domain.Pattern, locale string) []skills.ReferenceGroup {
 	groupOrder := []string{
-		localizedText(locale, "架构与结构", "Architecture & Structure"),
-		localizedText(locale, "业务与领域", "Business & Domain"),
-		localizedText(locale, "技术模式", "Technical Patterns"),
-		localizedText(locale, "高级主题", "Advanced Topics"),
-		localizedText(locale, "其他模式", "Other Patterns"),
+		generatorText(locale, "GeneratorReferenceGroupArchitecture"),
+		generatorText(locale, "GeneratorReferenceGroupBusiness"),
+		generatorText(locale, "GeneratorReferenceGroupTechnical"),
+		generatorText(locale, "GeneratorReferenceGroupAdvanced"),
+		generatorText(locale, "GeneratorReferenceGroupOther"),
 	}
 	groupsByTitle := make(map[string]*skills.ReferenceGroup, len(groupOrder))
 	for _, title := range groupOrder {
@@ -124,67 +131,67 @@ func conditionalCategoryReferenceGroups(patterns []domain.Pattern, locale string
 }
 
 func categoryReferenceMetadata(category, locale string) categoryReferenceMeta {
-	groupArchitecture := localizedText(locale, "架构与结构", "Architecture & Structure")
-	groupBusiness := localizedText(locale, "业务与领域", "Business & Domain")
-	groupTechnical := localizedText(locale, "技术模式", "Technical Patterns")
-	groupAdvanced := localizedText(locale, "高级主题", "Advanced Topics")
-	groupOther := localizedText(locale, "其他模式", "Other Patterns")
+	groupArchitecture := generatorText(locale, "GeneratorReferenceGroupArchitecture")
+	groupBusiness := generatorText(locale, "GeneratorReferenceGroupBusiness")
+	groupTechnical := generatorText(locale, "GeneratorReferenceGroupTechnical")
+	groupAdvanced := generatorText(locale, "GeneratorReferenceGroupAdvanced")
+	groupOther := generatorText(locale, "GeneratorReferenceGroupOther")
 
 	metadataByCategory := map[string]categoryReferenceMeta{
 		string(domain.CategoryStructure): {
 			Group:       groupArchitecture,
-			Title:       localizedText(locale, "结构模式", "Structure Patterns"),
-			Description: localizedText(locale, "代码组织模式", "Code organization patterns"),
+			Title:       generatorText(locale, "GeneratorCategoryStructureTitle"),
+			Description: generatorText(locale, "GeneratorCategoryStructureDescription"),
 		},
 		string(domain.CategoryNaming): {
 			Group:       groupArchitecture,
-			Title:       localizedText(locale, "命名模式", "Naming Patterns"),
-			Description: localizedText(locale, "命名约定", "Naming conventions"),
+			Title:       generatorText(locale, "GeneratorCategoryNamingTitle"),
+			Description: generatorText(locale, "GeneratorCategoryNamingDescription"),
 		},
 		string(domain.CategoryBusiness): {
 			Group:       groupBusiness,
-			Title:       localizedText(locale, "业务模式", "Business Patterns"),
-			Description: localizedText(locale, "业务逻辑模式", "Business logic patterns"),
+			Title:       generatorText(locale, "GeneratorCategoryBusinessTitle"),
+			Description: generatorText(locale, "GeneratorCategoryBusinessDescription"),
 		},
 		string(domain.CategoryDatabase): {
 			Group:       groupBusiness,
-			Title:       localizedText(locale, "数据库模式", "Database Patterns"),
-			Description: localizedText(locale, "数据库操作", "Database operations"),
+			Title:       generatorText(locale, "GeneratorCategoryDatabaseTitle"),
+			Description: generatorText(locale, "GeneratorCategoryDatabaseDescription"),
 		},
 		string(domain.CategoryAPI): {
 			Group:       groupBusiness,
-			Title:       localizedText(locale, "API 模式", "API Patterns"),
-			Description: localizedText(locale, "API 设计", "API design"),
+			Title:       generatorText(locale, "GeneratorCategoryAPITitle"),
+			Description: generatorText(locale, "GeneratorCategoryAPIDescription"),
 		},
 		string(domain.CategoryError): {
 			Group:       groupTechnical,
-			Title:       localizedText(locale, "错误处理", "Error Handling"),
-			Description: localizedText(locale, "错误处理模式", "Error handling patterns"),
+			Title:       generatorText(locale, "GeneratorCategoryErrorTitle"),
+			Description: generatorText(locale, "GeneratorCategoryErrorDescription"),
 		},
 		string(domain.CategoryMiddleware): {
 			Group:       groupTechnical,
-			Title:       localizedText(locale, "中间件模式", "Middleware Patterns"),
-			Description: localizedText(locale, "中间件设计", "Middleware design"),
+			Title:       generatorText(locale, "GeneratorCategoryMiddlewareTitle"),
+			Description: generatorText(locale, "GeneratorCategoryMiddlewareDescription"),
 		},
 		string(domain.CategoryConfig): {
 			Group:       groupTechnical,
-			Title:       localizedText(locale, "配置模式", "Config Patterns"),
-			Description: localizedText(locale, "配置管理", "Configuration management"),
+			Title:       generatorText(locale, "GeneratorCategoryConfigTitle"),
+			Description: generatorText(locale, "GeneratorCategoryConfigDescription"),
 		},
 		string(domain.CategoryUtils): {
 			Group:       groupTechnical,
-			Title:       localizedText(locale, "工具模式", "Utils Patterns"),
-			Description: localizedText(locale, "工具方法", "Utility methods"),
+			Title:       generatorText(locale, "GeneratorCategoryUtilsTitle"),
+			Description: generatorText(locale, "GeneratorCategoryUtilsDescription"),
 		},
 		string(domain.CategoryConcurrency): {
 			Group:       groupAdvanced,
-			Title:       localizedText(locale, "并发编程", "Concurrency Patterns"),
-			Description: localizedText(locale, "并发编程模式", "Concurrency programming patterns"),
+			Title:       generatorText(locale, "GeneratorCategoryConcurrencyTitle"),
+			Description: generatorText(locale, "GeneratorCategoryConcurrencyDescription"),
 		},
 		string(domain.CategoryTesting): {
 			Group:       groupAdvanced,
-			Title:       localizedText(locale, "测试模式", "Testing Patterns"),
-			Description: localizedText(locale, "测试约定", "Testing conventions"),
+			Title:       generatorText(locale, "GeneratorCategoryTestingTitle"),
+			Description: generatorText(locale, "GeneratorCategoryTestingDescription"),
 		},
 	}
 
@@ -194,7 +201,7 @@ func categoryReferenceMetadata(category, locale string) categoryReferenceMeta {
 	return categoryReferenceMeta{
 		Group:       groupOther,
 		Title:       category,
-		Description: localizedText(locale, "项目特定模式", "Project-specific patterns"),
+		Description: generatorText(locale, "GeneratorCategoryDefaultDescription"),
 	}
 }
 
@@ -206,22 +213,22 @@ func profileReferenceItems(profile *domain.ProjectProfile, locale, prefix string
 	items := make([]skills.ReferenceItem, 0, 3)
 	if len(profile.BusinessMethods) > 0 {
 		items = append(items, skills.ReferenceItem{
-			Title:       localizedText(locale, "入口方法索引", "Entry Method Index"),
-			Description: localizedText(locale, "项目级业务入口、跨模块编排入口和高价值工具入口索引", "Project-level business, cross-module orchestration, and high-value utility entry points"),
+			Title:       generatorText(locale, "GeneratorProfileReferenceBusinessMethodsTitle"),
+			Description: generatorText(locale, "GeneratorProfileReferenceBusinessMethodsDescription"),
 			Path:        prefix + "business-methods.md",
 		})
 	}
 	if len(profile.KeyModules) > 0 {
 		items = append(items, skills.ReferenceItem{
-			Title:       localizedText(locale, "关键模块", "Key Modules"),
-			Description: localizedText(locale, "关键模块职责、依赖和入口方法", "Key module responsibilities, dependencies, and entry methods"),
+			Title:       generatorText(locale, "GeneratorProfileReferenceModulesTitle"),
+			Description: generatorText(locale, "GeneratorProfileReferenceModulesDescription"),
 			Path:        prefix + "modules.md",
 		})
 	}
 	if len(profile.CommonUtils) > 0 {
 		items = append(items, skills.ReferenceItem{
-			Title:       localizedText(locale, "通用工具", "Common Utilities"),
-			Description: localizedText(locale, "通用工具方法及使用场景", "Common utility functions and usage scenarios"),
+			Title:       generatorText(locale, "GeneratorProfileReferenceCommonUtilsTitle"),
+			Description: generatorText(locale, "GeneratorProfileReferenceCommonUtilsDescription"),
 			Path:        prefix + "common-utils.md",
 		})
 	}
@@ -320,15 +327,16 @@ func normalizeReferencePath(value string) string {
 	return strings.ToLower(strings.Trim(filepath.ToSlash(value), "` "))
 }
 
-func localizedText(locale, zhCN, enUS string) string {
-	if strings.HasPrefix(strings.ToLower(locale), "zh") {
-		return zhCN
-	}
-	return enUS
-}
-
 func generatorText(locale, key string) string {
 	return i18n.GetForLocale(locale, key)
+}
+
+func generatorTextWithParams(locale, key string, params map[string]interface{}) string {
+	return i18n.GetForLocaleWithParams(locale, key, params)
+}
+
+func generatorListJoin(locale string, values []string) string {
+	return strings.Join(values, generatorText(locale, "GeneratorListSeparator"))
 }
 
 func generatedSkillName(projectName string) string {

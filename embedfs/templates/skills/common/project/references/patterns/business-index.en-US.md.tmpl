@@ -20,18 +20,21 @@ This page routes business rules and domain flows. Cross-boundary work such as AP
 
 Match the request's business nouns, user actions, state changes, rules or policies, entry channels, external dependencies, exception symptoms, or changed file paths to the domains below. Do not match only by package names or technical abbreviations. Read only the most relevant detail file first, then confirm behavior against current code.
 
-{{if .ImportanceGroups}}
-## Importance Layers
+{{if .ClaimGroups}}
+## Rule Claims
 
 Business rules are not equally strong. Read core development paths first; use local module experience only when the task hits nearby paths or similar requirements.
 
-{{range .ImportanceGroups}}
+{{range .ClaimGroups}}
 ### {{.Title}}
 
 {{.Description}}
 
-{{range .Patterns}}
-- **{{.Name}}** ({{printf "%.2f" (mul .Confidence 100)}}%, x{{.Frequency}})
+{{range .Claims}}
+- **{{.Title}}**: {{.Text}}
+  - Evidence: confidence {{printf "%.2f" (mul .Confidence 100)}}%, occurrences {{.Frequency}}, evidence points {{.EvidenceCount}}{{if .Scope}}, scope `{{.Scope}}`{{end}}
+  - Usage: {{.Usage}}
+  {{if .Locations}}- Locations: {{range .Locations}}`{{.}}` {{end}}{{end}}
 {{end}}
 
 {{end}}

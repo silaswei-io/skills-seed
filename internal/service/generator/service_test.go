@@ -1274,12 +1274,15 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	assert.Contains(t, overview, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
 
 	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
-	assert.Contains(t, api, "## 重要性分层")
+	assert.Contains(t, api, "## 规则断言")
 	assert.Contains(t, api, "常用项目约定")
+	assert.Contains(t, api, "Do not hand-edit generated handlers or types")
+	assert.Contains(t, api, "使用：可作为常用项目约定")
 
 	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	assert.Contains(t, businessIndex, "## 重要性分层")
+	assert.Contains(t, businessIndex, "## 规则断言")
 	assert.Contains(t, businessIndex, "Plan Lifecycle State Machine")
+	assert.Contains(t, businessIndex, "Deactivate existing active plans before creating or activating a plan")
 	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "vocab.md")
 	assert.Contains(t, businessDetail, "Deactivate existing active plans before creating or activating a plan")
 }

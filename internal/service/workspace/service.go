@@ -18,6 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
+	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
@@ -25,7 +26,7 @@ import (
 type WorkspaceGenerator struct {
 	configRepo           config.Reader
 	skillsLoader         *skills.Loader
-	writer               *generator.SkillWriter
+	renderer             *skillgen.Renderer
 	workspaceProfileRepo domain.WorkspaceProfileRepository
 	workspaceSpecRepo    domain.WorkspaceSpecRepository
 	scopedProfileRepo    domain.ScopedProjectProfileRepository
@@ -55,7 +56,7 @@ func NewWorkspaceGenerator(
 		projectSpecRepo:      projectSpecRepo,
 		scopedSpecRepo:       scopedSpecRepo,
 		skillsLoader:         skillsLoader,
-		writer:               generator.NewSkillWriter(skillsLoader),
+		renderer:             skillgen.NewRenderer(skillsLoader),
 		configRepo:           configRepo,
 		workspaceProfileRepo: workspaceProfileRepo,
 		workspaceSpecRepo:    workspaceSpecRepo,
@@ -217,37 +218,15 @@ func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, output
 	if err := generator.WriteWorkflowOutputs(g.workflowRepo, outputPath, g.skillsLoader.GetLocale()); err != nil {
 		return err
 	}
-	content, err := g.skillsLoader.Render("workspace-skill", data)
-	if err != nil {
-		return err
+	p := skillgen.NewPlan(outputPath)
+	p.AddFile("SKILL.md", skillgen.CatalogTemplate, "workspace-skill", data)
+	p.AgentMetadataData = data
+	if !opts.SkipReferences {
+		p.AddDir("references")
+		p.AddFile("references/workspace-overview.md", skillgen.CatalogTemplate, "workspace-reference-overview", data)
+		p.AddFile("references/cross-project-rules.md", skillgen.CatalogTemplate, "workspace-reference-cross-project-rules", data)
 	}
-	if err := os.WriteFile(filepath.Join(outputPath, "SKILL.md"), []byte(content), 0644); err != nil {
-		return err
-	}
-	if err := g.writer.GenerateAgentMetadata(outputPath, data); err != nil {
-		return err
-	}
-	if opts.SkipReferences {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Join(outputPath, "references"), 0755); err != nil {
-		return err
-	}
-	overview, err := g.skillsLoader.Render("workspace-reference-overview", data)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(outputPath, "references", "workspace-overview.md"), []byte(overview), 0644); err != nil {
-		return err
-	}
-	rules, err := g.skillsLoader.Render("workspace-reference-cross-project-rules", data)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(outputPath, "references", "cross-project-rules.md"), []byte(rules), 0644); err != nil {
-		return err
-	}
-	return nil
+	return g.renderer.Render(ctx, p)
 }
 
 func ensureGeneratedOutputDirWritable(outputPath string) error {

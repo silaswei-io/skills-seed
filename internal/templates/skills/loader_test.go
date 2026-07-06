@@ -239,7 +239,7 @@ func TestLoader_OmitsVisibleSkillsSeedGeneratedNoticeByDefault(t *testing.T) {
 		"LastUpdated":       "2026-06-08 12:00:00",
 		"Summary":           "业务模式",
 		"PatternObjects":    []domain.Pattern{*domain.NewPattern("p1", "业务规则", domain.CategoryBusiness)},
-		"ImportanceGroups":  []interface{}{},
+		"ClaimGroups":       []interface{}{},
 		"UsageScenes":       []string{},
 		"CodeFenceLanguage": "go",
 		"RelatedReferences": []interface{}{},
@@ -267,7 +267,7 @@ func TestLoader_RenderReference(t *testing.T) {
 		"BusinessMethods":   []interface{}{}, // 添加业务方法
 		"CodeFenceLanguage": "go",
 		"RelatedReferences": []interface{}{},
-		"ImportanceGroups":  []interface{}{},
+		"ClaimGroups":       []interface{}{},
 	}
 
 	content, err := loader.RenderPattern("api", data)
@@ -393,10 +393,10 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 					"PrimaryPath": "internal/service/resource.go",
 					"IsFallback":  false,
 				},
-				"GroupLocations":   []interface{}{},
-				"GroupSignals":     []string{},
-				"PatternObjects":   []domain.Pattern{*pattern},
-				"ImportanceGroups": []interface{}{},
+				"GroupLocations": []interface{}{},
+				"GroupSignals":   []string{},
+				"PatternObjects": []domain.Pattern{*pattern},
+				"ClaimGroups":    []interface{}{},
 				"RelatedReferences": []interface{}{
 					map[string]string{
 						"Title":  "API 模式",
@@ -437,7 +437,7 @@ func TestLoader_RenderPatternFallsBackToDefaultTemplate(t *testing.T) {
 		"BusinessMethods":   []*domain.BusinessMethod{},
 		"CodeFenceLanguage": "go",
 		"RelatedReferences": []interface{}{},
-		"ImportanceGroups":  []interface{}{},
+		"ClaimGroups":       []interface{}{},
 	})
 
 	require.NoError(t, err)
@@ -720,7 +720,7 @@ func categoryData(category string) map[string]interface{} {
 		"SamplePatterns":    []string{"Demo Pattern"},
 		"CodeFenceLanguage": "go",
 		"RelatedReferences": []interface{}{},
-		"ImportanceGroups":  []interface{}{},
+		"ClaimGroups":       []interface{}{},
 	}
 }
 

@@ -467,6 +467,9 @@ other = "Invalid JSON"
 [AgentNoValidJSONFound]
 other = "No valid JSON found in output"
 
+[AgentDiagnosticError]
+other = "Agent diagnostics: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
+
 [AgentExtractJSONError]
 other = "Failed to extract JSON"
 
@@ -2349,6 +2352,75 @@ other = "Business rules not yet mapped to a stable code domain"
 [GeneratorBusinessGroupDescription]
 other = "Rules, state constraints, orchestration, and data transformation evidence around {{.Title}}"
 
+[KnowledgePolicyGroupCoreTitle]
+other = "Core Development Paths"
+
+[KnowledgePolicyGroupCoreDescription]
+other = "High-confidence, cross-file, or frequent patterns to read first for related changes."
+
+[KnowledgePolicyGroupConventionTitle]
+other = "Common Project Conventions"
+
+[KnowledgePolicyGroupConventionDescription]
+other = "Common development conventions that still need change-scope judgment."
+
+[KnowledgePolicyGroupLocalTitle]
+other = "Local Module Experience"
+
+[KnowledgePolicyGroupLocalDescription]
+other = "Evidence is concentrated in a few modules; use when working in adjacent paths."
+
+[KnowledgePolicyGroupObservationTitle]
+other = "Reference Observations"
+
+[KnowledgePolicyGroupObservationDescription]
+other = "Weaker or more inferential findings; use as navigation hints, not hard constraints."
+
+[KnowledgeClaimUsageCore]
+other = "Treat as a priority development constraint; read before changing related capabilities and confirm against current code."
+
+[KnowledgeClaimUsageConvention]
+other = "Treat as a common project convention; apply after confirming the change scope matches."
+
+[KnowledgeClaimUsageLocal]
+other = "Use only when the task touches adjacent paths, similar modules, or similar requirements."
+
+[KnowledgeClaimUsageObservation]
+other = "Use only as a navigation hint or review checklist, not as a hard constraint."
+
+[KnowledgeRoutingBusinessFallbackTitle]
+other = "Other Business Rules"
+
+[KnowledgeValidationAreaAPIName]
+other = "API / Contract / Generation Chain"
+
+[KnowledgeValidationAreaAPIWhen]
+other = "Run after changing APIs, routes, request/response types, generated artifacts, or adapters."
+
+[KnowledgeValidationAreaBusinessName]
+other = "Business Flow / State / Orchestration"
+
+[KnowledgeValidationAreaBusinessWhen]
+other = "Run after changing business rules, state transitions, cross-module orchestration, or idempotency logic."
+
+[KnowledgeValidationAreaPersistenceName]
+other = "Persistence / Query / Migration"
+
+[KnowledgeValidationAreaPersistenceWhen]
+other = "Run after changing models, queries, transactions, migrations, or persistence/cache boundaries."
+
+[KnowledgeValidationAreaRuntimeName]
+other = "Config / Middleware / Startup"
+
+[KnowledgeValidationAreaRuntimeWhen]
+other = "Run after changing config structs, middleware registration, startup parameters, or plugin wiring."
+
+[KnowledgeValidationFallbackBroad]
+other = "No scope-specific validation command was found; this broad command is only fallback validation and does not replace scope-specific tests."
+
+[KnowledgeValidationFallbackGeneric]
+other = "No scope-specific validation command was found; run this general check first, but it does not replace scope-specific tests."
+
 [InteractiveFlagNoInteractive]
 other = "Disable the interactive wizard and run directly from flags and defaults"
 
@@ -2543,3 +2615,330 @@ other = "state transitions"
 
 [GeneratorTriggerHintPersistenceOrchestration]
 other = "persistence orchestration"
+
+[SkillRendererLoaderMissing]
+other = "Skills renderer is missing a template loader"
+
+[SkillRendererPlanMissing]
+other = "Skills renderer is missing a generation plan"
+
+[SkillRendererTemplateKindUnsupported]
+other = "Unsupported Skills template kind"
+
+[GeneratorListSeparator]
+other = ", "
+
+[GeneratorDefaultProjectName]
+other = "project"
+
+[GeneratorDefaultLanguageName]
+other = "code"
+
+[GeneratorSkillDescriptionDefault]
+other = "Use when modifying, reviewing, or extending {{.Project}} {{.Language}} code and project-specific architecture, business flow, generated artifact, or repository conventions matter"
+
+[GeneratorSkillDescriptionWithHints]
+other = "Use when modifying, reviewing, or extending {{.Project}} {{.Language}} code involving project-specific conventions such as {{.Hints}}"
+
+[GeneratorTriggerHintCoreBusinessFlow]
+other = "core business flow"
+
+[GeneratorTriggerHintBoundaryTransformation]
+other = "boundary transformation"
+
+[GeneratorTriggerHintExternalDependencyWrapper]
+other = "external dependency wrappers"
+
+[GeneratorWorkflowAPITitle]
+other = "Add Or Change API"
+
+[GeneratorWorkflowAPIWhen]
+other = "Interfaces, routes, request/response types, transformation logic, or generated artifacts change"
+
+[GeneratorWorkflowAPIStepRegenerateArtifacts]
+other = "Edit interface contract source files first, then regenerate derived artifacts"
+
+[GeneratorWorkflowAPIStepReadSpec]
+other = "Read Project Spec plus interface/structure patterns first to confirm contract source, response shape, transformation layer, and generated-artifact boundaries"
+
+[GeneratorWorkflowAPIStepKeepBoundaries]
+other = "Keep responsibility boundaries between entry points, orchestration code, and domain implementation when editing handwritten code"
+
+[GeneratorWorkflowAPIStepCheckTransform]
+other = "When adding or changing externally visible fields, check transformation logic and interface types together instead of exposing internal models directly"
+
+[GeneratorWorkflowBusinessTitle]
+other = "Change Business Flow"
+
+[GeneratorWorkflowBusinessWhen]
+other = "State transitions, cache keys, task retry, idempotency, or cross-entity business orchestration change"
+
+[GeneratorWorkflowBusinessStepReadMap]
+other = "Read the Business Pattern Map and matching business detail first; read the Entry Method Index next only when reusing an entry point"
+
+[GeneratorWorkflowBusinessStepVerifyCode]
+other = "Verify locks, states, error branches, and cache/task ordering against current code; current code wins over references"
+
+[GeneratorWorkflowBusinessStepConfirmSemantics]
+other = "Before adding product semantics, confirm the current code already implements them; if not, mark them as requirements to confirm, not project rules"
+
+[GeneratorWorkflowExternalDependencyTitle]
+other = "Add Or Change External Dependency"
+
+[GeneratorWorkflowExternalDependencyWhen]
+other = "Remote clients, external service calls, or shared context injection change"
+
+[GeneratorWorkflowExternalDependencyStepReadStructure]
+other = "Read structure patterns and Project Spec first to confirm wrapper layers, interface aliases, and context injection conventions"
+
+[GeneratorWorkflowExternalDependencyStepKeepInfraBoundary]
+other = "Keep connection or client initialization inside the existing infrastructure boundary and call dependencies through domain-oriented interfaces"
+
+[GeneratorWorkflowConfigTitle]
+other = "Change Config Or Hot Reload"
+
+[GeneratorWorkflowConfigWhen]
+other = "Config structures, config files, runtime-updatable fields, or config listeners change"
+
+[GeneratorWorkflowConfigStepReadPatterns]
+other = "Read config patterns first to confirm config structs, default files, and hot-reload listener boundaries"
+
+[GeneratorWorkflowConfigStepHandleReloadErrors]
+other = "When adding runtime-updatable fields, handle listener error paths so reload failures do not crash the service"
+
+[GeneratorCategorySummary]
+other = "{{.Category}} category contains {{.Count}} project-specific patterns: {{.Patterns}}."
+
+[GeneratorReferenceGroupArchitecture]
+other = "Architecture & Structure"
+
+[GeneratorReferenceGroupBusiness]
+other = "Business & Domain"
+
+[GeneratorReferenceGroupTechnical]
+other = "Technical Patterns"
+
+[GeneratorReferenceGroupAdvanced]
+other = "Advanced Topics"
+
+[GeneratorReferenceGroupOther]
+other = "Other Patterns"
+
+[GeneratorCategoryStructureTitle]
+other = "Structure Patterns"
+
+[GeneratorCategoryStructureDescription]
+other = "Code organization patterns"
+
+[GeneratorCategoryNamingTitle]
+other = "Naming Patterns"
+
+[GeneratorCategoryNamingDescription]
+other = "Naming conventions"
+
+[GeneratorCategoryBusinessTitle]
+other = "Business Patterns"
+
+[GeneratorCategoryBusinessDescription]
+other = "Business logic patterns"
+
+[GeneratorCategoryDatabaseTitle]
+other = "Database Patterns"
+
+[GeneratorCategoryDatabaseDescription]
+other = "Database operations"
+
+[GeneratorCategoryAPITitle]
+other = "API Patterns"
+
+[GeneratorCategoryAPIDescription]
+other = "API design"
+
+[GeneratorCategoryErrorTitle]
+other = "Error Handling"
+
+[GeneratorCategoryErrorDescription]
+other = "Error handling patterns"
+
+[GeneratorCategoryMiddlewareTitle]
+other = "Middleware Patterns"
+
+[GeneratorCategoryMiddlewareDescription]
+other = "Middleware design"
+
+[GeneratorCategoryConfigTitle]
+other = "Config Patterns"
+
+[GeneratorCategoryConfigDescription]
+other = "Configuration management"
+
+[GeneratorCategoryUtilsTitle]
+other = "Utils Patterns"
+
+[GeneratorCategoryUtilsDescription]
+other = "Utility methods"
+
+[GeneratorCategoryConcurrencyTitle]
+other = "Concurrency Patterns"
+
+[GeneratorCategoryConcurrencyDescription]
+other = "Concurrency programming patterns"
+
+[GeneratorCategoryTestingTitle]
+other = "Testing Patterns"
+
+[GeneratorCategoryTestingDescription]
+other = "Testing conventions"
+
+[GeneratorCategoryDefaultDescription]
+other = "Project-specific patterns"
+
+[GeneratorProfileReferenceBusinessMethodsTitle]
+other = "Entry Method Index"
+
+[GeneratorProfileReferenceBusinessMethodsDescription]
+other = "Project-level business, cross-module orchestration, and high-value utility entry points"
+
+[GeneratorProfileReferenceModulesTitle]
+other = "Key Modules"
+
+[GeneratorProfileReferenceModulesDescription]
+other = "Key module responsibilities, dependencies, and entry methods"
+
+[GeneratorProfileReferenceCommonUtilsTitle]
+other = "Common Utilities"
+
+[GeneratorProfileReferenceCommonUtilsDescription]
+other = "Common utility functions and usage scenarios"
+
+[GeneratorBusinessMethodProjectGroupTitle]
+other = "Project Entry Points"
+
+[GeneratorBusinessMethodProjectGroupSummary]
+other = "Project-level entry points that cannot be assigned to a stable module."
+
+[GeneratorBusinessMethodModuleGroupSummary]
+other = "Entry points from the same module or nearby paths; use this group first when locating reusable behavior."
+
+[GeneratorInsightDeterministicGeneration]
+other = "Skills are deterministically generated from stored patterns, project profile, and workflows; generation does not call AI."
+
+[GeneratorInsightCoveredCategories]
+other = "Covered pattern categories: {{.Categories}}"
+
+[GeneratorInsightCheckHitOrdering]
+other = "Pattern ordering includes check hit statistics."
+
+[GeneratorOverviewArchitectureSummary]
+other = "The current codebase has {{.Count}} learned architecture layers. This section is a navigation summary; use the Architecture Layers and Key Modules sections for concrete responsibilities."
+
+[GeneratorOverviewCoveragePreview]
+other = "The learned project profile currently covers {{.Total}} modules or business domains; this preview lists the first {{.Preview}} for navigation: {{.Domains}}. Use Key Modules, entry methods, and category patterns for the full reference set; confirm concrete business rules, architecture boundaries, and implementation details against current code instead of promoting one local summary to whole-project fact."
+
+[GeneratorOverviewCoverageFull]
+other = "The learned project profile currently covers {{.Total}} modules or business domains: {{.Domains}}. Use this section to quickly locate project scope and reference entry points; confirm concrete business rules, architecture boundaries, and implementation details against current code, Project Spec, and category patterns instead of promoting one domain summary to whole-project fact."
+
+[GeneratorOverviewCoverageMissing]
+other = "A stable whole-project overview summary has not been extracted yet; confirm global conclusions against current code, Project Spec, and category patterns."
+
+[GeneratorReferenceLinkBusinessAPI]
+other = "Read when the task touches API input/output, response fields, Extra/Before/After data, or adapter returns."
+
+[GeneratorReferenceLinkBusinessDatabase]
+other = "Read when the task touches persistence, transactions, query conditions, or stored model fields."
+
+[GeneratorReferenceLinkBusinessError]
+other = "Read when the task touches error codes, error wrapping, failure branches, or user-visible error semantics."
+
+[GeneratorReferenceLinkAPIBusiness]
+other = "Read when API fields carry business state, operation-log Extra, Before/After snapshots, or cross-entity rules."
+
+[GeneratorReferenceLinkAPIError]
+other = "Read when the API must return error codes, error response shapes, or failure semantics."
+
+[GeneratorReferenceLinkAPIMiddleware]
+other = "Read when API behavior depends on auth, interceptors, context injection, or request pipeline handling."
+
+[GeneratorReferenceLinkAPIConfig]
+other = "Read when APIs or generated artifacts are controlled by feature flags, route config, or generation config."
+
+[GeneratorReferenceLinkDatabaseBusiness]
+other = "Read when database reads/writes express business state, lifecycle, audit, or cross-entity constraints."
+
+[GeneratorReferenceLinkDatabaseConcurrency]
+other = "Read when data changes involve locks, idempotency, concurrent updates, or consistency windows."
+
+[GeneratorReferenceLinkDatabaseError]
+other = "Read when query or transaction failures need specific error semantics, wrapping, or fallback handling."
+
+[GeneratorReferenceLinkMiddlewareAPI]
+other = "Read when middleware affects API requests, responses, context, or auth entry points."
+
+[GeneratorReferenceLinkMiddlewareConfig]
+other = "Read when middleware is controlled by config flags, registration order, or environment parameters."
+
+[GeneratorReferenceLinkMiddlewareError]
+other = "Read when middleware must unify error responses, intercept failures, or recover panics."
+
+[GeneratorReferenceLinkConfigAPI]
+other = "Read when config affects APIs, routes, generated artifacts, or client contracts."
+
+[GeneratorReferenceLinkConfigMiddleware]
+other = "Read when config affects middleware enablement, registration order, or request pipeline behavior."
+
+[GeneratorReferenceLinkConfigDatabase]
+other = "Read when config affects database connections, migrations, table names, queries, or persistence behavior."
+
+[GeneratorReferenceLinkErrorAPI]
+other = "Read when errors must be mapped to API responses, error codes, or client-visible shapes."
+
+[GeneratorReferenceLinkErrorBusiness]
+other = "Read when failure branches express business rules, state constraints, or audit semantics."
+
+[GeneratorReferenceLinkErrorDatabase]
+other = "Read when errors come from queries, transactions, unique constraints, or persistence failures."
+
+[GeneratorReferenceLinkUtilsBusiness]
+other = "Read when utility functions carry domain rules, audit data, or business field formatting."
+
+[GeneratorReferenceLinkUtilsAPI]
+other = "Read when utility functions are used for API model conversion, response fields, or client contracts."
+
+[GeneratorReferenceLinkUtilsTesting]
+other = "Read when utility changes need project testing conventions, fixtures, or assertion patterns."
+
+[GeneratorReferenceLinkConcurrencyDatabase]
+other = "Read when concurrency control affects data consistency, transaction boundaries, or persistence order."
+
+[GeneratorReferenceLinkConcurrencyBusiness]
+other = "Read when locks, queues, or async flows carry business state transitions."
+
+[GeneratorReferenceLinkConcurrencyTesting]
+other = "Read when concurrent behavior needs race, timing, or retry-oriented test conventions."
+
+[GeneratorReferenceLinkTestingBusiness]
+other = "Read when tests assert business rules, state transitions, or cross-entity behavior."
+
+[GeneratorReferenceLinkTestingAPI]
+other = "Read when tests cover API contracts, response fields, generated code, or adapters."
+
+[GeneratorReferenceLinkTestingDatabase]
+other = "Read when tests depend on database fixtures, transaction isolation, or persistence assertions."
+
+[GeneratorReferenceLinkStructureBusiness]
+other = "Read when structural changes affect domain boundaries, entry orchestration, or cross-module business flows."
+
+[GeneratorReferenceLinkStructureAPI]
+other = "Read when structural changes affect API layers, adapters, generated directories, or contract files."
+
+[GeneratorReferenceLinkStructureConfig]
+other = "Read when structural changes require config paths, registration points, or loading conventions."
+
+[GeneratorReferenceLinkNamingAPI]
+other = "Read when naming affects API fields, paths, error codes, or client contracts."
+
+[GeneratorReferenceLinkNamingDatabase]
+other = "Read when naming affects tables, columns, indexes, query methods, or persistence models."
+
+[GeneratorReferenceLinkNamingBusiness]
+other = "Read when naming carries domain concepts, state names, or business actions."

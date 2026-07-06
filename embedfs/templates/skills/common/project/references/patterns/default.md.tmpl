@@ -23,18 +23,21 @@
 {{end}}
 
 {{if .PatternObjects}}
-{{if .ImportanceGroups}}
-## 重要性分层
+{{if .ClaimGroups}}
+## 规则断言
 
-用于判断哪些规则可以优先作为开发约束，哪些只适合作为定位线索。具体行为仍以当前代码为准。
+用于判断哪些结论可以优先作为开发约束，哪些只适合作为定位线索。具体行为仍以当前代码为准。
 
-{{range .ImportanceGroups}}
+{{range .ClaimGroups}}
 ### {{.Title}}
 
 {{.Description}}
 
-{{range .Patterns}}
-- **{{.Name}}** ({{printf "%.2f" (mul .Confidence 100)}}%, x{{.Frequency}})
+{{range .Claims}}
+- **{{.Title}}**: {{.Text}}
+  - 证据：置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，证据 {{.EvidenceCount}} 处{{if .Scope}}，范围 `{{.Scope}}`{{end}}
+  - 使用：{{.Usage}}
+  {{if .Locations}}- 位置：{{range .Locations}}`{{.}}` {{end}}{{end}}
 {{end}}
 
 {{end}}

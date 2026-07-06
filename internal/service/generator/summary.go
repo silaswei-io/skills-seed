@@ -106,17 +106,19 @@ func deterministicKeyInsights(patterns []domain.Pattern, insights map[string]dom
 	categories := domain.CategoryNamesWithPatterns(patterns)
 	sort.Strings(categories)
 	out := []string{
-		localizedText(locale, "skills 由已入库模式、项目画像和工作流确定性生成；生成阶段不调用 AI。", "Skills are deterministically generated from stored patterns, project profile, and workflows; generation does not call AI."),
+		generatorText(locale, "GeneratorInsightDeterministicGeneration"),
 	}
 	if len(categories) > 0 {
-		out = append(out, localizedText(locale, "已覆盖模式分类：", "Covered pattern categories: ")+strings.Join(categories, ", "))
+		out = append(out, generatorTextWithParams(locale, "GeneratorInsightCoveredCategories", map[string]interface{}{
+			"Categories": strings.Join(categories, ", "),
+		}))
 	}
 	hitCount := 0
 	for _, insight := range insights {
 		hitCount += insight.HitCount
 	}
 	if hitCount > 0 {
-		out = append(out, localizedText(locale, "已结合 check 命中统计排序。", "Pattern ordering includes check hit statistics."))
+		out = append(out, generatorText(locale, "GeneratorInsightCheckHitOrdering"))
 	}
 	return out
 }

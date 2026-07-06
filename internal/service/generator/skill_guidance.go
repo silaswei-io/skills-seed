@@ -1,10 +1,10 @@
 package generator
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/validation"
 )
 
 type skillWorkflow struct {
@@ -13,15 +13,7 @@ type skillWorkflow struct {
 	Steps       []string
 }
 
-type validationCommand struct {
-	Command    string
-	When       string
-	Source     string
-	Workdir    string
-	ScopePaths []string
-	Evidence   []string
-	Type       string
-}
+type validationCommand = validation.Command
 
 func skillTriggerDescription(projectName, language, locale string, profile *domain.ProjectProfile) string {
 	project := strings.TrimSpace(projectName)
@@ -29,26 +21,27 @@ func skillTriggerDescription(projectName, language, locale string, profile *doma
 		project = strings.TrimSpace(profile.ProjectName)
 	}
 	if project == "" {
-		project = "project"
+		project = generatorText(locale, "GeneratorDefaultProjectName")
 	}
 	lang := strings.TrimSpace(language)
 	if profile != nil && strings.TrimSpace(profile.Language) != "" {
 		lang = strings.TrimSpace(profile.Language)
 	}
 	if lang == "" {
-		lang = "code"
+		lang = generatorText(locale, "GeneratorDefaultLanguageName")
 	}
 	hints := projectSpecificTriggerHints(profile, locale)
-	if strings.HasPrefix(strings.ToLower(locale), "zh") {
-		if len(hints) == 0 {
-			return fmt.Sprintf("修改、审查或扩展 %s %s 代码且需要遵循该项目已学习的架构、业务流、派生产物或仓库约定时使用", project, lang)
-		}
-		return fmt.Sprintf("修改、审查或扩展 %s %s 代码且涉及 %s 等项目特定约定时使用", project, lang, strings.Join(hints, "、"))
-	}
 	if len(hints) == 0 {
-		return fmt.Sprintf("Use when modifying, reviewing, or extending %s %s code and project-specific architecture, business flow, generated artifact, or repository conventions matter", project, lang)
+		return generatorTextWithParams(locale, "GeneratorSkillDescriptionDefault", map[string]interface{}{
+			"Project":  project,
+			"Language": lang,
+		})
 	}
-	return fmt.Sprintf("Use when modifying, reviewing, or extending %s %s code involving project-specific conventions such as %s", project, lang, strings.Join(hints, ", "))
+	return generatorTextWithParams(locale, "GeneratorSkillDescriptionWithHints", map[string]interface{}{
+		"Project":  project,
+		"Language": lang,
+		"Hints":    generatorListJoin(locale, hints),
+	})
 }
 
 func projectSpecificTriggerHints(profile *domain.ProjectProfile, locale string) []string {
@@ -93,11 +86,11 @@ func projectSpecificTriggerHints(profile *domain.ProjectProfile, locale string) 
 		lower := strings.ToLower(name + " " + module.Path + " " + module.Description)
 		switch {
 		case containsAny(lower, "domain", "business", "service", "workflow", "process", "usecase", "application", "领域", "业务", "流程", "编排"):
-			add(localizedText(locale, "核心业务流", "core business flow"))
+			add(generatorText(locale, "GeneratorTriggerHintCoreBusinessFlow"))
 		case containsAny(lower, "map", "transform", "convert", "adapter", "present", "dto", "转换", "适配", "映射"):
-			add(localizedText(locale, "边界转换", "boundary transformation"))
+			add(generatorText(locale, "GeneratorTriggerHintBoundaryTransformation"))
 		case containsAny(lower, "client", "remote", "external", "integration", "upstream", "downstream", "gateway", "adapter", "外部", "集成", "依赖"):
-			add(localizedText(locale, "外部依赖封装", "external dependency wrappers"))
+			add(generatorText(locale, "GeneratorTriggerHintExternalDependencyWrapper"))
 		case name != "":
 			add(name)
 		}
@@ -112,49 +105,49 @@ func skillWorkflows(profile *domain.ProjectProfile, patterns []domain.Pattern, l
 	workflows := make([]skillWorkflow, 0, 4)
 	if hasAPISignals(profile, patterns) {
 		steps := []string{
-			localizedText(locale, "先读项目规范和接口/结构模式，确认契约来源、响应形态、转换层和派生产物边界", "Read Project Spec plus interface/structure patterns first to confirm contract source, response shape, transformation layer, and generated-artifact boundaries"),
-			localizedText(locale, "修改手写逻辑时保持入口层、编排层和领域实现的职责边界", "Keep responsibility boundaries between entry points, orchestration code, and domain implementation when editing handwritten code"),
-			localizedText(locale, "新增或改变对外字段时同步检查转换逻辑和接口类型，避免直接暴露内部模型", "When adding or changing externally visible fields, check transformation logic and interface types together instead of exposing internal models directly"),
+			generatorText(locale, "GeneratorWorkflowAPIStepReadSpec"),
+			generatorText(locale, "GeneratorWorkflowAPIStepKeepBoundaries"),
+			generatorText(locale, "GeneratorWorkflowAPIStepCheckTransform"),
 		}
 		if hasGeneratedArtifactSignals(profile) {
 			steps = append([]string{
-				localizedText(locale, "先修改接口契约源文件，再重新生成派生产物", "Edit interface contract source files first, then regenerate derived artifacts"),
+				generatorText(locale, "GeneratorWorkflowAPIStepRegenerateArtifacts"),
 			}, steps...)
 		}
 		workflows = append(workflows, skillWorkflow{
-			Title:       localizedText(locale, "新增或调整 API", "Add Or Change API"),
-			AppliesWhen: localizedText(locale, "涉及接口、路由、请求/响应类型、转换逻辑或派生产物", "Interfaces, routes, request/response types, transformation logic, or generated artifacts change"),
+			Title:       generatorText(locale, "GeneratorWorkflowAPITitle"),
+			AppliesWhen: generatorText(locale, "GeneratorWorkflowAPIWhen"),
 			Steps:       steps,
 		})
 	}
 	if hasBusinessSignals(profile, patterns) {
 		workflows = append(workflows, skillWorkflow{
-			Title:       localizedText(locale, "修改业务流程", "Change Business Flow"),
-			AppliesWhen: localizedText(locale, "涉及状态流转、缓存 key、任务重试、幂等或跨实体业务编排", "State transitions, cache keys, task retry, idempotency, or cross-entity business orchestration change"),
+			Title:       generatorText(locale, "GeneratorWorkflowBusinessTitle"),
+			AppliesWhen: generatorText(locale, "GeneratorWorkflowBusinessWhen"),
 			Steps: []string{
-				localizedText(locale, "先读业务模式地图和命中的业务详情；需要复用入口时再读入口方法索引", "Read the Business Pattern Map and matching business detail first; read the Entry Method Index next only when reusing an entry point"),
-				localizedText(locale, "对照当前代码确认锁、状态、错误分支和缓存/任务顺序；引用与代码冲突时以代码为准", "Verify locks, states, error branches, and cache/task ordering against current code; current code wins over references"),
-				localizedText(locale, "新增产品语义前确认现有代码是否已经实现；没有证据时把它标记为待确认需求，而不是项目规则", "Before adding product semantics, confirm the current code already implements them; if not, mark them as requirements to confirm, not project rules"),
+				generatorText(locale, "GeneratorWorkflowBusinessStepReadMap"),
+				generatorText(locale, "GeneratorWorkflowBusinessStepVerifyCode"),
+				generatorText(locale, "GeneratorWorkflowBusinessStepConfirmSemantics"),
 			},
 		})
 	}
 	if hasRPCSignals(profile, patterns) {
 		workflows = append(workflows, skillWorkflow{
-			Title:       localizedText(locale, "接入或调整外部依赖", "Add Or Change External Dependency"),
-			AppliesWhen: localizedText(locale, "涉及远程客户端、外部服务调用或共享上下文注入", "Remote clients, external service calls, or shared context injection change"),
+			Title:       generatorText(locale, "GeneratorWorkflowExternalDependencyTitle"),
+			AppliesWhen: generatorText(locale, "GeneratorWorkflowExternalDependencyWhen"),
 			Steps: []string{
-				localizedText(locale, "先读结构模式和项目规范，确认封装层、接口别名和上下文注入约定", "Read structure patterns and Project Spec first to confirm wrapper layers, interface aliases, and context injection conventions"),
-				localizedText(locale, "把连接或客户端初始化集中在既有基础设施边界，业务代码通过领域化接口调用", "Keep connection or client initialization inside the existing infrastructure boundary and call dependencies through domain-oriented interfaces"),
+				generatorText(locale, "GeneratorWorkflowExternalDependencyStepReadStructure"),
+				generatorText(locale, "GeneratorWorkflowExternalDependencyStepKeepInfraBoundary"),
 			},
 		})
 	}
 	if hasConfigSignals(profile, patterns) {
 		workflows = append(workflows, skillWorkflow{
-			Title:       localizedText(locale, "修改配置或热加载", "Change Config Or Hot Reload"),
-			AppliesWhen: localizedText(locale, "涉及配置结构、配置文件、运行时可更新字段或配置监听器", "Config structures, config files, runtime-updatable fields, or config listeners change"),
+			Title:       generatorText(locale, "GeneratorWorkflowConfigTitle"),
+			AppliesWhen: generatorText(locale, "GeneratorWorkflowConfigWhen"),
 			Steps: []string{
-				localizedText(locale, "先读配置模式，确认配置结构、默认文件和热加载监听边界", "Read config patterns first to confirm config structs, default files, and hot-reload listener boundaries"),
-				localizedText(locale, "新增运行时可更新字段时同步处理 listener 错误路径，不能让 reload 失败导致服务崩溃", "When adding runtime-updatable fields, handle listener error paths so reload failures do not crash the service"),
+				generatorText(locale, "GeneratorWorkflowConfigStepReadPatterns"),
+				generatorText(locale, "GeneratorWorkflowConfigStepHandleReloadErrors"),
 			},
 		})
 	}
@@ -162,26 +155,7 @@ func skillWorkflows(profile *domain.ProjectProfile, patterns []domain.Pattern, l
 }
 
 func validationCommands(profile *domain.ProjectProfile, _ []domain.Pattern, _ string) []validationCommand {
-	if profile == nil {
-		return nil
-	}
-	learned := domain.CleanValidationCommands(profile.ValidationCommands)
-	if len(learned) == 0 {
-		return nil
-	}
-	commands := make([]validationCommand, 0, len(learned))
-	for _, learnedCommand := range learned {
-		commands = append(commands, validationCommand{
-			Command:    learnedCommand.Command,
-			When:       learnedCommand.When,
-			Source:     learnedCommand.Source,
-			Workdir:    learnedCommand.Workdir,
-			ScopePaths: append([]string(nil), learnedCommand.ScopePaths...),
-			Evidence:   append([]string(nil), learnedCommand.Evidence...),
-			Type:       learnedCommand.Type,
-		})
-	}
-	return commands
+	return validation.Commands(profile)
 }
 
 func hasBusinessSignals(profile *domain.ProjectProfile, patterns []domain.Pattern) bool {

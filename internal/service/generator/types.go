@@ -68,18 +68,17 @@ type PatternReferenceLink struct {
 	Reason string
 }
 
-type PatternImportanceGroup struct {
-	Title       string
-	Description string
-	Patterns    []domain.Pattern
-}
-
 type ValidationMatrixItem struct {
-	Area     string
-	Command  string
-	When     string
-	Source   string
-	Evidence []string
+	Area        string
+	Command     string
+	When        string
+	Source      string
+	Evidence    []string
+	Confidence  float64
+	Coverage    float64
+	MatchKind   string
+	Recommended bool
+	Warning     string
 }
 
 type ReferenceAvailability struct {

@@ -1,9 +1,7 @@
 package generator
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -11,44 +9,32 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/claim"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
-// SkillWriter 封装所有"渲染模板 + 写文件"逻辑
-type SkillWriter struct {
+// planBuilder 负责把已学习知识转换成可渲染的 Skills 生成计划。
+type planBuilder struct {
 	skillsLoader *skills.Loader
 }
 
-func NewSkillWriter(loader *skills.Loader) *SkillWriter {
-	return &SkillWriter{skillsLoader: loader}
+func newPlanBuilder(loader *skills.Loader) *planBuilder {
+	return &planBuilder{skillsLoader: loader}
 }
 
-func (w *SkillWriter) SkillsLoader() *skills.Loader {
-	return w.skillsLoader
-}
-
-// WriteSkillsOutput 写入主 SKILL.md + agent 元数据 + 所有参考文档
-func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, opts SkillWriteOptions) error {
+// Build 生成主 SKILL.md、agent 元数据和 references 的渲染计划。
+func (b *planBuilder) Build(outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, opts PlanOptions) (*skillgen.Plan, error) {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
-		"operation", "generator.write_skills_output",
+		"operation", "generator.build_skills_plan",
 		"output_path", outputPath,
 		"patterns_count", len(patterns),
 	)
 
 	if summaryResult == nil {
-		return fmt.Errorf("%s", i18n.Get("GeneratorGenerateSummaryFailed"))
-	}
-
-	if err := os.MkdirAll(outputPath, 0755); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.create_output_dir",
-			"duration", time.Since(startedAt),
-			"output_path", outputPath,
-			"error", err,
-		)
-		return err
+		return nil, fmt.Errorf("%s", i18n.Get("GeneratorGenerateSummaryFailed"))
 	}
 
 	skillName := opts.SkillName
@@ -56,7 +42,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 	templateLanguage := opts.Language
 
 	if profile == nil {
-		return fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
+		return nil, fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
 	}
 	profile = domain.CleanProjectProfile(profile)
 	profile, patterns = sanitizeGenerationInputs(profile, patterns, opts.ProjectRoot)
@@ -70,7 +56,7 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 	if profile.Language != "" {
 		templateLanguage = profile.Language
 	}
-	locale := w.skillsLoader.GetLocale()
+	locale := b.skillsLoader.GetLocale()
 	references := referenceAvailability(profile, patterns, !opts.SkipReferences)
 	triggerDescription := skillTriggerDescription(templateProjectName, templateLanguage, locale, profile)
 
@@ -104,131 +90,60 @@ func (w *SkillWriter) WriteSkillsOutput(ctx context.Context, outputPath string, 
 		"StateSummaries":         []string{},
 	}
 
-	// 生成主 SKILL.md 文件
-	mainPath := filepath.Join(outputPath, "SKILL.md")
-	mainContent, err := w.skillsLoader.Render("project-skill", data)
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.render_skill_template",
-			"duration", time.Since(startedAt),
-			"error", err,
-		)
-		return err
-	}
+	p := skillgen.NewPlan(outputPath)
+	p.AddFile("SKILL.md", skillgen.CatalogTemplate, "project-skill", data)
+	p.AgentMetadataData = data
 
-	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.write_skill_file",
-			"duration", time.Since(startedAt),
-			"path", mainPath,
-			"error", err,
-		)
-		return err
-	}
-
-	if err := w.GenerateAgentMetadata(outputPath, data); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "generator.generate_agent_metadata",
-			"duration", time.Since(startedAt),
-			"output_path", outputPath,
-			"error", err,
-		)
-		return err
-	}
-
-	// 生成参考文档
 	if !opts.SkipReferences {
-		if err := w.GenerateReferenceFiles(ctx, outputPath, summaryResult.CategorySummaries, patterns, profile, spec, references); err != nil {
+		if err := b.appendReferenceFiles(p, summaryResult.CategorySummaries, patterns, profile, spec, references); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-				"operation", "generator.generate_reference_files",
+				"operation", "generator.append_reference_files",
 				"duration", time.Since(startedAt),
 				"output_path", outputPath,
 				"error", err,
 			)
-			return err
+			return nil, err
 		}
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "generator.write_skills_output",
+		"operation", "generator.build_skills_plan",
 		"duration", time.Since(startedAt),
-		"main_path", mainPath,
-		"main_content_length", len(mainContent),
 		"patterns_count", len(patterns),
 		"categories_count", len(summaryResult.CategorySummaries),
 	)
-	return nil
+	return p, nil
 }
 
-// GenerateAgentMetadata 渲染并写入 agent 元数据文件
-func (w *SkillWriter) GenerateAgentMetadata(outputPath string, data interface{}) error {
-	files, err := w.skillsLoader.RenderAgentMetadataFiles(data)
-	if err != nil {
-		return err
-	}
-	if len(files) == 0 {
-		return nil
-	}
-
-	for _, file := range files {
-		outputFile := filepath.Join(outputPath, file.Path)
-		if err := os.MkdirAll(filepath.Dir(outputFile), 0755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(outputFile, []byte(file.Content), 0644); err != nil {
-			return err
-		}
-
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "generator.generate_agent_metadata",
-			"path", outputFile,
-			"content_length", len(file.Content),
-		)
-	}
-	return nil
-}
-
-// GenerateReferenceFiles 生成所有参考文档
-func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath string, summaries map[string]agent.CategorySummary, patterns []domain.Pattern, profile *domain.ProjectProfile, spec *domain.ProjectSpec, references ReferenceAvailability) error {
+func (b *planBuilder) appendReferenceFiles(p *skillgen.Plan, summaries map[string]agent.CategorySummary, patterns []domain.Pattern, profile *domain.ProjectProfile, spec *domain.ProjectSpec, references ReferenceAvailability) error {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "generator.generate_reference_files",
-		"output_path", outputPath,
 		"summaries_count", len(summaries),
 		"patterns_count", len(patterns),
 	)
 
-	refsPath := filepath.Join(outputPath, "references")
-	if err := os.MkdirAll(refsPath, 0755); err != nil {
-		return err
-	}
+	p.AddDir("references")
+	p.AddDir("references/patterns")
+	p.RemovePath("references/examples")
 
-	if err := w.generateProjectOverview(refsPath, profile); err != nil {
-		return err
-	}
-	patternsPath := filepath.Join(refsPath, "patterns")
-	examplesPath := filepath.Join(refsPath, "examples")
-
-	if err := os.MkdirAll(patternsPath, 0755); err != nil {
-		return err
-	}
-	if err := os.RemoveAll(examplesPath); err != nil {
+	if err := b.appendProjectOverview(p, profile); err != nil {
 		return err
 	}
 
 	categoriesWithPatterns := categoryNamesWithPatterns(patterns)
-	if err := w.generateProfileReferenceFiles(refsPath, profile, categoriesWithPatterns); err != nil {
+	if err := b.appendProfileReferenceFiles(p, profile, categoriesWithPatterns); err != nil {
 		return err
 	}
 	if spec != nil {
-		if err := w.generateProjectSpec(refsPath, spec, profile, patterns, references); err != nil {
+		if err := b.appendProjectSpec(p, spec, profile, patterns, references); err != nil {
 			return err
 		}
 	}
 
 	for _, categoryName := range categoriesWithPatterns {
 		summary := summaries[categoryName]
-		if err := w.generateCategoryPattern(patternsPath, categoryName, summary, patterns, categoriesWithPatterns, profile.Language); err != nil {
+		if err := b.appendCategoryPattern(p, categoryName, summary, patterns, categoriesWithPatterns, profile.Language); err != nil {
 			return err
 		}
 	}
@@ -236,61 +151,41 @@ func (w *SkillWriter) GenerateReferenceFiles(ctx context.Context, outputPath str
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.generate_reference_files",
 		"duration", time.Since(startedAt),
-		"refs_path", refsPath,
 		"summaries_count", len(summaries),
 	)
 	return nil
 }
 
-func (w *SkillWriter) generateProjectSpec(refsPath string, spec *domain.ProjectSpec, profile *domain.ProjectProfile, patterns []domain.Pattern, references ReferenceAvailability) error {
-	specPath := filepath.Join(refsPath, "project-spec.md")
-	content, err := w.skillsLoader.RenderReferenceFile("project-spec", projectSpecTemplateData{
+func (b *planBuilder) appendProjectSpec(p *skillgen.Plan, spec *domain.ProjectSpec, profile *domain.ProjectProfile, patterns []domain.Pattern, references ReferenceAvailability) error {
+	p.AddFile("references/project-spec.md", skillgen.ReferenceTemplate, "project-spec", projectSpecTemplateData{
 		ProjectSpec:      *spec,
 		References:       references,
 		SourceOfTruth:    []SourceOfTruthItem{},
-		ValidationMatrix: validationMatrix(profile, patterns, w.skillsLoader.GetLocale()),
+		ValidationMatrix: validationMatrix(profile, patterns, b.skillsLoader.GetLocale()),
 	})
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("ProjectSpecRenderFailed"), err)
-	}
-	if err := os.WriteFile(specPath, []byte(content), 0644); err != nil {
-		return err
-	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "generator.generate_project_spec",
-		"path", specPath,
-		"content_length", len(content),
+		"operation", "generator.append_project_spec",
 	)
 	return nil
 }
 
-func (w *SkillWriter) generateProjectOverview(refsPath string, profile *domain.ProjectProfile) error {
-	overviewPath := filepath.Join(refsPath, "project-overview.md")
-
+func (b *planBuilder) appendProjectOverview(p *skillgen.Plan, profile *domain.ProjectProfile) error {
 	data := projectOverviewTemplateData{
 		ProjectProfile:      *profile,
-		OverviewReferences:  profileReferenceItems(profile, w.skillsLoader.GetLocale(), "./"),
-		OverviewSummary:     projectOverviewSummary(profile, w.skillsLoader.GetLocale()),
-		ArchitectureSummary: projectArchitectureSummary(profile, w.skillsLoader.GetLocale()),
-		ValidationMatrix:    validationMatrix(profile, nil, w.skillsLoader.GetLocale()),
+		OverviewReferences:  profileReferenceItems(profile, b.skillsLoader.GetLocale(), "./"),
+		OverviewSummary:     projectOverviewSummary(profile, b.skillsLoader.GetLocale()),
+		ArchitectureSummary: projectArchitectureSummary(profile, b.skillsLoader.GetLocale()),
+		ValidationMatrix:    validationMatrix(profile, nil, b.skillsLoader.GetLocale()),
 	}
-	content, err := w.skillsLoader.RenderProjectOverview(data)
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("InitGenerateOverviewFailed"), err)
-	}
-	if err := os.WriteFile(overviewPath, []byte(content), 0644); err != nil {
-		return err
-	}
+	p.AddFile("references/project-overview.md", skillgen.ProjectOverviewTemplate, "project-overview", data)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "generator.generate_project_overview",
-		"path", overviewPath,
-		"content_length", len(content),
+		"operation", "generator.append_project_overview",
 		"placeholder", false,
 	)
 	return nil
 }
 
-func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *domain.ProjectProfile, categoriesWithPatterns []string) error {
+func (b *planBuilder) appendProfileReferenceFiles(p *skillgen.Plan, profile *domain.ProjectProfile, categoriesWithPatterns []string) error {
 	categorySet := make(map[string]bool, len(categoriesWithPatterns))
 	for _, category := range categoriesWithPatterns {
 		categorySet[category] = true
@@ -300,7 +195,7 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 		HasBusinessPatterns: categorySet[string(domain.CategoryBusiness)],
 		HasUtilityPatterns:  categorySet[string(domain.CategoryUtils)],
 		CodeFenceLanguage:   codeFenceLanguage(profile.Language),
-		BusinessMethodIndex: buildBusinessMethodIndex(profile.BusinessMethods, w.skillsLoader.GetLocale()),
+		BusinessMethodIndex: buildBusinessMethodIndex(profile.BusinessMethods, b.skillsLoader.GetLocale()),
 	}
 	files := []struct {
 		templateName string
@@ -317,19 +212,12 @@ func (w *SkillWriter) generateProfileReferenceFiles(refsPath string, profile *do
 		if !file.enabled {
 			continue
 		}
-		content, err := w.skillsLoader.RenderReferenceFile(file.templateName, file.data)
-		if err != nil {
-			return fmt.Errorf("%s: reference=%s: %w", i18n.Get("InitGenerateOverviewFailed"), file.templateName, err)
-		}
-		outputPath := filepath.Join(refsPath, file.outputName)
-		if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
-			return err
-		}
+		outputPath := filepath.Join("references", file.outputName)
+		p.AddFile(outputPath, skillgen.ReferenceTemplate, file.templateName, file.data)
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "generator.generate_profile_reference",
+			"operation", "generator.append_profile_reference",
 			"reference", file.templateName,
 			"path", outputPath,
-			"content_length", len(content),
 		)
 	}
 	return nil
@@ -371,11 +259,11 @@ func disambiguatedModuleName(name, path string) string {
 	return name + " (" + path + ")"
 }
 
-func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string, summary agent.CategorySummary, allPatterns []domain.Pattern, allCategories []string, language string) error {
+func (b *planBuilder) appendCategoryPattern(p *skillgen.Plan, categoryName string, summary agent.CategorySummary, allPatterns []domain.Pattern, allCategories []string, language string) error {
 	var categoryPatterns []domain.Pattern
-	for _, p := range allPatterns {
-		if string(p.Category) == categoryName {
-			categoryPatterns = append(categoryPatterns, patternForTemplate(p))
+	for _, pattern := range allPatterns {
+		if string(pattern.Category) == categoryName {
+			categoryPatterns = append(categoryPatterns, patternForTemplate(pattern))
 		}
 	}
 
@@ -385,7 +273,7 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 	}
 
 	if categoryName == string(domain.CategoryBusiness) {
-		return w.generateSplitBusinessPatterns(patternsPath, summary, categoryPatterns, allPatterns, allCategories, language)
+		return b.appendSplitBusinessPatterns(p, summary, categoryPatterns, allPatterns, allCategories, language)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerGeneratorGeneratingPatternFile"),
@@ -400,7 +288,7 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 		"Summary":           summary.Summary,
 		"Patterns":          summary.Patterns,
 		"PatternObjects":    categoryPatterns,
-		"ImportanceGroups":  patternImportanceGroups(categoryPatterns, w.skillsLoader.GetLocale()),
+		"ClaimGroups":       claim.Groups(categoryPatterns, b.skillsLoader.GetLocale()),
 		"UsageScenes":       summary.UsageScenes,
 		"Priority":          summary.Priority,
 		"PatternCount":      len(categoryPatterns),
@@ -408,32 +296,23 @@ func (w *SkillWriter) generateCategoryPattern(patternsPath, categoryName string,
 		"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
 		"BusinessMethods":   domain.ValidBusinessMethods(summary.BusinessMethods),
 		"CodeFenceLanguage": codeFenceLanguage(language),
-		"RelatedReferences": categoryReferenceLinks(categoryName, allCategories, w.skillsLoader.GetLocale(), "./"),
+		"RelatedReferences": categoryReferenceLinks(categoryName, allCategories, b.skillsLoader.GetLocale(), "./"),
 	}
 
-	content, err := w.skillsLoader.RenderPattern(templateCategoryName(categoryName), data)
-	if err != nil {
-		return fmt.Errorf("%s: category=%s: %w", i18n.Get("GeneratorRenderPatternTemplateFailed"), categoryName, err)
-	}
-	outputPath := filepath.Join(patternsPath, categoryName+".md")
-	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
-		return err
-	}
+	outputPath := filepath.Join("references", "patterns", categoryName+".md")
+	p.AddFile(outputPath, skillgen.PatternTemplate, templateCategoryName(categoryName), data)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "generator.generate_category_pattern",
+		"operation", "generator.append_category_pattern",
 		"category", categoryName,
 		"path", outputPath,
-		"content_length", len(content),
 		"patterns_count", len(categoryPatterns),
 	)
 	return nil
 }
 
-func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary agent.CategorySummary, categoryPatterns, allPatterns []domain.Pattern, allCategories []string, language string) error {
-	groups := businessPatternGroups(w.skillsLoader.GetLocale(), categoryPatterns)
-	if err := os.MkdirAll(filepath.Join(patternsPath, string(domain.CategoryBusiness)), 0755); err != nil {
-		return err
-	}
+func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, summary agent.CategorySummary, categoryPatterns, allPatterns []domain.Pattern, allCategories []string, language string) error {
+	groups := businessPatternGroups(b.skillsLoader.GetLocale(), categoryPatterns)
+	p.AddDir(filepath.Join("references", "patterns", string(domain.CategoryBusiness)))
 
 	indexData := map[string]interface{}{
 		"Category":          summary.Category,
@@ -444,17 +323,16 @@ func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary
 		"Confidence":        calculateCategoryConfidence(allPatterns, string(domain.CategoryBusiness)) * 100,
 		"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
 		"Groups":            groups,
-		"ImportanceGroups":  patternImportanceGroups(categoryPatterns, w.skillsLoader.GetLocale()),
-		"RelatedReferences": businessPatternReferenceLinks(allCategories, w.skillsLoader.GetLocale(), "./"),
+		"ClaimGroups":       claim.Groups(categoryPatterns, b.skillsLoader.GetLocale()),
+		"RelatedReferences": businessPatternReferenceLinks(allCategories, b.skillsLoader.GetLocale(), "./"),
 	}
 
-	indexContent, err := w.skillsLoader.RenderRelative("project/references/patterns/business-index", indexData)
-	if err != nil {
-		return fmt.Errorf("%s: category=%s: %w", i18n.Get("GeneratorRenderPatternTemplateFailed"), domain.CategoryBusiness, err)
-	}
-	if err := os.WriteFile(filepath.Join(patternsPath, "business.md"), []byte(indexContent), 0644); err != nil {
-		return err
-	}
+	p.AddFile(
+		filepath.Join("references", "patterns", "business.md"),
+		skillgen.RelativeTemplate,
+		"project/references/patterns/business-index",
+		indexData,
+	)
 
 	for _, group := range groups {
 		data := map[string]interface{}{
@@ -468,20 +346,14 @@ func (w *SkillWriter) generateSplitBusinessPatterns(patternsPath string, summary
 			"Confidence":        calculatePatternConfidence(group.Patterns) * 100,
 			"LastUpdated":       time.Now().Format("2006-01-02 15:04:05"),
 			"CodeFenceLanguage": codeFenceLanguage(language),
-			"RelatedReferences": businessPatternReferenceLinks(allCategories, w.skillsLoader.GetLocale(), "../"),
+			"RelatedReferences": businessPatternReferenceLinks(allCategories, b.skillsLoader.GetLocale(), "../"),
 		}
-		content, err := w.skillsLoader.RenderRelative("project/references/patterns/business-detail", data)
-		if err != nil {
-			return fmt.Errorf("%s: category=%s group=%s: %w", i18n.Get("GeneratorRenderPatternTemplateFailed"), domain.CategoryBusiness, group.ID, err)
-		}
-		outputPath := filepath.Join(patternsPath, string(domain.CategoryBusiness), group.ID+".md")
-		if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
-			return err
-		}
+		outputPath := filepath.Join("references", "patterns", string(domain.CategoryBusiness), group.ID+".md")
+		p.AddFile(outputPath, skillgen.RelativeTemplate, "project/references/patterns/business-detail", data)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "generator.generate_split_business_patterns",
+		"operation", "generator.append_split_business_patterns",
 		"groups_count", len(groups),
 		"patterns_count", len(categoryPatterns),
 	)
@@ -548,8 +420,8 @@ func calculatePatternConfidence(patterns []domain.Pattern) float64 {
 	return total / float64(len(patterns))
 }
 
-// SkillWriteOptions 封装 WriteSkillsOutput 所需的项目级参数
-type SkillWriteOptions struct {
+// PlanOptions 封装生成计划所需的项目级参数。
+type PlanOptions struct {
 	SkillName           string
 	ProjectName         string
 	Language            string

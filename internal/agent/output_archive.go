@@ -18,9 +18,10 @@ import (
 
 // AgentOutputArchive 表示单次 Agent 调用输出归档后的文件路径。
 type AgentOutputArchive struct {
-	ContentPath string
-	RawPath     string
-	StderrPath  string
+	ContentPath  string
+	RawPath      string
+	StderrPath   string
+	ManifestPath string
 }
 
 type agentOutputManifest struct {
@@ -180,6 +181,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		)
 		return archive
 	}
+	archive.ManifestPath = manifestPath
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "agent.output.write",
 		"agent", opts.Agent,

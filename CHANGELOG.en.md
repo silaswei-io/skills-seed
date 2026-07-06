@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.12.0]
+
+### Changes
+
+- Refactored the Skills generation architecture with an `internal/skillgen` generation plan and renderer, separating plan building, template rendering, and file writing from the generator service.
+- Added `internal/knowledge` layers for policy decisions, business routing, validation command selection, and rule-claim view models; generation now consumes stable knowledge views instead of mixing classification, routing, and presentation rules inside template adapters.
+- Upgraded pattern references from importance layers to rule claims, rendering each learned pattern as an actionable claim with evidence count, scope, locations, and usage guidance so weak observations are less likely to be treated as hard constraints.
+- Consolidated generated text into i18n keys for workflows, categories, related references, validation matrix entries, rule claims, and renderer errors, reducing hardcoded user-visible strings in generation code.
+
+### Fixes
+
+- Agent invocation and result-parse failures now include unified diagnostics with agent, operation, attempt, output/error lengths, short previews, and content/raw/stderr/manifest archive paths, making it clear whether the CLI call failed or the Agent returned non-JSON output.
+
 ## [v0.11.6]
 
 ### Changes

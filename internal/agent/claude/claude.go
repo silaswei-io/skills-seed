@@ -291,9 +291,23 @@ func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesReq
 
 // 调用外部命令行程序（含速率限制自动重试）
 func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string, task ...agent.RuntimeTask) (string, error) {
+	output, _, err := c.callClaudeWithArchive(ctx, operation, prompt, task...)
+	return output, err
+}
+
+func parseClaudeResult[T any](agentName, operation, output string, archive agent.AgentOutputArchive, parse func(string) (T, error)) (T, error) {
+	result, err := parse(output)
+	if err != nil {
+		var zero T
+		return zero, agent.NewResultContractError(agentName, operation, err, output, archive)
+	}
+	return result, nil
+}
+
+func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prompt string, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
 	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
-		return "", err
+		return "", agent.AgentOutputArchive{}, err
 	}
 
 	maxRetries := c.retryCfg.EffectiveMaxRetries()
@@ -308,7 +322,7 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string, 
 				MaxRetries: maxRetries,
 			})
 		}
-		output, callDuration, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attemptNumber, workDir, firstRuntimeTask(task))
+		output, archive, callDuration, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attemptNumber, workDir, firstRuntimeTask(task))
 		if err == nil {
 			if retried {
 				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
@@ -319,10 +333,10 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string, 
 					CallDuration: callDuration,
 				})
 			}
-			return output, nil
+			return output, archive, nil
 		}
 		if !isRetryable || attempt == maxRetries {
-			return "", err
+			return "", archive, err
 		}
 
 		retried = true
@@ -339,13 +353,13 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string, 
 
 		select {
 		case <-ctx.Done():
-			return "", ctx.Err()
+			return "", agent.AgentOutputArchive{}, ctx.Err()
 		case <-time.After(waitDuration):
 		}
 	}
 
 	logger.Error(i18n.Get("LoggerAgentRateLimitExhausted"), "max_retries", maxRetries)
-	return "", fmt.Errorf("%s: %d", i18n.Get("AgentClaudeRateLimitExhausted"), maxRetries)
+	return "", agent.AgentOutputArchive{}, fmt.Errorf("%s: %d", i18n.Get("AgentClaudeRateLimitExhausted"), maxRetries)
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
@@ -364,7 +378,7 @@ func isRetryableError(stdout, stderr string) bool {
 }
 
 // 执行单次命令行调用
-func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string, attempt int, workDir string, task agent.RuntimeTask) (string, time.Duration, bool, error) {
+func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string, attempt int, workDir string, task agent.RuntimeTask) (string, agent.AgentOutputArchive, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -421,7 +435,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), err)
+			return stdoutStr + stderrStr, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 		}
 
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailed"),
@@ -436,7 +450,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 			"stderr_path", archive.StderrPath,
 			"prompt_length", len(prompt),
 		)
-		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), err)
+		return "", archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 	}
 
 	rawOutput := stdout.String()
@@ -468,7 +482,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
 	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
-	return output, duration, false, nil
+	return output, archive, duration, false, nil
 }
 
 func firstRuntimeTask(tasks []agent.RuntimeTask) agent.RuntimeTask {
@@ -819,7 +833,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 	}
 
 	// 2. 调用外部命令行程序
-	output, err := c.callClaude(ctx, operation, prompt, task)
+	output, archive, err := c.callClaudeWithArchive(ctx, operation, prompt, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", operation,
@@ -829,7 +843,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 	}
 
 	// 3. 解析结果
-	result, err := parser.ParseAnalyzeCurrentCodebaseResult(output)
+	result, err := parseClaudeResult(c.Name(), operation, output, archive, parser.ParseAnalyzeCurrentCodebaseResult)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
 			"method", operation,
@@ -869,7 +883,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agen
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, operation, prompt, task)
+	output, archive, err := c.callClaudeWithArchive(ctx, operation, prompt, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", operation,
@@ -878,7 +892,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agen
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
 	}
 
-	result, err := parser.ParseAnalyzeCurrentCodebaseBatchResult(output)
+	result, err := parseClaudeResult(c.Name(), operation, output, archive, parser.ParseAnalyzeCurrentCodebaseBatchResult)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
 			"method", operation,

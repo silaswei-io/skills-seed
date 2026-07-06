@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/routing"
 )
 
 type businessMethodIndex struct {
@@ -203,23 +204,20 @@ func businessMethodHasInfrastructureSignal(text string) bool {
 
 func businessMethodGroupTitle(module, locale string) string {
 	if module == "" || module == "project" {
-		return localizedText(locale, "项目入口", "Project Entry Points")
+		return generatorText(locale, "GeneratorBusinessMethodProjectGroupTitle")
 	}
-	words := splitBusinessGroupWords(module)
+	words := routing.SplitBusinessGroupWords(module)
 	if len(words) == 0 {
 		return module
 	}
-	return titleFromWords(words)
+	return routing.TitleFromWords(words)
 }
 
 func businessMethodGroupSummary(group businessMethodGroup, locale string) string {
 	if group.ID == "project" {
-		return localizedText(locale, "未能稳定归属到具体模块的项目级入口。", "Project-level entry points that cannot be assigned to a stable module.")
+		return generatorText(locale, "GeneratorBusinessMethodProjectGroupSummary")
 	}
-	return localizedText(locale,
-		"同一模块或相邻路径下的入口方法，优先按本组定位复用能力。",
-		"Entry points from the same module or nearby paths; use this group first when locating reusable behavior.",
-	)
+	return generatorText(locale, "GeneratorBusinessMethodModuleGroupSummary")
 }
 
 func businessMethodDisplayName(method domain.BusinessMethod, module string) string {
@@ -252,7 +250,7 @@ func businessMethodModule(method domain.BusinessMethod) string {
 	}
 	for i := len(parts) - 1; i >= 0; i-- {
 		part := strings.TrimSpace(parts[i])
-		if part == "" || isGenericBusinessPathPart(part) {
+		if part == "" || routing.IsGenericBusinessPathPart(part) {
 			continue
 		}
 		return part
@@ -266,7 +264,7 @@ func businessMethodPathStem(location string) string {
 	if ext := filepath.Ext(base); ext != "" {
 		base = strings.TrimSuffix(base, ext)
 	}
-	if isGenericBusinessPathPart(base) {
+	if routing.IsGenericBusinessPathPart(base) {
 		return ""
 	}
 	return base
