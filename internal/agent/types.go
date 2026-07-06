@@ -286,6 +286,8 @@ type AnalyzeCurrentCodebaseRequest struct {
 	UserContext           string        // 本次学习传入的一次性用户上下文
 	UserContextPath       string        // 本次学习传入的一次性用户上下文文件路径
 	LearningMode          config.LearningMode
+	ChangeProfile         string
+	LearningBudget        config.LearningBudget
 }
 
 // AllowedCategories 返回提示词可展示的合法模式分类列表。
@@ -323,6 +325,8 @@ type AnalyzeCurrentCodebaseBatchRequest struct {
 	UserContext           string
 	UserContextPath       string
 	LearningMode          config.LearningMode
+	ChangeProfile         string
+	LearningBudget        config.LearningBudget
 }
 
 // AllowedCategories 返回提示词可展示的合法模式分类列表。

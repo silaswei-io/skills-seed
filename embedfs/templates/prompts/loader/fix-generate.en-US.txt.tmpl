@@ -49,6 +49,14 @@ You are a professional code fix expert. Generate precise code fixes based on ana
 
 # Output Format
 
+## Field Type Contract
+
+- `fixes` must be an object whose keys are file paths and values are the complete fixed content (string) for that file. Do not output diffs, objects, or arrays.
+- `confidence` must be a number in 0.0-1.0.
+- `summary` must be a string; omit or return empty string when there is no summary.
+- `warnings` must be a string array; put a single value in a one-element array. Return `[]` or omit when empty.
+- Only the four top-level fields `fixes`, `confidence`, `summary`, and `warnings` are read. Do not output `notes` or any extra field; they are ignored by the parser.
+
 The `json` fenced block below documents the response structure:
 
 ```json
@@ -67,5 +75,3 @@ The `json` fenced block below documents the response structure:
 - **confidence**: 0.0-1.0 (0.9+: safe, 0.7-0.9: should work, 0.5-0.7: needs review)
 - **summary**: (optional) Overall fix description
 - **warnings**: (optional) Areas requiring manual review
-
-If you want to add notes, put them inside the JSON as a `notes` field.

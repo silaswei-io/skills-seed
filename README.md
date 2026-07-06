@@ -88,7 +88,7 @@ existing code / git history / check hits
         -> Claude Code / Codex loads SKILL.md
 ```
 
-1. `init` 创建 `.skills-seed/config.yaml`、本地数据库和可编辑 prompt 片段。
+1. `init` 创建 `.skills-seed/config.yaml`、本地数据库和可编辑项目上下文。
 2. `sync` 分析当前代码和历史沉淀，保存 patterns、项目画像、业务入口和验证建议。
 3. 生成的 `SKILL.md` 只作为入口，Agent 需要深入时再读取 `references/`。
 
@@ -215,24 +215,25 @@ skills-seed sync
 | `.skills-seed/config.yaml` | 当前项目配置 |
 | `.skills-seed/store/project.db` | patterns、命中、文件指纹和评审评论索引 |
 | `.skills-seed/store/documents/` | 项目画像、规范、状态和变更记录 |
-| `.skills-seed/prompts/` | 可编辑 prompt 片段，用于长期项目约束 |
+| `.skills-seed/context/` | 可编辑项目上下文，用于代码看不到的信息和长期规则 |
 | `.skills-seed/cache/` | 可重建缓存 |
 | `.skills-seed/runtime/` | 日志、渲染 prompt、Agent 输出和临时输入 |
 
 Skills Seed 不维护远端知识库；学习结果默认写入当前仓库。`sync` 和 `check` 会调用配置中的 Agent CLI，是否联网取决于你使用的 `claude` / `codex`。
 
-## Prompt 与上下文
+## 项目上下文
 
-`skills-seed init` 会生成 `.skills-seed/prompts/`。这些文件不是完整 prompt 模板，而是项目级补充片段，会与内置 prompt 合并。
+`skills-seed init` 会生成 `.skills-seed/context/`。这些文件不是内置 prompt 覆盖目录，而是给 AI 学习、检查和生成时参考的项目上下文。
 
 | 场景 | 推荐方式 |
 |---|---|
-| 长期团队规则 | 写入 `.skills-seed/prompts/instructions/<prompt-id>.md` |
-| 项目事实或背景 | 写入 `.skills-seed/prompts/project/common.md` |
+| 代码看不到的项目事实或背景 | 写入 `.skills-seed/context/project.md` |
+| 长期团队规则、兼容性或禁止事项 | 写入 `.skills-seed/context/rules.md` |
+| 术语、别名、状态名 | 写入 `.skills-seed/context/glossary.md` |
 | 本次同步临时说明 | 使用 `skills-seed sync --context` |
 | 本次同步较长说明 | 使用 `skills-seed sync --context-path` |
 
-长期有效的规则放进 prompts；只解释本次任务的限制或背景，使用 `sync --context`。
+长期有效的信息放进 context；只解释本次任务的限制或背景，使用 `sync --context`。
 
 ## HTML 页面
 

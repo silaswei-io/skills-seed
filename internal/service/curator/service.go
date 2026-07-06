@@ -44,6 +44,7 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 	if err != nil {
 		return nil, fmt.Errorf("load existing patterns: %w", err)
 	}
+	existing = activeCuratorPatterns(existing)
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
 	curated := deterministicCurate(candidates, retrieved.related)
 	logCurateSanitizeReport(req.Operation, sanitizeCurateResult(curated, candidates))
@@ -68,6 +69,16 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 		Dropped: curated.Dropped,
 		Summary: curated.Summary,
 	}, nil
+}
+
+func activeCuratorPatterns(patterns []domain.Pattern) []domain.Pattern {
+	out := make([]domain.Pattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		if pattern.IsActive() {
+			out = append(out, pattern)
+		}
+	}
+	return out
 }
 
 // Compact 整理已有模式库。它是显式维护操作，不属于 skills 生成阶段。

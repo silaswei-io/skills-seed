@@ -69,6 +69,14 @@ The AI call is non-interactive; do not ask the user outside the JSON. If an unco
 
 # Output Format
 
+## Field Type Contract
+
+- `name` and `root_path` must be strings.
+- `routing`, `rules`, `change_order`, `parallel_agent_guidance`, `load_multiple_skills_when`, and `projects` must be arrays.
+- Each `change_order[]` element may be either a string (short action description) or an object `{"step":1,"action":"action","details":"details"}`. The object form is recommended for ordered steps.
+- `parallel_agent_guidance[].allowed` must be a boolean; `scope` and `condition` must be strings.
+- Do not output `generated_at`; it is auto-filled by the system.
+
 The `json` fenced block below documents the response structure:
 
 ```json
@@ -90,10 +98,10 @@ The `json` fenced block below documents the response structure:
     }
   ],
   "change_order": [
-    "confirm contract or shared interface",
-    "update producer implementation",
-    "update consumer calls",
-    "update deployment config and integration tests"
+    {"step": 1, "action": "confirm contract or shared interface", "details": "update schema and type definitions"},
+    {"step": 2, "action": "update producer implementation", "details": ""},
+    {"step": 3, "action": "update consumer calls", "details": ""},
+    {"step": 4, "action": "update deployment config and integration tests", "details": ""}
   ],
   "parallel_agent_guidance": [
     {

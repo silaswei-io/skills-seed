@@ -122,7 +122,7 @@ skills-templates-sha256: <hash>
 
 #### 命令概述
 
-在 Git 仓库中初始化 `.skills-seed/`、默认配置、数据库和 prompt / skills 模板。支持单项目模式和 workspace 模式。
+在 Git 仓库中初始化 `.skills-seed/`、默认配置、数据库、项目上下文和 skills 模板。支持单项目模式和 workspace 模式。
 
 #### 命令形式
 
@@ -251,8 +251,8 @@ skills-seed reset --workspace
 | `--language`, `-l` | 配置或自动识别 | 项目主要语言 |
 | `--focus`, `-f` | 空 | 只学习指定目录或文件；可重复使用，路径必须在项目根目录内 |
 | `--profile` | `auto` | 项目画像刷新策略：`auto`、`skip`、`refresh` |
-| `--context` | 空 | 本次学习的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/prompts/` |
-| `--context-path` | 空 | 从文件或目录读取本次学习的一次性补充说明；可重复传入，不写入 `.skills-seed/prompts/` |
+| `--context` | 空 | 本次学习的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/context/` |
+| `--context-path` | 空 | 从文件或目录读取本次学习的一次性补充说明；可重复传入，不写入 `.skills-seed/context/` |
 | `--help`, `-h` | `false` | 查看 `learn current` 帮助 |
 
 #### `learn history` 参数
@@ -294,7 +294,7 @@ skills-seed learn history --limit 40 --batch-size 5
 4. workspace 子项目按 `agent.parallelism` 真并发执行。
 5. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
 6. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
-7. 长期有效的提示词补充写入 `.skills-seed/prompts/instructions/<prompt-id>.md`；`--context` 和 `--context-path` 只影响本次命令。
+7. 长期有效的项目上下文写入 `.skills-seed/context/`；`--context` 和 `--context-path` 只影响本次命令。
 8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
 9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的内嵌 tree-sitter 结构化预扫描；没有边界输入时不会因此全仓扫描。
 10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
@@ -332,19 +332,18 @@ skills-seed generate skills
 skills-seed generate skills --output .agents/skills/my-project
 ```
 
-一次性补充说明只在学习阶段使用，例如 `skills-seed learn current --context-path .skills-seed/context.md`。`generate skills` 只消费已沉淀的项目画像、workspace 画像/spec 和 patterns。
+一次性补充说明只在学习阶段使用，例如 `skills-seed learn current --context-path .skills-seed/run-context.md`。`generate skills` 只消费已沉淀的项目画像、workspace 画像/spec、patterns 和 `.skills-seed/context/` 中的长期上下文。
 
-#### Prompt 合并说明
+#### 项目上下文说明
 
-`.skills-seed/prompts/` 中的文件会与内置 prompt 合并，不会替换内置 prompt。常用持久补充位置：
+`.skills-seed/context/` 中的文件会与内置 prompt 合并，不会替换内置 prompt。常用持久补充位置：
 
-- `.skills-seed/prompts/project/project-profile.md`：项目事实画像。
-- `.skills-seed/prompts/project/common.md`：项目通用约束。
-- `.skills-seed/prompts/project/<prompt-id>.md`：某个 prompt 的项目级补充。
-- `.skills-seed/prompts/workspace/<prompt-id>.md`：workspace 级补充。
-- `.skills-seed/prompts/instructions/<prompt-id>.md`：用户补充指令。
+- `.skills-seed/context/project.md`：代码看不到的业务背景、外部系统和线上事实。
+- `.skills-seed/context/rules.md`：长期团队规则、兼容性、安全边界和禁止事项。
+- `.skills-seed/context/glossary.md`：术语、别名、状态名和业务词到代码词的对应关系。
+- `.skills-seed/context/workspace.md`：workspace 级上下文，仅 workspace 模式生成。
 
-合并顺序为内置 prompt、项目画像、项目通用约束、项目级补充、workspace 补充、用户补充指令，最后追加内置最终输出契约。最终输出契约不可由用户文件覆盖，用于保护 JSON / Markdown 输出格式。
+合并顺序为内置 prompt、`context/project.md`、`context/rules.md`、`context/glossary.md`、`context/workspace.md`，最后追加内置最终输出契约。最终输出契约不可由用户文件覆盖，用于保护 JSON / Markdown 输出格式。
 
 #### 生成内容
 

@@ -200,6 +200,30 @@ type PatternMetrics struct {
 	EffectiveScore   float64 // 综合排序分，0.0-1.0
 }
 
+// PatternStatus 表示模式在当前代码库中的生命周期状态。
+type PatternStatus string
+
+const (
+	PatternStatusActive     PatternStatus = "active"
+	PatternStatusStale      PatternStatus = "stale"
+	PatternStatusSuperseded PatternStatus = "superseded"
+	PatternStatusDeprecated PatternStatus = "deprecated"
+)
+
+// NormalizePatternStatus 归一化模式生命周期状态。
+func NormalizePatternStatus(status PatternStatus) PatternStatus {
+	switch PatternStatus(strings.ToLower(strings.TrimSpace(string(status)))) {
+	case PatternStatusStale:
+		return PatternStatusStale
+	case PatternStatusSuperseded:
+		return PatternStatusSuperseded
+	case PatternStatusDeprecated:
+		return PatternStatusDeprecated
+	default:
+		return PatternStatusActive
+	}
+}
+
 // PatternEvidenceLocation 保存一条模式的源码证据位置。
 type PatternEvidenceLocation struct {
 	Path        string  `json:"path,omitempty"`        // 相对项目根路径
@@ -246,6 +270,10 @@ type Pattern struct {
 	WorkspaceRole     string                    `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
 	AnalysisUnitID    string                    `json:"analysis_unit_id,omitempty"`
 	AnalysisUnitName  string                    `json:"analysis_unit_name,omitempty"`
+	Status            PatternStatus             `json:"status,omitempty"`
+	LastSeenAt        time.Time                 `json:"last_seen_at,omitempty"`
+	StaleReason       string                    `json:"stale_reason,omitempty"`
+	SupersededBy      string                    `json:"superseded_by,omitempty"`
 	CreatedAt         time.Time                 `json:"created_at"`
 	UpdatedAt         time.Time                 `json:"updated_at"` // 最后更新时间
 }
@@ -263,6 +291,8 @@ func NewPattern(id, name string, category Category) *Pattern {
 		Merged:     false,
 		MergedFrom: []string{},
 		Generated:  false,
+		Status:     PatternStatusActive,
+		LastSeenAt: now,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -277,10 +307,18 @@ func (p *Pattern) SetBusinessMethod(method *BusinessMethod) {
 
 // NormalizeForSave 补齐持久化时需要稳定保存的字段。
 func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
+	p.Status = NormalizePatternStatus(p.Status)
 	if previous != nil && !previous.CreatedAt.IsZero() {
 		p.CreatedAt = previous.CreatedAt
 	} else if p.CreatedAt.IsZero() {
 		p.CreatedAt = now
+	}
+	if p.LastSeenAt.IsZero() {
+		if previous != nil && !previous.LastSeenAt.IsZero() {
+			p.LastSeenAt = previous.LastSeenAt
+		} else {
+			p.LastSeenAt = now
+		}
 	}
 	p.UpdatedAt = now
 	if p.BusinessMethod != nil {
@@ -294,9 +332,21 @@ func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 
 // NormalizeAfterLoad 补齐旧 DB 记录缺失的派生字段，不改变更新时间。
 func (p *Pattern) NormalizeAfterLoad() {
+	p.Status = NormalizePatternStatus(p.Status)
+	if p.LastSeenAt.IsZero() {
+		p.LastSeenAt = p.UpdatedAt
+		if p.LastSeenAt.IsZero() {
+			p.LastSeenAt = p.CreatedAt
+		}
+	}
 	if p.BusinessMethod != nil {
 		p.BusinessMethod.NormalizeCodeLocation(nil, time.Time{})
 	}
+}
+
+// IsActive 判断模式是否应参与 check 和 generate 等默认消费流程。
+func (p Pattern) IsActive() bool {
+	return NormalizePatternStatus(p.Status) == PatternStatusActive
 }
 
 // NormalizeCodeLocation 规范化业务方法的结构化代码位置。

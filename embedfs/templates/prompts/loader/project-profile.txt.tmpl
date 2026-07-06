@@ -91,6 +91,15 @@
 
 # 输出格式
 
+## 字段类型约束
+
+- `frameworks`、`dependencies`、`framework_patterns`、`config_patterns`、`layers[].responsibilities`、`layers[].files`、`key_modules[].responsibilities`、`key_modules[].dependencies`、`key_modules[].dependents`、`key_modules[].key_methods`、`validation_commands[].scope_paths`、`validation_commands[].evidence` 必须是字符串数组；单个值也要写成数组。
+- `architecture`、`structure`、`dependency_graph`、`data_flow`、`summary` 必须是字符串，不能写成数组或对象。
+- `layers`、`key_modules`、`common_utils`、`business_methods`、`validation_commands` 必须是对象数组。
+- `business_methods[].name`、`description`、`usage`、`type`、`function`、`prerequisites`、`returns` 必须是字符串；多个条件用分号或逗号写在同一字符串里，不能写成数组或对象。
+- `business_methods[].code_location` 必须是对象 `{"current_location":"文件路径:行号"}`，不能写成字符串。
+- 不确定字段结构时宁可省略该字段或返回空数组/空字符串，不要用对象或自然语言段落代替。
+
 下面的 `json` 代码块用于说明返回结构：
 
 ```json

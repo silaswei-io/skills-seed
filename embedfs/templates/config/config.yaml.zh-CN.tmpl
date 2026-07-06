@@ -70,6 +70,21 @@ learning:
     select_relevant_files: true
     # 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果
     select_relevant_files_min_candidates: 200
+    budget:
+      # 单个分析单元最多入库的候选模式数；0 表示不限制
+      max_patterns_per_unit: 3
+      # 单次 learn current 最多入库的候选模式数；0 表示不限制
+      max_patterns_per_run: 12
+      # 极小改动最多新增模式数；0 表示只审计旧模式，不新增
+      micro_change_new_patterns: 0
+      # 小改动最多新增模式数
+      minor_change_new_patterns: 3
+      # 低于该置信度的候选默认不入库
+      min_confidence: 0.78
+      # 小改动优先更新已有模式，避免新增碎片模式
+      update_existing_first: true
+      # 候选必须包含可路由源码证据位置
+      require_routeable_evidence: true
     structural:
       # 启用有边界的结构化上下文；无边界输入时不会运行
       enabled: true

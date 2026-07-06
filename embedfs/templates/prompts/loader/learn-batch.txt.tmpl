@@ -208,10 +208,9 @@
 11. **business_method**: 仅用于工具/业务方法：
     - **name**: 完整方法签名或代码标识
     - **code_location**: 只能是对象 `{"current_location":"相对文件路径:行号"}`，不能写成字符串，也不能写成 `location`
-    - **layer**: 代码所在职责层或模块类型
     - **function**: 包含参数和返回值的完整签名
-    - **prerequisites**: 需要先设置什么（如事务已开启、配置已加载）
-    - **returns**: 返回内容包括错误
+    - **prerequisites**: 需要先设置什么（如事务已开启、配置已加载）；必须是字符串，多个条件用分号或逗号分隔，不能写成数组或对象
+    - **returns**: 返回内容包括错误；必须是字符串，多个返回值用分号或逗号分隔，不能写成数组或对象
     - **type**: "domain"（项目特有业务逻辑）或 "common"（可复用工具）
     - **description**: 详细的业务逻辑说明
     - **usage**: 何时调用此方法
@@ -243,7 +242,6 @@
       "business_method": {
         "name": "真实方法签名或代码标识",
         "code_location": {"current_location": "相对文件路径:行号"},
-        "layer": "职责层或模块类型",
         "description": "从代码证据归纳出的完整业务意图",
         "function": "真实完整签名",
         "prerequisites": "代码证据体现的调用前置条件和依赖",

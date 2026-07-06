@@ -13,7 +13,7 @@
 
 `Claude Code` · `Codex` · `Local Skills` · `Workspace` · `Code Review`
 
-[Quick Start](#quick-start) · [Output Preview](#output-preview) · [Prompts](#prompts-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
+[Quick Start](#quick-start) · [Output Preview](#output-preview) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
 
 </div>
 
@@ -83,7 +83,7 @@ init -> learn current / learn history -> generate skills -> check
 
 | Stage | Command | Output |
 |---|---|---|
-| Initialize | `skills-seed init` | `.skills-seed/config.yaml`, local database, default prompts |
+| Initialize | `skills-seed init` | `.skills-seed/config.yaml`, local database, default context files |
 | Learn current code | `skills-seed learn current` | patterns, business methods, utilities, project profile |
 | Learn history | `skills-seed learn history` | long-lived rules extracted from Git evolution |
 | Generate skills | `skills-seed generate skills` | `SKILL.md`, project overview, specs, pattern references |
@@ -117,11 +117,11 @@ Starting in 0.7.0, learning and project-profile analysis use an embedded tree-si
 
 When an AI Agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries with exponential backoff according to `agent.retry`. Long-running progress lines switch between normal, waiting, and retrying states, for example `Analyze current codebase`, `Analyze current codebase (API Error: 529 overloaded_error, call 3m37s, retry in 15s)`, and `Analyze current codebase (attempt 2)`. The call duration is how long the failed Agent call took; `retry in 15s` is the backoff wait.
 
-## Prompts And One-Time Guidance
+## Project Context And One-Time Guidance
 
-`skills-seed init` creates `.skills-seed/prompts/`. These files are not full replacements for the built-in prompts. They are merged with built-in prompts as project context, workspace constraints, or user instructions for learning and generation.
+`skills-seed init` creates `.skills-seed/context/`. These files are not built-in prompt overrides. They store project context that should guide AI learning, checks, and skill generation.
 
-Starting in 0.7.1, generated metadata, empty scaffolding, and unfilled placeholder text in default prompt files are filtered during rendering. Only user-authored constraints enter the Agent input. Each rendered prompt is saved under `.skills-seed/runtime/rendered-prompts/`; the neighboring `.manifest.json` records whether base, project, workspace, and instruction fragments were included and their lengths, making context provenance easier to debug.
+Generated metadata and unfilled placeholder text in default context files are filtered during rendering. Only user-authored context enters the Agent input. Each rendered prompt is saved under `.skills-seed/runtime/rendered-prompts/`; the neighboring `.manifest.json` records whether base and context fragments were included and their lengths, making context provenance easier to debug.
 
 Starting in 0.7.2, project-profile analysis performs a narrow JSON recovery for duplicated object-start fragments inside object arrays in model output. If parsing still fails, it returns an error and keeps the existing profile instead of saving an `unknown/parse failed` placeholder as a successful result.
 
@@ -140,40 +140,35 @@ Starting in 0.9.1, model output parsing runs through a stronger JSON repair flow
 Common layout:
 
 ```text
-.skills-seed/prompts/
-├── project/
-│   ├── project-profile.md      # Project facts used by related prompts
-│   ├── common.md               # Common project constraints used by related prompts
-│   └── <prompt-id>.md          # Optional project-level fragment for one prompt
-├── workspace/
-│   ├── skill-workspace-profile.md
-│   └── skill-workspace-spec.md
-└── instructions/
-    └── <prompt-id>.md          # User instructions appended to one prompt
+.skills-seed/context/
+├── README.md
+├── project.md      # Business background and information not visible in code
+├── rules.md        # Long-lived team rules, compatibility, and forbidden changes
+├── glossary.md     # Domain terms, aliases, states, and code-term mappings
+└── workspace.md    # Workspace-level context, only in workspace mode
 ```
 
 Runtime merge order:
 
 ```text
 built-in prompt
-+ project/project-profile.md
-+ project/common.md
-+ project/<prompt-id>.md
-+ workspace/<prompt-id>.md
-+ instructions/<prompt-id>.md
++ context/project.md
++ context/rules.md
++ context/glossary.md
++ context/workspace.md
 + built-in final output contract
 ```
 
-Use `instructions/<prompt-id>.md` for stable team requirements, such as "ignore temporary debugging code while learning commits" or "prioritize API compatibility rules when generating skills". These instructions are appended after the built-in prompt, but they must not change the JSON / Markdown output format required by the built-in prompt. Skills Seed appends a non-editable final output contract after user fragments to protect parser-facing output.
+Use `.skills-seed/context/rules.md` for stable team requirements, such as "ignore temporary debugging code while learning commits" or "prioritize API compatibility rules when generating skills". Context must not change the JSON / Markdown output format required by the built-in prompt. Skills Seed appends a non-editable final output contract after context fragments to protect parser-facing output.
 
-`--context` and `--context-path` are one-time guidance for the current `learn current` command. They are not written to `.skills-seed/prompts/`, and they are not passed as temporary input to `generate skills`. Use them for temporary instructions:
+`--context` and `--context-path` are one-time guidance for the current `learn current` command. They are not written to `.skills-seed/context/`, and they are not passed as temporary input to `generate skills`. Use them for temporary instructions:
 
 ```bash
 skills-seed learn current --context "Focus only on compatibility boundaries"
-skills-seed learn current --context-path .skills-seed/context.md
+skills-seed learn current --context-path .skills-seed/run-context.md
 ```
 
-If a rule should apply across future runs, put it in `.skills-seed/prompts/instructions/<prompt-id>.md`. If it only explains or limits one run, use `--context` or `--context-path`.
+If a rule should apply across future runs, put it in `.skills-seed/context/rules.md`. If it only explains or limits one run, use `--context` or `--context-path`.
 
 `learn current`, `preview`, and structural analysis now share one file-selection policy: by default they analyze source files, build config, and dependency config while continuing to skip documents, generated outputs, paths ignored by Git, paths matched by global `exclude`, and generated Skills output directories.
 

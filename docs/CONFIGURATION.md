@@ -202,9 +202,9 @@ exclude:
 
 ### Prompt 运行时调试
 
-Prompt 片段仍从 `.skills-seed/prompts/` 读取，但 0.7.1 起渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的约束。
+项目上下文从 `.skills-seed/context/` 读取，渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的上下文。
 
-渲染后的 prompt 默认保存在 `.skills-seed/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、项目画像、项目补充、workspace 补充、用户指令和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。0.9.13 起，最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象。
+渲染后的 prompt 默认保存在 `.skills-seed/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、context 片段和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象。
 
 0.10.5 起，`learn current` 单元分析不会再把已有模式库写入每个单元 prompt；如果需要查看已有模式，请读取本地模式库或使用 `patterns show` / `patterns stats`。模型输出解析会在最终契约之外继续做程序化 JSON 修复，覆盖字符串内原始换行/控制字符、裸对象键和数组项缺失对象起始符等异常。0.10.7 起，修复范围继续扩展到尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号。
 
@@ -325,23 +325,22 @@ skills-seed learn history --limit 100 --batch-size 10
 | `.skills-seed/runtime/rendered-prompts/` | 渲染后的 prompt 和 manifest |
 | `.skills-seed/runtime/agent-outputs/` | Agent 输出归档 |
 
-### `.skills-seed/prompts/`
+### `.skills-seed/context/`
 
-`.skills-seed/prompts/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑运行时提示词片段。它用于长期生效的项目说明、workspace 约束和用户补充指令。
+`.skills-seed/context/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑上下文目录。它用于长期生效的项目说明、团队规则、术语和 workspace 约束。
 
 常见路径：
 
 | 路径 | 作用 |
 |---|---|
-| `.skills-seed/prompts/project/project-profile.md` | 项目事实画像，会合并到相关 prompt |
-| `.skills-seed/prompts/project/common.md` | 项目通用约束，会合并到相关 prompt |
-| `.skills-seed/prompts/project/<prompt-id>.md` | 可选：某个 prompt 的项目级补充 |
-| `.skills-seed/prompts/workspace/<prompt-id>.md` | workspace 级补充，例如 `skill-workspace-profile.md` |
-| `.skills-seed/prompts/instructions/<prompt-id>.md` | 用户补充指令，追加到对应 prompt |
+| `.skills-seed/context/project.md` | 代码看不到的业务背景、外部系统和线上事实 |
+| `.skills-seed/context/rules.md` | 长期团队规则、兼容性、安全边界和禁止事项 |
+| `.skills-seed/context/glossary.md` | 术语、别名、状态名和业务词到代码词的对应关系 |
+| `.skills-seed/context/workspace.md` | workspace 级上下文，仅 workspace 模式生成 |
 
-这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户补充指令破坏解析。
+这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户上下文破坏解析。
 
-`--context` 和 `--context-path` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/prompts/`，也不会传给 `generate skills`。长期规则写入 `prompts/instructions/<prompt-id>.md`；临时说明使用 `learn current --context` 或 `learn current --context-path`。
+`--context` 和 `--context-path` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/context/`，也不会传给 `generate skills`。长期规则写入 `context/rules.md`；临时说明使用 `learn current --context` 或 `learn current --context-path`。
 
 ### `autofix`
 

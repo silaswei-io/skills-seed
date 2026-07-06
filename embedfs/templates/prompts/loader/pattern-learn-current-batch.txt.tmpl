@@ -116,6 +116,15 @@
 - `normal`: 默认策略；覆盖当前单元的主要业务能力、关键技术约定、重要异常路径和可复用入口，但不为覆盖面降低证据门槛。
 - `deep`: 可以读取更深的状态分支、外部依赖、异常/补偿流程和跨模块约束；`deep` 只表示允许更深入验证，不表示可以输出更多弱证据模式；所有输出仍必须有路由价值和代码证据。
 
+# 本轮变更画像与候选预算
+
+- **变更画像**: {{if .ChangeProfile}}{{.ChangeProfile}}{{else}}normal{{end}}
+- **单元候选上限**: {{.LearningBudget.MaxPatternsPerUnit}}
+- **本轮候选上限**: {{.LearningBudget.MaxPatternsPerRun}}
+- **最低置信度**: {{printf "%.2f" .LearningBudget.MinConfidence}}
+
+如果变更画像是 `micro`，默认不要新增 pattern，除非用户上下文明确要求学习且候选体现关键业务不变量；如果是 `minor`，只输出最关键的少量候选。超出预算时必须合并或丢弃弱候选，不要把一个规则拆成多条。
+
 # 省时读取策略
 
 - 先读结构化上下文、diff、入口路径和建议优先查看的代码文件；只有当它们不足以证明候选规则时，才继续读取直接调用方、被调用方或同目录相邻实现。
@@ -173,7 +182,10 @@
 - `profile_delta.layers` 必须是对象数组；每个元素只能是包含 `name`、`description`、`responsibilities`、`files` 的对象，不能写成字符串、字符串数组或自然语言段落。没有可靠架构层增量时返回 `[]`。
 - `profile_delta.key_modules`、`common_utils`、`business_methods`、`validation_commands` 必须是对象数组；没有证据时返回 `[]` 或省略字段。
 - `business_methods[].code_location` 必须是对象，例如 `{"current_location":"文件路径:行号"}`；不能写成 `"文件路径:行号"` 字符串。
-- `responsibilities`、`files`、`dependencies`、`dependents`、`key_methods`、`scope_paths`、`evidence` 等复数字段必须是字符串数组；单个值也要写成数组。
+- `business_methods[].name`、`description`、`usage`、`type`、`function`、`prerequisites`、`returns` 必须是字符串；多个条件用分号或逗号写在同一字符串里，不能写成数组或对象。
+- `profile_delta.architecture`、`structure`、`dependency_graph`、`data_flow`、`summary` 必须是字符串；没有增量时省略字段或返回空字符串，不能写成数组或对象。
+- `evidence_locations[].line` 必须是单个 1-based 整数；`evidence_locations[].confidence` 必须是 0.0-1.0 的数字；`patterns[].confidence`、`patterns[].frequency` 同理为数字。
+- `key_modules[].responsibilities`、`dependencies`、`dependents`、`key_methods`、`layers[].responsibilities`、`layers[].files`、`validation_commands[].scope_paths`、`validation_commands[].evidence` 等复数字段必须是字符串数组；单个值也要写成数组。
 - 不确定字段结构时宁可省略该字段或返回空数组，不要用字符串解释。
 
 下面的 `json` 代码块用于说明返回结构：
@@ -210,7 +222,6 @@
           "business_method": {
             "name": "完整方法签名",
             "code_location": {"current_location": "文件路径:行号"},
-            "layer": "入口/编排/领域/数据访问/工具等真实职责层；必须来自代码证据或项目词表",
             "description": "功能和业务逻辑",
             "function": "包含参数和返回类型的完整签名",
             "usage": "何时调用",
@@ -329,6 +340,7 @@
    - `profile_delta` 内所有数组字段必须保持 JSON 数组类型；`layers`、`key_modules`、`common_utils`、`business_methods` 和 `validation_commands` 必须是对象数组，严禁用字符串摘要代替。
    - `profile_delta.layers` 的每个元素必须是对象：`{"name":"","description":"","responsibilities":[],"files":[]}`；如果只能写出一句架构描述，说明证据不足，应返回 `[]`。
    - `profile_delta.business_methods[].code_location` 必须是对象：`{"current_location":"文件路径:行号"}`；不要为了简写而输出字符串。
+   - `profile_delta.business_methods[].prerequisites` 和 `returns` 必须是字符串；多个前置条件或返回值用分号或逗号写在同一字符串里，不能写成数组或对象。
    - 不要把项目初始化、完整结构说明、整体架构摘要、数据流总述或泛化概述写入 `profile_delta`；这些只能由完整项目画像刷新生成。
    - `profile_delta.validation_commands` 只填写用于验证改动结果的命令，例如仓库证据明确记录的测试、检查、静态分析、构建、代码生成或契约生成命令；不要输出安装工具、创建新项目、启动服务、部署、调试、拉取依赖、运行 demo 或一次性环境准备命令。
    - `profile_delta.business_methods` 只填写真实业务入口、跨模块编排入口、领域复用入口或高价值工具入口；不要输出普通启动、路由/入口注册、框架初始化、脚手架入口或简单记录操作。

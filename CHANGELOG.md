@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.12.1]
+
+### 变更
+
+- 将初始化生成的长期 AI 上下文收敛到 `.skills-seed/context/`，新增 `project.md`、`rules.md`、`glossary.md` 和 workspace 上下文文件，并在运行时渲染中按 context 片段合并用户实际填写的内容。
+- `learn current` 新增候选模式入库预算和当前改动规模画像，支持按单元、单次运行、极小/小改动、置信度和可路由证据限制新增模式，减少小改动产生碎片规则。
+- 为 pattern 增加生命周期字段，默认只让 active 模式参与 check、curate、generate 和统计流程，为后续陈旧/替代/废弃模式治理保留状态边界。
+- 更新 README、命令文档、配置文档和默认配置模板，说明新的项目上下文目录与 `learning.current.budget` 配置。
+
+### 修复
+
+- 修复学习和项目画像提示词中的 JSON 契约与代码结构不一致的问题，移除已不匹配的 `business_method.layer` 示例，并明确业务方法、画像增量、证据位置和验证命令等字段的字符串、数组、对象和数值类型约束。
+- 清理未填写的旧 prompt 脚手架时会保留已有用户内容，避免迁移到 context 目录时把真实项目补充误删。
+
 ## [v0.12.0]
 
 ### 变更

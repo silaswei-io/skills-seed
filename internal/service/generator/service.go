@@ -134,6 +134,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	if err := runStep(i18n.Get("ProgressGenerateLoadPatterns"), func() error {
 		var loadErr error
 		patterns, loadErr = s.patternRepo.GetAll(ctx)
+		patterns = activePatterns(patterns)
 		return loadErr
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),

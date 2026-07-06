@@ -210,10 +210,9 @@ For EACH pattern, you MUST provide:
 11. **business_method**: For utility/business methods ONLY:
     - **name**: Full method signature or code identifier
     - **code_location**: Must be an object `{"current_location":"relative/file/path:line"}`. Never output a string and never rename it to `location`.
-    - **layer**: Responsibility layer or module type
     - **function**: Complete signature with params and returns
-    - **prerequisites**: What needs to be set up first (e.g., transaction opened, config loaded)
-    - **returns**: What it returns including errors
+    - **prerequisites**: What needs to be set up first (e.g., transaction opened, config loaded). Must be a string; separate multiple conditions with semicolons or commas, never use an array or object.
+    - **returns**: What it returns including errors. Must be a string; separate multiple return values with semicolons or commas, never use an array or object.
     - **type**: "domain" (project-specific business logic) or "common" (reusable utility)
     - **description**: Detailed business logic explanation
     - **usage**: When to call this method
@@ -245,7 +244,6 @@ For EACH pattern, you MUST provide:
       "business_method": {
         "name": "Real method signature or code identifier",
         "code_location": {"current_location": "relative/file/path:line"},
-        "layer": "Responsibility layer or module type",
         "description": "Full business intent supported by code evidence",
         "function": "Real complete signature",
         "prerequisites": "Preconditions and dependencies shown by code evidence",

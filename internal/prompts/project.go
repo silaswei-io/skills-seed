@@ -37,6 +37,13 @@ var workspacePromptNames = []string{
 	"skill-workspace-spec",
 }
 
+var contextFileNames = []string{
+	"README",
+	"project",
+	"rules",
+	"glossary",
+}
+
 // ProjectPromptData 渲染项目提示词模板的数据
 type ProjectPromptData struct {
 	ProgramVersion      string
@@ -83,53 +90,25 @@ func EnsureProjectPrompts(seedPath string, data ProjectPromptData) error {
 		data.SkillsLocale = data.Locale
 	}
 
-	baseDirs := []string{
-		filepath.Join(seedPath, "prompts"),
-		filepath.Join(seedPath, "prompts", "project"),
-		filepath.Join(seedPath, "prompts", "instructions"),
+	contextDir := filepath.Join(seedPath, "context")
+	if err := os.MkdirAll(contextDir, 0755); err != nil {
+		return fmt.Errorf("%s: %w", i18n.GetWithParams("PromptCreateDirFailed", map[string]interface{}{"Path": contextDir}), err)
 	}
-
-	for _, dir := range baseDirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("%s: %w", i18n.GetWithParams("PromptCreateDirFailed", map[string]interface{}{"Path": dir}), err)
-		}
-	}
-
-	profileContent, err := renderProjectTemplate("project-profile", data.SkillsLocale, data)
-	if err != nil {
-		return err
-	}
-	profilePath := filepath.Join(seedPath, "prompts", "project", "project-profile.md")
-	if err := writeIfNotExists(profilePath, profileContent); err != nil {
-		return err
-	}
-
-	data.PromptName = "common"
-	projectContent, err := renderProjectTemplate("project-prompt", data.SkillsLocale, data)
-	if err != nil {
-		return err
-	}
-	projectPath := filepath.Join(seedPath, "prompts", "project", "common.md")
-	if err := writeIfNotExists(projectPath, projectContent); err != nil {
-		return err
-	}
-
-	for _, name := range projectPromptNames {
-		data.PromptName = name
-
-		instructionsContent, err := renderProjectTemplate("user-instructions", data.SkillsLocale, data)
+	for _, name := range contextFileNames {
+		content, err := renderContextTemplate(name, data.SkillsLocale, data)
 		if err != nil {
 			return err
 		}
-		instructionsPath := filepath.Join(seedPath, "prompts", "instructions", name+".md")
-		if err := writeIfNotExists(instructionsPath, instructionsContent); err != nil {
+		if err := writeIfNotExists(filepath.Join(contextDir, name+".md"), content); err != nil {
 			return err
 		}
 	}
 	if err := cleanupDeprecatedProjectInstructions(seedPath); err != nil {
 		return err
 	}
-
+	if err := cleanupGeneratedPromptScaffold(seedPath); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -155,20 +134,19 @@ func EnsureProjectPromptsAt(basePath string, data ProjectPromptData) error {
 		}
 	}
 
-	profileContent, err := renderProjectTemplate("project-profile", data.SkillsLocale, data)
+	profileContent, err := renderContextTemplate("project", data.SkillsLocale, data)
 	if err != nil {
 		return err
 	}
-	if err := writeIfNotExists(filepath.Join(basePath, "project-profile.md"), profileContent); err != nil {
+	if err := writeIfNotExists(filepath.Join(basePath, "project.md"), profileContent); err != nil {
 		return err
 	}
 
-	data.PromptName = "common"
-	projectContent, err := renderProjectTemplate("project-prompt", data.SkillsLocale, data)
+	rulesContent, err := renderContextTemplate("rules", data.SkillsLocale, data)
 	if err != nil {
 		return err
 	}
-	return writeIfNotExists(filepath.Join(basePath, "common.md"), projectContent)
+	return writeIfNotExists(filepath.Join(basePath, "rules.md"), rulesContent)
 }
 
 // EnsureWorkspacePrompts 初始化工作区级提示词文件
@@ -183,21 +161,50 @@ func EnsureWorkspacePrompts(seedPath string, data WorkspacePromptData) error {
 		data.SkillsLocale = data.Locale
 	}
 
-	workspaceDir := filepath.Join(seedPath, "prompts", "workspace")
+	workspaceDir := filepath.Join(seedPath, "context")
 	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
 		return fmt.Errorf("%s: %w", i18n.GetWithParams("PromptCreateDirFailed", map[string]interface{}{"Path": workspaceDir}), err)
 	}
 
-	for _, name := range workspacePromptNames {
-		content, err := renderWorkspaceTemplate(name, data.SkillsLocale, data)
-		if err != nil {
-			return err
-		}
-		if err := writeIfNotExists(filepath.Join(workspaceDir, name+".md"), content); err != nil {
-			return err
-		}
+	content, err := renderWorkspaceTemplate("skill-workspace-profile", data.SkillsLocale, data)
+	if err != nil {
+		return err
+	}
+	if err := writeIfNotExists(filepath.Join(workspaceDir, "workspace.md"), content); err != nil {
+		return err
 	}
 	return nil
+}
+
+func renderContextTemplate(name, locale string, data ProjectPromptData) (string, error) {
+	templateData, err := readContextTemplate(name, locale)
+	if err != nil {
+		return "", err
+	}
+	tmpl, err := template.New(name).Parse(string(templateData))
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func readContextTemplate(name, locale string) ([]byte, error) {
+	if locale == "" {
+		locale = config.DefaultToolLocale
+	}
+	fileName := name + ".md.tmpl"
+	if suffix := config.TemplateLocaleSuffix(locale); suffix != "" {
+		localizedPath := filepath.ToSlash(filepath.Join("templates", "prompts", "context", name+"."+suffix+".md.tmpl"))
+		if data, err := embedfs.FS.ReadFile(localizedPath); err == nil {
+			return data, nil
+		}
+	}
+	defaultPath := filepath.ToSlash(filepath.Join("templates", "prompts", "context", fileName))
+	return embedfs.FS.ReadFile(defaultPath)
 }
 
 func renderProjectTemplate(name, locale string, data ProjectPromptData) (string, error) {
@@ -296,6 +303,35 @@ func cleanupDeprecatedProjectInstructions(seedPath string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func cleanupGeneratedPromptScaffold(seedPath string) error {
+	paths := []string{
+		filepath.Join(seedPath, "prompts", "project", "project-profile.md"),
+		filepath.Join(seedPath, "prompts", "project", "common.md"),
+	}
+	for _, name := range projectPromptNames {
+		paths = append(paths, filepath.Join(seedPath, "prompts", "instructions", name+".md"))
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if hasPromptInstructionBody(string(data)) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	_ = os.Remove(filepath.Join(seedPath, "prompts", "project"))
+	_ = os.Remove(filepath.Join(seedPath, "prompts", "instructions"))
+	_ = os.Remove(filepath.Join(seedPath, "prompts"))
 	return nil
 }
 

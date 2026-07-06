@@ -92,115 +92,65 @@ func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
 
 func TestLoader_RenderMergesProjectWorkspaceAndUserInstructions(t *testing.T) {
 	seedPath := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "project"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "workspace"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"), []byte("PROJECT PROFILE"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "common.md"), []byte("COMMON PROJECT RULES"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "learn-analyze.md"), []byte("PROJECT LEARN ANALYZE CONTEXT"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "workspace", "learn-analyze.md"), []byte("WORKSPACE LEARN ANALYZE CONTEXT"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte("USER LEARN ANALYZE INSTRUCTIONS"), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "project.md"), []byte("PROJECT CONTEXT"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "rules.md"), []byte("PROJECT RULES"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "glossary.md"), []byte("PROJECT GLOSSARY"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "workspace.md"), []byte("WORKSPACE CONTEXT"), 0644))
 
 	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "PROJECT PROFILE")
-	require.Contains(t, prompt, "COMMON PROJECT RULES")
-	require.Contains(t, prompt, "PROJECT LEARN ANALYZE CONTEXT")
-	require.Contains(t, prompt, "WORKSPACE LEARN ANALYZE CONTEXT")
-	require.Contains(t, prompt, "USER LEARN ANALYZE INSTRUCTIONS")
-	require.Less(t, strings.Index(prompt, "COMMON PROJECT RULES"), strings.Index(prompt, "PROJECT LEARN ANALYZE CONTEXT"))
-	require.Less(t, strings.Index(prompt, "PROJECT LEARN ANALYZE CONTEXT"), strings.Index(prompt, "WORKSPACE LEARN ANALYZE CONTEXT"))
-	require.Less(t, strings.Index(prompt, "WORKSPACE LEARN ANALYZE CONTEXT"), strings.Index(prompt, "USER LEARN ANALYZE INSTRUCTIONS"))
+	require.Contains(t, prompt, "PROJECT CONTEXT")
+	require.Contains(t, prompt, "PROJECT RULES")
+	require.Contains(t, prompt, "PROJECT GLOSSARY")
+	require.Contains(t, prompt, "WORKSPACE CONTEXT")
+	require.Less(t, strings.Index(prompt, "PROJECT CONTEXT"), strings.Index(prompt, "PROJECT RULES"))
+	require.Less(t, strings.Index(prompt, "PROJECT RULES"), strings.Index(prompt, "PROJECT GLOSSARY"))
+	require.Less(t, strings.Index(prompt, "PROJECT GLOSSARY"), strings.Index(prompt, "WORKSPACE CONTEXT"))
 }
 
 func TestLoader_RenderSkipsLegacyDefaultPromptScaffolds(t *testing.T) {
 	seedPath := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "project"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
 
-	legacyCommon := `<!-- generated-by: skills-seed v0.7.0 -->
+	projectContext := `<!-- generated-by: skills-seed v0.12.0 -->
 <!-- prompt-template-sha256: old -->
-<!-- prompt-type: common -->
+<!-- context-type: project -->
 <!-- editable: true -->
 
-# 项目专属约束
-
-处理这个项目时，优先遵循当前仓库的真实结构、命名风格和已有模式
-
-## 项目画像来源
-
-请结合 ` + "`project-profile.md`" + ` 中记录的项目背景理解代码，不要输出适用于任意项目的泛化建议
-
-## 额外要求
-
-- 先遵循本项目现有结构
-- 优先复用现有模式
-- 仅在必要时引入新抽象
-- 输出必须具体到当前项目
-`
-	legacyInstructions := `<!-- generated-by: skills-seed v0.7.0 -->
-<!-- prompt-template-sha256: old -->
-<!-- prompt-type: learn-analyze -->
-<!-- editable: true -->
-<!-- prompt-merge: append -->
-<!-- priority: user-instructions -->
-
-# 用户补充指令
-
-这些内容会追加到内置 ` + "`learn-analyze`" + ` 提示词之后，不会替换内置任务定义、输入约定或输出格式。
-
-在此补充团队约束、编码偏好或特定场景规则。不要修改内置提示词要求的 JSON/Markdown 输出结构。
-`
-	profile := `<!-- generated-by: skills-seed v0.7.0 -->
-<!-- prompt-template-sha256: old -->
-<!-- prompt-type: project-profile -->
-<!-- editable: true -->
-
-# 项目画像
+# 项目背景
 
 - 项目名称: demo
 - 主要语言: go
 - 项目根目录: /tmp/demo
 
-## 目录结构摘要
+## 代码看不到的信息
 
-` + "```text\n/tmp/demo\n├── README.md\n└── main.go\n```\n" + `
-## 架构摘要
-
-未记录
-
-## 关键模块
-
-未记录
-
-## 团队编码风格
-
-未记录
+在这里补充业务背景、外部系统、线上事实、灰度策略、兼容对象、人工流程、历史包袱等信息。
 `
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "common.md"), []byte(legacyCommon), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte(legacyInstructions), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "project", "project-profile.md"), []byte(profile), 0644))
+	rulesContext := `# 团队规则
+
+在这里补充未来所有学习、检查和生成都应遵守的团队规则。
+`
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "project.md"), []byte(projectContext), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "rules.md"), []byte(rulesContext), 0644))
 
 	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
-	require.NotContains(t, prompt, "这些内容会追加到内置")
-	require.NotContains(t, prompt, "在此补充团队约束")
-	require.NotContains(t, prompt, "处理这个项目时，优先遵循当前仓库")
 	require.NotContains(t, prompt, "prompt-template-sha256")
-	require.NotContains(t, prompt, "未记录")
-	require.NotContains(t, prompt, "README.md")
-	require.Contains(t, prompt, "项目名称: demo")
-	require.Contains(t, prompt, "主要语言: go")
+	require.NotContains(t, prompt, "在这里补充")
+	require.NotContains(t, prompt, "项目名称: demo")
+	require.NotContains(t, prompt, "主要语言: go")
 }
 
 func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 	seedPath := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte("USER SAYS RETURN MARKDOWN"), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "rules.md"), []byte("USER SAYS RETURN MARKDOWN"), 0644))
 
 	loader := New("loader", "en-US", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())

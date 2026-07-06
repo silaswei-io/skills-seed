@@ -377,6 +377,7 @@ type learnCurrentProjectRun struct {
 	selectionSummary    aiFileSelectionSummary
 	stateSession        *currentStateSession
 	resumeSummary       *learnCurrentResumeSummary
+	changeProfile       currentChangeProfile
 
 	patterns                  []domain.Pattern
 	profileDelta              domain.ProjectProfileDelta
@@ -637,6 +638,7 @@ func (r *learnCurrentProjectRun) detectChanges() error {
 		return err
 	}
 	r.logDetectedChanges(detectStartedAt)
+	r.changeProfile = classifyCurrentChangeProfile(r.incrementalChanges)
 	return nil
 }
 
@@ -1111,10 +1113,12 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 
 	batchLabel := fmt.Sprintf("batch-%03d", batch.index+1)
 	analyzeResult, err := r.cont.AnalyzerSvc.AnalyzeCurrentCodebaseBatch(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCurrentCodebaseBatchOptions{
-		RuntimeLabel: batchLabel,
-		LearningMode: r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-		RunContext:   r.codebaseRunContext,
-		Units:        batchUnits,
+		RuntimeLabel:   batchLabel,
+		LearningMode:   r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		ChangeProfile:  string(r.changeProfile),
+		LearningBudget: r.cont.ConfigRepo.GetCurrentLearningConfig().Budget,
+		RunContext:     r.codebaseRunContext,
+		Units:          batchUnits,
 	})
 	if err != nil {
 		if len(batchUnits) == 1 {
@@ -1173,7 +1177,10 @@ func (r *learnCurrentProjectRun) saveAnalyzedUnit(ctx context.Context, analyzeLa
 		}
 		r.patternSaveMu.Lock()
 		var err error
-		saved, err = r.cont.LearnerSvc.SavePatternsStrictWithMetadata(ctx, learnedPatterns, "learn_current", unit)
+		learnedPatterns = r.admitLearnedPatterns(learnedPatterns)
+		if len(learnedPatterns) > 0 {
+			saved, err = r.cont.LearnerSvc.SavePatternsStrictWithMetadata(ctx, learnedPatterns, "learn_current", unit)
+		}
 		r.patternSaveMu.Unlock()
 		if err != nil {
 			return learnCurrentUnitResult{}, fmt.Errorf("%s: %w", saveProgressLabel, err)

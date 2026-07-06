@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.12.1]
+
+### Changes
+
+- Consolidated long-lived AI context created by `init` under `.skills-seed/context/`, adding `project.md`, `rules.md`, `glossary.md`, and workspace context files; runtime prompt rendering now merges the user-authored context fragments from that directory.
+- Added candidate-admission budgets and current-change profiling to `learn current`, limiting new stored patterns by analysis unit, run, micro/minor change size, confidence, and routeable evidence to reduce fragmented rules from small edits.
+- Added lifecycle fields to patterns, and made check, curate, generate, and statistics consume active patterns by default, leaving a clear boundary for stale, superseded, and deprecated pattern maintenance.
+- Updated the README, command docs, configuration docs, and default config templates for the new project context directory and `learning.current.budget` settings.
+
+### Fixes
+
+- Fixed JSON-contract drift between learning/project-profile prompts and the Go data model by removing the outdated `business_method.layer` example and tightening string, array, object, and numeric type requirements for business methods, profile deltas, evidence locations, and validation commands.
+- Deprecated prompt scaffold cleanup now preserves files with existing user-authored content, avoiding accidental removal of real project guidance during the context-directory migration.
+
 ## [v0.12.0]
 
 ### Changes

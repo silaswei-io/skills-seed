@@ -188,21 +188,14 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		return rendered, nil
 	}
 
-	rawProjectProfile := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "project-profile.md"))
-	rawCommonProjectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", "common.md"))
-	rawProjectPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "project", name+".md"))
-	projectProfile := prepareProjectProfilePrompt(rawProjectProfile)
-	commonProjectPrompt := prepareUserPromptFragment(rawCommonProjectPrompt)
-	projectPrompt := prepareUserPromptFragment(rawProjectPrompt)
-	scopedProfile, scopedCommon, scopedPrompt := l.readScopedProjectPrompts(name, data)
-	rawScopedProfile, rawScopedCommon, rawScopedPrompt := scopedProfile, scopedCommon, scopedPrompt
-	scopedProfile = prepareProjectProfilePrompt(scopedProfile)
-	scopedCommon = prepareUserPromptFragment(scopedCommon)
-	scopedPrompt = prepareUserPromptFragment(scopedPrompt)
-	rawWorkspacePrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "workspace", name+".md"))
-	rawInstructionsPrompt := l.readPromptFile(filepath.Join(l.seedPath, "prompts", "instructions", name+".md"))
-	workspacePrompt := prepareUserPromptFragment(rawWorkspacePrompt)
-	instructionsPrompt := prepareUserPromptFragment(rawInstructionsPrompt)
+	rawProjectContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "project.md"))
+	rawRulesContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "rules.md"))
+	rawGlossaryContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "glossary.md"))
+	rawWorkspaceContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "workspace.md"))
+	projectContext := prepareContextPromptFragment(rawProjectContext)
+	rulesContext := prepareContextPromptFragment(rawRulesContext)
+	glossaryContext := prepareContextPromptFragment(rawGlossaryContext)
+	workspaceContext := prepareContextPromptFragment(rawWorkspaceContext)
 
 	var parts []string
 	debugParts := []promptPartDebug{}
@@ -230,14 +223,10 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 	if base != "" {
 		addPart("base", base, base)
 	}
-	addPart("project-profile", rawProjectProfile, projectProfile)
-	addPart("project-common", rawCommonProjectPrompt, commonProjectPrompt)
-	addPart("project-prompt", rawProjectPrompt, projectPrompt)
-	addPart("scoped-project-profile", rawScopedProfile, scopedProfile)
-	addPart("scoped-project-common", rawScopedCommon, scopedCommon)
-	addPart("scoped-project-prompt", rawScopedPrompt, scopedPrompt)
-	addPart("workspace-prompt", rawWorkspacePrompt, workspacePrompt)
-	addPart("instructions-prompt", rawInstructionsPrompt, instructionsPrompt)
+	addPart("context-project", rawProjectContext, projectContext)
+	addPart("context-rules", rawRulesContext, rulesContext)
+	addPart("context-glossary", rawGlossaryContext, glossaryContext)
+	addPart("context-workspace", rawWorkspaceContext, workspaceContext)
 	if contractGuard != "" {
 		addPart("output-contract-guard", contractGuard, contractGuard)
 	}
@@ -248,14 +237,10 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		"agent", l.agentName,
 		"locale", locale,
 		"base_length", len(base),
-		"project_profile_length", len(projectProfile),
-		"common_project_prompt_length", len(commonProjectPrompt),
-		"project_prompt_length", len(projectPrompt),
-		"scoped_project_profile_length", len(scopedProfile),
-		"scoped_common_project_prompt_length", len(scopedCommon),
-		"scoped_project_prompt_length", len(scopedPrompt),
-		"workspace_prompt_length", len(workspacePrompt),
-		"instructions_prompt_length", len(instructionsPrompt),
+		"context_project_length", len(projectContext),
+		"context_rules_length", len(rulesContext),
+		"context_glossary_length", len(glossaryContext),
+		"context_workspace_length", len(workspaceContext),
 		"output_contract_guard_length", len(contractGuard),
 		"final_length", len(rendered),
 		"has_seed_path", true,
@@ -361,6 +346,12 @@ func prepareUserPromptFragment(content string) string {
 	return content
 }
 
+func prepareContextPromptFragment(content string) string {
+	content = stripPromptMetadata(content)
+	content = removeDefaultContextScaffold(content)
+	return strings.TrimSpace(content)
+}
+
 func prepareProjectProfilePrompt(content string) string {
 	content = stripPromptMetadata(content)
 	content = removeUnrecordedProfileSections(content)
@@ -416,6 +407,55 @@ func removeLegacyDefaultProjectPromptScaffold(content string) string {
 		content = strings.ReplaceAll(content, fragment, "")
 	}
 	return content
+}
+
+func removeDefaultContextScaffold(content string) string {
+	defaultFragments := []string{
+		"# 项目背景",
+		"# 团队规则",
+		"# 术语表",
+		"## 代码看不到的信息",
+		"## 关键入口",
+		"## 长期约束",
+		"## 禁止事项",
+		"## 业务术语",
+		"在这里补充业务背景、外部系统、线上事实、灰度策略、兼容对象、人工流程、历史包袱等信息。",
+		"在这里补充未来所有学习、检查和生成都应遵守的团队规则。",
+		"在这里补充不能破坏的兼容性、安全、数据、发布或运维边界。",
+		"在这里补充业务词、别名、状态名、外部系统名和代码标识符之间的对应关系。",
+		"暂未记录。",
+		"# Project Background",
+		"# Team Rules",
+		"# Glossary",
+		"## Information Not Visible In Code",
+		"## Key Entry Points",
+		"## Long-Lived Constraints",
+		"## Forbidden Changes",
+		"## Domain Terms",
+		"Add business background, external systems, production facts, rollout strategy, compatibility targets, manual processes, or historical constraints here.",
+		"Add team rules that should apply to future learning, checks, and skill generation.",
+		"Add compatibility, security, data, release, or operations boundaries that must not be broken.",
+		"Add mappings between business terms, aliases, state names, external systems, and code identifiers.",
+		"Not recorded yet.",
+	}
+	for _, fragment := range defaultFragments {
+		content = strings.ReplaceAll(content, fragment, "")
+	}
+	lines := strings.Split(content, "\n")
+	filtered := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- 项目名称:") ||
+			strings.HasPrefix(trimmed, "- 主要语言:") ||
+			strings.HasPrefix(trimmed, "- 项目根目录:") ||
+			strings.HasPrefix(trimmed, "- Project name:") ||
+			strings.HasPrefix(trimmed, "- Primary language:") ||
+			strings.HasPrefix(trimmed, "- Project root:") {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	return strings.Join(filtered, "\n")
 }
 
 func removeUnrecordedProfileSections(content string) string {

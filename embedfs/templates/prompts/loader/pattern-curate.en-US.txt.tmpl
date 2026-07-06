@@ -115,6 +115,8 @@ Given candidate patterns and related existing patterns, output the final canonic
 - Categories must come from input patterns and must be one of the allowed categories: {{.AllowedCategories}}. Do not create new categories.
 - `confidence` must be between 0.0 and 1.0. Use a frequency-weighted average or a conservative estimate when merging.
 - `frequency` should reflect merged occurrences and must be at least 1.
+- `business_method.prerequisites` and `returns` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
+- `business_method.name`, `description`, `usage`, `type`, and `function` must be strings. `business_method.code_location` must be an object `{"current_location":"file/path:line"}`.
 
 # Pre-Output Validation Checklist
 

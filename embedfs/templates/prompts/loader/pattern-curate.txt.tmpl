@@ -115,6 +115,8 @@
 - 分类必须来自输入模式的分类，且必须属于可用分类：{{.AllowedCategories}}。不要创建新分类。
 - `confidence` 必须在 0.0 到 1.0 之间；合并时使用频率加权平均或保守估计。
 - `frequency` 应反映合并后的出现次数，至少为 1。
+- `business_method.prerequisites` 和 `returns` 必须是字符串；多个条件用分号或逗号写在同一字符串里，不能写成数组或对象。
+- `business_method.name`、`description`、`usage`、`type`、`function` 必须是字符串；`business_method.code_location` 必须是对象 `{"current_location":"文件路径:行号"}`。
 
 # 输出前验证清单（必须内部执行）
 

@@ -43,6 +43,15 @@
 
 # 输出格式
 
+## 字段类型约束
+
+- `confidence` 必须是 0.0-1.0 的数字；`frequency` 必须是整数（默认 1）。
+- `good_example`、`bad_example`、`rule`、`description`、`name` 必须是字符串。
+- `evidence_locations[].line` 必须是单个 1-based 整数；`evidence_locations[].confidence` 必须是 0.0-1.0 的数字。
+- `business_method.prerequisites`、`returns`、`description`、`usage`、`type`、`function`、`name` 必须是字符串；多个条件用分号或逗号写在同一字符串里，不能写成数组或对象。
+- `business_method.code_location` 必须是对象 `{"current_location":"文件路径:行号"}`，不能写成字符串。
+- 不确定字段结构时宁可省略该字段或返回空数组/空字符串。
+
 下面的 `json` 代码块用于说明返回结构：
 
 ```json
@@ -55,6 +64,7 @@
   "bad_example": "违反模式的代码示例",
   "rule": "可操作的规则（当 X 时，应该 Y）",
   "confidence": 0.85,
+  "frequency": 1,
   "evidence_locations": [
     {
       "path": "相对文件路径",

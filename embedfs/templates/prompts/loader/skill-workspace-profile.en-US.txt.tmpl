@@ -53,6 +53,13 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 
 # Output Format
 
+## Field Type Contract
+
+- `name`, `root_path`, and `summary` must be strings.
+- `projects`, `shared`, `contracts`, `infra`, `dependencies`, and `impact_routes` must be arrays. Return `[]` when there is no evidence.
+- `projects[].frameworks`, `shared[].consumers`, `shared[].producers`, `shared[].affected_projects`, `contracts[].producers`, `contracts[].consumers`, `infra[].affected_projects`, and `impact_routes[].project_ids` must be string arrays.
+- Do not output `generated_at`; it is auto-filled by the system.
+
 The `json` fenced block below documents the response structure:
 
 ```json

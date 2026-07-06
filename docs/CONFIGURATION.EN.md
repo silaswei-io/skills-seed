@@ -202,9 +202,9 @@ Starting in 0.9.11, file selection also applies Git ignore rules by default. Sta
 
 ### Prompt Runtime Debugging
 
-Prompt fragments are still read from `.skills-seed/prompts/`, but starting in 0.7.1 rendering filters default metadata, empty scaffolding, and unfilled placeholder text. Only user-authored constraints are kept.
+Project context is read from `.skills-seed/context/`, and rendering filters default metadata, empty scaffolding, and unfilled placeholder text. Only user-authored context is kept.
 
-Rendered prompts are saved by default under `.skills-seed/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, project profile, project fragment, workspace fragment, user instruction, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent. Starting in 0.9.13, the final output contract is appended from a separate append template and forces JSON prompts to return exactly one parseable JSON object.
+Rendered prompts are saved by default under `.skills-seed/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, context, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent. The final output contract is appended from a separate append template and forces JSON prompts to return exactly one parseable JSON object.
 
 Starting in 0.10.5, `learn current` unit analysis no longer writes the existing pattern store into every unit prompt. To inspect stored patterns, read the local pattern store or use `patterns show` / `patterns stats`. In addition to the final output contract, parsing continues to apply programmatic JSON repair for issues such as raw newlines/control characters inside strings, bare object keys, and array items missing an object-start marker. Starting in 0.10.7, repair also covers trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
 
@@ -325,23 +325,22 @@ Command flags affect only the current run and do not rewrite the config file.
 | `.skills-seed/runtime/rendered-prompts/` | Rendered prompts and manifests |
 | `.skills-seed/runtime/agent-outputs/` | Archived Agent outputs |
 
-### `.skills-seed/prompts/`
+### `.skills-seed/context/`
 
-`.skills-seed/prompts/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable runtime prompt fragments for the project. Use it for persistent project notes, workspace constraints, and user instructions.
+`.skills-seed/context/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable project context. Use it for persistent project notes, team rules, glossary entries, and workspace constraints.
 
 Common paths:
 
 | Path | Purpose |
 |---|---|
-| `.skills-seed/prompts/project/project-profile.md` | Project facts merged into related prompts |
-| `.skills-seed/prompts/project/common.md` | Common project constraints merged into related prompts |
-| `.skills-seed/prompts/project/<prompt-id>.md` | Optional project-level fragment for one prompt |
-| `.skills-seed/prompts/workspace/<prompt-id>.md` | Workspace-level fragment, for example `skill-workspace-profile.md` |
-| `.skills-seed/prompts/instructions/<prompt-id>.md` | User instructions appended to one prompt |
+| `.skills-seed/context/project.md` | Business background, external systems, and production facts not visible in code |
+| `.skills-seed/context/rules.md` | Long-lived team rules, compatibility requirements, security boundaries, and forbidden changes |
+| `.skills-seed/context/glossary.md` | Domain terms, aliases, state names, and mappings from business language to code terms |
+| `.skills-seed/context/workspace.md` | Workspace-level context, generated only in workspace mode |
 
 These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
 
-`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/prompts/`, and are not passed to `generate skills`. Put long-lived rules in `prompts/instructions/<prompt-id>.md`; use `learn current --context` or `learn current --context-path` for temporary guidance.
+`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/context/`, and are not passed to `generate skills`. Put long-lived rules in `context/rules.md`; use `learn current --context` or `learn current --context-path` for temporary guidance.
 
 ### `autofix`
 

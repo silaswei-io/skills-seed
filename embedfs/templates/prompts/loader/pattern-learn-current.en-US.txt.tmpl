@@ -118,6 +118,15 @@ Allowed categories: {{.AllowedCategories}}
 - `normal`: Default strategy. Cover the unit's main business capabilities, key technical conventions, important exceptional paths, and reusable entries, but do not lower the evidence gate for coverage.
 - `deep`: Read deeper state branches, external dependencies, exception/compensation flows, and cross-module constraints when needed. `deep` permits deeper verification; it does not permit more weak-evidence patterns. Every output still needs routing value and source evidence.
 
+# Change Profile And Candidate Budget
+
+- **Change profile**: {{if .ChangeProfile}}{{.ChangeProfile}}{{else}}normal{{end}}
+- **Unit candidate limit**: {{.LearningBudget.MaxPatternsPerUnit}}
+- **Run candidate limit**: {{.LearningBudget.MaxPatternsPerRun}}
+- **Minimum confidence**: {{printf "%.2f" .LearningBudget.MinConfidence}}
+
+When the change profile is `micro`, do not add new patterns by default unless user context explicitly asks for learning and the candidate captures a critical business invariant. When it is `minor`, output only the few highest-value candidates. Merge or drop weak candidates when the budget would be exceeded; do not split one rule into many patterns.
+
 # Time-Saving Reading Strategy
 
 - Read structural context, diffs, entry paths, and suggested code files first. Continue to direct callers, callees, or neighboring implementations only when those files are required to prove a candidate rule.
@@ -174,7 +183,10 @@ Recommended analysis order: build a business candidate inventory and source busi
 - `profile_delta.layers` must be an array of objects. Each item must be an object with `name`, `description`, `responsibilities`, and `files`; never use a string, string array, or prose paragraph. Return `[]` when there is no reliable architecture-layer delta.
 - `profile_delta.key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects. Return `[]` or omit the field when there is no evidence.
 - `business_methods[].code_location` must be an object, for example `{"current_location":"file/path:line"}`; never use a `"file/path:line"` string.
-- Plural fields such as `responsibilities`, `files`, `dependencies`, `dependents`, `key_methods`, `scope_paths`, and `evidence` must be string arrays. Put a single value in a one-element array.
+- `business_methods[].name`, `description`, `usage`, `type`, `function`, `prerequisites`, and `returns` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
+- `profile_delta.architecture`, `structure`, `dependency_graph`, `data_flow`, and `summary` must be strings. Omit the field or return an empty string when there is no delta; never use an array or object.
+- `evidence_locations[].line` must be a single 1-based integer; `evidence_locations[].confidence` must be a number in 0.0-1.0; the same applies to `patterns[].confidence` and `patterns[].frequency`.
+- Plural fields such as `key_modules[].responsibilities`, `dependencies`, `dependents`, `key_methods`, `layers[].responsibilities`, `layers[].files`, `validation_commands[].scope_paths`, and `validation_commands[].evidence` must be string arrays. Put a single value in a one-element array.
 - When unsure about a field's structure, omit the field or return an empty array instead of explaining it with a string.
 
 The `json` fenced block below documents the response structure:
@@ -207,7 +219,6 @@ The `json` fenced block below documents the response structure:
       "business_method": {
         "name": "Complete method signature",
         "code_location": {"current_location": "file/path:line"},
-        "layer": "Real responsibility layer from code evidence or project vocabulary, such as entry, orchestration, domain, data access, or utility",
         "description": "Functionality and business logic",
         "function": "Full signature with parameters and return types",
         "usage": "When to call",

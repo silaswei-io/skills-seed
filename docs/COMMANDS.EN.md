@@ -122,7 +122,7 @@ skills-templates-sha256: <hash>
 
 #### Command Overview
 
-Initialize `.skills-seed/`, default config, database, and prompt / skills templates in a Git repository. Supports both single-project and workspace modes.
+Initialize `.skills-seed/`, default config, database, project context, and skills templates in a Git repository. Supports both single-project and workspace modes.
 
 #### Command Forms
 
@@ -251,8 +251,8 @@ Learn coding patterns, business methods, and best practices from the current cod
 | `--language`, `-l` | config or auto-detect | Primary project language |
 | `--focus`, `-f` | empty | Learn only a directory or file; may be repeated, and paths must stay under the project root |
 | `--profile` | `auto` | Project profile refresh strategy: `auto`, `skip`, or `refresh` |
-| `--context` | empty | One-time guidance for this learn run, passed to the AI agent and not written to `.skills-seed/prompts/` |
-| `--context-path` | empty | Read one-time guidance for this learn run from files or directories; may be repeated and is not written to `.skills-seed/prompts/` |
+| `--context` | empty | One-time guidance for this learn run, passed to the AI agent and not written to `.skills-seed/context/` |
+| `--context-path` | empty | Read one-time guidance for this learn run from files or directories; may be repeated and is not written to `.skills-seed/context/` |
 | `--help`, `-h` | `false` | Show `learn current` help |
 
 #### `learn history` Flags
@@ -294,7 +294,7 @@ skills-seed learn history --limit 40 --batch-size 5
 4. Workspace child projects run with real concurrency according to `agent.parallelism`.
 5. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
 6. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
-7. Persistent prompt guidance belongs in `.skills-seed/prompts/instructions/<prompt-id>.md`; `--context` and `--context-path` affect only the current command.
+7. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
 8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
 9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use the embedded tree-sitter structural pre-scan configured by `learning.current.structural`; without bounded inputs, it does not scan the whole repository.
 10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
@@ -332,19 +332,18 @@ skills-seed generate skills
 skills-seed generate skills --output .agents/skills/my-project
 ```
 
-One-shot guidance is only accepted during learning, for example `skills-seed learn current --context-path .skills-seed/context.md`. `generate skills` only consumes learned project profiles, workspace profile/spec, and patterns.
+One-shot guidance is only accepted during learning, for example `skills-seed learn current --context-path .skills-seed/run-context.md`. `generate skills` only consumes learned project profiles, workspace profile/spec, patterns, and long-lived context under `.skills-seed/context/`.
 
-#### Prompt Merge Notes
+#### Project Context Notes
 
-Files under `.skills-seed/prompts/` are merged with built-in prompts; they do not replace built-in prompts. Common persistent guidance locations:
+Files under `.skills-seed/context/` are merged with built-in prompts; they do not replace built-in prompts. Common persistent guidance locations:
 
-- `.skills-seed/prompts/project/project-profile.md`: project facts.
-- `.skills-seed/prompts/project/common.md`: common project constraints.
-- `.skills-seed/prompts/project/<prompt-id>.md`: project-level fragment for one prompt.
-- `.skills-seed/prompts/workspace/<prompt-id>.md`: workspace-level fragment.
-- `.skills-seed/prompts/instructions/<prompt-id>.md`: user instructions.
+- `.skills-seed/context/project.md`: business background, external systems, and production facts not visible in code.
+- `.skills-seed/context/rules.md`: long-lived team rules, compatibility requirements, security boundaries, and forbidden changes.
+- `.skills-seed/context/glossary.md`: terms, aliases, state names, and mappings from business language to code terms.
+- `.skills-seed/context/workspace.md`: workspace-level context, generated only in workspace mode.
 
-The merge order is built-in prompt, project profile, common project constraints, project-level fragment, workspace fragment, user instructions, then a built-in final output contract. User files cannot override the final output contract; it protects the JSON / Markdown output format expected by parsers.
+The merge order is built-in prompt, `context/project.md`, `context/rules.md`, `context/glossary.md`, `context/workspace.md`, then a built-in final output contract. User files cannot override the final output contract; it protects the JSON / Markdown output format expected by parsers.
 
 #### Generated Content
 

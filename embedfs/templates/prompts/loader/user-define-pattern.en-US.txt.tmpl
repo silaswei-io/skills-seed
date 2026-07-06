@@ -49,6 +49,15 @@ Before returning JSON, validate the result internally:
 
 # Output Format
 
+## Field Type Contract
+
+- `confidence` must be a number in 0.0-1.0; `frequency` must be an integer (default 1).
+- `good_example`, `bad_example`, `rule`, `description`, and `name` must be strings.
+- `evidence_locations[].line` must be a single 1-based integer; `evidence_locations[].confidence` must be a number in 0.0-1.0.
+- `business_method.prerequisites`, `returns`, `description`, `usage`, `type`, `function`, and `name` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
+- `business_method.code_location` must be an object `{"current_location":"file/path:line"}`; never use a string.
+- When unsure about a field's structure, omit the field or return an empty array / empty string.
+
 The `json` fenced block below documents the response structure:
 
 ```json
@@ -61,6 +70,7 @@ The `json` fenced block below documents the response structure:
   "bad_example": "Code example violating the pattern",
   "rule": "Actionable rule (when X, do Y)",
   "confidence": 0.85,
+  "frequency": 1,
   "evidence_locations": [
     {
       "path": "relative/file/path",

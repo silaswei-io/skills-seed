@@ -48,6 +48,13 @@
 
 # 输出格式
 
+## 字段类型约束
+
+- `name`、`root_path`、`summary` 必须是字符串。
+- `projects`、`shared`、`contracts`、`infra`、`dependencies`、`impact_routes` 必须是数组；没有证据时返回 `[]`。
+- `projects[].frameworks`、`shared[].consumers`、`shared[].producers`、`shared[].affected_projects`、`contracts[].producers`、`contracts[].consumers`、`infra[].affected_projects`、`impact_routes[].project_ids` 必须是字符串数组。
+- 不要输出 `generated_at`，由系统自动填充。
+
 下面的 `json` 代码块用于说明返回结构：
 
 ```json

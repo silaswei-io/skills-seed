@@ -177,6 +177,8 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"UserContextPath":       userContextPath,
 		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
 		"LearningMode":          promptLearningMode(req.LearningMode),
+		"ChangeProfile":         req.ChangeProfile,
+		"LearningBudget":        req.LearningBudget,
 	}, nil
 }
 
@@ -206,5 +208,7 @@ func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *Ana
 		"UserContextPath":       userContextPath,
 		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
 		"LearningMode":          promptLearningMode(req.LearningMode),
+		"ChangeProfile":         req.ChangeProfile,
+		"LearningBudget":        req.LearningBudget,
 	}, nil
 }

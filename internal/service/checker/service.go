@@ -90,6 +90,7 @@ func (s *CheckerService) checkFilesWithDiffs(ctx context.Context, files []domain
 	if err != nil {
 		return nil, domain.NewDomainError(domain.ErrDatabase, "获取已知模式失败", err)
 	}
+	patterns = activeCheckerPatterns(patterns)
 
 	recentCommits, err := s.gitRepo.GetCommits(ctx, 10, "")
 	if err != nil {
@@ -188,12 +189,30 @@ func (s *CheckerService) getProjectContext() agent.ProjectContext {
 
 // GetPatterns 获取全部模式
 func (s *CheckerService) GetPatterns(ctx context.Context) ([]domain.Pattern, error) {
-	return s.patternRepo.GetAll(ctx)
+	patterns, err := s.patternRepo.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return activeCheckerPatterns(patterns), nil
 }
 
 // GetHighConfidencePatterns 获取高置信度模式
 func (s *CheckerService) GetHighConfidencePatterns(ctx context.Context, threshold float64) ([]domain.Pattern, error) {
-	return s.patternRepo.GetHighConfidence(ctx, threshold)
+	patterns, err := s.patternRepo.GetHighConfidence(ctx, threshold)
+	if err != nil {
+		return nil, err
+	}
+	return activeCheckerPatterns(patterns), nil
+}
+
+func activeCheckerPatterns(patterns []domain.Pattern) []domain.Pattern {
+	out := make([]domain.Pattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		if pattern.IsActive() {
+			out = append(out, pattern)
+		}
+	}
+	return out
 }
 
 // AnalyzeFiles 分析指定绝对路径文件

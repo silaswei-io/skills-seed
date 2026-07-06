@@ -304,15 +304,15 @@ func TestCmdDefaultsSkillsLocaleToEnglishAndWritesEnglishPrompts(t *testing.T) {
 	require.Equal(t, "zh-CN", configRepo.GetToolLocale())
 	require.Equal(t, "en-US", configRepo.GetSkillsLocale())
 
-	profile, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "prompts", "project", "project-profile.md"))
+	profile, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "context", "project.md"))
 	require.NoError(t, err)
-	require.Contains(t, string(profile), "# Project Profile")
-	require.NotContains(t, string(profile), "# 项目画像")
+	require.Contains(t, string(profile), "# Project Background")
+	require.NotContains(t, string(profile), "# 项目背景")
 
-	instructions, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "prompts", "instructions", "fix-generate.md"))
+	instructions, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "context", "rules.md"))
 	require.NoError(t, err)
-	require.Contains(t, string(instructions), "Add user-confirmed project constraints")
-	require.NotContains(t, string(instructions), "# 用户补充指令")
+	require.Contains(t, string(instructions), "# Team Rules")
+	require.NotContains(t, string(instructions), "# 团队规则")
 }
 
 func TestInitializeProjectDetectsFrontendLanguage(t *testing.T) {
@@ -499,7 +499,7 @@ func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
 	require.Equal(t, "go", childConfig.GetProjectConfig().Language)
 	require.Equal(t, childRoot, childConfig.GetProjectConfig().RootPath)
-	require.NoFileExists(t, filepath.Join(childRoot, ".skills-seed", "prompts", "workspace", "skill-workspace-profile.md"))
+	require.NoFileExists(t, filepath.Join(childRoot, ".skills-seed", "context", "workspace.md"))
 }
 
 func TestInitializeWorkspaceChildrenReportsExistingChildWithSameAgent(t *testing.T) {
@@ -553,9 +553,8 @@ func TestEnsureWorkspacePromptFilesDoesNotCreateChildProjectPrompts(t *testing.T
 
 	require.NoError(t, ensureWorkspacePromptFiles(seedPath, projectRoot, "demo", configRepo))
 
-	require.FileExists(t, filepath.Join(seedPath, "prompts", "workspace", "skill-workspace-profile.md"))
-	require.FileExists(t, filepath.Join(seedPath, "prompts", "workspace", "skill-workspace-spec.md"))
-	_, err = os.Stat(filepath.Join(seedPath, "prompts", "projects", "backend"))
+	require.FileExists(t, filepath.Join(seedPath, "context", "workspace.md"))
+	_, err = os.Stat(filepath.Join(seedPath, "context", "projects", "backend"))
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
@@ -575,15 +574,13 @@ func TestEnsureWorkspacePromptFilesDoesNotWriteRuntimePathPlaceholders(t *testin
 
 	require.NoError(t, ensureWorkspacePromptFiles(seedPath, projectRoot, "hsm-workspace", configRepo))
 
-	for _, name := range []string{"skill-workspace-profile.md", "skill-workspace-spec.md"} {
-		content, err := os.ReadFile(filepath.Join(seedPath, "prompts", "workspace", name))
-		require.NoError(t, err)
-		text := string(content)
-		require.Contains(t, text, "hsmwebapi")
-		require.NotContains(t, text, "<workspace-input-file>")
-		require.NotContains(t, text, "<workspace-profile-file>")
-		require.NotContains(t, text, "<user-context-path>")
-	}
+	content, err := os.ReadFile(filepath.Join(seedPath, "context", "workspace.md"))
+	require.NoError(t, err)
+	text := string(content)
+	require.Contains(t, text, "hsmwebapi")
+	require.NotContains(t, text, "<workspace-input-file>")
+	require.NotContains(t, text, "<workspace-profile-file>")
+	require.NotContains(t, text, "<user-context-path>")
 }
 
 func initGitDir(t *testing.T, root string) {

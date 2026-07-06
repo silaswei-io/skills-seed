@@ -32,11 +32,13 @@ func (s *GeneratorService) patternGenerationInsights(ctx context.Context, patter
 }
 
 func rankPatternsForGeneration(patterns []domain.Pattern, insights map[string]domain.PatternInsight) []domain.Pattern {
+	patterns = activePatterns(patterns)
 	return domain.RankPatternsForGeneration(patterns, insights)
 }
 
 // calculateStats 计算统计信息
 func (s *GeneratorService) calculateStats(patterns []domain.Pattern) *Stats {
+	patterns = activePatterns(patterns)
 	stats := &Stats{
 		Total:      len(patterns),
 		ByCategory: make(map[string][]domain.Pattern),
@@ -70,4 +72,14 @@ func (s *GeneratorService) calculateStats(patterns []domain.Pattern) *Stats {
 	}
 
 	return stats
+}
+
+func activePatterns(patterns []domain.Pattern) []domain.Pattern {
+	out := make([]domain.Pattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		if pattern.IsActive() {
+			out = append(out, pattern)
+		}
+	}
+	return out
 }

@@ -319,6 +319,8 @@ type AnalyzeCurrentCodebaseRequest struct {
 	KnownPatternsJSON  string
 	KnownPatternsCount int
 	UserContext        string
+	ChangeProfile      string
+	LearningBudget     config.LearningBudget
 }
 
 // AnalyzeCurrentCodebaseResult 当前代码库分析结果
@@ -334,10 +336,12 @@ type AnalyzeCurrentCodebaseBatchUnit struct {
 }
 
 type AnalyzeCurrentCodebaseBatchOptions struct {
-	RuntimeLabel string
-	LearningMode config.LearningMode
-	RunContext   *CodebaseRunContext
-	Units        []AnalyzeCurrentCodebaseBatchUnit
+	RuntimeLabel   string
+	LearningMode   config.LearningMode
+	ChangeProfile  string
+	LearningBudget config.LearningBudget
+	RunContext     *CodebaseRunContext
+	Units          []AnalyzeCurrentCodebaseBatchUnit
 }
 
 type AnalyzeCurrentCodebaseUnitResult struct {
@@ -438,6 +442,8 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		SampleFiles:       req.SampleFiles,
 		DiffFiles:         req.DiffFiles,
 		UserContext:       req.UserContext,
+		ChangeProfile:     req.ChangeProfile,
+		LearningBudget:    req.LearningBudget,
 	}
 
 	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
@@ -503,6 +509,8 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		Structure:         runContext.ProjectStructure,
 		MainFiles:         append([]string(nil), runContext.MainFiles...),
 		UserContext:       runtimecontext.UserContext(ctx),
+		ChangeProfile:     opts.ChangeProfile,
+		LearningBudget:    opts.LearningBudget,
 		StructuralContext: "",
 	}
 
