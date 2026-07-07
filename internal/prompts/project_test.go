@@ -149,35 +149,3 @@ func TestEnsureProjectContextWritesContextWithoutAnalysisCommands(t *testing.T) 
 	require.NotContains(t, text, "分析目标")
 	require.NotContains(t, text, "输出目标")
 }
-
-func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
-	data := WorkspaceContextData{
-		WorkspaceName: "hsm-workspace",
-		WorkspaceRoot: "/tmp/hsm-workspace",
-		Projects: []WorkspaceContextProject{
-			{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"},
-		},
-		Locale: "zh-CN",
-	}
-
-	profile, err := renderWorkspaceTemplate("skill-workspace-profile", "zh-CN", data)
-	require.NoError(t, err)
-	spec, err := renderWorkspaceTemplate("skill-workspace-spec", "zh-CN", data)
-	require.NoError(t, err)
-
-	require.Contains(t, profile, "`hsmwebapi`: `hsmwebapi`")
-	require.NotContains(t, profile, "<workspace-input-file>")
-	require.NotContains(t, profile, "<workspace-profile-file>")
-	require.NotContains(t, profile, "<user-context-path>")
-	require.NotContains(t, profile, "workspace-input.json")
-	require.NotContains(t, profile, "workspace-profile.json")
-	require.NotContains(t, profile, "user-context.md")
-	require.NotContains(t, profile, "hsmwebapi 是主后端")
-	require.NotContains(t, spec, "<workspace-input-file>")
-	require.NotContains(t, spec, "<workspace-profile-file>")
-	require.NotContains(t, spec, "<user-context-path>")
-	require.NotContains(t, spec, "workspace-input.json")
-	require.NotContains(t, spec, "workspace-profile.json")
-	require.NotContains(t, spec, "user-context.md")
-	require.NotContains(t, spec, "kmip-go 提供 KMIP 能力")
-}

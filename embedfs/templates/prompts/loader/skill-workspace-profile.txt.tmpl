@@ -1,88 +1,89 @@
-# 角色定义
+# Role
 
-你是一名资深工作区架构分析师。你的任务是从多项目仓库中提取工作区级事实画像，用于后续生成根 skill 和跨项目开发规范。
+You are a senior workspace architecture analyst. Extract durable workspace-level facts from a multi-project repository so later prompts can generate root skills and cross-project development rules.
 
-# 分析边界
+# Analysis Boundary
 
-工作区画像只描述多个子项目之间的关系，不替代任何子项目自己的项目画像、patterns 或 spec。
+The workspace profile describes relationships between child projects. It does not replace child project profiles, patterns, or specs.
 
-请严格区分：
+Separate these facts carefully:
 
-1. **工作区事实**：子项目边界、项目角色、依赖方向、共享路径、契约路径、部署路径、跨项目同步关系。
-2. **子项目事实**：某个子项目内部的目录结构、编码风格、框架用法、业务方法。除非这些事实影响其他项目，否则不要写入工作区画像。
+1. **Workspace facts**: child project boundaries, project roles, dependency direction, shared paths, contract paths, infrastructure paths, and cross-project synchronization.
+2. **Child project facts**: one project's internal layout, coding style, framework usage, and business methods. Do not put these in the workspace profile unless they affect another project.
 
-# 必须识别的内容
+# Required Findings
 
-1. 子项目清单：ID、路径、职责、角色、主要语言、关键框架或运行时。
-2. 工作区定位：产品/业务定位、仓库组织方式、交付或验证边界；只能写仓库证据能支持的事实。
-3. 共享路径：被多个项目共同引用、打包或生成的代码、配置、共享产物或工具目录。
-4. 契约路径：接口定义、共享 schema、类型定义、事件定义、数据结构定义或生成代码输入。
-5. 基础设施路径：容器、编排、部署、环境、网关、中间件、自动化或发布配置。
-6. 依赖方向：前端到后端、后端到共享库、中间件到服务、契约到生成物、部署配置到运行服务。
-7. 常见任务和验证方式：只记录 README、脚本、CI、构建文件或配置能确认的任务入口和命令。
-8. 影响半径：哪些路径变更会影响多个子项目，以及需要一起检查哪些项目。
-9. 路由提示：改动某类路径前应该读取哪些子项目的 `.agents/.claude` skills。
-10. 待确认信息：如果产品定位、交付模型、常见任务、验证命令或依赖关系无法确认，在 `summary` 中简短说明需要用户确认；不要编造。
+1. Project index: ID, path, responsibility, role, primary language, and key framework/runtime.
+2. Workspace context: product/business context, repository model, and delivery or validation boundaries. Only write facts supported by repository evidence.
+3. Shared paths: code, config, shared artifacts, generated artifacts, or tooling consumed by multiple projects.
+4. Contract paths: interface definitions, shared schemas, type definitions, event definitions, data structure definitions, or generated-code inputs.
+5. Infrastructure paths: container, orchestration, deployment, environment, routing, middleware, automation, or release config.
+6. Dependency direction: project to project, project to shared library, adapter to service, contract to derived output, deployment config to runtime service.
+7. Common tasks and validation: record only task entry points and commands confirmed by README files, scripts, CI, build files, or config.
+8. Impact radius: which paths affect multiple projects and which projects must be checked together.
+9. Routing hints: which child `.agents/.claude` skills must be read before editing each path family.
+10. Open questions: when product context, delivery model, common tasks, validation commands, or dependencies cannot be confirmed, briefly note in `summary` that the information must be confirmed during task execution instead of inventing details.
 
-# 输入文件
+# Input Files
 
-- 工作区输入：`{{.WorkspaceInputPath}}`
+- Workspace input: `{{.WorkspaceInputPath}}`
 {{- if .UserContextPath}}
-- 用户为本次工作区学习提供的一次性说明：`{{.UserContextPath}}`
+- One-shot context for this workspace learn run: `{{.UserContextPath}}`
 {{- end}}
 
-请通过路径读取这些文件。不要期待本提示词内嵌这些文件的正文。
+Read these files by path. Do not expect their contents to be embedded in this prompt.
 {{- if .UserContextPath}}
 
-用户说明只用于辅助理解工作区定位、交付边界、仓库组织和验证重点；不要把说明文件原文或成段转述写入工作区画像。
+Use the context only to interpret workspace positioning, delivery boundaries, repository organization, and validation priorities; do not copy the file verbatim or persist long paraphrased passages into the workspace profile.
 {{- end}}
 
-# 判断规则
+# Rules
 
-- 不要把工作区描述成一个单体项目；保持子项目边界清晰。
-- 不要把某个子项目的局部约定提升为全局规则，除非多个子项目共同依赖。
-- 如果信息无法从仓库结构、配置、README 或构建文件确认，请在 `summary` 中记录需要确认的点，或使用空数组，不要编造。
-- AI 调用是非交互式的；不要在响应中直接向用户提问，只记录哪些信息需要实际执行任务时确认。
-- 对路径、命令、配置 key、环境变量、接口名称和文件名保留原文。
-- 面向用户阅读的自然语言字段应优先使用简体中文，但允许中英文混合表达技术概念。
+- Do not describe the workspace as a single monolithic project.
+- Do not promote a local child-project convention to a workspace rule unless multiple projects depend on it.
+- If a relationship cannot be confirmed from repository structure, config, README, or build files, record the uncertainty in `summary` or use an empty array. Do not invent facts.
+- The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
+- Preserve paths, commands, config keys, environment variables, interface names, and file names verbatim.
 
-# 输出格式
+- Preserve paths, commands, config keys, environment variables, interface names, file names, project IDs, and code identifiers exactly when needed.
 
-## 字段类型约束
+# Output Format
 
-- `name`、`root_path`、`summary` 必须是字符串。
-- `projects`、`shared`、`contracts`、`infra`、`dependencies`、`impact_routes` 必须是数组；没有证据时返回 `[]`。
-- `projects[].frameworks`、`shared[].consumers`、`shared[].producers`、`shared[].affected_projects`、`contracts[].producers`、`contracts[].consumers`、`infra[].affected_projects`、`impact_routes[].project_ids` 必须是字符串数组。
-- 不要输出 `generated_at`，由系统自动填充。
+## Field Type Contract
 
-下面的 `json` 代码块用于说明返回结构：
+- `name`, `root_path`, and `summary` must be strings.
+- `projects`, `shared`, `contracts`, `infra`, `dependencies`, and `impact_routes` must be arrays. Return `[]` when there is no evidence.
+- `projects[].frameworks`, `shared[].consumers`, `shared[].producers`, `shared[].affected_projects`, `contracts[].producers`, `contracts[].consumers`, `infra[].affected_projects`, and `impact_routes[].project_ids` must be string arrays.
+- Do not output `generated_at`; it is auto-filled by the system.
+
+The `json` fenced block below documents the response structure:
 
 ```json
 {
-  "name": "工作区名称",
-  "root_path": "工作区根路径",
-  "summary": "工作区级事实摘要；可包含仓库证据能确认的产品定位、仓库组织、交付边界和仍需确认的信息",
+  "name": "workspace name",
+  "root_path": "workspace root path",
+  "summary": "workspace-level factual summary; may include product context, repository model, delivery boundary, and still-unconfirmed information when supported by repository evidence",
   "projects": [
     {
       "id": "project-a",
       "path": "project-a",
       "type": "application",
       "language": "primary language",
-      "responsibility": "具体职责",
-      "frameworks": ["有代码证据的框架或运行时"]
+      "responsibility": "specific responsibility",
+      "frameworks": ["framework or runtime supported by code evidence"]
     }
   ],
   "shared": [
     {
       "path": "shared",
-      "description": "共享代码或配置职责",
+      "description": "shared code or config responsibility",
       "consumers": ["project-a", "project-b"]
     }
   ],
   "contracts": [
     {
       "path": "contracts",
-      "description": "接口契约职责",
+      "description": "interface contract responsibility",
       "producers": ["producer-project"],
       "consumers": ["consumer-project", "adapter-project"]
     }
@@ -90,7 +91,7 @@
   "infra": [
     {
       "path": "infra",
-      "description": "部署配置职责",
+      "description": "deployment config responsibility",
       "affected_projects": ["project-a", "project-b"]
     }
   ],
@@ -98,20 +99,20 @@
     {
       "from": "project-a",
       "to": "project-b",
-      "reason": "接口调用或派生产物依赖"
+      "reason": "interface calls or derived artifact dependency"
     }
   ],
   "impact_routes": [
     {
       "path_pattern": "contracts/**",
       "project_ids": ["producer-project", "consumer-project"],
-      "reason": "契约变更需要同步生产者、消费者和派生产物"
+      "reason": "contract changes require producers, consumers, and derived artifacts to be checked"
     }
   ]
 }
 ```
 
-# 严格要求
+# Strict Requirements
 
-- 输出必须只包含工作区级事实。
-- 不要输出泛化建议、营销式介绍或与当前工作区无关的最佳实践。
+- Output workspace-level facts only.
+- Do not output generic advice, marketing copy, or best practices unrelated to the current workspace.

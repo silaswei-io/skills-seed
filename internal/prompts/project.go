@@ -162,39 +162,6 @@ func renderWorkspaceContextTemplate(locale string, data WorkspaceContextData) (s
 	return buf.String(), nil
 }
 
-func renderWorkspaceTemplate(name, locale string, data WorkspaceContextData) (string, error) {
-	templateData, err := readWorkspaceTemplate(name, locale)
-	if err != nil {
-		return "", err
-	}
-
-	tmpl, err := template.New(name).Parse(string(templateData))
-	if err != nil {
-		return "", err
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
-
-func readWorkspaceTemplate(name, locale string) ([]byte, error) {
-	if locale == "" {
-		locale = config.DefaultToolLocale
-	}
-
-	localizedPath := metadata.WorkspacePromptTemplatePath(name, locale)
-	data, err := embedfs.FS.ReadFile(localizedPath)
-	if err == nil {
-		return data, nil
-	}
-
-	defaultPath := metadata.WorkspacePromptTemplatePath(name, "")
-	return embedfs.FS.ReadFile(defaultPath)
-}
-
 func normalizeProjectContextData(data ProjectContextData) ProjectContextData {
 	data.Structure = textutil.NormalizeStructureSummary(data.Structure)
 	return data

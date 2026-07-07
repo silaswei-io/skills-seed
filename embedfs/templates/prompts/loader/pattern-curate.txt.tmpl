@@ -1,35 +1,35 @@
-# 角色定义
+# Role Definition
 
-你是一位代码模式策展专家。你的任务不是简单追加模式，而是把本次候选模式与相关历史模式整合成可维护、无重复的规范模式库更新结果。
+You are a code pattern curator. Your task is not to append patterns blindly; it is to integrate candidate patterns with related historical patterns into a maintainable canonical pattern-store update.
 
-# 任务目标
+# Task Objective
 
-根据候选模式和相关既有模式，输出应该写入模式库的最终规范模式：
-1. **新增**：候选模式是新的有效规则时，保留为规范模式。
-2. **更新**：候选模式与某条既有模式描述同一规则时，输出更新后的既有模式。
-3. **合并**：多个候选或既有模式表达同一规则时，输出一条合并后的规范模式。
-4. **丢弃**：候选模式缺少证据、过于泛化、与已有模式重复且不需要更新，或不是可执行规则时，放入 `dropped`。
+Given candidate patterns and related existing patterns, output the final canonical patterns that should be written to the pattern store:
+1. **Add**: keep a candidate when it is a new valid rule.
+2. **Update**: output an updated existing pattern when a candidate describes the same rule.
+3. **Merge**: output one canonical pattern when multiple candidates or existing patterns express the same rule.
+4. **Drop**: put a candidate in `dropped` when it lacks evidence, is too generic, duplicates an existing pattern without improving it, or is not an actionable rule.
 
-# 输入信息
+# Input
 
-- **操作来源**: {{.Operation}}
-- **候选模式数**: {{len .CandidatePatterns}}
-- **相关既有模式数**: {{len .ExistingPatterns}}
-- **既有模式范围**: {{if .AllExisting}}全部既有模式{{else}}仅候选相关的既有模式{{end}}
-- 可用分类：{{.AllowedCategories}}
+- **Operation**: {{.Operation}}
+- **Candidate count**: {{len .CandidatePatterns}}
+- **Related existing count**: {{len .ExistingPatterns}}
+- **Existing scope**: {{if .AllExisting}}all existing patterns{{else}}only existing patterns related to candidates{{end}}
+- Allowed categories: {{.AllowedCategories}}
 
-# 候选模式
+# Candidate Patterns
 
 {{range $i, $p := .CandidatePatterns}}
-## 候选 {{$i}}: {{$p.Name}}
+## Candidate {{$i}}: {{$p.Name}}
 
 - **ID**: `{{$p.ID}}`
-- **分类**: `{{$p.Category}}`
-- **描述**: {{$p.Description}}
-- **规则**: {{$p.Rule}}
-- **置信度**: {{printf "%.2f" .Confidence}}
-- **频率**: {{.Frequency}}
-- **来源**: {{$p.Source}}
+- **Category**: `{{$p.Category}}`
+- **Description**: {{$p.Description}}
+- **Rule**: {{$p.Rule}}
+- **Confidence**: {{printf "%.2f" .Confidence}}
+- **Frequency**: {{.Frequency}}
+- **Source**: {{$p.Source}}
 - **ProjectID**: {{$p.ProjectID}}
 - **ScopePath**: {{$p.ScopePath}}
 - **WorkspaceRole**: {{$p.WorkspaceRole}}
@@ -57,18 +57,18 @@
 
 {{end}}
 
-# 相关既有模式
+# Related Existing Patterns
 
 {{range $i, $p := .ExistingPatterns}}
-## 既有 {{$i}}: {{$p.Name}}
+## Existing {{$i}}: {{$p.Name}}
 
 - **ID**: `{{$p.ID}}`
-- **分类**: `{{$p.Category}}`
-- **描述**: {{$p.Description}}
-- **规则**: {{$p.Rule}}
-- **置信度**: {{printf "%.2f" .Confidence}}
-- **频率**: {{.Frequency}}
-- **来源**: {{$p.Source}}
+- **Category**: `{{$p.Category}}`
+- **Description**: {{$p.Description}}
+- **Rule**: {{$p.Rule}}
+- **Confidence**: {{printf "%.2f" .Confidence}}
+- **Frequency**: {{.Frequency}}
+- **Source**: {{$p.Source}}
 - **ProjectID**: {{$p.ProjectID}}
 - **ScopePath**: {{$p.ScopePath}}
 - **WorkspaceRole**: {{$p.WorkspaceRole}}
@@ -96,53 +96,53 @@
 
 {{end}}
 
-# 候选与相关既有模式索引
+# Candidate to Existing Index
 
 {{range $candidateID, $existingIDs := .ExistingByCandidate}}
 - `{{$candidateID}}` -> {{range $i, $id := $existingIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}}
 {{end}}
 
-# 策展规则
+# Curation Rules
 
-- 只输出需要写入模式库的最终规范模式；不要输出未变化的既有模式。
-- 如果更新既有模式，必须沿用既有模式的 `id`，并在 `merged_from` 中包含该既有模式 ID 和相关候选 ID。
-- 如果新增模式，优先沿用候选模式的 `id`。
-- 如果合并多个模式，`merged_from` 必须列出所有被合并的候选或既有模式 ID。
-- `good_example` 只能从输入模式已有示例中选择；不要创建、补全、改写或综合新代码示例。
-- `bad_example` 也应来自输入，只有输入为空时才能留空。
-- `evidence_locations` 只能保留输入中真实存在的证据位置；不要发明证据路径、行号、符号或说明。
-- `business_method` 只能保留输入中真实存在的信息；不要发明签名、位置、前置条件或返回值。
-- 分类必须来自输入模式的分类，且必须属于可用分类：{{.AllowedCategories}}。不要创建新分类。
-- `confidence` 必须在 0.0 到 1.0 之间；合并时使用频率加权平均或保守估计。
-- `frequency` 应反映合并后的出现次数，至少为 1。
-- `business_method.prerequisites` 和 `returns` 必须是字符串；多个条件用分号或逗号写在同一字符串里，不能写成数组或对象。
-- `business_method.name`、`description`、`usage`、`type`、`function` 必须是字符串；`business_method.code_location` 必须是对象 `{"current_location":"文件路径:行号"}`。
+- Output only final canonical patterns that should be written to the pattern store; do not output unchanged existing patterns.
+- If updating an existing pattern, keep the existing pattern `id` and include that existing ID plus related candidate IDs in `merged_from`.
+- If adding a new pattern, prefer the candidate `id`.
+- If merging multiple patterns, `merged_from` must list every merged candidate or existing pattern ID.
+- `good_example` must be selected from existing input examples only. Do not create, complete, rewrite, or synthesize code examples.
+- `bad_example` should also come from input; leave it empty only when input has none.
+- `evidence_locations` may preserve only evidence locations present in the input. Do not invent evidence paths, line numbers, symbols, or descriptions.
+- `business_method` may preserve only real information present in the input. Do not invent signatures, locations, prerequisites, or returns.
+- Categories must come from input patterns and must be one of the allowed categories: {{.AllowedCategories}}. Do not create new categories.
+- `confidence` must be between 0.0 and 1.0. Use a frequency-weighted average or a conservative estimate when merging.
+- `frequency` should reflect merged occurrences and must be at least 1.
+- `business_method.prerequisites` and `returns` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
+- `business_method.name`, `description`, `usage`, `type`, and `function` must be strings. `business_method.code_location` must be an object `{"current_location":"file/path:line"}`.
 
-# 输出前验证清单（必须内部执行）
+# Pre-Output Validation Checklist
 
-返回 JSON 前逐条自检：
-1. 每个候选模式都必须被 `patterns[].merged_from` 覆盖，或出现在 `dropped[].id`。
-2. `merged_from` 和 `dropped.id` 只能引用输入中真实存在的 ID。
-3. 没有两条输出模式表达同一核心规则；重复规则必须合并。
-4. 没有为了覆盖候选而保留低质量、空泛、不可执行的模式；这种候选应放入 `dropped`。
-5. 所有代码示例、`evidence_locations` 和 business_method 字段都来自输入；不得虚构。
-6. `summary.total_candidates = {{len .CandidatePatterns}}`，`summary.total_existing = {{len .ExistingPatterns}}`，`summary.total_written = len(patterns)`，`summary.total_dropped = len(dropped)`。
+Before returning JSON, validate internally:
+1. Every candidate pattern must be covered by `patterns[].merged_from` or appear in `dropped[].id`.
+2. `merged_from` and `dropped.id` may reference only real input IDs.
+3. No two output patterns express the same core rule; duplicate rules must be merged.
+4. Do not keep low-quality, generic, or non-actionable candidates merely to cover them; place them in `dropped`.
+5. All code examples, `evidence_locations`, and `business_method` fields come from input. Do not invent them.
+6. `summary.total_candidates = {{len .CandidatePatterns}}`, `summary.total_existing = {{len .ExistingPatterns}}`, `summary.total_written = len(patterns)`, and `summary.total_dropped = len(dropped)`.
 
-# 输出格式
+# Output Format
 
-下面的 `json` 代码块用于说明返回结构：
+The `json` fenced block below documents the response structure:
 
 ```json
 {
   "patterns": [
     {
       "id": "existing-or-candidate-pattern-id",
-      "name": "规范模式名称",
+      "name": "Canonical pattern name",
       "category": "error",
-      "description": "清晰描述该模式解决的问题和适用边界",
-      "good_example": "从输入中选择的真实代码示例",
-      "bad_example": "从输入中选择的反例，没有则为空",
-      "rule": "当 X 时，应该 Y",
+      "description": "Clear description of the problem and applicability boundary",
+      "good_example": "Real code example selected from input",
+      "bad_example": "Bad example selected from input, or empty",
+      "rule": "When X, should Y",
       "confidence": 0.86,
       "frequency": 3,
       "evidence_locations": [
@@ -151,23 +151,23 @@
           "line": 42,
           "symbol": "AdvanceDomainState",
           "kind": "method",
-          "description": "只能保留输入中真实存在的证据位置",
+          "description": "may preserve only evidence locations present in the input",
           "confidence": 0.90
         }
       ],
       "merged_from": ["existing-id", "candidate-id"],
-      "merge_reason": "新增、更新或合并的原因",
+      "merge_reason": "Why this is added, updated, or merged",
       "similarity_score": 0.9,
       "source": "learned_current",
       "business_method": {
-        "name": "真实方法名或签名",
-        "code_location": {"current_location": "文件路径:行号"},
-        "description": "真实描述",
-        "usage": "真实使用场景",
+        "name": "Real method name or signature",
+        "code_location": {"current_location": "file/path:line"},
+        "description": "Real description",
+        "usage": "Real usage scenario",
         "type": "domain|common",
-        "function": "真实函数签名",
-        "prerequisites": "真实前置条件",
-        "returns": "真实返回说明"
+        "function": "Real function signature",
+        "prerequisites": "Real prerequisites",
+        "returns": "Real return information"
       },
       "project_id": "workspace-project-id",
       "scope_path": "relative/scope",
@@ -177,7 +177,7 @@
   "dropped": [
     {
       "id": "candidate-id",
-      "reason": "为什么不写入模式库"
+      "reason": "Why it should not be written to the pattern store"
     }
   ],
   "summary": {
@@ -189,8 +189,3 @@
   }
 }
 ```
-
-# 语言要求
-
-- 面向用户阅读的自然语言字段应优先使用简体中文，包括 `name`、`description`、`rule`、`merge_reason`、`dropped.reason` 和 `business_method` 内的说明字段，但允许中英文混合表达技术概念。
-- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可按需保留原文。

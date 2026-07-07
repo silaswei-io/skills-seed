@@ -365,7 +365,7 @@ These files are merged with built-in prompts; they do not replace built-in promp
 | Field | Default | Description |
 |---|---:|---|
 | `target` | `agent.engine` | Generated Skills target type; can differ from `agent.engine` |
-| `locale` | `en-US` | Generated Skills, AI prompts, and natural-language content persisted into Skills |
+| `locale` | `en-US` | AI learning output, generated Skills, and natural-language content persisted into Skills |
 | `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills output directory |
 | `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills output directory |
 
@@ -373,8 +373,10 @@ These files are merged with built-in prompts; they do not replace built-in promp
 
 1. `generate skills` uses `skills.paths` for the current `skills.target` by default.
 2. Use `skills-seed generate skills --output <path>` to override the output directory for one run.
-3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; `profile.locale` no longer controls AI prompt or Skills content language.
+3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; runtime prompt templates stay English, and `profile.locale` does not control AI output or Skills content language.
 4. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
+
+Starting in 0.13.0, runtime AI prompt templates are maintained as English-only source templates. The output language is injected through the final output contract from `skills.locale`; `profile.locale` only affects tool output and config-template language.
 
 ### `logging`
 

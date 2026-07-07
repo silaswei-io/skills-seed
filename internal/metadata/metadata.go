@@ -13,7 +13,7 @@ import (
 
 const (
 	// ProgramVersion 是 `skills-seed --version` 展示的 CLI 版本
-	ProgramVersion = "v0.12.2"
+	ProgramVersion = "v0.13.0"
 
 	UnavailableHash = "unavailable"
 
@@ -24,7 +24,6 @@ const (
 	LoaderTemplateProvider = "loader"
 	// PromptAppendTemplateProvider 是运行时提示词尾部追加约束模板目录。
 	PromptAppendTemplateProvider = "append"
-	WorkspaceTemplateProvider    = "workspace"
 
 	PromptTemplateExt         = ".txt.tmpl"
 	PromptMarkdownTemplateExt = ".md.tmpl"
@@ -75,15 +74,6 @@ func PromptAppendTemplatePath(name, locale string) string {
 		fileName = name + "." + templateLocaleSuffix(locale) + PromptTemplateExt
 	}
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, PromptAppendTemplateProvider, fileName))
-}
-
-// WorkspacePromptTemplatePath 返回工作区提示词模板路径
-func WorkspacePromptTemplatePath(name, locale string) string {
-	fileName := name + PromptMarkdownTemplateExt
-	if templateLocaleSuffix(locale) != "" {
-		fileName = name + "." + templateLocaleSuffix(locale) + PromptMarkdownTemplateExt
-	}
-	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, WorkspaceTemplateProvider, fileName))
 }
 
 // SkillsTemplatePath 返回 Skills 模板路径

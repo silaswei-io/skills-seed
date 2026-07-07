@@ -1,40 +1,40 @@
-# 角色定义
+# Role Definition
 
-你是一名资深软件架构师。请基于提供的项目上下文，生成用于技能文档的结构化项目概览。
+You are a senior software architect. Analyze the provided project context and return a structured project overview for generated skill documentation.
 
-本模板只负责项目画像：项目定位、目录结构、架构层次、模块职责、依赖关系、入口文件、配置和验证命令。不要在这里学习或归纳业务模式；业务规则、状态流转、跨实体编排等模式由 learn 模板负责。
+This template is only for the project profile: project purpose, directory structure, architecture layers, module responsibilities, dependency relationships, entry files, configuration, and validation commands. Do not learn or summarize business patterns here; business rules, state transitions, and cross-entity orchestration belong to the learn templates.
 
-# 词汇中立原则
+# Vocabulary Neutrality
 
-- 本模板中的“入口、模块、配置、验证命令、工具、业务方法”等词只表示抽象画像字段，不代表任何特定语言、框架、目录名或业务域。
-- 不要把模板示例中的技术名词、目录名或命令类型当作项目事实写入输出。具体框架、库、路径、命令和业务名词必须来自当前项目证据。
+- Terms in this template such as entry, module, configuration, validation command, utility, and business method are abstract profile fields. They do not imply any specific language, framework, directory name, or business domain.
+- Do not write technology names, directory names, or command types from template examples as project facts. Concrete frameworks, libraries, paths, commands, and business terms must come from current project evidence.
 
-# 项目信息
+# Project Information
 
-- **项目名称**: {{.ProjectName}}
-- **项目路径**: {{.RootPath}}
-- **主要语言**: {{.Language}}
+- **Project Name**: {{.ProjectName}}
+- **Project Path**: {{.RootPath}}
+- **Primary Language**: {{.Language}}
 {{- if .StructurePath}}
 
-# 项目目录结构
+# Project Directory Structure
 
-项目目录结构摘要位于 `{{.StructurePath}}`。请按路径读取，并仅把它作为本次允许分析范围和目录归属线索；如果下方提供了变更或聚焦路径，不要因为该文件中出现路径线索而扩展到未列入范围的文件，除非它们是判断调用关系所必需的直接相关文件。
+Project structure summary is available at `{{.StructurePath}}`. Read it by path and use it only as the allowed analysis boundary and directory ownership clue for this run. If changed or focused paths are provided below, do not expand into files outside those paths just because this structure file mentions path clues, unless they are directly related files required to confirm call relationships.
 {{- end}}
 {{- if .StructuralContextPath}}
 
-# 结构化上下文
+# Structural Context
 
-结构化上下文位于 `{{.StructuralContextPath}}`。请把它作为符号、导入、入口点和模块线索的结构化证据，用它来优先判断需要查看的文件；涉及调用关系、具体业务行为或代码示例时，仍需要按路径读取源码确认。
+Structural context is available at `{{.StructuralContextPath}}`. Treat it as structured evidence for symbols, imports, entry points, and module clues. Use it to prioritize files, but still read source files to confirm call relationships, detailed business behavior, or exact examples.
 {{- end}}
 {{- if .UserContextPath}}
 
-# 用户提供的上下文
+# User-Provided Context
 
-用户为本次学习提供的一次性业务、交付、仓库组织或验证说明位于 `{{.UserContextPath}}`。请按路径读取，并用于辅助理解、消歧和形成本次项目画像结论；不要把该文件原文或成段转述直接写入项目画像。
+One-shot user-provided context for this learn run is available at `{{.UserContextPath}}`. Read it by path and use it to interpret, disambiguate, and form this project profile; do not copy the file verbatim or persist long paraphrased passages from it into the project profile.
 {{- end}}
 {{- if .MainFiles}}
 
-# 入口文件
+# Entry Files
 
 {{range .MainFiles}}
 - {{.}}
@@ -42,129 +42,125 @@
 {{- end}}
 {{- if .ReadmePath}}
 
-# README 文件
+# README File
 
 - {{.ReadmePath}}
 {{- end}}
 {{- if .ExistingProfilePath}}
 
-# 已有项目画像
+# Existing Project Profile
 
-本次是增量刷新。请以已有画像作为基线；如果提供了 focus 路径，只检查这些路径和直接相关文件；最终仍返回一份完整合并后的项目画像 JSON
+Treat this run as an incremental refresh. Use the existing profile as the baseline, inspect only focused paths and directly related files when focus paths are provided, and return one complete merged profile JSON
 
-已有项目画像 JSON 位于 `{{.ExistingProfilePath}}`。请按路径读取。
+Existing project profile JSON is available at `{{.ExistingProfilePath}}`. Read it by path.
 {{- end}}
 {{- if .FocusPaths}}
 
-# 变更或聚焦路径
+# Changed Or Focused Paths
 
 {{range .FocusPaths}}
 - {{.}}
 {{- end}}
 {{- end}}
 
-# 分析要求
+# Analysis Requirements
 
-请识别：
+Identify:
 
-1. 技术栈、框架和关键依赖。
-2. 架构层次和模块职责。
-3. 模块依赖图和关键数据流。
-4. 通用工具方法和配置模式。
-5. 项目中明确记录的验证命令。
-6. 如已有项目画像中存在 `business_methods`，保留仍有证据支撑的条目；否则只记录真实可复用的业务/工具入口，不要为了填充画像而新增普通启动、脚手架或基础设施方法。
+1. Technology stack, frameworks, and important dependencies.
+2. Architecture layers and module responsibilities.
+3. Module dependency graph and key data flow.
+4. Common utilities and configuration patterns.
+5. Validation commands explicitly documented by project evidence.
+6. If an existing project profile already contains `business_methods`, preserve entries that are still supported by evidence; otherwise record only real reusable business or utility entry points, and do not add ordinary startup, scaffolding, or infrastructure methods just to fill the profile.
 
-你运行在项目根目录中，请按路径自行读取入口文件、README 和必要源码。不要编造上下文中无法确认的信息。如果信息不足，对应数组留空，或在相关描述里使用简短 TODO 说明
+You are running in the project root; read entry files, the README, and necessary source files by path. Do not invent unsupported facts. If information is not visible from the project, leave the related array empty or use a concise TODO-style note in the relevant description
 
-验证命令只能来自仓库内明确证据或用户提供上下文，例如 README、脚本、任务配置、CI 配置、构建配置或已有项目画像。必须保留证据中的原始命令文本；不要根据语言、框架、文件后缀或常见习惯推断默认命令。`source` 使用仓库相对路径；若只来自用户提供上下文，写 `user_context`。`scope_paths` 记录命令实际覆盖的相对路径或目录，`evidence` 记录证明该作用域的相对路径；无法确认作用域时可以留空，但不能把局部命令描述成全局命令。没有明确证据时，`validation_commands` 返回空数组。
+Validation commands must come only from explicit repository evidence or user-provided context, such as README files, scripts, task configuration, CI configuration, build configuration, or an existing project profile. Preserve the command text exactly as evidenced. Do not infer default commands from language, framework, file extension, or common practice. Use a repository-relative path for `source`; if the evidence only comes from user-provided context, write `user_context`. Use `scope_paths` for relative paths or directories actually covered by the command, and `evidence` for relative paths proving that scope. Leave scope fields empty when the scope is genuinely unclear, but never describe a local command as global. If there is no explicit evidence, return an empty `validation_commands` array.
 
-`validation_commands` 只记录用于验证改动结果的命令，例如仓库证据明确记录的测试、检查、静态分析、构建、代码生成或契约生成命令。不要输出安装工具、创建新项目、启动服务、部署、调试、拉取依赖、运行 demo 或一次性环境准备命令；这些属于操作说明，不是验证命令。
+`validation_commands` must include only commands that validate a completed change, such as repository-evidenced tests, checks, static analysis, builds, code generation, or contract generation. Do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands; those are operating instructions, not validation commands.
 
-如果提供了已有项目画像，请保留其中未变化的模块、工具方法、业务方法、验证命令、依赖和架构信息。只有当 focus 路径或直接相关文件提供明确证据时，才更新、新增或删除画像条目。输出必须仍是完整项目画像，不要返回局部 patch。
+If an existing project profile is provided, preserve unchanged modules, utilities, business methods, validation commands, dependencies, and architecture details from it. Update, add, or remove profile entries only when the focused paths or directly related files provide clear evidence. The output must still be a complete project profile, not a partial patch.
 
-`business_methods` 不是业务模式库，也不是启动函数清单。只有在源码中能直接确认某个方法是项目级业务入口、跨模块编排入口、领域复用入口或高价值工具入口，并且完整签名和位置都明确时，才可输出；由项目源码词表确认的核心领域操作、资源生命周期、策略执行、协议/命令封装或外部依赖交互入口属于领域复用入口候选，不要仅因其位于通用命名目录、公共包、适配层或外部依赖封装中就放入 `common_utils`；不要输出普通启动、路由/入口注册、框架初始化、脚手架入口或简单记录操作；不要把业务规则、状态流转或流程细节写进画像来替代 patterns。
+`business_methods` is not the business pattern store, and it is not a startup function list. Output a method only when source code directly confirms it is a project-level business entry point, cross-module orchestration entry point, domain reusable entry point, or high-value utility entry point, and its full signature and location are clear. Core domain operations, resource lifecycles, policy execution, protocol/command wrappers, and external dependency interaction entries confirmed by the project's source vocabulary are domain reusable entry candidates. Do not place them in `common_utils` solely because they live in generally named directories, shared packages, adapters, or external-dependency wrappers. Do not output ordinary startup, route/entry registration, framework initialization, scaffolding entry points, or simple record operations. Do not put business rules, state transitions, or workflow details into the profile as a substitute for patterns.
 
-# 语言要求
 
-- 面向用户阅读的自然语言字段应优先使用简体中文，包括 `architecture`、`layers`、`dependency_graph`、`data_flow`、`framework_patterns`、`structure`、`key_modules`、`business_methods`、`common_utils`、`config_patterns`、`validation_commands.when` 和 `summary`，但允许中英文混合表达技术概念。
-- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可按源码原文保留；不要从模板示例推断具体技术栈。
+# Output Format
 
-# 输出格式
+## Field Type Contract
 
-## 字段类型约束
+- `frameworks`, `dependencies`, `framework_patterns`, `config_patterns`, `layers[].responsibilities`, `layers[].files`, `key_modules[].responsibilities`, `key_modules[].dependencies`, `key_modules[].dependents`, `key_modules[].key_methods`, `validation_commands[].scope_paths`, and `validation_commands[].evidence` must be string arrays. Put a single value in a one-element array.
+- `architecture`, `structure`, `dependency_graph`, `data_flow`, and `summary` must be strings; never use an array or object.
+- `layers`, `key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects.
+- `business_methods[].name`, `description`, `usage`, `type`, `function`, `prerequisites`, and `returns` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
+- `business_methods[].code_location` must be an object `{"current_location":"file/path:line"}`; never use a string.
+- When unsure about a field's structure, omit the field or return an empty array / empty string instead of using an object or prose paragraph.
 
-- `frameworks`、`dependencies`、`framework_patterns`、`config_patterns`、`layers[].responsibilities`、`layers[].files`、`key_modules[].responsibilities`、`key_modules[].dependencies`、`key_modules[].dependents`、`key_modules[].key_methods`、`validation_commands[].scope_paths`、`validation_commands[].evidence` 必须是字符串数组；单个值也要写成数组。
-- `architecture`、`structure`、`dependency_graph`、`data_flow`、`summary` 必须是字符串，不能写成数组或对象。
-- `layers`、`key_modules`、`common_utils`、`business_methods`、`validation_commands` 必须是对象数组。
-- `business_methods[].name`、`description`、`usage`、`type`、`function`、`prerequisites`、`returns` 必须是字符串；多个条件用分号或逗号写在同一字符串里，不能写成数组或对象。
-- `business_methods[].code_location` 必须是对象 `{"current_location":"文件路径:行号"}`，不能写成字符串。
-- 不确定字段结构时宁可省略该字段或返回空数组/空字符串，不要用对象或自然语言段落代替。
-
-下面的 `json` 代码块用于说明返回结构：
+The `json` fenced block below documents the response schema:
 
 ```json
 {
   "project_name": "{{.ProjectName}}",
   "language": "{{.Language}}",
-  "frameworks": ["框架或库名称"],
-  "architecture": "具体架构描述",
+  "frameworks": ["framework or library name"],
+  "architecture": "Concrete architecture description",
   "layers": [
     {
-      "name": "层次名称",
-      "description": "层次职责",
-      "responsibilities": ["具体职责"],
+      "name": "Layer name",
+      "description": "Layer responsibility",
+      "responsibilities": ["Specific responsibility"],
       "files": ["path/to/file"]
     }
   ],
-  "dependency_graph": "使用代码证据中的真实模块名描述依赖方向",
-  "data_flow": "使用代码证据中的真实处理阶段描述数据流",
-  "framework_patterns": ["具体框架使用模式"],
-  "structure": "具体项目结构摘要",
+  "dependency_graph": "Describe dependency direction using real module names from code evidence",
+  "data_flow": "Describe data flow using real processing stages from code evidence",
+  "framework_patterns": ["Concrete framework usage pattern"],
+  "structure": "Concrete project structure summary",
   "key_modules": [
     {
-      "name": "模块名称",
+      "name": "Module name",
       "path": "module/path",
-      "description": "模块作用",
-      "responsibilities": ["具体职责"],
-      "dependencies": ["依赖模块"],
-      "dependents": ["被依赖模块"],
-      "key_methods": ["重要方法签名"]
+      "description": "Module role",
+      "responsibilities": ["Specific responsibility"],
+      "dependencies": ["dependency module"],
+      "dependents": ["dependent module"],
+      "key_methods": ["Important method signature"]
     }
   ],
   "business_methods": [
     {
       "name": "MethodName",
       "code_location": {"current_location": "file/path:line"},
-      "description": "项目级入口或复用方法的简短职责；不要在这里归纳业务模式",
-      "usage": "何时需要定位该入口或复用该方法",
+      "description": "Short responsibility of a project-level entry point or reusable method; do not summarize business patterns here",
+      "usage": "When to locate this entry point or reuse this method",
       "type": "domain|common",
-      "function": "完整方法签名",
-      "prerequisites": "调用前置条件或依赖",
-      "returns": "返回值和可能错误"
+      "function": "Full method signature",
+      "prerequisites": "Required setup or dependencies",
+      "returns": "Return values and possible errors"
     }
   ],
   "common_utils": [
     {
       "name": "FunctionName",
       "file": "file/path",
-      "signature": "真实函数或方法签名",
-      "description": "领域无关工具方法作用；承载产品领域行为的领域操作、协议/命令封装或外部依赖交互入口应优先放入 business_methods。该判断必须来自项目证据，不要根据目录名推断",
-      "usage": "何时使用"
+      "signature": "Real function or method signature",
+      "description": "What this domain-neutral utility does; domain operations, protocol/command wrappers, or external dependency interaction entries that carry product-domain behavior should prefer business_methods. This judgment must come from project evidence, not directory names",
+      "usage": "When to use it"
     }
   ],
-  "config_patterns": ["配置模式"],
-  "dependencies": ["依赖名称"],
+  "config_patterns": ["Configuration pattern"],
+  "dependencies": ["dependency name"],
   "validation_commands": [
     {
-      "command": "证据中出现的完整命令",
-      "when": "何时运行该命令",
-      "source": "仓库相对路径或 user_context",
-      "workdir": "命令应在哪个仓库相对目录运行；项目根目录可留空",
-      "scope_paths": ["该命令实际覆盖的相对路径或目录"],
-      "evidence": ["证明该命令适用范围的相对路径"],
+      "command": "Exact full command shown by evidence",
+      "when": "When to run this command",
+      "source": "Repository-relative path or user_context",
+      "workdir": "Repository-relative directory where the command should run; leave empty for project root",
+      "scope_paths": ["relative paths or directories actually covered by this command"],
+      "evidence": ["relative paths proving this command's scope"],
       "type": "test|build|lint|generate|contract|check"
     }
   ],
-  "summary": "具体项目概览"
+  "summary": "Specific project overview"
 }
 ```

@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.0]
+
+### 变更
+
+- 将运行时 AI prompt 模板收敛为英文单源模板，移除独立 `.en-US` 运行时模板，减少中英文模板漂移和维护成本。
+- `skills.locale` 现在明确控制 AI 学习输出、生成 Skills 以及沉淀内容语言；运行时 prompt 通过统一输出契约要求模型按目标语言输出，同时保留代码标识、路径、命令和配置键。
+- 删除废弃的 workspace runtime prompt 模板路径，workspace profile/spec 学习继续通过 loader prompt 体系渲染，避免长期 context 模板和运行时分析模板职责混在一起。
+- README、命令文档、配置文档和模板说明补充核心特性、`skills.locale` 语义以及运行时 prompt 单源模板规则。
+
+### 修复
+
+- 修复未显式传入 Skills 语言时 prompt loader 会回退到工具界面语言的问题，默认改为使用内置 Skills 语言配置，避免中文工具界面意外改变 AI 输出语言。
+- 输出契约尾部模板现在按目标语言渲染输出语言规则，保证 JSON 输出约束始终追加在用户上下文之后。
+
 ## [v0.12.2]
 
 ### 变更

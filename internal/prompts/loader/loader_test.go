@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
@@ -50,23 +51,24 @@ func TestLoader_RenderAllBuiltInPrompts(t *testing.T) {
 	}
 }
 
-func TestLoader_DefaultLocaleRendersChinesePrompt(t *testing.T) {
+func TestLoader_DefaultLocaleRendersEnglishPromptTemplate(t *testing.T) {
 	loader := New("loader", "", "")
 
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "你是一位专业的代码质量审查专家")
-	require.NotContains(t, prompt, "You are a professional code quality review expert")
+	require.Contains(t, prompt, "You are a professional code quality review expert")
+	require.NotContains(t, prompt, "你是一位专业的代码质量审查专家")
 }
 
-func TestLoader_RendersSkillsPromptsWithSkillsLocale(t *testing.T) {
-	loader := NewWithLocales("loader", "zh-CN", "en-US", "")
+func TestLoader_RendersEnglishPromptBodyAndOutputLanguageFromSkillsLocale(t *testing.T) {
+	loader := NewWithLocales("loader", "zh-CN", "zh-CN", "")
 
 	skillsPrompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
 	require.NoError(t, err)
-	require.Contains(t, skillsPrompt, "All user-facing natural-language fields must be written in English")
-	require.NotContains(t, skillsPrompt, "面向用户阅读的自然语言字段应优先使用简体中文")
+	require.Contains(t, skillsPrompt, "You are a project pattern learning expert")
+	require.Contains(t, skillsPrompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
+	require.NotContains(t, skillsPrompt, "角色定义")
 
 	toolPrompt, err := loader.Render("fix-generate", sampleGenerateFixesRequest())
 	require.NoError(t, err)
@@ -84,7 +86,7 @@ func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
 	require.Contains(t, prompt, "# Mandatory Final Output Rules")
 	require.Contains(t, prompt, "These rules have the highest priority and must be followed exactly")
 	require.Contains(t, prompt, "The first non-whitespace character must be `{`")
-	require.Contains(t, prompt, "All user-facing natural-language fields in the JSON must be written in English")
+	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")
 	require.NotContains(t, prompt, "不要使用 markdown 代码块包裹 JSON")
 }
 
@@ -175,9 +177,13 @@ func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 	loader := New("loader", "en-US", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
-	guardData, err := readAppendTemplateWithLocale("output-contract-guard", "en-US")
+	guardData, err := readAppendTemplate("output-contract-guard")
 	require.NoError(t, err)
-	guard := strings.TrimSpace(string(guardData))
+	guardTemplate, err := template.New("guard").Option("missingkey=error").Funcs(funcMap("en-US")).Parse(string(guardData))
+	require.NoError(t, err)
+	var guardBuf strings.Builder
+	require.NoError(t, guardTemplate.Execute(&guardBuf, map[string]interface{}{}))
+	guard := strings.TrimSpace(guardBuf.String())
 
 	require.Contains(t, prompt, "USER SAYS RETURN MARKDOWN")
 	require.Contains(t, prompt, guard)
@@ -343,7 +349,7 @@ func TestRenderAnalyzeListsDiffFilePaths(t *testing.T) {
 	prompt, err := loader.Render("learn-analyze", req)
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "变更文件 Diff (1 个)")
+	require.Contains(t, prompt, "Changed File Diffs (1)")
 	require.Contains(t, prompt, "changed.go")
 	require.Contains(t, prompt, "/tmp/skills-seed/runtime/diffs/changed.go.diff")
 }
@@ -359,7 +365,7 @@ func TestRenderInitSkillsListsDiffFilePaths(t *testing.T) {
 	prompt, err := loader.Render("pattern-learn-current", req)
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "变更文件 Diff (1 个)")
+	require.Contains(t, prompt, "Changed File Diffs (1)")
 	require.Contains(t, prompt, "internal/service.go")
 	require.Contains(t, prompt, "/tmp/skills-seed/runtime/diffs/internal/service.go.diff")
 }
@@ -397,11 +403,11 @@ func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	prompt, err := loader.Render("project-profile", data)
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "已有项目画像")
+	require.Contains(t, prompt, "Existing Project Profile")
 	require.Contains(t, prompt, "internal/service")
 	require.Contains(t, prompt, "/tmp/skills-seed/existing-profile.json")
 	require.NotContains(t, prompt, "Clean Architecture")
-	require.Contains(t, prompt, "完整项目画像")
+	require.Contains(t, prompt, "complete project profile")
 }
 
 func TestRenderProjectAnalysisBoundsStructureToFocusPaths(t *testing.T) {
@@ -412,8 +418,8 @@ func TestRenderProjectAnalysisBoundsStructureToFocusPaths(t *testing.T) {
 	}{
 		{
 			locale: "zh-CN",
-			label:  "项目目录结构摘要",
-			bound:  "不要因为该文件中出现路径线索而扩展到未列入范围的文件",
+			label:  "Project Directory Structure",
+			bound:  "do not expand into files outside those paths",
 		},
 		{
 			locale: "en-US",
@@ -444,10 +450,10 @@ func TestRenderProjectAnalysisIncludesStructuralContext(t *testing.T) {
 	prompt, err := loader.Render("project-profile", data)
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "结构化上下文")
+	require.Contains(t, prompt, "Structural Context")
 	require.Contains(t, prompt, "/tmp/skills-seed/structural-context.md")
 	require.NotContains(t, prompt, "handler calls service")
-	require.Contains(t, prompt, "结构化")
+	require.Contains(t, prompt, "structural")
 }
 
 func TestRenderInitSkillsBoundsStructureToFocusPaths(t *testing.T) {
@@ -458,8 +464,8 @@ func TestRenderInitSkillsBoundsStructureToFocusPaths(t *testing.T) {
 	}{
 		{
 			locale: "zh-CN",
-			label:  "项目目录结构摘要",
-			bound:  "不要因为该文件中出现路径线索而扩展到未列入范围的文件",
+			label:  "Project Directory Structure",
+			bound:  "do not expand into files outside those paths",
 		},
 		{
 			locale: "en-US",
@@ -490,10 +496,10 @@ func TestRenderInitSkillsIncludesStructuralContext(t *testing.T) {
 	prompt, err := loader.Render("pattern-learn-current", req)
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, "结构化上下文")
+	require.Contains(t, prompt, "Structural Context")
 	require.Contains(t, prompt, "/tmp/skills-seed/structural-context.md")
 	require.NotContains(t, prompt, "service has callers")
-	require.Contains(t, prompt, "结构化")
+	require.Contains(t, prompt, "structural")
 }
 
 func TestRenderCurrentLearningOmitsKnownPatterns(t *testing.T) {
@@ -501,7 +507,7 @@ func TestRenderCurrentLearningOmitsKnownPatterns(t *testing.T) {
 		locale string
 		label  string
 	}{
-		{locale: "zh-CN", label: "已有模式"},
+		{locale: "zh-CN", label: "Existing Patterns"},
 		{locale: "en-US", label: "Existing Patterns"},
 	}
 	for _, tt := range tests {
@@ -529,11 +535,11 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"业务覆盖矩阵",
-				"非请求接口",
-				"资源生命周期",
-				"外部依赖交互",
-				"允许中英文混合表达技术概念",
+				"business coverage matrix",
+				"non-request-interface",
+				"resource lifecycle",
+				"external dependency interaction",
+				"All user-facing natural-language fields must be written in English (en-US)",
 			},
 		},
 		{
@@ -582,11 +588,8 @@ func TestLoader_RenderLearningPromptsPreferSpecificCategoriesOverBusinessFallbac
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"具体分类优先",
-				"business 不是默认分类",
-			},
-			forbidden: []string{
-				"对每个业务候选至少尝试提取 1 个 `business` 模式",
+				"Prefer Specific Categories",
+				"business is not the default category",
 			},
 		},
 		{
@@ -637,11 +640,11 @@ func TestLoader_RenderLearningPromptsPreserveDomainOperationBusinessSignals(t *t
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"领域操作",
-				"业务覆盖矩阵",
-				"非请求接口",
-				"资源生命周期",
-				"外部依赖交互",
+				"domain-operation",
+				"business coverage matrix",
+				"non-request-interface",
+				"resource lifecycles",
+				"external dependency interactions",
 			},
 		},
 		{
@@ -697,15 +700,15 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 				return data
 			}(),
 			requiredText: []string{
-				"学习模式: fast",
-				"切分范围: domain",
-				"切分范围策略",
+				"Learning mode: fast",
+				"Scope: domain",
+				"Scope Strategy",
 				"`domain`",
 				"`flow`",
 				"`module`",
-				"模式策略",
-				"完整的语义闭环",
-				"如果需要频繁依赖另一个 unit 才能讲清楚，就合并",
+				"Mode Strategy",
+				"complete semantic loop",
+				"merge units that would need frequent cross-reading",
 				"`deep`",
 			},
 		},
@@ -740,15 +743,15 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 				return req
 			}(),
 			requiredText: []string{
-				"学习模式策略",
+				"Learning Mode Strategy",
 				"`fast`",
 				"`normal`",
 				"`deep`",
-				"推荐分析顺序",
-				"业务子域",
-				"可选拆解方向",
-				"通用命名目录、公共包、适配层或外部依赖封装",
-				"路由价值和代码证据",
+				"Recommended analysis order",
+				"business subdomains",
+				"Optional expansion directions",
+				"generally named directories, shared packages, adapters, or external-dependency wrappers",
+				"routing value and source evidence",
 			},
 		},
 		{
@@ -793,9 +796,9 @@ func TestLoader_ProjectProfilePromptKeepsDomainEntriesOutOfCommonUtils(t *testin
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"由项目源码词表确认的核心领域操作",
-				"不要仅因其位于通用命名目录、公共包、适配层或外部依赖封装中就放入 `common_utils`",
-				"承载产品领域行为的领域操作、协议/命令封装或外部依赖交互入口应优先放入 business_methods",
+				"Core domain operations, resource lifecycles, policy execution",
+				"Do not place them in `common_utils` solely because they live in generally named directories",
+				"external dependency interaction entries that carry product-domain behavior should prefer business_methods",
 			},
 		},
 		{
@@ -829,15 +832,15 @@ func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"业务覆盖优先",
-				"候选业务子域",
-				"业务覆盖矩阵",
-				"后台/异步/周期性流程",
-				"产品运行期行为",
-				"规则策略",
-				"外部依赖约束",
-				"相同候选输入",
-				"稳定选择",
+				"business coverage",
+				"business subdomain",
+				"business coverage matrix",
+				"async",
+				"runtime",
+				"policy",
+				"external dependency",
+				"same candidate input",
+				"stable selection",
 				"selected_paths",
 			},
 		},
@@ -885,10 +888,10 @@ func TestLoader_RenderPatternPromptsIncludePreOutputValidation(t *testing.T) {
 		{
 			locale: "zh-CN",
 			requiredText: []string{
-				"输出前验证清单",
-				"证据校验",
-				"分类校验",
-				"任何候选未通过必需校验时，不要输出",
+				"Pre-Output Validation Checklist",
+				"Evidence check",
+				"Category check",
+				"If a candidate fails any required validation check, do not output it",
 			},
 		},
 		{
@@ -935,26 +938,26 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 			checks: map[string][]string{
 				"pattern-learn-current": {
 					"`evidence_locations`",
-					"模式级源码证据位置",
-					"不要编造证据路径或行号",
+					"pattern-level source evidence locations",
+					"Do not invent evidence paths or line numbers",
 				},
 				"pattern-learn-current-batch": {
 					"`evidence_locations`",
-					"模式级源码证据位置",
-					"不要编造证据路径或行号",
+					"pattern-level source evidence locations",
+					"Do not invent evidence paths or line numbers",
 				},
 				"learn-batch": {
 					"`evidence_locations`",
-					"模式级源码证据位置",
-					"不要编造证据路径或行号",
+					"pattern-level source evidence locations",
+					"Do not invent evidence paths or line numbers",
 				},
 				"pattern-curate": {
 					"`evidence_locations`",
-					"只能保留输入中真实存在的证据位置",
+					"evidence_locations` may preserve only evidence locations present in the input",
 				},
 				"user-define-pattern": {
 					"`evidence_locations`",
-					"如果有关联文件，填入真实证据位置",
+					"real evidence locations",
 				},
 			},
 		},
@@ -978,7 +981,7 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 				},
 				"pattern-curate": {
 					"`evidence_locations`",
-					"may preserve only evidence locations present in the input",
+					"evidence_locations` may preserve only evidence locations present in the input",
 				},
 				"user-define-pattern": {
 					"`evidence_locations`",
@@ -1026,13 +1029,13 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 			locale: "zh-CN",
 			checks: map[string][]string{
 				"user-define-pattern": {
-					"输出前验证清单",
-					"只有在确有项目代码依据时才声称来自源码",
-					"不要编造文件路径、行号、方法签名、业务方法或源码证据",
+					"Pre-Output Validation Checklist",
+					"only when real project-code evidence is available",
+					"Do not invent file paths, line numbers, method signatures, business methods, or source evidence",
 				},
 				"pattern-curate": {
-					"输出前验证清单",
-					"每个候选模式都必须被 `patterns[].merged_from` 覆盖",
+					"Pre-Output Validation Checklist",
+					"Every candidate pattern must be covered by `patterns[].merged_from`",
 					"`summary.total_candidates",
 				},
 			},
@@ -1092,11 +1095,11 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 		{
 			locale: "zh-CN",
 			checks: map[string]string{
-				"learn-batch":                 "可用分类：" + allowedCategories,
-				"pattern-learn-current":       "可用分类：" + allowedCategories,
-				"pattern-learn-current-batch": "可用分类：" + allowedCategories,
-				"user-define-pattern":         "可用分类：" + allowedCategories,
-				"pattern-curate":              "可用分类：" + allowedCategories,
+				"learn-batch":                 "Allowed categories: " + allowedCategories,
+				"pattern-learn-current":       "Allowed categories: " + allowedCategories,
+				"pattern-learn-current-batch": "Allowed categories: " + allowedCategories,
+				"user-define-pattern":         "Allowed categories: " + allowedCategories,
+				"pattern-curate":              "Allowed categories: " + allowedCategories,
 			},
 		},
 		{
@@ -1172,30 +1175,29 @@ func TestLoader_RenderProjectInitPromptUsesConcreteCategoryInJSONExample(t *test
 	}
 }
 
-func TestLoader_RenderZhProjectAnalysisRequiresChineseNaturalLanguage(t *testing.T) {
+func TestLoader_RenderZhProjectAnalysisUsesEnglishTemplateAndChineseOutputGuard(t *testing.T) {
 	loader := New("codex", "zh-CN", "")
 
 	prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
-	require.Contains(t, prompt, "允许中英文混合表达技术概念")
-	require.Contains(t, prompt, "不要从模板示例推断具体技术栈")
+	require.Contains(t, prompt, "You are a senior software architect")
+	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")
+	require.NotContains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
 }
 
-func TestLoader_RenderEnProjectAnalysisRequiresEnglishNaturalLanguage(t *testing.T) {
-	loader := New("codex", "en-US", "")
+func TestLoader_RenderProjectAnalysisUsesSkillsLocaleForOutputGuard(t *testing.T) {
+	loader := NewWithLocales("codex", "zh-CN", "zh-CN", "")
 
 	prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
-	require.Contains(t, prompt, "`framework_patterns` must describe concrete framework or library usage in English")
-	require.Contains(t, prompt, "Do not infer a concrete technology stack from template examples")
+	require.Contains(t, prompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
+	require.Contains(t, prompt, "Do not write technology names, directory names, or command types from template examples as project facts")
 }
 
-func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testing.T) {
-	loader := New("loader", "en-US", "")
+func TestLoader_RenderPersistentPromptsUseOutputContractGuardLanguage(t *testing.T) {
+	loader := NewWithLocales("loader", "zh-CN", "zh-CN", "")
 
 	for _, tc := range []struct {
 		name string
@@ -1211,7 +1213,8 @@ func TestLoader_RenderEnPersistentPromptsRequireEnglishNaturalLanguage(t *testin
 		t.Run(tc.name, func(t *testing.T) {
 			prompt, err := loader.Render(tc.name, tc.data)
 			require.NoError(t, err)
-			require.Contains(t, prompt, "All user-facing natural-language fields must be written in English")
+			require.Contains(t, prompt, "# Mandatory Final Output Rules")
+			require.Contains(t, prompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
 		})
 	}
 }
@@ -1229,9 +1232,9 @@ func TestRenderWorkspacePromptsIncludeLearnUserContextPathWhenProvided(t *testin
 	require.NoError(t, err)
 
 	require.Contains(t, profile, "/tmp/skills-seed/user-context.md")
-	require.Contains(t, profile, "不要把说明文件原文")
+	require.Contains(t, profile, "do not copy the file verbatim")
 	require.Contains(t, spec, "/tmp/skills-seed/user-context.md")
-	require.Contains(t, spec, "不要把说明文件原文")
+	require.Contains(t, spec, "do not copy the file verbatim")
 }
 
 func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {
@@ -1264,9 +1267,9 @@ func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testin
 			prompt, err := loader.Render(tc.name, tc.data)
 			require.NoError(t, err)
 			require.Contains(t, prompt, "```json")
-			require.Contains(t, prompt, "# 最终输出硬约束")
-			require.Contains(t, prompt, "最终响应必须只包含一个 JSON 对象")
-			require.True(t, strings.LastIndex(prompt, "# 最终输出硬约束") > strings.LastIndex(prompt, "```json"))
+			require.Contains(t, prompt, "# Mandatory Final Output Rules")
+			require.Contains(t, prompt, "The final response must contain exactly one JSON object")
+			require.True(t, strings.LastIndex(prompt, "# Mandatory Final Output Rules") > strings.LastIndex(prompt, "```json"))
 		})
 	}
 }
@@ -1295,7 +1298,7 @@ func TestLoader_RuntimePromptsRequireFinalJSONSelfCheck(t *testing.T) {
 	}{
 		{
 			locale:       "zh-CN",
-			requiredText: "最终回复前必须在内部完成 JSON 自检",
+			requiredText: "Before the final response, internally validate the JSON",
 		},
 		{
 			locale:       "en-US",
@@ -1321,10 +1324,11 @@ func TestLoader_OutputContractGuardLivesInAppendTemplates(t *testing.T) {
 	_, err := embedfs.FS.ReadFile(metadata.PromptTemplatePath(metadata.LoaderTemplateProvider, "output-contract-guard", "zh-CN"))
 	require.Error(t, err)
 
-	guard, err := readAppendTemplateWithLocale("output-contract-guard", "zh-CN")
+	guard, err := readAppendTemplate("output-contract-guard")
 	require.NoError(t, err)
-	require.Contains(t, string(guard), "本节规则优先级最高，必须逐条遵守")
-	require.Contains(t, string(guard), "第一个非空字符必须是 `{`")
+	require.Contains(t, string(guard), "These rules have the highest priority and must be followed exactly")
+	require.Contains(t, string(guard), "{{outputLanguageInstruction}}")
+	require.Contains(t, string(guard), "The first non-whitespace character must be `{`")
 }
 
 func loaderRuntimePromptNames(t *testing.T) []string {
@@ -1343,7 +1347,6 @@ func loaderRuntimePromptNames(t *testing.T) []string {
 			continue
 		}
 		base := strings.TrimSuffix(name, metadata.PromptTemplateExt)
-		base = strings.TrimSuffix(base, ".en-US")
 		names[base] = struct{}{}
 	}
 	return sortedSetKeys(names)
@@ -1379,47 +1382,47 @@ func TestLoader_RuntimePromptsBoundFileReadingScope(t *testing.T) {
 			name: "learn-batch",
 			data: sampleBatchLearnData(),
 			requiredText: []string{
-				"先读取变更文件",
-				"仅在证据不足时扩展到直接调用方、被调用方或同目录测试",
-				"不要全仓库扫描",
+				"Read changed files",
+				"direct callers, direct callees, or same-directory tests",
+				"Do not scan the whole repository",
 			},
 			forbidden: []string{
-				"查看提交涉及的完整代码与变更",
+				"Inspect every changed file and related implementation",
 			},
 		},
 		{
 			name: "learn-analyze",
 			data: sampleAnalyzeRequest(),
 			requiredText: []string{
-				"先读取待分析文件",
-				"判断模式违规所必需",
+				"first read the files to analyze",
+				"when a rule decision requires it",
 			},
 			forbidden: []string{
-				"读取每个文件的完整内容",
+				"Read complete content of each file",
 			},
 		},
 		{
 			name: "pattern-learn-current",
 			data: sampleAnalyzeCurrentCodebaseRequest(),
 			requiredText: []string{
-				"优先读取结构化上下文",
-				"只扩展到能支持模式判断的直接相关文件",
-				"避免全仓库扫描",
+				"Read structural context",
+				"Expand only to directly related files needed for pattern decisions",
+				"avoid whole-repository scans",
 			},
 			forbidden: []string{
-				"逐个扫描示例文件中的 Service",
+				"Scan every Service in sample files",
 			},
 		},
 		{
 			name: "fix-generate",
 			data: sampleGenerateFixesRequest(),
 			requiredText: []string{
-				"只返回需要修改的文件",
-				"无法安全完整重写",
+				"include only files that actually need changes",
+				"cannot safely rewrite the complete file",
 				"warnings",
 			},
 			forbidden: []string{
-				"读取相关文件的完整内容",
+				"read the complete content of related files",
 			},
 		},
 	}
@@ -1446,26 +1449,20 @@ func TestLoader_ProjectInitPromptDoesNotHardCodeFrameworkCatalog(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, prompt, "Gin/Echo/Beego/Fiber/Spring Boot/Express/Django")
 	require.NotContains(t, prompt, "GORM/Ent/XORM/SQLAlchemy/TypeORM/MyBatis")
-	require.Contains(t, prompt, "只提取项目实际使用的框架")
+	require.Contains(t, prompt, "Extract only frameworks")
 }
 
 func TestLoader_PromptResponsibilityContracts(t *testing.T) {
 	tests := []struct {
-		name       string
-		data       interface{}
-		requiredZH []string
-		requiredEN []string
-		forbid     []string
+		name     string
+		data     interface{}
+		required []string
+		forbid   []string
 	}{
 		{
 			name: "project-profile",
 			data: sampleProjectAnalysisData(),
-			requiredZH: []string{
-				"本模板只负责项目画像",
-				"不要在这里学习或归纳业务模式",
-				"`business_methods` 不是业务模式库",
-			},
-			requiredEN: []string{
+			required: []string{
 				"This template is only for the project profile",
 				"Do not learn or summarize business patterns here",
 				"`business_methods` is not the business pattern store",
@@ -1478,13 +1475,7 @@ func TestLoader_PromptResponsibilityContracts(t *testing.T) {
 		{
 			name: "pattern-learn-current",
 			data: sampleAnalyzeCurrentCodebaseRequest(),
-			requiredZH: []string{
-				`"patterns"`,
-				`"profile_delta"`,
-				`"profile_refresh_recommended"`,
-				"项目结构、架构说明和技术栈概览不是本模板的主要产物",
-			},
-			requiredEN: []string{
+			required: []string{
 				`"patterns"`,
 				`"profile_delta"`,
 				`"profile_refresh_recommended"`,
@@ -1500,11 +1491,7 @@ func TestLoader_PromptResponsibilityContracts(t *testing.T) {
 		{
 			name: "learn-batch",
 			data: sampleBatchLearnData(),
-			requiredZH: []string{
-				`"patterns"`,
-				"只输出可执行、可复用、可验证的 patterns",
-			},
-			requiredEN: []string{
+			required: []string{
 				`"patterns"`,
 				"Only output executable, reusable, verifiable patterns",
 			},
@@ -1516,24 +1503,16 @@ func TestLoader_PromptResponsibilityContracts(t *testing.T) {
 		},
 	}
 
-	for _, locale := range []string{"zh-CN", "en-US"} {
-		t.Run(locale, func(t *testing.T) {
-			loader := New("loader", locale, "")
-			for _, tc := range tests {
-				t.Run(tc.name, func(t *testing.T) {
-					prompt, err := loader.Render(tc.name, tc.data)
-					require.NoError(t, err)
-					required := tc.requiredZH
-					if locale == "en-US" {
-						required = tc.requiredEN
-					}
-					for _, text := range required {
-						require.Contains(t, prompt, text)
-					}
-					for _, text := range tc.forbid {
-						require.NotContains(t, prompt, text)
-					}
-				})
+	loader := New("loader", "zh-CN", "")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prompt, err := loader.Render(tc.name, tc.data)
+			require.NoError(t, err)
+			for _, text := range tc.required {
+				require.Contains(t, prompt, text)
+			}
+			for _, text := range tc.forbid {
+				require.NotContains(t, prompt, text)
 			}
 		})
 	}

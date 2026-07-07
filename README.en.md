@@ -13,7 +13,7 @@
 
 `Claude Code` · `Codex` · `Local Skills` · `Workspace` · `Code Review`
 
-[Quick Start](#quick-start) · [Output Preview](#output-preview) · [Agent Cost](#agent-cost-guidance) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
+[Core Features](#core-features) · [Quick Start](#quick-start) · [Output Preview](#output-preview) · [Agent Cost](#agent-cost-guidance) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
 
 </div>
 
@@ -29,6 +29,33 @@ What you get is not a generic project summary. It is Agent working context gener
 - Which rules repeatedly appear in `check` or review and should be prioritized in generated skills.
 
 All data is local by default. The generated skills type is selected by `skills.target`; the Agent CLI used for analysis, learning, and summaries is selected by `agent.engine`. That means you can use `claude` for analysis and summarization while producing `codex` skills.
+
+## Core Features
+
+Skills Seed does not generate a static project summary. It turns project knowledge into something Agents can learn, refresh, share, and reuse.
+
+### Low-friction setup and sync
+
+- **Interactive `init` / `sync`**: First runs guide project mode, Agent, parallelism, and execution plan; daily sync can distinguish first generation, incremental sync, resume, and restart.
+- **Flexible configuration**: Agent, Skills target, output path, language, learning mode, unit scope, parallelism, budgets, excludes, retry policy, hooks, and autofix behavior can be configured through flags or `.skills-seed/config.yaml`.
+
+### Knowledge learned from real code
+
+- **Learns from code**: Current code, Git history, directory structure, check hits, and review records are the primary inputs, so users do not need to write a long project description first.
+- **Incremental learning**: `learn current` processes added, modified, and deleted files by default while skipping unchanged files; deleted files clear file fingerprints and are passed into learning as deletion diffs.
+- **Pattern lifecycle**: Patterns have `active`, `stale`, `superseded`, and `deprecated` states. Check, generate, and stats consume active patterns by default. Stale patterns are not physically deleted automatically; use `patterns delete` / `patterns compact` for governance.
+
+### Skills that refresh and load on demand
+
+- **Modular Skills sync**: Generates an entry `SKILL.md` plus task-oriented `references/`; Agents load the entry first and read deeper modules only when needed. Each `sync` refreshes local Skills from the latest learned state.
+- **Agent/output decoupling**: Use Claude to analyze a project while generating Codex-loadable Skills, or switch the analysis Agent based on team cost and quality needs.
+
+### Built for teams and complex repositories
+
+- **Workspace support**: The root repository handles child-project routing, cross-project constraints, and impact radius, while each child project keeps its own `.skills-seed`, patterns, and generated output.
+- **Local data for team collaboration**: Config, database, project context, runtime logs, and generated Skills stay in the repository by default, so teams can decide what to commit and share.
+- **Custom workflows**: The `workflow` command records team task flows so generated Skills can guide how to change the project, not just where files live.
+- **One-time guidance**: `--context` and `--context-path` add temporary goals or constraints to the current `sync` / `learn current` run without polluting long-lived project context.
 
 ## Agent Cost Guidance
 

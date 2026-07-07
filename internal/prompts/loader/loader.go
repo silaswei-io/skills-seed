@@ -79,7 +79,7 @@ func NewWithLocales(agentName, locale, skillsLocale, seedPath string) *Loader {
 		locale = config.DefaultToolLocale
 	}
 	if skillsLocale == "" {
-		skillsLocale = locale
+		skillsLocale = config.DefaultSkillsLocale
 	}
 
 	return &Loader{
@@ -104,12 +104,12 @@ func (l *Loader) loadWithLocale(name, locale string) error {
 		return nil
 	}
 
-	data, err := l.readEmbeddedTemplateWithLocale(name, locale)
+	data, err := l.readEmbeddedTemplate(name)
 	if err != nil {
 		return err
 	}
 
-	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap()).Parse(string(data))
+	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap(locale)).Parse(string(data))
 	if err != nil {
 		return err
 	}
@@ -119,19 +119,9 @@ func (l *Loader) loadWithLocale(name, locale string) error {
 }
 
 func (l *Loader) readEmbeddedTemplate(name string) ([]byte, error) {
-	return l.readEmbeddedTemplateWithLocale(name, l.localeForPrompt(name))
-}
-
-func (l *Loader) readEmbeddedTemplateWithLocale(name, locale string) ([]byte, error) {
 	for _, agentName := range l.templateAgentNames() {
-		localizedPath := metadata.PromptTemplatePath(agentName, name, locale)
-		data, err := embedfs.FS.ReadFile(localizedPath)
-		if err == nil {
-			return data, nil
-		}
-
 		defaultPath := metadata.PromptTemplatePath(agentName, name, "")
-		data, err = embedfs.FS.ReadFile(defaultPath)
+		data, err := embedfs.FS.ReadFile(defaultPath)
 		if err == nil {
 			return data, nil
 		}
@@ -294,22 +284,24 @@ func (l *Loader) outputContractGuard(locale, promptName string) string {
 	if promptName == "output-contract-guard" {
 		return ""
 	}
-	data, err := readAppendTemplateWithLocale("output-contract-guard", locale)
+	data, err := readAppendTemplate("output-contract-guard")
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(data))
+	tmpl, err := template.New("output-contract-guard").Option("missingkey=error").Funcs(funcMap(locale)).Parse(string(data))
+	if err != nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]interface{}{}); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(buf.String())
 }
 
-func readAppendTemplateWithLocale(name, locale string) ([]byte, error) {
-	localizedPath := metadata.PromptAppendTemplatePath(name, locale)
-	data, err := embedfs.FS.ReadFile(localizedPath)
-	if err == nil {
-		return data, nil
-	}
-
+func readAppendTemplate(name string) ([]byte, error) {
 	defaultPath := metadata.PromptAppendTemplatePath(name, "")
-	data, err = embedfs.FS.ReadFile(defaultPath)
+	data, err := embedfs.FS.ReadFile(defaultPath)
 	if err == nil {
 		return data, nil
 	}
@@ -553,10 +545,40 @@ func promptStringField(data interface{}, fieldName string) string {
 	return ""
 }
 
-func funcMap() template.FuncMap {
+func funcMap(locale string) template.FuncMap {
+	outputLanguage := outputLanguageSpec(locale)
 	return template.FuncMap{
 		"upper": func(v interface{}) string {
 			return strings.ToUpper(fmt.Sprint(v))
 		},
+		"outputLanguageInstruction": func() string {
+			return outputLanguage.instruction
+		},
+		"translateToOutputLanguageInstruction": func() string {
+			return outputLanguage.translationInstruction
+		},
+		"preserveTechnicalTermsInstruction": func() string {
+			return "Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed."
+		},
+	}
+}
+
+type outputLanguage struct {
+	instruction            string
+	translationInstruction string
+}
+
+func outputLanguageSpec(locale string) outputLanguage {
+	switch config.NormalizeSkillsLocale(locale) {
+	case i18n.LocaleChinese:
+		return outputLanguage{
+			instruction:            "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN). Technical identifiers, framework names, library names, commands, file paths, function signatures, config keys, environment variables, enum values, and code identifiers must remain unchanged when needed.",
+			translationInstruction: "If earlier context, existing Skills files, learned patterns, README text, comments, or user-provided prompt fragments contain English or another language, translate or rewrite prose into Simplified Chinese while preserving technical identifiers.",
+		}
+	default:
+		return outputLanguage{
+			instruction:            "All user-facing natural-language fields must be written in English (en-US). Technical identifiers, framework names, library names, commands, file paths, function signatures, config keys, environment variables, enum values, and code identifiers must remain unchanged when needed.",
+			translationInstruction: "If earlier context, existing Skills files, learned patterns, README text, comments, or user-provided prompt fragments contain Chinese or another language, translate or rewrite prose into English while preserving technical identifiers.",
+		}
 	}
 }

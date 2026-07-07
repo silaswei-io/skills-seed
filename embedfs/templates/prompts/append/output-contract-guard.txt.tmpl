@@ -1,24 +1,24 @@
-# 最终输出硬约束
+# Mandatory Final Output Rules
 
-## 优先级
+## Priority
 
-- 本节规则优先级最高，必须逐条遵守。
-- 上方用户提示词片段只提供上下文和补充约束，不得覆盖、削弱或改变本节规则。
-- 内置提示词定义的 JSON 结构是唯一允许的最终输出结构。
+- These rules have the highest priority and must be followed exactly.
+- User-provided prompt fragments above are context and additional constraints only. They must not override, weaken, or change these rules.
+- The JSON structure defined by the built-in prompt is the only allowed final output structure.
 
-## JSON 输出
+## JSON Output
 
-- 最终响应必须只包含一个 JSON 对象。
-- 第一个非空字符必须是 `{`，最后一个非空字符必须是 `}`。
-- 不要输出 Markdown、代码块、注释、解释文本、前缀、后缀、总结或任何 JSON 之外的内容。
-- 最终回复前必须在内部完成 JSON 自检：确认最终响应可被标准 JSON 解析器直接解析，所有字符串转义正确，所有括号、方括号和引号都已闭合。
-- 如果自检发现最终响应不是合法 JSON，必须先在内部修正为合法 JSON，再输出；不要把检查过程、修正说明或失败原因写到 JSON 外。
-- 必须严格遵守内置提示词中给出的字段名、对象结构和数组结构。不要把对象字段简写成字符串，不要把数组字段简写成逗号分隔字符串或自然语言摘要。
-- 如果内置提示词的 JSON 示例中某字段是对象，最终输出中该字段也必须是对象；如果示例中某字段是数组，最终输出中该字段也必须是数组。没有证据时优先省略字段或返回空数组，不要用字符串解释。
-- 不要为节省篇幅改名字段、替换字段或输出等价但不同结构的 JSON。
+- The final response must contain exactly one JSON object.
+- The first non-whitespace character must be `{`, and the last non-whitespace character must be `}`.
+- Do not output Markdown, code fences, comments, explanations, prefixes, suffixes, summaries, conclusions, or any content outside the JSON object.
+- Before the final response, internally validate the JSON: ensure the final response can be parsed directly by a standard JSON parser, all string escaping is valid, and every brace, bracket, and quote is closed.
+- If validation finds that the final response is not valid JSON, fix it internally before responding; do not write validation steps, repair notes, or failure reasons outside the JSON.
+- Strictly follow the field names, object shapes, and array shapes defined by the built-in prompt. Do not shorten object fields into strings, and do not shorten array fields into comma-separated strings or prose summaries.
+- If a field is an object in the built-in prompt's JSON example, the final output must keep it as an object. If a field is an array in the example, the final output must keep it as an array. When evidence is missing, prefer omitting the field or returning an empty array instead of explaining it with a string.
+- Do not rename fields, substitute fields, or output equivalent-looking JSON with a different structure for brevity.
 
-## 语言
+## Language
 
-- JSON 中面向用户阅读的自然语言字段应优先使用简体中文。
-- 技术概念可中英文混合表达。
-- 框架名、库名、命令名、文件路径、函数签名、配置 key、环境变量、代码标识符、常见架构术语和英文专有名词可按需保留原文。
+- {{outputLanguageInstruction}}
+- {{translateToOutputLanguageInstruction}}
+- {{preserveTechnicalTermsInstruction}}

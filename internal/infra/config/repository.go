@@ -874,7 +874,7 @@ func (r *Repository) SetLocale(locale string) error {
 	return r.Update(r.config)
 }
 
-// SetSkillsLocale 设置生成 Skills 和提示词语言
+// SetSkillsLocale 设置 AI 学习输出、生成 Skills 和沉淀内容语言。
 func (r *Repository) SetSkillsLocale(locale string) error {
 	r.config.Skills.Locale = locale
 	return r.Update(r.config)

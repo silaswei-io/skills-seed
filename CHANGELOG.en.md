@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.0]
+
+### Changes
+
+- Consolidated runtime AI prompt templates into English-only source templates and removed separate `.en-US` runtime variants, reducing drift between Chinese and English prompt copies.
+- Clarified that `skills.locale` controls AI learning output, generated Skills, and persisted natural-language content; runtime prompts now use a shared output contract to require the target language while preserving code identifiers, paths, commands, and config keys.
+- Removed deprecated workspace runtime prompt template paths. Workspace profile/spec learning continues through the loader prompt system, keeping long-lived context templates separate from runtime analysis templates.
+- Updated the README, command docs, configuration docs, and template README with core features, `skills.locale` semantics, and the single-source runtime prompt rule.
+
+### Fixes
+
+- Fixed prompt loader fallback when Skills language is omitted: it now uses the built-in Skills locale instead of the tool UI locale, preventing a Chinese UI from accidentally changing AI output language.
+- The appended output-contract template is now rendered with target-language rules, keeping final JSON constraints after user context while enforcing the configured output language.
+
 ## [v0.12.2]
 
 ### Changes

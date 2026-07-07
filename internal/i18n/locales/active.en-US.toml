@@ -2218,7 +2218,7 @@ other = "Initialization mode: project for a single project or workspace for a mu
 other = "Tool output and config template language: zh-CN or en-US; defaults to zh-CN when omitted"
 
 [InitFlagSkillsLocale]
-other = "Generated Skills and prompt language: zh-CN or en-US; defaults to en-US when omitted"
+other = "AI learning output, generated Skills, and persisted content language: zh-CN or en-US; defaults to en-US when omitted"
 
 [InitFlagAgent]
 other = "Agent engine to write during initialization, for example claude or codex"

@@ -6,10 +6,9 @@ Templates are organized by two different dimensions.
 
 `templates/prompts` stores prompt templates used to ask the AI agent for analysis or generated data.
 
-- `loader/` stores runtime agent prompts rendered by `internal/prompts/loader`.
-- `append/` stores mandatory fragments appended after runtime prompts, such as final output contracts.
+- `loader/` stores English runtime agent prompts rendered by `internal/prompts/loader`.
+- `append/` stores mandatory English fragments appended after runtime prompts, such as final output contracts and output-language rules.
 - `context/` stores templates used to initialize project context files under `.skills-seed/context`.
-- `workspace/` stores templates used to initialize workspace context files under `.skills-seed/context`.
 
 Runtime prompt IDs use kebab-case prefixes:
 
@@ -31,4 +30,6 @@ Skill template IDs are declared in `internal/templates/skills/catalog.go`. The c
 
 ## Locale
 
-The default template language is Simplified Chinese. Templates without a locale suffix are Chinese. English variants use `.en-US` before the template extension.
+Runtime prompt templates under `loader/` and `append/` are maintained in English only. The output language is controlled by `skills.locale` through the appended output contract.
+
+User-facing context and generated Skills templates may have locale variants. Templates without a locale suffix are Simplified Chinese for those user-facing artifacts, and English variants use `.en-US` before the template extension.
