@@ -23,6 +23,7 @@ import (
 	workflowcmd "github.com/silaswei-io/skills-seed/internal/command/workflow"
 	workspacecmd "github.com/silaswei-io/skills-seed/internal/command/workspace"
 	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
@@ -167,8 +168,15 @@ func configureCobraDefaults(rootCmd *cobra.Command) {
 func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(initcmd.Cmd())
 	rootCmd.AddCommand(initcmd.ResetCmd())
-	rootCmd.AddCommand(workspacecmd.Cmd(cont))
-	rootCmd.AddCommand(synccmd.Cmd(cont))
+	rootCmd.AddCommand(workspacecmd.Cmd(cont, workspacecmd.Dependencies{
+		EnsureChildInitialized: initcmd.EnsureWorkspaceChildInitializedAt,
+	}))
+	rootCmd.AddCommand(synccmd.Cmd(cont, synccmd.Dependencies{
+		LearnCurrent: func(cont *container.Container, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error) {
+			return learn.RunLearnCurrentWithStateScopeOptions(cont, stateScope, userContext, learn.CurrentRunOptions{Force: force})
+		},
+		Generate: generate.RunGenerate,
+	}))
 	rootCmd.AddCommand(workflowcmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))
 	rootCmd.AddCommand(check.Cmd(cont))

@@ -40,6 +40,14 @@ Business rules are not equally strong. Read core development paths first; use lo
 {{end}}
 {{end}}
 
+{{if index . "CoverageWarnings"}}
+## Coverage Notes
+
+{{range index . "CoverageWarnings"}}
+- [{{.Title}}]({{.Path}}): {{.Message}}
+{{end}}
+
+{{end}}
 {{range .Groups}}
 - **[{{.Title}}]({{.Path}})** - {{.Summary.Description}} ({{len .Patterns}} patterns)
   - When to read: {{if .Summary.IsFallback}}Read when the task cannot be mapped to a specific domain but changes business rules, state transitions, runtime behavior, or cross-module flows.{{else}}Read when the task mentions {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}, uses synonymous business actions or state changes, or changes code under {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}}.{{end}}
@@ -51,7 +59,7 @@ Business rules are not equally strong. Read core development paths first; use lo
 
 | Domain | Patterns | Primary Path | Keywords |
 |---|---:|---|---|
-{{range .Groups}}| [{{.Title}}]({{.Path}}) | {{len .Patterns}} | {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}-{{end}} | {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{range .Groups}}| [{{.Title}}]({{.Path}}) | {{len .Patterns}}{{if eq (len .Patterns) 1}}; thin coverage{{end}} | {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}-{{end}} | {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}-{{end}} |
 {{end}}
 
 {{if .UsageScenes}}

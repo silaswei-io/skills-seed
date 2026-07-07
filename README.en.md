@@ -13,7 +13,7 @@
 
 `Claude Code` · `Codex` · `Local Skills` · `Workspace` · `Code Review`
 
-[Quick Start](#quick-start) · [Output Preview](#output-preview) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
+[Quick Start](#quick-start) · [Output Preview](#output-preview) · [Agent Cost](#agent-cost-guidance) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
 
 </div>
 
@@ -29,6 +29,42 @@ What you get is not a generic project summary. It is Agent working context gener
 - Which rules repeatedly appear in `check` or review and should be prioritized in generated skills.
 
 All data is local by default. The generated skills type is selected by `skills.target`; the Agent CLI used for analysis, learning, and summaries is selected by `agent.engine`. That means you can use `claude` for analysis and summarization while producing `codex` skills.
+
+## Agent Cost Guidance
+
+`sync` / `learn current` send code snippets, structure, and project context to the Agent for batch analysis, so calls and token usage can be high. Prefer a faster, cheaper Agent model for routine learning and sync runs. Switch to a stronger model only when the generated rules are not good enough, the codebase is unusually complex, or stronger reasoning is clearly needed.
+
+First separate the two choices:
+
+| Setting | Purpose |
+|---|---|
+| `--agent` / `agent.engine` | Selects which Agent CLI runs analysis and learning |
+| `--skills` / `skills.target` | Selects which Agent skill format to generate |
+
+They can differ. For example, you can use Claude for analysis while generating Codex skills.
+
+Set them during initialization:
+
+```bash
+skills-seed init --agent codex --skills codex
+skills-seed init --agent claude --skills codex
+skills-seed init --mode project --agent codex --skills codex --locale en-US --no-interactive
+```
+
+Or edit `.skills-seed/config.yaml`:
+
+```yaml
+agent:
+  engine: "codex"
+  commands:
+    codex: "codex"
+    claude: "claude"
+
+skills:
+  target: "codex"
+```
+
+Model tier is controlled by the Agent CLI itself. If you need to pin a low-cost model, prefer setting the default model in the `codex` / `claude` CLI configuration; if your CLI only supports model flags, point `agent.commands.<engine>` at a wrapper script that calls the Agent CLI with those model arguments.
 
 ## Why Use It
 
@@ -142,33 +178,43 @@ Common layout:
 ```text
 .skills-seed/context/
 ├── README.md
-├── project.md      # Business background and information not visible in code
-├── rules.md        # Long-lived team rules, compatibility, and forbidden changes
-├── glossary.md     # Domain terms, aliases, states, and code-term mappings
+├── background.md   # Business background and information not visible in code
+├── constraints.md  # Long-lived team constraints, boundaries, and forbidden changes
+├── terminology.md  # Domain terms, aliases, states, and code-term mappings
 └── workspace.md    # Workspace-level context, only in workspace mode
 ```
+
+Recommended workflow:
+
+1. Open `.skills-seed/context/README.md` for the local writing guide.
+2. Edit only the file that matches the information you have.
+3. Leave empty sections as-is.
+4. Run `skills-seed sync` after editing long-lived context so future learning and generation can use it.
+5. Use `sync --context` or `sync --context-path` only for one-time guidance.
+
+Default placeholder text is filtered before Agent input. Avoid copying code, long README excerpts, or one-off debugging notes.
 
 Runtime merge order:
 
 ```text
 built-in prompt
-+ context/project.md
-+ context/rules.md
-+ context/glossary.md
++ context/background.md
++ context/constraints.md
++ context/terminology.md
 + context/workspace.md
 + built-in final output contract
 ```
 
-Use `.skills-seed/context/rules.md` for stable team requirements, such as "ignore temporary debugging code while learning commits" or "prioritize API compatibility rules when generating skills". Context must not change the JSON / Markdown output format required by the built-in prompt. Skills Seed appends a non-editable final output contract after context fragments to protect parser-facing output.
+Use `.skills-seed/context/constraints.md` for stable team requirements, such as "ignore temporary debugging code while learning commits" or "prioritize API compatibility rules when generating skills". Context must not change the JSON / Markdown output format required by the built-in prompt. Skills Seed appends a non-editable final output contract after context fragments to protect parser-facing output.
 
-`--context` and `--context-path` are one-time guidance for the current `learn current` command. They are not written to `.skills-seed/context/`, and they are not passed as temporary input to `generate skills`. Use them for temporary instructions:
+`--context` and `--context-path` are one-time guidance for the current `sync` or `learn current` command. They are not written to `.skills-seed/context/`, and they are not passed as temporary input to `generate skills`. Use them for temporary instructions:
 
 ```bash
-skills-seed learn current --context "Focus only on compatibility boundaries"
-skills-seed learn current --context-path .skills-seed/run-context.md
+skills-seed sync --context "Focus only on compatibility boundaries"
+skills-seed sync --context-path .skills-seed/run-context.md
 ```
 
-If a rule should apply across future runs, put it in `.skills-seed/context/rules.md`. If it only explains or limits one run, use `--context` or `--context-path`.
+If a rule should apply across future runs, put it in `.skills-seed/context/constraints.md`. If it only explains or limits one run, use `--context` or `--context-path`.
 
 `learn current`, `preview`, and structural analysis now share one file-selection policy: by default they analyze source files, build config, and dependency config while continuing to skip documents, generated outputs, paths ignored by Git, paths matched by global `exclude`, and generated Skills output directories.
 

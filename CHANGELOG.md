@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.12.2]
+
+### 变更
+
+- 将 `.skills-seed/context/` 的长期上下文文件命名收敛为 `background.md`、`constraints.md`、`terminology.md` 和 `workspace.md`，并更新 README、命令文档、配置文档和模板说明。
+- 初始化流程会清理旧的 `project.md`、`rules.md`、`glossary.md` 以及废弃的 `.skills-seed/prompts/` 目录，避免旧 prompt 脚手架继续参与运行时上下文合并。
+- 生成层会把弱证据或局部模式降级为复核线索，并为覆盖不足的业务分组输出提示，减少单条证据被写成硬约束的风险。
+- 收紧 command 架构边界，新增 `internal/service/syncflow` 承载 sync 学习后生成的应用流程，`sync` 和 `workspace` 命令不再横向依赖其它 command 包。
+
+### 修复
+
+- 生成 references 前会过滤不存在的代码片段示例，并更保守地处理疑似非项目相对路径，避免误删 URL、外部标识或普通描述文本。
+- workspace context 模板不再写入运行时占位符和分析目标文案，保持它作为长期可编辑项目上下文的职责。
+
 ## [v0.12.1]
 
 ### 变更

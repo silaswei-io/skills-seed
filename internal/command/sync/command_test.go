@@ -12,6 +12,8 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
+	gencmd "github.com/silaswei-io/skills-seed/internal/command/generate"
+	learncmd "github.com/silaswei-io/skills-seed/internal/command/learn"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -155,7 +157,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	}
 	stateScope := commandutil.CommandStateScope("sync")
 
-	err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil)
+	err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil, commandDependenciesForTest())
 
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
@@ -239,11 +241,20 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo),
 	}
 
-	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil)
+	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())
 
 	require.NoError(t, err)
 	require.Equal(t, 1, planCalls)
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-dev", "SKILL.md"))
+}
+
+func commandDependenciesForTest() Dependencies {
+	return Dependencies{
+		LearnCurrent: func(cont *container.Container, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error) {
+			return learncmd.RunLearnCurrentWithStateScopeOptions(cont, stateScope, userContext, learncmd.CurrentRunOptions{Force: force})
+		},
+		Generate: gencmd.RunGenerate,
+	}
 }
 
 func TestHasSyncCommandState(t *testing.T) {

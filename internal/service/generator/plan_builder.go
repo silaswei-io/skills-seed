@@ -287,7 +287,7 @@ func (b *planBuilder) appendCategoryPattern(p *skillgen.Plan, categoryName strin
 		"Category":          summary.Category,
 		"Summary":           summary.Summary,
 		"Patterns":          summary.Patterns,
-		"PatternObjects":    categoryPatterns,
+		"PatternObjects":    patternsForTemplate(categoryPatterns, b.skillsLoader.GetLocale()),
 		"ClaimGroups":       claim.Groups(categoryPatterns, b.skillsLoader.GetLocale()),
 		"UsageScenes":       summary.UsageScenes,
 		"Priority":          summary.Priority,
@@ -325,6 +325,7 @@ func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, summary agen
 		"Groups":            groups,
 		"ClaimGroups":       claim.Groups(categoryPatterns, b.skillsLoader.GetLocale()),
 		"RelatedReferences": businessPatternReferenceLinks(allCategories, b.skillsLoader.GetLocale(), "./"),
+		"CoverageWarnings":  businessCoverageWarnings(groups, b.skillsLoader.GetLocale()),
 	}
 
 	p.AddFile(

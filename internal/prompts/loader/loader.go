@@ -50,6 +50,18 @@ type renderedPromptManifest struct {
 	Parts       []promptPartDebug `json:"parts"`
 }
 
+type contextPromptFile struct {
+	partName string
+	fileName string
+}
+
+var contextPromptFiles = []contextPromptFile{
+	{partName: "context-background", fileName: "background.md"},
+	{partName: "context-constraints", fileName: "constraints.md"},
+	{partName: "context-terminology", fileName: "terminology.md"},
+	{partName: "context-workspace", fileName: "workspace.md"},
+}
+
 // RuntimeTask 标识一次 agent 调用共用的 runtime 文件名前缀。
 type RuntimeTask struct {
 	ID   string
@@ -188,15 +200,6 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		return rendered, nil
 	}
 
-	rawProjectContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "project.md"))
-	rawRulesContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "rules.md"))
-	rawGlossaryContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "glossary.md"))
-	rawWorkspaceContext := l.readPromptFile(filepath.Join(l.seedPath, "context", "workspace.md"))
-	projectContext := prepareContextPromptFragment(rawProjectContext)
-	rulesContext := prepareContextPromptFragment(rawRulesContext)
-	glossaryContext := prepareContextPromptFragment(rawGlossaryContext)
-	workspaceContext := prepareContextPromptFragment(rawWorkspaceContext)
-
 	var parts []string
 	debugParts := []promptPartDebug{}
 	addPart := func(partName, raw, cleaned string) {
@@ -223,10 +226,13 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 	if base != "" {
 		addPart("base", base, base)
 	}
-	addPart("context-project", rawProjectContext, projectContext)
-	addPart("context-rules", rawRulesContext, rulesContext)
-	addPart("context-glossary", rawGlossaryContext, glossaryContext)
-	addPart("context-workspace", rawWorkspaceContext, workspaceContext)
+	contextLengths := make(map[string]int, len(contextPromptFiles))
+	for _, file := range contextPromptFiles {
+		raw := l.readPromptFile(filepath.Join(l.seedPath, "context", file.fileName))
+		cleaned := prepareContextPromptFragment(raw)
+		addPart(file.partName, raw, cleaned)
+		contextLengths[file.partName] = len(cleaned)
+	}
 	if contractGuard != "" {
 		addPart("output-contract-guard", contractGuard, contractGuard)
 	}
@@ -237,10 +243,10 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		"agent", l.agentName,
 		"locale", locale,
 		"base_length", len(base),
-		"context_project_length", len(projectContext),
-		"context_rules_length", len(rulesContext),
-		"context_glossary_length", len(glossaryContext),
-		"context_workspace_length", len(workspaceContext),
+		"context_background_length", contextLengths["context-background"],
+		"context_constraints_length", contextLengths["context-constraints"],
+		"context_terminology_length", contextLengths["context-terminology"],
+		"context_workspace_length", contextLengths["context-workspace"],
 		"output_contract_guard_length", len(contractGuard),
 		"final_length", len(rendered),
 		"has_seed_path", true,
@@ -334,17 +340,7 @@ func templateCacheKey(locale, name string) string {
 }
 
 var htmlCommentBlockPattern = regexp.MustCompile(`(?s)<!--.*?-->\s*`)
-
-func prepareUserPromptFragment(content string) string {
-	content = stripPromptMetadata(content)
-	content = removeLegacyDefaultUserInstructionScaffold(content)
-	content = removeLegacyDefaultProjectPromptScaffold(content)
-	content = strings.TrimSpace(content)
-	if content == "# 用户补充指令" || content == "# User Instructions" || content == "# 项目专属约束" || content == "# Project-Specific Constraints" {
-		return ""
-	}
-	return content
-}
+var generatedWorkspaceProjectLinePattern = regexp.MustCompile("^[-*] `[^`]+` \\(`")
 
 func prepareContextPromptFragment(content string) string {
 	content = stripPromptMetadata(content)
@@ -352,91 +348,70 @@ func prepareContextPromptFragment(content string) string {
 	return strings.TrimSpace(content)
 }
 
-func prepareProjectProfilePrompt(content string) string {
-	content = stripPromptMetadata(content)
-	content = removeUnrecordedProfileSections(content)
-	content = removeStructureSummarySection(content)
-	return strings.TrimSpace(content)
-}
-
 func stripPromptMetadata(content string) string {
 	return htmlCommentBlockPattern.ReplaceAllString(content, "")
 }
 
-func removeLegacyDefaultUserInstructionScaffold(content string) string {
-	lines := strings.Split(content, "\n")
-	filtered := make([]string, 0, len(lines))
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case trimmed == "# 用户补充指令" || trimmed == "# User Instructions":
-			continue
-		case strings.Contains(trimmed, "这些内容会追加到内置") || strings.Contains(trimmed, "This content is appended after the built-in"):
-			continue
-		case strings.Contains(trimmed, "在此补充团队约束") || strings.Contains(trimmed, "Add team constraints, coding preferences"):
-			continue
-		default:
-			filtered = append(filtered, line)
-		}
-	}
-	return strings.Join(filtered, "\n")
-}
-
-func removeLegacyDefaultProjectPromptScaffold(content string) string {
-	defaultFragments := []string{
-		"# 项目专属约束",
-		"处理这个项目时，优先遵循当前仓库的真实结构、命名风格和已有模式",
-		"## 项目画像来源",
-		"请结合 `project-profile.md` 中记录的项目背景理解代码，不要输出适用于任意项目的泛化建议",
-		"## 额外要求",
-		"- 先遵循本项目现有结构",
-		"- 优先复用现有模式",
-		"- 仅在必要时引入新抽象",
-		"- 输出必须具体到当前项目",
-		"# Project-Specific Constraints",
-		"When working on this project, prioritize the real structure, naming style, and established patterns in this repository",
-		"## Project Context Source",
-		"Use `project-profile.md` as the primary background for this project. Avoid generic advice that would fit any project",
-		"## Extra Requirements",
-		"- Follow the current project structure first",
-		"- Reuse existing patterns whenever possible",
-		"- Introduce new abstractions only when necessary",
-		"- Keep outputs specific to this project",
-	}
-	for _, fragment := range defaultFragments {
-		content = strings.ReplaceAll(content, fragment, "")
-	}
-	return content
-}
-
 func removeDefaultContextScaffold(content string) string {
 	defaultFragments := []string{
-		"# 项目背景",
-		"# 团队规则",
-		"# 术语表",
-		"## 代码看不到的信息",
-		"## 关键入口",
-		"## 长期约束",
-		"## 禁止事项",
-		"## 业务术语",
-		"在这里补充业务背景、外部系统、线上事实、灰度策略、兼容对象、人工流程、历史包袱等信息。",
-		"在这里补充未来所有学习、检查和生成都应遵守的团队规则。",
-		"在这里补充不能破坏的兼容性、安全、数据、发布或运维边界。",
-		"在这里补充业务词、别名、状态名、外部系统名和代码标识符之间的对应关系。",
-		"暂未记录。",
-		"# Project Background",
-		"# Team Rules",
-		"# Glossary",
-		"## Information Not Visible In Code",
-		"## Key Entry Points",
-		"## Long-Lived Constraints",
+		"# 背景与外部事实",
+		"## 业务背景",
+		"说明这个项目服务的业务、用户、核心资源或关键流程。",
+		"## 外部系统和依赖",
+		"记录代码里不容易看出的外部平台、接口、账号体系、人工流程或上下游系统。",
+		"## 线上事实和历史约束",
+		"记录灰度策略、兼容对象、迁移状态、历史包袱、发布窗口或运维事实。",
+		"# 约束与边界",
+		"## 必须遵守",
+		"记录未来所有学习、检查和生成都必须遵守的长期团队约束。",
+		"## 禁止变更",
+		"记录不能破坏的兼容性、安全、数据、发布或运维边界。",
+		"## 验证偏好",
+		"记录必须优先使用或避免使用的验证方式、环境限制、人工确认要求。",
+		"# 术语与映射",
+		"## 业务词到代码词",
+		"记录需求、产品、运营常用词与代码里的包名、类型名、字段名、状态名之间的对应关系。",
+		"## 别名和历史名称",
+		"记录同一概念的旧名称、缩写、别名或容易混淆的叫法。",
+		"## 状态和枚举",
+		"记录代码中状态值、枚举值、错误码、事件名对应的业务含义。",
+		"# Background and External Facts",
+		"## Business Background",
+		"Describe the business, users, core resources, or key flows this project supports.",
+		"## External Systems and Dependencies",
+		"Record external platforms, APIs, account systems, manual processes, or upstream/downstream systems that are hard to infer from code.",
+		"## Production Facts and Historical Constraints",
+		"Record rollout strategy, compatibility targets, migration status, historical constraints, release windows, or operations facts.",
+		"# Constraints and Boundaries",
+		"## Must Follow",
+		"Record long-lived team constraints that future learning, checks, and generated skills must follow.",
 		"## Forbidden Changes",
-		"## Domain Terms",
-		"Add business background, external systems, production facts, rollout strategy, compatibility targets, manual processes, or historical constraints here.",
-		"Add team rules that should apply to future learning, checks, and skill generation.",
-		"Add compatibility, security, data, release, or operations boundaries that must not be broken.",
-		"Add mappings between business terms, aliases, state names, external systems, and code identifiers.",
-		"Not recorded yet.",
+		"Record compatibility, security, data, release, or operations boundaries that must not be broken.",
+		"## Validation Preferences",
+		"Record preferred or forbidden validation methods, environment limits, or required manual confirmations.",
+		"# Terminology and Mappings",
+		"## Business Terms to Code Terms",
+		"Record mappings from product, business, or operations terms to package names, type names, field names, state names, or code identifiers.",
+		"## Aliases and Historical Names",
+		"Record old names, abbreviations, aliases, or confusing names for the same concept.",
+		"## States and Enumerations",
+		"Record business meanings for state values, enum values, error codes, or event names used in code.",
+		"# 工作区背景",
+		"## 子项目职责",
+		"记录每个子项目负责的产品能力、对外接口、依赖方向和交付边界。",
+		"- 暂未识别子项目。",
+		"## 跨项目约束",
+		"记录多个子项目共同遵守的契约、共享库、配置、环境变量、数据 schema 或发布边界。",
+		"## 路由和影响范围",
+		"记录哪些路径或任务需要同时查看多个子项目 skill，例如契约、共享代码、基础设施、根目录脚本或部署配置。",
+		"# Workspace Background",
+		"## Child Project Responsibilities",
+		"Record each child project's product capability, public interfaces, dependency direction, and delivery boundary.",
+		"- No child projects detected yet.",
+		"## Cross-Project Constraints",
+		"Record contracts, shared libraries, config, environment variables, data schemas, or release boundaries shared by multiple child projects.",
+		"## Routing and Impact Radius",
+		"Record paths or tasks that require multiple child project skills to be read together, such as contracts, shared code, infrastructure, root scripts, or deployment config.",
 	}
 	for _, fragment := range defaultFragments {
 		content = strings.ReplaceAll(content, fragment, "")
@@ -450,85 +425,17 @@ func removeDefaultContextScaffold(content string) string {
 			strings.HasPrefix(trimmed, "- 项目根目录:") ||
 			strings.HasPrefix(trimmed, "- Project name:") ||
 			strings.HasPrefix(trimmed, "- Primary language:") ||
-			strings.HasPrefix(trimmed, "- Project root:") {
+			strings.HasPrefix(trimmed, "- Project root:") ||
+			strings.HasPrefix(trimmed, "- 工作区名称:") ||
+			strings.HasPrefix(trimmed, "- 工作区根目录:") ||
+			strings.HasPrefix(trimmed, "- Workspace name:") ||
+			strings.HasPrefix(trimmed, "- Workspace root:") ||
+			generatedWorkspaceProjectLinePattern.MatchString(trimmed) {
 			continue
 		}
 		filtered = append(filtered, line)
 	}
 	return strings.Join(filtered, "\n")
-}
-
-func removeUnrecordedProfileSections(content string) string {
-	sectionTitles := []string{
-		"## 架构摘要",
-		"## 关键模块",
-		"## 团队编码风格",
-		"## Architecture Summary",
-		"## Key Modules",
-		"## Team Coding Style",
-	}
-	for _, title := range sectionTitles {
-		content = removeSectionWithOnlyValues(content, title, []string{"未记录", "Not recorded"})
-	}
-	return content
-}
-
-func removeStructureSummarySection(content string) string {
-	for _, title := range []string{"## 目录结构摘要", "## Structure Summary"} {
-		content = removeMarkdownSection(content, title)
-	}
-	return content
-}
-
-func removeSectionWithOnlyValues(content, title string, values []string) string {
-	section := extractMarkdownSection(content, title)
-	if section == "" {
-		return content
-	}
-	body := strings.TrimSpace(strings.TrimPrefix(section, title))
-	for _, value := range values {
-		if body == value {
-			return strings.Replace(content, section, "", 1)
-		}
-	}
-	return content
-}
-
-func removeMarkdownSection(content, title string) string {
-	section := extractMarkdownSection(content, title)
-	if section == "" {
-		return content
-	}
-	return strings.Replace(content, section, "", 1)
-}
-
-func extractMarkdownSection(content, title string) string {
-	start := strings.Index(content, title)
-	if start < 0 {
-		return ""
-	}
-	rest := content[start+len(title):]
-	nextRel := -1
-	for _, marker := range []string{"\n## ", "\n# "} {
-		if idx := strings.Index(rest, marker); idx >= 0 && (nextRel < 0 || idx < nextRel) {
-			nextRel = idx
-		}
-	}
-	if nextRel < 0 {
-		return content[start:]
-	}
-	return content[start : start+len(title)+nextRel]
-}
-
-func (l *Loader) readScopedProjectPrompts(name string, data interface{}) (string, string, string) {
-	projectName := promptProjectName(data)
-	if projectName == "" {
-		return "", "", ""
-	}
-	basePath := filepath.Join(l.seedPath, "prompts", "projects", projectName)
-	return l.readPromptFile(filepath.Join(basePath, "project-profile.md")),
-		l.readPromptFile(filepath.Join(basePath, "common.md")),
-		l.readPromptFile(filepath.Join(basePath, name+".md"))
 }
 
 func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromptManifest) {
@@ -607,10 +514,6 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		"label", manifest.Label,
 		"content_length", len(content),
 	)
-}
-
-func promptProjectName(data interface{}) string {
-	return promptStringField(data, "ProjectName")
 }
 
 func promptRuntimeLabel(data interface{}) string {

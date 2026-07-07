@@ -143,8 +143,8 @@ other = "Failed to set project name"
 [InitSetRootPathFailed]
 other = "Failed to set project root path"
 
-[InitCreateProjectPromptsFailed]
-other = "Failed to initialize project prompts"
+[InitCreateProjectContextFailed]
+other = "Failed to initialize project context"
 
 [InitCreateContainerFailed]
 other = "Failed to create container"

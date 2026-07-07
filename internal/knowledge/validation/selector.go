@@ -134,6 +134,12 @@ func (selector commandSelector) chooseGenericForArea(area Area) commandChoice {
 			continue
 		}
 		score := commandTypeScoreForArea(command, area)
+		if commandLooksBroadTest(command) {
+			score -= 5
+		}
+		if commandKind(command) == "check" {
+			score += 2
+		}
 		if commandLooksHeavy(command) {
 			score--
 		}
@@ -204,6 +210,17 @@ func commandCoverageAllowed(command Command, coverage float64, evidenceCount int
 func commandLooksHeavy(command Command) bool {
 	text := strings.ToLower(command.Command + " " + command.Type)
 	return containsAny(text, " build", "go build", "docker build", "serverless build", "打包", "构建")
+}
+
+func commandLooksBroadTest(command Command) bool {
+	if commandKind(command) != "test" {
+		return false
+	}
+	if len(commandDeclaredScopePaths(command)) > 0 {
+		return false
+	}
+	text := strings.ToLower(command.Command)
+	return strings.Contains(text, "./...") || strings.Contains(text, "-race")
 }
 
 func commandSemanticScore(text string, needles []string) int {

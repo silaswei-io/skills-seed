@@ -316,6 +316,31 @@ func TestValidationMatrixDoesNotUseGenerateCommandForBusinessFlow(t *testing.T) 
 	assert.NotEqual(t, "codegen generate api", matrix[0].Command)
 }
 
+func TestValidationMatrixPrefersGenericCheckOverBroadRaceTestFallback(t *testing.T) {
+	profile := &domain.ProjectProfile{
+		ValidationCommands: []domain.ValidationCommand{
+			{Command: "jzero check", When: "开发过程中检查代码和配置", Source: "README.md", Evidence: []string{"README.md"}, Type: "check"},
+			{Command: "go test -race ./...", When: "运行测试时检查竞态条件", Source: "user_context", Evidence: []string{"test"}, Type: "test"},
+			{Command: "task build", When: "构建项目验证编译", Source: "Taskfile.yml", Evidence: []string{"Taskfile.yml"}, Type: "build"},
+		},
+	}
+	pattern := domain.NewPattern("admin-flow", "管理员业务流程", domain.CategoryBusiness)
+	pattern.Confidence = 0.91
+	pattern.Frequency = 3
+	pattern.SetRule("管理员变更需要保持加密和角色校验顺序。")
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path:   "internal/logic/system/admin/create.go",
+		Line:   48,
+		Symbol: "Create",
+	}}
+
+	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
+
+	require.NotEmpty(t, matrix)
+	assert.Equal(t, "jzero check", matrix[0].Command)
+	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
+}
+
 func TestValidationCommandPaths(t *testing.T) {
 	paths := validationCommandPaths("go test ./plugins/server_manage/internal/logic/service_manage/ ./internal/handler/home/...")
 

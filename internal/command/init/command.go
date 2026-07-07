@@ -423,7 +423,7 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	structure, _ := analyzerSvc.GetProjectStructure(projectRoot)
 	mainFiles := analyzerSvc.FindMainFiles(projectRoot)
 
-	promptData := prompts.ProjectPromptData{
+	contextData := prompts.ProjectContextData{
 		ProjectName:  projectName,
 		Language:     projectLanguage,
 		ProjectRoot:  projectRoot,
@@ -432,8 +432,8 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		Locale:       configRepo.GetToolLocale(),
 		SkillsLocale: configRepo.GetSkillsLocale(),
 	}
-	if err := prompts.EnsureProjectPrompts(seedPath, promptData); err != nil {
-		logger.Error(i18n.Get("InitCreateProjectPromptsFailed"), "error", err)
+	if err := prompts.EnsureProjectContext(seedPath, contextData); err != nil {
+		logger.Error(i18n.Get("InitCreateProjectContextFailed"), "error", err)
 		return err
 	}
 
@@ -453,8 +453,8 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 				return err
 			}
 		}
-		if err := ensureWorkspacePromptFiles(seedPath, projectRoot, projectName, configRepo); err != nil {
-			logger.Error(i18n.Get("InitCreateProjectPromptsFailed"), "error", err)
+		if err := ensureWorkspaceContextFiles(seedPath, projectRoot, projectName, configRepo); err != nil {
+			logger.Error(i18n.Get("InitCreateProjectContextFailed"), "error", err)
 			return err
 		}
 	}
@@ -713,11 +713,11 @@ func normalizeInitMode(mode string) string {
 	}
 }
 
-func ensureWorkspacePromptFiles(seedPath, projectRoot, projectName string, configRepo *config.Repository) error {
+func ensureWorkspaceContextFiles(seedPath, projectRoot, projectName string, configRepo *config.Repository) error {
 	workspaceConfig := configRepo.GetWorkspaceConfig()
-	projects := make([]prompts.WorkspacePromptProject, 0, len(workspaceConfig.Projects))
+	projects := make([]prompts.WorkspaceContextProject, 0, len(workspaceConfig.Projects))
 	for _, project := range workspaceConfig.Projects {
-		projects = append(projects, prompts.WorkspacePromptProject{
+		projects = append(projects, prompts.WorkspaceContextProject{
 			ID:       project.ID,
 			Path:     project.Path,
 			Type:     project.Type,
@@ -725,7 +725,7 @@ func ensureWorkspacePromptFiles(seedPath, projectRoot, projectName string, confi
 		})
 	}
 
-	return prompts.EnsureWorkspacePrompts(seedPath, prompts.WorkspacePromptData{
+	return prompts.EnsureWorkspaceContext(seedPath, prompts.WorkspaceContextData{
 		WorkspaceName: projectName,
 		WorkspaceRoot: projectRoot,
 		Projects:      projects,

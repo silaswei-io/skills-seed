@@ -9,15 +9,13 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
-	gencmd "github.com/silaswei-io/skills-seed/internal/command/generate"
-	learncmd "github.com/silaswei-io/skills-seed/internal/command/learn"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +27,15 @@ const (
 	syncRunRestart syncRunMode = "restart"
 )
 
+// Dependencies 描述 sync 命令需要调用的应用用例。
+type Dependencies struct {
+	LearnCurrent func(cont *container.Container, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error)
+	Generate     func(cont *container.Container) error
+}
+
 // Cmd 返回 sync 命令
-func Cmd(cont *container.Container) *cobra.Command {
+func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
+	dependencies := normalizeDependencies(deps...)
 	userContext := ""
 	contextPath := []string{}
 	resume := false
@@ -91,7 +96,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 				}
 			}
 			change := changelog.Start(cont.SeedPath, "sync")
-			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, resolvedMode, change); err != nil {
+			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, resolvedMode, change, dependencies); err != nil {
 				return err
 			}
 			return change.Save(i18n.Get("ChangeLogSummarySync"))
@@ -105,6 +110,13 @@ func Cmd(cont *container.Container) *cobra.Command {
 	cmd.Flags().BoolVar(&noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
 
 	return cmd
+}
+
+func normalizeDependencies(deps ...Dependencies) Dependencies {
+	if len(deps) == 0 {
+		return Dependencies{}
+	}
+	return deps[0]
 }
 
 func syncModeFromFlags(resume, restart bool) (syncRunMode, error) {
@@ -130,53 +142,41 @@ func normalizeSyncInputs(inputs syncInputs) (syncInputs, error) {
 }
 
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
-func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder) error {
-	// 步骤 1：学习当前代码。
-	logger.Info(i18n.Get("SyncStepLearn"))
-	result, err := learncmd.RunLearnCurrentWithStateScopeOptions(cont, stateScope, userContext, learncmd.CurrentRunOptions{
-		Force: mode == syncRunRestart,
-	})
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
+func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder, deps ...Dependencies) error {
+	dependencies := normalizeDependencies(deps...)
+	var learnCurrent syncflow.LearnCurrentFunc
+	if dependencies.LearnCurrent != nil {
+		learnCurrent = func(ctx context.Context, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error) {
+			return dependencies.LearnCurrent(cont, stateScope, userContext, force)
+		}
 	}
-	recordLearnSummary(change, result)
-
-	return syncLearnAfterLearn(result, syncGeneratedSkillMissing(cont), func() error {
-		return gencmd.RunGenerate(cont)
-	}, change)
+	var generate syncflow.GenerateFunc
+	if dependencies.Generate != nil {
+		generate = func(ctx context.Context) error {
+			return dependencies.Generate(cont)
+		}
+	}
+	service := syncflow.Service{
+		LearnCurrent: learnCurrent,
+		Generate:     generate,
+		OutputMissing: func() bool {
+			return syncGeneratedSkillMissing(cont)
+		},
+	}
+	return service.Run(ctx, syncflow.Request{
+		StateScope:  stateScope,
+		UserContext: userContext,
+		ForceLearn:  mode == syncRunRestart,
+		Change:      change,
+	})
 }
 
 func syncLearnAfterLearn(result domain.LearnCurrentResult, outputMissing bool, generate func() error, change *changelog.Builder) error {
-	if !syncShouldGenerateAfterLearn(result) && !outputMissing {
-		if change != nil {
-			change.Detail(i18n.Get("ChangeLogGenerateSkippedNoChanges"))
-		}
-		logger.Info(i18n.Get("SyncGenerateSkippedNoChanges"))
-		logger.Info(i18n.Get("SyncComplete"))
-		return nil
-	}
-	// 步骤 2：生成 Skills。
-	logger.Info(i18n.Get("SyncStepGenerate"))
-	if err := generate(); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
-	}
-	if change != nil {
-		change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
-	}
-
-	logger.Info(i18n.Get("SyncComplete"))
-	return nil
+	return syncflow.RunAfterLearn(result, outputMissing, generate, change)
 }
 
 func syncShouldGenerateAfterLearn(result domain.LearnCurrentResult) bool {
-	summary := result.Summary
-	if summary.Projects > 0 {
-		return summary.ChangedProjects > 0 || summary.WorkspaceChanged
-	}
-	if summary.NoFileChanges {
-		return false
-	}
-	return summary.ChangedFiles > 0 || summary.DeletedFiles > 0 || summary.PatternsFound > 0 || summary.PatternsSaved > 0
+	return syncflow.ShouldGenerateAfterLearn(result)
 }
 
 func syncGeneratedSkillMissing(cont *container.Container) bool {
@@ -195,29 +195,5 @@ func syncGeneratedSkillMissing(cont *container.Container) bool {
 }
 
 func recordLearnSummary(change *changelog.Builder, result domain.LearnCurrentResult) {
-	if change == nil {
-		return
-	}
-	summary := result.Summary
-	if summary.Projects > 0 {
-		change.Detail(i18n.GetWithParams("ChangeLogLearnWorkspaceSummary", map[string]interface{}{
-			"Projects":        summary.Projects,
-			"ChangedProjects": summary.ChangedProjects,
-		}))
-		if summary.WorkspaceChanged {
-			change.Detail(i18n.Get("ChangeLogWorkspaceRelationshipsChanged"))
-		}
-		return
-	}
-	if summary.NoFileChanges {
-		change.Detail(i18n.Get("ChangeLogLearnNoFileChanges"))
-		return
-	}
-	change.Detail(i18n.GetWithParams("ChangeLogLearnProjectSummary", map[string]interface{}{
-		"Changed":  summary.ChangedFiles,
-		"Deleted":  summary.DeletedFiles,
-		"Skipped":  summary.SkippedFiles,
-		"Patterns": summary.PatternsFound,
-		"Saved":    summary.PatternsSaved,
-	}))
+	syncflow.RecordLearnSummary(change, result)
 }

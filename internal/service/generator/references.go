@@ -8,6 +8,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/policy"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -247,6 +248,18 @@ func patternForTemplate(pattern domain.Pattern) domain.Pattern {
 		pattern.BusinessMethod = nil
 	}
 	return pattern
+}
+
+func patternsForTemplate(patterns []domain.Pattern, locale string) []domain.Pattern {
+	result := make([]domain.Pattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		pattern = patternForTemplate(pattern)
+		if strings.TrimSpace(pattern.Rule) != "" && policy.ShouldSoftenPatternText(pattern) {
+			pattern.Rule = policy.DisplayPatternText(pattern, locale)
+		}
+		result = append(result, pattern)
+	}
+	return result
 }
 
 func businessPatterns(patterns []domain.Pattern) []domain.Pattern {

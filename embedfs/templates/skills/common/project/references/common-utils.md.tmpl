@@ -9,7 +9,7 @@
 {{range .CommonUtils}}
 ## {{.Name}}
 
-- **位置**: `{{.File}}`
+- **位置**: {{if .File}}`{{.File}}`{{else}}未确认{{end}}
 - **签名**: `{{.Signature}}`
 - **描述**: {{.Description}}
 {{if .Usage}}- **使用场景**: {{.Usage}}{{end}}

@@ -9,17 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEnsureProjectPromptsWritesContextTemplateHashMetadata(t *testing.T) {
+func TestEnsureProjectContextWritesContextTemplateHashMetadata(t *testing.T) {
 	seedPath := t.TempDir()
 
-	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+	err := EnsureProjectContext(seedPath, ProjectContextData{
 		ProjectName: "demo",
 		Language:    "go",
 		Locale:      "en-US",
 	})
 	require.NoError(t, err)
 
-	content, err := os.ReadFile(filepath.Join(seedPath, "context", "project.md"))
+	content, err := os.ReadFile(filepath.Join(seedPath, "context", "background.md"))
 	require.NoError(t, err)
 	text := string(content)
 
@@ -28,65 +28,91 @@ func TestEnsureProjectPromptsWritesContextTemplateHashMetadata(t *testing.T) {
 	require.NotContains(t, text, metadata.UnavailableHash)
 }
 
-func TestEnsureProjectPromptsCreatesContextFilesOnly(t *testing.T) {
+func TestEnsureProjectContextCreatesContextFilesOnly(t *testing.T) {
 	seedPath := t.TempDir()
 
-	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+	err := EnsureProjectContext(seedPath, ProjectContextData{
 		ProjectName: "demo",
 		Language:    "go",
 		Locale:      "zh-CN",
 	})
 	require.NoError(t, err)
 
-	for _, name := range []string{"README.md", "project.md", "rules.md", "glossary.md"} {
+	for _, name := range []string{"README.md", "background.md", "constraints.md", "terminology.md"} {
 		require.FileExists(t, filepath.Join(seedPath, "context", name))
 	}
 	_, err = os.Stat(filepath.Join(seedPath, "prompts"))
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
-func TestEnsureProjectPromptsRemovesEmptyDeprecatedInstructions(t *testing.T) {
+func TestEnsureProjectContextRemovesDeprecatedPromptScaffold(t *testing.T) {
 	seedPath := t.TempDir()
 	instructionsDir := filepath.Join(seedPath, "prompts", "instructions")
 	require.NoError(t, os.MkdirAll(instructionsDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(instructionsDir, "skill-project-summary.md"), []byte(`<!-- generated-by: skills-seed v0.9.0 -->
+	path := filepath.Join(instructionsDir, "skill-project-summary.md")
+	require.NoError(t, os.WriteFile(path, []byte(`<!-- generated-by: skills-seed v0.9.0 -->
 <!-- prompt-type: skill-project-summary -->
 <!--
 old scaffold
 -->
 `), 0644))
 
-	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+	err := EnsureProjectContext(seedPath, ProjectContextData{
 		ProjectName: "demo",
 		Language:    "go",
 		Locale:      "zh-CN",
 	})
 	require.NoError(t, err)
 
-	require.NoFileExists(t, filepath.Join(instructionsDir, "skill-project-summary.md"))
+	require.NoFileExists(t, path)
+	require.NoDirExists(t, filepath.Join(seedPath, "prompts"))
 }
 
-func TestEnsureProjectPromptsKeepsDeprecatedInstructionsWithBody(t *testing.T) {
+func TestEnsureProjectContextRemovesDeprecatedPromptBody(t *testing.T) {
 	seedPath := t.TempDir()
 	instructionsDir := filepath.Join(seedPath, "prompts", "instructions")
 	require.NoError(t, os.MkdirAll(instructionsDir, 0755))
 	path := filepath.Join(instructionsDir, "skill-project-summary.md")
 	require.NoError(t, os.WriteFile(path, []byte("用户补充内容"), 0644))
 
-	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+	err := EnsureProjectContext(seedPath, ProjectContextData{
 		ProjectName: "demo",
 		Language:    "go",
 		Locale:      "zh-CN",
 	})
 	require.NoError(t, err)
 
-	require.FileExists(t, path)
+	require.NoFileExists(t, path)
+	require.NoDirExists(t, filepath.Join(seedPath, "prompts"))
 }
 
-func TestEnsureProjectPromptsUsesSkillsLocaleForContextFiles(t *testing.T) {
+func TestEnsureProjectContextRemovesDeprecatedContextFiles(t *testing.T) {
+	seedPath := t.TempDir()
+	contextDir := filepath.Join(seedPath, "context")
+	require.NoError(t, os.MkdirAll(contextDir, 0755))
+	for _, name := range []string{"project.md", "rules.md", "glossary.md"} {
+		require.NoError(t, os.WriteFile(filepath.Join(contextDir, name), []byte("deprecated"), 0644))
+	}
+
+	err := EnsureProjectContext(seedPath, ProjectContextData{
+		ProjectName: "demo",
+		Language:    "go",
+		Locale:      "zh-CN",
+	})
+	require.NoError(t, err)
+
+	for _, name := range []string{"project.md", "rules.md", "glossary.md"} {
+		require.NoFileExists(t, filepath.Join(contextDir, name))
+	}
+	for _, name := range []string{"background.md", "constraints.md", "terminology.md"} {
+		require.FileExists(t, filepath.Join(contextDir, name))
+	}
+}
+
+func TestEnsureProjectContextUsesSkillsLocaleForContextFiles(t *testing.T) {
 	seedPath := t.TempDir()
 
-	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+	err := EnsureProjectContext(seedPath, ProjectContextData{
 		ProjectName:  "demo",
 		Language:     "go",
 		Locale:       "zh-CN",
@@ -94,28 +120,28 @@ func TestEnsureProjectPromptsUsesSkillsLocaleForContextFiles(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	project, err := os.ReadFile(filepath.Join(seedPath, "context", "project.md"))
+	project, err := os.ReadFile(filepath.Join(seedPath, "context", "background.md"))
 	require.NoError(t, err)
-	require.Contains(t, string(project), "# Project Background")
-	require.NotContains(t, string(project), "# 项目背景")
+	require.Contains(t, string(project), "# Background and External Facts")
+	require.NotContains(t, string(project), "# 背景与外部事实")
 
-	rules, err := os.ReadFile(filepath.Join(seedPath, "context", "rules.md"))
+	rules, err := os.ReadFile(filepath.Join(seedPath, "context", "constraints.md"))
 	require.NoError(t, err)
-	require.Contains(t, string(rules), "# Team Rules")
-	require.NotContains(t, string(rules), "# 团队规则")
+	require.Contains(t, string(rules), "# Constraints and Boundaries")
+	require.NotContains(t, string(rules), "# 约束与边界")
 }
 
-func TestEnsureProjectPromptsWritesContextWithoutAnalysisCommands(t *testing.T) {
+func TestEnsureProjectContextWritesContextWithoutAnalysisCommands(t *testing.T) {
 	seedPath := t.TempDir()
 
-	err := EnsureProjectPrompts(seedPath, ProjectPromptData{
+	err := EnsureProjectContext(seedPath, ProjectContextData{
 		ProjectName: "demo",
 		Language:    "go",
 		Locale:      "zh-CN",
 	})
 	require.NoError(t, err)
 
-	content, err := os.ReadFile(filepath.Join(seedPath, "context", "project.md"))
+	content, err := os.ReadFile(filepath.Join(seedPath, "context", "background.md"))
 	require.NoError(t, err)
 	text := string(content)
 
@@ -125,10 +151,10 @@ func TestEnsureProjectPromptsWritesContextWithoutAnalysisCommands(t *testing.T) 
 }
 
 func TestRenderWorkspacePromptsDoNotIncludeRuntimeInputFilePaths(t *testing.T) {
-	data := WorkspacePromptData{
+	data := WorkspaceContextData{
 		WorkspaceName: "hsm-workspace",
 		WorkspaceRoot: "/tmp/hsm-workspace",
-		Projects: []WorkspacePromptProject{
+		Projects: []WorkspaceContextProject{
 			{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"},
 		},
 		Locale: "zh-CN",

@@ -47,7 +47,7 @@ Rules are inferred from code evidence and learned patterns. Only high-confidence
 
 **Description**: {{.Description}}
 
-**Applicable Rule**: {{.Rule}}
+{{if .Rule}}**Rule / Hint**: {{.Rule}}{{end}}
 
 **Routing Hint**: If the request's business wording, synonymous action, state change, entry channel, or exception symptom matches the description/rule above, locate code through this pattern's evidence path first, then confirm current behavior.
 

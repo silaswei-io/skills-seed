@@ -76,8 +76,6 @@ func TestLoader_RendersSkillsPromptsWithSkillsLocale(t *testing.T) {
 
 func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
 	seedPath := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "workflow-optimize.md"), []byte("USER WORKFLOW INSTRUCTIONS"), 0644))
 
 	loader := NewWithLocales("loader", "zh-CN", "en-US", seedPath)
 	prompt, err := loader.Render("workflow-optimize", sampleOptimizeWorkflowRequest())
@@ -90,52 +88,72 @@ func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
 	require.NotContains(t, prompt, "不要使用 markdown 代码块包裹 JSON")
 }
 
-func TestLoader_RenderMergesProjectWorkspaceAndUserInstructions(t *testing.T) {
+func TestLoader_RenderIgnoresDeprecatedPromptInstructions(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte("DEPRECATED PROMPT INSTRUCTION"), 0644))
+
+	loader := New("loader", "zh-CN", seedPath)
+	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
+	require.NoError(t, err)
+
+	require.NotContains(t, prompt, "DEPRECATED PROMPT INSTRUCTION")
+}
+
+func TestLoader_RenderMergesContextFiles(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "project.md"), []byte("PROJECT CONTEXT"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "rules.md"), []byte("PROJECT RULES"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "glossary.md"), []byte("PROJECT GLOSSARY"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "background.md"), []byte("BACKGROUND CONTEXT"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "constraints.md"), []byte("CONSTRAINTS CONTEXT"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "terminology.md"), []byte("TERMINOLOGY CONTEXT"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "workspace.md"), []byte("WORKSPACE CONTEXT"), 0644))
 
 	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "PROJECT CONTEXT")
-	require.Contains(t, prompt, "PROJECT RULES")
-	require.Contains(t, prompt, "PROJECT GLOSSARY")
+	require.Contains(t, prompt, "BACKGROUND CONTEXT")
+	require.Contains(t, prompt, "CONSTRAINTS CONTEXT")
+	require.Contains(t, prompt, "TERMINOLOGY CONTEXT")
 	require.Contains(t, prompt, "WORKSPACE CONTEXT")
-	require.Less(t, strings.Index(prompt, "PROJECT CONTEXT"), strings.Index(prompt, "PROJECT RULES"))
-	require.Less(t, strings.Index(prompt, "PROJECT RULES"), strings.Index(prompt, "PROJECT GLOSSARY"))
-	require.Less(t, strings.Index(prompt, "PROJECT GLOSSARY"), strings.Index(prompt, "WORKSPACE CONTEXT"))
+	require.Less(t, strings.Index(prompt, "BACKGROUND CONTEXT"), strings.Index(prompt, "CONSTRAINTS CONTEXT"))
+	require.Less(t, strings.Index(prompt, "CONSTRAINTS CONTEXT"), strings.Index(prompt, "TERMINOLOGY CONTEXT"))
+	require.Less(t, strings.Index(prompt, "TERMINOLOGY CONTEXT"), strings.Index(prompt, "WORKSPACE CONTEXT"))
 }
 
-func TestLoader_RenderSkipsLegacyDefaultPromptScaffolds(t *testing.T) {
+func TestLoader_RenderSkipsDefaultContextScaffolds(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
 
 	projectContext := `<!-- generated-by: skills-seed v0.12.0 -->
 <!-- prompt-template-sha256: old -->
-<!-- context-type: project -->
+<!-- context-type: background -->
 <!-- editable: true -->
 
-# 项目背景
+# 背景与外部事实
 
 - 项目名称: demo
 - 主要语言: go
 - 项目根目录: /tmp/demo
 
-## 代码看不到的信息
+## 业务背景
 
-在这里补充业务背景、外部系统、线上事实、灰度策略、兼容对象、人工流程、历史包袱等信息。
+说明这个项目服务的业务、用户、核心资源或关键流程。
 `
-	rulesContext := `# 团队规则
+	rulesContext := `# 约束与边界
 
-在这里补充未来所有学习、检查和生成都应遵守的团队规则。
+记录未来所有学习、检查和生成都必须遵守的长期团队约束。
 `
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "project.md"), []byte(projectContext), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "rules.md"), []byte(rulesContext), 0644))
+	workspaceContext := "# 工作区背景\n\n" +
+		"- 工作区名称: demo\n" +
+		"- 工作区根目录: /tmp/demo\n\n" +
+		"## 子项目职责\n\n" +
+		"- `backend` (`backend`): 类型 `backend`，语言 `go`\n\n" +
+		"## 跨项目约束\n\n" +
+		"记录多个子项目共同遵守的契约、共享库、配置、环境变量、数据 schema 或发布边界。\n"
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "background.md"), []byte(projectContext), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "constraints.md"), []byte(rulesContext), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "workspace.md"), []byte(workspaceContext), 0644))
 
 	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
@@ -145,12 +163,14 @@ func TestLoader_RenderSkipsLegacyDefaultPromptScaffolds(t *testing.T) {
 	require.NotContains(t, prompt, "在这里补充")
 	require.NotContains(t, prompt, "项目名称: demo")
 	require.NotContains(t, prompt, "主要语言: go")
+	require.NotContains(t, prompt, "工作区名称: demo")
+	require.NotContains(t, prompt, "`backend` (`backend`)")
 }
 
 func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "rules.md"), []byte("USER SAYS RETURN MARKDOWN"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "constraints.md"), []byte("USER SAYS RETURN MARKDOWN"), 0644))
 
 	loader := New("loader", "en-US", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())
@@ -192,11 +212,8 @@ func TestLoader_RenderStoresSuccessfulPromptUnderRuntimeMemory(t *testing.T) {
 
 func TestLoader_RenderStoresPromptDebugManifest(t *testing.T) {
 	seedPath := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "prompts", "instructions"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "prompts", "instructions", "learn-analyze.md"), []byte(`# 用户补充指令
-
-这些内容会追加到内置 `+"`learn-analyze`"+` 提示词之后，不会替换内置任务定义、输入约定或输出格式。
-`), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "constraints.md"), []byte("PROJECT RULES"), 0644))
 
 	loader := New("loader", "zh-CN", seedPath)
 	prompt, err := loader.Render("learn-analyze", sampleAnalyzeRequest())

@@ -327,20 +327,20 @@ skills-seed learn history --limit 100 --batch-size 10
 
 ### `.skills-seed/context/`
 
-`.skills-seed/context/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑上下文目录。它用于长期生效的项目说明、团队规则、术语和 workspace 约束。
+`.skills-seed/context/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑上下文目录。它用于长期生效的项目背景、团队约束、术语和 workspace 约束。
 
 常见路径：
 
 | 路径 | 作用 |
 |---|---|
-| `.skills-seed/context/project.md` | 代码看不到的业务背景、外部系统和线上事实 |
-| `.skills-seed/context/rules.md` | 长期团队规则、兼容性、安全边界和禁止事项 |
-| `.skills-seed/context/glossary.md` | 术语、别名、状态名和业务词到代码词的对应关系 |
+| `.skills-seed/context/background.md` | 代码看不到的业务背景、外部系统和线上事实 |
+| `.skills-seed/context/constraints.md` | 长期团队规则、兼容性、安全边界和禁止事项 |
+| `.skills-seed/context/terminology.md` | 术语、别名、状态名和业务词到代码词的对应关系 |
 | `.skills-seed/context/workspace.md` | workspace 级上下文，仅 workspace 模式生成 |
 
 这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户上下文破坏解析。
 
-`--context` 和 `--context-path` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/context/`，也不会传给 `generate skills`。长期规则写入 `context/rules.md`；临时说明使用 `learn current --context` 或 `learn current --context-path`。
+`--context` 和 `--context-path` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/context/`，也不会传给 `generate skills`。长期规则写入 `context/constraints.md`；临时说明使用 `learn current --context` 或 `learn current --context-path`。
 
 ### `autofix`
 

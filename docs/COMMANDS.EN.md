@@ -338,12 +338,12 @@ One-shot guidance is only accepted during learning, for example `skills-seed lea
 
 Files under `.skills-seed/context/` are merged with built-in prompts; they do not replace built-in prompts. Common persistent guidance locations:
 
-- `.skills-seed/context/project.md`: business background, external systems, and production facts not visible in code.
-- `.skills-seed/context/rules.md`: long-lived team rules, compatibility requirements, security boundaries, and forbidden changes.
-- `.skills-seed/context/glossary.md`: terms, aliases, state names, and mappings from business language to code terms.
+- `.skills-seed/context/background.md`: business background, external systems, and production facts not visible in code.
+- `.skills-seed/context/constraints.md`: long-lived team constraints, compatibility requirements, security boundaries, and forbidden changes.
+- `.skills-seed/context/terminology.md`: terms, aliases, state names, and mappings from business language to code terms.
 - `.skills-seed/context/workspace.md`: workspace-level context, generated only in workspace mode.
 
-The merge order is built-in prompt, `context/project.md`, `context/rules.md`, `context/glossary.md`, `context/workspace.md`, then a built-in final output contract. User files cannot override the final output contract; it protects the JSON / Markdown output format expected by parsers.
+The merge order is built-in prompt, `context/background.md`, `context/constraints.md`, `context/terminology.md`, `context/workspace.md`, then a built-in final output contract. User files cannot override the final output contract; it protects the JSON / Markdown output format expected by parsers.
 
 #### Generated Content
 

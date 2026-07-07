@@ -9,7 +9,7 @@ This file documents reusable utility functions extracted into the project profil
 {{range .CommonUtils}}
 ## {{.Name}}
 
-- **Location**: `{{.File}}`
+- **Location**: {{if .File}}`{{.File}}`{{else}}unconfirmed{{end}}
 - **Signature**: `{{.Signature}}`
 - **Description**: {{.Description}}
 {{if .Usage}}- **Usage**: {{.Usage}}{{end}}

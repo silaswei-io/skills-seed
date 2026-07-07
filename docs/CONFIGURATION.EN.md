@@ -327,20 +327,20 @@ Command flags affect only the current run and do not rewrite the config file.
 
 ### `.skills-seed/context/`
 
-`.skills-seed/context/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable project context. Use it for persistent project notes, team rules, glossary entries, and workspace constraints.
+`.skills-seed/context/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable project context. Use it for persistent project background, team constraints, terminology, and workspace constraints.
 
 Common paths:
 
 | Path | Purpose |
 |---|---|
-| `.skills-seed/context/project.md` | Business background, external systems, and production facts not visible in code |
-| `.skills-seed/context/rules.md` | Long-lived team rules, compatibility requirements, security boundaries, and forbidden changes |
-| `.skills-seed/context/glossary.md` | Domain terms, aliases, state names, and mappings from business language to code terms |
+| `.skills-seed/context/background.md` | Business background, external systems, and production facts not visible in code |
+| `.skills-seed/context/constraints.md` | Long-lived team constraints, compatibility requirements, security boundaries, and forbidden changes |
+| `.skills-seed/context/terminology.md` | Domain terms, aliases, state names, and mappings from business language to code terms |
 | `.skills-seed/context/workspace.md` | Workspace-level context, generated only in workspace mode |
 
 These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
 
-`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/context/`, and are not passed to `generate skills`. Put long-lived rules in `context/rules.md`; use `learn current --context` or `learn current --context-path` for temporary guidance.
+`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/context/`, and are not passed to `generate skills`. Put long-lived rules in `context/constraints.md`; use `learn current --context` or `learn current --context-path` for temporary guidance.
 
 ### `autofix`
 

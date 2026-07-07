@@ -11,7 +11,7 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-[快速开始](#快速开始) · [它会生成什么](#它会生成什么) · [常用命令](#常用命令) · [Workspace](#workspace) · [文档](#文档) · [HTML 页面](docs/html/skills-seed.html)
+[快速开始](#快速开始) · [它会生成什么](#它会生成什么) · [Agent 成本建议](#agent-成本建议) · [常用命令](#常用命令) · [Workspace](#workspace) · [文档](#文档)
 
 </div>
 
@@ -145,21 +145,43 @@ go build -o skills-seed ./cmd/skills-seed
 | Git | 需要在 Git 仓库中初始化和学习 |
 | Agent CLI | 默认使用 `claude`，也可以在初始化时选择 `codex` |
 
-`agent.engine` 决定用哪个 Agent CLI 执行分析和学习；`skills.target` 决定生成哪种 Agent 可加载的 Skills。两者可以不同，例如用 Claude 分析项目，同时输出 Codex Skills。
+安装可用的 Agent CLI 后，可以在 `init` 时选择执行学习的 Agent 和生成 Skills 的目标格式。
+
+## Agent 成本建议
+
+`sync` / `learn current` 会把代码片段、结构信息和上下文交给 Agent 做批量分析，调用次数和 token 消耗都可能比较高。日常建议用速度快、价格低的 Agent 模型跑学习和同步；只有在规则质量明显不够、项目特别复杂或需要更强推理时，再切到更强模型。
+
+先区分两个配置：
+
+| 配置 | 作用 |
+|---|---|
+| `--agent` / `agent.engine` | 选择哪个 Agent CLI 执行分析和学习 |
+| `--skills` / `skills.target` | 选择生成哪种 Agent 可加载的 Skills |
+
+两者可以不同，例如用 Claude 分析项目，同时输出 Codex Skills。
+
+初始化时直接指定：
+
+```bash
+skills-seed init --agent codex --skills codex
+skills-seed init --agent claude --skills codex
+skills-seed init --mode project --agent codex --skills codex --locale zh-CN --no-interactive
+```
+
+也可以直接修改 `.skills-seed/config.yaml`：
 
 ```yaml
 agent:
-  engine: "claude"
+  engine: "codex"
   commands:
-    claude: "claude"
     codex: "codex"
+    claude: "claude"
 
 skills:
   target: "codex"
-  paths:
-    claude: ".claude/skills/skills-seed-skills"
-    codex: ".agents/skills/skills-seed-skills"
 ```
+
+模型档位由对应 Agent CLI 自己控制。若需要固定低成本模型，优先在 `codex` / `claude` CLI 的默认配置中设置；如果你的 CLI 只支持命令行参数，可以把 `agent.commands.<engine>` 指向一个包装脚本，由脚本内部调用带模型参数的 Agent CLI。
 
 ## 与手写项目说明的区别
 
@@ -225,21 +247,39 @@ Skills Seed 不维护远端知识库；学习结果默认写入当前仓库。`s
 
 `skills-seed init` 会生成 `.skills-seed/context/`。这些文件不是内置 prompt 覆盖目录，而是给 AI 学习、检查和生成时参考的项目上下文。
 
+推荐按这个顺序使用：
+
+1. 先打开 `.skills-seed/context/README.md` 看填写指南。
+2. 只修改和当前信息对应的文件；没有内容的段落可以留空。
+3. 长期有效的信息写入 context 后，运行 `skills-seed sync` 让它进入后续学习和生成。
+4. 只解释本次任务的限制或背景时，使用 `sync --context` 或 `sync --context-path`。
+
+常见布局：
+
+```text
+.skills-seed/context/
+├── README.md
+├── background.md
+├── constraints.md
+├── terminology.md
+└── workspace.md
+```
+
 | 场景 | 推荐方式 |
 |---|---|
-| 代码看不到的项目事实或背景 | 写入 `.skills-seed/context/project.md` |
-| 长期团队规则、兼容性或禁止事项 | 写入 `.skills-seed/context/rules.md` |
-| 术语、别名、状态名 | 写入 `.skills-seed/context/glossary.md` |
+| 代码看不到的项目事实或背景 | 写入 `.skills-seed/context/background.md` |
+| 长期团队规则、兼容性或禁止事项 | 写入 `.skills-seed/context/constraints.md` |
+| 术语、别名、状态名 | 写入 `.skills-seed/context/terminology.md` |
+| workspace 跨项目背景和协作约束 | 写入 `.skills-seed/context/workspace.md` |
 | 本次同步临时说明 | 使用 `skills-seed sync --context` |
 | 本次同步较长说明 | 使用 `skills-seed sync --context-path` |
 
-长期有效的信息放进 context；只解释本次任务的限制或背景，使用 `sync --context`。
+默认占位文本不会进入 Agent 输入。不要复制代码、README 大段内容或一次性调试记录。
 
-## HTML 页面
-
-面向使用者的静态介绍页可直接在浏览器打开：
-
-[打开 `docs/html/skills-seed.html`](docs/html/skills-seed.html)
+```bash
+skills-seed sync --context "本次只关注兼容性边界"
+skills-seed sync --context-path .skills-seed/run-context.md
+```
 
 ## 文档
 

@@ -13,7 +13,7 @@ import (
 
 const (
 	// ProgramVersion 是 `skills-seed --version` 展示的 CLI 版本
-	ProgramVersion = "v0.12.1"
+	ProgramVersion = "v0.12.2"
 
 	UnavailableHash = "unavailable"
 
@@ -24,13 +24,12 @@ const (
 	LoaderTemplateProvider = "loader"
 	// PromptAppendTemplateProvider 是运行时提示词尾部追加约束模板目录。
 	PromptAppendTemplateProvider = "append"
-	ProjectTemplateProvider      = "project"
 	WorkspaceTemplateProvider    = "workspace"
 
-	PromptTemplateExt        = ".txt.tmpl"
-	ProjectPromptTemplateExt = ".md.tmpl"
-	SkillsTemplateExt        = ".md.tmpl"
-	GenericTemplateExt       = ".tmpl"
+	PromptTemplateExt         = ".txt.tmpl"
+	PromptMarkdownTemplateExt = ".md.tmpl"
+	SkillsTemplateExt         = ".md.tmpl"
+	GenericTemplateExt        = ".tmpl"
 )
 
 // TemplateProviderFallbacks 返回 provider 模板查找顺序
@@ -78,20 +77,11 @@ func PromptAppendTemplatePath(name, locale string) string {
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, PromptAppendTemplateProvider, fileName))
 }
 
-// ProjectPromptTemplatePath 返回项目提示词模板路径
-func ProjectPromptTemplatePath(name, locale string) string {
-	fileName := name + ProjectPromptTemplateExt
-	if templateLocaleSuffix(locale) != "" {
-		fileName = name + "." + templateLocaleSuffix(locale) + ProjectPromptTemplateExt
-	}
-	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, ProjectTemplateProvider, fileName))
-}
-
 // WorkspacePromptTemplatePath 返回工作区提示词模板路径
 func WorkspacePromptTemplatePath(name, locale string) string {
-	fileName := name + ProjectPromptTemplateExt
+	fileName := name + PromptMarkdownTemplateExt
 	if templateLocaleSuffix(locale) != "" {
-		fileName = name + "." + templateLocaleSuffix(locale) + ProjectPromptTemplateExt
+		fileName = name + "." + templateLocaleSuffix(locale) + PromptMarkdownTemplateExt
 	}
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, WorkspaceTemplateProvider, fileName))
 }

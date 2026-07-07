@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.12.2]
+
+### Changes
+
+- Renamed the long-lived `.skills-seed/context/` files to `background.md`, `constraints.md`, `terminology.md`, and `workspace.md`, and updated the README, command docs, configuration docs, and context templates.
+- Init now removes deprecated `project.md`, `rules.md`, `glossary.md`, and the old `.skills-seed/prompts/` directory so legacy prompt scaffolding no longer participates in runtime context composition.
+- Generated output now softens weak-evidence or local patterns into verification hints and emits coverage warnings for thin business groups, reducing the chance that a single observation becomes a hard rule.
+- Tightened command architecture boundaries by adding `internal/service/syncflow` for the learn-then-generate sync use case; `sync` and `workspace` commands no longer depend sideways on other command packages.
+
+### Fixes
+
+- Reference generation now removes missing code snippets and treats likely non-project-relative references more conservatively, avoiding accidental removal of URLs, external identifiers, or descriptive text.
+- Workspace context templates no longer write runtime placeholders or analysis-goal text, keeping them focused on long-lived editable project context.
+
 ## [v0.12.1]
 
 ### Changes

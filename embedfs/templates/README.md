@@ -8,8 +8,8 @@ Templates are organized by two different dimensions.
 
 - `loader/` stores runtime agent prompts rendered by `internal/prompts/loader`.
 - `append/` stores mandatory fragments appended after runtime prompts, such as final output contracts.
-- `project/` stores templates used to initialize project context files under `.skills-seed/prompts/project` and user instruction files under `.skills-seed/prompts/instructions`.
-- `workspace/` stores templates used to initialize user-editable workspace prompt fragments under `.skills-seed/prompts/workspace`.
+- `context/` stores templates used to initialize project context files under `.skills-seed/context`.
+- `workspace/` stores templates used to initialize workspace context files under `.skills-seed/context`.
 
 Runtime prompt IDs use kebab-case prefixes:
 

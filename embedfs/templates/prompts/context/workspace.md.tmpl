@@ -1,0 +1,27 @@
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- prompt-template-sha256: {{.PromptTemplatesHash}} -->
+<!-- context-type: workspace -->
+<!-- editable: true -->
+
+# 工作区背景
+
+- 工作区名称: {{.WorkspaceName}}
+- 工作区根目录: {{.WorkspaceRoot}}
+
+## 子项目职责
+
+记录每个子项目负责的产品能力、对外接口、依赖方向和交付边界。
+
+{{range .Projects}}
+- `{{.ID}}` (`{{.Path}}`): 类型 `{{.Type}}`，语言 `{{.Language}}`
+{{else}}
+- 暂未识别子项目。
+{{end}}
+
+## 跨项目约束
+
+记录多个子项目共同遵守的契约、共享库、配置、环境变量、数据 schema 或发布边界。
+
+## 路由和影响范围
+
+记录哪些路径或任务需要同时查看多个子项目 skill，例如契约、共享代码、基础设施、根目录脚本或部署配置。

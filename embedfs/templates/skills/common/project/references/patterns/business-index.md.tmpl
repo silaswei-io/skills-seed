@@ -40,6 +40,14 @@
 {{end}}
 {{end}}
 
+{{if index . "CoverageWarnings"}}
+## 覆盖提示
+
+{{range index . "CoverageWarnings"}}
+- [{{.Title}}]({{.Path}}): {{.Message}}
+{{end}}
+
+{{end}}
 {{range .Groups}}
 - **[{{.Title}}]({{.Path}})** - {{.Summary.Description}}（{{len .Patterns}} 个模式）
   - 何时读取：{{if .Summary.IsFallback}}需求描述无法匹配具体子域，但涉及业务规则、状态变化、运行期行为或跨模块流程时读取。{{else}}需求提到 {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}，出现同义业务动作/状态变化，或改动路径位于 {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}} 时读取。{{end}}
@@ -51,7 +59,7 @@
 
 | 子域 | 模式 | 主要路径 | 关键词 |
 |---|---:|---|---|
-{{range .Groups}}| [{{.Title}}]({{.Path}}) | {{len .Patterns}} | {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}-{{end}} | {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{range .Groups}}| [{{.Title}}]({{.Path}}) | {{len .Patterns}}{{if eq (len .Patterns) 1}}，覆盖不足{{end}} | {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}-{{end}} | {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}-{{end}} |
 {{end}}
 
 {{if .UsageScenes}}

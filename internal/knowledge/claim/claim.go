@@ -74,7 +74,7 @@ func FromPattern(pattern domain.Pattern, locale string) Claim {
 	decision := policy.EvaluatePattern(pattern)
 	return Claim{
 		Title:         strings.TrimSpace(pattern.Name),
-		Text:          claimText(pattern),
+		Text:          claimText(pattern, locale),
 		Usage:         usage(decision.Strength, locale),
 		Strength:      decision.Strength,
 		Category:      pattern.Category,
@@ -87,14 +87,8 @@ func FromPattern(pattern domain.Pattern, locale string) Claim {
 	}
 }
 
-func claimText(pattern domain.Pattern) string {
-	if text := strings.TrimSpace(pattern.Rule); text != "" {
-		return text
-	}
-	if text := strings.TrimSpace(pattern.Description); text != "" {
-		return text
-	}
-	return strings.TrimSpace(pattern.Name)
+func claimText(pattern domain.Pattern, locale string) string {
+	return policy.DisplayPatternText(pattern, locale)
 }
 
 func usage(strength policy.Strength, locale string) string {

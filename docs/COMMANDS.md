@@ -338,12 +338,12 @@ skills-seed generate skills --output .agents/skills/my-project
 
 `.skills-seed/context/` 中的文件会与内置 prompt 合并，不会替换内置 prompt。常用持久补充位置：
 
-- `.skills-seed/context/project.md`：代码看不到的业务背景、外部系统和线上事实。
-- `.skills-seed/context/rules.md`：长期团队规则、兼容性、安全边界和禁止事项。
-- `.skills-seed/context/glossary.md`：术语、别名、状态名和业务词到代码词的对应关系。
+- `.skills-seed/context/background.md`：代码看不到的业务背景、外部系统和线上事实。
+- `.skills-seed/context/constraints.md`：长期团队规则、兼容性、安全边界和禁止事项。
+- `.skills-seed/context/terminology.md`：术语、别名、状态名和业务词到代码词的对应关系。
 - `.skills-seed/context/workspace.md`：workspace 级上下文，仅 workspace 模式生成。
 
-合并顺序为内置 prompt、`context/project.md`、`context/rules.md`、`context/glossary.md`、`context/workspace.md`，最后追加内置最终输出契约。最终输出契约不可由用户文件覆盖，用于保护 JSON / Markdown 输出格式。
+合并顺序为内置 prompt、`context/background.md`、`context/constraints.md`、`context/terminology.md`、`context/workspace.md`，最后追加内置最终输出契约。最终输出契约不可由用户文件覆盖，用于保护 JSON / Markdown 输出格式。
 
 #### 生成内容
 

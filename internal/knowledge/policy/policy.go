@@ -33,6 +33,52 @@ func EvaluatePattern(pattern domain.Pattern) Decision {
 	return Decision{Strength: StrengthObservation}
 }
 
+// ShouldSoftenPatternText 判断模式是否只能作为线索展示，避免弱证据被写成硬规则。
+func ShouldSoftenPatternText(pattern domain.Pattern) bool {
+	strength := EvaluatePattern(pattern).Strength
+	return strength == StrengthLocal || strength == StrengthObservation
+}
+
+// DisplayPatternText 返回面向生成产物的模式文本；弱证据模式会降级措辞。
+func DisplayPatternText(pattern domain.Pattern, locale string) string {
+	text := strings.TrimSpace(pattern.Rule)
+	hasRule := text != ""
+	if text == "" {
+		text = strings.TrimSpace(pattern.Description)
+	}
+	if text == "" {
+		text = strings.TrimSpace(pattern.Name)
+	}
+	if hasRule && ShouldSoftenPatternText(pattern) {
+		return SoftenConstraintText(text, locale)
+	}
+	return text
+}
+
+// SoftenConstraintText 将“必须/禁止”等硬约束措辞降级为需要复核的定位线索。
+func SoftenConstraintText(text, locale string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	if strings.HasPrefix(locale, "en") {
+		softened := replaceWordBounded(text, "must", "should")
+		softened = replaceWordBounded(softened, "never", "avoid")
+		softened = replaceWordBounded(softened, "required", "expected")
+		softened = replaceWordBounded(softened, "forbidden", "discouraged")
+		return "Treat as a local hint; verify current code before applying: " + softened
+	}
+	replacer := strings.NewReplacer(
+		"必须严格", "需要",
+		"必须", "需要",
+		"严禁", "避免",
+		"禁止", "避免",
+		"不能", "不应",
+		"不要", "避免",
+	)
+	return "当前证据只支持作为定位线索；应用前先复核当前代码：" + replacer.Replace(text)
+}
+
 func PatternEvidenceCount(pattern domain.Pattern) int {
 	evidenceCount := len(pattern.EvidenceLocations)
 	if pattern.BusinessMethod != nil && strings.TrimSpace(pattern.BusinessMethod.DisplayLocation()) != "" {
@@ -42,4 +88,34 @@ func PatternEvidenceCount(pattern domain.Pattern) int {
 		evidenceCount = pattern.Metrics.EvidenceCount
 	}
 	return evidenceCount
+}
+
+func replaceWordBounded(text, old, replacement string) string {
+	fields := strings.Fields(text)
+	if len(fields) == 0 {
+		return text
+	}
+	for i, field := range fields {
+		prefix, core, suffix := splitWordPunctuation(field)
+		if strings.EqualFold(core, old) {
+			fields[i] = prefix + replacement + suffix
+		}
+	}
+	return strings.Join(fields, " ")
+}
+
+func splitWordPunctuation(value string) (string, string, string) {
+	start := 0
+	for start < len(value) && !isASCIIAlpha(value[start]) {
+		start++
+	}
+	end := len(value)
+	for end > start && !isASCIIAlpha(value[end-1]) {
+		end--
+	}
+	return value[:start], value[start:end], value[end:]
+}
+
+func isASCIIAlpha(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
 }

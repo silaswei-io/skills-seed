@@ -1,0 +1,27 @@
+<!-- generated-by: skills-seed {{.ProgramVersion}} -->
+<!-- prompt-template-sha256: {{.PromptTemplatesHash}} -->
+<!-- context-type: workspace -->
+<!-- editable: true -->
+
+# Workspace Background
+
+- Workspace name: {{.WorkspaceName}}
+- Workspace root: {{.WorkspaceRoot}}
+
+## Child Project Responsibilities
+
+Record each child project's product capability, public interfaces, dependency direction, and delivery boundary.
+
+{{range .Projects}}
+- `{{.ID}}` (`{{.Path}}`): type `{{.Type}}`, language `{{.Language}}`
+{{else}}
+- No child projects detected yet.
+{{end}}
+
+## Cross-Project Constraints
+
+Record contracts, shared libraries, config, environment variables, data schemas, or release boundaries shared by multiple child projects.
+
+## Routing and Impact Radius
+
+Record paths or tasks that require multiple child project skills to be read together, such as contracts, shared code, infrastructure, root scripts, or deployment config.

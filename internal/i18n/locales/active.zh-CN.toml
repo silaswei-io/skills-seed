@@ -143,8 +143,8 @@ other = "设置项目名称失败"
 [InitSetRootPathFailed]
 other = "设置项目根路径失败"
 
-[InitCreateProjectPromptsFailed]
-other = "初始化项目 prompts 失败"
+[InitCreateProjectContextFailed]
+other = "初始化项目 context 失败"
 
 [InitCreateContainerFailed]
 other = "创建容器失败"

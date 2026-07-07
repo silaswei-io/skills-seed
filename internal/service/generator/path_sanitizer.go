@@ -49,7 +49,7 @@ func (s projectPathSanitizer) profile(profile *domain.ProjectProfile) *domain.Pr
 	}
 	out.CommonUtils = make([]domain.UtilityFunction, 0, len(profile.CommonUtils))
 	for _, utility := range profile.CommonUtils {
-		if utility.File != "" && !s.exists(utility.File) {
+		if utility.File != "" && s.shouldDropMissingProjectPath(utility.File) {
 			utility.File = ""
 		}
 		out.CommonUtils = append(out.CommonUtils, utility)
@@ -58,6 +58,9 @@ func (s projectPathSanitizer) profile(profile *domain.ProjectProfile) *domain.Pr
 }
 
 func (s projectPathSanitizer) pattern(pattern domain.Pattern) domain.Pattern {
+	if strings.TrimSpace(pattern.GoodExample) != "" && !s.snippetExists(pattern.GoodExample, patternSnippetPaths(pattern)) {
+		pattern.GoodExample = ""
+	}
 	pattern.EvidenceLocations = s.evidenceLocations(pattern.EvidenceLocations)
 	if pattern.BusinessMethod != nil {
 		method := s.businessMethod(*pattern.BusinessMethod)
@@ -70,10 +73,10 @@ func (s projectPathSanitizer) pattern(pattern domain.Pattern) domain.Pattern {
 }
 
 func (s projectPathSanitizer) businessMethod(method domain.BusinessMethod) domain.BusinessMethod {
-	if method.CodeLocation.CurrentLocation != "" && !s.exists(method.CodeLocation.CurrentLocation) {
+	if method.CodeLocation.CurrentLocation != "" && s.shouldDropMissingProjectPath(method.CodeLocation.CurrentLocation) {
 		method.CodeLocation.CurrentLocation = ""
 	}
-	if method.CodeLocation.HistoricalLocation != "" && !s.exists(method.CodeLocation.HistoricalLocation) {
+	if method.CodeLocation.HistoricalLocation != "" && s.shouldDropMissingProjectPath(method.CodeLocation.HistoricalLocation) {
 		method.CodeLocation.HistoricalLocation = ""
 	}
 	if method.CodeLocation.CurrentLocation == "" && method.CodeLocation.HistoricalLocation == "" {
@@ -90,6 +93,10 @@ func (s projectPathSanitizer) evidenceLocations(locations []domain.PatternEviden
 		}
 	}
 	return out
+}
+
+func (s projectPathSanitizer) shouldDropMissingProjectPath(location string) bool {
+	return looksProjectRelativeReference(location) && !s.exists(location)
 }
 
 func (s projectPathSanitizer) validPathList(paths []string) []string {
@@ -112,6 +119,43 @@ func (s projectPathSanitizer) exists(location string) bool {
 	return err == nil
 }
 
+func (s projectPathSanitizer) snippetExists(snippet string, paths []string) bool {
+	snippet = strings.TrimSpace(snippet)
+	if snippet == "" {
+		return true
+	}
+	for _, path := range paths {
+		path = referencePathOnly(path)
+		if path == "" || !looksProjectRelativeReference(path) {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(s.root, path))
+		if err != nil {
+			continue
+		}
+		if strings.Contains(string(content), snippet) {
+			return true
+		}
+	}
+	return false
+}
+
+func patternSnippetPaths(pattern domain.Pattern) []string {
+	paths := make([]string, 0, len(pattern.EvidenceLocations)+2)
+	for _, location := range pattern.EvidenceLocations {
+		if location.Path != "" {
+			paths = append(paths, location.Path)
+		}
+	}
+	if pattern.ScopePath != "" {
+		paths = append(paths, pattern.ScopePath)
+	}
+	if pattern.BusinessMethod != nil {
+		paths = append(paths, pattern.BusinessMethod.DisplayLocation())
+	}
+	return paths
+}
+
 func referencePathOnly(location string) string {
 	location = strings.Trim(strings.TrimSpace(location), "`")
 	if location == "" {
@@ -124,6 +168,18 @@ func referencePathOnly(location string) string {
 		}
 	}
 	return filepath.Clean(filepath.ToSlash(location))
+}
+
+func looksProjectRelativeReference(location string) bool {
+	path := referencePathOnly(location)
+	if path == "" || filepath.IsAbs(path) || strings.Contains(path, "://") {
+		return false
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) > 1 && strings.Contains(parts[0], ".") {
+		return false
+	}
+	return true
 }
 
 func isLineSuffix(value string) bool {

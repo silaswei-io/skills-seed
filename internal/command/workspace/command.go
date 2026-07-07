@@ -7,7 +7,6 @@ import (
 	"path"
 	"strings"
 
-	initcmd "github.com/silaswei-io/skills-seed/internal/command/init"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -17,19 +16,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Dependencies 描述 workspace 命令需要调用的应用用例。
+type Dependencies struct {
+	EnsureChildInitialized func(workspaceRoot string, project config.WorkspaceProjectConfig, rootConfigRepo *config.Repository, locale string) error
+}
+
 // Cmd 返回 workspace 命令
-func Cmd(cont *container.Container) *cobra.Command {
+func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
+	dependencies := normalizeDependencies(deps...)
 	workspaceCmd := &cobra.Command{
 		Use:     "workspace",
 		Short:   i18n.Get("WorkspaceShort"),
 		Long:    i18n.Get("WorkspaceLongDesc"),
 		Example: i18n.Get("WorkspaceExample"),
 	}
-	workspaceCmd.AddCommand(addCmd(cont))
+	workspaceCmd.AddCommand(addCmd(cont, dependencies))
 	return workspaceCmd
 }
 
-func addCmd(cont *container.Container) *cobra.Command {
+func normalizeDependencies(deps ...Dependencies) Dependencies {
+	if len(deps) == 0 {
+		return Dependencies{}
+	}
+	return deps[0]
+}
+
+func addCmd(cont *container.Container, deps Dependencies) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add .|project-id-or-path...",
 		Short:   i18n.Get("WorkspaceAddShort"),
@@ -48,13 +60,18 @@ func addCmd(cont *container.Container) *cobra.Command {
 					return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
 				}
 			}
-			return runAddWorkspaceProjects(cmd.Context(), workspaceRoot, cont.ConfigRepo, args)
+			return runAddWorkspaceProjects(cmd.Context(), workspaceRoot, cont.ConfigRepo, args, deps)
 		},
 	}
 	return cmd
 }
 
-func runAddWorkspaceProjects(ctx context.Context, workspaceRoot string, rootConfigRepo *config.Repository, targets []string) error {
+func runAddWorkspaceProjects(ctx context.Context, workspaceRoot string, rootConfigRepo *config.Repository, targets []string, deps ...Dependencies) error {
+	dependencies := normalizeDependencies(deps...)
+	if dependencies.EnsureChildInitialized == nil {
+		return fmt.Errorf("workspace child initializer dependency is not configured")
+	}
+
 	if rootConfigRepo.GetProjectConfig().Mode != domain.ModeWorkspace {
 		return fmt.Errorf("%s", i18n.Get("AddRequireWorkspaceMode"))
 	}
@@ -79,7 +96,7 @@ func runAddWorkspaceProjects(ctx context.Context, workspaceRoot string, rootConf
 			return ctx.Err()
 		default:
 		}
-		if err := initcmd.EnsureWorkspaceChildInitializedAt(workspaceRoot, project, rootConfigRepo, locale); err != nil {
+		if err := dependencies.EnsureChildInitialized(workspaceRoot, project, rootConfigRepo, locale); err != nil {
 			return err
 		}
 	}

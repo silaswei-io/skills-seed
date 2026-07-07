@@ -3,14 +3,20 @@
 <!-- context-type: readme -->
 <!-- editable: true -->
 
-# Project Context
+# Context Guide
 
-This directory stores information that is not visible in code but should guide AI learning and checks. It is not a built-in prompt override directory; built-in prompts are maintained by skills-seed.
+This directory stores long-lived information that is not visible in code but should guide AI learning, checks, and generated skills. It is not a prompt override directory; built-in task prompts are still maintained by skills-seed.
 
 ## Files
 
-- `project.md`: business background, external systems, production facts, and hidden constraints.
-- `rules.md`: long-lived team rules, compatibility requirements, security boundaries, and forbidden changes.
-- `glossary.md`: domain terms, aliases, state names, and mappings between business language and code terms.
+- `background.md`: project background, external systems, production facts, rollout or compatibility targets, and manual processes.
+- `constraints.md`: long-lived team constraints, forbidden changes, and security, data, release, or operations boundaries.
+- `terminology.md`: business terms, aliases, state names, external system names, and code identifier mappings.
+- `workspace.md`: cross-project background and coordination constraints in workspace mode.
 
-Use `--context` or `--context-path` for one-time guidance instead of writing it here.
+## Writing Rules
+
+- Put information here only when it should apply to future runs.
+- Use `--context` or `--context-path` for one-time learning or sync guidance.
+- Do not paste code, long README excerpts, or temporary debugging notes here.
+- Empty sections are fine; default placeholder text is filtered out before Agent input.

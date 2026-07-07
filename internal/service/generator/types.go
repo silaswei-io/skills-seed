@@ -68,6 +68,12 @@ type PatternReferenceLink struct {
 	Reason string
 }
 
+type CoverageWarning struct {
+	Title   string
+	Path    string
+	Message string
+}
+
 type ValidationMatrixItem struct {
 	Area        string
 	Command     string
