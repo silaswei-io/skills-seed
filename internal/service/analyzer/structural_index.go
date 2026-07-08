@@ -225,7 +225,7 @@ func structuralSymbols(symbols []symbolInfo) []structuralSymbol {
 		if strings.TrimSpace(symbol.Name) == "" {
 			continue
 		}
-		out = append(out, structuralSymbol{Name: symbol.Name, Kind: symbol.Kind, Line: symbol.Line})
+		out = append(out, structuralSymbol(symbol))
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Kind != out[j].Kind {

@@ -366,10 +366,6 @@ func formatMultiSummaryLine(label string, done, total, width int) string {
 	return fmt.Sprintf("[%s] %d/%d %s", bar, done, total, label)
 }
 
-func formatMultiTaskLine(task *multiTask, width int) string {
-	return formatMultiTaskLineWithTotal(task, width, 0, runewidth.StringWidth(task.name))
-}
-
 func formatMultiTaskLineWithTotal(task *multiTask, width int, taskTotal int, nameWidth int) string {
 	filled := 0
 	if task.done {

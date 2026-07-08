@@ -175,10 +175,6 @@ func syncLearnAfterLearn(result domain.LearnCurrentResult, outputMissing bool, g
 	return syncflow.RunAfterLearn(result, outputMissing, generate, change)
 }
 
-func syncShouldGenerateAfterLearn(result domain.LearnCurrentResult) bool {
-	return syncflow.ShouldGenerateAfterLearn(result)
-}
-
 func syncGeneratedSkillMissing(cont *container.Container) bool {
 	if cont == nil || cont.ConfigRepo == nil {
 		return false
@@ -192,8 +188,4 @@ func syncGeneratedSkillMissing(cont *container.Container) bool {
 	}
 	_, err := os.Stat(filepath.Join(outputPath, "SKILL.md"))
 	return errors.Is(err, os.ErrNotExist)
-}
-
-func recordLearnSummary(change *changelog.Builder, result domain.LearnCurrentResult) {
-	syncflow.RecordLearnSummary(change, result)
 }

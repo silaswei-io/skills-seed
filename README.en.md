@@ -166,6 +166,8 @@ Starting in 0.11.6, current-code and history-learning prompts use a stricter Can
 
 Starting in 0.13.1, `sync` / `learn current` file selection first runs local filtering and gotree structural indexing, then sends high-value entry candidates to AI file selection and analysis-unit planning. Console progress shows only the important stages plus a unified file-selection summary; candidate counts, index counts, timings, and other diagnostic details are kept in runtime logs.
 
+Starting in 0.13.2, the repository is clean under `staticcheck ./...`; alongside `go test`, `go vet`, and builds, staticcheck is recommended as a release-time quality gate.
+
 AI file selection only provides relevance recommendations; the final analysis scope is decided by a local stable policy that merges recommendations, cache entries, and explicit user focus paths. Identical inputs reuse the selection cache; explicit focus files cannot be excluded by an AI recommendation, and large candidate sets with overly narrow recommendations are deterministically filled to a minimum budget to reduce large swings in analyzed file counts across runs.
 
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.

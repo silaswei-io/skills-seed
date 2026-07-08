@@ -77,9 +77,7 @@ func SpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
 			Reason:      "子项目路径只路由到该子项目的独立 skill",
 		})
 	}
-	for _, route := range profile.ImpactRoutes {
-		routing = append(routing, route)
-	}
+	routing = append(routing, profile.ImpactRoutes...)
 	projectIDs := ProjectIDs(profile.Projects)
 	for _, path := range profile.Contracts {
 		routing = append(routing, domain.WorkspaceRoute{

@@ -31,10 +31,3 @@ func RuntimeSlug(name, label string) string {
 	}
 	return strings.Join(parts, "-")
 }
-
-func (t RuntimeTask) slugOrFallback(fallback string) string {
-	if strings.TrimSpace(t.Slug) != "" {
-		return t.Slug
-	}
-	return fallback
-}

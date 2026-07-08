@@ -1608,14 +1608,6 @@ func businessPatternWithLocation(id, name, description, rule, example, location 
 	return pattern
 }
 
-func readFilePath(t *testing.T, path string) string {
-	t.Helper()
-
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-	return string(content)
-}
-
 func assertNoBrokenMarkdownLinks(t *testing.T, root string) {
 	t.Helper()
 
@@ -1664,34 +1656,6 @@ func assertNoExcessiveBlankLines(t *testing.T, root string) {
 		return nil
 	})
 	require.NoError(t, err)
-}
-
-func assertMarkdownTableHasNoBlankLines(t *testing.T, content, heading string) {
-	t.Helper()
-
-	start := strings.Index(content, heading)
-	require.NotEqual(t, -1, start)
-	section := content[start+len(heading):]
-	if next := strings.Index(section, "\n## "); next >= 0 {
-		section = section[:next]
-	}
-	lines := strings.Split(section, "\n")
-	firstTableLine := -1
-	lastTableLine := -1
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "|") {
-			if firstTableLine < 0 {
-				firstTableLine = i
-			}
-			lastTableLine = i
-		}
-	}
-	require.GreaterOrEqual(t, firstTableLine, 0)
-	require.GreaterOrEqual(t, lastTableLine, firstTableLine)
-	for i := firstTableLine; i <= lastTableLine; i++ {
-		require.NotEmpty(t, strings.TrimSpace(lines[i]), "blank line inside markdown table under %s", heading)
-	}
 }
 
 func TestCalculateStats(t *testing.T) {

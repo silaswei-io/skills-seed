@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.2]
+
+### Fixes
+
+- Cleaned up unused functions, ineffective appends, simplifiable struct conversions, and redundant formatting calls reported by `staticcheck`, allowing `staticcheck ./...` to run as an effective quality gate.
+- Migrated bbolt lock-timeout checks to the new `go.etcd.io/bbolt/errors` error variables instead of the deprecated `bolt.ErrTimeout`.
+- Removed unused test helpers and legacy render context types to reduce noise for future refactors.
+
 ## [v0.13.1]
 
 ### Changes

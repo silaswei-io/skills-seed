@@ -350,17 +350,6 @@ func unitFocusPaths(unit domain.AnalysisUnit, changes *incrementalFileChanges) [
 	return intersectUnitPaths(unit, allowed)
 }
 
-func unitSelectedFiles(unit domain.AnalysisUnit, selectedFiles []domain.FileInfo, changes *incrementalFileChanges) []domain.FileInfo {
-	allowed := pathSet(unitFocusPaths(unit, changes))
-	out := make([]domain.FileInfo, 0, len(selectedFiles))
-	for _, file := range selectedFiles {
-		if allowed[normalizeStatePath(file.Path)] {
-			out = append(out, file)
-		}
-	}
-	return out
-}
-
 func unitAnalyzedRecords(unit domain.AnalysisUnit, changes *incrementalFileChanges) []domain.FileAnalysisRecord {
 	allowed := pathSet(unitFocusPaths(unit, changes))
 	out := make([]domain.FileAnalysisRecord, 0, len(changes.Records))

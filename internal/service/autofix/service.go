@@ -77,7 +77,7 @@ func (s *AutofixService) fixWithPatch(ctx context.Context, issues []domain.Issue
 
 	// 构建 patch 内容
 	var patchContent strings.Builder
-	patchContent.WriteString(fmt.Sprintf("# Auto-generated patch by skills-seed\n"))
+	patchContent.WriteString("# Auto-generated patch by skills-seed\n")
 	patchContent.WriteString(fmt.Sprintf("# Generated at: %s\n", time.Now().Format(time.RFC3339)))
 	patchContent.WriteString(fmt.Sprintf("# Issues fixed: %d\n\n", len(issues)))
 

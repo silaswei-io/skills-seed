@@ -3,10 +3,8 @@ package workspace
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -685,14 +683,6 @@ func readGeneratedFile(t *testing.T, root string, parts ...string) string {
 	return string(content)
 }
 
-func readFilePath(t *testing.T, path string) string {
-	t.Helper()
-
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-	return string(content)
-}
-
 func assertMarkdownTableHasNoBlankLines(t *testing.T, content, heading string) {
 	t.Helper()
 
@@ -719,41 +709,6 @@ func assertMarkdownTableHasNoBlankLines(t *testing.T, content, heading string) {
 	for i := firstTableLine; i <= lastTableLine; i++ {
 		require.NotEmpty(t, strings.TrimSpace(lines[i]), "blank line inside markdown table under %s", heading)
 	}
-}
-
-var markdownLinkPattern = regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
-
-func assertNoBrokenMarkdownLinks(t *testing.T, root string) {
-	t.Helper()
-
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
-		require.NoError(t, walkErr)
-		if entry.IsDir() || filepath.Ext(path) != ".md" {
-			return nil
-		}
-
-		content, err := os.ReadFile(path)
-		require.NoError(t, err)
-
-		for _, match := range markdownLinkPattern.FindAllStringSubmatch(string(content), -1) {
-			target := strings.TrimSpace(match[1])
-			if target == "" || strings.HasPrefix(target, "#") || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
-				continue
-			}
-			if fragmentIndex := strings.Index(target, "#"); fragmentIndex >= 0 {
-				target = target[:fragmentIndex]
-			}
-			if target == "" {
-				continue
-			}
-
-			targetPath := filepath.Clean(filepath.Join(filepath.Dir(path), target))
-			_, err := os.Stat(targetPath)
-			assert.NoErrorf(t, err, "broken link in %s: %s", path, match[1])
-		}
-		return nil
-	})
-	require.NoError(t, err)
 }
 
 type memoryWorkspaceProfileRepo struct {

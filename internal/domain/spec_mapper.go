@@ -366,34 +366,3 @@ func containsAnyDomain(value string, needles ...string) bool {
 	}
 	return false
 }
-
-// patternForTemplate 清除不可用的 BusinessMethod，用于模板渲染
-func patternForTemplate(pattern Pattern) Pattern {
-	if !IsUsableBusinessMethod(pattern.BusinessMethod) {
-		pattern.BusinessMethod = nil
-	}
-	return pattern
-}
-
-// sanitizeName 将项目名转为 kebab-case 的 skill 名称
-func sanitizeName(name string) string {
-	var b strings.Builder
-	previousHyphen := false
-	for _, r := range strings.ToLower(name) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-			previousHyphen = false
-			continue
-		}
-		if !previousHyphen {
-			b.WriteRune('-')
-			previousHyphen = true
-		}
-	}
-
-	result := strings.Trim(b.String(), "-")
-	if result == "" {
-		result = "project"
-	}
-	return result
-}

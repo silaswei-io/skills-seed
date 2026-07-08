@@ -193,14 +193,6 @@ func ResetCmd() *cobra.Command {
 	return resetCmd
 }
 
-func initializeSkill(locale, mode string) error {
-	return initializeSkillWithWorkspaceChildren(locale, "", mode, "", "")
-}
-
-func initializeSkillWithWorkspaceChildren(locale, skillsLocale, mode, agentEngine, skillsTarget string) error {
-	return initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, skillsTarget, 0, "", "")
-}
-
 func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int, learningMode config.LearningMode, learningScope config.LearningScope) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {

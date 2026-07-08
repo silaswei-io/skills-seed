@@ -30,7 +30,7 @@ import (
 	workflowsvc "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
-	bolt "go.etcd.io/bbolt"
+	bberrors "go.etcd.io/bbolt/errors"
 )
 
 // Container 应用容器
@@ -210,7 +210,7 @@ func createAgent(cfg *config.Config, promptLoader *promptloader.Loader) (agent.A
 }
 
 func patternRepositoryError(err error) error {
-	if errors.Is(err, bolt.ErrTimeout) {
+	if errors.Is(err, bberrors.ErrTimeout) {
 		return fmt.Errorf("%s: %w. %s", i18n.Get("ContainerCreatePatternRepoFailed"), err, i18n.Get("ContainerPatternDBLockedHint"))
 	}
 	return fmt.Errorf("%s: %w", i18n.Get("ContainerCreatePatternRepoFailed"), err)

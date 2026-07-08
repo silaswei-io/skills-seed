@@ -1,9 +1,6 @@
 package generator
 
-import (
-	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/utils"
-)
+import "github.com/silaswei-io/skills-seed/internal/utils"
 
 func (s *GeneratorService) resolveOutputPath(outputPath string) (string, error) {
 	projectRoot := ""
@@ -15,8 +12,4 @@ func (s *GeneratorService) resolveOutputPath(outputPath string) (string, error) 
 
 func resolveProjectOutputPath(projectRoot, outputPath string) (string, error) {
 	return utils.ResolveProjectOutputPath(projectRoot, outputPath)
-}
-
-func configuredSkillOutputPath(projectRoot string, configRepo config.Reader) (string, error) {
-	return utils.ConfiguredSkillOutputPath(projectRoot, configRepo)
 }

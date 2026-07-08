@@ -391,9 +391,7 @@ func DeletePattern(ctx context.Context, cont *container.Container, patternID str
 }
 
 func deleteWorkspacePattern(ctx context.Context, cont *container.Container, patternID string, pattern *domain.Pattern) error {
-	projects := []string{}
 	if pattern != nil && strings.TrimSpace(pattern.ProjectID) != "" {
-		projects = append(projects, strings.TrimSpace(pattern.ProjectID))
 		if err := deleteWorkspaceChildPattern(ctx, cont, pattern.ProjectID, patternID); err != nil {
 			return err
 		}

@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.2]
+
+### 修复
+
+- 清理 `staticcheck` 发现的未使用函数、无效 append、可简化结构转换和冗余格式化调用，让 `staticcheck ./...` 可以作为有效质量门禁运行。
+- 将 bbolt 锁超时判断迁移到新版 `go.etcd.io/bbolt/errors` 错误变量，避免依赖已废弃的 `bolt.ErrTimeout`。
+- 删除测试包中未使用的 helper 和历史遗留类型，减少后续重构时的噪音。
+
 ## [v0.13.1]
 
 ### 变更

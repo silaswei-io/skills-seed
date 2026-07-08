@@ -18,10 +18,6 @@ type GenerateOptions struct {
 	SkipReferences bool
 }
 
-type skillRenderContext struct {
-	ProjectRoot string
-}
-
 type projectOverviewTemplateData struct {
 	domain.ProjectProfile
 	OverviewReferences  []skills.ReferenceItem

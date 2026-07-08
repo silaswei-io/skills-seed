@@ -302,12 +302,6 @@ func (r *learnCurrentRunningUnits) finish(index int, completed bool) string {
 	return r.runningTextLocked()
 }
 
-func (r *learnCurrentRunningUnits) runningText() string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.runningTextLocked()
-}
-
 func (r *learnCurrentRunningUnits) progressParams(parallelism int) map[string]interface{} {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -13,8 +13,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
-const fileName = "change-log.json"
-
 // Entry 表示一次学习或生成对项目沉淀产生的变更。
 type Entry struct {
 	ID        string    `json:"id"`
