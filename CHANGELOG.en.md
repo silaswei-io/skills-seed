@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.1]
+
+### Changes
+
+- Split `learn current` / `sync` file selection into clear stages: local filtering, gotree structural indexing, gotree file confirmation, AI file selection, and AI analysis-unit selection. Console progress now shows only important stages, while detailed metrics live in logs and the unified summary.
+- AI file selection for large repositories now uses a gotreesitter structural index to produce high-value entry candidates instead of sending oversized file trees to the Agent, reducing large swings in analyzed file counts across runs.
+- Runtime AI JSON output contracts are now generated from Go DTOs, removing hand-written JSON field descriptions that could drift from parser structures.
+- Moved init-generated long-lived context templates to `embedfs/templates/seed/context/`, keeping runtime prompts, seed templates, and generated Skills templates under clearer ownership boundaries.
+
+### Fixes
+
+- Fixed JSON field contract drift across learning, profile, generation, and workspace prompts, including validation-command evidence, profile deltas, location fields, and batched unit output.
+- Fixed resumable analysis-plan console summaries to report source files, local-filtered plan inputs, files sent to AI selection, files finally selected by AI, pending analysis files, and analysis units.
+- Kept `jsonrepair-go` as the generic JSON repair layer while removing extra patch-style compatibility parsing; malformed output is now addressed at the prompt/contract source.
+
 ## [v0.13.0]
 
 ### Changes

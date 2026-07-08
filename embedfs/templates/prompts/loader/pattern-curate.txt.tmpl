@@ -115,8 +115,6 @@ Given candidate patterns and related existing patterns, output the final canonic
 - Categories must come from input patterns and must be one of the allowed categories: {{.AllowedCategories}}. Do not create new categories.
 - `confidence` must be between 0.0 and 1.0. Use a frequency-weighted average or a conservative estimate when merging.
 - `frequency` should reflect merged occurrences and must be at least 1.
-- `business_method.prerequisites` and `returns` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
-- `business_method.name`, `description`, `usage`, `type`, and `function` must be strings. `business_method.code_location` must be an object `{"current_location":"file/path:line"}`.
 
 # Pre-Output Validation Checklist
 
@@ -130,62 +128,8 @@ Before returning JSON, validate internally:
 
 # Output Format
 
-The `json` fenced block below documents the response structure:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "patterns": [
-    {
-      "id": "existing-or-candidate-pattern-id",
-      "name": "Canonical pattern name",
-      "category": "error",
-      "description": "Clear description of the problem and applicability boundary",
-      "good_example": "Real code example selected from input",
-      "bad_example": "Bad example selected from input, or empty",
-      "rule": "When X, should Y",
-      "confidence": 0.86,
-      "frequency": 3,
-      "evidence_locations": [
-        {
-          "path": "path/to/domain_component.go",
-          "line": 42,
-          "symbol": "AdvanceDomainState",
-          "kind": "method",
-          "description": "may preserve only evidence locations present in the input",
-          "confidence": 0.90
-        }
-      ],
-      "merged_from": ["existing-id", "candidate-id"],
-      "merge_reason": "Why this is added, updated, or merged",
-      "similarity_score": 0.9,
-      "source": "learned_current",
-      "business_method": {
-        "name": "Real method name or signature",
-        "code_location": {"current_location": "file/path:line"},
-        "description": "Real description",
-        "usage": "Real usage scenario",
-        "type": "domain|common",
-        "function": "Real function signature",
-        "prerequisites": "Real prerequisites",
-        "returns": "Real return information"
-      },
-      "project_id": "workspace-project-id",
-      "scope_path": "relative/scope",
-      "workspace_role": "project-role"
-    }
-  ],
-  "dropped": [
-    {
-      "id": "candidate-id",
-      "reason": "Why it should not be written to the pattern store"
-    }
-  ],
-  "summary": {
-    "total_candidates": {{len .CandidatePatterns}},
-    "total_existing": {{len .ExistingPatterns}},
-    "total_written": 1,
-    "total_dropped": 1,
-    "merge_count": 1
-  }
-}
+{{ jsonContract "CuratePatternsOutput" }}
 ```

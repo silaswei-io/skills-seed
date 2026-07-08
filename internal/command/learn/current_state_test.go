@@ -27,6 +27,84 @@ func TestBuildStateInputsPreservesAISelectionState(t *testing.T) {
 	}, inputs)
 }
 
+func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{
+		{Path: "internal/key/create.go", Hash: "key-hash", Status: "present"},
+		{Path: "internal/types/types.go", Hash: "types-hash", Status: domain.FileAnalysisStatusAISkipped},
+	}, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key/create.go"}}}).
+		WithInputSummary(commandstate.InputSummary{
+			SourceFiles:         10,
+			LocalPlanInputFiles: 8,
+			SelectionInputFiles: 8,
+			SelectedFiles:       1,
+			SkippedFiles:        7,
+		})
+	session := &currentStateSession{
+		State: state,
+		Changes: &incrementalFileChanges{
+			Records:         []domain.FileAnalysisRecord{{Path: "internal/key/create.go", Hash: "key-hash"}},
+			AddedOrModified: []string{"internal/key/create.go"},
+		},
+	}
+
+	summary := buildLearnCurrentResumeSummary(session)
+
+	require.Equal(t, "10", summary.SourceFiles)
+	require.Equal(t, 8, summary.LocalPlanInputs)
+	require.Equal(t, "8", summary.AISelectionInputs)
+	require.Equal(t, "1", summary.AISelectedFiles)
+	require.Equal(t, 1, summary.PendingAnalyzeFiles)
+	require.Equal(t, 1, summary.Units)
+}
+
+func TestBuildLearnCurrentResumeSummaryFallsBackForLegacyState(t *testing.T) {
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{
+		{Path: "internal/key/create.go", Hash: "key-hash", Status: "present"},
+		{Path: "internal/types/types.go", Hash: "types-hash", Status: domain.FileAnalysisStatusAISkipped},
+		{Path: "internal/removed.go", Status: "deleted"},
+	}, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key/create.go"}}})
+	session := &currentStateSession{
+		State: state,
+		Changes: &incrementalFileChanges{
+			Records:         []domain.FileAnalysisRecord{{Path: "internal/key/create.go", Hash: "key-hash"}},
+			AddedOrModified: []string{"internal/key/create.go"},
+			Deleted:         []string{"internal/removed.go"},
+		},
+	}
+
+	summary := buildLearnCurrentResumeSummary(session)
+
+	require.Equal(t, "-", summary.SourceFiles)
+	require.Equal(t, 3, summary.LocalPlanInputs)
+	require.Equal(t, "2", summary.AISelectionInputs)
+	require.Equal(t, "1", summary.AISelectedFiles)
+	require.Equal(t, 2, summary.PendingAnalyzeFiles)
+}
+
+func TestCurrentStateInputSummaryUsesSelectionStages(t *testing.T) {
+	changes := &incrementalFileChanges{SourceFileCount: 12}
+	selectionPlan := currentFileSelectionPlan{
+		Candidates: []string{"a.go", "b.go", "c.go"},
+		Eligible:   true,
+	}
+	selectionSummary := aiFileSelectionSummary{
+		Applied:        true,
+		CandidateCount: 3,
+		SelectedCount:  1,
+		SkippedCount:   2,
+	}
+
+	summary := currentStateInputSummary(changes, selectionPlan, selectionSummary)
+
+	require.Equal(t, commandstate.InputSummary{
+		SourceFiles:         12,
+		LocalPlanInputFiles: 3,
+		SelectionInputFiles: 3,
+		SelectedFiles:       1,
+		SkippedFiles:        2,
+	}, summary)
+}
+
 func TestFilterCompletedStateChangesKeepsOnlyUnfinishedInputs(t *testing.T) {
 	changes := &incrementalFileChanges{
 		Records: []domain.FileAnalysisRecord{

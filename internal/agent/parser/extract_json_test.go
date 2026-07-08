@@ -16,42 +16,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestParseAnalyzeCurrentCodebaseResultAcceptsProfileStringLists(t *testing.T) {
-	input := `{
-		"patterns": [],
-		"profile_delta": {
-			"frameworks": "cobra",
-			"layers": [{
-				"name": "命令层",
-				"description": "CLI 编排",
-				"responsibilities": "组织 learn current 流程",
-				"files": "internal/command/learn/command.go"
-			}],
-			"key_modules": [{
-				"name": "parser",
-				"path": "internal/agent/parser",
-				"description": "解析 Agent 输出",
-				"responsibilities": "兼容模型输出类型漂移",
-				"dependencies": "encoding/json",
-				"dependents": "learn current",
-				"key_methods": "ParseAnalyzeCurrentCodebaseResult"
-			}]
-		},
-		"profile_refresh_recommended": {"needed": false, "reason": ""}
-	}`
-
-	result, err := ParseAnalyzeCurrentCodebaseResult(input)
-
-	require.NoError(t, err)
-	require.Equal(t, []string{"cobra"}, result.ProfileDelta.Frameworks)
-	require.Equal(t, []string{"组织 learn current 流程"}, result.ProfileDelta.Layers[0].Responsibilities)
-	require.Equal(t, []string{"internal/command/learn/command.go"}, result.ProfileDelta.Layers[0].Files)
-	require.Equal(t, []string{"兼容模型输出类型漂移"}, result.ProfileDelta.KeyModules[0].Responsibilities)
-	require.Equal(t, []string{"encoding/json"}, result.ProfileDelta.KeyModules[0].Dependencies)
-	require.Equal(t, []string{"learn current"}, result.ProfileDelta.KeyModules[0].Dependents)
-	require.Equal(t, []string{"ParseAnalyzeCurrentCodebaseResult"}, result.ProfileDelta.KeyModules[0].KeyMethods)
-}
-
 func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) {
 	output := `{
   "units": [
@@ -100,22 +64,15 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) 
 	assert.Equal(t, "服务层", result.Units[0].ProfileDelta.Layers[0].Name)
 }
 
-func TestParseWorkspaceSpecAcceptsObjectChangeOrder(t *testing.T) {
+func TestParseWorkspaceSpecParsesStringChangeOrder(t *testing.T) {
 	output := `{
 	  "name": "hsm-workspace",
 	  "root_path": "/workspace",
 	  "routing": [],
 	  "rules": [],
 	  "change_order": [
-	    {
-	      "step": 1,
-	      "action": "确认契约或共享接口稳定",
-	      "details": "修改 proto、API、SDK 前先确认兼容性。"
-	    },
-	    {
-	      "action": "更新消费方",
-	      "details": "同步适配依赖方。"
-	    }
+	    "1. 确认契约或共享接口稳定：修改 proto、API、SDK 前先确认兼容性。",
+	    "2. 更新消费方：同步适配依赖方。"
 	  ]
 	}`
 
@@ -123,8 +80,25 @@ func TestParseWorkspaceSpecAcceptsObjectChangeOrder(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		"1. 确认契约或共享接口稳定：修改 proto、API、SDK 前先确认兼容性。",
-		"更新消费方：同步适配依赖方。",
+		"2. 更新消费方：同步适配依赖方。",
 	}, result.ChangeOrder)
+}
+
+func TestParseWorkspaceSpecRejectsObjectChangeOrder(t *testing.T) {
+	output := `{
+	  "name": "hsm-workspace",
+	  "root_path": "/workspace",
+	  "routing": [],
+	  "rules": [],
+	  "change_order": [
+	    {"step": 1, "action": "确认契约或共享接口稳定", "details": "修改 proto、API、SDK 前先确认兼容性。"}
+	  ]
+	}`
+
+	result, err := ParseWorkspaceSpec(output)
+
+	require.Error(t, err)
+	require.Nil(t, result)
 }
 
 func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
@@ -163,34 +137,6 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	assert.Equal(t, "Taskfile.yml", result.ValidationCommands[0].Source)
 }
 
-func TestParseAnalyzeProjectResult_AcceptsStringValidationCommands(t *testing.T) {
-	output := `{
-  "project_name": "demo",
-  "language": "go",
-  "frameworks": ["cobra"],
-  "architecture": "layered",
-  "layers": [],
-  "dependency_graph": "command -> service",
-  "data_flow": "request -> response",
-  "framework_patterns": [],
-  "structure": "internal/",
-  "key_modules": [],
-  "business_methods": [],
-  "common_utils": [],
-  "config_patterns": [],
-  "dependencies": [],
-  "validation_commands": ["go test ./...", "go vet ./..."],
-  "summary": "demo project"
-}`
-
-	result, err := ParseAnalyzeProjectResult(output)
-
-	require.NoError(t, err)
-	require.Len(t, result.ValidationCommands, 2)
-	assert.Equal(t, "go test ./...", result.ValidationCommands[0].Command)
-	assert.Equal(t, "go vet ./...", result.ValidationCommands[1].Command)
-}
-
 func TestParseAnalyzeProjectResult_RepairsNonstandardJSON(t *testing.T) {
 	output := `{
   // project profile returned by model
@@ -221,6 +167,63 @@ func TestParseAnalyzeProjectResult_RepairsNonstandardJSON(t *testing.T) {
 	assert.Equal(t, []string{"cobra"}, result.Frameworks)
 	assert.Len(t, result.CommonUtils, 1)
 	assert.Equal(t, "RawFieldNames", result.CommonUtils[0].Name)
+}
+
+func TestParseAnalyzeProjectResultRejectsSemanticTypeMismatch(t *testing.T) {
+	output := `{
+  "project_name": "demo",
+  "language": "go",
+  "frameworks": ["cobra"],
+  "architecture": "layered",
+  "layers": [],
+  "dependency_graph": "command -> service",
+  "data_flow": "request -> response",
+  "framework_patterns": [],
+  "structure": "internal/",
+  "key_modules": [],
+  "business_methods": [],
+  "common_utils": [],
+  "config_patterns": [],
+  "dependencies": [],
+  "validation_commands": ["go test ./..."],
+  "summary": "demo project"
+}`
+
+	result, err := ParseAnalyzeProjectResult(output)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+}
+
+func TestParseAnalyzeCurrentCodebaseResultRejectsStringCodeLocation(t *testing.T) {
+	output := `{
+  "patterns": [{
+    "id": "business-run",
+    "name": "Business Run",
+    "category": "business",
+    "description": "runs a business workflow",
+    "good_example": "func Run() error {\n  return nil\n}",
+    "bad_example": "",
+    "rule": "Use for business orchestration",
+    "confidence": 0.9,
+    "frequency": 1,
+    "business_method": {
+      "name": "Run",
+      "code_location": "internal/service/demo.go:10",
+      "description": "runs demo workflow",
+      "usage": "demo flow",
+      "type": "domain",
+      "function": "func Run() error"
+    }
+  }],
+  "profile_delta": {},
+  "profile_refresh_recommended": {"needed": false}
+}`
+
+	result, err := ParseAnalyzeCurrentCodebaseResult(output)
+
+	require.Error(t, err)
+	require.Nil(t, result)
 }
 
 func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
@@ -273,129 +276,6 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
 	assert.Len(t, result.ProfileDelta.BusinessMethods, 1)
 }
 
-func TestParseAnalyzeCurrentCodebaseResult_AcceptsStringCodeLocation(t *testing.T) {
-	output := `{
-  "patterns": [{
-    "id": "business-run",
-    "name": "Business Run",
-    "category": "business",
-    "description": "runs a business workflow",
-    "good_example": "func Run() error {\n  return nil\n}",
-    "bad_example": "",
-    "rule": "Use for business orchestration",
-    "confidence": 0.9,
-    "frequency": 1,
-    "business_method": {
-      "name": "Run",
-      "code_location": "internal/service/demo.go:10",
-      "description": "runs demo workflow",
-      "usage": "demo flow",
-      "type": "domain",
-      "function": "func Run() error"
-    }
-  }],
-  "profile_delta": {
-    "business_methods": [{
-      "name": "Run",
-      "code_location": "internal/service/demo.go:10",
-      "description": "runs demo workflow",
-      "usage": "demo flow",
-      "type": "domain",
-      "function": "func Run() error"
-    }]
-  },
-  "profile_refresh_recommended": {"needed": false}
-}`
-
-	result, err := ParseAnalyzeCurrentCodebaseResult(output)
-
-	require.NoError(t, err)
-	require.Len(t, result.Patterns, 1)
-	require.NotNil(t, result.Patterns[0].BusinessMethod)
-	assert.Equal(t, "internal/service/demo.go:10", result.Patterns[0].BusinessMethod.DisplayLocation())
-	require.Len(t, result.ProfileDelta.BusinessMethods, 1)
-	assert.Equal(t, "internal/service/demo.go:10", result.ProfileDelta.BusinessMethods[0].DisplayLocation())
-}
-
-func TestParseAnalyzeCurrentCodebaseBatchResult_AcceptsStringCodeLocation(t *testing.T) {
-	output := `{
-  "units": [{
-    "unit_id": "tools",
-    "unit_name": "辅助工具",
-    "patterns": [],
-    "profile_delta": {
-      "business_methods": [{
-        "name": "RunTool",
-        "code_location": "internal/tools/run.go:27",
-        "description": "runs tool workflow",
-        "usage": "tool flow",
-        "type": "domain",
-        "function": "func RunTool() error"
-      }]
-    },
-    "profile_refresh_recommended": {"needed": false}
-  }]
-}`
-
-	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
-
-	require.NoError(t, err)
-	require.Len(t, result.Units, 1)
-	require.Len(t, result.Units[0].ProfileDelta.BusinessMethods, 1)
-	assert.Equal(t, "internal/tools/run.go:27", result.Units[0].ProfileDelta.BusinessMethods[0].DisplayLocation())
-}
-
-func TestParseAnalyzeCurrentCodebaseResult_AcceptsBusinessMethodTextArrays(t *testing.T) {
-	output := `{
-  "patterns": [{
-    "id": "business-run",
-    "name": "Business Run",
-    "category": "business",
-    "description": "runs a business workflow",
-    "good_example": "func Run() error {\n  return nil\n}",
-    "bad_example": "",
-    "rule": "Use for business orchestration",
-    "confidence": 0.9,
-    "frequency": 1,
-    "business_method": {
-      "name": "Run",
-      "code_location": {"current_location":"internal/service/demo.go:10"},
-      "description": "runs demo workflow",
-      "usage": "demo flow",
-      "type": "domain",
-      "function": "func Run() error",
-      "prerequisites": ["config loaded", "repository initialized"],
-      "returns": ["nil on success", "wrapped error on failure"]
-    }
-  }],
-  "profile_delta": {
-    "summary": "demo project",
-    "business_methods": [{
-      "name": "Run",
-      "code_location": {"current_location":"internal/service/demo.go:10"},
-      "description": "runs demo workflow",
-      "usage": "demo flow",
-      "type": "domain",
-      "function": "func Run() error",
-      "prerequisites": ["config loaded", "repository initialized"],
-      "returns": ["nil on success", "wrapped error on failure"]
-    }]
-  },
-  "profile_refresh_recommended": {"needed": false}
-}`
-
-	result, err := ParseAnalyzeCurrentCodebaseResult(output)
-
-	require.NoError(t, err)
-	require.Len(t, result.Patterns, 1)
-	require.NotNil(t, result.Patterns[0].BusinessMethod)
-	assert.Equal(t, "config loaded; repository initialized", result.Patterns[0].BusinessMethod.Prerequisites)
-	assert.Equal(t, "nil on success; wrapped error on failure", result.Patterns[0].BusinessMethod.Returns)
-	require.Len(t, result.ProfileDelta.BusinessMethods, 1)
-	assert.Equal(t, "config loaded; repository initialized", result.ProfileDelta.BusinessMethods[0].Prerequisites)
-	assert.Equal(t, "nil on success; wrapped error on failure", result.ProfileDelta.BusinessMethods[0].Returns)
-}
-
 func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
 	output := `{
   "patterns": [{
@@ -437,35 +317,6 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
 	assert.Equal(t, 42, result.Patterns[0].EvidenceLocations[0].Line)
 	assert.Equal(t, "LoadConfig", result.Patterns[0].EvidenceLocations[0].Symbol)
 	assert.Equal(t, "internal/service/config.go:42", result.Patterns[0].EvidenceLocations[0].DisplayLocation())
-}
-
-func TestParseAnalyzeCurrentCodebaseResult_AcceptsStringLineRanges(t *testing.T) {
-	output := `{
-  "patterns": [{
-    "id": "error-wrap",
-    "name": "Error Wrap",
-    "category": "error",
-    "description": "wraps errors",
-    "good_example": "return fmt.Errorf(\"load config: %w\", err)",
-    "bad_example": "",
-    "rule": "Wrap errors at module boundaries",
-    "confidence": 0.9,
-    "frequency": 1,
-    "evidence_locations": [
-      {"path": "internal/service/config.go", "line": "29-43", "symbol": "LoadConfig"}
-    ],
-    "business_method": null
-  }],
-  "profile_delta": {},
-  "profile_refresh_recommended": {"needed": false}
-}`
-
-	result, err := ParseAnalyzeCurrentCodebaseResult(output)
-
-	require.NoError(t, err)
-	require.Len(t, result.Patterns, 1)
-	require.Len(t, result.Patterns[0].EvidenceLocations, 1)
-	assert.Equal(t, 29, result.Patterns[0].EvidenceLocations[0].Line)
 }
 
 func TestParseAnalyzeResultReturnsErrorWhenJSONMissing(t *testing.T) {

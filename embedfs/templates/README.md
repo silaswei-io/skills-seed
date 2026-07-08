@@ -8,7 +8,6 @@ Templates are organized by two different dimensions.
 
 - `loader/` stores English runtime agent prompts rendered by `internal/prompts/loader`.
 - `append/` stores mandatory English fragments appended after runtime prompts, such as final output contracts and output-language rules.
-- `context/` stores templates used to initialize project context files under `.skills-seed/context`.
 
 Runtime prompt IDs use kebab-case prefixes:
 
@@ -17,6 +16,12 @@ Runtime prompt IDs use kebab-case prefixes:
 - `pattern-*` for pattern maintenance prompts.
 - `project-*` for project profile analysis prompts.
 - `skill-project-*` and `skill-workspace-*` for prompts that produce data consumed by generated skills.
+
+## Seed
+
+`templates/seed` stores user-editable seed templates written into a project or workspace during initialization.
+
+- `context/` stores templates used to initialize `.skills-seed/context/*.md`.
 
 ## Skills
 
@@ -32,4 +37,4 @@ Skill template IDs are declared in `internal/templates/skills/catalog.go`. The c
 
 Runtime prompt templates under `loader/` and `append/` are maintained in English only. The output language is controlled by `skills.locale` through the appended output contract.
 
-User-facing context and generated Skills templates may have locale variants. Templates without a locale suffix are Simplified Chinese for those user-facing artifacts, and English variants use `.en-US` before the template extension.
+User-facing seed context and generated Skills templates may have locale variants. Templates without a locale suffix are Simplified Chinese for those user-facing artifacts, and English variants use `.en-US` before the template extension.

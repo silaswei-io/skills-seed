@@ -824,7 +824,7 @@ func TestLoader_ProjectProfilePromptKeepsDomainEntriesOutOfCommonUtils(t *testin
 	}
 }
 
-func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
+func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testing.T) {
 	tests := []struct {
 		locale       string
 		requiredText []string
@@ -832,6 +832,7 @@ func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
 		{
 			locale: "zh-CN",
 			requiredText: []string{
+				"entry evidence first",
 				"business coverage",
 				"business subdomain",
 				"business coverage matrix",
@@ -839,7 +840,8 @@ func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
 				"runtime",
 				"policy",
 				"external dependency",
-				"same candidate input",
+				"structural context",
+				"same candidate overview",
 				"stable selection",
 				"selected_paths",
 			},
@@ -847,14 +849,15 @@ func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
 		{
 			locale: "en-US",
 			requiredText: []string{
-				"business coverage first",
+				"entry evidence first",
 				"candidate business subdomains",
 				"business coverage matrix",
 				"background/async/periodic flows",
 				"runtime product behavior",
 				"rules or policies",
 				"external dependency constraints",
-				"same candidate input",
+				"structural context",
+				"same candidate overview",
 				"stable selection",
 				"selected_paths",
 			},
@@ -865,12 +868,14 @@ func TestLoader_FileSelectPromptPrefersBusinessCoverage(t *testing.T) {
 		t.Run(tt.locale, func(t *testing.T) {
 			loader := New("loader", tt.locale, "")
 			prompt, err := loader.Render("file-select", map[string]interface{}{
-				"CandidateNum":    3,
-				"FileTree":        "internal/order/create.go\ninternal/billing/rule.go\ninternal/worker/task.go",
-				"CandidatesPath":  "/tmp/skills-seed/candidates.json",
-				"UserContextPath": "",
+				"CandidateNum":      3,
+				"FileTree":          "internal/order/create.go\ninternal/billing/rule.go\ninternal/worker/task.go",
+				"CandidatesPath":    "/tmp/skills-seed/candidates.json",
+				"StructuralContext": "## File Selection Structural Context\n\n### High-Value Candidates\n\n#### internal/order/create.go\n",
+				"UserContextPath":   "",
 			})
 			require.NoError(t, err)
+			require.NotContains(t, prompt, "structural-context.md")
 
 			lowerPrompt := strings.ToLower(prompt)
 			for _, text := range tt.requiredText {
@@ -957,7 +962,8 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 				},
 				"user-define-pattern": {
 					"`evidence_locations`",
-					"real evidence locations",
+					"pattern-level source evidence locations",
+					"Return an empty array when there is no real evidence",
 				},
 			},
 		},
@@ -985,7 +991,8 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 				},
 				"user-define-pattern": {
 					"`evidence_locations`",
-					"fill real evidence locations when related files are provided",
+					"pattern-level source evidence locations",
+					"Return an empty array when there is no real evidence",
 				},
 			},
 		},
@@ -1018,6 +1025,19 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoader_RenderCurrentBatchPromptIncludesValidationCommandObjectContract(t *testing.T) {
+	loader := New("loader", "en-US", "")
+
+	prompt, err := loader.Render("pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, `"validation_commands"`)
+	require.Contains(t, prompt, `"description": "exact full validation command shown by evidence"`)
+	require.Contains(t, prompt, `"scope_paths"`)
+	require.Contains(t, prompt, `"evidence"`)
+	require.Contains(t, prompt, `"type": "object"`)
 }
 
 func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *testing.T) {
@@ -1167,7 +1187,8 @@ func TestLoader_RenderProjectInitPromptUsesConcreteCategoryInJSONExample(t *test
 			loader := New("loader", tt.locale, "")
 			prompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
 			require.NoError(t, err)
-			require.Contains(t, prompt, `"category": "error"`)
+			require.Contains(t, prompt, `"category"`)
+			require.Contains(t, prompt, `"description": "one allowed category"`)
 			for _, text := range tt.forbidden {
 				require.NotContains(t, prompt, text)
 			}
@@ -1235,6 +1256,18 @@ func TestRenderWorkspacePromptsIncludeLearnUserContextPathWhenProvided(t *testin
 	require.Contains(t, profile, "do not copy the file verbatim")
 	require.Contains(t, spec, "/tmp/skills-seed/user-context.md")
 	require.Contains(t, spec, "do not copy the file verbatim")
+}
+
+func TestLoader_RenderWorkspaceSpecPromptRequiresStringChangeOrder(t *testing.T) {
+	loader := New("loader", "en-US", "")
+
+	prompt, err := loader.Render("skill-workspace-spec", workspaceSpecPromptData())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "source of truth for field names, types")
+	require.Contains(t, prompt, `"change_order"`)
+	require.Contains(t, prompt, `"description": "ordered string steps; include step numbers inside each string"`)
+	require.NotContains(t, prompt, `{"step": 1, "action": "confirm contract or shared interface"`)
 }
 
 func TestLoader_RenderBatchLearnUsesCommitHashesWithoutDiffs(t *testing.T) {

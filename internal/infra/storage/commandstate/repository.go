@@ -21,6 +21,15 @@ const schemaVersion = 1
 
 var ErrStateNotFound = errors.New("command state not found")
 
+// InputSummary 记录创建可恢复计划时的输入规模，用于恢复时展示不可重算的阶段指标。
+type InputSummary struct {
+	SourceFiles         int `json:"source_files,omitempty"`
+	LocalPlanInputFiles int `json:"local_plan_input_files,omitempty"`
+	SelectionInputFiles int `json:"selection_input_files,omitempty"`
+	SelectedFiles       int `json:"selected_files,omitempty"`
+	SkippedFiles        int `json:"skipped_files,omitempty"`
+}
+
 // FileInput 记录命令状态覆盖文件的输入摘要。
 type FileInput struct {
 	Path   string `json:"path"`
@@ -37,6 +46,7 @@ type State struct {
 	Mode          string                `json:"mode,omitempty"`
 	UserContext   string                `json:"user_context_hash,omitempty"`
 	CreatedAt     string                `json:"created_at"`
+	InputSummary  *InputSummary         `json:"input_summary,omitempty"`
 	Inputs        []FileInput           `json:"inputs"`
 	Units         []domain.AnalysisUnit `json:"units"`
 }
@@ -111,6 +121,15 @@ func NewStateWithMode(command, projectName, language, mode, userContext string, 
 		Inputs:        normalizeInputs(inputs),
 		Units:         normalizeUnits(units),
 	}
+}
+
+// WithInputSummary 设置创建计划时的输入规模摘要。
+func (s *State) WithInputSummary(summary InputSummary) *State {
+	if s == nil {
+		return nil
+	}
+	s.InputSummary = &summary
+	return s
 }
 
 // HashText 返回文本的稳定 SHA-256 摘要。

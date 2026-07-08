@@ -24,7 +24,7 @@ func TestEnsureProjectContextWritesContextTemplateHashMetadata(t *testing.T) {
 	text := string(content)
 
 	require.Contains(t, text, "generated-by: skills-seed "+metadata.ProgramVersion)
-	require.Contains(t, text, "prompt-template-sha256:")
+	require.Contains(t, text, "seed-template-sha256:")
 	require.NotContains(t, text, metadata.UnavailableHash)
 }
 

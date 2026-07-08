@@ -66,10 +66,11 @@ func SelectFilesPromptData(session *PromptInputSession, req *SelectFilesRequest)
 		return nil, fmt.Errorf("write file selection user context: %w", err)
 	}
 	return map[string]interface{}{
-		"FileTree":        req.FileTree,
-		"CandidatesPath":  candidatesPath,
-		"UserContextPath": userContextPath,
-		"CandidateNum":    req.CandidateNum,
+		"FileTree":          req.FileTree,
+		"CandidatesPath":    candidatesPath,
+		"StructuralContext": req.StructuralContext,
+		"UserContextPath":   userContextPath,
+		"CandidateNum":      req.CandidateNum,
 	}, nil
 }
 

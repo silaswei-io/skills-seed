@@ -39,6 +39,12 @@ type AnalyzerService struct {
 	structuralCollector structuralCollector
 }
 
+// FileSelectionStructuralContext 是 gotree 文件选择上下文及其阶段统计。
+type FileSelectionStructuralContext struct {
+	Text  string
+	Stats StructuralSelectionStats
+}
+
 // NewAnalyzerService 创建分析服务
 func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerService {
 	svc := &AnalyzerService{
@@ -80,6 +86,33 @@ func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectR
 		"error", err,
 	)
 	return "", nil
+}
+
+// BuildFileSelectionStructuralContext 维护结构索引，并为 AI 文件选择生成紧凑结构摘要。
+func (s *AnalyzerService) BuildFileSelectionStructuralContext(ctx context.Context, projectRoot, language string, changes *fileanalysis.FileChanges) (*FileSelectionStructuralContext, error) {
+	_ = language
+	if s.configRepo == nil || projectRoot == "" {
+		return &FileSelectionStructuralContext{}, nil
+	}
+	cfg := s.configRepo.GetCurrentLearningConfig().Structural
+	if !cfg.Enabled {
+		return &FileSelectionStructuralContext{}, nil
+	}
+	index, err := s.updateStructuralIndex(ctx, projectRoot, changes)
+	if err != nil {
+		return nil, err
+	}
+	context := buildStructuralSelectionContext(index, fileSelectionCandidatePaths(changes))
+	return &FileSelectionStructuralContext{Text: context.Text, Stats: context.Stats}, nil
+}
+
+func fileSelectionCandidatePaths(changes *fileanalysis.FileChanges) []string {
+	if changes == nil {
+		return nil
+	}
+	paths := append([]string{}, changes.AddedOrModified...)
+	paths = append(paths, changes.Deleted...)
+	return normalizeFileSelectionPaths(paths)
 }
 
 func structuralSeedPaths(focusPaths []string, sampleFiles []agent.SampleFile, diffFiles []agent.DiffFileRef, mainFiles []string) []string {

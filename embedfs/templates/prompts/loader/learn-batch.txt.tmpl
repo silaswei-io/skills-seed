@@ -181,99 +181,17 @@ Extract patterns in these categories:
 - **middleware**: Middleware usage
 
 
-# Required Format
+# JSON Schema Contract
 
-For EACH pattern, you MUST provide:
-1. **id**: Unique kebab-case identifier
-2. **name**: Clear, descriptive name
-3. **category**: One of the allowed categories ({{.AllowedCategories}})
-4. **description**: What it does and when to use it
-5. **good_example**: Code evidence copied verbatim from source you read (5-30 lines) - REQUIRED
-6. **bad_example**: Common mistake to avoid (if applicable)
-7. **rule**: When to apply this pattern
-8. **confidence**: 0.0 to 1.0 (how certain you are)
-9. **frequency**: How many times it appears in these commits
-10. **evidence_locations**: pattern-level source evidence locations. Fill real relative paths and line numbers for each pattern when possible:
-    - **path**: Relative path from the project root
-    - **line**: Single 1-based integer line number; omit when the exact line is unknown. Never output `"29-43"`, `29-43`, or any other range expression.
-    - **symbol**: Related function, method, type, variable, or file name
-    - **kind**: Evidence type such as "function", "method", "type", or "file"
-    - **description**: How this location supports the pattern
-    - **confidence**: Evidence-location confidence, 0.0 to 1.0
-    - business patterns must prioritize path and symbol; missing these fields makes the generated business overview less useful for routing
-11. **business_method**: For utility/business methods ONLY:
-    - **name**: Full method signature or code identifier
-    - **code_location**: Must be an object `{"current_location":"relative/file/path:line"}`. Never output a string and never rename it to `location`.
-    - **function**: Complete signature with params and returns
-    - **prerequisites**: What needs to be set up first (e.g., transaction opened, config loaded). Must be a string; separate multiple conditions with semicolons or commas, never use an array or object.
-    - **returns**: What it returns including errors. Must be a string; separate multiple return values with semicolons or commas, never use an array or object.
-    - **type**: "domain" (project-specific business logic) or "common" (reusable utility)
-    - **description**: Detailed business logic explanation
-    - **usage**: When to call this method
-
-# Output Shape Example
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "patterns": [
-    {
-      "id": "domain-workflow-state-transition",
-      "name": "Domain Workflow State Transition",
-      "category": "business",
-      "description": "Business flow, trigger, state progression, and exceptional branch inferred from real code evidence",
-      "good_example": "Code evidence copied verbatim from source you read (5-30 lines); do not output this placeholder",
-      "rule": "For the same business scenario, follow the validation order, state progression, and exceptional boundary shown by code evidence",
-      "confidence": 0.95,
-      "frequency": 5,
-      "evidence_locations": [
-        {
-          "path": "path/to/domain_component.go",
-          "line": 42,
-          "symbol": "AdvanceDomainState",
-          "kind": "method",
-          "description": "pattern-level source evidence locations",
-          "confidence": 0.90
-        }
-      ],
-      "business_method": {
-        "name": "Real method signature or code identifier",
-        "code_location": {"current_location": "relative/file/path:line"},
-        "description": "Full business intent supported by code evidence",
-        "function": "Real complete signature",
-        "prerequisites": "Preconditions and dependencies shown by code evidence",
-        "returns": "Return values and error semantics shown by code evidence",
-        "type": "domain",
-        "usage": "Usage scenario supported by code evidence"
-      }
-    },
-    {
-      "id": "consistency-boundary-pattern",
-      "name": "Consistency Boundary Pattern",
-      "category": "database",
-      "description": "Use the project's existing data-consistency boundary for multi-step state changes so failures are reverted or marked according to project semantics",
-      "good_example": "Consistency-boundary code evidence copied verbatim from source you read (5-30 lines); do not output this placeholder",
-      "bad_example": "",
-      "rule": "Multi-step state changes must use the project's existing consistency-boundary wrapper",
-      "confidence": 0.90,
-      "frequency": 8,
-      "evidence_locations": [
-        {
-          "path": "path/to/persistence_component.go",
-          "line": 88,
-          "symbol": "ApplyDomainChange",
-          "kind": "function",
-          "description": "pattern-level source evidence locations",
-          "confidence": 0.86
-        }
-      ]
-    }
-  ]
-}
+{{ jsonContract "LearnPatternsOutput" }}
 ```
 
 # CRITICAL Rules
 
-1. Return JSON matching the structure above
+1. Return JSON matching the schema above
 2. Every pattern MUST have `good_example` with code evidence copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, or invent code; if surrounding context must be omitted, mark it explicitly with `// ...`, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering
 3. Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Do not invent evidence paths or line numbers; if the exact line is unknown, provide only the real path.
 4. Use `business_method` ONLY for utility/business methods

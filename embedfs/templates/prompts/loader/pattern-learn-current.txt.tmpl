@@ -174,122 +174,10 @@ Recommended analysis order: build a business candidate inventory and source busi
 
 # Output Format
 
-## Hard JSON Type Contract
-
-- The final response must be a directly parseable JSON object. Do not output Markdown, explanatory text, comments, trailing commas, or extra fenced blocks.
-- `patterns` must be an array. Return `[]` when there are no patterns; never return a string, object, or `null`.
-- `profile_delta` must be an object. When there are no delta facts, return `{}` or only empty-array fields; never return a string summary.
-- `profile_delta.frameworks`, `dependencies`, `config_patterns`, and `framework_patterns` must be string arrays. Return `[]` or omit the field when there is no evidence.
-- `profile_delta.layers` must be an array of objects. Each item must be an object with `name`, `description`, `responsibilities`, and `files`; never use a string, string array, or prose paragraph. Return `[]` when there is no reliable architecture-layer delta.
-- `profile_delta.key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects. Return `[]` or omit the field when there is no evidence.
-- `business_methods[].code_location` must be an object, for example `{"current_location":"file/path:line"}`; never use a `"file/path:line"` string.
-- `business_methods[].name`, `description`, `usage`, `type`, `function`, `prerequisites`, and `returns` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
-- `profile_delta.architecture`, `structure`, `dependency_graph`, `data_flow`, and `summary` must be strings. Omit the field or return an empty string when there is no delta; never use an array or object.
-- `evidence_locations[].line` must be a single 1-based integer; `evidence_locations[].confidence` must be a number in 0.0-1.0; the same applies to `patterns[].confidence` and `patterns[].frequency`.
-- Plural fields such as `key_modules[].responsibilities`, `dependencies`, `dependents`, `key_methods`, `layers[].responsibilities`, `layers[].files`, `validation_commands[].scope_paths`, and `validation_commands[].evidence` must be string arrays. Put a single value in a one-element array.
-- When unsure about a field's structure, omit the field or return an empty array instead of explaining it with a string.
-
-The `json` fenced block below documents the response structure:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one directly parseable JSON object matching this schema, with no Markdown, explanatory text, comments, trailing commas, or extra fenced blocks.
 
 ```json
-{
-  "patterns": [
-    {
-      "id": "kebab-case-id",
-      "name": "Pattern Name",
-      "category": "error",
-      "description": "Description of the pattern and when to use it",
-      "good_example": "Code evidence copied verbatim from source you read (5-12 lines)",
-      "bad_example": "",
-      "rule": "When to apply this pattern",
-      "confidence": 0.9,
-      "frequency": 3,
-      "analysis_unit_id": "{{.AnalysisUnit.ID}}",
-      "analysis_unit_name": "{{.AnalysisUnit.Name}}",
-      "evidence_locations": [
-        {
-          "path": "relative/file/path",
-          "line": 42,
-          "symbol": "real function/method/type/variable name",
-          "kind": "function|method|type|file",
-          "description": "pattern-level source evidence locations",
-          "confidence": 0.88
-        }
-      ],
-      "business_method": {
-        "name": "Complete method signature",
-        "code_location": {"current_location": "file/path:line"},
-        "description": "Functionality and business logic",
-        "function": "Full signature with parameters and return types",
-        "usage": "When to call",
-        "type": "domain",
-        "returns": "Return value description",
-        "prerequisites": "Prerequisites"
-      }
-    }
-  ],
-  "profile_delta": {
-    "frameworks": ["new framework or runtime confirmed by evidence in this run"],
-    "dependencies": ["new dependency or tool confirmed by evidence in this run"],
-    "layers": [
-      {
-        "name": "Real responsibility layer name",
-        "description": "Responsibility change confirmed by this run",
-        "responsibilities": ["responsibility"],
-        "files": ["relative/file/path"]
-      }
-    ],
-    "key_modules": [
-      {
-        "name": "Module name",
-        "path": "relative directory or file path",
-        "description": "Module responsibility confirmed by this run",
-        "responsibilities": ["responsibility"],
-        "dependencies": ["dependency module"],
-        "dependents": ["dependent module"],
-        "key_methods": ["real method or entry"]
-      }
-    ],
-    "common_utils": [
-      {
-        "name": "Utility name",
-        "file": "relative/file/path",
-        "signature": "real function signature",
-        "description": "Utility responsibility",
-        "usage": "When to use it"
-      }
-    ],
-    "config_patterns": ["configuration convention confirmed by this run"],
-    "framework_patterns": ["framework usage convention confirmed by this run"],
-    "business_methods": [
-      {
-        "name": "Complete method signature",
-        "code_location": {"current_location": "file/path:line"},
-        "description": "Reusable business entry responsibility",
-        "usage": "When to call",
-        "type": "domain",
-        "function": "Complete method signature",
-        "returns": "Return value description",
-        "prerequisites": "Prerequisites"
-      }
-    ],
-    "validation_commands": [
-      {
-        "command": "Exact full validation command shown by evidence",
-        "when": "When to run this command",
-        "source": "Repository-relative path or user_context",
-        "workdir": "Repository-relative directory where the command should run; leave empty for project root",
-        "scope_paths": ["relative paths or directories actually covered by this command"],
-        "evidence": ["relative paths proving this command's scope"],
-        "type": "test|build|lint|generate|contract|check"
-      }
-    ]
-  },
-  "profile_refresh_recommended": {
-    "needed": false,
-    "reason": "Fill only when this run shows broad structure, module boundary, or technology stack changes"
-  }
-}
+{{ jsonContract "AnalyzeCurrentCodebaseOutput" }}
 ```
 
 # Pattern Category Decision Rules (Prefer Specific Categories)
@@ -350,9 +238,7 @@ Before returning JSON, validate every candidate pattern internally:
    - Drop the pattern if evidence is too weak.
 7. Project profile delta check:
    - Fill `profile_delta` only with structured project facts newly added or changed by source evidence read in this run; omit fields or return empty arrays/strings when there is no evidence.
-   - Every array field inside `profile_delta` must keep its JSON array type. `layers`, `key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects; never replace them with string summaries.
-   - Every `profile_delta.layers` item must be an object: `{"name":"","description":"","responsibilities":[],"files":[]}`. If you can only write a one-sentence architecture description, evidence is insufficient; return `[]`.
-   - Every `profile_delta.business_methods[].code_location` must be an object: `{"current_location":"file/path:line"}`. Do not output a string for brevity.
+   - If you can only write a one-sentence architecture description for a profile layer, evidence is insufficient; leave that delta empty.
    - Do not put project initialization, full structure documentation, whole-architecture summaries, data-flow overviews, or generic overview text into `profile_delta`; those belong only to a full project profile refresh.
    - `profile_delta.validation_commands` must include only commands that validate a completed change, such as repository-evidenced tests, checks, static analysis, builds, code generation, or contract generation; do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands. Fill `scope_paths` or `evidence` to state the command's applicability; if the scope is unclear, do not output the command.
    - `profile_delta.business_methods` must include only real business entry points, cross-module orchestration entry points, domain reusable entry points, or high-value utility entry points. Domain operations, resource lifecycles, policy execution, and external dependency interaction entries confirmed by source evidence are domain reusable entry candidates. Do not output ordinary startup, route/entry registration, framework initialization, scaffolding entry points, or simple record operations.

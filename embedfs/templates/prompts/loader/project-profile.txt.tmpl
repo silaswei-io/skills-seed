@@ -87,80 +87,8 @@ If an existing project profile is provided, preserve unchanged modules, utilitie
 
 # Output Format
 
-## Field Type Contract
-
-- `frameworks`, `dependencies`, `framework_patterns`, `config_patterns`, `layers[].responsibilities`, `layers[].files`, `key_modules[].responsibilities`, `key_modules[].dependencies`, `key_modules[].dependents`, `key_modules[].key_methods`, `validation_commands[].scope_paths`, and `validation_commands[].evidence` must be string arrays. Put a single value in a one-element array.
-- `architecture`, `structure`, `dependency_graph`, `data_flow`, and `summary` must be strings; never use an array or object.
-- `layers`, `key_modules`, `common_utils`, `business_methods`, and `validation_commands` must be arrays of objects.
-- `business_methods[].name`, `description`, `usage`, `type`, `function`, `prerequisites`, and `returns` must be strings. Separate multiple conditions with semicolons or commas inside a single string; never use an array or object.
-- `business_methods[].code_location` must be an object `{"current_location":"file/path:line"}`; never use a string.
-- When unsure about a field's structure, omit the field or return an empty array / empty string instead of using an object or prose paragraph.
-
-The `json` fenced block below documents the response schema:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "project_name": "{{.ProjectName}}",
-  "language": "{{.Language}}",
-  "frameworks": ["framework or library name"],
-  "architecture": "Concrete architecture description",
-  "layers": [
-    {
-      "name": "Layer name",
-      "description": "Layer responsibility",
-      "responsibilities": ["Specific responsibility"],
-      "files": ["path/to/file"]
-    }
-  ],
-  "dependency_graph": "Describe dependency direction using real module names from code evidence",
-  "data_flow": "Describe data flow using real processing stages from code evidence",
-  "framework_patterns": ["Concrete framework usage pattern"],
-  "structure": "Concrete project structure summary",
-  "key_modules": [
-    {
-      "name": "Module name",
-      "path": "module/path",
-      "description": "Module role",
-      "responsibilities": ["Specific responsibility"],
-      "dependencies": ["dependency module"],
-      "dependents": ["dependent module"],
-      "key_methods": ["Important method signature"]
-    }
-  ],
-  "business_methods": [
-    {
-      "name": "MethodName",
-      "code_location": {"current_location": "file/path:line"},
-      "description": "Short responsibility of a project-level entry point or reusable method; do not summarize business patterns here",
-      "usage": "When to locate this entry point or reuse this method",
-      "type": "domain|common",
-      "function": "Full method signature",
-      "prerequisites": "Required setup or dependencies",
-      "returns": "Return values and possible errors"
-    }
-  ],
-  "common_utils": [
-    {
-      "name": "FunctionName",
-      "file": "file/path",
-      "signature": "Real function or method signature",
-      "description": "What this domain-neutral utility does; domain operations, protocol/command wrappers, or external dependency interaction entries that carry product-domain behavior should prefer business_methods. This judgment must come from project evidence, not directory names",
-      "usage": "When to use it"
-    }
-  ],
-  "config_patterns": ["Configuration pattern"],
-  "dependencies": ["dependency name"],
-  "validation_commands": [
-    {
-      "command": "Exact full command shown by evidence",
-      "when": "When to run this command",
-      "source": "Repository-relative path or user_context",
-      "workdir": "Repository-relative directory where the command should run; leave empty for project root",
-      "scope_paths": ["relative paths or directories actually covered by this command"],
-      "evidence": ["relative paths proving this command's scope"],
-      "type": "test|build|lint|generate|contract|check"
-    }
-  ],
-  "summary": "Specific project overview"
-}
+{{ jsonContract "ProjectProfileOutput" }}
 ```

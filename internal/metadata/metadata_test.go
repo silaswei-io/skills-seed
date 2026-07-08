@@ -59,3 +59,30 @@ func TestEmbeddedTreeHashTracksContentAndPath(t *testing.T) {
 		t.Fatal("hash should change when file path changes")
 	}
 }
+
+func TestSeedContextTemplatePath(t *testing.T) {
+	tests := []struct {
+		name   string
+		locale string
+		want   string
+	}{
+		{
+			name: "default locale",
+			want: "templates/seed/context/background.md.tmpl",
+		},
+		{
+			name:   "localized",
+			locale: "en-US",
+			want:   "templates/seed/context/background.en-US.md.tmpl",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SeedContextTemplatePath("background", tt.locale)
+			if got != tt.want {
+				t.Fatalf("SeedContextTemplatePath() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

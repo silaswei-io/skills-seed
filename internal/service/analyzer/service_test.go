@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -368,6 +369,199 @@ func TestAnalyzeCurrentCodebasePassesBoundedSeedsToStructuralCollector(t *testin
 	}, collector.req.SeedPaths)
 }
 
+func TestBuildFileSelectionStructuralContextUsesStructuralIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTestFile(t, tmpDir, "packages/medusa/src/api/admin/orders/route.ts", `
+import { createOrderWorkflow } from "../../../workflows/create-order"
+export async function POST() { return createOrderWorkflow() }
+`)
+	writeTestFile(t, tmpDir, "packages/medusa/src/modules/cart/service.ts", `
+export class CartModuleService {
+  async create() {}
+}
+`)
+	writeTestFile(t, tmpDir, "packages/admin/src/utils/format.ts", `export function format() {}`)
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
+			},
+		},
+	})
+
+	changes := &fileanalysis.FileChanges{
+		AddedOrModified: []string{
+			"packages/medusa/src/api/admin/orders/route.ts",
+			"packages/medusa/src/modules/cart/service.ts",
+			"packages/admin/src/utils/format.ts",
+		},
+		Records: []domain.FileAnalysisRecord{
+			{Path: "packages/medusa/src/api/admin/orders/route.ts", Hash: "route-hash"},
+			{Path: "packages/medusa/src/modules/cart/service.ts", Hash: "service-hash"},
+			{Path: "packages/admin/src/utils/format.ts", Hash: "format-hash"},
+		},
+	}
+	contextResult, err := svc.BuildFileSelectionStructuralContext(context.Background(), tmpDir, "typescript", changes)
+
+	require.NoError(t, err)
+	require.NotNil(t, contextResult)
+	contextText := contextResult.Text
+	require.Contains(t, contextText, "File Selection Structural Context")
+	require.Contains(t, contextText, "High-value candidates: 2")
+	require.Equal(t, 3, contextResult.Stats.CandidateFiles)
+	require.Equal(t, 2, contextResult.Stats.HighValueCandidates)
+	require.Contains(t, contextText, "packages/medusa/src/api/admin/orders/route.ts")
+	require.Contains(t, contextText, "packages/medusa/src/modules/cart/service.ts")
+	require.NotContains(t, contextText, "packages/admin/src/utils/format.ts")
+	require.Contains(t, contextText, "func POST")
+}
+
+func TestBuildFileSelectionStructuralContextDoesNotPromoteLowValueCandidates(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTestFile(t, tmpDir, "www/utils/generated/oas-output/operations/admin/get_admin_orders.ts", `export const path = "/admin/orders"`)
+	writeTestFile(t, tmpDir, "packages/admin/src/utils/format.ts", `export function format() {}`)
+	writeTestFile(t, tmpDir, "packages/medusa/src/api/admin/orders/route.ts", `export async function GET() {}`)
+
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
+			},
+		},
+	})
+
+	changes := &fileanalysis.FileChanges{
+		AddedOrModified: []string{
+			"www/utils/generated/oas-output/operations/admin/get_admin_orders.ts",
+			"packages/admin/src/utils/format.ts",
+			"packages/medusa/src/api/admin/orders/route.ts",
+		},
+		Records: []domain.FileAnalysisRecord{
+			{Path: "www/utils/generated/oas-output/operations/admin/get_admin_orders.ts", Hash: "generated-hash"},
+			{Path: "packages/admin/src/utils/format.ts", Hash: "format-hash"},
+			{Path: "packages/medusa/src/api/admin/orders/route.ts", Hash: "route-hash"},
+		},
+	}
+	contextResult, err := svc.BuildFileSelectionStructuralContext(context.Background(), tmpDir, "typescript", changes)
+
+	require.NoError(t, err)
+	require.NotNil(t, contextResult)
+	contextText := contextResult.Text
+	require.Contains(t, contextText, "Candidate files: 3")
+	require.Contains(t, contextText, "High-value candidates: 1")
+	require.Contains(t, contextText, "packages/medusa/src/api/admin/orders/route.ts")
+	require.NotContains(t, contextText, "www/utils/generated/oas-output/operations/admin/get_admin_orders.ts\n- module")
+	require.NotContains(t, contextText, "packages/admin/src/utils/format.ts\n- module")
+}
+
+func TestBuildFileSelectionStructuralContextStoresIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	writeTestFile(t, tmpDir, "packages/medusa/src/api/admin/orders/route.ts", `export async function GET() {}`)
+	writeTestFile(t, tmpDir, "packages/admin/src/utils/format.ts", `export function formatOrderTotal() {}`)
+
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
+			},
+		},
+	})
+
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	contextResult, err := svc.BuildFileSelectionStructuralContext(ctx, tmpDir, "typescript", &fileanalysis.FileChanges{
+		AddedOrModified: []string{
+			"packages/medusa/src/api/admin/orders/route.ts",
+			"packages/admin/src/utils/format.ts",
+		},
+		Records: []domain.FileAnalysisRecord{
+			{Path: "packages/medusa/src/api/admin/orders/route.ts", Hash: "route-hash"},
+			{Path: "packages/admin/src/utils/format.ts", Hash: "format-hash"},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, contextResult)
+	contextText := contextResult.Text
+	require.NotContains(t, contextText, "#### packages/admin/src/utils/format.ts")
+	indexPath := filepath.Join(seedPath, "cache", "structural-index", "current.json")
+	content, err := os.ReadFile(indexPath)
+	require.NoError(t, err)
+	require.Contains(t, string(content), "packages/medusa/src/api/admin/orders/route.ts")
+	require.Contains(t, string(content), "route-hash")
+	require.Contains(t, string(content), "packages/admin/src/utils/format.ts")
+	require.Contains(t, string(content), "formatOrderTotal")
+}
+
+func TestBuildFileSelectionStructuralContextDeletesRemovedIndexRecords(t *testing.T) {
+	tmpDir := t.TempDir()
+	seedPath := filepath.Join(tmpDir, ".skills-seed")
+	writeTestFile(t, tmpDir, "packages/medusa/src/api/admin/orders/route.ts", `export async function GET() {}`)
+
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled: true,
+				},
+			},
+		},
+	})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	_, err := svc.BuildFileSelectionStructuralContext(ctx, tmpDir, "typescript", &fileanalysis.FileChanges{
+		AddedOrModified: []string{
+			"packages/medusa/src/api/admin/orders/route.ts",
+		},
+		Records: []domain.FileAnalysisRecord{
+			{Path: "packages/medusa/src/api/admin/orders/route.ts", Hash: "route-hash"},
+		},
+	})
+	require.NoError(t, err)
+
+	contextResult, err := svc.BuildFileSelectionStructuralContext(ctx, tmpDir, "typescript", &fileanalysis.FileChanges{
+		Deleted: []string{
+			"packages/medusa/src/api/admin/orders/route.ts",
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, contextResult)
+	contextText := contextResult.Text
+	require.Contains(t, contextText, "Candidate files: 1")
+	require.NotContains(t, contextText, "#### packages/medusa/src/api/admin/orders/route.ts")
+	content, err := os.ReadFile(filepath.Join(seedPath, "cache", "structural-index", "current.json"))
+	require.NoError(t, err)
+	require.NotContains(t, string(content), "packages/medusa/src/api/admin/orders/route.ts")
+}
+
+func TestFileSelectionPathSignalsOnlyPromoteHighValueCandidates(t *testing.T) {
+	candidates := []string{
+		"packages/admin/src/utils/format.ts",
+		"packages/admin/src/types/order.ts",
+		"packages/medusa/src/api/admin/orders/route.ts",
+		"packages/medusa/src/modules/cart/service.ts",
+		"packages/medusa/src/workflows/create-order.ts",
+	}
+	promoted := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if len(fileSelectionPathSignals(candidate)) > 0 {
+			promoted = append(promoted, candidate)
+		}
+	}
+
+	require.Equal(t, []string{
+		"packages/medusa/src/api/admin/orders/route.ts",
+		"packages/medusa/src/modules/cart/service.ts",
+		"packages/medusa/src/workflows/create-order.ts",
+	}, promoted)
+}
+
 func TestAnalyzeCurrentCodebase_AIError(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
@@ -379,6 +573,13 @@ func TestAnalyzeCurrentCodebase_AIError(t *testing.T) {
 	// AnalyzeCurrentCodebase 在 AI 失败时返回领域错误。
 	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{})
 	assert.Error(t, err)
+}
+
+func writeTestFile(t *testing.T, root, relPath, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(relPath))
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
+	require.NoError(t, os.WriteFile(path, []byte(strings.TrimSpace(content)+"\n"), 0644))
 }
 
 func TestAnalyzeCodebaseFull(t *testing.T) {

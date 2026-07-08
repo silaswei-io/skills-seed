@@ -16,7 +16,9 @@ import (
 )
 
 type FileChanges struct {
-	Scope                      domain.FileAnalysisScope
+	Scope domain.FileAnalysisScope
+	// SourceFileCount 是本地选择策略接受的当前源文件数，不包含排除文件、非源码文件和焦点外文件。
+	SourceFileCount            int
 	Records                    []domain.FileAnalysisRecord
 	AddedOrModified            []string
 	Deleted                    []string
@@ -64,6 +66,7 @@ func PrepareCurrentChangesWithOptions(ctx context.Context, tracker domain.FileAn
 	current := make(map[string]domain.FileAnalysisRecord)
 	changes := &FileChanges{
 		Scope:                      scope,
+		SourceFileCount:            len(selection.Files),
 		ExcludedGeneratedSkillDirs: GeneratedSkillExcludeDirs(configRepo, scanRoot),
 		SkippedFiles:               append([]SkippedFile{}, selection.Skipped...),
 	}

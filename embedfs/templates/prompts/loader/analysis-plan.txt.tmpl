@@ -50,19 +50,8 @@ The user context is at `{{.UserContextPath}}`. Read it only if it helps decide b
 
 # Output Format
 
-The final response must contain exactly one JSON object:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "units": [
-    {
-      "id": "kebab-case-id",
-      "name": "Business analysis unit name",
-      "route_terms": ["requirement term", "state term", "action term"],
-      "entry_paths": ["path relative to project root"],
-      "related_paths": ["path relative to project root"],
-      "scope_reason": "why these files belong to one business capability"
-    }
-  ]
-}
+{{ jsonContract "PlanAnalysisUnitsOutput" }}
 ```

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +38,8 @@ var sleepAfterWorkspaceChildStep = time.Sleep
 const (
 	learnCurrentProgressSubjectMaxRunes = 36
 	learnCurrentRunningSubjectMaxRunes  = 18
+	// learnCurrentProjectStepTotal 是项目级 learn current 在控制台展示的顶层阶段数。
+	learnCurrentProjectStepTotal = 9
 )
 
 type learnCurrentOptions struct {
@@ -354,6 +357,35 @@ type aiFileSelectionSummary struct {
 	Reason         string
 }
 
+func currentStateInputSummary(changes *incrementalFileChanges, selectionPlan currentFileSelectionPlan, selectionSummary aiFileSelectionSummary) commandstate.InputSummary {
+	localPlanInputs := len(selectionPlan.Candidates)
+	aiSelectionInputs := 0
+	aiSelectedFiles := 0
+	aiSkippedFiles := 0
+	if selectionSummary.Applied {
+		aiSelectionInputs = selectionSummary.CandidateCount
+		aiSelectedFiles = selectionSummary.SelectedCount
+		aiSkippedFiles = selectionSummary.SkippedCount
+	}
+	sourceFiles := 0
+	if changes != nil {
+		sourceFiles = changes.SourceFileCount
+	}
+	return commandstate.InputSummary{
+		SourceFiles:         sourceFiles,
+		LocalPlanInputFiles: localPlanInputs,
+		SelectionInputFiles: aiSelectionInputs,
+		SelectedFiles:       aiSelectedFiles,
+		SkippedFiles:        aiSkippedFiles,
+	}
+}
+
+type currentFileSelectionPlan struct {
+	Candidates []string
+	Eligible   bool
+	SkipReason string
+}
+
 type learnCurrentProjectRun struct {
 	cont      *container.Container
 	opts      learnCurrentProjectOptions
@@ -375,9 +407,14 @@ type learnCurrentProjectRun struct {
 	effectiveFocusPaths []string
 	selectedFiles       []domain.FileInfo
 	selectionSummary    aiFileSelectionSummary
+	selectionPlan       currentFileSelectionPlan
+	structuralContext   string
+	structuralStats     analyzer.StructuralSelectionStats
 	stateSession        *currentStateSession
 	resumeSummary       *learnCurrentResumeSummary
 	changeProfile       currentChangeProfile
+	analysisState       *commandstate.State
+	plannedUnits        []domain.AnalysisUnit
 
 	patterns                  []domain.Pattern
 	profileDelta              domain.ProjectProfileDelta
@@ -468,7 +505,7 @@ func newLearnCurrentProjectRun(cont *container.Container, opts learnCurrentProje
 	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	steps := commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
-		TotalSteps:     5,
+		TotalSteps:     learnCurrentProjectStepTotal,
 		ShowProgress:   opts.showProgress,
 		OnStepStart:    opts.onStepStart,
 		OnStepComplete: opts.onStepComplete,
@@ -502,8 +539,21 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if err := r.detectChanges(); err != nil {
 		return nil, err
 	}
+	if err := r.buildFileSelectionStructuralContext(); err != nil {
+		return nil, err
+	}
+	if err := r.confirmFileSelectionCandidates(); err != nil {
+		return nil, err
+	}
+	if err := r.selectRelevantFilesWithAI(); err != nil {
+		return nil, err
+	}
+	r.logFileSelectionSummary()
 	if !r.incrementalChanges.HasChanges() {
 		return r.finishWithoutChanges()
+	}
+	if err := r.planAnalysisUnits(); err != nil {
+		return nil, err
 	}
 	if err := r.analyzeCodebase(); err != nil {
 		return nil, err
@@ -630,15 +680,13 @@ func (r *learnCurrentProjectRun) detectChanges() error {
 		detectLabel = i18n.Get("ProgressLearnCurrentResumeState")
 	}
 	if err := r.steps.Run(detectLabel, func() error {
-		if err := r.restoreOrDetectChanges(detectLabel); err != nil {
-			return err
-		}
-		return r.selectRelevantFilesIfNeeded(detectLabel)
+		return r.restoreOrDetectChanges(detectLabel)
 	}); err != nil {
 		return err
 	}
 	r.logDetectedChanges(detectStartedAt)
 	r.changeProfile = classifyCurrentChangeProfile(r.incrementalChanges)
+	r.selectionPlan = r.buildFileSelectionPlan()
 	return nil
 }
 
@@ -686,46 +734,134 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 	return nil
 }
 
-func (r *learnCurrentProjectRun) selectRelevantFilesIfNeeded(detectLabel string) error {
+func (r *learnCurrentProjectRun) buildFileSelectionPlan() currentFileSelectionPlan {
 	focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
 	currentLearningConfig := r.cont.ConfigRepo.GetCurrentLearningConfig()
+	if r.stateSession != nil {
+		return currentFileSelectionPlan{
+			Candidates: focusRelPaths,
+			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipRestored"),
+		}
+	}
 	if !currentLearningConfig.SelectRelevantFiles {
-		return nil
+		return currentFileSelectionPlan{
+			Candidates: focusRelPaths,
+			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipDisabled"),
+		}
+	}
+	if len(focusRelPaths) == 0 {
+		return currentFileSelectionPlan{
+			Candidates: focusRelPaths,
+			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipNoCandidates"),
+		}
 	}
 	if len(focusRelPaths) < currentLearningConfig.SelectRelevantFilesMinCandidates {
-		if len(focusRelPaths) == 0 {
-			return nil
-		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current.select_relevant_files",
 			"candidate_count", len(focusRelPaths),
 			"min_candidates", currentLearningConfig.SelectRelevantFilesMinCandidates,
 			"skipped", true,
 		)
-		return nil
+		return currentFileSelectionPlan{
+			Candidates: focusRelPaths,
+			SkipReason: i18n.GetWithParams("ProgressLearnCurrentFileSelectionSkipBelowThreshold", map[string]interface{}{
+				"Candidates":    len(focusRelPaths),
+				"MinCandidates": currentLearningConfig.SelectRelevantFilesMinCandidates,
+			}),
+		}
+	}
+	return currentFileSelectionPlan{Candidates: focusRelPaths, Eligible: true}
+}
+
+func (r *learnCurrentProjectRun) buildFileSelectionStructuralContext() error {
+	if !r.selectionPlan.Eligible {
+		return r.steps.Run(i18n.GetWithParams("ProgressLearnCurrentSkipFileSelectionIndex", map[string]interface{}{
+			"Reason": r.selectionPlan.SkipReason,
+		}), func() error { return nil })
 	}
 
-	r.detail(detectLabel, "ProgressLearnCurrentDetectSelectFiles", map[string]interface{}{
-		"Candidates": len(focusRelPaths),
-	})
-	selectionResult, selectErr := fileanalysis.ApplyAIFileSelector(r.ctx, r.cont.Agent, fileanalysis.AISelectorOptions{
-		ProjectRoot:   r.projectRoot,
-		Candidates:    focusRelPaths,
-		Changes:       r.incrementalChanges,
-		UserContext:   r.opts.userContext,
-		CachePath:     layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
-		RequiredPaths: utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
-	})
-	if selectErr != nil {
-		logger.Warn(i18n.Get("LearnCurrentAIFileSelectorFallback"))
+	indexStartedAt := time.Now()
+	indexLabel := i18n.Get("ProgressLearnCurrentBuildFileSelectionIndex")
+	if err := r.steps.Run(indexLabel, func() error {
+		context, err := r.cont.AnalyzerSvc.BuildFileSelectionStructuralContext(r.ctx, r.projectRoot, r.currentLanguage, r.incrementalChanges)
+		if err != nil {
+			return err
+		}
+		if context != nil {
+			r.structuralContext = context.Text
+			r.structuralStats = context.Stats
+		}
+		return nil
+	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "command.learn_current.select_relevant_files",
-			"error", selectErr,
-			"candidate_count", len(focusRelPaths),
+			"operation", "command.learn_current.build_file_selection_index",
+			"duration", time.Since(indexStartedAt),
+			"candidate_count", len(r.selectionPlan.Candidates),
+			"error", err,
+		)
+		return err
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+		"operation", "command.learn_current.build_file_selection_index",
+		"duration", time.Since(indexStartedAt),
+		"candidate_count", len(r.selectionPlan.Candidates),
+		"indexed_count", r.structuralStats.IndexedFiles,
+	)
+	return nil
+}
+
+func (r *learnCurrentProjectRun) confirmFileSelectionCandidates() error {
+	if !r.selectionPlan.Eligible {
+		return r.steps.Run(i18n.GetWithParams("ProgressLearnCurrentSkipFileSelectionConfirm", map[string]interface{}{
+			"Reason": r.selectionPlan.SkipReason,
+		}), func() error { return nil })
+	}
+	return r.steps.Run(i18n.Get("ProgressLearnCurrentConfirmFileSelectionCandidates"), func() error {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+			"operation", "command.learn_current.confirm_file_selection_candidates",
+			"candidate_count", len(r.selectionPlan.Candidates),
+			"indexed_count", r.structuralStats.IndexedFiles,
+			"high_value_count", r.structuralStats.HighValueCandidates,
+			"low_value_summarized_count", r.structuralStats.LowValueSummarized,
 		)
 		return nil
+	})
+}
+
+func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
+	if !r.selectionPlan.Eligible {
+		return r.steps.Run(i18n.GetWithParams("ProgressLearnCurrentSkipAIFileSelection", map[string]interface{}{
+			"Reason": r.selectionPlan.SkipReason,
+		}), func() error { return nil })
 	}
-	if selectionResult == nil || len(selectionResult.SelectedPaths) == 0 {
+
+	selectStartedAt := time.Now()
+	selectLabel := i18n.Get("ProgressLearnCurrentAIFileSelection")
+	var selectionResult *fileanalysis.AISelectorResult
+	var selectErr error
+	if err := r.steps.Run(selectLabel, func() error {
+		selectionResult, selectErr = fileanalysis.ApplyAIFileSelector(r.ctx, r.cont.Agent, fileanalysis.AISelectorOptions{
+			ProjectRoot:       r.projectRoot,
+			Candidates:        r.selectionPlan.Candidates,
+			Changes:           r.incrementalChanges,
+			StructuralContext: r.structuralContext,
+			UserContext:       r.opts.userContext,
+			CachePath:         layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
+			RequiredPaths:     utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
+		})
+		if selectErr != nil {
+			logger.Warn(i18n.Get("LearnCurrentAIFileSelectorFallback"))
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+				"operation", "command.learn_current.select_relevant_files",
+				"error", selectErr,
+				"candidate_count", len(r.selectionPlan.Candidates),
+			)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if selectErr != nil || selectionResult == nil || len(selectionResult.SelectedPaths) == 0 {
 		return nil
 	}
 
@@ -734,14 +870,20 @@ func (r *learnCurrentProjectRun) selectRelevantFilesIfNeeded(detectLabel string)
 	r.incrementalChanges.ApplyAISelection(selectionResult.SelectedPaths, selectionResult.Reason)
 	r.selectionSummary = aiFileSelectionSummary{
 		Applied:        true,
-		CandidateCount: len(focusRelPaths),
+		CandidateCount: len(r.selectionPlan.Candidates),
 		SelectedCount:  len(selectionResult.SelectedPaths),
 		SkippedCount:   len(selectionResult.SkippedPaths),
 		Reason:         selectionResult.Reason,
 	}
+	if r.opts.showDetailedLogs {
+		logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentFingerprintCommitPlan", map[string]interface{}{
+			"Records": len(r.incrementalChanges.Records),
+		}))
+	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.select_relevant_files",
-		"candidate_count", len(focusRelPaths),
+		"duration", time.Since(selectStartedAt),
+		"candidate_count", len(r.selectionPlan.Candidates),
 		"selected_count", len(selectionResult.SelectedPaths),
 		"skipped_count", len(selectionResult.SkippedPaths),
 		"reason", selectionResult.Reason,
@@ -749,16 +891,41 @@ func (r *learnCurrentProjectRun) selectRelevantFilesIfNeeded(detectLabel string)
 	return nil
 }
 
+func (r *learnCurrentProjectRun) logFileSelectionSummary() {
+	if !r.opts.showDetailedLogs {
+		return
+	}
+	if r.resumeSummary != nil {
+		return
+	}
+	aiInput := "-"
+	aiSelected := "-"
+	if r.selectionSummary.Applied {
+		aiInput = strconv.Itoa(r.selectionSummary.CandidateCount)
+		aiSelected = strconv.Itoa(r.selectionSummary.SelectedCount)
+	}
+	logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentFileSelectionSummary", map[string]interface{}{
+		"SourceFiles":       r.incrementalChanges.SourceFileCount,
+		"LocalPlanInputs":   len(r.selectionPlan.Candidates),
+		"GotreeIndexed":     r.structuralStats.IndexedFiles,
+		"GotreeHighValue":   r.structuralStats.HighValueCandidates,
+		"AISelectionInputs": aiInput,
+		"AISelectedFiles":   aiSelected,
+	}))
+}
+
 func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
 	if r.opts.showDetailedLogs {
 		if r.resumeSummary != nil {
 			logger.Info(i18n.GetWithParams("LearnCurrentResumeSummary", map[string]interface{}{
-				"Command":   r.resumeSummary.Command,
-				"CreatedAt": r.resumeSummary.CreatedAt,
-				"Inputs":    r.resumeSummary.Inputs,
-				"Pending":   r.resumeSummary.Pending,
-				"Units":     r.resumeSummary.Units,
-				"AISkipped": r.resumeSummary.AISkipped,
+				"Command":             r.resumeSummary.Command,
+				"CreatedAt":           r.resumeSummary.CreatedAt,
+				"SourceFiles":         r.resumeSummary.SourceFiles,
+				"LocalPlanInputs":     r.resumeSummary.LocalPlanInputs,
+				"AISelectionInputs":   r.resumeSummary.AISelectionInputs,
+				"AISelectedFiles":     r.resumeSummary.AISelectedFiles,
+				"PendingAnalyzeFiles": r.resumeSummary.PendingAnalyzeFiles,
+				"Units":               r.resumeSummary.Units,
 			}))
 		} else {
 			logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{
@@ -770,16 +937,6 @@ func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
 			if len(r.incrementalChanges.ExcludedGeneratedSkillDirs) > 0 {
 				logger.Info(i18n.GetWithParams("LearnCurrentGeneratedSkillsExcluded", map[string]interface{}{
 					"Paths": strings.Join(r.incrementalChanges.ExcludedGeneratedSkillDirs, ", "),
-				}))
-			}
-			if r.selectionSummary.Applied {
-				logger.Info(i18n.GetWithParams("LearnCurrentAIFileSelectionSummary", map[string]interface{}{
-					"Candidates": r.selectionSummary.CandidateCount,
-					"Selected":   r.selectionSummary.SelectedCount,
-					"Skipped":    r.selectionSummary.SkippedCount,
-				}))
-				logger.Info(i18n.GetWithParams("LearnCurrentFingerprintCommitPlan", map[string]interface{}{
-					"Records": len(r.incrementalChanges.Records),
 				}))
 			}
 		}
@@ -800,6 +957,9 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 	}
 	if r.opts.showDetailedLogs {
 		logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
+	}
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentPlanUnits"), func() error { return nil }); err != nil {
+		return nil, err
 	}
 	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
 		return nil, err
@@ -847,31 +1007,57 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 	return r.buildResult(true), nil
 }
 
-func (r *learnCurrentProjectRun) analyzeCodebase() error {
-	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
-	analyzeStartedAt := time.Now()
-	analyzeLabel := i18n.Get("ProgressLearnCurrentAnalyzeCodebase")
-	if err := r.steps.Run(analyzeLabel, func() error {
+func (r *learnCurrentProjectRun) planAnalysisUnits() error {
+	planStartedAt := time.Now()
+	planLabel := i18n.Get("ProgressLearnCurrentPlanUnits")
+	if r.stateSession != nil {
+		planLabel = i18n.GetWithParams("ProgressLearnCurrentPlanUnitsRestored", map[string]interface{}{
+			"Units": len(r.stateSession.State.Units),
+		})
+	}
+	if err := r.steps.Run(planLabel, func() error {
 		focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
 		state := (*commandstate.State)(nil)
 		if r.stateSession != nil {
 			state = r.stateSession.State
 		}
 		if state == nil {
-			r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzePlanUnits", nil)
 			var err error
-			state, err = loadOrCreateCurrentState(r.ctx, r.stateRepo, r.cont.AnalyzerSvc, r.projectName, r.projectRoot, r.currentLanguage, r.learningMode, r.learningScope, focusRelPaths, r.incrementalChanges, r.opts.userContext)
+			state, err = loadOrCreateCurrentState(r.ctx, r.stateRepo, r.cont.AnalyzerSvc, r.projectName, r.projectRoot, r.currentLanguage, r.learningMode, r.learningScope, focusRelPaths, r.incrementalChanges, currentStateInputSummary(r.incrementalChanges, r.selectionPlan, r.selectionSummary), r.opts.userContext)
 			if err != nil {
 				return err
 			}
-		} else {
-			r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeResumePlan", map[string]interface{}{
-				"Units": len(state.Units),
-			})
 		}
+		r.analysisState = state
+		r.plannedUnits = pendingAnalysisUnits(state, r.incrementalChanges)
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
+			"operation", "command.learn_current.plan_analysis_units",
+			"duration", time.Since(planStartedAt),
+			"units_count", len(state.Units),
+			"pending_units_count", len(r.plannedUnits),
+			"candidate_count", len(focusRelPaths),
+		)
+		return nil
+	}); err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "command.learn_current.plan_analysis_units",
+			"duration", time.Since(planStartedAt),
+			"error", err,
+		)
+		return fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToAnalyzeCodebase", map[string]interface{}{"Error": err.Error()}))
+	}
+	return nil
+}
 
-		plannedUnits := pendingAnalysisUnits(state, r.incrementalChanges)
-		if len(plannedUnits) == 0 {
+func (r *learnCurrentProjectRun) analyzeCodebase() error {
+	// AI 分析是 learn current 最耗时的步骤，进度行会持续刷新当前耗时
+	analyzeStartedAt := time.Now()
+	analyzeLabel := i18n.Get("ProgressLearnCurrentAnalyzeCodebase")
+	if err := r.steps.Run(analyzeLabel, func() error {
+		if r.analysisState == nil {
+			return nil
+		}
+		if len(r.plannedUnits) == 0 {
 			return nil
 		}
 		if r.existingProfile != nil {
@@ -883,14 +1069,14 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 			return err
 		}
 		r.codebaseRunContext = runContext
-		completedUnits, err := r.analyzePlannedUnits(analyzeLabel, state, plannedUnits)
+		completedUnits, err := r.analyzePlannedUnits(analyzeLabel, r.analysisState, r.plannedUnits)
 		if err != nil {
 			return err
 		}
 		if r.mergedProfile != nil {
 			r.existingProfile = r.mergedProfile
 		}
-		if completedUnits == len(plannedUnits) {
+		if completedUnits == len(r.plannedUnits) {
 			_ = r.stateRepo.Clear()
 		}
 		return nil
@@ -922,10 +1108,25 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 func (r *learnCurrentProjectRun) analyzePlannedUnits(analyzeLabel string, state *commandstate.State, plannedUnits []domain.AnalysisUnit) (int, error) {
 	batches := r.planAnalysisBatches(plannedUnits)
 	parallelism := r.effectiveUnitParallelism(len(batches))
+	var (
+		completedUnits int
+		err            error
+	)
 	if parallelism <= 1 {
-		return r.analyzePlannedBatchesSerial(analyzeLabel, state, batches)
+		completedUnits, err = r.analyzePlannedBatchesSerial(analyzeLabel, state, batches)
+	} else {
+		completedUnits, err = r.analyzePlannedBatchesParallel(analyzeLabel, state, plannedUnits, batches, parallelism)
 	}
-	return r.analyzePlannedBatchesParallel(analyzeLabel, state, plannedUnits, batches, parallelism)
+	if err != nil {
+		return completedUnits, err
+	}
+	logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentAnalyzeUnitsSummary", map[string]interface{}{
+		"Completed":   completedUnits,
+		"Total":       len(plannedUnits),
+		"Batches":     len(batches),
+		"Parallelism": parallelism,
+	}))
+	return completedUnits, nil
 }
 
 func (r *learnCurrentProjectRun) effectiveUnitParallelism(unitCount int) int {

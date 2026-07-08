@@ -206,18 +206,19 @@ type FileSelectionCandidate struct {
 
 // SelectFilesRequest 请求 AI 基于候选文件树选择本次应分析的文件。
 type SelectFilesRequest struct {
-	FileTree     string                   // 候选文件树，不包含源码内容
-	Candidates   []FileSelectionCandidate // 候选文件元数据
-	UserContext  string                   // 一次性用户上下文
-	CandidateNum int                      // 候选文件数量
+	FileTree          string                   // 候选文件树，不包含源码内容
+	Candidates        []FileSelectionCandidate // 候选文件元数据
+	StructuralContext string                   // 基于 tree-sitter 的候选结构摘要
+	UserContext       string                   // 一次性用户上下文
+	CandidateNum      int                      // 候选文件数量
 }
 
 // SelectFilesResult 是 AI 文件选择器返回的结构化范围。
 type SelectFilesResult struct {
-	Include       []string // 需要纳入的相对路径或 glob
-	Exclude       []string // 需要从 include 中剔除的相对路径或 glob
-	SelectedPaths []string // 可选，明确选择的相对文件路径
-	Reason        string   // 简短通用理由
+	Include       []string `json:"include"`        // 需要纳入的相对路径或 glob
+	Exclude       []string `json:"exclude"`        // 需要从 include 中剔除的相对路径或 glob
+	SelectedPaths []string `json:"selected_paths"` // 可选，明确选择的相对文件路径
+	Reason        string   `json:"reason"`         // 简短通用理由
 }
 
 // AnalyzeProjectRequest 项目分析请求

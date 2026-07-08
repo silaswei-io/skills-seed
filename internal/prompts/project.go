@@ -23,27 +23,27 @@ var contextFileNames = []string{
 
 // ProjectContextData 渲染项目 context 模板的数据。
 type ProjectContextData struct {
-	ProgramVersion      string
-	PromptTemplatesHash string
-	PromptName          string
-	ProjectName         string
-	Language            string
-	ProjectRoot         string
-	Structure           string
-	MainFiles           []string
-	Locale              string
-	SkillsLocale        string
+	ProgramVersion    string
+	SeedTemplatesHash string
+	PromptName        string
+	ProjectName       string
+	Language          string
+	ProjectRoot       string
+	Structure         string
+	MainFiles         []string
+	Locale            string
+	SkillsLocale      string
 }
 
 // WorkspaceContextData 渲染工作区 context 模板的数据。
 type WorkspaceContextData struct {
-	ProgramVersion      string
-	PromptTemplatesHash string
-	WorkspaceName       string
-	WorkspaceRoot       string
-	Projects            []WorkspaceContextProject
-	Locale              string
-	SkillsLocale        string
+	ProgramVersion    string
+	SeedTemplatesHash string
+	WorkspaceName     string
+	WorkspaceRoot     string
+	Projects          []WorkspaceContextProject
+	Locale            string
+	SkillsLocale      string
 }
 
 // WorkspaceContextProject 是工作区 context 中展示的子项目摘要。
@@ -60,8 +60,8 @@ func EnsureProjectContext(seedPath string, data ProjectContextData) error {
 	if data.ProgramVersion == "" {
 		data.ProgramVersion = metadata.ProgramVersion
 	}
-	if data.PromptTemplatesHash == "" {
-		data.PromptTemplatesHash = metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS))
+	if data.SeedTemplatesHash == "" {
+		data.SeedTemplatesHash = metadata.HashOrUnavailable(metadata.SeedTemplatesHash(embedfs.FS))
 	}
 	if data.SkillsLocale == "" {
 		data.SkillsLocale = data.Locale
@@ -91,8 +91,8 @@ func EnsureWorkspaceContext(seedPath string, data WorkspaceContextData) error {
 	if data.ProgramVersion == "" {
 		data.ProgramVersion = metadata.ProgramVersion
 	}
-	if data.PromptTemplatesHash == "" {
-		data.PromptTemplatesHash = metadata.HashOrUnavailable(metadata.PromptTemplatesHash(embedfs.FS))
+	if data.SeedTemplatesHash == "" {
+		data.SeedTemplatesHash = metadata.HashOrUnavailable(metadata.SeedTemplatesHash(embedfs.FS))
 	}
 	if data.SkillsLocale == "" {
 		data.SkillsLocale = data.Locale
@@ -133,14 +133,13 @@ func readContextTemplate(name, locale string) ([]byte, error) {
 	if locale == "" {
 		locale = config.DefaultToolLocale
 	}
-	fileName := name + ".md.tmpl"
 	if suffix := config.TemplateLocaleSuffix(locale); suffix != "" {
-		localizedPath := filepath.ToSlash(filepath.Join("templates", "prompts", "context", name+"."+suffix+".md.tmpl"))
+		localizedPath := metadata.SeedContextTemplatePath(name, locale)
 		if data, err := embedfs.FS.ReadFile(localizedPath); err == nil {
 			return data, nil
 		}
 	}
-	defaultPath := filepath.ToSlash(filepath.Join("templates", "prompts", "context", fileName))
+	defaultPath := metadata.SeedContextTemplatePath(name, "")
 	return embedfs.FS.ReadFile(defaultPath)
 }
 

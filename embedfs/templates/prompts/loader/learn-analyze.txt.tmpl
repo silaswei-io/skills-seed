@@ -57,45 +57,8 @@ The following files changed since the previous analysis. Each diff is available 
 
 # Output Format
 
-The `json` fenced block below documents the response structure:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "issues": [
-    {
-      "file": "path/to/file",
-      "line": 42,
-      "severity": "warning",
-      "message": "Error handling does not match a learned project pattern",
-      "suggestion": "Apply the learned error handling rule using the local code style",
-      "pattern_id": "error-wrapping-pattern"
-    },
-    {
-      "file": "path/to/another-file",
-      "line": 15,
-      "severity": "error",
-      "message": "Multi-step data change does not follow the learned transaction boundary",
-      "suggestion": "Use the project-local transaction wrapper shown by the matching pattern",
-      "pattern_id": "transaction-boundary-pattern"
-    }
-  ],
-  "suggestions": [
-    "Consider standardizing the learned logging shape across affected files",
-    "Consider aligning this module boundary with the learned structure pattern"
-  ],
-  "confidence": 0.85
-}
+{{ jsonContract "AnalyzeCodeOutput" }}
 ```
-
-**Field descriptions**:
-- **issues**: List of found issues (return empty array `[]` if no issues)
-  - **file**: File path
-  - **line**: Line number (be as precise as possible)
-  - **severity**: "error" | "warning" | "info"
-  - **message**: Issue description (specify which rule was violated)
-  - **suggestion**: Fix suggestion (provide specific code change)
-  - **pattern_id**: ID of the violated pattern (leave empty if not matching a known pattern)
-- **suggestions**: General improvement suggestions for the overall code (not line-specific)
-- **confidence**: Analysis confidence 0.0-1.0
-
-If you need to add notes, put them in a `notes` field in the JSON.

@@ -49,26 +49,10 @@ You are a professional code fix expert. Generate precise code fixes based on ana
 
 # Output Format
 
-## Field Type Contract
-
-- `fixes` must be an object whose keys are file paths and values are the complete fixed content (string) for that file. Do not output diffs, objects, or arrays.
-- `confidence` must be a number in 0.0-1.0.
-- `summary` must be a string; omit or return empty string when there is no summary.
-- `warnings` must be a string array; put a single value in a one-element array. Return `[]` or omit when empty.
-- Only the four top-level fields `fixes`, `confidence`, `summary`, and `warnings` are read. Do not output `notes` or any extra field; they are ignored by the parser.
-
-The `json` fenced block below documents the response structure:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "fixes": {
-    "path/to/file1": "complete fixed content for file1",
-    "path/to/file2": "complete fixed content for file2"
-  },
-  "confidence": 0.85,
-  "summary": "Fix description (optional)",
-  "warnings": ["Areas needing manual review (optional)"]
-}
+{{ jsonContract "GenerateFixesOutput" }}
 ```
 
 - **fixes**: Map of file path → **complete** fixed content (not diffs); include only files that actually need changes and can be safely rewritten completely

@@ -49,67 +49,12 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 
 # Output Format
 
-## Field Type Contract
-
-- `name`, `root_path`, and `summary` must be strings.
-- `projects`, `shared`, `contracts`, `infra`, `dependencies`, and `impact_routes` must be arrays. Return `[]` when there is no evidence.
-- `projects[].frameworks`, `shared[].consumers`, `shared[].producers`, `shared[].affected_projects`, `contracts[].producers`, `contracts[].consumers`, `infra[].affected_projects`, and `impact_routes[].project_ids` must be string arrays.
 - Do not output `generated_at`; it is auto-filled by the system.
 
-The `json` fenced block below documents the response structure:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "name": "workspace name",
-  "root_path": "workspace root path",
-  "summary": "workspace-level factual summary; may include product context, repository model, delivery boundary, and still-unconfirmed information when supported by repository evidence",
-  "projects": [
-    {
-      "id": "project-a",
-      "path": "project-a",
-      "type": "application",
-      "language": "primary language",
-      "responsibility": "specific responsibility",
-      "frameworks": ["framework or runtime supported by code evidence"]
-    }
-  ],
-  "shared": [
-    {
-      "path": "shared",
-      "description": "shared code or config responsibility",
-      "consumers": ["project-a", "project-b"]
-    }
-  ],
-  "contracts": [
-    {
-      "path": "contracts",
-      "description": "interface contract responsibility",
-      "producers": ["producer-project"],
-      "consumers": ["consumer-project", "adapter-project"]
-    }
-  ],
-  "infra": [
-    {
-      "path": "infra",
-      "description": "deployment config responsibility",
-      "affected_projects": ["project-a", "project-b"]
-    }
-  ],
-  "dependencies": [
-    {
-      "from": "project-a",
-      "to": "project-b",
-      "reason": "interface calls or derived artifact dependency"
-    }
-  ],
-  "impact_routes": [
-    {
-      "path_pattern": "contracts/**",
-      "project_ids": ["producer-project", "consumer-project"],
-      "reason": "contract changes require producers, consumers, and derived artifacts to be checked"
-    }
-  ]
-}
+{{ jsonContract "WorkspaceProfileOutput" }}
 ```
 
 # Strict Requirements

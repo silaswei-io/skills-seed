@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -23,12 +24,14 @@ type currentStateSession struct {
 }
 
 type learnCurrentResumeSummary struct {
-	Command   string
-	CreatedAt string
-	Inputs    int
-	Pending   int
-	Units     int
-	AISkipped int
+	Command             string
+	CreatedAt           string
+	SourceFiles         string
+	LocalPlanInputs     int
+	AISelectionInputs   string
+	AISelectedFiles     string
+	PendingAnalyzeFiles int
+	Units               int
 }
 
 func learnCurrentStateRepo(seedPath, scope string) *commandstate.Repository {
@@ -43,19 +46,50 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 		return nil
 	}
 	aiSkipped := 0
+	deleted := 0
 	for _, input := range session.State.Inputs {
-		if input.Status == domain.FileAnalysisStatusAISkipped {
+		switch input.Status {
+		case domain.FileAnalysisStatusAISkipped:
 			aiSkipped++
+		case "deleted":
+			deleted++
 		}
 	}
-	return &learnCurrentResumeSummary{
-		Command:   session.State.Command,
-		CreatedAt: session.State.CreatedAt,
-		Inputs:    len(session.State.Inputs),
-		Pending:   len(session.Changes.AddedOrModified) + len(session.Changes.Deleted),
-		Units:     len(session.State.Units),
-		AISkipped: aiSkipped,
+	summary := session.State.InputSummary
+	sourceFiles := "-"
+	localPlanInputs := len(session.State.Inputs)
+	aiSelectionInputs := "-"
+	aiSelectedFiles := "-"
+	if summary != nil {
+		sourceFiles = displayCount(summary.SourceFiles)
+		if summary.LocalPlanInputFiles > 0 {
+			localPlanInputs = summary.LocalPlanInputFiles
+		}
+		aiSelectionInputs = displayCount(summary.SelectionInputFiles)
+		if summary.SelectionInputFiles > 0 {
+			aiSelectedFiles = displayCount(summary.SelectedFiles)
+		}
+	} else if aiSkipped > 0 {
+		aiSelectionInputs = displayCount(len(session.State.Inputs) - deleted)
+		aiSelectedFiles = displayCount(len(session.State.Inputs) - aiSkipped - deleted)
 	}
+	return &learnCurrentResumeSummary{
+		Command:             session.State.Command,
+		CreatedAt:           session.State.CreatedAt,
+		SourceFiles:         sourceFiles,
+		LocalPlanInputs:     localPlanInputs,
+		AISelectionInputs:   aiSelectionInputs,
+		AISelectedFiles:     aiSelectedFiles,
+		PendingAnalyzeFiles: len(analysisCandidatePaths(session.Changes)),
+		Units:               len(session.State.Units),
+	}
+}
+
+func displayCount(count int) string {
+	if count <= 0 {
+		return "-"
+	}
+	return strconv.Itoa(count)
 }
 
 func learnCurrentStateMode(mode, scope string) string {
@@ -248,6 +282,7 @@ func loadOrCreateCurrentState(
 	scope string,
 	focusRelPaths []string,
 	changes *incrementalFileChanges,
+	inputSummary commandstate.InputSummary,
 	userContext string,
 ) (*commandstate.State, error) {
 	state, err := repo.Load(ctx)
@@ -273,7 +308,8 @@ func loadOrCreateCurrentState(
 	if len(units) == 0 {
 		units = []domain.AnalysisUnit{fallbackAnalysisUnit(focusRelPaths)}
 	}
-	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateInputs(changes), units)
+	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateInputs(changes), units).
+		WithInputSummary(inputSummary)
 	if err := repo.Save(ctx, state); err != nil {
 		return nil, err
 	}

@@ -33,13 +33,8 @@ You are the skills-seed workflow inferrer. Infer and organize a maintainable Mar
 
 ## Output
 
-Return JSON only, no code fence. Shape example:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return JSON only, no code fence.
 
 ```json
-{
-  "title": "Short title",
-  "summary": "One-sentence summary",
-  "content": "# Title\n\n## Applicability\n...\n\n## Inputs And Prerequisites\n...\n\n## Steps\n1. ...\n\n## Validation\n...\n\n## Risks And Rollback\n...\n",
-  "suggestions": ["Gaps or conflicts"]
-}
+{{ jsonContract "OptimizeWorkflowOutput" }}
 ```

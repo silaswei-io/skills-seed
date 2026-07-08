@@ -1,11 +1,10 @@
 package parser
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
@@ -17,13 +16,11 @@ func ParsePlanAnalysisUnitsResult(output string) (*agent.PlanAnalysisUnitsResult
 		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
-	var payload struct {
-		Units []domain.AnalysisUnit `json:"units"`
-	}
+	var payload aicontract.PlanAnalysisUnitsOutput
 	if err := parseJSONPayload(jsonStr, &payload); err != nil {
 		return nil, err
 	}
-	return &agent.PlanAnalysisUnitsResult{Units: payload.Units}, nil
+	return &agent.PlanAnalysisUnitsResult{Units: analysisUnitsToDomain(payload.Units)}, nil
 }
 
 // ParseWorkspaceProfile 解析工作区画像结果。
@@ -33,10 +30,11 @@ func ParseWorkspaceProfile(output string) (*domain.WorkspaceProfile, error) {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
 	}
 
-	var profile domain.WorkspaceProfile
-	if err := parseJSONPayload(jsonStr, &profile); err != nil {
+	var payload aicontract.WorkspaceProfileOutput
+	if err := parseJSONPayload(jsonStr, &payload); err != nil {
 		return nil, err
 	}
+	profile := workspaceProfileToDomain(payload)
 	if profile.Projects == nil {
 		profile.Projects = []domain.WorkspaceProject{}
 	}
@@ -65,12 +63,11 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
 	}
 
-	var payload workspaceSpecPayload
+	var payload aicontract.WorkspaceSpecOutput
 	if err := parseJSONPayload(jsonStr, &payload); err != nil {
 		return nil, err
 	}
-	spec := payload.WorkspaceSpec
-	spec.ChangeOrder = normalizeWorkspaceChangeOrder(payload.ChangeOrder)
+	spec := workspaceSpecToDomain(payload)
 	if spec.Projects == nil {
 		spec.Projects = []domain.WorkspaceProject{}
 	}
@@ -92,43 +89,133 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 	return &spec, nil
 }
 
-func normalizeWorkspaceChangeOrder(items []json.RawMessage) []string {
-	if len(items) == 0 {
-		return []string{}
-	}
-	out := make([]string, 0, len(items))
-	for _, item := range items {
-		if value := normalizeWorkspaceChangeOrderItem(item); value != "" {
-			out = append(out, value)
+func analysisUnitsToDomain(units []aicontract.AnalysisUnitOutput) []domain.AnalysisUnit {
+	out := make([]domain.AnalysisUnit, len(units))
+	for i, unit := range units {
+		out[i] = domain.AnalysisUnit{
+			ID:           unit.ID,
+			Name:         unit.Name,
+			RouteTerms:   stringsOrEmpty(unit.RouteTerms),
+			EntryPaths:   stringsOrEmpty(unit.EntryPaths),
+			RelatedPaths: stringsOrEmpty(unit.RelatedPaths),
+			ScopeReason:  unit.ScopeReason,
 		}
 	}
 	return out
 }
 
-func normalizeWorkspaceChangeOrderItem(item json.RawMessage) string {
-	var text string
-	if err := json.Unmarshal(item, &text); err == nil {
-		return strings.TrimSpace(text)
+func workspaceProfileToDomain(profile aicontract.WorkspaceProfileOutput) domain.WorkspaceProfile {
+	return domain.WorkspaceProfile{
+		Name:         profile.Name,
+		RootPath:     profile.RootPath,
+		Summary:      profile.Summary,
+		Projects:     workspaceProjectsToDomain(profile.Projects),
+		Shared:       workspacePathsToDomain(profile.Shared),
+		Contracts:    workspacePathsToDomain(profile.Contracts),
+		Infra:        workspacePathsToDomain(profile.Infra),
+		Dependencies: workspaceDependenciesToDomain(profile.Dependencies),
+		ImpactRoutes: workspaceRoutesToDomain(profile.ImpactRoutes),
 	}
+}
 
-	var object struct {
-		Step    int    `json:"step"`
-		Action  string `json:"action"`
-		Details string `json:"details"`
+func workspaceSpecToDomain(spec aicontract.WorkspaceSpecOutput) domain.WorkspaceSpec {
+	return domain.WorkspaceSpec{
+		Name:                   spec.Name,
+		RootPath:               spec.RootPath,
+		Projects:               workspaceProjectsToDomain(spec.Projects),
+		Routing:                workspaceRoutesToDomain(spec.Routing),
+		Rules:                  workspaceRulesToDomain(spec.Rules),
+		ChangeOrder:            stringsOrEmpty(spec.ChangeOrder),
+		ParallelAgentGuidance:  workspaceParallelGuidanceToDomain(spec.ParallelAgentGuidance),
+		LoadMultipleSkillsWhen: workspaceLoadMultipleSkillsToDomain(spec.LoadMultipleSkillsWhen),
 	}
-	if err := json.Unmarshal(item, &object); err != nil {
-		return ""
+}
+
+func workspaceProjectsToDomain(projects []aicontract.WorkspaceProjectOutput) []domain.WorkspaceProject {
+	out := make([]domain.WorkspaceProject, len(projects))
+	for i, project := range projects {
+		out[i] = domain.WorkspaceProject{
+			ID:             project.ID,
+			Path:           project.Path,
+			Type:           project.Type,
+			Language:       project.Language,
+			Responsibility: project.Responsibility,
+			Frameworks:     stringsOrEmpty(project.Frameworks),
+		}
 	}
-	action := strings.TrimSpace(object.Action)
-	details := strings.TrimSpace(object.Details)
-	if action == "" {
-		return details
+	return out
+}
+
+func workspacePathsToDomain(paths []aicontract.WorkspacePathOutput) []domain.WorkspacePath {
+	out := make([]domain.WorkspacePath, len(paths))
+	for i, path := range paths {
+		out[i] = domain.WorkspacePath{
+			Path:             path.Path,
+			Description:      path.Description,
+			Consumers:        stringsOrEmpty(path.Consumers),
+			Producers:        stringsOrEmpty(path.Producers),
+			AffectedProjects: stringsOrEmpty(path.AffectedProjects),
+		}
 	}
-	if object.Step > 0 {
-		action = fmt.Sprintf("%d. %s", object.Step, action)
+	return out
+}
+
+func workspaceDependenciesToDomain(dependencies []aicontract.WorkspaceDependencyOutput) []domain.WorkspaceDependency {
+	out := make([]domain.WorkspaceDependency, len(dependencies))
+	for i, dependency := range dependencies {
+		out[i] = domain.WorkspaceDependency{
+			From:   dependency.From,
+			To:     dependency.To,
+			Reason: dependency.Reason,
+		}
 	}
-	if details == "" {
-		return action
+	return out
+}
+
+func workspaceRoutesToDomain(routes []aicontract.WorkspaceRouteOutput) []domain.WorkspaceRoute {
+	out := make([]domain.WorkspaceRoute, len(routes))
+	for i, route := range routes {
+		out[i] = domain.WorkspaceRoute{
+			PathPattern: route.PathPattern,
+			ProjectIDs:  stringsOrEmpty(route.ProjectIDs),
+			Reason:      route.Reason,
+		}
 	}
-	return action + "：" + details
+	return out
+}
+
+func workspaceRulesToDomain(rules []aicontract.WorkspaceRuleOutput) []domain.WorkspaceRule {
+	out := make([]domain.WorkspaceRule, len(rules))
+	for i, rule := range rules {
+		out[i] = domain.WorkspaceRule{
+			Title:       rule.Title,
+			Description: rule.Description,
+			AppliesTo:   stringsOrEmpty(rule.AppliesTo),
+		}
+	}
+	return out
+}
+
+func workspaceParallelGuidanceToDomain(items []aicontract.WorkspaceParallelGuidanceOutput) []domain.WorkspaceParallelGuidance {
+	out := make([]domain.WorkspaceParallelGuidance, len(items))
+	for i, item := range items {
+		out[i] = domain.WorkspaceParallelGuidance{
+			Scope:     item.Scope,
+			Allowed:   item.Allowed,
+			Condition: item.Condition,
+		}
+	}
+	return out
+}
+
+func workspaceLoadMultipleSkillsToDomain(items []aicontract.WorkspaceLoadMultipleSkillOutput) []domain.WorkspaceLoadMultipleSkill {
+	out := make([]domain.WorkspaceLoadMultipleSkill, len(items))
+	for i, item := range items {
+		out[i] = domain.WorkspaceLoadMultipleSkill{
+			Condition:  item.Condition,
+			ProjectIDs: stringsOrEmpty(item.ProjectIDs),
+			Reason:     item.Reason,
+		}
+	}
+	return out
 }

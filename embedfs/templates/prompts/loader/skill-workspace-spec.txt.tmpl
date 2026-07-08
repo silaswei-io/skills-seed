@@ -65,55 +65,12 @@ The AI call is non-interactive; do not ask the user outside the JSON. If an unco
 
 # Output Format
 
-## Field Type Contract
-
-- `name` and `root_path` must be strings.
-- `routing`, `rules`, `change_order`, `parallel_agent_guidance`, `load_multiple_skills_when`, and `projects` must be arrays.
-- Each `change_order[]` element may be either a string (short action description) or an object `{"step":1,"action":"action","details":"details"}`. The object form is recommended for ordered steps.
-- `parallel_agent_guidance[].allowed` must be a boolean; `scope` and `condition` must be strings.
 - Do not output `generated_at`; it is auto-filled by the system.
 
-The `json` fenced block below documents the response structure:
+The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return exactly one JSON object matching this schema.
 
 ```json
-{
-  "name": "workspace name",
-  "root_path": "workspace root path",
-  "routing": [
-    {
-      "path_pattern": "project-a/**",
-      "project_ids": ["project-a"],
-      "reason": "changes under this path require the matching child skill first"
-    }
-  ],
-  "rules": [
-    {
-      "title": "Shared boundary first",
-      "description": "After changing shared contracts or interface boundaries, check producers, consumers, derived artifacts, and adapters",
-      "applies_to": ["producer", "consumer", "adapter"]
-    }
-  ],
-  "change_order": [
-    {"step": 1, "action": "confirm contract or shared interface", "details": "update schema and type definitions"},
-    {"step": 2, "action": "update producer implementation", "details": ""},
-    {"step": 3, "action": "update consumer calls", "details": ""},
-    {"step": 4, "action": "update deployment config and integration tests", "details": ""}
-  ],
-  "parallel_agent_guidance": [
-    {
-      "scope": "project-a + project-b",
-      "allowed": true,
-      "condition": "contract files are stable and write paths do not overlap"
-    }
-  ],
-  "load_multiple_skills_when": [
-    {
-      "condition": "editing shared contracts or interface boundaries",
-      "project_ids": ["producer-project", "consumer-project"],
-      "reason": "contract changes affect producers, consumers, derived artifacts, and adapters"
-    }
-  ]
-}
+{{ jsonContract "WorkspaceSpecOutput" }}
 ```
 
 # Strict Rules

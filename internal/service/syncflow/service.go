@@ -3,6 +3,7 @@ package syncflow
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -40,6 +41,7 @@ type Request struct {
 
 // Run 执行当前代码学习，并在必要时生成 skills。
 func (s Service) Run(ctx context.Context, req Request) error {
+	startedAt := time.Now()
 	if s.LearnCurrent == nil {
 		return fmt.Errorf("sync learn dependency is not configured")
 	}
@@ -52,6 +54,13 @@ func (s Service) Run(ctx context.Context, req Request) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
+	logger.InfoAfterProgress(i18n.GetWithParams("SyncLearnCompleted", map[string]interface{}{
+		"Changed":  result.Summary.ChangedFiles,
+		"Deleted":  result.Summary.DeletedFiles,
+		"Patterns": result.Summary.PatternsFound,
+		"Saved":    result.Summary.PatternsSaved,
+		"Duration": time.Since(startedAt).Round(time.Second),
+	}))
 	RecordLearnSummary(req.Change, result)
 
 	outputMissing := false
@@ -65,6 +74,7 @@ func (s Service) Run(ctx context.Context, req Request) error {
 
 // RunAfterLearn 根据学习结果决定是否继续生成 skills。
 func RunAfterLearn(result domain.LearnCurrentResult, outputMissing bool, generate func() error, change ChangeRecorder) error {
+	startedAt := time.Now()
 	if !ShouldGenerateAfterLearn(result) && !outputMissing {
 		if change != nil {
 			change.Detail(i18n.Get("ChangeLogGenerateSkippedNoChanges"))
@@ -78,6 +88,9 @@ func RunAfterLearn(result domain.LearnCurrentResult, outputMissing bool, generat
 	if err := generate(); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 	}
+	logger.InfoAfterProgress(i18n.GetWithParams("SyncGenerateCompleted", map[string]interface{}{
+		"Duration": time.Since(startedAt).Round(time.Second),
+	}))
 	if change != nil {
 		change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
 	}

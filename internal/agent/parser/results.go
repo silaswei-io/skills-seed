@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
@@ -17,12 +18,7 @@ func ParseSelectFilesResult(output string) (*agent.SelectFilesResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	var result struct {
-		Include       []string `json:"include"`
-		Exclude       []string `json:"exclude"`
-		SelectedPaths []string `json:"selected_paths"`
-		Reason        string   `json:"reason"`
-	}
+	var result aicontract.SelectFilesOutput
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
 	}
@@ -46,18 +42,7 @@ func ParseAnalyzeResult(output string) (*agent.AnalyzeResult, error) {
 		return nil, err
 	}
 
-	var result struct {
-		Issues []struct {
-			File       string `json:"file"`
-			Line       int    `json:"line"`
-			Severity   string `json:"severity"`
-			Message    string `json:"message"`
-			Suggestion string `json:"suggestion"`
-			PatternID  string `json:"pattern_id"`
-		} `json:"issues"`
-		Suggestions []string `json:"suggestions"`
-		Confidence  float64  `json:"confidence"`
-	}
+	var result aicontract.AnalyzeCodeOutput
 
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
@@ -97,12 +82,7 @@ func ParseGenerateFixesResult(output string) (*agent.GenerateFixesResult, error)
 		}, nil
 	}
 
-	var result struct {
-		Fixes      map[string]string `json:"fixes"`
-		Confidence float64           `json:"confidence"`
-		Summary    string            `json:"summary"`
-		Warnings   []string          `json:"warnings"`
-	}
+	var result aicontract.GenerateFixesOutput
 
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
@@ -128,9 +108,7 @@ func ParseLearnResult(output string) (*agent.LearnResult, error) {
 		return nil, err
 	}
 
-	var result struct {
-		Patterns []patternPayload `json:"patterns"`
-	}
+	var result aicontract.LearnPatternsOutput
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
 	}
@@ -149,9 +127,7 @@ func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
 		return nil, err
 	}
 
-	var result struct {
-		Patterns []patternPayload `json:"patterns"`
-	}
+	var result aicontract.LearnPatternsOutput
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
 	}
@@ -165,20 +141,7 @@ func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, erro
 		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
-	var result struct {
-		Patterns []curatedPatternPayload `json:"patterns"`
-		Dropped  []struct {
-			ID     string `json:"id"`
-			Reason string `json:"reason"`
-		} `json:"dropped"`
-		Summary struct {
-			TotalCandidates int `json:"total_candidates"`
-			TotalExisting   int `json:"total_existing"`
-			TotalWritten    int `json:"total_written"`
-			TotalDropped    int `json:"total_dropped"`
-			MergeCount      int `json:"merge_count"`
-		} `json:"summary"`
-	}
+	var result aicontract.CuratePatternsOutput
 
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
@@ -198,7 +161,7 @@ func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, erro
 
 	now := time.Now()
 	for i, p := range result.Patterns {
-		curateResult.Patterns[i] = p.toCuratedPattern(now)
+		curateResult.Patterns[i] = curatedPatternToAgent(p, now)
 	}
 	for i, dropped := range result.Dropped {
 		curateResult.Dropped[i] = agent.CuratedDrop{
@@ -217,12 +180,12 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentNoValidJSONFound"), err)
 	}
 
-	var payload patternPayload
+	var payload aicontract.PatternOutput
 	if err := parseJSONPayload(jsonStr, &payload); err != nil {
 		return nil, err
 	}
 
-	pattern := payload.toDomainPattern(domain.SourceUserDefined, time.Now())
+	pattern := patternToDomain(payload, domain.SourceUserDefined, time.Now())
 	return &agent.UserDefinePatternResult{Pattern: &pattern}, nil
 }
 
@@ -235,12 +198,12 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
 	}
 
-	var result projectProfilePayload
+	var result aicontract.ProjectProfileOutput
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
 	}
 
-	return result.toAnalyzeProjectResult(time.Now()), nil
+	return projectProfileToAnalyzeProjectResult(result, time.Now()), nil
 }
 
 // ParseAnalyzeCurrentCodebaseResult 解析当前代码库分析结果。
@@ -255,11 +218,7 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
-	var payload struct {
-		Patterns                  []patternPayload                   `json:"patterns"`
-		ProfileDelta              projectProfilePayload              `json:"profile_delta"`
-		ProfileRefreshRecommended agent.ProfileRefreshRecommendation `json:"profile_refresh_recommended"`
-	}
+	var payload aicontract.AnalyzeCurrentCodebaseOutput
 	if err := parseJSONPayload(jsonStr, &payload); err != nil {
 		return nil, err
 	}
@@ -267,8 +226,8 @@ func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCode
 	now := time.Now()
 	return &agent.AnalyzeCurrentCodebaseResult{
 		Patterns:                  patternsToDomain(payload.Patterns, domain.SourceInit, now),
-		ProfileDelta:              payload.ProfileDelta.toProjectProfileDelta(now),
-		ProfileRefreshRecommended: payload.ProfileRefreshRecommended,
+		ProfileDelta:              projectProfileDeltaToDomain(payload.ProfileDelta, now),
+		ProfileRefreshRecommended: profileRefreshRecommendationToAgent(payload.ProfileRefreshRecommended),
 	}, nil
 }
 
@@ -284,15 +243,7 @@ func ParseAnalyzeCurrentCodebaseBatchResult(output string) (*agent.AnalyzeCurren
 		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
 	}
 
-	var payload struct {
-		Units []struct {
-			UnitID                    string                             `json:"unit_id"`
-			UnitName                  string                             `json:"unit_name"`
-			Patterns                  []patternPayload                   `json:"patterns"`
-			ProfileDelta              projectProfilePayload              `json:"profile_delta"`
-			ProfileRefreshRecommended agent.ProfileRefreshRecommendation `json:"profile_refresh_recommended"`
-		} `json:"units"`
-	}
+	var payload aicontract.AnalyzeCurrentCodebaseBatchOutput
 	if err := parseJSONPayload(jsonStr, &payload); err != nil {
 		return nil, err
 	}
@@ -304,11 +255,18 @@ func ParseAnalyzeCurrentCodebaseBatchResult(output string) (*agent.AnalyzeCurren
 			UnitID:                    unit.UnitID,
 			UnitName:                  unit.UnitName,
 			Patterns:                  patternsToDomain(unit.Patterns, domain.SourceInit, now),
-			ProfileDelta:              unit.ProfileDelta.toProjectProfileDelta(now),
-			ProfileRefreshRecommended: unit.ProfileRefreshRecommended,
+			ProfileDelta:              projectProfileDeltaToDomain(unit.ProfileDelta, now),
+			ProfileRefreshRecommended: profileRefreshRecommendationToAgent(unit.ProfileRefreshRecommended),
 		})
 	}
 	return &agent.AnalyzeCurrentCodebaseBatchResult{Units: units}, nil
+}
+
+func profileRefreshRecommendationToAgent(in aicontract.ProfileRefreshRecommendationOutput) agent.ProfileRefreshRecommendation {
+	return agent.ProfileRefreshRecommendation{
+		Needed: in.Needed,
+		Reason: in.Reason,
+	}
 }
 
 // ParseOptimizeWorkflowResult 解析工作流优化结果。
@@ -318,12 +276,7 @@ func ParseOptimizeWorkflowResult(output string) (*agent.OptimizeWorkflowResult, 
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentNoValidJSONFound"), err)
 	}
 
-	var result struct {
-		Title       string   `json:"title"`
-		Content     string   `json:"content"`
-		Summary     string   `json:"summary"`
-		Suggestions []string `json:"suggestions"`
-	}
+	var result aicontract.OptimizeWorkflowOutput
 	if err := parseJSONPayload(jsonStr, &result); err != nil {
 		return nil, err
 	}

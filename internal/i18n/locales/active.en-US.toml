@@ -754,7 +754,7 @@ other = "Batch learning commits {{.Current}}/{{.Total}}"
 other = "Preparing project context"
 
 [ProgressLearnCurrentDetectChanges]
-other = "Detecting incremental file changes"
+other = "Local file filtering (configured ignores)"
 
 [ProgressLearnCurrentResumeState]
 other = "Resuming previous analysis plan"
@@ -765,17 +765,44 @@ other = "{{.Label}}: checking resumable plan"
 [ProgressLearnCurrentDetectScanFiles]
 other = "{{.Label}}: scanning file fingerprints"
 
-[ProgressLearnCurrentDetectSelectFiles]
-other = "{{.Label}}: AI selecting {{.Candidates}} relevant files"
+[ProgressLearnCurrentBuildFileSelectionIndex]
+other = "gotree index build"
+
+[ProgressLearnCurrentSkipFileSelectionIndex]
+other = "Skipping gotree index build ({{.Reason}})"
+
+[ProgressLearnCurrentConfirmFileSelectionCandidates]
+other = "gotree file confirmation"
+
+[ProgressLearnCurrentSkipFileSelectionConfirm]
+other = "Skipping gotree file confirmation ({{.Reason}})"
+
+[ProgressLearnCurrentAIFileSelection]
+other = "AI file selection"
+
+[ProgressLearnCurrentSkipAIFileSelection]
+other = "Skipping AI file selection ({{.Reason}})"
+
+[ProgressLearnCurrentFileSelectionSkipRestored]
+other = "analysis plan restored"
+
+[ProgressLearnCurrentFileSelectionSkipDisabled]
+other = "AI file selection is disabled"
+
+[ProgressLearnCurrentFileSelectionSkipNoCandidates]
+other = "no candidate files"
+
+[ProgressLearnCurrentFileSelectionSkipBelowThreshold]
+other = "{{.Candidates}} candidates below threshold {{.MinCandidates}}"
 
 [ProgressLearnCurrentAnalyzeCodebase]
 other = "Analyzing current codebase"
 
-[ProgressLearnCurrentAnalyzePlanUnits]
-other = "{{.Label}}: planning analysis units"
+[ProgressLearnCurrentPlanUnits]
+other = "AI analysis unit selection"
 
-[ProgressLearnCurrentAnalyzeResumePlan]
-other = "{{.Label}}: resuming {{.Units}} planned analysis units"
+[ProgressLearnCurrentPlanUnitsRestored]
+other = "Restoring AI analysis unit plan ({{.Units}} units)"
 
 [ProgressLearnCurrentAnalyzeParallelUnits]
 other = "{{.Label}}: {{.Current}}/{{.Total}}, {{.RunningCount}} running ({{.Running}}), parallelism {{.Parallelism}}"
@@ -1271,6 +1298,12 @@ other = "[sync] No learned changes detected; skipping skills generation"
 
 [SyncComplete]
 other = "[sync] Complete!"
+
+[SyncLearnCompleted]
+other = "[sync] Learn step completed: {{.Changed}} changed, {{.Deleted}} deleted, {{.Patterns}} patterns found, {{.Saved}} saved, duration {{.Duration}}"
+
+[SyncGenerateCompleted]
+other = "[sync] Generate step completed, duration {{.Duration}}"
 
 [SyncLearnFailed]
 other = "Learn failed"
@@ -2063,16 +2096,16 @@ other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMod
 other = "Incremental file changes:\n  • added or modified: {{.Changed}}\n  • deleted: {{.Deleted}}\n  • unchanged skipped: {{.Unchanged}}\n  • excluded: {{.Skipped}}"
 
 [LearnCurrentResumeSummary]
-other = "Resuming unfinished {{.Command}} plan:\n  • plan created at: {{.CreatedAt}}\n  • planned input files: {{.Inputs}}\n  • pending files: {{.Pending}}\n  • analysis units: {{.Units}}\n  • AI-skipped files: {{.AISkipped}}\n  • this run will not repeat file scanning, exclusion statistics, or AI file selection"
+other = "Resuming unfinished {{.Command}} plan:\n  • plan created at: {{.CreatedAt}}\n  • source files: {{.SourceFiles}}\n  • local-filtered plan inputs: {{.LocalPlanInputs}}\n  • sent to AI file selection: {{.AISelectionInputs}}\n  • finally selected by AI: {{.AISelectedFiles}}\n  • pending analysis files: {{.PendingAnalyzeFiles}}\n  • analysis units: {{.Units}}\n  • this run will not repeat file scanning, exclusion statistics, local structural indexing, or AI file selection"
 
 [LearnCurrentNoFileChanges]
-other = "No learnable file changes detected; skipped pattern learning and project profile refresh"
+other = "No learnable file changes detected; skipped pattern learning"
 
 [LearnCurrentGeneratedSkillsExcluded]
 other = "Excluded generated skills directories: {{.Paths}}"
 
-[LearnCurrentAIFileSelectionSummary]
-other = "AI file selection:\n  • candidates: {{.Candidates}}\n  • selected for analysis: {{.Selected}}\n  • skipped by AI: {{.Skipped}}"
+[LearnCurrentFileSelectionSummary]
+other = "File selection summary:\n  • source files: {{.SourceFiles}}\n  • local-filtered plan inputs: {{.LocalPlanInputs}}\n  • gotree high-value candidates: {{.GotreeHighValue}}/{{.GotreeIndexed}}\n  • sent to AI file selection: {{.AISelectionInputs}}\n  • finally selected by AI: {{.AISelectedFiles}}"
 
 [LearnCurrentAIFileSelectorFallback]
 other = "AI file selection failed; falling back to all candidate files"
@@ -2094,6 +2127,9 @@ other = "Analysis completed:\n  • Patterns: {{.PatternsCount}}\n  • Project 
 
 [LearnCurrentAnalyzeParallelUnits]
 other = "Starting concurrent project-unit learning: {{.Total}} units, parallelism {{.Parallelism}}"
+
+[LearnCurrentAnalyzeUnitsSummary]
+other = "Analysis units completed: {{.Completed}}/{{.Total}}, batches {{.Batches}}, parallelism {{.Parallelism}}"
 
 [LearnCurrentSavePatternFailed]
 other = "Failed to save pattern [{{.ID}}]: {{.Error}}"

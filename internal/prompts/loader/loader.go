@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
@@ -559,6 +560,9 @@ func funcMap(locale string) template.FuncMap {
 		},
 		"preserveTechnicalTermsInstruction": func() string {
 			return "Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed."
+		},
+		"jsonContract": func(name string) (string, error) {
+			return aicontract.JSONSchema(name)
 		},
 	}
 }

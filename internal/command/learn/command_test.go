@@ -508,9 +508,13 @@ func TestRunLearnCurrentAIFileSelectorNarrowsAnalysisFiles(t *testing.T) {
 	require.Equal(t, domain.FileAnalysisStatusAnalyzed, savedByPath["internal/logic/create.go"].AnalysisStatus)
 	require.Equal(t, domain.FileAnalysisStatusAISkipped, savedByPath["internal/types/types.go"].AnalysisStatus)
 	require.Equal(t, "prefer high-signal implementation files", savedByPath["internal/types/types.go"].SelectionReason)
-	require.Contains(t, output, "AI 文件选择结果:")
-	require.Contains(t, output, "实际分析: 1")
-	require.Contains(t, output, "AI 跳过: 1")
+	require.Contains(t, output, "文件选择摘要:")
+	require.Contains(t, output, "本地过滤后计划输入: 2")
+	require.Contains(t, output, "发送给 AI 文件选择: 2")
+	require.Contains(t, output, "AI 最终选择: 1")
+	require.Contains(t, output, "gotree 索引建立")
+	require.Contains(t, output, "gotree 文件确认")
+	require.Contains(t, output, "AI 文件选择")
 	require.Contains(t, output, "本轮成功后将提交 2 条文件指纹")
 }
 
@@ -627,7 +631,13 @@ func TestRunLearnCurrentAIFileSelectorSkipsBelowCandidateThreshold(t *testing.T)
 
 	require.ElementsMatch(t, []string{"internal/logic/create.go", "internal/types/types.go"}, received.FocusPaths)
 	require.Len(t, received.SampleFiles, 2)
-	require.NotContains(t, output, "AI 文件选择结果:")
+	require.Contains(t, output, "文件选择摘要:")
+	require.Contains(t, output, "本地过滤后计划输入: 2")
+	require.Contains(t, output, "发送给 AI 文件选择: -")
+	require.Contains(t, output, "AI 最终选择: -")
+	require.Contains(t, output, "跳过 gotree 索引建立（候选 2 个，未达到阈值 10）")
+	require.Contains(t, output, "跳过 gotree 文件确认（候选 2 个，未达到阈值 10）")
+	require.Contains(t, output, "跳过 AI 文件选择（候选 2 个，未达到阈值 10）")
 }
 
 func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternStoreFails(t *testing.T) {
@@ -744,9 +754,14 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	require.Equal(t, []string{"batch-001"}, labels)
 	require.Equal(t, []string{"key"}, units)
 	require.Contains(t, output, "从上次中断的 learn-current 计划恢复")
-	require.Contains(t, output, "待继续处理: 2")
+	require.Contains(t, output, "本地过滤后计划输入: 3")
+	require.Contains(t, output, "发送给 AI 文件选择: -")
+	require.Contains(t, output, "AI 最终选择: -")
+	require.Contains(t, output, "恢复后待分析文件: 2")
 	require.Contains(t, output, "分析当前代码库 · 单元 2/2 · 密钥创建")
 	require.NotContains(t, output, "增量文件变化:")
+	require.NotContains(t, output, "计划输入文件:")
+	require.NotContains(t, output, "文件选择摘要:")
 	require.NoFileExists(t, stateRepo.Path())
 }
 
@@ -991,7 +1006,7 @@ func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {
 		requireRunLearnCurrentNoError(t, cont, opts)
 	})
 
-	require.Contains(t, output, "分析当前代码库：规划分析单元")
+	require.Contains(t, output, "AI 单元选择")
 	require.Contains(t, output, "分析当前代码库 · 单元 1/2 · 认证登录")
 	require.Contains(t, output, "分析当前代码库 · 提交指纹 2/2 · 密钥创建")
 }
@@ -1417,8 +1432,8 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	require.Contains(t, output, "backend")
 	require.Contains(t, output, "frontend")
 	require.Contains(t, output, "准备项目上下文")
-	require.Contains(t, output, "检测增量文件变化")
-	require.Contains(t, output, "分析当前代码库：规划分析单元")
+	require.Contains(t, output, "本地文件过滤（配置忽略）")
+	require.Contains(t, output, "AI 单元选择")
 	require.Contains(t, output, "分析当前代码库 · 单元 1/1 · 当前代码变更")
 	require.NotContains(t, output, "项目根路径:")
 	require.NotContains(t, output, "增量文件变化:")
@@ -1487,7 +1502,7 @@ func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.
 	attemptIndex := strings.Index(afterRetry, attemptLabel)
 	require.NotEqual(t, -1, attemptIndex, "expected retry attempt progress label after retry wait, got %q", output)
 	afterAttempt := afterRetry[attemptIndex+len(attemptLabel):]
-	restoreIndex := strings.Index(afterAttempt, "3/5 分析当前代码库 · 单元 1/1 · 当前代码变更\n")
+	restoreIndex := strings.Index(afterAttempt, "7/9 分析当前代码库 · 单元 1/1 · 当前代码变更\n")
 	require.NotEqual(t, -1, restoreIndex, "expected retry progress label to be restored after a successful retry, got %q", output)
 }
 
@@ -1526,7 +1541,7 @@ func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
 	require.Contains(t, output, "front")
 	require.Contains(t, output, "分析当前代码库")
 	require.Contains(t, output, "backend")
-	require.Contains(t, output, "3/5")
+	require.Contains(t, output, "7/9")
 	require.Contains(t, output, "完成")
 	require.Contains(t, output, "学习工作区子项目")
 	require.NotContains(t, output, "0/2 | backend")
@@ -1574,7 +1589,7 @@ func TestRunLearnWorkspaceCurrentMarksFailedChildProgress(t *testing.T) {
 		require.Contains(t, err.Error(), "profile overloaded")
 	})
 
-	require.Contains(t, output, "front        5/5 失败")
+	require.Contains(t, output, "front        9/9 失败")
 	require.Contains(t, output, "学习工作区子项目")
 }
 

@@ -13,11 +13,15 @@ import (
 
 const (
 	// ProgramVersion 是 `skills-seed --version` 展示的 CLI 版本
-	ProgramVersion = "v0.13.0"
+	ProgramVersion = "v0.13.1"
 
 	UnavailableHash = "unavailable"
 
+	// PromptTemplatesRoot 是运行时 AI 提示词模板根目录。
 	PromptTemplatesRoot = "templates/prompts"
+	// SeedTemplatesRoot 是 init 写入用户项目的种子模板根目录。
+	SeedTemplatesRoot = "templates/seed"
+	// SkillsTemplatesRoot 是生成 Skill 文件时使用的模板根目录。
 	SkillsTemplatesRoot = "templates/skills"
 
 	CommonTemplateProvider = "common"
@@ -76,6 +80,15 @@ func PromptAppendTemplatePath(name, locale string) string {
 	return filepath.ToSlash(filepath.Join(PromptTemplatesRoot, PromptAppendTemplateProvider, fileName))
 }
 
+// SeedContextTemplatePath 返回项目初始化 context 种子模板路径。
+func SeedContextTemplatePath(name, locale string) string {
+	fileName := name + PromptMarkdownTemplateExt
+	if templateLocaleSuffix(locale) != "" {
+		fileName = name + "." + templateLocaleSuffix(locale) + PromptMarkdownTemplateExt
+	}
+	return filepath.ToSlash(filepath.Join(SeedTemplatesRoot, "context", fileName))
+}
+
 // SkillsTemplatePath 返回 Skills 模板路径
 func SkillsTemplatePath(provider, relativeName, locale, ext string) string {
 	if ext == "" {
@@ -100,6 +113,11 @@ func SkillsAgentMetadataDir(provider string) string {
 // PromptTemplatesHash 计算提示词模板树哈希
 func PromptTemplatesHash(fsys fs.FS) (string, error) {
 	return EmbeddedTreeHash(fsys, PromptTemplatesRoot)
+}
+
+// SeedTemplatesHash 计算初始化种子模板树哈希。
+func SeedTemplatesHash(fsys fs.FS) (string, error) {
+	return EmbeddedTreeHash(fsys, SeedTemplatesRoot)
 }
 
 // SkillsTemplatesHash 计算 Skills 模板树哈希
