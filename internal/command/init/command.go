@@ -222,13 +222,6 @@ type initializeSkillOptions struct {
 	learningScope         config.LearningScope
 }
 
-func initializeSkillAt(projectRoot, locale, mode string) error {
-	return initializeSkillWithOptions(projectRoot, locale, mode, initializeSkillOptions{
-		initLogger:      true,
-		showUserSummary: true,
-	})
-}
-
 func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializeSkillOptions) error {
 	mode = normalizeInitMode(mode)
 	// 如果指定了 locale，先初始化 i18n
@@ -416,13 +409,12 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	mainFiles := analyzerSvc.FindMainFiles(projectRoot)
 
 	contextData := prompts.ProjectContextData{
-		ProjectName:  projectName,
-		Language:     projectLanguage,
-		ProjectRoot:  projectRoot,
-		Structure:    structure,
-		MainFiles:    mainFiles,
-		Locale:       configRepo.GetToolLocale(),
-		SkillsLocale: configRepo.GetSkillsLocale(),
+		ProjectName: projectName,
+		Language:    projectLanguage,
+		ProjectRoot: projectRoot,
+		Structure:   structure,
+		MainFiles:   mainFiles,
+		Locale:      configRepo.GetToolLocale(),
 	}
 	if err := prompts.EnsureProjectContext(seedPath, contextData); err != nil {
 		logger.Error(i18n.Get("InitCreateProjectContextFailed"), "error", err)
@@ -722,6 +714,5 @@ func ensureWorkspaceContextFiles(seedPath, projectRoot, projectName string, conf
 		WorkspaceRoot: projectRoot,
 		Projects:      projects,
 		Locale:        configRepo.GetToolLocale(),
-		SkillsLocale:  configRepo.GetSkillsLocale(),
 	})
 }

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,18 +18,17 @@ import (
 
 const (
 	aiFileSelectionCacheSchemaVersion = 1
-	aiFileSelectionPromptVersion      = "file-select-entry-candidates-v1"
+	aiFileSelectionPromptVersion      = "file-select-full-candidate-list-v3"
 )
 
 // AISelectorOptions 描述 AI 文件选择器的本地输入。
 type AISelectorOptions struct {
-	ProjectRoot       string
-	Candidates        []string
-	Changes           *FileChanges
-	StructuralContext string
-	UserContext       string
-	CachePath         string
-	RequiredPaths     []string
+	ProjectRoot   string
+	Candidates    []string
+	Changes       *FileChanges
+	UserContext   string
+	CachePath     string
+	RequiredPaths []string
 }
 
 // AISelectorResult 描述 AI 文件选择器应用后的本地结果。
@@ -50,11 +48,10 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 	}
 
 	req := &agent.SelectFilesRequest{
-		FileTree:          buildCandidatePromptTree(candidates, opts.StructuralContext),
-		Candidates:        buildCandidatePromptMetadata(opts.ProjectRoot, candidates, opts.Changes, opts.StructuralContext),
-		StructuralContext: opts.StructuralContext,
-		UserContext:       opts.UserContext,
-		CandidateNum:      len(candidates),
+		FileTree:     buildCandidatePromptTree(candidates),
+		Candidates:   buildCandidatePromptMetadata(opts.ProjectRoot, candidates, opts.Changes),
+		UserContext:  opts.UserContext,
+		CandidateNum: len(candidates),
 	}
 	fingerprint := aiFileSelectionFingerprint(req, opts.Changes, opts.RequiredPaths)
 	if opts.CachePath != "" {
@@ -112,14 +109,13 @@ type aiFileSelectionCache struct {
 }
 
 type aiFileSelectionFingerprintInput struct {
-	PromptVersion         string                         `json:"prompt_version"`
-	CandidateNum          int                            `json:"candidate_num"`
-	FileTree              string                         `json:"file_tree"`
-	Candidates            []agent.FileSelectionCandidate `json:"candidates"`
-	Changes               aiFileSelectionChangesInput    `json:"changes,omitempty"`
-	StructuralContextHash string                         `json:"structural_context_hash,omitempty"`
-	UserContextHash       string                         `json:"user_context_hash,omitempty"`
-	RequiredPaths         []string                       `json:"required_paths,omitempty"`
+	PromptVersion   string                         `json:"prompt_version"`
+	CandidateNum    int                            `json:"candidate_num"`
+	FileTree        string                         `json:"file_tree"`
+	Candidates      []agent.FileSelectionCandidate `json:"candidates"`
+	Changes         aiFileSelectionChangesInput    `json:"changes,omitempty"`
+	UserContextHash string                         `json:"user_context_hash,omitempty"`
+	RequiredPaths   []string                       `json:"required_paths,omitempty"`
 }
 
 type aiFileSelectionChangesInput struct {
@@ -138,14 +134,13 @@ func aiFileSelectionFingerprint(req *agent.SelectFilesRequest, changes *FileChan
 		return ""
 	}
 	input := aiFileSelectionFingerprintInput{
-		PromptVersion:         aiFileSelectionPromptVersion,
-		CandidateNum:          req.CandidateNum,
-		FileTree:              req.FileTree,
-		Candidates:            append([]agent.FileSelectionCandidate{}, req.Candidates...),
-		Changes:               aiFileSelectionChangesFingerprintInput(changes),
-		StructuralContextHash: hashText(req.StructuralContext),
-		UserContextHash:       hashText(req.UserContext),
-		RequiredPaths:         normalizeCandidatePaths(requiredPaths),
+		PromptVersion:   aiFileSelectionPromptVersion,
+		CandidateNum:    req.CandidateNum,
+		FileTree:        req.FileTree,
+		Candidates:      append([]agent.FileSelectionCandidate{}, req.Candidates...),
+		Changes:         aiFileSelectionChangesFingerprintInput(changes),
+		UserContextHash: hashText(req.UserContext),
+		RequiredPaths:   normalizeCandidatePaths(requiredPaths),
 	}
 	data, err := json.Marshal(input)
 	if err != nil {
@@ -349,80 +344,12 @@ func buildCandidateMetadata(projectRoot string, paths []string, changes *FileCha
 	return candidates
 }
 
-func buildCandidatePromptTree(candidates []string, structuralContext string) string {
-	candidates = normalizeCandidatePaths(candidates)
-	if strings.TrimSpace(structuralContext) == "" {
-		return buildCandidateTree(candidates)
-	}
-	var b strings.Builder
-	b.WriteString("Candidate overview. Full candidate paths are kept locally for result validation; use structural entry candidates for exact selectable paths.\n")
-	b.WriteString(fmt.Sprintf("- total candidate files: %d\n", len(candidates)))
-	b.WriteString("- modules:\n")
-	for _, item := range topPathCounts(candidates, func(path string) string {
-		return candidateModule(path)
-	}) {
-		b.WriteString(fmt.Sprintf("  - %s: %d\n", item.name, item.count))
-	}
-	b.WriteString("- file kinds:\n")
-	for _, item := range topPathCounts(candidates, candidateKind) {
-		b.WriteString(fmt.Sprintf("  - %s: %d\n", item.name, item.count))
-	}
-	return b.String()
+func buildCandidatePromptTree(candidates []string) string {
+	return buildCandidateTree(normalizeCandidatePaths(candidates))
 }
 
-func buildCandidatePromptMetadata(projectRoot string, candidates []string, changes *FileChanges, structuralContext string) []agent.FileSelectionCandidate {
-	if strings.TrimSpace(structuralContext) == "" || changes == nil {
-		return buildCandidateMetadata(projectRoot, candidates, changes)
-	}
-	changed := normalizeCandidatePaths(changes.AddedOrModified)
-	deleted := normalizeCandidatePaths(changes.Deleted)
-	if len(changed)+len(deleted) == 0 || len(changed) == len(normalizeCandidatePaths(candidates)) {
-		return []agent.FileSelectionCandidate{}
-	}
-	paths := append([]string{}, changed...)
-	paths = append(paths, deleted...)
-	return buildCandidateMetadata(projectRoot, paths, changes)
-}
-
-type pathCount struct {
-	name  string
-	count int
-}
-
-func topPathCounts(paths []string, keyFn func(string) string) []pathCount {
-	counts := map[string]int{}
-	for _, path := range paths {
-		key := strings.TrimSpace(keyFn(path))
-		if key == "" {
-			key = "unknown"
-		}
-		counts[key]++
-	}
-	items := make([]pathCount, 0, len(counts))
-	for name, count := range counts {
-		items = append(items, pathCount{name: name, count: count})
-	}
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].count != items[j].count {
-			return items[i].count > items[j].count
-		}
-		return items[i].name < items[j].name
-	})
-	return items
-}
-
-func candidateModule(path string) string {
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) <= 1 {
-		return "."
-	}
-	switch parts[0] {
-	case "apps", "cmd", "examples", "integration-tests", "internal", "packages", "plugins", "services", "www":
-		if len(parts) >= 2 {
-			return parts[0] + "/" + parts[1] + "/"
-		}
-	}
-	return parts[0] + "/"
+func buildCandidatePromptMetadata(projectRoot string, candidates []string, changes *FileChanges) []agent.FileSelectionCandidate {
+	return buildCandidateMetadata(projectRoot, candidates, changes)
 }
 
 func candidateKind(path string) string {

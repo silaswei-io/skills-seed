@@ -164,7 +164,7 @@ Starting in 0.11.2, `learning.current.max_units_per_call` controls how many unit
 
 Starting in 0.11.6, current-code and history-learning prompts use a stricter Candidate Admission Gate: facts, summaries, weak local evidence, and generic engineering practice are dropped unless they become source-backed, project-specific, routeable rules that can guide future changes. Business coverage matrices now prevent missed strong candidates instead of forcing pattern output.
 
-Starting in 0.13.1, `sync` / `learn current` file selection first runs local filtering and gotree structural indexing, then sends high-value entry candidates to AI file selection and analysis-unit planning. Console progress shows only the important stages plus a unified file-selection summary; candidate counts, index counts, timings, and other diagnostic details are kept in runtime logs.
+Current `sync` / `learn current` file selection first applies local filtering, then writes the full candidate file list and metadata into runtime so AI can make relevance recommendations and assist later analysis-unit planning. Console progress shows only the important stages plus a unified file-selection summary; candidate counts, timings, and other diagnostic details are kept in runtime logs.
 
 Starting in 0.13.2, the repository is clean under `staticcheck ./...`; alongside `go test`, `go vet`, and builds, staticcheck is recommended as a release-time quality gate.
 

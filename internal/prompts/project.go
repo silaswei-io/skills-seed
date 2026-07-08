@@ -25,14 +25,12 @@ var contextFileNames = []string{
 type ProjectContextData struct {
 	ProgramVersion    string
 	SeedTemplatesHash string
-	PromptName        string
 	ProjectName       string
 	Language          string
 	ProjectRoot       string
 	Structure         string
 	MainFiles         []string
 	Locale            string
-	SkillsLocale      string
 }
 
 // WorkspaceContextData 渲染工作区 context 模板的数据。
@@ -43,7 +41,6 @@ type WorkspaceContextData struct {
 	WorkspaceRoot     string
 	Projects          []WorkspaceContextProject
 	Locale            string
-	SkillsLocale      string
 }
 
 // WorkspaceContextProject 是工作区 context 中展示的子项目摘要。
@@ -63,9 +60,6 @@ func EnsureProjectContext(seedPath string, data ProjectContextData) error {
 	if data.SeedTemplatesHash == "" {
 		data.SeedTemplatesHash = metadata.HashOrUnavailable(metadata.SeedTemplatesHash(embedfs.FS))
 	}
-	if data.SkillsLocale == "" {
-		data.SkillsLocale = data.Locale
-	}
 
 	contextDir := filepath.Join(seedPath, "context")
 	if err := os.MkdirAll(contextDir, 0755); err != nil {
@@ -75,7 +69,7 @@ func EnsureProjectContext(seedPath string, data ProjectContextData) error {
 		return err
 	}
 	for _, name := range contextFileNames {
-		content, err := renderContextTemplate(name, data.SkillsLocale, data)
+		content, err := renderContextTemplate(name, data.Locale, data)
 		if err != nil {
 			return err
 		}
@@ -94,16 +88,13 @@ func EnsureWorkspaceContext(seedPath string, data WorkspaceContextData) error {
 	if data.SeedTemplatesHash == "" {
 		data.SeedTemplatesHash = metadata.HashOrUnavailable(metadata.SeedTemplatesHash(embedfs.FS))
 	}
-	if data.SkillsLocale == "" {
-		data.SkillsLocale = data.Locale
-	}
 
 	workspaceDir := filepath.Join(seedPath, "context")
 	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
 		return fmt.Errorf("%s: %w", i18n.GetWithParams("PromptCreateDirFailed", map[string]interface{}{"Path": workspaceDir}), err)
 	}
 
-	content, err := renderWorkspaceContextTemplate(data.SkillsLocale, data)
+	content, err := renderWorkspaceContextTemplate(data.Locale, data)
 	if err != nil {
 		return err
 	}

@@ -35,7 +35,10 @@ type Dependencies struct {
 
 // Cmd 返回 sync 命令
 func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
-	dependencies := normalizeDependencies(deps...)
+	dependencies := Dependencies{}
+	if len(deps) > 0 {
+		dependencies = deps[0]
+	}
 	userContext := ""
 	contextPath := []string{}
 	resume := false
@@ -112,13 +115,6 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 	return cmd
 }
 
-func normalizeDependencies(deps ...Dependencies) Dependencies {
-	if len(deps) == 0 {
-		return Dependencies{}
-	}
-	return deps[0]
-}
-
 func syncModeFromFlags(resume, restart bool) (syncRunMode, error) {
 	if resume && restart {
 		return syncRunAuto, fmt.Errorf("%s", i18n.Get("SyncRunModeConflict"))
@@ -143,7 +139,10 @@ func normalizeSyncInputs(inputs syncInputs) (syncInputs, error) {
 
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
 func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder, deps ...Dependencies) error {
-	dependencies := normalizeDependencies(deps...)
+	dependencies := Dependencies{}
+	if len(deps) > 0 {
+		dependencies = deps[0]
+	}
 	var learnCurrent syncflow.LearnCurrentFunc
 	if dependencies.LearnCurrent != nil {
 		learnCurrent = func(ctx context.Context, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error) {
@@ -169,10 +168,6 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 		ForceLearn:  mode == syncRunRestart,
 		Change:      change,
 	})
-}
-
-func syncLearnAfterLearn(result domain.LearnCurrentResult, outputMissing bool, generate func() error, change *changelog.Builder) error {
-	return syncflow.RunAfterLearn(result, outputMissing, generate, change)
 }
 
 func syncGeneratedSkillMissing(cont *container.Container) bool {

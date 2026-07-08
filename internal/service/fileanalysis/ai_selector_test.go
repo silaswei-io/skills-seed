@@ -97,7 +97,7 @@ func TestApplyAIFileSelectorStillNarrowsWithoutRequiredPaths(t *testing.T) {
 	require.Empty(t, result.ForcedPaths)
 }
 
-func TestApplyAIFileSelectorUsesStructuralContextWithoutFullCandidateTree(t *testing.T) {
+func TestApplyAIFileSelectorKeepsFullCandidateTree(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "cmd", "server"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "orders"), 0755))
@@ -106,17 +106,13 @@ func TestApplyAIFileSelectorUsesStructuralContextWithoutFullCandidateTree(t *tes
 
 	selector := &fakeFileSelector{result: &agent.SelectFilesResult{SelectedPaths: []string{"cmd/server/main.go"}}}
 	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
-		ProjectRoot:       root,
-		Candidates:        []string{"cmd/server/main.go", "internal/orders/handler.go"},
-		StructuralContext: "## File Selection Structural Context\n\n### High-Value Candidates\n\n#### cmd/server/main.go\n",
+		ProjectRoot: root,
+		Candidates:  []string{"cmd/server/main.go", "internal/orders/handler.go"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"cmd/server/main.go"}, result.AIPaths)
-	require.Contains(t, selector.req.FileTree, "Candidate overview")
-	require.Contains(t, selector.req.FileTree, "cmd/server/: 1")
-	require.NotContains(t, selector.req.FileTree, "main.go")
-	require.NotContains(t, selector.req.FileTree, "handler.go")
-	require.Contains(t, selector.req.StructuralContext, "High-Value Candidates")
+	require.Contains(t, selector.req.FileTree, "main.go")
+	require.Contains(t, selector.req.FileTree, "handler.go")
 }
 
 func TestApplyAIFileSelectorFillsMinimumBudgetForLargeCandidateSets(t *testing.T) {

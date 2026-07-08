@@ -35,6 +35,6 @@ Skill template IDs are declared in `internal/templates/skills/catalog.go`. The c
 
 ## Locale
 
-Runtime prompt templates under `loader/` and `append/` are maintained in English only. The output language is controlled by `skills.locale` through the appended output contract.
+Runtime prompt templates under `loader/` and `append/` are maintained in English only. Their appended output contract follows the tool `locale`.
 
-User-facing seed context and generated Skills templates may have locale variants. Templates without a locale suffix are Simplified Chinese for those user-facing artifacts, and English variants use `.en-US` before the template extension.
+User-facing seed context and generated Skills templates may have locale variants. Seed context templates follow the tool `locale`, while `skills.locale` only selects the locale variant used for generated Skills templates. Templates without a locale suffix are Simplified Chinese for those user-facing artifacts, and English variants use `.en-US` before the template extension.

@@ -340,10 +340,10 @@ type LoggingConfig struct {
 	MaxLogFiles int    `yaml:"max_log_files"` // 最大日志文件数量
 }
 
-// SkillsConfig 控制生成的 Skills 类型、输出路径和内容语言。
+// SkillsConfig 控制生成的 Skills 类型、输出路径和模板语言。
 type SkillsConfig struct {
 	Target string            `yaml:"target"` // 目标 Agent Skills 类型
-	Locale string            `yaml:"locale"` // Skills 与沉淀内容语言：zh-CN, en-US
+	Locale string            `yaml:"locale"` // 生成 Skills 模板语言：zh-CN, en-US
 	Paths  map[string]string `yaml:"paths"`  // target -> Skills 输出路径
 }
 
@@ -725,12 +725,10 @@ type Reader interface {
 	GetExclude() []string
 	GetToolLocale() string
 	GetSkillsLocale() string
-	GetPromptLocale(name string) string
 	GetEffectiveAgentEngine() string
 	GetEffectiveAgentCommand() string
 	GetEffectiveSkillsTarget() string
 	GetEffectiveSkillsPath() string
-	GetCurrentProjectConfig() ProjectConfig
 	GetWorkspaceProjects() []WorkspaceProjectConfig
 }
 
@@ -789,14 +787,9 @@ func (r *Repository) GetToolLocale() string {
 	return normalizeLocale(r.config.Project.Locale)
 }
 
-// GetSkillsLocale 返回生成 Skills 和学习沉淀内容使用的语言。
+// GetSkillsLocale 返回生成 Skills 使用的模板语言。
 func (r *Repository) GetSkillsLocale() string {
 	return normalizeSkillsLocale(r.config.Skills.Locale)
-}
-
-// GetPromptLocale 返回指定提示词输出目标使用的语言。
-func (r *Repository) GetPromptLocale(name string) string {
-	return r.GetSkillsLocale()
 }
 
 // GetEffectiveAgentEngine 返回应用默认值后的 Agent 引擎。
@@ -824,11 +817,6 @@ func (r *Repository) GetEffectiveSkillsTarget() string {
 // GetEffectiveSkillsPath 返回当前有效目标类型对应的 Skills 输出路径。
 func (r *Repository) GetEffectiveSkillsPath() string {
 	return EffectiveSkillsPath(r.GetEffectiveSkillsTarget(), r.config.Skills)
-}
-
-// GetCurrentProjectConfig 返回当前项目或工作区根的身份配置。
-func (r *Repository) GetCurrentProjectConfig() ProjectConfig {
-	return r.GetProjectConfig()
 }
 
 // GetWorkspaceProjects 返回配置中的工作区子项目列表副本。
@@ -874,7 +862,7 @@ func (r *Repository) SetLocale(locale string) error {
 	return r.Update(r.config)
 }
 
-// SetSkillsLocale 设置 AI 学习输出、生成 Skills 和沉淀内容语言。
+// SetSkillsLocale 设置生成 Skills 模板语言。
 func (r *Repository) SetSkillsLocale(locale string) error {
 	r.config.Skills.Locale = locale
 	return r.Update(r.config)

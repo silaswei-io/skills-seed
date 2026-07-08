@@ -27,6 +27,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
+	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,7 @@ import (
 func TestSyncLearnAfterLearnGeneratesWhenLearnChanged(t *testing.T) {
 	generateCalled := false
 
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{ChangedFiles: 1}}, false, func() error {
+	err := syncflow.RunAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{ChangedFiles: 1}}, false, func() error {
 		generateCalled = true
 		return nil
 	}, nil)
@@ -47,7 +48,7 @@ func TestSyncLearnAfterLearnGeneratesWhenLearnChanged(t *testing.T) {
 func TestSyncLearnAfterLearnSkipsGenerateWhenNoFileChanges(t *testing.T) {
 	generateCalled := false
 
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, false, func() error {
+	err := syncflow.RunAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, false, func() error {
 		generateCalled = true
 		return nil
 	}, nil)
@@ -59,7 +60,7 @@ func TestSyncLearnAfterLearnSkipsGenerateWhenNoFileChanges(t *testing.T) {
 func TestSyncLearnAfterLearnWrapsGenerateError(t *testing.T) {
 	errGenerate := errors.New("boom")
 
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{ChangedFiles: 1}}, false, func() error {
+	err := syncflow.RunAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{ChangedFiles: 1}}, false, func() error {
 		return errGenerate
 	}, nil)
 
@@ -69,7 +70,7 @@ func TestSyncLearnAfterLearnWrapsGenerateError(t *testing.T) {
 func TestSyncLearnAfterLearnGeneratesWhenOutputMissing(t *testing.T) {
 	generateCalled := false
 
-	err := syncLearnAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, true, func() error {
+	err := syncflow.RunAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, true, func() error {
 		generateCalled = true
 		return nil
 	}, nil)
@@ -115,6 +116,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
 	cfg.Skills.Target = "codex"
+	cfg.Skills.Locale = "zh-CN"
 	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
 	require.NoError(t, configRepo.Update(cfg))
 	require.NoError(t, exec.Command("git", "-C", projectRoot, "init", "-q").Run())
@@ -183,6 +185,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
 	cfg.Skills.Target = "codex"
+	cfg.Skills.Locale = "zh-CN"
 	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
 	require.NoError(t, configRepo.Update(cfg))
 	require.NoError(t, exec.Command("git", "-C", projectRoot, "init", "-q").Run())

@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.3]
+
+### 变更
+
+- `learn current` / `sync` 的 AI 文件选择改为将完整候选文件列表与元数据写入 runtime，再由 AI 基于文件路径、状态、大小和类型给出相关性建议，移除 gotree 结构索引和候选确认阶段，让文件选择链路更直接、可排查。
+- 收敛语言配置职责：`locale` 负责工具输出、配置模板、seed context 模板和运行时 AI 输出契约，`skills.locale` 只负责生成 Skills 时使用的模板语言，避免学习沉淀内容语言被 Skills 生成配置意外影响。
+- 将本地 Agent 项目记忆文件 `AGENTS.md` 加入忽略规则并从仓库跟踪中移除，避免个人/本地协作规则进入远程代码仓库。
+
+### 修复
+
+- 清理文件选择和命令依赖注入链路中随 gotree 结构索引遗留的类型、helper、测试夹具和提示词字段，减少运行时 prompt 与 Go DTO 的漂移风险。
+
 ## [v0.13.2]
 
 ### 修复

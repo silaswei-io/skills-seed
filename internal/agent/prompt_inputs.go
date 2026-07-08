@@ -57,6 +57,10 @@ func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePat
 
 // SelectFilesPromptData 返回 AI 文件选择器所需的提示词数据。
 func SelectFilesPromptData(session *PromptInputSession, req *SelectFilesRequest) (map[string]interface{}, error) {
+	fileListPath, err := session.Write("candidate-files.txt", req.FileTree)
+	if err != nil {
+		return nil, fmt.Errorf("write file selection candidate files: %w", err)
+	}
 	candidatesPath, err := session.Write("candidates.json", mustJSON(req.Candidates))
 	if err != nil {
 		return nil, fmt.Errorf("write file selection candidates: %w", err)
@@ -66,11 +70,10 @@ func SelectFilesPromptData(session *PromptInputSession, req *SelectFilesRequest)
 		return nil, fmt.Errorf("write file selection user context: %w", err)
 	}
 	return map[string]interface{}{
-		"FileTree":          req.FileTree,
-		"CandidatesPath":    candidatesPath,
-		"StructuralContext": req.StructuralContext,
-		"UserContextPath":   userContextPath,
-		"CandidateNum":      req.CandidateNum,
+		"FileListPath":    fileListPath,
+		"CandidatesPath":  candidatesPath,
+		"UserContextPath": userContextPath,
+		"CandidateNum":    req.CandidateNum,
 	}, nil
 }
 

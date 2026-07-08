@@ -124,7 +124,7 @@ exclude:
 | `name` | 当前目录名 | 项目名称，init 时自动填充 |
 | `mode` | `project` | 初始化模式：`project` 单项目，`workspace` 多子项目工作区 |
 | `language` | 自动识别或空 | 项目主要语言；init 识别不到时留空，可按项目设置 |
-| `locale` | `zh-CN` | 工具输出与配置模板语言 |
+| `locale` | `zh-CN` | 工具输出、配置模板与 seed context 模板语言 |
 | `git_remote` | 自动填充或空 | Git 远程仓库地址 |
 | `root_path` | 当前项目绝对路径 | init 时写入，供运行时定位项目根目录 |
 | `initialized_at` | init 时间 | 初始化时间 |
@@ -365,7 +365,7 @@ skills-seed learn history --limit 100 --batch-size 10
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `target` | `agent.engine` | 生成的 Skills 目标类型；可与 `agent.engine` 不同 |
-| `locale` | `en-US` | AI 学习输出、生成的 Skills 以及会沉淀到 Skills 的自然语言内容 |
+| `locale` | `en-US` | 生成 Skills 时使用的模板语言 |
 | `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills 输出目录 |
 | `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills 输出目录 |
 
@@ -373,10 +373,10 @@ skills-seed learn history --limit 100 --batch-size 10
 
 1. `generate skills` 默认使用 `skills.target` 对应的 `skills.paths`。
 2. 可通过 `skills-seed generate skills --output <path>` 临时指定输出目录。
-3. `skills.locale` 支持 `zh-CN` 和 `en-US`，默认英文；运行时 prompt 模板保持英文，`profile.locale` 不决定 AI 输出或 Skills 内容语言。
+3. `skills.locale` 支持 `zh-CN` 和 `en-US`，默认英文；它只影响 `generate skills` 读取的 Skills 模板语言，不再控制运行时 AI prompt 输出语言。
 4. 新增自定义 engine 或 target 时，应分别添加 `agent.commands.<engine>` 和 `skills.paths.<target>`。
 
-0.13.0 起，运行时 AI prompt 模板统一维护为英文单源模板，输出语言通过 `skills.locale` 注入到最终输出契约；`profile.locale` 只影响工具输出和配置模板语言。
+运行时 AI prompt 模板统一维护为英文单源模板，最终输出契约跟随 `locale`；`skills.locale` 只影响生成 Skills 时选择的模板语言。
 
 ### `logging`
 

@@ -24,12 +24,11 @@ import (
 
 // Loader 加载内置模板，并叠加项目/自定义提示词片段。
 type Loader struct {
-	agentName    string
-	locale       string
-	skillsLocale string
-	seedPath     string
-	templates    map[string]*template.Template
-	mu           sync.RWMutex
+	agentName string
+	locale    string
+	seedPath  string
+	templates map[string]*template.Template
+	mu        sync.RWMutex
 }
 
 type promptPartDebug struct {
@@ -71,30 +70,20 @@ type RuntimeTask struct {
 
 // New 创建提示词模板加载器。
 func New(agentName, locale, seedPath string) *Loader {
-	return NewWithLocales(agentName, locale, "", seedPath)
-}
-
-// NewWithLocales 创建可按提示词用途选择语言的提示词模板加载器。
-func NewWithLocales(agentName, locale, skillsLocale, seedPath string) *Loader {
 	if locale == "" {
 		locale = config.DefaultToolLocale
 	}
-	if skillsLocale == "" {
-		skillsLocale = config.DefaultSkillsLocale
-	}
-
 	return &Loader{
-		agentName:    agentName,
-		locale:       locale,
-		skillsLocale: skillsLocale,
-		seedPath:     seedPath,
-		templates:    make(map[string]*template.Template),
+		agentName: agentName,
+		locale:    locale,
+		seedPath:  seedPath,
+		templates: make(map[string]*template.Template),
 	}
 }
 
 // Load 加载指定提示词模板
 func (l *Loader) Load(name string) error {
-	return l.loadWithLocale(name, l.localeForPrompt(name))
+	return l.loadWithLocale(name, l.locale)
 }
 
 func (l *Loader) loadWithLocale(name, locale string) error {
@@ -142,7 +131,7 @@ func (l *Loader) Render(name string, data interface{}) (string, error) {
 
 // RenderForRuntimeTask 渲染提示词并使用指定 runtime 任务名保存调试文件。
 func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task RuntimeTask) (string, error) {
-	locale := l.localeForPrompt(name)
+	locale := l.locale
 	cacheKey := templateCacheKey(locale, name)
 	l.mu.RLock()
 	_, loaded := l.templates[cacheKey]
@@ -319,13 +308,6 @@ func (l *Loader) appendOutputContractGuard(base, contractGuard string) string {
 		return contractGuard
 	}
 	return strings.TrimSpace(base + "\n\n" + contractGuard)
-}
-
-func (l *Loader) localeForPrompt(name string) string {
-	if strings.TrimSpace(name) != "" {
-		return l.skillsLocale
-	}
-	return l.skillsLocale
 }
 
 func templateCacheKey(locale, name string) string {
@@ -573,7 +555,7 @@ type outputLanguage struct {
 }
 
 func outputLanguageSpec(locale string) outputLanguage {
-	switch config.NormalizeSkillsLocale(locale) {
+	switch config.NormalizeToolLocale(locale) {
 	case i18n.LocaleChinese:
 		return outputLanguage{
 			instruction:            "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN). Technical identifiers, framework names, library names, commands, file paths, function signatures, config keys, environment variables, enum values, and code identifiers must remain unchanged when needed.",

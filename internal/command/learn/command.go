@@ -39,7 +39,7 @@ const (
 	learnCurrentProgressSubjectMaxRunes = 36
 	learnCurrentRunningSubjectMaxRunes  = 18
 	// learnCurrentProjectStepTotal 是项目级 learn current 在控制台展示的顶层阶段数。
-	learnCurrentProjectStepTotal = 9
+	learnCurrentProjectStepTotal = 7
 )
 
 type learnCurrentOptions struct {
@@ -402,8 +402,6 @@ type learnCurrentProjectRun struct {
 	selectedFiles       []domain.FileInfo
 	selectionSummary    aiFileSelectionSummary
 	selectionPlan       currentFileSelectionPlan
-	structuralContext   string
-	structuralStats     analyzer.StructuralSelectionStats
 	stateSession        *currentStateSession
 	resumeSummary       *learnCurrentResumeSummary
 	changeProfile       currentChangeProfile
@@ -531,12 +529,6 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 		return nil, err
 	}
 	if err := r.detectChanges(); err != nil {
-		return nil, err
-	}
-	if err := r.buildFileSelectionStructuralContext(); err != nil {
-		return nil, err
-	}
-	if err := r.confirmFileSelectionCandidates(); err != nil {
 		return nil, err
 	}
 	if err := r.selectRelevantFilesWithAI(); err != nil {
@@ -767,61 +759,6 @@ func (r *learnCurrentProjectRun) buildFileSelectionPlan() currentFileSelectionPl
 	return currentFileSelectionPlan{Candidates: focusRelPaths, Eligible: true}
 }
 
-func (r *learnCurrentProjectRun) buildFileSelectionStructuralContext() error {
-	if !r.selectionPlan.Eligible {
-		return r.steps.Run(i18n.GetWithParams("ProgressLearnCurrentSkipFileSelectionIndex", map[string]interface{}{
-			"Reason": r.selectionPlan.SkipReason,
-		}), func() error { return nil })
-	}
-
-	indexStartedAt := time.Now()
-	indexLabel := i18n.Get("ProgressLearnCurrentBuildFileSelectionIndex")
-	if err := r.steps.Run(indexLabel, func() error {
-		context, err := r.cont.AnalyzerSvc.BuildFileSelectionStructuralContext(r.ctx, r.projectRoot, r.currentLanguage, r.incrementalChanges)
-		if err != nil {
-			return err
-		}
-		if context != nil {
-			r.structuralContext = context.Text
-			r.structuralStats = context.Stats
-		}
-		return nil
-	}); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "command.learn_current.build_file_selection_index",
-			"duration", time.Since(indexStartedAt),
-			"candidate_count", len(r.selectionPlan.Candidates),
-			"error", err,
-		)
-		return err
-	}
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "command.learn_current.build_file_selection_index",
-		"duration", time.Since(indexStartedAt),
-		"candidate_count", len(r.selectionPlan.Candidates),
-		"indexed_count", r.structuralStats.IndexedFiles,
-	)
-	return nil
-}
-
-func (r *learnCurrentProjectRun) confirmFileSelectionCandidates() error {
-	if !r.selectionPlan.Eligible {
-		return r.steps.Run(i18n.GetWithParams("ProgressLearnCurrentSkipFileSelectionConfirm", map[string]interface{}{
-			"Reason": r.selectionPlan.SkipReason,
-		}), func() error { return nil })
-	}
-	return r.steps.Run(i18n.Get("ProgressLearnCurrentConfirmFileSelectionCandidates"), func() error {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "command.learn_current.confirm_file_selection_candidates",
-			"candidate_count", len(r.selectionPlan.Candidates),
-			"indexed_count", r.structuralStats.IndexedFiles,
-			"high_value_count", r.structuralStats.HighValueCandidates,
-			"low_value_summarized_count", r.structuralStats.LowValueSummarized,
-		)
-		return nil
-	})
-}
-
 func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
 	if !r.selectionPlan.Eligible {
 		return r.steps.Run(i18n.GetWithParams("ProgressLearnCurrentSkipAIFileSelection", map[string]interface{}{
@@ -835,13 +772,12 @@ func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
 	var selectErr error
 	if err := r.steps.Run(selectLabel, func() error {
 		selectionResult, selectErr = fileanalysis.ApplyAIFileSelector(r.ctx, r.cont.Agent, fileanalysis.AISelectorOptions{
-			ProjectRoot:       r.projectRoot,
-			Candidates:        r.selectionPlan.Candidates,
-			Changes:           r.incrementalChanges,
-			StructuralContext: r.structuralContext,
-			UserContext:       r.opts.userContext,
-			CachePath:         layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
-			RequiredPaths:     utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
+			ProjectRoot:   r.projectRoot,
+			Candidates:    r.selectionPlan.Candidates,
+			Changes:       r.incrementalChanges,
+			UserContext:   r.opts.userContext,
+			CachePath:     layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
+			RequiredPaths: utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
 		})
 		if selectErr != nil {
 			logger.Warn(i18n.Get("LearnCurrentAIFileSelectorFallback"))
@@ -901,8 +837,6 @@ func (r *learnCurrentProjectRun) logFileSelectionSummary() {
 	logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentFileSelectionSummary", map[string]interface{}{
 		"SourceFiles":       r.incrementalChanges.SourceFileCount,
 		"LocalPlanInputs":   len(r.selectionPlan.Candidates),
-		"GotreeIndexed":     r.structuralStats.IndexedFiles,
-		"GotreeHighValue":   r.structuralStats.HighValueCandidates,
 		"AISelectionInputs": aiInput,
 		"AISelectedFiles":   aiSelected,
 	}))

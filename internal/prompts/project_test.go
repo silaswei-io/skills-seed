@@ -109,14 +109,13 @@ func TestEnsureProjectContextRemovesDeprecatedContextFiles(t *testing.T) {
 	}
 }
 
-func TestEnsureProjectContextUsesSkillsLocaleForContextFiles(t *testing.T) {
+func TestEnsureProjectContextUsesToolLocaleForContextFiles(t *testing.T) {
 	seedPath := t.TempDir()
 
 	err := EnsureProjectContext(seedPath, ProjectContextData{
-		ProjectName:  "demo",
-		Language:     "go",
-		Locale:       "zh-CN",
-		SkillsLocale: "en-US",
+		ProjectName: "demo",
+		Language:    "go",
+		Locale:      "en-US",
 	})
 	require.NoError(t, err)
 

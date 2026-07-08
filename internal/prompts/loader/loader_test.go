@@ -61,8 +61,8 @@ func TestLoader_DefaultLocaleRendersEnglishPromptTemplate(t *testing.T) {
 	require.NotContains(t, prompt, "你是一位专业的代码质量审查专家")
 }
 
-func TestLoader_RendersEnglishPromptBodyAndOutputLanguageFromSkillsLocale(t *testing.T) {
-	loader := NewWithLocales("loader", "zh-CN", "zh-CN", "")
+func TestLoader_RendersEnglishPromptBodyAndToolLocaleOutputGuard(t *testing.T) {
+	loader := New("loader", "zh-CN", "")
 
 	skillsPrompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
 	require.NoError(t, err)
@@ -76,10 +76,10 @@ func TestLoader_RendersEnglishPromptBodyAndOutputLanguageFromSkillsLocale(t *tes
 	require.NotContains(t, toolPrompt, "你是一位专业的代码修复专家")
 }
 
-func TestLoader_RendersOutputContractGuardWithPromptLocale(t *testing.T) {
+func TestLoader_RendersOutputContractGuardWithToolLocale(t *testing.T) {
 	seedPath := t.TempDir()
 
-	loader := NewWithLocales("loader", "zh-CN", "en-US", seedPath)
+	loader := New("loader", "en-US", seedPath)
 	prompt, err := loader.Render("workflow-optimize", sampleOptimizeWorkflowRequest())
 
 	require.NoError(t, err)
@@ -539,7 +539,7 @@ func TestLoader_RenderLearningPromptsIncludeRichBusinessExtractionGuidance(t *te
 				"non-request-interface",
 				"resource lifecycle",
 				"external dependency interaction",
-				"All user-facing natural-language fields must be written in English (en-US)",
+				"All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)",
 			},
 		},
 		{
@@ -840,8 +840,7 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"runtime",
 				"policy",
 				"external dependency",
-				"structural context",
-				"same candidate overview",
+				"same candidate file list",
 				"stable selection",
 				"selected_paths",
 			},
@@ -856,8 +855,7 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"runtime product behavior",
 				"rules or policies",
 				"external dependency constraints",
-				"structural context",
-				"same candidate overview",
+				"same candidate file list",
 				"stable selection",
 				"selected_paths",
 			},
@@ -868,14 +866,13 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 		t.Run(tt.locale, func(t *testing.T) {
 			loader := New("loader", tt.locale, "")
 			prompt, err := loader.Render("file-select", map[string]interface{}{
-				"CandidateNum":      3,
-				"FileTree":          "internal/order/create.go\ninternal/billing/rule.go\ninternal/worker/task.go",
-				"CandidatesPath":    "/tmp/skills-seed/candidates.json",
-				"StructuralContext": "## File Selection Structural Context\n\n### High-Value Candidates\n\n#### internal/order/create.go\n",
-				"UserContextPath":   "",
+				"CandidateNum":    3,
+				"FileListPath":    "/tmp/skills-seed/candidate-files.txt",
+				"CandidatesPath":  "/tmp/skills-seed/candidates.json",
+				"UserContextPath": "",
 			})
 			require.NoError(t, err)
-			require.NotContains(t, prompt, "structural-context.md")
+			require.Contains(t, prompt, "/tmp/skills-seed/candidate-files.txt")
 
 			lowerPrompt := strings.ToLower(prompt)
 			for _, text := range tt.requiredText {
@@ -1203,22 +1200,22 @@ func TestLoader_RenderZhProjectAnalysisUsesEnglishTemplateAndChineseOutputGuard(
 	require.NoError(t, err)
 
 	require.Contains(t, prompt, "You are a senior software architect")
-	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")
-	require.NotContains(t, prompt, "面向用户阅读的自然语言字段应优先使用简体中文")
-}
-
-func TestLoader_RenderProjectAnalysisUsesSkillsLocaleForOutputGuard(t *testing.T) {
-	loader := NewWithLocales("codex", "zh-CN", "zh-CN", "")
-
-	prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())
-	require.NoError(t, err)
-
 	require.Contains(t, prompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
 	require.Contains(t, prompt, "Do not write technology names, directory names, or command types from template examples as project facts")
 }
 
+func TestLoader_RenderProjectAnalysisUsesToolLocaleForOutputGuard(t *testing.T) {
+	loader := New("codex", "en-US", "")
+
+	prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())
+	require.NoError(t, err)
+
+	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")
+	require.Contains(t, prompt, "Do not write technology names, directory names, or command types from template examples as project facts")
+}
+
 func TestLoader_RenderPersistentPromptsUseOutputContractGuardLanguage(t *testing.T) {
-	loader := NewWithLocales("loader", "zh-CN", "zh-CN", "")
+	loader := New("loader", "zh-CN", "")
 
 	for _, tc := range []struct {
 		name string
@@ -1310,7 +1307,7 @@ func TestLoader_RuntimePromptsFenceJSONExamplesAndAppendOutputContract(t *testin
 func TestLoader_RuntimePromptsRequireFinalJSONSelfCheck(t *testing.T) {
 	promptData := map[string]interface{}{
 		"analysis-plan":               sampleAnalysisPlanData(),
-		"file-select":                 map[string]interface{}{"CandidateNum": 1, "FileTree": "main.go", "CandidatesPath": "", "UserContextPath": ""},
+		"file-select":                 map[string]interface{}{"CandidateNum": 1, "FileListPath": "/tmp/skills-seed/candidate-files.txt", "CandidatesPath": "", "UserContextPath": ""},
 		"learn-analyze":               sampleAnalyzeRequest(),
 		"learn-batch":                 sampleBatchLearnData(),
 		"fix-generate":                sampleGenerateFixesRequest(),

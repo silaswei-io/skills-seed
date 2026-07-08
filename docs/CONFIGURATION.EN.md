@@ -124,7 +124,7 @@ exclude:
 | `name` | current directory name | Project name, filled during init |
 | `mode` | `project` | Init mode: `project` for a single project, `workspace` for a multi-project workspace |
 | `language` | auto-detected or empty | Primary project language; left empty when init cannot detect it |
-| `locale` | `zh-CN` | Language for tool output and config templates |
+| `locale` | `zh-CN` | Language for tool output, config templates, and seed context templates |
 | `git_remote` | auto-filled or empty | Git remote URL |
 | `root_path` | current project absolute path | Written during init and used to locate the project root |
 | `initialized_at` | init time | Initialization time |
@@ -365,7 +365,7 @@ These files are merged with built-in prompts; they do not replace built-in promp
 | Field | Default | Description |
 |---|---:|---|
 | `target` | `agent.engine` | Generated Skills target type; can differ from `agent.engine` |
-| `locale` | `en-US` | AI learning output, generated Skills, and natural-language content persisted into Skills |
+| `locale` | `en-US` | Template language used when generating Skills |
 | `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills output directory |
 | `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills output directory |
 
@@ -373,10 +373,10 @@ These files are merged with built-in prompts; they do not replace built-in promp
 
 1. `generate skills` uses `skills.paths` for the current `skills.target` by default.
 2. Use `skills-seed generate skills --output <path>` to override the output directory for one run.
-3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; runtime prompt templates stay English, and `profile.locale` does not control AI output or Skills content language.
+3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; it only affects which Skills templates `generate skills` renders and no longer controls runtime AI prompt output language.
 4. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
 
-Starting in 0.13.0, runtime AI prompt templates are maintained as English-only source templates. The output language is injected through the final output contract from `skills.locale`; `profile.locale` only affects tool output and config-template language.
+Runtime AI prompt templates are maintained as English-only source templates. Their final output contract follows `locale`; `skills.locale` only affects which template locale is used when generating Skills.
 
 ### `logging`
 

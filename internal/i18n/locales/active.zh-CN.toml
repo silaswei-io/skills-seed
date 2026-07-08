@@ -765,18 +765,6 @@ other = "{{.Label}}：检查可恢复计划"
 [ProgressLearnCurrentDetectScanFiles]
 other = "{{.Label}}：扫描文件指纹"
 
-[ProgressLearnCurrentBuildFileSelectionIndex]
-other = "gotree 索引建立"
-
-[ProgressLearnCurrentSkipFileSelectionIndex]
-other = "跳过 gotree 索引建立（{{.Reason}}）"
-
-[ProgressLearnCurrentConfirmFileSelectionCandidates]
-other = "gotree 文件确认"
-
-[ProgressLearnCurrentSkipFileSelectionConfirm]
-other = "跳过 gotree 文件确认（{{.Reason}}）"
-
 [ProgressLearnCurrentAIFileSelection]
 other = "AI 文件选择"
 
@@ -2097,7 +2085,7 @@ other = "指定扫描范围: {{.Focus}}\n项目画像策略: {{.ProfileMode}}"
 other = "增量文件变化:\n  • 新增或修改: {{.Changed}}\n  • 删除: {{.Deleted}}\n  • 未变化跳过: {{.Unchanged}}\n  • 排除: {{.Skipped}}"
 
 [LearnCurrentResumeSummary]
-other = "从上次中断的 {{.Command}} 计划恢复:\n  • 计划创建时间: {{.CreatedAt}}\n  • 源文件数量: {{.SourceFiles}}\n  • 本地过滤后计划输入: {{.LocalPlanInputs}}\n  • 发送给 AI 文件选择: {{.AISelectionInputs}}\n  • AI 最终选择: {{.AISelectedFiles}}\n  • 恢复后待分析文件: {{.PendingAnalyzeFiles}}\n  • 分析单元: {{.Units}}\n  • 本次不会重新执行文件扫描、排除统计、本地结构索引和 AI 文件选择"
+other = "从上次中断的 {{.Command}} 计划恢复:\n  • 计划创建时间: {{.CreatedAt}}\n  • 源文件数量: {{.SourceFiles}}\n  • 本地过滤后计划输入: {{.LocalPlanInputs}}\n  • 发送给 AI 文件选择: {{.AISelectionInputs}}\n  • AI 最终选择: {{.AISelectedFiles}}\n  • 恢复后待分析文件: {{.PendingAnalyzeFiles}}\n  • 分析单元: {{.Units}}\n  • 本次不会重新执行文件扫描、排除统计和 AI 文件选择"
 
 [LearnCurrentNoFileChanges]
 other = "未检测到可学习文件变化，已跳过 patterns 学习"
@@ -2106,7 +2094,7 @@ other = "未检测到可学习文件变化，已跳过 patterns 学习"
 other = "已排除生成的 skills 目录:\n {{.Paths}}"
 
 [LearnCurrentFileSelectionSummary]
-other = "文件选择摘要:\n  • 源文件数量: {{.SourceFiles}}\n  • 本地过滤后计划输入: {{.LocalPlanInputs}}\n  • gotree 高价值候选: {{.GotreeHighValue}}/{{.GotreeIndexed}}\n  • 发送给 AI 文件选择: {{.AISelectionInputs}}\n  • AI 最终选择: {{.AISelectedFiles}}"
+other = "文件选择摘要:\n  • 源文件数量: {{.SourceFiles}}\n  • 本地过滤后计划输入: {{.LocalPlanInputs}}\n  • 发送给 AI 文件选择: {{.AISelectionInputs}}\n  • AI 最终选择: {{.AISelectedFiles}}"
 
 [LearnCurrentAIFileSelectorFallback]
 other = "AI 文件选择失败，回退为分析全部候选文件"
@@ -2255,7 +2243,7 @@ other = "初始化模式：project 单项目或 workspace 多子项目根仓"
 other = "工具输出与配置模板语言：zh-CN 或 en-US；不指定时默认 zh-CN"
 
 [InitFlagSkillsLocale]
-other = "AI 学习输出、生成 Skills 和沉淀内容语言：zh-CN 或 en-US；不指定时默认 en-US"
+other = "生成 Skills 模板语言：zh-CN 或 en-US；不指定时默认 en-US"
 
 [InitFlagAgent]
 other = "初始化时写入的 Agent engine，例如 claude 或 codex"
@@ -2492,7 +2480,7 @@ other = "工作区"
 other = "初始化当前 Git 仓库为工作区，并处理检测到的子项目。"
 
 [InteractiveInitSkillsLocale]
-other = "选择 Skills 语言"
+other = "选择 Skills 模板语言"
 
 [InteractiveInitAgent]
 other = "选择 Agent"
@@ -2504,7 +2492,7 @@ other = "选择 Skills 类型"
 other = "填写 Agent 总并发数"
 
 [InteractiveInitCustomizeAdvanced]
-other = "是否自定义分析深度、切分范围或 Skills 配置？"
+other = "是否自定义分析深度、切分范围或 Skills 模板配置？"
 
 [InteractiveInitParallelismPlanProject]
 other = "单项目：learning.current.parallelism={{.UnitParallelism}}"
@@ -2546,7 +2534,7 @@ other = "初始化类型"
 other = "工具语言"
 
 [InteractiveInitSummarySkillsLocale]
-other = "Skills 语言"
+other = "Skills 模板语言"
 
 [InteractiveInitSummaryAgent]
 other = "Agent"

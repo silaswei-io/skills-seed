@@ -161,13 +161,11 @@ func TestRepository_EffectiveGetterDefaults(t *testing.T) {
 
 	assert.Equal(t, "zh-CN", repo.GetToolLocale())
 	assert.Equal(t, "en-US", repo.GetSkillsLocale())
-	assert.Equal(t, "en-US", repo.GetPromptLocale("learn-batch"))
-	assert.Equal(t, "en-US", repo.GetPromptLocale("fix-generate"))
 	assert.Equal(t, "claude", repo.GetEffectiveAgentEngine())
 	assert.Equal(t, "claude", repo.GetEffectiveAgentCommand())
 	assert.Equal(t, "claude", repo.GetEffectiveSkillsTarget())
 	assert.Equal(t, ".claude/skills/skills-seed-skills", repo.GetEffectiveSkillsPath())
-	assert.Empty(t, repo.GetCurrentProjectConfig().Language)
+	assert.Empty(t, repo.GetProjectConfig().Language)
 	assert.Empty(t, repo.GetWorkspaceProjects())
 }
 

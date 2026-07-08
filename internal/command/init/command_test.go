@@ -26,7 +26,10 @@ func TestInitializeWorkspaceInitializesDetectedChildProjects(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(shellRoot, "install.ini"), []byte("[install]\n"), 0644))
 	initGitDir(t, shellRoot)
 
-	require.NoError(t, initializeSkillAt(workspaceRoot, "zh-CN", domain.ModeWorkspace))
+	require.NoError(t, initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+	}))
 
 	require.FileExists(t, filepath.Join(workspaceRoot, ".skills-seed", "config.yaml"))
 	require.FileExists(t, filepath.Join(childRoot, ".skills-seed", "config.yaml"))
@@ -125,7 +128,10 @@ func TestInitializeWorkspaceWithoutDetectedChildrenKeepsRootSeed(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	initGitDir(t, workspaceRoot)
 
-	require.NoError(t, initializeSkillAt(workspaceRoot, "zh-CN", domain.ModeWorkspace))
+	require.NoError(t, initializeSkillWithOptions(workspaceRoot, "zh-CN", domain.ModeWorkspace, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+	}))
 
 	configRepo, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
@@ -249,7 +255,7 @@ func TestInitializeProjectWithSkillsSetsTarget(t *testing.T) {
 	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
 }
 
-func TestInitializeProjectWithSkillsLocaleSetsSkillsLanguage(t *testing.T) {
+func TestInitializeProjectWithSkillsLocaleSetsSkillsTemplateLanguage(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)
 
@@ -285,7 +291,7 @@ func TestCmdAcceptsSeparateSkillsLocale(t *testing.T) {
 	require.Equal(t, "zh-CN", configRepo.GetSkillsLocale())
 }
 
-func TestCmdDefaultsSkillsLocaleToEnglishAndWritesEnglishPrompts(t *testing.T) {
+func TestCmdDefaultsSkillsLocaleToEnglishButKeepsContextTemplatesInToolLocale(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)
 	previousDir, err := os.Getwd()
@@ -306,13 +312,13 @@ func TestCmdDefaultsSkillsLocaleToEnglishAndWritesEnglishPrompts(t *testing.T) {
 
 	profile, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "context", "background.md"))
 	require.NoError(t, err)
-	require.Contains(t, string(profile), "# Background and External Facts")
-	require.NotContains(t, string(profile), "# 背景与外部事实")
+	require.Contains(t, string(profile), "# 背景与外部事实")
+	require.NotContains(t, string(profile), "# Background and External Facts")
 
 	instructions, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "context", "constraints.md"))
 	require.NoError(t, err)
-	require.Contains(t, string(instructions), "# Constraints and Boundaries")
-	require.NotContains(t, string(instructions), "# 约束与边界")
+	require.Contains(t, string(instructions), "# 约束与边界")
+	require.NotContains(t, string(instructions), "# Constraints and Boundaries")
 }
 
 func TestInitializeProjectDetectsFrontendLanguage(t *testing.T) {
@@ -577,7 +583,8 @@ func TestEnsureWorkspaceContextFilesDoesNotWriteRuntimePathPlaceholders(t *testi
 	content, err := os.ReadFile(filepath.Join(seedPath, "context", "workspace.md"))
 	require.NoError(t, err)
 	text := string(content)
-	require.Contains(t, text, "# Workspace Background")
+	require.Contains(t, text, "# 工作区背景")
+	require.NotContains(t, text, "# Workspace Background")
 	require.Contains(t, text, "hsmwebapi")
 	require.NotContains(t, text, "Workspace Profile Prompt")
 	require.NotContains(t, text, "Analysis Goal")

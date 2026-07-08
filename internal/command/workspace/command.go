@@ -23,7 +23,10 @@ type Dependencies struct {
 
 // Cmd 返回 workspace 命令
 func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
-	dependencies := normalizeDependencies(deps...)
+	dependencies := Dependencies{}
+	if len(deps) > 0 {
+		dependencies = deps[0]
+	}
 	workspaceCmd := &cobra.Command{
 		Use:     "workspace",
 		Short:   i18n.Get("WorkspaceShort"),
@@ -32,13 +35,6 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 	}
 	workspaceCmd.AddCommand(addCmd(cont, dependencies))
 	return workspaceCmd
-}
-
-func normalizeDependencies(deps ...Dependencies) Dependencies {
-	if len(deps) == 0 {
-		return Dependencies{}
-	}
-	return deps[0]
 }
 
 func addCmd(cont *container.Container, deps Dependencies) *cobra.Command {
@@ -67,7 +63,10 @@ func addCmd(cont *container.Container, deps Dependencies) *cobra.Command {
 }
 
 func runAddWorkspaceProjects(ctx context.Context, workspaceRoot string, rootConfigRepo *config.Repository, targets []string, deps ...Dependencies) error {
-	dependencies := normalizeDependencies(deps...)
+	dependencies := Dependencies{}
+	if len(deps) > 0 {
+		dependencies = deps[0]
+	}
 	if dependencies.EnsureChildInitialized == nil {
 		return fmt.Errorf("workspace child initializer dependency is not configured")
 	}

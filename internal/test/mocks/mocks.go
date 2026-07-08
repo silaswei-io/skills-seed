@@ -625,17 +625,12 @@ func (m *MockConfigReader) GetToolLocale() string {
 	return "zh-CN"
 }
 
-// GetSkillsLocale 模拟获取 Skills 语言
+// GetSkillsLocale 模拟获取 Skills 模板语言
 func (m *MockConfigReader) GetSkillsLocale() string {
 	if m.SkillsCfg.Locale != "" {
 		return m.SkillsCfg.Locale
 	}
 	return "en-US"
-}
-
-// GetPromptLocale 模拟按提示词用途获取语言
-func (m *MockConfigReader) GetPromptLocale(name string) string {
-	return m.GetSkillsLocale()
 }
 
 // GetEffectiveAgentEngine 模拟获取有效 Agent 引擎
@@ -664,9 +659,6 @@ func (m *MockConfigReader) GetEffectiveSkillsTarget() string {
 func (m *MockConfigReader) GetEffectiveSkillsPath() string {
 	return config.EffectiveSkillsPath(m.GetEffectiveSkillsTarget(), m.SkillsCfg)
 }
-
-// GetCurrentProjectConfig 模拟获取当前项目配置
-func (m *MockConfigReader) GetCurrentProjectConfig() config.ProjectConfig { return m.ProjectCfg }
 
 // GetWorkspaceProjects 模拟获取工作区子项目配置
 func (m *MockConfigReader) GetWorkspaceProjects() []config.WorkspaceProjectConfig {

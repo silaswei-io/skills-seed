@@ -29,6 +29,7 @@ Thumbs.db
 *.db
 *.log
 .test/
+AGENTS.md
 .skills-seed/
 .claude/skills/
 .agents/skills/

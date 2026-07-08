@@ -29,7 +29,16 @@ func newTestService(mockPattern *mocks.MockPatternRepository) *GeneratorService 
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	return NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	return newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+}
+
+func newGeneratorService(
+	patternRepo domain.PatternRepository,
+	profileRepo domain.ProjectProfileRepository,
+	loader *skills.Loader,
+	cfg config.Reader,
+) *GeneratorService {
+	return NewGeneratorService(patternRepo, profileRepo, loader, cfg)
 }
 
 func TestGenerateSkills_NoPatterns(t *testing.T) {
@@ -74,7 +83,7 @@ func TestGenerateSkillsDoesNotCallAISummary(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	svc := newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 	assert.NoError(t, err)
@@ -202,7 +211,7 @@ func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	var started []string
 	var completed []string
@@ -251,7 +260,7 @@ func TestGenerateSkillsRebuildsWhenInputFingerprintUnchanged(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, loader, cfg)
+	svc := newGeneratorService(patternRepo, mockProfile, loader, cfg)
 	outputPath := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
@@ -295,7 +304,7 @@ func TestGenerateSkillsDoesNotSkipWhenWorkflowScriptChanges(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := newGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	})
 	svc.SetWorkflowRepository(workflowRepo)
@@ -335,7 +344,7 @@ func TestGenerateSkillsRemovesDeletedWorkflowOutputs(t *testing.T) {
 			return &domain.ProjectProfile{ProjectName: "test", Language: "go", Summary: "demo"}, nil
 		},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := newGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	})
 	svc.SetWorkflowRepository(workflowRepo)
@@ -383,7 +392,7 @@ func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) 
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, loader, cfg)
+	svc := newGeneratorService(patternRepo, mockProfile, loader, cfg)
 	outputPath := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
@@ -432,7 +441,7 @@ func TestGenerateSkillsWithOptionsSkipsReferencesAndReferenceLinks(t *testing.T)
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 
 	err := svc.GenerateSkillsWithOptions(context.Background(), tmpDir, GenerateOptions{SkipReferences: true})
@@ -480,7 +489,7 @@ func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
 	scriptPath := filepath.Join(seedPath, "workflows", "deploy", "scripts", "smoke-test.sh")
 	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\necho ok\n"), 0755))
 
-	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	})
 	svc.SetWorkflowRepository(workflowRepo)
@@ -517,7 +526,7 @@ func TestGenerateSkillsRebuildsGeneratedOutputWithoutReadingExistingSkill(t *tes
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	svc := newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("<!-- generated-by: skills-seed v0.0.4 -->\nconst secretExistingSkillContent = true"), 0644))
 
@@ -619,7 +628,7 @@ func TestGenerateSkillsDoesNotUseRuntimeUserContextDuringGenerate(t *testing.T) 
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	svc := newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。")
 
 	require.NoError(t, svc.GenerateSkills(ctx, t.TempDir()))
@@ -641,7 +650,7 @@ func TestGenerateSkillsUsesDeterministicSummary(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	svc := newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API；交付物是离线安装包，不是 SaaS。")
 
 	tmpDir := t.TempDir()
@@ -666,7 +675,7 @@ func TestGenerateSkillsDoesNotCallAgentSummary(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	svc := newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -743,7 +752,7 @@ func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	err := svc.GenerateSkills(context.Background(), t.TempDir())
 	assert.Error(t, err)
@@ -773,7 +782,7 @@ func TestGenerateSkills_RendersProjectOverviewFromProfile(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "references"), 0755))
@@ -816,7 +825,7 @@ func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t 
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -935,7 +944,7 @@ func TestGenerateSkills_RendersEnglishRelatedReferences(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	svc := newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 	tmpDir := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -1013,7 +1022,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -1098,7 +1107,7 @@ func TestGenerateSkills_HidesCommonUtilsCoveredByBusinessPatterns(t *testing.T) 
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -1154,7 +1163,7 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 		AgentCfg:   config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -1236,7 +1245,7 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -1311,7 +1320,7 @@ func TestGenerateSkills_DisambiguatesDuplicateModuleHeadings(t *testing.T) {
 
 	loader := skills.NewLoader("zh-CN")
 	cfg := &mocks.MockConfigReader{ProjectCfg: config.ProjectConfig{Name: "demo", Language: "go"}}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
@@ -1353,7 +1362,7 @@ func TestGenerateSkills_GroupsBusinessMethodsAndDisambiguatesGenericNames(t *tes
 			}, nil
 		},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "backend"},
 	})
 	tmpDir := t.TempDir()
@@ -1414,7 +1423,7 @@ func TestGenerateSkills_FiltersMissingEvidencePaths(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("en-US"), &mocks.MockConfigReader{
+	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("en-US"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go", RootPath: projectRoot},
 	})
 	tmpDir := filepath.Join(projectRoot, ".agents", "skills", "backend-dev")
@@ -1447,7 +1456,7 @@ func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "backend"},
 	})
 	tmpDir := t.TempDir()
@@ -1524,7 +1533,7 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 	cfg := &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}
-	svc := NewGeneratorService(mockPattern, mockProfile, loader, cfg)
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
@@ -1563,7 +1572,7 @@ func TestGenerateSkills_CodexWritesOpenAIMetadata(t *testing.T) {
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 		AgentCfg:   config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
+	svc := newGeneratorService(mockPattern, &mocks.MockProjectProfileRepository{}, loader, cfg)
 
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)

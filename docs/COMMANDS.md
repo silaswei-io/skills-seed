@@ -138,8 +138,8 @@ skills-templates-sha256: <hash>
 | `--agent` | 空 | 初始化时写入的执行 Agent engine，例如 `claude` 或 `codex`；留空时使用内置默认值 |
 | `--skills` | 空 | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex`；留空时使用内置默认值 |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
-| `--locale`, `-l` | 空 | 工具输出与配置模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
-| `--skills-locale` | 空 | AI 学习输出、生成 Skills 和沉淀内容语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
+| `--locale`, `-l` | 空 | 工具输出、配置模板与 seed context 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
+| `--skills-locale` | 空 | 生成 Skills 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
 | `--help`, `-h` | `false` | 查看 `init` 帮助 |
 
 #### 常用示例
@@ -209,7 +209,7 @@ skills-seed init --workspace --agent codex --skills codex
 | `--mode` | `project` | 重置后的初始化模式：`project` 或 `workspace` |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
 | `--locale`, `-l` | 空 | 重置后工具输出与配置模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
-| `--skills-locale` | 空 | 重置后 AI 学习输出、生成 Skills 和沉淀内容语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
+| `--skills-locale` | 空 | 重置后生成 Skills 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
 | `--help`, `-h` | `false` | 查看 `reset` 帮助 |
 
 #### 常用示例

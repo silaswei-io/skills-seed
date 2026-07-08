@@ -765,18 +765,6 @@ other = "{{.Label}}: checking resumable plan"
 [ProgressLearnCurrentDetectScanFiles]
 other = "{{.Label}}: scanning file fingerprints"
 
-[ProgressLearnCurrentBuildFileSelectionIndex]
-other = "gotree index build"
-
-[ProgressLearnCurrentSkipFileSelectionIndex]
-other = "Skipping gotree index build ({{.Reason}})"
-
-[ProgressLearnCurrentConfirmFileSelectionCandidates]
-other = "gotree file confirmation"
-
-[ProgressLearnCurrentSkipFileSelectionConfirm]
-other = "Skipping gotree file confirmation ({{.Reason}})"
-
 [ProgressLearnCurrentAIFileSelection]
 other = "AI file selection"
 
@@ -2096,7 +2084,7 @@ other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMod
 other = "Incremental file changes:\n  • added or modified: {{.Changed}}\n  • deleted: {{.Deleted}}\n  • unchanged skipped: {{.Unchanged}}\n  • excluded: {{.Skipped}}"
 
 [LearnCurrentResumeSummary]
-other = "Resuming unfinished {{.Command}} plan:\n  • plan created at: {{.CreatedAt}}\n  • source files: {{.SourceFiles}}\n  • local-filtered plan inputs: {{.LocalPlanInputs}}\n  • sent to AI file selection: {{.AISelectionInputs}}\n  • finally selected by AI: {{.AISelectedFiles}}\n  • pending analysis files: {{.PendingAnalyzeFiles}}\n  • analysis units: {{.Units}}\n  • this run will not repeat file scanning, exclusion statistics, local structural indexing, or AI file selection"
+other = "Resuming unfinished {{.Command}} plan:\n  • plan created at: {{.CreatedAt}}\n  • source files: {{.SourceFiles}}\n  • local-filtered plan inputs: {{.LocalPlanInputs}}\n  • sent to AI file selection: {{.AISelectionInputs}}\n  • finally selected by AI: {{.AISelectedFiles}}\n  • pending analysis files: {{.PendingAnalyzeFiles}}\n  • analysis units: {{.Units}}\n  • this run will not repeat file scanning, exclusion statistics, or AI file selection"
 
 [LearnCurrentNoFileChanges]
 other = "No learnable file changes detected; skipped pattern learning"
@@ -2105,7 +2093,7 @@ other = "No learnable file changes detected; skipped pattern learning"
 other = "Excluded generated skills directories: {{.Paths}}"
 
 [LearnCurrentFileSelectionSummary]
-other = "File selection summary:\n  • source files: {{.SourceFiles}}\n  • local-filtered plan inputs: {{.LocalPlanInputs}}\n  • gotree high-value candidates: {{.GotreeHighValue}}/{{.GotreeIndexed}}\n  • sent to AI file selection: {{.AISelectionInputs}}\n  • finally selected by AI: {{.AISelectedFiles}}"
+other = "File selection summary:\n  • source files: {{.SourceFiles}}\n  • local-filtered plan inputs: {{.LocalPlanInputs}}\n  • sent to AI file selection: {{.AISelectionInputs}}\n  • finally selected by AI: {{.AISelectedFiles}}"
 
 [LearnCurrentAIFileSelectorFallback]
 other = "AI file selection failed; falling back to all candidate files"
@@ -2254,7 +2242,7 @@ other = "Initialization mode: project for a single project or workspace for a mu
 other = "Tool output and config template language: zh-CN or en-US; defaults to zh-CN when omitted"
 
 [InitFlagSkillsLocale]
-other = "AI learning output, generated Skills, and persisted content language: zh-CN or en-US; defaults to en-US when omitted"
+other = "Template language for generated Skills: zh-CN or en-US; defaults to en-US when omitted"
 
 [InitFlagAgent]
 other = "Agent engine to write during initialization, for example claude or codex"
@@ -2491,7 +2479,7 @@ other = "Workspace"
 other = "Initialize the current Git repository as a workspace and process detected child projects."
 
 [InteractiveInitSkillsLocale]
-other = "Select Skills language"
+other = "Select Skills template language"
 
 [InteractiveInitAgent]
 other = "Select Agent"
@@ -2503,7 +2491,7 @@ other = "Select Skills type"
 other = "Enter total Agent parallelism"
 
 [InteractiveInitCustomizeAdvanced]
-other = "Customize analysis depth, split scope, or Skills settings?"
+other = "Customize analysis depth, split scope, or Skills template settings?"
 
 [InteractiveInitParallelismPlanProject]
 other = "Project: learning.current.parallelism={{.UnitParallelism}}"
@@ -2545,7 +2533,7 @@ other = "Initialization type"
 other = "Tool language"
 
 [InteractiveInitSummarySkillsLocale]
-other = "Skills language"
+other = "Skills template language"
 
 [InteractiveInitSummaryAgent]
 other = "Agent"

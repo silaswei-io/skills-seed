@@ -47,19 +47,22 @@ func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	require.Equal(t, config.LearningModeDeep, currentData["LearningMode"])
 }
 
-func TestSelectFilesPromptDataInlinesStructuralContext(t *testing.T) {
+func TestSelectFilesPromptDataWritesRuntimeInputs(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
-	structuralContext := "## Structural Context\n\n### Entry Points\n- func main (cmd/server/main.go:3)\n"
 	data, err := SelectFilesPromptData(session, &SelectFilesRequest{
-		Candidates:        []FileSelectionCandidate{{Path: "cmd/server/main.go", Kind: "source"}},
-		StructuralContext: structuralContext,
+		FileTree:   "cmd/server/main.go\ninternal/orders/handler.go\n",
+		Candidates: []FileSelectionCandidate{{Path: "cmd/server/main.go", Kind: "source"}},
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, structuralContext, data["StructuralContext"])
-	require.NotContains(t, data, "StructuralContextPath")
-	require.NoFileExists(t, filepath.Join(session.dir, "structural-context.md"))
+	fileListPath, ok := data["FileListPath"].(string)
+	require.True(t, ok)
+	require.Equal(t, filepath.Join(session.dir, "candidate-files.txt"), fileListPath)
+
+	fileList, err := os.ReadFile(fileListPath)
+	require.NoError(t, err)
+	require.Contains(t, string(fileList), "cmd/server/main.go")
 }
 
 func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {

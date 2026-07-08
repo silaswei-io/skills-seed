@@ -110,12 +110,12 @@ autofix:
 
 ########################################################################
 # Skills 生成
-# 控制生成的 Skills 目标类型、输出路径和内容语言
+# 控制生成的 Skills 目标类型、输出路径和模板语言
 ########################################################################
 skills:
   # 生成的 Skills 目标类型；可与 agent.engine 不同，例如用 claude 生成 codex skills
   target: "claude"
-  # AI 学习输出、生成的 Skills 和沉淀到 Skills 的自然语言内容：zh-CN 中文，en-US 英文
+  # 生成 Skills 时使用的模板语言：zh-CN 中文，en-US 英文
   locale: "en-US"
   # Skills 目标类型到输出目录的映射；仅控制生成产物保存位置
   paths:
