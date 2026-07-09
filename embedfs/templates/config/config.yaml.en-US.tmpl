@@ -9,7 +9,7 @@ profile:
   mode: "project"
   # Primary language, auto-detected during init; empty when unknown
   language: ""
-  # Tool output language: zh-CN (Chinese) or en-US (English)
+  # Tool output, config-template, and seed-context template language: zh-CN (Chinese) or en-US (English)
   locale: "en-US"
   # Git remote repository URL (auto-filled during init)
   git_remote: ""
@@ -66,9 +66,9 @@ learning:
     parallelism: 1
     # Maximum analysis units per AI call; 1 disables batching to reduce oversized outputs and cross-unit bleed
     max_units_per_call: 1
-    # Enable relevant-file selection to narrow learn current scope from the candidate file tree
+    # Enable relevant-file filtering to narrow learn current scope from the candidate file tree
     select_relevant_files: true
-    # Only call AI file selection when candidate files reach this threshold; smaller projects use local filtering
+    # Only call AI file filtering when candidate files reach this threshold; smaller projects use local filtering
     select_relevant_files_min_candidates: 200
     budget:
       # Maximum candidate patterns stored per analysis unit; 0 means unlimited
@@ -88,6 +88,8 @@ learning:
     structural:
       # Enable bounded structural context; it does not run without bounded inputs
       enabled: true
+      # Structural context provider: auto prefers CodeGraph with automatic repair, then falls back to tree-sitter; codegraph or treesitter can be forced
+      provider: "auto"
       # Maximum symbols emitted into structural context
       max_symbols: 30
       # Skip individual files larger than this size (KB)
@@ -110,12 +112,12 @@ autofix:
 
 ########################################################################
 # Skills
-# Controls the generated Skills target type, output paths, and template language
+# Controls the generated Skills target type, output paths, and AI/Skills content language
 ########################################################################
 skills:
   # Target Skills type; can differ from agent.engine, for example use claude to generate codex skills
   target: "claude"
-  # Template language used when generating Skills: zh-CN (Chinese) or en-US (English)
+  # Language used for AI output, persisted learned content, and generated Skills: zh-CN (Chinese) or en-US (English)
   locale: "en-US"
   # Mapping from Skills target type to output directory; only controls where generated artifacts are saved
   paths:

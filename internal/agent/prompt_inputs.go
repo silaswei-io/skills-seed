@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -55,25 +56,33 @@ func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePat
 	}, nil
 }
 
-// SelectFilesPromptData 返回 AI 文件选择器所需的提示词数据。
+// SelectFilesPromptData 返回 AI 文件筛选器所需的提示词数据。
 func SelectFilesPromptData(session *PromptInputSession, req *SelectFilesRequest) (map[string]interface{}, error) {
 	fileListPath, err := session.Write("candidate-files.txt", req.FileTree)
 	if err != nil {
-		return nil, fmt.Errorf("write file selection candidate files: %w", err)
+		return nil, fmt.Errorf("write file filtering candidate files: %w", err)
 	}
 	candidatesPath, err := session.Write("candidates.json", mustJSON(req.Candidates))
 	if err != nil {
-		return nil, fmt.Errorf("write file selection candidates: %w", err)
+		return nil, fmt.Errorf("write file filtering candidates: %w", err)
 	}
 	userContextPath, err := session.Write("user-context.md", req.UserContext)
 	if err != nil {
-		return nil, fmt.Errorf("write file selection user context: %w", err)
+		return nil, fmt.Errorf("write file filtering user context: %w", err)
+	}
+	structuralContextPath := strings.TrimSpace(req.StructuralContextPath)
+	if structuralContextPath == "" && strings.TrimSpace(req.StructuralContext) != "" {
+		structuralContextPath, err = session.Write("structural-context.md", req.StructuralContext)
+		if err != nil {
+			return nil, fmt.Errorf("write file filtering structural context: %w", err)
+		}
 	}
 	return map[string]interface{}{
-		"FileListPath":    fileListPath,
-		"CandidatesPath":  candidatesPath,
-		"UserContextPath": userContextPath,
-		"CandidateNum":    req.CandidateNum,
+		"FileListPath":          fileListPath,
+		"CandidatesPath":        candidatesPath,
+		"UserContextPath":       userContextPath,
+		"StructuralContextPath": structuralContextPath,
+		"CandidateNum":          req.CandidateNum,
 	}, nil
 }
 

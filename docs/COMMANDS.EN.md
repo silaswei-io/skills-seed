@@ -18,7 +18,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Pattern Management | [`skills-seed patterns`](#skills-seed-patterns) | Add, delete, curate, and inspect patterns | `skills-seed patterns show` |
 | Workflow | [`skills-seed workflow`](#skills-seed-workflow) | Add or update user task workflows | `skills-seed workflow --context "..."` |
 | Review Metrics | [`skills-seed review`](#skills-seed-review) | Import review comments and measure pattern coverage | `skills-seed review stats` |
-| Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show or refresh the project profile | `skills-seed profile show` |
+| Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show or update the project profile | `skills-seed profile show` |
 | One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
 | Change History | [`skills-seed log`](#skills-seed-log) | Show learned change history | `skills-seed log` |
 | Checks | [`skills-seed check`](#skills-seed-check) | Check staged or tracked files | `skills-seed check` |
@@ -67,7 +67,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed patterns update <pattern-id> (--context <description> \| --context-path <path>)` | Update a pattern | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | Preview analysis inputs | `files` | `--help, -h` = `false` |
 | `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
-| `skills-seed profile` | Show or refresh the project profile | `refresh`, `show` | `--help, -h` = `false` |
+| `skills-seed profile` | Show or update the project profile | `refresh`, `show` | `--help, -h` = `false` |
 | `skills-seed profile refresh` | Re-analyze the project and save the project profile | - | `--help, -h` = `false`<br>`--language, -l` = `` |
 | `skills-seed profile show` | Show the current project profile summary | - | `--help, -h` = `false` |
 | `skills-seed reset` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
@@ -139,7 +139,7 @@ Initialize `.skills-seed/`, default config, database, project context, and skill
 | `--skills` | empty | Skills output type to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
 | `--locale`, `-l` | empty | Tool output, config-template, and seed-context template language: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
-| `--skills-locale` | empty | Template language for generated Skills: `zh-CN` or `en-US`; empty uses the built-in default `en-US` |
+| `--skills-locale` | empty | Language for AI output, persisted learned content, and generated Skills: `zh-CN` or `en-US`; empty uses the built-in default `en-US` |
 | `--help`, `-h` | `false` | Show `init` help |
 
 #### Common Examples
@@ -209,7 +209,7 @@ Back up and reset the current repository's `.skills-seed`. Existing data is move
 | `--mode` | `project` | Mode after reset: `project` or `workspace` |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
 | `--locale`, `-l` | empty | Tool output and config template language after reset: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
-| `--skills-locale` | empty | Template language for generated Skills after reset: `zh-CN` or `en-US`; empty uses the built-in default `en-US` |
+| `--skills-locale` | empty | Language for AI output, persisted learned content, and generated Skills after reset: `zh-CN` or `en-US`; empty uses the built-in default `en-US` |
 | `--help`, `-h` | `false` | Show `reset` help |
 
 #### Common Examples
@@ -250,7 +250,7 @@ Learn coding patterns, business methods, and best practices from the current cod
 |---|---:|---|
 | `--language`, `-l` | config or auto-detect | Primary project language |
 | `--focus`, `-f` | empty | Learn only a directory or file; may be repeated, and paths must stay under the project root |
-| `--profile` | `auto` | Project profile refresh strategy: `auto`, `skip`, or `refresh` |
+| `--profile` | `auto` | Project profile sync strategy: `auto`, `skip`, or `refresh` |
 | `--context` | empty | One-time guidance for this learn run, passed to the AI agent and not written to `.skills-seed/context/` |
 | `--context-path` | empty | Read one-time guidance for this learn run from files or directories; may be repeated and is not written to `.skills-seed/context/` |
 | `--help`, `-h` | `false` | Show `learn current` help |
@@ -268,9 +268,9 @@ Learn coding patterns, business methods, and best practices from the current cod
 
 | Value | Description |
 |---|---|
-| `auto` | Creates the project profile when missing; refreshes when this run writes new or updated patterns; otherwise skips |
+| `auto` | Creates the project profile when missing; syncs it when this run writes new or updated patterns; otherwise skips |
 | `skip` | Learn patterns only |
-| `refresh` | Force profile refresh from the current input |
+| `refresh` | Force project-profile re-analysis and sync from the current input |
 
 #### Common Examples
 
@@ -288,7 +288,7 @@ skills-seed learn history --limit 40 --batch-size 5
 
 #### Notes
 
-1. After the first successful run, Skills Seed records md5 fingerprints for analyzed files. If no learnable files changed, pattern learning and profile refresh are skipped.
+1. After the first successful run, Skills Seed records md5 fingerprints for analyzed files. If no learnable files changed, pattern learning and project-profile sync are skipped.
 2. Generated skill directories are excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
 3. The workspace root coordinates learning and does not store child patterns in root storage.
 4. Workspace child projects run with real concurrency according to `agent.parallelism`.
@@ -296,7 +296,7 @@ skills-seed learn history --limit 40 --batch-size 5
 6. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
 7. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
 8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
-9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use the embedded tree-sitter structural pre-scan configured by `learning.current.structural`; without bounded inputs, it does not scan the whole repository.
+9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` prefers CodeGraph, automatically initializes or repairs its index when needed, and falls back to embedded tree-sitter when unavailable. Without bounded inputs, it does not scan the whole repository.
 10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
@@ -370,13 +370,13 @@ references/
 
 #### Command Overview
 
-Preview files selected for full or incremental analysis under the current configuration without calling an AI agent. Use it to debug `exclude.paths`, `exclude.gitignore`, focus paths, and file-selection behavior.
+Preview files that would enter full or incremental analysis under the current configuration without calling an AI agent. Use it to debug `exclude.paths`, `exclude.gitignore`, focus paths, and file-filtering behavior.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed preview files` | Preview files selected for analysis | `skills-seed preview files --mode incremental --focus internal/service` | Prints file-selection results only; does not learn patterns |
+| `skills-seed preview files` | Preview files that would be analyzed | `skills-seed preview files --mode incremental --focus internal/service` | Prints file-filtering results only; does not learn patterns |
 
 #### `preview` Flags
 
@@ -405,7 +405,7 @@ skills-seed preview files --limit 500
 
 #### Notes
 
-1. `preview files` shares the file-selection policy used by `learn current`, so it shows which files would enter learning analysis.
+1. `preview files` shares the file-filtering policy used by `learn current`, so it shows which files would enter learning analysis.
 2. `--mode incremental` shows added, modified, and deleted candidates from the current file snapshot. Without an existing snapshot, the result is close to first-run learning scope.
 3. Skipped counts help confirm whether documents, configured excludes, or Git ignore rules filtered the expected files.
 
@@ -575,14 +575,14 @@ skills-seed review stats --line-window 5
 
 #### Command Overview
 
-Show or refresh the project profile. The profile is stored at `.skills-seed/store/documents/project-profile.json` and is used to generate `references/project-overview.md`.
+Show or update the project profile. The profile is stored at `.skills-seed/store/documents/project-profile.json` and is used to generate `references/project-overview.md`.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed profile show` | Print the current project profile summary | `skills-seed profile show` | Does not call the AI agent or modify the database |
-| `skills-seed profile refresh` | Re-analyze the project and overwrite the profile | `skills-seed profile refresh --language go` | Does not learn patterns; only refreshes the profile |
+| `skills-seed profile refresh` | Re-analyze the project and overwrite the profile | `skills-seed profile refresh --language go` | Does not learn patterns; only updates the profile |
 
 #### `profile` Flags
 

@@ -63,6 +63,26 @@ func TestSelectFilesPromptDataWritesRuntimeInputs(t *testing.T) {
 	fileList, err := os.ReadFile(fileListPath)
 	require.NoError(t, err)
 	require.Contains(t, string(fileList), "cmd/server/main.go")
+	require.Empty(t, data["StructuralContextPath"])
+	require.NoFileExists(t, filepath.Join(session.dir, "structural-context.md"))
+}
+
+func TestSelectFilesPromptDataWritesStructuralContextWhenPresent(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+
+	data, err := SelectFilesPromptData(session, &SelectFilesRequest{
+		FileTree:          "cmd/server/main.go\n",
+		StructuralContext: "## Structural Context\n- cmd/server/main.go defines main",
+	})
+	require.NoError(t, err)
+
+	contextPath, ok := data["StructuralContextPath"].(string)
+	require.True(t, ok)
+	require.Equal(t, filepath.Join(session.dir, "structural-context.md"), contextPath)
+
+	content, err := os.ReadFile(contextPath)
+	require.NoError(t, err)
+	require.Contains(t, string(content), "cmd/server/main.go defines main")
 }
 
 func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {

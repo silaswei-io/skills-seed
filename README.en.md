@@ -164,11 +164,11 @@ Starting in 0.11.2, `learning.current.max_units_per_call` controls how many unit
 
 Starting in 0.11.6, current-code and history-learning prompts use a stricter Candidate Admission Gate: facts, summaries, weak local evidence, and generic engineering practice are dropped unless they become source-backed, project-specific, routeable rules that can guide future changes. Business coverage matrices now prevent missed strong candidates instead of forcing pattern output.
 
-Current `sync` / `learn current` file selection first applies local filtering, then writes the full candidate file list and metadata into runtime so AI can make relevance recommendations and assist later analysis-unit planning. Console progress shows only the important stages plus a unified file-selection summary; candidate counts, timings, and other diagnostic details are kept in runtime logs.
+Current `sync` / `learn current` file filtering first applies local rules, then writes candidate metadata and, when available, CodeGraph-backed structural context into runtime so AI can make relevance recommendations and assist later analysis-unit planning. Console progress shows only the important stages plus a compact file-filtering result; candidate counts, timings, and other diagnostic details are kept in runtime logs.
 
 Starting in 0.13.2, the repository is clean under `staticcheck ./...`; alongside `go test`, `go vet`, and builds, staticcheck is recommended as a release-time quality gate.
 
-AI file selection only provides relevance recommendations; the final analysis scope is decided by a local stable policy that merges recommendations, cache entries, and explicit user focus paths. Identical inputs reuse the selection cache; explicit focus files cannot be excluded by an AI recommendation, and large candidate sets with overly narrow recommendations are deterministically filled to a minimum budget to reduce large swings in analyzed file counts across runs.
+AI file filtering provides the final relevance recommendation for the analysis scope, with local validation to keep paths inside the candidate set and force-keep explicit user focus paths. Identical inputs reuse the filtering cache, but the local policy no longer expands narrow AI recommendations to a fixed budget.
 
 Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
 
@@ -176,11 +176,11 @@ Starting in 0.10.4, default pre-storage curation uses local deterministic mergin
 
 Starting in 0.10.5, `learn current` unit analysis no longer injects the existing pattern store into every unit prompt, preventing context from growing with the number of saved patterns. Post-learning deduplication remains handled by local deterministic merging; use `skills-seed patterns compact --ai` when explicit semantic compaction is needed.
 
-Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file selection before analysis. When `generate skills` is run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds it. The root `completion` command has been removed, and Chinese help text is now consistent.
+Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file filtering before analysis. When `generate skills` is run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds it. The root `completion` command has been removed, and Chinese help text is now consistent.
 
 `generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
 
-Starting in 0.7.0, learning and project-profile analysis use an embedded tree-sitter structural pre-scan when bounded inputs exist. It extracts symbols, imports, entry points, and module clues so the Agent can prioritize source files to inspect. It no longer depends on an external CodeGraph command or index; configure it under `analysis.structural`, where `max_symbols` controls emitted symbol count and `max_file_size` controls the per-source-file size limit.
+Learning and project-profile analysis use bounded structural context when focus paths, diffs, samples, or entry files exist. Configure it under `learning.current.structural`: `provider: auto` prefers CodeGraph, automatically initializes or repairs its index when possible, and falls back to embedded tree-sitter only when CodeGraph is unavailable; `provider: codegraph` or `provider: treesitter` can force either source.
 
 When an AI Agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries with exponential backoff according to `agent.retry`. Long-running progress lines switch between normal, waiting, and retrying states, for example `Analyze current codebase`, `Analyze current codebase (API Error: 529 overloaded_error, call 3m37s, retry in 15s)`, and `Analyze current codebase (attempt 2)`. The call duration is how long the failed Agent call took; `retry in 15s` is the backoff wait.
 
@@ -247,7 +247,7 @@ skills-seed sync --context-path .skills-seed/run-context.md
 
 If a rule should apply across future runs, put it in `.skills-seed/context/constraints.md`. If it only explains or limits one run, use `--context` or `--context-path`.
 
-`learn current`, `preview`, and structural analysis now share one file-selection policy: by default they analyze source files, build config, and dependency config while continuing to skip documents, generated outputs, paths ignored by Git, paths matched by global `exclude`, and generated Skills output directories.
+`learn current`, `preview`, and structural analysis now share one file-filtering policy: by default they analyze source files, build config, and dependency config while continuing to skip documents, generated outputs, paths ignored by Git, paths matched by global `exclude`, and generated Skills output directories.
 
 ## Quick Start
 

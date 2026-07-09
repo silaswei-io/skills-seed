@@ -12,7 +12,7 @@
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
 - workspace 公共库、契约和基础设施影响会在 `learn current` 阶段根据仓库证据、子项目画像和一次性用户说明分析并沉淀到 workspace profile/spec，不从配置文件读取；生成阶段只消费已沉淀结果。
 - workspace 根配置的 `profile.language` 默认留空，因为一个工作区可以包含多种语言子项目。
-- `analysis.codegraph` 已移除，结构化预扫描改为 `learning.current.structural`，基于内嵌 tree-sitter，不需要外部 CodeGraph 命令或索引。
+- `analysis.codegraph` 已移除，结构化上下文统一配置在 `learning.current.structural`；默认 `provider: auto` 优先 CodeGraph，不可用时降级到内嵌 tree-sitter。
 
 ## 配置示例
 
@@ -54,6 +54,7 @@ learning:
     select_relevant_files_min_candidates: 200
     structural:
       enabled: true
+      provider: "auto"
       max_symbols: 30
       max_file_size: 512
   history:
@@ -176,20 +177,21 @@ exclude:
 | `select_relevant_files` | `true` | 是否先基于候选文件树筛选最值得分析的相关文件，减少无意义文件进入 AI 分析 |
 | `select_relevant_files_min_candidates` | `200` | 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果，避免额外 AI 调用 |
 | `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
+| `structural.provider` | `auto` | 结构化上下文来源：`auto` 优先 CodeGraph 并自动修复，不可用时降级 tree-sitter；也可强制 `codegraph` 或 `treesitter` |
 | `structural.max_symbols` | `30` | 输出到结构化上下文的最大符号数 |
 | `structural.max_file_size` | `512` | 单个源码文件大小上限，单位 KB；超过时跳过该文件 |
 
 #### `structural`
 
-基于内嵌 tree-sitter 的轻量结构化预扫描。它提供符号、导入、入口点和模块线索，不依赖外部命令，也不维护索引。
+结构化上下文用于给 Agent 提供符号、导入、入口点和模块线索。默认 `provider: auto` 会优先使用 CodeGraph；如果目标项目未初始化会自动执行初始化，索引同步或状态检查异常时会尝试自动修复，只有 CodeGraph 命令不可用或修复失败时才降级到内嵌 tree-sitter。`provider: codegraph` 会强制只使用 CodeGraph；`provider: treesitter` 会只使用内嵌 tree-sitter。
 
-0.7.1 起，结构化预扫描、`learn current` 和 `preview` 共用同一套文件选择策略：默认只纳入源码、构建配置和依赖配置；文档、生成产物、全局 `exclude` 命中的路径以及已生成 Skills 输出目录会被跳过。
+0.7.1 起，结构化预扫描、`learn current` 和 `preview` 共用同一套文件过滤策略：默认只纳入源码、构建配置和依赖配置；文档、生成产物、全局 `exclude` 命中的路径以及已生成 Skills 输出目录会被跳过。
 
-0.9.0 起，项目结构摘要、样例文件收集和结构化预扫描都统一使用同一套配置化文件选择策略。除 `.git`、`.skills-seed` 和已配置的 skills 输出目录等内置安全边界外，不再在 analyzer 内额外维护目录名关键字；需要排除依赖、构建产物或项目自定义目录时，应写入 `exclude`。
+0.9.0 起，项目结构摘要、样例文件收集和结构化预扫描都统一使用同一套配置化文件过滤策略。除 `.git`、`.skills-seed` 和已配置的 skills 输出目录等内置安全边界外，不再在 analyzer 内额外维护目录名关键字；需要排除依赖、构建产物或项目自定义目录时，应写入 `exclude`。
 
 0.9.1 起，`select_relevant_files` 默认开启；当本地过滤后的候选文件数达到 `select_relevant_files_min_candidates` 时，`learn current` 会先让 AI 从候选文件树和变更元数据中筛出更相关的文件，再进入后续分析。
 
-0.9.11 起，文件选择策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。0.9.13 起，快照仍保存完整当前状态，但发送给 AI 的 diff 会按 `exclude.paths` 和 `exclude.gitignore` 过滤，避免被忽略文件作为删除 diff 进入分析。
+0.9.11 起，文件过滤策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。0.9.13 起，快照仍保存完整当前状态，但发送给 AI 的 diff 会按 `exclude.paths` 和 `exclude.gitignore` 过滤，避免被忽略文件作为删除 diff 进入分析。
 
 #### 建议
 
@@ -197,7 +199,7 @@ exclude:
 2. 明确不需要相关文件筛选时，把 `select_relevant_files` 设为 `false`。
 3. 小项目可提高 `select_relevant_files_min_candidates`，直接跳过 AI 文件筛选；大型项目可降低该值以更早收敛范围。
 4. 明确不需要结构化上下文时，把 `structural.enabled` 设为 `false`。
-5. 大型仓库可降低 `structural.max_file_size`，避免解析生成文件、bundle 或异常大文件。
+5. 大型仓库在使用 tree-sitter 或 auto 降级时可降低 `structural.max_file_size`，避免解析生成文件、bundle 或异常大文件。
 6. 结构化上下文只消费已有边界输入，不在没有 seed 时全仓扫描。
 
 ### Prompt 运行时调试
@@ -214,7 +216,7 @@ exclude:
 
 0.11.2 起，`learning.current.max_units_per_call` 可控制一次 AI 调用最多分析的单元数，默认 `1` 表示不合批；调高后会把多个单元放入同一次调用并要求响应按顶层 `units` 返回。生成 skills 时，低频或局部证据不会进入强约束层，避免把偶发现象误写成必须遵守的项目标准。
 
-AI 文件选择采用“相关性建议 + 本地稳定策略”：相同输入仍会按指纹复用缓存；用户显式 focus 文件会被本地策略强制保留，候选集较大且 AI 建议过窄时会按确定性预算补足一部分候选，避免关键文件被跳过或多次学习覆盖面大幅波动。
+AI 文件筛选会直接决定最终分析范围，同时本地校验会确保路径仍在候选集内，并强制保留用户显式 focus 文件。相同输入仍会按指纹复用缓存，但本地策略不再把较窄的 AI 建议扩展到固定预算。
 
 初始化交互中的“Agent 总并发数”会自动落到具体配置：单项目模式写入 `learning.current.parallelism`；workspace 模式会根据发现到的子项目数拆分为根配置的 `agent.parallelism`（子项目并发）和 `learning.current.parallelism`（每个子项目内的分析单元并发），并确保两者乘积不超过总并发。
 
@@ -365,7 +367,7 @@ skills-seed learn history --limit 100 --batch-size 10
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `target` | `agent.engine` | 生成的 Skills 目标类型；可与 `agent.engine` 不同 |
-| `locale` | `en-US` | 生成 Skills 时使用的模板语言 |
+| `locale` | `en-US` | AI 学习输出、沉淀内容和生成 Skills 使用的语言 |
 | `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills 输出目录 |
 | `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills 输出目录 |
 
@@ -373,10 +375,10 @@ skills-seed learn history --limit 100 --batch-size 10
 
 1. `generate skills` 默认使用 `skills.target` 对应的 `skills.paths`。
 2. 可通过 `skills-seed generate skills --output <path>` 临时指定输出目录。
-3. `skills.locale` 支持 `zh-CN` 和 `en-US`，默认英文；它只影响 `generate skills` 读取的 Skills 模板语言，不再控制运行时 AI prompt 输出语言。
+3. `skills.locale` 支持 `zh-CN` 和 `en-US`，默认英文；它统一控制运行时 AI 自然语言输出、沉淀内容以及 `generate skills` 产物语言。
 4. 新增自定义 engine 或 target 时，应分别添加 `agent.commands.<engine>` 和 `skills.paths.<target>`。
 
-运行时 AI prompt 模板统一维护为英文单源模板，最终输出契约跟随 `locale`；`skills.locale` 只影响生成 Skills 时选择的模板语言。
+运行时 AI prompt 模板统一维护为英文单源模板，最终输出契约跟随 `skills.locale`；`profile.locale` 只影响工具输出、配置模板和 seed context 模板语言。
 
 ### `logging`
 
@@ -397,7 +399,7 @@ skills-seed learn history --limit 100 --batch-size 10
 | `gitignore` | `true` | 是否排除 Git ignore 命中的文件，包括 `.gitignore`、`.git/info/exclude` 和全局 Git ignore |
 | `paths` | 见下表 | 需要排除的相对路径或 glob |
 
-关闭 `gitignore` 后，文件选择仍会应用内置安全边界、已生成 Skills 输出目录和 `exclude.paths`，但不会再跳过被 Git ignore 规则忽略的源码文件。
+关闭 `gitignore` 后，文件过滤仍会应用内置安全边界、已生成 Skills 输出目录和 `exclude.paths`，但不会再跳过被 Git ignore 规则忽略的源码文件。
 
 #### 默认值
 

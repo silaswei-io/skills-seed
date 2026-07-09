@@ -255,7 +255,7 @@ func TestInitializeProjectWithSkillsSetsTarget(t *testing.T) {
 	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
 }
 
-func TestInitializeProjectWithSkillsLocaleSetsSkillsTemplateLanguage(t *testing.T) {
+func TestInitializeProjectWithSkillsLocaleSetsAISkillsContentLanguage(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)
 

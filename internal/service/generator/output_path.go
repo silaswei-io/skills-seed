@@ -7,9 +7,5 @@ func (s *GeneratorService) resolveOutputPath(outputPath string) (string, error) 
 	if s.configRepo != nil {
 		projectRoot = s.configRepo.GetProjectConfig().RootPath
 	}
-	return resolveProjectOutputPath(projectRoot, outputPath)
-}
-
-func resolveProjectOutputPath(projectRoot, outputPath string) (string, error) {
 	return utils.ResolveProjectOutputPath(projectRoot, outputPath)
 }

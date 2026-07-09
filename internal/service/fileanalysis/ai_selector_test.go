@@ -115,7 +115,7 @@ func TestApplyAIFileSelectorKeepsFullCandidateTree(t *testing.T) {
 	require.Contains(t, selector.req.FileTree, "handler.go")
 }
 
-func TestApplyAIFileSelectorFillsMinimumBudgetForLargeCandidateSets(t *testing.T) {
+func TestApplyAIFileSelectorKeepsAINarrowSelectionForLargeCandidateSets(t *testing.T) {
 	root := t.TempDir()
 	candidates := make([]string, 0, 120)
 	for i := 0; i < 120; i++ {
@@ -131,9 +131,39 @@ func TestApplyAIFileSelectorFillsMinimumBudgetForLargeCandidateSets(t *testing.T
 		Candidates:  candidates,
 	})
 	require.NoError(t, err)
-	require.Len(t, result.SelectedPaths, stableSelectionMinCount)
-	require.Contains(t, result.SelectedPaths, "pkg/f119.go")
-	require.Contains(t, result.SelectedPaths, "pkg/f000.go")
+	require.Equal(t, []string{"pkg/f119.go"}, result.SelectedPaths)
+	require.Len(t, result.SkippedPaths, 119)
+}
+
+func TestApplyAIFileSelectorDoesNotRefillAIExcludedPaths(t *testing.T) {
+	root := t.TempDir()
+	candidates := make([]string, 0, 120)
+	for i := 0; i < 60; i++ {
+		path := fmt.Sprintf("packages/core/f%03d.ts", i)
+		candidates = append(candidates, path)
+		require.NoError(t, os.MkdirAll(filepath.Join(root, filepath.Dir(path)), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, path), []byte("export const value = true"), 0644))
+	}
+	for i := 0; i < 60; i++ {
+		path := fmt.Sprintf("integration-tests/f%03d.ts", i)
+		candidates = append(candidates, path)
+		require.NoError(t, os.MkdirAll(filepath.Join(root, filepath.Dir(path)), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, path), []byte("export const testValue = true"), 0644))
+	}
+
+	selector := &fakeFileSelector{result: &agent.SelectFilesResult{
+		SelectedPaths: []string{"packages/core/f059.ts"},
+		Exclude:       []string{"integration-tests/**"},
+	}}
+	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  candidates,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"packages/core/f059.ts"}, result.SelectedPaths)
+	for _, path := range result.SelectedPaths {
+		require.NotContains(t, path, "integration-tests/")
+	}
 }
 
 func TestApplyAIFileSelectorFallsBackWhenAISelectsNothing(t *testing.T) {

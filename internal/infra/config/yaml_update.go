@@ -70,6 +70,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLBool(doc, []string{"learning", "current", "budget", "update_existing_first"}, cfg.Learning.Current.Budget.UpdateExistingFirst)
 	setYAMLBool(doc, []string{"learning", "current", "budget", "require_routeable_evidence"}, cfg.Learning.Current.Budget.RequireRouteableEvidence)
 	setYAMLBool(doc, []string{"learning", "current", "structural", "enabled"}, cfg.Learning.Current.Structural.Enabled)
+	setYAMLString(doc, []string{"learning", "current", "structural", "provider"}, string(cfg.Learning.Current.Structural.Provider))
 	setYAMLInt(doc, []string{"learning", "current", "structural", "max_symbols"}, cfg.Learning.Current.Structural.MaxSymbols)
 	setYAMLInt(doc, []string{"learning", "current", "structural", "max_file_size"}, cfg.Learning.Current.Structural.MaxFileSize)
 

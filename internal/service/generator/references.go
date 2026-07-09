@@ -352,31 +352,6 @@ func generatorListJoin(locale string, values []string) string {
 	return strings.Join(values, generatorText(locale, "GeneratorListSeparator"))
 }
 
-func generatedSkillName(projectName string) string {
-	var b strings.Builder
-	previousHyphen := false
-	for _, r := range strings.ToLower(projectName) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-			previousHyphen = false
-			continue
-		}
-		if !previousHyphen {
-			b.WriteRune('-')
-			previousHyphen = true
-		}
-	}
-
-	name := strings.Trim(b.String(), "-")
-	if name == "" {
-		name = "project"
-	}
-	if !strings.HasSuffix(name, "-dev") {
-		name += "-dev"
-	}
-	return name
-}
-
 func (s *GeneratorService) projectSpecFromProfileAndPatterns(profile *domain.ProjectProfile, patterns []domain.Pattern, project config.WorkspaceProjectConfig) *domain.ProjectSpec {
 	return domain.NewProjectSpecFromProfile(profile, patterns, domain.WorkspaceProjectOverride{
 		ID:       project.ID,

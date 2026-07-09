@@ -53,7 +53,6 @@ func TestNewRepository(t *testing.T) {
 		assert.NotContains(t, string(content), "claude_command:")
 		assert.NotContains(t, string(content), "codex_command:")
 		assert.NotContains(t, string(content), "skills_path:")
-		assert.NotContains(t, string(content), "provider:")
 		assert.NotContains(t, string(content), "output:")
 		assert.NotContains(t, string(content), "skills_provider:")
 		assert.NotContains(t, string(content), "skills_paths:")

@@ -22,7 +22,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
-// Loader 加载内置模板，并叠加项目/自定义提示词片段。
+// Loader 加载内置模板，并按 Skills 目标语言约束 AI 自然语言输出。
 type Loader struct {
 	agentName string
 	locale    string
@@ -71,7 +71,7 @@ type RuntimeTask struct {
 // New 创建提示词模板加载器。
 func New(agentName, locale, seedPath string) *Loader {
 	if locale == "" {
-		locale = config.DefaultToolLocale
+		locale = config.DefaultSkillsLocale
 	}
 	return &Loader{
 		agentName: agentName,
@@ -555,7 +555,7 @@ type outputLanguage struct {
 }
 
 func outputLanguageSpec(locale string) outputLanguage {
-	switch config.NormalizeToolLocale(locale) {
+	switch config.NormalizeSkillsLocale(locale) {
 	case i18n.LocaleChinese:
 		return outputLanguage{
 			instruction:            "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN). Technical identifiers, framework names, library names, commands, file paths, function signatures, config keys, environment variables, enum values, and code identifiers must remain unchanged when needed.",

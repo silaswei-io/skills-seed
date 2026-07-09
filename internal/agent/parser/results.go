@@ -12,7 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
-// ParseSelectFilesResult 解析 AI 文件选择器输出。
+// ParseSelectFilesResult 解析 AI 文件筛选器输出。
 func ParseSelectFilesResult(output string) (*agent.SelectFilesResult, error) {
 	jsonStr, err := ExtractJSON(output)
 	if err != nil {

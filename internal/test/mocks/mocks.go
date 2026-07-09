@@ -113,7 +113,7 @@ func (m *MockAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefine
 	return &agent.UserDefinePatternResult{}, nil
 }
 
-// SelectFiles 模拟 AI 文件选择器
+// SelectFiles 模拟 AI 文件筛选器
 func (m *MockAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
 	if m.SelectFilesFn != nil {
 		return m.SelectFilesFn(ctx, req)
@@ -625,7 +625,7 @@ func (m *MockConfigReader) GetToolLocale() string {
 	return "zh-CN"
 }
 
-// GetSkillsLocale 模拟获取 Skills 模板语言
+// GetSkillsLocale 模拟获取 AI 输出、沉淀内容和生成 Skills 使用的语言。
 func (m *MockConfigReader) GetSkillsLocale() string {
 	if m.SkillsCfg.Locale != "" {
 		return m.SkillsCfg.Locale

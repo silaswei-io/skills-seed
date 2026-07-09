@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -31,7 +30,37 @@ type structuralCollector interface {
 	Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error)
 }
 
-// treesitterCollector 基于内嵌 tree-sitter 实现 structuralCollector。
+type structuralProvider interface {
+	Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (*structuralContextData, error)
+}
+
+type policyAwareStructuralProvider interface {
+	withPolicy(policy fileanalysis.SelectionPolicy) structuralProvider
+}
+
+type renderedStructuralCollector struct {
+	provider   structuralProvider
+	renderer   structuralRenderer
+	maxSymbols int
+}
+
+func (c *renderedStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
+	data, err := c.provider.Collect(ctx, projectRoot, req)
+	if err != nil || data == nil {
+		return "", err
+	}
+	return c.renderer.Render(data, c.maxSymbols), nil
+}
+
+func (c *renderedStructuralCollector) withPolicy(policy fileanalysis.SelectionPolicy) *renderedStructuralCollector {
+	next := *c
+	if aware, ok := next.provider.(policyAwareStructuralProvider); ok {
+		next.provider = aware.withPolicy(policy)
+	}
+	return &next
+}
+
+// treesitterCollector 基于内嵌 tree-sitter 实现 structuralProvider。
 type treesitterCollector struct {
 	maxSymbols  int
 	maxFileSize int64
@@ -51,7 +80,15 @@ type seedRoot struct {
 	isDir bool
 }
 
-func newStructuralCollector(cfg config.StructuralConfig) *treesitterCollector {
+func newStructuralCollector(cfg config.StructuralConfig) structuralCollector {
+	return &renderedStructuralCollector{
+		provider:   newStructuralProvider(cfg),
+		renderer:   structuralRenderer{},
+		maxSymbols: cfg.MaxSymbols,
+	}
+}
+
+func newTreeSitterProvider(cfg config.StructuralConfig) *treesitterCollector {
 	// maxFileSize 默认限制单文件 512KB，避免大文件拖慢 tree-sitter 解析。
 	maxFileSize := int64(512 * 1024)
 	if cfg.MaxFileSize > 0 {
@@ -65,29 +102,23 @@ func newStructuralCollector(cfg config.StructuralConfig) *treesitterCollector {
 	}
 }
 
-func (c *treesitterCollector) withPolicy(policy fileanalysis.SelectionPolicy) *treesitterCollector {
+func (c *treesitterCollector) withPolicy(policy fileanalysis.SelectionPolicy) structuralProvider {
 	next := *c
 	next.policy = policy
 	return &next
 }
 
-// Collect 遍历项目树、解析源码文件，并返回 Markdown 格式的结构化上下文。
-func (c *treesitterCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
+// Collect 遍历项目树、解析源码文件，并返回统一结构化上下文。
+func (c *treesitterCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (*structuralContextData, error) {
 	startedAt := time.Now()
 	seedRoots := c.boundedSeedRoots(projectRoot, req.SeedPaths)
 	if len(seedRoots) == 0 {
-		return "", nil
+		return nil, nil
 	}
 
 	var results []fileResult
 	langCounts := map[string]int{}
 	var stats grammars.WalkStats
-	maxSymbols := c.maxSymbols
-	if maxSymbols <= 0 {
-		// maxSymbols 默认最多输出 30 个符号，控制提示词上下文体积。
-		maxSymbols = 30
-	}
-
 	for _, seedRoot := range seedRoots {
 		seedResults, seedLangCounts, seedStats := c.collectSeed(ctx, projectRoot, seedRoot)
 		results = append(results, seedResults...)
@@ -103,19 +134,18 @@ func (c *treesitterCollector) Collect(ctx context.Context, projectRoot string, r
 		stats.BytesParsed += seedStats.BytesParsed
 	}
 
-	result := c.assembleMarkdown(results, langCounts, stats, maxSymbols)
+	data := c.toStructuralContext(results, langCounts, stats)
 
 	logger.Diagnostic("operation complete",
 		"operation", "analyzer.treesitter_collect",
 		"duration", time.Since(startedAt),
-		"context_bytes", len(result),
 		"project_root", projectRoot,
 		"seed_roots", len(seedRoots),
 		"files_parsed", stats.FilesParsed,
 		"languages", len(langCounts),
 	)
 
-	return result, nil
+	return data, nil
 }
 
 func (c *treesitterCollector) collectSeed(ctx context.Context, projectRoot string, seed seedRoot) ([]fileResult, map[string]int, grammars.WalkStats) {
@@ -280,104 +310,44 @@ func fileSize(path string) int64 {
 	return info.Size()
 }
 
-func (c *treesitterCollector) assembleMarkdown(
+func (c *treesitterCollector) toStructuralContext(
 	results []fileResult,
 	langCounts map[string]int,
 	stats grammars.WalkStats,
-	maxSymbols int,
-) string {
-	var b strings.Builder
-	b.WriteString("## Structural Context\n\n")
-
-	// 状态区：输出扫描文件数、解析文件数和语言分布。
-	b.WriteString("### Status\n\n")
-	b.WriteString(fmt.Sprintf("Files scanned: %d | Files parsed: %d | Languages: %s\n\n",
-		stats.FilesFound, stats.FilesParsed, formatLangCounts(langCounts)))
-
-	// 符号区：按 maxSymbols 限制输出数量。
-	b.WriteString("### Symbols\n\n")
-	printed := 0
-	var entryPoints []string
-
-	// 按文件路径排序，保证输出稳定。
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].relPath < results[j].relPath
-	})
-
+) *structuralContextData {
+	data := &structuralContextData{
+		Source:      structuralProviderTreeSitter,
+		FilesFound:  stats.FilesFound,
+		FilesParsed: stats.FilesParsed,
+		LangCounts:  langCounts,
+	}
 	for _, fr := range results {
-		if len(fr.symbols) == 0 {
-			continue
-		}
-		if printed >= maxSymbols {
-			b.WriteString("... (truncated)\n\n")
-			break
-		}
-
-		b.WriteString(fmt.Sprintf("#### %s: %s\n", fr.langName, fr.relPath))
 		for _, sym := range fr.symbols {
-			if printed >= maxSymbols {
-				break
-			}
-			b.WriteString(fmt.Sprintf("- %s %s (line %d)\n", sym.Kind, sym.Name, sym.Line))
+			data.Symbols = append(data.Symbols, structuralSymbol{
+				Path: fr.relPath,
+				Lang: fr.langName,
+				Name: sym.Name,
+				Kind: sym.Kind,
+				Line: sym.Line,
+			})
 			if isEntryPoint(sym.Name) {
-				entryPoints = append(entryPoints, fmt.Sprintf("- %s %s (%s:%d)", sym.Kind, sym.Name, fr.relPath, sym.Line))
+				data.EntryPoints = append(data.EntryPoints, structuralEntryPoint{
+					Path: fr.relPath,
+					Kind: sym.Kind,
+					Name: sym.Name,
+					Line: sym.Line,
+				})
 			}
-			printed++
 		}
-		b.WriteByte('\n')
-	}
-
-	// import 区：只输出简要依赖路径。
-	b.WriteString("### Imports\n\n")
-	importPrinted := 0
-	for _, fr := range results {
-		if len(fr.imports) == 0 {
-			continue
-		}
-		if importPrinted >= maxSymbols {
-			break
-		}
-		b.WriteString(fmt.Sprintf("#### %s: %s\n", fr.langName, fr.relPath))
 		for _, imp := range fr.imports {
-			if importPrinted >= maxSymbols {
-				break
-			}
-			b.WriteString(fmt.Sprintf("- %s\n", imp.Path))
-			importPrinted++
+			data.Imports = append(data.Imports, structuralImport{
+				Path:       fr.relPath,
+				Lang:       fr.langName,
+				ImportPath: imp.Path,
+			})
 		}
-		b.WriteByte('\n')
 	}
-
-	// 入口点区：集中列出 main 等入口符号。
-	if len(entryPoints) > 0 {
-		b.WriteString("### Entry Points\n\n")
-		for _, ep := range entryPoints {
-			b.WriteString(ep)
-			b.WriteByte('\n')
-		}
-		b.WriteByte('\n')
-	}
-
-	return b.String()
-}
-
-func formatLangCounts(counts map[string]int) string {
-	type kv struct {
-		lang  string
-		count int
-	}
-	var kvs []kv
-	for k, v := range counts {
-		kvs = append(kvs, kv{k, v})
-	}
-	sort.Slice(kvs, func(i, j int) bool {
-		return kvs[i].count > kvs[j].count
-	})
-	parts := make([]string, len(kvs))
-	for i, kv := range kvs {
-		parts[i] = fmt.Sprintf("%s(%d)", kv.lang, kv.count)
-	}
-	return strings.Join(parts, ", ")
+	return data
 }
 
 // parseTree 是测试辅助方法：解析源码并返回 tree-sitter 语法树。

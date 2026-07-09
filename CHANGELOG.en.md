@@ -7,12 +7,13 @@
 ### Changes
 
 - Changed AI file selection for `learn current` / `sync` to write the full candidate file list and metadata into runtime, letting AI recommend relevant files from paths, status, size, and kind while removing the gotree structural-index and candidate-confirmation stages.
-- Tightened language-configuration ownership: `locale` now controls tool output, config templates, seed context templates, and runtime AI output contracts, while `skills.locale` only controls the template language used when generating Skills.
+- Tightened language-configuration ownership: `locale` now only controls tool output, config templates, and seed-context templates, while `skills.locale` controls runtime AI output contracts, persisted learned content, and generated Skills language to prevent tool language from mixing with Skills content language.
 - Added `AGENTS.md` to ignore rules and removed it from repository tracking so local Agent project memory does not enter the remote source repository.
 
 ### Fixes
 
 - Removed file-selection DTO fields, command helpers, test fixtures, and prompt wording left behind by the gotree structural-index path, reducing drift between runtime prompts and Go DTOs.
+- Consolidated generated skill naming and workspace child skill-path resolution, avoiding duplicated generator/workspace naming logic and preventing workspace learning input collection from creating default child configs while reading.
 
 ## [v0.13.2]
 

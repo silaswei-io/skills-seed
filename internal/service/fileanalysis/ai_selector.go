@@ -18,20 +18,21 @@ import (
 
 const (
 	aiFileSelectionCacheSchemaVersion = 1
-	aiFileSelectionPromptVersion      = "file-select-full-candidate-list-v3"
+	aiFileSelectionPromptVersion      = "file-select-structural-context-v6"
 )
 
-// AISelectorOptions 描述 AI 文件选择器的本地输入。
+// AISelectorOptions 描述 AI 文件筛选器的本地输入。
 type AISelectorOptions struct {
-	ProjectRoot   string
-	Candidates    []string
-	Changes       *FileChanges
-	UserContext   string
-	CachePath     string
-	RequiredPaths []string
+	ProjectRoot       string
+	Candidates        []string
+	Changes           *FileChanges
+	UserContext       string
+	StructuralContext string
+	CachePath         string
+	RequiredPaths     []string
 }
 
-// AISelectorResult 描述 AI 文件选择器应用后的本地结果。
+// AISelectorResult 描述 AI 文件筛选器应用后的本地结果。
 type AISelectorResult struct {
 	SelectedPaths []string
 	SkippedPaths  []string
@@ -48,10 +49,11 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 	}
 
 	req := &agent.SelectFilesRequest{
-		FileTree:     buildCandidatePromptTree(candidates),
-		Candidates:   buildCandidatePromptMetadata(opts.ProjectRoot, candidates, opts.Changes),
-		UserContext:  opts.UserContext,
-		CandidateNum: len(candidates),
+		FileTree:          buildCandidatePromptTree(candidates),
+		Candidates:        buildCandidatePromptMetadata(opts.ProjectRoot, candidates, opts.Changes),
+		UserContext:       opts.UserContext,
+		StructuralContext: opts.StructuralContext,
+		CandidateNum:      len(candidates),
 	}
 	fingerprint := aiFileSelectionFingerprint(req, opts.Changes, opts.RequiredPaths)
 	if opts.CachePath != "" {
@@ -73,10 +75,11 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 		aiResult = &agent.SelectFilesResult{}
 	}
 	cacheable = cacheable && hasAISelectionDirective(aiResult)
-	aiSelected := applyAISelection(candidates, aiResult)
-	selected, forced := applyStableSelectionPolicy(stableSelectionOptions{
+	aiDecision := applyAISelection(candidates, aiResult)
+	selected, forced := applyValidatedSelectionPolicy(validatedSelectionOptions{
 		Candidates:    candidates,
-		AISelected:    aiSelected,
+		AISelected:    aiDecision.Selected,
+		AIExcluded:    aiDecision.Excluded,
 		RequiredPaths: opts.RequiredPaths,
 	})
 	if len(selected) == 0 {
@@ -88,7 +91,7 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 		SkippedPaths:  subtractPaths(candidates, selected),
 		Reason:        strings.TrimSpace(aiResult.Reason),
 		ForcedPaths:   forced,
-		AIPaths:       aiSelected,
+		AIPaths:       aiDecision.Selected,
 	}
 	if opts.CachePath != "" && cacheable {
 		_ = writeAIFileSelectionCache(opts.CachePath, aiFileSelectionCache{
@@ -109,13 +112,14 @@ type aiFileSelectionCache struct {
 }
 
 type aiFileSelectionFingerprintInput struct {
-	PromptVersion   string                         `json:"prompt_version"`
-	CandidateNum    int                            `json:"candidate_num"`
-	FileTree        string                         `json:"file_tree"`
-	Candidates      []agent.FileSelectionCandidate `json:"candidates"`
-	Changes         aiFileSelectionChangesInput    `json:"changes,omitempty"`
-	UserContextHash string                         `json:"user_context_hash,omitempty"`
-	RequiredPaths   []string                       `json:"required_paths,omitempty"`
+	PromptVersion         string                         `json:"prompt_version"`
+	CandidateNum          int                            `json:"candidate_num"`
+	FileTree              string                         `json:"file_tree"`
+	Candidates            []agent.FileSelectionCandidate `json:"candidates"`
+	Changes               aiFileSelectionChangesInput    `json:"changes,omitempty"`
+	UserContextHash       string                         `json:"user_context_hash,omitempty"`
+	StructuralContextHash string                         `json:"structural_context_hash,omitempty"`
+	RequiredPaths         []string                       `json:"required_paths,omitempty"`
 }
 
 type aiFileSelectionChangesInput struct {
@@ -134,13 +138,14 @@ func aiFileSelectionFingerprint(req *agent.SelectFilesRequest, changes *FileChan
 		return ""
 	}
 	input := aiFileSelectionFingerprintInput{
-		PromptVersion:   aiFileSelectionPromptVersion,
-		CandidateNum:    req.CandidateNum,
-		FileTree:        req.FileTree,
-		Candidates:      append([]agent.FileSelectionCandidate{}, req.Candidates...),
-		Changes:         aiFileSelectionChangesFingerprintInput(changes),
-		UserContextHash: hashText(req.UserContext),
-		RequiredPaths:   normalizeCandidatePaths(requiredPaths),
+		PromptVersion:         aiFileSelectionPromptVersion,
+		CandidateNum:          req.CandidateNum,
+		FileTree:              req.FileTree,
+		Candidates:            append([]agent.FileSelectionCandidate{}, req.Candidates...),
+		Changes:               aiFileSelectionChangesFingerprintInput(changes),
+		UserContextHash:       hashText(req.UserContext),
+		StructuralContextHash: hashText(req.StructuralContext),
+		RequiredPaths:         normalizeCandidatePaths(requiredPaths),
 	}
 	data, err := json.Marshal(input)
 	if err != nil {
@@ -367,15 +372,21 @@ func candidateKind(path string) string {
 	}
 }
 
-func applyAISelection(candidates []string, result *agent.SelectFilesResult) []string {
+type aiSelectionDecision struct {
+	Selected []string
+	Excluded []string
+}
+
+func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSelectionDecision {
 	if result == nil {
-		return candidates
+		return aiSelectionDecision{Selected: candidates}
 	}
 	candidateSet := make(map[string]bool, len(candidates))
 	for _, path := range candidates {
 		candidateSet[path] = true
 	}
 	selected := make(map[string]bool)
+	excluded := make(map[string]bool)
 	addPath := func(path string) {
 		path = cleanRelativePath(path)
 		if path == "" || !candidateSet[path] {
@@ -407,6 +418,11 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) []st
 		if exclude == "" {
 			continue
 		}
+		for _, candidate := range candidates {
+			if candidateMatchesPattern(candidate, exclude) {
+				excluded[candidate] = true
+			}
+		}
 		for path := range selected {
 			if candidateMatchesPattern(path, exclude) {
 				delete(selected, path)
@@ -418,7 +434,12 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) []st
 		out = append(out, path)
 	}
 	sort.Strings(out)
-	return out
+	excludedOut := make([]string, 0, len(excluded))
+	for path := range excluded {
+		excludedOut = append(excludedOut, path)
+	}
+	sort.Strings(excludedOut)
+	return aiSelectionDecision{Selected: out, Excluded: excludedOut}
 }
 
 func cleanPattern(pattern string) string {

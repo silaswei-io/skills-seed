@@ -61,7 +61,7 @@ func TestLoader_DefaultLocaleRendersEnglishPromptTemplate(t *testing.T) {
 	require.NotContains(t, prompt, "你是一位专业的代码质量审查专家")
 }
 
-func TestLoader_RendersEnglishPromptBodyAndToolLocaleOutputGuard(t *testing.T) {
+func TestLoader_RendersEnglishPromptBodyAndTargetLocaleOutputGuard(t *testing.T) {
 	loader := New("loader", "zh-CN", "")
 
 	skillsPrompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
@@ -76,7 +76,7 @@ func TestLoader_RendersEnglishPromptBodyAndToolLocaleOutputGuard(t *testing.T) {
 	require.NotContains(t, toolPrompt, "你是一位专业的代码修复专家")
 }
 
-func TestLoader_RendersOutputContractGuardWithToolLocale(t *testing.T) {
+func TestLoader_RendersOutputContractGuardWithTargetLocale(t *testing.T) {
 	seedPath := t.TempDir()
 
 	loader := New("loader", "en-US", seedPath)
@@ -842,6 +842,9 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"external dependency",
 				"same candidate file list",
 				"stable selection",
+				"read it first",
+				"do not linearly read the complete candidate file list",
+				"Do not use a fixed output count",
 				"selected_paths",
 			},
 		},
@@ -857,6 +860,9 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"external dependency constraints",
 				"same candidate file list",
 				"stable selection",
+				"read it first",
+				"do not linearly read the complete candidate file list",
+				"Do not use a fixed output count",
 				"selected_paths",
 			},
 		},
@@ -866,10 +872,11 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 		t.Run(tt.locale, func(t *testing.T) {
 			loader := New("loader", tt.locale, "")
 			prompt, err := loader.Render("file-select", map[string]interface{}{
-				"CandidateNum":    3,
-				"FileListPath":    "/tmp/skills-seed/candidate-files.txt",
-				"CandidatesPath":  "/tmp/skills-seed/candidates.json",
-				"UserContextPath": "",
+				"CandidateNum":          3,
+				"StructuralContextPath": "/tmp/skills-seed/structural-context.md",
+				"FileListPath":          "/tmp/skills-seed/candidate-files.txt",
+				"CandidatesPath":        "/tmp/skills-seed/candidates.json",
+				"UserContextPath":       "",
 			})
 			require.NoError(t, err)
 			require.Contains(t, prompt, "/tmp/skills-seed/candidate-files.txt")
@@ -1204,7 +1211,7 @@ func TestLoader_RenderZhProjectAnalysisUsesEnglishTemplateAndChineseOutputGuard(
 	require.Contains(t, prompt, "Do not write technology names, directory names, or command types from template examples as project facts")
 }
 
-func TestLoader_RenderProjectAnalysisUsesToolLocaleForOutputGuard(t *testing.T) {
+func TestLoader_RenderProjectAnalysisUsesTargetLocaleForOutputGuard(t *testing.T) {
 	loader := New("codex", "en-US", "")
 
 	prompt, err := loader.Render("project-profile", sampleProjectAnalysisData())

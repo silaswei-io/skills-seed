@@ -105,6 +105,26 @@ func TestCurrentStateInputSummaryUsesSelectionStages(t *testing.T) {
 	}, summary)
 }
 
+func TestCurrentStateInputSummaryRecordsAttemptedSelection(t *testing.T) {
+	changes := &incrementalFileChanges{SourceFileCount: 12}
+	selectionPlan := currentFileSelectionPlan{
+		Candidates: []string{"a.go", "b.go", "c.go"},
+		Eligible:   true,
+	}
+	selectionSummary := aiFileSelectionSummary{
+		Attempted:      true,
+		CandidateCount: 3,
+	}
+
+	summary := currentStateInputSummary(changes, selectionPlan, selectionSummary)
+
+	require.Equal(t, commandstate.InputSummary{
+		SourceFiles:         12,
+		LocalPlanInputFiles: 3,
+		SelectionInputFiles: 3,
+	}, summary)
+}
+
 func TestFilterCompletedStateChangesKeepsOnlyUnfinishedInputs(t *testing.T) {
 	changes := &incrementalFileChanges{
 		Records: []domain.FileAnalysisRecord{

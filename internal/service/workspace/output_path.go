@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
@@ -15,7 +16,7 @@ func (g *WorkspaceGenerator) workspaceRootOutputPath(projectRoot, workspaceName 
 }
 
 func workspaceSkillName(workspaceName string) string {
-	name := generatedSkillName(workspaceName)
+	name := skillgen.GeneratedSkillName(workspaceName)
 	if strings.HasSuffix(name, "-dev") {
 		return strings.TrimSuffix(name, "-dev") + "-workspace"
 	}
@@ -32,7 +33,7 @@ func (g *WorkspaceGenerator) childSkillTarget(projectRoot string, project config
 		return childSkillTarget{}, err
 	}
 	if exists {
-		outputPath, err := configuredSkillOutputPath(projectRootPath, childConfig)
+		outputPath, err := utils.ConfiguredSkillOutputPath(projectRootPath, childConfig)
 		if err != nil {
 			return childSkillTarget{}, err
 		}
@@ -42,7 +43,7 @@ func (g *WorkspaceGenerator) childSkillTarget(projectRoot string, project config
 			ConfigPath:      configPath,
 		}, nil
 	}
-	outputPath, err := configuredSkillOutputPath(projectRootPath, g.configRepo)
+	outputPath, err := utils.ConfiguredSkillOutputPath(projectRootPath, g.configRepo)
 	if err != nil {
 		return childSkillTarget{}, err
 	}
@@ -52,29 +53,12 @@ func (g *WorkspaceGenerator) childSkillTarget(projectRoot string, project config
 	}, nil
 }
 
-func configuredSkillOutputPath(projectRoot string, configRepo config.Reader) (string, error) {
-	return utils.ConfiguredSkillOutputPath(projectRoot, configRepo)
-}
-
 func (g *WorkspaceGenerator) targetSkillOutputPath(projectRoot, skillName string) (string, error) {
-	target := ""
-	outputPath := ""
-	if g.configRepo != nil {
-		target = g.configRepo.GetEffectiveSkillsTarget()
-		outputPath = g.configRepo.GetEffectiveSkillsPath()
-	}
-	if strings.TrimSpace(outputPath) == "" {
-		outputPath = config.DefaultSkillsPathForTarget(target)
-	}
-	resolvedOutputPath, err := resolveProjectOutputPath(projectRoot, outputPath)
+	resolvedOutputPath, err := utils.ConfiguredSkillOutputPath(projectRoot, g.configRepo)
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(filepath.Dir(resolvedOutputPath), skillName), nil
-}
-
-func resolveProjectOutputPath(projectRoot, outputPath string) (string, error) {
-	return utils.ResolveProjectOutputPath(projectRoot, outputPath)
 }
 
 func (g *WorkspaceGenerator) workspaceChildConfig(projectRoot string, project config.WorkspaceProjectConfig) (config.Reader, bool, string, error) {
@@ -106,29 +90,4 @@ func relativeWorkspacePath(workspaceRoot, path string) string {
 		return path
 	}
 	return rel
-}
-
-func generatedSkillName(projectName string) string {
-	var b strings.Builder
-	previousHyphen := false
-	for _, r := range strings.ToLower(projectName) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-			previousHyphen = false
-			continue
-		}
-		if !previousHyphen {
-			b.WriteRune('-')
-			previousHyphen = true
-		}
-	}
-
-	name := strings.Trim(b.String(), "-")
-	if name == "" {
-		name = "project"
-	}
-	if !strings.HasSuffix(name, "-dev") {
-		name += "-dev"
-	}
-	return name
 }

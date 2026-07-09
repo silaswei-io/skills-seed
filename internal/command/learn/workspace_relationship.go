@@ -17,6 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
+	"github.com/silaswei-io/skills-seed/internal/utils"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
@@ -280,7 +281,10 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 		childLayout := layout.New(childSeedPath)
 		projectProfilePath := childLayout.ProjectProfile()
 		projectSpecPath := childLayout.ProjectSpec()
-		skillPath := workspaceChildSkillPath(projectRootPath, childSeedPath, cont.ConfigRepo)
+		skillPath, err := workspaceChildSkillPath(projectRootPath, childSeedPath, cont.ConfigRepo)
+		if err != nil {
+			return workspaceLearnInputData{}, err
+		}
 		child := workspaceLearnInputProject{
 			ID:                 project.ID,
 			Path:               project.Path,
@@ -300,27 +304,30 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 	return input, nil
 }
 
-func workspaceChildSkillPath(projectRootPath, childSeedPath string, rootConfig config.Reader) string {
-	configRepo, err := config.NewRepository(childSeedPath, "")
-	if err == nil {
-		target := configRepo.GetEffectiveSkillsTarget()
-		outputPath := configRepo.GetEffectiveSkillsPath()
-		if outputPath == "" {
-			outputPath = config.DefaultSkillsPathForTarget(target)
+func workspaceChildSkillPath(projectRootPath, childSeedPath string, rootConfig config.Reader) (string, error) {
+	configReader := rootConfig
+	configPath := filepath.Join(childSeedPath, "config.yaml")
+	if _, err := os.Stat(configPath); err != nil {
+		if !os.IsNotExist(err) {
+			return "", err
 		}
-		return filepath.ToSlash(outputPath)
+	} else {
+		configRepo, err := config.NewRepository(childSeedPath, "")
+		if err != nil {
+			return "", err
+		}
+		configReader = configRepo
 	}
 
-	target := ""
-	outputPath := ""
-	if rootConfig != nil {
-		target = rootConfig.GetEffectiveSkillsTarget()
-		outputPath = rootConfig.GetEffectiveSkillsPath()
+	outputPath, err := utils.ConfiguredSkillOutputPath(projectRootPath, configReader)
+	if err != nil {
+		return "", err
 	}
-	if outputPath == "" {
-		outputPath = config.DefaultSkillsPathForTarget(target)
+	relPath, err := filepath.Rel(projectRootPath, outputPath)
+	if err != nil {
+		return "", err
 	}
-	return filepath.ToSlash(outputPath)
+	return filepath.ToSlash(relPath), nil
 }
 
 func readChildProjectProfile(ctx context.Context, cont *container.Container, projectID, profilePath string) (*domain.ProjectProfile, error) {

@@ -9,7 +9,7 @@ profile:
   mode: "project"
   # 项目主要语言，init 时自动识别；识别不到时留空
   language: ""
-  # 工具输出语言：zh-CN 中文，en-US 英文
+  # 工具输出、配置模板和 seed context 模板语言：zh-CN 中文，en-US 英文
   locale: "zh-CN"
   # Git 远程仓库地址，init 时自动填充
   git_remote: ""
@@ -88,6 +88,8 @@ learning:
     structural:
       # 启用有边界的结构化上下文；无边界输入时不会运行
       enabled: true
+      # 结构化上下文来源：auto 优先 CodeGraph 并自动修复，不可用时降级 tree-sitter；也可设为 codegraph 或 treesitter
+      provider: "auto"
       # 输出到结构化上下文的最大符号数
       max_symbols: 30
       # 跳过超过此大小的单个文件（KB）
@@ -110,12 +112,12 @@ autofix:
 
 ########################################################################
 # Skills 生成
-# 控制生成的 Skills 目标类型、输出路径和模板语言
+# 控制生成的 Skills 目标类型、输出路径和 AI/Skills 内容语言
 ########################################################################
 skills:
   # 生成的 Skills 目标类型；可与 agent.engine 不同，例如用 claude 生成 codex skills
   target: "claude"
-  # 生成 Skills 时使用的模板语言：zh-CN 中文，en-US 英文
+  # AI 输出、沉淀内容和生成 Skills 使用的语言：zh-CN 中文，en-US 英文
   locale: "en-US"
   # Skills 目标类型到输出目录的映射；仅控制生成产物保存位置
   paths:

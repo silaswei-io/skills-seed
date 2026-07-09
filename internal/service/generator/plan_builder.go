@@ -48,7 +48,7 @@ func (b *planBuilder) Build(outputPath string, patterns []domain.Pattern, summar
 	profile, patterns = sanitizeGenerationInputs(profile, patterns, opts.ProjectRoot)
 	profile = profileForSkillTemplates(profile, patterns)
 	if skillName == "" {
-		skillName = generatedSkillName(opts.ProjectName)
+		skillName = skillgen.GeneratedSkillName(opts.ProjectName)
 	}
 	if profile.ProjectName != "" {
 		templateProjectName = profile.ProjectName

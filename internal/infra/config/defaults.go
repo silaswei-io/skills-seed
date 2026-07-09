@@ -10,7 +10,7 @@ import (
 const (
 	// DefaultToolLocale 控制 CLI 文案、配置模板和 seed context 模板的默认语言。
 	DefaultToolLocale = i18n.DefaultLocale
-	// DefaultSkillsLocale 控制生成 Skills 模板的默认语言。
+	// DefaultSkillsLocale 控制 AI 输出、沉淀内容和生成 Skills 的默认语言。
 	DefaultSkillsLocale = i18n.LocaleEnglish
 	// DefaultSaveRenderedPrompts 表示默认保留渲染后的提示词文件，便于排查 AI 调用输入。
 	DefaultSaveRenderedPrompts = true

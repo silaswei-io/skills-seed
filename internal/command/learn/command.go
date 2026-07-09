@@ -345,10 +345,12 @@ func (r *learnCurrentRunningUnits) runningTextLocked() string {
 
 type aiFileSelectionSummary struct {
 	Applied        bool
+	Attempted      bool
 	CandidateCount int
 	SelectedCount  int
 	SkippedCount   int
 	Reason         string
+	Status         string
 }
 
 func currentStateInputSummary(changes *incrementalFileChanges, selectionPlan currentFileSelectionPlan, selectionSummary aiFileSelectionSummary) commandstate.InputSummary {
@@ -356,8 +358,10 @@ func currentStateInputSummary(changes *incrementalFileChanges, selectionPlan cur
 	aiSelectionInputs := 0
 	aiSelectedFiles := 0
 	aiSkippedFiles := 0
-	if selectionSummary.Applied {
+	if selectionSummary.Attempted || selectionSummary.Applied {
 		aiSelectionInputs = selectionSummary.CandidateCount
+	}
+	if selectionSummary.Applied {
 		aiSelectedFiles = selectionSummary.SelectedCount
 		aiSkippedFiles = selectionSummary.SkippedCount
 	}
@@ -771,13 +775,15 @@ func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
 	var selectionResult *fileanalysis.AISelectorResult
 	var selectErr error
 	if err := r.steps.Run(selectLabel, func() error {
+		structuralContext := r.fileSelectionStructuralContext()
 		selectionResult, selectErr = fileanalysis.ApplyAIFileSelector(r.ctx, r.cont.Agent, fileanalysis.AISelectorOptions{
-			ProjectRoot:   r.projectRoot,
-			Candidates:    r.selectionPlan.Candidates,
-			Changes:       r.incrementalChanges,
-			UserContext:   r.opts.userContext,
-			CachePath:     layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
-			RequiredPaths: utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
+			ProjectRoot:       r.projectRoot,
+			Candidates:        r.selectionPlan.Candidates,
+			Changes:           r.incrementalChanges,
+			UserContext:       r.opts.userContext,
+			StructuralContext: structuralContext,
+			CachePath:         layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
+			RequiredPaths:     utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
 		})
 		if selectErr != nil {
 			logger.Warn(i18n.Get("LearnCurrentAIFileSelectorFallback"))
@@ -792,6 +798,11 @@ func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
 		return err
 	}
 	if selectErr != nil || selectionResult == nil || len(selectionResult.SelectedPaths) == 0 {
+		r.selectionSummary = aiFileSelectionSummary{
+			Attempted:      true,
+			CandidateCount: len(r.selectionPlan.Candidates),
+			Status:         i18n.Get("LearnCurrentAIFileSelectorFallback"),
+		}
 		return nil
 	}
 
@@ -800,15 +811,12 @@ func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
 	r.incrementalChanges.ApplyAISelection(selectionResult.SelectedPaths, selectionResult.Reason)
 	r.selectionSummary = aiFileSelectionSummary{
 		Applied:        true,
+		Attempted:      true,
 		CandidateCount: len(r.selectionPlan.Candidates),
 		SelectedCount:  len(selectionResult.SelectedPaths),
 		SkippedCount:   len(selectionResult.SkippedPaths),
 		Reason:         selectionResult.Reason,
-	}
-	if r.opts.showDetailedLogs {
-		logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentFingerprintCommitPlan", map[string]interface{}{
-			"Records": len(r.incrementalChanges.Records),
-		}))
+		Status:         i18n.Get("LearnCurrentFileSelectionApplied"),
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.select_relevant_files",
@@ -816,9 +824,23 @@ func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
 		"candidate_count", len(r.selectionPlan.Candidates),
 		"selected_count", len(selectionResult.SelectedPaths),
 		"skipped_count", len(selectionResult.SkippedPaths),
+		"fingerprint_record_count", len(r.incrementalChanges.Records),
 		"reason", selectionResult.Reason,
 	)
 	return nil
+}
+
+func (r *learnCurrentProjectRun) fileSelectionStructuralContext() string {
+	if r.cont == nil || r.cont.AnalyzerSvc == nil {
+		return ""
+	}
+	return r.cont.AnalyzerSvc.CollectFileSelectionContext(r.ctx, r.projectRoot, analyzer.FileSelectionContextRequest{
+		ProjectName:    r.projectName,
+		Language:       r.currentLanguage,
+		FocusPaths:     utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
+		CandidateCount: len(r.selectionPlan.Candidates),
+		UserContext:    r.opts.userContext,
+	})
 }
 
 func (r *learnCurrentProjectRun) logFileSelectionSummary() {
@@ -830,15 +852,28 @@ func (r *learnCurrentProjectRun) logFileSelectionSummary() {
 	}
 	aiInput := "-"
 	aiSelected := "-"
-	if r.selectionSummary.Applied {
+	aiStatus := i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
+		"Reason": r.selectionPlan.SkipReason,
+	})
+	if r.selectionSummary.Attempted {
 		aiInput = strconv.Itoa(r.selectionSummary.CandidateCount)
+		aiStatus = strings.TrimSpace(r.selectionSummary.Status)
+		if aiStatus == "" {
+			aiStatus = i18n.Get("LearnCurrentAIFileSelectorFallback")
+		}
+	}
+	if r.selectionSummary.Applied {
 		aiSelected = strconv.Itoa(r.selectionSummary.SelectedCount)
 	}
 	logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentFileSelectionSummary", map[string]interface{}{
-		"SourceFiles":       r.incrementalChanges.SourceFileCount,
-		"LocalPlanInputs":   len(r.selectionPlan.Candidates),
-		"AISelectionInputs": aiInput,
-		"AISelectedFiles":   aiSelected,
+		"ScannedFiles":        r.incrementalChanges.ScannedFileCount,
+		"LocalSkippedFiles":   len(r.incrementalChanges.Skipped),
+		"SourceFiles":         r.incrementalChanges.SourceFileCount,
+		"LocalPlanInputs":     len(r.selectionPlan.Candidates),
+		"AISelectionInputs":   aiInput,
+		"AISelectedFiles":     aiSelected,
+		"AISelectionStatus":   aiStatus,
+		"PendingAnalyzeFiles": len(analysisCandidatePaths(r.incrementalChanges)),
 	}))
 }
 
@@ -857,10 +892,13 @@ func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
 			}))
 		} else {
 			logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{
-				"Changed":   len(r.incrementalChanges.AddedOrModified),
-				"Deleted":   len(r.incrementalChanges.Deleted),
-				"Unchanged": len(r.incrementalChanges.Unchanged),
-				"Skipped":   len(r.incrementalChanges.Skipped),
+				"ScannedFiles":      r.incrementalChanges.ScannedFileCount,
+				"LocalSkippedFiles": len(r.incrementalChanges.Skipped),
+				"SourceFiles":       r.incrementalChanges.SourceFileCount,
+				"Changed":           len(r.incrementalChanges.AddedOrModified),
+				"Deleted":           len(r.incrementalChanges.Deleted),
+				"Unchanged":         len(r.incrementalChanges.Unchanged),
+				"LocalPlanInputs":   len(analysisCandidatePaths(r.incrementalChanges)),
 			}))
 			if len(r.incrementalChanges.ExcludedGeneratedSkillDirs) > 0 {
 				logger.Info(i18n.GetWithParams("LearnCurrentGeneratedSkillsExcluded", map[string]interface{}{

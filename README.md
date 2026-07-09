@@ -201,7 +201,7 @@ skills:
 
 模型档位由对应 Agent CLI 自己控制。若需要固定低成本模型，优先在 `codex` / `claude` CLI 的默认配置中设置；如果你的 CLI 只支持命令行参数，可以把 `agent.commands.<engine>` 指向一个包装脚本，由脚本内部调用带模型参数的 Agent CLI。
 
-当前 `sync` / `learn current` 的文件选择会先做本地过滤，再把完整候选文件列表与元数据写入 runtime，由 AI 给出相关性建议并参与后续单元规划。终端只展示关键阶段和统一的文件选择摘要，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
+当前 `sync` / `learn current` 的文件筛选会先做本地过滤，再把候选元数据和可用的 CodeGraph 结构化上下文写入 runtime，由 AI 给出相关性建议并参与后续单元规划。终端只展示关键阶段和精简的文件筛选结果，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
 
 从 0.13.2 开始，仓库通过 `staticcheck ./...` 清理静态检查噪音；除 `go test`、`go vet` 和构建外，发布前也建议运行 staticcheck 作为代码质量门禁。
 
@@ -227,7 +227,7 @@ skills:
 | `skills-seed workflow` | 添加或更新团队常用任务流程 |
 | `skills-seed check` | 用已学习规则检查当前改动 |
 | `skills-seed hook` | 安装、卸载或手动运行 Git hook |
-| `skills-seed profile` | 查看或刷新项目画像 |
+| `skills-seed profile` | 查看或更新项目画像 |
 | `skills-seed preview` | 预览同步时可能纳入的文件范围 |
 | `skills-seed log` | 查看学习和生成变更记录 |
 

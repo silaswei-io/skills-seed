@@ -18,7 +18,7 @@
 | 模式管理 | [`skills-seed patterns`](#skills-seed-patterns) | 添加、删除、整理和查看 patterns | `skills-seed patterns show` |
 | 工作流 | [`skills-seed workflow`](#skills-seed-workflow) | 添加或更新用户任务工作流 | `skills-seed workflow --context "..."` |
 | 评审统计 | [`skills-seed review`](#skills-seed-review) | 导入评审评论并统计 pattern 防漏效果 | `skills-seed review stats` |
-| 项目画像 | [`skills-seed profile`](#skills-seed-profile) | 查看或刷新项目画像 | `skills-seed profile show` |
+| 项目画像 | [`skills-seed profile`](#skills-seed-profile) | 查看或更新项目画像 | `skills-seed profile show` |
 | 一键同步 | [`skills-seed sync`](#skills-seed-sync) | 学习当前代码并生成 skills | `skills-seed sync` |
 | 变更记录 | [`skills-seed log`](#skills-seed-log) | 查看学习变更记录 | `skills-seed log` |
 | 提交检查 | [`skills-seed check`](#skills-seed-check) | 检查暂存区或所有跟踪文件 | `skills-seed check` |
@@ -67,7 +67,7 @@
 | `skills-seed patterns update <pattern-id> (--context <description> \| --context-path <path>)` | 修订指定 pattern | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | 预览分析输入 | `files` | `--help, -h` = `false` |
 | `skills-seed preview files` | 预览将被分析的文件 | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
-| `skills-seed profile` | 查看或刷新项目画像 | `refresh`, `show` | `--help, -h` = `false` |
+| `skills-seed profile` | 查看或更新项目画像 | `refresh`, `show` | `--help, -h` = `false` |
 | `skills-seed profile refresh` | 重新分析项目并保存项目画像 | - | `--help, -h` = `false`<br>`--language, -l` = `` |
 | `skills-seed profile show` | 显示当前项目画像摘要 | - | `--help, -h` = `false` |
 | `skills-seed reset` | 备份并重置 skills-seed 初始化状态 | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
@@ -139,7 +139,7 @@ skills-templates-sha256: <hash>
 | `--skills` | 空 | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex`；留空时使用内置默认值 |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
 | `--locale`, `-l` | 空 | 工具输出、配置模板与 seed context 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
-| `--skills-locale` | 空 | 生成 Skills 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
+| `--skills-locale` | 空 | AI 输出、沉淀内容和生成 Skills 语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
 | `--help`, `-h` | `false` | 查看 `init` 帮助 |
 
 #### 常用示例
@@ -209,7 +209,7 @@ skills-seed init --workspace --agent codex --skills codex
 | `--mode` | `project` | 重置后的初始化模式：`project` 或 `workspace` |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
 | `--locale`, `-l` | 空 | 重置后工具输出与配置模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
-| `--skills-locale` | 空 | 重置后生成 Skills 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
+| `--skills-locale` | 空 | 重置后 AI 输出、沉淀内容和生成 Skills 语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
 | `--help`, `-h` | `false` | 查看 `reset` 帮助 |
 
 #### 常用示例
@@ -250,7 +250,7 @@ skills-seed reset --workspace
 |---|---:|---|
 | `--language`, `-l` | 配置或自动识别 | 项目主要语言 |
 | `--focus`, `-f` | 空 | 只学习指定目录或文件；可重复使用，路径必须在项目根目录内 |
-| `--profile` | `auto` | 项目画像刷新策略：`auto`、`skip`、`refresh` |
+| `--profile` | `auto` | 项目画像同步策略：`auto`、`skip`、`refresh` |
 | `--context` | 空 | 本次学习的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/context/` |
 | `--context-path` | 空 | 从文件或目录读取本次学习的一次性补充说明；可重复传入，不写入 `.skills-seed/context/` |
 | `--help`, `-h` | `false` | 查看 `learn current` 帮助 |
@@ -268,9 +268,9 @@ skills-seed reset --workspace
 
 | 取值 | 说明 |
 |---|---|
-| `auto` | 项目画像不存在时自动生成；本次实际写入新模式/更新模式时自动刷新；否则跳过 |
+| `auto` | 项目画像不存在时自动生成；本次实际写入新模式/更新模式时自动同步；否则跳过 |
 | `skip` | 只学习 patterns，不更新画像 |
-| `refresh` | 基于当前输入强制刷新画像 |
+| `refresh` | 基于当前输入强制重新分析并同步画像 |
 
 #### 常用示例
 
@@ -288,7 +288,7 @@ skills-seed learn history --limit 40 --batch-size 5
 
 #### 注意事项
 
-1. 首次成功后会记录已分析文件的 md5；没有可学习文件变化时，会跳过 patterns 学习和项目画像刷新。
+1. 首次成功后会记录已分析文件的 md5；没有可学习文件变化时，会跳过 patterns 学习和项目画像同步。
 2. 生成的 skills 目录默认排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
 4. workspace 子项目按 `agent.parallelism` 真并发执行。
@@ -296,7 +296,7 @@ skills-seed learn history --limit 40 --batch-size 5
 6. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
 7. 长期有效的项目上下文写入 `.skills-seed/context/`；`--context` 和 `--context-path` 只影响本次命令。
 8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
-9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的内嵌 tree-sitter 结构化预扫描；没有边界输入时不会因此全仓扫描。
+9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 优先 CodeGraph，必要时自动初始化或修复索引，不可用时降级到内嵌 tree-sitter。没有边界输入时不会因此全仓扫描。
 10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
@@ -370,7 +370,7 @@ references/
 
 #### 命令概述
 
-预览当前配置下 full 或 incremental 分析会选择的文件，不调用 AI Agent。适合排查 `exclude.paths`、`exclude.gitignore`、focus 路径和文件选择策略是否符合预期。
+预览当前配置下 full 或 incremental 分析会进入分析范围的文件，不调用 AI Agent。适合排查 `exclude.paths`、`exclude.gitignore`、focus 路径和文件过滤策略是否符合预期。
 
 #### 命令形式
 
@@ -405,7 +405,7 @@ skills-seed preview files --limit 500
 
 #### 注意事项
 
-1. `preview files` 和 `learn current` 共用文件选择策略，可用于确认哪些文件会进入学习分析。
+1. `preview files` 和 `learn current` 共用文件过滤策略，可用于确认哪些文件会进入学习分析。
 2. `--mode incremental` 会基于当前文件快照展示新增、修改和删除候选；如果还没有快照，结果会接近首次学习范围。
 3. 输出中的 skipped 计数可帮助判断文档、排除规则或 Git ignore 是否过滤了预期文件。
 
@@ -575,14 +575,14 @@ skills-seed review stats --line-window 5
 
 #### 命令概述
 
-查看或刷新项目画像。项目画像位于 `.skills-seed/store/documents/project-profile.json`，用于生成 `references/project-overview.md`。
+查看或更新项目画像。项目画像位于 `.skills-seed/store/documents/project-profile.json`，用于生成 `references/project-overview.md`。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
 | `skills-seed profile show` | 显示当前项目画像摘要 | `skills-seed profile show` | 不调用 AI Agent，不修改数据库 |
-| `skills-seed profile refresh` | 重新分析项目并覆盖项目画像 | `skills-seed profile refresh --language go` | 不学习 patterns，只刷新画像 |
+| `skills-seed profile refresh` | 重新分析项目并覆盖项目画像 | `skills-seed profile refresh --language go` | 不学习 patterns，只更新画像 |
 
 #### `profile` 参数
 

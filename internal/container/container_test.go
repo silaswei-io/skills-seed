@@ -1,11 +1,19 @@
 package container
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/stretchr/testify/require"
 	bberrors "go.etcd.io/bbolt/errors"
 )
@@ -29,4 +37,43 @@ func TestPatternRepositoryErrorKeepsGenericMessageForOtherErrors(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "创建模式仓储失败")
 	require.NotContains(t, err.Error(), "数据库文件可能正在被其他 skills-seed 命令使用")
+}
+
+func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Locale = "zh-CN"
+	cfg.Project.RootPath = projectRoot
+	cfg.Agent.Engine = "noop"
+	cfg.Agent.Commands = map[string]string{"noop": "noop"}
+	cfg.Skills.Locale = "en-US"
+	require.NoError(t, configRepo.Update(cfg))
+
+	var capturedLoader *promptloader.Loader
+	restoreFactory := RegisterAgentFactoryForTest("noop", func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+		capturedLoader = loader
+		return nil
+	})
+	defer restoreFactory()
+
+	cont, err := NewContainer(context.Background(), seedPath)
+	require.NoError(t, err)
+	defer cont.Close()
+
+	require.Same(t, cont.PromptLoader, capturedLoader)
+	prompt, err := cont.PromptLoader.Render("workflow-optimize", agent.OptimizeWorkflowRequest{
+		ID:       "release",
+		Context:  "整理发版流程",
+		Language: "go",
+	})
+	require.NoError(t, err)
+	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")
+	require.NotContains(t, prompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
 }

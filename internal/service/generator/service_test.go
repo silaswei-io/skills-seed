@@ -174,16 +174,19 @@ func TestGenerateSkills_FillsMissingCategorySummaries(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestResolveProjectOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
+func TestResolveOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
 	parent := t.TempDir()
 	projectRoot := filepath.Join(parent, "repo")
 	require.NoError(t, os.MkdirAll(projectRoot, 0755))
+	svc := newGeneratorService(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{RootPath: projectRoot},
+	})
 
-	inside, err := resolveProjectOutputPath(projectRoot, ".agents/skills/demo")
+	inside, err := svc.resolveOutputPath(".agents/skills/demo")
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(projectRoot, ".agents", "skills", "demo"), inside)
 
-	_, err = resolveProjectOutputPath(projectRoot, "../outside")
+	_, err = svc.resolveOutputPath("../outside")
 	require.Error(t, err)
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
+	"github.com/silaswei-io/skills-seed/internal/utils"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
@@ -121,7 +122,7 @@ func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context, opts W
 
 func (g *WorkspaceGenerator) resolveWorkspaceRootOutputPath(projectRoot, workspaceName string, opts WorkspaceGenerateOptions) (string, error) {
 	if strings.TrimSpace(opts.RootOutputPath) != "" {
-		return resolveProjectOutputPath(projectRoot, opts.RootOutputPath)
+		return utils.ResolveProjectOutputPath(projectRoot, opts.RootOutputPath)
 	}
 	return g.workspaceRootOutputPath(projectRoot, workspaceName)
 }
@@ -254,7 +255,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		selfManagedConfigPath := filepath.ToSlash(filepath.Join(project.Path, ".skills-seed", "config.yaml"))
 		projects = append(projects, workspaceProjectTemplateData{
 			WorkspaceProjectConfig: project,
-			SkillName:              generatedSkillName(project.ID),
+			SkillName:              skillgen.GeneratedSkillName(project.ID),
 			SkillPath:              skillPath,
 			ProjectSpecPath:        filepath.ToSlash(filepath.Join(childSkillDir, "references", "project-spec.md")),
 			SkillSummary:           childSkillSummary(filepath.Join(target.OutputPath, "SKILL.md")),

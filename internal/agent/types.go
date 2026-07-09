@@ -195,7 +195,7 @@ type CurateSummary struct {
 	MergeCount      int // 合并操作数
 }
 
-// FileSelectionCandidate 是 AI 文件选择器可见的候选文件元数据。
+// FileSelectionCandidate 是 AI 文件筛选器可见的候选文件元数据。
 type FileSelectionCandidate struct {
 	Path    string `json:"path"`              // 相对项目根路径
 	Status  string `json:"status,omitempty"`  // 文件状态，如 added、modified、deleted
@@ -204,15 +204,17 @@ type FileSelectionCandidate struct {
 	Changed bool   `json:"changed,omitempty"` // 是否属于本次新增或修改
 }
 
-// SelectFilesRequest 请求 AI 基于候选文件树选择本次应分析的文件。
+// SelectFilesRequest 请求 AI 基于候选文件树筛选本次应分析的文件。
 type SelectFilesRequest struct {
-	FileTree     string                   // 候选文件树，不包含源码内容
-	Candidates   []FileSelectionCandidate // 候选文件元数据
-	UserContext  string                   // 一次性用户上下文
-	CandidateNum int                      // 候选文件数量
+	FileTree              string                   // 候选文件树，不包含源码内容
+	Candidates            []FileSelectionCandidate // 候选文件元数据
+	UserContext           string                   // 一次性用户上下文
+	StructuralContext     string                   // 结构化候选线索，优先来自 CodeGraph
+	StructuralContextPath string                   // 结构化候选线索文件路径
+	CandidateNum          int                      // 候选文件数量
 }
 
-// SelectFilesResult 是 AI 文件选择器返回的结构化范围。
+// SelectFilesResult 是 AI 文件筛选器返回的结构化范围。
 type SelectFilesResult struct {
 	Include       []string `json:"include"`        // 需要纳入的相对路径或 glob
 	Exclude       []string `json:"exclude"`        // 需要从 include 中剔除的相对路径或 glob
@@ -227,8 +229,8 @@ type AnalyzeProjectRequest struct {
 	Language              string   // 主要语言
 	Structure             string   // 目录结构（tree 输出）
 	StructurePath         string   // 目录结构文件路径
-	StructuralContext     string   // tree-sitter 结构化分析上下文
-	StructuralContextPath string   // tree-sitter 结构化分析上下文文件路径
+	StructuralContext     string   // 结构化分析上下文
+	StructuralContextPath string   // 结构化分析上下文文件路径
 	ReadmePath            string   // README 文件路径（如果存在）
 	MainFiles             []string // 主要入口文件路径
 	ExistingProfileJSON   string   // 已有项目画像 JSON
@@ -273,8 +275,8 @@ type AnalyzeCurrentCodebaseRequest struct {
 	FocusPaths            []string      // 指定扫描范围（相对项目根）
 	Structure             string        // 目录结构
 	StructurePath         string        // 目录结构文件路径
-	StructuralContext     string        // tree-sitter 结构化分析上下文
-	StructuralContextPath string        // tree-sitter 结构化分析上下文文件路径
+	StructuralContext     string        // 结构化分析上下文
+	StructuralContextPath string        // 结构化分析上下文文件路径
 	MainFiles             []string      // 主要入口文件路径
 	SampleFiles           []SampleFile  // 示例文件路径
 	DiffFiles             []DiffFileRef // 变更文件 diff 引用
@@ -299,7 +301,7 @@ func (r *AnalyzeCurrentCodebaseRequest) AllowedCategories() string {
 type AnalyzeCurrentCodebaseResult struct {
 	Patterns                  []domain.Pattern             // 提取的候选模式
 	ProfileDelta              domain.ProjectProfileDelta   // 本次代码证据明确改变的项目画像增量
-	ProfileRefreshRecommended ProfileRefreshRecommendation // 是否建议执行完整项目画像刷新
+	ProfileRefreshRecommended ProfileRefreshRecommendation // 是否建议重新分析完整项目画像
 }
 
 // AnalyzeCurrentCodebaseBatchUnit 描述批量当前代码学习中的单个分析单元输入。
@@ -354,8 +356,8 @@ type PlanAnalysisUnitsRequest struct {
 	RootPath              string
 	Language              string
 	FocusPaths            []string
-	StructuralContext     string // tree-sitter 结构化分析上下文
-	StructuralContextPath string // tree-sitter 结构化分析上下文文件路径
+	StructuralContext     string // 结构化分析上下文
+	StructuralContextPath string // 结构化分析上下文文件路径
 	UserContext           string
 	LearningMode          config.LearningMode
 	LearningScope         config.LearningScope

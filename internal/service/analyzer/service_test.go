@@ -258,6 +258,7 @@ func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {
 
 	collector := newStructuralCollector(config.StructuralConfig{
 		Enabled:     true,
+		Provider:    config.StructuralProviderTreeSitter,
 		MaxSymbols:  10,
 		MaxFileSize: 1,
 	})

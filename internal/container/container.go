@@ -140,7 +140,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	workflowRepo := workflowstore.NewRepository(seedPath)
 
 	// 5. 创建加载器
-	promptLoader := promptloader.New(cfg.Agent.Engine, configRepo.GetToolLocale(), seedPath)
+	promptLoader := promptloader.New(cfg.Agent.Engine, configRepo.GetSkillsLocale(), seedPath)
 	skillsLoader := skills.NewLoaderForAgent(configRepo.GetEffectiveSkillsTarget(), configRepo.GetSkillsLocale())
 
 	// 6. 创建 Agent

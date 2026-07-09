@@ -206,7 +206,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		}
 
 		plan, err := s.planBuilder.Build(resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, PlanOptions{
-			SkillName:           generatedSkillName(projectConfig.Name),
+			SkillName:           skillgen.GeneratedSkillName(projectConfig.Name),
 			ProjectName:         projectConfig.Name,
 			Language:            projectConfig.Language,
 			ProgramVersion:      metadata.ProgramVersion,

@@ -12,7 +12,7 @@ The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates 
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
 - Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec during `learn current` from repository evidence, child project profiles, and one-shot user context. They are not read from config, and generation only consumes learned artifacts.
 - Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
-- `analysis.codegraph` was removed. Structural pre-scan is now configured through `learning.current.structural`, uses embedded tree-sitter, and does not require an external CodeGraph command or index.
+- `analysis.codegraph` was removed. Structural context is now configured through `learning.current.structural`; the default `provider: auto` prefers CodeGraph and falls back to embedded tree-sitter when unavailable.
 
 ## Config Example
 
@@ -54,6 +54,7 @@ learning:
     select_relevant_files_min_candidates: 200
     structural:
       enabled: true
+      provider: "auto"
       max_symbols: 30
       max_file_size: 512
   history:
@@ -174,30 +175,31 @@ exclude:
 | `parallelism` | `1` | In-project analysis-unit parallelism; used by ordinary projects and workspace child projects, `1` means serial |
 | `max_units_per_call` | `1` | Maximum analysis units per AI call; `1` disables batching to reduce oversized outputs, parse failures, and cross-unit conclusion bleed |
 | `select_relevant_files` | `true` | Select the most relevant files from the candidate file tree before AI analysis to reduce noisy inputs |
-| `select_relevant_files_min_candidates` | `200` | Only call AI file selection when the candidate count reaches this threshold; smaller projects use local filtering to avoid an extra AI call |
+| `select_relevant_files_min_candidates` | `200` | Only call AI file filtering when the candidate count reaches this threshold; smaller projects use local filtering to avoid an extra AI call |
 | `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
+| `structural.provider` | `auto` | Structural context source: `auto` prefers CodeGraph with automatic repair and falls back to tree-sitter when unavailable; `codegraph` or `treesitter` can be forced |
 | `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |
 | `structural.max_file_size` | `512` | Per-source-file size limit in KB; larger files are skipped |
 
 #### `structural`
 
-Lightweight structural pre-scan based on embedded tree-sitter. It provides symbols, imports, entry points, and module clues without depending on an external command or maintaining an index.
+Structural context gives the Agent symbols, imports, entry points, and module clues. The default `provider: auto` prefers CodeGraph; it automatically initializes missing project indexes, attempts repair when sync or status checks fail, and falls back to embedded tree-sitter only when the CodeGraph command is unavailable or repair fails. `provider: codegraph` forces CodeGraph only, while `provider: treesitter` uses only embedded tree-sitter.
 
-Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the same file-selection policy: source files, build config, and dependency config are included by default, while documents, generated outputs, paths matched by global `exclude`, and generated Skills output directories are skipped.
+Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the same file-filtering policy: source files, build config, and dependency config are included by default, while documents, generated outputs, paths matched by global `exclude`, and generated Skills output directories are skipped.
 
-Starting in 0.9.0, project-structure summaries, sample-file collection, and structural pre-scan all use the same configured file-selection policy. Except for built-in safety boundaries such as `.git`, `.skills-seed`, and configured generated-skills output directories, analyzer no longer keeps extra directory-name keywords. Put dependency, build-output, or project-specific directories in `exclude` when they should be skipped.
+Starting in 0.9.0, project-structure summaries, sample-file collection, and structural pre-scan all use the same configured file-filtering policy. Except for built-in safety boundaries such as `.git`, `.skills-seed`, and configured generated-skills output directories, analyzer no longer keeps extra directory-name keywords. Put dependency, build-output, or project-specific directories in `exclude` when they should be skipped.
 
-Starting in 0.9.1, `select_relevant_files` is enabled by default. When the locally filtered candidate count reaches `select_relevant_files_min_candidates`, `learn current` asks AI to select the most relevant files from the candidate file tree and change metadata before deeper analysis.
+Starting in 0.9.1, `select_relevant_files` is enabled by default. When the locally filtered candidate count reaches `select_relevant_files_min_candidates`, `learn current` asks AI to filter the most relevant files from the candidate file tree and change metadata before deeper analysis.
 
-Starting in 0.9.11, file selection also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed. Starting in 0.9.13, snapshots still preserve the full current state, but diffs sent to AI are filtered by `exclude.paths` and `exclude.gitignore`, preventing ignored files from entering analysis as deleted diffs.
+Starting in 0.9.11, file filtering also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed. Starting in 0.9.13, snapshots still preserve the full current state, but diffs sent to AI are filtered by `exclude.paths` and `exclude.gitignore`, preventing ignored files from entering analysis as deleted diffs.
 
 #### Recommendations
 
 1. Most projects should keep the defaults; structural context still does not run without bounded inputs.
-2. Set `select_relevant_files` to `false` when relevant-file selection is not needed.
-3. Raise `select_relevant_files_min_candidates` for small projects to skip AI file selection, or lower it for large projects to narrow scope earlier.
+2. Set `select_relevant_files` to `false` when relevant-file filtering is not needed.
+3. Raise `select_relevant_files_min_candidates` for small projects to skip AI file filtering, or lower it for large projects to narrow scope earlier.
 4. Set `structural.enabled` to `false` when structural context is not needed.
-5. Lower `structural.max_file_size` for large repositories to avoid generated files, bundles, or unusually large files.
+5. Lower `structural.max_file_size` for large repositories when using tree-sitter or auto fallback to avoid generated files, bundles, or unusually large files.
 6. Structural context only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
 
 ### Prompt Runtime Debugging
@@ -214,7 +216,7 @@ Starting in 0.11.1, `learning.current.scope` can be set to `domain`, `flow`, or 
 
 Starting in 0.11.2, `learning.current.max_units_per_call` controls how many analysis units one AI call may process, with the default `1` disabling batching. Raising it groups multiple units into one call and requires the response to return top-level `units`. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer, so incidental examples are not rendered as mandatory project standards.
 
-AI file selection now acts as a relevance recommendation plus a local stable policy: identical inputs still reuse fingerprinted cache entries; explicit user focus files are force-kept, and large candidate sets with overly narrow AI recommendations are deterministically filled to a minimum budget so important files are less likely to be skipped and coverage swings less across runs.
+AI file filtering now directly decides the final analysis scope, with local validation that keeps paths inside the candidate set and force-keeps explicit user focus files. Identical inputs still reuse fingerprinted cache entries, but the local policy no longer expands narrow AI recommendations to a fixed budget.
 
 The interactive init prompt asks for total Agent parallelism and writes concrete config fields automatically. In project mode it writes `learning.current.parallelism`; in workspace mode it splits the value across root `agent.parallelism` (child-project parallelism) and `learning.current.parallelism` (analysis-unit parallelism inside each child project), keeping their product within the total.
 
@@ -365,7 +367,7 @@ These files are merged with built-in prompts; they do not replace built-in promp
 | Field | Default | Description |
 |---|---:|---|
 | `target` | `agent.engine` | Generated Skills target type; can differ from `agent.engine` |
-| `locale` | `en-US` | Template language used when generating Skills |
+| `locale` | `en-US` | Language used for AI learning output, persisted content, and generated Skills |
 | `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills output directory |
 | `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills output directory |
 
@@ -373,10 +375,10 @@ These files are merged with built-in prompts; they do not replace built-in promp
 
 1. `generate skills` uses `skills.paths` for the current `skills.target` by default.
 2. Use `skills-seed generate skills --output <path>` to override the output directory for one run.
-3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; it only affects which Skills templates `generate skills` renders and no longer controls runtime AI prompt output language.
+3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; it controls runtime AI natural-language output, persisted learned content, and the language of `generate skills` artifacts.
 4. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
 
-Runtime AI prompt templates are maintained as English-only source templates. Their final output contract follows `locale`; `skills.locale` only affects which template locale is used when generating Skills.
+Runtime AI prompt templates are maintained as English-only source templates. Their final output contract follows `skills.locale`; `profile.locale` only affects tool output, config templates, and seed-context templates.
 
 ### `logging`
 
@@ -397,7 +399,7 @@ Runtime AI prompt templates are maintained as English-only source templates. The
 | `gitignore` | `true` | Exclude files matched by Git ignore rules, including `.gitignore`, `.git/info/exclude`, and the global Git ignore file |
 | `paths` | See below | Relative paths or globs to exclude |
 
-When `gitignore` is disabled, file selection still applies built-in safety boundaries, generated Skills output directories, and `exclude.paths`, but source files ignored by Git are no longer skipped just because of Git ignore rules.
+When `gitignore` is disabled, file filtering still applies built-in safety boundaries, generated Skills output directories, and `exclude.paths`, but source files ignored by Git are no longer skipped just because of Git ignore rules.
 
 #### Defaults
 

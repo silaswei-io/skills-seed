@@ -79,11 +79,32 @@ func (c *ExcludeConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// StructuralConfig 结构化分析配置（基于内嵌 tree-sitter）
+type StructuralProvider string
+
+const (
+	StructuralProviderAuto       StructuralProvider = "auto"       // 优先 CodeGraph，可用性修复失败后降级 tree-sitter
+	StructuralProviderCodeGraph  StructuralProvider = "codegraph"  // 仅使用 CodeGraph，不可用时跳过结构化上下文
+	StructuralProviderTreeSitter StructuralProvider = "treesitter" // 仅使用内嵌 tree-sitter
+)
+
+// NormalizeStructuralProvider 把结构化上下文 provider 归一化为受支持取值。
+func NormalizeStructuralProvider(provider string) StructuralProvider {
+	switch StructuralProvider(strings.ToLower(strings.TrimSpace(provider))) {
+	case StructuralProviderCodeGraph:
+		return StructuralProviderCodeGraph
+	case StructuralProviderTreeSitter:
+		return StructuralProviderTreeSitter
+	default:
+		return StructuralProviderAuto
+	}
+}
+
+// StructuralConfig 结构化分析配置。
 type StructuralConfig struct {
-	Enabled     bool `yaml:"enabled"`       // 是否启用结构化分析
-	MaxSymbols  int  `yaml:"max_symbols"`   // context 最大符号数
-	MaxFileSize int  `yaml:"max_file_size"` // 跳过超过此大小的文件（KB），默认 512
+	Enabled     bool               `yaml:"enabled"`       // 是否启用结构化分析
+	Provider    StructuralProvider `yaml:"provider"`      // 结构化上下文来源：auto、codegraph、treesitter
+	MaxSymbols  int                `yaml:"max_symbols"`   // context 最大符号数
+	MaxFileSize int                `yaml:"max_file_size"` // 跳过超过此大小的文件（KB），默认 512
 
 	defaultsApplied bool `yaml:"-"`
 }
@@ -91,6 +112,7 @@ type StructuralConfig struct {
 func defaultStructuralConfig() StructuralConfig {
 	return StructuralConfig{
 		Enabled:         true,
+		Provider:        StructuralProviderAuto,
 		MaxSymbols:      30,
 		MaxFileSize:     512,
 		defaultsApplied: true,
@@ -340,10 +362,10 @@ type LoggingConfig struct {
 	MaxLogFiles int    `yaml:"max_log_files"` // 最大日志文件数量
 }
 
-// SkillsConfig 控制生成的 Skills 类型、输出路径和模板语言。
+// SkillsConfig 控制生成的 Skills 类型、输出路径和 AI/Skills 内容语言。
 type SkillsConfig struct {
 	Target string            `yaml:"target"` // 目标 Agent Skills 类型
-	Locale string            `yaml:"locale"` // 生成 Skills 模板语言：zh-CN, en-US
+	Locale string            `yaml:"locale"` // AI 输出、沉淀内容和生成 Skills 的语言：zh-CN, en-US
 	Paths  map[string]string `yaml:"paths"`  // target -> Skills 输出路径
 }
 
@@ -604,6 +626,7 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Learning.Current.Structural.MaxFileSize <= 0 {
 		cfg.Learning.Current.Structural.MaxFileSize = 512
 	}
+	cfg.Learning.Current.Structural.Provider = NormalizeStructuralProvider(string(cfg.Learning.Current.Structural.Provider))
 	if cfg.Learning.Current.SelectRelevantFilesMinCandidates <= 0 {
 		cfg.Learning.Current.SelectRelevantFilesMinCandidates = 200
 	}
@@ -787,7 +810,7 @@ func (r *Repository) GetToolLocale() string {
 	return normalizeLocale(r.config.Project.Locale)
 }
 
-// GetSkillsLocale 返回生成 Skills 使用的模板语言。
+// GetSkillsLocale 返回 AI 输出、沉淀内容和生成 Skills 使用的语言。
 func (r *Repository) GetSkillsLocale() string {
 	return normalizeSkillsLocale(r.config.Skills.Locale)
 }
@@ -856,13 +879,13 @@ func (r *Repository) SetRootPath(rootPath string) error {
 	return r.Update(r.config)
 }
 
-// SetLocale 设置语言
+// SetLocale 设置工具输出、配置模板和 seed context 模板语言。
 func (r *Repository) SetLocale(locale string) error {
 	r.config.Project.Locale = locale
 	return r.Update(r.config)
 }
 
-// SetSkillsLocale 设置生成 Skills 模板语言。
+// SetSkillsLocale 设置 AI 输出、沉淀内容和生成 Skills 使用的语言。
 func (r *Repository) SetSkillsLocale(locale string) error {
 	r.config.Skills.Locale = locale
 	return r.Update(r.config)
