@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.4]
+
+### Changes
+
+- `learn current` / `sync` file selection and analysis-unit planning now prefer CodeGraph structural context; missing or unhealthy indexes are initialized, synced, or repaired automatically, and embedded tree-sitter is used only when CodeGraph is truly unavailable.
+- Analysis planning and project-profile prompts no longer inline full candidate/focused file lists. Path lists are deduplicated, sorted, written to runtime input files, and referenced from prompts by path and count to reduce large-repository prompt noise.
+- File selection, analysis planning, and current-code learning prompts now include stable decision rules. The final JSON output contract also adds generic stable-ordering guidance to reduce drift for identical inputs.
+
+### Fixes
+
+- Removed fixed-count budget leftovers from AI file selection so the final scope is driven by relevance recommendations plus local validation rather than an accidental fixed file count.
+- Simplified console output for local filtering, AI file selection, and fingerprint commit planning so it focuses on source, filtered, and final counts while detailed diagnostics stay in runtime logs.
+- Split pre-selection structural context collection into a dedicated boundary, preventing tree-sitter from scanning the whole repository without explicit seeds and making structural-context propagation testable.
+
 ## [v0.13.3]
 
 ### Changes

@@ -398,13 +398,14 @@ func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
 	loader := New("codex", "zh-CN", "")
 	data := sampleProjectAnalysisData()
 	data["ExistingProfilePath"] = "/tmp/skills-seed/existing-profile.json"
-	data["FocusPaths"] = []string{"internal/service"}
+	data["FocusPathsPath"] = "/tmp/skills-seed/focused-paths.txt"
+	data["FocusPathCount"] = 1
 
 	prompt, err := loader.Render("project-profile", data)
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, "Existing Project Profile")
-	require.Contains(t, prompt, "internal/service")
+	require.Contains(t, prompt, "/tmp/skills-seed/focused-paths.txt")
 	require.Contains(t, prompt, "/tmp/skills-seed/existing-profile.json")
 	require.NotContains(t, prompt, "Clean Architecture")
 	require.Contains(t, prompt, "complete project profile")
@@ -431,7 +432,8 @@ func TestRenderProjectAnalysisBoundsStructureToFocusPaths(t *testing.T) {
 		t.Run(tt.locale, func(t *testing.T) {
 			loader := New("codex", tt.locale, "")
 			data := sampleProjectAnalysisData()
-			data["FocusPaths"] = []string{"internal/service"}
+			data["FocusPathsPath"] = "/tmp/skills-seed/focused-paths.txt"
+			data["FocusPathCount"] = 1
 
 			prompt, err := loader.Render("project-profile", data)
 
@@ -788,6 +790,22 @@ func TestLoader_RenderCurrentLearningPromptsIncludeModeStrategy(t *testing.T) {
 	}
 }
 
+func TestLoader_RenderAnalysisPlanReferencesFileListInsteadOfInliningPaths(t *testing.T) {
+	loader := New("loader", "zh-CN", "")
+
+	prompt, err := loader.Render("analysis-plan", sampleAnalysisPlanData())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "/tmp/skills-seed/analysis-files.txt")
+	require.Contains(t, prompt, "2 files")
+	require.Contains(t, prompt, "Read the structural context first")
+	require.Contains(t, prompt, "Stability Rules")
+	require.Contains(t, prompt, "stable unit boundaries")
+	require.Contains(t, prompt, "lexicographic path order")
+	require.NotContains(t, prompt, "- internal/auth/login.go")
+	require.NotContains(t, prompt, "- internal/key/create.go")
+}
+
 func TestLoader_ProjectProfilePromptKeepsDomainEntriesOutOfCommonUtils(t *testing.T) {
 	tests := []struct {
 		locale       string
@@ -842,6 +860,8 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"external dependency",
 				"same candidate file list",
 				"stable selection",
+				"deterministic tie-breakers",
+				"lexicographic path order",
 				"read it first",
 				"do not linearly read the complete candidate file list",
 				"Do not use a fixed output count",
@@ -860,6 +880,8 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"external dependency constraints",
 				"same candidate file list",
 				"stable selection",
+				"deterministic tie-breakers",
+				"lexicographic path order",
 				"read it first",
 				"do not linearly read the complete candidate file list",
 				"Do not use a fixed output count",
@@ -933,6 +955,26 @@ func TestLoader_RenderPatternPromptsIncludePreOutputValidation(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestLoader_RenderCurrentLearningPromptsIncludeStableCandidateSelection(t *testing.T) {
+	loader := New("loader", "zh-CN", "")
+	for _, tc := range []struct {
+		name string
+		data interface{}
+	}{
+		{"pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest()},
+		{"pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prompt, err := loader.Render(tc.name, tc.data)
+			require.NoError(t, err)
+			require.Contains(t, prompt, "Stable Candidate Selection")
+			require.Contains(t, prompt, "same analysis")
+			require.Contains(t, prompt, "merely for stylistic variety")
+			require.Contains(t, prompt, "lexicographic order")
 		})
 	}
 }
@@ -1366,6 +1408,8 @@ func TestLoader_OutputContractGuardLivesInAppendTemplates(t *testing.T) {
 	require.Contains(t, string(guard), "These rules have the highest priority and must be followed exactly")
 	require.Contains(t, string(guard), "{{outputLanguageInstruction}}")
 	require.Contains(t, string(guard), "The first non-whitespace character must be `{`")
+	require.Contains(t, string(guard), "For identical input evidence and task instructions")
+	require.Contains(t, string(guard), "deterministic ordering based on stable identifiers")
 }
 
 func loaderRuntimePromptNames(t *testing.T) []string {
@@ -1651,7 +1695,8 @@ func sampleAnalysisPlanData() map[string]interface{} {
 		"Language":              "go",
 		"LearningMode":          "normal",
 		"LearningScope":         "flow",
-		"FocusPaths":            []string{"internal/auth/login.go", "internal/key/create.go"},
+		"FocusPathsPath":        "/tmp/skills-seed/analysis-files.txt",
+		"FocusPathCount":        2,
 		"StructuralContextPath": "/tmp/skills-seed/structural-context.md",
 		"UserContextPath":       "",
 	}
@@ -1682,7 +1727,8 @@ func sampleProjectAnalysisData() map[string]interface{} {
 		"ReadmePath":            "README.md",
 		"MainFiles":             []string{"cmd/demo/main.go"},
 		"ExistingProfilePath":   "",
-		"FocusPaths":            []string{},
+		"FocusPathsPath":        "",
+		"FocusPathCount":        0,
 		"UserContextPath":       "",
 	}
 }

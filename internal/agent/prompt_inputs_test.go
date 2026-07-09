@@ -47,6 +47,25 @@ func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	require.Equal(t, config.LearningModeDeep, currentData["LearningMode"])
 }
 
+func TestPlanAnalysisUnitsPromptDataWritesFocusedPathList(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+
+	data, err := PlanAnalysisUnitsPromptData(session, &PlanAnalysisUnitsRequest{
+		FocusPaths: []string{"internal/key/create.go", "internal/auth/login.go", "internal/auth/login.go"},
+	})
+	require.NoError(t, err)
+
+	path, ok := data["FocusPathsPath"].(string)
+	require.True(t, ok)
+	require.Equal(t, filepath.Join(session.dir, "analysis-files.txt"), path)
+	require.Equal(t, 2, data["FocusPathCount"])
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "internal/auth/login.go\ninternal/key/create.go\n", string(content))
+	require.NotContains(t, data, "FocusPaths")
+}
+
 func TestSelectFilesPromptDataWritesRuntimeInputs(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
@@ -104,6 +123,25 @@ func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {
 	require.NotContains(t, text, "\u00a0")
 	require.NotContains(t, text, "&nbsp;")
 	require.NotContains(t, text, "service.go   ")
+}
+
+func TestAnalyzeProjectPromptDataWritesFocusedPathList(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+
+	data, err := AnalyzeProjectPromptData(session, &AnalyzeProjectRequest{
+		FocusPaths: []string{"internal/profile/service.go", "cmd/demo/main.go"},
+	})
+	require.NoError(t, err)
+
+	path, ok := data["FocusPathsPath"].(string)
+	require.True(t, ok)
+	require.Equal(t, filepath.Join(session.dir, "focused-paths.txt"), path)
+	require.Equal(t, 2, data["FocusPathCount"])
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "cmd/demo/main.go\ninternal/profile/service.go\n", string(content))
+	require.NotContains(t, data, "FocusPaths")
 }
 
 func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T) {

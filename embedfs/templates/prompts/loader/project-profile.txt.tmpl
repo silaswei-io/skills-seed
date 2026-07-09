@@ -54,13 +54,11 @@ Treat this run as an incremental refresh. Use the existing profile as the baseli
 
 Existing project profile JSON is available at `{{.ExistingProfilePath}}`. Read it by path.
 {{- end}}
-{{- if .FocusPaths}}
+{{- if .FocusPathsPath}}
 
 # Changed Or Focused Paths
 
-{{range .FocusPaths}}
-- {{.}}
-{{- end}}
+Changed or focused paths are available at `{{.FocusPathsPath}}` ({{.FocusPathCount}} paths). Treat this file as the focused analysis boundary for this profile run. Read it by path when you need exact paths, and do not expand into unrelated files solely because the project structure mentions them.
 {{- end}}
 
 # Analysis Requirements

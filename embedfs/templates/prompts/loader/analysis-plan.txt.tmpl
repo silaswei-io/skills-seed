@@ -12,9 +12,10 @@ You are a codebase business-analysis planner. Your only task is to split the cur
 
 # Files To Learn
 
-The paths below are the only files allowed for this plan. Do not expand outside this list; only group these paths when they belong to the same business capability.
+{{if .FocusPathsPath}}The complete allowed file list is available at `{{.FocusPathsPath}}` ({{.FocusPathCount}} files). This file is the only file boundary allowed for this plan. Do not expand outside it; only group paths from that list when they belong to the same business capability.
 
-{{range .FocusPaths}}- {{.}}
+Read the structural context first when available. Read the allowed file list by path only when you need exact allowed paths, coverage checks, or final unit membership.
+{{else}}No focused file list is available. Return an empty `units` array.
 {{end}}
 
 # Structural Context
@@ -35,6 +36,14 @@ The user context is at `{{.UserContextPath}}`. Read it only if it helps decide b
 3. A unit should cover a reasonably complete semantic loop: entry/interface, types/responses, business orchestration, data models, config, utilities, or cross-cutting processing directly related to the capability. Create a standalone unit only when the files can independently produce high-value business patterns; merge units that would need frequent cross-reading to explain themselves.
 4. Do not create standalone units for thin interfaces, simple record operations, pure models, pure dispatch registration, generic initialization, or utilities with no business rules unless they decide product behavior or business boundaries.
 5. Every unit must include at least one `entry_paths` or `related_paths` item, and every path must come from the file list. `route_terms` should use requester-facing business words, action words, state words, resource names, or external system names. `scope_reason` briefly explains ownership.
+
+# Stability Rules
+
+1. The same file list, structural context, learning mode, scope, and user context should produce stable unit boundaries, IDs, names, route terms, and path membership.
+2. Do not split, merge, rename, or reorder units merely because multiple valid groupings are possible. Change the plan only when evidence changes the business boundary.
+3. When evidence is equivalent, prefer structural entry/call evidence over path-name guesses; then prefer broader business coverage; then use lexicographic path order as the final tie-breaker.
+4. Use stable unit IDs derived from durable business terms and paths. Do not include timestamps, run numbers, vague ordinal names, or stylistic variants.
+5. Sort each unit's `entry_paths` and `related_paths` lexicographically unless the schema or task evidence requires a semantic order.
 
 # Mode Strategy
 

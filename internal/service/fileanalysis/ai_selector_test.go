@@ -43,8 +43,9 @@ func TestApplyAIFileSelectorAppliesIncludeExcludeSafely(t *testing.T) {
 	}}
 
 	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
-		ProjectRoot: root,
-		Candidates:  []string{"internal/logic/create.go", "internal/types/types.go"},
+		ProjectRoot:       root,
+		Candidates:        []string{"internal/logic/create.go", "internal/types/types.go"},
+		StructuralContext: "## Structural Context\n- internal/logic/create.go is an entry",
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"internal/logic/create.go"}, result.SelectedPaths)
@@ -53,6 +54,7 @@ func TestApplyAIFileSelectorAppliesIncludeExcludeSafely(t *testing.T) {
 	require.Contains(t, selector.req.FileTree, "create.go")
 	require.Contains(t, selector.req.FileTree, "internal/")
 	require.Contains(t, selector.req.FileTree, "logic/")
+	require.Contains(t, selector.req.StructuralContext, "internal/logic/create.go is an entry")
 	require.NotContains(t, selector.req.FileTree, "/tmp/outside")
 }
 

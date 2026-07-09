@@ -51,9 +51,10 @@ User context is available at `{{.UserContextPath}}`. Read it by path and use it 
 11. Do not recommend files outside local exclusion rules; do not return absolute paths; do not return `..` paths.
 12. When uncertain, prefer files that cover more business subdomains and have higher information density. Keep necessary entry points, initialization, core modules, and cross-boundary adapter files.
 13. The same candidate file list, metadata, and user context should produce a stable selection. Do not expand or shrink the scope because of wording, ordering, or temporary preference changes.
-14. Do not use a fixed output count, percentage, top-N cap, or minimum quota. Recommend every candidate needed for reliable codebase learning, whether that is a small set or a large set.
-15. When files can be listed explicitly, prefer `selected_paths` with recommended relative file paths sorted lexicographically. Use `include`/`exclude` only for clearly broad directories or patterns; do not use vague globs as a substitute for known files.
-16. Your output is a relevance recommendation; do not assume you can finally exclude explicit user focus files. The local validation policy will force-keep those files.
+14. Use deterministic tie-breakers when evidence is equivalent: structural entry/call evidence first, then changed handwritten source files, then path and metadata signals, then lexicographic path order.
+15. Do not use a fixed output count, percentage, top-N cap, or minimum quota. Recommend every candidate needed for reliable codebase learning, whether that is a small set or a large set.
+16. When files can be listed explicitly, prefer `selected_paths` with recommended relative file paths sorted lexicographically. Use `include`/`exclude` only for clearly broad directories or patterns; do not use vague globs as a substitute for known files.
+17. Your output is a relevance recommendation; do not assume you can finally exclude explicit user focus files. The local validation policy will force-keep those files.
 
 # Output Format
 

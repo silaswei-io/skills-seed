@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -35,31 +34,10 @@ import (
 // AnalyzerService 代码分析服务
 // 职责：分析代码、提取模式、分析项目结构
 type AnalyzerService struct {
-	agent               agent.Agent
-	configRepo          config.Reader
-	structuralCollector structuralCollector
-}
-
-// FileSelectionContextRequest 描述 AI 文件筛选前的结构化候选线索请求。
-type FileSelectionContextRequest struct {
-	ProjectName    string
-	Language       string
-	FocusPaths     []string
-	CandidateCount int
-	UserContext    string
-}
-
-func (r FileSelectionContextRequest) Purpose() string {
-	var b strings.Builder
-	b.WriteString("pre-filter AI file analysis candidates before reading the full candidate list")
-	if r.CandidateCount > 0 {
-		b.WriteString("; local candidate count: ")
-		b.WriteString(strconv.Itoa(r.CandidateCount))
-	}
-	if strings.TrimSpace(r.UserContext) != "" {
-		b.WriteString("; user guidance is present")
-	}
-	return b.String()
+	agent                         agent.Agent
+	configRepo                    config.Reader
+	structuralCollector           structuralCollector
+	fileSelectionContextCollector structuralCollector
 }
 
 // NewAnalyzerService 创建分析服务
@@ -72,6 +50,7 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerServi
 		cfg := configRepo.GetCurrentLearningConfig().Structural
 		if cfg.Enabled {
 			svc.structuralCollector = newStructuralCollector(cfg)
+			svc.fileSelectionContextCollector = newFileSelectionContextCollector(cfg)
 		}
 	}
 	return svc
@@ -103,40 +82,6 @@ func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectR
 		"error", err,
 	)
 	return "", nil
-}
-
-// CollectFileSelectionContext 在 AI 文件筛选前收集结构化候选线索。
-// 该阶段只使用 CodeGraph/auto provider，避免 tree-sitter 在没有明确 seed 时全仓扫描。
-func (s *AnalyzerService) CollectFileSelectionContext(ctx context.Context, projectRoot string, req FileSelectionContextRequest) string {
-	if s == nil || s.configRepo == nil || projectRoot == "" {
-		return ""
-	}
-	cfg := s.configRepo.GetCurrentLearningConfig().Structural
-	if !cfg.Enabled {
-		return ""
-	}
-	provider := config.NormalizeStructuralProvider(string(cfg.Provider))
-	if provider == config.StructuralProviderTreeSitter {
-		return ""
-	}
-
-	data, err := newCodeGraphProvider(cfg).Collect(ctx, projectRoot, structuralContextRequest{
-		ProjectName: req.ProjectName,
-		Language:    req.Language,
-		Purpose:     req.Purpose(),
-		FocusPaths:  req.FocusPaths,
-		SeedPaths:   req.FocusPaths,
-	})
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "analyzer.file_selection_structural_context",
-			"project_root", projectRoot,
-			"candidate_count", req.CandidateCount,
-			"error", err,
-		)
-		return ""
-	}
-	return structuralRenderer{}.Render(data, cfg.MaxSymbols)
 }
 
 func structuralSeedPaths(focusPaths []string, sampleFiles []agent.SampleFile, diffFiles []agent.DiffFileRef, mainFiles []string) []string {

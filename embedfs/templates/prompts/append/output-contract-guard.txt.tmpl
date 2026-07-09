@@ -17,6 +17,12 @@
 - If a field is an object in the built-in prompt's JSON example, the final output must keep it as an object. If a field is an array in the example, the final output must keep it as an array. When evidence is missing, prefer omitting the field or returning an empty array instead of explaining it with a string.
 - Do not rename fields, substitute fields, or output equivalent-looking JSON with a different structure for brevity.
 
+## Stable Output
+
+- For identical input evidence and task instructions, keep the final JSON semantically stable.
+- Preserve any ordering required by the task prompt. If the task prompt does not define an order, use deterministic ordering based on stable identifiers such as path, id, name, category, or source location.
+- Do not change IDs, names, grouping, array membership, or equivalent wording merely for variety.
+
 ## Language
 
 - {{outputLanguageInstruction}}

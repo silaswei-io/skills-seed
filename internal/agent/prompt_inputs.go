@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -94,8 +95,34 @@ func mustJSON(value interface{}) string {
 	return string(data)
 }
 
+func writePathListInput(session *PromptInputSession, name string, paths []string) (string, int, error) {
+	normalized := make([]string, 0, len(paths))
+	seen := make(map[string]struct{}, len(paths))
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		normalized = append(normalized, path)
+	}
+	sort.Strings(normalized)
+	path, err := session.Write(name, strings.Join(normalized, "\n"))
+	if err != nil {
+		return "", 0, err
+	}
+	return path, len(normalized), nil
+}
+
 // PlanAnalysisUnitsPromptData 返回业务分析单元规划所需的提示词数据。
 func PlanAnalysisUnitsPromptData(session *PromptInputSession, req *PlanAnalysisUnitsRequest) (map[string]interface{}, error) {
+	focusPathsPath, focusPathCount, err := writePathListInput(session, "analysis-files.txt", req.FocusPaths)
+	if err != nil {
+		return nil, fmt.Errorf("write analysis plan file list: %w", err)
+	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
 		return nil, fmt.Errorf("write analysis plan structural context: %w", err)
@@ -108,7 +135,8 @@ func PlanAnalysisUnitsPromptData(session *PromptInputSession, req *PlanAnalysisU
 		"ProjectName":           req.ProjectName,
 		"RootPath":              req.RootPath,
 		"Language":              req.Language,
-		"FocusPaths":            req.FocusPaths,
+		"FocusPathsPath":        focusPathsPath,
+		"FocusPathCount":        focusPathCount,
 		"StructuralContextPath": structuralContextPath,
 		"UserContextPath":       userContextPath,
 		"LearningMode":          promptLearningMode(req.LearningMode),
@@ -133,6 +161,10 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 	if err != nil {
 		return nil, fmt.Errorf("write project structure prompt input: %w", err)
 	}
+	focusPathsPath, focusPathCount, err := writePathListInput(session, "focused-paths.txt", req.FocusPaths)
+	if err != nil {
+		return nil, fmt.Errorf("write project profile focused paths: %w", err)
+	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
 		return nil, fmt.Errorf("write structural context prompt input: %w", err)
@@ -154,7 +186,8 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 		"ReadmePath":            req.ReadmePath,
 		"MainFiles":             req.MainFiles,
 		"ExistingProfilePath":   existingProfilePath,
-		"FocusPaths":            req.FocusPaths,
+		"FocusPathsPath":        focusPathsPath,
+		"FocusPathCount":        focusPathCount,
 		"UserContextPath":       userContextPath,
 	}, nil
 }

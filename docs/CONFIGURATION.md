@@ -189,7 +189,7 @@ exclude:
 
 0.9.0 起，项目结构摘要、样例文件收集和结构化预扫描都统一使用同一套配置化文件过滤策略。除 `.git`、`.skills-seed` 和已配置的 skills 输出目录等内置安全边界外，不再在 analyzer 内额外维护目录名关键字；需要排除依赖、构建产物或项目自定义目录时，应写入 `exclude`。
 
-0.9.1 起，`select_relevant_files` 默认开启；当本地过滤后的候选文件数达到 `select_relevant_files_min_candidates` 时，`learn current` 会先让 AI 从候选文件树和变更元数据中筛出更相关的文件，再进入后续分析。
+0.9.1 起，`select_relevant_files` 默认开启；当本地过滤后的候选文件数达到 `select_relevant_files_min_candidates` 时，`learn current` 会先让 AI 从候选文件树和变更元数据中筛出更相关的文件，再进入后续分析。当前版本会把候选路径、候选元数据和可用结构化上下文写入 runtime 输入文件；prompt 只引用这些输入文件路径和数量，避免把大列表直接内联到渲染后的 prompt。
 
 0.9.11 起，文件过滤策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。0.9.13 起，快照仍保存完整当前状态，但发送给 AI 的 diff 会按 `exclude.paths` 和 `exclude.gitignore` 过滤，避免被忽略文件作为删除 diff 进入分析。
 
@@ -206,7 +206,7 @@ exclude:
 
 项目上下文从 `.skills-seed/context/` 读取，渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的上下文。
 
-渲染后的 prompt 默认保存在 `.skills-seed/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、context 片段和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象。
+渲染后的 prompt 默认保存在 `.skills-seed/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、context 片段和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。候选文件、焦点文件和结构化上下文等大块输入会优先保存到 `.skills-seed/runtime/` 下的 prompt input 目录，渲染后的 prompt 通过路径引用它们。最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象，同时要求相同输入下保持语义稳定和确定性排序。
 
 0.10.5 起，`learn current` 单元分析不会再把已有模式库写入每个单元 prompt；如果需要查看已有模式，请读取本地模式库或使用 `patterns show` / `patterns stats`。模型输出解析会在最终契约之外继续做程序化 JSON 修复，覆盖字符串内原始换行/控制字符、裸对象键和数组项缺失对象起始符等异常。0.10.7 起，修复范围继续扩展到尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号。
 
@@ -216,7 +216,7 @@ exclude:
 
 0.11.2 起，`learning.current.max_units_per_call` 可控制一次 AI 调用最多分析的单元数，默认 `1` 表示不合批；调高后会把多个单元放入同一次调用并要求响应按顶层 `units` 返回。生成 skills 时，低频或局部证据不会进入强约束层，避免把偶发现象误写成必须遵守的项目标准。
 
-AI 文件筛选会直接决定最终分析范围，同时本地校验会确保路径仍在候选集内，并强制保留用户显式 focus 文件。相同输入仍会按指纹复用缓存，但本地策略不再把较窄的 AI 建议扩展到固定预算。
+AI 文件筛选会直接决定最终分析范围，同时本地校验会确保路径仍在候选集内，并强制保留用户显式 focus 文件。相同输入仍会按指纹复用缓存，但本地策略不再把较窄的 AI 建议扩展到固定预算。文件筛选、分析单元规划和当前代码学习 prompt 会使用明确的稳定决策规则；当证据等价时优先结构证据、可路由性和源码词汇，最后用路径、ID 或符号的字典序作为 tie-breaker。
 
 初始化交互中的“Agent 总并发数”会自动落到具体配置：单项目模式写入 `learning.current.parallelism`；workspace 模式会根据发现到的子项目数拆分为根配置的 `agent.parallelism`（子项目并发）和 `learning.current.parallelism`（每个子项目内的分析单元并发），并确保两者乘积不超过总并发。
 

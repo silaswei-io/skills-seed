@@ -237,6 +237,60 @@ func TestAnalyzeProjectSkipsUnavailableOptionalStructuralContext(t *testing.T) {
 	require.Empty(t, received.StructuralContext)
 }
 
+func TestCollectFileSelectionContextUsesDedicatedCollector(t *testing.T) {
+	tmpDir := t.TempDir()
+	collector := &recordingStructuralCollector{context: "## Structural Context\n- graph entry"}
+	svc := NewAnalyzerService(&mocks.MockAgent{}, nil)
+	svc.fileSelectionContextCollector = collector
+
+	contextText := svc.CollectFileSelectionContext(context.Background(), tmpDir, FileSelectionContextRequest{
+		ProjectName:    "demo",
+		Language:       "go",
+		FocusPaths:     []string{"cmd/server/main.go"},
+		CandidateCount: 13524,
+		UserContext:    "focus runtime behavior",
+	})
+
+	require.Contains(t, contextText, "graph entry")
+	require.Equal(t, "demo", collector.req.ProjectName)
+	require.Equal(t, "go", collector.req.Language)
+	require.Equal(t, []string{"cmd/server/main.go"}, collector.req.FocusPaths)
+	require.Equal(t, []string{"cmd/server/main.go"}, collector.req.SeedPaths)
+	require.Contains(t, collector.req.Purpose, "local candidate count: 13524")
+	require.Contains(t, collector.req.Purpose, "user guidance is present")
+}
+
+func TestCollectFileSelectionContextSkipsTreeSitterProvider(t *testing.T) {
+	svc := NewAnalyzerService(&mocks.MockAgent{}, &mocks.MockConfigReader{
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{
+					Enabled:  true,
+					Provider: config.StructuralProviderTreeSitter,
+				},
+			},
+		},
+	})
+
+	contextText := svc.CollectFileSelectionContext(context.Background(), t.TempDir(), FileSelectionContextRequest{
+		CandidateCount: 10,
+	})
+
+	require.Empty(t, contextText)
+	require.Nil(t, svc.fileSelectionContextCollector)
+}
+
+func TestCollectFileSelectionContextFallsBackWhenCollectorFails(t *testing.T) {
+	svc := NewAnalyzerService(&mocks.MockAgent{}, nil)
+	svc.fileSelectionContextCollector = fakeStructuralCollector{err: errors.New("codegraph unavailable")}
+
+	contextText := svc.CollectFileSelectionContext(context.Background(), t.TempDir(), FileSelectionContextRequest{
+		CandidateCount: 10,
+	})
+
+	require.Empty(t, contextText)
+}
+
 func TestAnalyzeProject_AIError(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,

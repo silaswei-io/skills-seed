@@ -138,11 +138,18 @@ When the change profile is `micro`, do not add new patterns by default unless us
 Output a pattern only when the candidate satisfies all conditions below. Otherwise return an empty array or drop the candidate; do not use weak low-confidence patterns to fill space:
 
 1. **Direct evidence**: The candidate must be directly supported by concrete source snippets, real paths, real symbols, and explicit behavior read in this task. Directory structure, file names, comments, README text, or structural context alone are not sufficient rule evidence.
-2. **Project-specific**: The candidate must capture this project's business semantics, module boundary, state/error/data constraint, configuration convention, external dependency interaction, or repeatedly used implementation choice. Drop Go/CLI/framework common sense.
+2. **Project-specific**: The candidate must capture this project's business semantics, module boundary, state/error/data constraint, configuration convention, external dependency interaction, or repeatedly used implementation choice. Drop language, tool, or framework common sense.
 3. **Actionable**: `rule` must guide a future change, such as which paths/symbols to inspect and which order, state, error, or data boundary to preserve. A description of what the code currently does is not a pattern by itself.
 4. **Routeable**: The candidate must include request terms, source terms, paths, or symbols that help a future task route to code. Drop candidates that cannot be reached from request language.
 5. **Non-duplicate**: If multiple candidates express the same core rule, keep only the strongest and most routeable one, and merge evidence locations into it.
 6. **Conservative confidence**: A local implementation that appears once in one file or one method is usually not a project-level pattern. Unless it expresses a clear business invariant or critical boundary, drop it or keep it as a low-confidence local reference.
+
+# Stable Candidate Selection
+
+- The same analysis units, structural context, focused paths, diffs, and source evidence should produce stable pattern candidates.
+- Do not add, drop, split, merge, rename, recategorize, or move a candidate between units merely for stylistic variety or because another equally valid wording exists.
+- When evidence is equivalent, keep the candidate with stronger routeability, clearer source vocabulary, broader future-change risk, and more direct evidence. If those are equivalent, use lexicographic order of unit IDs, evidence paths, and symbols as the final tie-breaker.
+- Preserve stable pattern names, categories, business method identities, analysis unit ownership, and evidence ordering for the same rule across repeated runs.
 
 # Facts Are Not Patterns
 
