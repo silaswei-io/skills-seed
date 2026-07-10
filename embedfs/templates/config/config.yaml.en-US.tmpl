@@ -58,9 +58,9 @@ agent:
 ########################################################################
 learning:
   current:
-    # Learning mode: fast is quicker, normal balances quality and speed, deep is more thorough
+    # Learning mode: normal is the safest balance; fast keeps only high-value core patterns; deep reads deeper branches and exceptional paths
     mode: "normal"
-    # Analysis unit scope: domain groups by business domain, flow splits by workflow, module splits finer by module/plugin
+    # Analysis unit scope: flow is the default stable choice by workflow/resource action; domain is coarser with fewer patterns; module is finer for clear module/plugin boundaries
     scope: "flow"
     # In-project analysis-unit parallelism; used by ordinary projects and workspace child projects, 1 means serial
     parallelism: 1

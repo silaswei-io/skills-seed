@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.7]
+
+### 变更
+
+- 初始化交互和默认配置模板补充 `learning.current.mode` 与 `learning.current.scope` 的选择建议，明确 `normal` / `flow` 是默认稳妥组合，并说明 `fast`、`deep`、`domain`、`module` 的适用边界。
+- 配置文档同步扩展学习模式和分析单元切分范围说明，帮助用户在高层长期规则、流程级稳定拆分和模块化仓库之间选择合适策略。
+- 分析单元规划和当前代码学习 prompt 明确要求按当前配置的 mode / scope 决策，避免模型在不同学习模式或切分策略之间折中混用。
+
 ## [v0.13.6]
 
 ### 修复

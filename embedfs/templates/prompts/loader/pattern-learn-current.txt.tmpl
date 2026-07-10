@@ -114,6 +114,7 @@ Allowed categories: {{.AllowedCategories}}
 
 # Learning Mode Strategy
 
+- Active learning mode: `{{.LearningMode}}`. Apply this mode exactly; do not blend it with other modes.
 - `fast`: Prioritize entry points, structural context, and direct evidence. Output only stable, frequent, request-routing core patterns; merge low-value details and homogeneous repeated rules.
 - `normal`: Default strategy. Cover the unit's main business capabilities, key technical conventions, important exceptional paths, and reusable entries, but do not lower the evidence gate for coverage.
 - `deep`: Read deeper state branches, external dependencies, exception/compensation flows, and cross-module constraints when needed. `deep` permits deeper verification; it does not permit more weak-evidence patterns. Every output still needs routing value and source evidence.

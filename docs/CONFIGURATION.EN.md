@@ -170,8 +170,8 @@ exclude:
 
 | Field | Default | Description |
 |---|---:|---|
-| `mode` | `normal` | Analysis depth: `fast` is quicker and merges nearby capabilities, `normal` balances quality and speed, `deep` is more thorough and keeps more business boundaries |
-| `scope` | `flow` | Unit split scope: `domain` groups by business domain, `flow` splits by workflow/resource action, `module` allows finer module/plugin/API splits |
+| `mode` | `normal` | Analysis depth: `normal` is the default and safest balance; `fast` is quicker and keeps only high-value core patterns; `deep` reads deeper branches, external dependencies, and exceptional paths |
+| `scope` | `flow` | Unit split scope: `flow` is the default stable choice by workflow/resource action; `domain` is coarser with fewer patterns for high-level long-lived rules; `module` is finer for clear module/plugin boundaries |
 | `parallelism` | `1` | In-project analysis-unit parallelism; used by ordinary projects and workspace child projects, `1` means serial |
 | `max_units_per_call` | `1` | Maximum analysis units per AI call; `1` disables batching to reduce oversized outputs, parse failures, and cross-unit conclusion bleed |
 | `select_relevant_files` | `true` | Select the most relevant files from the candidate file tree before AI analysis to reduce noisy inputs |

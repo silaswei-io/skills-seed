@@ -2510,22 +2510,22 @@ other = "选择分析深度"
 other = "更快，合并更多相近能力，只学习高价值稳定模式。"
 
 [InteractiveInitLearningModeNormalDesc]
-other = "默认平衡质量和速度。"
+other = "默认且最稳妥，平衡质量和速度。"
 
 [InteractiveInitLearningModeDeepDesc]
-other = "更深入，保留更多业务边界和异常路径。"
+other = "更深入，会读取更深分支、外部依赖和异常路径。"
 
 [InteractiveInitLearningScope]
 other = "选择单元切分范围"
 
 [InteractiveInitLearningScopeDomainDesc]
-other = "按业务域合并，跨插件、接口或模块也尽量归入同一业务域。"
+other = "更粗，按业务域合并，模式更少；适合沉淀高层长期规则。"
 
 [InteractiveInitLearningScopeFlowDesc]
-other = "按业务流程、资源动作或外部系统职责拆分。"
+other = "默认且最稳定，按业务流程、资源动作或外部系统职责拆分。"
 
 [InteractiveInitLearningScopeModuleDesc]
-other = "允许按模块、插件或接口更细拆分。"
+other = "更细，按模块、插件或接口拆分；适合边界清晰的插件化仓库。"
 
 [InteractiveInitSummaryTitle]
 other = "即将执行"

@@ -58,9 +58,9 @@ agent:
 ########################################################################
 learning:
   current:
-    # 学习模式：fast 更快，normal 默认平衡，deep 更深入
+    # 学习模式：normal 最稳妥，平衡质量和速度；fast 只保留高价值核心模式；deep 会读取更深分支和异常路径
     mode: "normal"
-    # 分析单元切分范围：domain 按业务域合并，flow 按流程拆分，module 按模块/插件更细拆分
+    # 分析单元切分范围：flow 默认且最稳定，按业务流程/资源动作拆分；domain 更粗、模式更少；module 更细，适合插件/模块边界清晰的仓库
     scope: "flow"
     # 项目内分析单元并发数；普通项目或 workspace 子项目生效，1 表示串行
     parallelism: 1

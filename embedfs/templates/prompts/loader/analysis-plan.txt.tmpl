@@ -47,12 +47,14 @@ The user context is at `{{.UserContextPath}}`. Read it only if it helps decide b
 
 # Mode Strategy
 
+- Apply the configured `Learning mode` exactly. Do not average strategies across modes, and do not use `deep`-style finer splitting when the mode is `fast` or `normal`.
 - `fast`: Prefer merging nearby capabilities into larger business-domain units; split only units that can independently produce core, frequent, high-value patterns.
 - `normal`: Default balanced strategy; split by business capability while merging thin interfaces, simple record operations, pure models, and utilities with no business rules.
 - `deep`: Allow finer business units for capabilities with independent rules, state transitions, external dependencies, or exceptional paths, but still do not split mechanically by file.
 
 # Scope Strategy
 
+- Apply the configured `Scope` exactly. When the same files could be grouped several ways, use this scope as the tie-breaker before lexical ordering.
 - `domain`: Prefer grouping by business domain, product capability, or external-system family. If files serve the same business domain, keep them in one unit even when they span multiple components, interfaces, submodules, or directories.
 - `flow`: Split by business workflow, resource action, state transition, or external-system responsibility. This is the balanced default; a single domain may contain a few independent flows.
 - `module`: Allow finer splits by component, interface, submodule, or engineering responsibility, but every unit must still explain business rules independently; do not create mechanical units for purely technical files.

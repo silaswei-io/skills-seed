@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.7]
+
+### Changes
+
+- Init prompts and default config templates now explain how to choose `learning.current.mode` and `learning.current.scope`, making `normal` / `flow` the clearly recommended stable default while documenting when `fast`, `deep`, `domain`, and `module` fit.
+- Configuration docs now expand the learning-mode and analysis-unit scope guidance so users can choose between long-lived domain rules, stable workflow-level splits, and module-oriented repositories.
+- Analysis-unit planning and current-code learning prompts now require the model to follow the active mode / scope exactly, reducing blended decisions across learning modes or split strategies.
+
 ## [v0.13.6]
 
 ### Fixes

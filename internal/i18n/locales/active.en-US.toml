@@ -2509,22 +2509,22 @@ other = "Select analysis depth"
 other = "Faster; merges nearby capabilities and learns only high-value stable patterns."
 
 [InteractiveInitLearningModeNormalDesc]
-other = "Default balance between quality and speed."
+other = "Default and safest balance between quality and speed."
 
 [InteractiveInitLearningModeDeepDesc]
-other = "More thorough; keeps more business boundaries and exceptional paths."
+other = "More thorough; reads deeper branches, external dependencies, and exceptional paths."
 
 [InteractiveInitLearningScope]
 other = "Select unit split scope"
 
 [InteractiveInitLearningScopeDomainDesc]
-other = "Group by business domain, even across plugins, APIs, or modules."
+other = "Coarser; groups by business domain with fewer patterns, suitable for long-lived high-level rules."
 
 [InteractiveInitLearningScopeFlowDesc]
-other = "Split by business workflow, resource action, or external-system responsibility."
+other = "Default and most stable; splits by business workflow, resource action, or external-system responsibility."
 
 [InteractiveInitLearningScopeModuleDesc]
-other = "Allow finer splits by module, plugin, or API."
+other = "Finer; splits by module, plugin, or API, suitable for repositories with clear module/plugin boundaries."
 
 [InteractiveInitSummaryTitle]
 other = "Execution plan"
