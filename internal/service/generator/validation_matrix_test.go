@@ -119,7 +119,7 @@ func TestValidationMatrixPrefersNarrowTestCommandOverGlobalBuild(t *testing.T) {
 	assert.Equal(t, "go test ./plugins/kmip_cluster_manage/...", matrix[0].Command)
 }
 
-func TestValidationMatrixDoesNotPromoteNarrowCommandAcrossBroadEvidence(t *testing.T) {
+func TestValidationMatrixOmitsFallbackForBroadEvidence(t *testing.T) {
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
@@ -159,12 +159,10 @@ func TestValidationMatrixDoesNotPromoteNarrowCommandAcrossBroadEvidence(t *testi
 
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
-	require.NotEmpty(t, matrix)
-	assert.Equal(t, "project check", matrix[0].Command)
-	assert.NotEqual(t, "codegen generate swagger", matrix[0].Command)
+	assert.Empty(t, matrix)
 }
 
-func TestValidationMatrixDoesNotUseNarrowSemanticCommandForMixedEvidence(t *testing.T) {
+func TestValidationMatrixDoesNotUseFallbackCommandForMixedEvidence(t *testing.T) {
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
@@ -193,12 +191,10 @@ func TestValidationMatrixDoesNotUseNarrowSemanticCommandForMixedEvidence(t *test
 
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
-	require.NotEmpty(t, matrix)
-	assert.Equal(t, "project check", matrix[0].Command)
-	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
+	assert.Empty(t, matrix)
 }
 
-func TestValidationMatrixPrefersGenericCheckBeforeBroadBuildForMixedEvidence(t *testing.T) {
+func TestValidationMatrixOmitsGenericCheckAndBroadBuildForMixedEvidence(t *testing.T) {
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
@@ -225,9 +221,7 @@ func TestValidationMatrixPrefersGenericCheckBeforeBroadBuildForMixedEvidence(t *
 
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
-	require.NotEmpty(t, matrix)
-	assert.Equal(t, "project check", matrix[0].Command)
-	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
+	assert.Empty(t, matrix)
 }
 
 func TestValidationMatrixTreatsSingleKeywordGenericCommandAsFallback(t *testing.T) {
@@ -251,9 +245,7 @@ func TestValidationMatrixTreatsSingleKeywordGenericCommandAsFallback(t *testing.
 
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
-	require.NotEmpty(t, matrix)
-	assert.Equal(t, "project check", matrix[0].Command)
-	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
+	assert.Empty(t, matrix)
 }
 
 func TestValidationMatrixMarksBroadBuildAsFallback(t *testing.T) {
@@ -278,12 +270,10 @@ func TestValidationMatrixMarksBroadBuildAsFallback(t *testing.T) {
 
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
-	require.NotEmpty(t, matrix)
-	assert.Equal(t, "GOOS=$GOOS GOARCH=$GOARCH go build -tags no_k8s -o app main.go", matrix[0].Command)
-	assert.Contains(t, matrix[0].When, "覆盖范围较宽")
+	assert.Empty(t, matrix)
 }
 
-func TestValidationMatrixDoesNotUseGenerateCommandForBusinessFlow(t *testing.T) {
+func TestValidationMatrixDoesNotUseBroadTestForBusinessFlow(t *testing.T) {
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{
@@ -311,12 +301,10 @@ func TestValidationMatrixDoesNotUseGenerateCommandForBusinessFlow(t *testing.T) 
 
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
-	require.NotEmpty(t, matrix)
-	assert.Equal(t, "go test ./...", matrix[0].Command)
-	assert.NotEqual(t, "codegen generate api", matrix[0].Command)
+	assert.Empty(t, matrix)
 }
 
-func TestValidationMatrixPrefersGenericCheckOverBroadRaceTestFallback(t *testing.T) {
+func TestValidationMatrixOmitsGenericCheckAndBroadRaceTestFallback(t *testing.T) {
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
 			{Command: "jzero check", When: "开发过程中检查代码和配置", Source: "README.md", Evidence: []string{"README.md"}, Type: "check"},
@@ -336,9 +324,7 @@ func TestValidationMatrixPrefersGenericCheckOverBroadRaceTestFallback(t *testing
 
 	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
 
-	require.NotEmpty(t, matrix)
-	assert.Equal(t, "jzero check", matrix[0].Command)
-	assert.Contains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
+	assert.Empty(t, matrix)
 }
 
 func TestValidationCommandPaths(t *testing.T) {

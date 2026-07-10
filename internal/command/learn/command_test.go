@@ -1121,7 +1121,7 @@ func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T
 				Frameworks: []string{"Gin"},
 				Summary:    "backend 是私有化部署主后端。",
 				KeyModules: []domain.ModuleInfo{
-					{Path: "internal/api", Description: "管理 API 入口"},
+					{Name: "api", Path: "internal/api", Description: "管理 API 入口"},
 				},
 			}, nil
 		},
@@ -1132,6 +1132,8 @@ func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T
 	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
 	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, "internal", "api"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "internal", "api", "handler.go"), []byte("package api\n"), 0644))
 	require.DirExists(t, childRoot)
 
 	var profileReq *agent.AnalyzeWorkspaceProfileRequest

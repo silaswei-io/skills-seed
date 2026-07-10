@@ -73,13 +73,16 @@ These items come from learned patterns and are only navigation hints and review 
 ## Validation Commands
 
 {{if .ValidationMatrix}}
+The table only includes commands that evidence maps to a concrete scope.
+
 | Change Scope | Suggested Command | Trigger | Evidence |
 |---|---|---|---|
 {{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
 {{end}}
 
-Other learned commands:
-
+Other learned commands; they may not cover the current change scope, so confirm coverage against current code and evidence before running:
+{{else}}
+No validation matrix could be mapped to concrete change scopes. Confirm coverage against current code and evidence before running the commands below.
 {{end}}
 {{range .ValidationCommands}}
 - `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}{{if .Workdir}}, workdir: `{{.Workdir}}`{{end}}{{if .ScopePaths}}, scope: {{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}, evidence: {{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}, type: {{.Type}}{{end}}

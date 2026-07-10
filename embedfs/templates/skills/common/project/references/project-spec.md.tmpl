@@ -73,13 +73,16 @@
 ## 验证命令
 
 {{if .ValidationMatrix}}
+下表只包含能由证据映射到具体范围的命令。
+
 | 改动范围 | 建议命令 | 触发条件 | 证据 |
 |---|---|---|---|
 {{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
 {{end}}
 
-其他已学习命令：
-
+其他已学习命令（未必能覆盖当前改动范围，运行前先按当前代码和证据确认）：
+{{else}}
+当前没有可映射到具体改动范围的验证矩阵；以下命令运行前需要先按当前代码和证据确认覆盖范围。
 {{end}}
 {{range .ValidationCommands}}
 - `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}{{if .Workdir}}，工作目录：`{{.Workdir}}`{{end}}{{if .ScopePaths}}，作用域：{{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}，证据：{{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}，类型：{{.Type}}{{end}}

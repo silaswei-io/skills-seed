@@ -26,9 +26,21 @@ var outputTypes = map[string]reflect.Type{
 
 // JSONSchema 返回指定 AI 输出 DTO 的 JSON Schema。
 func JSONSchema(name string) (string, error) {
+	schema, err := reflectSchema(name)
+	if err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func reflectSchema(name string) (*jsonschema.Schema, error) {
 	t, ok := outputTypes[name]
 	if !ok {
-		return "", fmt.Errorf("unknown AI output contract %q", name)
+		return nil, fmt.Errorf("unknown AI output contract %q", name)
 	}
 	reflector := jsonschema.Reflector{
 		Anonymous:      true,
@@ -36,9 +48,5 @@ func JSONSchema(name string) (string, error) {
 		ExpandedStruct: true,
 	}
 	schema := reflector.ReflectFromType(t)
-	data, err := json.MarshalIndent(schema, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return schema, nil
 }

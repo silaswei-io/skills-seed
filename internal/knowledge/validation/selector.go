@@ -91,6 +91,9 @@ func (selector commandSelector) chooseByText(area Area) commandChoice {
 		if commandLooksHeavy(command) {
 			continue
 		}
+		if commandLooksBroadTest(command) {
+			continue
+		}
 		declaredPaths := commandDeclaredScopePaths(command)
 		if len(declaredPaths) > 0 && len(evidenceRoots) > 0 && !commandSharesEvidenceRoot(declaredPaths, evidenceRoots) {
 			continue

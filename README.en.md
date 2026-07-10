@@ -13,7 +13,7 @@
 
 `Claude Code` · `Codex` · `Local Skills` · `Workspace` · `Code Review`
 
-[Core Features](#core-features) · [Quick Start](#quick-start) · [Output Preview](#output-preview) · [Agent Cost](#agent-cost-guidance) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
+[Core Features](#core-features) · [Quick Start](#quick-start) · [Case Study](#case-study) · [Output Preview](#output-preview) · [Agent Cost](#agent-cost-guidance) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
 
 </div>
 
@@ -29,6 +29,14 @@ What you get is not a generic project summary. It is Agent working context gener
 - Which rules repeatedly appear in `check` or review and should be prioritized in generated skills.
 
 All data is local by default. The generated skills type is selected by `skills.target`; the Agent CLI used for analysis, learning, and summaries is selected by `agent.engine`. That means you can use `claude` for analysis and summarization while producing `codex` skills.
+
+## Case Study
+
+The [medusa-demo](https://github.com/silaswei-io/medusa-demo/tree/develop/.claude/skills/skills-seed-skills) repository shows what a default `sync` can produce for a real TypeScript monorepo. Skills Seed generated a project-level Skill whose `SKILL.md` only handles task routing, constraint sources, and validation-command selection, while business rules, architecture boundaries, entry methods, and code evidence live under `references/`.
+
+This is different from hand-written task Skills such as `writing-docs` or `reviewing-prs`: those Skills are best for fixed workflows and collaboration rules, while the generated Skill helps an Agent answer "how should this project be changed, where should I read first, which rules have code evidence, and what should I validate" before editing code.
+
+See the full generated-output comparison and usage notes in the [Medusa Demo case study](docs/MEDUSA_DEMO_CASE.EN.md).
 
 ## Core Features
 
@@ -389,6 +397,7 @@ go build -o skills-seed ./cmd/skills-seed
 
 ## Documentation
 
+- [Medusa Demo Case Study](docs/MEDUSA_DEMO_CASE.EN.md)
 - [Command Reference](docs/COMMANDS.EN.md)
 - [Configuration Reference](docs/CONFIGURATION.EN.md)
 - [Changelog](CHANGELOG.en.md)

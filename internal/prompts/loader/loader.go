@@ -62,6 +62,10 @@ var contextPromptFiles = []contextPromptFile{
 	{partName: "context-workspace", fileName: "workspace.md"},
 }
 
+var promptAppendFragments = map[string][]string{
+	"pattern-learn-current-batch": {"pattern-evidence-rules"},
+}
+
 // RuntimeTask 标识一次 agent 调用共用的 runtime 文件名前缀。
 type RuntimeTask struct {
 	ID   string
@@ -165,14 +169,16 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 	}
 
 	base := buf.String()
+	appendFragments := l.appendFragments(locale, name)
 	contractGuard := l.outputContractGuard(locale, name)
 	if l.seedPath == "" {
-		rendered := l.appendOutputContractGuard(base, contractGuard)
+		rendered := l.appendOutputContractGuard(l.appendRenderedFragments(base, appendFragments), contractGuard)
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticPromptRendered"),
 			"template", name,
 			"agent", l.agentName,
 			"locale", locale,
 			"base_length", len(base),
+			"append_fragments_count", len(appendFragments),
 			"output_contract_guard_length", len(contractGuard),
 			"final_length", len(rendered),
 			"has_seed_path", false,
@@ -213,6 +219,9 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		addPart(file.partName, raw, cleaned)
 		contextLengths[file.partName] = len(cleaned)
 	}
+	for _, fragment := range appendFragments {
+		addPart(fragment.Name, fragment.Content, fragment.Content)
+	}
 	if contractGuard != "" {
 		addPart("output-contract-guard", contractGuard, contractGuard)
 	}
@@ -227,6 +236,7 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		"context_constraints_length", contextLengths["context-constraints"],
 		"context_terminology_length", contextLengths["context-terminology"],
 		"context_workspace_length", contextLengths["context-workspace"],
+		"append_fragments_count", len(appendFragments),
 		"output_contract_guard_length", len(contractGuard),
 		"final_length", len(rendered),
 		"has_seed_path", true,
@@ -289,6 +299,46 @@ func (l *Loader) outputContractGuard(locale, promptName string) string {
 	return strings.TrimSpace(buf.String())
 }
 
+type renderedAppendFragment struct {
+	Name    string
+	Content string
+}
+
+func (l *Loader) appendFragments(locale, promptName string) []renderedAppendFragment {
+	names := promptAppendFragments[promptName]
+	if len(names) == 0 {
+		return nil
+	}
+	fragments := make([]renderedAppendFragment, 0, len(names))
+	for _, name := range names {
+		content := l.renderAppendTemplate(locale, name)
+		if content == "" {
+			continue
+		}
+		fragments = append(fragments, renderedAppendFragment{
+			Name:    name,
+			Content: content,
+		})
+	}
+	return fragments
+}
+
+func (l *Loader) renderAppendTemplate(locale, name string) string {
+	data, err := readAppendTemplate(name)
+	if err != nil {
+		return ""
+	}
+	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap(locale)).Parse(string(data))
+	if err != nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]interface{}{}); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(buf.String())
+}
+
 func readAppendTemplate(name string) ([]byte, error) {
 	defaultPath := metadata.PromptAppendTemplatePath(name, "")
 	data, err := embedfs.FS.ReadFile(defaultPath)
@@ -299,15 +349,27 @@ func readAppendTemplate(name string) ([]byte, error) {
 	return nil, os.ErrNotExist
 }
 
+func (l *Loader) appendRenderedFragments(base string, fragments []renderedAppendFragment) string {
+	for _, fragment := range fragments {
+		base = appendPromptSection(base, fragment.Content)
+	}
+	return base
+}
+
 func (l *Loader) appendOutputContractGuard(base, contractGuard string) string {
+	return appendPromptSection(base, contractGuard)
+}
+
+func appendPromptSection(base, section string) string {
 	base = strings.TrimSpace(base)
-	if contractGuard == "" {
+	section = strings.TrimSpace(section)
+	if section == "" {
 		return base
 	}
 	if base == "" {
-		return contractGuard
+		return section
 	}
-	return strings.TrimSpace(base + "\n\n" + contractGuard)
+	return strings.TrimSpace(base + "\n\n" + section)
 }
 
 func templateCacheKey(locale, name string) string {

@@ -27,7 +27,25 @@ func RuntimeSlug(name, label string) string {
 		parts = append(parts, safe)
 	}
 	if safe := runtimefiles.SafePart(label, ""); safe != "" {
-		parts = append(parts, safe)
+		if trimmed := trimRuntimeSlugOverlap(parts, safe); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
 	}
 	return strings.Join(parts, "-")
+}
+
+func trimRuntimeSlugOverlap(parts []string, label string) string {
+	if len(parts) == 0 || label == "" {
+		return label
+	}
+	lastPart := parts[len(parts)-1]
+	lastSegments := strings.Split(lastPart, "-")
+	labelSegments := strings.Split(label, "-")
+	if len(lastSegments) == 0 || len(labelSegments) == 0 {
+		return label
+	}
+	if lastSegments[len(lastSegments)-1] != labelSegments[0] {
+		return label
+	}
+	return strings.Join(labelSegments[1:], "-")
 }

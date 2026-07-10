@@ -29,6 +29,7 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 	if profile == nil {
 		return nil
 	}
+	profile = CleanProjectProfile(profile)
 
 	spec := &ProjectSpec{
 		ProjectName:        profile.ProjectName,

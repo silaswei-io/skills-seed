@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.5]
+
+### 变更
+
+- `learn current` / `sync` 的 AI 文件筛选会识别大候选集里的超宽 `include` 结果；当模型返回过大的目录或通配符时，优先保留显式 `selected_paths`，否则只保留带入口、编排、服务、模型、配置等结构信号的文件，避免大项目重新膨胀到整包学习。
+- 当前代码批量学习 prompt 拆出可复用的 pattern evidence 追加片段，并收紧候选准入、证据片段、画像增量和验证命令规则，降低弱事实、未确认路径和过长示例进入 patterns / profile 的概率。
+- 生成 Skills 的验证命令矩阵只展示能由证据映射到具体改动范围的命令；其它已学习命令保留为待确认清单，避免把全局测试、构建或泛化 check 误写成精确验证建议。
+- README 增加 medusa-demo 真实项目案例入口，并新增案例文档说明默认 `sync` 生成的项目级 Skill 与手写任务 Skills 的互补关系和价值边界。
+
+### 修复
+
+- 清理项目画像中的 `unconfirmed`、`unknown`、`待确认` 等占位路径，生成前直接丢弃缺少真实路径的模块和工具方法，避免无证据位置污染 `project-spec`、模块索引和工具索引。
+- 输出契约追加模板补充 JSON 字符串转义要求，防止模型在代码片段或正则内容中输出 `\s`、`\ ` 等非法 JSON escape。
+- 修复 runtime prompt 文件名在 batch 标签下重复拼接的问题，让 `pattern-learn-current-batch` 搭配 `batch-008` 生成更稳定的 runtime slug。
+- 新增 Prompt 模板说明文档，记录 loader 模板、append 模板和生产调用关系，降低后续压缩 prompt 时的维护风险。
+
 ## [v0.13.4]
 
 ### 变更

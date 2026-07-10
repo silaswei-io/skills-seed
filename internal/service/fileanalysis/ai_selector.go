@@ -18,7 +18,8 @@ import (
 
 const (
 	aiFileSelectionCacheSchemaVersion = 1
-	aiFileSelectionPromptVersion      = "file-select-structural-context-v6"
+	aiFileSelectionPromptVersion      = "file-select-structural-context-v7"
+	aiBroadIncludeCandidateThreshold  = 200
 )
 
 // AISelectorOptions 描述 AI 文件筛选器的本地输入。
@@ -81,10 +82,16 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 		AISelected:    aiDecision.Selected,
 		AIExcluded:    aiDecision.Excluded,
 		RequiredPaths: opts.RequiredPaths,
+		AllowFallback: !aiDecision.SuppressedBroadInclude,
 	})
 	if len(selected) == 0 {
-		selected = candidates
-		cacheable = false
+		if aiDecision.SuppressedBroadInclude {
+			selected = structuralSignalPaths(candidates)
+		}
+		if len(selected) == 0 {
+			selected = candidates
+			cacheable = false
+		}
 	}
 	result := &AISelectorResult{
 		SelectedPaths: selected,
@@ -373,8 +380,9 @@ func candidateKind(path string) string {
 }
 
 type aiSelectionDecision struct {
-	Selected []string
-	Excluded []string
+	Selected               []string
+	Excluded               []string
+	SuppressedBroadInclude bool
 }
 
 func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSelectionDecision {
@@ -387,6 +395,7 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSe
 	}
 	selected := make(map[string]bool)
 	excluded := make(map[string]bool)
+	suppressedBroadInclude := false
 	addPath := func(path string) {
 		path = cleanRelativePath(path)
 		if path == "" || !candidateSet[path] {
@@ -402,10 +411,19 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSe
 		if include == "" {
 			continue
 		}
-		for _, candidate := range candidates {
-			if candidateMatchesPattern(candidate, include) {
+		matches := matchedCandidatePaths(candidates, include)
+		if shouldSuppressIncludeExpansion(candidates, matches) {
+			suppressedBroadInclude = true
+			if len(selected) > 0 {
+				continue
+			}
+			for _, candidate := range structuralSignalPaths(matches) {
 				selected[candidate] = true
 			}
+			continue
+		}
+		for _, candidate := range matches {
+			selected[candidate] = true
 		}
 	}
 	if len(selected) == 0 && len(result.Include) == 0 && len(result.SelectedPaths) == 0 {
@@ -439,7 +457,60 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSe
 		excludedOut = append(excludedOut, path)
 	}
 	sort.Strings(excludedOut)
-	return aiSelectionDecision{Selected: out, Excluded: excludedOut}
+	return aiSelectionDecision{
+		Selected:               out,
+		Excluded:               excludedOut,
+		SuppressedBroadInclude: suppressedBroadInclude,
+	}
+}
+
+func matchedCandidatePaths(candidates []string, pattern string) []string {
+	matches := make([]string, 0)
+	for _, candidate := range candidates {
+		if candidateMatchesPattern(candidate, pattern) {
+			matches = append(matches, candidate)
+		}
+	}
+	sort.Strings(matches)
+	return matches
+}
+
+func shouldSuppressIncludeExpansion(candidates, matches []string) bool {
+	return len(candidates) > aiBroadIncludeCandidateThreshold && len(matches) > aiBroadIncludeCandidateThreshold
+}
+
+func structuralSignalPaths(paths []string) []string {
+	selected := make([]string, 0)
+	for _, path := range normalizeCandidatePaths(paths) {
+		if fileSelectionPathScore(path) > 0 {
+			selected = append(selected, path)
+		}
+	}
+	sort.Strings(selected)
+	return selected
+}
+
+func fileSelectionPathScore(path string) int {
+	lower := strings.ToLower(path)
+	score := 0
+	highSignalTerms := []string{
+		"route", "router", "handler", "controller", "workflow", "service", "usecase",
+		"model", "entity", "schema", "config", "task", "job", "event", "subscriber",
+		"adapter", "client", "provider", "middleware", "policy", "validator",
+	}
+	for _, term := range highSignalTerms {
+		if strings.Contains(lower, term) {
+			score += 10
+		}
+	}
+	if strings.HasSuffix(lower, "/index.ts") || strings.HasSuffix(lower, "/index.js") ||
+		strings.HasSuffix(lower, "/main.go") || strings.HasSuffix(lower, "/main.ts") {
+		score += 8
+	}
+	if strings.Contains(lower, "test") || strings.Contains(lower, "spec") || strings.Contains(lower, "fixture") {
+		score -= 8
+	}
+	return score
 }
 
 func cleanPattern(pattern string) string {

@@ -137,6 +137,57 @@ func TestApplyAIFileSelectorKeepsAINarrowSelectionForLargeCandidateSets(t *testi
 	require.Len(t, result.SkippedPaths, 119)
 }
 
+func TestApplyAIFileSelectorIgnoresOverbroadIncludeWhenSelectedPathsExist(t *testing.T) {
+	root := t.TempDir()
+	candidates := make([]string, 0, 260)
+	for i := 0; i < 260; i++ {
+		path := fmt.Sprintf("packages/core/f%03d.ts", i)
+		candidates = append(candidates, path)
+		require.NoError(t, os.MkdirAll(filepath.Join(root, filepath.Dir(path)), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, path), []byte("export const value = true"), 0644))
+	}
+
+	selector := &fakeFileSelector{result: &agent.SelectFilesResult{
+		SelectedPaths: []string{"packages/core/f259.ts"},
+		Include:       []string{"packages/core/**"},
+		Reason:        "selected explicit entry and broad package context",
+	}}
+	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  candidates,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"packages/core/f259.ts"}, result.SelectedPaths)
+	require.Len(t, result.SkippedPaths, 259)
+}
+
+func TestApplyAIFileSelectorKeepsOnlyStructuralSignalsFromOverbroadInclude(t *testing.T) {
+	root := t.TempDir()
+	candidates := make([]string, 0, 260)
+	for i := 0; i < 258; i++ {
+		path := fmt.Sprintf("packages/core/f%03d.ts", i)
+		candidates = append(candidates, path)
+		require.NoError(t, os.MkdirAll(filepath.Join(root, filepath.Dir(path)), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, path), []byte("export const value = true"), 0644))
+	}
+	for _, path := range []string{"packages/core/route.ts", "packages/core/service.ts"} {
+		candidates = append(candidates, path)
+		require.NoError(t, os.WriteFile(filepath.Join(root, path), []byte("export const value = true"), 0644))
+	}
+
+	selector := &fakeFileSelector{result: &agent.SelectFilesResult{
+		Include: []string{"packages/core/**"},
+		Reason:  "broad package context",
+	}}
+	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  candidates,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"packages/core/route.ts", "packages/core/service.ts"}, result.SelectedPaths)
+	require.Len(t, result.SkippedPaths, len(candidates)-2)
+}
+
 func TestApplyAIFileSelectorDoesNotRefillAIExcludedPaths(t *testing.T) {
 	root := t.TempDir()
 	candidates := make([]string, 0, 120)

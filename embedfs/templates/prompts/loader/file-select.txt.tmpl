@@ -53,8 +53,9 @@ User context is available at `{{.UserContextPath}}`. Read it by path and use it 
 13. The same candidate file list, metadata, and user context should produce a stable selection. Do not expand or shrink the scope because of wording, ordering, or temporary preference changes.
 14. Use deterministic tie-breakers when evidence is equivalent: structural entry/call evidence first, then changed handwritten source files, then path and metadata signals, then lexicographic path order.
 15. Do not use a fixed output count, percentage, top-N cap, or minimum quota. Recommend every candidate needed for reliable codebase learning, whether that is a small set or a large set.
-16. When files can be listed explicitly, prefer `selected_paths` with recommended relative file paths sorted lexicographically. Use `include`/`exclude` only for clearly broad directories or patterns; do not use vague globs as a substitute for known files.
-17. Your output is a relevance recommendation; do not assume you can finally exclude explicit user focus files. The local validation policy will force-keep those files.
+16. Prefer `selected_paths` with explicit recommended relative file paths sorted lexicographically, especially when the candidate set is large.
+17. Use `include` only for small, precise directories or patterns whose full expansion is intended. Do not return broad package, module, source-root, or wildcard includes as a substitute for known files; local validation may ignore overbroad includes and keep only files with structural entry or orchestration signals.
+18. Your output is a relevance recommendation; do not assume you can finally exclude explicit user focus files. The local validation policy will force-keep those files.
 
 # Output Format
 

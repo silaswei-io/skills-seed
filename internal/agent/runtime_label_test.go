@@ -33,3 +33,15 @@ func TestAnalyzeCurrentCodebaseOperationIncludesRuntimeLabel(t *testing.T) {
 	require.Equal(t, "AnalyzeCurrentCodebase/unit-auth-login", operation)
 	require.Equal(t, "unit-auth-login", OperationLabel(operation))
 }
+
+func TestRuntimeSlugKeepsDistinctLabel(t *testing.T) {
+	slug := RuntimeSlug("pattern-learn-current", "unit-auth")
+
+	require.Equal(t, "pattern-learn-current-unit-auth", slug)
+}
+
+func TestRuntimeSlugTrimsOverlappingBatchLabel(t *testing.T) {
+	slug := RuntimeSlug("pattern-learn-current-batch", "batch-008")
+
+	require.Equal(t, "pattern-learn-current-batch-008", slug)
+}

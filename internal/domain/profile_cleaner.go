@@ -21,13 +21,13 @@ func CleanProjectProfile(profile *ProjectProfile) *ProjectProfile {
 	for _, module := range profile.KeyModules {
 		module.Name = strings.TrimSpace(module.Name)
 		module.DisplayName = strings.TrimSpace(module.DisplayName)
-		module.Path = strings.TrimSpace(module.Path)
+		module.Path = normalizeProfileEvidencePath(module.Path)
 		module.Description = strings.TrimSpace(module.Description)
 		module.KeyMethods = FilterGeneratedPlaceholders(module.KeyMethods)
 		module.Responsibilities = FilterGeneratedPlaceholders(module.Responsibilities)
 		module.Dependencies = FilterGeneratedPlaceholders(module.Dependencies)
 		module.Dependents = FilterGeneratedPlaceholders(module.Dependents)
-		if module.Name == "" && module.Path == "" {
+		if module.Name == "" || module.Path == "" {
 			continue
 		}
 		if module.DisplayName == "" {
@@ -53,7 +53,12 @@ func CleanProjectProfile(profile *ProjectProfile) *ProjectProfile {
 
 	cleaned.CommonUtils = make([]UtilityFunction, 0, len(profile.CommonUtils))
 	for _, utility := range profile.CommonUtils {
-		if strings.TrimSpace(utility.Name) != "" {
+		utility.Name = strings.TrimSpace(utility.Name)
+		utility.File = normalizeProfileEvidencePath(utility.File)
+		utility.Signature = strings.TrimSpace(utility.Signature)
+		utility.Description = strings.TrimSpace(utility.Description)
+		utility.Usage = strings.TrimSpace(utility.Usage)
+		if utility.Name != "" && utility.File != "" {
 			cleaned.CommonUtils = append(cleaned.CommonUtils, utility)
 		}
 	}
@@ -71,7 +76,7 @@ func CleanValidationCommands(commands []ValidationCommand) []ValidationCommand {
 		command.Command = strings.TrimSpace(command.Command)
 		command.When = strings.TrimSpace(command.When)
 		command.Source = strings.TrimSpace(command.Source)
-		command.Workdir = normalizeProfilePath(command.Workdir)
+		command.Workdir = normalizeProfileEvidencePath(command.Workdir)
 		command.ScopePaths = cleanProfilePaths(command.ScopePaths)
 		command.Evidence = cleanProfilePaths(command.Evidence)
 		command.Type = strings.TrimSpace(command.Type)
@@ -92,7 +97,7 @@ func cleanProfilePaths(paths []string) []string {
 	cleaned := make([]string, 0, len(paths))
 	seen := make(map[string]bool, len(paths))
 	for _, path := range paths {
-		path = normalizeProfilePath(path)
+		path = normalizeProfileEvidencePath(path)
 		if path == "" || seen[path] {
 			continue
 		}
@@ -109,6 +114,14 @@ func normalizeProfilePath(path string) string {
 	}
 	path = filepath.ToSlash(filepath.Clean(path))
 	if path == "." {
+		return ""
+	}
+	return path
+}
+
+func normalizeProfileEvidencePath(path string) string {
+	path = normalizeProfilePath(path)
+	if isUnconfirmedProfileValue(path) {
 		return ""
 	}
 	return path
@@ -173,7 +186,7 @@ func FilterGeneratedPlaceholders(values []string) []string {
 	seen := make(map[string]bool, len(values))
 	for _, value := range values {
 		trimmed := strings.TrimSpace(value)
-		if trimmed == "" || strings.Contains(strings.ToUpper(trimmed), "TODO") {
+		if trimmed == "" || strings.Contains(strings.ToUpper(trimmed), "TODO") || isUnconfirmedProfileValue(trimmed) {
 			continue
 		}
 		key := strings.ToLower(trimmed)
@@ -184,6 +197,20 @@ func FilterGeneratedPlaceholders(values []string) []string {
 		filtered = append(filtered, trimmed)
 	}
 	return filtered
+}
+
+func isUnconfirmedProfileValue(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return true
+	}
+	lower := strings.ToLower(trimmed)
+	switch lower {
+	case "unconfirmed", "unknown", "unknown path", "unknown location", "n/a", "na", "none", "null", "-", "未确认", "待确认", "未知", "无":
+		return true
+	default:
+		return strings.Contains(lower, "unconfirmed") || strings.Contains(trimmed, "待确认") || strings.Contains(trimmed, "未确认")
+	}
 }
 
 func moduleIdentityKey(module ModuleInfo) string {

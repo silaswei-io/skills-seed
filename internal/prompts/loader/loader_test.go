@@ -866,6 +866,8 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"do not linearly read the complete candidate file list",
 				"Do not use a fixed output count",
 				"selected_paths",
+				"Do not return broad package",
+				"keep only files with structural entry or orchestration signals",
 			},
 		},
 		{
@@ -886,6 +888,8 @@ func TestLoader_FileSelectPromptPrefersEntryEvidenceAndBusinessCoverage(t *testi
 				"do not linearly read the complete candidate file list",
 				"Do not use a fixed output count",
 				"selected_paths",
+				"Do not return broad package",
+				"keep only files with structural entry or orchestration signals",
 			},
 		},
 	}
@@ -1080,10 +1084,55 @@ func TestLoader_RenderCurrentBatchPromptIncludesValidationCommandObjectContract(
 
 	require.NoError(t, err)
 	require.Contains(t, prompt, `"validation_commands"`)
-	require.Contains(t, prompt, `"description": "exact full validation command shown by evidence"`)
+	require.Contains(t, prompt, "exact full validation command shown by evidence")
 	require.Contains(t, prompt, `"scope_paths"`)
 	require.Contains(t, prompt, `"evidence"`)
 	require.Contains(t, prompt, `"type": "object"`)
+	require.Contains(t, prompt, `"description": "exact full validation command shown by evidence"`)
+}
+
+func TestLoader_RenderCurrentBatchPromptPreservesDTOContractDetails(t *testing.T) {
+	loader := New("loader", "en-US", "")
+
+	prompt, err := loader.Render("pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, `"description": "input unit id"`)
+	require.Contains(t, prompt, `"description": "one result object for every evidenced input unit"`)
+	require.Contains(t, prompt, `"examples"`)
+	require.Contains(t, prompt, `"additionalProperties": false`)
+}
+
+func TestLoader_RenderCurrentBatchPromptAppendsPatternEvidenceRules(t *testing.T) {
+	seedPath := t.TempDir()
+	loader := New("loader", "en-US", seedPath)
+
+	prompt, err := loader.Render("pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "# Pattern Evidence Rules")
+	runtimeDir := filepath.Join(seedPath, "runtime", "rendered-prompts")
+	entries, err := os.ReadDir(runtimeDir)
+	require.NoError(t, err)
+	var manifestPath string
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".manifest.json") {
+			manifestPath = filepath.Join(runtimeDir, entry.Name())
+			break
+		}
+	}
+	require.NotEmpty(t, manifestPath)
+	dataBytes, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	var manifest renderedPromptManifest
+	require.NoError(t, json.Unmarshal(dataBytes, &manifest))
+	var found bool
+	for _, part := range manifest.Parts {
+		if part.Name == "pattern-evidence-rules" && part.Included {
+			found = true
+		}
+	}
+	require.True(t, found)
 }
 
 func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *testing.T) {
@@ -1408,6 +1457,7 @@ func TestLoader_OutputContractGuardLivesInAppendTemplates(t *testing.T) {
 	require.Contains(t, string(guard), "These rules have the highest priority and must be followed exactly")
 	require.Contains(t, string(guard), "{{outputLanguageInstruction}}")
 	require.Contains(t, string(guard), "The first non-whitespace character must be `{`")
+	require.Contains(t, string(guard), "escape backslashes as `\\\\`, double quotes as `\\\"`, and newlines as `\\n`")
 	require.Contains(t, string(guard), "For identical input evidence and task instructions")
 	require.Contains(t, string(guard), "deterministic ordering based on stable identifiers")
 }

@@ -52,21 +52,21 @@ func TestCleanProjectProfileDeduplicatesModulesAndFiltersPlaceholders(t *testing
 		KeyModules: []ModuleInfo{
 			{
 				Name:             " home ",
-				Path:             "",
+				Path:             " internal/handler/home ",
 				Description:      "first",
 				Responsibilities: []string{" route ", "TODO confirm"},
 				KeyMethods:       []string{"List", "List"},
 			},
 			{
 				Name:             "home",
-				Path:             "",
+				Path:             "internal/handler/home",
 				Description:      "second",
 				Responsibilities: []string{"handler"},
 				Dependencies:     []string{"svc", "svc"},
 				KeyMethods:       []string{"Create"},
 			},
 			{
-				Name: "",
+				Name: "event bus",
 				Path: "",
 			},
 		},
@@ -77,10 +77,38 @@ func TestCleanProjectProfileDeduplicatesModulesAndFiltersPlaceholders(t *testing
 	require.Len(t, cleaned.KeyModules, 1)
 	module := cleaned.KeyModules[0]
 	assert.Equal(t, "home", module.Name)
+	assert.Equal(t, "internal/handler/home", module.Path)
 	assert.Equal(t, "first", module.Description)
 	assert.Equal(t, []string{"route", "handler"}, module.Responsibilities)
 	assert.Equal(t, []string{"svc"}, module.Dependencies)
 	assert.Equal(t, []string{"List", "Create"}, module.KeyMethods)
+}
+
+func TestCleanProjectProfileDropsUnconfirmedProfileEntries(t *testing.T) {
+	profile := &ProjectProfile{
+		KeyModules: []ModuleInfo{
+			{Name: "Event Bus Modules", Path: "unconfirmed"},
+			{Name: "Workflow Execution Engines", Path: "待确认"},
+			{Name: "service", Path: "internal/service"},
+		},
+		CommonUtils: []UtilityFunction{
+			{Name: "SearchHint", File: "unconfirmed", Signature: "func SearchHint()"},
+			{Name: "Confirmed", File: "internal/pkg/confirmed.go", Signature: "func Confirmed()"},
+		},
+		ValidationCommands: []ValidationCommand{
+			{Command: "task test", ScopePaths: []string{"unconfirmed", "internal/service"}, Evidence: []string{"未确认", "Taskfile.yml"}},
+		},
+	}
+
+	cleaned := CleanProjectProfile(profile)
+
+	require.Len(t, cleaned.KeyModules, 1)
+	assert.Equal(t, "service", cleaned.KeyModules[0].Name)
+	require.Len(t, cleaned.CommonUtils, 1)
+	assert.Equal(t, "Confirmed", cleaned.CommonUtils[0].Name)
+	require.Len(t, cleaned.ValidationCommands, 1)
+	assert.Equal(t, []string{"internal/service"}, cleaned.ValidationCommands[0].ScopePaths)
+	assert.Equal(t, []string{"Taskfile.yml"}, cleaned.ValidationCommands[0].Evidence)
 }
 
 func TestCleanProjectProfileCollapsesFrameworkAndConfigTemplatePatterns(t *testing.T) {

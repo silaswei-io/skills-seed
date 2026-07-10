@@ -38,8 +38,8 @@ func (s projectPathSanitizer) profile(profile *domain.ProjectProfile) *domain.Pr
 	}
 	out.KeyModules = make([]domain.ModuleInfo, 0, len(profile.KeyModules))
 	for _, module := range profile.KeyModules {
-		if module.Path != "" && !s.exists(module.Path) {
-			module.Path = ""
+		if strings.TrimSpace(module.Path) == "" || !s.exists(module.Path) {
+			continue
 		}
 		out.KeyModules = append(out.KeyModules, module)
 	}
@@ -50,7 +50,7 @@ func (s projectPathSanitizer) profile(profile *domain.ProjectProfile) *domain.Pr
 	out.CommonUtils = make([]domain.UtilityFunction, 0, len(profile.CommonUtils))
 	for _, utility := range profile.CommonUtils {
 		if utility.File != "" && s.shouldDropMissingProjectPath(utility.File) {
-			utility.File = ""
+			continue
 		}
 		out.CommonUtils = append(out.CommonUtils, utility)
 	}

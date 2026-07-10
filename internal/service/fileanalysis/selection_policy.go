@@ -9,6 +9,7 @@ type validatedSelectionOptions struct {
 	AISelected    []string
 	AIExcluded    []string
 	RequiredPaths []string
+	AllowFallback bool
 }
 
 func applyValidatedSelectionPolicy(opts validatedSelectionOptions) ([]string, []string) {
@@ -33,7 +34,7 @@ func applyValidatedSelectionPolicy(opts validatedSelectionOptions) ([]string, []
 		}
 	}
 
-	if len(selected) == 0 {
+	if len(selected) == 0 && opts.AllowFallback {
 		for _, path := range candidates {
 			if !excluded[path] {
 				selected[path] = true

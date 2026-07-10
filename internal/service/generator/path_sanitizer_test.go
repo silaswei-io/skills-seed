@@ -42,7 +42,7 @@ func TestSanitizeGenerationInputsPreservesExternalUtilityLocations(t *testing.T)
 	assert.Equal(t, "gitlab.myibc.net/Olym_Management/go_group/olym-contrib.git/ocryptor", sanitized.CommonUtils[0].File)
 }
 
-func TestSanitizeGenerationInputsClearsMissingProjectUtilityLocations(t *testing.T) {
+func TestSanitizeGenerationInputsDropsMissingProjectUtilityLocations(t *testing.T) {
 	root := t.TempDir()
 	profile := &domain.ProjectProfile{
 		CommonUtils: []domain.UtilityFunction{{
@@ -53,8 +53,21 @@ func TestSanitizeGenerationInputsClearsMissingProjectUtilityLocations(t *testing
 
 	sanitized, _ := sanitizeGenerationInputs(profile, nil, root)
 
-	require.Len(t, sanitized.CommonUtils, 1)
-	assert.Empty(t, sanitized.CommonUtils[0].File)
+	assert.Empty(t, sanitized.CommonUtils)
+}
+
+func TestSanitizeGenerationInputsDropsMissingModulePaths(t *testing.T) {
+	root := t.TempDir()
+	profile := &domain.ProjectProfile{
+		KeyModules: []domain.ModuleInfo{{
+			Name: "missing",
+			Path: "internal/missing",
+		}},
+	}
+
+	sanitized, _ := sanitizeGenerationInputs(profile, nil, root)
+
+	assert.Empty(t, sanitized.KeyModules)
 }
 
 func TestSanitizeGenerationInputsDropsGoodExampleNotFoundInEvidenceFile(t *testing.T) {

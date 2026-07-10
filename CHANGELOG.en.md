@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.5]
+
+### Changes
+
+- `learn current` / `sync` AI file selection now detects overbroad `include` results in large candidate sets. When a model returns an oversized directory or glob, explicit `selected_paths` are preferred; otherwise only files with structural signals such as entries, orchestration, services, models, config, or middleware are kept, preventing large projects from expanding back to whole-package learning.
+- The current-code batch learning prompt now uses a reusable appended pattern-evidence fragment and tighter candidate-admission, evidence-snippet, profile-delta, and validation-command rules, reducing weak facts, unconfirmed paths, and oversized examples in patterns and project profiles.
+- Generated Skills validation matrices now show only commands that can be mapped from evidence to a concrete change scope. Other learned commands remain as confirm-before-running entries instead of being promoted as precise validation advice.
+- The README now includes a medusa-demo real-project case entry, with a dedicated case-study document explaining how the default `sync` output complements hand-written task Skills and where its value comes from.
+
+### Fixes
+
+- Project-profile cleanup now removes placeholders such as `unconfirmed`, `unknown`, and `待确认`; generation drops modules and utility methods without real paths so `project-spec`, module indexes, and utility indexes are not polluted by unverified locations.
+- The appended output-contract template now states JSON string escaping requirements explicitly, preventing invalid escapes such as `\s` or `\ ` in code snippets or regex-like text.
+- Runtime prompt slugs no longer repeat overlapping batch labels, so `pattern-learn-current-batch` plus `batch-008` produces a stable, shorter runtime slug.
+- Added prompt-template documentation covering loader templates, append templates, and production callers to reduce maintenance risk when future prompt compression work happens.
+
 ## [v0.13.4]
 
 ### Changes

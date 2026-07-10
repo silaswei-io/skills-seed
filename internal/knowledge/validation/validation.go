@@ -97,6 +97,9 @@ func Matrix(profile *domain.ProjectProfile, patterns []domain.Pattern, locale st
 			continue
 		}
 		when, warning := matrixWhen(choice, area, locale)
+		if choice.Match != MatchScoped && choice.Match != MatchSemantic {
+			continue
+		}
 		matrix = append(matrix, Recommendation{
 			Area:        area.Name,
 			Command:     choice.Command.Command,

@@ -73,8 +73,8 @@ type ValidationCommandOutput struct {
 	When       string   `json:"when,omitempty" jsonschema_description:"when to run this command"`
 	Source     string   `json:"source,omitempty" jsonschema_description:"repository-relative evidence path or user_context"`
 	Workdir    string   `json:"workdir,omitempty" jsonschema_description:"repository-relative workdir, empty for project root"`
-	ScopePaths []string `json:"scope_paths,omitempty" jsonschema_description:"relative paths or directories covered by this command"`
-	Evidence   []string `json:"evidence,omitempty" jsonschema_description:"relative paths proving this command's scope"`
+	ScopePaths []string `json:"scope_paths,omitempty" jsonschema_description:"relative paths or directories explicitly covered by this command; leave empty for broad or unclear commands"`
+	Evidence   []string `json:"evidence,omitempty" jsonschema_description:"relative repository paths proving this command and its scope; do not use unconfirmed placeholders"`
 	Type       string   `json:"type,omitempty" jsonschema_description:"test|build|lint|generate|contract|check"`
 }
 
@@ -87,7 +87,7 @@ type ArchitectureLayerOutput struct {
 
 type UtilityFunctionOutput struct {
 	Name        string `json:"name" jsonschema_description:"utility name"`
-	File        string `json:"file" jsonschema_description:"relative/file/path"`
+	File        string `json:"file" jsonschema_description:"real repository-relative file path or external package path; omit the utility if the location is unconfirmed"`
 	Signature   string `json:"signature" jsonschema_description:"real function or method signature"`
 	Description string `json:"description" jsonschema_description:"domain-neutral utility responsibility; external dependency interaction entries that carry product-domain behavior should prefer business_methods"`
 	Usage       string `json:"usage" jsonschema_description:"when to use it"`
@@ -95,7 +95,7 @@ type UtilityFunctionOutput struct {
 
 type ModuleOutput struct {
 	Name             string   `json:"name" jsonschema_description:"module name"`
-	Path             string   `json:"path" jsonschema_description:"relative directory or file path"`
+	Path             string   `json:"path" jsonschema_description:"real repository-relative directory or file path; omit the module if no concrete path is confirmed"`
 	Description      string   `json:"description" jsonschema_description:"module responsibility"`
 	Responsibilities []string `json:"responsibilities" jsonschema_description:"specific responsibilities"`
 	Dependencies     []string `json:"dependencies" jsonschema_description:"dependency modules"`
