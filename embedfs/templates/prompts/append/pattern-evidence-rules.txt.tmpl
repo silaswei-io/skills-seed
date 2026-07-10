@@ -1,4 +1,8 @@
 # Pattern Evidence Rules
 
-- Each pattern's `good_example` MUST be code evidence copied verbatim from source you read, preferably 5-12 lines.
-- Do not output long `good_example` snippets.
+- Each pattern's `good_example` MUST be code evidence copied verbatim from source you read. Follow the base prompt's length requirement; when the base prompt does not specify one, prefer 5-12 lines.
+- Do not complete, rewrite, synthesize, or invent code. Preserve identifiers, literals, comments, and control-flow order exactly as read.
+- Do not output long `good_example` snippets or full long functions. Include only the lines that best prove the rule.
+- When excerpting, do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, cleanup, cache ordering, task ordering, retry behavior, or compensation. If surrounding context must be omitted, mark it explicitly with `// ...`.
+- If a flow needs multiple evidence points, list them in `evidence_locations` and summarize the flow in `description` / `rule` instead of stuffing every branch into `good_example`.
+- `good_example` and `bad_example` are JSON strings. Escape backslashes as `\\`, double quotes as `\"`, and newlines as `\n`; do not output invalid escapes such as `\s`, `\ `, unescaped Windows paths, or raw regex backslashes.

@@ -30,9 +30,9 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	require.Contains(t, filepath.ToSlash(archive.ContentPath), ".skills-seed/runtime/agent-outputs/")
 	require.Contains(t, filepath.ToSlash(archive.RawPath), ".skills-seed/runtime/agent-outputs/")
 	require.Contains(t, filepath.ToSlash(archive.StderrPath), ".skills-seed/runtime/agent-outputs/")
-	require.Regexp(t, `^\d{8}-\d{6}-claude-analyzecurrentcodebase\.md$`, filepath.Base(archive.ContentPath))
-	require.Regexp(t, `^\d{8}-\d{6}-claude-analyzecurrentcodebase\.raw\.txt$`, filepath.Base(archive.RawPath))
-	require.Regexp(t, `^\d{8}-\d{6}-claude-analyzecurrentcodebase\.stderr\.txt$`, filepath.Base(archive.StderrPath))
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.md$`, filepath.Base(archive.ContentPath))
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.raw\.txt$`, filepath.Base(archive.RawPath))
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.stderr\.txt$`, filepath.Base(archive.StderrPath))
 
 	content, err := os.ReadFile(archive.ContentPath)
 	require.NoError(t, err)
@@ -43,7 +43,7 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	var manifestPath string
 	for _, entry := range entries {
 		if strings.HasSuffix(entry.Name(), ".manifest.json") {
-			require.Regexp(t, `^\d{8}-\d{6}-claude-analyzecurrentcodebase\.manifest\.json$`, entry.Name())
+			require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.manifest\.json$`, entry.Name())
 			manifestPath = filepath.Join(seedPath, "runtime", "agent-outputs", entry.Name())
 		}
 	}
@@ -80,7 +80,7 @@ func TestSaveAgentOutputForContextLabelsUnitOperation(t *testing.T) {
 		Content:   `{"patterns":[]}`,
 	})
 
-	require.Regexp(t, `^\d{8}-\d{6}-claude-analyzecurrentcodebase-unit-auth\.md$`, filepath.Base(archive.ContentPath))
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase-unit-auth\.md$`, filepath.Base(archive.ContentPath))
 
 	entries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "agent-outputs"))
 	require.NoError(t, err)

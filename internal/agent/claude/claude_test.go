@@ -186,7 +186,7 @@ func TestSelectFilesStoresPromptAndOutputWithSharedRuntimeName(t *testing.T) {
 			outputName = entry.Name()
 		}
 	}
-	require.Regexp(t, `^\d{8}-\d{6}-file-select\.md$`, promptName)
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-file-select\.md$`, promptName)
 	require.Equal(t, strings.TrimSuffix(promptName, "-file-select.md")+"-claude-file-select.md", outputName)
 }
 

@@ -4,7 +4,7 @@ Runtime prompt templates live under `embedfs/templates/prompts/loader/`. They ar
 
 `embedfs/templates/prompts/append/output-contract-guard.txt.tmpl` is not called as a standalone task prompt. `Loader.Render` / `RenderForRuntimeTask` append it to every runtime prompt, after any project context fragments, so final JSON shape, escaping, stable output, and language rules are enforced consistently.
 
-Other files under `embedfs/templates/prompts/append/` are reusable fragments selected by prompt name in `internal/prompts/loader`. For example, `pattern-evidence-rules` is appended to `pattern-learn-current-batch` so evidence snippet rules can be shared without duplicating them inside the base template.
+Other files under `embedfs/templates/prompts/append/` are reusable fragments selected by prompt name in `internal/prompts/loader`. For example, `pattern-abstraction-rules` is appended to pattern-learning and curation prompts so abstraction level and stable naming rules stay consistent, while `pattern-evidence-rules` centralizes code-evidence snippet constraints.
 
 | Template | Main production callers | Scenario |
 |---|---|---|

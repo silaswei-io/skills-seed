@@ -52,8 +52,10 @@ The following files changed since the previous analysis. Each diff is available 
    - **warning**: Does not follow best practices, may affect maintainability or readability
    - **info**: Improvement suggestions, non-mandatory optimizations
 5. If a file fully complies with all pattern rules, produce no issues for it
-6. Also check for obvious code issues not explicitly described in the patterns
-7. Provide specific fix suggestions for each issue
+6. Also check for obvious code issues not explicitly described in the patterns, but do not turn speculative style preferences into violations.
+7. Report only actionable issues backed by direct code evidence. If the evidence is ambiguous, lower severity or omit the issue.
+8. Provide specific fix suggestions for each issue.
+9. For stable output, sort issues by severity (`error`, `warning`, `info`), then file path, line number, and pattern ID. Do not reword or reorder equivalent findings merely for variety.
 
 # Output Format
 

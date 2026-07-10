@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.8]
+
+### Changes
+
+- Added shared abstraction-level rules to pattern learning, curation, and current-code analysis prompts, consistently separating facts, local implementations, project patterns, and workspace rules so weak facts or code summaries are less likely to enter the pattern store.
+- Expanded current-code learning, project profile, workspace profile, workflow optimization, and fix-generation prompts with stable ordering, evidence boundaries, and abstraction-level guidance for more repeatable and routeable outputs.
+
+### Fixes
+
+- Runtime prompt and Agent output archives continue to use second-level timestamps, with an incrementing same-second sequence appended to avoid debug-file overwrites without introducing microsecond or nanosecond filenames.
+- Fixed `NameWithID` so explicitly supplied runtime IDs no longer consume an automatic ID sequence value, preventing meaningless gaps in later generated runtime filenames.
+- User-defined pattern prompts no longer append code-learning-specific abstraction rules, preventing manually entered conventions without source evidence from being treated as invalid learned-code patterns.
+
 ## [v0.13.7]
 
 ### Changes

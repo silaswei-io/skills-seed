@@ -208,7 +208,7 @@ func TestLoader_RenderStoresSuccessfulPromptUnderRuntimeMemory(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, renderedName)
-	require.Regexp(t, `^\d{8}-\d{6}-learn-analyze\.md$`, renderedName)
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-learn-analyze\.md$`, renderedName)
 
 	content, err := os.ReadFile(filepath.Join(runtimeDir, renderedName))
 	require.NoError(t, err)
@@ -271,7 +271,7 @@ func TestLoader_RenderStoresRuntimeLabelInPromptNameAndManifest(t *testing.T) {
 			promptName = entry.Name()
 		}
 	}
-	require.Regexp(t, `^\d{8}-\d{6}-pattern-learn-current-unit-auth\.md$`, promptName)
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-pattern-learn-current-unit-auth\.md$`, promptName)
 	require.NotEmpty(t, manifestPath)
 	dataBytes, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
@@ -1133,6 +1133,42 @@ func TestLoader_RenderCurrentBatchPromptAppendsPatternEvidenceRules(t *testing.T
 		}
 	}
 	require.True(t, found)
+}
+
+func TestLoader_RenderPatternPromptsAppendAbstractionRules(t *testing.T) {
+	tests := []string{
+		"learn-batch",
+		"pattern-curate",
+		"pattern-learn-current",
+		"pattern-learn-current-batch",
+	}
+	dataByPrompt := map[string]interface{}{
+		"learn-batch":                 sampleBatchLearnData(),
+		"pattern-curate":              sampleCuratePatternsData(),
+		"pattern-learn-current":       sampleAnalyzeCurrentCodebaseRequest(),
+		"pattern-learn-current-batch": sampleAnalyzeCurrentCodebaseBatchRequest(),
+	}
+
+	for _, name := range tests {
+		t.Run(name, func(t *testing.T) {
+			loader := New("loader", "en-US", "")
+			prompt, err := loader.Render(name, dataByPrompt[name])
+			require.NoError(t, err)
+			require.Contains(t, prompt, "# Pattern Abstraction And Stability Rules")
+			require.Contains(t, prompt, "**Project pattern**")
+			require.Contains(t, prompt, "stable identities")
+		})
+	}
+}
+
+func TestLoader_RenderUserDefinePatternDoesNotAppendCodeLearningAbstractionRules(t *testing.T) {
+	loader := New("loader", "en-US", "")
+
+	prompt, err := loader.Render("user-define-pattern", sampleUserDefinePatternData())
+
+	require.NoError(t, err)
+	require.NotContains(t, prompt, "# Pattern Abstraction And Stability Rules")
+	require.Contains(t, prompt, "good_example` and `bad_example` may be empty or illustrative style examples")
 }
 
 func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *testing.T) {

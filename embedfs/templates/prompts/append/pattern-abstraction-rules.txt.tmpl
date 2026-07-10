@@ -1,0 +1,12 @@
+# Pattern Abstraction And Stability Rules
+
+- Use this abstraction ladder when deciding whether a candidate is worth outputting:
+  1. **Fact**: a function calls another function, reads a field, or lives in a directory. This is not a pattern.
+  2. **Local implementation**: one file has a useful flow. Keep it only as low-confidence local guidance when it protects a clear invariant or boundary.
+  3. **Project pattern**: future similar changes should preserve an order, boundary, invariant, error semantic, state constraint, data constraint, or routing rule. This is the target level.
+  4. **Workspace rule**: only cross-project contracts, shared paths, dependency order, or coordinated validation may be promoted above a project pattern.
+- Do not raise the abstraction by deleting the concrete trigger. A good rule still names when it applies, which paths or symbols to inspect, and what constraint must be preserved.
+- Do not lower the abstraction into a code summary. A good rule is reusable beyond the single snippet that proved it.
+- Keep stable identities for the same rule across repeated runs. Prefer IDs and names built from durable domain/action/constraint terms; avoid timestamps, version words, ordinal names, broad directory names, and stylistic variants.
+- When two candidates overlap, preserve the most specific actionable rule. Merge only homogeneous evidence for the same rule; do not merge independent state, error, data, transaction, external-call, or authorization constraints into a broad generic pattern.
+- When evidence is equivalent, choose deterministically by stronger routeability, clearer source vocabulary, higher future-change risk, then lexicographic order of category, evidence path, and symbol.

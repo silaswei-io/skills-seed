@@ -41,11 +41,11 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 
 - Do not describe the workspace as a single monolithic project.
 - Do not promote a local child-project convention to a workspace rule unless multiple projects depend on it.
+- Use a workspace-level abstraction only for facts that affect more than one child project: contracts, shared paths, dependency direction, change order, impact radius, or coordinated validation. Keep single-project internals out of the workspace profile.
 - If a relationship cannot be confirmed from repository structure, config, README, or build files, record the uncertainty in `summary` or use an empty array. Do not invent facts.
 - The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
-- Preserve paths, commands, config keys, environment variables, interface names, and file names verbatim.
-
 - Preserve paths, commands, config keys, environment variables, interface names, file names, project IDs, and code identifiers exactly when needed.
+- For stable output, keep configured project IDs and paths unchanged, sort repeated arrays by project ID then path, and do not rename responsibilities or relationships merely for wording variety.
 
 # Output Format
 

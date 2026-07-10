@@ -37,6 +37,8 @@ Use the context only to interpret workspace-level rules, delivery boundaries, an
 Prefer repository evidence that includes paths and project IDs. Do not invent relationships that cannot be confirmed.
 The AI call is non-interactive; do not ask the user outside the JSON. If an unconfirmed relationship affects execution, make the rule require asking the user during task execution.
 
+Use the right abstraction level: workspace rules are only for cross-project routing, shared/contracts/infra paths, dependency order, parallel-agent write boundaries, or coordinated validation. Keep one child project's local naming, directory layout, error handling, or testing style out of the workspace spec unless another project must follow it.
+
 # Output Requirements
 
 1. **Routing rules**
@@ -61,8 +63,6 @@ The AI call is non-interactive; do not ask the user outside the JSON. If an unco
    - Do not promote one project's naming, error handling, directory layout, or test style into a global rule.
    - Keep child details in that child project's `project-spec.md` or pattern references.
 
-- Preserve paths, commands, config keys, environment variables, project IDs, and code identifiers exactly when needed.
-
 # Output Format
 
 - Do not output `generated_at`; it is auto-filled by the system.
@@ -75,4 +75,5 @@ The JSON Schema below is generated from the AI output DTO and is the source of t
 
 # Strict Rules
 
-- Preserve paths, commands, config keys, environment variables, and code identifiers verbatim.
+- Preserve paths, commands, config keys, environment variables, project IDs, and code identifiers verbatim.
+- For stable output, order routing rules by path pattern, cross-project flows by dependency order, and parallel rules by project ID. Do not rename rules or reshape groups merely for stylistic variety.

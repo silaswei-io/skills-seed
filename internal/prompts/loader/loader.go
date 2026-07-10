@@ -63,7 +63,10 @@ var contextPromptFiles = []contextPromptFile{
 }
 
 var promptAppendFragments = map[string][]string{
-	"pattern-learn-current-batch": {"pattern-evidence-rules"},
+	"learn-batch":                 {"pattern-abstraction-rules", "pattern-evidence-rules"},
+	"pattern-curate":              {"pattern-abstraction-rules"},
+	"pattern-learn-current":       {"pattern-abstraction-rules"},
+	"pattern-learn-current-batch": {"pattern-abstraction-rules", "pattern-evidence-rules"},
 }
 
 // RuntimeTask 标识一次 agent 调用共用的 runtime 文件名前缀。
