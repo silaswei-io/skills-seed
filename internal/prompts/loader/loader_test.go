@@ -1458,6 +1458,9 @@ func TestLoader_OutputContractGuardLivesInAppendTemplates(t *testing.T) {
 	require.Contains(t, string(guard), "{{outputLanguageInstruction}}")
 	require.Contains(t, string(guard), "The first non-whitespace character must be `{`")
 	require.Contains(t, string(guard), "escape backslashes as `\\\\`, double quotes as `\\\"`, and newlines as `\\n`")
+	require.Contains(t, string(guard), "internally validate the output language")
+	require.Contains(t, string(guard), "Final Self-Check")
+	require.Contains(t, string(guard), "both JSON validity and output-language correctness")
 	require.Contains(t, string(guard), "For identical input evidence and task instructions")
 	require.Contains(t, string(guard), "deterministic ordering based on stable identifiers")
 }

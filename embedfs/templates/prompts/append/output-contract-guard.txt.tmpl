@@ -29,3 +29,9 @@
 - {{outputLanguageInstruction}}
 - {{translateToOutputLanguageInstruction}}
 - {{preserveTechnicalTermsInstruction}}
+- Before the final response, internally validate the output language: every user-facing natural-language string must match the required output language. If any natural-language field is in another language, translate or rewrite it before responding. Verbatim code snippets that the task requires copying exactly may preserve source comments and string literals.
+
+## Final Self-Check
+
+- Before responding, internally check both JSON validity and output-language correctness together. If either check fails, fix the response internally and return only the corrected JSON object.
+- Do not describe this self-check, validation result, or any repair action in the final response.

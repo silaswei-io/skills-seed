@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.6]
+
+### Fixes
+
+- Runtime AI output contracts now require a final self-check for both JSON parseability and target-language consistency. If any natural-language field does not match `skills.locale`, the model must translate or rewrite it internally before returning, preventing Chinese learned patterns from leaking into English Skills.
+- The language self-check applies only to user-facing natural-language fields; verbatim code snippets may preserve source comments and string literals when the task requires exact evidence.
+
 ## [v0.13.5]
 
 ### Changes
