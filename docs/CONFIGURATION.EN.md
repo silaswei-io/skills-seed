@@ -258,7 +258,8 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 
 1. Retry currently applies to retryable Agent CLI errors such as 429 / 529 / overloaded.
 2. Wait time starts at `initial_interval`, doubles after each retry, and is capped by `max_interval`.
-3. Long-running steps such as `learn current` update the active progress line with the agent error, failed call duration, and backoff wait; when the next call starts, the line switches to `attempt N`.
+3. Long-running steps such as `learn current` update the active progress line with the agent error, failed call duration, and backoff wait; the terminal also prints a stable retry notice with the wait duration and extracted API reason.
+4. When the next call starts, the progress line switches to `attempt N`; final CLI call failures are shown only for exhausted retries or non-retryable errors.
 
 #### Switch Agent
 

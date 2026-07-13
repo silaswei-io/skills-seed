@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.9]
+
+### Fixes
+
+- Agent CLI retryable rate-limit or overload errors now print a stable terminal retry notice with the wait duration and extracted API reason, so the concrete cause is not lost when dynamic progress lines refresh.
+- Claude / Codex retryable call failures no longer print as final “CLI call failed” warnings, avoiding misleading output after a later retry succeeds during AI file selection.
+
 ## [v0.13.8]
 
 ### Changes

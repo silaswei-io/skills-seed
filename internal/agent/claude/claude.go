@@ -423,7 +423,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string
 		})
 
 		if retryable {
-			logger.Warn(i18n.Get("LoggerAgentClaudeCallFailed"),
+			logger.Diagnostic(i18n.Get("LoggerAgentClaudeCallRetryable"),
 				"agent", c.Name(),
 				"operation", operation,
 				"attempt", attempt,

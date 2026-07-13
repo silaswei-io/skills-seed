@@ -651,7 +651,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, 
 		})
 
 		if retryable {
-			logger.Warn(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.Diagnostic(i18n.Get("LoggerAgentCodexCallRetryable"),
 				"agent", c.Name(),
 				"operation", operation,
 				"attempt", attempt,

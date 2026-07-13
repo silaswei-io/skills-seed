@@ -84,6 +84,25 @@ func TestRetryProgressLabelShowsRetryAttemptSeparately(t *testing.T) {
 	require.Equal(t, "分析当前代码库（第2次尝试）", label)
 }
 
+func TestRetryConsoleMessageShowsRetryReason(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	message := RetryConsoleMessage(RetryInfo{
+		AgentName:    "claude",
+		Attempt:      1,
+		MaxRetries:   3,
+		WaitDuration: 15 * time.Second,
+		CallDuration: 217 * time.Second,
+		Reason:       "API Error: 529\n overloaded_error",
+	})
+
+	require.Contains(t, message, "claude 触发 API 速率限制")
+	require.Contains(t, message, "本次调用 3m37s")
+	require.Contains(t, message, "15s 后重试")
+	require.Contains(t, message, "API Error: 529 overloaded_error")
+	require.NotContains(t, message, "\n")
+}
+
 func TestRetryProgressBinderRestoresBaseLabelAfterRecoveredRetry(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 

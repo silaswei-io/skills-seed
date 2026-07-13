@@ -12,6 +12,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -190,6 +191,38 @@ func TestSelectFilesStoresPromptAndOutputWithSharedRuntimeName(t *testing.T) {
 	require.Equal(t, strings.TrimSuffix(promptName, "-file-select.md")+"-claude-file-select.md", outputName)
 }
 
+func TestSelectFilesRetryDoesNotPrintFinalFailureWarning(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	require.NoError(t, os.MkdirAll(seedPath, 0755))
+	successOutput := `{"type":"result","result":"{\"include\":[\"internal/auth/login.go\"],\"selected_paths\":[\"internal/auth/login.go\"],\"reason\":\"auth\"}"}`
+	commandPath := writeFakeClaudeRetryCommand(t, "API Error: 529 overloaded_error", successOutput)
+	loader := promptloader.New("claude", "zh-CN", seedPath)
+	ag := New(commandPath, 5*time.Second, loader, false, config.RetryConfig{
+		MaxRetries:      1,
+		InitialInterval: 1,
+		MaxInterval:     1,
+	})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	var result *agent.SelectFilesResult
+	output := captureClaudeStdout(t, func() {
+		var err error
+		result, err = ag.SelectFiles(ctx, &agent.SelectFilesRequest{
+			FileTree:     "internal/auth/login.go",
+			Candidates:   []agent.FileSelectionCandidate{{Path: "internal/auth/login.go", Changed: true}},
+			CandidateNum: 1,
+		})
+		require.NoError(t, err)
+	})
+
+	require.Equal(t, []string{"internal/auth/login.go"}, result.SelectedPaths)
+	require.Contains(t, output, "claude 触发 API 速率限制")
+	require.Contains(t, output, "API Error: 529 overloaded_error")
+	require.NotContains(t, output, "Claude CLI 调用失败")
+}
+
 func TestParseClaudeOutput_ExtractsResultAndTokenUsage(t *testing.T) {
 	output, usage := parseClaudeOutput(`{
   "type": "result",
@@ -225,6 +258,46 @@ func writeFakeClaudeCommand(t *testing.T, output string) string {
 	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s' " + shellQuote(output) + "\n"
 	require.NoError(t, os.WriteFile(path, []byte(script), 0755))
 	return path
+}
+
+func writeFakeClaudeRetryCommand(t *testing.T, firstOutput, successOutput string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "claude")
+	countPath := filepath.Join(dir, "count")
+	script := "#!/bin/sh\n" +
+		"count=0\n" +
+		"if [ -f " + shellQuote(countPath) + " ]; then count=$(cat " + shellQuote(countPath) + "); fi\n" +
+		"count=$((count + 1))\n" +
+		"printf '%s' \"$count\" > " + shellQuote(countPath) + "\n" +
+		"cat >/dev/null\n" +
+		"if [ \"$count\" = \"1\" ]; then\n" +
+		"  printf '%s' " + shellQuote(firstOutput) + "\n" +
+		"  exit 1\n" +
+		"fi\n" +
+		"printf '%s' " + shellQuote(successOutput) + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0755))
+	return path
+}
+
+func captureClaudeStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	tempFile, err := os.CreateTemp(t.TempDir(), "stdout")
+	require.NoError(t, err)
+
+	originalStdout := os.Stdout
+	os.Stdout = tempFile
+	defer func() {
+		os.Stdout = originalStdout
+	}()
+
+	fn()
+
+	require.NoError(t, tempFile.Close())
+	data, err := os.ReadFile(tempFile.Name())
+	require.NoError(t, err)
+	return string(data)
 }
 
 func shellQuote(s string) string {

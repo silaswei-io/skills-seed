@@ -272,6 +272,15 @@ other = "{{.Label}} (attempt {{.Attempt}})"
 [AgentRetryReasonUnknown]
 other = "unknown reason"
 
+[AgentRetryConsoleAgentFallback]
+other = "AI Agent"
+
+[AgentRetryConsoleNote]
+other = "{{.Agent}} hit an API rate limit; retrying in {{.Wait}}: {{.Reason}}"
+
+[AgentRetryConsoleNoteWithDuration]
+other = "{{.Agent}} hit an API rate limit after {{.CallDuration}}; retrying in {{.Wait}}: {{.Reason}}"
+
 [AgentCodexPrepareWorkDirFailed]
 other = "Failed to prepare Codex temporary work directory"
 
@@ -1887,6 +1896,12 @@ other = "Failed to write category document"
 # 日志 - 代理
 [LoggerAgentClaudeCallFailed]
 other = "Claude CLI call failed"
+
+[LoggerAgentClaudeCallRetryable]
+other = "Claude CLI call hit a retryable error"
+
+[LoggerAgentCodexCallRetryable]
+other = "Codex CLI call hit a retryable error"
 
 [LoggerAgentNoValidJSON]
 other = "No valid JSON found"

@@ -272,6 +272,15 @@ other = "{{.Label}}（第{{.Attempt}}次尝试）"
 [AgentRetryReasonUnknown]
 other = "未捕获到具体原因"
 
+[AgentRetryConsoleAgentFallback]
+other = "AI Agent"
+
+[AgentRetryConsoleNote]
+other = "{{.Agent}} 触发 API 速率限制，{{.Wait}} 后重试：{{.Reason}}"
+
+[AgentRetryConsoleNoteWithDuration]
+other = "{{.Agent}} 触发 API 速率限制（本次调用 {{.CallDuration}}），{{.Wait}} 后重试：{{.Reason}}"
+
 [AgentCodexPrepareWorkDirFailed]
 other = "准备 Codex 临时工作目录失败"
 
@@ -1888,6 +1897,12 @@ other = "写入分类文档失败"
 # 日志 - 代理
 [LoggerAgentClaudeCallFailed]
 other = "Claude CLI 调用失败"
+
+[LoggerAgentClaudeCallRetryable]
+other = "Claude CLI 调用触发可重试错误"
+
+[LoggerAgentCodexCallRetryable]
+other = "Codex CLI 调用触发可重试错误"
 
 [LoggerAgentNoValidJSON]
 other = "未找到有效的 JSON"

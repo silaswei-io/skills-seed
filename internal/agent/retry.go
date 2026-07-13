@@ -166,6 +166,7 @@ func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 	if reporter := retryReporterFromContext(ctx); reporter != nil {
 		reporter(info)
 	}
+	logger.InfoAfterProgress(RetryConsoleMessage(info))
 	fields := []any{
 		"agent", info.AgentName,
 		"operation", info.Operation,
@@ -229,6 +230,30 @@ func RetryAttemptProgressLabel(label string, info RetryInfo) string {
 		"Label":   label,
 		"Attempt": info.Attempt,
 	})
+}
+
+// RetryConsoleMessage 返回重试事件的稳定终端提示，用于补足会被动态进度行覆盖的细节。
+func RetryConsoleMessage(info RetryInfo) string {
+	reason := truncateRetryReason(normalizeRetryReason(info.Reason))
+	if reason == "" {
+		reason = i18n.Get("AgentRetryReasonUnknown")
+	}
+	agentName := strings.TrimSpace(info.AgentName)
+	if agentName == "" {
+		agentName = i18n.Get("AgentRetryConsoleAgentFallback")
+	}
+	params := map[string]interface{}{
+		"Agent":        agentName,
+		"Reason":       reason,
+		"Attempt":      info.Attempt,
+		"MaxRetries":   info.MaxRetries,
+		"Wait":         info.WaitDuration.Truncate(time.Second).String(),
+		"CallDuration": info.CallDuration.Truncate(time.Second).String(),
+	}
+	if info.CallDuration > 0 {
+		return i18n.GetWithParams("AgentRetryConsoleNoteWithDuration", params)
+	}
+	return i18n.GetWithParams("AgentRetryConsoleNote", params)
 }
 
 func retryReporterFromContext(ctx context.Context) RetryReporter {

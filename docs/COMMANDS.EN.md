@@ -297,7 +297,7 @@ skills-seed learn history --limit 40 --batch-size 5
 7. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
 8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
 9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` prefers CodeGraph, automatically initializes or repairs its index when needed, and falls back to embedded tree-sitter when unavailable. Without bounded inputs, it does not scan the whole repository.
-10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, then switches to `attempt N` when the next call starts.
+10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, the terminal also prints a stable notice with the wait duration and API reason, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
 
