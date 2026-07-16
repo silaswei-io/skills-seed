@@ -91,6 +91,29 @@ var buildAndDependencyFiles = map[string]bool{
 	"cmakelists.txt":      true,
 }
 
+// engineeringKnowledgeFiles 是工程约束、构建、验证和代码生成的权威入口文件。
+var engineeringKnowledgeFiles = map[string]bool{
+	"agents.md":       true,
+	"claude.md":       true,
+	"taskfile.yml":    true,
+	"taskfile.yaml":   true,
+	"makefile":        true,
+	"justfile":        true,
+	"jenkinsfile":     true,
+	".gitlab-ci.yml":  true,
+	".gitlab-ci.yaml": true,
+	"build.sh":        true,
+	"_build.sh":       true,
+	"build.ps1":       true,
+	"build.bat":       true,
+	"buf.gen.yaml":    true,
+	"buf.gen.yml":     true,
+	"sqlc.yaml":       true,
+	"sqlc.yml":        true,
+	".jzero.yaml":     true,
+	".jzero.yml":      true,
+}
+
 func IsDocument(path string) bool {
 	base := strings.ToLower(strings.TrimSpace(filepath.Base(filepath.ToSlash(path))))
 	if base == "" || base == "." {
@@ -122,4 +145,19 @@ func IsAnalyzable(path string) bool {
 		return false
 	}
 	return false
+}
+
+// IsEngineeringKnowledge 判断文件是否属于独立采集的权威工程知识源。
+func IsEngineeringKnowledge(path string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(filepath.ToSlash(path)))
+	normalized = strings.TrimPrefix(normalized, "./")
+	if normalized == "" {
+		return false
+	}
+	if engineeringKnowledgeFiles[filepath.Base(normalized)] {
+		return true
+	}
+	isWorkflow := strings.HasPrefix(normalized, ".github/workflows/") &&
+		(strings.HasSuffix(normalized, ".yml") || strings.HasSuffix(normalized, ".yaml"))
+	return isWorkflow || strings.HasPrefix(normalized, ".skills-seed/context/")
 }

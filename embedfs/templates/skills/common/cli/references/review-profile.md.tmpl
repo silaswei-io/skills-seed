@@ -1,0 +1,64 @@
+# Review And Profile
+
+Use review/profile commands to inspect feedback loops and project-level understanding.
+
+## `skills-seed review import`
+
+Purpose:
+
+- Import local code review comments from JSON.
+- Preserve review feedback so it can be compared with learned pattern coverage.
+
+Flag:
+
+- `--from-file`: path to the JSON file containing review comments.
+
+Use case:
+
+- `skills-seed review import --from-file review-comments.json`
+
+## `skills-seed review stats`
+
+Purpose:
+
+- Show how imported review comments relate to pattern hits.
+- Measure whether existing patterns would have prevented reviewed issues.
+
+Flag:
+
+- `--line-window`: line distance allowed when matching review comments with pattern hits.
+
+Use cases:
+
+- `skills-seed review stats`
+- `skills-seed review stats --line-window 5`
+
+## `skills-seed profile show`
+
+Purpose:
+
+- Display the current project profile summary.
+- Inspect whether skills-seed understands project architecture, language, modules, utilities, and validation commands correctly.
+
+Use case:
+
+- `skills-seed profile show`
+
+## `skills-seed profile refresh`
+
+Purpose:
+
+- Re-analyze and save the project profile using AI.
+
+Flag:
+
+- `--language, -l`: override detected language.
+
+Use when:
+
+- Architecture changed.
+- Major module boundaries changed.
+- The generated Skill routes tasks poorly.
+- Validation commands or profile facts are stale.
+
+After refreshing the profile, run `skills-seed generate skills` or `skills-seed sync`.

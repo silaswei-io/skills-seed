@@ -58,6 +58,19 @@ func TestApplyAIFileSelectorAppliesIncludeExcludeSafely(t *testing.T) {
 	require.NotContains(t, selector.req.FileTree, "/tmp/outside")
 }
 
+func TestApplyAIFileSelectorRejectsNilAgentResult(t *testing.T) {
+	root := t.TempDir()
+	selector := &fakeFileSelector{}
+
+	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
+		ProjectRoot: root,
+		Candidates:  []string{"main.go"},
+	})
+
+	require.Error(t, err)
+	require.Nil(t, result)
+}
+
 func TestApplyAIFileSelectorKeepsRequiredPaths(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "logic"), 0755))
@@ -224,18 +237,6 @@ func TestApplyAIFileSelectorFallsBackWhenAISelectsNothing(t *testing.T) {
 		Include: []string{"../bad"},
 		Exclude: []string{"**/*"},
 	}}
-
-	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
-		ProjectRoot: t.TempDir(),
-		Candidates:  []string{"a.go", "b.go"},
-	})
-	require.NoError(t, err)
-	require.Equal(t, []string{"a.go", "b.go"}, result.SelectedPaths)
-	require.Empty(t, result.SkippedPaths)
-}
-
-func TestApplyAIFileSelectorHandlesNilAIResult(t *testing.T) {
-	selector := &fakeFileSelector{}
 
 	result, err := ApplyAIFileSelector(context.Background(), selector, AISelectorOptions{
 		ProjectRoot: t.TempDir(),

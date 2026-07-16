@@ -13,7 +13,11 @@ description: {{.SkillDescription}}
 **Patterns Learned**: {{.PatternCount}}
 **Average Confidence**: {{printf "%.2f" .AvgConfidence}}%
 
-This is the project entry skill. It only routes the task to the right project references, confirms constraint sources, and selects validation commands. Business rules, architecture details, code evidence, and examples must be read from the matching references before implementation decisions.
+{{if .ValidationCommands}}This is the project entry skill. It only routes the task to the right project references, confirms constraint sources, and selects learned validation commands. Business rules, architecture details, code evidence, and examples must be read from the matching references before implementation decisions.
+{{else}}This is the project entry skill. It only routes the task to the right project references and confirms constraint sources. Business rules, architecture details, code evidence, and examples must be read from the matching references before implementation decisions.
+
+No validation commands have been learned; confirm them from repository authority files such as AGENTS, build scripts, or CI configuration instead of inferring language defaults.
+{{end}}
 
 ## How To Use This Skill
 

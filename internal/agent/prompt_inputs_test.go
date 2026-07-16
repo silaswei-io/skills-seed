@@ -144,6 +144,22 @@ func TestAnalyzeProjectPromptDataWritesFocusedPathList(t *testing.T) {
 	require.NotContains(t, data, "FocusPaths")
 }
 
+func TestAnalyzeProjectPromptDataWritesEngineeringKnowledgeList(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+
+	data, err := AnalyzeProjectPromptData(session, &AnalyzeProjectRequest{
+		EngineeringKnowledge: []string{"AGENTS.md", "Taskfile.yml"},
+	})
+
+	require.NoError(t, err)
+	path, ok := data["EngineeringKnowledgePath"].(string)
+	require.True(t, ok)
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "AGENTS.md\nTaskfile.yml\n", string(content))
+	require.Equal(t, 2, data["EngineeringKnowledgeCount"])
+}
+
 func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T) {
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)

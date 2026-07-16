@@ -1,46 +1,46 @@
 package skilloutput
 
 import (
-	"errors"
+	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
+	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
-const generatedMarker = "generated-by: skills-seed"
-
-// ManualSkillExistsError 表示目标目录已有非 skills-seed 生成的 SKILL.md。
-type ManualSkillExistsError struct {
-	Path string
+// Replace 在 staging 目录完整生成 Skill，并事务性替换现有输出。
+func Replace(outputPath string, build func(staging string) error) error {
+	return fileio.ReplaceDir(outputPath, build)
 }
 
-func (e *ManualSkillExistsError) Error() string {
-	return "manual skill exists: " + e.Path
-}
-
-// EnsureWritable 确认输出目录可以由 skills-seed 覆盖。
-func EnsureWritable(outputPath string) error {
-	skillPath := filepath.Join(outputPath, "SKILL.md")
-	content, err := os.ReadFile(skillPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
+// ReplaceWithinRoot 在构建前和发布前重新校验项目输出边界。
+func ReplaceWithinRoot(projectRoot, outputPath string, build func(staging string) error) error {
+	if strings.TrimSpace(projectRoot) == "" {
+		return Replace(outputPath, build)
+	}
+	if _, err := utils.ResolveProjectOutputPath(projectRoot, outputPath); err != nil {
 		return err
 	}
-	if strings.Contains(string(content), generatedMarker) {
+	canonicalTarget, err := utils.CanonicalPathWithinRoot(projectRoot, outputPath)
+	if err != nil {
+		return err
+	}
+	validate := func() error {
+		current, err := utils.CanonicalPathWithinRoot(projectRoot, outputPath)
+		if err != nil {
+			return err
+		}
+		if current != canonicalTarget {
+			return fmt.Errorf("%s", i18n.Get("SkillOutputPathChanged"))
+		}
 		return nil
 	}
-	return &ManualSkillExistsError{Path: skillPath}
+	return fileio.ReplaceDirWithOptions(canonicalTarget, fileio.ReplaceDirOptions{Mode: 0o755, Validate: validate}, build)
 }
 
-// Rebuild 删除并重建 skills-seed 生成的输出目录。
-func Rebuild(outputPath string) error {
-	if err := EnsureWritable(outputPath); err != nil {
-		return err
-	}
-	if err := os.RemoveAll(outputPath); err != nil {
-		return err
-	}
-	return os.MkdirAll(outputPath, 0755)
+// Remove 删除由配置指定的 skills-seed 输出目录。
+func Remove(outputPath string) error {
+	return os.RemoveAll(outputPath)
 }

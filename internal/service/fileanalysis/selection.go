@@ -60,6 +60,10 @@ func SelectFiles(opts SelectOptions) (*FileSelection, error) {
 		if d.IsDir() {
 			return nil
 		}
+		if _, err := utils.ResolvePathWithinRoot(opts.Root, path); err != nil {
+			selection.addSkipped(relPath, SkipReasonUnreadable)
+			return nil
+		}
 		if !pathInFocus(relPath, focusRelPaths) {
 			selection.addSkipped(relPath, SkipReasonOutOfFocus)
 			return nil

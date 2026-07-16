@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 type Strength string
@@ -66,7 +67,7 @@ func SoftenConstraintText(text, locale string) string {
 		softened = replaceWordBounded(softened, "never", "avoid")
 		softened = replaceWordBounded(softened, "required", "expected")
 		softened = replaceWordBounded(softened, "forbidden", "discouraged")
-		return "Treat as a local hint; verify current code before applying: " + softened
+		return i18n.GetForLocale(locale, "KnowledgePolicySoftenedPrefix") + softened
 	}
 	replacer := strings.NewReplacer(
 		"必须严格", "需要",
@@ -76,7 +77,7 @@ func SoftenConstraintText(text, locale string) string {
 		"不能", "不应",
 		"不要", "避免",
 	)
-	return "当前证据只支持作为定位线索；应用前先复核当前代码：" + replacer.Replace(text)
+	return i18n.GetForLocale(locale, "KnowledgePolicySoftenedPrefix") + replacer.Replace(text)
 }
 
 func PatternEvidenceCount(pattern domain.Pattern) int {

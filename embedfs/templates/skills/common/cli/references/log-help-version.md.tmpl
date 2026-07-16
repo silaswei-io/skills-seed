@@ -1,0 +1,54 @@
+# Log Help Version
+
+Use these commands for inspection, support, and diagnostics.
+
+## `skills-seed log`
+
+Purpose:
+
+- Show recent skills-seed learning and generation changes.
+- Inspect why generated Skills changed.
+
+Use case:
+
+- `skills-seed log`
+
+Use `log` when:
+
+- Generated output changed unexpectedly.
+- A previous learning/generation run needs inspection.
+- You need a quick history of skills-seed activity.
+
+## `skills-seed help [command]`
+
+Purpose:
+
+- Show root or nested command help.
+- Confirm flags and defaults for the installed CLI version.
+
+Use cases:
+
+- Root help: `skills-seed help`
+- Command help: `skills-seed help sync`
+- Nested command help: `skills-seed help patterns show`
+
+Always prefer local help over memory when exact flags matter.
+
+## `skills-seed --version`
+
+Purpose:
+
+- Print CLI version and embedded template fingerprints.
+
+Output includes:
+
+- CLI version.
+- `prompt-templates-sha256`.
+- `skills-templates-sha256`.
+
+Use version output when:
+
+- Comparing installed binary with generated Skill metadata.
+- Debugging stale global CLI Skill content.
+- Reporting an issue.
+- Confirming whether template changes should trigger regenerated output.

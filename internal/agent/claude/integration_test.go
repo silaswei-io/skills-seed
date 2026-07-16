@@ -352,7 +352,7 @@ func TestE2E_ProjectAnalysis(t *testing.T) {
 
 // TestE2E_InitSkills 测试 pattern-learn-current 模板：渲染 → Claude → 解析
 // 模板绑定: ProjectName, RootPath, Language, Structure, MainFiles, SampleFiles
-// 输出格式: {"patterns":[...], "profile_delta":{...}, "profile_refresh_recommended":{...}}
+// 输出格式: {"patterns":[...], "profile_refresh_recommended":{...}}
 func TestE2E_InitSkills(t *testing.T) {
 	ag := skipIfShort(t)
 
@@ -395,8 +395,8 @@ func TestE2E_InitSkills(t *testing.T) {
 	require.NoError(t, err, "AnalyzeCurrentCodebase should succeed")
 	require.NotNil(t, result, "Result should not be nil")
 
-	t.Logf("Patterns: %d, ProfileDelta: %t, ProfileRefreshRecommended: %t",
-		len(result.Patterns), !result.ProfileDelta.IsZero(), result.ProfileRefreshRecommended.Needed)
+	t.Logf("Patterns: %d, ProfileRefreshRecommended: %t",
+		len(result.Patterns), result.ProfileRefreshRecommended.Needed)
 	for _, p := range result.Patterns {
 		t.Logf("  - [%s] %s (confidence: %.2f)", p.Category, p.Name, p.Confidence)
 	}

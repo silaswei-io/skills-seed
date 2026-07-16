@@ -86,6 +86,7 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	var multiTracker *progress.MultiTracker
 	if !showChildDetails {
 		multiTracker = progress.NewMulti(commandutil.WorkspaceProjectProgressNames(workspaceConfig.Projects))
+		defer multiTracker.Stop()
 		multiTracker.SetLabel(i18n.Get("ProgressLearnWorkspaceProjects"))
 		multiTracker.SetTaskTotal(learnCurrentProjectStepTotal)
 	}

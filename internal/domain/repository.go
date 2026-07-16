@@ -19,6 +19,9 @@ type PatternRepository interface {
 	// Save 保存模式
 	Save(ctx context.Context, p *Pattern) error
 
+	// ApplyPatternMutation 在一个仓储事务中删除旧模式并保存替换模式。
+	ApplyPatternMutation(ctx context.Context, mutation PatternMutation) error
+
 	// FindSimilar 查找相似的模式（通过名称和分类）
 	FindSimilar(ctx context.Context, pattern *Pattern) (*Pattern, error)
 
@@ -27,6 +30,12 @@ type PatternRepository interface {
 
 	// Count 统计模式数量
 	Count(ctx context.Context) (int, error)
+}
+
+// PatternMutation 描述一次原子的模式库变更。
+type PatternMutation struct {
+	DeleteIDs []string
+	Save      []*Pattern
 }
 
 // PatternHitRecorder 保存检查命中记录。
@@ -49,6 +58,8 @@ type ReviewRepository interface {
 type CommitAnalysisTracker interface {
 	// MarkCommitAnalyzed 标记commit已被分析
 	MarkCommitAnalyzed(ctx context.Context, commitHash string) error
+	// MarkCommitsAnalyzed 在一个仓储事务中标记一批 commit。
+	MarkCommitsAnalyzed(ctx context.Context, commitHashes []string) error
 
 	// IsCommitAnalyzed 检查commit是否已被分析
 	IsCommitAnalyzed(ctx context.Context, commitHash string) (bool, error)

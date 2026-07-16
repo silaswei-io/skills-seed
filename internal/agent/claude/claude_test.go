@@ -35,7 +35,8 @@ func TestClaudePrintArgs_ReadOnlyToolsAndUserPluginsDisabledByDefault(t *testing
 		},
 	})
 
-	args := claudePrintArgs(false)
+	outputSchema := `{"type":"object"}`
+	args := claudePrintArgs(false, outputSchema)
 
 	require.NotContains(t, args, "--setting-sources")
 	settings := requireArgValue(t, args, "--settings")
@@ -54,6 +55,8 @@ func TestClaudePrintArgs_ReadOnlyToolsAndUserPluginsDisabledByDefault(t *testing
 		"--disable-slash-commands",
 		"--output-format",
 		"json",
+		"--json-schema",
+		outputSchema,
 		"--settings",
 		settings,
 		"--tools",
@@ -70,10 +73,19 @@ func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 		},
 	})
 
-	args := claudePrintArgs(true)
+	args := claudePrintArgs(true, `{"type":"object"}`)
 
 	require.NotContains(t, args, "--setting-sources")
 	require.NotContains(t, args, "--settings")
+}
+
+func TestClaudeArgsForLogRedactsInlineSchema(t *testing.T) {
+	args := claudePrintArgs(true, `{"type":"object"}`)
+
+	logged := claudeArgsForLog(args)
+
+	require.Equal(t, `{"type":"object"}`, requireArgValue(t, args, "--json-schema"))
+	require.Equal(t, "<schema:17 bytes>", requireArgValue(t, logged, "--json-schema"))
 }
 
 func TestAnalyzeCodeReturnsErrorWhenClaudeCommandMissing(t *testing.T) {
@@ -130,12 +142,12 @@ func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
 	require.ErrorIs(t, err, renderErr)
 }
 
-func TestAnalyzeProjectRepairsMalformedModelJSON(t *testing.T) {
+func TestAnalyzeProjectReadsStructuredOutput(t *testing.T) {
 	projectRoot := t.TempDir()
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
 
-	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{project_name:'demo', common_utils:[{name:'bad',}],}"}`)
+	commandPath := writeFakeClaudeCommand(t, `{"type":"result","structured_output":{"project_name":"demo","common_utils":[{"name":"good"}]}}`)
 	loader := promptloader.New("claude", "zh-CN", "")
 	ag := New(commandPath, 5*time.Second, loader, false, config.DefaultRetryConfig())
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
@@ -151,7 +163,7 @@ func TestAnalyzeProjectRepairsMalformedModelJSON(t *testing.T) {
 	require.NotNil(t, result)
 	require.Equal(t, "demo", result.ProjectName)
 	require.Len(t, result.CommonUtils, 1)
-	require.Equal(t, "bad", result.CommonUtils[0].Name)
+	require.Equal(t, "good", result.CommonUtils[0].Name)
 }
 
 func TestSelectFilesStoresPromptAndOutputWithSharedRuntimeName(t *testing.T) {
@@ -159,7 +171,7 @@ func TestSelectFilesStoresPromptAndOutputWithSharedRuntimeName(t *testing.T) {
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
 
-	commandPath := writeFakeClaudeCommand(t, `{"type":"result","result":"{\"include\":[\"internal/auth/login.go\"],\"selected_paths\":[\"internal/auth/login.go\"],\"reason\":\"auth\"}"}`)
+	commandPath := writeFakeClaudeCommand(t, `{"type":"result","structured_output":{"include":["internal/auth/login.go"],"selected_paths":["internal/auth/login.go"],"reason":"auth"}}`)
 	loader := promptloader.New("claude", "zh-CN", seedPath)
 	ag := New(commandPath, 5*time.Second, loader, false, config.DefaultRetryConfig())
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
@@ -196,7 +208,7 @@ func TestSelectFilesRetryDoesNotPrintFinalFailureWarning(t *testing.T) {
 	projectRoot := t.TempDir()
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	require.NoError(t, os.MkdirAll(seedPath, 0755))
-	successOutput := `{"type":"result","result":"{\"include\":[\"internal/auth/login.go\"],\"selected_paths\":[\"internal/auth/login.go\"],\"reason\":\"auth\"}"}`
+	successOutput := `{"type":"result","structured_output":{"include":["internal/auth/login.go"],"selected_paths":["internal/auth/login.go"],"reason":"auth"}}`
 	commandPath := writeFakeClaudeRetryCommand(t, "API Error: 529 overloaded_error", successOutput)
 	loader := promptloader.New("claude", "zh-CN", seedPath)
 	ag := New(commandPath, 5*time.Second, loader, false, config.RetryConfig{
@@ -223,10 +235,11 @@ func TestSelectFilesRetryDoesNotPrintFinalFailureWarning(t *testing.T) {
 	require.NotContains(t, output, "Claude CLI 调用失败")
 }
 
-func TestParseClaudeOutput_ExtractsResultAndTokenUsage(t *testing.T) {
-	output, usage := parseClaudeOutput(`{
+func TestParseClaudeOutput_ExtractsStructuredOutputAndTokenUsage(t *testing.T) {
+	output, usage, outputErr := parseClaudeOutput(`{
   "type": "result",
-  "result": "{\"patterns\":[]}",
+  "result": "malformed free-form fallback",
+  "structured_output": {"patterns": []},
   "usage": {
     "input_tokens": 10,
     "output_tokens": 5,
@@ -235,13 +248,36 @@ func TestParseClaudeOutput_ExtractsResultAndTokenUsage(t *testing.T) {
   "total_cost": 0.01
 }`)
 
-	require.Equal(t, `{"patterns":[]}`, output)
+	require.Nil(t, outputErr)
+	require.Equal(t, `{"patterns": []}`, output)
 	require.True(t, usage.Known())
 	require.EqualValues(t, 10, usage.InputTokens)
 	require.EqualValues(t, 5, usage.OutputTokens)
 	require.EqualValues(t, 17, usage.TotalTokens)
 	require.True(t, usage.HasCost)
 	require.InDelta(t, 0.01, usage.CostUSD, 0.000001)
+}
+
+func TestParseClaudeOutput_DoesNotUseFreeFormResult(t *testing.T) {
+	rawOutput := `{"type":"result","result":"{\"patterns\":[]}"}`
+
+	output, _, outputErr := parseClaudeOutput(rawOutput)
+
+	require.Empty(t, output)
+	require.ErrorContains(t, outputErr, "缺少 structured_output")
+}
+
+func TestParseClaudeOutput_RejectsErrorEnvelope(t *testing.T) {
+	output, _, outputErr := parseClaudeOutput(`{
+  "type": "result",
+  "subtype": "error_max_structured_output_retries",
+  "is_error": true,
+  "errors": ["Structured output validation failed"]
+}`)
+
+	require.Empty(t, output)
+	require.True(t, outputErr.invocation)
+	require.ErrorContains(t, outputErr, "Structured output validation failed")
 }
 
 func writeClaudeJSON(t *testing.T, path string, value interface{}) {

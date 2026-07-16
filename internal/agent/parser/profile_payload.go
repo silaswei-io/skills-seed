@@ -31,25 +31,6 @@ func projectProfileToAnalyzeProjectResult(p aicontract.ProjectProfileOutput, now
 	return result
 }
 
-func projectProfileDeltaToDomain(p aicontract.ProjectProfileDeltaOutput, now time.Time) domain.ProjectProfileDelta {
-	return domain.ProjectProfileDelta{
-		Frameworks:         p.Frameworks,
-		Dependencies:       p.Dependencies,
-		Layers:             architectureLayersToDomain(p.Layers),
-		KeyModules:         modulesToDomain(p.KeyModules),
-		CommonUtils:        utilityFunctionsToDomain(p.CommonUtils),
-		ConfigPatterns:     p.ConfigPatterns,
-		FrameworkPatterns:  p.FrameworkPatterns,
-		BusinessMethods:    businessMethodsToDomain(p.BusinessMethods, now),
-		ValidationCommands: validationCommandsToDomain(p.ValidationCommands),
-		Summary:            p.Summary,
-		Architecture:       p.Architecture,
-		Structure:          p.Structure,
-		DependencyGraph:    p.DependencyGraph,
-		DataFlow:           p.DataFlow,
-	}
-}
-
 func architectureLayersToDomain(layers []aicontract.ArchitectureLayerOutput) []domain.ArchitectureLayer {
 	out := make([]domain.ArchitectureLayer, len(layers))
 	for i, layer := range layers {

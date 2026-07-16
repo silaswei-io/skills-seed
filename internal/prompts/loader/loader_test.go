@@ -169,6 +169,25 @@ func TestLoader_RenderSkipsDefaultContextScaffolds(t *testing.T) {
 	require.NotContains(t, prompt, "`backend` (`backend`)")
 }
 
+func TestDefaultContextScaffoldIsDerivedFromSeedTemplates(t *testing.T) {
+	scaffold := loadDefaultContextScaffoldLines()
+	for _, file := range contextPromptFiles {
+		name := strings.TrimSuffix(file.fileName, filepath.Ext(file.fileName))
+		for _, locale := range []string{"", "en-US"} {
+			path := metadata.SeedContextTemplatePath(name, locale)
+			data, err := embedfs.FS.ReadFile(path)
+			require.NoError(t, err)
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.Contains(line, "{{") || strings.HasPrefix(line, "<!--") {
+					continue
+				}
+				require.Contains(t, scaffold, line, "seed scaffold line from %s must be removed from prompts", path)
+			}
+		}
+	}
+}
+
 func TestLoader_RenderAppendsOutputContractAfterUserInstructions(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0755))
@@ -392,6 +411,20 @@ func TestRenderProjectAnalysisListsReadmePathWithoutEmbeddedContent(t *testing.T
 	require.NoError(t, err)
 	require.Contains(t, prompt, "README.md")
 	require.NotContains(t, prompt, "secret readme content")
+}
+
+func TestRenderProjectAnalysisRequiresAuthorityFilesForValidationCommands(t *testing.T) {
+	loader := New("loader", "en-US", "")
+	data := sampleProjectAnalysisData()
+	data["EngineeringKnowledgePath"] = "/tmp/skills-seed/engineering-knowledge-paths.txt"
+	data["EngineeringKnowledgeCount"] = 3
+
+	prompt, err := loader.Render("project-profile", data)
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "# Authoritative Engineering Knowledge")
+	require.Contains(t, prompt, "Read every listed file before producing `validation_commands`")
+	require.Contains(t, prompt, "(3 files)")
 }
 
 func TestRenderProjectAnalysisIncludesIncrementalProfileGuidance(t *testing.T) {
@@ -1077,18 +1110,16 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 	}
 }
 
-func TestLoader_RenderCurrentBatchPromptIncludesValidationCommandObjectContract(t *testing.T) {
+func TestLoader_RenderCurrentBatchPromptExcludesProjectProfileContract(t *testing.T) {
 	loader := New("loader", "en-US", "")
 
 	prompt, err := loader.Render("pattern-learn-current-batch", sampleAnalyzeCurrentCodebaseBatchRequest())
 
 	require.NoError(t, err)
-	require.Contains(t, prompt, `"validation_commands"`)
-	require.Contains(t, prompt, "exact full validation command shown by evidence")
-	require.Contains(t, prompt, `"scope_paths"`)
-	require.Contains(t, prompt, `"evidence"`)
-	require.Contains(t, prompt, `"type": "object"`)
-	require.Contains(t, prompt, `"description": "exact full validation command shown by evidence"`)
+	require.NotContains(t, prompt, `"profile_delta"`)
+	require.NotContains(t, prompt, `"validation_commands"`)
+	require.Contains(t, prompt, `"profile_refresh_recommended"`)
+	require.Contains(t, prompt, "Project profile facts are handled by the independent profile analysis stage")
 }
 
 func TestLoader_RenderCurrentBatchPromptPreservesDTOContractDetails(t *testing.T) {
@@ -1619,7 +1650,7 @@ func TestLoader_ProjectInitPromptDoesNotHardCodeFrameworkCatalog(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, prompt, "Gin/Echo/Beego/Fiber/Spring Boot/Express/Django")
 	require.NotContains(t, prompt, "GORM/Ent/XORM/SQLAlchemy/TypeORM/MyBatis")
-	require.Contains(t, prompt, "Extract only frameworks")
+	require.Contains(t, prompt, "Project profile facts are handled by the independent profile analysis stage")
 }
 
 func TestLoader_PromptResponsibilityContracts(t *testing.T) {
@@ -1647,11 +1678,11 @@ func TestLoader_PromptResponsibilityContracts(t *testing.T) {
 			data: sampleAnalyzeCurrentCodebaseRequest(),
 			required: []string{
 				`"patterns"`,
-				`"profile_delta"`,
 				`"profile_refresh_recommended"`,
 				"Project structure, architecture narrative, and tech-stack overview are context for this template",
 			},
 			forbid: []string{
+				`"profile_delta"`,
 				`"category_summaries"`,
 				`"business_rules"`,
 				`"best_practices"`,
@@ -1808,17 +1839,19 @@ func sampleCuratePatternsData() map[string]interface{} {
 
 func sampleProjectAnalysisData() map[string]interface{} {
 	return map[string]interface{}{
-		"ProjectName":           "demo",
-		"RootPath":              "/tmp/demo",
-		"Language":              "go",
-		"StructurePath":         "/tmp/skills-seed/project-structure.txt",
-		"StructuralContextPath": "",
-		"ReadmePath":            "README.md",
-		"MainFiles":             []string{"cmd/demo/main.go"},
-		"ExistingProfilePath":   "",
-		"FocusPathsPath":        "",
-		"FocusPathCount":        0,
-		"UserContextPath":       "",
+		"ProjectName":               "demo",
+		"RootPath":                  "/tmp/demo",
+		"Language":                  "go",
+		"StructurePath":             "/tmp/skills-seed/project-structure.txt",
+		"StructuralContextPath":     "",
+		"ReadmePath":                "README.md",
+		"MainFiles":                 []string{"cmd/demo/main.go"},
+		"EngineeringKnowledgePath":  "",
+		"EngineeringKnowledgeCount": 0,
+		"ExistingProfilePath":       "",
+		"FocusPathsPath":            "",
+		"FocusPathCount":            0,
+		"UserContextPath":           "",
 	}
 }
 

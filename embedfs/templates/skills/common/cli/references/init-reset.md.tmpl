@@ -1,0 +1,73 @@
+# Init And Reset
+
+Use this reference for repository setup, reinitialization, and the interactive global CLI Skill prompt.
+
+## `skills-seed init`
+
+Purpose:
+
+- Create `.skills-seed/config.yaml`.
+- Create `.skills-seed/context/` seed files.
+- Configure project mode or workspace mode.
+- Configure the AI execution agent and generated Skill target.
+- In interactive mode, optionally install/update the global `skills-seed-cli` operation Skill only when the detected environment is missing it or has stale metadata.
+
+Flags:
+
+- `--locale, -l`: CLI UI, config-template, and seed-context language.
+- `--skills-locale`: generated Skill and learned natural-language content language.
+- `--mode`: `project` or `workspace`.
+- `--agent`: AI execution engine, usually `claude` or `codex`.
+- `--skills`: generated Skill provider/layout, usually `claude` or `codex`.
+- `--workspace`: shortcut for `--mode workspace`.
+- `--no-interactive`: skip prompts.
+
+Use cases:
+
+- Interactive first setup: `skills-seed init`
+- Project setup for Codex: `skills-seed init --mode project --agent codex --skills codex --locale zh-CN --skills-locale en-US --no-interactive`
+- Workspace setup: `skills-seed init --workspace --agent claude --skills claude --locale zh-CN --no-interactive`
+
+Interactive global CLI Skill behavior:
+
+- `init` auto-detects available Claude/Codex global environments.
+- It checks whether the generated global CLI Skill is missing or outdated for the current `skills-seed` binary.
+- Only then does it ask install/update versus skip.
+- It does not ask which agent target to install. Use `skills-seed cli-skills install --target ...` for manual target control.
+
+Boundaries:
+
+- `init` does not learn project conventions. Run `skills-seed sync` after setup.
+- `init` does not delete generated project Skills.
+- `init` does not uninstall global CLI Skills.
+
+## `skills-seed reset`
+
+Purpose:
+
+- Back up existing `.skills-seed` under `.skills-seed.backup/<timestamp>`.
+- Recreate local skills-seed state with selected project/workspace settings.
+
+Flags:
+
+- `--locale, -l`: CLI UI/config/seed context language.
+- `--skills-locale`: generated Skill and learned natural-language content language.
+- `--mode`: `project` or `workspace`.
+- `--workspace`: shortcut for `--mode workspace`.
+
+Use cases:
+
+- Recreate project state: `skills-seed reset --mode project --locale zh-CN`
+- Convert to workspace mode: `skills-seed reset --workspace --locale zh-CN`
+
+Use reset when:
+
+- The local `.skills-seed` state is inconsistent.
+- You need to switch between project and workspace mode.
+- You want to recreate default config/context files while keeping a backup.
+
+Avoid reset when:
+
+- You only need to update generated Skills: use `skills-seed generate skills`.
+- You only need to learn current code: use `skills-seed sync` or `skills-seed learn current`.
+- You only need to update the global CLI Skill: use `skills-seed cli-skills install`.

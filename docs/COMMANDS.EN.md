@@ -33,6 +33,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
 | Daily incremental update | `skills-seed sync` | Learns current changes and generates skills only when learning changed output |
 | Add one missed rule | `skills-seed patterns add --context "<description>"` → `skills-seed generate skills` | Adds a natural-language pattern, then regenerates |
+| Inspect task workflows | `skills-seed workflow show --format json` | Returns lightweight summaries; read details with `workflow show <id> --format json` as needed |
 | Update task workflow | `skills-seed workflow --context "<notes>"` → `skills-seed generate skills` | `--context` is inferred by the Agent from goals, constraints, background, or paths; omit `--name` to generate one, same-name workflows merge by default, and `--overwrite` replaces one completely |
 | Pre-commit updates | `skills-seed hook install` | Install the pre-commit hook and choose sync, learn only, or skip before commit |
 | Inspect learned changes | `skills-seed log` | Show recent learned and generated changes in a git-log-like format |
@@ -45,8 +46,11 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `check`, `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed check` | Check staged files | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
+| `skills-seed cli-skills` | Manage global skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
+| `skills-seed cli-skills install` | Install/update global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
+| `skills-seed cli-skills uninstall` | Uninstall global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed generate` | Generate AI Agent outputs | `skills` | `--help, -h` = `false` |
 | `skills-seed generate skills` | Generate AI Agent skills | - | `--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
 | `skills-seed hook` | Manage Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
@@ -75,7 +79,8 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
 | `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
-| `skills-seed workflow` | Add or update a user workflow | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
+| `skills-seed workflow` | Manage user workflows | `show [workflow-id]` | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
+| `skills-seed workflow show [workflow-id]` | Show existing workflow summaries or full details | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | Add sub-projects to workspace | - | `--help, -h` = `false` |
 <!-- COMMAND_TREE_END -->
@@ -115,6 +120,32 @@ skills-templates-sha256: <hash>
 
 1. Use `skills-seed <command> --help` to view detailed flags for any command.
 2. `--version` prints the current binary version. Runtime documentation links point to the matching tag instead of `main`.
+
+### `skills-seed cli-skills`
+
+#### Command Overview
+
+Manage the global `skills-seed-cli` operation Skill so Claude/Codex-style agents know how to use `skills-seed`. This does not manage project-generated business Skills.
+
+#### Command Forms
+
+| Command Form | Description | Common Example |
+|---|---|---|
+| `skills-seed cli-skills install` | Install or update the global CLI operation Skill | `skills-seed cli-skills install` |
+| `skills-seed cli-skills uninstall` | Uninstall the generated global CLI operation Skill | `skills-seed cli-skills uninstall --target codex` |
+
+#### Flags
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--target`, `-t` | `auto` | Target: `auto`, `claude`, `codex`, or `all`. `auto` handles only agent global directories detected as available on the current machine. |
+| `--help`, `-h` | `false` | Show help |
+
+#### Notes
+
+1. Interactive `init` asks about global CLI Skill installation only when the detected environment is missing it or has stale version/fingerprint metadata.
+2. Use `cli-skills install|uninstall --target ...` when you need to choose Claude, Codex, or both explicitly.
+3. Install fully rebuilds the selected `skills-seed-cli` directory; uninstall removes that fixed target directory. `generated-by` is informational source metadata only.
 
 ## Top-Level Commands
 
@@ -362,7 +393,7 @@ references/
 #### Notes
 
 1. Workspace mode regenerates each child skill using that child's own config first, then regenerates the workspace root skill.
-2. A manual `SKILL.md` without a `generated-by: skills-seed` marker is not overwritten by default.
+2. The configured output directory is exclusively managed by skills-seed and fully rebuilt on every generation; store durable custom guidance in `.skills-seed/context/`, patterns, or workflows.
 3. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
 4. `generate skills` does not check a generation-input fingerprint. When run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds from the current profile, patterns, and workflows.
 
@@ -609,6 +640,38 @@ skills-seed profile refresh --language go
 
 1. `profile show` is useful for quickly checking the current profile.
 2. `profile refresh` overwrites the existing project profile, but does not run pattern learning.
+
+### `skills-seed workflow`
+
+#### Command Overview
+
+Manage reusable task workflows. The root command asks the Agent to organize user guidance into a standard workflow. The `show` subcommand only reads existing workflows, does not call an Agent, and does not modify files.
+
+#### Command Forms
+
+| Command Form | Description | Common Example | Notes |
+|---|---|---|---|
+| `skills-seed workflow --context <notes>` | Create a workflow or merge into an explicitly named workflow | `skills-seed workflow --name release --context "Run smoke tests after release"` | Without `--name`, an Agent-generated name always creates a new workflow |
+| `skills-seed workflow show` | List lightweight summaries in the current scope | `skills-seed workflow show --format json` | The list omits full content |
+| `skills-seed workflow show <id>` | Show the complete workflow | `skills-seed workflow show release --format json` | Returns full details for the specified workflow |
+| `skills-seed workflow show --child <id>` | Inspect workflows in a workspace child | `skills-seed workflow show --child backend --format json` | `--child` is valid only from a workspace root |
+
+#### Flags
+
+| Command | Flag | Default | Description |
+|---|---|---:|---|
+| `workflow` | `--name` | empty | Workflow name; provide it explicitly when updating an existing workflow |
+| `workflow` | `--context` | empty | Goals, constraints, background, or rough notes for the Agent to organize |
+| `workflow` | `--overwrite` | `false` | Replace a same-name workflow completely; never enable without user confirmation |
+| `workflow` | `--child` | empty | Write the workflow to a workspace child |
+| `workflow show` | `--format` | `table` | Output `table` or `json` |
+| `workflow show` | `--child` | empty | Inspect a workspace child |
+
+#### Notes
+
+1. Before updating an existing workflow, use `workflow show --format json` and read matching details as needed.
+2. Do not rewrite equivalent content; conflicts require choosing merge or overwrite.
+3. After a write, run `skills-seed generate skills`.
 
 ### `skills-seed sync`
 

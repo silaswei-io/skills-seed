@@ -29,7 +29,7 @@ func TestNewLearnerService(t *testing.T) {
 }
 
 func TestKnownPatternsSnapshotIncludesEvidenceLocations(t *testing.T) {
-	pattern := domain.NewPattern("error-wrap", "Error Wrap", domain.CategoryError)
+	pattern := newLearnerTestPattern("error-wrap", "Error Wrap", domain.CategoryError)
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
 		{Path: "internal/service/config.go", Line: 42, Symbol: "LoadConfig", Kind: "function", Description: "wraps config errors", Confidence: 0.88},
 	}
@@ -161,8 +161,8 @@ func TestLearn_Success(t *testing.T) {
 			assert.Equal(t, []string{"internal/def456.go"}, req.CommitFiles[1].Files)
 			return &agent.BatchLearnResult{
 				Patterns: []domain.Pattern{
-					*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
-					*domain.NewPattern("p2", "Naming Convention", domain.CategoryNaming),
+					*newLearnerTestPattern("p1", "Error Handling", domain.CategoryError),
+					*newLearnerTestPattern("p2", "Naming Convention", domain.CategoryNaming),
 				},
 				LearnedAt: time.Now(),
 			}, nil
@@ -175,6 +175,41 @@ func TestLearn_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, savedPatterns, 2)
 	assert.Len(t, markCalled, 2)
+}
+
+func TestLearn_DoesNotMarkCommitsWhenPatternSaveFails(t *testing.T) {
+	commits := []domain.CommitInfo{{Hash: "abc123", Message: "test", Author: "dev"}}
+	mockGit := &mocks.MockGitRepository{
+		CommitsFn: func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error) {
+			return commits, nil
+		},
+		ChangedFilesFn: func(ctx context.Context, hash string) ([]string, error) {
+			return []string{"main.go"}, nil
+		},
+	}
+	mockPattern := &mocks.MockPatternRepository{
+		SaveFn: func(ctx context.Context, pattern *domain.Pattern) error {
+			return errors.New("store failed")
+		},
+	}
+	marked := false
+	mockTracker := &mocks.MockCommitTracker{
+		IsAnalyzedFn: func(ctx context.Context, hash string) (bool, error) { return false, nil },
+		MarkAnalyzedFn: func(ctx context.Context, hash string) error {
+			marked = true
+			return nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		BatchLearnFromCommitsFn: func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
+			return &agent.BatchLearnResult{Patterns: []domain.Pattern{*newLearnerTestPattern("p1", "Pattern", domain.CategoryError)}}, nil
+		},
+	}
+
+	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, curator.NewService(mockAgent, mockPattern))
+	require.Error(t, svc.Learn(context.Background(), 10, "", 5))
+	require.False(t, marked)
 }
 
 func TestLearn_SavesNewPatternWhenNoSimilarPattern(t *testing.T) {
@@ -207,7 +242,7 @@ func TestLearn_SavesNewPatternWhenNoSimilarPattern(t *testing.T) {
 		NameVal: "test", AvailableVal: true,
 		BatchLearnFromCommitsFn: func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
 			return &agent.BatchLearnResult{
-				Patterns:  []domain.Pattern{*domain.NewPattern("p1", "New Pattern", domain.CategoryError)},
+				Patterns:  []domain.Pattern{*newLearnerTestPattern("p1", "New Pattern", domain.CategoryError)},
 				LearnedAt: time.Now(),
 			}, nil
 		},
@@ -264,7 +299,7 @@ func TestLearnFromStaged_Success(t *testing.T) {
 			assert.Equal(t, []string{"main.go"}, req.ChangedFiles)
 			return &agent.LearnResult{
 				Patterns: []domain.Pattern{
-					*domain.NewPattern("p1", "Pattern 1", domain.CategoryError),
+					*newLearnerTestPattern("p1", "Pattern 1", domain.CategoryError),
 				},
 				LearnedAt: time.Now(),
 			}, nil
@@ -311,7 +346,7 @@ func TestLearnFromStaged_AIError(t *testing.T) {
 }
 
 func TestLearnFromCommit_WithMerge(t *testing.T) {
-	existingPattern := domain.NewPattern("e1", "Error Handling", domain.CategoryError)
+	existingPattern := newLearnerTestPattern("e1", "Error Handling", domain.CategoryError)
 	existingPattern.Confidence = 0.8
 	existingPattern.Frequency = 3
 	existingPattern.SetRule("wrap errors with context")
@@ -337,7 +372,7 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		LearnFromCommitFn: func(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error) {
-			p := domain.NewPattern("p1", "Error Handling", domain.CategoryError)
+			p := newLearnerTestPattern("p1", "Error Handling", domain.CategoryError)
 			p.Confidence = 0.9
 			p.SetRule("wrap errors with context")
 			return &agent.LearnResult{
@@ -358,7 +393,7 @@ func TestLearnFromCommit_WithMerge(t *testing.T) {
 }
 
 func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
-	existingPattern := domain.NewPattern("existing", "Error Handling", domain.CategoryError)
+	existingPattern := newLearnerTestPattern("existing", "Error Handling", domain.CategoryError)
 	existingPattern.Confidence = 0.8
 	existingPattern.Frequency = 2
 	existingPattern.SetRule("wrap errors with context")
@@ -379,16 +414,17 @@ func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
-	newPattern := domain.NewPattern("new", "Error Handling", domain.CategoryError)
+	newPattern := newLearnerTestPattern("new", "Error Handling", domain.CategoryError)
 	newPattern.Confidence = 0.9
 	newPattern.Frequency = 1
 	newPattern.SetRule("wrap errors with context")
-	count := svc.SavePatterns(context.Background(), []domain.Pattern{*newPattern}, "learn_current")
+	count, err := svc.SavePatternsStrict(context.Background(), []domain.Pattern{*newPattern}, "learn_current")
 
+	require.NoError(t, err)
 	require.Equal(t, 1, count)
 	require.NotNil(t, saved)
 	require.Equal(t, "new", saved.ID)
-	require.Equal(t, 3, saved.Frequency)
+	require.Equal(t, 1, saved.Frequency)
 }
 
 func TestSavePatternsStrictReturnsErrorWhenSaveFails(t *testing.T) {
@@ -400,7 +436,7 @@ func TestSavePatternsStrictReturnsErrorWhenSaveFails(t *testing.T) {
 	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
-	count, err := svc.SavePatternsStrict(context.Background(), []domain.Pattern{*domain.NewPattern("new", "Error Handling", domain.CategoryError)}, "learn_current")
+	count, err := svc.SavePatternsStrict(context.Background(), []domain.Pattern{*newLearnerTestPattern("new", "Error Handling", domain.CategoryError)}, "learn_current")
 
 	require.Error(t, err)
 	require.Zero(t, count)
@@ -417,7 +453,7 @@ func TestSavePatternsStrictWithMetadataPersistsAnalysisUnit(t *testing.T) {
 	}
 	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
-	pattern := domain.NewPattern("new", "Auth Pattern", domain.CategoryBusiness)
+	pattern := newLearnerTestPattern("new", "Auth Pattern", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetRule("apply to auth flows")
 
@@ -444,16 +480,18 @@ func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 			},
 		}
 		mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
+		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(nil, mockPattern))
 
 		patterns := []domain.Pattern{
-			*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
-			*domain.NewPattern("p2", "Naming Convention", domain.CategoryNaming),
+			*newLearnerTestPattern("p1", "Error Handling", domain.CategoryError),
+			*newLearnerTestPattern("p2", "Naming Convention", domain.CategoryNaming),
 		}
 
 		var count int
 		output := captureStdout(t, func() {
-			count = svc.SavePatterns(context.Background(), patterns, "learn_current")
+			var err error
+			count, err = svc.SavePatternsStrict(context.Background(), patterns, curator.OperationLearnHistory)
+			require.NoError(t, err)
 		})
 
 		require.Equal(t, 2, count)
@@ -461,7 +499,7 @@ func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 	})
 
 	t.Run("merged patterns", func(t *testing.T) {
-		existingPattern := domain.NewPattern("existing", "Error Handling", domain.CategoryError)
+		existingPattern := newLearnerTestPattern("existing", "Error Handling", domain.CategoryError)
 		existingPattern.Frequency = 2
 		mockPattern := &mocks.MockPatternRepository{
 			FindSimilarFn: func(ctx context.Context, p *domain.Pattern) (*domain.Pattern, error) {
@@ -473,16 +511,25 @@ func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 			},
 		}
 		mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
+		svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(nil, mockPattern))
 
 		var count int
 		output := captureStdout(t, func() {
-			count = svc.SavePatterns(context.Background(), []domain.Pattern{*domain.NewPattern("new", "Error Handling", domain.CategoryError)}, "learn_current")
+			var err error
+			count, err = svc.SavePatternsStrict(context.Background(), []domain.Pattern{*newLearnerTestPattern("new", "Error Handling", domain.CategoryError)}, curator.OperationLearnHistory)
+			require.NoError(t, err)
 		})
 
 		require.Equal(t, 1, count)
 		require.Empty(t, output)
 	})
+}
+
+func newLearnerTestPattern(id, name string, category domain.Category) *domain.Pattern {
+	pattern := domain.NewPattern(id, name, category)
+	pattern.Rule = "Preserve the project-specific " + name + " rule."
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/example.go", Line: 1, Kind: "file"}}
+	return pattern
 }
 
 func captureStdout(t *testing.T, fn func()) string {

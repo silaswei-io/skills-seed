@@ -43,6 +43,16 @@ type fixedTitleOptimizer struct {
 	title string
 }
 
+type conflictingOptimizer struct{}
+
+func (conflictingOptimizer) OptimizeWorkflow(context.Context, *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
+	return &agent.OptimizeWorkflowResult{
+		Title:     "deploy",
+		Content:   "# deploy",
+		Conflicts: []string{"use blue-green deployment", "use rolling deployment", "use blue-green deployment"},
+	}, nil
+}
+
 func (m fixedTitleOptimizer) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
 	return &agent.OptimizeWorkflowResult{
 		Title:   m.title,
@@ -238,4 +248,22 @@ func TestUpsertWorkflowRequiresContext(t *testing.T) {
 
 	_, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{Name: "deploy"})
 	require.Error(t, err)
+}
+
+func TestUpsertWorkflowRejectsConflictsWithoutWriting(t *testing.T) {
+	seedPath := t.TempDir()
+	repo := workflowstore.NewRepository(seedPath)
+	svc := NewService(repo, conflictingOptimizer{}, "go")
+
+	workflow, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{
+		Name:    "deploy",
+		Context: "改成滚动发布",
+	})
+
+	require.Nil(t, workflow)
+	var conflictErr *ConflictError
+	require.ErrorAs(t, err, &conflictErr)
+	require.Equal(t, []string{"use blue-green deployment", "use rolling deployment"}, conflictErr.Conflicts)
+	_, getErr := repo.Get("deploy")
+	require.ErrorIs(t, getErr, workflowstore.ErrNotFound)
 }

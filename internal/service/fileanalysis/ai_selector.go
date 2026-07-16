@@ -71,11 +71,10 @@ func ApplyAIFileSelector(ctx context.Context, selector agent.FileSelector, opts 
 	if err != nil {
 		return nil, err
 	}
-	cacheable := aiResult != nil
-	if !cacheable {
-		aiResult = &agent.SelectFilesResult{}
+	if err := agent.RequireResult(aiResult, "SelectFiles"); err != nil {
+		return nil, err
 	}
-	cacheable = cacheable && hasAISelectionDirective(aiResult)
+	cacheable := hasAISelectionDirective(aiResult)
 	aiDecision := applyAISelection(candidates, aiResult)
 	selected, forced := applyValidatedSelectionPolicy(validatedSelectionOptions{
 		Candidates:    candidates,

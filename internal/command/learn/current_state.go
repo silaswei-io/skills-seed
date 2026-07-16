@@ -2,6 +2,10 @@ package learn
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -11,6 +15,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
+	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
 const (
@@ -19,7 +25,7 @@ const (
 
 type currentStateSession struct {
 	State   *commandstate.State
-	Changes *incrementalFileChanges
+	Changes *fileanalysis.FileChanges
 	Resumed bool
 }
 
@@ -98,7 +104,30 @@ func learnCurrentStateMode(mode, scope string) string {
 	return mode + "|scope=" + scope
 }
 
-func buildStateInputs(changes *incrementalFileChanges) []commandstate.FileInput {
+func learnCurrentInvocationHash(configRepo config.Reader, focusPaths []string, profileMode string, force bool) string {
+	type invocation struct {
+		FocusPaths    []string                     `json:"focus_paths"`
+		ProfileMode   string                       `json:"profile_mode"`
+		Force         bool                         `json:"force"`
+		CurrentConfig config.CurrentLearningConfig `json:"current_config"`
+		ExcludeConfig config.ExcludeConfig         `json:"exclude_config"`
+		SkillsConfig  config.SkillsConfig          `json:"skills_config"`
+	}
+	value := invocation{
+		FocusPaths:  normalizeStatePaths(focusPaths),
+		ProfileMode: strings.ToLower(strings.TrimSpace(profileMode)),
+		Force:       force,
+	}
+	if configRepo != nil {
+		value.CurrentConfig = configRepo.GetCurrentLearningConfig()
+		value.ExcludeConfig = configRepo.GetExcludeConfig()
+		value.SkillsConfig = configRepo.GetSkillsConfig()
+	}
+	data, _ := json.Marshal(value)
+	return commandstate.HashText(string(data))
+}
+
+func buildStateInputs(changes *fileanalysis.FileChanges) []commandstate.FileInput {
 	if changes == nil {
 		return nil
 	}
@@ -124,18 +153,22 @@ func buildStateInputs(changes *incrementalFileChanges) []commandstate.FileInput 
 	return inputs
 }
 
-func canReuseCurrentState(state *commandstate.State, changes *incrementalFileChanges, projectName, language, mode, userContext string) bool {
+func canReuseCurrentState(state *commandstate.State, changes *fileanalysis.FileChanges, projectName, language, mode, userContext, invocationHash string) bool {
 	if state == nil || changes == nil {
 		return false
 	}
-	if state.ProjectName != projectName || state.Language != language || state.Mode != mode || state.UserContext != commandstate.HashText(userContext) {
+	if state.ProjectName != projectName || state.Language != language || state.Mode != mode || state.UserContext != commandstate.HashText(userContext) || state.InvocationHash != invocationHash {
 		return false
 	}
 	planned := map[string]commandstate.FileInput{}
 	for _, input := range state.Inputs {
 		planned[normalizeStatePath(input.Path)] = input
 	}
-	for _, input := range buildStateInputs(changes) {
+	currentInputs := buildStateInputs(changes)
+	if len(planned) != len(currentInputs) {
+		return false
+	}
+	for _, input := range currentInputs {
 		existing, ok := planned[normalizeStatePath(input.Path)]
 		if !ok || existing.Status != input.Status || existing.Hash != input.Hash {
 			return false
@@ -144,21 +177,75 @@ func canReuseCurrentState(state *commandstate.State, changes *incrementalFileCha
 	return len(state.Units) > 0
 }
 
-func canResumeCurrentState(state *commandstate.State, projectName, language, mode, userContext string) bool {
+func canResumeCurrentState(state *commandstate.State, projectName, language, mode, userContext, invocationHash string) bool {
 	return state != nil &&
 		state.ProjectName == projectName &&
 		state.Language == language &&
 		state.Mode == mode &&
 		state.UserContext == commandstate.HashText(userContext) &&
+		state.InvocationHash == invocationHash &&
 		len(state.Units) > 0 &&
 		len(state.Inputs) > 0
 }
 
-func changesFromCurrentState(state *commandstate.State) *incrementalFileChanges {
+func currentChangesCoveredByState(state *commandstate.State, changes *fileanalysis.FileChanges) bool {
+	if state == nil || changes == nil {
+		return false
+	}
+	planned := make(map[string]commandstate.FileInput, len(state.Inputs))
+	for _, input := range state.Inputs {
+		planned[normalizeStatePath(input.Path)] = input
+	}
+	for _, current := range buildStateInputs(changes) {
+		existing, ok := planned[normalizeStatePath(current.Path)]
+		if !ok {
+			return false
+		}
+		if current.Status == "deleted" {
+			if existing.Status != "deleted" {
+				return false
+			}
+			continue
+		}
+		if existing.Status == "deleted" || existing.Hash != current.Hash {
+			return false
+		}
+	}
+	return true
+}
+
+func currentStateInputsMatchProject(projectRoot string, inputs []commandstate.FileInput) bool {
+	for _, input := range inputs {
+		path := filepath.Join(projectRoot, filepath.FromSlash(normalizeStatePath(input.Path)))
+		resolved, err := utils.CanonicalPathWithinRoot(projectRoot, path)
+		if err != nil {
+			return false
+		}
+		if input.Status == "deleted" {
+			if _, err := os.Stat(resolved); !os.IsNotExist(err) {
+				return false
+			}
+			continue
+		}
+		data, err := os.ReadFile(resolved)
+		if err != nil {
+			return false
+		}
+		if input.Hash != "" {
+			sum := md5.Sum(data)
+			if hex.EncodeToString(sum[:]) != input.Hash {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func changesFromCurrentState(state *commandstate.State) *fileanalysis.FileChanges {
 	if state == nil {
 		return nil
 	}
-	changes := &incrementalFileChanges{}
+	changes := &fileanalysis.FileChanges{}
 	for _, input := range state.Inputs {
 		path := normalizeStatePath(input.Path)
 		if path == "" {
@@ -185,7 +272,7 @@ func changesFromCurrentState(state *commandstate.State) *incrementalFileChanges 
 	return changes
 }
 
-func filterCompletedStateChanges(changes *incrementalFileChanges, analyzed []domain.FileAnalysisRecord) *incrementalFileChanges {
+func filterCompletedStateChanges(changes *fileanalysis.FileChanges, analyzed []domain.FileAnalysisRecord) *fileanalysis.FileChanges {
 	if changes == nil {
 		return nil
 	}
@@ -249,6 +336,7 @@ func restoreCurrentState(
 	language string,
 	mode string,
 	userContext string,
+	invocationHash string,
 ) (*currentStateSession, error) {
 	state, err := repo.Load(ctx)
 	if err != nil {
@@ -257,7 +345,7 @@ func restoreCurrentState(
 		}
 		return nil, err
 	}
-	if !canResumeCurrentState(state, projectName, language, mode, userContext) {
+	if !canResumeCurrentState(state, projectName, language, mode, userContext, invocationHash) {
 		return nil, nil
 	}
 	analyzedRecords, err := tracker.ListAnalyzedFiles(ctx, domain.FileAnalysisScope{})
@@ -281,16 +369,17 @@ func loadOrCreateCurrentState(
 	mode string,
 	scope string,
 	focusRelPaths []string,
-	changes *incrementalFileChanges,
+	changes *fileanalysis.FileChanges,
 	inputSummary commandstate.InputSummary,
 	userContext string,
+	invocationHash string,
 ) (*commandstate.State, error) {
 	state, err := repo.Load(ctx)
 	if err != nil && err != commandstate.ErrStateNotFound {
 		return nil, err
 	}
 	stateMode := learnCurrentStateMode(mode, scope)
-	if canReuseCurrentState(state, changes, projectName, language, stateMode, userContext) {
+	if canReuseCurrentState(state, changes, projectName, language, stateMode, userContext, invocationHash) {
 		return state, nil
 	}
 	units, err := analyzerSvc.PlanAnalysisUnits(ctx, &analyzer.PlanAnalysisUnitsRequest{
@@ -309,6 +398,7 @@ func loadOrCreateCurrentState(
 		units = []domain.AnalysisUnit{fallbackAnalysisUnit(focusRelPaths)}
 	}
 	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateInputs(changes), units).
+		WithInvocationHash(invocationHash).
 		WithInputSummary(inputSummary)
 	if err := repo.Save(ctx, state); err != nil {
 		return nil, err
@@ -316,7 +406,7 @@ func loadOrCreateCurrentState(
 	return state, nil
 }
 
-func pendingAnalysisUnits(state *commandstate.State, changes *incrementalFileChanges) []domain.AnalysisUnit {
+func pendingAnalysisUnits(state *commandstate.State, changes *fileanalysis.FileChanges) []domain.AnalysisUnit {
 	if state == nil || changes == nil {
 		return nil
 	}
@@ -342,7 +432,7 @@ func fallbackAnalysisUnit(paths []string) domain.AnalysisUnit {
 	}
 }
 
-func unitFocusPaths(unit domain.AnalysisUnit, changes *incrementalFileChanges) []string {
+func unitFocusPaths(unit domain.AnalysisUnit, changes *fileanalysis.FileChanges) []string {
 	if changes == nil {
 		return nil
 	}
@@ -350,7 +440,7 @@ func unitFocusPaths(unit domain.AnalysisUnit, changes *incrementalFileChanges) [
 	return intersectUnitPaths(unit, allowed)
 }
 
-func unitAnalyzedRecords(unit domain.AnalysisUnit, changes *incrementalFileChanges) []domain.FileAnalysisRecord {
+func unitAnalyzedRecords(unit domain.AnalysisUnit, changes *fileanalysis.FileChanges) []domain.FileAnalysisRecord {
 	allowed := pathSet(unitFocusPaths(unit, changes))
 	out := make([]domain.FileAnalysisRecord, 0, len(changes.Records))
 	for _, record := range changes.Records {
@@ -364,7 +454,7 @@ func unitAnalyzedRecords(unit domain.AnalysisUnit, changes *incrementalFileChang
 	return out
 }
 
-func skippedSelectionRecords(changes *incrementalFileChanges) []domain.FileAnalysisRecord {
+func skippedSelectionRecords(changes *fileanalysis.FileChanges) []domain.FileAnalysisRecord {
 	if changes == nil {
 		return nil
 	}
@@ -377,7 +467,7 @@ func skippedSelectionRecords(changes *incrementalFileChanges) []domain.FileAnaly
 	return out
 }
 
-func analysisCandidatePaths(changes *incrementalFileChanges) []string {
+func analysisCandidatePaths(changes *fileanalysis.FileChanges) []string {
 	if changes == nil {
 		return nil
 	}
@@ -393,7 +483,7 @@ func analysisCandidatePaths(changes *incrementalFileChanges) []string {
 	return paths
 }
 
-func unitCommittedRecords(unit domain.AnalysisUnit, changes *incrementalFileChanges) []domain.FileAnalysisRecord {
+func unitCommittedRecords(unit domain.AnalysisUnit, changes *fileanalysis.FileChanges) []domain.FileAnalysisRecord {
 	records := unitAnalyzedRecords(unit, changes)
 	records = append(records, skippedSelectionRecords(changes)...)
 	sort.Slice(records, func(i, j int) bool { return records[i].Path < records[j].Path })

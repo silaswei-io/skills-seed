@@ -1,0 +1,43 @@
+# Preview
+
+Use `skills-seed preview files` to inspect analysis input selection before learning or syncing.
+
+## Purpose
+
+Preview answers:
+
+- Which files would be analyzed?
+- Which mode is selecting files?
+- Did focus paths narrow the selection correctly?
+- Are expected source/config files excluded?
+
+## Flags
+
+- `--mode`: `full`, `first`, `incremental`, or `current`.
+- `--focus, -f`: restrict preview to paths. Repeatable.
+- `--limit`: maximum displayed paths.
+
+## Modes
+
+- `full`: broad source/config set that can be analyzed.
+- `first`: first-run analysis inputs.
+- `incremental`: likely incremental learning inputs.
+- `current`: current-change inputs.
+
+## Use Cases
+
+- Preview full scan: `skills-seed preview files`
+- Preview current changes: `skills-seed preview files --mode current`
+- Focus on a directory: `skills-seed preview files --focus internal/service --limit 50`
+
+## Missing File Diagnostics
+
+If a file is missing:
+
+1. Check `.gitignore`.
+2. Check global excludes in `.skills-seed/config.yaml`.
+3. Check whether it is generated output or documentation skipped by policy.
+4. Remove `--focus` and preview again.
+5. Confirm the command is running from the intended project/workspace root.
+
+Use preview before `learn current --focus ...` or `sync --context ...` when scope is uncertain.

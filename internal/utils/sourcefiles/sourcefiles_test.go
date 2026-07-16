@@ -31,3 +31,23 @@ func TestIsAnalyzableKeepsDependencyFiles(t *testing.T) {
 	require.True(t, IsAnalyzable("docs/package.json"))
 	require.False(t, IsAnalyzable("LICENSE"))
 }
+
+func TestIsEngineeringKnowledge(t *testing.T) {
+	tests := map[string]bool{
+		"AGENTS.md":                           true,
+		"docs/AGENTS.md":                      true,
+		"Taskfile.yml":                        true,
+		"Makefile":                            true,
+		".github/workflows/verify.yaml":       true,
+		".skills-seed/context/release.md":     true,
+		"internal/service/service.go":         false,
+		".github/workflows/notes.md":          false,
+		"docs/build-and-test-instructions.md": false,
+	}
+
+	for path, expected := range tests {
+		t.Run(path, func(t *testing.T) {
+			require.Equal(t, expected, IsEngineeringKnowledge(path))
+		})
+	}
+}

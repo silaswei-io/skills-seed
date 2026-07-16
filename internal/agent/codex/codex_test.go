@@ -17,7 +17,7 @@ import (
 func TestCodexExecArgs_UseCurrentWorkDirMode(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 
-	args := codexExecArgs(false)
+	args := codexExecArgs(false, "/tmp/output-schema.json")
 
 	require.Equal(t, []string{
 		"--ask-for-approval", "never",
@@ -28,6 +28,7 @@ func TestCodexExecArgs_UseCurrentWorkDirMode(t *testing.T) {
 		"--sandbox", "read-only",
 		"--color", "never",
 		"--json",
+		"--output-schema", "/tmp/output-schema.json",
 		"-",
 	}, args)
 }
@@ -43,7 +44,7 @@ enabled = true
 enabled = true
 `), 0o644))
 
-	args := codexExecArgs(false)
+	args := codexExecArgs(false, "/tmp/output-schema.json")
 
 	require.Contains(t, args, `plugins."superpowers@openai-curated".enabled=false`)
 	require.Contains(t, args, `plugins."local".enabled=false`)
@@ -57,7 +58,7 @@ func TestCodexExecArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 enabled = true
 `), 0o644))
 
-	args := codexExecArgs(true)
+	args := codexExecArgs(true, "/tmp/output-schema.json")
 
 	require.NotContains(t, args, `plugins."superpowers@openai-curated".enabled=false`)
 }

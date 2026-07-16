@@ -1,0 +1,92 @@
+# Patterns
+
+Use pattern commands to manage durable implementation rules.
+
+Patterns are for rules that should affect future work. They are better than repeating the same `sync --context` guidance.
+
+## `skills-seed patterns add`
+
+Purpose:
+
+- Create a new pattern from explicit human guidance.
+
+Forms:
+
+- `skills-seed patterns add --context "<description>"`
+- `skills-seed patterns add --context-path docs/rule.md`
+- `skills-seed patterns add --category architecture --context "<description>"`
+
+Use when the user gives a durable rule such as "handlers must not call storage directly".
+
+## `skills-seed patterns update <pattern-id>`
+
+Purpose:
+
+- Refine an existing pattern while preserving its identity.
+
+Forms:
+
+- `skills-seed patterns update pat_123 --context "<description>"`
+- `skills-seed patterns update pat_123 --context-path updates.md`
+- `skills-seed patterns update pat_123 --category workflow --context "<description>"`
+
+Use update when a pattern is mostly right but incomplete.
+
+## `skills-seed patterns delete <pattern-id>`
+
+Purpose:
+
+- Remove stale or wrong patterns.
+
+Aliases:
+
+- `rm`
+- `remove`
+
+Use delete only when the rule should no longer influence generated Skills or checks.
+
+## `skills-seed patterns show [pattern-id]`
+
+Purpose:
+
+- List patterns or show one full pattern.
+
+Flags:
+
+- `--format`: `table` or `json`.
+- `--sort`: `updated`, `score`, `hits`, or `category`.
+
+Use cases:
+
+- List patterns: `skills-seed patterns show`
+- Show one: `skills-seed patterns show pat_123`
+- Machine-readable output: `skills-seed patterns show --format json`
+- Sort by usage: `skills-seed patterns show --sort hits`
+
+## `skills-seed patterns stats`
+
+Purpose:
+
+- Show pattern quality and check hit statistics.
+
+Use stats to see which patterns are active, useful, or possibly stale.
+
+## `skills-seed patterns compact`
+
+Purpose:
+
+- Deduplicate, merge, or drop redundant patterns.
+
+Flags:
+
+- `--category, -c`: restrict compaction to one category.
+- `--dry-run`: preview changes.
+- `--ai`: use AI assistance for compaction.
+
+Recommended flow:
+
+1. `skills-seed patterns compact --dry-run`
+2. Review planned changes.
+3. Run compaction with a category or AI only when needed.
+
+After pattern changes, run `skills-seed generate skills` to update generated Skill files.

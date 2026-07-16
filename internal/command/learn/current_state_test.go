@@ -1,16 +1,23 @@
 package learn
 
 import (
+	"context"
+	"crypto/md5"
+	"encoding/hex"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBuildStateInputsPreservesAISelectionState(t *testing.T) {
-	changes := &incrementalFileChanges{
+	changes := &fileanalysis.FileChanges{
 		Records: []domain.FileAnalysisRecord{
 			{Path: "internal/key/create.go", Hash: "key-hash", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
 			{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusAISkipped},
@@ -27,6 +34,70 @@ func TestBuildStateInputsPreservesAISelectionState(t *testing.T) {
 	}, inputs)
 }
 
+func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{{Path: "main.go", Hash: "hash", Status: "present"}}, []domain.AnalysisUnit{{ID: "all", EntryPaths: []string{"main.go"}}})
+	state.ArtifactsCommitted = true
+	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
+	require.NoError(t, repo.Save(context.Background(), state))
+
+	loaded, err := repo.Load(context.Background())
+	require.NoError(t, err)
+	require.True(t, loaded.ArtifactsCommitted)
+}
+
+func TestCurrentStateInputsMatchProjectDetectsChangedFiles(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "main.go")
+	original := []byte("package main\n")
+	require.NoError(t, os.WriteFile(path, original, 0o644))
+	sum := md5.Sum(original)
+	inputs := []commandstate.FileInput{{Path: "main.go", Hash: hex.EncodeToString(sum[:]), Status: "present"}}
+
+	require.True(t, currentStateInputsMatchProject(root, inputs))
+	require.NoError(t, os.WriteFile(path, []byte("package changed\n"), 0o644))
+	require.False(t, currentStateInputsMatchProject(root, inputs))
+}
+
+func TestCurrentStateInputsMatchProjectChecksDeletedFiles(t *testing.T) {
+	root := t.TempDir()
+	inputs := []commandstate.FileInput{{Path: "removed.go", Status: "deleted"}}
+	require.True(t, currentStateInputsMatchProject(root, inputs))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "removed.go"), []byte("package restored\n"), 0o644))
+	require.False(t, currentStateInputsMatchProject(root, inputs))
+}
+
+func TestCurrentChangesCoveredByStateRejectsUnplannedInput(t *testing.T) {
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{
+		{Path: "main.go", Hash: "main-hash", Status: "present"},
+	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})
+	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{
+		{Path: "main.go", Hash: "main-hash"},
+		{Path: "new.go", Hash: "new-hash"},
+	}}
+
+	require.False(t, currentChangesCoveredByState(state, changes))
+}
+
+func TestCanReuseCurrentStateRequiresExactInputSet(t *testing.T) {
+	const invocationHash = "invocation"
+	mode := learnCurrentStateMode(string(config.LearningModeNormal), string(config.LearningScopeFlow))
+	state := commandstate.NewStateWithMode(commandStateLearnCurrent, "demo", "go", mode, "", []commandstate.FileInput{
+		{Path: "main.go", Hash: "main-hash", Status: "present"},
+		{Path: "removed.go", Status: "deleted"},
+	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}}).WithInvocationHash(invocationHash)
+	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "main.go", Hash: "main-hash"}}}
+
+	require.False(t, canReuseCurrentState(state, changes, "demo", "go", mode, "", invocationHash))
+}
+
+func TestLearnCurrentInvocationHashIncludesExecutionOptions(t *testing.T) {
+	base := learnCurrentInvocationHash(nil, []string{"internal/auth"}, learnCurrentProfileAuto, false)
+
+	require.NotEqual(t, base, learnCurrentInvocationHash(nil, []string{"internal/key"}, learnCurrentProfileAuto, false))
+	require.NotEqual(t, base, learnCurrentInvocationHash(nil, []string{"internal/auth"}, learnCurrentProfileRefresh, false))
+	require.NotEqual(t, base, learnCurrentInvocationHash(nil, []string{"internal/auth"}, learnCurrentProfileAuto, true))
+}
+
 func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{
 		{Path: "internal/key/create.go", Hash: "key-hash", Status: "present"},
@@ -41,7 +112,7 @@ func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
 		})
 	session := &currentStateSession{
 		State: state,
-		Changes: &incrementalFileChanges{
+		Changes: &fileanalysis.FileChanges{
 			Records:         []domain.FileAnalysisRecord{{Path: "internal/key/create.go", Hash: "key-hash"}},
 			AddedOrModified: []string{"internal/key/create.go"},
 		},
@@ -65,7 +136,7 @@ func TestBuildLearnCurrentResumeSummaryFallsBackForLegacyState(t *testing.T) {
 	}, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key/create.go"}}})
 	session := &currentStateSession{
 		State: state,
-		Changes: &incrementalFileChanges{
+		Changes: &fileanalysis.FileChanges{
 			Records:         []domain.FileAnalysisRecord{{Path: "internal/key/create.go", Hash: "key-hash"}},
 			AddedOrModified: []string{"internal/key/create.go"},
 			Deleted:         []string{"internal/removed.go"},
@@ -82,7 +153,7 @@ func TestBuildLearnCurrentResumeSummaryFallsBackForLegacyState(t *testing.T) {
 }
 
 func TestCurrentStateInputSummaryUsesSelectionStages(t *testing.T) {
-	changes := &incrementalFileChanges{SourceFileCount: 12}
+	changes := &fileanalysis.FileChanges{SourceFileCount: 12}
 	selectionPlan := currentFileSelectionPlan{
 		Candidates: []string{"a.go", "b.go", "c.go"},
 		Eligible:   true,
@@ -106,7 +177,7 @@ func TestCurrentStateInputSummaryUsesSelectionStages(t *testing.T) {
 }
 
 func TestCurrentStateInputSummaryRecordsAttemptedSelection(t *testing.T) {
-	changes := &incrementalFileChanges{SourceFileCount: 12}
+	changes := &fileanalysis.FileChanges{SourceFileCount: 12}
 	selectionPlan := currentFileSelectionPlan{
 		Candidates: []string{"a.go", "b.go", "c.go"},
 		Eligible:   true,
@@ -126,7 +197,7 @@ func TestCurrentStateInputSummaryRecordsAttemptedSelection(t *testing.T) {
 }
 
 func TestFilterCompletedStateChangesKeepsOnlyUnfinishedInputs(t *testing.T) {
-	changes := &incrementalFileChanges{
+	changes := &fileanalysis.FileChanges{
 		Records: []domain.FileAnalysisRecord{
 			{Path: "internal/auth/login.go", Hash: "auth-hash"},
 			{Path: "internal/key/create.go", Hash: "key-hash"},
@@ -154,7 +225,7 @@ func TestFilterCompletedStateChangesKeepsOnlyUnfinishedInputs(t *testing.T) {
 }
 
 func TestFilterCompletedStateChangesKeepsChangedHashPending(t *testing.T) {
-	changes := &incrementalFileChanges{
+	changes := &fileanalysis.FileChanges{
 		Records:         []domain.FileAnalysisRecord{{Path: "internal/key/create.go", Hash: "new-hash"}},
 		AddedOrModified: []string{"internal/key/create.go"},
 	}

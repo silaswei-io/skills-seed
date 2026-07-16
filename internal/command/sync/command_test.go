@@ -218,6 +218,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		pattern.Confidence = 0.9
 		pattern.SetDescription("description")
 		pattern.SetRule("rule")
+		pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "main.go", Line: 2, Symbol: "main", Kind: "func"}}
 		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
 	}
 

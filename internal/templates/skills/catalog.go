@@ -15,7 +15,7 @@ type TemplateEntry struct {
 var skillTemplateCatalog = []TemplateEntry{
 	{
 		ID:           "project-skill",
-		RelativeName: "project/project-skill",
+		RelativeName: "project/skill",
 		Ext:          metadata.SkillsTemplateExt,
 		OutputPath:   "SKILL.md",
 		Providers:    []string{"common", "claude", "codex"},
@@ -78,7 +78,7 @@ var skillTemplateCatalog = []TemplateEntry{
 	},
 	{
 		ID:           "workspace-skill",
-		RelativeName: "workspace/workspace-skill",
+		RelativeName: "workspace/skill",
 		Ext:          metadata.SkillsTemplateExt,
 		OutputPath:   "SKILL.md",
 		Providers:    []string{"common"},

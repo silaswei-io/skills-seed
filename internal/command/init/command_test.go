@@ -10,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
+	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/stretchr/testify/require"
 )
 
@@ -148,6 +149,7 @@ func TestInteractiveInitDefaultsMatchNoArgDefaults(t *testing.T) {
 	require.False(t, opts.workspace)
 	require.Equal(t, "claude", opts.agent)
 	require.Equal(t, "claude", opts.skills)
+	require.False(t, opts.installGlobalCLISkills)
 	require.Equal(t, config.LearningModeNormal, opts.learningMode)
 	require.Equal(t, config.LearningScopeFlow, opts.learningScope)
 }
@@ -252,7 +254,7 @@ func TestInitializeProjectWithSkillsSetsTarget(t *testing.T) {
 	require.Equal(t, domain.ModeProject, configRepo.GetProjectConfig().Mode)
 	require.Equal(t, "claude", configRepo.GetAgentConfig().Engine)
 	require.Equal(t, "codex", configRepo.GetSkillsConfig().Target)
-	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
+	require.Equal(t, ".agents/skills/"+skillgen.GeneratedSkillName(filepath.Base(projectRoot)), configRepo.GetSkillsConfig().Paths["codex"])
 }
 
 func TestInitializeProjectWithSkillsLocaleSetsAISkillsContentLanguage(t *testing.T) {
@@ -377,7 +379,7 @@ func TestInitializeProjectWithAgentAndSkillsCanDiffer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "claude", configRepo.GetAgentConfig().Engine)
 	require.Equal(t, "codex", configRepo.GetSkillsConfig().Target)
-	require.Equal(t, ".agents/skills/skills-seed-skills", configRepo.GetSkillsConfig().Paths["codex"])
+	require.Equal(t, ".agents/skills/"+skillgen.GeneratedSkillName(filepath.Base(projectRoot)), configRepo.GetSkillsConfig().Paths["codex"])
 }
 
 func TestInitializeProjectSummaryUsesRelativeSeedPathAndDocumentationLink(t *testing.T) {
@@ -446,14 +448,14 @@ func TestInitializeWorkspaceInitializesChildProjectsWithRootSkills(t *testing.T)
 	require.Equal(t, domain.ModeWorkspace, rootConfig.GetProjectConfig().Mode)
 	require.Equal(t, "claude", rootConfig.GetAgentConfig().Engine)
 	require.Equal(t, "codex", rootConfig.GetSkillsConfig().Target)
-	require.Equal(t, ".agents/skills/skills-seed-skills", rootConfig.GetSkillsConfig().Paths["codex"])
+	require.Equal(t, ".agents/skills/"+skillgen.GeneratedWorkspaceSkillName(filepath.Base(workspaceRoot)), rootConfig.GetSkillsConfig().Paths["codex"])
 
 	childConfig, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, domain.ModeProject, childConfig.GetProjectConfig().Mode)
 	require.Equal(t, "claude", childConfig.GetAgentConfig().Engine)
 	require.Equal(t, "codex", childConfig.GetSkillsConfig().Target)
-	require.Equal(t, ".agents/skills/skills-seed-skills", childConfig.GetSkillsConfig().Paths["codex"])
+	require.Equal(t, ".agents/skills/backend-dev", childConfig.GetSkillsConfig().Paths["codex"])
 }
 
 func TestInitializeWorkspaceChildrenFailsForConfiguredChildWithoutGitRepository(t *testing.T) {

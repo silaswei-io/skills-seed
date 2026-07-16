@@ -12,15 +12,12 @@ import (
 )
 
 func (g *WorkspaceGenerator) workspaceRootOutputPath(projectRoot, workspaceName string) (string, error) {
-	return g.targetSkillOutputPath(projectRoot, workspaceSkillName(workspaceName))
+	return g.targetSkillOutputPath(projectRoot, skillgen.GeneratedWorkspaceSkillName(workspaceName))
 }
 
-func workspaceSkillName(workspaceName string) string {
+func legacyWorkspaceSkillName(workspaceName string) string {
 	name := skillgen.GeneratedSkillName(workspaceName)
-	if strings.HasSuffix(name, "-dev") {
-		return strings.TrimSuffix(name, "-dev") + "-workspace"
-	}
-	return name + "-workspace"
+	return strings.TrimSuffix(name, "-dev") + "-workspace"
 }
 
 func (g *WorkspaceGenerator) childSkillTarget(projectRoot string, project config.WorkspaceProjectConfig) (childSkillTarget, error) {

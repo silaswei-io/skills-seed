@@ -26,10 +26,10 @@ other = "help for skills-seed"
 other = "version for skills-seed"
 
 [WorkflowShort]
-other = "Add or update a user workflow"
+other = "Manage user workflows"
 
 [WorkflowLongDesc]
-other = "Ask the current Agent to infer and organize a standard workflow from user-provided goals, constraints, background, or paths, then save it as an independent resource. Same-name workflows are merged and deduplicated by default; use --overwrite to replace them completely. Workflows are not profile.mode and do not affect the project/workspace mode lock."
+other = "Ask the current Agent to infer and organize a standard workflow from user-provided goals, constraints, background, or paths, then save it as an independent resource. Same-name workflows are merged and deduplicated by default; use --overwrite to replace them completely. Use the show subcommand to inspect existing workflows without writing. Workflows are not profile.mode and do not affect the project/workspace mode lock."
 
 [WorkflowExample]
 other = "  skills-seed workflow --context \"Check environment variables and build artifacts before release, then run smoke tests after deployment\"\n  skills-seed workflow --name deploy --context \"Also check database migrations and rollback scripts before release\"\n  skills-seed workflow --name deploy --context \"Replace the release workflow with only this new process\" --overwrite"
@@ -45,6 +45,75 @@ other = "Completely replace the same-name workflow instead of merging with exist
 
 [WorkflowFlagChild]
 other = "In workspace mode, save the workflow to a child project, for example --child backend"
+
+[WorkflowShowShort]
+other = "Show existing workflow summaries or full details"
+
+[WorkflowShowLongDesc]
+other = "Without an argument, list lightweight summaries for workflows in the current target. With a workflow ID, show its full content. Use --format json for stable structured output."
+
+[WorkflowShowExample]
+other = "  skills-seed workflow show\n  skills-seed workflow show --format json\n  skills-seed workflow show release --format json\n  skills-seed workflow show --child backend --format json"
+
+[WorkflowShowFlagFormat]
+other = "Output format: table or json"
+
+[WorkflowShowFlagChild]
+other = "In workspace mode, inspect a child project, for example --child backend"
+
+[WorkflowShowUnsupportedFormat]
+other = "Unsupported workflow output format: {{.Format}}"
+
+[WorkflowShowNotFound]
+other = "Workflow not found: {{.ID}}"
+
+[WorkflowShowHeaderID]
+other = "ID"
+
+[WorkflowShowHeaderName]
+other = "Name"
+
+[WorkflowShowHeaderTarget]
+other = "Target"
+
+[WorkflowShowHeaderSummary]
+other = "Summary"
+
+[WorkflowShowHeaderContexts]
+other = "Contexts"
+
+[WorkflowShowHeaderScripts]
+other = "Scripts"
+
+[WorkflowShowHeaderUpdatedAt]
+other = "Updated At"
+
+[WorkflowShowFieldID]
+other = "ID"
+
+[WorkflowShowFieldName]
+other = "Name"
+
+[WorkflowShowFieldTarget]
+other = "Target"
+
+[WorkflowShowFieldSummary]
+other = "Summary"
+
+[WorkflowShowFieldContexts]
+other = "Contexts"
+
+[WorkflowShowFieldScripts]
+other = "Scripts"
+
+[WorkflowShowFieldCreatedAt]
+other = "Created At"
+
+[WorkflowShowFieldUpdatedAt]
+other = "Updated At"
+
+[WorkflowShowContentHeading]
+other = "Workflow Content"
 
 [WorkflowSaved]
 other = "Workflow saved: {{.Name}} ({{.ID}}) -> {{.Target}}"
@@ -69,12 +138,6 @@ other = "workflow skills template loader is not configured"
 
 [ProgressOptimizeWorkflowAI]
 other = "Optimizing user workflow"
-
-[WorkflowOutputContextHeading]
-other = "Context"
-
-[WorkflowOutputScriptsHeading]
-other = "Scripts"
 
 [WorkflowOutputSummaryHeadingCandidates]
 other = "Applies When|When to use|Goal|Summary|Description"
@@ -443,44 +506,8 @@ other = "Failed to parse AI result"
 [AgentJSONUnmarshalSimpleFailed]
 other = "Failed to unmarshal JSON"
 
-[AgentEmptyAIOutput]
-other = "Empty AI output"
-
-[AgentEmptyAIOutputHint]
-other = "AI returned an empty response"
-
-[AgentEmptyAIResponse]
-other = "AI returned an empty response"
-
-[AgentNoJSONFound]
-other = "No JSON found"
-
-[AgentNoJSONFoundHint]
-other = "No opening JSON brace found"
-
-[AgentNoJSONObjectFound]
-other = "No JSON object found in AI response"
-
-[AgentUnmatchedBraces]
-other = "Unmatched JSON braces"
-
-[AgentUnmatchedJSONBraces]
-other = "Unmatched JSON braces in AI response"
-
-[AgentInvalidJSON]
-other = "Invalid JSON"
-
-[AgentInvalidJSONError]
-other = "Invalid JSON"
-
-[AgentNoValidJSONFound]
-other = "No valid JSON found in output"
-
 [AgentDiagnosticError]
 other = "Agent diagnostics: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
-
-[AgentExtractJSONError]
-other = "Failed to extract JSON"
 
 [AgentAnalyzeCodebaseFailedSummary]
 other = "Failed to analyze codebase"
@@ -880,9 +907,6 @@ other = "Preparing generation data"
 [ProgressGenerateLoadProfile]
 other = "Loading project profile"
 
-[ProgressGenerateCheckOutput]
-other = "Checking output directory"
-
 [ProgressGenerateWriteSkills]
 other = "Writing skill files"
 
@@ -919,17 +943,11 @@ other = "Output: {{.Path}}"
 [GenerateProjectProfileMissing]
 other = "Project profile is missing, so project overview cannot be generated. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
 
-[GenerateManualSkillExists]
-other = "A non skills-seed generated SKILL.md already exists and will not be overwritten by default: {{.Path}}"
-
 [GenerateWorkspaceChildGenerating]
 other = "Generating skills for child project {{.ProjectName}}"
 
 [GenerateWorkspaceChildGenerated]
 other = "Generated skills for child project {{.ProjectName}}"
-
-[GenerateWorkspaceChildManualSkillSkipped]
-other = "Child project {{.ProjectName}} has a manual SKILL.md; skipping overwrite: {{.Path}}"
 
 [GenerateWorkspaceChildNotInitialized]
 other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed add {{.ProjectName}}"
@@ -1702,18 +1720,6 @@ other = "Generating pattern file"
 other = "Sample file collected"
 
 # 代理消息
-[AgentParsingOutputLength]
-other = "Parsing AI output"
-
-[AgentExtractJSONFailed]
-other = "Failed to extract JSON from AI output"
-
-[AgentOriginalOutput]
-other = "AI original output"
-
-[AgentExtractedJSON]
-other = "Successfully extracted JSON"
-
 [AgentJSONUnmarshalFailed]
 other = "JSON parsing failed"
 
@@ -1905,18 +1911,6 @@ other = "Codex CLI call hit a retryable error"
 
 [LoggerAgentNoValidJSON]
 other = "No valid JSON found"
-
-[LoggerAgentAnalyzeCodebaseFailed]
-other = "AI codebase analysis failed, returning empty result"
-
-[LoggerAgentParseResultFailed]
-other = "Failed to parse AI result, returning empty result"
-
-[LoggerAgentAnalyzeCodeFallback]
-other = "AI code analysis failed, returning empty result"
-
-[LoggerAgentExtractJSONFallback]
-other = "JSON extraction failed, returning empty result"
 
 [LoggerAgentPromptRenderFailed]
 other = "Prompt template rendering failed"
@@ -2129,7 +2123,7 @@ other = "Focus path {{.Path}} is not accessible"
 other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or refresh"
 
 [LearnCurrentResult]
-other = "Analysis result:\n  • new patterns: {{.PatternsCount}}\n  • project profile has delta: {{.ProfileDelta}}"
+other = "Analysis result:\n  • new patterns: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeParallelUnits]
 other = "Starting concurrent project-unit learning: {{.Total}} units, parallelism {{.Parallelism}}"
@@ -2511,6 +2505,30 @@ other = "Enter total Agent parallelism"
 [InteractiveInitCustomizeAdvanced]
 other = "Customize analysis depth, split scope, or Skills template settings?"
 
+[InteractiveInitGlobalCLISkills]
+other = "The global skills-seed CLI Skill for this environment is missing or outdated. Install/update it?"
+
+[InteractiveInitGlobalCLISkillsTarget]
+other = "Select global CLI Skills to install or update"
+
+[InteractiveInitGlobalCLISkillsTargetAuto]
+other = "auto-detect"
+
+[InteractiveInitGlobalCLISkillsTargetAutoDesc]
+other = "Write only Claude or Codex global Skills directories detected as available on this machine."
+
+[InteractiveInitGlobalCLISkillsTargetAll]
+other = "claude + codex"
+
+[InteractiveInitGlobalCLISkillsTargetAllDesc]
+other = "Write both Claude and Codex global Skills directories."
+
+[InteractiveInitGlobalCLISkillsTargetClaudeDesc]
+other = "Write only the Claude global Skills directory."
+
+[InteractiveInitGlobalCLISkillsTargetCodexDesc]
+other = "Write only the Codex global Skills directory."
+
 [InteractiveInitParallelismPlanProject]
 other = "Project: learning.current.parallelism={{.UnitParallelism}}"
 
@@ -2559,6 +2577,12 @@ other = "Agent"
 [InteractiveInitSummarySkills]
 other = "Skills type"
 
+[InteractiveInitSummaryGlobalCLISkills]
+other = "Global CLI Skills"
+
+[InteractiveInitSummaryGlobalCLISkillsTarget]
+other = "Yes ({{.Target}})"
+
 [InteractiveInitSummaryAgentTotalParallelism]
 other = "Total Agent parallelism"
 
@@ -2580,6 +2604,12 @@ other = "Show current initialization"
 [InteractiveInitInspectDesc]
 other = "Print the current configuration summary without modifying {{.Path}}."
 
+[InteractiveInitInstallGlobalCLISkills]
+other = "Install/update global CLI Skills"
+
+[InteractiveInitInstallGlobalCLISkillsDesc]
+other = "Auto-detect available Claude/Codex global directories and install or refresh the skills-seed CLI operation Skill."
+
 [InteractiveInitReset]
 other = "Reinitialize"
 
@@ -2588,6 +2618,57 @@ other = "Back up the existing .skills-seed directory, then choose mode, Agent, l
 
 [InteractiveInitExistingSummaryTitle]
 other = "Current initialization"
+
+[InitGlobalCLISkillsReady]
+other = "Global skills-seed CLI Skills are ready: {{.Paths}}"
+
+[InitGlobalCLISkillsFailed]
+other = "Failed to install or update global skills-seed CLI Skills"
+
+[CLISkillsShort]
+other = "Manage global skills-seed CLI Skills"
+
+[CLISkillsLongDesc]
+other = "Install, refresh, or uninstall the global skills-seed CLI usage Skill for AI agents."
+
+[CLISkillsExample]
+other = "skills-seed cli-skills install\nskills-seed cli-skills install --target claude\nskills-seed cli-skills uninstall --target codex"
+
+[CLISkillsInstallShort]
+other = "Install/update global CLI Skills"
+
+[CLISkillsInstallLongDesc]
+other = "Install or refresh the global skills-seed CLI Skill tree; by default only currently available Claude/Codex targets are written, and selected fixed target directories are fully rebuilt."
+
+[CLISkillsInstallExample]
+other = "skills-seed cli-skills install\nskills-seed cli-skills install -t claude\nskills-seed cli-skills install -t codex\nskills-seed cli-skills install -t all"
+
+[CLISkillsInstallFlagTarget]
+other = "Install target: auto, all, claude, or codex"
+
+[CLISkillsInstallReady]
+other = "Global skills-seed CLI Skills are ready: {{.Paths}}"
+
+[CLISkillsUninstallShort]
+other = "Uninstall global CLI Skills"
+
+[CLISkillsUninstallLongDesc]
+other = "Uninstall global skills-seed CLI Skill trees; by default only currently available Claude/Codex targets are handled, and selected fixed target directories are removed directly."
+
+[CLISkillsUninstallExample]
+other = "skills-seed cli-skills uninstall\nskills-seed cli-skills uninstall -t claude\nskills-seed cli-skills uninstall -t codex\nskills-seed cli-skills uninstall -t all"
+
+[CLISkillsUninstallFlagTarget]
+other = "Uninstall target: auto, all, claude, or codex"
+
+[CLISkillsUninstallReady]
+other = "Global skills-seed CLI Skills were uninstalled or skipped: {{.Paths}}"
+
+[CLISkillsUnsupportedTarget]
+other = "Unsupported CLI Skills target: {{.Target}}; use auto, all, claude, or codex"
+
+[CLISkillsNoAvailableTarget]
+other = "No available Claude or Codex global environment was detected; pass --target claude, --target codex, or --target all explicitly"
 
 [SyncFlagResume]
 other = "Resume the previous incomplete sync state"
@@ -2984,3 +3065,162 @@ other = "Read when naming affects tables, columns, indexes, query methods, or pe
 
 [GeneratorReferenceLinkNamingBusiness]
 other = "Read when naming carries domain concepts, state names, or business actions."
+
+[WorkspaceRouteProjectReason]
+other = "Route a child project path only to that project's skill"
+
+[WorkspaceRouteContractReason]
+other = "Contract changes require checking producers, consumers, and generated artifacts"
+
+[WorkspaceRouteSharedReason]
+other = "Shared code changes require checking all importers or consumers"
+
+[WorkspaceRouteInfraReason]
+other = "Infrastructure changes require checking child projects affected by deployment or runtime configuration"
+
+[WorkspaceRuleBoundaryTitle]
+other = "Define cross-project boundaries first"
+
+[WorkspaceRuleBoundaryDescription]
+other = "Before changing contracts, shared code, or infrastructure, identify affected child projects and read their skills."
+
+[CheckerGetStagedFilesFailed]
+other = "Failed to get staged files"
+
+[CheckerWalkProjectFailed]
+other = "Failed to scan project files"
+
+[CheckerBuildSnapshotDiffFailed]
+other = "Failed to build file snapshot diff"
+
+[CheckerReplaceSnapshotFailed]
+other = "Failed to replace file snapshot"
+
+[CheckerGetPatternsFailed]
+other = "Failed to get known patterns"
+
+[CheckerGetRecentCommitsFailed]
+other = "Failed to get recent commits"
+
+[CheckerAnalyzeFailed]
+other = "AI analysis failed"
+
+[CheckerSavePatternHitsFailed]
+other = "Failed to save pattern hit records"
+
+[InteractiveSelectRequiresOption]
+other = "Interactive selection requires at least one option"
+
+[InteractiveInvalidInteger]
+other = "Enter a valid integer"
+
+[InteractiveMinimumInteger]
+other = "Value must be at least {{.Minimum}}"
+
+[WorkflowConflictRequirements]
+other = "Workflow contains conflicting requirements: {{.Conflicts}}"
+
+[WorkflowRepositoryMissing]
+other = "Workflow repository is not configured"
+
+[WorkflowOptimizerMissing]
+other = "Workflow optimizer is not configured"
+
+[WorkflowContextRequired]
+other = "workflow --context is required"
+
+[WorkflowOptimizerEmptyContent]
+other = "Workflow optimizer returned empty content"
+
+[WorkflowOptimizerEmptyTitle]
+other = "Workflow optimizer returned empty title"
+
+[WorkflowOptimizerUnsafeTitle]
+other = "Workflow optimizer returned an unsafe title"
+
+[PatternsNotWritten]
+other = "Pattern was not written"
+
+[WorkspaceProjectPathOutsideRoot]
+other = "Workspace project path {{.Path}} is outside workspace root {{.Root}}"
+
+[SkillOutputPathChanged]
+other = "Output path changed during generation"
+
+[DirectoryBuilderMissing]
+other = "Directory builder is not configured"
+
+[DirectoryModeRequired]
+other = "Directory mode is required"
+
+[DirectoryLockTargetFailed]
+other = "Failed to lock directory target"
+
+[DirectoryBackupPathExists]
+other = "Directory backup path already exists: {{.Path}}"
+
+[DirectoryBackupFailed]
+other = "Failed to back up directory"
+
+[DirectoryPublishFailed]
+other = "Failed to publish directory"
+
+[DirectoryRestoreFailed]
+other = "Failed to restore directory"
+
+[DirectoryRemoveBackupFailed]
+other = "Failed to remove directory backup"
+
+[DirectoryRemoveTransactionFailed]
+other = "Failed to remove directory transaction"
+
+[DirectoryRestoreInterruptedFailed]
+other = "Failed to restore interrupted directory replacement"
+
+[DirectoryRemoveCommittedBackupFailed]
+other = "Failed to remove committed directory backup"
+
+[DirectoryTransactionLostTarget]
+other = "Directory transaction lost both target and backup: {{.Path}}"
+
+[DirectoryRemoveStagingFailed]
+other = "Failed to remove transaction staging directory"
+
+[DirectoryRemoveRecoveredTransactionFailed]
+other = "Failed to remove recovered directory transaction"
+
+[DirectoryParseTransactionFailed]
+other = "Failed to parse directory transaction"
+
+[DirectoryTransactionTargetMismatch]
+other = "Directory transaction does not belong to target: {{.Path}}"
+
+[DirectoryInvalidStagingPath]
+other = "Invalid directory transaction staging path: {{.Path}}"
+
+[DirectoryValidateTargetFailed]
+other = "Failed to validate directory target"
+
+[CommandDocsHeading]
+other = "Generated Command Index"
+
+[CommandDocsNotice]
+other = "This section is generated from the Cobra command tree to keep commands, subcommands, and flag defaults aligned with the CLI implementation. Detailed usage notes remain in the command sections below."
+
+[CommandDocsHeaderCommand]
+other = "Command"
+
+[CommandDocsHeaderSummary]
+other = "Summary"
+
+[CommandDocsHeaderSubcommands]
+other = "Subcommands"
+
+[CommandDocsHeaderFlags]
+other = "Flags"
+
+[KnowledgePolicySoftenedPrefix]
+other = "Treat as a local hint; verify current code before applying: "
+
+[AutoFixPatchHeader]
+other = "# Auto-generated patch by skills-seed\n# Generated at: {{.GeneratedAt}}\n# Issues fixed: {{.IssueCount}}"

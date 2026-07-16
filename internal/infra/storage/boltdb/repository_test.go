@@ -32,6 +32,7 @@ func newTestPattern(id, name string, category domain.Category, confidence float6
 	p.Confidence = confidence
 	p.Description = "Test pattern: " + name
 	p.Rule = "Follow the " + name + " convention"
+	p.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/example.go", Line: 1, Kind: "file"}}
 	p.SetExamples("good example", "bad example")
 	return p
 }
@@ -100,6 +101,22 @@ func TestPatternRepository_SaveRejectsNilPattern(t *testing.T) {
 	err := repo.Save(context.Background(), nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid pattern")
+}
+
+func TestPatternRepository_ApplyPatternMutationValidatesBeforeDeleting(t *testing.T) {
+	repo := setupTestDB(t)
+	existing := newTestPattern("existing", "Existing", domain.CategoryError, 0.9)
+	require.NoError(t, repo.Save(context.Background(), existing))
+
+	err := repo.ApplyPatternMutation(context.Background(), domain.PatternMutation{
+		DeleteIDs: []string{existing.ID},
+		Save:      []*domain.Pattern{nil},
+	})
+
+	require.Error(t, err)
+	got, getErr := repo.Get(context.Background(), existing.ID)
+	require.NoError(t, getErr)
+	require.Equal(t, existing.ID, got.ID)
 }
 
 func TestPatternRepository_SaveRemovesLegacyCategoryCopies(t *testing.T) {
@@ -661,6 +678,17 @@ func TestPatternRepository_MarkCommitAnalyzedStoresTimestampedRecords(t *testing
 	require.Equal(t, "abc123", records[0].Hash)
 	require.False(t, records[0].CreatedAt.IsZero())
 	require.False(t, records[0].UpdatedAt.IsZero())
+}
+
+func TestPatternRepository_MarkCommitsAnalyzedStoresBatch(t *testing.T) {
+	repo := setupTestDB(t)
+	ctx := context.Background()
+
+	require.NoError(t, repo.MarkCommitsAnalyzed(ctx, []string{"abc123", "def456", "abc123"}))
+
+	commits, err := repo.GetAnalyzedCommits(ctx)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"abc123", "def456"}, commits)
 }
 
 func TestPatternRepository_FileAnalysisTracking(t *testing.T) {

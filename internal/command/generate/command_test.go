@@ -109,7 +109,7 @@ func TestRunGenerateWorkspaceUsesOutputFlagForRootSkill(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 
 	require.FileExists(t, filepath.Join(workspaceRoot, "custom", "workspace-root", "SKILL.md"))
-	require.NoFileExists(t, filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md"))
 }
 
 func TestRunGenerateWorkspaceNoReferencesSkipsRootAndChildReferences(t *testing.T) {
@@ -125,7 +125,7 @@ func TestRunGenerateWorkspaceNoReferencesSkipsRootAndChildReferences(t *testing.
 	cmd.SetArgs([]string{"skills", "--no-references"})
 	require.NoError(t, cmd.Execute())
 
-	rootOutputPath := filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace")
+	rootOutputPath := filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace-dev")
 	childOutputPath := filepath.Join(childRoot, ".agents", "skills", "backend-dev")
 	require.FileExists(t, filepath.Join(rootOutputPath, "SKILL.md"))
 	require.NoDirExists(t, filepath.Join(rootOutputPath, "references"))
@@ -146,7 +146,7 @@ func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
 	executeGenerateSkillsCommand(t, cont)
 
 	require.FileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
-	rootOverview := readGenerateFile(t, workspaceRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md")
+	rootOverview := readGenerateFile(t, workspaceRoot, ".agents", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	require.Contains(t, rootOverview, "backend/.agents/skills/backend-dev/SKILL.md")
 	require.Contains(t, rootOverview, "backend Development Skill")
 	require.NotContains(t, rootOverview, "backend 开发技能")
@@ -211,25 +211,25 @@ func TestRunGenerateDoesNotCallSummary(t *testing.T) {
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 
-func TestRunGenerateWorkspaceSkipsManualChildSkillAndKeepsRootGenerated(t *testing.T) {
+func TestRunGenerateWorkspaceOverwritesExistingChildSkill(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()
 	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
 
 	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
 	seedGenerateChildMemory(t, childRoot, "Backend Rule")
-	manualSkillDir := filepath.Join(childRoot, ".agents", "skills", "backend-dev")
-	require.NoError(t, os.MkdirAll(manualSkillDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(manualSkillDir, "SKILL.md"), []byte("# Manual Backend Skill\n"), 0644))
+	existingSkillDir := filepath.Join(childRoot, ".agents", "skills", "backend-dev")
+	require.NoError(t, os.MkdirAll(existingSkillDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(existingSkillDir, "SKILL.md"), []byte("# Existing Backend Skill\n"), 0644))
 	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
 	defer cont.Close()
 
 	executeGenerateSkillsCommand(t, cont)
 
-	require.Equal(t, "# Manual Backend Skill\n", readGenerateFile(t, childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
-	require.NoFileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "references", "project-spec.md"))
-	rootOverview := readGenerateFile(t, workspaceRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md")
-	require.Contains(t, rootOverview, "Manual Backend Skill")
+	require.NotEqual(t, "# Existing Backend Skill\n", readGenerateFile(t, childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
+	require.FileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "references", "project-spec.md"))
+	rootOverview := readGenerateFile(t, workspaceRoot, ".agents", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
+	require.NotContains(t, rootOverview, "Existing Backend Skill")
 }
 
 func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
@@ -283,9 +283,8 @@ func TestRunGenerateWorkspacePrintsConcurrentChildProjectProgress(t *testing.T) 
 	require.Contains(t, output, "写入技能文件")
 	require.Contains(t, output, "整理生成数据")
 	require.Contains(t, output, "读取项目画像")
-	require.Contains(t, output, "检查输出目录")
-	require.Contains(t, output, "backend      6/6")
-	require.Contains(t, output, "frontend     6/6")
+	require.Contains(t, output, "backend      5/5")
+	require.Contains(t, output, "frontend     5/5")
 	require.Contains(t, output, "2/2 生成工作区子项目 skills")
 	require.NotContains(t, output, "2/2 - 写入技能文件")
 	require.NotContains(t, output, "统计已学习模式")

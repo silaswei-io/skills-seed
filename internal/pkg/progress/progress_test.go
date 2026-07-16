@@ -245,6 +245,7 @@ func TestMultiTrackerRendersAggregateCountAndTaskLines(t *testing.T) {
 func TestMultiTrackerRendersPerTaskStepCounts(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := NewMulti([]string{"backend"})
+		defer tracker.Stop()
 		tracker.enabled = true
 		tracker.SetLabel("学习工作区子项目")
 		tracker.SetTaskTotal(5)
@@ -266,6 +267,7 @@ func TestMultiTrackerRendersPerTaskStepCounts(t *testing.T) {
 
 func TestMultiTrackerAlignsPerTaskProgressPanel(t *testing.T) {
 	tracker := NewMulti([]string{"agent", "cluster-manage"})
+	defer tracker.Stop()
 	tracker.enabled = true
 	tracker.SetLabel("学习工作区子项目")
 	tracker.SetTaskTotal(5)
@@ -326,6 +328,7 @@ func TestMultiTrackerRenderClipsLongLinesBeforeTheyWrap(t *testing.T) {
 
 	output := captureStdout(t, func() {
 		tracker := NewMulti([]string{"backend", "front"})
+		defer tracker.Stop()
 		tracker.enabled = true
 		tracker.SetLabel("学习工作区子项目")
 		tracker.SetTaskTotal(5)
@@ -346,6 +349,7 @@ func TestMultiTrackerRenderClipsLongLinesBeforeTheyWrap(t *testing.T) {
 
 func TestMultiTrackerCompletedStepStillAnimatesUntilNextStep(t *testing.T) {
 	tracker := NewMulti([]string{"backend"})
+	defer tracker.Stop()
 	tracker.enabled = true
 	tracker.SetTaskTotal(5)
 

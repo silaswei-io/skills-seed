@@ -1,0 +1,51 @@
+# Check And Hook
+
+Use `check` and `hook` for review and pre-commit behavior.
+
+## `skills-seed check`
+
+Purpose:
+
+- Review staged files by default.
+- Review all tracked files with `--all`.
+- Optionally apply AI-assisted fixes in interactive mode.
+
+Flags:
+
+- `--interactive, -i`: allow interactive issue handling.
+- `--all, -a`: check all tracked files instead of staged files.
+
+Use cases:
+
+- Check staged files: `skills-seed check`
+- Check all tracked files: `skills-seed check --all`
+- Non-interactive check: `skills-seed check --interactive=false`
+
+Boundary:
+
+- Use `check` for quality review.
+- Use `sync` or `learn current` for updating learned knowledge.
+
+## Hook Commands
+
+### `skills-seed hook install`
+
+Installs a Git pre-commit hook that delegates to `skills-seed hook run`.
+
+Use when the repository should prompt or check before commits.
+
+### `skills-seed hook run`
+
+Runs the pre-commit hook workflow manually.
+
+Use for debugging hook behavior before committing.
+
+### `skills-seed hook uninstall`
+
+Removes the installed pre-commit hook.
+
+## Hook Troubleshooting
+
+- If the hook cannot find `skills-seed`, ensure the binary directory is on PATH for non-interactive shells.
+- If hook behavior differs from manual runs, compare working directory and environment variables.
+- If hooks are too slow, keep routine learning manual and use `check` for staged files.

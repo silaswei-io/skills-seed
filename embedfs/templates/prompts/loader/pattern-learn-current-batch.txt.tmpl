@@ -106,7 +106,6 @@ Allowed categories: {{.AllowedCategories}}
 - Every pattern must include the matching `analysis_unit_id` and `analysis_unit_name`.
 - A pattern must be attributable to the current unit through its paths, route terms, entries, symbols, states, or business vocabulary.
 - Do not move evidence or conclusions between units.
-- `profile_delta` may contain only facts clearly added or changed by evidence from this unit. Do not refresh the whole project profile inside one unit.
 
 # Learning Mode Strategy
 
@@ -115,14 +114,10 @@ Allowed categories: {{.AllowedCategories}}
 - `normal`: cover main capabilities, key technical conventions, important exceptional paths, and reusable entries.
 - `deep`: read deeper branches, exception or compensation paths, external dependency behavior, and cross-module constraints when directly needed.
 
-# Change Profile And Candidate Budget
+# Change Profile And Quality Gate
 
 - **Change profile**: {{if .ChangeProfile}}{{.ChangeProfile}}{{else}}normal{{end}}
-- **Unit candidate limit**: {{.LearningBudget.MaxPatternsPerUnit}}
-- **Run candidate limit**: {{.LearningBudget.MaxPatternsPerRun}}
-- **Minimum confidence**: {{printf "%.2f" .LearningBudget.MinConfidence}}
-
-For `micro`, normally return no new patterns unless user context asks for learning or evidence proves a critical invariant. For `minor`, keep only the strongest candidates. Merge or drop weak candidates instead of splitting them.
+For `micro`, return no patterns unless evidence proves a durable project rule or critical invariant. For every profile, return all candidates that pass the quality gate and return no weak candidates merely to increase coverage.
 
 # Reading Strategy
 
@@ -192,7 +187,7 @@ Before returning JSON, validate every candidate:
    - It must pass direct evidence, project-specificity, actionability, routeability, non-duplication, and conservative confidence.
    - If you cannot state the project-specific risk created by violating it, do not output it.
 1. Evidence check:
-   - `good_example` must be copied verbatim from source read during this task.
+   - `good_example` must be one continuous excerpt copied verbatim from source read during this task. Do not insert omission markers.
    - `good_example` should be 5-12 lines unless the complete relevant function is shorter; do not copy a full long function.
    - `evidence_locations` contains pattern-level source evidence locations. `line` must be one 1-based integer, never a range.
    - Do not invent code, paths, signatures, line numbers, call relationships, evidence paths or line numbers, or behavior.
@@ -210,13 +205,9 @@ Before returning JSON, validate every candidate:
 6. Confidence check:
    - Use `confidence >= 0.90` only for direct repeated evidence or clear cross-file evidence.
    - `frequency` must count independent evidence occurrences, not adjacent snippets from one file.
-7. Project profile delta check:
-   - Fill `profile_delta` only with structured facts newly added or changed by source evidence read for the current unit.
-   - `profile_delta.validation_commands` may include only commands that validate completed changes, such as tests, static analysis, builds, code generation, or contract generation. Do not output setup, service startup, deployment, debugging, dependency fetching, or demos.
-   - `profile_delta.validation_commands[].command` must be the exact full validation command shown by evidence; keep `scope_paths` and `evidence` arrays only when repository evidence confirms the covered path. Leave scope fields empty for broad or unclear commands.
-   - `profile_delta.key_modules`, `profile_delta.common_utils`, and `profile_delta.business_methods` are evidence-backed entries, not search hints. Do not output entries whose path, file, signature, or location is unconfirmed.
-   - `profile_delta.business_methods` must keep `usage`, `type`, `function`, `prerequisites`, and `returns` as separate fields.
-   - Set `profile_refresh_recommended.needed` to `true` only for broad structural, module boundary, or technology changes that cannot be expressed as precise deltas.
+7. Project profile refresh check:
+   - Project profile facts are handled by the independent profile analysis stage; do not include them in patterns.
+   - Set `profile_refresh_recommended.needed` to `true` only for broad structural, module boundary, or technology changes that require that stage to run.
 8. Business coverage check:
    - Check each unit's business subdomains, including runtime, async, event, task, initialization, config-driven, and external-dependency-driven behavior.
    - Output a business pattern only when it passes the Candidate Admission Gate.

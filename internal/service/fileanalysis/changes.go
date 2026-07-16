@@ -181,6 +181,10 @@ func (c *FileChanges) addSkipped(path string, reason SkipReason) {
 
 func fingerprintLearnFile(projectRoot string, scope domain.FileAnalysisScope, relPath string) (domain.FileAnalysisRecord, error) {
 	path := filepath.Join(projectRoot, filepath.FromSlash(relPath))
+	path, err := utils.CanonicalPathWithinRoot(projectRoot, path)
+	if err != nil {
+		return domain.FileAnalysisRecord{}, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return domain.FileAnalysisRecord{}, err

@@ -14,6 +14,7 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -170,6 +171,9 @@ func (s *AnalyzerService) AnalyzePatterns(ctx context.Context, req *AnalyzePatte
 			err,
 		)
 	}
+	if err := agent.RequireResult(result, "AnalyzeCode"); err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzePatternsFailed"), err)
+	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.analyze_patterns",
@@ -188,16 +192,17 @@ func (s *AnalyzerService) AnalyzePatterns(ctx context.Context, req *AnalyzePatte
 
 // AnalyzeProjectRequest 项目分析请求
 type AnalyzeProjectRequest struct {
-	ProjectName         string
-	RootPath            string
-	Language            string
-	Structure           string
-	StructuralContext   string
-	ReadmePath          string
-	MainFiles           []string
-	ExistingProfileJSON string
-	FocusPaths          []string
-	UserContext         string
+	ProjectName          string
+	RootPath             string
+	Language             string
+	Structure            string
+	StructuralContext    string
+	ReadmePath           string
+	MainFiles            []string
+	EngineeringKnowledge []string
+	ExistingProfileJSON  string
+	FocusPaths           []string
+	UserContext          string
 }
 
 // AnalyzeProjectResult 项目分析结果
@@ -248,18 +253,26 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	if req.StructuralContext != "" {
 		structuralContext = req.StructuralContext
 	}
+	engineeringKnowledge := req.EngineeringKnowledge
+	if engineeringKnowledge == nil {
+		engineeringKnowledge, err = engineeringKnowledgePaths(req.RootPath)
+		if err != nil {
+			return nil, fmt.Errorf("collect engineering knowledge: %w", err)
+		}
+	}
 
 	agentReq := &agent.AnalyzeProjectRequest{
-		ProjectName:         req.ProjectName,
-		RootPath:            req.RootPath,
-		Language:            req.Language,
-		Structure:           req.Structure,
-		StructuralContext:   structuralContext,
-		ReadmePath:          req.ReadmePath,
-		MainFiles:           req.MainFiles,
-		ExistingProfileJSON: req.ExistingProfileJSON,
-		FocusPaths:          req.FocusPaths,
-		UserContext:         req.UserContext,
+		ProjectName:          req.ProjectName,
+		RootPath:             req.RootPath,
+		Language:             req.Language,
+		Structure:            req.Structure,
+		StructuralContext:    structuralContext,
+		ReadmePath:           req.ReadmePath,
+		MainFiles:            req.MainFiles,
+		EngineeringKnowledge: engineeringKnowledge,
+		ExistingProfileJSON:  req.ExistingProfileJSON,
+		FocusPaths:           req.FocusPaths,
+		UserContext:          req.UserContext,
 	}
 
 	result, err := s.agent.AnalyzeProject(ctx, agentReq)
@@ -274,6 +287,9 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 			i18n.Get("AnalyzerAnalyzeProjectFailed"),
 			err,
 		)
+	}
+	if err := agent.RequireResult(result, "AnalyzeProject"); err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeProjectFailed"), err)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -322,13 +338,11 @@ type AnalyzeCurrentCodebaseRequest struct {
 	KnownPatternsCount int
 	UserContext        string
 	ChangeProfile      string
-	LearningBudget     config.LearningBudget
 }
 
 // AnalyzeCurrentCodebaseResult 当前代码库分析结果
 type AnalyzeCurrentCodebaseResult struct {
 	Patterns                  []domain.Pattern
-	ProfileDelta              domain.ProjectProfileDelta
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
 }
 
@@ -338,18 +352,16 @@ type AnalyzeCurrentCodebaseBatchUnit struct {
 }
 
 type AnalyzeCurrentCodebaseBatchOptions struct {
-	RuntimeLabel   string
-	LearningMode   config.LearningMode
-	ChangeProfile  string
-	LearningBudget config.LearningBudget
-	RunContext     *CodebaseRunContext
-	Units          []AnalyzeCurrentCodebaseBatchUnit
+	RuntimeLabel  string
+	LearningMode  config.LearningMode
+	ChangeProfile string
+	RunContext    *CodebaseRunContext
+	Units         []AnalyzeCurrentCodebaseBatchUnit
 }
 
 type AnalyzeCurrentCodebaseUnitResult struct {
 	AnalysisUnit              domain.AnalysisUnit
 	Patterns                  []domain.Pattern
-	ProfileDelta              domain.ProjectProfileDelta
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
 }
 
@@ -399,6 +411,9 @@ func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalys
 	if err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
+	if err := agent.RequireResult(result, "PlanAnalysisUnits"); err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
 	return result.Units, nil
 }
 
@@ -445,7 +460,6 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		DiffFiles:         req.DiffFiles,
 		UserContext:       req.UserContext,
 		ChangeProfile:     req.ChangeProfile,
-		LearningBudget:    req.LearningBudget,
 	}
 
 	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
@@ -461,18 +475,19 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 			err,
 		)
 	}
+	if err := agent.RequireResult(result, "AnalyzeCurrentCodebase"); err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.analyze_current_codebase",
 		"duration", time.Since(startedAt),
 		"patterns_count", len(result.Patterns),
-		"profile_delta", !result.ProfileDelta.IsZero(),
 		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
 	)
 
 	return &AnalyzeCurrentCodebaseResult{
-		Patterns:                  result.Patterns,
-		ProfileDelta:              result.ProfileDelta,
+		Patterns:                  validateCurrentPatterns(req.RootPath, result.Patterns),
 		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
 	}, nil
 }
@@ -512,7 +527,6 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		MainFiles:         append([]string(nil), runContext.MainFiles...),
 		UserContext:       runtimecontext.UserContext(ctx),
 		ChangeProfile:     opts.ChangeProfile,
-		LearningBudget:    opts.LearningBudget,
 		StructuralContext: "",
 	}
 
@@ -537,6 +551,9 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		)
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
+	if err := agent.RequireResult(result, "AnalyzeCurrentCodebaseBatch"); err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
 
 	out := make([]AnalyzeCurrentCodebaseUnitResult, 0, len(result.Units))
 	for _, unitResult := range result.Units {
@@ -544,7 +561,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		if unit.ID == "" && len(opts.Units) == 1 {
 			unit = opts.Units[0].AnalysisUnit
 		}
-		patterns := unitResult.Patterns
+		patterns := validateCurrentPatterns(projectRoot, unitResult.Patterns)
 		for i := range patterns {
 			if patterns[i].AnalysisUnitID == "" {
 				patterns[i].AnalysisUnitID = unit.ID
@@ -556,7 +573,6 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		out = append(out, AnalyzeCurrentCodebaseUnitResult{
 			AnalysisUnit:              unit,
 			Patterns:                  patterns,
-			ProfileDelta:              unitResult.ProfileDelta,
 			ProfileRefreshRecommended: unitResult.ProfileRefreshRecommended,
 		})
 	}

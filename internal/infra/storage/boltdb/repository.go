@@ -197,41 +197,68 @@ func (r *PatternRepository) GetHighConfidence(ctx context.Context, threshold flo
 
 // Save 保存模式
 func (r *PatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
-	if p == nil {
-		return fmt.Errorf("invalid pattern")
+	if err := validatePatternForSave(p); err != nil {
+		return err
 	}
-	p.Category = domain.NormalizePatternCategory(p.Category)
-	if !p.IsValid() {
-		return fmt.Errorf("invalid pattern")
-	}
+	return r.db.Update(func(tx *bolt.Tx) error {
+		return savePatternInTx(tx.Bucket(bucketPatterns), p)
+	})
+}
 
+// ApplyPatternMutation 在一个 Bolt 写事务中应用模式删除和保存。
+func (r *PatternRepository) ApplyPatternMutation(ctx context.Context, mutation domain.PatternMutation) error {
+	for _, pattern := range mutation.Save {
+		if err := validatePatternForSave(pattern); err != nil {
+			return err
+		}
+	}
 	return r.db.Update(func(tx *bolt.Tx) error {
 		mainBucket := tx.Bucket(bucketPatterns)
-
-		// 获取或创建该分类的子bucket
-		categoryKey := []byte(p.Category)
-		categoryBucket, err := mainBucket.CreateBucketIfNotExists(categoryKey)
-		if err != nil {
-			return fmt.Errorf("failed to create category bucket %s: %w", p.Category, err)
+		for _, id := range mutation.DeleteIDs {
+			if err := deletePatternInTx(mainBucket, id); err != nil {
+				return err
+			}
 		}
-
-		previous, err := findPatternInTx(mainBucket, p.ID)
-		if err != nil {
-			return err
+		for _, pattern := range mutation.Save {
+			if err := savePatternInTx(mainBucket, pattern); err != nil {
+				return err
+			}
 		}
-		p.RefreshMetrics()
-		p.NormalizeForSave(previous, time.Now())
-
-		// 在该分类的子bucket中保存模式
-		data, err := json.Marshal(p)
-		if err != nil {
-			return err
-		}
-		if err := categoryBucket.Put([]byte(p.ID), data); err != nil {
-			return err
-		}
-		return deletePatternCopiesOutsideCategory(mainBucket, p.ID, p.Category)
+		return nil
 	})
+}
+
+func validatePatternForSave(pattern *domain.Pattern) error {
+	if pattern == nil {
+		return fmt.Errorf("invalid pattern")
+	}
+	pattern.Category = domain.NormalizePatternCategory(pattern.Category)
+	if !pattern.IsValid() {
+		return fmt.Errorf("invalid pattern")
+	}
+	return nil
+}
+
+func savePatternInTx(mainBucket *bolt.Bucket, pattern *domain.Pattern) error {
+	categoryKey := []byte(pattern.Category)
+	categoryBucket, err := mainBucket.CreateBucketIfNotExists(categoryKey)
+	if err != nil {
+		return fmt.Errorf("failed to create category bucket %s: %w", pattern.Category, err)
+	}
+	previous, err := findPatternInTx(mainBucket, pattern.ID)
+	if err != nil {
+		return err
+	}
+	pattern.RefreshMetrics()
+	pattern.NormalizeForSave(previous, time.Now())
+	data, err := json.Marshal(pattern)
+	if err != nil {
+		return err
+	}
+	if err := categoryBucket.Put([]byte(pattern.ID), data); err != nil {
+		return err
+	}
+	return deletePatternCopiesOutsideCategory(mainBucket, pattern.ID, pattern.Category)
 }
 
 // RecordPatternHits 保存 check 命中记录。
@@ -510,16 +537,17 @@ func (r *PatternRepository) FindSimilar(ctx context.Context, pattern *domain.Pat
 // Delete 删除模式
 func (r *PatternRepository) Delete(ctx context.Context, id string) error {
 	return r.db.Update(func(tx *bolt.Tx) error {
-		mainBucket := tx.Bucket(bucketPatterns)
+		return deletePatternInTx(tx.Bucket(bucketPatterns), id)
+	})
+}
 
-		// 在所有分类中查找并删除
-		return mainBucket.ForEach(func(categoryKey, _ []byte) error {
-			categoryBucket := mainBucket.Bucket(categoryKey)
-			if categoryBucket == nil {
-				return nil
-			}
-			return categoryBucket.Delete([]byte(id))
-		})
+func deletePatternInTx(mainBucket *bolt.Bucket, id string) error {
+	return mainBucket.ForEach(func(categoryKey, _ []byte) error {
+		categoryBucket := mainBucket.Bucket(categoryKey)
+		if categoryBucket == nil {
+			return nil
+		}
+		return categoryBucket.Delete([]byte(id))
 	})
 }
 
@@ -548,29 +576,32 @@ func (r *PatternRepository) Count(ctx context.Context) (int, error) {
 
 // MarkCommitAnalyzed 标记commit已被分析
 func (r *PatternRepository) MarkCommitAnalyzed(ctx context.Context, commitHash string) error {
+	return r.MarkCommitsAnalyzed(ctx, []string{commitHash})
+}
+
+// MarkCommitsAnalyzed 在一个 Bolt 写事务中标记一批 commit。
+func (r *PatternRepository) MarkCommitsAnalyzed(ctx context.Context, commitHashes []string) error {
 	return r.db.Update(func(tx *bolt.Tx) error {
 		metaBucket := tx.Bucket(bucketMetadata)
-
-		// 获取已存在的列表
 		records, err := readAnalyzedCommitRecords(metaBucket.Get(keyAnalyzedCommits))
 		if err != nil {
 			return err
 		}
-		// 添加新的commit（如果不存在）
+		existing := make(map[string]struct{}, len(records))
 		for _, record := range records {
-			if record.Hash == commitHash {
-				return nil // 已存在
-			}
+			existing[record.Hash] = struct{}{}
 		}
-
 		now := time.Now()
-		records = append(records, domain.AnalyzedCommitRecord{
-			Hash:      commitHash,
-			CreatedAt: now,
-			UpdatedAt: now,
-		})
-
-		// 保存更新后的列表
+		for _, commitHash := range commitHashes {
+			if commitHash == "" {
+				continue
+			}
+			if _, ok := existing[commitHash]; ok {
+				continue
+			}
+			records = append(records, domain.AnalyzedCommitRecord{Hash: commitHash, CreatedAt: now, UpdatedAt: now})
+			existing[commitHash] = struct{}{}
+		}
 		updated, err := json.Marshal(records)
 		if err != nil {
 			return err

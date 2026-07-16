@@ -1,25 +1,18 @@
 package parser
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
 // ParseSelectFilesResult 解析 AI 文件筛选器输出。
 func ParseSelectFilesResult(output string) (*agent.SelectFilesResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, err
-	}
 	var result aicontract.SelectFilesOutput
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 	return &agent.SelectFilesResult{
@@ -32,19 +25,9 @@ func ParseSelectFilesResult(output string) (*agent.SelectFilesResult, error) {
 
 // ParseAnalyzeResult 解析代码分析结果。
 func ParseAnalyzeResult(output string) (*agent.AnalyzeResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentExtractJSONFallback"),
-			"method", "ParseAnalyzeResult",
-			"error", err,
-			"output_length", len(output),
-		)
-		return nil, err
-	}
-
 	var result aicontract.AnalyzeCodeOutput
 
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 
@@ -69,22 +52,9 @@ func ParseAnalyzeResult(output string) (*agent.AnalyzeResult, error) {
 
 // ParseGenerateFixesResult 解析生成修复结果。
 func ParseGenerateFixesResult(output string) (*agent.GenerateFixesResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentExtractJSONFallback"),
-			"method", "ParseGenerateFixesResult",
-			"error", err,
-			"output_length", len(output),
-		)
-		return &agent.GenerateFixesResult{
-			Fixes:      make(map[string]string),
-			Confidence: 0.0,
-		}, nil
-	}
-
 	var result aicontract.GenerateFixesOutput
 
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 
@@ -98,18 +68,8 @@ func ParseGenerateFixesResult(output string) (*agent.GenerateFixesResult, error)
 
 // ParseLearnResult 解析学习结果。
 func ParseLearnResult(output string) (*agent.LearnResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentExtractJSONFallback"),
-			"method", "ParseLearnResult",
-			"error", err,
-			"output_length", len(output),
-		)
-		return nil, err
-	}
-
 	var result aicontract.LearnPatternsOutput
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 	return &agent.LearnResult{Patterns: patternsToDomain(result.Patterns, domain.SourceLearned, time.Now())}, nil
@@ -117,18 +77,8 @@ func ParseLearnResult(output string) (*agent.LearnResult, error) {
 
 // ParseBatchLearnResult 解析批量学习结果。
 func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentExtractJSONFallback"),
-			"method", "ParseBatchLearnResult",
-			"error", err,
-			"output_length", len(output),
-		)
-		return nil, err
-	}
-
 	var result aicontract.LearnPatternsOutput
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 	return &agent.BatchLearnResult{Patterns: patternsToDomain(result.Patterns, domain.SourceLearned, time.Now())}, nil
@@ -136,14 +86,9 @@ func ParseBatchLearnResult(output string) (*agent.BatchLearnResult, error) {
 
 // ParseCuratePatternsResult 解析模式策展结果。
 func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
-	}
-
 	var result aicontract.CuratePatternsOutput
 
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 
@@ -175,13 +120,8 @@ func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, erro
 
 // ParseUserDefinePatternResult 解析用户自定义模式结果。
 func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentNoValidJSONFound"), err)
-	}
-
 	var payload aicontract.PatternOutput
-	if err := parseJSONPayload(jsonStr, &payload); err != nil {
+	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
 
@@ -191,15 +131,8 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 
 // ParseAnalyzeProjectResult 解析项目分析结果。
 func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		logger.Error(i18n.Get("AgentExtractJSONFailed"), "error", err)
-		logger.Error(i18n.Get("AgentOriginalOutput"), "output", output)
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
-	}
-
 	var result aicontract.ProjectProfileOutput
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 
@@ -208,43 +141,22 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 
 // ParseAnalyzeCurrentCodebaseResult 解析当前代码库分析结果。
 func ParseAnalyzeCurrentCodebaseResult(output string) (*agent.AnalyzeCurrentCodebaseResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentExtractJSONFallback"),
-			"method", "ParseAnalyzeCurrentCodebaseResult",
-			"error", err,
-			"output_length", len(output),
-		)
-		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
-	}
-
 	var payload aicontract.AnalyzeCurrentCodebaseOutput
-	if err := parseJSONPayload(jsonStr, &payload); err != nil {
+	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
 	return &agent.AnalyzeCurrentCodebaseResult{
-		Patterns:                  patternsToDomain(payload.Patterns, domain.SourceInit, now),
-		ProfileDelta:              projectProfileDeltaToDomain(payload.ProfileDelta, now),
+		Patterns:                  patternsToDomain(payload.Patterns, domain.SourceLearnedCurrent, now),
 		ProfileRefreshRecommended: profileRefreshRecommendationToAgent(payload.ProfileRefreshRecommended),
 	}, nil
 }
 
 // ParseAnalyzeCurrentCodebaseBatchResult 解析当前代码库批量分析结果。
 func ParseAnalyzeCurrentCodebaseBatchResult(output string) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentExtractJSONFallback"),
-			"method", "ParseAnalyzeCurrentCodebaseBatchResult",
-			"error", err,
-			"output_length", len(output),
-		)
-		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
-	}
-
 	var payload aicontract.AnalyzeCurrentCodebaseBatchOutput
-	if err := parseJSONPayload(jsonStr, &payload); err != nil {
+	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
 
@@ -254,8 +166,7 @@ func ParseAnalyzeCurrentCodebaseBatchResult(output string) (*agent.AnalyzeCurren
 		units = append(units, agent.AnalyzeCurrentCodebaseUnitResult{
 			UnitID:                    unit.UnitID,
 			UnitName:                  unit.UnitName,
-			Patterns:                  patternsToDomain(unit.Patterns, domain.SourceInit, now),
-			ProfileDelta:              projectProfileDeltaToDomain(unit.ProfileDelta, now),
+			Patterns:                  patternsToDomain(unit.Patterns, domain.SourceLearnedCurrent, now),
 			ProfileRefreshRecommended: profileRefreshRecommendationToAgent(unit.ProfileRefreshRecommended),
 		})
 	}
@@ -271,19 +182,13 @@ func profileRefreshRecommendationToAgent(in aicontract.ProfileRefreshRecommendat
 
 // ParseOptimizeWorkflowResult 解析工作流优化结果。
 func ParseOptimizeWorkflowResult(output string) (*agent.OptimizeWorkflowResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentNoValidJSONFound"), err)
-	}
-
 	var result aicontract.OptimizeWorkflowOutput
-	if err := parseJSONPayload(jsonStr, &result); err != nil {
+	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
 	return &agent.OptimizeWorkflowResult{
-		Title:       strings.TrimSpace(result.Title),
-		Content:     strings.TrimSpace(result.Content),
-		Summary:     strings.TrimSpace(result.Summary),
-		Suggestions: result.Suggestions,
+		Title:     strings.TrimSpace(result.Title),
+		Content:   strings.TrimSpace(result.Content),
+		Conflicts: result.Conflicts,
 	}, nil
 }

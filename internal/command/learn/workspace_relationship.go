@@ -117,6 +117,9 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		if err != nil {
 			return err
 		}
+		if err := agent.RequireResult(profile, "AnalyzeWorkspaceProfile"); err != nil {
+			return err
+		}
 		profile = workspacediscovery.MergeProfile(baseProfile, profile)
 		profile.GeneratedAt = generatedAt
 		return nil
@@ -140,7 +143,10 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		if err != nil {
 			return err
 		}
-		spec = workspacediscovery.MergeSpec(workspacediscovery.SpecFromProfile(profile), spec)
+		if err := agent.RequireResult(spec, "AnalyzeWorkspaceSpec"); err != nil {
+			return err
+		}
+		spec = workspacediscovery.MergeSpec(workspacediscovery.SpecFromProfile(profile, cont.ConfigRepo.GetSkillsLocale()), spec)
 		spec.GeneratedAt = generatedAt
 		return nil
 	}); err != nil {
@@ -256,7 +262,7 @@ func saveWorkspaceRelationshipFallback(ctx context.Context, cont *container.Cont
 		}
 	}
 	if cont.WorkspaceSpecRepo != nil {
-		spec := workspacediscovery.SpecFromProfile(profile)
+		spec := workspacediscovery.SpecFromProfile(profile, cont.ConfigRepo.GetSkillsLocale())
 		spec.GeneratedAt = generatedAt
 		if err := cont.WorkspaceSpecRepo.Save(ctx, spec); err != nil {
 			return err

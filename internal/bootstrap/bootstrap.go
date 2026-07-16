@@ -10,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/check"
+	cliskillscmd "github.com/silaswei-io/skills-seed/internal/command/cliskills"
 	"github.com/silaswei-io/skills-seed/internal/command/generate"
 	"github.com/silaswei-io/skills-seed/internal/command/hook"
 	initcmd "github.com/silaswei-io/skills-seed/internal/command/init"
@@ -168,6 +169,7 @@ func configureCobraDefaults(rootCmd *cobra.Command) {
 func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(initcmd.Cmd())
 	rootCmd.AddCommand(initcmd.ResetCmd())
+	rootCmd.AddCommand(cliskillscmd.Cmd())
 	rootCmd.AddCommand(workspacecmd.Cmd(cont, workspacecmd.Dependencies{
 		EnsureChildInitialized: initcmd.EnsureWorkspaceChildInitializedAt,
 	}))
@@ -203,7 +205,7 @@ func commandNeedsProjectRuntime(args []string) bool {
 	}
 
 	switch cleaned[0] {
-	case "help", "init", "hook", "log":
+	case "help", "init", "cli-skills", "hook", "log":
 		return false
 	case "add", "check", "reset", "sync":
 		return true

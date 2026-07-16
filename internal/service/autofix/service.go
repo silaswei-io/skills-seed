@@ -77,9 +77,11 @@ func (s *AutofixService) fixWithPatch(ctx context.Context, issues []domain.Issue
 
 	// 构建 patch 内容
 	var patchContent strings.Builder
-	patchContent.WriteString("# Auto-generated patch by skills-seed\n")
-	patchContent.WriteString(fmt.Sprintf("# Generated at: %s\n", time.Now().Format(time.RFC3339)))
-	patchContent.WriteString(fmt.Sprintf("# Issues fixed: %d\n\n", len(issues)))
+	patchContent.WriteString(i18n.GetWithParams("AutoFixPatchHeader", map[string]interface{}{
+		"GeneratedAt": time.Now().Format(time.RFC3339),
+		"IssueCount":  len(issues),
+	}))
+	patchContent.WriteString("\n\n")
 
 	// 为每个文件生成 diff
 	for file, fix := range fixes {
@@ -103,7 +105,9 @@ func (s *AutofixService) fixWithPatch(ctx context.Context, issues []domain.Issue
 		Strategy:   StrategyPatch,
 		Success:    true,
 		OutputPath: patchPath,
-		Message:    fmt.Sprintf(i18n.Get("AutoFixPatchCreated"), patchPath),
+		Message: i18n.GetWithParams("AutoFixPatchCreated", map[string]interface{}{
+			"Path": patchPath,
+		}),
 	}, nil
 }
 
@@ -147,7 +151,9 @@ func (s *AutofixService) fixWithBackup(ctx context.Context, issues []domain.Issu
 		Strategy:   StrategyBackup,
 		Success:    true,
 		OutputPath: backupPath,
-		Message:    fmt.Sprintf(i18n.Get("AutoFixBackupCreated"), backupPath),
+		Message: i18n.GetWithParams("AutoFixBackupCreated", map[string]interface{}{
+			"Path": backupPath,
+		}),
 	}, nil
 }
 
@@ -176,7 +182,9 @@ func (s *AutofixService) fixWithStash(ctx context.Context, issues []domain.Issue
 	return &FixResult{
 		Strategy: StrategyStash,
 		Success:  true,
-		Message:  fmt.Sprintf(i18n.Get("AutoFixStashCreated"), stashMessage),
+		Message: i18n.GetWithParams("AutoFixStashCreated", map[string]interface{}{
+			"Message": stashMessage,
+		}),
 	}, nil
 }
 
@@ -209,7 +217,9 @@ func (s *AutofixService) fixWithBranch(ctx context.Context, issues []domain.Issu
 		Strategy:   StrategyBranch,
 		Success:    true,
 		OutputPath: branchName,
-		Message:    fmt.Sprintf(i18n.Get("AutoFixBranchCreated"), branchName),
+		Message: i18n.GetWithParams("AutoFixBranchCreated", map[string]interface{}{
+			"BranchName": branchName,
+		}),
 	}, nil
 }
 

@@ -1,0 +1,78 @@
+# Workflow
+
+Use `skills-seed workflow` to create or update durable task procedures.
+
+Workflows are for repeatable processes such as release, deployment, migration, code generation, review, or multi-step validation. They are rendered into generated Skills so future agents can follow them.
+
+## Purpose
+
+`workflow` turns user guidance into structured workflow knowledge:
+
+- Name and identity.
+- Applicability.
+- Ordered steps.
+- Preconditions and validation.
+- Project or workspace scope.
+
+## Flags
+
+- `--name`: workflow name. If omitted, the agent derives one from context.
+- `--context`: workflow guidance text.
+- `--overwrite`: replace an existing workflow with the same identity instead of merging.
+- `--child`: in workspace mode, apply the workflow to one child project by ID or path.
+
+## Inspect Existing Workflows
+
+- List summaries: `skills-seed workflow show`
+- List summaries as structured data: `skills-seed workflow show --format json`
+- Inspect one workflow: `skills-seed workflow show <workflow-id> --format json`
+- Inspect a child scope: `skills-seed workflow show --child backend --format json`
+
+The list form is intentionally lightweight. Use the detail form when complete workflow content is needed.
+
+## Use Cases
+
+- Add release flow: `skills-seed workflow --name release --context "Before release, run tests, check config, build artifacts, tag, then smoke test"`
+- Merge new guidance into existing deploy flow: `skills-seed workflow --name deploy --context "Also verify database migrations and rollback scripts"`
+- Replace an existing flow: `skills-seed workflow --name deploy --context "Use only this new deployment process" --overwrite`
+- Add child workflow in workspace mode: `skills-seed workflow --child backend --name deploy --context "Backend deployment process"`
+
+## Merge Versus Overwrite
+
+Default behavior merges guidance with an existing workflow of the same identity.
+
+Use merge when:
+
+- The old workflow remains mostly correct.
+- The user says "also", "add", "supplement", or "include".
+
+Use `--overwrite` when:
+
+- The user says "replace", "rewrite", "only use this", or "the previous process is wrong".
+- The old workflow should not influence future generated Skills.
+
+## Name Selection
+
+Use `--name` when the workflow identity matters:
+
+- `release`
+- `deploy`
+- `migration`
+- `api-change`
+- `schema-update`
+
+Omit `--name` only when it is acceptable for the agent to infer a name.
+
+## Workspace Boundary
+
+In workspace mode:
+
+- Omit `--child` for workspace-level processes such as cross-project release or root CI workflow.
+- Use `--child <id-or-path>` for child-specific workflows.
+- A child workflow should not be stored as a workspace workflow unless it affects workspace routing or cross-project order.
+
+## After Updating Workflows
+
+Run `skills-seed generate skills` to render workflow references into generated Skill output.
+
+Use `skills-seed sync` instead when the workflow update should be part of a broader learning/generation pass.

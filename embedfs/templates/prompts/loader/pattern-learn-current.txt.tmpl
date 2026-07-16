@@ -9,7 +9,7 @@ Based on the provided project information and source evidence, learn project pat
 2. Technical patterns: interface, data access, error handling, configuration, cross-cutting processing, structure, utilities, concurrency, and testing
 3. Reusable business or utility entry points: output `business_method` only when the real signature, location, and usage scenario are clear
 4. Signals needed by the business pattern map: every business pattern must be discoverable by request terms, paths, symbols, or state names
-5. Domain-operation patterns: product operations, resource lifecycles, policy execution, external dependency interactions, and state progression identified from the project's own source terms
+5. Domain operations and domain-operation patterns: product operations, resource lifecycles, policy execution, external dependency interactions, and state progression identified from the project's own source terms
 
 Project structure, architecture narrative, and tech-stack overview are context for this template, not the primary output. Do not output project introductions that lack actionable rules and code evidence.
 
@@ -105,11 +105,10 @@ Allowed categories: {{.AllowedCategories}}
 
 ## Current Analysis Unit Boundary (Highest Priority)
 
-- This run may learn only rules, patterns, business entries, and project-profile deltas that belong to the current analysis unit `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}.
+- This run may learn only rules, patterns, and business entries that belong to the current analysis unit `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}.
 - Read and output only this unit's `FocusPaths`, entry paths, related paths, and adjacent files strictly required to confirm direct call relationships.
 - Do not output other analysis units, other business domains, or whole-project generic conclusions. Other modules seen in structural context or the directory structure are boundary clues only.
 - Every output pattern must be attributable to this analysis unit through its paths, route terms, entry symbols, or business terms. Drop any candidate whose unit ownership is unclear.
-- `profile_delta` may contain only facts clearly added or changed by evidence from this unit. Do not use this unit to refresh the whole project profile.
 {{- end}}
 
 # Learning Mode Strategy
@@ -119,14 +118,10 @@ Allowed categories: {{.AllowedCategories}}
 - `normal`: Default strategy. Cover the unit's main business capabilities, key technical conventions, important exceptional paths, and reusable entries, but do not lower the evidence gate for coverage.
 - `deep`: Read deeper state branches, external dependencies, exception/compensation flows, and cross-module constraints when needed. `deep` permits deeper verification; it does not permit more weak-evidence patterns. Every output still needs routing value and source evidence.
 
-# Change Profile And Candidate Budget
+# Change Profile And Quality Gate
 
 - **Change profile**: {{if .ChangeProfile}}{{.ChangeProfile}}{{else}}normal{{end}}
-- **Unit candidate limit**: {{.LearningBudget.MaxPatternsPerUnit}}
-- **Run candidate limit**: {{.LearningBudget.MaxPatternsPerRun}}
-- **Minimum confidence**: {{printf "%.2f" .LearningBudget.MinConfidence}}
-
-When the change profile is `micro`, do not add new patterns by default unless user context explicitly asks for learning and the candidate captures a critical business invariant. When it is `minor`, output only the few highest-value candidates. Merge or drop weak candidates when the budget would be exceeded; do not split one rule into many patterns.
+When the change profile is `micro`, return no patterns unless evidence proves a durable project rule or critical business invariant. For every profile, return all candidates that pass the quality gate and return no weak candidates merely to increase coverage.
 
 # Time-Saving Reading Strategy
 
@@ -183,7 +178,7 @@ Recommended analysis order: build a business candidate inventory, source busines
 11. Keep patterns cohesive: one pattern expresses one actionable rule. Do not pack state validation, transaction boundaries, external calls, error mapping, and data transformation into one pattern. The same code block may contribute several different-category patterns when each rule is independently evidenced.
 12. Do not output business patterns with no routing value. If the name, rule, and evidence path cannot help a future request find related code, add source-backed routing detail or drop the candidate.
 13. Use `business_method` only for real reusable business entries, cross-module orchestration entries, domain-operation entries, or high-value utility entries. It must include a real signature and file location. Do not attach it to pure dispatch entries, generated code, framework initialization, route registration, scaffolding, or simple record operations.
-14. Extract only frameworks, dependencies, architecture layers, module boundaries, and data flows actually used by the project. Output them only when they form actionable team conventions or clearly change the project profile; do not infer facts from templates, stale dependencies, or common names.
+14. Do not turn framework, dependency, architecture, module, or data-flow facts into patterns unless they independently form actionable project rules. Project profile facts are handled by the independent profile analysis stage.
 15. Merge homogeneous evidence into one pattern. Independent business rules, state branches, error semantics, data transformations, or cross-module constraints may be split into focused patterns, but every pattern must pass the Candidate Admission Gate. Do not apply a fixed output count, and do not output weak-evidence patterns for coverage.
 
 # Output Format
@@ -222,7 +217,7 @@ Before returning JSON, validate every candidate pattern internally:
    - Do not output weak patterns just to make this analysis look productive. Return `patterns: []` when there is no strong candidate.
    - If you cannot state in one sentence what project-specific risk a future change would create by violating it, do not output it.
 1. Evidence check:
-   - `good_example` must be copied verbatim from source code read during this task.
+   - `good_example` must be one continuous excerpt copied verbatim from source code read during this task. Do not insert omission markers.
    - `good_example` must match this template's 5-12 line requirement unless the complete relevant function is shorter.
    - `good_example` must not copy a full long function. Include only the 5-12 lines that best prove the rule. Use `description`, `rule`, and multiple `evidence_locations` for complex flows instead of putting every branch into the code snippet.
    - `evidence_locations` contains pattern-level source evidence locations. Fill real relative paths for each pattern when possible; `line` must be a single 1-based integer, never a range expression such as `29-43`; when the exact line is unknown, provide only `path` and put range notes in `description`.
@@ -250,14 +245,9 @@ Before returning JSON, validate every candidate pattern internally:
    - `frequency` must reflect independent evidence occurrences; do not count adjacent snippets from the same file as multiple occurrences.
    - Lower confidence when evidence is partial.
    - Drop the pattern if evidence is too weak.
-7. Project profile delta check:
-   - Fill `profile_delta` only with structured project facts newly added or changed by source evidence read in this run; omit fields or return empty arrays/strings when there is no evidence.
-   - If you can only write a one-sentence architecture description for a profile layer, evidence is insufficient; leave that delta empty.
-   - Do not put project initialization, full structure documentation, whole-architecture summaries, data-flow overviews, or generic overview text into `profile_delta`; those belong only to a full project profile refresh.
-   - `profile_delta.validation_commands` must include only commands that validate a completed change, such as repository-evidenced tests, checks, static analysis, builds, code generation, or contract generation; do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands. Fill `scope_paths` or `evidence` only when repository evidence confirms the covered path; if the scope is unclear, do not output scoped fields.
-   - `profile_delta.key_modules`, `profile_delta.common_utils`, and `profile_delta.business_methods` are evidence-backed entries, not search hints. Do not output entries whose path, file, signature, or location is unconfirmed.
-   - `profile_delta.business_methods` must include only real business entry points, cross-module orchestration entry points, domain reusable entry points, or high-value utility entry points. Domain operations, resource lifecycles, policy execution, and external dependency interaction entries confirmed by source evidence are domain reusable entry candidates. Do not output ordinary startup, route/entry registration, framework initialization, scaffolding entry points, or simple record operations.
-   - Set `profile_refresh_recommended.needed` to `true` only when broad structural changes, module boundary changes, or technology stack migration cannot be expressed as a precise delta.
+7. Project profile refresh check:
+   - Project profile facts are handled by the independent profile analysis stage; do not include them in patterns.
+   - Set `profile_refresh_recommended.needed` to `true` only when broad structural changes, module boundary changes, or technology stack migration require that stage to run.
 8. Business coverage check:
    - Check the business coverage matrix for the source you read; do not output only interface, data-access, error-handling, or structure patterns just because those are easiest to identify.
    - Use the business coverage matrix only to avoid missing strong candidates, not to force output. Output a business pattern only when the business subdomain has a rule that passes the Candidate Admission Gate.
@@ -272,5 +262,5 @@ If a candidate fails any required validation check, do not output it.
 - **Business methods MUST include complete method signatures and file locations**
 - Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Use `business_method` only for real callable business/utility methods; do not mix the two concepts.
 - Business patterns should prioritize `evidence_locations.path` and `evidence_locations.symbol` so the generated business pattern map can route by request terms, paths, and symbols.
-- Each pattern's `good_example` MUST be code evidence copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, or invent code; when excerpting, do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering. If surrounding context must be omitted, mark it explicitly with `// ...`
+- Each pattern's `good_example` MUST be one continuous code excerpt copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, invent, or insert omission markers. Use multiple `evidence_locations` when one excerpt cannot prove the complete rule.
 - Do not output long `good_example` snippets. If a flow needs multiple evidence points, list them in `evidence_locations` and summarize the flow in `description`/`rule`.

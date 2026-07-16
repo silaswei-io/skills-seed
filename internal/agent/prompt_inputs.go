@@ -22,6 +22,17 @@ func promptLearningScope(scope config.LearningScope) config.LearningScope {
 	return config.NormalizeLearningScope(string(scope))
 }
 
+// WorkspacePromptData 返回工作区画像和规范提示词共享的路径参数。
+func WorkspacePromptData(workspaceName, workspaceRoot, workspaceInputPath, workspaceProfilePath, userContextPath string) map[string]interface{} {
+	return map[string]interface{}{
+		"WorkspaceName":        workspaceName,
+		"WorkspaceRoot":        workspaceRoot,
+		"WorkspaceInputPath":   workspaceInputPath,
+		"WorkspaceProfilePath": workspaceProfilePath,
+		"UserContextPath":      userContextPath,
+	}
+}
+
 // NewPromptInputSessionForContext 在已知当前 seed 路径时，把提示词输入文件创建到 .skills-seed/runtime 下。
 func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*PromptInputSession, error) {
 	seedPath := runtimecontext.SeedPath(ctx)
@@ -165,6 +176,10 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 	if err != nil {
 		return nil, fmt.Errorf("write project profile focused paths: %w", err)
 	}
+	engineeringKnowledgePath, engineeringKnowledgeCount, err := writePathListInput(session, "engineering-knowledge-paths.txt", req.EngineeringKnowledge)
+	if err != nil {
+		return nil, fmt.Errorf("write engineering knowledge paths: %w", err)
+	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
 		return nil, fmt.Errorf("write structural context prompt input: %w", err)
@@ -178,17 +193,19 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 		return nil, fmt.Errorf("write user context prompt input: %w", err)
 	}
 	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"StructurePath":         structurePath,
-		"StructuralContextPath": structuralContextPath,
-		"ReadmePath":            req.ReadmePath,
-		"MainFiles":             req.MainFiles,
-		"ExistingProfilePath":   existingProfilePath,
-		"FocusPathsPath":        focusPathsPath,
-		"FocusPathCount":        focusPathCount,
-		"UserContextPath":       userContextPath,
+		"ProjectName":               req.ProjectName,
+		"RootPath":                  req.RootPath,
+		"Language":                  req.Language,
+		"StructurePath":             structurePath,
+		"StructuralContextPath":     structuralContextPath,
+		"ReadmePath":                req.ReadmePath,
+		"MainFiles":                 req.MainFiles,
+		"EngineeringKnowledgePath":  engineeringKnowledgePath,
+		"EngineeringKnowledgeCount": engineeringKnowledgeCount,
+		"ExistingProfilePath":       existingProfilePath,
+		"FocusPathsPath":            focusPathsPath,
+		"FocusPathCount":            focusPathCount,
+		"UserContextPath":           userContextPath,
 	}, nil
 }
 
@@ -224,7 +241,6 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
 		"LearningMode":          promptLearningMode(req.LearningMode),
 		"ChangeProfile":         req.ChangeProfile,
-		"LearningBudget":        req.LearningBudget,
 	}, nil
 }
 
@@ -255,6 +271,5 @@ func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *Ana
 		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
 		"LearningMode":          promptLearningMode(req.LearningMode),
 		"ChangeProfile":         req.ChangeProfile,
-		"LearningBudget":        req.LearningBudget,
 	}, nil
 }

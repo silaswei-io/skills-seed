@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 )
 
@@ -122,7 +123,10 @@ func ResolveProjectRoot(workspaceRoot string, project config.WorkspaceProjectCon
 		return "", err
 	}
 	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
-		return "", fmt.Errorf("workspace project path %s is outside workspace root %s", project.Path, workspaceRoot)
+		return "", fmt.Errorf("%s", i18n.GetWithParams("WorkspaceProjectPathOutsideRoot", map[string]interface{}{
+			"Path": project.Path,
+			"Root": workspaceRoot,
+		}))
 	}
 	return projectAbs, nil
 }

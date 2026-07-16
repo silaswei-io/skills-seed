@@ -2,17 +2,17 @@ package aicontract
 
 // CodeLocationOutput 是 AI 输出中的最小可维护代码位置契约。
 type CodeLocationOutput struct {
-	CurrentLocation string `json:"current_location,omitempty" jsonschema:"example=packages/modules/event-bus-local/src/services/event-bus-local.ts:140" jsonschema_description:"repository-relative source file and 1-based line in the format packages/modules/event-bus-local/src/services/event-bus-local.ts:140"`
+	CurrentLocation string `json:"current_location" jsonschema:"required,example=packages/modules/event-bus-local/src/services/event-bus-local.ts:140" jsonschema_description:"repository-relative source file and 1-based line in the format packages/modules/event-bus-local/src/services/event-bus-local.ts:140"`
 }
 
 // EvidenceLocationOutput 描述模式对应的源码证据位置。
 type EvidenceLocationOutput struct {
 	Path        string  `json:"path,omitempty" jsonschema_description:"relative/file/path"`
-	Line        int     `json:"line,omitempty" jsonschema_description:"single 1-based line number"`
-	Symbol      string  `json:"symbol,omitempty" jsonschema_description:"real function, method, type, variable, or file name"`
-	Kind        string  `json:"kind,omitempty" jsonschema_description:"function|method|type|file"`
+	Line        int     `json:"line,omitempty" jsonschema:"minimum=1" jsonschema_description:"single 1-based line number"`
+	Symbol      string  `json:"symbol,omitempty" jsonschema_description:"real function, method, type, class, interface, struct, enum, trait, protocol, module, object, or file name"`
+	Kind        string  `json:"kind,omitempty" jsonschema:"enum=function,enum=func,enum=method,enum=type,enum=class,enum=interface,enum=struct,enum=enum,enum=trait,enum=protocol,enum=module,enum=object,enum=file" jsonschema_description:"canonical source symbol kind; omit when unknown"`
 	Description string  `json:"description,omitempty" jsonschema_description:"how this location supports the pattern"`
-	Confidence  float64 `json:"confidence,omitempty" jsonschema_description:"0.0-1.0"`
+	Confidence  float64 `json:"confidence,omitempty" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 }
 
 // BusinessMethodOutput 描述可路由、可复用的业务或工具入口。
@@ -21,7 +21,7 @@ type BusinessMethodOutput struct {
 	CodeLocation  CodeLocationOutput `json:"code_location" jsonschema_description:"object containing current_location; never output code_location as a single string"`
 	Description   string             `json:"description" jsonschema_description:"responsibility supported by source evidence"`
 	Usage         string             `json:"usage" jsonschema_description:"when to locate or call this entry point"`
-	Type          string             `json:"type" jsonschema_description:"domain|common"`
+	Type          string             `json:"type" jsonschema:"enum=domain,enum=common" jsonschema_description:"domain|common"`
 	Function      string             `json:"function" jsonschema_description:"complete signature with parameters and return types"`
 	Prerequisites string             `json:"prerequisites" jsonschema_description:"required setup or dependencies as one string"`
 	Returns       string             `json:"returns" jsonschema_description:"return values and error semantics as one string"`
@@ -31,13 +31,13 @@ type BusinessMethodOutput struct {
 type PatternOutput struct {
 	ID                string                   `json:"id" jsonschema_description:"kebab-case-id"`
 	Name              string                   `json:"name" jsonschema_description:"pattern name"`
-	Category          string                   `json:"category" jsonschema_description:"one allowed category"`
+	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category"`
 	Description       string                   `json:"description" jsonschema_description:"what this pattern does and when to use it"`
 	GoodExample       string                   `json:"good_example" jsonschema_description:"source-backed code evidence as an escaped JSON string"`
 	BadExample        string                   `json:"bad_example" jsonschema_description:"common mistake to avoid or empty string"`
 	Rule              string                   `json:"rule" jsonschema_description:"actionable rule saying when to apply the pattern"`
-	Confidence        float64                  `json:"confidence" jsonschema_description:"0.0-1.0"`
-	Frequency         int                      `json:"frequency" jsonschema_description:"integer occurrence count"`
+	Confidence        float64                  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
+	Frequency         int                      `json:"frequency" jsonschema:"minimum=1" jsonschema_description:"positive integer occurrence count"`
 	AnalysisUnitID    string                   `json:"analysis_unit_id,omitempty" jsonschema_description:"input analysis unit id"`
 	AnalysisUnitName  string                   `json:"analysis_unit_name,omitempty" jsonschema_description:"input analysis unit name"`
 	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"pattern-level source evidence locations"`
@@ -48,24 +48,24 @@ type PatternOutput struct {
 type CuratedPatternOutput struct {
 	ID                string                   `json:"id" jsonschema_description:"existing or candidate pattern id"`
 	Name              string                   `json:"name" jsonschema_description:"canonical pattern name"`
-	Category          string                   `json:"category" jsonschema_description:"one allowed category"`
+	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category"`
 	Description       string                   `json:"description" jsonschema_description:"clear applicability boundary"`
-	GoodExample       string                   `json:"good_example" jsonschema_description:"real code example selected from input"`
-	BadExample        string                   `json:"bad_example" jsonschema_description:"bad example selected from input, or empty string"`
+	GoodExample       string                   `json:"good_example" jsonschema_description:"empty for learn_current; otherwise an exact input example or empty string"`
+	BadExample        string                   `json:"bad_example" jsonschema_description:"empty for learn_current; otherwise an exact input example or empty string"`
 	Rule              string                   `json:"rule" jsonschema_description:"canonical actionable rule"`
-	Confidence        float64                  `json:"confidence" jsonschema_description:"0.0-1.0"`
-	Frequency         int                      `json:"frequency" jsonschema_description:"integer occurrence count"`
+	Confidence        float64                  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
+	Frequency         int                      `json:"frequency" jsonschema:"minimum=1" jsonschema_description:"positive integer occurrence count"`
 	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"evidence locations preserved from input"`
 	MergedFrom        []string                 `json:"merged_from" jsonschema_description:"merged candidate or existing pattern ids"`
 	MergeReason       string                   `json:"merge_reason" jsonschema_description:"why this pattern is added, updated, or merged"`
-	SimilarityScore   float64                  `json:"similarity_score" jsonschema_description:"0.0-1.0"`
-	Source            string                   `json:"source" jsonschema_description:"learned_current|learned_history|user_defined"`
-	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"business method preserved from input, or null when not applicable"`
-	ProjectID         string                   `json:"project_id,omitempty" jsonschema_description:"workspace project id"`
-	ScopePath         string                   `json:"scope_path,omitempty" jsonschema_description:"relative workspace scope path"`
-	WorkspaceRole     string                   `json:"workspace_role,omitempty" jsonschema_description:"workspace role"`
-	AnalysisUnitID    string                   `json:"analysis_unit_id,omitempty" jsonschema_description:"analysis unit id preserved from input"`
-	AnalysisUnitName  string                   `json:"analysis_unit_name,omitempty" jsonschema_description:"analysis unit name preserved from input"`
+	SimilarityScore   float64                  `json:"similarity_score" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
+	Source            string                   `json:"source" jsonschema_description:"empty for learn_current; otherwise learned_current|learned_history|user_defined"`
+	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"null for learn_current; otherwise an exact input business method or null"`
+	ProjectID         string                   `json:"project_id,omitempty" jsonschema_description:"empty for learn_current; otherwise workspace project id"`
+	ScopePath         string                   `json:"scope_path,omitempty" jsonschema_description:"empty for learn_current; otherwise relative workspace scope path"`
+	WorkspaceRole     string                   `json:"workspace_role,omitempty" jsonschema_description:"empty for learn_current; otherwise workspace role"`
+	AnalysisUnitID    string                   `json:"analysis_unit_id,omitempty" jsonschema_description:"empty for learn_current; otherwise input analysis unit id"`
+	AnalysisUnitName  string                   `json:"analysis_unit_name,omitempty" jsonschema_description:"empty for learn_current; otherwise input analysis unit name"`
 }
 
 type ValidationCommandOutput struct {
@@ -75,7 +75,7 @@ type ValidationCommandOutput struct {
 	Workdir    string   `json:"workdir,omitempty" jsonschema_description:"repository-relative workdir, empty for project root"`
 	ScopePaths []string `json:"scope_paths,omitempty" jsonschema_description:"relative paths or directories explicitly covered by this command; leave empty for broad or unclear commands"`
 	Evidence   []string `json:"evidence,omitempty" jsonschema_description:"relative repository paths proving this command and its scope; do not use unconfirmed placeholders"`
-	Type       string   `json:"type,omitempty" jsonschema_description:"test|build|lint|generate|contract|check"`
+	Type       string   `json:"type,omitempty" jsonschema:"enum=test,enum=build,enum=lint,enum=generate,enum=contract,enum=check" jsonschema_description:"test|build|lint|generate|contract|check"`
 }
 
 type ArchitectureLayerOutput struct {
@@ -123,24 +123,6 @@ type ProjectProfileOutput struct {
 	Summary            string                    `json:"summary" jsonschema_description:"specific project overview"`
 }
 
-// ProjectProfileDeltaOutput 是当前代码学习阶段允许返回的画像增量。
-type ProjectProfileDeltaOutput struct {
-	Frameworks         []string                  `json:"frameworks,omitempty" jsonschema_description:"new framework or runtime confirmed by evidence"`
-	Dependencies       []string                  `json:"dependencies,omitempty" jsonschema_description:"new dependency or tool confirmed by evidence"`
-	Layers             []ArchitectureLayerOutput `json:"layers,omitempty" jsonschema_description:"architecture layer deltas"`
-	KeyModules         []ModuleOutput            `json:"key_modules,omitempty" jsonschema_description:"key module deltas"`
-	CommonUtils        []UtilityFunctionOutput   `json:"common_utils,omitempty" jsonschema_description:"utility deltas"`
-	ConfigPatterns     []string                  `json:"config_patterns,omitempty" jsonschema_description:"configuration conventions confirmed by this run"`
-	FrameworkPatterns  []string                  `json:"framework_patterns,omitempty" jsonschema_description:"framework usage conventions confirmed by this run"`
-	BusinessMethods    []BusinessMethodOutput    `json:"business_methods,omitempty" jsonschema_description:"new reusable business or utility entries"`
-	ValidationCommands []ValidationCommandOutput `json:"validation_commands,omitempty" jsonschema_description:"new repository-evidenced validation commands"`
-	Summary            string                    `json:"summary,omitempty" jsonschema_description:"concise delta summary"`
-	Architecture       string                    `json:"architecture,omitempty" jsonschema_description:"architecture delta only"`
-	Structure          string                    `json:"structure,omitempty" jsonschema_description:"structure delta only"`
-	DependencyGraph    string                    `json:"dependency_graph,omitempty" jsonschema_description:"dependency graph delta only"`
-	DataFlow           string                    `json:"data_flow,omitempty" jsonschema_description:"data flow delta only"`
-}
-
 type ProfileRefreshRecommendationOutput struct {
 	Needed bool   `json:"needed" jsonschema_description:"true only when broad structure or technology changes require full refresh"`
 	Reason string `json:"reason,omitempty" jsonschema_description:"reason when refresh is needed"`
@@ -155,8 +137,8 @@ type SelectFilesOutput struct {
 
 type AnalyzeIssueOutput struct {
 	File       string `json:"file" jsonschema_description:"relative file path"`
-	Line       int    `json:"line" jsonschema_description:"single 1-based line number"`
-	Severity   string `json:"severity" jsonschema_description:"error|warning|info"`
+	Line       int    `json:"line" jsonschema:"minimum=1" jsonschema_description:"single 1-based line number"`
+	Severity   string `json:"severity" jsonschema:"enum=error,enum=warning,enum=info" jsonschema_description:"error|warning|info"`
 	Message    string `json:"message" jsonschema_description:"issue description"`
 	Suggestion string `json:"suggestion" jsonschema_description:"specific fix suggestion"`
 	PatternID  string `json:"pattern_id" jsonschema_description:"matched pattern id or empty string"`
@@ -165,12 +147,12 @@ type AnalyzeIssueOutput struct {
 type AnalyzeCodeOutput struct {
 	Issues      []AnalyzeIssueOutput `json:"issues" jsonschema_description:"found issues, empty array when none"`
 	Suggestions []string             `json:"suggestions" jsonschema_description:"general improvement suggestions"`
-	Confidence  float64              `json:"confidence" jsonschema_description:"0.0-1.0"`
+	Confidence  float64              `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 }
 
 type GenerateFixesOutput struct {
 	Fixes      map[string]string `json:"fixes" jsonschema_description:"complete fixed content for that file"`
-	Confidence float64           `json:"confidence" jsonschema_description:"0.0-1.0"`
+	Confidence float64           `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 	Summary    string            `json:"summary" jsonschema_description:"overall fix summary or empty string"`
 	Warnings   []string          `json:"warnings" jsonschema_description:"manual review warnings"`
 }
@@ -200,7 +182,6 @@ type CurateSummaryOutput struct {
 
 type AnalyzeCurrentCodebaseOutput struct {
 	Patterns                  []PatternOutput                    `json:"patterns" jsonschema_description:"candidate patterns"`
-	ProfileDelta              ProjectProfileDeltaOutput          `json:"profile_delta" jsonschema_description:"structured project facts newly added or changed by evidence"`
 	ProfileRefreshRecommended ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"whether a full project profile refresh is needed"`
 }
 
@@ -212,7 +193,6 @@ type AnalyzeCurrentCodebaseBatchUnitOutput struct {
 	UnitID                    string                             `json:"unit_id" jsonschema_description:"input unit id"`
 	UnitName                  string                             `json:"unit_name" jsonschema_description:"input unit name"`
 	Patterns                  []PatternOutput                    `json:"patterns" jsonschema_description:"candidate patterns for this unit"`
-	ProfileDelta              ProjectProfileDeltaOutput          `json:"profile_delta" jsonschema_description:"structured project facts for this unit"`
 	ProfileRefreshRecommended ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"whether this unit requires full profile refresh"`
 }
 
@@ -300,8 +280,7 @@ type WorkspaceSpecOutput struct {
 }
 
 type OptimizeWorkflowOutput struct {
-	Title       string   `json:"title" jsonschema_description:"short title"`
-	Summary     string   `json:"summary" jsonschema_description:"one-sentence summary"`
-	Content     string   `json:"content" jsonschema_description:"complete Markdown workflow body"`
-	Suggestions []string `json:"suggestions" jsonschema_description:"gaps or conflicts"`
+	Title     string   `json:"title" jsonschema_description:"short title"`
+	Content   string   `json:"content" jsonschema_description:"complete Markdown workflow body"`
+	Conflicts []string `json:"conflicts" jsonschema_description:"incompatible existing and new requirements; empty when the workflow can be saved"`
 }

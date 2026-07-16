@@ -1,0 +1,13 @@
+{{if .Content}}{{.Content}}
+{{else}}# {{.Title}}
+{{with .Summary}}
+{{.}}
+{{end}}{{if .Contexts}}
+## Context
+{{range .Contexts}}
+{{.}}
+{{end}}{{end}}{{end}}{{if .Scripts}}
+## Scripts
+{{range .Scripts}}
+- `{{.}}`
+{{end}}{{end}}

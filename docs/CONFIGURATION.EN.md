@@ -69,8 +69,8 @@ skills:
   target: "claude"
   locale: "en-US"
   paths:
-    claude: ".claude/skills/skills-seed-skills"
-    codex: ".agents/skills/skills-seed-skills"
+    claude: ".claude/skills/<project-name>-dev"
+    codex: ".agents/skills/<project-name>-dev"
 
 logging:
   level: "DEBUG"
@@ -208,7 +208,7 @@ Project context is read from `.skills-seed/context/`, and rendering filters defa
 
 Rendered prompts are saved by default under `.skills-seed/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, context, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent. Large inputs such as candidate files, focused files, and structural context are preferably stored in prompt input directories under `.skills-seed/runtime/`, and rendered prompts reference them by path. The final output contract is appended from a separate append template and forces JSON prompts to return exactly one parseable JSON object while keeping semantic output and deterministic ordering stable for identical inputs.
 
-Starting in 0.10.5, `learn current` unit analysis no longer writes the existing pattern store into every unit prompt. To inspect stored patterns, read the local pattern store or use `patterns show` / `patterns stats`. In addition to the final output contract, parsing continues to apply programmatic JSON repair for issues such as raw newlines/control characters inside strings, bare object keys, and array items missing an object-start marker. Starting in 0.10.7, repair also covers trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
+Starting in 0.10.5, `learn current` unit analysis no longer writes the existing pattern store into every unit prompt. To inspect stored patterns, read the local pattern store or use `patterns show` / `patterns stats`. Claude and Codex calls now enforce the same DTO-generated schema through native structured-output flags. The parser uses `jsonrepair-go` for JSON syntax repair, and repaired output must still pass strict DTO decoding; unknown fields and invalid shapes are not accepted.
 
 Starting in 0.11.0, `learning.current.mode` can be set to `fast`, `normal`, or `deep` to choose between learning speed and pattern coverage quality; the mode is included in resume-state fingerprints. Generated skills now render related-reference routing, importance layers, validation matrices, grouped entry indexes, and path-validated source evidence.
 
@@ -274,8 +274,8 @@ skills:
   target: "codex"
   locale: "en-US"
   paths:
-    claude: ".claude/skills/skills-seed-skills"
-    codex: ".agents/skills/skills-seed-skills"
+    claude: ".claude/skills/<project-name>-dev"
+    codex: ".agents/skills/<project-name>-dev"
 ```
 
 You can also set the agent during initialization:
@@ -369,8 +369,8 @@ These files are merged with built-in prompts; they do not replace built-in promp
 |---|---:|---|
 | `target` | `agent.engine` | Generated Skills target type; can differ from `agent.engine` |
 | `locale` | `en-US` | Language used for AI learning output, persisted content, and generated Skills |
-| `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills output directory |
-| `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills output directory |
+| `paths.claude` | `.claude/skills/<project-name>-dev` | Claude Code skills output directory; workspace roots default to `<workspace-name>-workspace-dev` |
+| `paths.codex` | `.agents/skills/<project-name>-dev` | Codex skills output directory; workspace roots default to `<workspace-name>-workspace-dev` |
 
 #### Notes
 

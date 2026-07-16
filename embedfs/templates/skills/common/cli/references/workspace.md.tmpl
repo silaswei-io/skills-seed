@@ -1,0 +1,58 @@
+# Workspace
+
+Use this reference for workspace-mode repositories and child project routing.
+
+## Workspace Mode Responsibility
+
+Workspace mode coordinates multiple child projects. It should answer:
+
+- Which child project owns a path or task.
+- Whether a task crosses project boundaries.
+- Which child project Skills must be loaded.
+- Which changes must happen before others.
+- Which child tasks can run in parallel.
+
+Workspace mode must not replace child project Skills for implementation details. Child architecture, coding conventions, business rules, and validation commands belong to child project Skills.
+
+## `skills-seed workspace add .|project-id-or-path...`
+
+Purpose:
+
+- Add discovered child repositories to workspace config.
+- Initialize child `.skills-seed` state when missing.
+- Preserve already initialized child projects.
+
+Arguments:
+
+- `.`: add all detected child projects.
+- `project-id-or-path`: add selected detected children.
+
+Use cases:
+
+- Add every detected child: `skills-seed workspace add .`
+- Add selected children: `skills-seed workspace add backend web`
+
+Detection rules:
+
+- Children are first-level directories with independent `.git` directories.
+- Marker files such as `go.mod`, `package.json`, `install.sh`, Helm files, or Terraform files help infer type/language.
+- Existing child `.skills-seed/config.yaml` files are preserved.
+- A partial child `.skills-seed` directory without config fails instead of being overwritten.
+
+Normal workspace flow:
+
+1. `skills-seed init --workspace`
+2. `skills-seed workspace add .`
+3. `skills-seed sync`
+
+Generated output:
+
+- Root workspace Skill routes tasks.
+- Child project Skills hold project-specific implementation rules.
+- Workspace references hold routing, dependency, impact, ordering, and parallel guidance.
+
+Troubleshooting:
+
+- If no child is detected, confirm each child has its own `.git`.
+- If a child should not be workspace-managed, keep it self-managed with its own `.skills-seed/config.yaml`.
+- If a task touches shared contracts, infra, root scripts, or generated artifacts, load workspace cross-project rules before child Skills.

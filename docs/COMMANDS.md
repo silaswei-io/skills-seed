@@ -33,6 +33,7 @@
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
 | 日常增量更新 | `skills-seed sync` | 学习当前变更，有实际学习变化时生成 skills |
 | 只补充一条规则 | `skills-seed patterns add --context "<描述>"` → `skills-seed generate skills` | 用自然语言添加 pattern 后重新生成 |
+| 查询任务工作流 | `skills-seed workflow show --format json` | 返回轻量摘要；按需用 `workflow show <id> --format json` 读取详情 |
 | 更新任务工作流 | `skills-seed workflow --context "<说明>"` → `skills-seed generate skills` | `--context` 会先经 Agent 从目标、约束、背景或路径推导标准工作流；未提供 `--name` 时自动生成名称，同名默认合并，完全替换时加 `--overwrite` |
 | 提交前更新 | `skills-seed hook install` | 安装 pre-commit hook，在提交前选择同步、只学习或跳过 |
 | 查看沉淀变化 | `skills-seed log` | 像 `git log` 一样查看最近学习和生成带来的变更 |
@@ -45,8 +46,11 @@
 
 | 命令 | 摘要 | 子命令 | 参数 |
 |---|---|---|---|
-| `skills-seed` | 为 AI 助手培育项目技能 | `check`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | 为 AI 助手培育项目技能 | `check`, `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed check` | 检查暂存的文件 | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
+| `skills-seed cli-skills` | 管理全局 skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
+| `skills-seed cli-skills install` | 安装/更新全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
+| `skills-seed cli-skills uninstall` | 卸载全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed generate` | 生成 AI Agent skills | `skills` | `--help, -h` = `false` |
 | `skills-seed generate skills` | 生成 AI Agent skills | - | `--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
 | `skills-seed hook` | 管理 Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
@@ -75,7 +79,8 @@
 | `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
 | `skills-seed sync` | 一键同步 skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
-| `skills-seed workflow` | 添加或更新用户工作流 | - | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
+| `skills-seed workflow` | 管理用户工作流 | `show [workflow-id]` | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
+| `skills-seed workflow show [workflow-id]` | 查看已有工作流的摘要或完整详情 | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | 向工作区添加子项目 | - | `--help, -h` = `false` |
 <!-- COMMAND_TREE_END -->
@@ -115,6 +120,32 @@ skills-templates-sha256: <hash>
 
 1. `skills-seed <command> --help` 可查看任意命令的详细参数。
 2. `--version` 输出的是当前二进制版本，文档链接会指向对应 tag，避免与 `main` 分支文档不一致。
+
+### `skills-seed cli-skills`
+
+#### 命令概述
+
+管理全局 `skills-seed-cli` 操作 Skill，用于让 Claude/Codex 等 Agent 知道如何使用 `skills-seed`。它不管理项目生成的业务 Skill。
+
+#### 命令形式
+
+| 命令形式 | 说明 | 常用示例 |
+|---|---|---|
+| `skills-seed cli-skills install` | 安装或更新全局 CLI 操作 Skill | `skills-seed cli-skills install` |
+| `skills-seed cli-skills uninstall` | 卸载由 skills-seed 生成的全局 CLI 操作 Skill | `skills-seed cli-skills uninstall --target codex` |
+
+#### 参数
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `--target`, `-t` | `auto` | 目标：`auto`、`claude`、`codex` 或 `all`。`auto` 只处理当前机器检测到可用的 Agent 全局目录。 |
+| `--help`, `-h` | `false` | 查看帮助 |
+
+#### 注意事项
+
+1. `init` 交互中只会在检测到当前环境的全局 CLI Skill 未安装或版本/指纹过期时询问是否安装/更新。
+2. 需要指定 Claude、Codex 或强制两者都处理时，使用 `cli-skills install|uninstall --target ...`。
+3. 安装会完整重建选中的 `skills-seed-cli` 目录；卸载会直接删除该固定目标目录。`generated-by` 仅作为来源元数据。
 
 ## 顶层命令
 
@@ -362,7 +393,7 @@ references/
 #### 注意事项
 
 1. workspace 模式会先用每个子项目自己的配置重新生成子项目 skill，再生成根仓 workspace skill。
-2. 已有手写 `SKILL.md` 没有 `generated-by: skills-seed` 标记时默认不会被覆盖。
+2. 配置指定的输出目录由 skills-seed 独占管理，每次生成都会完整重建；持久自定义内容应写入 `.skills-seed/context/`、patterns 或 workflow。
 3. 生成排序会使用 `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`；`review stats` 仍只作为观测数据，不直接影响生成。
 4. `generate skills` 不做生成输入指纹校验；显式执行时会删除旧的 skills-seed 生成目录并按当前画像、patterns 和工作流完整重建。
 
@@ -609,6 +640,38 @@ skills-seed profile refresh --language go
 
 1. `profile show` 适合快速确认当前画像内容。
 2. `profile refresh` 会覆盖现有项目画像，但不会执行 patterns 学习。
+
+### `skills-seed workflow`
+
+#### 命令概述
+
+管理可复用的任务工作流。根命令调用 Agent 把用户说明整理成标准工作流；`show` 子命令只读查询已有工作流，不调用 Agent、不修改文件。
+
+#### 命令形式
+
+| 命令形式 | 说明 | 常用示例 | 注意事项 |
+|---|---|---|---|
+| `skills-seed workflow --context <说明>` | 创建工作流，或按显式名称合并更新 | `skills-seed workflow --name release --context "发布后执行 smoke test"` | 未提供 `--name` 时始终按 Agent 生成的名称创建新工作流 |
+| `skills-seed workflow show` | 列出当前作用域的轻量摘要 | `skills-seed workflow show --format json` | 列表不包含完整内容 |
+| `skills-seed workflow show <id>` | 查看一个工作流的完整内容 | `skills-seed workflow show release --format json` | 返回指定工作流的完整详情 |
+| `skills-seed workflow show --child <id>` | 查询 workspace 子项目工作流 | `skills-seed workflow show --child backend --format json` | `--child` 只能在 workspace 根项目使用 |
+
+#### 参数
+
+| 命令 | 参数 | 默认值 | 说明 |
+|---|---|---:|---|
+| `workflow` | `--name` | 空 | 工作流名称；更新已有工作流时应显式提供 |
+| `workflow` | `--context` | 空 | 交给 Agent 整理的目标、约束、背景或零散说明 |
+| `workflow` | `--overwrite` | `false` | 完全替换同名工作流；不得在用户未确认时启用 |
+| `workflow` | `--child` | 空 | 把工作流写入指定 workspace 子项目 |
+| `workflow show` | `--format` | `table` | 输出 `table` 或 `json` |
+| `workflow show` | `--child` | 空 | 查询指定 workspace 子项目 |
+
+#### 注意事项
+
+1. 更新已有工作流前，可先执行 `workflow show --format json`，再按需读取匹配详情。
+2. 已有内容等价时不重复写入；存在冲突时由用户选择合并或覆盖。
+3. 写入完成后运行 `skills-seed generate skills`。
 
 ### `skills-seed sync`
 

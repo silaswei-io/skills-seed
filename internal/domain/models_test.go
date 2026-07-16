@@ -43,6 +43,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   CategoryNaming,
 				Confidence: 0.8,
 			},
@@ -53,6 +54,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   CategoryNaming,
 				Confidence: 0.8,
 			},
@@ -63,6 +65,17 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "",
+				Rule:       "Use domain terms in exported names.",
+				Category:   CategoryNaming,
+				Confidence: 0.8,
+			},
+			want: false,
+		},
+		{
+			name: "empty rule",
+			pattern: &Pattern{
+				ID:         "p1",
+				Name:       "Use descriptive names",
 				Category:   CategoryNaming,
 				Confidence: 0.8,
 			},
@@ -73,6 +86,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   "",
 				Confidence: 0.8,
 			},
@@ -83,6 +97,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   Category("performance"),
 				Confidence: 0.8,
 			},
@@ -93,6 +108,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   CategoryNaming,
 				Confidence: -0.1,
 			},
@@ -103,6 +119,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   CategoryNaming,
 				Confidence: 1.1,
 			},
@@ -113,6 +130,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   CategoryNaming,
 				Confidence: 0.0,
 			},
@@ -123,6 +141,7 @@ func TestPattern_IsValid(t *testing.T) {
 			pattern: &Pattern{
 				ID:         "p1",
 				Name:       "Use descriptive names",
+				Rule:       "Use domain terms in exported names.",
 				Category:   CategoryNaming,
 				Confidence: 1.0,
 			},
@@ -347,6 +366,10 @@ func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *
 		CodeLocation: CodeLocation{CurrentLocation: "internal/service/generator/service.go:672"},
 		Function:     "func (s *GeneratorService) writeSkillsOutput(ctx context.Context, outputPath string, patterns []domain.Pattern, summaryResult *agent.GenerateSkillsResult, stats *Stats, profile *domain.ProjectProfile, spec *domain.ProjectSpec, skillName string) error",
 		Type:         "domain",
+	}
+	specific.EvidenceLocations = []PatternEvidenceLocation{
+		{Path: "internal/service/generator/service.go", Line: 672, Symbol: "writeSkillsOutput", Kind: "method"},
+		{Path: "embedfs/templates/skills/common/project/skill.md.tmpl", Kind: "file"},
 	}
 
 	generic := NewPattern("layered-architecture", "使用分层架构", CategoryStructure)
@@ -981,6 +1004,7 @@ func TestNewPattern_AllCategories(t *testing.T) {
 	for _, cat := range categories {
 		t.Run(string(cat), func(t *testing.T) {
 			p := NewPattern("id", "name", cat)
+			p.Rule = "Preserve the project-specific rule."
 			assert.Equal(t, cat, p.Category)
 			assert.True(t, p.IsValid(), "Pattern with category %s should be valid", cat)
 		})

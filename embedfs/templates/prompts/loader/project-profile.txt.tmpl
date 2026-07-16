@@ -46,6 +46,12 @@ One-shot user-provided context for this learn run is available at `{{.UserContex
 
 - {{.ReadmePath}}
 {{- end}}
+{{- if .EngineeringKnowledgePath}}
+
+# Authoritative Engineering Knowledge
+
+Authoritative engineering knowledge paths are available at `{{.EngineeringKnowledgePath}}` ({{.EngineeringKnowledgeCount}} files). Read every listed file before producing `validation_commands`, build or generation guidance, and project-level engineering constraints. These files are independent knowledge sources and remain in scope even when changed or focused paths exclude them. Preserve exact commands and cite the listed repository-relative source path.
+{{- end}}
 {{- if .ExistingProfilePath}}
 
 # Existing Project Profile

@@ -5,7 +5,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
-const GenerateProjectStepTotal = 6
+const GenerateProjectStepTotal = 5
 
 type GenerateProgressHooks struct {
 	OnStepStart    func(label string)

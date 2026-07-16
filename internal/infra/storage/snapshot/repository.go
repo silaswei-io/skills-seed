@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
@@ -53,50 +54,28 @@ func (r *Repository) Load() (map[string]string, error) {
 
 // Replace 用给定文件内容原子替换全部快照。
 func (r *Repository) Replace(files map[string]string) error {
-	parent := filepath.Dir(r.dir)
-	if err := os.MkdirAll(parent, 0o755); err != nil {
-		return err
-	}
-
-	tmp, err := os.MkdirTemp(parent, ".snapshots-tmp-*")
-	if err != nil {
-		return err
-	}
-	cleanup := true
-	defer func() {
-		if cleanup {
-			_ = os.RemoveAll(tmp)
-		}
-	}()
-
 	paths := make([]string, 0, len(files))
 	for path := range files {
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
 
-	for _, path := range paths {
-		safePath, err := safeRelativePath(path)
-		if err != nil {
-			return err
+	return fileio.ReplaceDirWithOptions(r.dir, fileio.ReplaceDirOptions{Mode: 0o700}, func(staging string) error {
+		for _, path := range paths {
+			safePath, err := safeRelativePath(path)
+			if err != nil {
+				return err
+			}
+			target := filepath.Join(staging, filepath.FromSlash(safePath))
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(target, []byte(files[path]), 0o644); err != nil {
+				return err
+			}
 		}
-		target := filepath.Join(tmp, filepath.FromSlash(safePath))
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(target, []byte(files[path]), 0o644); err != nil {
-			return err
-		}
-	}
-
-	if err := os.RemoveAll(r.dir); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, r.dir); err != nil {
-		return fmt.Errorf("replace snapshots: %w", err)
-	}
-	cleanup = false
-	return nil
+		return nil
+	})
 }
 
 func safeRelativePath(path string) (string, error) {

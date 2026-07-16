@@ -24,26 +24,26 @@ func TestPrepareIncrementalFileChangesDetectsAddedModifiedAndDeleted(t *testing.
 	configRepo := newIncrementalConfig(t, projectRoot)
 	scope := domain.FileAnalysisScope{}
 
-	first, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, scope, nil)
+	first, err := fileanalysis.PrepareCurrentChanges(ctx, repo, configRepo, projectRoot, projectRoot, scope, nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"main.go"}, first.AddedOrModified)
-	require.NoError(t, commitIncrementalFileChanges(ctx, repo, first))
+	require.NoError(t, fileanalysis.CommitCurrentChanges(ctx, repo, first))
 
 	writeLearnFile(t, projectRoot, "main.go", "package main\nconst changed = true\n")
 	writeLearnFile(t, projectRoot, "internal/app.go", "package internal\n")
 	gitAddAll(t, projectRoot)
 
-	second, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, scope, nil)
+	second, err := fileanalysis.PrepareCurrentChanges(ctx, repo, configRepo, projectRoot, projectRoot, scope, nil)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"main.go", "internal/app.go"}, second.AddedOrModified)
 	require.Empty(t, second.Deleted)
 	require.Equal(t, []string{"internal/app.go", "main.go"}, second.FocusPaths())
 
-	require.NoError(t, commitIncrementalFileChanges(ctx, repo, second))
+	require.NoError(t, fileanalysis.CommitCurrentChanges(ctx, repo, second))
 	require.NoError(t, os.Remove(filepath.Join(projectRoot, "internal", "app.go")))
 	gitAddAll(t, projectRoot)
 
-	third, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, scope, nil)
+	third, err := fileanalysis.PrepareCurrentChanges(ctx, repo, configRepo, projectRoot, projectRoot, scope, nil)
 	require.NoError(t, err)
 	require.Empty(t, third.AddedOrModified)
 	require.Equal(t, []string{"internal/app.go"}, third.Deleted)
@@ -61,7 +61,7 @@ func TestPrepareIncrementalFileChangesExcludesGeneratedSkills(t *testing.T) {
 	repo := newLearnTracker(t, projectRoot)
 	configRepo := newIncrementalConfig(t, projectRoot)
 
-	changes, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
+	changes, err := fileanalysis.PrepareCurrentChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"main.go"}, changes.AddedOrModified)
 	require.ElementsMatch(t, []string{".agents/skills/skills-seed-skills", ".claude/skills/skills-seed-skills"}, changes.ExcludedGeneratedSkillDirs)
@@ -79,7 +79,7 @@ func TestPrepareIncrementalFileChangesSkipsDocumentsButKeepsDocsSource(t *testin
 	repo := newLearnTracker(t, projectRoot)
 	configRepo := newIncrementalConfig(t, projectRoot)
 
-	changes, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
+	changes, err := fileanalysis.PrepareCurrentChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"main.go", "docs/examples/demo.go"}, changes.AddedOrModified)
 	require.Contains(t, changes.Skipped, "README.MD")
@@ -102,7 +102,7 @@ func TestPrepareIncrementalFileChangesDoesNotDeleteCurrentGitIgnoredRecords(t *t
 	}))
 	configRepo := newIncrementalConfig(t, projectRoot)
 
-	changes, err := prepareIncrementalFileChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
+	changes, err := fileanalysis.PrepareCurrentChanges(ctx, repo, configRepo, projectRoot, projectRoot, domain.FileAnalysisScope{}, nil)
 
 	require.NoError(t, err)
 	require.NotContains(t, changes.Deleted, "ignored/generated.go")
@@ -110,7 +110,7 @@ func TestPrepareIncrementalFileChangesDoesNotDeleteCurrentGitIgnoredRecords(t *t
 }
 
 func TestIncrementalFileChangesApplyAISelectionMarksUnselectedRecords(t *testing.T) {
-	changes := &incrementalFileChanges{
+	changes := &fileanalysis.FileChanges{
 		Records: []domain.FileAnalysisRecord{
 			{Path: "internal/logic/create.go", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
 			{Path: "internal/types/types.go", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},

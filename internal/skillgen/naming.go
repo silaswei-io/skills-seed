@@ -27,3 +27,19 @@ func GeneratedSkillName(projectName string) string {
 	}
 	return name
 }
+
+// GeneratedWorkspaceSkillName 把工作区名规整为根 workspace skill 使用的稳定目录名。
+func GeneratedWorkspaceSkillName(workspaceName string) string {
+	name := GeneratedSkillName(workspaceName)
+	if strings.HasSuffix(name, "-workspace-dev") {
+		return name
+	}
+	if strings.HasSuffix(name, "-dev") {
+		base := strings.TrimSuffix(name, "-dev")
+		if strings.HasSuffix(base, "-workspace") {
+			return base + "-dev"
+		}
+		return base + "-workspace-dev"
+	}
+	return name + "-workspace-dev"
+}

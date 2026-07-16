@@ -111,6 +111,17 @@ func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context, opts W
 	if err := g.writeWorkspaceRootSkill(ctx, rootOutputPath, projectConfig, workspaceConfig, profile, spec, opts); err != nil {
 		return err
 	}
+	if strings.TrimSpace(opts.RootOutputPath) == "" {
+		legacyOutputPath, err := g.targetSkillOutputPath(projectRoot, legacyWorkspaceSkillName(projectConfig.Name))
+		if err != nil {
+			return err
+		}
+		if legacyOutputPath != rootOutputPath {
+			if err := skilloutput.Remove(legacyOutputPath); err != nil {
+				return err
+			}
+		}
+	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.generate_workspace_skills",
@@ -137,7 +148,7 @@ func (g *WorkspaceGenerator) analyzeWorkspaceForGenerate(ctx context.Context, pr
 	}
 
 	profile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
-	spec := workspacediscovery.SpecFromProfile(profile)
+	spec := workspacediscovery.SpecFromProfile(profile, g.skillsLoader.GetLocale())
 	return profile, spec, nil
 }
 
@@ -170,12 +181,12 @@ func (g *WorkspaceGenerator) loadPersistedWorkspaceArtifacts(ctx context.Context
 				return nil, nil, false, err
 			}
 		} else {
-			spec = workspacediscovery.MergeSpec(workspacediscovery.SpecFromProfile(profile), storedSpec)
+			spec = workspacediscovery.MergeSpec(workspacediscovery.SpecFromProfile(profile, g.skillsLoader.GetLocale()), storedSpec)
 			loaded = true
 		}
 	}
 	if spec == nil {
-		spec = workspacediscovery.SpecFromProfile(profile)
+		spec = workspacediscovery.SpecFromProfile(profile, g.skillsLoader.GetLocale())
 	}
 	return profile, spec, loaded, nil
 }
@@ -206,39 +217,20 @@ func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, output
 	if err != nil {
 		return err
 	}
-	if err := ensureGeneratedOutputDirWritable(outputPath); err != nil {
-		return err
-	}
-	if err := skilloutput.Rebuild(outputPath); err != nil {
-		var manualErr *skilloutput.ManualSkillExistsError
-		if errors.As(err, &manualErr) {
-			return &generator.ManualSkillExistsError{Path: manualErr.Path}
+	return skilloutput.ReplaceWithinRoot(projectConfig.RootPath, outputPath, func(staging string) error {
+		if err := generator.WriteWorkflowOutputs(g.workflowRepo, staging, g.skillsLoader.GetLocale()); err != nil {
+			return err
 		}
-		return err
-	}
-	if err := generator.WriteWorkflowOutputs(g.workflowRepo, outputPath, g.skillsLoader.GetLocale()); err != nil {
-		return err
-	}
-	p := skillgen.NewPlan(outputPath)
-	p.AddFile("SKILL.md", skillgen.CatalogTemplate, "workspace-skill", data)
-	p.AgentMetadataData = data
-	if !opts.SkipReferences {
-		p.AddDir("references")
-		p.AddFile("references/workspace-overview.md", skillgen.CatalogTemplate, "workspace-reference-overview", data)
-		p.AddFile("references/cross-project-rules.md", skillgen.CatalogTemplate, "workspace-reference-cross-project-rules", data)
-	}
-	return g.renderer.Render(ctx, p)
-}
-
-func ensureGeneratedOutputDirWritable(outputPath string) error {
-	if err := skilloutput.EnsureWritable(outputPath); err != nil {
-		var manualErr *skilloutput.ManualSkillExistsError
-		if errors.As(err, &manualErr) {
-			return &generator.ManualSkillExistsError{Path: manualErr.Path}
+		p := skillgen.NewPlan(staging)
+		p.AddFile("SKILL.md", skillgen.CatalogTemplate, "workspace-skill", data)
+		p.AgentMetadataData = data
+		if !opts.SkipReferences {
+			p.AddDir("references")
+			p.AddFile("references/workspace-overview.md", skillgen.CatalogTemplate, "workspace-reference-overview", data)
+			p.AddFile("references/cross-project-rules.md", skillgen.CatalogTemplate, "workspace-reference-cross-project-rules", data)
 		}
-		return err
-	}
-	return nil
+		return g.renderer.Render(ctx, p)
+	})
 }
 
 func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectConfig config.ProjectConfig, workspaceConfig config.WorkspaceConfig, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec, opts WorkspaceGenerateOptions) (workspaceSkillTemplateData, error) {
@@ -316,7 +308,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 	return workspaceSkillTemplateData{
 		ProgramVersion:      metadata.ProgramVersion,
 		SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
-		SkillName:           workspaceSkillName(name),
+		SkillName:           skillgen.GeneratedWorkspaceSkillName(name),
 		ProjectName:         name,
 		WorkspaceName:       name,
 		WorkspaceFacts:      summary,

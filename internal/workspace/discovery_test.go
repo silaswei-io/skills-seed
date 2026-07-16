@@ -5,8 +5,29 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSpecFromProfileUsesRequestedLocaleForFallbackRules(t *testing.T) {
+	profile := &domain.WorkspaceProfile{
+		Name: "demo",
+		Projects: []domain.WorkspaceProject{
+			{ID: "backend", Path: "backend"},
+		},
+		Contracts: []domain.WorkspacePath{{Path: "contracts"}},
+		Shared:    []domain.WorkspacePath{{Path: "shared"}},
+		Infra:     []domain.WorkspacePath{{Path: "infra"}},
+	}
+
+	spec := SpecFromProfile(profile, "en-US")
+
+	require.Len(t, spec.Rules, 1)
+	require.Equal(t, "Define cross-project boundaries first", spec.Rules[0].Title)
+	for _, route := range spec.Routing {
+		require.NotRegexp(t, `[\p{Han}]`, route.Reason)
+	}
+}
 
 func TestDiscoverProjectsUsesOnlyFirstLevelGitRepositories(t *testing.T) {
 	root := t.TempDir()

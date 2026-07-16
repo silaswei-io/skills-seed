@@ -90,6 +90,19 @@ func TestConfiguredSelectionPolicyCanDisableGitIgnore(t *testing.T) {
 	require.ElementsMatch(t, []string{"ignored-dir/generated.go", "main.go"}, selection.Paths())
 }
 
+func TestSelectFilesSkipsSymlinkOutsideRoot(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside.go")
+	require.NoError(t, os.WriteFile(outside, []byte("package outside\n"), 0o644))
+	require.NoError(t, os.Symlink(outside, filepath.Join(root, "linked.go")))
+
+	selection, err := SelectFiles(SelectOptions{Root: root, Policy: NewSelectionPolicy(nil)})
+
+	require.NoError(t, err)
+	require.Empty(t, selection.Paths())
+	require.Equal(t, 1, selection.SkippedCount(SkipReasonUnreadable))
+}
+
 func initSelectionGitRepo(t *testing.T, root string) {
 	t.Helper()
 	cmd := exec.Command("git", "init", "-q")

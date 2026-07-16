@@ -1,0 +1,53 @@
+# Sync
+
+Use `skills-seed sync` for the normal day-to-day loop: learn current repository changes and regenerate Skills when needed.
+
+## Purpose
+
+`sync` coordinates:
+
+- Current-file analysis.
+- Profile/spec/pattern updates when inputs changed.
+- Skill generation when learned output changed or generated files are missing.
+- Resume/restart handling for interrupted runs.
+
+Use `sync` first unless the user explicitly wants only learning or only rendering.
+
+## Flags
+
+- `--context`: one-shot text guidance for this run.
+- `--context-path`: one-shot guidance loaded from one or more files. Repeatable.
+- `--resume`: continue a previous incomplete sync command state.
+- `--restart`: clear resumable sync state and start over.
+- `--no-interactive`: skip interactive resume/restart prompts.
+
+## Use Cases
+
+- Daily update: `skills-seed sync`
+- Automation: `skills-seed sync --no-interactive`
+- Resume interrupted sync: `skills-seed sync --resume --no-interactive`
+- Ignore partial state: `skills-seed sync --restart`
+- Add one-run guidance: `skills-seed sync --context "Focus on payment retry behavior"`
+- Load one-run guidance from files: `skills-seed sync --context-path .skills-seed/context/background.md --context-path notes.md`
+
+## Resume Rules
+
+- Use `--resume` only when a previous sync was interrupted and resumable state exists.
+- Use `--restart` when resumable state is stale or should be discarded.
+- `--resume` and `--restart` are mutually exclusive.
+- A rate-limit retry inside an AI call does not necessarily mean the whole command failed; inspect the final command result and logs.
+
+## Context Boundary
+
+- Use `--context` only for temporary guidance.
+- Use `--context-path` when temporary guidance is long or already in a file.
+- Move durable repository background into `.skills-seed/context/`.
+- Move durable implementation rules into `patterns add/update`.
+- Move durable process guidance into `workflow`.
+
+## When Not To Use Sync
+
+- Only update learned state: use `learn current`.
+- Only render files from existing state: use `generate skills`.
+- Only add a human rule: use `patterns add`, then `generate skills`.
+- Only add a process: use `workflow`, then `generate skills`.

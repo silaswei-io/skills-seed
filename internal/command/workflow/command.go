@@ -78,6 +78,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	cmd.Flags().StringVar(&opts.context, "context", "", i18n.Get("WorkflowFlagContext"))
 	cmd.Flags().BoolVar(&opts.overwrite, "overwrite", false, i18n.Get("WorkflowFlagOverwrite"))
 	cmd.Flags().StringVar(&opts.child, "child", "", i18n.Get("WorkflowFlagChild"))
+	cmd.AddCommand(showCmd(cont))
 	return cmd
 }
 

@@ -2,6 +2,25 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.10]
+
+### Changes
+
+- Claude and Codex now use DTO-generated JSON Schema for native structured output. Parsing is consolidated around `jsonrepair-go` syntax repair followed by strict DTO decoding, with empty Agent results, unknown fields, and invalid structures rejected consistently.
+- Refactored `learn current` into clear preparation, change detection, file selection, unit analysis, progress, and persistence responsibilities. Recovery state now records an invocation fingerprint, schema version, and artifact-commit marker so incompatible runs cannot reuse old plans or persist learned output twice.
+- Added source-level pattern evidence validation and curation hydration for current-code learning, checking files, symbols, lines, examples, and provenance before recalculating frequency and confidence from canonical evidence.
+- Added table/JSON summaries and detail inspection through `workflow show`, workspace-child queries, conflict handling, and stable suffixes for generated-name collisions. Workflow documents and scripts now use generated-Skill templates and transactional directory output.
+- Added `cli-skills install|uninstall` so skills-seed fully generates and manages the global `skills-seed-cli` operation Skill, using CLI version and prompt/skills template fingerprints to detect stale installations.
+- Generated Skills now exclusively own their configured output directories and publish complete trees through sibling staging, persistent transaction records, target locks, pre-publish path validation, and rollback. Default paths are now `<project-name>-dev` and `<workspace-name>-workspace-dev`, with legacy workspace output cleaned up.
+- Completed bilingual i18n coverage for user-facing errors, command indexes, workspace fallbacks, weak-evidence hints, and auto-fix patch headers. Workflow documents, Git hooks, and prompt scaffold cleanup now use embedded templates as their single source.
+
+### Fixes
+
+- Fixed interrupted `learn current` runs potentially losing completed units, persisting patterns/profile twice, reusing state from incompatible arguments, or swallowing history-learning and fingerprint-commit errors.
+- Fixed concurrent analysis progress inconsistencies in completion counts, running-unit labels, and stable ordering, while preserving original plan order when merging batch results.
+- Fixed directory generation and snapshot replacement leaving partial output, publishing after target boundaries changed, or failing to recover an interrupted publish.
+- Fixed Chinese workspace fallback rules leaking into English Skills, AutoFix message template parameters remaining unexpanded, and seed-context default scaffold text drifting from its source templates.
+
 ## [v0.13.9]
 
 ### Fixes

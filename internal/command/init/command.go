@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	cliskillscmd "github.com/silaswei-io/skills-seed/internal/command/cliskills"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -20,21 +21,24 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
 type commandOptions struct {
-	locale                string
-	skillsLocale          string
-	mode                  string
-	agent                 string
-	skills                string
-	workspace             bool
-	noInteractive         bool
-	agentTotalParallelism int
-	learningMode          config.LearningMode
-	learningScope         config.LearningScope
+	locale                 string
+	skillsLocale           string
+	mode                   string
+	agent                  string
+	skills                 string
+	workspace              bool
+	noInteractive          bool
+	installGlobalCLISkills bool
+	globalCLISkillsTarget  string
+	agentTotalParallelism  int
+	learningMode           config.LearningMode
+	learningScope          config.LearningScope
 }
 
 // Cmd 返回 init 命令
@@ -66,6 +70,8 @@ func Cmd() *cobra.Command {
 				switch action {
 				case initExistingInspect:
 					return printExistingInitSummary(projectRoot, cmd)
+				case initExistingInstallGlobalCLISkills:
+					return installGlobalCLISkillsFromInit(cmd, cliskillscmd.TargetAuto)
 				case initExistingReset:
 					resolved, err := resolveInteractiveInit(cmd, opts)
 					if err != nil {
@@ -87,6 +93,9 @@ func Cmd() *cobra.Command {
 					}
 					if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
 						return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
+					}
+					if opts.installGlobalCLISkills {
+						return installGlobalCLISkillsFromInit(cmd, opts.globalCLISkillsTarget)
 					}
 					return nil
 				}
@@ -118,6 +127,9 @@ func Cmd() *cobra.Command {
 			if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
 				return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 			}
+			if opts.installGlobalCLISkills {
+				return installGlobalCLISkillsFromInit(cmd, opts.globalCLISkillsTarget)
+			}
 			return nil
 		},
 	}
@@ -132,6 +144,14 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().BoolVar(&opts.noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
 
 	return initCmd
+}
+
+func installGlobalCLISkillsFromInit(cmd *cobra.Command, target string) error {
+	results, err := cliskillscmd.InstallGlobal(target)
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitGlobalCLISkillsFailed"), err)
+	}
+	return cliskillscmd.PrintInstallResults(cmd.OutOrStdout(), results)
 }
 
 func printExistingInitSummary(projectRoot string, cmd *cobra.Command) error {
@@ -321,6 +341,9 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		logger.Error(i18n.Get("InitSetProjectNameFailed"), "error", err)
 		return err
 	}
+	if err := setInitializedProjectSkillsPaths(configRepo, projectName, mode); err != nil {
+		return err
+	}
 
 	if err := configRepo.SetRootPath(projectRoot); err != nil {
 		logger.Error(i18n.Get("InitSetRootPathFailed"), "error", err)
@@ -368,7 +391,7 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	}
 	if opts.skillsTarget != "" {
 		cfg := configRepo.Get()
-		ensureSkillsTarget(cfg, opts.skillsTarget)
+		ensureSkillsTarget(cfg, opts.skillsTarget, projectName, mode)
 		if err := configRepo.Update(cfg); err != nil {
 			return err
 		}
@@ -500,13 +523,46 @@ func gitOriginRemoteFromConfig(configPath string) string {
 	return ""
 }
 
-func ensureSkillsTarget(cfg *config.Config, target string) {
+func ensureSkillsTarget(cfg *config.Config, target string, projectName string, mode string) {
 	cfg.Skills.Target = target
 	if cfg.Skills.Paths == nil {
 		cfg.Skills.Paths = map[string]string{}
 	}
 	if cfg.Skills.Paths[target] == "" {
-		cfg.Skills.Paths[target] = config.DefaultSkillsPathForTarget(target)
+		cfg.Skills.Paths[target] = defaultSkillsPathForProjectTarget(target, projectName, mode)
+	}
+}
+
+func setInitializedProjectSkillsPaths(configRepo *config.Repository, projectName string, mode string) error {
+	cfg := configRepo.Get()
+	if cfg.Skills.Paths == nil {
+		cfg.Skills.Paths = map[string]string{}
+	}
+	for _, target := range []string{"claude", "codex"} {
+		cfg.Skills.Paths[target] = defaultSkillsPathForProjectTarget(target, projectName, mode)
+	}
+	if target := strings.TrimSpace(cfg.Skills.Target); target != "" {
+		cfg.Skills.Paths[target] = defaultSkillsPathForProjectTarget(target, projectName, mode)
+	}
+	return configRepo.Update(cfg)
+}
+
+func defaultSkillsPathForProjectTarget(target string, projectName string, mode string) string {
+	skillName := skillgen.GeneratedSkillName(projectName)
+	if mode == domain.ModeWorkspace {
+		skillName = skillgen.GeneratedWorkspaceSkillName(projectName)
+	}
+	return skillsPathForTargetAndName(target, skillName)
+}
+
+func skillsPathForTargetAndName(target string, skillName string) string {
+	switch strings.ToLower(strings.TrimSpace(target)) {
+	case "claude":
+		return filepath.ToSlash(filepath.Join(".claude", "skills", skillName))
+	case "codex":
+		return filepath.ToSlash(filepath.Join(".agents", "skills", skillName))
+	default:
+		return filepath.ToSlash(filepath.Join(".skills", skillName))
 	}
 }
 
@@ -610,7 +666,7 @@ func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspacePr
 	childConfig := childConfigRepo.Get()
 	childConfig.Agent = rootConfigRepo.GetAgentConfig()
 	childConfig.Agent.Parallelism = 0
-	childConfig.Skills = rootConfigRepo.GetSkillsConfig()
+	inheritWorkspaceChildSkills(childConfig, rootConfigRepo.GetSkillsConfig(), rootConfigRepo.GetSkillsLocale())
 	childConfig.Learning.Current = rootConfigRepo.GetCurrentLearningConfig()
 	if err := childConfigRepo.Update(childConfig); err != nil {
 		return err
@@ -620,6 +676,24 @@ func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspacePr
 		"Path":        projectRootPath,
 	}))
 	return nil
+}
+
+func inheritWorkspaceChildSkills(childConfig *config.Config, rootSkills config.SkillsConfig, rootSkillsLocale string) {
+	childConfig.Skills.Target = rootSkills.Target
+	childConfig.Skills.Locale = rootSkillsLocale
+	if childConfig.Skills.Paths == nil {
+		childConfig.Skills.Paths = map[string]string{}
+	}
+	if rootSkills.Paths != nil {
+		for target := range rootSkills.Paths {
+			if childConfig.Skills.Paths[target] == "" {
+				childConfig.Skills.Paths[target] = defaultSkillsPathForProjectTarget(target, childConfig.Project.Name, domain.ModeProject)
+			}
+		}
+	}
+	if childConfig.Skills.Target != "" && childConfig.Skills.Paths[childConfig.Skills.Target] == "" {
+		childConfig.Skills.Paths[childConfig.Skills.Target] = defaultSkillsPathForProjectTarget(childConfig.Skills.Target, childConfig.Project.Name, domain.ModeProject)
+	}
 }
 
 func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSeedPath, childConfigPath string, rootConfigRepo *config.Repository) error {

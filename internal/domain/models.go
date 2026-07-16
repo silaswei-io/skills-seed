@@ -11,7 +11,6 @@
 package domain
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -427,8 +426,9 @@ func (m BusinessMethod) LocationStatus() string {
 
 // IsValid 验证模式是否有效
 func (p *Pattern) IsValid() bool {
-	return p.ID != "" &&
-		p.Name != "" &&
+	return strings.TrimSpace(p.ID) != "" &&
+		strings.TrimSpace(p.Name) != "" &&
+		strings.TrimSpace(p.Rule) != "" &&
 		IsValidPatternCategory(p.Category) &&
 		p.Confidence >= 0.0 &&
 		p.Confidence <= 1.0
@@ -500,48 +500,7 @@ func (p *Pattern) RefreshMetrics() {
 }
 
 func (p *Pattern) evidenceCount() int {
-	text := strings.Join([]string{
-		p.ID,
-		p.Name,
-		p.Description,
-		p.Rule,
-		p.GoodExample,
-		p.BadExample,
-		p.ProjectID,
-		p.ScopePath,
-		p.WorkspaceRole,
-		p.AnalysisUnitID,
-		p.AnalysisUnitName,
-	}, "\n")
-
-	count := 0
-	count += countMatches(text, regexp.MustCompile(`(?:^|[\s"'])[\w./-]+\.go(?::\d+)?(?:[\s"',)]|$)`))
-	count += countMatches(text, regexp.MustCompile(`\b(?:internal|cmd|pkg|api|service|repository|handler|domain)/[\w./-]+`))
-	count += countMatches(text, regexp.MustCompile(`\b[A-Z][A-Za-z0-9_]*\.[A-Za-z0-9_]+\b`))
-	count += countMatches(text, regexp.MustCompile(`\bfunc\s+(?:\([^)]*\)\s*)?[A-Za-z0-9_]+\s*\(`))
-	count += countMatches(text, regexp.MustCompile("`[^`]+`"))
-
-	if p.BusinessMethod != nil {
-		count++
-		if p.BusinessMethod.DisplayLocation() != "" {
-			count++
-		}
-		if p.BusinessMethod.Function != "" {
-			count++
-		}
-		if p.BusinessMethod.Type == "domain" {
-			count++
-		}
-	}
-	if p.ProjectID != "" {
-		count++
-	}
-	if p.ScopePath != "" {
-		count++
-	}
-	if p.AnalysisUnitID != "" || p.AnalysisUnitName != "" {
-		count++
-	}
+	count, _ := PatternEvidenceQuality(p.EvidenceLocations)
 	return count
 }
 
@@ -581,10 +540,6 @@ func categorySpecificityBonus(p *Pattern) float64 {
 		return 0.05
 	}
 	return 0
-}
-
-func countMatches(text string, re *regexp.Regexp) int {
-	return len(re.FindAllString(text, -1))
 }
 
 func clamp01(v float64) float64 {

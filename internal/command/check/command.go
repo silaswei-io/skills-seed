@@ -281,6 +281,9 @@ func generateFixes(cont *container.Container, ctx context.Context, issues []doma
 	if err != nil {
 		return nil, fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToGenerateFixes", map[string]interface{}{"Error": err.Error()}))
 	}
+	if err := agent.RequireResult(result, "GenerateFixes"); err != nil {
+		return nil, fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToGenerateFixes", map[string]interface{}{"Error": err.Error()}))
+	}
 
 	logger.Info(i18n.GetWithParams("LoggerCheckConfidence", map[string]interface{}{"Confidence": fmt.Sprintf("%.0f", result.Confidence*100)}))
 	if strings.TrimSpace(result.Summary) != "" {

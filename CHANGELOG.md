@@ -2,6 +2,25 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.10]
+
+### 变更
+
+- Claude 与 Codex 统一使用 DTO 生成的 JSON Schema 约束原生结构化输出，解析层收敛为 `jsonrepair-go` 语法修复加严格 DTO 解码，并统一拒绝空 Agent 结果、未知字段和错误结构。
+- 重构 `learn current` 执行边界，将准备、变更检测、文件筛选、单元分析、进度和持久化拆分为独立职责；恢复状态新增调用指纹、Schema 版本和产物已提交标记，避免不兼容调用复用旧计划或重复写入学习结果。
+- 当前代码学习新增源码级 pattern 证据校验与策展结果回填，校验文件、符号、行号、示例和证据来源，并按真实证据重新计算频次与置信度，减少无依据、重复或跨作用域污染的模式。
+- 新增 `workflow show` 的表格/JSON 摘要与详情查询、workspace 子项目查询、冲突结果处理和稳定重名编号；工作流文档及脚本现在通过生成 Skills 的模板和事务目录输出。
+- 新增 `cli-skills install|uninstall`，由 skills-seed 完整生成和管理全局 `skills-seed-cli` 操作 Skill，并通过版本及 prompt/skills 模板指纹判断是否需要更新。
+- 生成 Skills 改为独占管理配置输出目录，通过同级 staging、持久化事务记录、目标锁、发布前路径复检和失败回滚完整替换；默认目录统一为 `<project-name>-dev` 和 `<workspace-name>-workspace-dev`，并清理旧 workspace 输出。
+- 用户可见错误、命令索引、workspace fallback、弱证据提示和自动修复补丁头补齐中英文 i18n；工作流文档、Git hook 与 prompt scaffold 清理改用嵌入模板作为单一来源。
+
+### 修复
+
+- 修复 `learn current` 中断恢复时可能丢失已完成单元、重复持久化 patterns/profile、复用不兼容参数状态或吞掉历史学习/指纹提交错误的问题。
+- 修复并发分析进度在完成计数、运行中单元和稳定顺序上的状态不一致，并确保批量结果按原计划顺序合并。
+- 修复目录级生成和快照替换可能留下半成品、误覆盖路径边界变化目标或无法从中断发布恢复的问题。
+- 修复英文 Skills 中出现中文 workspace 默认规则、AutoFix 消息模板参数未展开，以及 seed context 默认脚手架与源模板重复维护的问题。
+
 ## [v0.13.9]
 
 ### 修复

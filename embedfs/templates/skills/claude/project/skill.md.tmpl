@@ -13,7 +13,11 @@ description: {{.SkillDescription}}
 **已学习模式**: {{.PatternCount}}
 **平均置信度**: {{printf "%.2f" .AvgConfidence}}%
 
-这是项目入口 skill，只负责判断任务应读取哪些项目参考、确认约束来源和选择验证命令。业务规则、架构细节、代码证据和示例必须进入对应 references 后再决策。
+{{if .ValidationCommands}}这是项目入口 skill，只负责判断任务应读取哪些项目参考、确认约束来源和选择已学习的验证命令。业务规则、架构细节、代码证据和示例必须进入对应 references 后再决策。
+{{else}}这是项目入口 skill，只负责判断任务应读取哪些项目参考和确认约束来源。业务规则、架构细节、代码证据和示例必须进入对应 references 后再决策。
+
+当前没有已学习的验证命令，执行验证前必须从仓库内的 AGENTS、构建脚本或 CI 配置确认，不要按语言惯例猜测。
+{{end}}
 
 ## 使用方式
 

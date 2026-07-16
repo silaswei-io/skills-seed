@@ -32,6 +32,9 @@ func (s *Service) CurateAndStore(ctx context.Context, req CurateRequest) (*Curat
 // CurateAndStoreWithHooks 将候选模式策展为规范模式并写入模式库，并向调用方报告进度。
 func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest, hooks ProgressHooks) (*CurateResult, error) {
 	candidates := validateCandidates(req.Candidates)
+	if req.Operation == OperationLearnCurrent {
+		candidates = coalesceCurrentCandidates(validateCurrentCandidates(candidates))
+	}
 	if len(candidates) == 0 {
 		return &CurateResult{
 			Summary: agent.CurateSummary{
@@ -46,14 +49,26 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 	}
 	existing = activeCuratorPatterns(existing)
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
-	curated := deterministicCurate(candidates, retrieved.related)
+	var curated *agent.CuratePatternsResult
+	if req.Operation == OperationLearnCurrent {
+		curated, err = s.curate(ctx, req.Operation, candidates, retrieved.related, false, retrieved.existingByCandidate, hooks)
+		if err != nil {
+			return nil, fmt.Errorf("curate current patterns: %w", err)
+		}
+	} else {
+		curated = deterministicCurate(candidates, retrieved.related)
+	}
 	logCurateSanitizeReport(req.Operation, sanitizeCurateResult(curated, candidates))
-	if err := validateCurateResult(curated, candidates, retrieved.related); err != nil {
+	validationErr := validateCurateResultForOperation(req.Operation, curated, candidates, retrieved.related)
+	if validationErr != nil {
+		if req.Operation == OperationLearnCurrent {
+			return nil, fmt.Errorf("validate current curation: %w", validationErr)
+		}
 		logger.Warn(i18n.Get("LoggerAgentCuratePatternsValidationFallback"),
 			"operation", req.Operation,
-			"error", err,
+			"error", validationErr,
 		)
-		curated = fallbackCurate(candidates, retrieved.related)
+		curated = deterministicCurate(candidates, retrieved.related)
 	}
 
 	written, err := applyCuratedPatterns(ctx, s.patternRepo, curated.Patterns, retrieved.related)
@@ -120,7 +135,14 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 				}
 			}
 		}
-		curated = s.curate(ctx, OperationCompact, patterns, patterns, true, byCandidate, hooks)
+		curated, err = s.curate(ctx, OperationCompact, patterns, patterns, true, byCandidate, hooks)
+		if err != nil {
+			logger.Warn(i18n.Get("LoggerAgentCuratePatternsParseFallback"),
+				"operation", OperationCompact,
+				"error", err,
+			)
+			curated = deterministicCurate(patterns, patterns)
+		}
 	} else {
 		curated = deterministicCurate(patterns, nil)
 	}
@@ -130,7 +152,7 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 			"operation", OperationCompact,
 			"error", err,
 		)
-		curated = fallbackCurate(patterns, patterns)
+		curated = deterministicCurate(patterns, patterns)
 	}
 	curated.Summary.TotalCandidates = len(patterns)
 	curated.Summary.TotalExisting = len(patterns)
@@ -157,9 +179,9 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 	}, nil
 }
 
-func (s *Service) curate(ctx context.Context, operation string, candidates, existing []domain.Pattern, allExisting bool, existingByCandidate map[string][]string, hooks ProgressHooks) *agent.CuratePatternsResult {
+func (s *Service) curate(ctx context.Context, operation string, candidates, existing []domain.Pattern, allExisting bool, existingByCandidate map[string][]string, hooks ProgressHooks) (*agent.CuratePatternsResult, error) {
 	if s.agent == nil {
-		return fallbackCurate(candidates, existing)
+		return nil, fmt.Errorf("pattern curator agent is not configured")
 	}
 
 	var result *agent.CuratePatternsResult
@@ -183,13 +205,12 @@ func (s *Service) curate(ctx context.Context, operation string, candidates, exis
 		hooks.OnStepComplete(label)
 	}
 	if callErr != nil {
-		logger.Warn(i18n.Get("LoggerAgentCuratePatternsParseFallback"),
-			"operation", operation,
-			"error", callErr,
-		)
-		return fallbackCurate(candidates, existing)
+		return nil, callErr
 	}
-	return result
+	if err := agent.RequireResult(result, "CuratePatterns"); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func logCurateSanitizeReport(operation string, report sanitizeCurateResultReport) {

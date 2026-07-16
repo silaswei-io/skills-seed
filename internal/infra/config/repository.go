@@ -270,44 +270,9 @@ type CurrentLearningConfig struct {
 	MaxUnitsPerCall                  int              `yaml:"max_units_per_call"`                   // 单次 AI 调用最多分析的单元数，1 表示不合批
 	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否先筛选最值得分析的相关文件
 	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 文件筛选
-	Budget                           LearningBudget   `yaml:"budget"`                               // 当前代码学习的候选入库预算
 	Structural                       StructuralConfig `yaml:"structural"`                           // 结构化上下文配置
 
 	defaultsApplied bool `yaml:"-"`
-}
-
-// LearningBudget 控制 learn current 的候选模式入库预算。
-type LearningBudget struct {
-	MaxPatternsPerUnit       int     `yaml:"max_patterns_per_unit"`      // 单个分析单元最多入库的候选模式数，0 表示不限制
-	MaxPatternsPerRun        int     `yaml:"max_patterns_per_run"`       // 单次 learn current 最多入库的候选模式数，0 表示不限制
-	MicroChangeNewPatterns   int     `yaml:"micro_change_new_patterns"`  // 极小改动最多新增模式数
-	MinorChangeNewPatterns   int     `yaml:"minor_change_new_patterns"`  // 小改动最多新增模式数
-	MinConfidence            float64 `yaml:"min_confidence"`             // 低于该置信度的候选默认不入库
-	UpdateExistingFirst      bool    `yaml:"update_existing_first"`      // 小改动优先更新已有模式，避免新增碎片模式
-	RequireRouteableEvidence bool    `yaml:"require_routeable_evidence"` // 是否要求候选包含可路由证据位置
-}
-
-func defaultLearningBudget() LearningBudget {
-	return LearningBudget{
-		MaxPatternsPerUnit:       3,
-		MaxPatternsPerRun:        12,
-		MicroChangeNewPatterns:   0,
-		MinorChangeNewPatterns:   3,
-		MinConfidence:            0.78,
-		UpdateExistingFirst:      true,
-		RequireRouteableEvidence: true,
-	}
-}
-
-// UnmarshalYAML 在应用默认值的同时保留显式设置的零值。
-func (c *LearningBudget) UnmarshalYAML(value *yaml.Node) error {
-	type rawLearningBudget LearningBudget
-	defaults := rawLearningBudget(defaultLearningBudget())
-	if err := value.Decode(&defaults); err != nil {
-		return err
-	}
-	*c = LearningBudget(defaults)
-	return nil
 }
 
 func defaultCurrentLearningConfig() CurrentLearningConfig {
@@ -318,7 +283,6 @@ func defaultCurrentLearningConfig() CurrentLearningConfig {
 		MaxUnitsPerCall:                  1,
 		SelectRelevantFiles:              true,
 		SelectRelevantFilesMinCandidates: 200,
-		Budget:                           defaultLearningBudget(),
 		Structural:                       defaultStructuralConfig(),
 		defaultsApplied:                  true,
 	}

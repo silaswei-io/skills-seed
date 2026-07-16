@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/stretchr/testify/require"
 )
@@ -34,6 +35,7 @@ func TestRunProjectTasksReturnsCanceledContextWithoutRunningTasks(t *testing.T) 
 }
 
 func TestResolveProjectRootRejectsPathOutsideWorkspaceRoot(t *testing.T) {
+	require.NoError(t, i18n.Init(i18n.LocaleEnglish))
 	workspaceRoot := t.TempDir()
 
 	projectRoot, err := ResolveProjectRoot(workspaceRoot, config.WorkspaceProjectConfig{ID: "backend", Path: "backend"})

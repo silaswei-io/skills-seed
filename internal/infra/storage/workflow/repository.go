@@ -122,17 +122,30 @@ func (r *Repository) Save(workflow domain.Workflow) error {
 	if workflow.UpdatedAt.IsZero() {
 		workflow.UpdatedAt = time.Now()
 	}
-	if err := os.MkdirAll(r.ScriptsDir(workflow.ID), 0755); err != nil {
-		return err
-	}
-	if err := fileio.WriteFileAtomic(r.metadataPath(workflow.ID), renderWorkflowMetadata(workflow), 0644); err != nil {
-		return err
-	}
 	content := strings.TrimSpace(workflow.Content)
 	if content == "" {
 		content = "# " + strings.TrimSpace(workflow.Name)
 	}
-	return fileio.WriteFileAtomic(r.workflowPath(workflow.ID), []byte(content+"\n"), 0644)
+	targetDir := filepath.Join(r.root, workflow.ID)
+	return fileio.ReplaceDir(targetDir, func(staging string) error {
+		stagingScripts := filepath.Join(staging, scriptsDirName)
+		existingScripts := filepath.Join(targetDir, scriptsDirName)
+		if _, err := os.Stat(existingScripts); err == nil {
+			if err := os.CopyFS(stagingScripts, os.DirFS(existingScripts)); err != nil {
+				return err
+			}
+		} else if os.IsNotExist(err) {
+			if err := os.MkdirAll(stagingScripts, 0o755); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		if err := fileio.WriteFileAtomic(filepath.Join(staging, workflowMetaFileName), renderWorkflowMetadata(workflow), 0o644); err != nil {
+			return err
+		}
+		return fileio.WriteFileAtomic(filepath.Join(staging, workflowFileName), []byte(content+"\n"), 0o644)
+	})
 }
 
 // ScriptsDir 返回工作流脚本目录。

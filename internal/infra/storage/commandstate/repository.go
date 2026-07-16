@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,7 +20,10 @@ import (
 
 const schemaVersion = 1
 
-var ErrStateNotFound = errors.New("command state not found")
+var (
+	ErrStateNotFound            = errors.New("command state not found")
+	ErrUnsupportedSchemaVersion = errors.New("unsupported command state schema version")
+)
 
 // InputSummary 记录创建可恢复计划时的输入规模，用于恢复时展示不可重算的阶段指标。
 type InputSummary struct {
@@ -39,16 +43,20 @@ type FileInput struct {
 
 // State 是命令未完成执行的可恢复状态。
 type State struct {
-	SchemaVersion int                   `json:"schema_version"`
-	Command       string                `json:"command"`
-	ProjectName   string                `json:"project_name"`
-	Language      string                `json:"language"`
-	Mode          string                `json:"mode,omitempty"`
-	UserContext   string                `json:"user_context_hash,omitempty"`
-	CreatedAt     string                `json:"created_at"`
-	InputSummary  *InputSummary         `json:"input_summary,omitempty"`
-	Inputs        []FileInput           `json:"inputs"`
-	Units         []domain.AnalysisUnit `json:"units"`
+	SchemaVersion int    `json:"schema_version"`
+	Command       string `json:"command"`
+	ProjectName   string `json:"project_name"`
+	Language      string `json:"language"`
+	Mode          string `json:"mode,omitempty"`
+	UserContext   string `json:"user_context_hash,omitempty"`
+	// InvocationHash 绑定影响分析范围和计划的命令参数及配置，防止不兼容调用复用旧状态。
+	InvocationHash string                `json:"invocation_hash,omitempty"`
+	CreatedAt      string                `json:"created_at"`
+	InputSummary   *InputSummary         `json:"input_summary,omitempty"`
+	Inputs         []FileInput           `json:"inputs"`
+	Units          []domain.AnalysisUnit `json:"units"`
+	// ArtifactsCommitted 表示本轮 profile 和 patterns 已成功持久化，恢复时只需提交快照与指纹。
+	ArtifactsCommitted bool `json:"artifacts_committed,omitempty"`
 }
 
 // Repository 读写某个命令的恢复状态。
@@ -78,13 +86,26 @@ func (r *Repository) Command() string {
 
 // Load 读取命令状态。
 func (r *Repository) Load(ctx context.Context) (*State, error) {
-	return stateStore(r.path).Get(ctx)
+	state, err := stateStore(r.path).Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if state.SchemaVersion != schemaVersion {
+		return nil, fmt.Errorf("%w: got %d, want %d", ErrUnsupportedSchemaVersion, state.SchemaVersion, schemaVersion)
+	}
+	return state, nil
 }
 
 // Save 写入命令状态。
 func (r *Repository) Save(ctx context.Context, state *State) error {
+	if state == nil {
+		return errors.New("command state is nil")
+	}
 	if state.SchemaVersion == 0 {
 		state.SchemaVersion = schemaVersion
+	}
+	if state.SchemaVersion != schemaVersion {
+		return fmt.Errorf("%w: got %d, want %d", ErrUnsupportedSchemaVersion, state.SchemaVersion, schemaVersion)
 	}
 	if strings.TrimSpace(state.Command) == "" {
 		state.Command = r.command
@@ -129,6 +150,15 @@ func (s *State) WithInputSummary(summary InputSummary) *State {
 		return nil
 	}
 	s.InputSummary = &summary
+	return s
+}
+
+// WithInvocationHash 设置创建分析计划时的调用上下文摘要。
+func (s *State) WithInvocationHash(hash string) *State {
+	if s == nil {
+		return nil
+	}
+	s.InvocationHash = strings.TrimSpace(hash)
 	return s
 }
 

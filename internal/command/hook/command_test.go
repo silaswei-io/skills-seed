@@ -7,7 +7,8 @@ import (
 )
 
 func TestPreCommitHookDelegatesToHookRun(t *testing.T) {
-	content := preCommitHookContent()
+	content, err := preCommitHookContent()
+	require.NoError(t, err)
 
 	require.Contains(t, content, "skills-seed hook run")
 	require.NotContains(t, content, "skills-seed check")

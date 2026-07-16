@@ -25,3 +25,23 @@ func TestGeneratedSkillName(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratedWorkspaceSkillName(t *testing.T) {
+	tests := []struct {
+		name      string
+		workspace string
+		want      string
+	}{
+		{name: "simple name", workspace: "Demo API", want: "demo-api-workspace-dev"},
+		{name: "project suffix", workspace: "demo-dev", want: "demo-workspace-dev"},
+		{name: "raw workspace suffix", workspace: "demo-workspace", want: "demo-workspace-dev"},
+		{name: "workspace suffix", workspace: "demo-workspace-dev", want: "demo-workspace-dev"},
+		{name: "fallback", workspace: "中文项目", want: "project-workspace-dev"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, GeneratedWorkspaceSkillName(tt.workspace))
+		})
+	}
+}

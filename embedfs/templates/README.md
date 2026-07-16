@@ -23,15 +23,22 @@ Runtime prompt IDs use kebab-case prefixes:
 
 - `context/` stores templates used to initialize `.skills-seed/context/*.md`.
 
+## Hooks
+
+`templates/hooks` stores executable integration templates installed by CLI commands, such as the Git pre-commit hook.
+
 ## Skills
 
-`templates/skills` stores templates for files generated into skill directories.
+`templates/skills` stores templates for files generated into Skill directories.
 
-- `common/` stores templates shared by providers.
-- `claude/` and `codex/` store provider-specific overrides or metadata.
-- `project/` and `workspace/` under those provider directories describe the generated skill type.
+- `common/` stores shared templates by Skill type.
+- `claude/` and `codex/` store provider-specific overrides or metadata. These directories are retained as provider boundaries even when a current template is identical to `common/`.
+- `project/` stores templates for one project Skill: an entry `skill*.tmpl`, project references, profile/spec references, and category pattern references.
+- `workspace/` stores templates for the workspace root Skill: an entry `skill*.tmpl` plus workspace routing and cross-project references.
+- `shared/` stores generated artifacts shared by project and workspace Skills, such as workflow reference documents.
+- `cli/` stores the global `skills-seed-cli` operation Skill: an entry `skill*.tmpl` plus CLI operation references. It is about using `skills-seed`, not about project coding rules. The shared implementation lives under `common/cli` because the command semantics are provider-neutral; if Claude or Codex needs different wording or metadata later, add `claude/cli` or `codex/cli` overrides and keep the shared behavior in `common/cli`.
 
-Skill template IDs are declared in `internal/templates/skills/catalog.go`. The catalog maps a logical ID such as `project-skill` or `workspace-skill` to a template path and a normalized output path. Root skill templates may have descriptive template filenames, but the generated root file remains `SKILL.md`.
+Skill template IDs are declared in `internal/templates/skills/catalog.go`. The catalog maps a logical ID such as `project-skill` or `workspace-skill` to a template path and a normalized output path. Entry templates are named `skill*.tmpl` inside their Skill type directory, and the generated root file remains `SKILL.md`.
 
 ## Locale
 

@@ -40,15 +40,6 @@ func (s *GeneratorService) SetWorkflowRepository(repo domain.WorkflowRepository)
 	s.workflowRepo = repo
 }
 
-// ManualSkillExistsError 表示目标目录已有非 skills-seed 生成的 SKILL.md
-type ManualSkillExistsError struct {
-	Path string
-}
-
-func (e *ManualSkillExistsError) Error() string {
-	return i18n.GetWithParams("GenerateManualSkillExists", map[string]interface{}{"Path": e.Path})
-}
-
 // NewGeneratorService 创建生成服务
 func NewGeneratorService(
 	patternRepo domain.PatternRepository,
@@ -76,18 +67,7 @@ func NewGeneratorService(
 
 // GenerateSkills 生成 Skills 文件夹
 func (s *GeneratorService) GenerateSkills(ctx context.Context, outputPath string) error {
-	return s.GenerateSkillsWithProgress(ctx, outputPath, nil, nil)
-}
-
-func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, outputPath string, opts GenerateOptions) error {
-	return s.GenerateSkillsWithHooks(ctx, outputPath, GenerateProgressHooks{}, opts)
-}
-
-func (s *GeneratorService) GenerateSkillsWithProgress(ctx context.Context, outputPath string, onStepStart func(label string), onStepComplete func(label string)) error {
-	return s.GenerateSkillsWithHooks(ctx, outputPath, GenerateProgressHooks{
-		OnStepStart:    onStepStart,
-		OnStepComplete: onStepComplete,
-	}, GenerateOptions{})
+	return s.GenerateSkillsWithHooks(ctx, outputPath, GenerateProgressHooks{}, GenerateOptions{})
 }
 
 func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPath string, hooks GenerateProgressHooks, opts GenerateOptions) error {
@@ -167,12 +147,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	profile, rankedPatterns = sanitizeGenerationInputs(profile, rankedPatterns, projectRoot)
 	spec := s.projectSpecFromProfileAndPatterns(profile, rankedPatterns, config.WorkspaceProjectConfig{})
 
-	if err := runStep(i18n.Get("ProgressGenerateCheckOutput"), func() error {
-		return s.ensureGeneratedOutputDirWritable(resolvedOutputPath)
-	}); err != nil {
-		return err
-	}
-
 	var summaryResult *agent.GenerateSkillsResult
 	if err := runStep(i18n.Get("ProgressGenerateSummary"), func() error {
 		summaryResult = s.buildDeterministicSummary(rankedPatterns, patternInsights)
@@ -198,27 +172,25 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		if err != nil {
 			return err
 		}
-		if err := s.rebuildGeneratedOutputDir(resolvedOutputPath); err != nil {
-			return err
-		}
-		if err := s.writeWorkflowOutputs(resolvedOutputPath); err != nil {
-			return err
-		}
-
-		plan, err := s.planBuilder.Build(resolvedOutputPath, rankedPatterns, summaryResult, stats, profile, spec, PlanOptions{
-			SkillName:           skillgen.GeneratedSkillName(projectConfig.Name),
-			ProjectName:         projectConfig.Name,
-			Language:            projectConfig.Language,
-			ProgramVersion:      metadata.ProgramVersion,
-			SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
-			SkipReferences:      opts.SkipReferences,
-			WorkflowReferences:  workflowReferences,
-			ProjectRoot:         projectRoot,
+		return skilloutput.ReplaceWithinRoot(projectRoot, resolvedOutputPath, func(staging string) error {
+			if err := s.writeWorkflowOutputs(staging); err != nil {
+				return err
+			}
+			plan, err := s.planBuilder.Build(staging, rankedPatterns, summaryResult, stats, profile, spec, PlanOptions{
+				SkillName:           skillgen.GeneratedSkillName(projectConfig.Name),
+				ProjectName:         projectConfig.Name,
+				Language:            projectConfig.Language,
+				ProgramVersion:      metadata.ProgramVersion,
+				SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
+				SkipReferences:      opts.SkipReferences,
+				WorkflowReferences:  workflowReferences,
+				ProjectRoot:         projectRoot,
+			})
+			if err != nil {
+				return err
+			}
+			return s.renderer.Render(ctx, plan)
 		})
-		if err != nil {
-			return err
-		}
-		return s.renderer.Render(ctx, plan)
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.generate_skills",
@@ -237,28 +209,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		"resolved_output_path", resolvedOutputPath,
 		"categories_count", len(stats.ByCategory),
 	)
-	return nil
-}
-
-func (s *GeneratorService) ensureGeneratedOutputDirWritable(outputPath string) error {
-	if err := skilloutput.EnsureWritable(outputPath); err != nil {
-		var manualErr *skilloutput.ManualSkillExistsError
-		if errors.As(err, &manualErr) {
-			return &ManualSkillExistsError{Path: manualErr.Path}
-		}
-		return err
-	}
-	return nil
-}
-
-func (s *GeneratorService) rebuildGeneratedOutputDir(outputPath string) error {
-	if err := skilloutput.Rebuild(outputPath); err != nil {
-		var manualErr *skilloutput.ManualSkillExistsError
-		if errors.As(err, &manualErr) {
-			return &ManualSkillExistsError{Path: manualErr.Path}
-		}
-		return err
-	}
 	return nil
 }
 

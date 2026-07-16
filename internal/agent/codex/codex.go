@@ -1,26 +1,18 @@
 package codex
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 )
 
@@ -83,7 +75,7 @@ func (c *CodexAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest)
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "AnalyzeCode", prompt)
+	output, err := c.callCodex(ctx, "AnalyzeCode", prompt, aicontract.ContractAnalyzeCode)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexAnalyzeFailed"), err)
 	}
@@ -126,7 +118,7 @@ func (c *CodexAgent) LearnFromCommit(ctx context.Context, req *agent.LearnReques
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderBatchLearnPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "LearnFromCommit", prompt)
+	output, err := c.callCodex(ctx, "LearnFromCommit", prompt, aicontract.ContractLearnPatterns)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexLearnFailed"), err)
 	}
@@ -161,7 +153,7 @@ func (c *CodexAgent) BatchLearnFromCommits(ctx context.Context, req *agent.Batch
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderBatchLearnPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "BatchLearnFromCommits", prompt)
+	output, err := c.callCodex(ctx, "BatchLearnFromCommits", prompt, aicontract.ContractLearnPatterns)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexBatchLearnFailed"), err)
 	}
@@ -186,7 +178,7 @@ func (c *CodexAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixes
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderGenerateFixesPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "GenerateFixes", prompt)
+	output, err := c.callCodex(ctx, "GenerateFixes", prompt, aicontract.ContractGenerateFixes)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexGenerateFixesFailed"), err)
 	}
@@ -222,7 +214,7 @@ func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequ
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "SelectFiles", prompt, task)
+	output, err := c.callCodex(ctx, "SelectFiles", prompt, aicontract.ContractSelectFiles, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexAnalyzeFailed"), err)
 	}
@@ -244,7 +236,7 @@ func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatter
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderCuratePatternsPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "CuratePatterns", prompt)
+	output, err := c.callCodex(ctx, "CuratePatterns", prompt, aicontract.ContractCuratePatterns)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCuratePatternsFailed"), err)
 	}
@@ -288,7 +280,7 @@ func (c *CodexAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProje
 		return nil, fmt.Errorf("%s: prompt is empty", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "AnalyzeProject", prompt)
+	output, err := c.callCodex(ctx, "AnalyzeProject", prompt, aicontract.ContractProjectProfile)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexProjectAnalysisFailed"), err)
 	}
@@ -326,7 +318,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, operation, prompt, task)
+	output, err := c.callCodex(ctx, operation, prompt, aicontract.ContractAnalyzeCurrentCodebase, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCodebaseAnalysisFailed"), err)
 	}
@@ -339,7 +331,6 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 		"agent", c.Name(),
 		"operation", operation,
 		"patterns_count", len(result.Patterns),
-		"profile_delta", !result.ProfileDelta.IsZero(),
 		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
 	)
 	return result, nil
@@ -364,7 +355,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, operation, prompt, task)
+	output, err := c.callCodex(ctx, operation, prompt, aicontract.ContractAnalyzeCurrentCodebaseBatch, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCodebaseAnalysisFailed"), err)
 	}
@@ -399,7 +390,7 @@ func (c *CodexAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnaly
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalysisPlanPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "PlanAnalysisUnits", prompt, task)
+	output, err := c.callCodex(ctx, "PlanAnalysisUnits", prompt, aicontract.ContractPlanAnalysisUnits, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCodebaseAnalysisFailed"), err)
 	}
@@ -428,7 +419,7 @@ func (c *CodexAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefin
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderUserDefinePatternPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "UserDefinePattern", prompt)
+	output, err := c.callCodex(ctx, "UserDefinePattern", prompt, aicontract.ContractUserDefinePattern)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentUserDefinePatternFailed"), err)
 	}
@@ -454,7 +445,7 @@ func (c *CodexAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWo
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderOptimizeWorkflowPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "OptimizeWorkflow", prompt)
+	output, err := c.callCodex(ctx, "OptimizeWorkflow", prompt, aicontract.ContractOptimizeWorkflow)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentOptimizeWorkflowFailed"), err)
 	}
@@ -468,7 +459,7 @@ func (c *CodexAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWo
 
 // AnalyzeWorkspaceProfile 分析工作区结构和跨项目关系
 func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
-	prompt, err := c.promptLoader.Render("skill-workspace-profile", workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
+	prompt, err := c.promptLoader.Render("skill-workspace-profile", agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
 	if err != nil || prompt == "" {
 		if err != nil {
 			return nil, err
@@ -476,7 +467,7 @@ func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.Ana
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "AnalyzeWorkspaceProfile", prompt)
+	output, err := c.callCodex(ctx, "AnalyzeWorkspaceProfile", prompt, aicontract.ContractWorkspaceProfile)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexProjectAnalysisFailed"), err)
 	}
@@ -496,7 +487,7 @@ func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.Ana
 
 // AnalyzeWorkspaceSpec 生成工作区级开发规范
 func (c *CodexAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
-	data := workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
+	data := agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
 	prompt, err := c.promptLoader.Render("skill-workspace-spec", data)
 	if err != nil || prompt == "" {
 		if err != nil {
@@ -505,7 +496,7 @@ func (c *CodexAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analyz
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "AnalyzeWorkspaceSpec", prompt)
+	output, err := c.callCodex(ctx, "AnalyzeWorkspaceSpec", prompt, aicontract.ContractWorkspaceSpec)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexProjectAnalysisFailed"), err)
 	}
@@ -521,431 +512,4 @@ func (c *CodexAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analyz
 		"rules_count", len(result.Rules),
 	)
 	return result, nil
-}
-
-func workspacePromptData(workspaceName, workspaceRoot, workspaceInputPath, workspaceProfilePath, userContextPath string) map[string]interface{} {
-	return map[string]interface{}{
-		"WorkspaceName":        workspaceName,
-		"WorkspaceRoot":        workspaceRoot,
-		"WorkspaceInputPath":   workspaceInputPath,
-		"WorkspaceProfilePath": workspaceProfilePath,
-		"UserContextPath":      userContextPath,
-	}
-}
-
-func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt string, task ...agent.RuntimeTask) (string, error) {
-	maxRetries := c.retryCfg.EffectiveMaxRetries()
-	retried := false
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		attemptNumber := attempt + 1
-		if attempt > 0 {
-			agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
-				AgentName:  c.Name(),
-				Operation:  operation,
-				Attempt:    attemptNumber,
-				MaxRetries: maxRetries,
-			})
-		}
-		output, callDuration, isRetryable, err := c.doCallCodex(ctx, operation, prompt, attemptNumber, firstRuntimeTask(task))
-		if err == nil {
-			if retried {
-				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
-					AgentName:    c.Name(),
-					Operation:    operation,
-					Attempt:      attemptNumber,
-					MaxRetries:   maxRetries,
-					CallDuration: callDuration,
-				})
-			}
-			return output, nil
-		}
-		if !isRetryable || attempt == maxRetries {
-			return "", err
-		}
-
-		retried = true
-		waitDuration := c.retryCfg.WaitDuration(attempt)
-		agent.ReportRetryForContext(ctx, agent.RetryInfo{
-			AgentName:    c.Name(),
-			Operation:    operation,
-			Attempt:      attemptNumber,
-			MaxRetries:   maxRetries,
-			WaitDuration: waitDuration,
-			CallDuration: callDuration,
-			Reason:       agent.RetryReasonFromOutput(output, ""),
-		})
-
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-time.After(waitDuration):
-		}
-	}
-
-	logger.Error(i18n.Get("LoggerAgentRateLimitExhausted"), "max_retries", maxRetries)
-	return "", fmt.Errorf("%s: %d", i18n.Get("AgentClaudeRateLimitExhausted"), maxRetries)
-}
-
-// isRetryableError 检测是否为可重试错误（速率限制、过载等）
-func isCodexRetryableError(stdout, stderr string) bool {
-	combined := stdout + stderr
-	if agent.HTTPStatusRetryableRegex.MatchString(combined) {
-		return true
-	}
-	return strings.Contains(combined, "overloaded_error") ||
-		strings.Contains(combined, "rate limit") ||
-		strings.Contains(combined, "速率限制") ||
-		strings.Contains(combined, "请求频率") ||
-		strings.Contains(combined, "访问量过大")
-}
-
-// doCallCodex 执行单次 Codex CLI 调用
-func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt string, attempt int, task agent.RuntimeTask) (string, time.Duration, bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
-
-	workDir, err := agent.WorkDirForContext(ctx)
-	if err != nil {
-		return "", 0, false, err
-	}
-	args := codexExecArgs(c.allowUserPlugins)
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
-		"agent", c.Name(),
-		"operation", operation,
-		"command", c.commandPath,
-		"args", args,
-		"timeout", c.timeout,
-		"work_dir", workDir,
-		"prompt_length", len(prompt),
-		"attempt", attempt,
-	)
-
-	cmd := exec.CommandContext(ctx, c.commandPath, args...)
-	cmd.Dir = workDir
-	cmd.Stdin = strings.NewReader(prompt)
-	configureCommandProcessGroup(cmd)
-	stopProcessGroupKill := context.AfterFunc(ctx, func() {
-		terminateCommandProcessGroup(cmd)
-	})
-	defer stopProcessGroupKill()
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	startedAt := time.Now()
-	if err := cmd.Run(); err != nil {
-		duration := time.Since(startedAt)
-		stdoutStr := stdout.String()
-		stderrStr := stderr.String()
-		retryable := isCodexRetryableError(stdoutStr, stderrStr)
-		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:     c.Name(),
-			Operation: operation,
-			RuntimeID: task.ID,
-			Slug:      task.Slug,
-			Attempt:   attempt,
-			RawOutput: stdoutStr,
-			Stderr:    stderrStr,
-			ExitError: true,
-		})
-
-		if retryable {
-			logger.Diagnostic(i18n.Get("LoggerAgentCodexCallRetryable"),
-				"agent", c.Name(),
-				"operation", operation,
-				"attempt", attempt,
-				"duration", duration,
-				"error", err,
-				"stdout_length", len(stdoutStr),
-				"stderr_length", len(stderrStr),
-				"raw_output_path", archive.RawPath,
-				"stderr_path", archive.StderrPath,
-				"retryable", true,
-			)
-			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRateLimited"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
-		}
-
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"agent", c.Name(),
-			"operation", operation,
-			"duration", duration,
-			"stdout_length", stdout.Len(),
-			"stderr_length", stderr.Len(),
-			"raw_output_path", archive.RawPath,
-			"stderr_path", archive.StderrPath,
-		)
-		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
-	}
-	duration := time.Since(startedAt)
-
-	rawOutput := stdout.String()
-	usage := tokenusage.Extract(rawOutput)
-	callCompleteFields := []any{
-		"agent", c.Name(),
-		"operation", operation,
-		"duration", duration,
-		"output_length", stdout.Len(),
-		"stderr_length", stderr.Len(),
-		"attempt", attempt,
-	}
-	callCompleteFields = append(callCompleteFields, tokenusage.Fields(usage, "")...)
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
-	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
-
-	content, err := extractFinalContent(rawOutput)
-	if err != nil {
-		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:           c.Name(),
-			Operation:       operation,
-			RuntimeID:       task.ID,
-			Slug:            task.Slug,
-			Attempt:         attempt,
-			RawOutput:       rawOutput,
-			Stderr:          stderr.String(),
-			TokenUsageKnown: usage.Known(),
-		})
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"agent", c.Name(),
-			"operation", operation,
-			"duration", duration,
-			"error", err,
-			"output_length", stdout.Len(),
-			"raw_output_path", archive.RawPath,
-			"stderr_path", archive.StderrPath,
-		)
-		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, err, rawOutput, archive))
-	}
-	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-		Agent:           c.Name(),
-		Operation:       operation,
-		RuntimeID:       task.ID,
-		Slug:            task.Slug,
-		Attempt:         attempt,
-		Content:         content,
-		RawOutput:       rawOutput,
-		Stderr:          stderr.String(),
-		TokenUsageKnown: usage.Known(),
-	})
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
-		"agent", c.Name(),
-		"operation", operation,
-		"content_length", len(content),
-		"output_path", archive.ContentPath,
-		"raw_output_path", archive.RawPath,
-		"stderr_path", archive.StderrPath,
-	)
-	return content, duration, false, nil
-}
-
-func codexExecArgs(allowUserPlugins bool) []string {
-	// 已经把需要分析的结构和样例代码放进提示词。这里让模型以一次性、
-	// 只读、非交互模式在当前目录运行，避免写入文件或等待工具审批
-	args := []string{
-		"--ask-for-approval", "never",
-		"exec",
-		"--skip-git-repo-check",
-		"--ephemeral",
-		"--ignore-rules",
-		"--sandbox", "read-only",
-		"--color", "never",
-		"--json",
-		"-",
-	}
-	if !allowUserPlugins {
-		args = append(codexDisableUserPluginArgs(), args...)
-	}
-	return args
-}
-
-func firstRuntimeTask(tasks []agent.RuntimeTask) agent.RuntimeTask {
-	if len(tasks) == 0 {
-		return agent.RuntimeTask{}
-	}
-	return tasks[0]
-}
-
-func promptRuntimeTask(task agent.RuntimeTask) promptloader.RuntimeTask {
-	return promptloader.RuntimeTask{ID: task.ID, Slug: task.Slug}
-}
-
-func codexDisableUserPluginArgs() []string {
-	pluginNames := codexUserPluginNames()
-	args := make([]string, 0, len(pluginNames)*2)
-	for _, name := range pluginNames {
-		args = append(args, "-c", fmt.Sprintf("plugins.%s.enabled=false", strconv.Quote(name)))
-	}
-	return args
-}
-
-func codexUserPluginNames() []string {
-	configPath := filepath.Join(codexHomeDir(), "config.toml")
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil
-	}
-
-	var cfg struct {
-		Plugins map[string]interface{} `toml:"plugins"`
-	}
-	if err := toml.Unmarshal(content, &cfg); err != nil {
-		logger.Debug("读取 Codex 用户插件配置失败",
-			"config_path", configPath,
-			"error", err,
-		)
-		return nil
-	}
-
-	names := make([]string, 0, len(cfg.Plugins))
-	for name := range cfg.Plugins {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
-}
-
-func codexHomeDir() string {
-	if home := os.Getenv("CODEX_HOME"); home != "" {
-		return home
-	}
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return ".codex"
-	}
-	return filepath.Join(userHome, ".codex")
-}
-
-func extractFinalContent(output string) (string, error) {
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	var lastMessageContent string
-	var allParts []string
-
-	// Forward pass: collect all message event contents.
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		var evt map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &evt); err != nil {
-			continue
-		}
-
-		if content := extractCodexEventContent(evt); content != "" {
-			lastMessageContent = content
-			allParts = append(allParts, content)
-		}
-	}
-
-	if lastMessageContent != "" {
-		if looksLikeJSONContent(lastMessageContent) && !hasEarlierJSONContent(allParts) {
-			return lastMessageContent, nil
-		}
-		// If there are multiple distinct message events, merge them.
-		// Deduplicate: if the last message contains all previous content,
-		// just return the last one.
-		if len(allParts) <= 1 {
-			return lastMessageContent, nil
-		}
-		merged := strings.Join(allParts, "\n")
-		previous := strings.TrimSpace(strings.Join(allParts[:len(allParts)-1], "\n"))
-		if previous != "" && strings.Contains(lastMessageContent, previous) {
-			return lastMessageContent, nil
-		}
-		return merged, nil
-	}
-
-	return "", fmt.Errorf("%s", i18n.Get("AgentCodexNoFinalMessage"))
-}
-
-func looksLikeJSONContent(content string) bool {
-	trimmed := strings.TrimSpace(content)
-	return strings.HasPrefix(trimmed, "{")
-}
-
-func hasEarlierJSONContent(parts []string) bool {
-	if len(parts) <= 1 {
-		return false
-	}
-	for _, part := range parts[:len(parts)-1] {
-		if looksLikeJSONContent(part) {
-			return true
-		}
-	}
-	return false
-}
-
-func extractCodexEventContent(evt map[string]interface{}) string {
-	if isCodexMessageType(stringField(evt, "msg_type")) || isCodexMessageType(stringField(evt, "type")) {
-		if content := contentField(evt); content != "" {
-			return content
-		}
-	}
-
-	if item, ok := mapField(evt, "item"); ok && isCodexMessageType(stringField(item, "type")) {
-		if content := contentField(item); content != "" {
-			return content
-		}
-	}
-
-	if message, ok := mapField(evt, "message"); ok {
-		if content := contentField(message); content != "" {
-			return content
-		}
-	}
-
-	return ""
-}
-
-func isCodexMessageType(value string) bool {
-	switch value {
-	case "agent_message", "assistant_message", "message", "final_message":
-		return true
-	default:
-		return false
-	}
-}
-
-func contentField(data map[string]interface{}) string {
-	for _, field := range []string{"content", "message", "text", "final_message"} {
-		if content := stringifyContent(data[field]); content != "" {
-			return content
-		}
-	}
-	return ""
-}
-
-func stringifyContent(value interface{}) string {
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	case []interface{}:
-		var parts []string
-		for _, item := range typed {
-			switch content := item.(type) {
-			case string:
-				if content = strings.TrimSpace(content); content != "" {
-					parts = append(parts, content)
-				}
-			case map[string]interface{}:
-				if text := contentField(content); text != "" {
-					parts = append(parts, text)
-				}
-			}
-		}
-		return strings.TrimSpace(strings.Join(parts, "\n"))
-	default:
-		return ""
-	}
-}
-
-func stringField(data map[string]interface{}, key string) string {
-	value, _ := data[key].(string)
-	return value
-}
-
-func mapField(data map[string]interface{}, key string) (map[string]interface{}, bool) {
-	value, ok := data[key].(map[string]interface{})
-	return value, ok
 }

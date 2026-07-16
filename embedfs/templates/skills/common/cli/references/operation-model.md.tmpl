@@ -1,0 +1,83 @@
+# Operation Model
+
+`skills-seed` is a repository knowledge and Skill generation CLI. It learns project conventions, stores durable knowledge under `.skills-seed`, and renders AI-agent Skills from that state.
+
+## Command Groups
+
+| Group | Commands | Role |
+|---|---|---|
+| Setup | `init`, `reset`, `workspace add` | Create or rebuild local skills-seed state. |
+| Learning | `sync`, `learn current`, `learn history` | Extract conventions, workflows, profiles, specs, and patterns. |
+| Rendering | `generate skills` | Write `SKILL.md`, `references/`, workflow files, and provider metadata. |
+| Knowledge management | `patterns ...`, `workflow`, `profile ...`, `review ...` | Add, inspect, curate, and validate durable knowledge. |
+| Diagnostics | `preview files`, `log`, `--version`, `help` | Inspect inputs, state, and CLI/template fingerprints. |
+| Quality | `check`, `hook ...` | Review files and integrate pre-commit behavior. |
+| Global CLI Skill maintenance | `cli-skills install`, `cli-skills uninstall` | Install or remove this global operation manual. |
+
+## Runtime Boundary
+
+Commands that can run without project initialization:
+
+- `skills-seed --version`
+- `skills-seed help [command]`
+- `skills-seed init`
+- `skills-seed cli-skills install`
+- `skills-seed cli-skills uninstall`
+- `skills-seed hook --help`
+- `skills-seed log`
+
+Commands that need `.skills-seed` project state:
+
+- `skills-seed sync`
+- `skills-seed learn current`
+- `skills-seed learn history`
+- `skills-seed generate skills`
+- `skills-seed patterns ...`
+- `skills-seed workflow`
+- `skills-seed preview files`
+- `skills-seed profile ...`
+- `skills-seed review ...`
+- `skills-seed check`
+
+## State Model
+
+The CLI works with these durable state categories:
+
+- `.skills-seed/config.yaml`: tool configuration, project/workspace mode, agent, Skills target, learning settings, and output paths.
+- `.skills-seed/context/`: user-owned durable context such as background, constraints, terminology, or workspace notes.
+- Learned patterns: project-specific implementation rules and evidence.
+- Project profile/spec: architecture, modules, dependencies, validation commands, and rules used by generated Skills.
+- Workflows: user-defined or learned task procedures rendered into generated Skills.
+- Command state: resumable state for interrupted commands such as `sync`.
+
+## Choosing The Right Command
+
+- Use `sync` by default for normal repository updates.
+- Use `learn current` when you want to update learned state without writing generated Skill files.
+- Use `generate skills` when learned state is already correct and only output files need refreshing.
+- Use `patterns add` when the user gives a durable rule.
+- Use `workflow` when the user gives a repeatable task process.
+- Use `preview files` when analysis input selection is unclear.
+- Use `check` when the task is review-oriented or pre-commit-oriented.
+
+## Context Rules
+
+- `--context` is for one short instruction for the current run.
+- `--context-path` is for one or more files that should influence only the current run.
+- `.skills-seed/context/` is for durable repository background.
+- `patterns add/update` is for durable implementation rules.
+- `workflow` is for durable process guidance.
+
+Do not repeatedly pass the same `--context`; persist it in the right state instead.
+
+## Version And Fingerprints
+
+Run `skills-seed --version` when command behavior, templates, or generated Skill content may be stale.
+
+The output includes:
+
+- CLI version.
+- `prompt-templates-sha256`: embedded AI prompt template fingerprint.
+- `skills-templates-sha256`: embedded Skill rendering template fingerprint.
+
+Use this when comparing an installed binary against generated metadata in Skill files.

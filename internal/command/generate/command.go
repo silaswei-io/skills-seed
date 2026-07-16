@@ -2,7 +2,6 @@ package generate
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -171,6 +170,7 @@ func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts g
 	}
 	projects := cont.ConfigRepo.GetWorkspaceConfig().Projects
 	childProgress := progress.NewMulti(commandutil.WorkspaceProjectProgressNames(projects))
+	defer childProgress.Stop()
 	childProgress.SetLabel(i18n.Get("ProgressGenerateWorkspaceProjects"))
 	childProgress.SetTaskTotal(ws.GenerateProjectStepTotal)
 	if err := generateWorkspaceChildSkillsWithOptions(ctx, cont, opts, childProgress); err != nil {
@@ -287,18 +287,6 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 			OnStepUpdate:   updateStep,
 			OnStepComplete: completeStep,
 		}, generator.GenerateOptions{SkipReferences: opts.noReferences}); err != nil {
-			var manualErr *generator.ManualSkillExistsError
-			if errors.As(err, &manualErr) {
-				logger.Warn(i18n.GetWithParams("GenerateWorkspaceChildManualSkillSkipped", map[string]interface{}{
-					"ProjectName": project.ID,
-					"Path":        manualErr.Path,
-				}))
-				if multiTracker != nil {
-					multiTracker.Complete(progressName, i18n.Get("GenerateWorkspaceProjectProgressComplete"))
-				}
-				failProgress = false
-				return nil
-			}
 			return err
 		}
 		logger.Info(i18n.GetWithParams("GenerateWorkspaceChildGenerated", map[string]interface{}{"ProjectName": project.ID}))

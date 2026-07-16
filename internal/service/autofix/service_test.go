@@ -7,12 +7,14 @@ import (
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFixWithPatchCreatesUnifiedDiff(t *testing.T) {
+	require.NoError(t, i18n.Init(i18n.LocaleEnglish))
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n"), 0644))
 
@@ -32,10 +34,13 @@ func TestFixWithPatchCreatesUnifiedDiff(t *testing.T) {
 	content, err := os.ReadFile(result.OutputPath)
 	require.NoError(t, err)
 	patch := string(content)
+	assert.Contains(t, patch, "# Auto-generated patch by skills-seed")
+	assert.Contains(t, patch, "# Issues fixed: 1")
 	assert.Contains(t, patch, "diff --git a/main.go b/main.go")
 	assert.Contains(t, patch, "@@ -1,1 +1,3 @@")
 	assert.Contains(t, patch, "-package main")
 	assert.Contains(t, patch, "+func main() {}")
+	assert.NotContains(t, result.Message, "{{.Path}}")
 }
 
 func TestFixWithBackupUsesProjectRootAndPreservesPath(t *testing.T) {

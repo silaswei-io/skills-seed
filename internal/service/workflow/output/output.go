@@ -9,6 +9,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
+	skilltemplates "github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
 const (
@@ -42,7 +43,7 @@ func LoadReferences(repo domain.WorkflowRepository, locale string) ([]Reference,
 			ID:          workflow.ID,
 			Name:        workflowDisplayName(workflow),
 			Path:        workflowReferencePath(workflow.ID),
-			Description: workflowDescription(workflow, locale),
+			Description: Summary(workflow, locale),
 		})
 	}
 	return refs, nil
@@ -78,7 +79,11 @@ func Write(repo domain.WorkflowRepository, outputPath, locale string) error {
 		if strings.TrimSpace(workflow.ID) == "" {
 			continue
 		}
-		if err := fileio.WriteFileAtomic(workflowOutputPath(outputPath, workflow.ID), []byte(renderWorkflowOutput(workflow, locale)), 0644); err != nil {
+		content, err := renderWorkflowOutput(workflow, locale)
+		if err != nil {
+			return err
+		}
+		if err := fileio.WriteFileAtomic(workflowOutputPath(outputPath, workflow.ID), []byte(content), 0644); err != nil {
 			return err
 		}
 		if err := copyWorkflowScripts(repo.ScriptsDir(workflow.ID), workflowScriptOutputDir(outputPath, workflow.ID)); err != nil {
@@ -88,57 +93,32 @@ func Write(repo domain.WorkflowRepository, outputPath, locale string) error {
 	return nil
 }
 
-func renderWorkflowOutput(workflow domain.Workflow, locale string) string {
-	if strings.TrimSpace(workflow.Content) != "" {
-		return renderWorkflowContentWithScripts(workflow, locale)
+type workflowOutputTemplateData struct {
+	Title    string
+	Summary  string
+	Content  string
+	Contexts []string
+	Scripts  []string
+}
+
+func renderWorkflowOutput(workflow domain.Workflow, locale string) (string, error) {
+	data := workflowOutputTemplateData{
+		Title:   workflowDisplayName(workflow),
+		Summary: Summary(workflow, locale),
+		Content: strings.TrimSpace(workflow.Content),
 	}
-	var b strings.Builder
-	b.WriteString("# ")
-	b.WriteString(workflowDisplayName(workflow))
-	b.WriteString("\n\n")
-	if description := workflowDescription(workflow, locale); description != "" {
-		b.WriteString(description)
-		b.WriteString("\n\n")
-	}
-	if len(workflow.Contexts) > 0 {
-		b.WriteString("## ")
-		b.WriteString(localized(locale, "WorkflowOutputContextHeading"))
-		b.WriteString("\n\n")
-		for _, item := range workflow.Contexts {
-			if strings.TrimSpace(item.Content) == "" {
-				continue
-			}
-			b.WriteString(strings.TrimSpace(item.Content))
-			b.WriteString("\n\n")
+	for _, item := range workflow.Contexts {
+		if content := strings.TrimSpace(item.Content); content != "" {
+			data.Contexts = append(data.Contexts, content)
 		}
 	}
-	appendWorkflowScripts(&b, workflow, locale)
-	return b.String()
-}
-
-func renderWorkflowContentWithScripts(workflow domain.Workflow, locale string) string {
-	var b strings.Builder
-	b.WriteString(strings.TrimSpace(workflow.Content))
-	b.WriteString("\n\n")
-	appendWorkflowScripts(&b, workflow, locale)
-	return b.String()
-}
-
-func appendWorkflowScripts(b *strings.Builder, workflow domain.Workflow, locale string) {
-	if len(workflow.Scripts) == 0 {
-		return
-	}
-	b.WriteString("## ")
-	b.WriteString(localized(locale, "WorkflowOutputScriptsHeading"))
-	b.WriteString("\n\n")
 	for _, script := range workflow.Scripts {
 		if strings.TrimSpace(script.Path) == "" {
 			continue
 		}
-		b.WriteString("- `")
-		b.WriteString(workflowScriptReferencePath(workflow.ID, script.Path))
-		b.WriteString("`\n")
+		data.Scripts = append(data.Scripts, workflowScriptReferencePath(workflow.ID, script.Path))
 	}
+	return skilltemplates.NewLoader(locale).RenderRelative("shared/workflow-reference", data)
 }
 
 func copyWorkflowScripts(srcDir, dstDir string) error {
@@ -198,7 +178,8 @@ func workflowDisplayName(workflow domain.Workflow) string {
 	return workflow.ID
 }
 
-func workflowDescription(workflow domain.Workflow, locale string) string {
+// Summary 从标准工作流内容中提取适合列表展示和候选匹配的简短摘要。
+func Summary(workflow domain.Workflow, locale string) string {
 	if description := summarizedWorkflowDescription(workflow.Content, locale); description != "" {
 		return description
 	}

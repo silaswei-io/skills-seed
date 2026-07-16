@@ -282,6 +282,7 @@ func TestDeleteCmdInProjectDeletesPattern(t *testing.T) {
 	require.NoError(t, err)
 	defer patternRepo.Close()
 	pattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	pattern.Rule = "修改插件时必须更新对应源代码。"
 	require.NoError(t, patternRepo.Save(ctx, pattern))
 
 	cont := &container.Container{
@@ -338,6 +339,7 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 	require.NoError(t, err)
 	defer rootPatternRepo.Close()
 	rootPattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	rootPattern.Rule = "修改插件时必须更新对应源代码。"
 	rootPattern.ProjectID = "hsmwebapi"
 	rootPattern.ScopePath = "hsmwebapi"
 	require.NoError(t, rootPatternRepo.Save(ctx, rootPattern))
@@ -345,6 +347,7 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 	childPatternRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "store", "project.db"))
 	require.NoError(t, err)
 	childPattern := domain.NewPattern("plugin-source-editing-rule", "插件源码修改规范", domain.CategoryConfig)
+	childPattern.Rule = "修改插件时必须更新对应源代码。"
 	require.NoError(t, childPatternRepo.Save(ctx, childPattern))
 	require.NoError(t, childPatternRepo.Close())
 

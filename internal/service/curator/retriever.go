@@ -82,7 +82,7 @@ func patternSimilarity(left, right domain.Pattern) float64 {
 		score += 0.18
 	}
 	if strings.EqualFold(strings.TrimSpace(left.Rule), strings.TrimSpace(right.Rule)) && strings.TrimSpace(left.Rule) != "" {
-		score += 0.12
+		score += 0.18
 	}
 	if score > 1 {
 		return 1
@@ -91,10 +91,15 @@ func patternSimilarity(left, right domain.Pattern) float64 {
 }
 
 func sameScope(left, right domain.Pattern) bool {
-	return strings.TrimSpace(left.ProjectID) == strings.TrimSpace(right.ProjectID) &&
-		strings.TrimSpace(left.ScopePath) == strings.TrimSpace(right.ScopePath) &&
-		strings.TrimSpace(left.WorkspaceRole) == strings.TrimSpace(right.WorkspaceRole) &&
-		strings.TrimSpace(left.AnalysisUnitID) == strings.TrimSpace(right.AnalysisUnitID)
+	leftProject := strings.TrimSpace(left.ProjectID)
+	leftPath := strings.TrimSpace(left.ScopePath)
+	leftRole := strings.TrimSpace(left.WorkspaceRole)
+	if leftProject == "" && leftPath == "" && leftRole == "" {
+		return false
+	}
+	return leftProject == strings.TrimSpace(right.ProjectID) &&
+		leftPath == strings.TrimSpace(right.ScopePath) &&
+		leftRole == strings.TrimSpace(right.WorkspaceRole)
 }
 
 func businessMethodOverlap(left, right *domain.BusinessMethod) bool {

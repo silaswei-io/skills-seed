@@ -25,24 +25,24 @@ func RenderCommandTreeDocs(locale string) (string, error) {
 	rootCmd.InitDefaultHelpCmd()
 
 	var b strings.Builder
-	if strings.EqualFold(locale, "en-US") {
-		renderCommandTreeDocsEn(&b, rootCmd)
-	} else {
-		renderCommandTreeDocsZh(&b, rootCmd)
-	}
+	renderCommandTreeDocs(&b, rootCmd, locale)
 	return strings.TrimSpace(b.String()), nil
 }
 
-func renderCommandTreeDocsZh(b *strings.Builder, rootCmd *cobra.Command) {
-	b.WriteString("## 自动生成命令索引\n\n")
-	b.WriteString("> 本节由 Cobra command tree 生成，用于校验命令、子命令和参数默认值是否与 CLI 实现一致；详细场景说明仍以各命令章节为准。\n\n")
-	renderCommandSummaryTable(b, rootCmd, "命令", "摘要", "子命令", "参数")
-}
-
-func renderCommandTreeDocsEn(b *strings.Builder, rootCmd *cobra.Command) {
-	b.WriteString("## Generated Command Index\n\n")
-	b.WriteString("> This section is generated from the Cobra command tree to keep commands, subcommands, and flag defaults aligned with the CLI implementation. Detailed usage notes remain in the command sections below.\n\n")
-	renderCommandSummaryTable(b, rootCmd, "Command", "Summary", "Subcommands", "Flags")
+func renderCommandTreeDocs(b *strings.Builder, rootCmd *cobra.Command, locale string) {
+	b.WriteString("## ")
+	b.WriteString(i18n.GetForLocale(locale, "CommandDocsHeading"))
+	b.WriteString("\n\n> ")
+	b.WriteString(i18n.GetForLocale(locale, "CommandDocsNotice"))
+	b.WriteString("\n\n")
+	renderCommandSummaryTable(
+		b,
+		rootCmd,
+		i18n.GetForLocale(locale, "CommandDocsHeaderCommand"),
+		i18n.GetForLocale(locale, "CommandDocsHeaderSummary"),
+		i18n.GetForLocale(locale, "CommandDocsHeaderSubcommands"),
+		i18n.GetForLocale(locale, "CommandDocsHeaderFlags"),
+	)
 }
 
 func renderCommandSummaryTable(b *strings.Builder, rootCmd *cobra.Command, commandHeader, summaryHeader, subcommandsHeader, flagsHeader string) {

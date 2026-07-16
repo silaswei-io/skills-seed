@@ -2,8 +2,41 @@ package domain
 
 import (
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
+
+// PatternEvidenceQuality 根据结构化证据的独立位置和路径多样性派生质量指标。
+func PatternEvidenceQuality(locations []PatternEvidenceLocation) (int, float64) {
+	identities := make(map[string]struct{}, len(locations))
+	paths := make(map[string]struct{}, len(locations))
+	for _, location := range locations {
+		path := strings.TrimSpace(location.Path)
+		if path == "" {
+			continue
+		}
+		identity := path + "|" + strconv.Itoa(location.Line) + "|" + strings.TrimSpace(location.Symbol) + "|" + strings.TrimSpace(location.Kind)
+		identities[identity] = struct{}{}
+		paths[path] = struct{}{}
+	}
+
+	frequency := len(identities)
+	switch {
+	case frequency == 0:
+		return 0, 0
+	case frequency == 1:
+		return frequency, 0.80
+	case frequency == 2 && len(paths) == 1:
+		return frequency, 0.84
+	case frequency == 2:
+		return frequency, 0.87
+	case len(paths) >= 3:
+		return frequency, 0.94
+	default:
+		return frequency, 0.90
+	}
+}
 
 // StrongestPatterns 按 confidence 和 frequency 排序后取 top N
 func StrongestPatterns(patterns []Pattern, limit int) []Pattern {

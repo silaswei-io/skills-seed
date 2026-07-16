@@ -1,17 +1,23 @@
 package hook
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"text/template"
 
+	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/spf13/cobra"
 )
+
+// preCommitHookTemplatePath 是内置 pre-commit hook 模板路径。
+const preCommitHookTemplatePath = "templates/hooks/pre-commit.sh.tmpl"
 
 // Cmd 返回 hook 命令
 func Cmd() *cobra.Command {
@@ -81,7 +87,10 @@ func installHook() error {
 
 	// 创建 hook 脚本
 	hookPath := filepath.Join(gitDir, "hooks", "pre-commit")
-	hookContent := preCommitHookContent()
+	hookContent, err := preCommitHookContent()
+	if err != nil {
+		return err
+	}
 
 	// 确保 hooks 目录存在
 	hooksDir := filepath.Join(gitDir, "hooks")
@@ -97,12 +106,20 @@ func installHook() error {
 	return nil
 }
 
-func preCommitHookContent() string {
-	return `#!/bin/bash
-# skills-seed pre-commit hook
-
-skills-seed hook run
-`
+func preCommitHookContent() (string, error) {
+	data, err := embedfs.FS.ReadFile(preCommitHookTemplatePath)
+	if err != nil {
+		return "", err
+	}
+	tmpl, err := template.New("pre-commit-hook").Option("missingkey=error").Parse(string(data))
+	if err != nil {
+		return "", err
+	}
+	var content bytes.Buffer
+	if err := tmpl.Execute(&content, nil); err != nil {
+		return "", err
+	}
+	return content.String(), nil
 }
 
 func uninstallHook() error {

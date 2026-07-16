@@ -8,20 +8,37 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
+// AI 输出契约名称统一绑定 DTO，供提示词和 Agent CLI 复用同一份 Schema。
+const (
+	ContractAnalyzeCode                 = "AnalyzeCodeOutput"
+	ContractGenerateFixes               = "GenerateFixesOutput"
+	ContractLearnPatterns               = "LearnPatternsOutput"
+	ContractCuratePatterns              = "CuratePatternsOutput"
+	ContractUserDefinePattern           = "UserDefinePatternOutput"
+	ContractProjectProfile              = "ProjectProfileOutput"
+	ContractAnalyzeCurrentCodebase      = "AnalyzeCurrentCodebaseOutput"
+	ContractAnalyzeCurrentCodebaseBatch = "AnalyzeCurrentCodebaseBatchOutput"
+	ContractPlanAnalysisUnits           = "PlanAnalysisUnitsOutput"
+	ContractSelectFiles                 = "SelectFilesOutput"
+	ContractWorkspaceProfile            = "WorkspaceProfileOutput"
+	ContractWorkspaceSpec               = "WorkspaceSpecOutput"
+	ContractOptimizeWorkflow            = "OptimizeWorkflowOutput"
+)
+
 var outputTypes = map[string]reflect.Type{
-	"AnalyzeCodeOutput":                 reflect.TypeOf(AnalyzeCodeOutput{}),
-	"GenerateFixesOutput":               reflect.TypeOf(GenerateFixesOutput{}),
-	"LearnPatternsOutput":               reflect.TypeOf(LearnPatternsOutput{}),
-	"CuratePatternsOutput":              reflect.TypeOf(CuratePatternsOutput{}),
-	"UserDefinePatternOutput":           reflect.TypeOf(PatternOutput{}),
-	"ProjectProfileOutput":              reflect.TypeOf(ProjectProfileOutput{}),
-	"AnalyzeCurrentCodebaseOutput":      reflect.TypeOf(AnalyzeCurrentCodebaseOutput{}),
-	"AnalyzeCurrentCodebaseBatchOutput": reflect.TypeOf(AnalyzeCurrentCodebaseBatchOutput{}),
-	"PlanAnalysisUnitsOutput":           reflect.TypeOf(PlanAnalysisUnitsOutput{}),
-	"SelectFilesOutput":                 reflect.TypeOf(SelectFilesOutput{}),
-	"WorkspaceProfileOutput":            reflect.TypeOf(WorkspaceProfileOutput{}),
-	"WorkspaceSpecOutput":               reflect.TypeOf(WorkspaceSpecOutput{}),
-	"OptimizeWorkflowOutput":            reflect.TypeOf(OptimizeWorkflowOutput{}),
+	ContractAnalyzeCode:                 reflect.TypeOf(AnalyzeCodeOutput{}),
+	ContractGenerateFixes:               reflect.TypeOf(GenerateFixesOutput{}),
+	ContractLearnPatterns:               reflect.TypeOf(LearnPatternsOutput{}),
+	ContractCuratePatterns:              reflect.TypeOf(CuratePatternsOutput{}),
+	ContractUserDefinePattern:           reflect.TypeOf(PatternOutput{}),
+	ContractProjectProfile:              reflect.TypeOf(ProjectProfileOutput{}),
+	ContractAnalyzeCurrentCodebase:      reflect.TypeOf(AnalyzeCurrentCodebaseOutput{}),
+	ContractAnalyzeCurrentCodebaseBatch: reflect.TypeOf(AnalyzeCurrentCodebaseBatchOutput{}),
+	ContractPlanAnalysisUnits:           reflect.TypeOf(PlanAnalysisUnitsOutput{}),
+	ContractSelectFiles:                 reflect.TypeOf(SelectFilesOutput{}),
+	ContractWorkspaceProfile:            reflect.TypeOf(WorkspaceProfileOutput{}),
+	ContractWorkspaceSpec:               reflect.TypeOf(WorkspaceSpecOutput{}),
+	ContractOptimizeWorkflow:            reflect.TypeOf(OptimizeWorkflowOutput{}),
 }
 
 // JSONSchema 返回指定 AI 输出 DTO 的 JSON Schema。
@@ -30,6 +47,21 @@ func JSONSchema(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return marshalSchema(schema)
+}
+
+// StructuredOutputSchema 返回 Agent CLI 可直接校验的 DTO Schema。
+// CLI 自带校验器不一定加载 Draft 2020-12 meta-schema，因此不传递版本声明。
+func StructuredOutputSchema(name string) (string, error) {
+	schema, err := reflectSchema(name)
+	if err != nil {
+		return "", err
+	}
+	schema.Version = ""
+	return marshalSchema(schema)
+}
+
+func marshalSchema(schema *jsonschema.Schema) (string, error) {
 	data, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return "", err

@@ -62,13 +62,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLInt(doc, []string{"learning", "current", "max_units_per_call"}, cfg.Learning.Current.MaxUnitsPerCall)
 	setYAMLBool(doc, []string{"learning", "current", "select_relevant_files"}, cfg.Learning.Current.SelectRelevantFiles)
 	setYAMLInt(doc, []string{"learning", "current", "select_relevant_files_min_candidates"}, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
-	setYAMLInt(doc, []string{"learning", "current", "budget", "max_patterns_per_unit"}, cfg.Learning.Current.Budget.MaxPatternsPerUnit)
-	setYAMLInt(doc, []string{"learning", "current", "budget", "max_patterns_per_run"}, cfg.Learning.Current.Budget.MaxPatternsPerRun)
-	setYAMLInt(doc, []string{"learning", "current", "budget", "micro_change_new_patterns"}, cfg.Learning.Current.Budget.MicroChangeNewPatterns)
-	setYAMLInt(doc, []string{"learning", "current", "budget", "minor_change_new_patterns"}, cfg.Learning.Current.Budget.MinorChangeNewPatterns)
-	setYAMLFloat(doc, []string{"learning", "current", "budget", "min_confidence"}, cfg.Learning.Current.Budget.MinConfidence)
-	setYAMLBool(doc, []string{"learning", "current", "budget", "update_existing_first"}, cfg.Learning.Current.Budget.UpdateExistingFirst)
-	setYAMLBool(doc, []string{"learning", "current", "budget", "require_routeable_evidence"}, cfg.Learning.Current.Budget.RequireRouteableEvidence)
+	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "budget")
 	setYAMLBool(doc, []string{"learning", "current", "structural", "enabled"}, cfg.Learning.Current.Structural.Enabled)
 	setYAMLString(doc, []string{"learning", "current", "structural", "provider"}, string(cfg.Learning.Current.Structural.Provider))
 	setYAMLInt(doc, []string{"learning", "current", "structural", "max_symbols"}, cfg.Learning.Current.Structural.MaxSymbols)
@@ -154,11 +148,6 @@ func setYAMLBool(root *yaml.Node, path []string, value bool) {
 func setYAMLInt(root *yaml.Node, path []string, value int) {
 	node := ensureYAMLPath(root, path)
 	setScalarNode(node, "!!int", strconv.Itoa(value), 0)
-}
-
-func setYAMLFloat(root *yaml.Node, path []string, value float64) {
-	node := ensureYAMLPath(root, path)
-	setScalarNode(node, "!!float", strconv.FormatFloat(value, 'f', -1, 64), 0)
 }
 
 func setYAMLStringMap(root *yaml.Node, path []string, values map[string]string) {

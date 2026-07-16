@@ -1,24 +1,18 @@
 package claude
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 )
 
@@ -85,7 +79,7 @@ func (c *ClaudeAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest
 	}
 
 	// 2. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "AnalyzeCode", prompt)
+	output, err := c.callClaude(ctx, "AnalyzeCode", prompt, aicontract.ContractAnalyzeCode)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeAnalyzeFailed"), err)
 	}
@@ -138,7 +132,7 @@ func (c *ClaudeAgent) LearnFromCommit(ctx context.Context, req *agent.LearnReque
 	}
 
 	// 2. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "LearnFromCommit", prompt)
+	output, err := c.callClaude(ctx, "LearnFromCommit", prompt, aicontract.ContractLearnPatterns)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", "LearnFromCommit",
@@ -192,7 +186,7 @@ func (c *ClaudeAgent) BatchLearnFromCommits(ctx context.Context, req *agent.Batc
 	}
 
 	// 3. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "BatchLearnFromCommits", prompt)
+	output, err := c.callClaude(ctx, "BatchLearnFromCommits", prompt, aicontract.ContractLearnPatterns)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", "BatchLearnFromCommits",
@@ -234,7 +228,7 @@ func (c *ClaudeAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixe
 	}
 
 	// 2. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "GenerateFixes", prompt)
+	output, err := c.callClaude(ctx, "GenerateFixes", prompt, aicontract.ContractGenerateFixes)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", "GenerateFixes",
@@ -282,372 +276,11 @@ func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesReq
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "SelectFiles", prompt, task)
+	output, err := c.callClaude(ctx, "SelectFiles", prompt, aicontract.ContractSelectFiles, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeAnalyzeFailed"), err)
 	}
 	return parser.ParseSelectFilesResult(output)
-}
-
-// 调用外部命令行程序（含速率限制自动重试）
-func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt string, task ...agent.RuntimeTask) (string, error) {
-	output, _, err := c.callClaudeWithArchive(ctx, operation, prompt, task...)
-	return output, err
-}
-
-func parseClaudeResult[T any](agentName, operation, output string, archive agent.AgentOutputArchive, parse func(string) (T, error)) (T, error) {
-	result, err := parse(output)
-	if err != nil {
-		var zero T
-		return zero, agent.NewResultContractError(agentName, operation, err, output, archive)
-	}
-	return result, nil
-}
-
-func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prompt string, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
-	workDir, err := agent.WorkDirForContext(ctx)
-	if err != nil {
-		return "", agent.AgentOutputArchive{}, err
-	}
-
-	maxRetries := c.retryCfg.EffectiveMaxRetries()
-	retried := false
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		attemptNumber := attempt + 1
-		if attempt > 0 {
-			agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
-				AgentName:  c.Name(),
-				Operation:  operation,
-				Attempt:    attemptNumber,
-				MaxRetries: maxRetries,
-			})
-		}
-		output, archive, callDuration, isRetryable, err := c.doCallClaude(ctx, operation, prompt, attemptNumber, workDir, firstRuntimeTask(task))
-		if err == nil {
-			if retried {
-				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
-					AgentName:    c.Name(),
-					Operation:    operation,
-					Attempt:      attemptNumber,
-					MaxRetries:   maxRetries,
-					CallDuration: callDuration,
-				})
-			}
-			return output, archive, nil
-		}
-		if !isRetryable || attempt == maxRetries {
-			return "", archive, err
-		}
-
-		retried = true
-		waitDuration := c.retryCfg.WaitDuration(attempt)
-		agent.ReportRetryForContext(ctx, agent.RetryInfo{
-			AgentName:    c.Name(),
-			Operation:    operation,
-			Attempt:      attemptNumber,
-			MaxRetries:   maxRetries,
-			WaitDuration: waitDuration,
-			CallDuration: callDuration,
-			Reason:       agent.RetryReasonFromOutput(output, ""),
-		})
-
-		select {
-		case <-ctx.Done():
-			return "", agent.AgentOutputArchive{}, ctx.Err()
-		case <-time.After(waitDuration):
-		}
-	}
-
-	logger.Error(i18n.Get("LoggerAgentRateLimitExhausted"), "max_retries", maxRetries)
-	return "", agent.AgentOutputArchive{}, fmt.Errorf("%s: %d", i18n.Get("AgentClaudeRateLimitExhausted"), maxRetries)
-}
-
-// isRetryableError 检测是否为可重试错误（速率限制、过载等）
-func isRetryableError(stdout, stderr string) bool {
-	combined := stdout + stderr
-	// 使用 HTTP status code 正则匹配，避免正常输出中包含 "429" 等数字被误判
-	if agent.HTTPStatusRetryableRegex.MatchString(combined) {
-		return true
-	}
-	// 非数字类的已知限流/过载信号
-	return strings.Contains(combined, "overloaded_error") ||
-		strings.Contains(combined, "rate limit") ||
-		strings.Contains(combined, "速率限制") ||
-		strings.Contains(combined, "请求频率") ||
-		strings.Contains(combined, "访问量过大")
-}
-
-// 执行单次命令行调用
-func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt string, attempt int, workDir string, task agent.RuntimeTask) (string, agent.AgentOutputArchive, time.Duration, bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
-
-	args := claudePrintArgs(c.allowUserPlugins)
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
-		"agent", c.Name(),
-		"operation", operation,
-		"command", c.commandPath,
-		"timeout", c.timeout,
-		"work_dir", workDir,
-		"prompt_length", len(prompt),
-		"args", args,
-		"attempt", attempt,
-	)
-
-	cmd := exec.CommandContext(ctx, c.commandPath, args...)
-	cmd.Dir = workDir
-	cmd.Stdin = strings.NewReader(prompt)
-
-	// 分别捕获标准输出和标准错误
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	startTime := time.Now()
-	err := cmd.Run()
-	duration := time.Since(startTime)
-
-	if err != nil {
-		stdoutStr := stdout.String()
-		stderrStr := stderr.String()
-		retryable := isRetryableError(stdoutStr, stderrStr)
-		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:     c.Name(),
-			Operation: operation,
-			RuntimeID: task.ID,
-			Slug:      task.Slug,
-			Attempt:   attempt,
-			RawOutput: stdoutStr,
-			Stderr:    stderrStr,
-			ExitError: true,
-		})
-
-		if retryable {
-			logger.Diagnostic(i18n.Get("LoggerAgentClaudeCallRetryable"),
-				"agent", c.Name(),
-				"operation", operation,
-				"attempt", attempt,
-				"error", err,
-				"duration", duration,
-				"stdout_length", len(stdoutStr),
-				"stderr_length", len(stderrStr),
-				"raw_output_path", archive.RawPath,
-				"stderr_path", archive.StderrPath,
-				"retryable", true,
-			)
-			return stdoutStr + stderrStr, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
-		}
-
-		logger.Error(i18n.Get("LoggerAgentClaudeCallFailed"),
-			"agent", c.Name(),
-			"operation", operation,
-			"attempt", attempt,
-			"error", err,
-			"duration", duration,
-			"stdout_length", len(stdoutStr),
-			"stderr_length", len(stderrStr),
-			"raw_output_path", archive.RawPath,
-			"stderr_path", archive.StderrPath,
-			"prompt_length", len(prompt),
-		)
-		return "", archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
-	}
-
-	rawOutput := stdout.String()
-	output, usage := parseClaudeOutput(rawOutput)
-	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-		Agent:           c.Name(),
-		Operation:       operation,
-		RuntimeID:       task.ID,
-		Slug:            task.Slug,
-		Attempt:         attempt,
-		Content:         output,
-		RawOutput:       rawOutput,
-		Stderr:          stderr.String(),
-		TokenUsageKnown: usage.Known(),
-	})
-	callCompleteFields := []any{
-		"agent", c.Name(),
-		"operation", operation,
-		"attempt", attempt,
-		"output_length", len(output),
-		"raw_output_length", stdout.Len(),
-		"stderr_length", stderr.Len(),
-		"duration", duration,
-		"output_path", archive.ContentPath,
-		"raw_output_path", archive.RawPath,
-		"stderr_path", archive.StderrPath,
-	}
-	callCompleteFields = append(callCompleteFields, tokenusage.Fields(usage, "")...)
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
-	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
-
-	return output, archive, duration, false, nil
-}
-
-func firstRuntimeTask(tasks []agent.RuntimeTask) agent.RuntimeTask {
-	if len(tasks) == 0 {
-		return agent.RuntimeTask{}
-	}
-	return tasks[0]
-}
-
-func promptRuntimeTask(task agent.RuntimeTask) promptloader.RuntimeTask {
-	return promptloader.RuntimeTask{ID: task.ID, Slug: task.Slug}
-}
-
-func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage) {
-	usage := tokenusage.Extract(rawOutput)
-	var result struct {
-		Result string `json:"result"`
-	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(rawOutput)), &result); err == nil && result.Result != "" {
-		return result.Result, usage
-	}
-	return rawOutput, usage
-}
-
-func claudePrintArgs(allowUserPlugins bool) []string {
-	// 模型命令行常常在生成最终结构化结果之前尝试检查文件
-	// 将会话保持为非持久化且只读状态，这样批量分析就能顺利完成，而无需授予具备写入权限的工具
-	args := []string{
-		"--print",
-		"--no-session-persistence",
-		"--disable-slash-commands",
-		"--output-format",
-		"json",
-	}
-	if !allowUserPlugins {
-		if settings := claudeDisableUserPluginSettings(); settings != "" {
-			args = append(args, "--settings", settings)
-		}
-	}
-	return append(args, "--tools", "Read,Glob,Grep,LS")
-}
-
-type claudeInstalledPluginsConfig struct {
-	Plugins map[string][]claudeInstalledPlugin `json:"plugins"`
-}
-
-type claudeInstalledPlugin struct {
-	Scope string `json:"scope"`
-}
-
-type claudeUserSettings struct {
-	EnabledPlugins map[string]interface{} `json:"enabledPlugins"`
-}
-
-type claudePluginOverrideSettings struct {
-	EnabledPlugins map[string]bool `json:"enabledPlugins"`
-}
-
-func claudeDisableUserPluginSettings() string {
-	pluginNames := claudeUserPluginNames()
-	if len(pluginNames) == 0 {
-		return ""
-	}
-
-	settings := claudePluginOverrideSettings{
-		EnabledPlugins: make(map[string]bool, len(pluginNames)),
-	}
-	for _, name := range pluginNames {
-		settings.EnabledPlugins[name] = false
-	}
-
-	data, err := json.Marshal(settings)
-	if err != nil {
-		logger.Debug("生成 Claude 用户插件禁用配置失败", "error", err)
-		return ""
-	}
-	return string(data)
-}
-
-func claudeUserPluginNames() []string {
-	names := map[string]struct{}{}
-	for _, name := range claudeInstalledUserPluginNames() {
-		names[name] = struct{}{}
-	}
-	for _, name := range claudeEnabledUserPluginNames() {
-		names[name] = struct{}{}
-	}
-
-	result := make([]string, 0, len(names))
-	for name := range names {
-		result = append(result, name)
-	}
-	sort.Strings(result)
-	return result
-}
-
-func claudeInstalledUserPluginNames() []string {
-	configPath := filepath.Join(claudeHomeDir(), "plugins", "installed_plugins.json")
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil
-	}
-
-	var cfg claudeInstalledPluginsConfig
-	if err := json.Unmarshal(content, &cfg); err != nil {
-		logger.Debug("读取 Claude 已安装插件配置失败",
-			"config_path", configPath,
-			"error", err,
-		)
-		return nil
-	}
-
-	var names []string
-	for name, installs := range cfg.Plugins {
-		if !isClaudeMarketplacePluginName(name) {
-			continue
-		}
-		for _, install := range installs {
-			if install.Scope == "user" {
-				names = append(names, name)
-				break
-			}
-		}
-	}
-	return names
-}
-
-func claudeEnabledUserPluginNames() []string {
-	settingsPath := filepath.Join(claudeHomeDir(), "settings.json")
-	content, err := os.ReadFile(settingsPath)
-	if err != nil {
-		return nil
-	}
-
-	var settings claudeUserSettings
-	if err := json.Unmarshal(content, &settings); err != nil {
-		logger.Debug("读取 Claude 用户设置失败",
-			"settings_path", settingsPath,
-			"error", err,
-		)
-		return nil
-	}
-
-	names := make([]string, 0, len(settings.EnabledPlugins))
-	for name := range settings.EnabledPlugins {
-		if isClaudeMarketplacePluginName(name) {
-			names = append(names, name)
-		}
-	}
-	return names
-}
-
-func isClaudeMarketplacePluginName(name string) bool {
-	return strings.Contains(name, "@") && !strings.HasSuffix(name, "@builtin")
-}
-
-func claudeHomeDir() string {
-	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
-		return dir
-	}
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return ".claude"
-	}
-	return filepath.Join(userHome, ".claude")
 }
 
 // CuratePatterns 策展候选模式并输出规范模式。
@@ -666,7 +299,7 @@ func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatte
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderCuratePatternsPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "CuratePatterns", prompt)
+	output, err := c.callClaude(ctx, "CuratePatterns", prompt, aicontract.ContractCuratePatterns)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentCuratePatternsCallFailed"),
 			"error", err,
@@ -677,7 +310,8 @@ func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatte
 
 	result, err := parser.ParseCuratePatternsResult(output)
 	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentCuratePatternsParseFallback"),
+		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
+			"method", "CuratePatterns",
 			"error", err,
 			"operation", req.Operation,
 		)
@@ -713,14 +347,14 @@ func (c *ClaudeAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefi
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderUserDefinePatternPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "UserDefinePattern", prompt)
+	output, err := c.callClaude(ctx, "UserDefinePattern", prompt, aicontract.ContractUserDefinePattern)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentUserDefinePatternFailed"), err)
 	}
 
 	result, err := parser.ParseUserDefinePatternResult(output)
 	if err != nil {
-		logger.Warn(i18n.Get("LoggerAgentParseResultFallback"),
+		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
 			"method", "UserDefinePattern",
 			"error", err,
 		)
@@ -745,7 +379,7 @@ func (c *ClaudeAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeW
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderOptimizeWorkflowPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "OptimizeWorkflow", prompt)
+	output, err := c.callClaude(ctx, "OptimizeWorkflow", prompt, aicontract.ContractOptimizeWorkflow)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentOptimizeWorkflowFailed"), err)
 	}
@@ -786,7 +420,7 @@ func (c *ClaudeAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProj
 	}
 
 	// 3. 调用外部命令行程序
-	output, err := c.callClaude(ctx, "AnalyzeProject", prompt)
+	output, err := c.callClaude(ctx, "AnalyzeProject", prompt, aicontract.ContractProjectProfile)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
 	}
@@ -833,7 +467,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 	}
 
 	// 2. 调用外部命令行程序
-	output, archive, err := c.callClaudeWithArchive(ctx, operation, prompt, task)
+	output, archive, err := c.callClaudeWithArchive(ctx, operation, prompt, aicontract.ContractAnalyzeCurrentCodebase, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", operation,
@@ -857,7 +491,6 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Ana
 		"agent", c.Name(),
 		"operation", operation,
 		"patterns_count", len(result.Patterns),
-		"profile_delta", !result.ProfileDelta.IsZero(),
 		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
 	)
 
@@ -883,7 +516,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agen
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
 
-	output, archive, err := c.callClaudeWithArchive(ctx, operation, prompt, task)
+	output, archive, err := c.callClaudeWithArchive(ctx, operation, prompt, aicontract.ContractAnalyzeCurrentCodebaseBatch, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", operation,
@@ -928,7 +561,7 @@ func (c *ClaudeAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnal
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalysisPlanPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "PlanAnalysisUnits", prompt, task)
+	output, err := c.callClaude(ctx, "PlanAnalysisUnits", prompt, aicontract.ContractPlanAnalysisUnits, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailedNonFallback"),
 			"method", "PlanAnalysisUnits",
@@ -951,7 +584,7 @@ func (c *ClaudeAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnal
 
 // AnalyzeWorkspaceProfile 分析工作区结构和跨项目关系
 func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
-	prompt, err := c.promptLoader.Render("skill-workspace-profile", workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
+	prompt, err := c.promptLoader.Render("skill-workspace-profile", agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
 	if err != nil || prompt == "" {
 		if err != nil {
 			return nil, err
@@ -959,7 +592,7 @@ func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.An
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "AnalyzeWorkspaceProfile", prompt)
+	output, err := c.callClaude(ctx, "AnalyzeWorkspaceProfile", prompt, aicontract.ContractWorkspaceProfile)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
 	}
@@ -979,7 +612,7 @@ func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.An
 
 // AnalyzeWorkspaceSpec 生成工作区级开发规范
 func (c *ClaudeAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
-	data := workspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
+	data := agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
 	prompt, err := c.promptLoader.Render("skill-workspace-spec", data)
 	if err != nil || prompt == "" {
 		if err != nil {
@@ -988,7 +621,7 @@ func (c *ClaudeAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analy
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "AnalyzeWorkspaceSpec", prompt)
+	output, err := c.callClaude(ctx, "AnalyzeWorkspaceSpec", prompt, aicontract.ContractWorkspaceSpec)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
 	}
@@ -1004,14 +637,4 @@ func (c *ClaudeAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analy
 		"rules_count", len(result.Rules),
 	)
 	return result, nil
-}
-
-func workspacePromptData(workspaceName, workspaceRoot, workspaceInputPath, workspaceProfilePath, userContextPath string) map[string]interface{} {
-	return map[string]interface{}{
-		"WorkspaceName":        workspaceName,
-		"WorkspaceRoot":        workspaceRoot,
-		"WorkspaceInputPath":   workspaceInputPath,
-		"WorkspaceProfilePath": workspaceProfilePath,
-		"UserContextPath":      userContextPath,
-	}
 }

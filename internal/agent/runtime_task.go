@@ -20,6 +20,14 @@ func NewRuntimeTask(slug string) RuntimeTask {
 	}
 }
 
+// FirstRuntimeTask 返回可选任务列表中的首个任务。
+func FirstRuntimeTask(tasks []RuntimeTask) RuntimeTask {
+	if len(tasks) == 0 {
+		return RuntimeTask{}
+	}
+	return tasks[0]
+}
+
 // RuntimeSlug 合并模板名和业务标签，生成可读语义名。
 func RuntimeSlug(name, label string) string {
 	parts := []string{}

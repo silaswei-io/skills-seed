@@ -190,7 +190,7 @@ func TestResolveOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
+func TestGenerateSkillsWithHooksReportsProjectSteps(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Wrap errors with context")
@@ -218,18 +218,20 @@ func TestGenerateSkillsWithProgressReportsProjectSteps(t *testing.T) {
 
 	var started []string
 	var completed []string
-	err := svc.GenerateSkillsWithProgress(context.Background(), t.TempDir(), func(label string) {
-		started = append(started, label)
-	}, func(label string) {
-		completed = append(completed, label)
-	})
+	err := svc.GenerateSkillsWithHooks(context.Background(), t.TempDir(), GenerateProgressHooks{
+		OnStepStart: func(label string) {
+			started = append(started, label)
+		},
+		OnStepComplete: func(label string) {
+			completed = append(completed, label)
+		},
+	}, GenerateOptions{})
 
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		"解析输出目录",
 		"加载已学习模式",
 		"读取项目画像",
-		"检查输出目录",
 		"整理生成数据",
 		"写入技能文件",
 	}, started)
@@ -407,7 +409,7 @@ func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) 
 	require.FileExists(t, missingPath)
 }
 
-func TestGenerateSkillsWithOptionsSkipsReferencesAndReferenceLinks(t *testing.T) {
+func TestGenerateSkillsWithHooksSkipsReferencesAndReferenceLinks(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Use existing business rule")
@@ -447,7 +449,7 @@ func TestGenerateSkillsWithOptionsSkipsReferencesAndReferenceLinks(t *testing.T)
 	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 	tmpDir := t.TempDir()
 
-	err := svc.GenerateSkillsWithOptions(context.Background(), tmpDir, GenerateOptions{SkipReferences: true})
+	err := svc.GenerateSkillsWithHooks(context.Background(), tmpDir, GenerateProgressHooks{}, GenerateOptions{SkipReferences: true})
 	require.NoError(t, err)
 
 	require.FileExists(t, filepath.Join(tmpDir, "SKILL.md"))
@@ -687,11 +689,11 @@ func TestGenerateSkillsDoesNotCallAgentSummary(t *testing.T) {
 	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "ai.md"), "AI Rule")
 }
 
-func TestGenerateSkills_DoesNotOverwriteManualSkill(t *testing.T) {
+func TestGenerateSkills_OverwritesExistingUnmarkedSkill(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Manual Rule", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
-	pattern.SetDescription("manual skill rule")
-	pattern.SetRule("do not overwrite manual skill")
+	pattern.SetDescription("existing skill rule")
+	pattern.SetRule("replace existing skill output")
 
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
@@ -700,16 +702,11 @@ func TestGenerateSkills_DoesNotOverwriteManualSkill(t *testing.T) {
 	}
 	svc := newTestService(mockPattern)
 	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("# Manual Skill\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("# Existing Skill\n"), 0644))
 
-	err := svc.GenerateSkills(context.Background(), tmpDir)
-
-	require.Error(t, err)
-	var manualErr *ManualSkillExistsError
-	require.ErrorAs(t, err, &manualErr)
-	assert.Equal(t, filepath.Join(tmpDir, "SKILL.md"), manualErr.Path)
-	assert.Equal(t, "# Manual Skill\n", readGeneratedFile(t, tmpDir, "SKILL.md"))
-	require.NoFileExists(t, filepath.Join(tmpDir, "references", "project-spec.md"))
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+	require.NotEqual(t, "# Existing Skill\n", readGeneratedFile(t, tmpDir, "SKILL.md"))
+	require.FileExists(t, filepath.Join(tmpDir, "references", "project-spec.md"))
 }
 
 func TestGenerateSkills_OverwritesGeneratedSkill(t *testing.T) {
@@ -789,6 +786,7 @@ func TestGenerateSkills_RendersProjectOverviewFromProfile(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "references"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "SKILL.md"), []byte("<!-- generated-by: skills-seed v0.13.9 -->\n# Old generated skill\n"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "references", "project-overview.md"), []byte("old overview"), 0644))
 
 	err := svc.GenerateSkills(context.Background(), tmpDir)
@@ -1468,6 +1466,8 @@ func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {
 
 	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
 	assert.NotContains(t, skill, "## 验证命令")
+	assert.NotContains(t, skill, "确认约束来源和选择验证命令")
+	assert.Contains(t, skill, "当前没有已学习的验证命令")
 	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
 	assert.NotContains(t, overview, "## 验证命令")
 }

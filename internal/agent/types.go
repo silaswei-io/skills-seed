@@ -233,6 +233,7 @@ type AnalyzeProjectRequest struct {
 	StructuralContextPath string   // 结构化分析上下文文件路径
 	ReadmePath            string   // README 文件路径（如果存在）
 	MainFiles             []string // 主要入口文件路径
+	EngineeringKnowledge  []string // 权威工程知识文件路径，不参与业务源码筛选
 	ExistingProfileJSON   string   // 已有项目画像 JSON
 	ExistingProfilePath   string   // 已有项目画像 JSON 文件路径
 	FocusPaths            []string // 指定增量分析范围
@@ -289,7 +290,6 @@ type AnalyzeCurrentCodebaseRequest struct {
 	UserContextPath       string        // 本次学习传入的一次性用户上下文文件路径
 	LearningMode          config.LearningMode
 	ChangeProfile         string
-	LearningBudget        config.LearningBudget
 }
 
 // AllowedCategories 返回提示词可展示的合法模式分类列表。
@@ -300,7 +300,6 @@ func (r *AnalyzeCurrentCodebaseRequest) AllowedCategories() string {
 // AnalyzeCurrentCodebaseResult 分析当前代码库结果
 type AnalyzeCurrentCodebaseResult struct {
 	Patterns                  []domain.Pattern             // 提取的候选模式
-	ProfileDelta              domain.ProjectProfileDelta   // 本次代码证据明确改变的项目画像增量
 	ProfileRefreshRecommended ProfileRefreshRecommendation // 是否建议重新分析完整项目画像
 }
 
@@ -328,7 +327,6 @@ type AnalyzeCurrentCodebaseBatchRequest struct {
 	UserContextPath       string
 	LearningMode          config.LearningMode
 	ChangeProfile         string
-	LearningBudget        config.LearningBudget
 }
 
 // AllowedCategories 返回提示词可展示的合法模式分类列表。
@@ -341,7 +339,6 @@ type AnalyzeCurrentCodebaseUnitResult struct {
 	UnitID                    string
 	UnitName                  string
 	Patterns                  []domain.Pattern
-	ProfileDelta              domain.ProjectProfileDelta
 	ProfileRefreshRecommended ProfileRefreshRecommendation
 }
 
@@ -403,10 +400,9 @@ type OptimizeWorkflowRequest struct {
 
 // OptimizeWorkflowResult 是 AI 优化后的标准工作流。
 type OptimizeWorkflowResult struct {
-	Title       string
-	Content     string
-	Summary     string
-	Suggestions []string
+	Title     string
+	Content   string
+	Conflicts []string
 }
 
 // CodeAnalyzer 代码分析接口

@@ -92,6 +92,8 @@ func (m *MockAgent) CuratePatterns(ctx context.Context, req *agent.CuratePattern
 			ProjectID:         candidate.ProjectID,
 			ScopePath:         candidate.ScopePath,
 			WorkspaceRole:     candidate.WorkspaceRole,
+			AnalysisUnitID:    candidate.AnalysisUnitID,
+			AnalysisUnitName:  candidate.AnalysisUnitName,
 		})
 	}
 	return &agent.CuratePatternsResult{
@@ -177,7 +179,6 @@ func (m *MockAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.
 				UnitID:                    unit.AnalysisUnit.ID,
 				UnitName:                  unit.AnalysisUnit.Name,
 				Patterns:                  result.Patterns,
-				ProfileDelta:              result.ProfileDelta,
 				ProfileRefreshRecommended: result.ProfileRefreshRecommended,
 			})
 			continue
@@ -217,7 +218,6 @@ func (m *MockAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWor
 	}
 	return &agent.OptimizeWorkflowResult{
 		Title:   title,
-		Summary: req.Context,
 		Content: "# " + title + "\n\n## 适用场景\n" + req.Context + "\n",
 	}, nil
 }
@@ -300,16 +300,17 @@ func (m *MockGitRepository) Checkout(ctx context.Context, name string) error {
 
 // MockPatternRepository 模拟模式仓储
 type MockPatternRepository struct {
-	GetFn                func(ctx context.Context, id string) (*domain.Pattern, error)
-	GetAllFn             func(ctx context.Context) ([]domain.Pattern, error)
-	GetByCategoryFn      func(ctx context.Context, category domain.Category) ([]domain.Pattern, error)
-	GetHighConfidenceFn  func(ctx context.Context, threshold float64) ([]domain.Pattern, error)
-	SaveFn               func(ctx context.Context, p *domain.Pattern) error
-	FindSimilarFn        func(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error)
-	DeleteFn             func(ctx context.Context, id string) error
-	CountFn              func(ctx context.Context) (int, error)
-	RecordPatternHitsFn  func(ctx context.Context, hits []domain.PatternHit) error
-	GetPatternHitStatsFn func(ctx context.Context) ([]domain.PatternHitStats, error)
+	GetFn                  func(ctx context.Context, id string) (*domain.Pattern, error)
+	GetAllFn               func(ctx context.Context) ([]domain.Pattern, error)
+	GetByCategoryFn        func(ctx context.Context, category domain.Category) ([]domain.Pattern, error)
+	GetHighConfidenceFn    func(ctx context.Context, threshold float64) ([]domain.Pattern, error)
+	SaveFn                 func(ctx context.Context, p *domain.Pattern) error
+	ApplyPatternMutationFn func(ctx context.Context, mutation domain.PatternMutation) error
+	FindSimilarFn          func(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error)
+	DeleteFn               func(ctx context.Context, id string) error
+	CountFn                func(ctx context.Context) (int, error)
+	RecordPatternHitsFn    func(ctx context.Context, hits []domain.PatternHit) error
+	GetPatternHitStatsFn   func(ctx context.Context) ([]domain.PatternHitStats, error)
 }
 
 // Get 模拟按 ID 获取模式
@@ -348,6 +349,24 @@ func (m *MockPatternRepository) GetHighConfidence(ctx context.Context, threshold
 func (m *MockPatternRepository) Save(ctx context.Context, p *domain.Pattern) error {
 	if m.SaveFn != nil {
 		return m.SaveFn(ctx, p)
+	}
+	return nil
+}
+
+// ApplyPatternMutation 模拟原子模式变更。
+func (m *MockPatternRepository) ApplyPatternMutation(ctx context.Context, mutation domain.PatternMutation) error {
+	if m.ApplyPatternMutationFn != nil {
+		return m.ApplyPatternMutationFn(ctx, mutation)
+	}
+	for _, id := range mutation.DeleteIDs {
+		if err := m.Delete(ctx, id); err != nil {
+			return err
+		}
+	}
+	for _, pattern := range mutation.Save {
+		if err := m.Save(ctx, pattern); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -508,8 +527,22 @@ func (m *MockProjectProfileRepository) SaveSpecForProject(ctx context.Context, p
 // MockCommitTracker 模拟提交追踪
 type MockCommitTracker struct {
 	MarkAnalyzedFn func(ctx context.Context, hash string) error
+	MarkManyFn     func(ctx context.Context, hashes []string) error
 	IsAnalyzedFn   func(ctx context.Context, hash string) (bool, error)
 	GetAnalyzedFn  func(ctx context.Context) ([]string, error)
+}
+
+// MarkCommitsAnalyzed 模拟批量标记提交。
+func (m *MockCommitTracker) MarkCommitsAnalyzed(ctx context.Context, hashes []string) error {
+	if m.MarkManyFn != nil {
+		return m.MarkManyFn(ctx, hashes)
+	}
+	for _, hash := range hashes {
+		if err := m.MarkCommitAnalyzed(ctx, hash); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // MarkCommitAnalyzed 模拟标记提交已分析

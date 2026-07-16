@@ -1,0 +1,101 @@
+---
+name: skills-seed-cli
+description: Use when operating, explaining, debugging, or automating the skills-seed CLI.
+---
+
+<!-- generated-by: skills-seed -->
+<!-- skills-seed-version: {{.Version}} -->
+<!-- prompt-templates-sha256: {{.PromptHash}} -->
+<!-- skills-templates-sha256: {{.SkillsHash}} -->
+
+# skills-seed CLI Skill
+
+Use this Skill when the user asks you to operate, explain, debug, or automate `skills-seed`.
+
+This is a CLI operation Skill, not a project coding Skill. It teaches how to use `skills-seed` to build and maintain project/workspace Skills for other repositories.
+
+## Operating Principles
+
+- Prefer a built-in `skills-seed` command over ad hoc scripts.
+- Before relying on a flag or default, run `skills-seed <command> --help` because installed versions can differ.
+- Run project-scoped commands from the repository root, or from a subdirectory where `skills-seed` can discover `.skills-seed`.
+- Use `sync` as the normal high-level workflow: it learns current changes and regenerates Skills when needed.
+- Use `learn current` when learning should happen without generation.
+- Use `generate skills` when learned data already exists and only files need to be rendered.
+- Store durable guidance with `.skills-seed/context/`, `patterns add`, `patterns update`, or `workflow`; use `--context` and `--context-path` only for one run.
+- In automation, pass `--no-interactive` where the command supports it.
+
+## Read The Right Reference
+
+- [Operation Model](./references/operation-model.md): state model, command families, runtime boundary, and context persistence rules.
+- [Init And Reset](./references/init-reset.md): `init`, `reset`, interactive setup, non-interactive setup, and global CLI Skill prompt behavior.
+- [Workspace](./references/workspace.md): `workspace add`, workspace mode ownership, child project routing, and cross-project boundaries.
+- [Sync](./references/sync.md): high-level day-to-day learning and generation flow, resume/restart semantics, and one-shot context.
+- [Learn](./references/learn.md): `learn current`, `learn history`, focus, force, profile modes, and history learning.
+- [Generate](./references/generate.md): `generate skills`, output paths, references, workspace generation, and stale output handling.
+- [Patterns](./references/patterns.md): `patterns add/update/delete/show/stats/compact` and durable rule management.
+- [Workflow](./references/workflow.md): `workflow`, workflow identity, merge versus overwrite, child targeting, and generated workflow output.
+- [Preview](./references/preview.md): `preview files`, file-selection modes, focus, and missing-file diagnostics.
+- [Check And Hook](./references/check-hook.md): `check`, `hook install/run/uninstall`, staged-file review, and pre-commit behavior.
+- [Review And Profile](./references/review-profile.md): `review import/stats`, `profile show/refresh`, and feedback loops.
+- [Log Help Version](./references/log-help-version.md): `log`, `help`, `--version`, fingerprints, and reporting diagnostics.
+- [CLI Skill Maintenance](./references/cli-skills.md): `cli-skills install/uninstall`, auto target detection, and replacement semantics.
+
+## Fast Routing
+
+| User Intent | Start With |
+|---|---|
+| Initialize a repository | [Init And Reset](./references/init-reset.md) |
+| Add a workspace child project | [Workspace](./references/workspace.md) |
+| Learn current code or history | [Learn](./references/learn.md) or [Sync](./references/sync.md) |
+| Regenerate project Skills | [Generate](./references/generate.md) |
+| Add durable rules | [Patterns](./references/patterns.md) |
+| Add durable workflows | [Workflow](./references/workflow.md) |
+| Check files before commit | [Check And Hook](./references/check-hook.md) |
+| Understand why files were or were not analyzed | [Preview](./references/preview.md) |
+| Inspect learned feedback/profile state | [Review And Profile](./references/review-profile.md) |
+| Install/update/remove this global CLI Skill | [CLI Skill Maintenance](./references/cli-skills.md) |
+
+## Core Commands
+
+| Command | Purpose |
+|---|---|
+| `skills-seed init` | Initialize a project or workspace root. |
+| `skills-seed reset` | Back up `.skills-seed` and recreate local skills-seed state. |
+| `skills-seed workspace add` | Add detected child repositories to a workspace. |
+| `skills-seed sync` | Learn current changes and regenerate Skills when needed. |
+| `skills-seed learn current` | Learn from current files without separately running generation. |
+| `skills-seed learn history` | Learn from recent Git commits. |
+| `skills-seed generate skills` | Render Skills from existing learned state. |
+| `skills-seed patterns add` | Create a durable pattern from explicit guidance. |
+| `skills-seed patterns update` | Update a durable pattern. |
+| `skills-seed patterns delete` | Delete a pattern; aliases: `rm`, `remove`. |
+| `skills-seed patterns show` | List patterns or show one pattern. |
+| `skills-seed patterns stats` | Show pattern quality and check hit statistics. |
+| `skills-seed patterns compact` | Deduplicate or merge patterns. |
+| `skills-seed workflow` | Create or update task workflows. |
+| `skills-seed workflow show` | List workflow summaries or inspect one workflow. |
+| `skills-seed preview files` | Inspect analysis file selection. |
+| `skills-seed check` | Review staged or tracked files. |
+| `skills-seed review import` | Import review feedback from JSON. |
+| `skills-seed review stats` | Measure pattern coverage against imported review feedback. |
+| `skills-seed profile show` | Inspect the project profile. |
+| `skills-seed profile refresh` | Refresh the project profile with AI. |
+| `skills-seed hook install` | Install the pre-commit integration. |
+| `skills-seed hook run` | Run the pre-commit workflow manually. |
+| `skills-seed hook uninstall` | Remove the pre-commit integration. |
+| `skills-seed log` | Show recent skills-seed learning/generation changes. |
+| `skills-seed help [command]` | Show root or nested command help. |
+| `skills-seed --version` | Show CLI and template fingerprints. |
+| `skills-seed cli-skills install` | Install or update this global CLI operation Skill. |
+| `skills-seed cli-skills uninstall` | Remove this generated global CLI operation Skill. |
+
+## Default Workflows
+
+1. First project setup: `skills-seed init`, then `skills-seed sync`.
+2. First workspace setup: `skills-seed init --workspace`, then `skills-seed workspace add .`, then `skills-seed sync`.
+3. Daily update: `skills-seed sync`.
+4. Add a durable rule: `skills-seed patterns add --context "<rule>"`, then `skills-seed generate skills`.
+5. Add a durable task process: `skills-seed workflow --name <name> --context "<process>"`, then `skills-seed generate skills`.
+6. Debug file selection: `skills-seed preview files --mode current` before learning.
+7. Pre-commit review: `skills-seed check` or install the hook with `skills-seed hook install`.

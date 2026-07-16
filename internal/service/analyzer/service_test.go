@@ -99,6 +99,7 @@ func TestAnalyzePatterns_AIError(t *testing.T) {
 }
 
 func TestAnalyzeProject(t *testing.T) {
+	tmpDir := t.TempDir()
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
@@ -114,7 +115,7 @@ func TestAnalyzeProject(t *testing.T) {
 	svc := NewAnalyzerService(mockAgent, nil)
 	result, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
 		ProjectName: "test",
-		RootPath:    "/tmp/test",
+		RootPath:    tmpDir,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "go", result.Language)
@@ -168,6 +169,31 @@ func TestAnalyzeProjectAddsStructuralContext(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Contains(t, received.StructuralContext, "main calls service")
+}
+
+func TestAnalyzeProjectCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "AGENTS.md"), []byte("go test ./..."), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "Taskfile.yml"), []byte("version: '3'"), 0o644))
+
+	var received agent.AnalyzeProjectRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			received = *req
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+
+	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		FocusPaths:  []string{"internal/service"},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"AGENTS.md", "Taskfile.yml"}, received.EngineeringKnowledge)
 }
 
 func TestAnalyzeProjectSkipsStructuralContextWithoutSeeds(t *testing.T) {
@@ -327,15 +353,14 @@ func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {
 }
 
 func TestAnalyzeCurrentCodebase(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n"), 0o644))
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 			return &agent.AnalyzeCurrentCodebaseResult{
 				Patterns: []domain.Pattern{
-					*domain.NewPattern("p1", "Error Handling", domain.CategoryError),
-				},
-				ProfileDelta: domain.ProjectProfileDelta{
-					ConfigPatterns: []string{"Always wrap errors"},
+					currentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go"),
 				},
 			}, nil
 		},
@@ -343,12 +368,11 @@ func TestAnalyzeCurrentCodebase(t *testing.T) {
 	svc := NewAnalyzerService(mockAgent, nil)
 	result, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{
 		ProjectName: "test",
-		RootPath:    "/tmp/test",
+		RootPath:    tmpDir,
 		Language:    "go",
 	})
 	require.NoError(t, err)
 	assert.Len(t, result.Patterns, 1)
-	assert.Contains(t, result.ProfileDelta.ConfigPatterns, "Always wrap errors")
 }
 
 func TestAnalyzeCurrentCodebaseAddsStructuralContext(t *testing.T) {
@@ -446,7 +470,7 @@ func TestAnalyzeCodebaseFull(t *testing.T) {
 		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 			return &agent.AnalyzeCurrentCodebaseResult{
 				Patterns: []domain.Pattern{
-					*domain.NewPattern("p1", "Test Pattern", domain.CategoryNaming),
+					currentPatternForTest("p1", "Test Pattern", domain.CategoryNaming, "main.go"),
 				},
 			}, nil
 		},
@@ -472,7 +496,7 @@ func TestAnalyzeCodebaseFullWithFocusPathsOnlySendsFocusedSamples(t *testing.T) 
 			received = *req
 			return &agent.AnalyzeCurrentCodebaseResult{
 				Patterns: []domain.Pattern{
-					*domain.NewPattern("agent-pattern", "Agent Pattern", domain.CategoryStructure),
+					currentPatternForTest("agent-pattern", "Agent Pattern", domain.CategoryStructure, "internal/agent/agent.go"),
 				},
 			}, nil
 		},
@@ -584,7 +608,7 @@ func TestAnalyzeCodebaseFullUsesSnapshotDiffsWithoutCommittingSnapshots(t *testi
 		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 			received = *req
 			return &agent.AnalyzeCurrentCodebaseResult{
-				Patterns: []domain.Pattern{*domain.NewPattern("p1", "Snapshot Pattern", domain.CategoryStructure)},
+				Patterns: []domain.Pattern{currentPatternForTest("p1", "Snapshot Pattern", domain.CategoryStructure, "modified.go")},
 			}, nil
 		},
 	}
@@ -613,6 +637,13 @@ func TestAnalyzeCodebaseFullUsesSnapshotDiffsWithoutCommittingSnapshots(t *testi
 		"modified.go":  "package main\nfunc oldName() {}\n",
 		"unchanged.go": "package same\n",
 	}, loaded)
+}
+
+func currentPatternForTest(id, name string, category domain.Category, path string) domain.Pattern {
+	pattern := domain.NewPattern(id, name, category)
+	pattern.Rule = "When changing this behavior, preserve the evidenced project constraint."
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: path, Kind: "file"}}
+	return *pattern
 }
 
 func TestAnalyzeCodebaseFullWithExternalRunContextDoesNotCommitSnapshots(t *testing.T) {
@@ -861,6 +892,7 @@ func TestNewAnalyzerService_DefaultLocale(t *testing.T) {
 }
 
 func TestAnalyzeProjectFull_WithMock(t *testing.T) {
+	tmpDir := t.TempDir()
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
@@ -880,7 +912,7 @@ func TestAnalyzeProjectFull_WithMock(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, err := svc.AnalyzeProjectFull(ctx, "/tmp/test", "test-project")
+	result, err := svc.AnalyzeProjectFull(ctx, tmpDir, "test-project")
 	require.NoError(t, err)
 	assert.Equal(t, "go", result.Language)
 	assert.Contains(t, result.Frameworks, "gin")

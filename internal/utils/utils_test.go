@@ -151,6 +151,21 @@ func TestResolveProjectOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
 		"OutputPath":  outsidePath,
 		"ProjectRoot": projectRoot,
 	}))
+
+	_, err = ResolveProjectOutputPath(projectRoot, ".")
+	require.Error(t, err)
+}
+
+func TestResolveProjectOutputPathRejectsSymlinkEscape(t *testing.T) {
+	parent := t.TempDir()
+	projectRoot := filepath.Join(parent, "repo")
+	outside := filepath.Join(parent, "outside")
+	require.NoError(t, os.MkdirAll(projectRoot, 0o755))
+	require.NoError(t, os.MkdirAll(outside, 0o755))
+	require.NoError(t, os.Symlink(outside, filepath.Join(projectRoot, ".agents")))
+
+	_, err := ResolveProjectOutputPath(projectRoot, ".agents/skills/demo")
+	require.Error(t, err)
 }
 
 func TestRelativePaths(t *testing.T) {

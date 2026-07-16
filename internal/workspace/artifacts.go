@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 // MergeProfile 将 AI 分析出的工作区事实覆盖到由配置推导出的基础画像上。
@@ -64,8 +65,8 @@ func MergeSpec(base, analyzed *domain.WorkspaceSpec) *domain.WorkspaceSpec {
 	return base
 }
 
-// SpecFromProfile 根据工作区画像生成保守的路由规则和跨项目规则。
-func SpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
+// SpecFromProfile 根据工作区画像生成指定语言的保守路由规则和跨项目规则。
+func SpecFromProfile(profile *domain.WorkspaceProfile, locale string) *domain.WorkspaceSpec {
 	if profile == nil {
 		return &domain.WorkspaceSpec{}
 	}
@@ -74,7 +75,7 @@ func SpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: filepath.ToSlash(filepath.Join(project.Path, "**")),
 			ProjectIDs:  []string{project.ID},
-			Reason:      "子项目路径只路由到该子项目的独立 skill",
+			Reason:      i18n.GetForLocale(locale, "WorkspaceRouteProjectReason"),
 		})
 	}
 	routing = append(routing, profile.ImpactRoutes...)
@@ -83,21 +84,21 @@ func SpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
 			ProjectIDs:  nonEmptyStrings(append(append([]string{}, path.Producers...), path.Consumers...), projectIDs),
-			Reason:      firstNonEmpty(path.Description, "契约路径变更需要检查生产者、消费者和生成物"),
+			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteContractReason")),
 		})
 	}
 	for _, path := range profile.Shared {
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
 			ProjectIDs:  nonEmptyStrings(path.Consumers, projectIDs),
-			Reason:      firstNonEmpty(path.Description, "共享代码变更需要检查所有导入方或复用方"),
+			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteSharedReason")),
 		})
 	}
 	for _, path := range profile.Infra {
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
 			ProjectIDs:  nonEmptyStrings(path.AffectedProjects, projectIDs),
-			Reason:      firstNonEmpty(path.Description, "基础设施变更需要检查受部署或运行时配置影响的子项目"),
+			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteInfraReason")),
 		})
 	}
 	return &domain.WorkspaceSpec{
@@ -107,8 +108,8 @@ func SpecFromProfile(profile *domain.WorkspaceProfile) *domain.WorkspaceSpec {
 		Routing:  routing,
 		Rules: []domain.WorkspaceRule{
 			{
-				Title:       "跨项目改动先定边界",
-				Description: "修改契约、共享代码或基础设施前，先确认受影响子项目并读取对应 skill。",
+				Title:       i18n.GetForLocale(locale, "WorkspaceRuleBoundaryTitle"),
+				Description: i18n.GetForLocale(locale, "WorkspaceRuleBoundaryDescription"),
 				AppliesTo:   projectIDs,
 			},
 		},

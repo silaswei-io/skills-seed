@@ -100,27 +100,89 @@ func ResolveProjectOutputPath(projectRoot, outputPath string) (string, error) {
 		return filepath.Clean(resolvedPath), nil
 	}
 
+	pathAbs, err := ResolvePathWithinRoot(projectRoot, resolvedPath)
+	if err != nil {
+		return "", fmt.Errorf("%s", i18n.GetWithParams("GenerateOutputPathOutsideProjectRoot", map[string]interface{}{
+			"OutputPath":  outputPath,
+			"ProjectRoot": projectRoot,
+		}))
+	}
 	rootAbs, err := filepath.Abs(projectRoot)
 	if err != nil {
 		return "", err
 	}
-	pathAbs, err := filepath.Abs(resolvedPath)
-	if err != nil {
-		return "", err
-	}
-	rootAbs = filepath.Clean(rootAbs)
-	pathAbs = filepath.Clean(pathAbs)
-	relPath, err := filepath.Rel(rootAbs, pathAbs)
-	if err != nil {
-		return "", err
-	}
-	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
+	if filepath.Clean(pathAbs) == filepath.Clean(rootAbs) {
 		return "", fmt.Errorf("%s", i18n.GetWithParams("GenerateOutputPathOutsideProjectRoot", map[string]interface{}{
 			"OutputPath":  outputPath,
 			"ProjectRoot": projectRoot,
 		}))
 	}
 	return pathAbs, nil
+}
+
+// ResolvePathWithinRoot 解析现有符号链接，并确保目标的真实路径位于根目录内。
+// 目标尚不存在时，从最近存在的父目录开始解析，避免中间符号链接绕过边界。
+func ResolvePathWithinRoot(root, target string) (string, error) {
+	_, err := CanonicalPathWithinRoot(root, target)
+	if err != nil {
+		return "", err
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(targetAbs), nil
+}
+
+// CanonicalPathWithinRoot 返回解析符号链接后的安全目标路径。
+func CanonicalPathWithinRoot(root, target string) (string, error) {
+	rootPath, err := resolvePathFromExistingAncestor(root)
+	if err != nil {
+		return "", err
+	}
+	targetPath, err := resolvePathFromExistingAncestor(target)
+	if err != nil {
+		return "", err
+	}
+	relPath, err := filepath.Rel(rootPath, targetPath)
+	if err != nil {
+		return "", err
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("path %q resolves outside root %q", target, root)
+	}
+	return targetPath, nil
+}
+
+func resolvePathFromExistingAncestor(path string) (string, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	absPath = filepath.Clean(absPath)
+	current := absPath
+	missingParts := make([]string, 0)
+	for {
+		if _, err := os.Lstat(current); err == nil {
+			break
+		} else if !os.IsNotExist(err) {
+			return "", err
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", fmt.Errorf("no existing ancestor for path %q", path)
+		}
+		missingParts = append(missingParts, filepath.Base(current))
+		current = parent
+	}
+	resolved, err := filepath.EvalSymlinks(current)
+	if err != nil {
+		return "", err
+	}
+	for i := len(missingParts) - 1; i >= 0; i-- {
+		resolved = filepath.Join(resolved, missingParts[i])
+	}
+	return filepath.Clean(resolved), nil
 }
 
 // ConfiguredSkillOutputPath 根据 skills target 配置解析最终输出路径。

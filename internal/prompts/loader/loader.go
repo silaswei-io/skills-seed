@@ -382,6 +382,11 @@ func templateCacheKey(locale, name string) string {
 var htmlCommentBlockPattern = regexp.MustCompile(`(?s)<!--.*?-->\s*`)
 var generatedWorkspaceProjectLinePattern = regexp.MustCompile("^[-*] `[^`]+` \\(`")
 
+var (
+	defaultContextScaffoldOnce  sync.Once
+	defaultContextScaffoldLines map[string]struct{}
+)
+
 func prepareContextPromptFragment(content string) string {
 	content = stripPromptMetadata(content)
 	content = removeDefaultContextScaffold(content)
@@ -393,74 +398,14 @@ func stripPromptMetadata(content string) string {
 }
 
 func removeDefaultContextScaffold(content string) string {
-	defaultFragments := []string{
-		"# 背景与外部事实",
-		"## 业务背景",
-		"说明这个项目服务的业务、用户、核心资源或关键流程。",
-		"## 外部系统和依赖",
-		"记录代码里不容易看出的外部平台、接口、账号体系、人工流程或上下游系统。",
-		"## 线上事实和历史约束",
-		"记录灰度策略、兼容对象、迁移状态、历史包袱、发布窗口或运维事实。",
-		"# 约束与边界",
-		"## 必须遵守",
-		"记录未来所有学习、检查和生成都必须遵守的长期团队约束。",
-		"## 禁止变更",
-		"记录不能破坏的兼容性、安全、数据、发布或运维边界。",
-		"## 验证偏好",
-		"记录必须优先使用或避免使用的验证方式、环境限制、人工确认要求。",
-		"# 术语与映射",
-		"## 业务词到代码词",
-		"记录需求、产品、运营常用词与代码里的包名、类型名、字段名、状态名之间的对应关系。",
-		"## 别名和历史名称",
-		"记录同一概念的旧名称、缩写、别名或容易混淆的叫法。",
-		"## 状态和枚举",
-		"记录代码中状态值、枚举值、错误码、事件名对应的业务含义。",
-		"# Background and External Facts",
-		"## Business Background",
-		"Describe the business, users, core resources, or key flows this project supports.",
-		"## External Systems and Dependencies",
-		"Record external platforms, APIs, account systems, manual processes, or upstream/downstream systems that are hard to infer from code.",
-		"## Production Facts and Historical Constraints",
-		"Record rollout strategy, compatibility targets, migration status, historical constraints, release windows, or operations facts.",
-		"# Constraints and Boundaries",
-		"## Must Follow",
-		"Record long-lived team constraints that future learning, checks, and generated skills must follow.",
-		"## Forbidden Changes",
-		"Record compatibility, security, data, release, or operations boundaries that must not be broken.",
-		"## Validation Preferences",
-		"Record preferred or forbidden validation methods, environment limits, or required manual confirmations.",
-		"# Terminology and Mappings",
-		"## Business Terms to Code Terms",
-		"Record mappings from product, business, or operations terms to package names, type names, field names, state names, or code identifiers.",
-		"## Aliases and Historical Names",
-		"Record old names, abbreviations, aliases, or confusing names for the same concept.",
-		"## States and Enumerations",
-		"Record business meanings for state values, enum values, error codes, or event names used in code.",
-		"# 工作区背景",
-		"## 子项目职责",
-		"记录每个子项目负责的产品能力、对外接口、依赖方向和交付边界。",
-		"- 暂未识别子项目。",
-		"## 跨项目约束",
-		"记录多个子项目共同遵守的契约、共享库、配置、环境变量、数据 schema 或发布边界。",
-		"## 路由和影响范围",
-		"记录哪些路径或任务需要同时查看多个子项目 skill，例如契约、共享代码、基础设施、根目录脚本或部署配置。",
-		"# Workspace Background",
-		"## Child Project Responsibilities",
-		"Record each child project's product capability, public interfaces, dependency direction, and delivery boundary.",
-		"- No child projects detected yet.",
-		"## Cross-Project Constraints",
-		"Record contracts, shared libraries, config, environment variables, data schemas, or release boundaries shared by multiple child projects.",
-		"## Routing and Impact Radius",
-		"Record paths or tasks that require multiple child project skills to be read together, such as contracts, shared code, infrastructure, root scripts, or deployment config.",
-	}
-	for _, fragment := range defaultFragments {
-		content = strings.ReplaceAll(content, fragment, "")
-	}
+	scaffoldLines := loadDefaultContextScaffoldLines()
 	lines := strings.Split(content, "\n")
 	filtered := make([]string, 0, len(lines))
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "- 项目名称:") ||
+		_, isDefaultScaffold := scaffoldLines[trimmed]
+		if isDefaultScaffold ||
+			strings.HasPrefix(trimmed, "- 项目名称:") ||
 			strings.HasPrefix(trimmed, "- 主要语言:") ||
 			strings.HasPrefix(trimmed, "- 项目根目录:") ||
 			strings.HasPrefix(trimmed, "- Project name:") ||
@@ -476,6 +421,28 @@ func removeDefaultContextScaffold(content string) string {
 		filtered = append(filtered, line)
 	}
 	return strings.Join(filtered, "\n")
+}
+
+func loadDefaultContextScaffoldLines() map[string]struct{} {
+	defaultContextScaffoldOnce.Do(func() {
+		defaultContextScaffoldLines = make(map[string]struct{})
+		for _, file := range contextPromptFiles {
+			for _, locale := range []string{"", i18n.LocaleEnglish} {
+				data, err := embedfs.FS.ReadFile(metadata.SeedContextTemplatePath(strings.TrimSuffix(file.fileName, filepath.Ext(file.fileName)), locale))
+				if err != nil {
+					continue
+				}
+				for _, line := range strings.Split(string(data), "\n") {
+					line = strings.TrimSpace(line)
+					if line == "" || strings.Contains(line, "{{") || strings.HasPrefix(line, "<!--") {
+						continue
+					}
+					defaultContextScaffoldLines[line] = struct{}{}
+				}
+			}
+		}
+	})
+	return defaultContextScaffoldLines
 }
 
 func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromptManifest) {

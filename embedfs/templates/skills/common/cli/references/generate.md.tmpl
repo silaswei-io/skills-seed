@@ -1,0 +1,60 @@
+# Generate
+
+Use `skills-seed generate skills` when learned state already exists and Skill files need to be rendered.
+
+## Purpose
+
+Generation writes the target Skill tree from existing learned state:
+
+- `SKILL.md`
+- `references/`
+- workflow reference files
+- provider metadata, such as Codex agent metadata when applicable
+
+Generation does not analyze source files by itself.
+
+## Flags
+
+- `--output, -o`: override configured output path for this run.
+- `--no-references`: write only the main Skill file and skip detailed reference files.
+
+## Use Cases
+
+- Generate configured target: `skills-seed generate skills`
+- Write elsewhere once: `skills-seed generate skills --output .agents/skills/my-project`
+- Inspect only the root Skill quickly: `skills-seed generate skills --no-references`
+
+## Project Mode
+
+Project mode writes one project Skill tree. It consumes:
+
+- Project profile/spec.
+- Learned patterns.
+- Workflow entries.
+- Validation command evidence.
+
+If no patterns exist in project mode, generation may do nothing useful; run `sync` or `learn current` first.
+
+## Workspace Mode
+
+Workspace mode writes:
+
+- Child project Skill trees.
+- Root workspace Skill tree.
+
+The root workspace Skill routes tasks. Child Skills carry implementation rules. Do not put child project internals into workspace references.
+
+## Output Safety
+
+- The configured output directory is owned by skills-seed and is fully rebuilt on generation.
+- Direct edits under generated Skill directories are discarded. Store durable guidance in `.skills-seed/context/`, patterns, or workflows.
+- `--output` is a one-run override; it does not rewrite config.
+
+## Stale Output Handling
+
+If generated content looks stale:
+
+1. Run `skills-seed preview files --mode current`.
+2. Run `skills-seed sync`, or `skills-seed learn current --force` when relearning is needed.
+3. Run `skills-seed generate skills`.
+4. Compare `skills-templates-sha256` metadata if template freshness is in doubt.

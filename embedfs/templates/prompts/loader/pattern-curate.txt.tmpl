@@ -108,13 +108,19 @@ Given candidate patterns and related existing patterns, output the final canonic
 - If updating an existing pattern, keep the existing pattern `id` and include that existing ID plus related candidate IDs in `merged_from`.
 - If adding a new pattern, prefer the candidate `id`.
 - If merging multiple patterns, `merged_from` must list every merged candidate or existing pattern ID.
+{{if eq .Operation "learn_current"}}
+- `good_example`, `bad_example`, `business_method`, `source`, `project_id`, `scope_path`, `workspace_role`, `analysis_unit_id`, and `analysis_unit_name` are source-owned fields restored locally from `merged_from`. Return empty strings for these string fields and `null` for `business_method`; do not summarize, rewrite, or copy them.
+{{else}}
 - `good_example` must be selected from existing input examples only. Do not create, complete, rewrite, or synthesize code examples.
 - `bad_example` should also come from input; leave it empty only when input has none.
-- `evidence_locations` may preserve only evidence locations present in the input. Do not invent evidence paths, line numbers, symbols, or descriptions.
 - `business_method` may preserve only real information present in the input. Do not invent signatures, locations, prerequisites, or returns.
+{{end}}
+- `evidence_locations` may preserve only evidence locations present in the input. Do not invent evidence paths, line numbers, symbols, or descriptions.
 - Categories must come from input patterns and must be one of the allowed categories: {{.AllowedCategories}}. Do not create new categories.
-- `confidence` must be between 0.0 and 1.0. Use a frequency-weighted average or a conservative estimate when merging.
-- `frequency` should reflect merged occurrences and must be at least 1.
+- `confidence` and `frequency` are recomputed locally from verified evidence. Return schema-valid values, but do not use them to justify keeping a weak pattern.
+- Compare each rule with its examples, business method returns, and evidence descriptions. Drop or narrow a candidate when those inputs contradict one another.
+- Absolute wording such as always, must, never, all, or every requires independent evidence or a clearly scoped invariant. Otherwise narrow the rule or drop it.
+- Do not generalize behavior from one lifecycle action to sibling actions unless their evidence proves the same invariant.
 
 # Pre-Output Validation Checklist
 
@@ -123,7 +129,7 @@ Before returning JSON, validate internally:
 2. `merged_from` and `dropped.id` may reference only real input IDs.
 3. No two output patterns express the same core rule; duplicate rules must be merged.
 4. Do not keep low-quality, generic, or non-actionable candidates merely to cover them; place them in `dropped`.
-5. All code examples, `evidence_locations`, and `business_method` fields come from input. Do not invent them.
+5. All source-owned fields follow the operation-specific rules above. Never invent source material.
 6. `summary.total_candidates = {{len .CandidatePatterns}}`, `summary.total_existing = {{len .ExistingPatterns}}`, `summary.total_written = len(patterns)`, and `summary.total_dropped = len(dropped)`.
 
 # Output Format

@@ -18,6 +18,7 @@ package learner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -91,12 +92,6 @@ func (s *LearnerService) marshalKnownPatterns(ctx context.Context) (string, int)
 	return string(jsonBytes), len(patterns)
 }
 
-// SavePatterns 策展并保存多个候选模式。
-func (s *LearnerService) SavePatterns(ctx context.Context, patterns []domain.Pattern, operation string) int {
-	savedCount, _ := s.SavePatternsStrict(ctx, patterns, operation)
-	return savedCount
-}
-
 // SavePatternsStrict 策展并保存多个候选模式，失败时返回错误。
 func (s *LearnerService) SavePatternsStrict(ctx context.Context, patterns []domain.Pattern, operation string) (int, error) {
 	return s.SavePatternsStrictWithMetadata(ctx, patterns, operation, domain.AnalysisUnit{})
@@ -161,7 +156,7 @@ func (s *LearnerService) KnownPatternsSnapshot(ctx context.Context) (string, int
 //
 // 增量学习
 //   - 使用 patternRepo.IsCommitAnalyzed() 检查提交是否已分析
-//   - 使用 patternRepo.MarkCommitAnalyzed() 标记已分析
+//   - 使用 commitTracker.MarkCommitsAnalyzed() 原子标记批次已分析
 //
 // 模式入库
 //   - Learner 只产生候选模式
@@ -280,6 +275,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 		"known_patterns_json_length", len(knownPatternsJSON),
 	)
 	patternsLearned := 0
+	var batchErrors []error
 	totalBatches := (len(unanalyzedCommits) + batchSize - 1) / batchSize
 	batchProgress := progress.New(totalBatches)
 	retryProgress := agent.NewRetryProgressBinder(batchProgress.UpdateStep)
@@ -293,13 +289,18 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 		}
 
 		batch := unanalyzedCommits[i:end]
-		commitFiles := s.collectCommitFiles(ctx, batch, "learn")
+		commitFiles, collectErr := s.collectCommitFiles(ctx, batch, "learn")
+		if collectErr != nil {
+			batchErrors = append(batchErrors, fmt.Errorf("batch %d collect commit files: %w", i/batchSize+1, collectErr))
+		}
 		if len(commitFiles) == 0 {
+			err := fmt.Errorf("batch %d: no commit file paths available", i/batchSize+1)
 			logger.Warn(i18n.Get("LoggerLearnerBatchFailed"),
 				"operation", "learn",
 				"batch_id", i/batchSize+1,
-				"error", "no commit file paths available",
+				"error", err,
 			)
+			batchErrors = append(batchErrors, err)
 			continue
 		}
 		learnableBatch := commitInfos(commitFiles)
@@ -339,7 +340,10 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 			var callErr error
 			result, callErr = s.agent.BatchLearnFromCommits(ctx, req)
 			retryProgress.FinishStep(progressLabel, callErr == nil)
-			return callErr
+			if callErr != nil {
+				return callErr
+			}
+			return agent.RequireResult(result, "BatchLearnFromCommits")
 		})
 		if err != nil {
 			logger.Warn(i18n.Get("LoggerLearnerBatchFailed"),
@@ -354,6 +358,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 				"batch_commits_count", len(learnableBatch),
 				"error", err,
 			)
+			batchErrors = append(batchErrors, fmt.Errorf("batch %d agent: %w", i/batchSize+1, err))
 			continue
 		}
 
@@ -379,19 +384,19 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 				"batch_id", i/batchSize+1,
 				"error", saveErr,
 			)
-		} else {
-			patternsLearned += savedCount
+			batchErrors = append(batchErrors, fmt.Errorf("batch %d save patterns: %w", i/batchSize+1, saveErr))
+			continue
 		}
+		patternsLearned += savedCount
 
 		// 7. 标记这些 commits 已被分析
-		for _, c := range learnableBatch {
-			if err := s.commitTracker.MarkCommitAnalyzed(ctx, c.Hash); err != nil {
-				logger.Warn(i18n.Get("LoggerLearnerMarkAnalyzedFailed"),
-					"operation", "learn",
-					"commit_hash", shortHash(c.Hash),
-					"error", err,
-				)
-			}
+		commitHashes := make([]string, 0, len(learnableBatch))
+		for _, commit := range learnableBatch {
+			commitHashes = append(commitHashes, commit.Hash)
+		}
+		if err := s.commitTracker.MarkCommitsAnalyzed(ctx, commitHashes); err != nil {
+			logger.Warn(i18n.Get("LoggerLearnerMarkAnalyzedFailed"), "operation", "learn", "error", err)
+			batchErrors = append(batchErrors, fmt.Errorf("batch %d mark commits analyzed: %w", i/batchSize+1, err))
 		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "learner.batch",
@@ -416,11 +421,15 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 		"total_batches", totalBatches,
 	)
 
+	if len(batchErrors) > 0 {
+		return fmt.Errorf("learn history completed with %d failed batch operations: %w", len(batchErrors), errors.Join(batchErrors...))
+	}
 	return nil
 }
 
-func (s *LearnerService) collectCommitFiles(ctx context.Context, commits []domain.CommitInfo, operation string) []agent.CommitFileChange {
+func (s *LearnerService) collectCommitFiles(ctx context.Context, commits []domain.CommitInfo, operation string) ([]agent.CommitFileChange, error) {
 	commitFiles := make([]agent.CommitFileChange, 0, len(commits))
+	var collectErrors []error
 	for _, c := range commits {
 		files, err := s.gitRepo.GetChangedFiles(ctx, c.Hash)
 		if err != nil {
@@ -429,6 +438,7 @@ func (s *LearnerService) collectCommitFiles(ctx context.Context, commits []domai
 				"commit_hash", shortHash(c.Hash),
 				"error", err,
 			)
+			collectErrors = append(collectErrors, fmt.Errorf("commit %s: %w", shortHash(c.Hash), err))
 			continue
 		}
 		commitFiles = append(commitFiles, agent.CommitFileChange{
@@ -436,7 +446,7 @@ func (s *LearnerService) collectCommitFiles(ctx context.Context, commits []domai
 			Files:  files,
 		})
 	}
-	return commitFiles
+	return commitFiles, errors.Join(collectErrors...)
 }
 
 func commitInfos(commitFiles []agent.CommitFileChange) []domain.CommitInfo {
@@ -475,6 +485,9 @@ func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInf
 			err,
 		).WithContext("commit_hash", c.Hash)
 	}
+	if err := agent.RequireResult(result, "LearnFromCommit"); err != nil {
+		return domain.NewDomainError(domain.ErrAIService, i18n.Get("LearnerAILearnFailed"), err)
+	}
 
 	_, err = s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnCommit)
 	return err
@@ -512,6 +525,9 @@ func (s *LearnerService) LearnFromStaged(ctx context.Context, commitInfo domain.
 			i18n.Get("LearnerAILearnFailed"),
 			err,
 		)
+	}
+	if err := agent.RequireResult(result, "LearnFromStaged"); err != nil {
+		return domain.NewDomainError(domain.ErrAIService, i18n.Get("LearnerAILearnFailed"), err)
 	}
 
 	_, err = s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnStaged)

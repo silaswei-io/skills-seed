@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	term "github.com/charmbracelet/x/term"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 // Option 表示一个可选择项。
@@ -25,7 +26,7 @@ type Option[T comparable] struct {
 func Select[T comparable](title string, options []Option[T], defaultValue T) (T, error) {
 	var zero T
 	if len(options) == 0 {
-		return zero, fmt.Errorf("interactive select requires at least one option")
+		return zero, fmt.Errorf("%s", i18n.Get("InteractiveSelectRequiresOption"))
 	}
 
 	value := defaultValue
@@ -81,10 +82,10 @@ func Int(title string, defaultValue, minValue int) (int, error) {
 		Validate(func(value string) error {
 			parsed, err := strconv.Atoi(strings.TrimSpace(value))
 			if err != nil {
-				return fmt.Errorf("invalid integer")
+				return fmt.Errorf("%s", i18n.Get("InteractiveInvalidInteger"))
 			}
 			if parsed < minValue {
-				return fmt.Errorf("must be at least %d", minValue)
+				return fmt.Errorf("%s", i18n.GetWithParams("InteractiveMinimumInteger", map[string]interface{}{"Minimum": minValue}))
 			}
 			return nil
 		}).

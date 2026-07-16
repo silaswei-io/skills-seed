@@ -48,6 +48,7 @@ func curatedToDomain(pattern agent.CuratedPattern) domain.Pattern {
 
 func applyCuratedPatterns(ctx context.Context, repo domain.PatternRepository, curated []agent.CuratedPattern, existing []domain.Pattern) ([]domain.Pattern, error) {
 	written := make([]domain.Pattern, 0, len(curated))
+	mutation := domain.PatternMutation{}
 	outputIDs := make(map[string]struct{}, len(curated))
 	for _, pattern := range curated {
 		outputIDs[pattern.ID] = struct{}{}
@@ -65,21 +66,16 @@ func applyCuratedPatterns(ctx context.Context, repo domain.PatternRepository, cu
 			if _, isOutput := outputIDs[sourceID]; isOutput {
 				continue
 			}
-			if err := repo.Delete(ctx, sourceID); err != nil {
-				return written, err
-			}
+			mutation.DeleteIDs = append(mutation.DeleteIDs, sourceID)
 		}
 		domainPattern := curatedToDomain(pattern)
-		if err := repo.Save(ctx, &domainPattern); err != nil {
-			return written, err
-		}
 		written = append(written, domainPattern)
+		mutation.Save = append(mutation.Save, &written[len(written)-1])
+	}
+	if err := repo.ApplyPatternMutation(ctx, mutation); err != nil {
+		return nil, err
 	}
 	return written, nil
-}
-
-func fallbackCurate(candidates, existing []domain.Pattern) *agent.CuratePatternsResult {
-	return deterministicCurate(candidates, existing)
 }
 
 func deterministicCurate(candidates, existing []domain.Pattern) *agent.CuratePatternsResult {

@@ -3,8 +3,11 @@ package parser
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 	"time"
 
+	jsonrepair "github.com/silaswei-io/jsonrepair-go"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -119,16 +122,21 @@ func patternsToDomain(patterns []aicontract.PatternOutput, source domain.Source,
 }
 
 func parseJSONPayload(jsonStr string, target any) error {
-	if err := json.Unmarshal([]byte(jsonStr), target); err != nil {
-		repaired, repairErr := FixAIJSON(jsonStr)
-		if repairErr != nil {
-			return fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	normalized, err := jsonrepair.Repair(jsonStr)
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+
+	decoder := json.NewDecoder(strings.NewReader(normalized))
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(target); err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			err = fmt.Errorf("multiple JSON values")
 		}
-		if shapeErr := json.Unmarshal([]byte(repaired), target); shapeErr == nil {
-			return nil
-		} else {
-			return fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), shapeErr)
-		}
+		return fmt.Errorf("%s: %w", i18n.Get("AgentJSONUnmarshalSimpleFailed"), err)
 	}
 	return nil
 }

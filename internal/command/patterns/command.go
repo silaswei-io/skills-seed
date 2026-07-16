@@ -213,7 +213,10 @@ func runUserDefinePattern(ctx context.Context, cont *container.Container, req ag
 	if err != nil {
 		return nil, err
 	}
-	if result == nil || result.Pattern == nil {
+	if err := agent.RequireResult(result, "UserDefinePattern"); err != nil {
+		return nil, err
+	}
+	if result.Pattern == nil {
 		return nil, fmt.Errorf("%s", i18n.Get("PatternsUserDefineNoPattern"))
 	}
 	return result, nil
@@ -288,7 +291,7 @@ func curateAndStoreUserDefinedPattern(ctx context.Context, svc *curator.Service,
 		return domain.Pattern{}, err
 	}
 	if len(curated.Written) == 0 {
-		reason := "pattern was not written"
+		reason := i18n.Get("PatternsNotWritten")
 		if len(curated.Dropped) > 0 && curated.Dropped[0].Reason != "" {
 			reason = curated.Dropped[0].Reason
 		}

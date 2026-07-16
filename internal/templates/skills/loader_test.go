@@ -192,7 +192,7 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 	data := map[string]interface{}{
 		"ProgramVersion":      "v0.0.4",
 		"SkillsTemplatesHash": "hash",
-		"SkillName":           "demo-workspace",
+		"SkillName":           "demo-workspace-dev",
 		"WorkspaceName":       "demo",
 		"ProjectCount":        1,
 		"Projects": []map[string]interface{}{
@@ -544,6 +544,7 @@ func TestLoader_RenderAgentMetadata(t *testing.T) {
 func TestSkillTemplates_DoNotKeepDuplicateOrRetiredReferenceTemplates(t *testing.T) {
 	for _, path := range []string{
 		"../../../embedfs/templates/skills/common/references/examples",
+		"../../../embedfs/templates/skills/common/workflow",
 		"../../../embedfs/templates/skills/claude/references/project-overview.md.tmpl",
 		"../../../embedfs/templates/skills/claude/references/project-overview.md.tmpl",
 		"../../../embedfs/templates/skills/claude/references/patterns",
@@ -556,6 +557,28 @@ func TestSkillTemplates_DoNotKeepDuplicateOrRetiredReferenceTemplates(t *testing
 		_, err := os.Stat(path)
 		require.ErrorIs(t, err, os.ErrNotExist, path)
 	}
+}
+
+func TestSkillTemplates_DoNotKeepEmptyDirectories(t *testing.T) {
+	root := filepath.Clean("../../../embedfs/templates/skills")
+	var emptyDirs []string
+	require.NoError(t, filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 0 {
+			emptyDirs = append(emptyDirs, path)
+		}
+		return nil
+	}))
+	require.Empty(t, emptyDirs)
 }
 
 func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
@@ -574,13 +597,13 @@ func TestLoader_RenderMissingMapKeyFails(t *testing.T) {
 func TestSkillTemplateCatalogMapsLogicalIDsToNormalizedOutputs(t *testing.T) {
 	projectSkill, ok := TemplateCatalogEntry("project-skill")
 	require.True(t, ok)
-	require.Equal(t, "project/project-skill", projectSkill.RelativeName)
+	require.Equal(t, "project/skill", projectSkill.RelativeName)
 	require.Equal(t, "SKILL.md", projectSkill.OutputPath)
 	require.ElementsMatch(t, []string{"common", "claude", "codex"}, projectSkill.Providers)
 
 	workspaceSkill, ok := TemplateCatalogEntry("workspace-skill")
 	require.True(t, ok)
-	require.Equal(t, "workspace/workspace-skill", workspaceSkill.RelativeName)
+	require.Equal(t, "workspace/skill", workspaceSkill.RelativeName)
 	require.Equal(t, "SKILL.md", workspaceSkill.OutputPath)
 	require.ElementsMatch(t, []string{"common"}, workspaceSkill.Providers)
 

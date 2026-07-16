@@ -1,23 +1,15 @@
 package parser
 
 import (
-	"fmt"
-
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 // ParsePlanAnalysisUnitsResult 解析业务分析单元规划结果。
 func ParsePlanAnalysisUnitsResult(output string) (*agent.PlanAnalysisUnitsResult, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentNoValidJSONFound"))
-	}
-
 	var payload aicontract.PlanAnalysisUnitsOutput
-	if err := parseJSONPayload(jsonStr, &payload); err != nil {
+	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
 	return &agent.PlanAnalysisUnitsResult{Units: analysisUnitsToDomain(payload.Units)}, nil
@@ -25,13 +17,8 @@ func ParsePlanAnalysisUnitsResult(output string) (*agent.PlanAnalysisUnitsResult
 
 // ParseWorkspaceProfile 解析工作区画像结果。
 func ParseWorkspaceProfile(output string) (*domain.WorkspaceProfile, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
-	}
-
 	var payload aicontract.WorkspaceProfileOutput
-	if err := parseJSONPayload(jsonStr, &payload); err != nil {
+	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
 	profile := workspaceProfileToDomain(payload)
@@ -58,13 +45,8 @@ func ParseWorkspaceProfile(output string) (*domain.WorkspaceProfile, error) {
 
 // ParseWorkspaceSpec 解析工作区开发规范结果。
 func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
-	jsonStr, err := ExtractJSON(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentExtractJSONError"), err)
-	}
-
 	var payload aicontract.WorkspaceSpecOutput
-	if err := parseJSONPayload(jsonStr, &payload); err != nil {
+	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
 	spec := workspaceSpecToDomain(payload)

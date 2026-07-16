@@ -45,10 +45,32 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
-	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
-	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "references", "workspace-overview.md"))
+	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md"))
+	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev", "references", "workspace-overview.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
+}
+
+func TestGenerateWorkspaceSkillsRemovesLegacyRoot(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
+	legacyPath := filepath.Join(projectRoot, ".agents", "skills", "demo-workspace")
+	require.NoError(t, os.MkdirAll(legacyPath, 0755))
+	existingContent := []byte("# Existing workspace skill\n")
+	require.NoError(t, os.WriteFile(filepath.Join(legacyPath, "SKILL.md"), existingContent, 0644))
+
+	loader := skills.NewLoaderForAgent("codex", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{
+			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
+		},
+		AgentCfg: config.AgentConfig{Engine: "codex"},
+	}
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+
+	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
+	require.NoDirExists(t, legacyPath)
 }
 
 func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) {
@@ -70,7 +92,7 @@ func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) 
 	}))
 
 	require.FileExists(t, filepath.Join(projectRoot, "custom", "root-skill", "SKILL.md"))
-	require.NoFileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md"))
 }
 
 func TestGenerateWorkspaceSkillsWithOptionsSkipsReferences(t *testing.T) {
@@ -89,10 +111,10 @@ func TestGenerateWorkspaceSkillsWithOptionsSkipsReferences(t *testing.T) {
 
 	require.NoError(t, svc.GenerateWorkspaceSkillsWithOptions(context.Background(), WorkspaceGenerateOptions{SkipReferences: true}))
 
-	outputPath := filepath.Join(projectRoot, ".agents", "skills", "demo-workspace")
+	outputPath := filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev")
 	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
 	require.NoDirExists(t, filepath.Join(outputPath, "references"))
-	rootSkill := readGeneratedFile(t, projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md")
+	rootSkill := readGeneratedFile(t, projectRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md")
 	require.Contains(t, rootSkill, "本次生成未写入 references")
 	require.NotContains(t, rootSkill, "./references/workspace-overview.md")
 }
@@ -119,7 +141,7 @@ func TestGenerateWorkspaceSkillsRebuildsGeneratedOutput(t *testing.T) {
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace")
+	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev")
 	skillPath := filepath.Join(outputPath, "SKILL.md")
 	oldTime := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	require.NoError(t, os.Chtimes(skillPath, oldTime, oldTime))
@@ -153,7 +175,7 @@ func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *te
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace")
+	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev")
 	missingPath := filepath.Join(outputPath, "references", "cross-project-rules.md")
 	require.NoError(t, os.Remove(missingPath))
 
@@ -192,7 +214,7 @@ func TestGenerateWorkspaceSkillsDoesNotUseRootPatternsAsWorkspaceRules(t *testin
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
+	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-dev", "references", "cross-project-rules.md")
 	require.NotContains(t, rules, "插件源码修改规范")
 	require.NotContains(t, rules, "改代码时应该改源插件代码")
 	require.Contains(t, rules, "跨项目改动先定边界")
@@ -225,7 +247,7 @@ func TestGenerateWorkspaceSkillsWritesWorkspaceWorkflows(t *testing.T) {
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace")
+	outputPath := filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev")
 	skill := readGeneratedFile(t, outputPath, "SKILL.md")
 	require.Contains(t, skill, "[release](./workflows/release.md)")
 	require.FileExists(t, filepath.Join(outputPath, "workflows", "release.md"))
@@ -287,12 +309,12 @@ func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	require.Contains(t, overview, "学习阶段沉淀：backend 是私有化部署主后端，不是 SaaS。")
 	require.Contains(t, overview, "学习阶段沉淀：负责离线安装包的管理 API。")
 	require.Contains(t, overview, "`shared` - 学习阶段沉淀：离线包共享配置")
 
-	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "cross-project-rules.md")
+	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "cross-project-rules.md")
 	require.Contains(t, rules, "离线交付边界")
 	require.Contains(t, rules, "学习阶段沉淀：变更 backend 时必须保留离线安装包验证。")
 }
@@ -351,12 +373,12 @@ func TestGenerateWorkspaceSkillsFiltersUnknownWorkspaceProjects(t *testing.T) {
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	require.Contains(t, overview, "`front` -> `backend`")
 	require.NotContains(t, overview, "ai-rpc")
 	require.NotContains(t, overview, "services/**")
 
-	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "cross-project-rules.md")
+	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "cross-project-rules.md")
 	require.Contains(t, rules, "接口一致性")
 	require.NotContains(t, rules, "RPC 同步")
 	require.NotContains(t, rules, "services/ai-rpc")
@@ -428,7 +450,7 @@ hsmwebapi 是管理 API 入口，core-engine 是核心能力库。
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-dev", "references", "workspace-overview.md")
 	require.NotContains(t, overview, "HSM 工作区用于管理密码设备")
 	require.NotContains(t, overview, "hsmwebapi 是管理 API 入口")
 	require.NotContains(t, overview, "私有化部署")
@@ -473,13 +495,13 @@ func TestGenerateWorkspaceSkills_DoesNotCallWorkspaceAIInGenerate(t *testing.T) 
 	require.False(t, calledProfile)
 	require.False(t, calledSpec)
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-dev", "references", "workspace-overview.md")
 	require.Contains(t, overview, "hsmwebapi")
 	require.Contains(t, overview, "kmip-go")
 	require.NotContains(t, overview, "HSM 工作区负责私有化密码设备管理")
 	require.NotContains(t, overview, "hsmwebapi 调用 kmip-go 实现 KMIP 能力")
 
-	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-workspace", "references", "cross-project-rules.md")
+	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-dev", "references", "cross-project-rules.md")
 	require.Contains(t, rules, "hsmwebapi/**")
 	require.Contains(t, rules, "kmip-go/**")
 	require.NotContains(t, rules, "KMIP 能力同步")
@@ -521,7 +543,7 @@ skills:
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
-	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md")
+	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md")
 	require.NotContains(t, rootSkill, "## 工作区地图")
 	require.NotContains(t, rootSkill, "## 路由规则")
 	require.NotContains(t, rootSkill, "## 影响范围判断")
@@ -531,7 +553,7 @@ skills:
 	require.Contains(t, rootSkill, "[工作区概览](./references/workspace-overview.md)")
 	require.Contains(t, rootSkill, "[跨项目规则](./references/cross-project-rules.md)")
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	require.Contains(t, overview, "子项目配置：`backend/.skills-seed/config.yaml`")
 	require.Contains(t, overview, "backend/.agents/skills/custom-child-skill/SKILL.md")
 }
@@ -556,7 +578,7 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	assertMarkdownTableHasNoBlankLines(t, overview, "## 路由表")
 }
 
@@ -577,7 +599,7 @@ func TestGenerateWorkspaceSkills_DoesNotPersistRuntimeUserContext(t *testing.T) 
 	ctx := runtimecontext.WithUserContext(context.Background(), "本次运行的一次性原文不能进入 workspace skill")
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	require.NotContains(t, overview, "本次运行的一次性原文不能进入 workspace skill")
 }
 
@@ -606,17 +628,17 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
-	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
-	require.NoFileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace", "SKILL.md"))
+	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md"))
+	require.NoFileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"))
 
-	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md")
+	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md")
 	require.Contains(t, rootSkill, "[工作区概览](./references/workspace-overview.md)")
 	require.Contains(t, rootSkill, "[跨项目规则](./references/cross-project-rules.md)")
 	require.NotContains(t, rootSkill, "backend/.claude/skills/skills-seed-skills/SKILL.md")
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	require.Contains(t, overview, "未分析出明确契约路径")
 	require.Contains(t, overview, "默认写入边界")
 }
@@ -659,16 +681,16 @@ skills:
 	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
-	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md"))
+	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "custom-child-skill", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".claude", "skills", "skills-seed-skills", "SKILL.md"))
 
-	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "SKILL.md")
+	rootSkill := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md")
 	assert.NotContains(t, rootSkill, "子项目自带 skills-seed")
 	assert.NotContains(t, rootSkill, "backend/.skills-seed/config.yaml")
 	assert.NotContains(t, rootSkill, "backend/.agents/skills/custom-child-skill/SKILL.md")
 
-	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace", "references", "workspace-overview.md")
+	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	assert.Contains(t, overview, "子项目配置：`backend/.skills-seed/config.yaml`")
 	assert.Contains(t, overview, "backend/.agents/skills/custom-child-skill/SKILL.md")
 }

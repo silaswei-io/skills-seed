@@ -1,0 +1,67 @@
+# Learn
+
+Use learning commands when the goal is updating durable project knowledge.
+
+## `skills-seed learn current`
+
+Purpose:
+
+- Analyze current files.
+- Update learned patterns and project state.
+- Optionally refresh project profile.
+- Avoid a separate generation step unless the user runs one later.
+
+Flags:
+
+- `--language, -l`: override detected project language.
+- `--focus, -f`: restrict analysis to paths. Repeatable.
+- `--profile`: `auto`, `skip`, or `refresh`.
+- `--context`: one-shot text guidance.
+- `--context-path`: one-shot guidance from files. Repeatable.
+- `--force`: ignore saved file fingerprints and relearn selected files.
+
+Use cases:
+
+- Learn current changes: `skills-seed learn current`
+- Force relearning: `skills-seed learn current --force`
+- Focus on directories: `skills-seed learn current --focus internal/command --focus internal/service`
+- Refresh profile during learning: `skills-seed learn current --profile refresh`
+- Skip profile work: `skills-seed learn current --profile skip`
+
+Boundaries:
+
+- Use `learn current` when generation should not run yet.
+- Use `sync` when learning and generation should be coordinated.
+- Use `preview files --mode current` first when file selection is unclear.
+
+## `skills-seed learn history`
+
+Purpose:
+
+- Learn conventions from recent Git commits.
+- Extract patterns from committed changes rather than current working tree state.
+
+Flags:
+
+- `--limit, -n`: maximum commits to inspect.
+- `--since, -s`: lower bound such as a date or Git revision expression.
+- `--batch-size, -b`: commits per learning batch.
+
+Use cases:
+
+- Learn recent history: `skills-seed learn history`
+- Limit commits: `skills-seed learn history --limit 20`
+- Learn since a date: `skills-seed learn history --since 2026-01-01`
+- Tune batches: `skills-seed learn history --limit 50 --batch-size 5`
+
+When to use history:
+
+- A repository already has meaningful commit history.
+- You want stable conventions from reviewed changes.
+- Current working tree changes are not representative.
+
+After learning:
+
+- Run `skills-seed patterns show` to inspect learned rules.
+- Run `skills-seed profile show` to inspect project profile.
+- Run `skills-seed generate skills` when learned state should be rendered.

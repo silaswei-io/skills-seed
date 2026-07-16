@@ -9,6 +9,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
@@ -37,17 +38,26 @@ type UpsertRequest struct {
 	Overwrite bool
 }
 
+// ConflictError 表示已有工作流与新增说明不能安全自动合并。
+type ConflictError struct {
+	Conflicts []string
+}
+
+func (e *ConflictError) Error() string {
+	return i18n.GetWithParams("WorkflowConflictRequirements", map[string]interface{}{"Conflicts": strings.Join(e.Conflicts, "; ")})
+}
+
 // UpsertWorkflow 创建或更新用户工作流。
 func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domain.Workflow, error) {
 	if s == nil || s.repo == nil {
-		return nil, fmt.Errorf("workflow repository is not configured")
+		return nil, fmt.Errorf("%s", i18n.Get("WorkflowRepositoryMissing"))
 	}
 	if s.optimizer == nil {
-		return nil, fmt.Errorf("workflow optimizer is not configured")
+		return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerMissing"))
 	}
 	context := strings.TrimSpace(req.Context)
 	if context == "" {
-		return nil, fmt.Errorf("workflow --context is required")
+		return nil, fmt.Errorf("%s", i18n.Get("WorkflowContextRequired"))
 	}
 
 	name := strings.TrimSpace(req.Name)
@@ -72,24 +82,31 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 	if err != nil {
 		return nil, err
 	}
+	if err := agent.RequireResult(optimized, "OptimizeWorkflow"); err != nil {
+		return nil, err
+	}
+	conflicts := normalizeConflicts(optimized.Conflicts)
+	if len(conflicts) > 0 {
+		return nil, &ConflictError{Conflicts: conflicts}
+	}
 	optimizedContent := strings.TrimSpace(optimized.Content)
 	if optimizedContent == "" {
-		return nil, fmt.Errorf("workflow optimizer returned empty content")
+		return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyContent"))
 	}
 	title := strings.TrimSpace(optimized.Title)
 	if title == "" {
 		title = name
 	}
 	if title == "" {
-		return nil, fmt.Errorf("workflow optimizer returned empty title")
+		return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyTitle"))
 	}
 	if id == "" {
-		id, err = s.newGeneratedWorkflowID(title, context)
+		id, err = s.newGeneratedWorkflowID(title)
 		if err != nil {
 			return nil, err
 		}
 		if id == "" {
-			return nil, fmt.Errorf("workflow optimizer returned unsafe title")
+			return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerUnsafeTitle"))
 		}
 	}
 	workflow := domain.Workflow{
@@ -122,7 +139,7 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 	return s.repo.Get(id)
 }
 
-func (s *Service) newGeneratedWorkflowID(title, context string) (string, error) {
+func (s *Service) newGeneratedWorkflowID(title string) (string, error) {
 	baseID := workflowIDFromGeneratedTitle(title)
 	if baseID == "" {
 		return "", nil
@@ -152,6 +169,23 @@ func (s *Service) newGeneratedWorkflowID(title, context string) (string, error) 
 			return "", err
 		}
 	}
+}
+
+func normalizeConflicts(values []string) []string {
+	conflicts := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		conflicts = append(conflicts, value)
+	}
+	return conflicts
 }
 
 func workflowIDFromGeneratedTitle(title string) string {

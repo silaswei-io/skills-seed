@@ -69,8 +69,8 @@ skills:
   target: "claude"
   locale: "en-US"
   paths:
-    claude: ".claude/skills/skills-seed-skills"
-    codex: ".agents/skills/skills-seed-skills"
+    claude: ".claude/skills/<project-name>-dev"
+    codex: ".agents/skills/<project-name>-dev"
 
 logging:
   level: "DEBUG"
@@ -208,7 +208,7 @@ exclude:
 
 渲染后的 prompt 默认保存在 `.skills-seed/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、context 片段和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。候选文件、焦点文件和结构化上下文等大块输入会优先保存到 `.skills-seed/runtime/` 下的 prompt input 目录，渲染后的 prompt 通过路径引用它们。最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象，同时要求相同输入下保持语义稳定和确定性排序。
 
-0.10.5 起，`learn current` 单元分析不会再把已有模式库写入每个单元 prompt；如果需要查看已有模式，请读取本地模式库或使用 `patterns show` / `patterns stats`。模型输出解析会在最终契约之外继续做程序化 JSON 修复，覆盖字符串内原始换行/控制字符、裸对象键和数组项缺失对象起始符等异常。0.10.7 起，修复范围继续扩展到尾随逗号、注释、单引号字符串、Python 风格字面量以及对象字段/数组元素漏逗号。
+0.10.5 起，`learn current` 单元分析不会再把已有模式库写入每个单元 prompt；如果需要查看已有模式，请读取本地模式库或使用 `patterns show` / `patterns stats`。Claude 和 Codex 调用统一使用 DTO 生成的 Schema 约束原生结构化输出；解析层使用 `jsonrepair-go` 修复 JSON 语法，修复结果仍必须通过严格 DTO 解码，不会放行未知字段或错误结构。
 
 0.11.0 起，`learning.current.mode` 可设置为 `fast`、`normal` 或 `deep`，用于在学习速度和模式覆盖质量之间选择策略；该配置会进入续跑状态指纹。生成 skills 时会输出相关参考路由、重要性分层、验证矩阵和分组入口索引，并在渲染前校验证据路径是否存在。
 
@@ -274,8 +274,8 @@ skills:
   target: "codex"
   locale: "en-US"
   paths:
-    claude: ".claude/skills/skills-seed-skills"
-    codex: ".agents/skills/skills-seed-skills"
+    claude: ".claude/skills/<project-name>-dev"
+    codex: ".agents/skills/<project-name>-dev"
 ```
 
 也可以在初始化时直接指定：
@@ -369,8 +369,8 @@ skills-seed learn history --limit 100 --batch-size 10
 |---|---:|---|
 | `target` | `agent.engine` | 生成的 Skills 目标类型；可与 `agent.engine` 不同 |
 | `locale` | `en-US` | AI 学习输出、沉淀内容和生成 Skills 使用的语言 |
-| `paths.claude` | `.claude/skills/skills-seed-skills` | Claude Code skills 输出目录 |
-| `paths.codex` | `.agents/skills/skills-seed-skills` | Codex skills 输出目录 |
+| `paths.claude` | `.claude/skills/<project-name>-dev` | Claude Code skills 输出目录；workspace 根默认为 `<workspace-name>-workspace-dev` |
+| `paths.codex` | `.agents/skills/<project-name>-dev` | Codex skills 输出目录；workspace 根默认为 `<workspace-name>-workspace-dev` |
 
 #### 说明
 

@@ -234,6 +234,30 @@ func (t *MultiTracker) Fail(name, label string) {
 	t.Complete(name, label)
 }
 
+// Stop 停止后台刷新并收起当前进度块；可重复调用。
+func (t *MultiTracker) Stop() {
+	if t.stopTicker() {
+		t.finish()
+	}
+}
+
+func (t *MultiTracker) stopTicker() bool {
+	t.mu.Lock()
+	stop := t.stop
+	stopped := t.stopped
+	if stop != nil {
+		t.stop = nil
+		t.stopped = nil
+	}
+	t.mu.Unlock()
+	if stop == nil {
+		return false
+	}
+	close(stop)
+	<-stopped
+	return true
+}
+
 func (t *MultiTracker) Render() {
 	if !t.enabled {
 		return

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
+	cliskillscmd "github.com/silaswei-io/skills-seed/internal/command/cliskills"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -23,8 +24,9 @@ const (
 type initExistingAction string
 
 const (
-	initExistingInspect initExistingAction = "inspect"
-	initExistingReset   initExistingAction = "reset"
+	initExistingInspect                initExistingAction = "inspect"
+	initExistingReset                  initExistingAction = "reset"
+	initExistingInstallGlobalCLISkills initExistingAction = "install-global-cli-skills"
 )
 
 func shouldRunInteractiveInit(cmd *cobra.Command, opts commandOptions) bool {
@@ -128,6 +130,19 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		resolved.skills = skills
 	}
 
+	inspection, err := cliskillscmd.InspectGlobal(cliskillscmd.TargetAuto)
+	if err != nil {
+		return resolved, err
+	}
+	resolved.globalCLISkillsTarget = cliskillscmd.TargetAuto
+	if cliskillscmd.NeedsInstallOrUpdate(inspection) {
+		installGlobalCLISkills, err := interactive.Confirm(i18n.Get("InteractiveInitGlobalCLISkills"), i18n.Get("InteractiveYes"), i18n.Get("InteractiveNo"), true)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.installGlobalCLISkills = installGlobalCLISkills
+	}
+
 	projectCount := detectedWorkspaceProjectCount(resolved.mode)
 	interactive.PrintSummary(cmd.OutOrStdout(), i18n.Get("InteractiveInitSummaryTitle"), []interactive.SummaryItem{
 		{Label: i18n.Get("InteractiveInitSummaryMode"), Value: localizedInitMode(resolved.mode)},
@@ -139,6 +154,7 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		{Label: i18n.Get("InteractiveInitSummaryLearningMode"), Value: string(resolved.learningMode)},
 		{Label: i18n.Get("InteractiveInitSummaryLearningScope"), Value: string(resolved.learningScope)},
 		{Label: i18n.Get("InteractiveInitSummarySkills"), Value: resolved.skills},
+		{Label: i18n.Get("InteractiveInitSummaryGlobalCLISkills"), Value: localizedGlobalCLISkillsTarget(resolved)},
 	})
 
 	confirmed, err := interactive.Confirm(i18n.Get("InteractiveConfirmExecute"), i18n.Get("InteractiveYes"), i18n.Get("InteractiveNo"), true)
@@ -154,11 +170,21 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 func resolveInteractiveExistingInit(cmd *cobra.Command, projectRoot string) (initExistingAction, error) {
 	interactive.PrintBanner(cmd.OutOrStdout(), "skills-seed", "Project skills for AI agents", bannerTags())
 	configPath := filepath.Join(projectRoot, ".skills-seed", "config.yaml")
-	action, err := interactive.Select(i18n.Get("InteractiveInitAlreadyInitializedTitle"), []interactive.Option[initExistingAction]{
+	options := []interactive.Option[initExistingAction]{
 		{Value: initExistingInspect, Title: i18n.Get("InteractiveInitInspect"), Description: i18n.GetWithParams("InteractiveInitInspectDesc", map[string]interface{}{"Path": configPath})},
-		{Value: initExistingReset, Title: i18n.Get("InteractiveInitReset"), Description: i18n.Get("InteractiveInitResetDesc")},
-		{Value: "", Title: i18n.Get("InteractiveCancel")},
-	}, initExistingInspect)
+	}
+	if shouldOfferGlobalCLISkillsInstall() {
+		options = append(options, interactive.Option[initExistingAction]{
+			Value:       initExistingInstallGlobalCLISkills,
+			Title:       i18n.Get("InteractiveInitInstallGlobalCLISkills"),
+			Description: i18n.Get("InteractiveInitInstallGlobalCLISkillsDesc"),
+		})
+	}
+	options = append(options,
+		interactive.Option[initExistingAction]{Value: initExistingReset, Title: i18n.Get("InteractiveInitReset"), Description: i18n.Get("InteractiveInitResetDesc")},
+		interactive.Option[initExistingAction]{Value: "", Title: i18n.Get("InteractiveCancel")},
+	)
+	action, err := interactive.Select(i18n.Get("InteractiveInitAlreadyInitializedTitle"), options, initExistingInspect)
 	if err != nil {
 		return "", err
 	}
@@ -166,6 +192,14 @@ func resolveInteractiveExistingInit(cmd *cobra.Command, projectRoot string) (ini
 		return "", interactive.ErrCanceled
 	}
 	return action, nil
+}
+
+func shouldOfferGlobalCLISkillsInstall() bool {
+	inspection, err := cliskillscmd.InspectGlobal(cliskillscmd.TargetAuto)
+	if err != nil {
+		return false
+	}
+	return cliskillscmd.NeedsInstallOrUpdate(inspection)
 }
 
 func detectedWorkspaceProjectCount(mode string) int {
@@ -265,4 +299,15 @@ func localizedInitMode(mode string) string {
 		return i18n.Get("InteractiveInitModeWorkspace")
 	}
 	return i18n.Get("InteractiveInitModeProject")
+}
+
+func localizedGlobalCLISkillsTarget(opts commandOptions) string {
+	if !opts.installGlobalCLISkills {
+		return i18n.Get("InteractiveNo")
+	}
+	target := opts.globalCLISkillsTarget
+	if target == "" {
+		target = cliskillscmd.TargetAuto
+	}
+	return i18n.GetWithParams("InteractiveInitSummaryGlobalCLISkillsTarget", map[string]interface{}{"Target": target})
 }

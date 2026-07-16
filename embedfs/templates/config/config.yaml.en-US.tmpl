@@ -70,21 +70,6 @@ learning:
     select_relevant_files: true
     # Only call AI file filtering when candidate files reach this threshold; smaller projects use local filtering
     select_relevant_files_min_candidates: 200
-    budget:
-      # Maximum candidate patterns stored per analysis unit; 0 means unlimited
-      max_patterns_per_unit: 3
-      # Maximum candidate patterns stored per learn current run; 0 means unlimited
-      max_patterns_per_run: 12
-      # Maximum new patterns for micro changes; 0 audits existing patterns only
-      micro_change_new_patterns: 0
-      # Maximum new patterns for minor changes
-      minor_change_new_patterns: 3
-      # Candidates below this confidence are not stored by default
-      min_confidence: 0.78
-      # Prefer updating existing patterns on small changes to avoid fragmented new rules
-      update_existing_first: true
-      # Require routeable source evidence for candidate admission
-      require_routeable_evidence: true
     structural:
       # Enable bounded structural context; it does not run without bounded inputs
       enabled: true

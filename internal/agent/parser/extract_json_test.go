@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,16 +38,6 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) 
           "analysis_unit_name": "认证登录流程"
         }
       ],
-      "profile_delta": {
-        "layers": [
-          {
-            "name": "服务层",
-            "description": "核心登录业务逻辑",
-            "responsibilities": ["密码验证"],
-            "files": ["internal/service/system/admin/login.go"]
-          }
-        ]
-      },
       "profile_refresh_recommended": {"needed": false, "reason": ""}
     }
   ]
@@ -60,8 +51,7 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) 
 	assert.Equal(t, "认证登录流程", result.Units[0].UnitName)
 	require.Len(t, result.Units[0].Patterns, 1)
 	assert.Equal(t, "login-failure-lock-mechanism", result.Units[0].Patterns[0].ID)
-	require.Len(t, result.Units[0].ProfileDelta.Layers, 1)
-	assert.Equal(t, "服务层", result.Units[0].ProfileDelta.Layers[0].Name)
+	assert.Equal(t, domain.SourceLearnedCurrent, result.Units[0].Patterns[0].Source)
 }
 
 func TestParseWorkspaceSpecParsesStringChangeOrder(t *testing.T) {
@@ -137,7 +127,7 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	assert.Equal(t, "Taskfile.yml", result.ValidationCommands[0].Source)
 }
 
-func TestParseAnalyzeProjectResult_RepairsNonstandardJSON(t *testing.T) {
+func TestParseAnalyzeProjectResultRepairsNonstandardJSON(t *testing.T) {
 	output := `{
   // project profile returned by model
   project_name: 'demo',
@@ -160,13 +150,12 @@ func TestParseAnalyzeProjectResult_RepairsNonstandardJSON(t *testing.T) {
 }`
 
 	result, err := ParseAnalyzeProjectResult(output)
-	if !assert.NoError(t, err) {
-		return
-	}
-	assert.Equal(t, "demo", result.ProjectName)
-	assert.Equal(t, []string{"cobra"}, result.Frameworks)
-	assert.Len(t, result.CommonUtils, 1)
-	assert.Equal(t, "RawFieldNames", result.CommonUtils[0].Name)
+
+	require.NoError(t, err)
+	require.Equal(t, "demo", result.ProjectName)
+	require.Equal(t, []string{"cobra"}, result.Frameworks)
+	require.Len(t, result.CommonUtils, 1)
+	require.Equal(t, "RawFieldNames", result.CommonUtils[0].Name)
 }
 
 func TestParseAnalyzeProjectResultRejectsSemanticTypeMismatch(t *testing.T) {
@@ -216,7 +205,6 @@ func TestParseAnalyzeCurrentCodebaseResultRejectsStringCodeLocation(t *testing.T
       "function": "func Run() error"
     }
   }],
-  "profile_delta": {},
   "profile_refresh_recommended": {"needed": false}
 }`
 
@@ -249,19 +237,6 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
       "returns": "error"
     }
   }],
-  "profile_delta": {
-    "summary": "demo project",
-    "business_methods": [{
-      "name": "Run",
-      "code_location": {"current_location":"internal/service/demo.go:10"},
-      "description": "runs demo workflow",
-      "usage": "demo flow",
-      "type": "domain",
-      "function": "func Run() error",
-      "prerequisites": "config loaded",
-      "returns": "error"
-    }]
-  },
   "profile_refresh_recommended": {"needed": false}
 }`
 
@@ -272,8 +247,6 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
 	assert.Equal(t, "internal/service/demo.go:10", result.Patterns[0].BusinessMethod.DisplayLocation())
 	assert.Equal(t, "config loaded", result.Patterns[0].BusinessMethod.Prerequisites)
 	assert.Equal(t, "error", result.Patterns[0].BusinessMethod.Returns)
-	assert.Equal(t, "demo project", result.ProfileDelta.Summary)
-	assert.Len(t, result.ProfileDelta.BusinessMethods, 1)
 }
 
 func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
@@ -302,7 +275,6 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
     ],
     "business_method": null
   }],
-  "profile_delta": {},
   "profile_refresh_recommended": {"needed": false}
 }`
 
@@ -317,6 +289,18 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
 	assert.Equal(t, 42, result.Patterns[0].EvidenceLocations[0].Line)
 	assert.Equal(t, "LoadConfig", result.Patterns[0].EvidenceLocations[0].Symbol)
 	assert.Equal(t, "internal/service/config.go:42", result.Patterns[0].EvidenceLocations[0].DisplayLocation())
+	assert.Equal(t, domain.SourceLearnedCurrent, result.Patterns[0].Source)
+}
+
+func TestParseAnalyzeCurrentCodebaseResultRejectsRemovedProfileDelta(t *testing.T) {
+	result, err := ParseAnalyzeCurrentCodebaseResult(`{
+  "patterns": [],
+  "profile_delta": {},
+  "profile_refresh_recommended": {"needed": false}
+}`)
+
+	require.Error(t, err)
+	require.Nil(t, result)
 }
 
 func TestParseAnalyzeResultReturnsErrorWhenJSONMissing(t *testing.T) {

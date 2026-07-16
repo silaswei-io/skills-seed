@@ -7,6 +7,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/service/snapshotflow"
 	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
@@ -46,7 +47,7 @@ func NewCheckerService(
 func (s *CheckerService) Check(ctx context.Context) ([]domain.Issue, error) {
 	files, err := s.gitRepo.GetStagedFiles(ctx)
 	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrGitOperation, "获取暂存文件失败", err)
+		return nil, domain.NewDomainError(domain.ErrGitOperation, i18n.Get("CheckerGetStagedFilesFailed"), err)
 	}
 	files = s.filterExcluded(files)
 	return s.CheckFiles(ctx, files)
@@ -57,18 +58,18 @@ func (s *CheckerService) CheckAll(ctx context.Context) ([]domain.Issue, error) {
 	root := s.projectRoot()
 	files, err := filetree.Walk(root, s.exclude())
 	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrInternal, "遍历项目文件失败", err)
+		return nil, domain.NewDomainError(domain.ErrInternal, i18n.Get("CheckerWalkProjectFailed"), err)
 	}
 	flow, err := snapshotflow.Build(ctx, root, files)
 	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrInternal, "生成文件快照差异失败", err)
+		return nil, domain.NewDomainError(domain.ErrInternal, i18n.Get("CheckerBuildSnapshotDiffFailed"), err)
 	}
 	issues, err := s.checkFilesWithDiffs(ctx, flow.AddedFiles, flow.DiffFiles)
 	if err != nil {
 		return nil, err
 	}
 	if err := flow.Repository.Replace(flow.CurrentFiles); err != nil {
-		return nil, domain.NewDomainError(domain.ErrInternal, "替换文件快照失败", err)
+		return nil, domain.NewDomainError(domain.ErrInternal, i18n.Get("CheckerReplaceSnapshotFailed"), err)
 	}
 	return issues, nil
 }
@@ -88,13 +89,13 @@ func (s *CheckerService) checkFilesWithDiffs(ctx context.Context, files []domain
 
 	patterns, err := s.patternRepo.GetAll(ctx)
 	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrDatabase, "获取已知模式失败", err)
+		return nil, domain.NewDomainError(domain.ErrDatabase, i18n.Get("CheckerGetPatternsFailed"), err)
 	}
 	patterns = activeCheckerPatterns(patterns)
 
 	recentCommits, err := s.gitRepo.GetCommits(ctx, 10, "")
 	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrGitOperation, "获取最近提交失败", err)
+		return nil, domain.NewDomainError(domain.ErrGitOperation, i18n.Get("CheckerGetRecentCommitsFailed"), err)
 	}
 
 	req := &agent.AnalyzeRequest{
@@ -107,11 +108,14 @@ func (s *CheckerService) checkFilesWithDiffs(ctx context.Context, files []domain
 
 	result, err := s.agent.AnalyzeCode(ctx, req)
 	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, "AI 分析失败", err).WithContext("files_count", len(files))
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("CheckerAnalyzeFailed"), err).WithContext("files_count", len(files))
+	}
+	if err := agent.RequireResult(result, "AnalyzeCode"); err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("CheckerAnalyzeFailed"), err).WithContext("files_count", len(files))
 	}
 
 	if err := s.recordPatternHits(ctx, result.Issues); err != nil {
-		return nil, domain.NewDomainError(domain.ErrDatabase, "保存模式命中记录失败", err)
+		return nil, domain.NewDomainError(domain.ErrDatabase, i18n.Get("CheckerSavePatternHitsFailed"), err)
 	}
 
 	return result.Issues, nil

@@ -1,7 +1,9 @@
 package workflow
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,6 +87,112 @@ func TestWorkflowCommandUsesOverwriteFlagOnly(t *testing.T) {
 	cmd := Cmd(cont)
 	require.NotNil(t, cmd.Flags().Lookup("overwrite"))
 	require.Nil(t, cmd.Flags().Lookup("append"))
+}
+
+func TestWorkflowShowListsLightweightSummariesAsJSON(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cont := newWorkflowWorkspaceContainer(t)
+	defer cont.Close()
+
+	now := time.Date(2026, 7, 13, 12, 30, 0, 0, time.UTC)
+	require.NoError(t, cont.WorkflowRepo.Save(domain.Workflow{
+		ID:   "release",
+		Name: "Release",
+		Contexts: []domain.WorkflowContext{
+			{Content: "发布前检查构建产物", CreatedAt: now},
+		},
+		Content:   "# Release\n\n## 适用场景\n发布流程覆盖构建产物检查和上线后验证。\n\n## 步骤\n- 检查构建产物",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}))
+
+	cmd := Cmd(cont)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"show", "--format", "json"})
+	require.NoError(t, cmd.Execute())
+
+	var got []workflowSummaryView
+	require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+	require.Len(t, got, 1)
+	require.Equal(t, "release", got[0].ID)
+	require.Equal(t, "workspace", got[0].Target)
+	require.Equal(t, "发布流程覆盖构建产物检查和上线后验证。", got[0].Summary)
+	require.Equal(t, 1, got[0].ContextCount)
+	require.NotContains(t, out.String(), "\"content\"")
+}
+
+func TestWorkflowShowReturnsFullDetailsAsJSON(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cont := newWorkflowWorkspaceContainer(t)
+	defer cont.Close()
+
+	now := time.Date(2026, 7, 13, 12, 30, 0, 0, time.UTC)
+	require.NoError(t, cont.WorkflowRepo.Save(domain.Workflow{
+		ID:   "release",
+		Name: "Release",
+		Contexts: []domain.WorkflowContext{
+			{Content: "发布前检查构建产物", CreatedAt: now},
+		},
+		Content:   "# Release\n\n## 适用场景\n发布流程覆盖构建产物检查和上线后验证。",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}))
+	require.NoError(t, os.WriteFile(filepath.Join(cont.WorkflowRepo.ScriptsDir("release"), "smoke.sh"), []byte("#!/bin/sh\necho ok\n"), 0755))
+
+	cmd := Cmd(cont)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"show", "release", "--format", "json"})
+	require.NoError(t, cmd.Execute())
+
+	var got workflowDetailView
+	require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+	require.Equal(t, "release", got.ID)
+	require.Equal(t, "workspace", got.Target)
+	require.Contains(t, got.Content, "发布流程覆盖构建产物检查")
+	require.Len(t, got.Contexts, 1)
+	require.Len(t, got.Scripts, 1)
+	require.Equal(t, "smoke.sh", got.Scripts[0].Path)
+	require.NotEmpty(t, got.Scripts[0].SHA256)
+}
+
+func TestWorkflowShowCanInspectWorkspaceChild(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cont := newWorkflowWorkspaceContainer(t)
+	defer cont.Close()
+
+	childSeedPath := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend", ".skills-seed")
+	childCont, err := container.NewContainer(context.Background(), childSeedPath)
+	require.NoError(t, err)
+	require.NoError(t, childCont.WorkflowRepo.Save(domain.Workflow{
+		ID:      "deploy",
+		Name:    "Backend Deploy",
+		Content: "# Backend Deploy\n\n## 适用场景\n后端部署前执行数据库迁移检查。",
+	}))
+	require.NoError(t, childCont.Close())
+
+	cmd := Cmd(cont)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"show", "--child", "backend", "--format", "json"})
+	require.NoError(t, cmd.Execute())
+
+	var got []workflowSummaryView
+	require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+	require.Len(t, got, 1)
+	require.Equal(t, "deploy", got[0].ID)
+	require.Equal(t, "backend", got[0].Target)
+}
+
+func TestWorkflowShowRequiresInitializedProject(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cmd := Cmd(nil)
+	cmd.SetArgs([]string{"show", "--format", "json"})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), i18n.Get("ErrNotInitialized"))
 }
 
 func newWorkflowWorkspaceContainer(t *testing.T) *container.Container {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -71,6 +72,23 @@ func TestCheck_GitError(t *testing.T) {
 	svc := newTestService(mockAgent, mockGit, mockPattern)
 	_, err := svc.Check(context.Background())
 	assert.Error(t, err)
+}
+
+func TestCheck_GitErrorUsesActiveLocale(t *testing.T) {
+	mockGit := &mocks.MockGitRepository{
+		StagedFilesFn: func(context.Context) ([]domain.FileInfo, error) {
+			return nil, errors.New("git error")
+		},
+	}
+	svc := newTestService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, mockGit, &mocks.MockPatternRepository{})
+
+	require.NoError(t, i18n.Init(i18n.LocaleEnglish))
+	_, err := svc.Check(context.Background())
+	require.ErrorContains(t, err, "Failed to get staged files")
+
+	require.NoError(t, i18n.Init(i18n.LocaleChinese))
+	_, err = svc.Check(context.Background())
+	require.ErrorContains(t, err, "获取暂存文件失败")
 }
 
 func TestCheckAll_Success(t *testing.T) {

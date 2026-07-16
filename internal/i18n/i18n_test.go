@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInit(t *testing.T) {
@@ -67,8 +68,25 @@ func TestGetForLocaleDoesNotMutateGlobalLocale(t *testing.T) {
 	err := Init("zh-CN")
 	assert.NoError(t, err)
 
-	assert.Equal(t, "Scripts", GetForLocale("en-US", "WorkflowOutputScriptsHeading"))
-	assert.Equal(t, "脚本", Get("WorkflowOutputScriptsHeading"))
+	assert.Equal(t, "Summary", GetForLocale("en-US", "CommandDocsHeaderSummary"))
+	assert.Equal(t, "摘要", Get("CommandDocsHeaderSummary"))
+}
+
+func TestActiveLocalesHaveMatchingKeys(t *testing.T) {
+	load := func(path string) map[string]map[string]string {
+		data, err := localeFS.ReadFile(path)
+		require.NoError(t, err)
+		messages := make(map[string]map[string]string)
+		require.NoError(t, unmarshalToml(data, &messages))
+		return messages
+	}
+
+	english := load("locales/active.en-US.toml")
+	chinese := load("locales/active.zh-CN.toml")
+	require.Len(t, english, len(chinese))
+	for key := range english {
+		require.Contains(t, chinese, key, "missing zh-CN translation for %s", key)
+	}
 }
 
 func TestGetWithoutInit(t *testing.T) {
