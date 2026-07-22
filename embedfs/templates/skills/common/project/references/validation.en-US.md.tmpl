@@ -1,0 +1,26 @@
+# Validation Strategy
+
+This file is the single source for project validation commands. Commands come from the learned project profile; the recommendation matrix only accepts a command's own workdir, scope declaration, or command path as scope evidence.
+
+## Minimum Validation Strategy
+
+{{if .Gaps}}Current validation gaps:
+{{range .Gaps}}- {{.}}
+{{end}}
+{{end}}- Confirm accepted commands and working directories from AGENTS, build scripts, and CI configuration.
+- Run applicable generation, build, check, and test commands for the change scope. Do not infer a recommendation when the command has no scope evidence.
+- Inspect generated files and the code diff for unrelated changes or missing derived artifacts.
+- When automated tests are missing, manually verify affected runtime paths and record the risk.
+
+{{if .Matrix}}## Scope Matrix
+
+| Change scope | Recommended command | Trigger | Command evidence |
+|---|---|---|---|
+{{range .Matrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{end}}
+
+{{end}}## Learned Commands
+
+{{if .Commands}}{{range .Commands}}- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}{{if .Workdir}}, workdir: `{{.Workdir}}`{{end}}{{if .ScopePaths}}, scope: {{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}, evidence: {{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}, type: {{.Type}}{{end}}
+{{end}}{{else}}*No repository-backed validation command was learned.*
+{{end}}

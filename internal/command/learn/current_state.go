@@ -86,9 +86,25 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 		LocalPlanInputs:     localPlanInputs,
 		AISelectionInputs:   aiSelectionInputs,
 		AISelectedFiles:     aiSelectedFiles,
-		PendingAnalyzeFiles: len(analysisCandidatePaths(session.Changes)),
+		PendingAnalyzeFiles: pendingResumeAnalysisFiles(session),
 		Units:               len(session.State.Units),
 	}
+}
+
+func pendingResumeAnalysisFiles(session *currentStateSession) int {
+	if session == nil || session.State == nil {
+		return 0
+	}
+	if session.State.Analysis == nil {
+		return len(analysisCandidatePaths(session.Changes))
+	}
+	pending := pathSet(nil)
+	for _, unit := range pendingAnalysisUnits(session.State, session.Changes) {
+		for _, path := range unitFocusPaths(unit, session.Changes) {
+			pending[path] = true
+		}
+	}
+	return len(pending)
 }
 
 func displayCount(count int) string {
@@ -407,18 +423,34 @@ func loadOrCreateCurrentState(
 }
 
 func pendingAnalysisUnits(state *commandstate.State, changes *fileanalysis.FileChanges) []domain.AnalysisUnit {
-	if state == nil || changes == nil {
+	if state == nil || changes == nil || (state.Analysis != nil && state.Analysis.Complete) {
 		return nil
 	}
 	pending := pathSet(analysisCandidatePaths(changes))
+	var completed []domain.AnalysisUnit
+	if state.Analysis != nil {
+		completed = state.Analysis.CompletedUnits
+	}
 	units := make([]domain.AnalysisUnit, 0, len(state.Units))
 	for _, unit := range state.Units {
+		if analysisUnitIncluded(completed, unit) {
+			continue
+		}
 		if len(intersectUnitPaths(unit, pending)) == 0 {
 			continue
 		}
 		units = append(units, unit)
 	}
 	return units
+}
+
+func analysisUnitIncluded(units []domain.AnalysisUnit, target domain.AnalysisUnit) bool {
+	for _, unit := range units {
+		if analysisUnitSame(unit, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func fallbackAnalysisUnit(paths []string) domain.AnalysisUnit {

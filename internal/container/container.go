@@ -157,10 +157,8 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 	checkerSvc := checker.NewCheckerService(agentImpl, gitRepo, patternRepo, configRepo)
 	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, cfg.Project.Language)
-	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo)
-	generatorSvc.SetWorkflowRepository(workflowRepo)
-	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(patternRepo, profileRepo, skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo)
-	workspaceGeneratorSvc.SetWorkflowRepository(workflowRepo)
+	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo)
+	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(patternRepo, profileRepo, skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo, workflowRepo)
 
 	return &Container{
 		SeedPath:              seedPath,

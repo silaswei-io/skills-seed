@@ -33,6 +33,47 @@ func TestValidationMatrixChoosesCommandByEvidencePath(t *testing.T) {
 	assert.NotContains(t, matrix[0].When, "未找到覆盖该范围的专用验证命令")
 }
 
+func TestValidationMatrixDoesNotAssociateUnscopedGeneratorWithBusinessEvidence(t *testing.T) {
+	profile := &domain.ProjectProfile{ValidationCommands: []domain.ValidationCommand{{
+		Command:  "jzero gen",
+		When:     "修改 API 描述后重新生成代码。",
+		Evidence: []string{"Taskfile.yml"},
+		Type:     "generate",
+	}}}
+	pattern := domain.NewPattern("operate-log", "操作日志 API 处理", domain.CategoryAPI)
+	pattern.Confidence = 0.95
+	pattern.SetDescription("操作日志导出与删除流程。")
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "plugins/logger_cipher_operate/internal/logic/operate_log/trigger_export_operate_log.go", Line: 34},
+		{Path: "plugins/logger_cipher_operate/internal/service/operate_log/export_service.go", Line: 37},
+		{Path: "plugins/logger_cipher_operate/internal/service/operate_log/delete_task_processor.go", Line: 34},
+	}
+
+	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
+
+	require.Empty(t, matrix)
+}
+
+func TestValidationMatrixDisplaysCommandOwnedEvidence(t *testing.T) {
+	profile := &domain.ProjectProfile{ValidationCommands: []domain.ValidationCommand{{
+		Command:    "go test ./plugins/logger_cipher_operate/...",
+		ScopePaths: []string{"plugins/logger_cipher_operate"},
+		Evidence:   []string{"Taskfile.yml:42"},
+		Type:       "test",
+	}}}
+	pattern := domain.NewPattern("operate-log", "操作日志业务流程", domain.CategoryBusiness)
+	pattern.Confidence = 0.95
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path: "plugins/logger_cipher_operate/internal/service/operate_log/export_service.go", Line: 37,
+	}}
+
+	matrix := validationMatrix(profile, []domain.Pattern{*pattern}, "zh-CN")
+
+	require.Len(t, matrix, 1)
+	require.Contains(t, matrix[0].Evidence, "Taskfile.yml:42")
+	require.NotContains(t, matrix[0].Evidence, "plugins/logger_cipher_operate/internal/service/operate_log/export_service.go:37")
+}
+
 func TestValidationMatrixDoesNotUsePluginCommandForInternalEvidence(t *testing.T) {
 	profile := &domain.ProjectProfile{
 		ValidationCommands: []domain.ValidationCommand{
@@ -84,7 +125,8 @@ func TestValidationMatrixPrefersPatternEvidenceOverBroadModuleEvidence(t *testin
 
 	require.NotEmpty(t, matrix)
 	assert.Equal(t, "go test ./plugins/key_manage/...", matrix[0].Command)
-	assert.Contains(t, matrix[0].Evidence, "plugins/key_manage/internal/handler/key_manage/create.go:12")
+	assert.Contains(t, matrix[0].Evidence, "plugins/key_manage")
+	assert.NotContains(t, matrix[0].Evidence, "plugins/key_manage/internal/handler/key_manage/create.go:12")
 }
 
 func TestValidationMatrixPrefersNarrowTestCommandOverGlobalBuild(t *testing.T) {

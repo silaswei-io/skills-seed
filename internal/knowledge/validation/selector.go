@@ -1,40 +1,24 @@
 package validation
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/silaswei-io/skills-seed/internal/domain"
+)
 
 type commandSelector struct {
 	commands []Command
 }
 
 type commandChoice struct {
-	Command    Command
-	Match      MatchKind
-	Coverage   float64
-	Confidence float64
+	Command Command
 }
 
 func (selector commandSelector) Choose(area Area) commandChoice {
 	if choice := selector.chooseByEvidenceForArea(area, true); choice.Command.Command != "" {
-		choice.Match = MatchScoped
-		return choice
-	}
-	if choice := selector.chooseByEvidenceForArea(area, false); choice.Command.Command != "" && !commandLooksHeavy(choice.Command) {
-		choice.Match = MatchBroad
-		choice.Confidence = minFloat(choice.Confidence, 0.55)
 		return choice
 	}
 	if choice := selector.chooseByText(area); choice.Command.Command != "" {
-		choice.Match = MatchSemantic
-		return choice
-	}
-	if choice := selector.chooseGenericForArea(area); choice.Command.Command != "" {
-		choice.Match = MatchGeneric
-		choice.Confidence = minFloat(choice.Confidence, 0.45)
-		return choice
-	}
-	if choice := selector.chooseByEvidenceForArea(area, false); choice.Command.Command != "" {
-		choice.Match = MatchBroad
-		choice.Confidence = minFloat(choice.Confidence, 0.45)
 		return choice
 	}
 	return commandChoice{}
@@ -70,11 +54,7 @@ func (selector commandSelector) chooseByEvidenceForArea(area Area, narrowOnly bo
 		score += int(coverage * 10)
 		if score > bestScore {
 			bestScore = score
-			best = commandChoice{
-				Command:    command,
-				Coverage:   coverage,
-				Confidence: confidenceFromScore(score, coverage),
-			}
+			best = commandChoice{Command: command}
 		}
 	}
 	return best
@@ -95,7 +75,10 @@ func (selector commandSelector) chooseByText(area Area) commandChoice {
 			continue
 		}
 		declaredPaths := commandDeclaredScopePaths(command)
-		if len(declaredPaths) > 0 && len(evidenceRoots) > 0 && !commandSharesEvidenceRoot(declaredPaths, evidenceRoots) {
+		if len(declaredPaths) == 0 {
+			continue
+		}
+		if len(evidenceRoots) > 0 && !commandSharesEvidenceRoot(declaredPaths, evidenceRoots) {
 			continue
 		}
 		coverage := commandEvidenceCoverage(declaredPaths, area.Evidence)
@@ -107,52 +90,10 @@ func (selector commandSelector) chooseByText(area Area) commandChoice {
 			continue
 		}
 		semanticScore := commandSemanticScore(text, area.Needles)
-		if len(declaredPaths) == 0 && !commandHasSpecificSemanticMatch(command, semanticScore) {
-			continue
-		}
 		score := commandTypeScoreForArea(command, area) + semanticScore
-		if len(declaredPaths) == 0 {
-			score += 2
-		}
 		if score > bestScore {
 			bestScore = score
-			best = commandChoice{
-				Command:    command,
-				Coverage:   coverage,
-				Confidence: confidenceFromScore(score, coverage),
-			}
-		}
-	}
-	return best
-}
-
-func (selector commandSelector) chooseGenericForArea(area Area) commandChoice {
-	best := commandChoice{}
-	bestScore := 0
-	for _, command := range selector.commands {
-		if strings.TrimSpace(command.Command) == "" || len(commandDeclaredScopePaths(command)) > 0 {
-			continue
-		}
-		if !commandAppliesToArea(command, area) {
-			continue
-		}
-		score := commandTypeScoreForArea(command, area)
-		if commandLooksBroadTest(command) {
-			score -= 5
-		}
-		if commandKind(command) == "check" {
-			score += 2
-		}
-		if commandLooksHeavy(command) {
-			score--
-		}
-		if score > bestScore {
-			bestScore = score
-			best = commandChoice{
-				Command:    command,
-				Coverage:   0,
-				Confidence: confidenceFromScore(score, 0),
-			}
+			best = commandChoice{Command: command}
 		}
 	}
 	return best
@@ -172,17 +113,6 @@ func commandEvidenceScore(commandPaths, evidence []string) int {
 
 func commandText(command Command) string {
 	return strings.ToLower(command.Command + " " + command.When + " " + command.Source + " " + command.Type + " " + strings.Join(command.ScopePaths, " ") + " " + strings.Join(command.Evidence, " "))
-}
-
-func commandHasSpecificSemanticMatch(command Command, semanticScore int) bool {
-	if semanticScore <= 0 {
-		return false
-	}
-	text := strings.ToLower(command.Type + " " + command.Command + " " + command.When)
-	if containsAny(text, "test", "verify", "测试", "验证") {
-		return true
-	}
-	return semanticScore >= 2
 }
 
 func commandEvidenceCoverage(commandPaths, evidence []string) float64 {
@@ -329,15 +259,14 @@ func commandAppliesToArea(command Command, area Area) bool {
 }
 
 func commandKind(command Command) string {
-	text := strings.ToLower(command.Type + " " + command.Command + " " + command.When)
-	switch {
-	case containsAny(text, "test", "测试"):
+	switch Kind(command) {
+	case domain.ValidationCommandTest:
 		return "test"
-	case containsAny(text, "check", "lint", "vet", "检查"):
+	case domain.ValidationCommandStaticCheck:
 		return "check"
-	case containsAny(text, "generate", " gen", "codegen", "生成"):
+	case domain.ValidationCommandGenerate, domain.ValidationCommandContract:
 		return "generate"
-	case containsAny(text, "build", "编译", "构建"):
+	case domain.ValidationCommandBuild:
 		return "build"
 	default:
 		return "other"
@@ -345,14 +274,7 @@ func commandKind(command Command) string {
 }
 
 func commandScopePaths(command Command) []string {
-	paths := make([]string, 0, len(command.ScopePaths)+len(command.Evidence)+1)
-	paths = append(paths, command.ScopePaths...)
-	paths = append(paths, command.Evidence...)
-	if command.Workdir != "" {
-		paths = append(paths, command.Workdir)
-	}
-	paths = append(paths, CommandPaths(command.Command)...)
-	return uniqueStrings(paths)
+	return commandDeclaredScopePaths(command)
 }
 
 func commandDeclaredScopePaths(command Command) []string {
@@ -437,24 +359,6 @@ func normalizeValidationPath(path string) string {
 		path = path[:idx]
 	}
 	return strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
-}
-
-func confidenceFromScore(score int, coverage float64) float64 {
-	confidence := 0.35 + float64(score)*0.04 + coverage*0.25
-	if confidence > 0.95 {
-		return 0.95
-	}
-	if confidence < 0 {
-		return 0
-	}
-	return confidence
-}
-
-func minFloat(left, right float64) float64 {
-	if left < right {
-		return left
-	}
-	return right
 }
 
 func containsAny(value string, needles ...string) bool {

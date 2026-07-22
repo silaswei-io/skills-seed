@@ -2,7 +2,6 @@ package routing
 
 import (
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -101,10 +100,31 @@ func businessPatternGroupKey(pattern domain.Pattern) businessGroupKey {
 	if pattern.ScopePath != "" {
 		return businessGroupKeyFromPathText(pattern.ScopePath)
 	}
+	if key := businessGroupKeyFromAnalysisUnit(pattern); key.ID != "" {
+		return key
+	}
 	if key := businessGroupKeyFromPatternText(pattern); key.ID != "" {
 		return key
 	}
 	return businessGroupKey{}
+}
+
+func businessGroupKeyFromAnalysisUnit(pattern domain.Pattern) businessGroupKey {
+	idWords := splitBusinessGroupWords(pattern.AnalysisUnitID)
+	if len(idWords) == 0 {
+		idWords = splitBusinessGroupWords(pattern.AnalysisUnitName)
+	}
+	if len(idWords) == 0 {
+		return businessGroupKey{}
+	}
+	title := strings.TrimSpace(pattern.AnalysisUnitName)
+	if title == "" {
+		title = TitleFromWords(idWords)
+	}
+	return businessGroupKey{
+		ID:    strings.Join(idWords, "-"),
+		Title: title,
+	}
 }
 
 func businessGroupKeyFromPath(pattern domain.Pattern) businessGroupKey {
@@ -147,21 +167,58 @@ func businessGroupKeyFromPathText(location string) businessGroupKey {
 	}
 	for i := len(parts) - 1; i >= 0; i-- {
 		part := strings.TrimSpace(parts[i])
-		if part == "" {
+		if part == "" || isGenericBusinessDirectory(part) {
 			continue
 		}
 		part = strings.TrimSuffix(part, filepath.Ext(part))
-		if IsGenericBusinessPathPart(part) {
-			continue
-		}
 		if key := businessGroupKeyFromName(part); key.ID != "" {
 			return key
 		}
 	}
-	if !IsGenericBusinessPathPart(fileStem) {
-		return businessGroupKeyFromName(fileStem)
+	return businessGroupKeyFromName(normalizeBusinessFileStem(fileStem))
+}
+
+func isGenericBusinessDirectory(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "app", "application", "biz", "business", "cmd", "controller", "domain", "handler", "handlers",
+		"internal", "logic", "model", "pkg", "repository", "route", "service", "services", "src", "svc",
+		"usecase", "usecases":
+		return true
+	default:
+		return false
 	}
-	return businessGroupKey{}
+}
+
+func normalizeBusinessFileStem(value string) string {
+	words := splitBusinessGroupWords(value)
+	if len(words) >= 2 && words[len(words)-2] == "tp" && isDigits(words[len(words)-1]) {
+		words = words[:len(words)-1]
+	}
+	if len(words) > 1 && isBusinessRoleSuffix(words[len(words)-1]) {
+		words = words[:len(words)-1]
+	}
+	return strings.Join(words, "-")
+}
+
+func isBusinessRoleSuffix(value string) bool {
+	switch value {
+	case "client", "controller", "handler", "logic", "manager", "reloader", "repository", "service":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func businessGroupKeyFromName(name string) businessGroupKey {
@@ -180,6 +237,10 @@ func businessGroupKeyFromName(name string) businessGroupKey {
 }
 
 func SplitBusinessGroupWords(text string) []string {
+	return splitBusinessGroupWords(text)
+}
+
+func splitBusinessGroupWords(text string) []string {
 	var normalized strings.Builder
 	var previous rune
 	for _, r := range strings.TrimSpace(text) {
@@ -199,7 +260,7 @@ func SplitBusinessGroupWords(text string) []string {
 	words := make([]string, 0, len(fields))
 	for _, field := range fields {
 		field = strings.Trim(field, "-_")
-		if field == "" || isGenericBusinessNameWord(field) {
+		if field == "" {
 			continue
 		}
 		words = append(words, field)
@@ -213,7 +274,9 @@ func TitleFromWords(words []string) string {
 		if word == "" {
 			continue
 		}
-		parts = append(parts, strings.ToUpper(word[:1])+word[1:])
+		runes := []rune(word)
+		runes[0] = unicode.ToUpper(runes[0])
+		parts = append(parts, string(runes))
 	}
 	return strings.Join(parts, " ")
 }
@@ -232,34 +295,6 @@ func businessFallbackGroupKey(locale string) businessGroupKey {
 		ID:    businessFallbackGroupID,
 		Title: i18n.GetForLocale(locale, "KnowledgeRoutingBusinessFallbackTitle"),
 	}
-}
-
-func IsGenericBusinessPathPart(part string) bool {
-	part = strings.ToLower(strings.TrimSpace(part))
-	if part == "" {
-		return true
-	}
-	part = strings.TrimSuffix(part, filepath.Ext(part))
-	generic := map[string]bool{
-		"app": true, "application": true, "biz": true, "business": true, "cmd": true,
-		"controller": true, "domain": true, "handler": true, "internal": true,
-		"logic": true, "model": true, "pkg": true, "repository": true, "route": true,
-		"service": true, "services": true, "src": true, "usecase": true, "usecases": true,
-	}
-	if generic[part] {
-		return true
-	}
-	return regexp.MustCompile(`^(v|go|ts|js|py)?\d+$`).MatchString(part)
-}
-
-func isGenericBusinessNameWord(word string) bool {
-	generic := map[string]bool{
-		"business": true, "case": true, "domain": true, "flow": true, "handler": true,
-		"logic": true, "manager": true, "method": true, "pattern": true, "pipeline": true,
-		"process": true, "processor": true, "rule": true, "service": true, "state": true,
-		"strategy": true, "use": true, "workflow": true,
-	}
-	return generic[strings.ToLower(word)]
 }
 
 func buildBusinessGroupSummary(locale string, group BusinessGroup) BusinessGroupSummary {
@@ -318,8 +353,6 @@ func businessPatternSignals(pattern domain.Pattern) []string {
 	return uniqueStrings([]string{
 		pattern.Name,
 		pattern.ID,
-		pattern.Rule,
-		pattern.Description,
 	})
 }
 

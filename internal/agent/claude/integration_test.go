@@ -312,10 +312,9 @@ func TestE2E_CuratePatterns(t *testing.T) {
 	require.NoError(t, err, "CuratePatterns should succeed")
 	require.NotNil(t, result, "Result should not be nil")
 
-	t.Logf("Written: %d, Dropped: %d, TotalCandidates: %d",
-		len(result.Patterns), len(result.Dropped), result.Summary.TotalCandidates)
+	t.Logf("Written: %d, Dropped: %d", len(result.Patterns), len(result.Dropped))
 	for _, pattern := range result.Patterns {
-		t.Logf("  Curated: %s (from %v)", pattern.Name, pattern.MergedFrom)
+		t.Logf("  Curated: %s (from %v)", pattern.Name, pattern.SourceIDs)
 	}
 }
 

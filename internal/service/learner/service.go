@@ -92,21 +92,30 @@ func (s *LearnerService) marshalKnownPatterns(ctx context.Context) (string, int)
 	return string(jsonBytes), len(patterns)
 }
 
-// SavePatternsStrict 策展并保存多个候选模式，失败时返回错误。
-func (s *LearnerService) SavePatternsStrict(ctx context.Context, patterns []domain.Pattern, operation string) (int, error) {
-	return s.SavePatternsStrictWithMetadata(ctx, patterns, operation, domain.AnalysisUnit{})
+// CurateAndSavePatterns 策展并保存多个候选模式。
+func (s *LearnerService) CurateAndSavePatterns(ctx context.Context, patterns []domain.Pattern, operation curator.Operation) (int, error) {
+	return s.curateAndSavePatterns(ctx, patterns, operation, domain.AnalysisUnit{}, curator.ProgressHooks{})
 }
 
-// SavePatternsStrictWithMetadata 策展并保存候选模式，同时补充本次学习范围元数据。
-func (s *LearnerService) SavePatternsStrictWithMetadata(ctx context.Context, patterns []domain.Pattern, operation string, unit domain.AnalysisUnit) (int, error) {
+// CurateAndSavePatternsWithMetadata 策展并保存候选模式，同时补充学习范围。
+func (s *LearnerService) CurateAndSavePatternsWithMetadata(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, unit domain.AnalysisUnit) (int, error) {
+	return s.curateAndSavePatterns(ctx, patterns, operation, unit, curator.ProgressHooks{})
+}
+
+// CurateAndSavePatternsWithHooks 策展并保存候选模式，同时报告内部阶段。
+func (s *LearnerService) CurateAndSavePatternsWithHooks(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, hooks curator.ProgressHooks) (int, error) {
+	return s.curateAndSavePatterns(ctx, patterns, operation, domain.AnalysisUnit{}, hooks)
+}
+
+func (s *LearnerService) curateAndSavePatterns(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, unit domain.AnalysisUnit, hooks curator.ProgressHooks) (int, error) {
 	if s.curatorSvc == nil {
 		return 0, fmt.Errorf("pattern curator is not configured")
 	}
 	patterns = attachAnalysisUnit(patterns, unit)
-	result, err := s.curatorSvc.CurateAndStore(ctx, curator.CurateRequest{
+	result, err := s.curatorSvc.CurateAndStoreWithHooks(ctx, curator.CurateRequest{
 		Operation:  operation,
 		Candidates: patterns,
-	})
+	}, hooks)
 	if err != nil {
 		return 0, err
 	}
@@ -377,7 +386,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 
 		// 6. 策展并保存新模式
 		beforeSaveCount := patternsLearned
-		savedCount, saveErr := s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnHistory)
+		savedCount, saveErr := s.CurateAndSavePatterns(ctx, result.Patterns, curator.OperationLearnHistory)
 		if saveErr != nil {
 			logger.Warn(i18n.Get("LoggerLearnerBatchFailed"),
 				"operation", "learn",
@@ -489,7 +498,7 @@ func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInf
 		return domain.NewDomainError(domain.ErrAIService, i18n.Get("LearnerAILearnFailed"), err)
 	}
 
-	_, err = s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnCommit)
+	_, err = s.CurateAndSavePatterns(ctx, result.Patterns, curator.OperationLearnCommit)
 	return err
 }
 
@@ -530,7 +539,7 @@ func (s *LearnerService) LearnFromStaged(ctx context.Context, commitInfo domain.
 		return domain.NewDomainError(domain.ErrAIService, i18n.Get("LearnerAILearnFailed"), err)
 	}
 
-	_, err = s.SavePatternsStrict(ctx, result.Patterns, curator.OperationLearnStaged)
+	_, err = s.CurateAndSavePatterns(ctx, result.Patterns, curator.OperationLearnStaged)
 	return err
 }
 

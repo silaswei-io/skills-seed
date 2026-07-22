@@ -152,7 +152,9 @@ func TestRenderSkillDocumentsPublicCommands(t *testing.T) {
 		require.Contains(t, content, command)
 	}
 	require.Contains(t, content, "./references/workflow.md")
-	require.Contains(t, content, "Use when operating, explaining, debugging, or automating the skills-seed CLI")
+	require.Contains(t, content, "Use only when the user explicitly asks to run, inspect, or troubleshoot a concrete skills-seed CLI command")
+	require.Contains(t, content, "Do not load it merely because a task mentions `skills-seed`")
+	require.NotContains(t, content, "operating, explaining, debugging, or automating")
 }
 
 func TestRenderSkillTreeIncludesPerCommandReferences(t *testing.T) {

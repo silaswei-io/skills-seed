@@ -1,0 +1,28 @@
+# Go 测试矩阵
+
+本文件由当前源码树确定性生成，不依赖 AI 学习结果。每个 `_test.go` 归属到最近的上级 `go.mod`。
+
+## 目录
+
+- [模块测试命令](#模块测试命令)
+- [测试文件证据](#测试文件证据)
+- [覆盖缺口](#覆盖缺口)
+
+## 模块测试命令
+
+| 工作目录 | 命令 | 测试文件数 | 模块证据 |
+|---|---|---:|---|
+{{range .Inventory.Modules}}{{if .TestFiles}}| `{{.Workdir}}` | `go test ./...` | {{len .TestFiles}} | `{{.ModFile}}` |
+{{end}}{{end}}
+
+## 测试文件证据
+
+{{range .Inventory.Modules}}{{if .TestFiles}}### `{{.Workdir}}`（{{len .TestFiles}} 个）
+
+{{range .TestFiles}}- `{{.}}`
+{{end}}
+{{end}}{{end}}## 覆盖缺口
+
+{{range .Inventory.Modules}}{{if not .TestFiles}}- 模块 `{{.Workdir}}`（`{{.ModFile}}`）没有 `_test.go`，因此不生成测试命令。
+{{end}}{{end}}{{range .Inventory.UnownedTestFiles}}- `{{.}}` 不属于任何 `go.mod`，需要先确认模块边界。
+{{end}}

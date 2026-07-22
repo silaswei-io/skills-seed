@@ -36,6 +36,9 @@ func TestCleanProjectProfileCleansValidationCommands(t *testing.T) {
 			{Command: ""},
 			{Command: "TODO add command"},
 			{Command: "待确认验证命令"},
+			{Command: "./front_gateway server --config etc/etc.yaml", Type: "test"},
+			{Command: "./front_gateway version"},
+			{Command: "./front_gateway init --config etc/etc.yaml"},
 		},
 	}
 
@@ -45,6 +48,15 @@ func TestCleanProjectProfileCleansValidationCommands(t *testing.T) {
 	assert.Equal(t, "task verify", cleaned.ValidationCommands[0].Command)
 	assert.Equal(t, "after changes", cleaned.ValidationCommands[0].When)
 	assert.Equal(t, "Taskfile.yml", cleaned.ValidationCommands[0].Source)
+	assert.Equal(t, "test", cleaned.ValidationCommands[0].Type)
+}
+
+func TestClassifyValidationCommandUsesTokensInsteadOfSubstrings(t *testing.T) {
+	assert.Equal(t, ValidationCommandOther, ClassifyValidationCommand(ValidationCommand{Command: "inspect generated files"}))
+	assert.Equal(t, ValidationCommandOther, ClassifyValidationCommand(ValidationCommand{Command: "checksum assets"}))
+	assert.Equal(t, ValidationCommandTest, ClassifyValidationCommand(ValidationCommand{Command: "go test ./..."}))
+	assert.Equal(t, ValidationCommandStaticCheck, ClassifyValidationCommand(ValidationCommand{Command: "staticcheck ./..."}))
+	assert.Equal(t, ValidationCommandGenerate, ClassifyValidationCommand(ValidationCommand{Command: "jzero gen swagger"}))
 }
 
 func TestCleanProjectProfileDeduplicatesModulesAndFiltersPlaceholders(t *testing.T) {
@@ -111,19 +123,17 @@ func TestCleanProjectProfileDropsUnconfirmedProfileEntries(t *testing.T) {
 	assert.Equal(t, []string{"Taskfile.yml"}, cleaned.ValidationCommands[0].Evidence)
 }
 
-func TestCleanProjectProfileCollapsesFrameworkAndConfigTemplatePatterns(t *testing.T) {
+func TestCleanProjectProfileOnlyCollapsesEquivalentPatternText(t *testing.T) {
 	profile := &ProjectProfile{
 		FrameworkPatterns: []string{
-			"Handler层使用go-zero的httpx.Parse解析请求到types结构",
-			"Handler 层使用 httpx.Parse 解析请求，httpx.OkJsonCtx/httpx.ErrorCtx 返回响应",
-			"Logic层使用logx.WithContext初始化日志",
-			"Logic 层嵌入 logx.Logger 记录日志",
+			"Resolve input before invoking the reusable entry",
+			"resolve input before invoking the reusable entry",
+			"Preserve the existing output boundary",
 		},
 		ConfigPatterns: []string{
-			"使用 condition.Condition 构建数据库查询条件",
-			"使用 jzero 框架的 condition 包构建数据库查询条件",
-			"KMIP基础请求使用kmiprequest.BaseRequestStandard()",
-			"所有 KMIP DTO 的 BaseReq 字段使用 kmiprequest.BaseRequestStandard()",
+			"Load configuration through the project entry",
+			"load configuration through the project entry",
+			"Keep defaults at the integration boundary",
 		},
 	}
 
@@ -152,6 +162,7 @@ func TestNewProjectSpecFromProfileDemotesScopedAndSingleEvidencePatterns(t *test
 	global := NewPattern("global", "Cross Module Error Wrapping", CategoryError)
 	global.Confidence = 0.95
 	global.Frequency = 3
+	global.Source = SourceUserDefined
 	global.SetRule("Wrap domain errors with project context")
 	global.EvidenceLocations = []PatternEvidenceLocation{
 		{Path: "internal/service/a.go", Line: 10, Symbol: "A"},
@@ -161,6 +172,7 @@ func TestNewProjectSpecFromProfileDemotesScopedAndSingleEvidencePatterns(t *test
 	scoped := NewPattern("scoped", "Handler Double Parse", CategoryAPI)
 	scoped.Confidence = 1
 	scoped.Frequency = 6
+	scoped.Source = SourceUserDefined
 	scoped.SetRule("All handlers must call fuzzy.DecodeRequest before httpx.Parse")
 	scoped.EvidenceLocations = []PatternEvidenceLocation{
 		{Path: "internal/handler/home/home_compact.go", Line: 1, Symbol: "Home"},
@@ -184,12 +196,14 @@ func TestNewProjectSpecFromProfileDemotesScopedAndSingleEvidencePatterns(t *test
 
 func TestNewProjectSpecFromProfileCollapsesDuplicatePatternRules(t *testing.T) {
 	first := NewPattern("a", "Go Zero Handler Standard", CategoryAPI)
+	first.Source = SourceUserDefined
 	first.Confidence = 0.95
 	first.Frequency = 2
 	first.SetRule("Handler should parse request, create logic, call method, and return JSON response")
 	first.EvidenceLocations = []PatternEvidenceLocation{{Path: "internal/handler/a.go", Line: 1, Symbol: "A"}}
 
 	second := NewPattern("b", "Handler Standard Flow", CategoryAPI)
+	second.Source = SourceUserDefined
 	second.Confidence = 0.94
 	second.Frequency = 3
 	second.SetRule("Handler should parse request, create logic, call method, and return JSON response")
@@ -210,6 +224,7 @@ func TestNewProjectSpecFromProfileCollapsesDuplicatePatternRules(t *testing.T) {
 
 func TestNewProjectSpecFromProfileKeepsGuidanceAsNavigationHints(t *testing.T) {
 	handler := NewPattern("handler", "Handler Double Parse", CategoryAPI)
+	handler.Source = SourceUserDefined
 	handler.Confidence = 1
 	handler.Frequency = 6
 	handler.SetRule("所有 Handler 函数必须先使用 fuzzy.DecodeRequest 解析请求，再使用 httpx.Parse 进行参数验证")
@@ -230,11 +245,9 @@ func TestNewProjectSpecFromProfileKeepsGuidanceAsNavigationHints(t *testing.T) {
 	require.Len(t, spec.PatternGuidance, 1)
 	assert.Equal(t, "Handler Double Parse", spec.PatternGuidance[0].Name)
 	assert.Empty(t, spec.PatternGuidance[0].Rule)
-	assert.NotContains(t, spec.PatternGuidance[0].Description, "必须")
-	assert.NotContains(t, spec.PatternGuidance[0].Description, "所有")
 }
 
-func TestNewProjectSpecFromProfilePromotesStableAnalysisUnitRules(t *testing.T) {
+func TestNewProjectSpecFromProfileKeepsStrongLearnedPatternAsGuidance(t *testing.T) {
 	stable := NewPattern("kmip-success", "KMIP JSON 响应检查成功码", CategoryError)
 	stable.Confidence = 0.93
 	stable.Frequency = 6
@@ -260,8 +273,8 @@ func TestNewProjectSpecFromProfilePromotesStableAnalysisUnitRules(t *testing.T) 
 	spec := NewProjectSpecFromProfile(&ProjectProfile{ProjectName: "demo"}, []Pattern{*stable, *local}, WorkspaceProjectOverride{})
 
 	require.NotNil(t, spec)
-	require.Len(t, spec.PatternRules, 1)
-	assert.Equal(t, "KMIP JSON 响应检查成功码", spec.PatternRules[0].Name)
+	assert.Empty(t, spec.PatternRules)
 	require.Len(t, spec.PatternGuidance, 1)
-	assert.Equal(t, "单文件初始化流程", spec.PatternGuidance[0].Name)
+	assert.Equal(t, stable.Name, spec.PatternGuidance[0].Name)
+	assert.Empty(t, spec.PatternGuidance[0].Rule)
 }

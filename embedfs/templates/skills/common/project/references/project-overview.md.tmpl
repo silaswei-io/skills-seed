@@ -3,6 +3,8 @@
 **语言**: {{.Language}}
 **生成时间**: {{.GeneratedAt}}
 
+架构叙述来自已学习项目画像，用于导航而非硬约束；文件路径和入口方法会在生成时按当前源码校验，其他描述在修改前仍需回到代码和配置确认。
+
 ---
 
 ## 目录
@@ -16,8 +18,6 @@
 - [业务入口方法](#业务入口方法)
 - [通用工具](#通用工具)
 - [配置模式](#配置模式)
-{{if .ValidationCommands}}- [验证命令](#验证命令)
-{{end}}
 
 ## 项目概览摘要
 
@@ -102,7 +102,7 @@
 ## 关键模块
 
 {{if .KeyModules}}
-已提取 {{len .KeyModules}} 个关键模块，完整职责、依赖和关键方法见 [关键模块](./modules.md)
+已提取 {{len .KeyModules}} 个关键模块，职责摘要和已验证入口见 [关键模块](./modules.md)
 {{else}}
 *关键模块信息尚未提取*
 {{end}}
@@ -131,21 +131,6 @@
 {{end}}
 {{else}}
 *配置模式信息尚未提取*
-{{end}}
-
-{{if .ValidationCommands}}
-## 验证命令
-
-{{if .ValidationMatrix}}
-| 改动范围 | 建议命令 | 证据 |
-|---|---|---|
-{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
-{{end}}
-
-{{end}}
-{{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}{{if .Workdir}}，工作目录：`{{.Workdir}}`{{end}}{{if .ScopePaths}}，作用域：{{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}，证据：{{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}，类型：{{.Type}}{{end}}
-{{end}}
 {{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}

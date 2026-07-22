@@ -30,53 +30,31 @@ func TestValidateCurrentPatternsUsesVerifiedSourceEvidence(t *testing.T) {
 	require.Equal(t, domain.SourceLearnedCurrent, patterns[0].Source)
 	require.Equal(t, "service.go", patterns[0].ScopePath)
 	require.Equal(t, 3, patterns[0].EvidenceLocations[0].Line)
-	require.Equal(t, "func", patterns[0].EvidenceLocations[0].Kind)
+	require.Equal(t, "function", patterns[0].EvidenceLocations[0].Kind)
 	require.Equal(t, 1, patterns[0].Frequency)
-	require.Equal(t, 0.80, patterns[0].Confidence)
+	require.Equal(t, 0.99, patterns[0].Confidence)
 	require.Equal(t, pattern.GoodExample, patterns[0].GoodExample)
 }
 
 func TestValidateCurrentPatternsAcceptsTypeFamilyEvidence(t *testing.T) {
 	root := t.TempDir()
-	source := "package service\n\ntype User struct {\n\tID string\n}\n"
-	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte(source), 0o644))
+	source := "class Base:\n    pass\n\nclass User(Base):\n    pass\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "service.py"), []byte(source), 0o644))
 
 	pattern := domain.NewPattern("user-identity", "User Identity", domain.CategoryStructure)
 	pattern.Rule = "When extending users, preserve the string identity field."
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
-		{Path: "service.go", Symbol: "User", Kind: "type"},
+		{Path: "service.py", Symbol: "User", Kind: "type"},
 	}
 
 	patterns := validateCurrentPatterns(root, []domain.Pattern{*pattern})
 
 	require.Len(t, patterns, 1)
-	require.Equal(t, "struct", patterns[0].EvidenceLocations[0].Kind)
-	require.Equal(t, 3, patterns[0].EvidenceLocations[0].Line)
+	require.Equal(t, "class", patterns[0].EvidenceLocations[0].Kind)
+	require.Equal(t, 4, patterns[0].EvidenceLocations[0].Line)
 }
 
-func TestCompatibleSymbolKindUsesCanonicalFamilies(t *testing.T) {
-	tests := []struct {
-		requested string
-		actual    string
-		want      bool
-	}{
-		{requested: "function", actual: "func", want: true},
-		{requested: "method", actual: "func", want: true},
-		{requested: "type", actual: "struct", want: true},
-		{requested: "type", actual: "class", want: true},
-		{requested: "type", actual: "interface", want: true},
-		{requested: "type", actual: "func", want: false},
-		{requested: "file", actual: "struct", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.requested+"-"+tt.actual, func(t *testing.T) {
-			require.Equal(t, tt.want, compatibleSymbolKind(tt.requested, tt.actual))
-		})
-	}
-}
-
-func TestValidateCurrentPatternsRejectsUnverifiedCandidates(t *testing.T) {
+func TestValidateCurrentPatternsRejectsUnverifiedEvidence(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte("package service\n"), 0o644))
 

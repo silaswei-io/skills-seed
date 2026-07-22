@@ -2,6 +2,29 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.11]
+
+### 变更
+
+- 重构生成 Skill 的知识模型，将内容明确分为用户/内置规则、源码支持的可复用解决方案和弱证据观察；入口 Skill 补齐调试、测试、API、插件、数据库迁移和架构分析等触发语义，并为长 reference、验证策略、业务入口和源码位置提供更紧凑的按需路由。
+- 收敛 generator、knowledge、domain 和 template 的职责边界，移除 Claude/Codex 重复项目模板、基于字符串猜测的规则弱化与业务分组，以及 generator 对 Agent DTO 的依赖；项目画像、模式证据、业务入口和验证命令改由强类型本地模型统一生成。
+- `learn current` 语义策展改为最小 AI 契约：Agent 只输出规范文本、置信度和真实 `source_ids`，示例、证据、业务方法、频次、来源及统计由本地代码从输入恢复；未分类候选只做确定性本地恢复，不再完整重跑昂贵的策展请求。
+- 文件筛选、分析单元规划和模式策展标记为自包含 prompt-only 任务；Claude 禁用仓库读取工具，避免模型在已提供完整输入时重复 Read/Glob/Grep/LS。代码分析和项目画像仍保留只读源码工具。
+- Agent runtime 归档按调用 attempt 独立保存，并在 manifest 中记录输入、输出、缓存和费用；控制台将非缓存 Token 与上下文处理量分开展示，失败调用也计入汇总。
+- `learn current` 终端阶段改为“AI 策展模式 → 校验策展结果 → 写入模式库”，并将 learner API 命名收敛为 `CurateAndSavePatterns`，避免把长耗时 AI 调用误显示成磁盘保存。
+- 生成 Skill 将验证命令和本地测试事实分别集中到 `references/validation.md` 与 `references/testing.md`；Go 测试矩阵由真实 `go.mod` 和 `_test.go` 确定性生成，并按最近 module 给出工作目录、命令、测试数和源码证据。
+- 发布脚本保留 Go 测试、vet、staticcheck 和构建门禁，不再运行外部 shell 质量用例，也移除对应的 `--skip-quality` 分支。
+
+### 修复
+
+- 修复 `error_max_structured_output_retries` 被误报为 API 速率限制、30 分钟 deadline 只显示 `signal: killed`，以及重试 attempt 覆盖前一次 runtime 证据的问题。
+- 修复策展结果引用虚构来源 ID 时触发完整 AI 重试、未知 dropped 条目污染覆盖率，以及同一候选同时出现在 canonical pattern 和 dropped 中导致最终入库失败的问题；`compact --ai` 继续保持严格失败语义。
+- 修复中断发生在项目画像或模式策展阶段时重复分析已完成单元的问题；恢复状态现在保存完整分析结果和画像提交状态，`sync --resume` 可以直接从未完成的策展/持久化阶段继续。
+- 修复生成 Skill 中零证据结论、重复模式、空项目规则、无验证闭环、过长 reference 无目录、局部学习结果被渲染成硬约束，以及业务入口被通用目录名错误分组的问题。
+- 修复验证命令分类接受部署、启动等非验证命令，路径清理和业务路由依赖语言/框架特例，以及来源证据排序与最终主来源不一致的问题。
+- 修复验证矩阵把业务源码误当作命令证据、无作用域的 `jzero gen` 仅凭语义关联到无关业务函数，以及验证内容在入口、规范和概览中重复漂移的问题。
+- 修复工作区子项目仍路由到旧 `skills-seed-skills/SKILL.md`、入口重复列出全部业务详情链接，以及学习结果把 Base64 等编码手段描述为安全存储或安全传输的问题。
+
 ## [v0.13.10]
 
 ### 变更

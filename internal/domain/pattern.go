@@ -2,40 +2,29 @@ package domain
 
 import (
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
 
-// PatternEvidenceQuality 根据结构化证据的独立位置和路径多样性派生质量指标。
-func PatternEvidenceQuality(locations []PatternEvidenceLocation) (int, float64) {
-	identities := make(map[string]struct{}, len(locations))
+// AllowsHardConstraint 表示模式来源是否具备直接约束代码修改的权威性。
+// AI 学习结果可提供有证据的复用建议，但不能自行提升为项目规则。
+func (p Pattern) AllowsHardConstraint() bool {
+	return p.Source == SourceUserDefined || p.Source == SourceDefault
+}
+
+// PatternEvidenceFileCount 统计模式覆盖的不同源码文件。
+// 同一文件中的多个符号通常属于同一实现，不能重复计算覆盖度。
+func PatternEvidenceFileCount(locations []PatternEvidenceLocation) int {
 	paths := make(map[string]struct{}, len(locations))
 	for _, location := range locations {
 		path := strings.TrimSpace(location.Path)
 		if path == "" {
 			continue
 		}
-		identity := path + "|" + strconv.Itoa(location.Line) + "|" + strings.TrimSpace(location.Symbol) + "|" + strings.TrimSpace(location.Kind)
-		identities[identity] = struct{}{}
 		paths[path] = struct{}{}
 	}
 
-	frequency := len(identities)
-	switch {
-	case frequency == 0:
-		return 0, 0
-	case frequency == 1:
-		return frequency, 0.80
-	case frequency == 2 && len(paths) == 1:
-		return frequency, 0.84
-	case frequency == 2:
-		return frequency, 0.87
-	case len(paths) >= 3:
-		return frequency, 0.94
-	default:
-		return frequency, 0.90
-	}
+	return len(paths)
 }
 
 // StrongestPatterns 按 confidence 和 frequency 排序后取 top N

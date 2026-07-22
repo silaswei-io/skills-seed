@@ -1,6 +1,6 @@
 # {{.ProjectName}} 通用工具
 
-本文件记录项目画像中提取的通用工具方法。新增工具函数或处理重复逻辑前，优先检查这里是否已有可复用实现
+本文件记录项目画像中提取的通用工具方法。位置和签名经过源码校验；描述与使用场景来自项目画像，复用前需按函数实现确认。
 
 {{if .HasUtilityPatterns}}相关工具规则见 [工具模式](./patterns/utils.md)
 {{end}}
@@ -11,7 +11,8 @@
 
 - **位置**: {{if .File}}`{{.File}}`{{else}}未确认{{end}}
 - **签名**: `{{.Signature}}`
-- **描述**: {{.Description}}
+{{if .Description}}- **描述**: {{.Description}}
+{{end}}
 {{if .Usage}}- **使用场景**: {{.Usage}}{{end}}
 
 {{end}}

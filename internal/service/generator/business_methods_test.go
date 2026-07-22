@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildBusinessMethodIndexPrioritizesBusinessEntries(t *testing.T) {
+func TestBuildBusinessMethodIndexKeepsEveryEntryAndGroupsBySource(t *testing.T) {
 	index := buildBusinessMethodIndex([]domain.BusinessMethod{
 		{
 			Name:         "GenerateCurl",
@@ -26,11 +26,13 @@ func TestBuildBusinessMethodIndexPrioritizesBusinessEntries(t *testing.T) {
 		},
 	}, "en-US")
 
-	require.Len(t, index.Sections, 2)
-	require.Equal(t, "Business & Orchestration Entry Points", index.Sections[0].Title)
-	require.Len(t, index.Sections[0].Groups, 1)
-	require.Equal(t, "ApplyTransition", index.Sections[0].Groups[0].Methods[0].Name)
-	require.Equal(t, "Supporting & Utility Entry Points", index.Sections[1].Title)
-	require.Len(t, index.Sections[1].Groups, 1)
-	require.Equal(t, "GenerateCurl", index.Sections[1].Groups[0].Methods[0].Name)
+	require.Equal(t, 2, index.Total)
+	require.Len(t, index.Groups, 2)
+	groups := make(map[string]string, len(index.Groups))
+	for _, group := range index.Groups {
+		require.Len(t, group.Methods, 1)
+		groups[group.ID] = group.Methods[0].Name
+	}
+	require.Equal(t, "GenerateCurl", groups["gen_api_curl_test"])
+	require.Equal(t, "ApplyTransition", groups["order"])
 }

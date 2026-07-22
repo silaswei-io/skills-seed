@@ -41,7 +41,7 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -67,7 +67,7 @@ func TestGenerateWorkspaceSkillsRemovesLegacyRoot(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.NoDirExists(t, legacyPath)
@@ -85,7 +85,7 @@ func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkillsWithOptions(context.Background(), WorkspaceGenerateOptions{
 		RootOutputPath: "custom/root-skill",
@@ -107,7 +107,7 @@ func TestGenerateWorkspaceSkillsWithOptionsSkipsReferences(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkillsWithOptions(context.Background(), WorkspaceGenerateOptions{SkipReferences: true}))
 
@@ -137,7 +137,7 @@ func TestGenerateWorkspaceSkillsRebuildsGeneratedOutput(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -171,7 +171,7 @@ func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *te
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -210,7 +210,7 @@ func TestGenerateWorkspaceSkillsDoesNotUseRootPatternsAsWorkspaceRules(t *testin
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(patternRepo, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -242,8 +242,7 @@ func TestGenerateWorkspaceSkillsWritesWorkspaceWorkflows(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
-	svc.SetWorkflowRepository(workflowRepo)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, workflowRepo)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -305,7 +304,7 @@ func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, profileRepo, specRepo)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, profileRepo, specRepo, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -369,7 +368,7 @@ func TestGenerateWorkspaceSkillsFiltersUnknownWorkspaceProjects(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, profileRepo, specRepo)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, profileRepo, specRepo, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -411,7 +410,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	err := svc.GenerateWorkspaceSkills(context.Background())
 
@@ -439,7 +438,7 @@ func TestGenerateWorkspaceSkillsDoesNotPersistRuntimeContextInWorkspaceReference
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), strings.TrimSpace(`
 HSM 工作区用于管理密码设备、密钥服务、KMIP 接入和日志/网络组件。
 hsmwebapi 是管理 API 入口，core-engine 是核心能力库。
@@ -487,7 +486,7 @@ func TestGenerateWorkspaceSkills_DoesNotCallWorkspaceAIInGenerate(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 为主后端，它调用 kmip-go 实现 KMIP 的能力。")
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
@@ -539,7 +538,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -574,7 +573,7 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -594,7 +593,7 @@ func TestGenerateWorkspaceSkills_DoesNotPersistRuntimeUserContext(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
 
 	ctx := runtimecontext.WithUserContext(context.Background(), "本次运行的一次性原文不能进入 workspace skill")
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
@@ -625,7 +624,7 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 			"codex":  ".agents/skills/skills-seed-skills",
 		}},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md"))
@@ -641,6 +640,27 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 	overview := readGeneratedFile(t, projectRoot, ".claude", "skills", "demo-workspace-dev", "references", "workspace-overview.md")
 	require.Contains(t, overview, "未分析出明确契约路径")
 	require.Contains(t, overview, "默认写入边界")
+}
+
+func TestGenerateWorkspaceSkills_NormalizesLegacyChildSkillPath(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "hsmwebapi"), 0755))
+	loader := skills.NewLoaderForAgent("codex", "zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg:   config.ProjectConfig{Name: "hsm-workspace", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
+		WorkspaceCfg: config.WorkspaceConfig{Projects: []config.WorkspaceProjectConfig{{ID: "hsmwebapi", Path: "hsmwebapi", Type: "backend", Language: "go"}}},
+		AgentCfg:     config.AgentConfig{Engine: "codex"},
+		SkillsCfg: config.SkillsConfig{Paths: map[string]string{
+			"codex": ".agents/skills/skills-seed-skills",
+		}},
+	}
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, loader, cfg, nil, nil, nil)
+
+	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
+
+	overview := readGeneratedFile(t, projectRoot, ".agents", "skills", "hsm-workspace-dev", "references", "workspace-overview.md")
+	require.Contains(t, overview, "hsmwebapi/.agents/skills/hsmwebapi-dev/SKILL.md")
+	require.NotContains(t, overview, "hsmwebapi/.agents/skills/skills-seed-skills/SKILL.md")
 }
 
 func TestGenerateWorkspaceSkills_UsesChildProjectConfigPath(t *testing.T) {
@@ -678,7 +698,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil)
+	svc := NewWorkspaceGenerator(&mocks.MockPatternRepository{}, mockProfile, loader, cfg, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md"))

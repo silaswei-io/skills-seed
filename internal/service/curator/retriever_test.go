@@ -20,3 +20,10 @@ func TestSameScopeUsesOnlySemanticWorkspaceScope(t *testing.T) {
 	right.ScopePath = "services/other"
 	require.False(t, sameScope(left, right))
 }
+
+func TestTokensMatchReorderedChinesePhrases(t *testing.T) {
+	left := tokens("用户状态校验")
+	right := tokens("校验用户状态")
+
+	require.Greater(t, jaccard(left, right), 0.3)
+}

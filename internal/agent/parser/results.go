@@ -95,18 +95,10 @@ func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, erro
 	curateResult := &agent.CuratePatternsResult{
 		Patterns: make([]agent.CuratedPattern, len(result.Patterns)),
 		Dropped:  make([]agent.CuratedDrop, len(result.Dropped)),
-		Summary: agent.CurateSummary{
-			TotalCandidates: result.Summary.TotalCandidates,
-			TotalExisting:   result.Summary.TotalExisting,
-			TotalWritten:    result.Summary.TotalWritten,
-			TotalDropped:    result.Summary.TotalDropped,
-			MergeCount:      result.Summary.MergeCount,
-		},
 	}
 
-	now := time.Now()
 	for i, p := range result.Patterns {
-		curateResult.Patterns[i] = curatedPatternToAgent(p, now)
+		curateResult.Patterns[i] = curatedPatternToAgent(p)
 	}
 	for i, dropped := range result.Dropped {
 		curateResult.Dropped[i] = agent.CuratedDrop{

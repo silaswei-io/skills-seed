@@ -106,6 +106,11 @@ func (u Usage) Known() bool {
 	return u.HasTokens || u.HasCost
 }
 
+// UncachedTokens 返回本次未从提示词缓存读取的输入、输出和缓存写入量。
+func (u Usage) UncachedTokens() int64 {
+	return u.InputTokens + u.OutputTokens + u.CacheCreationInputTokens
+}
+
 // Normalize 补齐令牌总量和已知状态
 func (u Usage) Normalize() Usage {
 	if !u.HasTokens {

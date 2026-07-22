@@ -7,45 +7,74 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDisplayPatternTextSoftensLocalChineseHardConstraint(t *testing.T) {
-	pattern := domain.NewPattern("local-flow", "局部流程", domain.CategoryBusiness)
-	pattern.Confidence = 0.83
-	pattern.Frequency = 1
-	pattern.SetRule("修改登录流程时必须先解密密码")
-	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/login.go", Line: 10}}
+func TestLearnedPatternWithSourceEvidenceIsReusableSolution(t *testing.T) {
+	pattern := domain.NewPattern("existing-capability", "Existing Capability", domain.CategoryBusiness)
+	pattern.Source = domain.SourceLearnedCurrent
+	pattern.SetDescription("The existing entry handles the capability within its current integration boundary.")
+	pattern.SetRule("Inspect and prefer ExistingEntry; extend it only when the current boundary does not fit.")
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "src/capability.ext", Line: 10, Symbol: "ExistingEntry", Kind: "function"}}
 
-	text := DisplayPatternText(*pattern, "zh-CN")
-
-	assert.Contains(t, text, "定位线索")
-	assert.NotContains(t, text, "必须")
-	assert.Contains(t, text, "需要先解密密码")
+	assert.Equal(t, StrengthSolution, EvaluatePattern(*pattern).Strength)
+	assert.Equal(t, pattern.Description, DisplayPatternText(*pattern))
 }
 
-func TestDisplayPatternTextKeepsStrongChineseHardConstraint(t *testing.T) {
-	pattern := domain.NewPattern("core-flow", "核心流程", domain.CategoryBusiness)
-	pattern.Confidence = 0.93
-	pattern.Frequency = 3
-	pattern.SetRule("修改登录流程时必须先解密密码")
+func TestUserPatternRemainsAuthoritativeRule(t *testing.T) {
+	pattern := domain.NewPattern("maintained-rule", "Maintained Rule", domain.CategoryStructure)
+	pattern.Source = domain.SourceUserDefined
+	pattern.SetDescription("Applies to related changes.")
+	pattern.SetRule("Use the maintained project boundary.")
+
+	assert.Equal(t, StrengthRule, EvaluatePattern(*pattern).Strength)
+	assert.Equal(t, pattern.Rule, DisplayPatternText(*pattern))
+}
+
+func TestLearnedPatternWithoutSourceEvidenceIsObservation(t *testing.T) {
+	pattern := domain.NewPattern("unverified", "Unverified", domain.CategoryConfig)
+	pattern.Source = domain.SourceLearned
+	pattern.ScopePath = "src/component"
+	pattern.Metrics.EvidenceCount = 8
+	pattern.SetDescription("A possible local behavior.")
+	pattern.SetRule("Prefer a presumed entry.")
+
+	assert.Equal(t, StrengthObservation, EvaluatePattern(*pattern).Strength)
+	assert.Equal(t, pattern.Description, DisplayPatternText(*pattern))
+}
+
+func TestPatternEvidenceCountCountsIndependentSourceFiles(t *testing.T) {
+	pattern := domain.NewPattern("evidence", "Evidence", domain.CategoryConcurrency)
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
-		{Path: "internal/login.go", Line: 10},
-		{Path: "internal/admin.go", Line: 20},
+		{Path: "src/component.ext", Line: 10, Symbol: "Entry"},
+		{Path: "src/component.ext", Line: 20, Symbol: "Helper"},
+		{Path: "src/integration.ext", Line: 30, Symbol: "Adapter"},
 	}
+	pattern.Metrics.EvidenceCount = 9
 
-	text := DisplayPatternText(*pattern, "zh-CN")
-
-	assert.Equal(t, "修改登录流程时必须先解密密码", text)
+	assert.Equal(t, 2, PatternEvidenceCount(*pattern))
 }
 
-func TestDisplayPatternTextSoftensLocalEnglishHardConstraint(t *testing.T) {
-	pattern := domain.NewPattern("local-flow", "Local Flow", domain.CategoryBusiness)
-	pattern.Confidence = 0.83
-	pattern.Frequency = 1
-	pattern.SetRule("Login changes must decrypt the password first")
-	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/login.go", Line: 10}}
+func TestFileEvidenceIsReusableWithoutSourceExcerpt(t *testing.T) {
+	pattern := domain.NewPattern("file-backed", "File Backed", domain.CategoryConfig)
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "config/settings.ext", Kind: "file"}}
 
-	text := DisplayPatternText(*pattern, "en-US")
+	assert.Equal(t, StrengthSolution, EvaluatePattern(*pattern).Strength)
+}
 
-	assert.Contains(t, text, "local hint")
-	assert.NotContains(t, text, " must ")
-	assert.Contains(t, text, "should decrypt")
+func TestDisplayPatternTextPreservesLearnedSemantics(t *testing.T) {
+	pattern := domain.NewPattern("learned", "Learned", domain.CategoryStructure)
+	pattern.Source = domain.SourceLearnedCurrent
+	pattern.SetDescription("所有 Logic 必须严格使用现有结构")
+
+	text := DisplayPatternText(*pattern)
+
+	assert.Equal(t, pattern.Description, text)
+}
+
+func TestDisplayPatternTextUsesLearnedRuleWhenDescriptionIsMissing(t *testing.T) {
+	pattern := domain.NewPattern("learned-rule", "Learned Rule", domain.CategoryError)
+	pattern.Source = domain.SourceLearnedCurrent
+	pattern.SetRule("All failures must include operation context")
+
+	text := DisplayPatternText(*pattern)
+
+	assert.Equal(t, pattern.Rule, text)
 }

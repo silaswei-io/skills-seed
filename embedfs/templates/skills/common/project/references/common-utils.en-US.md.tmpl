@@ -1,6 +1,6 @@
 # {{.ProjectName}} Common Utilities
 
-This file documents reusable utility functions extracted into the project profile. Check it before adding utility functions or duplicating common logic
+This file documents reusable utility functions extracted into the project profile. Locations and signatures are source-verified; descriptions and usage notes come from the profile and must be checked against the implementation before reuse.
 
 {{if .HasUtilityPatterns}}Related utility rules: [Utility Patterns](./patterns/utils.md)
 {{end}}
@@ -11,7 +11,8 @@ This file documents reusable utility functions extracted into the project profil
 
 - **Location**: {{if .File}}`{{.File}}`{{else}}unconfirmed{{end}}
 - **Signature**: `{{.Signature}}`
-- **Description**: {{.Description}}
+{{if .Description}}- **Description**: {{.Description}}
+{{end}}
 {{if .Usage}}- **Usage**: {{.Usage}}{{end}}
 
 {{end}}

@@ -1,45 +1,29 @@
 # {{.ProjectName}} 关键模块
 
-本文件记录项目画像中提取的关键模块、职责边界、依赖关系和入口方法。调整模块结构或新增功能入口前，优先检查对应模块边界
+本文件提供项目画像中的模块导航。模块路径来自当前源码，入口只展示经过源码签名校验的方法；职责和依赖关系是学习观察，修改前需按源码复核。
 
 {{if .KeyModules}}
+{{if gt (len .KeyModules) 5}}
 ## 目录
 
 {{range .KeyModules}}- [{{.DisplayName}}](#{{anchor .DisplayName}})
+{{end}}
 {{end}}
 
 {{range .KeyModules}}
 ## {{.DisplayName}}
 
-- **路径**: `{{.Path}}`
-{{if .Description}}
-- **描述**: {{.Description}}
-{{end}}
-{{if .Responsibilities}}
-- **职责**
-{{range .Responsibilities}}
-  - {{.}}
-{{end}}
-{{end}}
-{{if .Dependencies}}
-- **依赖**
-{{range .Dependencies}}
-  - {{.}}
-{{end}}
-{{end}}
-{{if .Dependents}}
-- **被依赖**
-{{range .Dependents}}
-  - {{.}}
-{{end}}
-{{end}}
-{{if .KeyMethods}}
-- **关键方法**
-{{range .KeyMethods}}
-  - `{{.}}`
-{{end}}
-{{end}}
-
+- **源码路径**: `{{.Path}}`
+{{if .Description}}- **职责观察（需按源码复核）**: {{.Description}}
+{{end}}{{if .Responsibilities}}- **具体职责观察**:
+{{range .Responsibilities}}  - {{.}}
+{{end}}{{end}}{{if .Dependencies}}- **依赖线索**:
+{{range .Dependencies}}  - {{.}}
+{{end}}{{end}}{{if .Dependents}}- **被依赖线索**:
+{{range .Dependents}}  - {{.}}
+{{end}}{{end}}{{if .KeyMethods}}- **已验证入口**:
+{{range .KeyMethods}}  - `{{.}}`
+{{end}}{{end}}
 {{end}}
 {{else}}
 *关键模块信息尚未提取*

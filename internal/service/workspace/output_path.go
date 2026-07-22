@@ -34,6 +34,7 @@ func (g *WorkspaceGenerator) childSkillTarget(projectRoot string, project config
 		if err != nil {
 			return childSkillTarget{}, err
 		}
+		outputPath = normalizeLegacyChildSkillPath(outputPath, firstNonEmpty(childConfig.GetProjectConfig().Name, project.ID))
 		return childSkillTarget{
 			OutputPath:      outputPath,
 			UsesChildConfig: true,
@@ -44,10 +45,19 @@ func (g *WorkspaceGenerator) childSkillTarget(projectRoot string, project config
 	if err != nil {
 		return childSkillTarget{}, err
 	}
+	outputPath = normalizeLegacyChildSkillPath(outputPath, project.ID)
 	return childSkillTarget{
 		OutputPath: outputPath,
 		ConfigPath: configPath,
 	}, nil
+}
+
+// normalizeLegacyChildSkillPath 将旧版通用目录迁移为当前项目的稳定生成名；显式自定义目录保持不变。
+func normalizeLegacyChildSkillPath(outputPath, projectName string) string {
+	if filepath.Base(filepath.Clean(outputPath)) != "skills-seed-skills" {
+		return outputPath
+	}
+	return filepath.Join(filepath.Dir(outputPath), skillgen.GeneratedSkillName(projectName))
 }
 
 func (g *WorkspaceGenerator) targetSkillOutputPath(projectRoot, skillName string) (string, error) {

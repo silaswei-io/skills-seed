@@ -8,8 +8,16 @@ import (
 
 // RuntimeTask 标识一次 agent 调用中共享的 runtime 文件名前缀。
 type RuntimeTask struct {
-	ID   string
-	Slug string
+	ID         string
+	Slug       string
+	PromptOnly bool
+}
+
+// NewPromptOnlyRuntimeTask 创建不需要仓库读取工具的自包含任务。
+func NewPromptOnlyRuntimeTask(slug string) RuntimeTask {
+	task := NewRuntimeTask(slug)
+	task.PromptOnly = true
+	return task
 }
 
 // NewRuntimeTask 创建 prompt 与 agent 输出共用的 runtime 任务标识。

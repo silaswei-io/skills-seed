@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
-	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -182,7 +181,7 @@ func TestRunGenerateUsesConfiguredOutputPathWithoutCobraCommand(t *testing.T) {
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 
-func TestRunGenerateDoesNotCallSummary(t *testing.T) {
+func TestRunGenerateDoesNotRequireAvailableAgent(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
@@ -206,6 +205,7 @@ func TestRunGenerateDoesNotCallSummary(t *testing.T) {
 	cont, err := container.NewContainer(context.Background(), seedPath)
 	require.NoError(t, err)
 	defer cont.Close()
+	cont.Agent = &mocks.MockAgent{NameVal: provider, AvailableVal: false}
 
 	require.NoError(t, RunGenerate(cont))
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
@@ -357,44 +357,6 @@ func TestRunGenerateWorkspacePrintsWorkspaceProgressBeforeChildDetails(t *testin
 	require.Greater(t, startIndex, stepIndex)
 	require.Greater(t, doneIndex, stepIndex)
 	require.NotContains(t, output, "Token 消耗: 子项目 backend")
-}
-
-func TestRunGenerateProjectRequiresAvailableAgent(t *testing.T) {
-	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	cfg.Project.Mode = domain.ModeProject
-	cfg.Agent.Engine = "mock"
-	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	require.NoError(t, configRepo.Update(cfg))
-
-	cont := &container.Container{
-		ConfigRepo: configRepo,
-		Agent:      &mocks.MockAgent{NameVal: "mock", AvailableVal: false},
-	}
-
-	err = commandutil.RequireAgentAvailable(cont)
-	require.Error(t, err)
-}
-
-func TestRunGenerateWorkspaceRequiresAvailableAgent(t *testing.T) {
-	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	cfg.Project.Mode = domain.ModeWorkspace
-	cfg.Agent.Engine = "mock"
-	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	require.NoError(t, configRepo.Update(cfg))
-
-	cont := &container.Container{
-		ConfigRepo: configRepo,
-		Agent:      &mocks.MockAgent{NameVal: "mock", AvailableVal: false},
-	}
-
-	err = commandutil.RequireAgentAvailable(cont)
-	require.Error(t, err)
 }
 
 func TestOutputPathForCurrentTargetUsesConfiguredSkillsTarget(t *testing.T) {

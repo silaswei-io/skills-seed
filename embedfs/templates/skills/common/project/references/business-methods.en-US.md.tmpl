@@ -1,32 +1,26 @@
 # {{.ProjectName}} Entry Method Index
 
-This file indexes project-level business entry points, cross-module orchestration entry points, or high-value utility entry points. It does not replace business rules; read business patterns first when changing a business flow, then use this file to locate reusable behavior
+This file indexes project-level business entry points, cross-module orchestration entry points, or high-value utility entry points. Locations and signatures are source-verified; function, prerequisite, return, and usage descriptions come from the project profile and must be checked against the method body before use.
 
 {{if .HasBusinessPatterns}}Related business rules: [Business Patterns](./patterns/business.md)
 {{end}}
 
-{{if .BusinessMethodIndex.Sections}}
+{{if .BusinessMethodIndex.Groups}}
 ## Table Of Contents
 
-{{range .BusinessMethodIndex.Sections}}- {{.Title}}
-{{range .Groups}}  - {{.Title}}
-{{range .Methods}}    - [{{.DisplayName}}](#{{.Anchor}})
-{{end}}{{end}}{{end}}
+{{range .BusinessMethodIndex.Groups}}- {{.Title}}
+{{range .Methods}}  - {{.DisplayName}} (`{{.DisplayLocation}}`)
+{{end}}{{end}}
 {{end}}
 
-{{if .BusinessMethodIndex.Sections}}
-{{range .BusinessMethodIndex.Sections}}
+{{if .BusinessMethodIndex.Groups}}
+{{range .BusinessMethodIndex.Groups}}
 ## {{.Title}}
-
-{{if .Description}}{{.Description}}{{end}}
-
-{{range .Groups}}
-### {{.Title}}
 
 {{if .Summary}}{{.Summary}}{{end}}
 
 {{range .Methods}}
-#### {{.DisplayName}}
+### {{.DisplayName}}
 
 - **Current Location**: `{{.DisplayLocation}}`
 {{if .LocationStatus}}- **Location Status**: `{{.LocationStatus}}`
@@ -35,7 +29,8 @@ This file indexes project-level business entry points, cross-module orchestratio
 {{if .Module}}- **Module**: `{{.Module}}`{{end}}
 {{if ne .DisplayName .Name}}- **Original Method Name**: `{{.Name}}`{{end}}
 {{if .Type}}- **Type**: {{.Type}}{{end}}
-- **Function**: {{.Description}}
+{{if .Description}}- **Function**: {{.Description}}
+{{end}}
 {{if .Function}}
 
 **Method Signature**
@@ -53,7 +48,7 @@ This file indexes project-level business entry points, cross-module orchestratio
 **Usage**: {{.Usage}}
 {{end}}
 
-{{end}}{{end}}{{end}}
+{{end}}{{end}}
 {{else}}
 *Entry method information has not been extracted yet*
 {{end}}

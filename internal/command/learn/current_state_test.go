@@ -45,6 +45,34 @@ func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
 	require.True(t, loaded.ArtifactsCommitted)
 }
 
+func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
+	pattern := domain.NewPattern("checkpoint", "Checkpoint", domain.CategoryBusiness)
+	unit := domain.AnalysisUnit{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}}
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{{Path: "internal/auth.go", Hash: "hash", Status: "present"}}, []domain.AnalysisUnit{unit})
+	state.Analysis = &commandstate.AnalysisCheckpoint{
+		Complete:             true,
+		Patterns:             []domain.Pattern{*pattern},
+		CompletedUnits:       []domain.AnalysisUnit{unit},
+		ProfileRefreshNeeded: true,
+		ProfileRefreshReason: "module boundary changed",
+	}
+	state.ProfileCommitted = true
+	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
+	require.NoError(t, repo.Save(context.Background(), state))
+
+	loaded, err := repo.Load(context.Background())
+
+	require.NoError(t, err)
+	require.NotNil(t, loaded.Analysis)
+	require.True(t, loaded.Analysis.Complete)
+	require.Len(t, loaded.Analysis.Patterns, 1)
+	require.Equal(t, "checkpoint", loaded.Analysis.Patterns[0].ID)
+	require.Equal(t, []domain.AnalysisUnit{unit}, loaded.Analysis.CompletedUnits)
+	require.True(t, loaded.Analysis.ProfileRefreshNeeded)
+	require.Equal(t, "module boundary changed", loaded.Analysis.ProfileRefreshReason)
+	require.True(t, loaded.ProfileCommitted)
+}
+
 func TestCurrentStateInputsMatchProjectDetectsChangedFiles(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "main.go")

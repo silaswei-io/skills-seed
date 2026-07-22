@@ -16,7 +16,7 @@ func TestJSONSchemaGeneratesDTOContract(t *testing.T) {
 	require.Contains(t, schema, `"current_location"`)
 	require.NotContains(t, schema, `"profile_delta"`)
 	require.NotContains(t, schema, `"validation_commands"`)
-	require.Contains(t, schema, `packages/modules/event-bus-local/src/services/event-bus-local.ts:140`)
+	require.Contains(t, schema, `src/component/file.ext:140`)
 	require.Contains(t, schema, `never output code_location as a single string`)
 	require.Contains(t, schema, `"additionalProperties": false`)
 
@@ -26,7 +26,7 @@ func TestJSONSchemaGeneratesDTOContract(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "string", currentLocation["type"])
 	require.Contains(t, currentLocation["description"], "repository-relative source file and 1-based line")
-	require.Contains(t, currentLocation["examples"], "packages/modules/event-bus-local/src/services/event-bus-local.ts:140")
+	require.Contains(t, currentLocation["examples"], "src/component/file.ext:140")
 }
 
 func TestStructuredOutputSchemaOmitsUnsupportedMetaSchema(t *testing.T) {
@@ -67,6 +67,18 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	line, _, ok := findSchemaPropertyWithContainer(analyze, "line")
 	require.True(t, ok)
 	require.Equal(t, float64(1), line["minimum"])
+}
+
+func TestCurateSchemaContainsOnlyDecisionFields(t *testing.T) {
+	schema, err := StructuredOutputSchema(ContractCuratePatterns)
+
+	require.NoError(t, err)
+	require.Contains(t, schema, `"source_ids"`)
+	require.NotContains(t, schema, `"merged_from"`)
+	require.NotContains(t, schema, `"good_example"`)
+	require.NotContains(t, schema, `"evidence_locations"`)
+	require.NotContains(t, schema, `"business_method"`)
+	require.NotContains(t, schema, `"summary"`)
 }
 
 func TestJSONSchemaRejectsUnknownContract(t *testing.T) {

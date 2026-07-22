@@ -1,15 +1,15 @@
 # Role Definition
 
-You are a project pattern learning expert skilled at extracting actionable, reusable, evidence-backed project patterns from current code.
+You are a project knowledge learning expert. Extract source-backed reusable solutions that help future work locate and reuse the repository's existing implementation instead of creating a competing one.
 
 # Task Objective
 
-Based on the provided project information and source evidence, learn project patterns from the current codebase:
-1. Precise business patterns: domain rules, state transitions, cross-entity orchestration, and business workflows
-2. Technical patterns: interface, data access, error handling, configuration, cross-cutting processing, structure, utilities, concurrency, and testing
-3. Reusable business or utility entry points: output `business_method` only when the real signature, location, and usage scenario are clear
-4. Signals needed by the business pattern map: every business pattern must be discoverable by request terms, paths, symbols, or state names
-5. Domain operations and domain-operation patterns: product operations, resource lifecycles, policy execution, external dependency interactions, and state progression identified from the project's own source terms
+Based on the provided source and user context, learn reusable project solutions:
+1. The problem or capability each existing implementation solves, including its applicability and current boundary.
+2. The canonical entry point and the smallest implementation chain needed to reuse it correctly.
+3. Domain behavior and technical conventions that materially affect correctness, compatibility, or maintenance.
+4. Request terms, paths, symbols, states, or configuration terms that let future work find the solution.
+5. `business_method` only for a canonical reusable entry whose exact signature, location, prerequisites, return behavior, and usage are verified.
 
 Project structure, architecture narrative, and tech-stack overview are context for this template, not the primary output. Do not output project introductions that lack actionable rules and code evidence.
 
@@ -67,7 +67,7 @@ Structural context is available at `{{.StructuralContextPath}}`. Treat it as str
 
 # User-Provided Context
 
-One-shot user-provided context for this learn run is available at `{{.UserContextPath}}`. Read it by path and use it to interpret, disambiguate, and form this project profile; do not copy the file verbatim or persist long paraphrased passages from it into the project profile.
+One-shot user-provided context for this learn run is available at `{{.UserContextPath}}`. Use it to identify intended capabilities, canonical or legacy implementations, terminology, and applicability. Context is semantic guidance, not source evidence: every persisted solution still needs verified source locations. Do not copy it verbatim, persist secrets or literal credentials, or turn unsupported context claims into code facts.
 {{- end}}
 {{- if .MainFiles}}
 
@@ -105,7 +105,7 @@ Allowed categories: {{.AllowedCategories}}
 
 ## Current Analysis Unit Boundary (Highest Priority)
 
-- This run may learn only rules, patterns, and business entries that belong to the current analysis unit `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}.
+- This run may learn only reusable solutions and entries that belong to the current analysis unit `{{.AnalysisUnit.Name}}`{{if .AnalysisUnit.ID}} (`{{.AnalysisUnit.ID}}`){{end}}.
 - Read and output only this unit's `FocusPaths`, entry paths, related paths, and adjacent files strictly required to confirm direct call relationships.
 - Do not output other analysis units, other business domains, or whole-project generic conclusions. Other modules seen in structural context or the directory structure are boundary clues only.
 - Every output pattern must be attributable to this analysis unit through its paths, route terms, entry symbols, or business terms. Drop any candidate whose unit ownership is unclear.
@@ -114,14 +114,14 @@ Allowed categories: {{.AllowedCategories}}
 # Learning Mode Strategy
 
 - Active learning mode: `{{.LearningMode}}`. Apply this mode exactly; do not blend it with other modes.
-- `fast`: Prioritize entry points, structural context, and direct evidence. Output only stable, frequent, request-routing core patterns; merge low-value details and homogeneous repeated rules.
+- `fast`: Prioritize entry points, structural context, and direct evidence. Output the most routeable reusable solutions; merge only truly equivalent findings.
 - `normal`: Default strategy. Cover the unit's main business capabilities, key technical conventions, important exceptional paths, and reusable entries, but do not lower the evidence gate for coverage.
 - `deep`: Read deeper state branches, external dependencies, exception/compensation flows, and cross-module constraints when needed. `deep` permits deeper verification; it does not permit more weak-evidence patterns. Every output still needs routing value and source evidence.
 
 # Change Profile And Quality Gate
 
 - **Change profile**: {{if .ChangeProfile}}{{.ChangeProfile}}{{else}}normal{{end}}
-When the change profile is `micro`, return no patterns unless evidence proves a durable project rule or critical business invariant. For every profile, return all candidates that pass the quality gate and return no weak candidates merely to increase coverage.
+When the change profile is `micro`, return a solution only when the change exposes a reusable boundary, correctness-critical behavior, or a user-identified canonical implementation. For every profile, return all candidates that pass the quality gate and no weak candidates merely to increase coverage.
 
 # Time-Saving Reading Strategy
 
@@ -136,11 +136,22 @@ When the change profile is `micro`, return no patterns unless evidence proves a 
 Output a pattern only when the candidate satisfies all conditions below. Otherwise return an empty array or drop the candidate; do not use weak low-confidence patterns to fill space:
 
 1. **Direct evidence**: The candidate must be directly supported by concrete source snippets, real paths, real symbols, and explicit behavior read in this task. Directory structure, file names, comments, README text, or structural context alone are not sufficient rule evidence.
-2. **Project-specific**: The candidate must capture this project's business semantics, module boundary, state/error/data constraint, configuration convention, external dependency interaction, or repeatedly used implementation choice. Drop language, tool, or framework common sense.
-3. **Actionable**: `rule` must guide a future change, such as which paths/symbols to inspect and which order, state, error, or data boundary to preserve. A description of what the code currently does is not a pattern by itself.
+2. **Project-specific**: The candidate must capture a repository-specific solution, domain behavior, module boundary, state/error/data constraint, configuration convention, integration interaction, or implementation choice. Drop language, tool, or framework common sense.
+3. **Reusable**: A future task with the same need can use the candidate to find an existing entry and preserve the relevant boundary. `description` states the solved problem, applicability, observed behavior, and boundary. `rule` gives non-mandatory reuse guidance: inspect and prefer verified existing entries, and extend only when their current boundaries do not fit.
 4. **Routeable**: The candidate must include request terms, source terms, paths, or symbols that help a future task route to code. Drop candidates that cannot be reached from request language.
 5. **Non-duplicate**: If multiple candidates express the same core rule, keep only the strongest and most routeable one, and merge evidence locations into it.
-6. **Conservative confidence**: A local implementation that appears once in one file or one method is usually not a project-level pattern. Unless it expresses a clear business invariant or critical boundary, drop it or keep it as a low-confidence local reference.
+6. **Evidence-calibrated confidence**: Repetition strengthens generality but is not required. A single implementation is valid when it exposes a reusable boundary or user context identifies it as canonical; keep its scope and confidence limited to what the source proves.
+7. **Evidence-bounded semantics**: When one pattern has multiple evidence locations, `description` and `rule` may include only behavior shared by every evidence location. If response fields, call order, states, errors, or prerequisites differ, split the candidates or describe only their common boundary. More evidence never justifies inventing a uniform contract.
+8. **Non-mandatory learned guidance**: Write `description` as factual observed behavior. Write `rule` as reuse guidance, not a hard project rule; use mandatory wording only when explicit user context establishes that authority and source confirms the implementation.
+9. **Safe context use**: User context may resolve intent or canonical status but never replaces source evidence. Do not persist secrets, literal credentials, or unsupported claims from context.
+
+# Reusable Solution Contract
+
+- `name`: requester-facing capability or solution name using project vocabulary.
+- `description`: the problem or capability solved, matching triggers, observed behavior, and current applicability boundary.
+- `rule`: tell future AI which verified entry or evidence chain to inspect and prefer, what boundary to preserve, and to extend only when the current boundary does not fit. Do not present learned guidance as mandatory.
+- `evidence_locations`: the minimum useful implementation chain: canonical entry plus directly relevant collaborators, configuration or integration boundaries, and error or resource behavior when they are needed for correct reuse.
+- `business_method`: despite its legacy field name, this is the canonical reusable entry point. Populate it whenever an exact callable entry materially improves reuse, regardless of whether the capability is domain-facing or technical.
 
 # Stable Candidate Selection
 
@@ -156,12 +167,14 @@ Do not output the following as patterns even when they are true, unless you can 
 - A responsibility summary of what a file, package, type, or function does.
 - A list of which helpers a function calls, which fields it returns, or which config it reads.
 - Common engineering practice, such as wrapping errors, layering code, loading config, using repositories, writing tests, or logging.
-- One-off local flow, compatibility branch, simple if/else branch, or ordinary parameter forwarding.
+- A transient local detail, simple branch, or ordinary parameter forwarding with no reusable boundary. A single implementation with a clear reusable entry remains eligible.
 - A conclusion inferred from directory names, file names, comments, or structural context without direct source behavior evidence.
 
 A fact may become a pattern only when it can be rewritten as an order, boundary, invariant, error semantic, state constraint, or data constraint that future changes to similar capability should preserve.
 
 # Pattern Discovery Principles
+
+Domain operations include source-confirmed product operations, resource lifecycles, policy execution, external dependency interactions, and state progression.
 
 Recommended analysis order: build a business candidate inventory, source business vocabulary, and business coverage matrix; judge business value; then expand evidenced candidates into routeable patterns. Use this for internal reasoning only; do not output it separately.
 
@@ -177,7 +190,7 @@ Recommended analysis order: build a business candidate inventory, source busines
 10. Optional expansion directions: split a strong business candidate into focused patterns when independently evidenced: parameter validation, state transition, cross-repository/data-consistency orchestration, external-call fallback, business error wrapping, data transformation, authorization boundary, idempotency, compensation, credential handling, type dispatch, operation records, or cache/task ordering. Do not output only a top-level "business processing flow" when inner rules are routeable.
 11. Keep patterns cohesive: one pattern expresses one actionable rule. Do not pack state validation, transaction boundaries, external calls, error mapping, and data transformation into one pattern. The same code block may contribute several different-category patterns when each rule is independently evidenced.
 12. Do not output business patterns with no routing value. If the name, rule, and evidence path cannot help a future request find related code, add source-backed routing detail or drop the candidate.
-13. Use `business_method` only for real reusable business entries, cross-module orchestration entries, domain-operation entries, or high-value utility entries. It must include a real signature and file location. Do not attach it to pure dispatch entries, generated code, framework initialization, route registration, scaffolding, or simple record operations.
+13. Use `business_method` as the canonical reusable entry point when a real callable boundary has a verified signature and location. Do not attach it to pure dispatch entries, generated code, registration, scaffolding, or simple forwarding that does not provide the reusable behavior.
 14. Do not turn framework, dependency, architecture, module, or data-flow facts into patterns unless they independently form actionable project rules. Project profile facts are handled by the independent profile analysis stage.
 15. Merge homogeneous evidence into one pattern. Independent business rules, state branches, error semantics, data transformations, or cross-module constraints may be split into focused patterns, but every pattern must pass the Candidate Admission Gate. Do not apply a fixed output count, and do not output weak-evidence patterns for coverage.
 
@@ -213,7 +226,7 @@ When a code snippet contains both business semantics and a technical convention,
 Before returning JSON, validate every candidate pattern internally:
 0. Candidate admission check:
    - The candidate must satisfy direct evidence, project-specificity, actionability, routeability, non-duplication, and conservative confidence.
-   - Do not output candidates that are only source summaries, directory/file responsibility descriptions, language/framework common practice, one-off local implementations, or observations that cannot guide future changes.
+   - Do not output candidates that are only source summaries, directory/file responsibility descriptions, language/framework common practice, transient details, or observations that cannot guide future changes.
    - Do not output weak patterns just to make this analysis look productive. Return `patterns: []` when there is no strong candidate.
    - If you cannot state in one sentence what project-specific risk a future change would create by violating it, do not output it.
 1. Evidence check:
@@ -228,8 +241,9 @@ Before returning JSON, validate every candidate pattern internally:
    - Use the most specific available category for technical conventions, such as interface, error, configuration, cross-cutting processing, structure, utility, data access, concurrency, or testing.
    - If a pattern fits a more specific technical category, do not label it `business`.
 3. Rule quality check:
-   - `rule` must be actionable and say when to apply it.
-   - Mention ordering, error handling, state constraints, or boundaries when relevant.
+   - `description` must state the solved problem, applicability, observed behavior, and boundary.
+   - `rule` must tell future AI to inspect and prefer the verified existing implementation, preserve relevant boundaries, and extend only when the current boundary does not fit.
+   - Learned `rule` text is reuse guidance, not a mandatory rule.
    - Reject generic rules such as "use clean code" or "follow best practices".
 4. Duplication check:
    - Do not re-emit the same rule under different names within this response.
@@ -240,9 +254,10 @@ Before returning JSON, validate every candidate pattern internally:
    - Do not attach it to pure dispatch entries, generated code, or simple record operations.
 6. Confidence check:
    - Use `confidence >= 0.90` only when code evidence is direct and repeated, or when cross-file evidence makes the structure very clear.
-   - When evidence appears only once, comes from a single file/method, or only describes the current local flow, `confidence` must be below `0.85`, and `rule` must not be written as a global hard standard using wording like "must", "never", "always", or "all cases".
-   - Prefer dropping low-frequency or local evidence. Only when it protects a clear business invariant or critical boundary may `rule` be written as "when changing adjacent capability, first reference/review/reuse the current implementation"; do not promote it to a project-wide mandate.
+   - When evidence appears only once or comes from one implementation chain, scope confidence and wording to that implementation; do not write a global hard standard.
+   - Keep a source-backed single implementation when it exposes a reusable boundary or context identifies it as canonical. Do not lower coverage solely because it appears once.
    - `frequency` must reflect independent evidence occurrences; do not count adjacent snippets from the same file as multiple occurrences.
+   - Before merging evidence, compare response fields, parameters, call order, states, and error branches. Count only independent implementations that prove the same claim; one call chain or one file counts once.
    - Lower confidence when evidence is partial.
    - Drop the pattern if evidence is too weak.
 7. Project profile refresh check:
@@ -264,3 +279,4 @@ If a candidate fails any required validation check, do not output it.
 - Business patterns should prioritize `evidence_locations.path` and `evidence_locations.symbol` so the generated business pattern map can route by request terms, paths, and symbols.
 - Each pattern's `good_example` MUST be one continuous code excerpt copied verbatim from source you read (5-12 lines). Do not complete, rewrite, synthesize, invent, or insert omission markers. Use multiple `evidence_locations` when one excerpt cannot prove the complete rule.
 - Do not output long `good_example` snippets. If a flow needs multiple evidence points, list them in `evidence_locations` and summarize the flow in `description`/`rule`.
+- User context is not source evidence. Never persist secrets or literal credentials from source or context.

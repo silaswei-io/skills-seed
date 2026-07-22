@@ -2,7 +2,7 @@ package aicontract
 
 // CodeLocationOutput 是 AI 输出中的最小可维护代码位置契约。
 type CodeLocationOutput struct {
-	CurrentLocation string `json:"current_location" jsonschema:"required,example=packages/modules/event-bus-local/src/services/event-bus-local.ts:140" jsonschema_description:"repository-relative source file and 1-based line in the format packages/modules/event-bus-local/src/services/event-bus-local.ts:140"`
+	CurrentLocation string `json:"current_location" jsonschema:"required,example=src/component/file.ext:140" jsonschema_description:"repository-relative source file and 1-based line in the format src/component/file.ext:140"`
 }
 
 // EvidenceLocationOutput 描述模式对应的源码证据位置。
@@ -17,10 +17,10 @@ type EvidenceLocationOutput struct {
 
 // BusinessMethodOutput 描述可路由、可复用的业务或工具入口。
 type BusinessMethodOutput struct {
-	Name          string             `json:"name" jsonschema_description:"complete method signature or code identifier"`
+	Name          string             `json:"name" jsonschema_description:"qualified code identifier only; do not put a signature in this field"`
 	CodeLocation  CodeLocationOutput `json:"code_location" jsonschema_description:"object containing current_location; never output code_location as a single string"`
-	Description   string             `json:"description" jsonschema_description:"responsibility supported by source evidence"`
-	Usage         string             `json:"usage" jsonschema_description:"when to locate or call this entry point"`
+	Description   string             `json:"description" jsonschema_description:"capability and boundary supported by source evidence"`
+	Usage         string             `json:"usage" jsonschema_description:"applicability and when to locate or call this canonical reusable entry"`
 	Type          string             `json:"type" jsonschema:"enum=domain,enum=common" jsonschema_description:"domain|common"`
 	Function      string             `json:"function" jsonschema_description:"complete signature with parameters and return types"`
 	Prerequisites string             `json:"prerequisites" jsonschema_description:"required setup or dependencies as one string"`
@@ -32,40 +32,27 @@ type PatternOutput struct {
 	ID                string                   `json:"id" jsonschema_description:"kebab-case-id"`
 	Name              string                   `json:"name" jsonschema_description:"pattern name"`
 	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category"`
-	Description       string                   `json:"description" jsonschema_description:"what this pattern does and when to use it"`
+	Description       string                   `json:"description" jsonschema_description:"source-backed problem or capability, matching triggers, observed behavior, and applicability boundary; for multiple evidence locations include only behavior every location proves"`
 	GoodExample       string                   `json:"good_example" jsonschema_description:"source-backed code evidence as an escaped JSON string"`
 	BadExample        string                   `json:"bad_example" jsonschema_description:"common mistake to avoid or empty string"`
-	Rule              string                   `json:"rule" jsonschema_description:"actionable rule saying when to apply the pattern"`
+	Rule              string                   `json:"rule" jsonschema_description:"non-mandatory reuse guidance naming verified existing entries or boundaries to prefer and when extension is appropriate; never generalize beyond source evidence"`
 	Confidence        float64                  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 	Frequency         int                      `json:"frequency" jsonschema:"minimum=1" jsonschema_description:"positive integer occurrence count"`
 	AnalysisUnitID    string                   `json:"analysis_unit_id,omitempty" jsonschema_description:"input analysis unit id"`
 	AnalysisUnitName  string                   `json:"analysis_unit_name,omitempty" jsonschema_description:"input analysis unit name"`
-	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"pattern-level source evidence locations"`
-	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"real callable business or utility method, or null when not applicable"`
+	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"minimum source-backed implementation chain needed for correct reuse"`
+	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"canonical reusable callable entry with verified signature and location, or null"`
 }
 
-// CuratedPatternOutput 是模式策展 prompt 的输出契约。
+// CuratedPatternOutput 只承载 AI 拥有的规范文本和来源决策。
 type CuratedPatternOutput struct {
-	ID                string                   `json:"id" jsonschema_description:"existing or candidate pattern id"`
-	Name              string                   `json:"name" jsonschema_description:"canonical pattern name"`
-	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category"`
-	Description       string                   `json:"description" jsonschema_description:"clear applicability boundary"`
-	GoodExample       string                   `json:"good_example" jsonschema_description:"empty for learn_current; otherwise an exact input example or empty string"`
-	BadExample        string                   `json:"bad_example" jsonschema_description:"empty for learn_current; otherwise an exact input example or empty string"`
-	Rule              string                   `json:"rule" jsonschema_description:"canonical actionable rule"`
-	Confidence        float64                  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
-	Frequency         int                      `json:"frequency" jsonschema:"minimum=1" jsonschema_description:"positive integer occurrence count"`
-	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"evidence locations preserved from input"`
-	MergedFrom        []string                 `json:"merged_from" jsonschema_description:"merged candidate or existing pattern ids"`
-	MergeReason       string                   `json:"merge_reason" jsonschema_description:"why this pattern is added, updated, or merged"`
-	SimilarityScore   float64                  `json:"similarity_score" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
-	Source            string                   `json:"source" jsonschema_description:"empty for learn_current; otherwise learned_current|learned_history|user_defined"`
-	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"null for learn_current; otherwise an exact input business method or null"`
-	ProjectID         string                   `json:"project_id,omitempty" jsonschema_description:"empty for learn_current; otherwise workspace project id"`
-	ScopePath         string                   `json:"scope_path,omitempty" jsonschema_description:"empty for learn_current; otherwise relative workspace scope path"`
-	WorkspaceRole     string                   `json:"workspace_role,omitempty" jsonschema_description:"empty for learn_current; otherwise workspace role"`
-	AnalysisUnitID    string                   `json:"analysis_unit_id,omitempty" jsonschema_description:"empty for learn_current; otherwise input analysis unit id"`
-	AnalysisUnitName  string                   `json:"analysis_unit_name,omitempty" jsonschema_description:"empty for learn_current; otherwise input analysis unit name"`
+	ID          string   `json:"id" jsonschema_description:"canonical id, preferably an input id"`
+	Name        string   `json:"name" jsonschema_description:"canonical pattern name"`
+	Category    string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category"`
+	Description string   `json:"description" jsonschema_description:"factual solved problem, matching triggers, observed behavior, and applicability boundary"`
+	Rule        string   `json:"rule" jsonschema_description:"canonical reuse guidance; normative only for explicit authoritative input"`
+	Confidence  float64  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0 evidence consistency and specificity"`
+	SourceIDs   []string `json:"source_ids" jsonschema_description:"all real candidate or existing pattern ids represented by this canonical pattern"`
 }
 
 type ValidationCommandOutput struct {
@@ -98,8 +85,8 @@ type ModuleOutput struct {
 	Path             string   `json:"path" jsonschema_description:"real repository-relative directory or file path; omit the module if no concrete path is confirmed"`
 	Description      string   `json:"description" jsonschema_description:"module responsibility"`
 	Responsibilities []string `json:"responsibilities" jsonschema_description:"specific responsibilities"`
-	Dependencies     []string `json:"dependencies" jsonschema_description:"dependency modules"`
-	Dependents       []string `json:"dependents" jsonschema_description:"dependent modules"`
+	Dependencies     []string `json:"dependencies" jsonschema_description:"concrete module names or paths directly evidenced by imports, calls, registration, configuration, or an existing still-supported profile"`
+	Dependents       []string `json:"dependents" jsonschema_description:"concrete dependent module names or paths supported by the same direct evidence"`
 	KeyMethods       []string `json:"key_methods" jsonschema_description:"real methods or entries"`
 }
 
@@ -164,20 +151,11 @@ type LearnPatternsOutput struct {
 type CuratePatternsOutput struct {
 	Patterns []CuratedPatternOutput `json:"patterns" jsonschema_description:"final canonical patterns to write"`
 	Dropped  []CuratedDropOutput    `json:"dropped" jsonschema_description:"candidate patterns not written"`
-	Summary  CurateSummaryOutput    `json:"summary" jsonschema_description:"curation statistics"`
 }
 
 type CuratedDropOutput struct {
 	ID     string `json:"id" jsonschema_description:"candidate id"`
 	Reason string `json:"reason" jsonschema_description:"why it should not be written"`
-}
-
-type CurateSummaryOutput struct {
-	TotalCandidates int `json:"total_candidates" jsonschema_description:"candidate count"`
-	TotalExisting   int `json:"total_existing" jsonschema_description:"related existing count"`
-	TotalWritten    int `json:"total_written" jsonschema_description:"len(patterns)"`
-	TotalDropped    int `json:"total_dropped" jsonschema_description:"len(dropped)"`
-	MergeCount      int `json:"merge_count" jsonschema_description:"merge operation count"`
 }
 
 type AnalyzeCurrentCodebaseOutput struct {

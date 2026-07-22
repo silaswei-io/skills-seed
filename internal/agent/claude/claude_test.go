@@ -36,7 +36,7 @@ func TestClaudePrintArgs_ReadOnlyToolsAndUserPluginsDisabledByDefault(t *testing
 	})
 
 	outputSchema := `{"type":"object"}`
-	args := claudePrintArgs(false, outputSchema)
+	args := claudePrintArgs(false, outputSchema, false)
 
 	require.NotContains(t, args, "--setting-sources")
 	settings := requireArgValue(t, args, "--settings")
@@ -64,6 +64,13 @@ func TestClaudePrintArgs_ReadOnlyToolsAndUserPluginsDisabledByDefault(t *testing
 	}, args)
 }
 
+func TestClaudePrintArgsPromptOnlyDisablesRepositoryTools(t *testing.T) {
+	args := claudePrintArgs(false, `{"type":"object"}`, true)
+
+	require.Contains(t, args, "--tools")
+	require.Empty(t, requireArgValue(t, args, "--tools"))
+}
+
 func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 	claudeHome := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", claudeHome)
@@ -73,14 +80,14 @@ func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 		},
 	})
 
-	args := claudePrintArgs(true, `{"type":"object"}`)
+	args := claudePrintArgs(true, `{"type":"object"}`, false)
 
 	require.NotContains(t, args, "--setting-sources")
 	require.NotContains(t, args, "--settings")
 }
 
 func TestClaudeArgsForLogRedactsInlineSchema(t *testing.T) {
-	args := claudePrintArgs(true, `{"type":"object"}`)
+	args := claudePrintArgs(true, `{"type":"object"}`, false)
 
 	logged := claudeArgsForLog(args)
 
@@ -230,7 +237,7 @@ func TestSelectFilesRetryDoesNotPrintFinalFailureWarning(t *testing.T) {
 	})
 
 	require.Equal(t, []string{"internal/auth/login.go"}, result.SelectedPaths)
-	require.Contains(t, output, "claude 触发 API 速率限制")
+	require.Contains(t, output, "claude 遇到可重试错误")
 	require.Contains(t, output, "API Error: 529 overloaded_error")
 	require.NotContains(t, output, "Claude CLI 调用失败")
 }
@@ -278,6 +285,10 @@ func TestParseClaudeOutput_RejectsErrorEnvelope(t *testing.T) {
 	require.Empty(t, output)
 	require.True(t, outputErr.invocation)
 	require.ErrorContains(t, outputErr, "Structured output validation failed")
+}
+
+func TestStructuredOutputRetryExhaustionIsRetryable(t *testing.T) {
+	require.True(t, isRetryableError(`{"type":"result","subtype":"error_max_structured_output_retries","is_error":true}`, ""))
 }
 
 func writeClaudeJSON(t *testing.T, path string, value interface{}) {

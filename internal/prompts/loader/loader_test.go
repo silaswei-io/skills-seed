@@ -66,7 +66,7 @@ func TestLoader_RendersEnglishPromptBodyAndTargetLocaleOutputGuard(t *testing.T)
 
 	skillsPrompt, err := loader.Render("pattern-learn-current", sampleAnalyzeCurrentCodebaseRequest())
 	require.NoError(t, err)
-	require.Contains(t, skillsPrompt, "You are a project pattern learning expert")
+	require.Contains(t, skillsPrompt, "You are a project knowledge learning expert")
 	require.Contains(t, skillsPrompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
 	require.NotContains(t, skillsPrompt, "角色定义")
 
@@ -1039,10 +1039,6 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 					"pattern-level source evidence locations",
 					"Do not invent evidence paths or line numbers",
 				},
-				"pattern-curate": {
-					"`evidence_locations`",
-					"evidence_locations` may preserve only evidence locations present in the input",
-				},
 				"user-define-pattern": {
 					"`evidence_locations`",
 					"pattern-level source evidence locations",
@@ -1067,10 +1063,6 @@ func TestLoader_RenderPatternPromptsRequireEvidenceLocations(t *testing.T) {
 					"`evidence_locations`",
 					"pattern-level source evidence locations",
 					"Do not invent evidence paths or line numbers",
-				},
-				"pattern-curate": {
-					"`evidence_locations`",
-					"evidence_locations` may preserve only evidence locations present in the input",
 				},
 				"user-define-pattern": {
 					"`evidence_locations`",
@@ -1122,6 +1114,24 @@ func TestLoader_RenderCurrentBatchPromptExcludesProjectProfileContract(t *testin
 	require.Contains(t, prompt, "Project profile facts are handled by the independent profile analysis stage")
 }
 
+func TestLoader_RenderCuratePromptExcludesSourceOwnedPayloads(t *testing.T) {
+	data := sampleCuratePatternsData()
+	candidates := data["CandidatePatterns"].([]domain.Pattern)
+	candidates[0].GoodExample = "CURATION_SOURCE_CODE_MARKER"
+	existing := data["ExistingPatterns"].([]domain.Pattern)
+	existing[0].BadExample = "CURATION_BAD_EXAMPLE_MARKER"
+	loader := New("loader", "en-US", "")
+
+	prompt, err := loader.Render("pattern-curate", data)
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, `"source_ids"`)
+	require.NotContains(t, prompt, "CURATION_SOURCE_CODE_MARKER")
+	require.NotContains(t, prompt, "CURATION_BAD_EXAMPLE_MARKER")
+	require.NotContains(t, prompt, `"good_example"`)
+	require.NotContains(t, prompt, `"summary"`)
+}
+
 func TestLoader_RenderCurrentBatchPromptPreservesDTOContractDetails(t *testing.T) {
 	loader := New("loader", "en-US", "")
 
@@ -1166,6 +1176,71 @@ func TestLoader_RenderCurrentBatchPromptAppendsPatternEvidenceRules(t *testing.T
 	require.True(t, found)
 }
 
+func TestLoader_RenderCurrentLearningPromptsBoundClaimsToSharedEvidence(t *testing.T) {
+	loader := New("loader", "en-US", "")
+	tests := []struct {
+		name string
+		data any
+	}{
+		{name: "pattern-learn-current", data: sampleAnalyzeCurrentCodebaseRequest()},
+		{name: "pattern-learn-current-batch", data: sampleAnalyzeCurrentCodebaseBatchRequest()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt, err := loader.Render(tt.name, tt.data)
+			require.NoError(t, err)
+			require.Contains(t, prompt, "only behavior shared by every evidence location")
+			require.Contains(t, prompt, "single implementation")
+			require.Contains(t, prompt, "one call chain or one file counts once")
+			require.Contains(t, prompt, "Non-mandatory learned guidance")
+			require.Contains(t, prompt, "factual observed behavior")
+		})
+	}
+}
+
+func TestLoader_RenderCurrentLearningPromptsDefineReusableSolutionMemory(t *testing.T) {
+	loader := New("loader", "en-US", "")
+	for _, tt := range []struct {
+		name string
+		data any
+	}{
+		{name: "pattern-learn-current", data: sampleAnalyzeCurrentCodebaseRequest()},
+		{name: "pattern-learn-current-batch", data: sampleAnalyzeCurrentCodebaseBatchRequest()},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			prompt, err := loader.Render(tt.name, tt.data)
+			require.NoError(t, err)
+			for _, text := range []string{
+				"Reusable Solution Contract",
+				"problem or capability solved",
+				"canonical reusable entry",
+				"extend only when the current boundary does not fit",
+				"User context",
+				"not source evidence",
+				"persist secrets",
+			} {
+				require.Contains(t, prompt, text)
+			}
+		})
+	}
+}
+
+func TestLoader_RenderCuratePromptPreservesRouteableProjectKnowledge(t *testing.T) {
+	loader := New("loader", "en-US", "")
+	prompt, err := loader.Render("pattern-curate", sampleCuratePatternsData())
+	require.NoError(t, err)
+
+	require.Contains(t, prompt, "This is a project knowledge store")
+	require.Contains(t, prompt, "Never drop a candidate merely because it is domain-specific")
+	require.Contains(t, prompt, "Keep a single-file or local candidate as a scoped observation")
+	require.Contains(t, prompt, "a desire to reduce the output count are not sufficient reasons to merge")
+	require.Contains(t, prompt, "same solution with compatible applicability, behavior, and boundaries")
+	require.Contains(t, prompt, "extend only when the current boundary does not fit")
+	require.Contains(t, prompt, "not source evidence")
+	require.Contains(t, prompt, "`frequency` is recomputed locally")
+	require.NotContains(t, prompt, "`confidence` and `frequency` are recomputed locally")
+}
+
 func TestLoader_RenderPatternPromptsAppendAbstractionRules(t *testing.T) {
 	tests := []string{
 		"learn-batch",
@@ -1186,8 +1261,10 @@ func TestLoader_RenderPatternPromptsAppendAbstractionRules(t *testing.T) {
 			prompt, err := loader.Render(name, dataByPrompt[name])
 			require.NoError(t, err)
 			require.Contains(t, prompt, "# Pattern Abstraction And Stability Rules")
-			require.Contains(t, prompt, "**Project pattern**")
+			require.Contains(t, prompt, "**Scoped solution**")
+			require.Contains(t, prompt, "**Authoritative rule**")
 			require.Contains(t, prompt, "stable identities")
+			require.Contains(t, prompt, "Encoding, serialization, compression, checksums, and hashing do not provide confidentiality")
 		})
 	}
 }
@@ -1217,8 +1294,8 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 				},
 				"pattern-curate": {
 					"Pre-Output Validation Checklist",
-					"Every candidate pattern must be covered by `patterns[].merged_from`",
-					"`summary.total_candidates",
+					"Every candidate pattern must be covered by `patterns[].source_ids`",
+					"source-owned fields restored locally from `source_ids`",
 				},
 			},
 		},
@@ -1232,8 +1309,8 @@ func TestLoader_RenderUserPatternAndMergePromptsIncludePreOutputValidation(t *te
 				},
 				"pattern-curate": {
 					"Pre-Output Validation Checklist",
-					"Every candidate pattern must be covered by `patterns[].merged_from`",
-					"`summary.total_candidates",
+					"Every candidate pattern must be covered by `patterns[].source_ids`",
+					"source-owned fields restored locally from `source_ids`",
 				},
 			},
 		},
@@ -1318,7 +1395,7 @@ func TestLoader_RenderPatternPromptsUseSharedAllowedCategories(t *testing.T) {
 					prompt, err := loader.Render(name, data)
 					require.NoError(t, err)
 					require.Contains(t, prompt, requiredText)
-					require.NotContains(t, prompt, "security")
+					require.NotContains(t, requiredText, "security")
 				})
 			}
 		})
@@ -1694,7 +1771,8 @@ func TestLoader_PromptResponsibilityContracts(t *testing.T) {
 			data: sampleBatchLearnData(),
 			required: []string{
 				`"patterns"`,
-				"Only output executable, reusable, verifiable patterns",
+				"reusable solution learning from commit history",
+				"Help future work locate and prefer existing implementations",
 			},
 			forbid: []string{
 				`"profile_delta"`,

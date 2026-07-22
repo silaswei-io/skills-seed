@@ -28,12 +28,13 @@ func TestTokenUsageConsoleMessageUsesCompactUnits(t *testing.T) {
 	)
 
 	require.Contains(t, message, "codex/AnalyzeProject")
-	require.Contains(t, message, "本次 14.8k")
+	require.Contains(t, message, "本次非缓存 12.8k")
+	require.Contains(t, message, "上下文处理 14.8k")
 	require.Contains(t, message, "输入 12k")
 	require.Contains(t, message, "输出 345")
 	require.Contains(t, message, "缓存读 2k")
 	require.Contains(t, message, "缓存写 500")
-	require.Contains(t, message, "累计 1.2m")
+	require.Contains(t, message, "累计非缓存 1.2m")
 }
 
 func TestTokenUsageSummaryConsoleMessageUsesCompactUnits(t *testing.T) {
@@ -47,7 +48,7 @@ func TestTokenUsageSummaryConsoleMessageUsesCompactUnits(t *testing.T) {
 	})
 
 	require.Contains(t, message, "Token 消耗汇总")
-	require.Contains(t, message, "累计 1.2m")
+	require.Contains(t, message, "累计非缓存 1.2m")
 	require.Contains(t, message, "输入 1.2m")
 	require.Contains(t, message, "输出 34.5k")
 	require.Contains(t, message, "费用 $1.23")
@@ -76,7 +77,7 @@ func TestScopedTokenUsageDefersConsoleOutputUntilFlush(t *testing.T) {
 	})
 
 	require.Contains(t, output, "Token 消耗: 子项目 front claude/AnalyzeCurrentCodebase")
-	require.Contains(t, output, "本次 1.2k")
+	require.Contains(t, output, "本次非缓存 1.2k")
 	require.Equal(t, 1, strings.Count(output, "Token 消耗:"))
 }
 

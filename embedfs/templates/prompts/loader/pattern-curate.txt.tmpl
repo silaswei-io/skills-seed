@@ -1,14 +1,14 @@
 # Role Definition
 
-You are a code pattern curator. Your task is not to append patterns blindly; it is to integrate candidate patterns with related historical patterns into a maintainable canonical pattern-store update.
+You are a project solution curator. Integrate source-backed candidate solutions with related historical knowledge into a maintainable canonical pattern-store update.
 
 # Task Objective
 
-Given candidate patterns and related existing patterns, output the final canonical patterns that should be written to the pattern store:
-1. **Add**: keep a candidate when it is a new valid rule.
+Given candidate patterns and related existing patterns, output the final canonical patterns that should be written to this project's pattern store:
+1. **Add**: keep a candidate when it is useful, evidence-backed knowledge for future work in this repository.
 2. **Update**: output an updated existing pattern when a candidate describes the same rule.
-3. **Merge**: output one canonical pattern when multiple candidates or existing patterns express the same rule.
-4. **Drop**: put a candidate in `dropped` when it lacks evidence, is too generic, duplicates an existing pattern without improving it, or is not an actionable rule.
+3. **Merge**: output one canonical pattern only when multiple candidates or existing patterns describe the same solution with compatible applicability, behavior, and boundaries.
+4. **Drop**: put a candidate in `dropped` only when it lacks routeable evidence, contradicts its evidence, exactly duplicates an existing pattern without adding information, or records a transient detail with no likely reuse value.
 
 # Input
 
@@ -33,10 +33,6 @@ Given candidate patterns and related existing patterns, output the final canonic
 - **ProjectID**: {{$p.ProjectID}}
 - **ScopePath**: {{$p.ScopePath}}
 - **WorkspaceRole**: {{$p.WorkspaceRole}}
-- **Good Example**:
-{{$p.GoodExample}}
-- **Bad Example**:
-{{$p.BadExample}}
 {{if $p.EvidenceLocations}}
 - **Evidence Locations**:
 {{range $loc := $p.EvidenceLocations}}
@@ -47,12 +43,6 @@ Given candidate patterns and related existing patterns, output the final canonic
 - **Business Method**:
   - name: {{$p.BusinessMethod.Name}}
   - location: {{$p.BusinessMethod.DisplayLocation}}
-  - description: {{$p.BusinessMethod.Description}}
-  - usage: {{$p.BusinessMethod.Usage}}
-  - type: {{$p.BusinessMethod.Type}}
-  - function: {{$p.BusinessMethod.Function}}
-  - prerequisites: {{$p.BusinessMethod.Prerequisites}}
-  - returns: {{$p.BusinessMethod.Returns}}
 {{end}}
 
 {{end}}
@@ -72,10 +62,6 @@ Given candidate patterns and related existing patterns, output the final canonic
 - **ProjectID**: {{$p.ProjectID}}
 - **ScopePath**: {{$p.ScopePath}}
 - **WorkspaceRole**: {{$p.WorkspaceRole}}
-- **Good Example**:
-{{$p.GoodExample}}
-- **Bad Example**:
-{{$p.BadExample}}
 {{if $p.EvidenceLocations}}
 - **Evidence Locations**:
 {{range $loc := $p.EvidenceLocations}}
@@ -86,12 +72,6 @@ Given candidate patterns and related existing patterns, output the final canonic
 - **Business Method**:
   - name: {{$p.BusinessMethod.Name}}
   - location: {{$p.BusinessMethod.DisplayLocation}}
-  - description: {{$p.BusinessMethod.Description}}
-  - usage: {{$p.BusinessMethod.Usage}}
-  - type: {{$p.BusinessMethod.Type}}
-  - function: {{$p.BusinessMethod.Function}}
-  - prerequisites: {{$p.BusinessMethod.Prerequisites}}
-  - returns: {{$p.BusinessMethod.Returns}}
 {{end}}
 
 {{end}}
@@ -105,32 +85,30 @@ Given candidate patterns and related existing patterns, output the final canonic
 # Curation Rules
 
 - Output only final canonical patterns that should be written to the pattern store; do not output unchanged existing patterns.
-- If updating an existing pattern, keep the existing pattern `id` and include that existing ID plus related candidate IDs in `merged_from`.
+- If updating an existing pattern, keep the existing pattern `id` and include that existing ID plus related candidate IDs in `source_ids`.
 - If adding a new pattern, prefer the candidate `id`.
-- If merging multiple patterns, `merged_from` must list every merged candidate or existing pattern ID.
-{{if eq .Operation "learn_current"}}
-- `good_example`, `bad_example`, `business_method`, `source`, `project_id`, `scope_path`, `workspace_role`, `analysis_unit_id`, and `analysis_unit_name` are source-owned fields restored locally from `merged_from`. Return empty strings for these string fields and `null` for `business_method`; do not summarize, rewrite, or copy them.
-{{else}}
-- `good_example` must be selected from existing input examples only. Do not create, complete, rewrite, or synthesize code examples.
-- `bad_example` should also come from input; leave it empty only when input has none.
-- `business_method` may preserve only real information present in the input. Do not invent signatures, locations, prerequisites, or returns.
-{{end}}
-- `evidence_locations` may preserve only evidence locations present in the input. Do not invent evidence paths, line numbers, symbols, or descriptions.
+- `source_ids` is the ownership boundary between the AI decision and local source hydration. It must list every candidate or existing pattern represented by the canonical pattern and may contain only IDs shown in this prompt.
+- This is a project knowledge store, not a catalogue of language-agnostic best practices. Project-specific domain workflows, state transitions, access policies, framework integration, configuration behavior, and operational conventions are valuable when they are routeable to evidence. Never drop a candidate merely because it is domain-specific, technology-specific, or appears in only one file.
+- Keep a single-file or local candidate as a scoped observation when it can help a future task find or safely modify that behavior. Calibrate its confidence and wording to the evidence instead of promoting it to a repository-wide mandate.
+- Merge candidates only when they express the same behavior with compatible applicability and semantics. Shared vocabulary, adjacent layers, sibling lifecycle actions, or a desire to reduce the output count are not sufficient reasons to merge. Preserve distinct workflows as distinct patterns.
+- Preserve source-backed reusable solutions even when they are domain-specific, technology-specific, or represented by one implementation. Repetition is evidence of breadth, not a prerequisite for reuse.
+- Code examples, evidence locations, business methods, frequency, provenance, workspace scope, analysis-unit ownership, and statistics are source-owned fields restored locally from `source_ids`. They are intentionally absent from the output contract; do not reproduce them in other fields.
 - Categories must come from input patterns and must be one of the allowed categories: {{.AllowedCategories}}. Do not create new categories.
-- `confidence` and `frequency` are recomputed locally from verified evidence. Return schema-valid values, but do not use them to justify keeping a weak pattern.
-- Compare each rule with its examples, business method returns, and evidence descriptions. Drop or narrow a candidate when those inputs contradict one another.
+- `frequency` is recomputed locally from verified evidence. Set `confidence` from the consistency and specificity of the input evidence; do not inflate it because several locations belong to one file or call chain.
+- For learned sources, `description` states the solved problem, matching triggers, observed behavior, and applicability boundary. `rule` is non-mandatory reuse guidance: inspect and prefer the verified existing entry, preserve its relevant boundary, and extend only when the current boundary does not fit. Preserve explicit user-maintained rules without weakening them.
+- Compare each rule with its evidence descriptions and business entry location. Drop or narrow a candidate when those inputs contradict one another.
 - Absolute wording such as always, must, never, all, or every requires independent evidence or a clearly scoped invariant. Otherwise narrow the rule or drop it.
 - Do not generalize behavior from one lifecycle action to sibling actions unless their evidence proves the same invariant.
+- User context can establish intent or canonical status but is not source evidence. Do not persist secrets, literal credentials, or unsupported context claims.
 
 # Pre-Output Validation Checklist
 
 Before returning JSON, validate internally:
-1. Every candidate pattern must be covered by `patterns[].merged_from` or appear in `dropped[].id`.
-2. `merged_from` and `dropped.id` may reference only real input IDs.
+1. Every candidate pattern must be covered by `patterns[].source_ids` or appear in `dropped[].id`.
+2. `source_ids` and `dropped.id` may reference only real input IDs. Re-read the literal ID values in the Candidate Patterns and Related Existing Patterns sections; never create aliases, sequence IDs, symbol names, or grouping IDs.
 3. No two output patterns express the same core rule; duplicate rules must be merged.
-4. Do not keep low-quality, generic, or non-actionable candidates merely to cover them; place them in `dropped`.
-5. All source-owned fields follow the operation-specific rules above. Never invent source material.
-6. `summary.total_candidates = {{len .CandidatePatterns}}`, `summary.total_existing = {{len .ExistingPatterns}}`, `summary.total_written = len(patterns)`, and `summary.total_dropped = len(dropped)`.
+4. Keep routeable project-specific knowledge even when local; drop only unsupported, contradictory, exactly duplicated, or non-reusable candidates.
+5. The output contains only semantic canonical fields and source ownership decisions. Never invent source material or statistics.
 
 # Output Format
 

@@ -2,6 +2,9 @@ package generator
 
 import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/claim"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/routing"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -18,12 +21,72 @@ type GenerateOptions struct {
 	SkipReferences bool
 }
 
+type generationSummary struct {
+	CategorySummaries map[string]categorySummary
+	KeyInsights       []string
+}
+
+type categorySummary struct {
+	Category string
+	Summary  string
+	Patterns []string
+}
+
+type skillTemplateData struct {
+	ProgramVersion      string
+	SkillsTemplatesHash string
+	ProjectName         string
+	SkillName           string
+	SkillDescription    string
+	Language            string
+	PatternCount        int
+	Categories          int
+	LastUpdated         string
+	KeyInsights         []string
+	References          ReferenceAvailability
+	OverviewReferences  []skills.ReferenceItem
+	ReferenceGroups     []skills.ReferenceGroup
+	WorkflowReferences  []WorkflowReference
+	StateSummaries      []string
+}
+
+type categoryPatternTemplateData struct {
+	Category          string
+	Summary           string
+	PatternObjects    []patternRenderModel
+	ClaimGroups       []claim.Group
+	PatternCount      int
+	LastUpdated       string
+	CodeFenceLanguage string
+	RelatedReferences []PatternReferenceLink
+}
+
+type businessIndexTemplateData struct {
+	Category          string
+	Summary           string
+	PatternCount      int
+	LastUpdated       string
+	Groups            []patternGroup
+	RelatedReferences []PatternReferenceLink
+	CoverageWarnings  []CoverageWarning
+}
+
+type businessDetailTemplateData struct {
+	Category          string
+	GroupTitle        string
+	GroupSummary      routing.BusinessGroupSummary
+	PatternObjects    []patternRenderModel
+	PatternCount      int
+	LastUpdated       string
+	CodeFenceLanguage string
+	RelatedReferences []PatternReferenceLink
+}
+
 type projectOverviewTemplateData struct {
 	domain.ProjectProfile
 	OverviewReferences  []skills.ReferenceItem
 	OverviewSummary     string
 	ArchitectureSummary string
-	ValidationMatrix    []ValidationMatrixItem
 }
 
 type profileReferenceTemplateData struct {
@@ -41,9 +104,18 @@ type moduleReferenceTemplateData struct {
 
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
-	References       ReferenceAvailability
-	SourceOfTruth    []SourceOfTruthItem
-	ValidationMatrix []ValidationMatrixItem
+	References    ReferenceAvailability
+	SourceOfTruth []SourceOfTruthItem
+}
+
+type validationReferenceTemplateData struct {
+	Commands []validationCommand
+	Matrix   []ValidationMatrixItem
+	Gaps     []string
+}
+
+type testingReferenceTemplateData struct {
+	Inventory sourcecode.GoTestInventory
 }
 
 type SourceOfTruthItem struct {
@@ -70,17 +142,26 @@ type CoverageWarning struct {
 	Message string
 }
 
+type patternRenderModel struct {
+	domain.Pattern
+	HardConstraint bool
+}
+
+func (p patternRenderModel) AllowsHardConstraint() bool {
+	return p.HardConstraint
+}
+
+type patternGroup struct {
+	routing.BusinessGroup
+	Patterns []patternRenderModel
+}
+
 type ValidationMatrixItem struct {
-	Area        string
-	Command     string
-	When        string
-	Source      string
-	Evidence    []string
-	Confidence  float64
-	Coverage    float64
-	MatchKind   string
-	Recommended bool
-	Warning     string
+	Area     string
+	Command  string
+	When     string
+	Source   string
+	Evidence []string
 }
 
 type ReferenceAvailability struct {
@@ -91,6 +172,8 @@ type ReferenceAvailability struct {
 	KeyModules       bool
 	CommonUtils      bool
 	BusinessPatterns bool
+	Validation       bool
+	Testing          bool
 }
 
 type WorkflowReference struct {
@@ -98,13 +181,4 @@ type WorkflowReference struct {
 	Name        string
 	Path        string
 	Description string
-}
-
-// Stats 统计信息
-type Stats struct {
-	Total          int
-	AvgConfidence  float64
-	HighConfidence []domain.Pattern
-	Frequent       []domain.Pattern
-	ByCategory     map[string][]domain.Pattern
 }

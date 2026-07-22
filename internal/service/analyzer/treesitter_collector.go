@@ -14,6 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
 // structuralContextRequest 定义结构化分析所需的输入参数。
@@ -71,7 +72,7 @@ type treesitterCollector struct {
 type fileResult struct {
 	relPath  string
 	langName string
-	symbols  []symbolInfo
+	symbols  []sourcecode.Symbol
 	imports  []importInfo
 }
 
@@ -197,7 +198,7 @@ func (c *treesitterCollector) collectFile(projectRoot, path string) (fileResult,
 	return fileResult{
 		relPath:  relPath,
 		langName: langName,
-		symbols:  extractSymbols(root, lang, src, langName),
+		symbols:  sourcecode.ExtractSymbols(root, lang, path, src),
 		imports:  extractImports(root, lang, src, langName),
 	}, true
 }
@@ -223,7 +224,7 @@ func (c *treesitterCollector) collectFromRoot(ctx context.Context, projectRoot, 
 		src := pf.Source
 		root := pf.Tree.RootNode()
 
-		syms := extractSymbols(root, lang, src, langName)
+		syms := sourcecode.ExtractSymbols(root, lang, pf.Path, src)
 		imps := extractImports(root, lang, src, langName)
 
 		langCounts[langName]++

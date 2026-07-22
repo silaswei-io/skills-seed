@@ -1,6 +1,6 @@
 ---
 name: skills-seed-cli
-description: Use when operating, explaining, debugging, or automating the skills-seed CLI.
+description: Use only when the user explicitly asks to run, inspect, or troubleshoot a concrete skills-seed CLI command. Do not use for skills-seed source development, code review, architecture discussion, or general questions.
 ---
 
 <!-- generated-by: skills-seed -->
@@ -10,9 +10,11 @@ description: Use when operating, explaining, debugging, or automating the skills
 
 # skills-seed CLI Skill
 
-Use this Skill when the user asks you to operate, explain, debug, or automate `skills-seed`.
+Use this Skill only when the request requires operating the `skills-seed` CLI: running a command, inspecting command output or local CLI state, or diagnosing a concrete command failure.
 
-This is a CLI operation Skill, not a project coding Skill. It teaches how to use `skills-seed` to build and maintain project/workspace Skills for other repositories.
+Do not load it merely because a task mentions `skills-seed`. Source development, code review, architecture design, generated Skill quality review, and general discussion belong to the repository's normal development workflow unless the task also requires a concrete CLI operation.
+
+This is a CLI operation Skill, not a project coding Skill. It teaches how to operate `skills-seed` to build and maintain project/workspace Skills for other repositories.
 
 ## Operating Principles
 

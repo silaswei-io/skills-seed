@@ -2,7 +2,6 @@
 
 **分类**: {{.Category}}
 **模式数量**: {{.PatternCount}}
-**置信度**: {{printf "%.2f" .Confidence}}%
 **最后更新**: {{.LastUpdated}}
 
 {{.GroupSummary.Description}}
@@ -21,40 +20,35 @@
 {{end}}
 {{end}}
 
-{{if .GroupLocations}}
-## 代码证据入口
-
-{{range .GroupLocations}}
-- `{{.Path}}`{{if .Symbol}} - {{.Symbol}}{{end}}{{if .Description}}：{{.Description}}{{end}}{{if .Confidence}}（置信度 {{printf "%.2f" (mul .Confidence 100)}}%）{{end}}
-{{end}}
-{{end}}
-
-{{if .GroupSignals}}
-## 相关信号
-
-{{range .GroupSignals}}
-- {{.}}
-{{end}}
-{{end}}
-
 {{if .PatternObjects}}
-## 详细模式
+{{if gt (len .PatternObjects) 5}}
+## 目录
 
-规则是从代码证据和已学习模式归纳而来。只有高置信、重复出现且跨证据验证的模式才可作为硬约束；低频或局部证据只能作为定位线索和复核清单。
+{{range .PatternObjects}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}
+{{end}}
+
+## 可复用解决方案与证据
+
+有源码证据的 AI 学习模式用于定位并优先复用已有实现；只有用户维护或内置的显式规则才可作为硬约束。
 
 {{range .PatternObjects}}
 ### {{.Name}}
 
-**描述**: {{.Description}}
+{{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用与实现观察（需按源码复核）**: {{.Description}}{{end}}
 
-{{if .Rule}}**规则 / 线索**: {{.Rule}}{{end}}
+{{end}}
+{{if .Rule}}**用户规则**: {{.Rule}}{{end}}
 
-**定位提示**: 如果需求中的业务说法、同义动作、状态变化、入口渠道或异常现象与上方描述/规则匹配，先按本模式的证据路径定位代码，再确认当前实现。
+{{if .EvidenceLocations}}**已验证源码**
 
-**证据**: 置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，来源 {{.Source}}。出现次数少或证据集中在单一路径时，先按当前代码复核后再执行。
+{{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}
+{{end}}
+{{end}}{{if .BusinessMethod}}**已验证入口**: `{{.BusinessMethod.DisplayLocation}}` - {{.BusinessMethod.Name}}
+{{end}}
 
 {{if .GoodExample}}
-#### ✅ 代码证据
+#### 代码证据
 
 ```{{$.CodeFenceLanguage}}
 {{.GoodExample}}
@@ -62,7 +56,7 @@
 {{end}}
 
 {{if .BadExample}}
-#### ❌ 错误示例（避免）
+#### 避免示例
 
 {{.BadExample}}
 {{end}}

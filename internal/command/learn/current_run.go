@@ -133,7 +133,7 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if err := r.saveProfileIfNeeded(); err != nil {
 		return nil, err
 	}
-	if err := r.savePatternsStep(); err != nil {
+	if err := r.curateAndSavePatternsStep(); err != nil {
 		return nil, err
 	}
 
@@ -458,7 +458,7 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
 		return nil, err
 	}
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error { return nil }); err != nil {
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentCurateAndSavePatterns"), func() error { return nil }); err != nil {
 		return nil, err
 	}
 	profileStartedAt := time.Now()

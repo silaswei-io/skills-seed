@@ -16,15 +16,6 @@ const (
 	AreaRuntime     AreaKind = "runtime"
 )
 
-type MatchKind string
-
-const (
-	MatchScoped   MatchKind = "scoped"
-	MatchSemantic MatchKind = "semantic"
-	MatchGeneric  MatchKind = "generic"
-	MatchBroad    MatchKind = "broad"
-)
-
 type Command struct {
 	Command    string
 	When       string
@@ -44,16 +35,19 @@ type Area struct {
 }
 
 type Recommendation struct {
-	Area        string
-	Command     string
-	When        string
-	Source      string
-	Evidence    []string
-	Confidence  float64
-	Coverage    float64
-	MatchKind   string
-	Recommended bool
-	Warning     string
+	Area     string
+	Command  string
+	When     string
+	Source   string
+	Evidence []string
+}
+
+func Kind(command Command) domain.ValidationCommandKind {
+	return domain.ClassifyValidationCommand(domain.ValidationCommand{
+		Command: command.Command,
+		When:    command.When,
+		Type:    command.Type,
+	})
 }
 
 func Commands(profile *domain.ProjectProfile) []Command {
@@ -89,31 +83,37 @@ func Matrix(profile *domain.ProjectProfile, patterns []domain.Pattern, locale st
 	areas := Areas(profile, patterns, locale)
 	matrix := make([]Recommendation, 0, len(areas))
 	for _, area := range areas {
-		displayEvidence := limitStrings(area.Evidence, 3)
+		areaEvidence := limitStrings(area.Evidence, 3)
 		commandArea := area
-		commandArea.Evidence = displayEvidence
+		commandArea.Evidence = areaEvidence
 		choice := selector.Choose(commandArea)
 		if choice.Command.Command == "" {
 			continue
 		}
-		when, warning := matrixWhen(choice, area, locale)
-		if choice.Match != MatchScoped && choice.Match != MatchSemantic {
-			continue
-		}
 		matrix = append(matrix, Recommendation{
-			Area:        area.Name,
-			Command:     choice.Command.Command,
-			When:        when,
-			Source:      choice.Command.Source,
-			Evidence:    displayEvidence,
-			Confidence:  choice.Confidence,
-			Coverage:    choice.Coverage,
-			MatchKind:   string(choice.Match),
-			Recommended: choice.Match == MatchScoped || choice.Match == MatchSemantic,
-			Warning:     warning,
+			Area:     area.Name,
+			Command:  choice.Command.Command,
+			When:     firstNonEmptyString(choice.Command.When, area.When),
+			Source:   choice.Command.Source,
+			Evidence: commandEvidence(choice.Command),
 		})
 	}
 	return matrix
+}
+
+// commandEvidence 只返回命令自身携带的来源和作用域声明，避免把业务源码误写成命令证据。
+func commandEvidence(command Command) []string {
+	evidence := make([]string, 0, len(command.Evidence)+len(command.ScopePaths)+2)
+	evidence = append(evidence, command.Evidence...)
+	if command.Source != "" {
+		evidence = append(evidence, command.Source)
+	}
+	evidence = append(evidence, command.ScopePaths...)
+	if command.Workdir != "" {
+		evidence = append(evidence, command.Workdir)
+	}
+	evidence = append(evidence, CommandPaths(command.Command)...)
+	return limitStrings(uniqueStrings(evidence), 3)
 }
 
 func Areas(profile *domain.ProjectProfile, patterns []domain.Pattern, locale string) []Area {
@@ -191,29 +191,4 @@ func areaEvidence(profile *domain.ProjectProfile, patterns []domain.Pattern, nee
 		}
 	}
 	return uniqueStrings(evidence)
-}
-
-func matrixWhen(choice commandChoice, area Area, locale string) (string, string) {
-	base := firstNonEmptyString(choice.Command.When, area.When)
-	warning := ""
-	switch choice.Match {
-	case MatchGeneric:
-		warning = fallbackText(locale, "generic")
-	case MatchBroad:
-		warning = fallbackText(locale, "broad")
-	}
-	if warning == "" {
-		return base, ""
-	}
-	if base == "" {
-		return warning, warning
-	}
-	return warning + " " + base, warning
-}
-
-func fallbackText(locale string, kind string) string {
-	if kind == "broad" {
-		return i18n.GetForLocale(locale, "KnowledgeValidationFallbackBroad")
-	}
-	return i18n.GetForLocale(locale, "KnowledgeValidationFallbackGeneric")
 }

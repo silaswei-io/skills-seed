@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
@@ -18,13 +19,17 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
 
 	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
-		Agent:           "claude",
-		Operation:       "AnalyzeCurrentCodebase",
-		Attempt:         1,
-		Content:         `{"patterns":[]}`,
-		RawOutput:       `{"type":"result","result":"{\"patterns\":[]}"}`,
-		Stderr:          "warning",
-		TokenUsageKnown: true,
+		Agent:     "claude",
+		Operation: "AnalyzeCurrentCodebase",
+		Attempt:   1,
+		Content:   `{"patterns":[]}`,
+		RawOutput: `{"type":"result","result":"{\"patterns\":[]}"}`,
+		Stderr:    "warning",
+		TokenUsage: tokenusage.Usage{
+			InputTokens:  10,
+			OutputTokens: 5,
+			HasTokens:    true,
+		},
 	})
 
 	require.Contains(t, filepath.ToSlash(archive.ContentPath), ".skills-seed/runtime/agent-outputs/")
@@ -56,6 +61,7 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 		RawPath         string `json:"raw_path"`
 		StderrPath      string `json:"stderr_path"`
 		TokenUsageKnown bool   `json:"token_usage_known"`
+		TotalTokens     int64  `json:"total_tokens"`
 	}
 	data, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
@@ -66,6 +72,24 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	require.Equal(t, archive.RawPath, manifest.RawPath)
 	require.Equal(t, archive.StderrPath, manifest.StderrPath)
 	require.True(t, manifest.TokenUsageKnown)
+	require.EqualValues(t, 15, manifest.TotalTokens)
+}
+
+func TestSaveAgentOutputForContextPreservesRetryAttempts(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	first := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
+		Agent: "claude", Operation: "Analyze", RuntimeID: "20260722-120000", Attempt: 1, RawOutput: "first",
+	})
+	second := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
+		Agent: "claude", Operation: "Analyze", RuntimeID: "20260722-120000", Attempt: 2, RawOutput: "second",
+	})
+
+	require.NotEqual(t, first.RawPath, second.RawPath)
+	require.Equal(t, "20260722-120000-claude-analyze.raw.txt", filepath.Base(first.RawPath))
+	require.Equal(t, "20260722-120000-claude-analyze-attempt-002.raw.txt", filepath.Base(second.RawPath))
+	require.FileExists(t, first.RawPath)
+	require.FileExists(t, second.RawPath)
 }
 
 func TestSaveAgentOutputForContextLabelsUnitOperation(t *testing.T) {

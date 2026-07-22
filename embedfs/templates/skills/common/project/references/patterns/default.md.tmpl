@@ -1,9 +1,7 @@
 # {{.Category}} 模式概览
 
 **分类**: {{.Category}}
-**优先级**: {{.Priority}}
 **模式数量**: {{.PatternCount}}
-**置信度**: {{printf "%.2f" .Confidence}}%
 **最后更新**: {{.LastUpdated}}
 
 ---
@@ -22,11 +20,19 @@
 {{end}}
 {{end}}
 
+{{if gt (len .PatternObjects) 5}}
+## 目录
+
+{{if .ClaimGroups}}{{range .ClaimGroups}}{{range .Claims}}- [{{.Title}}](#{{anchor .Title}})
+{{end}}{{end}}{{else}}{{range .PatternObjects}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}{{end}}
+{{end}}
+
 {{if .PatternObjects}}
 {{if .ClaimGroups}}
-## 规则断言
+## 用户规则与可复用解决方案
 
-用于判断哪些结论可以优先作为开发约束，哪些只适合作为定位线索。具体行为仍以当前代码为准。
+用户维护或内置规则可以约束修改；有源码证据的 AI 学习结果用于定位并优先复用已有实现。具体适用边界仍以当前代码为准。
 
 {{range .ClaimGroups}}
 ### {{.Title}}
@@ -34,53 +40,32 @@
 {{.Description}}
 
 {{range .Claims}}
-- **{{.Title}}**: {{.Text}}
-  - 证据：置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，证据 {{.EvidenceCount}} 处{{if .Scope}}，范围 `{{.Scope}}`{{end}}
+- **{{.Title}}**{{if .Text}}: {{.Text}}{{end}}
+  - 证据：{{.EvidenceCount}} 个源码文件{{if .Scope}}，范围 `{{.Scope}}`{{end}}
   - 使用：{{.Usage}}
   {{if .Locations}}- 位置：{{range .Locations}}`{{.}}` {{end}}{{end}}
 {{end}}
 
 {{end}}
-{{end}}
+{{else}}
+## 可复用解决方案
 
-## 详细模式
-
-规则是从代码证据和已学习模式归纳而来。只有高置信、重复出现且跨证据验证的模式才可作为硬约束；低频或局部证据只能作为定位线索和复核清单。
+以下模式用于定位并优先复用已有实现；AI 学习结果不能单独作为硬约束。
 
 {{range .PatternObjects}}
 ### {{.Name}}
 
-{{if .Description}}**描述**: {{.Description}}{{end}}
-
-{{if .Rule}}**规则 / 线索**: {{.Rule}}{{end}}
-
-**证据**: 置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，来源 {{.Source}}。出现次数少或证据集中在单一路径时，先按当前代码复核后再执行。
-
-{{if .GoodExample}}
-#### 代码证据
-
+{{if .Description}}{{.Description}}
+{{end}}{{if .Rule}}- 用户规则：{{.Rule}}
+{{end}}{{if .EvidenceLocations}}- 位置：{{range .EvidenceLocations}}`{{.DisplayLocation}}` {{end}}
+{{end}}{{if .GoodExample}}
 ```{{$.CodeFenceLanguage}}
 {{.GoodExample}}
 ```
 {{end}}
-
-{{if .BadExample}}
-#### 避免示例
-
-{{.BadExample}}
-{{end}}
-
----
-
 {{end}}
 {{end}}
 
-{{if .UsageScenes}}
-## 使用场景
-
-{{range .UsageScenes}}
-- {{.}}
-{{end}}
 {{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}

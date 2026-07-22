@@ -8,59 +8,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGroupsDoNotPromoteSingleEvidenceBusinessPatternToCore(t *testing.T) {
-	local := domain.NewPattern("local-business", "Local Business Rule", domain.CategoryBusiness)
-	local.Confidence = 0.89
-	local.Frequency = 1
-	local.SetRule("Review the nearby implementation before changing this local flow.")
-	local.EvidenceLocations = []domain.PatternEvidenceLocation{
-		{Path: "internal/service/local.go", Line: 10, Symbol: "Run", Kind: "function", Confidence: 0.89},
+func TestGroupsSeparateUserRulesAndReusableSolutions(t *testing.T) {
+	solution := domain.NewPattern("existing-capability", "Existing Capability", domain.CategoryBusiness)
+	solution.Source = domain.SourceLearnedCurrent
+	solution.SetDescription("The existing entry implements the capability within a verified boundary.")
+	solution.SetRule("Inspect and prefer ExistingEntry; extend only when its boundary does not fit.")
+	solution.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "src/capability.ext", Line: 10, Symbol: "ExistingEntry", Kind: "function", Confidence: 0.89},
 	}
 
-	core := domain.NewPattern("stable-business", "Stable Business Rule", domain.CategoryBusiness)
-	core.Confidence = 0.93
-	core.Frequency = 2
-	core.SetRule("Apply this stable business rule when changing the related capability.")
-	core.EvidenceLocations = []domain.PatternEvidenceLocation{
-		{Path: "internal/service/a.go", Line: 10, Symbol: "RunA", Kind: "function", Confidence: 0.92},
-		{Path: "internal/service/b.go", Line: 20, Symbol: "RunB", Kind: "function", Confidence: 0.91},
+	rule := domain.NewPattern("maintained-rule", "Maintained Rule", domain.CategoryStructure)
+	rule.Source = domain.SourceUserDefined
+	rule.SetRule("Preserve the maintained project boundary.")
+	rule.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "src/boundary.ext", Line: 5, Symbol: "Boundary", Kind: "type", Confidence: 0.92},
 	}
 
-	groups := Groups([]domain.Pattern{*local, *core}, "zh-CN")
+	groups := Groups([]domain.Pattern{*solution, *rule}, "zh-CN")
 
 	require.Len(t, groups, 2)
-	require.Equal(t, "核心开发路径", groups[0].Title)
+	require.Equal(t, "用户规则", groups[0].Title)
 	require.Len(t, groups[0].Claims, 1)
-	require.Equal(t, "Stable Business Rule", groups[0].Claims[0].Title)
-	require.Equal(t, policy.StrengthCore, groups[0].Claims[0].Strength)
-	require.Equal(t, "Apply this stable business rule when changing the related capability.", groups[0].Claims[0].Text)
-	require.Equal(t, []string{"internal/service/a.go:10", "internal/service/b.go:20"}, groups[0].Claims[0].Locations)
+	require.Equal(t, policy.StrengthRule, groups[0].Claims[0].Strength)
+	require.Equal(t, rule.Rule, groups[0].Claims[0].Text)
 
-	require.Equal(t, "局部模块经验", groups[1].Title)
+	require.Equal(t, "可复用解决方案", groups[1].Title)
 	require.Len(t, groups[1].Claims, 1)
-	require.Equal(t, "Local Business Rule", groups[1].Claims[0].Title)
-	require.Equal(t, policy.StrengthLocal, groups[1].Claims[0].Strength)
-	require.Equal(t, "internal/service/local.go:10", groups[1].Claims[0].Scope)
+	require.Equal(t, policy.StrengthSolution, groups[1].Claims[0].Strength)
+	require.Equal(t, solution.Description, groups[1].Claims[0].Text)
+	require.Equal(t, []string{"src/capability.ext:10 - ExistingEntry"}, groups[1].Claims[0].Locations)
 }
 
-func TestFromPatternUsesRuleDescriptionNameFallbackAndLimitsLocations(t *testing.T) {
-	pattern := domain.NewPattern("fallback", "Fallback Name", domain.CategoryAPI)
-	pattern.Confidence = 0.8
-	pattern.Frequency = 1
-	pattern.Description = "Fallback description."
-	pattern.ScopePath = "internal/api"
-	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
-		{Path: "internal/api/a.go", Line: 1},
-		{Path: "internal/api/b.go", Line: 2},
-		{Path: "internal/api/a.go", Line: 1},
-		{Path: "internal/api/c.go", Line: 3},
-		{Path: "internal/api/d.go", Line: 4},
-	}
+func TestFromPatternKeepsUnverifiedContentAsObservation(t *testing.T) {
+	pattern := domain.NewPattern("unverified", "Unverified", domain.CategoryAPI)
+	pattern.Description = "A possible local behavior."
+	pattern.Rule = "Prefer a presumed entry."
+	pattern.ScopePath = "src/component"
 
 	item := FromPattern(*pattern, "en-US")
 
-	require.Equal(t, "Fallback description.", item.Text)
-	require.Equal(t, "internal/api", item.Scope)
-	require.Equal(t, []string{"internal/api/a.go:1", "internal/api/b.go:2", "internal/api/c.go:3"}, item.Locations)
+	require.Equal(t, policy.StrengthObservation, item.Strength)
+	require.Equal(t, pattern.Description, item.Text)
+	require.Equal(t, "src/component", item.Scope)
 	require.NotEmpty(t, item.Usage)
 }

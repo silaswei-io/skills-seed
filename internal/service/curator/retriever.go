@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
@@ -122,13 +123,41 @@ func tokens(value string) map[string]struct{} {
 	matches := tokenRE.FindAllString(strings.ToLower(value), -1)
 	result := make(map[string]struct{}, len(matches))
 	for _, match := range matches {
-		token := strings.TrimSpace(match)
-		if token == "" {
-			continue
-		}
-		result[token] = struct{}{}
+		addSemanticTokens(result, match)
 	}
 	return result
+}
+
+func addSemanticTokens(result map[string]struct{}, value string) {
+	var word strings.Builder
+	var han []rune
+	flushWord := func() {
+		if word.Len() > 0 {
+			result[word.String()] = struct{}{}
+			word.Reset()
+		}
+	}
+	flushHan := func() {
+		if len(han) == 1 {
+			result[string(han)] = struct{}{}
+		}
+		for i := 0; i+1 < len(han); i++ {
+			result[string(han[i:i+2])] = struct{}{}
+		}
+		han = han[:0]
+	}
+
+	for _, r := range strings.ToLower(value) {
+		if unicode.Is(unicode.Han, r) {
+			flushWord()
+			han = append(han, r)
+			continue
+		}
+		flushHan()
+		word.WriteRune(r)
+	}
+	flushWord()
+	flushHan()
 }
 
 func jaccard(left, right map[string]struct{}) float64 {

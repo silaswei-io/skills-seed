@@ -500,8 +500,7 @@ func (p *Pattern) RefreshMetrics() {
 }
 
 func (p *Pattern) evidenceCount() int {
-	count, _ := PatternEvidenceQuality(p.EvidenceLocations)
-	return count
+	return PatternEvidenceFileCount(p.EvidenceLocations)
 }
 
 func (p *Pattern) genericPenalty() float64 {

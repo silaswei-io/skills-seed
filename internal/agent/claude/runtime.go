@@ -20,7 +20,7 @@ import (
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 )
 
-// 调用外部命令行程序（含速率限制自动重试）
+// 调用外部命令行程序，并处理可重试的瞬时错误和结构化输出失败。
 func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, error) {
 	output, _, err := c.callClaudeWithArchive(ctx, operation, prompt, outputContract, task...)
 	return output, err
@@ -93,8 +93,8 @@ func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prom
 		}
 	}
 
-	logger.Error(i18n.Get("LoggerAgentRateLimitExhausted"), "max_retries", maxRetries)
-	return "", agent.AgentOutputArchive{}, fmt.Errorf("%s: %d", i18n.Get("AgentClaudeRateLimitExhausted"), maxRetries)
+	logger.Error(i18n.Get("LoggerAgentRetryExhausted"), "max_retries", maxRetries)
+	return "", agent.AgentOutputArchive{}, fmt.Errorf("%s: %d", i18n.Get("AgentRetryExhausted"), maxRetries)
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
@@ -106,6 +106,7 @@ func isRetryableError(stdout, stderr string) bool {
 	}
 	// 非数字类的已知限流/过载信号
 	return strings.Contains(combined, "overloaded_error") ||
+		strings.Contains(combined, "error_max_structured_output_retries") ||
 		strings.Contains(combined, "rate limit") ||
 		strings.Contains(combined, "速率限制") ||
 		strings.Contains(combined, "请求频率") ||
@@ -117,7 +118,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	args := claudePrintArgs(c.allowUserPlugins, outputSchema)
+	args := claudePrintArgs(c.allowUserPlugins, outputSchema, task.PromptOnly)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
 		"operation", operation,
@@ -143,19 +144,23 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	duration := time.Since(startTime)
 
 	if err != nil {
+		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
+		usage := tokenusage.Extract(stdoutStr)
 		retryable := isRetryableError(stdoutStr, stderrStr)
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:     c.Name(),
-			Operation: operation,
-			RuntimeID: task.ID,
-			Slug:      task.Slug,
-			Attempt:   attempt,
-			RawOutput: stdoutStr,
-			Stderr:    stderrStr,
-			ExitError: true,
+			Agent:      c.Name(),
+			Operation:  operation,
+			RuntimeID:  task.ID,
+			Slug:       task.Slug,
+			Attempt:    attempt,
+			RawOutput:  stdoutStr,
+			Stderr:     stderrStr,
+			ExitError:  true,
+			TokenUsage: usage,
 		})
+		agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
 		if retryable {
 			logger.Diagnostic(i18n.Get("LoggerAgentClaudeCallRetryable"),
@@ -170,7 +175,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRateLimited"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+			return stdoutStr + stderrStr, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 		}
 
 		logger.Error(i18n.Get("LoggerAgentClaudeCallFailed"),
@@ -191,15 +196,15 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	rawOutput := stdout.String()
 	output, usage, outputErr := parseClaudeOutput(rawOutput)
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-		Agent:           c.Name(),
-		Operation:       operation,
-		RuntimeID:       task.ID,
-		Slug:            task.Slug,
-		Attempt:         attempt,
-		Content:         output,
-		RawOutput:       rawOutput,
-		Stderr:          stderr.String(),
-		TokenUsageKnown: usage.Known(),
+		Agent:      c.Name(),
+		Operation:  operation,
+		RuntimeID:  task.ID,
+		Slug:       task.Slug,
+		Attempt:    attempt,
+		Content:    output,
+		RawOutput:  rawOutput,
+		Stderr:     stderr.String(),
+		TokenUsage: usage,
 	})
 	if outputErr != nil {
 		retryable := isRetryableError(rawOutput, stderr.String())
@@ -286,7 +291,7 @@ func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage, *claudeOutpu
 	return "", usage, &claudeOutputError{cause: fmt.Errorf("claude CLI 成功响应缺少 structured_output")}
 }
 
-func claudePrintArgs(allowUserPlugins bool, outputSchema string) []string {
+func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool) []string {
 	// 模型命令行常常在生成最终结构化结果之前尝试检查文件
 	// 将会话保持为非持久化且只读状态，这样批量分析就能顺利完成，而无需授予具备写入权限的工具
 	args := []string{
@@ -303,7 +308,11 @@ func claudePrintArgs(allowUserPlugins bool, outputSchema string) []string {
 			args = append(args, "--settings", settings)
 		}
 	}
-	return append(args, "--tools", "Read,Glob,Grep,LS")
+	tools := "Read,Glob,Grep,LS"
+	if promptOnly {
+		tools = ""
+	}
+	return append(args, "--tools", tools)
 }
 
 func claudeArgsForLog(args []string) []string {

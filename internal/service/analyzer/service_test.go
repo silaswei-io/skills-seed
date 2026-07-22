@@ -100,13 +100,18 @@ func TestAnalyzePatterns_AIError(t *testing.T) {
 
 func TestAnalyzeProject(t *testing.T) {
 	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "helper.go"), []byte("package helper\n\nfunc BuildResponse(value any) error { return nil }\n"), 0o644))
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			return &agent.AnalyzeProjectResult{
-				Language:           "go",
-				Frameworks:         []string{"gin"},
-				Architecture:       "DDD",
+				Language:     "go",
+				Frameworks:   []string{"gin"},
+				Architecture: "DDD",
+				CommonUtils: []domain.UtilityFunction{
+					{Name: "BuildResponse", File: "helper.go:99", Signature: "func BuildResponse(value any) error", Description: "AI summary"},
+					{Name: "SuccessResp", File: "helper.go:3", Signature: "func SuccessResp()"},
+				},
 				ValidationCommands: []domain.ValidationCommand{{Command: "task verify", When: "after changes", Source: "Taskfile.yml"}},
 				Summary:            "Test project summary",
 			}, nil
@@ -120,6 +125,10 @@ func TestAnalyzeProject(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "go", result.Language)
 	assert.Contains(t, result.Frameworks, "gin")
+	require.Len(t, result.CommonUtils, 1)
+	assert.Equal(t, "BuildResponse", result.CommonUtils[0].Name)
+	assert.Equal(t, "helper.go:3", result.CommonUtils[0].File)
+	assert.Empty(t, result.CommonUtils[0].Description)
 	require.Len(t, result.ValidationCommands, 1)
 	assert.Equal(t, "task verify", result.ValidationCommands[0].Command)
 }
@@ -893,6 +902,8 @@ func TestNewAnalyzerService_DefaultLocale(t *testing.T) {
 
 func TestAnalyzeProjectFull_WithMock(t *testing.T) {
 	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "pkg"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "pkg", "response.go"), []byte("package pkg\n\nfunc Response(value any) error { return nil }\n"), 0o644))
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
@@ -903,7 +914,7 @@ func TestAnalyzeProjectFull_WithMock(t *testing.T) {
 				Dependencies:   []string{"github.com/gin-gonic/gin"},
 				Summary:        "A test project",
 				KeyModules:     []domain.ModuleInfo{{Name: "handler", Path: "internal/handler"}},
-				CommonUtils:    []domain.UtilityFunction{{Name: "Response", File: "pkg/response.go"}},
+				CommonUtils:    []domain.UtilityFunction{{Name: "Response", File: "pkg/response.go", Signature: "func Response(value any) error"}},
 				ConfigPatterns: []string{"YAML config"},
 			}, nil
 		},

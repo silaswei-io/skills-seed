@@ -1,6 +1,7 @@
 package claim
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 )
 
 // maxClaimLocations 限制概要断言展示的证据位置数量，避免 reference 首页过长。
-const maxClaimLocations = 3
+const maxClaimLocations = 4
 
 type Claim struct {
 	Title         string
@@ -37,9 +38,8 @@ func Groups(patterns []domain.Pattern, locale string) []Group {
 		return nil
 	}
 	groups := []Group{
-		{Title: i18n.GetForLocale(locale, "KnowledgePolicyGroupCoreTitle"), Description: i18n.GetForLocale(locale, "KnowledgePolicyGroupCoreDescription")},
-		{Title: i18n.GetForLocale(locale, "KnowledgePolicyGroupConventionTitle"), Description: i18n.GetForLocale(locale, "KnowledgePolicyGroupConventionDescription")},
-		{Title: i18n.GetForLocale(locale, "KnowledgePolicyGroupLocalTitle"), Description: i18n.GetForLocale(locale, "KnowledgePolicyGroupLocalDescription")},
+		{Title: i18n.GetForLocale(locale, "KnowledgePolicyGroupRuleTitle"), Description: i18n.GetForLocale(locale, "KnowledgePolicyGroupRuleDescription")},
+		{Title: i18n.GetForLocale(locale, "KnowledgePolicyGroupSolutionTitle"), Description: i18n.GetForLocale(locale, "KnowledgePolicyGroupSolutionDescription")},
 		{Title: i18n.GetForLocale(locale, "KnowledgePolicyGroupObservationTitle"), Description: i18n.GetForLocale(locale, "KnowledgePolicyGroupObservationDescription")},
 	}
 	for _, pattern := range patterns {
@@ -74,7 +74,7 @@ func FromPattern(pattern domain.Pattern, locale string) Claim {
 	decision := policy.EvaluatePattern(pattern)
 	return Claim{
 		Title:         strings.TrimSpace(pattern.Name),
-		Text:          claimText(pattern, locale),
+		Text:          claimText(pattern),
 		Usage:         usage(decision.Strength, locale),
 		Strength:      decision.Strength,
 		Category:      pattern.Category,
@@ -87,18 +87,16 @@ func FromPattern(pattern domain.Pattern, locale string) Claim {
 	}
 }
 
-func claimText(pattern domain.Pattern, locale string) string {
-	return policy.DisplayPatternText(pattern, locale)
+func claimText(pattern domain.Pattern) string {
+	return policy.DisplayPatternText(pattern)
 }
 
 func usage(strength policy.Strength, locale string) string {
 	switch strength {
-	case policy.StrengthCore:
-		return i18n.GetForLocale(locale, "KnowledgeClaimUsageCore")
-	case policy.StrengthConvention:
-		return i18n.GetForLocale(locale, "KnowledgeClaimUsageConvention")
-	case policy.StrengthLocal:
-		return i18n.GetForLocale(locale, "KnowledgeClaimUsageLocal")
+	case policy.StrengthRule:
+		return i18n.GetForLocale(locale, "KnowledgeClaimUsageRule")
+	case policy.StrengthSolution:
+		return i18n.GetForLocale(locale, "KnowledgeClaimUsageSolution")
 	default:
 		return i18n.GetForLocale(locale, "KnowledgeClaimUsageObservation")
 	}
@@ -133,23 +131,37 @@ func locations(pattern domain.Pattern) []string {
 		result = append(result, value)
 	}
 	if pattern.BusinessMethod != nil {
-		add(pattern.BusinessMethod.DisplayLocation())
+		add(evidenceLabel(pattern.BusinessMethod.DisplayLocation(), pattern.BusinessMethod.Name, pattern.BusinessMethod.Description))
 	}
 	for _, location := range pattern.EvidenceLocations {
-		add(location.DisplayLocation())
+		add(evidenceLabel(location.DisplayLocation(), location.Symbol, location.Description))
 	}
 	return result
 }
 
+func evidenceLabel(location, symbol, description string) string {
+	location = strings.TrimSpace(location)
+	symbol = strings.TrimSpace(symbol)
+	description = strings.TrimSpace(description)
+	if symbol == "" && description == "" {
+		return location
+	}
+	if description == "" {
+		return fmt.Sprintf("%s - %s", location, symbol)
+	}
+	if symbol == "" {
+		return fmt.Sprintf("%s - %s", location, description)
+	}
+	return fmt.Sprintf("%s - %s: %s", location, symbol, description)
+}
+
 func strengthIndex(strength policy.Strength) int {
 	switch strength {
-	case policy.StrengthCore:
+	case policy.StrengthRule:
 		return 0
-	case policy.StrengthConvention:
+	case policy.StrengthSolution:
 		return 1
-	case policy.StrengthLocal:
-		return 2
 	default:
-		return 3
+		return 2
 	}
 }

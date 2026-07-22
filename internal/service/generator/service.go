@@ -22,46 +22,37 @@ import (
 
 // GeneratorService 生成服务
 type GeneratorService struct {
-	patternRepo       domain.PatternRepository
-	patternStatsRepo  domain.PatternStatsRepository
-	profileRepo       domain.ProjectProfileRepository
-	scopedProfileRepo domain.ScopedProjectProfileRepository
-	projectSpecRepo   domain.ProjectSpecRepository
-	scopedSpecRepo    domain.ScopedProjectSpecRepository
-	workflowRepo      domain.WorkflowRepository
-	skillsLoader      *skills.Loader
-	planBuilder       *planBuilder
-	renderer          *skillgen.Renderer
-	configRepo        config.Reader
-}
-
-// SetWorkflowRepository 注入用户工作流仓储。
-func (s *GeneratorService) SetWorkflowRepository(repo domain.WorkflowRepository) {
-	s.workflowRepo = repo
+	patternRepo      patternReader
+	patternStatsRepo patternStatsReader
+	profileRepo      profileReader
+	projectSpecRepo  projectSpecWriter
+	workflowRepo     domain.WorkflowRepository
+	skillsLoader     *skills.Loader
+	planBuilder      *planBuilder
+	renderer         *skillgen.Renderer
+	configRepo       config.Reader
 }
 
 // NewGeneratorService 创建生成服务
 func NewGeneratorService(
-	patternRepo domain.PatternRepository,
-	profileRepo domain.ProjectProfileRepository,
+	patternRepo patternReader,
+	profileRepo profileReader,
 	skillsLoader *skills.Loader,
 	configRepo config.Reader,
+	workflowRepo domain.WorkflowRepository,
 ) *GeneratorService {
-	scopedProfileRepo, _ := profileRepo.(domain.ScopedProjectProfileRepository)
-	projectSpecRepo, _ := profileRepo.(domain.ProjectSpecRepository)
-	scopedSpecRepo, _ := profileRepo.(domain.ScopedProjectSpecRepository)
-	patternStatsRepo, _ := patternRepo.(domain.PatternStatsRepository)
+	projectSpecRepo, _ := profileRepo.(projectSpecWriter)
+	patternStatsRepo, _ := patternRepo.(patternStatsReader)
 	return &GeneratorService{
-		patternRepo:       patternRepo,
-		patternStatsRepo:  patternStatsRepo,
-		profileRepo:       profileRepo,
-		scopedProfileRepo: scopedProfileRepo,
-		projectSpecRepo:   projectSpecRepo,
-		scopedSpecRepo:    scopedSpecRepo,
-		skillsLoader:      skillsLoader,
-		planBuilder:       newPlanBuilder(skillsLoader),
-		renderer:          skillgen.NewRenderer(skillsLoader),
-		configRepo:        configRepo,
+		patternRepo:      patternRepo,
+		patternStatsRepo: patternStatsRepo,
+		profileRepo:      profileRepo,
+		projectSpecRepo:  projectSpecRepo,
+		workflowRepo:     workflowRepo,
+		skillsLoader:     skillsLoader,
+		planBuilder:      newPlanBuilder(skillsLoader),
+		renderer:         skillgen.NewRenderer(skillsLoader),
+		configRepo:       configRepo,
 	}
 }
 
@@ -131,8 +122,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	}
 	rankedPatterns := rankPatternsForGeneration(patterns, patternInsights)
 
-	stats := s.calculateStats(patterns)
-
 	var profile *domain.ProjectProfile
 	if err := runStep(i18n.Get("ProgressGenerateLoadProfile"), func() error {
 		var profileErr error
@@ -141,15 +130,15 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	}); err != nil {
 		return err
 	}
-	profile = cleanProjectProfile(profile)
 	projectConfig := s.configRepo.GetProjectConfig()
 	projectRoot := firstNonEmptyString(projectConfig.RootPath, runtimecontext.ProjectRoot(ctx))
-	profile, rankedPatterns = sanitizeGenerationInputs(profile, rankedPatterns, projectRoot)
-	spec := s.projectSpecFromProfileAndPatterns(profile, rankedPatterns, config.WorkspaceProjectConfig{})
-
-	var summaryResult *agent.GenerateSkillsResult
+	snapshot, err := s.buildVerifiedKnowledgeSnapshot(profile, rankedPatterns, projectRoot)
+	if err != nil {
+		return fmt.Errorf("scan project validation facts: %w", err)
+	}
+	var summaryResult generationSummary
 	if err := runStep(i18n.Get("ProgressGenerateSummary"), func() error {
-		summaryResult = s.buildDeterministicSummary(rankedPatterns, patternInsights)
+		summaryResult = s.buildDeterministicSummary(snapshot.Patterns, patternInsights)
 		return nil
 	}); err != nil {
 		return err
@@ -157,17 +146,12 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 
 	if err := runStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
 		if s.projectSpecRepo != nil {
-			if err := s.projectSpecRepo.SaveSpec(ctx, spec); err != nil {
+			if err := s.projectSpecRepo.SaveSpec(ctx, snapshot.Spec); err != nil {
 				return err
 			}
 		}
 
 		// 确保分类摘要非 nil
-		if summaryResult.CategorySummaries == nil {
-			summaryResult.CategorySummaries = map[string]agent.CategorySummary{}
-		}
-		summaryResult.CategorySummaries = s.ensureCategorySummaries(rankedPatterns, summaryResult.CategorySummaries)
-
 		workflowReferences, err := s.loadWorkflowReferences()
 		if err != nil {
 			return err
@@ -176,7 +160,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			if err := s.writeWorkflowOutputs(staging); err != nil {
 				return err
 			}
-			plan, err := s.planBuilder.Build(staging, rankedPatterns, summaryResult, stats, profile, spec, PlanOptions{
+			plan, err := s.planBuilder.Build(staging, snapshot, summaryResult, PlanOptions{
 				SkillName:           skillgen.GeneratedSkillName(projectConfig.Name),
 				ProjectName:         projectConfig.Name,
 				Language:            projectConfig.Language,
@@ -184,7 +168,6 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 				SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
 				SkipReferences:      opts.SkipReferences,
 				WorkflowReferences:  workflowReferences,
-				ProjectRoot:         projectRoot,
 			})
 			if err != nil {
 				return err
@@ -207,7 +190,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		"duration", time.Since(startedAt),
 		"patterns_count", len(patterns),
 		"resolved_output_path", resolvedOutputPath,
-		"categories_count", len(stats.ByCategory),
+		"categories_count", len(domain.CategoryNamesWithPatterns(snapshot.Patterns)),
 	)
 	return nil
 }

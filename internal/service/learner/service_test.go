@@ -418,7 +418,7 @@ func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 	newPattern.Confidence = 0.9
 	newPattern.Frequency = 1
 	newPattern.SetRule("wrap errors with context")
-	count, err := svc.SavePatternsStrict(context.Background(), []domain.Pattern{*newPattern}, "learn_current")
+	count, err := svc.CurateAndSavePatterns(context.Background(), []domain.Pattern{*newPattern}, curator.OperationLearnCurrent)
 
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
@@ -427,7 +427,7 @@ func TestSavePatterns_MergesSimilarPatterns(t *testing.T) {
 	require.Equal(t, 1, saved.Frequency)
 }
 
-func TestSavePatternsStrictReturnsErrorWhenSaveFails(t *testing.T) {
+func TestCurateAndSavePatternsReturnsErrorWhenSaveFails(t *testing.T) {
 	mockPattern := &mocks.MockPatternRepository{
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
 			return errors.New("db closed")
@@ -436,14 +436,14 @@ func TestSavePatternsStrictReturnsErrorWhenSaveFails(t *testing.T) {
 	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 	svc := NewLearnerService(mockAgent, &mocks.MockGitRepository{}, mockPattern, &mocks.MockCommitTracker{}, curator.NewService(mockAgent, mockPattern))
 
-	count, err := svc.SavePatternsStrict(context.Background(), []domain.Pattern{*newLearnerTestPattern("new", "Error Handling", domain.CategoryError)}, "learn_current")
+	count, err := svc.CurateAndSavePatterns(context.Background(), []domain.Pattern{*newLearnerTestPattern("new", "Error Handling", domain.CategoryError)}, curator.OperationLearnCurrent)
 
 	require.Error(t, err)
 	require.Zero(t, count)
 	require.Contains(t, err.Error(), "db closed")
 }
 
-func TestSavePatternsStrictWithMetadataPersistsAnalysisUnit(t *testing.T) {
+func TestCurateAndSavePatternsWithMetadataPersistsAnalysisUnit(t *testing.T) {
 	var saved *domain.Pattern
 	mockPattern := &mocks.MockPatternRepository{
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
@@ -457,7 +457,7 @@ func TestSavePatternsStrictWithMetadataPersistsAnalysisUnit(t *testing.T) {
 	pattern.Confidence = 0.9
 	pattern.SetRule("apply to auth flows")
 
-	count, err := svc.SavePatternsStrictWithMetadata(context.Background(), []domain.Pattern{*pattern}, "learn_current", domain.AnalysisUnit{
+	count, err := svc.CurateAndSavePatternsWithMetadata(context.Background(), []domain.Pattern{*pattern}, curator.OperationLearnCurrent, domain.AnalysisUnit{
 		ID:   "auth",
 		Name: "Authentication",
 	})
@@ -490,7 +490,7 @@ func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 		var count int
 		output := captureStdout(t, func() {
 			var err error
-			count, err = svc.SavePatternsStrict(context.Background(), patterns, curator.OperationLearnHistory)
+			count, err = svc.CurateAndSavePatterns(context.Background(), patterns, curator.OperationLearnHistory)
 			require.NoError(t, err)
 		})
 
@@ -516,7 +516,7 @@ func TestSavePatterns_DoesNotPrintPerPatternSuccessLogs(t *testing.T) {
 		var count int
 		output := captureStdout(t, func() {
 			var err error
-			count, err = svc.SavePatternsStrict(context.Background(), []domain.Pattern{*newLearnerTestPattern("new", "Error Handling", domain.CategoryError)}, curator.OperationLearnHistory)
+			count, err = svc.CurateAndSavePatterns(context.Background(), []domain.Pattern{*newLearnerTestPattern("new", "Error Handling", domain.CategoryError)}, curator.OperationLearnHistory)
 			require.NoError(t, err)
 		})
 

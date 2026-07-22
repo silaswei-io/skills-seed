@@ -13,7 +13,7 @@ Other files under `embedfs/templates/prompts/append/` are reusable fragments sel
 | `fix-generate` | `CodexAgent.GenerateFixes`, `ClaudeAgent.GenerateFixes` | Generate fixes for check/analyze findings. |
 | `learn-analyze` | `CodexAgent.AnalyzeCode`, `ClaudeAgent.AnalyzeCode` | Analyze files for `check`-style issue detection. |
 | `learn-batch` | `CodexAgent.LearnFromCommit`, `CodexAgent.BatchLearnFromCommits`, Claude equivalents | Learn pattern candidates from git commit history batches. |
-| `pattern-curate` | `CodexAgent.CuratePatterns`, `ClaudeAgent.CuratePatterns` | Curate learned/user-supplied candidate patterns before storage. |
+| `pattern-curate` | `CodexAgent.CuratePatterns`, `ClaudeAgent.CuratePatterns` | Decide canonical text and real source IDs for current-code candidates; source-owned fields are hydrated locally before storage. |
 | `pattern-learn-current` | `CodexAgent.AnalyzeCurrentCodebase`, `ClaudeAgent.AnalyzeCurrentCodebase` | Learn patterns from one current-code analysis unit. |
 | `pattern-learn-current-batch` | `CodexAgent.AnalyzeCurrentCodebaseBatch`, `ClaudeAgent.AnalyzeCurrentCodebaseBatch` | Learn patterns from one or more current-code analysis units in a single agent call. |
 | `project-profile` | `CodexAgent.AnalyzeProject`, `ClaudeAgent.AnalyzeProject` | Build or refresh a project profile from structure, focused paths, and source evidence. |
@@ -21,6 +21,8 @@ Other files under `embedfs/templates/prompts/append/` are reusable fragments sel
 | `skill-workspace-spec` | `CodexAgent.AnalyzeWorkspaceSpec`, `ClaudeAgent.AnalyzeWorkspaceSpec` | Generate workspace-level executable development constraints. |
 | `user-define-pattern` | `CodexAgent.UserDefinePattern`, `ClaudeAgent.UserDefinePattern` | Convert user-provided pattern descriptions into structured pattern output. |
 | `workflow-optimize` | `CodexAgent.OptimizeWorkflow`, `ClaudeAgent.OptimizeWorkflow` | Normalize a user workflow description into structured workflow steps. |
+
+File selection, analysis-unit planning, and pattern curation are prompt-only tasks because their prompts already contain all required inputs. Claude runs them with repository tools disabled, preventing multi-turn repository reads from inflating token usage. Current-code analysis and project profiling still retain read-only source tools because their prompts intentionally reference repository files.
 
 ## Redundancy Status
 

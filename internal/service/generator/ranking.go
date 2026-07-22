@@ -36,44 +36,6 @@ func rankPatternsForGeneration(patterns []domain.Pattern, insights map[string]do
 	return domain.RankPatternsForGeneration(patterns, insights)
 }
 
-// calculateStats 计算统计信息
-func (s *GeneratorService) calculateStats(patterns []domain.Pattern) *Stats {
-	patterns = activePatterns(patterns)
-	stats := &Stats{
-		Total:      len(patterns),
-		ByCategory: make(map[string][]domain.Pattern),
-	}
-
-	if len(patterns) == 0 {
-		return stats
-	}
-
-	var totalConfidence float64
-	for _, p := range patterns {
-		totalConfidence += p.Confidence
-	}
-	stats.AvgConfidence = totalConfidence / float64(len(patterns))
-
-	for _, p := range patterns {
-		category := string(p.Category)
-		stats.ByCategory[category] = append(stats.ByCategory[category], p)
-	}
-
-	for _, p := range patterns {
-		if p.Confidence > 0.8 {
-			stats.HighConfidence = append(stats.HighConfidence, p)
-		}
-	}
-
-	for _, p := range patterns {
-		if p.Frequency > 3 {
-			stats.Frequent = append(stats.Frequent, p)
-		}
-	}
-
-	return stats
-}
-
 func activePatterns(patterns []domain.Pattern) []domain.Pattern {
 	out := make([]domain.Pattern, 0, len(patterns))
 	for _, pattern := range patterns {

@@ -2,7 +2,6 @@
 
 **Category**: {{.Category}}
 **Pattern Count**: {{.PatternCount}}
-**Confidence**: {{printf "%.2f" .Confidence}}%
 **Last Updated**: {{.LastUpdated}}
 
 {{.GroupSummary.Description}}
@@ -21,40 +20,35 @@ This page only covers business-domain rules. If the task touches cross-boundary 
 {{end}}
 {{end}}
 
-{{if .GroupLocations}}
-## Code Evidence Entry Points
-
-{{range .GroupLocations}}
-- `{{.Path}}`{{if .Symbol}} - {{.Symbol}}{{end}}{{if .Description}}: {{.Description}}{{end}}{{if .Confidence}} (confidence {{printf "%.2f" (mul .Confidence 100)}}%){{end}}
-{{end}}
-{{end}}
-
-{{if .GroupSignals}}
-## Related Signals
-
-{{range .GroupSignals}}
-- {{.}}
-{{end}}
-{{end}}
-
 {{if .PatternObjects}}
-## Detailed Patterns
+{{if gt (len .PatternObjects) 5}}
+## Table Of Contents
 
-Rules are inferred from code evidence and learned patterns. Only high-confidence patterns that repeat and are backed by multiple evidence points should be treated as hard constraints; low-frequency or local evidence is a routing hint and review checklist.
+{{range .PatternObjects}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}
+{{end}}
+
+## Reusable Solutions And Evidence
+
+AI-learned patterns with source evidence identify existing solutions to inspect and prefer. Only explicit user-maintained or built-in rules may be treated as hard constraints.
 
 {{range .PatternObjects}}
 ### {{.Name}}
 
-**Description**: {{.Description}}
+{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability and implementation observation (verify in source)**: {{.Description}}{{end}}
 
-{{if .Rule}}**Rule / Hint**: {{.Rule}}{{end}}
+{{end}}
+{{if .Rule}}**User rule**: {{.Rule}}{{end}}
 
-**Routing Hint**: If the request's business wording, synonymous action, state change, entry channel, or exception symptom matches the description/rule above, locate code through this pattern's evidence path first, then confirm current behavior.
+{{if .EvidenceLocations}}**Verified Source**
 
-**Evidence**: confidence {{printf "%.2f" (mul .Confidence 100)}}%, occurrences {{.Frequency}}, source {{.Source}}. When occurrences are low or evidence is concentrated in one path, verify current code before applying it.
+{{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}
+{{end}}
+{{end}}{{if .BusinessMethod}}**Verified Entry Point**: `{{.BusinessMethod.DisplayLocation}}` - {{.BusinessMethod.Name}}
+{{end}}
 
 {{if .GoodExample}}
-#### ✅ Code Evidence
+#### Code Evidence
 
 ```{{$.CodeFenceLanguage}}
 {{.GoodExample}}
@@ -62,7 +56,7 @@ Rules are inferred from code evidence and learned patterns. Only high-confidence
 {{end}}
 
 {{if .BadExample}}
-#### ❌ Bad Example (Avoid)
+#### Avoid
 
 {{.BadExample}}
 {{end}}

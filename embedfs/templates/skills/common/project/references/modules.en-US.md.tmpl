@@ -1,45 +1,29 @@
 # {{.ProjectName}} Key Modules
 
-This file documents key modules, ownership boundaries, dependencies, and entry methods extracted into the project profile. Check it before changing module structure or adding feature entry points
+This file provides module navigation from the project profile. Module paths come from current source, and entry points are shown only after source-signature verification. Responsibilities and dependency relationships are learned observations that must be checked against source before changes.
 
 {{if .KeyModules}}
+{{if gt (len .KeyModules) 5}}
 ## Table Of Contents
 
 {{range .KeyModules}}- [{{.DisplayName}}](#{{anchor .DisplayName}})
+{{end}}
 {{end}}
 
 {{range .KeyModules}}
 ## {{.DisplayName}}
 
-- **Path**: `{{.Path}}`
-{{if .Description}}
-- **Description**: {{.Description}}
-{{end}}
-{{if .Responsibilities}}
-- **Responsibilities**
-{{range .Responsibilities}}
-  - {{.}}
-{{end}}
-{{end}}
-{{if .Dependencies}}
-- **Dependencies**
-{{range .Dependencies}}
-  - {{.}}
-{{end}}
-{{end}}
-{{if .Dependents}}
-- **Dependents**
-{{range .Dependents}}
-  - {{.}}
-{{end}}
-{{end}}
-{{if .KeyMethods}}
-- **Key Methods**
-{{range .KeyMethods}}
-  - `{{.}}`
-{{end}}
-{{end}}
-
+- **Source path**: `{{.Path}}`
+{{if .Description}}- **Responsibility observation (verify against source)**: {{.Description}}
+{{end}}{{if .Responsibilities}}- **Specific responsibility observations**:
+{{range .Responsibilities}}  - {{.}}
+{{end}}{{end}}{{if .Dependencies}}- **Dependency hints**:
+{{range .Dependencies}}  - {{.}}
+{{end}}{{end}}{{if .Dependents}}- **Dependent hints**:
+{{range .Dependents}}  - {{.}}
+{{end}}{{end}}{{if .KeyMethods}}- **Verified entry points**:
+{{range .KeyMethods}}  - `{{.}}`
+{{end}}{{end}}
 {{end}}
 {{else}}
 *Key module information has not been extracted yet*

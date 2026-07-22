@@ -1,100 +1,21 @@
 package curator
 
 import (
-	"context"
 	"strings"
-	"time"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-func curatedToDomain(pattern agent.CuratedPattern) domain.Pattern {
-	source := domain.Source(pattern.Source)
-	if source == "" {
-		source = domain.SourceLearned
-	}
-	frequency := pattern.Frequency
-	if frequency <= 0 {
-		frequency = 1
-	}
-	now := time.Now()
-	result := domain.Pattern{
-		ID:                pattern.ID,
-		Name:              pattern.Name,
-		Category:          domain.NormalizePatternCategory(domain.Category(pattern.Category)),
-		Description:       pattern.Description,
-		GoodExample:       pattern.GoodExample,
-		BadExample:        pattern.BadExample,
-		Rule:              pattern.Rule,
-		Confidence:        pattern.Confidence,
-		Frequency:         frequency,
-		Source:            source,
-		Merged:            len(pattern.MergedFrom) > 1,
-		MergedFrom:        append([]string(nil), pattern.MergedFrom...),
-		BusinessMethod:    pattern.BusinessMethod,
-		EvidenceLocations: append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...),
-		ProjectID:         pattern.ProjectID,
-		ScopePath:         pattern.ScopePath,
-		WorkspaceRole:     pattern.WorkspaceRole,
-		AnalysisUnitID:    pattern.AnalysisUnitID,
-		AnalysisUnitName:  pattern.AnalysisUnitName,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-	result.RefreshMetrics()
-	return result
-}
-
-func applyCuratedPatterns(ctx context.Context, repo domain.PatternRepository, curated []agent.CuratedPattern, existing []domain.Pattern) ([]domain.Pattern, error) {
-	written := make([]domain.Pattern, 0, len(curated))
-	mutation := domain.PatternMutation{}
-	outputIDs := make(map[string]struct{}, len(curated))
-	for _, pattern := range curated {
-		outputIDs[pattern.ID] = struct{}{}
-	}
-	existingIDs := patternIDSet(existing)
-
-	for _, pattern := range curated {
-		for _, sourceID := range pattern.MergedFrom {
-			if sourceID == "" || sourceID == pattern.ID {
-				continue
-			}
-			if _, existed := existingIDs[sourceID]; !existed {
-				continue
-			}
-			if _, isOutput := outputIDs[sourceID]; isOutput {
-				continue
-			}
-			mutation.DeleteIDs = append(mutation.DeleteIDs, sourceID)
-		}
-		domainPattern := curatedToDomain(pattern)
-		written = append(written, domainPattern)
-		mutation.Save = append(mutation.Save, &written[len(written)-1])
-	}
-	if err := repo.ApplyPatternMutation(ctx, mutation); err != nil {
-		return nil, err
-	}
-	return written, nil
-}
-
-func deterministicCurate(candidates, existing []domain.Pattern) *agent.CuratePatternsResult {
+func deterministicCurate(candidates, existing []domain.Pattern) *proposal {
 	merger := newDeterministicMerger(existing, len(candidates))
 
 	for _, candidate := range candidates {
 		merger.Add(candidate)
 	}
 
-	result := &agent.CuratePatternsResult{
+	result := &proposal{
 		Patterns: merger.CuratedPatterns(),
-		Dropped:  []agent.CuratedDrop{},
-	}
-
-	result.Summary = agent.CurateSummary{
-		TotalCandidates: len(candidates),
-		TotalExisting:   len(existing),
-		TotalWritten:    len(result.Patterns),
-		TotalDropped:    len(result.Dropped),
+		Dropped:  []Drop{},
 	}
 	return result
 }
@@ -102,14 +23,14 @@ func deterministicCurate(candidates, existing []domain.Pattern) *agent.CuratePat
 type deterministicMerger struct {
 	accepted  []domain.Pattern
 	indexByID map[string]int
-	output    map[string]agent.CuratedPattern
+	output    map[string]domain.Pattern
 }
 
 func newDeterministicMerger(existing []domain.Pattern, candidateCount int) *deterministicMerger {
 	merger := &deterministicMerger{
 		accepted:  make([]domain.Pattern, 0, len(existing)+candidateCount),
 		indexByID: make(map[string]int, len(existing)+candidateCount),
-		output:    make(map[string]agent.CuratedPattern, candidateCount),
+		output:    make(map[string]domain.Pattern, candidateCount),
 	}
 	for _, pattern := range existing {
 		merger.upsertAccepted(normalizeCandidate(pattern))
@@ -120,16 +41,16 @@ func newDeterministicMerger(existing []domain.Pattern, candidateCount int) *dete
 func (m *deterministicMerger) Add(candidate domain.Pattern) {
 	candidate = normalizeCandidate(candidate)
 	if index, ok := m.indexByID[candidate.ID]; ok {
-		m.recordMerged(index, candidate, 1, "deterministic update")
+		m.recordMerged(index, candidate)
 		return
 	}
 	bestIndex, bestScore := m.bestMatch(candidate)
 	if bestIndex >= 0 && bestScore >= deterministicMergeThreshold {
-		m.recordMerged(bestIndex, candidate, bestScore, "deterministic merge")
+		m.recordMerged(bestIndex, candidate)
 		return
 	}
 	m.appendAccepted(candidate)
-	m.output[candidate.ID] = domainToCurated(candidate, []string{candidate.ID}, 1, "new candidate")
+	m.output[candidate.ID] = patternWithSources(candidate, []string{candidate.ID})
 }
 
 func (m *deterministicMerger) upsertAccepted(pattern domain.Pattern) {
@@ -140,11 +61,11 @@ func (m *deterministicMerger) upsertAccepted(pattern domain.Pattern) {
 	m.appendAccepted(pattern)
 }
 
-func (m *deterministicMerger) recordMerged(index int, candidate domain.Pattern, similarity float64, reason string) {
+func (m *deterministicMerger) recordMerged(index int, candidate domain.Pattern) {
 	merged := mergeKeepingBestPattern(m.accepted[index], candidate)
 	m.replaceAccepted(index, merged)
 	m.removeMergedOutputs(merged.MergedFrom, merged.ID)
-	m.output[merged.ID] = domainToCurated(merged, merged.MergedFrom, similarity, reason)
+	m.output[merged.ID] = patternWithSources(merged, merged.MergedFrom)
 }
 
 func (m *deterministicMerger) appendAccepted(pattern domain.Pattern) {
@@ -185,8 +106,8 @@ func (m *deterministicMerger) removeMergedOutputs(mergedFrom []string, keepID st
 	}
 }
 
-func (m *deterministicMerger) CuratedPatterns() []agent.CuratedPattern {
-	result := make([]agent.CuratedPattern, 0, len(m.output))
+func (m *deterministicMerger) CuratedPatterns() []domain.Pattern {
+	result := make([]domain.Pattern, 0, len(m.output))
 	for _, pattern := range m.accepted {
 		if curated, ok := m.output[pattern.ID]; ok {
 			result = append(result, curated)
@@ -281,30 +202,13 @@ func mergeEvidenceLocations(left, right []domain.PatternEvidenceLocation) []doma
 	return out
 }
 
-func domainToCurated(pattern domain.Pattern, mergedFrom []string, similarity float64, reason string) agent.CuratedPattern {
+func patternWithSources(pattern domain.Pattern, mergedFrom []string) domain.Pattern {
 	pattern = normalizeCandidate(pattern)
-	return agent.CuratedPattern{
-		ID:                pattern.ID,
-		Name:              pattern.Name,
-		Category:          string(pattern.Category),
-		Description:       pattern.Description,
-		GoodExample:       pattern.GoodExample,
-		BadExample:        pattern.BadExample,
-		Rule:              pattern.Rule,
-		Confidence:        pattern.Confidence,
-		Frequency:         pattern.Frequency,
-		MergedFrom:        uniqueStrings(mergedFrom),
-		MergeReason:       reason,
-		SimilarityScore:   similarity,
-		Source:            string(pattern.Source),
-		BusinessMethod:    pattern.BusinessMethod,
-		EvidenceLocations: append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...),
-		ProjectID:         pattern.ProjectID,
-		ScopePath:         pattern.ScopePath,
-		WorkspaceRole:     pattern.WorkspaceRole,
-		AnalysisUnitID:    pattern.AnalysisUnitID,
-		AnalysisUnitName:  pattern.AnalysisUnitName,
-	}
+	pattern.MergedFrom = uniqueStrings(mergedFrom)
+	pattern.Merged = len(pattern.MergedFrom) > 1
+	pattern.BusinessMethod = cloneBusinessMethod(pattern.BusinessMethod)
+	pattern.EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...)
+	return pattern
 }
 
 func uniqueStrings(values []string) []string {

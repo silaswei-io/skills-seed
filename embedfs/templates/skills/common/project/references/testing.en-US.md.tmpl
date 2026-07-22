@@ -1,0 +1,28 @@
+# Go Test Matrix
+
+This file is generated deterministically from the current source tree and does not depend on AI learning. Each `_test.go` belongs to its nearest ancestor `go.mod`.
+
+## Contents
+
+- [Module Test Commands](#module-test-commands)
+- [Test File Evidence](#test-file-evidence)
+- [Coverage Gaps](#coverage-gaps)
+
+## Module Test Commands
+
+| Workdir | Command | Test files | Module evidence |
+|---|---|---:|---|
+{{range .Inventory.Modules}}{{if .TestFiles}}| `{{.Workdir}}` | `go test ./...` | {{len .TestFiles}} | `{{.ModFile}}` |
+{{end}}{{end}}
+
+## Test File Evidence
+
+{{range .Inventory.Modules}}{{if .TestFiles}}### `{{.Workdir}}` ({{len .TestFiles}} files)
+
+{{range .TestFiles}}- `{{.}}`
+{{end}}
+{{end}}{{end}}## Coverage Gaps
+
+{{range .Inventory.Modules}}{{if not .TestFiles}}- Module `{{.Workdir}}` (`{{.ModFile}}`) has no `_test.go`, so no test command is generated.
+{{end}}{{end}}{{range .Inventory.UnownedTestFiles}}- `{{.}}` does not belong to a `go.mod`; confirm its module boundary first.
+{{end}}

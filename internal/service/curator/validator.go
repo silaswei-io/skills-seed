@@ -4,13 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
-
-type sanitizeCurateResultReport struct {
-	IgnoredDroppedIDs []string
-}
 
 func validateCandidates(candidates []domain.Pattern) []domain.Pattern {
 	valid := make([]domain.Pattern, 0, len(candidates))
@@ -64,35 +59,16 @@ func commonPairValue(left, right string) string {
 	return ""
 }
 
-func validateCurateResultForOperation(operation string, result *agent.CuratePatternsResult, candidates, existing []domain.Pattern) error {
+func validateCurateResultForOperation(operation Operation, result *proposal, candidates, existing []domain.Pattern) error {
 	if operation == OperationLearnCurrent {
-		if err := hydrateCurrentCurateResult(result, candidates, existing); err != nil {
+		if err := hydrateCurateResult(result, candidates, existing); err != nil {
 			return err
 		}
 	}
 	return validateCurateResult(result, candidates, existing)
 }
 
-func sanitizeCurateResult(result *agent.CuratePatternsResult, candidates []domain.Pattern) sanitizeCurateResultReport {
-	if result == nil {
-		return sanitizeCurateResultReport{}
-	}
-
-	candidateIDs := patternIDSet(candidates)
-	dropped := result.Dropped[:0]
-	report := sanitizeCurateResultReport{}
-	for _, item := range result.Dropped {
-		if _, ok := candidateIDs[item.ID]; !ok {
-			report.IgnoredDroppedIDs = append(report.IgnoredDroppedIDs, item.ID)
-			continue
-		}
-		dropped = append(dropped, item)
-	}
-	result.Dropped = dropped
-	return report
-}
-
-func validateCurateResult(result *agent.CuratePatternsResult, candidates, existing []domain.Pattern) error {
+func validateCurateResult(result *proposal, candidates, existing []domain.Pattern) error {
 	if result == nil {
 		return fmt.Errorf("curation result is nil")
 	}
@@ -108,10 +84,11 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 	}
 
 	coveredCandidates := make(map[string]struct{}, len(candidateIDs))
+	mergedCandidates := make(map[string]struct{}, len(candidateIDs))
 	outputIDs := make(map[string]struct{}, len(result.Patterns))
 	for i := range result.Patterns {
 		pattern := &result.Patterns[i]
-		pattern.Category = string(domain.NormalizePatternCategory(domain.Category(pattern.Category)))
+		pattern.Category = domain.NormalizePatternCategory(pattern.Category)
 		if strings.TrimSpace(pattern.ID) == "" {
 			return fmt.Errorf("curated pattern has empty id")
 		}
@@ -119,7 +96,7 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 			return fmt.Errorf("duplicate curated pattern id %q", pattern.ID)
 		}
 		outputIDs[pattern.ID] = struct{}{}
-		if !domain.IsValidPatternCategory(domain.Category(pattern.Category)) {
+		if !domain.IsValidPatternCategory(pattern.Category) {
 			return fmt.Errorf("curated pattern %q has invalid category %q", pattern.ID, pattern.Category)
 		}
 		if strings.TrimSpace(pattern.Name) == "" {
@@ -140,6 +117,7 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 			}
 			if _, ok := candidateIDs[id]; ok {
 				coveredCandidates[id] = struct{}{}
+				mergedCandidates[id] = struct{}{}
 			}
 		}
 	}
@@ -152,6 +130,9 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 		if _, exists := droppedIDs[dropped.ID]; exists {
 			return fmt.Errorf("duplicate dropped candidate id %q", dropped.ID)
 		}
+		if _, merged := mergedCandidates[dropped.ID]; merged {
+			return fmt.Errorf("candidate pattern %q is both merged and dropped", dropped.ID)
+		}
 		droppedIDs[dropped.ID] = struct{}{}
 		coveredCandidates[dropped.ID] = struct{}{}
 	}
@@ -161,142 +142,7 @@ func validateCurateResult(result *agent.CuratePatternsResult, candidates, existi
 			return fmt.Errorf("candidate pattern %q is not covered by curated result", id)
 		}
 	}
-	return nil
-}
-
-func hydrateCurrentCurateResult(result *agent.CuratePatternsResult, candidates, existing []domain.Pattern) error {
-	if result == nil {
-		return fmt.Errorf("curation result is nil")
-	}
-	inputs := make(map[string][]domain.Pattern, len(candidates)+len(existing))
-	for _, pattern := range append(append([]domain.Pattern(nil), candidates...), existing...) {
-		inputs[pattern.ID] = append(inputs[pattern.ID], pattern)
-	}
-	for i := range result.Patterns {
-		pattern := &result.Patterns[i]
-		var sources []domain.Pattern
-		allowedEvidence := make(map[string]domain.PatternEvidenceLocation)
-		var sourceEvidence []domain.PatternEvidenceLocation
-		for _, sourceID := range pattern.MergedFrom {
-			mergedSources, ok := inputs[sourceID]
-			if !ok {
-				return fmt.Errorf("curated pattern %q references unknown source %q", pattern.ID, sourceID)
-			}
-			for _, source := range mergedSources {
-				sources = append(sources, source)
-				for _, location := range source.EvidenceLocations {
-					key := curateEvidenceKey(location)
-					if _, exists := allowedEvidence[key]; exists {
-						continue
-					}
-					allowedEvidence[key] = location
-					sourceEvidence = append(sourceEvidence, location)
-				}
-			}
-		}
-		if len(sources) == 0 {
-			return fmt.Errorf("curated pattern %q has no merged sources", pattern.ID)
-		}
-
-		sources = prioritizeCurrentSources(pattern.ID, sources)
-		pattern.GoodExample, pattern.BadExample = currentExamples(sources)
-		pattern.BusinessMethod = firstCurrentBusinessMethod(sources)
-		hydrateCurrentProvenance(pattern, sources)
-
-		canonicalEvidence := make([]domain.PatternEvidenceLocation, 0, len(pattern.EvidenceLocations))
-		seenEvidence := make(map[string]struct{}, len(pattern.EvidenceLocations))
-		for _, location := range pattern.EvidenceLocations {
-			key := curateEvidenceKey(location)
-			canonical, ok := allowedEvidence[key]
-			if !ok {
-				continue
-			}
-			if _, exists := seenEvidence[key]; exists {
-				continue
-			}
-			seenEvidence[key] = struct{}{}
-			canonicalEvidence = append(canonicalEvidence, canonical)
-		}
-		if len(canonicalEvidence) == 0 {
-			canonicalEvidence = sourceEvidence
-		}
-		if len(canonicalEvidence) == 0 {
-			return fmt.Errorf("curated pattern %q has no evidence", pattern.ID)
-		}
-		pattern.EvidenceLocations = canonicalEvidence
-		pattern.Frequency, pattern.Confidence = domain.PatternEvidenceQuality(pattern.EvidenceLocations)
-	}
-	return nil
-}
-
-func prioritizeCurrentSources(patternID string, sources []domain.Pattern) []domain.Pattern {
-	ordered := make([]domain.Pattern, 0, len(sources))
-	for _, source := range sources {
-		if source.ID == patternID {
-			ordered = append(ordered, source)
-		}
-	}
-	for _, source := range sources {
-		if source.ID != patternID {
-			ordered = append(ordered, source)
-		}
-	}
-	return ordered
-}
-
-func currentExamples(sources []domain.Pattern) (string, string) {
-	var goodExample string
-	var badExample string
-	for _, source := range sources {
-		if goodExample == "" {
-			goodExample = strings.TrimSpace(source.GoodExample)
-		}
-		if badExample == "" {
-			badExample = strings.TrimSpace(source.BadExample)
-		}
-		if goodExample != "" && badExample != "" {
-			break
-		}
-	}
-	return goodExample, badExample
-}
-
-func firstCurrentBusinessMethod(sources []domain.Pattern) *domain.BusinessMethod {
-	for _, source := range sources {
-		if source.BusinessMethod != nil {
-			return source.BusinessMethod
-		}
-	}
-	return nil
-}
-
-func hydrateCurrentProvenance(pattern *agent.CuratedPattern, sources []domain.Pattern) {
-	if len(sources) == 0 {
-		return
-	}
-	pattern.Source = string(sources[0].Source)
-	pattern.ProjectID = commonSourceValue(sources, func(source domain.Pattern) string { return source.ProjectID })
-	pattern.ScopePath = commonSourceValue(sources, func(source domain.Pattern) string { return source.ScopePath })
-	pattern.WorkspaceRole = commonSourceValue(sources, func(source domain.Pattern) string { return source.WorkspaceRole })
-	pattern.AnalysisUnitID = commonSourceValue(sources, func(source domain.Pattern) string { return source.AnalysisUnitID })
-	pattern.AnalysisUnitName = commonSourceValue(sources, func(source domain.Pattern) string { return source.AnalysisUnitName })
-}
-
-func commonSourceValue(sources []domain.Pattern, value func(domain.Pattern) string) string {
-	if len(sources) == 0 {
-		return ""
-	}
-	common := strings.TrimSpace(value(sources[0]))
-	for _, source := range sources[1:] {
-		if strings.TrimSpace(value(source)) != common {
-			return ""
-		}
-	}
-	return common
-}
-
-func curateEvidenceKey(location domain.PatternEvidenceLocation) string {
-	return strings.TrimSpace(location.Path) + "|" + fmt.Sprint(location.Line) + "|" + strings.TrimSpace(location.Symbol) + "|" + strings.TrimSpace(location.Kind)
+	return validateProposalOwnership(result)
 }
 
 func patternIDSet(patterns []domain.Pattern) map[string]struct{} {

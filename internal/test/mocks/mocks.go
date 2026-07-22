@@ -75,35 +75,18 @@ func (m *MockAgent) CuratePatterns(ctx context.Context, req *agent.CuratePattern
 	patterns := make([]agent.CuratedPattern, 0, len(req.CandidatePatterns))
 	for _, candidate := range req.CandidatePatterns {
 		patterns = append(patterns, agent.CuratedPattern{
-			ID:                candidate.ID,
-			Name:              candidate.Name,
-			Category:          string(candidate.Category),
-			Description:       candidate.Description,
-			GoodExample:       candidate.GoodExample,
-			BadExample:        candidate.BadExample,
-			Rule:              candidate.Rule,
-			Confidence:        candidate.Confidence,
-			Frequency:         candidate.Frequency,
-			MergedFrom:        []string{candidate.ID},
-			MergeReason:       "new candidate",
-			Source:            string(candidate.Source),
-			EvidenceLocations: append([]domain.PatternEvidenceLocation(nil), candidate.EvidenceLocations...),
-			BusinessMethod:    candidate.BusinessMethod,
-			ProjectID:         candidate.ProjectID,
-			ScopePath:         candidate.ScopePath,
-			WorkspaceRole:     candidate.WorkspaceRole,
-			AnalysisUnitID:    candidate.AnalysisUnitID,
-			AnalysisUnitName:  candidate.AnalysisUnitName,
+			ID:          candidate.ID,
+			Name:        candidate.Name,
+			Category:    string(candidate.Category),
+			Description: candidate.Description,
+			Rule:        candidate.Rule,
+			Confidence:  candidate.Confidence,
+			SourceIDs:   []string{candidate.ID},
 		})
 	}
 	return &agent.CuratePatternsResult{
 		Patterns: patterns,
 		Dropped:  []agent.CuratedDrop{},
-		Summary: agent.CurateSummary{
-			TotalCandidates: len(req.CandidatePatterns),
-			TotalExisting:   len(req.ExistingPatterns),
-			TotalWritten:    len(patterns),
-		},
 	}, nil
 }
 

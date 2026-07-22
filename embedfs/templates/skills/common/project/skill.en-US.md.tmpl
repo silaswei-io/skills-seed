@@ -6,146 +6,80 @@ description: {{.SkillDescription}}
 <!-- generated-by: skills-seed {{.ProgramVersion}} -->
 <!-- skills-template-sha256: {{.SkillsTemplatesHash}} -->
 
-# {{.ProjectName}} Development Skills
+# {{.ProjectName}} Development Skill
 
 **Language**: {{.Language}}
-**Last Updated**: {{.LastUpdated}}
-**Patterns Learned**: {{.PatternCount}}
-**Average Confidence**: {{printf "%.2f" .AvgConfidence}}%
+**Last updated**: {{.LastUpdated}}
+**Learned patterns**: {{.PatternCount}}
 
-{{if .ValidationCommands}}This is the project entry skill. It only routes the task to the right project references, confirms constraint sources, and selects learned validation commands. Business rules, architecture details, code evidence, and examples must be read from the matching references before implementation decisions.
-{{else}}This is the project entry skill. It only routes the task to the right project references and confirms constraint sources. Business rules, architecture details, code evidence, and examples must be read from the matching references before implementation decisions.
+This project entry skill only routes tasks to the smallest necessary references and confirms constraint sources. Read the matching reference before deciding from business rules, architecture details, code evidence, test facts, or validation commands.
 
-No validation commands have been learned; confirm them from repository authority files such as AGENTS, build scripts, or CI configuration instead of inferring language defaults.
+## Usage
+
+1. Read the smallest necessary reference set for the task. Do not load every reference at once. After entering a category pattern, check its "Related References" section first and continue when a cross-boundary hint matches the task.
+{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. For business rules, state transitions, or cross-entity flows, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.
+{{else}}2. For business rules, state transitions, or cross-entity flows, inspect current code and reuse nearby implementations.
+{{end}}{{if .References.BusinessMethods}}3. For project-level business entries, cross-module orchestration, or tool entries, read the [Entry Method Index](./references/business-methods.md).
+{{else}}3. Confirm project-level entries from current code and module entry points.
+{{end}}4. For APIs, contracts, adapters, derived artifacts, or configuration conventions, read [Project Spec](./references/project-spec.md) and the related category pattern.
+{{if .References.KeyModules}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md).
+{{else}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md).
+{{end}}6. To validate a change, read [Validation Strategy](./references/validation.md){{if .References.Testing}}; for Go code, also read the [Test Matrix](./references/testing.md){{end}}.
+{{else}}2. References were omitted from this generation. Read current code and prefer nearby implementations.
 {{end}}
 
-## How To Use This Skill
+Only explicit user-maintained or built-in rules are hard constraints. Source-backed learned patterns locate reusable solutions but are not mandatory rules. Current code wins when it conflicts with a reference; report missing evidence instead of inventing project rules.
 
-1. Read the smallest relevant reference set for the task; do not read every reference by default. After opening any category pattern, check its "Related References" section first and continue to the matching reference when the task crosses one of those boundaries.
-{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. Business rules, state transitions, or cross-entity flows: read the [Business Pattern Map](./references/patterns/business.md) first, then open the matching business detail page.
-{{else}}2. Business rules, state transitions, or cross-entity flows: inspect current code and reuse nearby implementations.
-{{end}}{{if .References.BusinessMethods}}3. When reusing project-level business entry points, cross-module orchestration entry points, or utility entry points, read [Entry Method Index](./references/business-methods.md) next.
-{{else}}3. When reusing project-level entry points, confirm them from current code and module entry points.
-{{end}}4. API, contracts, adapters, derived artifacts, or configuration conventions: read [Project Spec](./references/project-spec.md) and related category patterns.
-{{if .References.KeyModules}}5. Architecture, module boundaries, or dependency relationships: read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md).
-{{else}}5. Architecture, module boundaries, or dependency relationships: read [Project Overview](./references/project-overview.md).
-{{end}}6. Utilities, config, middleware, concurrency, or tests: read only the matching category pattern.
-{{else}}2. References were not written in this generation; inspect current code directly and reuse nearby implementations.
-{{end}}
-
-Only high-confidence patterns backed by code evidence are hard constraints. If references and current code disagree, trust current code; if evidence is missing, state the gap instead of inventing product rules.
-
----
-
-{{if .Workflows}}
-## Common Workflows
-
-{{range .Workflows}}
-### {{.Title}}
-
-Applies when: {{.AppliesWhen}}
-
-{{range .Steps}}
-- {{.}}
-{{end}}
-
-{{end}}
----
-
-{{end}}
 {{if .WorkflowReferences}}
 ## User Workflows
 
-{{range .WorkflowReferences}}
-- **[{{.Name}}]({{.Path}})**{{if .Description}} - {{.Description}}{{end}}
+{{range .WorkflowReferences}}- **[{{.Name}}]({{.Path}})**{{if .Description}} - {{.Description}}{{end}}
 {{end}}
-
----
-
-{{end}}
-{{if .StateSummaries}}
+{{end}}{{if .StateSummaries}}
 ## State And Boundary Notes
 
-{{range .StateSummaries}}
-- {{.}}
+{{range .StateSummaries}}- {{.}}
 {{end}}
-
----
-
-{{end}}
-{{if .ValidationCommands}}
-## Validation Commands
-
-{{if .ValidationMatrix}}Choose the smallest command set that matches the change. The table only includes commands that evidence maps to a concrete scope:
-
-| Change Scope | Suggested Command | Trigger | Evidence |
-|---|---|---|---|
-{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
-{{end}}
-
-Other learned commands; they may not cover the current change scope, so confirm coverage against current code and evidence before running:
-{{else}}Learned commands are listed below. No validation matrix could be mapped to concrete change scopes, so confirm coverage against current code and evidence before running:
-{{end}}
-{{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}{{if .Workdir}}, workdir: `{{.Workdir}}`{{end}}{{if .ScopePaths}}, scope: {{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}, evidence: {{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}, type: {{.Type}}{{end}}
-{{end}}
-
----
-
 {{end}}
 ## Pattern References
 
 {{if .References.Enabled}}- **[Project Spec](./references/project-spec.md)** - Boundaries, rules, configuration, and touchpoints
-- **[Project Overview](./references/project-overview.md)** - Architecture, tech stack, key modules
-{{else}}*References were not written in this generation.*
-{{end}}
-{{if .OverviewReferences}}
+- **[Project Overview](./references/project-overview.md)** - Architecture, technology stack, and key modules
+- **[Validation Strategy](./references/validation.md)** - Learned commands, applicability, and validation gaps
+{{if .References.Testing}}- **[Test Matrix](./references/testing.md)** - Go modules, test commands, and test-file evidence
+{{end}}{{else}}*References were omitted from this generation.*
+{{end}}{{if .OverviewReferences}}
 
 ### Project Details
-{{range .OverviewReferences}}
-- **[{{.Title}}]({{.Path}})** - {{.Description}}
-{{end}}
-{{end}}
 
-{{if .ReferenceGroups}}
+{{range .OverviewReferences}}- **[{{.Title}}]({{.Path}})** - {{.Description}}
+{{end}}{{end}}{{if .ReferenceGroups}}
 {{range .ReferenceGroups}}
 ### {{.Title}}
-{{range .Items}}
-- **[{{.Title}}]({{.Path}})** - {{.Description}}
-{{end}}
 
+{{range .Items}}- **[{{.Title}}]({{.Path}})** - {{.Description}}
+{{end}}{{end}}{{else if .References.Enabled}}
+*No category pattern references were generated.*
 {{end}}
-{{else if .References.Enabled}}
-*No category pattern references have been generated yet.*
-{{end}}
-
----
 
 ## Project Rules
 
-- Check nearby code before introducing a new pattern or abstraction
-- Use project-specific business methods and utilities from the references when they exist
-{{if .References.ProjectSpec}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by [Project Spec](./references/project-spec.md){{else}}- Derived artifacts, interface models, adapters, and configuration conventions are governed by current code and project configuration{{end}}
-- Only pattern rules backed by code evidence should be treated as hard constraints; reference observations cannot override current code behavior
-- If references and current code disagree, trust current code
+- Check nearby code before introducing a pattern or abstraction.
+- Reuse project-specific entries and utilities from references when available.
+{{if .References.ProjectSpec}}- Follow [Project Spec](./references/project-spec.md) for derived artifacts, interface models, adapters, and configuration conventions.{{else}}- Follow current code and project configuration for derived artifacts, interface models, adapters, and configuration conventions.{{end}}
+- Treat only explicit user-maintained or built-in rules as hard constraints; verify learned patterns against source.
+- Current code wins when references disagree.
 
-{{if .KeyInsights}}
-### Key Insights
-{{range .KeyInsights}}
-- {{.}}
+{{if .KeyInsights}}### Key Insights
+
+{{range .KeyInsights}}- {{.}}
 {{end}}
+{{end}}## Pattern Statistics
 
-{{end}}
----
-
-## Pattern Statistics
-
-- **Total Patterns**: {{.PatternCount}}
-- **Average Confidence**: {{printf "%.2f" .AvgConfidence}}%
+- **Total patterns**: {{.PatternCount}}
 - **Categories**: {{.Categories}}
 
-{{if includeSkillsSeedGeneratedNotice}}
----
+{{if includeSkillsSeedGeneratedNotice}}---
 
-*This skill becomes smarter with every commit. Generated by [skills-seed](https://github.com/silaswei-io/skills-seed).*
+*This skill gets smarter with every commit. Generated by [skills-seed](https://github.com/silaswei-io/skills-seed).*
 {{end}}

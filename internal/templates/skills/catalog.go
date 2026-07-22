@@ -35,6 +35,20 @@ var skillTemplateCatalog = []TemplateEntry{
 		Providers:    []string{"common"},
 	},
 	{
+		ID:           "project-reference-validation",
+		RelativeName: "project/references/validation",
+		Ext:          metadata.SkillsTemplateExt,
+		OutputPath:   "references/validation.md",
+		Providers:    []string{"common"},
+	},
+	{
+		ID:           "project-reference-testing",
+		RelativeName: "project/references/testing",
+		Ext:          metadata.SkillsTemplateExt,
+		OutputPath:   "references/testing.md",
+		Providers:    []string{"common"},
+	},
+	{
 		ID:           "project-reference-business-methods",
 		RelativeName: "project/references/business-methods",
 		Ext:          metadata.SkillsTemplateExt,

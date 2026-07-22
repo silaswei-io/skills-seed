@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -53,13 +54,6 @@ func TestLoader_Render(t *testing.T) {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "项目级业务入口和可复用方法索引"},
 		},
-		"Workflows": []map[string]interface{}{
-			{
-				"Title":       "新增或调整 API",
-				"AppliesWhen": "接口或生成层变化时",
-				"Steps":       []string{"修改接口定义。", "运行生成命令。"},
-			},
-		},
 		"WorkflowReferences": []map[string]string{
 			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查"},
 		},
@@ -69,6 +63,7 @@ func TestLoader_Render(t *testing.T) {
 		"ValidationMatrix": []map[string]interface{}{
 			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
 		},
+		"ValidationGaps": []string{},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
 		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
@@ -97,9 +92,10 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "项目入口 skill")
 	assert.Contains(t, content, "业务模式地图")
-	assert.Contains(t, content, "常用工作流")
+	assert.NotContains(t, content, "常用工作流")
 	assert.Contains(t, content, "部署工作流")
-	assert.Contains(t, content, "task verify")
+	assert.Contains(t, content, "验证策略")
+	assert.NotContains(t, content, "task verify")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")
 	assert.NotContains(t, content, "为外部调用补充超时测试")
 }
@@ -129,13 +125,6 @@ func TestLoader_Render_English(t *testing.T) {
 			"Add timeout tests for external calls",
 		},
 		"OverviewReferences": []ReferenceItem{},
-		"Workflows": []map[string]interface{}{
-			{
-				"Title":       "Add Or Change API",
-				"AppliesWhen": "endpoints change",
-				"Steps":       []string{"Change the API source files first."},
-			},
-		},
 		"WorkflowReferences": []map[string]string{},
 		"ValidationCommands": []map[string]interface{}{
 			{"Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
@@ -143,6 +132,7 @@ func TestLoader_Render_English(t *testing.T) {
 		"ValidationMatrix": []map[string]interface{}{
 			{"Area": "Business Flow / State / Orchestration", "Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
 		},
+		"ValidationGaps":  []string{},
 		"StateSummaries":  []string{"Task: preserve task state transitions."},
 		"References":      fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{},
@@ -155,8 +145,9 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.Contains(t, content, "test-project")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "project entry skill")
-	assert.Contains(t, content, "Common Workflows")
-	assert.Contains(t, content, "task verify")
+	assert.NotContains(t, content, "Common Workflows")
+	assert.Contains(t, content, "Validation Strategy")
+	assert.NotContains(t, content, "task verify")
 	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
 	assert.NotContains(t, content, "Add timeout tests for external calls")
 }
@@ -279,6 +270,32 @@ func TestLoader_RenderReference(t *testing.T) {
 	assert.Contains(t, content, "API 路由命名规范")
 }
 
+func TestLoader_AddsTableOfContentsForLongPatternReference(t *testing.T) {
+	loader := NewLoader("zh-CN")
+	patterns := make([]domain.Pattern, 0, 6)
+	for i := 1; i <= 6; i++ {
+		pattern := domain.NewPattern(fmt.Sprintf("p%d", i), fmt.Sprintf("模式 %d", i), domain.Category("custom-domain"))
+		patterns = append(patterns, *pattern)
+	}
+
+	content, err := loader.RenderPattern("custom-domain", map[string]interface{}{
+		"Category":          "custom-domain",
+		"Summary":           "自定义分类模式",
+		"PatternObjects":    patterns,
+		"UsageScenes":       []string{},
+		"Priority":          3,
+		"PatternCount":      len(patterns),
+		"LastUpdated":       "2026-07-21 00:00:00",
+		"CodeFenceLanguage": "go",
+		"RelatedReferences": []interface{}{},
+		"ClaimGroups":       []interface{}{},
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, content, "## 目录")
+	require.Contains(t, content, "[模式 6](#模式-6)")
+}
+
 // TestLoader_RenderReference_NotFound 测试不存在的模板
 func TestLoader_RenderReference_NotFound(t *testing.T) {
 	loader := NewLoader("zh-CN")
@@ -336,8 +353,7 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 			detailChecks: []string{
 				"同义业务动作",
 				"入口渠道或外部依赖",
-				"定位提示",
-				"先按本模式的证据路径定位代码",
+				"有源码证据的 AI 学习模式用于定位并优先复用已有实现",
 			},
 		},
 		{
@@ -351,8 +367,7 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 			detailChecks: []string{
 				"synonymous business actions",
 				"entry channels, or external dependencies",
-				"Routing Hint",
-				"locate code through this pattern's evidence path first",
+				"AI-learned patterns with source evidence identify existing solutions to inspect and prefer",
 			},
 		},
 	}
@@ -366,12 +381,11 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 
 			data := map[string]interface{}{
 				"PatternCount":      1,
-				"Confidence":        90.0,
 				"LastUpdated":       "2026-06-26 00:00:00",
 				"Summary":           "",
-				"UsageScenes":       []string{},
 				"Category":          "business",
 				"CodeFenceLanguage": "go",
+				"CoverageWarnings":  []interface{}{},
 				"Groups": []map[string]interface{}{
 					{
 						"ID":    "resource",
@@ -393,10 +407,7 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 					"PrimaryPath": "internal/service/resource.go",
 					"IsFallback":  false,
 				},
-				"GroupLocations": []interface{}{},
-				"GroupSignals":   []string{},
 				"PatternObjects": []domain.Pattern{*pattern},
-				"ClaimGroups":    []interface{}{},
 				"RelatedReferences": []interface{}{
 					map[string]string{
 						"Title":  "API 模式",
@@ -497,6 +508,19 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 					require.NotContains(t, mainContent, "skills-seed learn history")
 					require.NotContains(t, mainContent, "skills-seed generate skills")
 					require.NotContains(t, mainContent, "skills-seed generate-skills")
+					require.NotContains(t, mainContent, "task verify")
+					validationContent, err := loader.Render("project-reference-validation", map[string]interface{}{
+						"Commands": []domain.ValidationCommand{{Command: "task verify", When: "code changes", Source: "Taskfile.yml"}},
+						"Matrix":   []map[string]interface{}{},
+						"Gaps":     []string{},
+					})
+					require.NoError(t, err)
+					require.Contains(t, validationContent, "task verify")
+					if locale == "zh-CN" {
+						require.Contains(t, validationContent, "## 最低验证策略")
+					} else {
+						require.Contains(t, validationContent, "## Minimum Validation Strategy")
+					}
 
 					overview, err := loader.Render("project-reference-overview", projectOverviewData())
 					require.NoError(t, err)
@@ -553,6 +577,10 @@ func TestSkillTemplates_DoNotKeepDuplicateOrRetiredReferenceTemplates(t *testing
 		"../../../embedfs/templates/skills/codex/references/project-overview.md.tmpl",
 		"../../../embedfs/templates/skills/codex/references/patterns",
 		"../../../embedfs/templates/skills/codex/references/examples",
+		"../../../embedfs/templates/skills/codex/project/skill.md.tmpl",
+		"../../../embedfs/templates/skills/codex/project/skill.en-US.md.tmpl",
+		"../../../embedfs/templates/skills/claude/project/skill.md.tmpl",
+		"../../../embedfs/templates/skills/claude/project/skill.en-US.md.tmpl",
 	} {
 		_, err := os.Stat(path)
 		require.ErrorIs(t, err, os.ErrNotExist, path)
@@ -628,13 +656,13 @@ func TestSkillTemplateCatalogFilesExistAndUsePrefixNames(t *testing.T) {
 			require.NotContains(t, entry.RelativeName, ".")
 
 			for _, provider := range entry.Providers {
-				path := metadata.SkillsTemplatePath(provider, entry.RelativeName, "", entry.Ext)
-				_, err := embedfs.FS.ReadFile(path)
+				loader := NewLoaderForAgent(provider, "zh-CN")
+				path, err := loader.catalogTemplatePath(entry)
 				require.NoError(t, err, path)
 				require.NotContains(t, path, "_")
 
-				enPath := metadata.SkillsTemplatePath(provider, entry.RelativeName, "en-US", entry.Ext)
-				_, err = embedfs.FS.ReadFile(enPath)
+				enLoader := NewLoaderForAgent(provider, "en-US")
+				enPath, err := enLoader.catalogTemplatePath(entry)
 				require.NoError(t, err, enPath)
 				require.NotContains(t, enPath, "_")
 			}
@@ -679,13 +707,6 @@ func fullSkillData() map[string]interface{} {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},
-		"Workflows": []map[string]interface{}{
-			{
-				"Title":       "新增或调整 API",
-				"AppliesWhen": "接口或生成层变化时",
-				"Steps":       []string{"修改接口定义。", "运行生成命令。"},
-			},
-		},
 		"WorkflowReferences": []map[string]string{},
 		"ValidationCommands": []map[string]interface{}{
 			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
@@ -693,6 +714,7 @@ func fullSkillData() map[string]interface{} {
 		"ValidationMatrix": []map[string]interface{}{
 			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
 		},
+		"ValidationGaps": []string{},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
 		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
@@ -779,6 +801,7 @@ func projectOverviewData() map[string]interface{} {
 		"ValidationMatrix": []map[string]interface{}{
 			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
 		},
+		"ValidationGaps":      []string{},
 		"CodeFenceLanguage":   "go",
 		"ProjectID":           "demo",
 		"ScopePath":           "demo",
@@ -870,5 +893,7 @@ func fullReferenceAvailability() map[string]bool {
 		"KeyModules":       true,
 		"CommonUtils":      true,
 		"BusinessPatterns": true,
+		"Validation":       true,
+		"Testing":          true,
 	}
 }

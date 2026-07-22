@@ -1,9 +1,7 @@
 # {{.Category}} 模式概览
 
 **分类**: {{.Category}}
-**优先级**: {{.Priority}}
 **模式数量**: {{.PatternCount}}
-**置信度**: {{printf "%.2f" .Confidence}}%
 **最后更新**: {{.LastUpdated}}
 
 ---
@@ -18,14 +16,15 @@
 {{range .PatternObjects}}
 ### {{.Name}}
 
-**描述**: {{.Description}}
+{{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用与实现观察（需按源码复核）**: {{.Description}}{{end}}
 
-**适用规则**: {{.Rule}}
+{{end}}
+{{if .Rule}}**用户规则**: {{.Rule}}{{end}}
 
-**证据**: 置信度 {{printf "%.2f" (mul .Confidence 100)}}%，出现 {{.Frequency}} 次，来源 {{.Source}}。出现次数少或证据集中在单一路径时，先按当前代码复核后再执行。
+**证据**: {{len .EvidenceLocations}} 个已验证源码符号，来源 {{.Source}}
 
 {{if .GoodExample}}
-#### ✅ 代码证据
+#### 代码证据
 
 ```{{$.CodeFenceLanguage}}
 {{.GoodExample}}
@@ -33,21 +32,13 @@
 {{end}}
 
 {{if .BadExample}}
-#### ❌ 错误示例（避免）
+#### 避免示例
 
 {{.BadExample}}
 {{end}}
 
 ---
 
-{{end}}
-{{end}}
-
-{{if .UsageScenes}}
-## 使用场景
-
-{{range .UsageScenes}}
-- {{.}}
 {{end}}
 {{end}}
 

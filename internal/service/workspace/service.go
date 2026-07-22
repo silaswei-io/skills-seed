@@ -45,6 +45,7 @@ func NewWorkspaceGenerator(
 	configRepo config.Reader,
 	workspaceProfileRepo domain.WorkspaceProfileRepository,
 	workspaceSpecRepo domain.WorkspaceSpecRepository,
+	workflowRepo domain.WorkflowRepository,
 ) *WorkspaceGenerator {
 	scopedProfileRepo, _ := profileRepo.(domain.ScopedProjectProfileRepository)
 	projectSpecRepo, _ := profileRepo.(domain.ProjectSpecRepository)
@@ -61,12 +62,8 @@ func NewWorkspaceGenerator(
 		configRepo:           configRepo,
 		workspaceProfileRepo: workspaceProfileRepo,
 		workspaceSpecRepo:    workspaceSpecRepo,
+		workflowRepo:         workflowRepo,
 	}
-}
-
-// SetWorkflowRepository 注入当前目标的工作流仓储。
-func (g *WorkspaceGenerator) SetWorkflowRepository(repo domain.WorkflowRepository) {
-	g.workflowRepo = repo
 }
 
 // GenerateProgressHooks 复用 generator.GenerateProgressHooks，供 workspace 生成流程消费。

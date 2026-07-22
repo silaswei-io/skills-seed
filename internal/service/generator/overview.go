@@ -10,8 +10,11 @@ func projectOverviewSummary(profile *domain.ProjectProfile, locale string) strin
 	if profile == nil {
 		return ""
 	}
+	if hasBroadProfileEvidence(profile) {
+		return learnedCoverageSummary(profile, locale)
+	}
 	summary := strings.TrimSpace(profile.Summary)
-	if summary != "" && !looksLikeUnitScopedOverview(summary, profile) {
+	if summary != "" {
 		return summary
 	}
 	return learnedCoverageSummary(profile, locale)
@@ -21,8 +24,16 @@ func projectArchitectureSummary(profile *domain.ProjectProfile, locale string) s
 	if profile == nil {
 		return ""
 	}
+	if hasBroadProfileEvidence(profile) {
+		if len(profile.Layers) == 0 {
+			return ""
+		}
+		return generatorTextWithParams(locale, "GeneratorOverviewArchitectureSummary", map[string]interface{}{
+			"Count": len(profile.Layers),
+		})
+	}
 	architecture := strings.TrimSpace(profile.Architecture)
-	if architecture != "" && !looksLikeUnitScopedOverview(architecture, profile) {
+	if architecture != "" {
 		return architecture
 	}
 	if len(profile.Layers) == 0 {
@@ -33,34 +44,9 @@ func projectArchitectureSummary(profile *domain.ProjectProfile, locale string) s
 	})
 }
 
-func looksLikeUnitScopedOverview(value string, profile *domain.ProjectProfile) bool {
-	normalized := strings.ToLower(strings.TrimSpace(value))
-	if normalized == "" || profile == nil {
-		return false
-	}
-	if !hasBroadProfileEvidence(profile) {
-		return false
-	}
-	return containsAny(normalized, "单元", "unit", "analysis unit")
-}
-
 func hasBroadProfileEvidence(profile *domain.ProjectProfile) bool {
-	if profile == nil {
-		return false
-	}
-	signals := 0
-	if len(profile.KeyModules) > 1 {
-		signals++
-	}
-	if len(profile.BusinessMethods) > 1 {
-		signals++
-	}
-	if len(profile.Layers) > 1 {
-		signals++
-	}
-	return signals >= 1
+	return profile != nil && (len(profile.KeyModules) > 1 || len(profile.BusinessMethods) > 1 || len(profile.Layers) > 1)
 }
-
 func learnedCoverageSummary(profile *domain.ProjectProfile, locale string) string {
 	const previewLimit = 8
 	domains := learnedDomainNames(profile, previewLimit)

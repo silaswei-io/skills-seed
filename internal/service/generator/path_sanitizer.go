@@ -7,23 +7,32 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
 func sanitizeGenerationInputs(profile *domain.ProjectProfile, patterns []domain.Pattern, projectRoot string) (*domain.ProjectProfile, []domain.Pattern) {
 	if strings.TrimSpace(projectRoot) == "" {
 		return profile, patterns
 	}
-	sanitizer := projectPathSanitizer{root: projectRoot}
+	sanitizer := projectPathSanitizer{
+		root:     projectRoot,
+		verifier: sourcecode.NewVerifier(projectRoot),
+	}
 	sanitizedProfile := sanitizer.profile(profile)
 	sanitizedPatterns := make([]domain.Pattern, 0, len(patterns))
 	for _, pattern := range patterns {
-		sanitizedPatterns = append(sanitizedPatterns, sanitizer.pattern(pattern))
+		pattern = sanitizer.pattern(pattern)
+		if pattern.AllowsHardConstraint() || len(pattern.EvidenceLocations) > 0 || pattern.BusinessMethod != nil || strings.TrimSpace(pattern.ScopePath) != "" {
+			sanitizedPatterns = append(sanitizedPatterns, pattern)
+		}
 	}
+	sanitizedProfile = enrichVerifiedProfileEntries(sanitizedProfile, sanitizedPatterns)
 	return sanitizedProfile, sanitizedPatterns
 }
 
 type projectPathSanitizer struct {
-	root string
+	root     string
+	verifier *sourcecode.Verifier
 }
 
 func (s projectPathSanitizer) profile(profile *domain.ProjectProfile) *domain.ProjectProfile {
@@ -41,20 +50,74 @@ func (s projectPathSanitizer) profile(profile *domain.ProjectProfile) *domain.Pr
 		if strings.TrimSpace(module.Path) == "" || !s.exists(module.Path) {
 			continue
 		}
+		module.KeyMethods = nil
 		out.KeyModules = append(out.KeyModules, module)
 	}
-	out.BusinessMethods = make([]domain.BusinessMethod, 0, len(profile.BusinessMethods))
-	for _, method := range profile.BusinessMethods {
-		out.BusinessMethods = append(out.BusinessMethods, s.businessMethod(method))
+	out.BusinessMethods = s.verifier.VerifyBusinessMethods(profile.BusinessMethods)
+	out.CommonUtils = s.verifier.VerifyUtilities(profile.CommonUtils)
+	return &out
+}
+
+func enrichVerifiedProfileEntries(profile *domain.ProjectProfile, patterns []domain.Pattern) *domain.ProjectProfile {
+	if profile == nil {
+		return nil
 	}
-	out.CommonUtils = make([]domain.UtilityFunction, 0, len(profile.CommonUtils))
-	for _, utility := range profile.CommonUtils {
-		if utility.File != "" && s.shouldDropMissingProjectPath(utility.File) {
-			continue
-		}
-		out.CommonUtils = append(out.CommonUtils, utility)
+	out := *profile
+	out.BusinessMethods = mergeVerifiedBusinessMethods(profile.BusinessMethods, patterns)
+	for i := range out.KeyModules {
+		out.KeyModules[i].KeyMethods = moduleBusinessMethodNames(out.KeyModules[i].Path, out.BusinessMethods)
 	}
 	return &out
+}
+
+func mergeVerifiedBusinessMethods(methods []domain.BusinessMethod, patterns []domain.Pattern) []domain.BusinessMethod {
+	out := make([]domain.BusinessMethod, 0, len(methods)+len(patterns))
+	seen := make(map[string]bool, len(methods)+len(patterns))
+	add := func(method domain.BusinessMethod) {
+		location := strings.TrimSpace(method.DisplayLocation())
+		signature := strings.TrimSpace(method.Function)
+		if location == "" || signature == "" {
+			return
+		}
+		key := strings.ToLower(location + "\x00" + signature)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		out = append(out, method)
+	}
+	for _, method := range methods {
+		add(method)
+	}
+	for _, pattern := range patterns {
+		if pattern.BusinessMethod != nil {
+			add(*pattern.BusinessMethod)
+		}
+	}
+	return out
+}
+
+func moduleBusinessMethodNames(modulePath string, methods []domain.BusinessMethod) []string {
+	modulePath = strings.Trim(referencePathOnly(modulePath), "/")
+	if modulePath == "" {
+		return nil
+	}
+	seen := map[string]bool{}
+	var names []string
+	for _, method := range methods {
+		path := strings.Trim(referencePathOnly(method.DisplayLocation()), "/")
+		if path != modulePath && !strings.HasPrefix(path, modulePath+"/") {
+			continue
+		}
+		name := strings.TrimSpace(method.Name)
+		key := strings.ToLower(name)
+		if name == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		names = append(names, name)
+	}
+	return names
 }
 
 func (s projectPathSanitizer) pattern(pattern domain.Pattern) domain.Pattern {
@@ -63,40 +126,40 @@ func (s projectPathSanitizer) pattern(pattern domain.Pattern) domain.Pattern {
 	}
 	pattern.EvidenceLocations = s.evidenceLocations(pattern.EvidenceLocations)
 	if pattern.BusinessMethod != nil {
-		method := s.businessMethod(*pattern.BusinessMethod)
-		pattern.BusinessMethod = &method
+		methods := s.verifier.VerifyBusinessMethods([]domain.BusinessMethod{*pattern.BusinessMethod})
+		if len(methods) == 0 {
+			pattern.BusinessMethod = nil
+		} else {
+			pattern.BusinessMethod = &methods[0]
+		}
 	}
 	if pattern.ScopePath != "" && !s.exists(pattern.ScopePath) {
 		pattern.ScopePath = ""
 	}
+	if !pattern.AllowsHardConstraint() {
+		if evidenceCount := domain.PatternEvidenceFileCount(pattern.EvidenceLocations); evidenceCount > 0 {
+			pattern.Frequency = evidenceCount
+		}
+		pattern.RefreshMetrics()
+	}
 	return pattern
 }
 
-func (s projectPathSanitizer) businessMethod(method domain.BusinessMethod) domain.BusinessMethod {
-	if method.CodeLocation.CurrentLocation != "" && s.shouldDropMissingProjectPath(method.CodeLocation.CurrentLocation) {
-		method.CodeLocation.CurrentLocation = ""
-	}
-	if method.CodeLocation.HistoricalLocation != "" && s.shouldDropMissingProjectPath(method.CodeLocation.HistoricalLocation) {
-		method.CodeLocation.HistoricalLocation = ""
-	}
-	if method.CodeLocation.CurrentLocation == "" && method.CodeLocation.HistoricalLocation == "" {
-		method.CodeLocation.Status = domain.CodeLocationStatusMissing
-	}
-	return method
-}
-
 func (s projectPathSanitizer) evidenceLocations(locations []domain.PatternEvidenceLocation) []domain.PatternEvidenceLocation {
-	out := make([]domain.PatternEvidenceLocation, 0, len(locations))
-	for _, location := range locations {
-		if s.exists(location.DisplayLocation()) {
-			out = append(out, location)
-		}
+	verified := s.verifier.VerifyEvidenceLocations(locations)
+	files := make(map[string]bool, len(verified))
+	for _, location := range verified {
+		files[referencePathOnly(location.Path)] = true
 	}
-	return out
-}
-
-func (s projectPathSanitizer) shouldDropMissingProjectPath(location string) bool {
-	return looksProjectRelativeReference(location) && !s.exists(location)
+	for _, location := range locations {
+		path := referencePathOnly(location.Path)
+		if path == "" || strings.TrimSpace(location.Symbol) != "" || files[path] || !s.exists(path) {
+			continue
+		}
+		files[path] = true
+		verified = append(verified, domain.PatternEvidenceLocation{Path: path, Kind: "file"})
+	}
+	return verified
 }
 
 func (s projectPathSanitizer) validPathList(paths []string) []string {

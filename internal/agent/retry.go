@@ -179,7 +179,7 @@ func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 	if info.CallDuration > 0 {
 		fields = append(fields, "call_duration_seconds", info.CallDuration.Seconds())
 	}
-	logger.Diagnostic(i18n.Get("LoggerAgentRateLimitRetry"), fields...)
+	logger.Diagnostic(i18n.Get("LoggerAgentRetry"), fields...)
 }
 
 func ReportRetryAttemptForContext(ctx context.Context, info RetryInfo) {

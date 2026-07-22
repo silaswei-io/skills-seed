@@ -242,7 +242,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		Agent:        mockAgent,
 		AnalyzerSvc:  analyzer.NewAnalyzerService(mockAgent, configRepo),
 		LearnerSvc:   servicelearner.NewLearnerService(mockAgent, git.NewRepository(projectRoot), patternRepo, patternRepo, curatorSvc),
-		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo),
+		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil),
 	}
 
 	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())

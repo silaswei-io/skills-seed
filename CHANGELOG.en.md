@@ -2,6 +2,29 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.11]
+
+### Changes
+
+- Reworked the generated-Skill knowledge model into explicit user/built-in rules, source-backed reusable solutions, and weak-evidence observations. Entry Skills now cover debugging, testing, API work, plugins, database migrations, and architecture analysis, with compact on-demand routing for long references, validation strategy, business entries, and source locations.
+- Consolidated generator, knowledge, domain, and template ownership. Removed duplicate Claude/Codex project templates, string-guessing rule softening and business grouping, and generator dependencies on Agent DTOs; project profiles, pattern evidence, business entries, and validation commands now render from typed local models.
+- Reduced `learn current` semantic curation to a minimal AI contract: the Agent owns canonical text, confidence, and real `source_ids`, while examples, evidence, business methods, frequency, provenance, and statistics are restored locally from inputs. Only unclassified candidates use deterministic local recovery, replacing full expensive curation retries.
+- Marked file selection, analysis-unit planning, and pattern curation as self-contained prompt-only tasks. Claude disables repository read tools when all required input is already present, while code analysis and project profiling retain read-only source tools.
+- Agent runtime archives now preserve every invocation attempt independently and record input, output, cache, and cost usage in manifests. Console output separates uncached tokens from total context processed, and failed invocations contribute to totals.
+- `learn current` now reports “AI curation → curation validation → pattern-store write” explicitly, and learner APIs use the accurate `CurateAndSavePatterns` name instead of presenting a long AI call as local persistence.
+- Generated Skills now centralize learned validation commands in `references/validation.md` and local test facts in `references/testing.md`. Go test matrices are derived deterministically from real `go.mod` and `_test.go` files, including each module's workdir, command, test count, and source evidence.
+- The release script retains Go tests, vet, staticcheck, and build gates but no longer runs an external shell quality case or exposes the related `--skip-quality` branch.
+
+### Fixes
+
+- Fixed `error_max_structured_output_retries` being reported as an API rate limit, 30-minute deadlines surfacing only as `signal: killed`, and retry attempts overwriting earlier runtime evidence.
+- Fixed invented curation source IDs causing a full AI retry, unknown dropped entries corrupting coverage, and one candidate appearing in both a canonical pattern and `dropped` and failing storage. `compact --ai` remains strict.
+- Fixed completed analysis units being rerun after failures during project-profile sync or pattern curation. Resume state now keeps complete analysis output and profile-commit status so `sync --resume` continues at the unfinished curation/persistence stage.
+- Fixed generated Skills containing zero-evidence claims, duplicate patterns, empty project rules, no validation closure, long references without contents, local learned observations rendered as hard constraints, and business entries grouped under generic directory names.
+- Fixed validation-command classification accepting deployment/startup commands, path cleanup and business routing relying on language/framework special cases, and evidence ordering disagreeing with the selected primary source.
+- Fixed validation matrices presenting business source locations as command evidence, unscoped `jzero gen` commands being associated with unrelated business functions through semantics alone, and validation content drifting across the entry, spec, and overview.
+- Fixed workspace child routes still targeting legacy `skills-seed-skills/SKILL.md`, entry Skills duplicating every business-detail link, and learned patterns overstating Base64 and other encodings as secure storage or transport.
+
 ## [v0.13.10]
 
 ### Changes

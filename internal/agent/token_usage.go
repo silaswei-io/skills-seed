@@ -99,13 +99,15 @@ func tokenUsageConsoleMessageWithScope(scope, agentName, operation string, usage
 	total = total.Normalize()
 
 	params := map[string]interface{}{
-		"Scope":      scope,
-		"Agent":      agentName,
-		"Operation":  operation,
-		"Current":    tokenusage.FormatCount(usage.TotalTokens),
-		"Detail":     tokenUsageDetail(usage),
-		"Cumulative": tokenusage.FormatCount(total.TotalTokens),
-		"Cost":       tokenUsageCost(usage, total),
+		"Scope":               scope,
+		"Agent":               agentName,
+		"Operation":           operation,
+		"Current":             tokenusage.FormatCount(usage.UncachedTokens()),
+		"CurrentProcessed":    tokenusage.FormatCount(usage.TotalTokens),
+		"Detail":              tokenUsageDetail(usage),
+		"Cumulative":          tokenusage.FormatCount(total.UncachedTokens()),
+		"CumulativeProcessed": tokenusage.FormatCount(total.TotalTokens),
+		"Cost":                tokenUsageCost(usage, total),
 	}
 	if strings.TrimSpace(scope) != "" {
 		return i18n.GetWithParams("AgentTokenUsageConsoleScoped", params)
@@ -116,9 +118,10 @@ func tokenUsageConsoleMessageWithScope(scope, agentName, operation string, usage
 func tokenUsageSummaryConsoleMessage(total tokenusage.Usage) string {
 	total = total.Normalize()
 	return i18n.GetWithParams("AgentTokenUsageSummaryConsole", map[string]interface{}{
-		"Total":  tokenusage.FormatCount(total.TotalTokens),
-		"Detail": tokenUsageDetail(total),
-		"Cost":   tokenUsageSummaryCost(total),
+		"Total":     tokenusage.FormatCount(total.UncachedTokens()),
+		"Processed": tokenusage.FormatCount(total.TotalTokens),
+		"Detail":    tokenUsageDetail(total),
+		"Cost":      tokenUsageSummaryCost(total),
 	})
 }
 

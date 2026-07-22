@@ -260,7 +260,7 @@ func (c *ClaudeAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixe
 
 // SelectFiles 基于候选文件树选择当前代码学习范围。
 func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
-	task := agent.NewRuntimeTask(agent.RuntimeSlug("file-select", ""))
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("file-select", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-file-select")
 	if err != nil {
 		return nil, err
@@ -285,6 +285,7 @@ func (c *ClaudeAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesReq
 
 // CuratePatterns 策展候选模式并输出规范模式。
 func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("pattern-curate", ""))
 	data := map[string]interface{}{
 		"Operation":           req.Operation,
 		"CandidatePatterns":   req.CandidatePatterns,
@@ -294,12 +295,12 @@ func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatte
 		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
 
-	prompt, err := c.promptLoader.Render("pattern-curate", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-curate", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderCuratePatternsPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "CuratePatterns", prompt, aicontract.ContractCuratePatterns)
+	output, err := c.callClaude(ctx, "CuratePatterns", prompt, aicontract.ContractCuratePatterns, task)
 	if err != nil {
 		logger.Error(i18n.Get("LoggerAgentCuratePatternsCallFailed"),
 			"error", err,
@@ -323,7 +324,6 @@ func (c *ClaudeAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatte
 		"operation", "CuratePatterns",
 		"written_count", len(result.Patterns),
 		"dropped_count", len(result.Dropped),
-		"total_candidates", result.Summary.TotalCandidates,
 	)
 
 	return result, nil
@@ -545,7 +545,7 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agen
 
 // PlanAnalysisUnits 将当前待学习文件拆成可续跑的业务分析单元。
 func (c *ClaudeAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
-	task := agent.NewRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-analysis-plan")
 	if err != nil {
 		return nil, err

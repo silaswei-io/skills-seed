@@ -6,95 +6,49 @@
 {{end}}{{if .WorkspaceRole}}**工作区角色**: {{.WorkspaceRole}}
 {{end}}**生成时间**: {{.GeneratedAt}}
 
----
-
 ## 使用原则
 
 - 本规范只保留当前项目的可执行约束、生成/配置约定和改动触点。
-- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，业务入口读 [入口方法索引](./business-methods.md){{end}}。
-- “规则”只包含当前 pattern 中带代码证据的约束；局部或证据不足的内容会降级为“参考观察”。
+- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，业务入口读 [入口方法索引](./business-methods.md){{end}}；验证方式读 [验证策略](./validation.md){{if .References.Testing}} 和 [测试矩阵](./testing.md){{end}}。
+- “规则”只包含有代码证据的用户维护或内置约束；有证据的 AI 学习结果进入“源码支持的复用约定”，但不提升为硬约束。
+- 框架和配置条目来自已学习项目画像，只用于定位；修改前仍需按当前代码、依赖清单和配置文件确认。
 - 当本规范和实际代码不一致时，以当前代码为准。
 
 ## 目录
 
 - [规则](#规则)
-{{if .PatternGuidance}}- [参考观察](#参考观察)
+{{if .PatternGuidance}}- [源码支持的复用约定](#源码支持的复用约定)
 {{end}}{{if .FrameworkPatterns}}- [框架使用约定](#框架使用约定)
 {{end}}{{if .ConfigPatterns}}- [配置约定](#配置约定)
-{{end}}{{if .ValidationCommands}}- [验证命令](#验证命令)
 {{end}}- [改动触点](#改动触点)
 
-{{if .SourceOfTruth}}
-## 修改来源
+{{if .SourceOfTruth}}## 修改来源
 
 | 领域 | 应修改 | 不应直接修改 |
 |---|---|---|
 {{range .SourceOfTruth}}| {{.Area}} | {{.Edit}} | {{.DoNotEdit}} |
 {{end}}
+{{end}}## 规则
+
+{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{end}}{{else}}*尚未提取权威硬规则；这不代表项目没有可复用实现，请继续检查下方约定和分类 references。*
 {{end}}
+{{if .PatternGuidance}}## 源码支持的复用约定
 
-## 规则
+以下内容来自源码证据，可用于定位并优先复用已有解决方案，但不能覆盖当前代码行为或作为硬约束：
 
-{{if .PatternRules}}
-{{range .PatternRules}}
-- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{if .Description}}{{.Description}}{{else}}{{.Name}}{{end}}
 {{end}}
-{{else}}
-*尚未提取可执行规则。*
+{{end}}{{if .FrameworkPatterns}}## 框架使用约定
+
+{{range .FrameworkPatterns}}- {{.}}
 {{end}}
+{{end}}{{if .ConfigPatterns}}## 配置约定
 
-{{if .PatternGuidance}}
-## 参考观察
-
-以下内容来自已学习模式，只能作为定位线索和复核清单，不能覆盖当前代码行为：
-
-{{range .PatternGuidance}}
-- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Description}}{{.Description}}{{else}}{{.Name}}{{end}}
+{{range .ConfigPatterns}}- {{.}}
 {{end}}
-{{end}}
+{{end}}## 改动触点
 
-{{if .FrameworkPatterns}}
-## 框架使用约定
-
-{{range .FrameworkPatterns}}
-- {{.}}
-{{end}}
-{{end}}
-
-{{if .ConfigPatterns}}
-## 配置约定
-
-{{range .ConfigPatterns}}
-- {{.}}
-{{end}}
-{{end}}
-
-{{if .ValidationCommands}}
-## 验证命令
-
-{{if .ValidationMatrix}}
-下表只包含能由证据映射到具体范围的命令。
-
-| 改动范围 | 建议命令 | 触发条件 | 证据 |
-|---|---|---|---|
-{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
-{{end}}
-
-其他已学习命令（未必能覆盖当前改动范围，运行前先按当前代码和证据确认）：
-{{else}}
-当前没有可映射到具体改动范围的验证矩阵；以下命令运行前需要先按当前代码和证据确认覆盖范围。
-{{end}}
-{{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}{{if .Workdir}}，工作目录：`{{.Workdir}}`{{end}}{{if .ScopePaths}}，作用域：{{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}，证据：{{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}，类型：{{.Type}}{{end}}
-{{end}}
-{{end}}
-
-## 改动触点
-
-{{if .Touchpoints}}
-{{range .Touchpoints}}
-- **{{.Kind}}** `{{.Name}}`{{if .Path}} - `{{.Path}}`{{end}}{{if .Description}}: {{.Description}}{{end}}
-{{end}}
-{{else}}
-*尚未提取关键触点。*
+{{if .Touchpoints}}{{range .Touchpoints}}- **{{.Kind}}** `{{.Name}}`{{if .Path}} - `{{.Path}}`{{end}}{{if .Description}}: {{.Description}}{{end}}
+{{end}}{{else}}*尚未提取关键触点。*
 {{end}}

@@ -1,0 +1,26 @@
+# 验证策略
+
+本文件是项目验证命令的唯一来源。命令来自已学习项目画像；推荐矩阵只接受命令自身声明的工作目录、作用域或命令路径作为范围证据。
+
+## 最低验证策略
+
+{{if .Gaps}}当前验证缺口：
+{{range .Gaps}}- {{.}}
+{{end}}
+{{end}}- 先从 AGENTS、构建脚本和 CI 配置确认当前仓库认可的命令与工作目录。
+- 按改动范围运行适用的生成、构建、检查和测试命令；没有范围证据的命令不要推断为推荐命令。
+- 检查生成文件和代码 diff，确认没有无关改动或遗漏的派生产物。
+- 缺少自动化测试时，人工验证受影响运行路径并明确记录风险。
+
+{{if .Matrix}}## 范围矩阵
+
+| 改动范围 | 建议命令 | 触发条件 | 命令证据 |
+|---|---|---|---|
+{{range .Matrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
+{{end}}
+
+{{end}}## 已学习命令
+
+{{if .Commands}}{{range .Commands}}- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}}（来源：`{{.Source}}`）{{end}}{{if .Workdir}}，工作目录：`{{.Workdir}}`{{end}}{{if .ScopePaths}}，作用域：{{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}，证据：{{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}，类型：{{.Type}}{{end}}
+{{end}}{{else}}*未学习到有仓库证据的验证命令。*
+{{end}}

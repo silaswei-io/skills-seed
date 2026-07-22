@@ -149,28 +149,15 @@ type CuratePatternsRequest struct {
 	ExistingByCandidate map[string][]string // 候选模式 ID -> 相关既有模式 ID
 }
 
-// CuratedPattern 表示 AI 策展后建议写入的规范模式。
+// CuratedPattern 表示 AI 对规范文本和来源归属的策展决策。
 type CuratedPattern struct {
-	ID                string                           // 模式ID
-	Name              string                           // 模式名称
-	Category          string                           // 分类
-	Description       string                           // 描述
-	GoodExample       string                           // 正例代码
-	BadExample        string                           // 反例代码
-	Rule              string                           // 规则
-	Confidence        float64                          // 置信度
-	Frequency         int                              // 频率
-	MergedFrom        []string                         // 被合并的候选或既有模式ID
-	MergeReason       string                           // 合并理由
-	SimilarityScore   float64                          // 合并相似度
-	Source            string                           // 来源
-	BusinessMethod    *domain.BusinessMethod           // 业务方法信息
-	EvidenceLocations []domain.PatternEvidenceLocation // 通用源码证据位置
-	ProjectID         string                           // workspace 子项目 ID
-	ScopePath         string                           // workspace 路径范围
-	WorkspaceRole     string                           // workspace 角色
-	AnalysisUnitID    string                           // learn current 分析单元 ID
-	AnalysisUnitName  string                           // learn current 分析单元名称
+	ID          string   // 规范模式 ID
+	Name        string   // 规范模式名称
+	Category    string   // 分类
+	Description string   // 解决的问题和适用边界
+	Rule        string   // 复用指导
+	Confidence  float64  // 证据一致性和具体性
+	SourceIDs   []string // 组成该规范模式的候选或既有模式 ID
 }
 
 // CuratedDrop 表示不入库的候选模式。
@@ -183,16 +170,6 @@ type CuratedDrop struct {
 type CuratePatternsResult struct {
 	Patterns []CuratedPattern // 应写入模式库的规范模式
 	Dropped  []CuratedDrop    // 明确不入库的候选模式
-	Summary  CurateSummary    // 策展统计
-}
-
-// CurateSummary 策展统计。
-type CurateSummary struct {
-	TotalCandidates int // 候选模式总数
-	TotalExisting   int // 参与判断的既有模式总数
-	TotalWritten    int // 输出规范模式数
-	TotalDropped    int // 丢弃候选数
-	MergeCount      int // 合并操作数
 }
 
 // FileSelectionCandidate 是 AI 文件筛选器可见的候选文件元数据。

@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -11,8 +10,6 @@ const (
 	projectSpecMaxRules    = 30
 	projectSpecMaxGuidance = 40
 )
-
-var projectSpecRuleWords = regexp.MustCompile(`[\p{Han}A-Za-z0-9_]+`)
 
 // WorkspaceProjectOverride 描述工作区子项目覆盖字段，
 // 用于 NewProjectSpecFromProfile 中避免 domain → config 依赖。
@@ -171,31 +168,7 @@ func projectSpecPatternKey(pattern Pattern) string {
 	if text == "" {
 		return ""
 	}
-	if familyKey := projectSpecTemplateFamilyKey(pattern, text); familyKey != "" {
-		return familyKey
-	}
-	words := projectSpecRuleWords.FindAllString(text, -1)
-	filtered := make([]string, 0, len(words))
-	for _, word := range words {
-		word = strings.TrimSpace(word)
-		if len([]rune(word)) <= 1 || projectSpecStopWord(word) {
-			continue
-		}
-		filtered = append(filtered, word)
-		if len(filtered) >= 12 {
-			break
-		}
-	}
-	return string(pattern.Category) + ":" + strings.Join(filtered, " ")
-}
-
-func projectSpecStopWord(word string) bool {
-	switch word {
-	case "must", "should", "when", "then", "with", "use", "using", "the", "and", "or", "for", "all", "所有", "必须", "应该", "使用", "进行", "通过", "模式", "统一", "标准", "处理", "函数", "结构", "层":
-		return true
-	default:
-		return false
-	}
+	return string(pattern.Category) + ":" + strings.Join(strings.Fields(text), " ")
 }
 
 func projectSpecPatternScore(pattern Pattern) float64 {
@@ -207,7 +180,7 @@ func patternHasExecutableEvidence(pattern Pattern) bool {
 }
 
 func patternIsGlobalSpecRule(pattern Pattern) bool {
-	if !patternHasExecutableEvidence(pattern) {
+	if !pattern.AllowsHardConstraint() || !patternHasExecutableEvidence(pattern) {
 		return false
 	}
 	evidenceCount := projectSpecEvidenceCount(pattern)
@@ -215,8 +188,7 @@ func patternIsGlobalSpecRule(pattern Pattern) bool {
 		pattern.Frequency >= 2 &&
 		evidenceCount >= 2 &&
 		pattern.Metrics.GenericPenalty < 0.5 &&
-		!projectSpecLooksScoped(pattern) &&
-		!projectSpecLooksLikeTemplateOnly(pattern)
+		!projectSpecLooksScoped(pattern)
 }
 
 func patternIsUsefulProjectSpecGuidance(pattern Pattern) bool {
@@ -227,75 +199,26 @@ func patternIsUsefulProjectSpecGuidance(pattern Pattern) bool {
 		return false
 	}
 	evidenceCount := projectSpecEvidenceCount(pattern)
-	return pattern.Frequency >= 2 || evidenceCount >= 2
+	if pattern.AllowsHardConstraint() {
+		return pattern.Frequency >= 2 || evidenceCount >= 2
+	}
+	return pattern.Frequency >= 2 && evidenceCount >= 2
 }
 
 func projectSpecEvidenceCount(pattern Pattern) int {
-	evidenceCount := len(uniquePatternEvidenceLocations(pattern.EvidenceLocations))
-	if pattern.BusinessMethod != nil && (strings.TrimSpace(pattern.BusinessMethod.DisplayLocation()) != "" || strings.TrimSpace(pattern.BusinessMethod.Function) != "") {
+	evidenceCount := PatternEvidenceFileCount(pattern.EvidenceLocations)
+	if evidenceCount == 0 && pattern.BusinessMethod != nil && (strings.TrimSpace(pattern.BusinessMethod.DisplayLocation()) != "" || strings.TrimSpace(pattern.BusinessMethod.Function) != "") {
 		evidenceCount++
-	}
-	if pattern.Metrics.EvidenceCount > evidenceCount {
-		evidenceCount = pattern.Metrics.EvidenceCount
 	}
 	return evidenceCount
 }
 
-func projectSpecTemplateFamilyKey(pattern Pattern, text string) string {
-	category := string(pattern.Category)
-	combined := strings.ToLower(pattern.Name + " " + pattern.Description + " " + pattern.Rule)
-	if category == string(CategoryAPI) || category == string(CategoryStructure) || category == string(CategoryNaming) {
-		if strings.Contains(combined, "handler") && containsAnyDomain(combined, "httpx", "parse", "okjson", "errorctx", "go-zero", "goctl", "请求解析", "响应") {
-			return category + ":handler-flow"
-		}
-		if strings.Contains(combined, "logic") && containsAnyDomain(combined, "logx", "svcctx", "context", "request", "constructor", "构造", "依赖注入", "字段") {
-			return category + ":logic-constructor"
-		}
-		if containsAnyDomain(combined, "handler-logic", "handler logic", "分层") {
-			return category + ":handler-logic-layering"
-		}
-	}
-	if category == string(CategoryError) && containsAnyDomain(text, "wrap", "包装", "错误码", "error code", "status.wrap") {
-		return category + ":error-wrapping"
-	}
-	return ""
-}
-
 func projectSpecGuidanceText(pattern Pattern) string {
-	text := strings.TrimSpace(firstNonEmpty(pattern.Description, pattern.Rule, pattern.Name))
-	text = strings.ReplaceAll(text, "必须", "可检查是否需要")
-	text = strings.ReplaceAll(text, "所有", "相关")
-	text = strings.ReplaceAll(text, "不得", "避免")
-	text = strings.ReplaceAll(text, "不要", "避免")
-
-	replacements := []struct {
-		old string
-		new string
-	}{
-		{" must ", " may need to "},
-		{" Must ", " May need to "},
-		{" should ", " can "},
-		{" Should ", " Can "},
-		{" do not ", " avoid "},
-		{" Do not ", " Avoid "},
-		{" don't ", " avoid "},
-		{" Don't ", " Avoid "},
-		{" all ", " related "},
-		{" All ", " Related "},
-	}
-	padded := " " + text + " "
-	for _, replacement := range replacements {
-		padded = strings.ReplaceAll(padded, replacement.old, replacement.new)
-	}
-	return strings.TrimSpace(padded)
+	return strings.TrimSpace(firstNonEmpty(pattern.Description, pattern.Rule, pattern.Name))
 }
 
 func projectSpecLooksScoped(pattern Pattern) bool {
-	if strings.TrimSpace(pattern.ScopePath) != "" {
-		return true
-	}
-	text := strings.ToLower(pattern.Name + " " + pattern.Description + " " + pattern.Rule)
-	if containsAnyDomain(text, "when implementing", "当实现", "本单元", "当前模块", "相邻路径", "this unit", "current module", "adjacent path", "component") {
+	if strings.TrimSpace(pattern.ScopePath) != "" || strings.TrimSpace(pattern.AnalysisUnitID) != "" {
 		return true
 	}
 	paths := map[string]bool{}
@@ -314,13 +237,6 @@ func projectSpecLooksScoped(pattern Pattern) bool {
 	return false
 }
 
-func projectSpecLooksLikeTemplateOnly(pattern Pattern) bool {
-	if pattern.Category == CategoryError {
-		return false
-	}
-	return projectSpecTemplateFamilyKey(pattern, strings.ToLower(firstNonEmpty(pattern.Rule, pattern.Description, pattern.Name))) != ""
-}
-
 func topLevelEvidencePath(path string) string {
 	path = strings.Trim(strings.TrimSpace(path), "`")
 	if path == "" {
@@ -330,7 +246,7 @@ func topLevelEvidencePath(path string) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	if len(parts) >= 2 && (parts[0] == "internal" || parts[0] == "plugins" || parts[0] == "cmd") {
+	if len(parts) >= 2 {
 		return parts[0] + "/" + parts[1]
 	}
 	return parts[0]
@@ -357,13 +273,4 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func containsAnyDomain(value string, needles ...string) bool {
-	for _, needle := range needles {
-		if strings.Contains(value, strings.ToLower(needle)) {
-			return true
-		}
-	}
-	return false
 }

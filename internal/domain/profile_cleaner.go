@@ -83,6 +83,11 @@ func CleanValidationCommands(commands []ValidationCommand) []ValidationCommand {
 		if isInvalidValidationCommand(command.Command) {
 			continue
 		}
+		kind := ClassifyValidationCommand(command)
+		if kind == ValidationCommandOther {
+			continue
+		}
+		command.Type = CanonicalValidationCommandType(kind, command.Type)
 		key := strings.ToLower(command.Command + "\x00" + command.Workdir + "\x00" + strings.Join(command.ScopePaths, "\x00") + "\x00" + command.When)
 		if seen[key] {
 			continue
@@ -143,7 +148,7 @@ func cleanProfilePatternList(values []string, limit int) []string {
 		if value == "" || strings.Contains(strings.ToUpper(value), "TODO") {
 			continue
 		}
-		key := profilePatternFamilyKey(value)
+		key := strings.ToLower(value)
 		if seen[key] {
 			continue
 		}
@@ -154,30 +159,6 @@ func cleanProfilePatternList(values []string, limit int) []string {
 		}
 	}
 	return cleaned
-}
-
-func profilePatternFamilyKey(value string) string {
-	text := strings.ToLower(value)
-	switch {
-	case strings.Contains(text, "handler") && (strings.Contains(text, "httpx.parse") || strings.Contains(text, "errorctx") || strings.Contains(text, "okjsonctx") || strings.Contains(text, "请求")):
-		return "handler-http-flow"
-	case (strings.Contains(text, "httpx.parse") || strings.Contains(text, "errorctx") || strings.Contains(text, "okjsonctx")) && (strings.Contains(text, "响应") || strings.Contains(text, "请求") || strings.Contains(text, "context")):
-		return "handler-http-flow"
-	case strings.Contains(text, "logic") && (strings.Contains(text, "logx") || strings.Contains(text, "svcctx") || strings.Contains(text, "context") || strings.Contains(text, "构造")):
-		return "logic-constructor"
-	case strings.Contains(text, "logx") && (strings.Contains(text, "withcontext") || strings.Contains(text, "logger") || strings.Contains(text, "日志")):
-		return "logic-logging"
-	case strings.Contains(text, "status.wrap") || strings.Contains(text, "错误包装") || strings.Contains(text, "包装api错误"):
-		return "status-wrap"
-	case strings.Contains(text, "condition") && (strings.Contains(text, "查询") || strings.Contains(text, "database") || strings.Contains(text, "数据库")):
-		return "condition-query"
-	case strings.Contains(text, "kmip") && strings.Contains(text, "baserequeststandard"):
-		return "kmip-base-request"
-	case strings.Contains(text, "kmip") && (strings.Contains(text, "success") || strings.Contains(text, "响应解析")):
-		return "kmip-response-parse"
-	default:
-		return strings.ToLower(value)
-	}
 }
 
 // FilterGeneratedPlaceholders 过滤掉空值和含 TODO 的占位符

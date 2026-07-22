@@ -33,6 +33,7 @@ Use `sync` first unless the user explicitly wants only learning or only renderin
 ## Resume Rules
 
 - Use `--resume` only when a previous sync was interrupted and resumable state exists.
+- Completed analysis units and their learned results are reused; only unfinished units are analyzed again.
 - Use `--restart` when resumable state is stale or should be discarded.
 - `--resume` and `--restart` are mutually exclusive.
 - A rate-limit retry inside an AI call does not necessarily mean the whole command failed; inspect the final command result and logs.

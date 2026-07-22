@@ -38,28 +38,15 @@ func patternToDomain(p aicontract.PatternOutput, source domain.Source, now time.
 	return pattern
 }
 
-func curatedPatternToAgent(p aicontract.CuratedPatternOutput, now time.Time) agent.CuratedPattern {
+func curatedPatternToAgent(p aicontract.CuratedPatternOutput) agent.CuratedPattern {
 	return agent.CuratedPattern{
-		ID:                p.ID,
-		Name:              p.Name,
-		Category:          p.Category,
-		Description:       p.Description,
-		GoodExample:       p.GoodExample,
-		BadExample:        p.BadExample,
-		Rule:              p.Rule,
-		Confidence:        p.Confidence,
-		Frequency:         p.Frequency,
-		MergedFrom:        p.MergedFrom,
-		MergeReason:       p.MergeReason,
-		SimilarityScore:   p.SimilarityScore,
-		Source:            p.Source,
-		EvidenceLocations: evidenceLocationsToDomain(p.EvidenceLocations),
-		BusinessMethod:    businessMethodToDomain(p.BusinessMethod, now),
-		ProjectID:         p.ProjectID,
-		ScopePath:         p.ScopePath,
-		WorkspaceRole:     p.WorkspaceRole,
-		AnalysisUnitID:    p.AnalysisUnitID,
-		AnalysisUnitName:  p.AnalysisUnitName,
+		ID:          p.ID,
+		Name:        p.Name,
+		Category:    p.Category,
+		Description: p.Description,
+		Rule:        p.Rule,
+		Confidence:  p.Confidence,
+		SourceIDs:   p.SourceIDs,
 	}
 }
 

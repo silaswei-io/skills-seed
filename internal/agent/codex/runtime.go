@@ -89,8 +89,8 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt, outputCon
 		}
 	}
 
-	logger.Error(i18n.Get("LoggerAgentRateLimitExhausted"), "max_retries", maxRetries)
-	return "", fmt.Errorf("%s: %d", i18n.Get("AgentClaudeRateLimitExhausted"), maxRetries)
+	logger.Error(i18n.Get("LoggerAgentRetryExhausted"), "max_retries", maxRetries)
+	return "", fmt.Errorf("%s: %d", i18n.Get("AgentRetryExhausted"), maxRetries)
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
@@ -143,19 +143,23 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 	startedAt := time.Now()
 	if err := cmd.Run(); err != nil {
 		duration := time.Since(startedAt)
+		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
+		usage := tokenusage.Extract(stdoutStr)
 		retryable := isCodexRetryableError(stdoutStr, stderrStr)
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:     c.Name(),
-			Operation: operation,
-			RuntimeID: task.ID,
-			Slug:      task.Slug,
-			Attempt:   attempt,
-			RawOutput: stdoutStr,
-			Stderr:    stderrStr,
-			ExitError: true,
+			Agent:      c.Name(),
+			Operation:  operation,
+			RuntimeID:  task.ID,
+			Slug:       task.Slug,
+			Attempt:    attempt,
+			RawOutput:  stdoutStr,
+			Stderr:     stderrStr,
+			ExitError:  true,
+			TokenUsage: usage,
 		})
+		agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
 		if retryable {
 			logger.Diagnostic(i18n.Get("LoggerAgentCodexCallRetryable"),
@@ -170,7 +174,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRateLimited"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 		}
 
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -203,14 +207,14 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 	content, err := extractFinalContent(rawOutput)
 	if err != nil {
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:           c.Name(),
-			Operation:       operation,
-			RuntimeID:       task.ID,
-			Slug:            task.Slug,
-			Attempt:         attempt,
-			RawOutput:       rawOutput,
-			Stderr:          stderr.String(),
-			TokenUsageKnown: usage.Known(),
+			Agent:      c.Name(),
+			Operation:  operation,
+			RuntimeID:  task.ID,
+			Slug:       task.Slug,
+			Attempt:    attempt,
+			RawOutput:  rawOutput,
+			Stderr:     stderr.String(),
+			TokenUsage: usage,
 		})
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"agent", c.Name(),
@@ -224,15 +228,15 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, err, rawOutput, archive))
 	}
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-		Agent:           c.Name(),
-		Operation:       operation,
-		RuntimeID:       task.ID,
-		Slug:            task.Slug,
-		Attempt:         attempt,
-		Content:         content,
-		RawOutput:       rawOutput,
-		Stderr:          stderr.String(),
-		TokenUsageKnown: usage.Known(),
+		Agent:      c.Name(),
+		Operation:  operation,
+		RuntimeID:  task.ID,
+		Slug:       task.Slug,
+		Attempt:    attempt,
+		Content:    content,
+		RawOutput:  rawOutput,
+		Stderr:     stderr.String(),
+		TokenUsage: usage,
 	})
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
 		"agent", c.Name(),

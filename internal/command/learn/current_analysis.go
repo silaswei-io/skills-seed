@@ -84,8 +84,13 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 		if r.analysisState == nil {
 			return nil
 		}
+		if r.restoreAnalysisCheckpoint() {
+			var err error
+			r.codebaseRunContext, err = r.buildCodebaseRunContext()
+			return err
+		}
 		if len(r.plannedUnits) == 0 {
-			return nil
+			return r.saveAnalysisCheckpoint(true)
 		}
 		if r.analysisArtifactsCommitted() {
 			runContext, err := r.buildCodebaseRunContext()
@@ -105,7 +110,7 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 		if err != nil {
 			return err
 		}
-		return nil
+		return r.saveAnalysisCheckpoint(true)
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.analyze_codebase",
@@ -212,6 +217,9 @@ func (r *learnCurrentProjectRun) analyzePlannedBatchesSerial(analyzeLabel string
 			return completedUnits, err
 		}
 		completedUnits += r.mergeUnitResults(results)
+		if err := r.saveAnalysisCheckpoint(false); err != nil {
+			return completedUnits, err
+		}
 	}
 	return completedUnits, nil
 }
@@ -274,9 +282,10 @@ func (r *learnCurrentProjectRun) analyzePlannedBatchesParallel(analyzeLabel stri
 }
 
 func (r *learnCurrentProjectRun) collectParallelUnitResults(results <-chan []learnCurrentUnitResult, errs <-chan error) (int, error) {
+	var firstErr error
 	for err := range errs {
-		if err != nil {
-			return 0, err
+		if err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
 	completedUnits := 0
@@ -295,7 +304,12 @@ func (r *learnCurrentProjectRun) collectParallelUnitResults(results <-chan []lea
 	for _, result := range collected {
 		r.mergeUnitResult(result)
 	}
-	return completedUnits, nil
+	if len(collected) > 0 {
+		if err := r.saveAnalysisCheckpoint(false); err != nil {
+			return completedUnits, err
+		}
+	}
+	return completedUnits, firstErr
 }
 
 func (r *learnCurrentProjectRun) unitProgressParams(state *commandstate.State, unit domain.AnalysisUnit, current, total int) map[string]interface{} {
@@ -441,11 +455,26 @@ func (r *learnCurrentProjectRun) mergeUnitResult(result learnCurrentUnitResult) 
 	}
 }
 
-func (r *learnCurrentProjectRun) savePatternsStep() error {
-	saveStartedAt := time.Now()
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSavePatterns"), func() error {
+func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
+	startedAt := time.Now()
+	stepLabel := i18n.Get("ProgressLearnCurrentCurateAndSavePatterns")
+	if err := r.steps.Run(stepLabel, func() error {
 		if !r.analysisArtifactsCommitted() && len(r.patterns) > 0 {
-			saved, err := r.cont.LearnerSvc.SavePatternsStrict(r.ctx, r.patterns, curator.OperationLearnCurrent)
+			hooks := curator.ProgressHooks{
+				OnStepStart: func(label string) {
+					r.patternStageDetail(stepLabel, label)
+				},
+				OnStepUpdate: func(label string) {
+					r.patternStageDetail(stepLabel, label)
+				},
+				OnValidationStart: func(label string) {
+					r.patternStageDetail(stepLabel, label)
+				},
+				OnStoreStart: func(label string) {
+					r.patternStageDetail(stepLabel, label)
+				},
+			}
+			saved, err := r.cont.LearnerSvc.CurateAndSavePatternsWithHooks(r.ctx, r.patterns, curator.OperationLearnCurrent, hooks)
 			if err != nil {
 				return err
 			}
@@ -470,8 +499,8 @@ func (r *learnCurrentProjectRun) savePatternsStep() error {
 		return err
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "command.learn_current.save_patterns",
-		"duration", time.Since(saveStartedAt),
+		"operation", "command.learn_current.curate_and_save_patterns",
+		"duration", time.Since(startedAt),
 		"patterns_count", len(r.patterns),
 		"saved_count", r.savedCount,
 	)
@@ -481,19 +510,64 @@ func (r *learnCurrentProjectRun) savePatternsStep() error {
 	return nil
 }
 
+func (r *learnCurrentProjectRun) patternStageDetail(baseLabel, detail string) {
+	r.detail(baseLabel, "ProgressLearnCurrentPatternStageDetail", map[string]interface{}{
+		"Detail": detail,
+	})
+}
+
 func (r *learnCurrentProjectRun) analysisArtifactsCommitted() bool {
 	return r.analysisState != nil && r.analysisState.ArtifactsCommitted
 }
 
+func (r *learnCurrentProjectRun) profileCommitted() bool {
+	return r.analysisState != nil && r.analysisState.ProfileCommitted
+}
+
+func (r *learnCurrentProjectRun) saveAnalysisCheckpoint(complete bool) error {
+	if r.analysisState == nil {
+		return nil
+	}
+	r.analysisState.Analysis = &commandstate.AnalysisCheckpoint{
+		Complete:             complete,
+		Patterns:             append([]domain.Pattern(nil), r.patterns...),
+		CompletedUnits:       append([]domain.AnalysisUnit(nil), r.completedAnalysisUnits...),
+		ProfileRefreshNeeded: r.profileRefreshRecommended.Needed,
+		ProfileRefreshReason: r.profileRefreshRecommended.Reason,
+	}
+	return r.stateRepo.Save(r.ctx, r.analysisState)
+}
+
+func (r *learnCurrentProjectRun) restoreAnalysisCheckpoint() bool {
+	if r.analysisState == nil || r.analysisState.Analysis == nil {
+		return false
+	}
+	checkpoint := r.analysisState.Analysis
+	r.patterns = append(r.patterns, checkpoint.Patterns...)
+	r.completedAnalysisUnits = append(r.completedAnalysisUnits, checkpoint.CompletedUnits...)
+	r.profileRefreshRecommended = agent.ProfileRefreshRecommendation{
+		Needed: checkpoint.ProfileRefreshNeeded,
+		Reason: checkpoint.ProfileRefreshReason,
+	}
+	return checkpoint.Complete
+}
+
 func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	profileStartedAt := time.Now()
-	if r.refreshProfile && !r.analysisArtifactsCommitted() {
+	if r.refreshProfile && !r.profileCommitted() && !r.analysisArtifactsCommitted() {
 		if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSaveProfile"), func() error {
 			profile, err := analyzeProjectProfile(r.ctx, r.cont, r.projectRoot, r.projectName, r.currentLanguage, r.effectiveFocusPaths, r.existingProfile)
 			if err != nil {
 				return err
 			}
-			return r.cont.ProfileRepo.Save(r.ctx, profile)
+			if err := r.cont.ProfileRepo.Save(r.ctx, profile); err != nil {
+				return err
+			}
+			if r.analysisState == nil {
+				return nil
+			}
+			r.analysisState.ProfileCommitted = true
+			return r.stateRepo.Save(r.ctx, r.analysisState)
 		}); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "command.learn_current.save_project_profile",

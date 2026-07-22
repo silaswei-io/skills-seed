@@ -29,6 +29,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/service/snapshotflow"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
@@ -291,6 +292,9 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	if err := agent.RequireResult(result, "AnalyzeProject"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeProjectFailed"), err)
 	}
+	entryVerifier := sourcecode.NewVerifier(req.RootPath)
+	result.CommonUtils = entryVerifier.VerifyUtilities(result.CommonUtils)
+	result.BusinessMethods = entryVerifier.VerifyBusinessMethods(result.BusinessMethods)
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.analyze_project",

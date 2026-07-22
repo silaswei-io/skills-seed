@@ -339,10 +339,10 @@ other = "unknown reason"
 other = "AI Agent"
 
 [AgentRetryConsoleNote]
-other = "{{.Agent}} hit an API rate limit; retrying in {{.Wait}}: {{.Reason}}"
+other = "{{.Agent}} hit a retryable error; retrying in {{.Wait}}: {{.Reason}}"
 
 [AgentRetryConsoleNoteWithDuration]
-other = "{{.Agent}} hit an API rate limit after {{.CallDuration}}; retrying in {{.Wait}}: {{.Reason}}"
+other = "{{.Agent}} hit a retryable error after {{.CallDuration}}; retrying in {{.Wait}}: {{.Reason}}"
 
 [AgentCodexPrepareWorkDirFailed]
 other = "Failed to prepare Codex temporary work directory"
@@ -491,14 +491,14 @@ other = "Claude project analysis failed"
 [AgentClaudeCLIFailed]
 other = "Claude CLI call failed"
 
-[AgentClaudeRateLimited]
-other = "Claude rate limited"
+[AgentClaudeRetryable]
+other = "Claude call hit a retryable error"
 
-[AgentCodexRateLimited]
-other = "Codex rate limited"
+[AgentCodexRetryable]
+other = "Codex call hit a retryable error"
 
-[AgentClaudeRateLimitExhausted]
-other = "Claude rate limit retries exhausted"
+[AgentRetryExhausted]
+other = "Agent call retries exhausted"
 
 [AgentParseResultFailed]
 other = "Failed to parse AI result"
@@ -840,8 +840,17 @@ other = "{{.Label}} · saving patterns {{.Current}}/{{.Total}} · {{.Name}}"
 [ProgressLearnCurrentAnalyzeCommitUnit]
 other = "{{.Label}} · committing fingerprints {{.Current}}/{{.Total}} · {{.Name}}"
 
-[ProgressLearnCurrentSavePatterns]
-other = "Saving pattern store"
+[ProgressLearnCurrentCurateAndSavePatterns]
+other = "Curating and saving pattern store"
+
+[ProgressLearnCurrentPatternStageDetail]
+other = "{{.Label}} · {{.Detail}}"
+
+[ProgressCuratePatternsValidation]
+other = "Validating curated patterns"
+
+[ProgressCuratePatternsStore]
+other = "Writing pattern store"
 
 [ProgressLearnCurrentSaveProfile]
 other = "Synchronizing project profile"
@@ -1458,7 +1467,7 @@ other = "  # Auto-detect and add all sub-projects\n  skills-seed workspace add .
 other = "Generate AI Agent skills"
 
 [GenerateSkillsLongDesc]
-other = "Generate AI Agent skills from learned patterns and project profile.\n\nThis command will:\n  • Read learned patterns from database\n  • Read project profile\n  • Select skills template based on skills.target\n  • Use agent.engine for summary and polish\n  • Generate SKILL.md and references/"
+other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from the database\n  • Read the project profile\n  • Select templates based on skills.target\n  • Deterministically generate SKILL.md and references/\n\nGeneration does not invoke an Agent."
 
 [GenerateSkillsExample]
 other = "  # Generate to default skills.paths\n  skills-seed generate skills\n\n  # Specify output directory\n  skills-seed generate skills --output .agents/skills/my-project"
@@ -1933,17 +1942,20 @@ other = "Pattern curation result parsing failed"
 [LoggerAgentCuratePatternsValidationFallback]
 other = "Pattern curation result has structural issues; continuing with deterministic merge result"
 
+[LoggerAgentCuratePatternsCoverageRecovered]
+other = "Pattern curation coverage is incomplete; recovering only unclassified candidates locally"
+
 [LoggerAgentCuratePatternsSanitized]
 other = "Pattern curation result contains non-candidate dropped entries; ignored those entries and continued"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
 
-[LoggerAgentRateLimitRetry]
-other = "API rate limit hit, waiting before retry"
+[LoggerAgentRetry]
+other = "Agent call hit a retryable error, waiting before retry"
 
-[LoggerAgentRateLimitExhausted]
-other = "API rate limit retry attempts exhausted"
+[LoggerAgentRetryExhausted]
+other = "Agent call retry attempts exhausted"
 
 [LoggerRuntimeInitialized]
 other = "Runtime logger initialized"
@@ -1973,13 +1985,13 @@ other = "Agent call completed"
 other = "Agent token usage"
 
 [AgentTokenUsageConsole]
-other = "Token usage: {{.Agent}}/{{.Operation}} current {{.Current}} ({{.Detail}}), cumulative {{.Cumulative}}{{.Cost}}"
+other = "Token usage: {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}{{.Cost}}"
 
 [AgentTokenUsageConsoleScoped]
-other = "Token usage: child project {{.Scope}} {{.Agent}}/{{.Operation}} current {{.Current}} ({{.Detail}}), cumulative {{.Cumulative}}{{.Cost}}"
+other = "Token usage: child project {{.Scope}} {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}{{.Cost}}"
 
 [AgentTokenUsageSummaryConsole]
-other = "Token usage summary: cumulative {{.Total}} ({{.Detail}}){{.Cost}}"
+other = "Token usage summary: cumulative uncached {{.Total}}, context processed {{.Processed}} ({{.Detail}}){{.Cost}}"
 
 [AgentTokenUsageInputDetail]
 other = "input {{.Value}}"
@@ -2388,23 +2400,17 @@ other = "Business rules not yet mapped to a stable code domain"
 [GeneratorBusinessGroupDescription]
 other = "Rules, state constraints, orchestration, and data transformation evidence around {{.Title}}"
 
-[KnowledgePolicyGroupCoreTitle]
-other = "Core Development Paths"
+[KnowledgePolicyGroupRuleTitle]
+other = "User Rules"
 
-[KnowledgePolicyGroupCoreDescription]
-other = "High-confidence, cross-file, or frequent patterns to read first for related changes."
+[KnowledgePolicyGroupRuleDescription]
+other = "Authoritative rules explicitly configured by users or built into the tool; apply them after confirming they still match current source."
 
-[KnowledgePolicyGroupConventionTitle]
-other = "Common Project Conventions"
+[KnowledgePolicyGroupSolutionTitle]
+other = "Reusable Solutions"
 
-[KnowledgePolicyGroupConventionDescription]
-other = "Common development conventions that still need change-scope judgment."
-
-[KnowledgePolicyGroupLocalTitle]
-other = "Local Module Experience"
-
-[KnowledgePolicyGroupLocalDescription]
-other = "Evidence is concentrated in a few modules; use when working in adjacent paths."
+[KnowledgePolicyGroupSolutionDescription]
+other = "Current source evidence supports these learned solutions. Use them to locate and prefer existing implementations while checking their applicability boundaries."
 
 [KnowledgePolicyGroupObservationTitle]
 other = "Reference Observations"
@@ -2412,14 +2418,11 @@ other = "Reference Observations"
 [KnowledgePolicyGroupObservationDescription]
 other = "Weaker or more inferential findings; use as navigation hints, not hard constraints."
 
-[KnowledgeClaimUsageCore]
-other = "Treat as a priority development constraint; read before changing related capabilities and confirm against current code."
+[KnowledgeClaimUsageRule]
+other = "Use as a user-maintained rule after confirming it does not conflict with current source."
 
-[KnowledgeClaimUsageConvention]
-other = "Treat as a common project convention; apply after confirming the change scope matches."
-
-[KnowledgeClaimUsageLocal]
-other = "Use only when the task touches adjacent paths, similar modules, or similar requirements."
+[KnowledgeClaimUsageSolution]
+other = "For matching needs, inspect and prefer these existing entry points; extend only when their current boundaries do not fit."
 
 [KnowledgeClaimUsageObservation]
 other = "Use only as a navigation hint or review checklist, not as a hard constraint."
@@ -2450,12 +2453,6 @@ other = "Config / Middleware / Startup"
 
 [KnowledgeValidationAreaRuntimeWhen]
 other = "Run after changing config structs, middleware registration, startup parameters, or plugin wiring."
-
-[KnowledgeValidationFallbackBroad]
-other = "No scope-specific validation command was found; this broad command is only fallback validation and does not replace scope-specific tests."
-
-[KnowledgeValidationFallbackGeneric]
-other = "No scope-specific validation command was found; run this general check first, but it does not replace scope-specific tests."
 
 [InteractiveFlagNoInteractive]
 other = "Disable the interactive wizard and run directly from flags and defaults"
@@ -2715,30 +2712,6 @@ other = "Sync current state"
 [InteractiveSyncAutoDesc]
 other = "Keep the default sync behavior and decide whether to learn, generate, or skip from current changes."
 
-[GeneratorBusinessEntrySectionTitle]
-other = "Business & Orchestration Entry Points"
-
-[GeneratorBusinessEntrySectionDescription]
-other = "Prioritizes domain flows, state transitions, authorization checks, persistence orchestration, and other entry points likely to be reused in everyday business work."
-
-[GeneratorSupportingEntrySectionTitle]
-other = "Supporting & Utility Entry Points"
-
-[GeneratorSupportingEntrySectionDescription]
-other = "Infrastructure, generation tools, test helpers, external client wrappers, or shared utilities; read when the change touches those areas."
-
-[GeneratorTriggerHintBusinessEntry]
-other = "business entry points and orchestration"
-
-[GeneratorTriggerHintAuthorizationPolicy]
-other = "authorization and policy"
-
-[GeneratorTriggerHintStateTransition]
-other = "state transitions"
-
-[GeneratorTriggerHintPersistenceOrchestration]
-other = "persistence orchestration"
-
 [SkillRendererLoaderMissing]
 other = "Skills renderer is missing a template loader"
 
@@ -2758,76 +2731,16 @@ other = "project"
 other = "code"
 
 [GeneratorSkillDescriptionDefault]
-other = "Use when modifying, reviewing, or extending {{.Project}} {{.Language}} code and project-specific architecture, business flow, generated artifact, or repository conventions matter"
+other = "Use when modifying, debugging, testing, reviewing, or extending {{.Project}} {{.Language}} code, including APIs and contracts, plugins and integrations, persistence and migrations, configuration and runtime behavior, or architecture analysis"
 
-[GeneratorSkillDescriptionWithHints]
-other = "Use when modifying, reviewing, or extending {{.Project}} {{.Language}} code involving project-specific conventions such as {{.Hints}}"
+[GeneratorValidationGapTest]
+other = "No repository-evidenced test command has been learned"
 
-[GeneratorTriggerHintCoreBusinessFlow]
-other = "core business flow"
+[GeneratorValidationGapStaticCheck]
+other = "No repository-evidenced static-check command has been learned"
 
-[GeneratorTriggerHintBoundaryTransformation]
-other = "boundary transformation"
-
-[GeneratorTriggerHintExternalDependencyWrapper]
-other = "external dependency wrappers"
-
-[GeneratorWorkflowAPITitle]
-other = "Add Or Change API"
-
-[GeneratorWorkflowAPIWhen]
-other = "Interfaces, routes, request/response types, transformation logic, or generated artifacts change"
-
-[GeneratorWorkflowAPIStepRegenerateArtifacts]
-other = "Edit interface contract source files first, then regenerate derived artifacts"
-
-[GeneratorWorkflowAPIStepReadSpec]
-other = "Read Project Spec plus interface/structure patterns first to confirm contract source, response shape, transformation layer, and generated-artifact boundaries"
-
-[GeneratorWorkflowAPIStepKeepBoundaries]
-other = "Keep responsibility boundaries between entry points, orchestration code, and domain implementation when editing handwritten code"
-
-[GeneratorWorkflowAPIStepCheckTransform]
-other = "When adding or changing externally visible fields, check transformation logic and interface types together instead of exposing internal models directly"
-
-[GeneratorWorkflowBusinessTitle]
-other = "Change Business Flow"
-
-[GeneratorWorkflowBusinessWhen]
-other = "State transitions, cache keys, task retry, idempotency, or cross-entity business orchestration change"
-
-[GeneratorWorkflowBusinessStepReadMap]
-other = "Read the Business Pattern Map and matching business detail first; read the Entry Method Index next only when reusing an entry point"
-
-[GeneratorWorkflowBusinessStepVerifyCode]
-other = "Verify locks, states, error branches, and cache/task ordering against current code; current code wins over references"
-
-[GeneratorWorkflowBusinessStepConfirmSemantics]
-other = "Before adding product semantics, confirm the current code already implements them; if not, mark them as requirements to confirm, not project rules"
-
-[GeneratorWorkflowExternalDependencyTitle]
-other = "Add Or Change External Dependency"
-
-[GeneratorWorkflowExternalDependencyWhen]
-other = "Remote clients, external service calls, or shared context injection change"
-
-[GeneratorWorkflowExternalDependencyStepReadStructure]
-other = "Read structure patterns and Project Spec first to confirm wrapper layers, interface aliases, and context injection conventions"
-
-[GeneratorWorkflowExternalDependencyStepKeepInfraBoundary]
-other = "Keep connection or client initialization inside the existing infrastructure boundary and call dependencies through domain-oriented interfaces"
-
-[GeneratorWorkflowConfigTitle]
-other = "Change Config Or Hot Reload"
-
-[GeneratorWorkflowConfigWhen]
-other = "Config structures, config files, runtime-updatable fields, or config listeners change"
-
-[GeneratorWorkflowConfigStepReadPatterns]
-other = "Read config patterns first to confirm config structs, default files, and hot-reload listener boundaries"
-
-[GeneratorWorkflowConfigStepHandleReloadErrors]
-other = "When adding runtime-updatable fields, handle listener error paths so reload failures do not crash the service"
+[GeneratorValidationGapScopedMatrix]
+other = "No validation matrix can currently be mapped to change scopes"
 
 [GeneratorCategorySummary]
 other = "{{.Category}} category contains {{.Count}} project-specific patterns: {{.Patterns}}."
@@ -2926,7 +2839,7 @@ other = "Project-level business, cross-module orchestration, and high-value util
 other = "Key Modules"
 
 [GeneratorProfileReferenceModulesDescription]
-other = "Key module responsibilities, dependencies, and entry methods"
+other = "Key module paths, responsibility summaries, and verified entry points"
 
 [GeneratorProfileReferenceCommonUtilsTitle]
 other = "Common Utilities"
@@ -3218,9 +3131,6 @@ other = "Subcommands"
 
 [CommandDocsHeaderFlags]
 other = "Flags"
-
-[KnowledgePolicySoftenedPrefix]
-other = "Treat as a local hint; verify current code before applying: "
 
 [AutoFixPatchHeader]
 other = "# Auto-generated patch by skills-seed\n# Generated at: {{.GeneratedAt}}\n# Issues fixed: {{.IssueCount}}"

@@ -5,12 +5,14 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/knowledge/routing"
 )
 
-type patternGroup = routing.BusinessGroup
-
 func businessPatternGroups(locale string, patterns []domain.Pattern) []patternGroup {
-	groups := routing.BusinessPatternGroups(locale, patterns)
-	for i := range groups {
-		groups[i].Patterns = patternsForTemplate(groups[i].Patterns, locale)
+	routed := routing.BusinessPatternGroups(locale, patterns)
+	groups := make([]patternGroup, 0, len(routed))
+	for _, group := range routed {
+		groups = append(groups, patternGroup{
+			BusinessGroup: group,
+			Patterns:      patternsForTemplate(group.Patterns),
+		})
 	}
 	return groups
 }

@@ -96,7 +96,7 @@ func TestRetryConsoleMessageShowsRetryReason(t *testing.T) {
 		Reason:       "API Error: 529\n overloaded_error",
 	})
 
-	require.Contains(t, message, "claude 触发 API 速率限制")
+	require.Contains(t, message, "claude 遇到可重试错误")
 	require.Contains(t, message, "本次调用 3m37s")
 	require.Contains(t, message, "15s 后重试")
 	require.Contains(t, message, "API Error: 529 overloaded_error")

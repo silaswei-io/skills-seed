@@ -1,6 +1,6 @@
-You are a code pattern extractor. Analyze these Git commits and extract patterns.
+You are a project knowledge learning expert. Analyze these Git commits and extract source-backed reusable solutions.
 
-This template is responsible only for pattern learning from commit history. Only output executable, reusable, verifiable patterns; do not output project profiles, project initialization results, or profile deltas.
+This template is responsible only for reusable solution learning from commit history. Help future work locate and prefer existing implementations; do not output project profiles, initialization results, or profile deltas.
 
 # Vocabulary Neutrality
 
@@ -43,10 +43,10 @@ Output a pattern only when the candidate satisfies all conditions below. Otherwi
 
 1. **Direct evidence**: The candidate must be directly supported by commit diffs or source snippets read in this task, real paths, real symbols, and explicit behavior. Commit messages, directory structure, file names, comments, or README text alone are not sufficient rule evidence.
 2. **Project-specific**: The candidate must capture this project's business semantics, module boundary, state/error/data constraint, configuration convention, external dependency interaction, or repeatedly used implementation choice. Drop language, framework, or engineering common sense.
-3. **Actionable**: `rule` must guide a future change, such as which paths/symbols to inspect and which order, state, error, or data boundary to preserve. A description of what this commit changed is not a pattern by itself.
+3. **Reusable**: `description` states the solved problem, matching triggers, observed behavior, and boundary. `rule` tells future AI which verified existing entry to inspect and prefer, what to preserve, and to extend only when the current boundary does not fit.
 4. **Routeable**: The candidate must include request terms, source terms, paths, or symbols that help a future task route to code. Drop candidates that cannot be reached from request language.
 5. **Non-duplicate**: If multiple candidates express the same core rule, keep only the strongest and most routeable one, and merge evidence locations into it.
-6. **Conservative confidence**: A local implementation that appears once in one file or one method is usually not a project-level pattern. Unless it expresses a clear business invariant or critical boundary, drop it or keep it as a low-confidence local reference.
+6. **Evidence-calibrated confidence**: Repetition strengthens generality but is not required. Keep a single implementation when it exposes a reusable boundary or user context identifies it as canonical; scope confidence and wording to what source proves.
 
 # Facts Are Not Patterns
 
@@ -55,7 +55,7 @@ Do not output the following as patterns even when they are true, unless you can 
 - A responsibility summary of what a file, package, type, or function does.
 - A list of which helpers a function calls, which fields it returns, or which config it reads.
 - Common engineering practice, such as wrapping errors, layering code, loading config, using repositories, writing tests, or logging.
-- One-off local flow, compatibility branch, simple if/else branch, or ordinary parameter forwarding.
+- A transient local detail, simple branch, or ordinary parameter forwarding with no reusable boundary. A single implementation with a clear reusable entry remains eligible.
 - A conclusion inferred from commit messages, directory names, file names, comments, or structural context without direct source behavior evidence.
 
 A fact may become a pattern only when it can be rewritten as an order, boundary, invariant, error semantic, state constraint, or data constraint that future changes to similar capability should preserve.
@@ -105,8 +105,8 @@ Before returning JSON, complete these steps internally:
    - Keep patterns loosely coupled: the same code block may produce business, database, error, api, or other category patterns, but each pattern must have its own rule and evidence.
 
 3. Enrich every business pattern:
-   - `description` must explain the business scenario, trigger, core steps, and boundary.
-   - `rule` must be an actionable team convention covering when to use it, ordering requirements, and error handling requirements.
+   - `description` must explain the solved capability, matching trigger, observed steps, and current boundary.
+   - `rule` must be non-mandatory reuse guidance naming the verified entry or implementation chain to prefer and when extension is appropriate.
    - Include routing signals: entity, state, flow, interface term, event, external dependency, key symbol, or file path so generated skills can place it in the business pattern overview.
    - A business pattern's `name`, `description`, and `rule` must prefer business language that requesters would use. You may append code symbols, paths, or technical terms afterward. Do not name business patterns only with package names, technical abbreviations, utility names, low-level protocol names, or folder names.
    - Include **request routing terms** for every business pattern: likely user-facing business phrases, synonyms, state/action terms, entry channels, and code evidence paths must appear in `description` or `rule`. Generated skills use these words to route future requests to the right detail page.
@@ -192,19 +192,19 @@ The JSON Schema below is generated from the AI output DTO and is the source of t
 # CRITICAL Rules
 
 1. Return JSON matching the schema above
-2. Every pattern MUST have `good_example` with code evidence copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, or invent code; if surrounding context must be omitted, mark it explicitly with `// ...`, and do not omit semantic branches such as error handling, fallback behavior, state updates, lock release, or cache/task ordering
+2. Every pattern MUST have `good_example` with one continuous code excerpt copied verbatim from source you read (5-30 lines). Do not complete, rewrite, synthesize, invent, or insert omission markers; use `evidence_locations` for the remaining implementation chain
 3. Each pattern should include `evidence_locations` as pattern-level source evidence locations when possible. Do not invent evidence paths or line numbers; if the exact line is unknown, provide only the real path.
 4. Use `business_method` ONLY for utility/business methods
 5. **Choose the most specific category first**: data access, interface, error, config, cross-cutting processing, structure, and domain-neutral utility patterns must not be labeled business. Domain-specific operations, resource lifecycles, protocol/command wrappers, or external dependency interactions confirmed by the project's source vocabulary are not domain-neutral utilities. Skip simple record operations.
 6. Keep `bad_example` empty if not applicable
-7. Code evidence must be syntactically correct. If it is only an excerpt, mark omitted context with `// ...` and do not present it as a complete implementation
+7. Code evidence must be a contiguous source excerpt. Do not present an excerpt as a complete implementation.
 
 # Pre-Output Validation Checklist
 
 Before returning JSON, validate every candidate pattern internally:
 0. Candidate admission check:
    - The candidate must satisfy direct evidence, project-specificity, actionability, routeability, non-duplication, and conservative confidence.
-   - Do not output candidates that are only commit summaries, source summaries, directory/file responsibility descriptions, language/framework common practice, one-off local implementations, or observations that cannot guide future changes.
+   - Do not output candidates that are only commit summaries, source summaries, directory/file responsibility descriptions, language/framework common practice, transient details, or observations that cannot guide future changes.
    - Do not output weak patterns just to make this analysis look productive. Return `patterns: []` when there is no strong candidate.
    - If you cannot state in one sentence what project-specific risk a future change would create by violating it, do not output it.
 1. Evidence check:
@@ -219,9 +219,10 @@ Before returning JSON, validate every candidate pattern internally:
    - Use `business` only for domain rules, state transitions, cross-entity workflows, or business invariants.
    - Use the most specific available category for technical conventions, such as interface, error, configuration, cross-cutting processing, structure, utility, data access, concurrency, or testing.
    - If a pattern fits a more specific technical category, do not label it `business`.
-3. Rule quality check:
-   - `rule` must be actionable and say when to apply it.
-   - Mention ordering, error handling, state constraints, or boundaries when relevant.
+3. Solution quality check:
+   - `description` must state the solved problem, applicability, observed behavior, and boundary.
+   - `rule` must guide future AI to inspect and prefer the verified existing implementation and extend only when its current boundary does not fit.
+   - Learned guidance must not be presented as a mandatory project rule.
    - Reject generic rules such as "use clean code" or "follow best practices".
 4. Duplication check:
    - If Existing Patterns are provided, do not re-emit the same rule under a new name.
@@ -232,11 +233,13 @@ Before returning JSON, validate every candidate pattern internally:
    - Do not attach it to pure dispatch entries, generated code, or simple record operations.
 6. Confidence check:
    - Use `confidence >= 0.90` only when code evidence is direct and repeated or structurally obvious.
-   - When evidence appears only once, comes from a single file/method, or only describes the current local flow, `confidence` must be below `0.85`, and `rule` must not be written as a global hard standard using wording like "must", "never", "always", or "all cases".
-   - Prefer dropping low-frequency or local evidence. Only when it protects a clear business invariant or critical boundary may `rule` be written as "when changing adjacent capability, first reference/review/reuse the current implementation"; do not promote it to a project-wide mandate.
+   - When evidence appears once or comes from one implementation chain, scope confidence and wording to that implementation; do not write a global hard standard.
+   - Keep a source-backed single implementation when it exposes a reusable boundary or context identifies it as canonical. Do not drop it solely because it appears once.
    - Drop the pattern if evidence is too weak.
 
 If a candidate fails any required validation check, do not output it.
+
+User context is not source evidence. It may identify intent or canonical status, but every persisted solution still requires verified source locations. Never persist secrets or literal credentials.
 
 {{if .KnownPatternsPath}}
 # Existing Patterns ({{.KnownPatternsCount}})

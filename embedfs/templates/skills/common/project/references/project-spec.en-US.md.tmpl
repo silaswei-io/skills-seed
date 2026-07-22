@@ -6,95 +6,49 @@
 {{end}}{{if .WorkspaceRole}}**Workspace Role**: {{.WorkspaceRole}}
 {{end}}**Generated At**: {{.GeneratedAt}}
 
----
-
 ## Usage Principles
 
 - This spec keeps executable constraints, generated/config conventions, and change touchpoints only.
-- For architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for entry methods read [Entry Method Index](./business-methods.md){{end}}.
-- "Rules" only include constraints backed by code evidence in the current pattern set; local or weaker findings are downgraded to "Reference Observations."
-- If this spec conflicts with the current code, trust the current code.
+- For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for entry methods read [Entry Method Index](./business-methods.md){{end}}; for verification read [Validation Strategy](./validation.md){{if .References.Testing}} and [Test Matrix](./testing.md){{end}}.
+- "Rules" only include source-backed user-maintained or built-in constraints. AI-learned results with evidence appear under "Source-Backed Reuse Guidance" without becoming hard constraints.
+- Framework and configuration items are navigation aids from the learned profile. Confirm them against current code, manifests, and configuration files.
+- Trust current code when it conflicts with this spec.
 
 ## Table Of Contents
 
 - [Rules](#rules)
-{{if .PatternGuidance}}- [Reference Observations](#reference-observations)
+{{if .PatternGuidance}}- [Source-Backed Reuse Guidance](#source-backed-reuse-guidance)
 {{end}}{{if .FrameworkPatterns}}- [Framework Conventions](#framework-conventions)
 {{end}}{{if .ConfigPatterns}}- [Configuration Conventions](#configuration-conventions)
-{{end}}{{if .ValidationCommands}}- [Validation Commands](#validation-commands)
 {{end}}- [Change Touchpoints](#change-touchpoints)
 
-{{if .SourceOfTruth}}
-## Source Of Truth
+{{if .SourceOfTruth}}## Source Of Truth
 
 | Area | Edit | Do Not Edit Directly |
 |---|---|---|
 {{range .SourceOfTruth}}| {{.Area}} | {{.Edit}} | {{.DoNotEdit}} |
 {{end}}
+{{end}}## Rules
+
+{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{end}}{{else}}*No authoritative hard rules have been extracted. Continue with the guidance below and category references for reusable implementations.*
 {{end}}
+{{if .PatternGuidance}}## Source-Backed Reuse Guidance
 
-## Rules
+These items come from source evidence and identify existing solutions to inspect and prefer. They do not override current behavior or become hard constraints:
 
-{{if .PatternRules}}
-{{range .PatternRules}}
-- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{if .Description}}{{.Description}}{{else}}{{.Name}}{{end}}
 {{end}}
-{{else}}
-*No executable rules extracted yet.*
+{{end}}{{if .FrameworkPatterns}}## Framework Conventions
+
+{{range .FrameworkPatterns}}- {{.}}
 {{end}}
+{{end}}{{if .ConfigPatterns}}## Configuration Conventions
 
-{{if .PatternGuidance}}
-## Reference Observations
-
-These items come from learned patterns and are only navigation hints and review checklists; they must not override current code behavior:
-
-{{range .PatternGuidance}}
-- **{{.Name}}** ({{.Category}}, {{printf "%.2f" .Confidence}}, x{{.Frequency}}): {{if .Description}}{{.Description}}{{else}}{{.Name}}{{end}}
+{{range .ConfigPatterns}}- {{.}}
 {{end}}
-{{end}}
+{{end}}## Change Touchpoints
 
-{{if .FrameworkPatterns}}
-## Framework Conventions
-
-{{range .FrameworkPatterns}}
-- {{.}}
-{{end}}
-{{end}}
-
-{{if .ConfigPatterns}}
-## Configuration Conventions
-
-{{range .ConfigPatterns}}
-- {{.}}
-{{end}}
-{{end}}
-
-{{if .ValidationCommands}}
-## Validation Commands
-
-{{if .ValidationMatrix}}
-The table only includes commands that evidence maps to a concrete scope.
-
-| Change Scope | Suggested Command | Trigger | Evidence |
-|---|---|---|---|
-{{range .ValidationMatrix}}| {{.Area}} | `{{.Command}}` | {{if .When}}{{.When}}{{else}}-{{end}} | {{if .Evidence}}{{range .Evidence}}`{{.}}` {{end}}{{else}}-{{end}} |
-{{end}}
-
-Other learned commands; they may not cover the current change scope, so confirm coverage against current code and evidence before running:
-{{else}}
-No validation matrix could be mapped to concrete change scopes. Confirm coverage against current code and evidence before running the commands below.
-{{end}}
-{{range .ValidationCommands}}
-- `{{.Command}}`{{if .When}} - {{.When}}{{end}}{{if .Source}} (source: `{{.Source}}`){{end}}{{if .Workdir}}, workdir: `{{.Workdir}}`{{end}}{{if .ScopePaths}}, scope: {{range .ScopePaths}}`{{.}}` {{end}}{{end}}{{if .Evidence}}, evidence: {{range .Evidence}}`{{.}}` {{end}}{{end}}{{if .Type}}, type: {{.Type}}{{end}}
-{{end}}
-{{end}}
-
-## Change Touchpoints
-
-{{if .Touchpoints}}
-{{range .Touchpoints}}
-- **{{.Kind}}** `{{.Name}}`{{if .Path}} - `{{.Path}}`{{end}}{{if .Description}}: {{.Description}}{{end}}
-{{end}}
-{{else}}
-*No key touchpoints extracted yet.*
+{{if .Touchpoints}}{{range .Touchpoints}}- **{{.Kind}}** `{{.Name}}`{{if .Path}} - `{{.Path}}`{{end}}{{if .Description}}: {{.Description}}{{end}}
+{{end}}{{else}}*No key touchpoints extracted yet.*
 {{end}}

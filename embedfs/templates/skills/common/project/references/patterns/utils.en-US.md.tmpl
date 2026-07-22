@@ -1,9 +1,7 @@
 # {{.Category}} Pattern Overview
 
 **Category**: {{.Category}}
-**Priority**: {{.Priority}}
 **Pattern Count**: {{.PatternCount}}
-**Confidence**: {{printf "%.2f" .Confidence}}%
 **Last Updated**: {{.LastUpdated}}
 
 ---
@@ -23,19 +21,27 @@ This page only covers {{.Category}} category conventions. If the task crosses on
 {{end}}
 
 {{if .PatternObjects}}
-## Detailed Utility Patterns
+{{if gt (len .PatternObjects) 5}}
+## Table Of Contents
+
+{{range .PatternObjects}}- [{{.Name}}](#{{anchor .Name}})
+{{end}}
+{{end}}
+
+## Reusable Solutions
 
 {{range .PatternObjects}}
 ### {{.Name}}
 
-**Description**: {{.Description}}
+{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability and implementation observation (verify in source)**: {{.Description}}{{end}}
 
-**Rule**: {{.Rule}}
+{{end}}
+{{if .Rule}}**User rule**: {{.Rule}}{{end}}
 
-**Evidence**: confidence {{printf "%.2f" (mul .Confidence 100)}}%, occurrences {{.Frequency}}, source {{.Source}}
+**Evidence**: {{len .EvidenceLocations}} verified source symbols, source {{.Source}}
 
 {{if .GoodExample}}
-#### ✅ Code Evidence
+#### Code Evidence
 
 ```{{$.CodeFenceLanguage}}
 {{.GoodExample}}
@@ -43,21 +49,13 @@ This page only covers {{.Category}} category conventions. If the task crosses on
 {{end}}
 
 {{if .BadExample}}
-#### ❌ Bad Example (Avoid)
+#### Avoid
 
 {{.BadExample}}
 {{end}}
 
 ---
 
-{{end}}
-{{end}}
-
-{{if .UsageScenes}}
-## Usage Scenarios
-
-{{range .UsageScenes}}
-- {{.}}
 {{end}}
 {{end}}
 

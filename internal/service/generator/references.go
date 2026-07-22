@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -14,10 +13,10 @@ import (
 
 func (s *GeneratorService) ensureCategorySummaries(
 	patterns []domain.Pattern,
-	summaries map[string]agent.CategorySummary,
-) map[string]agent.CategorySummary {
+	summaries map[string]categorySummary,
+) map[string]categorySummary {
 	if summaries == nil {
-		summaries = map[string]agent.CategorySummary{}
+		summaries = map[string]categorySummary{}
 	}
 
 	byCategory := make(map[string][]domain.Pattern)
@@ -103,15 +102,6 @@ func categoryReferenceGroups(patterns []domain.Pattern, locale string) []skills.
 			Description: meta.Description,
 			Path:        "./references/patterns/" + category + ".md",
 		})
-		if category == string(domain.CategoryBusiness) {
-			for _, businessGroup := range businessPatternGroups(locale, businessPatterns(patterns)) {
-				group.Items = append(group.Items, skills.ReferenceItem{
-					Title:       businessGroup.Title,
-					Description: businessGroup.Summary.Description,
-					Path:        "./references/patterns/business/" + businessGroup.ID + ".md",
-				})
-			}
-		}
 	}
 
 	groups := make([]skills.ReferenceGroup, 0, len(groupOrder))
@@ -250,24 +240,18 @@ func patternForTemplate(pattern domain.Pattern) domain.Pattern {
 	return pattern
 }
 
-func patternsForTemplate(patterns []domain.Pattern, locale string) []domain.Pattern {
-	result := make([]domain.Pattern, 0, len(patterns))
+func patternsForTemplate(patterns []domain.Pattern) []patternRenderModel {
+	result := make([]patternRenderModel, 0, len(patterns))
 	for _, pattern := range patterns {
 		pattern = patternForTemplate(pattern)
-		if strings.TrimSpace(pattern.Rule) != "" && policy.ShouldSoftenPatternText(pattern) {
-			pattern.Rule = policy.DisplayPatternText(pattern, locale)
+		hardConstraint := pattern.AllowsHardConstraint()
+		statement := policy.DisplayPatternText(pattern)
+		if !hardConstraint {
+			pattern.BadExample = ""
+			pattern.Rule = ""
+			pattern.Description = statement
 		}
-		result = append(result, pattern)
-	}
-	return result
-}
-
-func businessPatterns(patterns []domain.Pattern) []domain.Pattern {
-	result := make([]domain.Pattern, 0)
-	for _, pattern := range patterns {
-		if pattern.Category == domain.CategoryBusiness {
-			result = append(result, patternForTemplate(pattern))
-		}
+		result = append(result, patternRenderModel{Pattern: pattern, HardConstraint: hardConstraint})
 	}
 	return result
 }

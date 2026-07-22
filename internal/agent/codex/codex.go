@@ -198,7 +198,7 @@ func (c *CodexAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixes
 
 // SelectFiles 基于候选文件树选择当前代码学习范围。
 func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
-	task := agent.NewRuntimeTask(agent.RuntimeSlug("file-select", ""))
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("file-select", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-file-select")
 	if err != nil {
 		return nil, err
@@ -223,6 +223,7 @@ func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequ
 
 // CuratePatterns 策展候选模式并输出规范模式。
 func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("pattern-curate", ""))
 	data := map[string]interface{}{
 		"Operation":           req.Operation,
 		"CandidatePatterns":   req.CandidatePatterns,
@@ -231,12 +232,12 @@ func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatter
 		"ExistingByCandidate": req.ExistingByCandidate,
 		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
-	prompt, err := c.promptLoader.Render("pattern-curate", data)
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-curate", data, promptRuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderCuratePatternsPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "CuratePatterns", prompt, aicontract.ContractCuratePatterns)
+	output, err := c.callCodex(ctx, "CuratePatterns", prompt, aicontract.ContractCuratePatterns, task)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCuratePatternsFailed"), err)
 	}
@@ -250,7 +251,6 @@ func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatter
 		"operation", "CuratePatterns",
 		"written_count", len(result.Patterns),
 		"dropped_count", len(result.Dropped),
-		"total_candidates", result.Summary.TotalCandidates,
 	)
 	return result, nil
 }
@@ -374,7 +374,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent
 
 // PlanAnalysisUnits 将当前待学习文件拆成可续跑的业务分析单元。
 func (c *CodexAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
-	task := agent.NewRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-analysis-plan")
 	if err != nil {
 		return nil, err

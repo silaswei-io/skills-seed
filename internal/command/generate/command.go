@@ -119,10 +119,6 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		logger.Warn(i18n.Get("GenerateNoPatterns"))
 		return nil
 	}
-	if err := commandutil.RequireAgentAvailable(cont); err != nil {
-		return err
-	}
-
 	logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
 
 	effectiveOutputPath := opts.outputPath
@@ -272,15 +268,8 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 		if err := commandutil.LockConfiguredMode(ctx, childCont); err != nil {
 			return err
 		}
-		scope := project.ID
-		if scope == "" {
-			scope = project.Path
-		}
-		childCtx := agent.WithTokenUsageScope(runtimecontext.WithoutUserContext(ctx), scope)
+		childCtx := runtimecontext.WithoutUserContext(ctx)
 		childCtx = runtimecontext.WithSeedPath(childCtx, childCont.SeedPath)
-		if err := commandutil.RequireAgentAvailable(childCont); err != nil {
-			return err
-		}
 		childOutputPath := outputPathForCurrentTarget(childCont)
 		if err := childCont.GeneratorSvc.GenerateSkillsWithHooks(childCtx, childOutputPath, generator.GenerateProgressHooks{
 			OnStepStart:    startStep,
@@ -294,7 +283,6 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 			multiTracker.Complete(progressName, i18n.Get("GenerateWorkspaceProjectProgressComplete"))
 		}
 		failProgress = false
-		agent.FlushTokenUsageScope(childCtx)
 		return nil
 	})
 }
