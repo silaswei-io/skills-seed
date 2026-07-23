@@ -115,7 +115,6 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	cfg.Project.Language = "go"
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Skills.Target = "codex"
 	cfg.Skills.Locale = "zh-CN"
 	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
@@ -143,9 +142,9 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 		AnalyzerSvc: analyzer.NewAnalyzerService(mockAgent, configRepo),
 		LearnerSvc:  servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, curatorSvc),
 	}
-	staleLearnState := commandstate.NewState("learn-current", "demo", "go", userContext, []commandstate.FileInput{
-		{Path: "internal/stale.go", Hash: "stale", Status: "present"},
-	}, []domain.AnalysisUnit{{ID: "stale", EntryPaths: []string{"internal/stale.go"}}})
+	staleLearnState := commandstate.NewState("learn-current", "demo", "go", userContext, []domain.FileAnalysisRecord{
+		{Path: "internal/stale.go", Hash: "stale"},
+	}, nil, []domain.AnalysisUnit{{ID: "stale", EntryPaths: []string{"internal/stale.go"}}})
 	require.NoError(t, commandstate.NewRepository(seedPath, "learn-current").Save(context.Background(), staleLearnState))
 
 	planCalls := 0
@@ -185,7 +184,6 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 	cfg.Project.Language = "go"
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Skills.Target = "codex"
 	cfg.Skills.Locale = "zh-CN"
 	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
@@ -274,9 +272,9 @@ func TestHasSyncCommandState(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, hasState)
 
-	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []commandstate.FileInput{
-		{Path: "main.go", Hash: "hash", Status: "present"},
-	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
+	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []domain.FileAnalysisRecord{
+		{Path: "main.go", Hash: "hash"},
+	}, nil, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
 
 	hasState, err = hasSyncCommandState(context.Background(), seedPath, "sync")
 	require.NoError(t, err)
@@ -291,14 +289,14 @@ func TestHasResumableSyncCommandStateRequiresInputsAndUnits(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, resumable)
 
-	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", nil, nil)))
+	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", nil, nil, nil)))
 	resumable, err = hasResumableSyncCommandState(context.Background(), seedPath, "sync")
 	require.NoError(t, err)
 	require.False(t, resumable)
 
-	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []commandstate.FileInput{
-		{Path: "main.go", Hash: "hash", Status: "present"},
-	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
+	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []domain.FileAnalysisRecord{
+		{Path: "main.go", Hash: "hash"},
+	}, nil, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
 	resumable, err = hasResumableSyncCommandState(context.Background(), seedPath, "sync")
 	require.NoError(t, err)
 	require.True(t, resumable)
@@ -415,9 +413,9 @@ func TestSyncRestartClearsOnlySyncCommandState(t *testing.T) {
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	syncRepo := commandstate.NewRepository(seedPath, "sync")
 	learnRepo := commandstate.NewRepository(seedPath, "learn-current")
-	state := commandstate.NewState("sync", "demo", "go", "", []commandstate.FileInput{
-		{Path: "main.go", Hash: "hash", Status: "present"},
-	}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})
+	state := commandstate.NewState("sync", "demo", "go", "", []domain.FileAnalysisRecord{
+		{Path: "main.go", Hash: "hash"},
+	}, nil, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})
 	require.NoError(t, syncRepo.Save(context.Background(), state))
 	require.NoError(t, learnRepo.Save(context.Background(), state))
 

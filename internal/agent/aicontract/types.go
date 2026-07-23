@@ -65,6 +65,13 @@ type ValidationCommandOutput struct {
 	Type       string   `json:"type,omitempty" jsonschema:"enum=test,enum=build,enum=lint,enum=generate,enum=contract,enum=check" jsonschema_description:"test|build|lint|generate|contract|check"`
 }
 
+type EngineeringRuleOutput struct {
+	Title    string   `json:"title" jsonschema_description:"concise authoritative rule title"`
+	Rule     string   `json:"rule" jsonschema_description:"exact actionable constraint supported by the authoritative source"`
+	Source   string   `json:"source" jsonschema_description:"repository-relative authoritative engineering knowledge path or user_context"`
+	Evidence []string `json:"evidence,omitempty" jsonschema_description:"repository-relative files supporting the constraint"`
+}
+
 type ArchitectureLayerOutput struct {
 	Name             string   `json:"name" jsonschema_description:"real responsibility layer name"`
 	Description      string   `json:"description" jsonschema_description:"layer responsibility"`
@@ -107,6 +114,7 @@ type ProjectProfileOutput struct {
 	ConfigPatterns     []string                  `json:"config_patterns" jsonschema_description:"configuration conventions"`
 	Dependencies       []string                  `json:"dependencies" jsonschema_description:"important dependencies"`
 	ValidationCommands []ValidationCommandOutput `json:"validation_commands" jsonschema_description:"repository-evidenced validation commands"`
+	EngineeringRules   []EngineeringRuleOutput   `json:"engineering_rules" jsonschema_description:"explicit constraints from authoritative engineering knowledge or user context"`
 	Summary            string                    `json:"summary" jsonschema_description:"specific project overview"`
 }
 
@@ -187,11 +195,8 @@ type PlanAnalysisUnitsOutput struct {
 	Units []AnalysisUnitOutput `json:"units" jsonschema_description:"business analysis units"`
 }
 
-type WorkspaceProjectOutput struct {
-	ID             string   `json:"id" jsonschema_description:"project id"`
-	Path           string   `json:"path" jsonschema_description:"project relative path"`
-	Type           string   `json:"type" jsonschema_description:"application|library|service|tooling or evidenced project type"`
-	Language       string   `json:"language" jsonschema_description:"primary language"`
+type WorkspaceProjectAnalysisOutput struct {
+	ProjectID      string   `json:"project_id" jsonschema_description:"exact configured project id"`
 	Responsibility string   `json:"responsibility,omitempty" jsonschema_description:"specific responsibility"`
 	Frameworks     []string `json:"frameworks,omitempty" jsonschema_description:"frameworks or runtimes supported by evidence"`
 }
@@ -205,9 +210,14 @@ type WorkspacePathOutput struct {
 }
 
 type WorkspaceDependencyOutput struct {
-	From   string `json:"from" jsonschema_description:"source project id"`
-	To     string `json:"to" jsonschema_description:"target project id or shared path id"`
-	Reason string `json:"reason" jsonschema_description:"evidenced dependency reason"`
+	FromProjectID string                   `json:"from_project_id" jsonschema_description:"exact configured source project id"`
+	To            WorkspaceReferenceOutput `json:"to" jsonschema_description:"typed target project, role, or declared shared path"`
+	Reason        string                   `json:"reason" jsonschema_description:"evidenced dependency reason"`
+}
+
+type WorkspaceReferenceOutput struct {
+	Kind  string `json:"kind" jsonschema:"enum=project,enum=role,enum=path" jsonschema_description:"project|role|path"`
+	Value string `json:"value" jsonschema_description:"exact configured project id, configured role, or workspace-relative path/pattern"`
 }
 
 type WorkspaceRouteOutput struct {
@@ -217,27 +227,27 @@ type WorkspaceRouteOutput struct {
 }
 
 type WorkspaceProfileOutput struct {
-	Name         string                      `json:"name" jsonschema_description:"workspace name"`
-	RootPath     string                      `json:"root_path" jsonschema_description:"workspace root path"`
-	Summary      string                      `json:"summary,omitempty" jsonschema_description:"workspace-level factual summary"`
-	Projects     []WorkspaceProjectOutput    `json:"projects" jsonschema_description:"child projects"`
-	Shared       []WorkspacePathOutput       `json:"shared,omitempty" jsonschema_description:"shared paths"`
-	Contracts    []WorkspacePathOutput       `json:"contracts,omitempty" jsonschema_description:"contract paths"`
-	Infra        []WorkspacePathOutput       `json:"infra,omitempty" jsonschema_description:"infrastructure paths"`
-	Dependencies []WorkspaceDependencyOutput `json:"dependencies,omitempty" jsonschema_description:"workspace dependencies"`
-	ImpactRoutes []WorkspaceRouteOutput      `json:"impact_routes,omitempty" jsonschema_description:"impact routes"`
+	Summary      string                           `json:"summary,omitempty" jsonschema_description:"workspace-level factual summary"`
+	Projects     []WorkspaceProjectAnalysisOutput `json:"projects" jsonschema_description:"analysis fields keyed by exact configured project id; identity fields come only from config"`
+	Shared       []WorkspacePathOutput            `json:"shared,omitempty" jsonschema_description:"shared paths"`
+	Contracts    []WorkspacePathOutput            `json:"contracts,omitempty" jsonschema_description:"contract paths"`
+	Infra        []WorkspacePathOutput            `json:"infra,omitempty" jsonschema_description:"infrastructure paths"`
+	Dependencies []WorkspaceDependencyOutput      `json:"dependencies,omitempty" jsonschema_description:"workspace dependencies"`
+	ImpactRoutes []WorkspaceRouteOutput           `json:"impact_routes,omitempty" jsonschema_description:"impact routes"`
 }
 
 type WorkspaceRuleOutput struct {
-	Title       string   `json:"title" jsonschema_description:"rule title"`
-	Description string   `json:"description" jsonschema_description:"actionable workspace rule"`
-	AppliesTo   []string `json:"applies_to,omitempty" jsonschema_description:"project ids, roles, or path families"`
+	Title       string                     `json:"title" jsonschema_description:"rule title"`
+	Description string                     `json:"description" jsonschema_description:"actionable workspace rule"`
+	AppliesTo   []WorkspaceReferenceOutput `json:"applies_to,omitempty" jsonschema_description:"typed project, role, or path scopes"`
+	Source      string                     `json:"source" jsonschema_description:"workspace_profile, user_context, or a repository-relative authoritative source path"`
+	Evidence    []string                   `json:"evidence,omitempty" jsonschema_description:"repository-relative files supporting the rule"`
 }
 
 type WorkspaceParallelGuidanceOutput struct {
-	Scope     string `json:"scope" jsonschema_description:"project or path scope"`
-	Allowed   bool   `json:"allowed" jsonschema_description:"true when concurrent work is allowed"`
-	Condition string `json:"condition" jsonschema_description:"condition for safe parallelism"`
+	Scope     WorkspaceReferenceOutput `json:"scope" jsonschema_description:"typed project, role, or path scope"`
+	Allowed   bool                     `json:"allowed" jsonschema_description:"true when concurrent work is allowed"`
+	Condition string                   `json:"condition" jsonschema_description:"condition for safe parallelism"`
 }
 
 type WorkspaceLoadMultipleSkillOutput struct {
@@ -247,12 +257,9 @@ type WorkspaceLoadMultipleSkillOutput struct {
 }
 
 type WorkspaceSpecOutput struct {
-	Name                   string                             `json:"name" jsonschema_description:"workspace name"`
-	RootPath               string                             `json:"root_path" jsonschema_description:"workspace root path"`
-	Projects               []WorkspaceProjectOutput           `json:"projects" jsonschema_description:"child projects"`
 	Routing                []WorkspaceRouteOutput             `json:"routing" jsonschema_description:"routing rules"`
 	Rules                  []WorkspaceRuleOutput              `json:"rules" jsonschema_description:"workspace-level rules"`
-	ChangeOrder            []string                           `json:"change_order,omitempty" jsonschema_description:"ordered string steps; include step numbers inside each string"`
+	ChangeOrder            []string                           `json:"change_order,omitempty" jsonschema_description:"ordered step text without numeric or list prefixes; presentation adds numbering"`
 	ParallelAgentGuidance  []WorkspaceParallelGuidanceOutput  `json:"parallel_agent_guidance,omitempty" jsonschema_description:"parallel agent boundaries"`
 	LoadMultipleSkillsWhen []WorkspaceLoadMultipleSkillOutput `json:"load_multiple_skills_when,omitempty" jsonschema_description:"when to load multiple child skills"`
 }

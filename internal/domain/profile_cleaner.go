@@ -64,8 +64,27 @@ func CleanProjectProfile(profile *ProjectProfile) *ProjectProfile {
 	}
 
 	cleaned.ValidationCommands = CleanValidationCommands(profile.ValidationCommands)
+	cleaned.EngineeringRules = cleanEngineeringRules(profile.EngineeringRules)
 
 	return &cleaned
+}
+
+func cleanEngineeringRules(rules []EngineeringRule) []EngineeringRule {
+	cleaned := make([]EngineeringRule, 0, len(rules))
+	seen := make(map[string]bool, len(rules))
+	for _, rule := range rules {
+		rule.Title = strings.TrimSpace(rule.Title)
+		rule.Rule = strings.TrimSpace(rule.Rule)
+		rule.Source = normalizeProfileEvidencePath(rule.Source)
+		rule.Evidence = cleanProfilePaths(rule.Evidence)
+		key := rule.Source + "\x00" + strings.ToLower(rule.Title) + "\x00" + rule.Rule
+		if rule.Title == "" || rule.Rule == "" || rule.Source == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		cleaned = append(cleaned, rule)
+	}
+	return cleaned
 }
 
 // CleanValidationCommands 清洗从项目证据中学习到的验证命令。

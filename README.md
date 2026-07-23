@@ -169,13 +169,11 @@ go build -o skills-seed ./cmd/skills-seed
 |---|---|
 | Go | `go.mod` 当前要求 Go 1.25.6+ |
 | Git | 需要在 Git 仓库中初始化和学习 |
-| Agent CLI | `hybrid`/`agent` 学习默认使用 `claude`，也可以选择 `codex`；`local` 学习不需要 Agent CLI |
+| Agent CLI | 默认使用 `claude`，也可以在初始化时选择 `codex` |
 
 安装可用的 Agent CLI 后，可以在 `init` 时选择执行学习的 Agent 和生成 Skills 的目标格式。
 
 ## Agent 成本建议
-
-`learning.backend` 支持 `local`、`hybrid`、`agent`。默认 `hybrid` 使用 CodeGraph 做本地单元规划和确定性模式提取，只把未覆盖文件与有竞争关系的策展候选交给 Agent；`local` 的学习全流程不创建 Agent，适合离线或零 Token 场景；`agent` 保留完整 AI 学习行为。`learn history` 在三种后端下都只增强已有模式的历史证据，不再调用 Agent 生成新模式。
 
 `sync` / `learn current` 会把代码片段、结构信息和上下文交给 Agent 做批量分析，调用次数和 token 消耗都可能比较高。日常建议用速度快、价格低的 Agent 模型跑学习和同步；只有在规则质量明显不够、项目特别复杂或需要更强推理时，再切到更强模型。
 

@@ -17,9 +17,18 @@ type ProjectProfile struct {
 	DataFlow           string              `json:"data_flow"`
 	FrameworkPatterns  []string            `json:"framework_patterns"`
 	BusinessMethods    []BusinessMethod    `json:"business_methods"`
+	EngineeringRules   []EngineeringRule   `json:"engineering_rules,omitempty"`
 	ValidationCommands []ValidationCommand `json:"validation_commands,omitempty"`
 	Summary            string              `json:"summary"`
 	GeneratedAt        string              `json:"generated_at"`
+}
+
+// EngineeringRule 描述来自权威工程知识文件或用户上下文的显式约束。
+type EngineeringRule struct {
+	Title    string   `json:"title"`
+	Rule     string   `json:"rule"`
+	Source   string   `json:"source"`
+	Evidence []string `json:"evidence,omitempty"`
 }
 
 // ValidationCommand 描述从项目证据中学习到的验证命令。
@@ -44,6 +53,7 @@ type ProjectSpec struct {
 	Boundaries         []ProjectSpecBoundary    `json:"boundaries,omitempty"`
 	PatternRules       []ProjectSpecPatternRule `json:"pattern_rules,omitempty"`
 	PatternGuidance    []ProjectSpecPatternRule `json:"pattern_guidance,omitempty"`
+	EngineeringRules   []EngineeringRule        `json:"engineering_rules,omitempty"`
 	ConfigPatterns     []string                 `json:"config_patterns,omitempty"`
 	FrameworkPatterns  []string                 `json:"framework_patterns,omitempty"`
 	ValidationCommands []ValidationCommand      `json:"validation_commands,omitempty"`

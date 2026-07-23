@@ -28,6 +28,7 @@ type workspaceSkillTemplateData struct {
 	ImpactRoutes        []domain.WorkspaceRoute
 	Routing             []domain.WorkspaceRoute
 	Rules               []domain.WorkspaceRule
+	Guidance            []domain.WorkspaceRule
 	ChangeOrder         []string
 	ParallelGuidance    []domain.WorkspaceParallelGuidance
 	LoadMultipleWhen    []domain.WorkspaceLoadMultipleSkill
@@ -41,6 +42,7 @@ type workspaceSkillTemplateData struct {
 	HasImpactRoutes     bool
 	HasRouting          bool
 	HasRules            bool
+	HasGuidance         bool
 	HasChangeOrder      bool
 	HasParallelGuidance bool
 	HasLoadMultipleWhen bool
@@ -59,10 +61,4 @@ type workspaceProjectTemplateData struct {
 	SelfManagedConfigPath string
 	UsesChildConfig       bool
 	HasFrameworks         bool
-}
-
-type childSkillTarget struct {
-	OutputPath      string
-	UsesChildConfig bool
-	ConfigPath      string
 }

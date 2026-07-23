@@ -148,23 +148,8 @@ func mergeKeepingBestPattern(left, right domain.Pattern) domain.Pattern {
 		primary.BusinessMethod = secondary.BusinessMethod
 	}
 	primary.EvidenceLocations = mergeEvidenceLocations(primary.EvidenceLocations, secondary.EvidenceLocations)
-	primary.HistoryEvidence = mergeHistoryEvidence(primary.HistoryEvidence, secondary.HistoryEvidence)
 	primary.RefreshMetrics()
 	return primary
-}
-
-func mergeHistoryEvidence(left, right domain.PatternHistoryEvidence) domain.PatternHistoryEvidence {
-	commits := uniqueStrings(append(append([]string(nil), left.CommitHashes...), right.CommitHashes...))
-	paths := uniqueStrings(append(append([]string(nil), left.CoChangedPaths...), right.CoChangedPaths...))
-	first := left.FirstSeenAt
-	if first.IsZero() || !right.FirstSeenAt.IsZero() && right.FirstSeenAt.Before(first) {
-		first = right.FirstSeenAt
-	}
-	last := left.LastSeenAt
-	if right.LastSeenAt.After(last) {
-		last = right.LastSeenAt
-	}
-	return domain.PatternHistoryEvidence{CommitHashes: commits, CommitCount: len(commits), FirstSeenAt: first, LastSeenAt: last, CoChangedPaths: paths}
 }
 
 func mergedPatternSources(left, right domain.Pattern) []string {

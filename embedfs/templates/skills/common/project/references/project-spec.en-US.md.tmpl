@@ -22,17 +22,12 @@
 {{end}}{{if .ConfigPatterns}}- [Configuration Conventions](#configuration-conventions)
 {{end}}- [Change Touchpoints](#change-touchpoints)
 
-{{if .SourceOfTruth}}## Source Of Truth
+## Rules
 
-| Area | Edit | Do Not Edit Directly |
-|---|---|---|
-{{range .SourceOfTruth}}| {{.Area}} | {{.Edit}} | {{.DoNotEdit}} |
-{{end}}
-{{end}}## Rules
-
-{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
-{{end}}{{else}}*No authoritative hard rules have been extracted. Continue with the guidance below and category references for reusable implementations.*
-{{end}}
+{{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**: {{.Rule}} (source: `{{.Source}}`{{if .Evidence}}; evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}})
+{{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*No authoritative hard rules have been extracted. Continue with the guidance below and category references for reusable implementations.*
+{{end}}{{end}}
 {{if .PatternGuidance}}## Source-Backed Reuse Guidance
 
 These items come from source evidence and identify existing solutions to inspect and prefer. They do not override current behavior or become hard constraints:

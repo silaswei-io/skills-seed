@@ -12,8 +12,8 @@ This file is generated deterministically from the current source tree and does n
 
 | Workdir | Command | Test files | Module evidence |
 |---|---|---:|---|
-{{range .Inventory.Modules}}{{if .TestFiles}}| `{{.Workdir}}` | `go test ./...` | {{len .TestFiles}} | `{{.ModFile}}` |
-{{end}}{{end}}
+{{range .Inventory.Modules}}| `{{.Workdir}}` | `go test ./...` | {{len .TestFiles}} | `{{.ModFile}}` |
+{{end}}
 
 ## Test File Evidence
 
@@ -23,6 +23,6 @@ This file is generated deterministically from the current source tree and does n
 {{end}}
 {{end}}{{end}}## Coverage Gaps
 
-{{range .Inventory.Modules}}{{if not .TestFiles}}- Module `{{.Workdir}}` (`{{.ModFile}}`) has no `_test.go`, so no test command is generated.
+{{range .Inventory.Modules}}{{if not .TestFiles}}- Module `{{.Workdir}}` (`{{.ModFile}}`) has no `_test.go`; `go test ./...` still checks package loading and compilation, but automated test coverage is missing.
 {{end}}{{end}}{{range .Inventory.UnownedTestFiles}}- `{{.}}` does not belong to a `go.mod`; confirm its module boundary first.
 {{end}}

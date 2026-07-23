@@ -104,8 +104,7 @@ type moduleReferenceTemplateData struct {
 
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
-	References    ReferenceAvailability
-	SourceOfTruth []SourceOfTruthItem
+	References ReferenceAvailability
 }
 
 type validationReferenceTemplateData struct {
@@ -116,12 +115,6 @@ type validationReferenceTemplateData struct {
 
 type testingReferenceTemplateData struct {
 	Inventory sourcecode.GoTestInventory
-}
-
-type SourceOfTruthItem struct {
-	Area      string
-	Edit      string
-	DoNotEdit string
 }
 
 type categoryReferenceMeta struct {

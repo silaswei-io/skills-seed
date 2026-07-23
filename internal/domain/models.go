@@ -193,20 +193,10 @@ type BusinessMethod struct {
 
 // PatternMetrics 描述一条模式的质量和可排序性。
 type PatternMetrics struct {
-	SpecificityScore  float64 // 项目特有性，0.0-1.0
-	EvidenceCount     int     // 代码路径、方法签名、项目符号等证据数量
-	HistoricalSupport int     // 支持该模式的历史提交数量
-	GenericPenalty    float64 // 泛化/模板化惩罚，0.0-1.0
-	EffectiveScore    float64 // 综合排序分，0.0-1.0
-}
-
-// PatternHistoryEvidence 保存 Git 历史对当前模式源码证据的本地支持度。
-type PatternHistoryEvidence struct {
-	CommitHashes   []string  `json:"commit_hashes,omitempty"`
-	CommitCount    int       `json:"commit_count,omitempty"`
-	FirstSeenAt    time.Time `json:"first_seen_at,omitempty"`
-	LastSeenAt     time.Time `json:"last_seen_at,omitempty"`
-	CoChangedPaths []string  `json:"co_changed_paths,omitempty"`
+	SpecificityScore float64 // 项目特有性，0.0-1.0
+	EvidenceCount    int     // 代码路径、方法签名、项目符号等证据数量
+	GenericPenalty   float64 // 泛化/模板化惩罚，0.0-1.0
+	EffectiveScore   float64 // 综合排序分，0.0-1.0
 }
 
 // PatternStatus 表示模式在当前代码库中的生命周期状态。
@@ -257,22 +247,21 @@ func (l PatternEvidenceLocation) DisplayLocation() string {
 
 // Pattern 代码模式聚合根
 type Pattern struct {
-	ID              string
-	Name            string
-	Category        Category
-	Description     string
-	GoodExample     string
-	BadExample      string
-	Rule            string
-	Confidence      float64
-	Frequency       int
-	Metrics         PatternMetrics
-	HistoryEvidence PatternHistoryEvidence `json:"history_evidence,omitempty"`
-	Source          Source
-	Merged          bool            // 是否已被汇总
-	MergedFrom      []string        // 从哪些模式ID汇总而来
-	Generated       bool            // 是否已生成到 skills
-	BusinessMethod  *BusinessMethod // 业务方法信息（可选，仅用于 utils 和 business 分类）
+	ID             string
+	Name           string
+	Category       Category
+	Description    string
+	GoodExample    string
+	BadExample     string
+	Rule           string
+	Confidence     float64
+	Frequency      int
+	Metrics        PatternMetrics
+	Source         Source
+	Merged         bool            // 是否已被汇总
+	MergedFrom     []string        // 从哪些模式ID汇总而来
+	Generated      bool            // 是否已生成到 skills
+	BusinessMethod *BusinessMethod // 业务方法信息（可选，仅用于 utils 和 business 分类）
 	// EvidenceLocations 是模式对应的通用源码证据位置，不等同于 BusinessMethod 的可调用位置。
 	EvidenceLocations []PatternEvidenceLocation `json:"evidence_locations,omitempty"`
 	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
@@ -497,18 +486,15 @@ func (p *Pattern) Merge(other *Pattern) {
 // RefreshMetrics 使用确定性启发式刷新模式质量指标。
 func (p *Pattern) RefreshMetrics() {
 	evidence := p.evidenceCount()
-	historicalSupport := len(p.HistoryEvidence.CommitHashes)
 	genericPenalty := p.genericPenalty()
-	historyScore := clamp01(float64(historicalSupport) / 20.0)
-	specificity := clamp01(float64(evidence)/6.0 + categorySpecificityBonus(p) + historyScore*0.05 - genericPenalty*0.35)
-	effective := clamp01(specificity*0.6 + p.Confidence*0.3 + historyScore*0.08 - genericPenalty*0.1)
+	specificity := clamp01(float64(evidence)/6.0 + categorySpecificityBonus(p) - genericPenalty*0.35)
+	effective := clamp01(specificity*0.6 + p.Confidence*0.3 - genericPenalty*0.1)
 
 	p.Metrics = PatternMetrics{
-		SpecificityScore:  roundScore(specificity),
-		EvidenceCount:     evidence,
-		HistoricalSupport: historicalSupport,
-		GenericPenalty:    roundScore(genericPenalty),
-		EffectiveScore:    roundScore(effective),
+		SpecificityScore: roundScore(specificity),
+		EvidenceCount:    evidence,
+		GenericPenalty:   roundScore(genericPenalty),
+		EffectiveScore:   roundScore(effective),
 	}
 	p.UpdatedAt = time.Now()
 }

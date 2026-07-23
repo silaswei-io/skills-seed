@@ -143,25 +143,22 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	promptLoader := promptloader.New(cfg.Agent.Engine, configRepo.GetSkillsLocale(), seedPath)
 	skillsLoader := skills.NewLoaderForAgent(configRepo.GetEffectiveSkillsTarget(), configRepo.GetSkillsLocale())
 
-	// 6. local 学习后端不创建外部 Agent，其余命令按需校验 Agent 可用性。
-	var agentImpl agent.Agent
-	if configRepo.GetLearningBackend() != config.LearningBackendLocal {
-		agentImpl, err = createAgent(cfg, promptLoader)
-		if err != nil {
-			_ = patternRepo.Close()
-			return nil, err
-		}
+	// 6. 创建 Agent
+	agentImpl, err := createAgent(cfg, promptLoader)
+	if err != nil {
+		_ = patternRepo.Close()
+		return nil, err
 	}
 
 	// 7. 创建服务
 	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo)
-	curatorSvc := curator.NewServiceWithBackend(agentImpl, patternRepo, configRepo.GetLearningBackend())
-	learnerSvc := learner.NewLearnerServiceWithBackend(agentImpl, gitRepo, patternRepo, patternRepo, curatorSvc, configRepo.GetLearningBackend())
+	curatorSvc := curator.NewService(agentImpl, patternRepo)
+	learnerSvc := learner.NewLearnerService(agentImpl, gitRepo, patternRepo, patternRepo, curatorSvc)
 
 	checkerSvc := checker.NewCheckerService(agentImpl, gitRepo, patternRepo, configRepo)
 	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, cfg.Project.Language)
 	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo)
-	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(patternRepo, profileRepo, skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo, workflowRepo)
+	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo, workflowRepo)
 
 	return &Container{
 		SeedPath:              seedPath,

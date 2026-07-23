@@ -147,9 +147,8 @@ func (b *planBuilder) appendReferenceFiles(p *skillgen.Plan, summaries map[strin
 
 func (b *planBuilder) appendProjectSpec(p *skillgen.Plan, spec *domain.ProjectSpec, references ReferenceAvailability) error {
 	p.AddFile("references/project-spec.md", skillgen.ReferenceTemplate, "project-spec", projectSpecTemplateData{
-		ProjectSpec:   *spec,
-		References:    references,
-		SourceOfTruth: []SourceOfTruthItem{},
+		ProjectSpec: *spec,
+		References:  references,
 	})
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.append_project_spec",

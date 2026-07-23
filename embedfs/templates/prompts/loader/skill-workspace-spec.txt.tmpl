@@ -53,6 +53,7 @@ Use the right abstraction level: workspace rules are only for cross-project rout
 3. **Consistency rules**
    - Keep interface input/output shapes, error codes, access context, environment variables, config keys, event structures, data structures, and log fields consistent across projects.
    - Only include rules supported by current workspace evidence.
+   - Every rule must set `source` to `user_context`, `workspace_profile`, or a repository-relative authoritative file. Use `workspace_profile` for inferred guidance; it will not be rendered as a mandatory rule. Repository-backed rules must list concrete evidence paths.
 
 4. **Parallel agent rules**
    - Say which child projects may be handled concurrently.
@@ -76,4 +77,6 @@ The JSON Schema below is generated from the AI output DTO and is the source of t
 # Strict Rules
 
 - Preserve paths, commands, config keys, environment variables, project IDs, and code identifiers verbatim.
+- Project identity is owned by configuration. Do not return workspace name, root path, or a duplicate project index.
+- Each `change_order` item contains step text only. Do not include numeric, bullet, or list prefixes; presentation adds numbering.
 - For stable output, order routing rules by path pattern, cross-project flows by dependency order, and parallel rules by project ID. Do not rename rules or reshape groups merely for stylistic variety.

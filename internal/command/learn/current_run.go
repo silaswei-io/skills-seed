@@ -14,7 +14,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
@@ -73,7 +72,7 @@ func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Cont
 	if err := run.loadImportedCuration(); err != nil {
 		return nil, err
 	}
-	if run.cont.ConfigRepo.GetLearningBackend() != config.LearningBackendLocal && !run.hasCurationDecision() {
+	if !run.hasCurationDecision() {
 		if err := commandutil.RequireAgentAvailable(cont); err != nil {
 			return nil, err
 		}
@@ -288,7 +287,7 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 		if err != nil {
 			return err
 		}
-		if !currentStateInputsMatchProject(r.projectRoot, session.State.Inputs) || !currentChangesCoveredByState(session.State, detected) {
+		if !currentStateInputsMatchProject(r.projectRoot, session.State.Files, session.State.Deleted) || !currentChangesCoveredByState(session.State, detected) {
 			if err := r.stateRepo.Clear(); err != nil {
 				return err
 			}
@@ -308,7 +307,7 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current.resume_state",
 			"state_scope", r.stateRepo.Command(),
-			"inputs_count", len(session.State.Inputs),
+			"inputs_count", currentStateInputCount(session.State),
 			"pending_count", len(r.incrementalChanges.AddedOrModified)+len(r.incrementalChanges.Deleted),
 			"units_count", len(session.State.Units),
 		)
@@ -341,12 +340,6 @@ func (r *learnCurrentProjectRun) currentStateInvocationHash() string {
 func (r *learnCurrentProjectRun) buildFileSelectionPlan() currentFileSelectionPlan {
 	focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
 	currentLearningConfig := r.cont.ConfigRepo.GetCurrentLearningConfig()
-	if r.cont.ConfigRepo.GetLearningBackend() != config.LearningBackendAgent {
-		return currentFileSelectionPlan{
-			Candidates: focusRelPaths,
-			SkipReason: "learning backend uses deterministic local file selection",
-		}
-	}
 	if r.stateSession != nil {
 		return currentFileSelectionPlan{
 			Candidates: focusRelPaths,

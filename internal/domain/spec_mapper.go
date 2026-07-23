@@ -35,6 +35,7 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 		ConfigPatterns:     append([]string(nil), profile.ConfigPatterns...),
 		FrameworkPatterns:  append([]string(nil), profile.FrameworkPatterns...),
 		ValidationCommands: CleanValidationCommands(profile.ValidationCommands),
+		EngineeringRules:   append([]EngineeringRule(nil), profile.EngineeringRules...),
 		GeneratedAt:        time.Now().Format("2006-01-02 15:04:05"),
 	}
 	if project.ID != "" {

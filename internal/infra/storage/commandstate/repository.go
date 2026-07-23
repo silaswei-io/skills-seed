@@ -34,13 +34,6 @@ type InputSummary struct {
 	SkippedFiles        int `json:"skipped_files,omitempty"`
 }
 
-// FileInput 记录命令状态覆盖文件的输入摘要。
-type FileInput struct {
-	Path   string `json:"path"`
-	Hash   string `json:"hash,omitempty"`
-	Status string `json:"status"`
-}
-
 // AnalysisCheckpoint 保存高成本分析的阶段结果，供失败后从未完成单元继续。
 type AnalysisCheckpoint struct {
 	Patterns             []domain.Pattern      `json:"patterns,omitempty"`
@@ -49,9 +42,10 @@ type AnalysisCheckpoint struct {
 	ProfileRefreshReason string                `json:"profile_refresh_reason,omitempty"`
 }
 
-// CurationCheckpoint 保存已完成的 AI 策展批次决策，等待本地校验和原子提交。
+// CurationCheckpoint 保存一次已完成的 AI 策展决策，等待本地校验和原子提交。
 type CurationCheckpoint struct {
-	Decisions map[string]json.RawMessage `json:"decisions"`
+	CandidateHash string          `json:"candidate_hash"`
+	Decision      json.RawMessage `json:"decision"`
 }
 
 // State 是命令未完成执行的可恢复状态。
@@ -63,11 +57,12 @@ type State struct {
 	Mode          string `json:"mode,omitempty"`
 	UserContext   string `json:"user_context_hash,omitempty"`
 	// InvocationHash 绑定影响分析范围和计划的命令参数及配置，防止不兼容调用复用旧状态。
-	InvocationHash string                `json:"invocation_hash,omitempty"`
-	CreatedAt      string                `json:"created_at"`
-	InputSummary   *InputSummary         `json:"input_summary,omitempty"`
-	Inputs         []FileInput           `json:"inputs"`
-	Units          []domain.AnalysisUnit `json:"units"`
+	InvocationHash string                      `json:"invocation_hash,omitempty"`
+	CreatedAt      string                      `json:"created_at"`
+	InputSummary   *InputSummary               `json:"input_summary,omitempty"`
+	Files          []domain.FileAnalysisRecord `json:"files"`
+	Deleted        []string                    `json:"deleted"`
+	Units          []domain.AnalysisUnit       `json:"units"`
 	// Analysis 保存已完成单元及其结果；阶段完成状态由计划覆盖关系推导。
 	Analysis *AnalysisCheckpoint `json:"analysis,omitempty"`
 	// Curation 保存与当前候选集合绑定的 AI 策展决策。
@@ -144,12 +139,12 @@ func (r *Repository) Clear() error {
 }
 
 // NewState 创建规范化命令状态。
-func NewState(command, projectName, language, userContext string, inputs []FileInput, units []domain.AnalysisUnit) *State {
-	return NewStateWithMode(command, projectName, language, "", userContext, inputs, units)
+func NewState(command, projectName, language, userContext string, files []domain.FileAnalysisRecord, deleted []string, units []domain.AnalysisUnit) *State {
+	return NewStateWithMode(command, projectName, language, "", userContext, files, deleted, units)
 }
 
 // NewStateWithMode 创建包含学习模式的命令状态。
-func NewStateWithMode(command, projectName, language, mode, userContext string, inputs []FileInput, units []domain.AnalysisUnit) *State {
+func NewStateWithMode(command, projectName, language, mode, userContext string, files []domain.FileAnalysisRecord, deleted []string, units []domain.AnalysisUnit) *State {
 	return &State{
 		SchemaVersion: schemaVersion,
 		Command:       normalizeCommand(command),
@@ -158,7 +153,8 @@ func NewStateWithMode(command, projectName, language, mode, userContext string, 
 		Mode:          strings.TrimSpace(mode),
 		UserContext:   HashText(userContext),
 		CreatedAt:     time.Now().Format(time.RFC3339),
-		Inputs:        normalizeInputs(inputs),
+		Files:         normalizeFiles(files),
+		Deleted:       normalizePaths(deleted),
 		Units:         normalizeUnits(units),
 	}
 }
@@ -232,15 +228,14 @@ func normalizeCommand(command string) string {
 	return out
 }
 
-func normalizeInputs(inputs []FileInput) []FileInput {
-	out := make([]FileInput, 0, len(inputs))
-	for _, input := range inputs {
-		input.Path = filepath.ToSlash(filepath.Clean(strings.TrimSpace(input.Path)))
-		input.Status = strings.TrimSpace(input.Status)
-		if input.Path == "" || input.Path == "." {
+func normalizeFiles(files []domain.FileAnalysisRecord) []domain.FileAnalysisRecord {
+	out := make([]domain.FileAnalysisRecord, 0, len(files))
+	for _, record := range files {
+		record.Path = filepath.ToSlash(filepath.Clean(strings.TrimSpace(record.Path)))
+		if record.Path == "" || record.Path == "." {
 			continue
 		}
-		out = append(out, input)
+		out = append(out, record)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out
@@ -301,8 +296,11 @@ func unitPaths(unit domain.AnalysisUnit) []string {
 // MarshalJSON keeps nil slices encoded as [] for stable state files.
 func (s State) MarshalJSON() ([]byte, error) {
 	type alias State
-	if s.Inputs == nil {
-		s.Inputs = []FileInput{}
+	if s.Files == nil {
+		s.Files = []domain.FileAnalysisRecord{}
+	}
+	if s.Deleted == nil {
+		s.Deleted = []string{}
 	}
 	if s.Units == nil {
 		s.Units = []domain.AnalysisUnit{}

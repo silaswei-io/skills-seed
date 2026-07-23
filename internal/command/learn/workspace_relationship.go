@@ -17,7 +17,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
-	"github.com/silaswei-io/skills-seed/internal/utils"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
@@ -47,20 +46,12 @@ type workspaceRelationshipFingerprintInput struct {
 	UserContext    string                  `json:"user_context,omitempty"`
 }
 
-type workspaceRelationshipOptions struct {
-	ChangedProjectIDs []string
-	ProfileMode       string
-}
-
-func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig, opts workspaceRelationshipOptions) (bool, error) {
+func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) (bool, error) {
 	if cont.WorkspaceProfileRepo == nil && cont.WorkspaceSpecRepo == nil {
 		return false, nil
 	}
 	generatedAt := time.Now().Format(time.RFC3339)
 	baseProfile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
-	if cont.ConfigRepo.GetLearningBackend() == config.LearningBackendLocal || cont.Agent == nil {
-		return true, saveWorkspaceRelationshipFallback(ctx, cont, baseProfile, generatedAt)
-	}
 
 	input, err := workspaceLearnInput(ctx, cont, workspaceName, projectRoot, workspaceConfig)
 	if err != nil {
@@ -75,7 +66,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 	if err != nil {
 		return false, err
 	}
-	if workspaceRelationshipShouldSkip(ctx, cont, input, decision, opts, userContext) {
+	if workspaceRelationshipShouldSkip(ctx, cont, input, decision) {
 		if err := decision.Commit(ctx, cont.FileTracker); err != nil {
 			return false, err
 		}
@@ -120,7 +111,10 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		if err := agent.RequireResult(profile, "AnalyzeWorkspaceProfile"); err != nil {
 			return err
 		}
-		profile = workspacediscovery.MergeProfile(baseProfile, profile)
+		profile, err = workspacediscovery.AssembleProfile(baseProfile, profile)
+		if err != nil {
+			return err
+		}
 		profile.GeneratedAt = generatedAt
 		return nil
 	}); err != nil {
@@ -146,7 +140,15 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		if err := agent.RequireResult(spec, "AnalyzeWorkspaceSpec"); err != nil {
 			return err
 		}
-		spec = workspacediscovery.MergeSpec(workspacediscovery.SpecFromProfile(profile, cont.ConfigRepo.GetSkillsLocale()), spec)
+		spec, err = workspacediscovery.AssembleSpec(
+			workspacediscovery.SpecFromProfile(profile, cont.ConfigRepo.GetSkillsLocale()),
+			spec,
+			profile,
+			workspacediscovery.ValidationOptions{RootPath: projectRoot, HasUserContext: userContext != ""},
+		)
+		if err != nil {
+			return err
+		}
 		spec.GeneratedAt = generatedAt
 		return nil
 	}); err != nil {
@@ -178,14 +180,8 @@ func workspaceRelationshipFingerprintScope() domain.FileAnalysisScope {
 	return domain.FileAnalysisScope{ProjectID: "__workspace__", ScopePath: "learn"}
 }
 
-func workspaceRelationshipShouldSkip(ctx context.Context, cont *container.Container, input workspaceLearnInputData, decision *domain.InputFingerprintDecision, opts workspaceRelationshipOptions, userContext string) bool {
-	if !workspaceRelationshipArtifactsExist(ctx, cont) {
-		return false
-	}
-	if decision.ShouldSkip() {
-		return true
-	}
-	if opts.ProfileMode == learnCurrentProfileRefresh || userContext != "" || len(opts.ChangedProjectIDs) > 0 {
+func workspaceRelationshipShouldSkip(ctx context.Context, cont *container.Container, input workspaceLearnInputData, decision *domain.InputFingerprintDecision) bool {
+	if decision == nil || !decision.ShouldSkip() || !workspaceRelationshipArtifactsExist(ctx, cont) {
 		return false
 	}
 	return workspaceRelationshipArtifactsMatchInput(ctx, cont, input)
@@ -206,69 +202,47 @@ func workspaceRelationshipArtifactsExist(ctx context.Context, cont *container.Co
 }
 
 func workspaceRelationshipArtifactsMatchInput(ctx context.Context, cont *container.Container, input workspaceLearnInputData) bool {
+	baseProfile := workspaceProfileFromInput(input)
+	profile := baseProfile
 	if cont.WorkspaceProfileRepo != nil {
-		profile, err := cont.WorkspaceProfileRepo.Get(ctx)
-		if err != nil || !workspaceProfileMatchesInput(profile, input) {
+		stored, err := cont.WorkspaceProfileRepo.Get(ctx)
+		if err != nil {
+			return false
+		}
+		profile, err = workspacediscovery.ReconcileProfile(baseProfile, stored)
+		if err != nil {
 			return false
 		}
 	}
 	if cont.WorkspaceSpecRepo != nil {
-		spec, err := cont.WorkspaceSpecRepo.Get(ctx)
-		if err != nil || !workspaceSpecMatchesInput(spec, input) {
+		stored, err := cont.WorkspaceSpecRepo.Get(ctx)
+		if err != nil {
+			return false
+		}
+		_, err = workspacediscovery.ReconcileSpec(
+			workspacediscovery.SpecFromProfile(profile, cont.ConfigRepo.GetSkillsLocale()),
+			stored,
+			profile,
+			workspacediscovery.ValidationOptions{RootPath: input.RootPath},
+		)
+		if err != nil {
 			return false
 		}
 	}
 	return true
 }
 
-func workspaceProfileMatchesInput(profile *domain.WorkspaceProfile, input workspaceLearnInputData) bool {
-	if profile == nil || profile.Name != input.Name || profile.RootPath != input.RootPath {
-		return false
+func workspaceProfileFromInput(input workspaceLearnInputData) *domain.WorkspaceProfile {
+	projects := make([]domain.WorkspaceProject, 0, len(input.Projects))
+	for _, project := range input.Projects {
+		projects = append(projects, domain.WorkspaceProject{
+			ID:       project.ID,
+			Path:     project.Path,
+			Type:     project.Type,
+			Language: project.Language,
+		})
 	}
-	return workspaceProjectsMatchInput(profile.Projects, input.Projects)
-}
-
-func workspaceSpecMatchesInput(spec *domain.WorkspaceSpec, input workspaceLearnInputData) bool {
-	if spec == nil || spec.Name != input.Name || spec.RootPath != input.RootPath {
-		return false
-	}
-	return workspaceProjectsMatchInput(spec.Projects, input.Projects)
-}
-
-func workspaceProjectsMatchInput(projects []domain.WorkspaceProject, inputProjects []workspaceLearnInputProject) bool {
-	if len(projects) != len(inputProjects) {
-		return false
-	}
-	for i, project := range projects {
-		inputProject := inputProjects[i]
-		if project.ID != inputProject.ID ||
-			project.Path != inputProject.Path ||
-			project.Type != inputProject.Type ||
-			project.Language != inputProject.Language {
-			return false
-		}
-	}
-	return true
-}
-
-func saveWorkspaceRelationshipFallback(ctx context.Context, cont *container.Container, profile *domain.WorkspaceProfile, generatedAt string) error {
-	if profile == nil {
-		profile = &domain.WorkspaceProfile{}
-	}
-	profile.GeneratedAt = generatedAt
-	if cont.WorkspaceProfileRepo != nil {
-		if err := cont.WorkspaceProfileRepo.Save(ctx, profile); err != nil {
-			return err
-		}
-	}
-	if cont.WorkspaceSpecRepo != nil {
-		spec := workspacediscovery.SpecFromProfile(profile, cont.ConfigRepo.GetSkillsLocale())
-		spec.GeneratedAt = generatedAt
-		if err := cont.WorkspaceSpecRepo.Save(ctx, spec); err != nil {
-			return err
-		}
-	}
-	return nil
+	return &domain.WorkspaceProfile{Name: input.Name, RootPath: input.RootPath, Projects: projects}
 }
 
 func workspaceLearnInput(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) (workspaceLearnInputData, error) {
@@ -287,7 +261,11 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 		childLayout := layout.New(childSeedPath)
 		projectProfilePath := childLayout.ProjectProfile()
 		projectSpecPath := childLayout.ProjectSpec()
-		skillPath, err := workspaceChildSkillPath(projectRootPath, childSeedPath, cont.ConfigRepo)
+		target, err := workspacediscovery.ResolveChildSkillTarget(projectRoot, project, cont.ConfigRepo)
+		if err != nil {
+			return workspaceLearnInputData{}, err
+		}
+		skillPath, err := filepath.Rel(projectRootPath, target.OutputPath)
 		if err != nil {
 			return workspaceLearnInputData{}, err
 		}
@@ -308,32 +286,6 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 		input.Projects = append(input.Projects, child)
 	}
 	return input, nil
-}
-
-func workspaceChildSkillPath(projectRootPath, childSeedPath string, rootConfig config.Reader) (string, error) {
-	configReader := rootConfig
-	configPath := filepath.Join(childSeedPath, "config.yaml")
-	if _, err := os.Stat(configPath); err != nil {
-		if !os.IsNotExist(err) {
-			return "", err
-		}
-	} else {
-		configRepo, err := config.NewRepository(childSeedPath, "")
-		if err != nil {
-			return "", err
-		}
-		configReader = configRepo
-	}
-
-	outputPath, err := utils.ConfiguredSkillOutputPath(projectRootPath, configReader)
-	if err != nil {
-		return "", err
-	}
-	relPath, err := filepath.Rel(projectRootPath, outputPath)
-	if err != nil {
-		return "", err
-	}
-	return filepath.ToSlash(relPath), nil
 }
 
 func readChildProjectProfile(ctx context.Context, cont *container.Container, projectID, profilePath string) (*domain.ProjectProfile, error) {

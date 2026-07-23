@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.14.1]
+
+### Changes
+
+- Removed the low-quality `local`/`hybrid` learning backends that added disproportionate architectural complexity. Current-code learning, Git-history learning, project profiling, and pattern curation now share one Agent workflow, while CodeGraph remains available for structural source analysis and symbol validation.
+- Modeled repository engineering rules as source- and evidence-backed knowledge, extracting actionable rules from repository instruction files and keeping them distinct from source-learned patterns in generated Skills.
+- Refactored workspace profile and specification boundaries: configuration owns project identity, while the Agent owns relationship facts and candidate guidance. Project references are now typed, and system rules, user rules, and inferred guidance have explicit semantics.
+- Unified workspace child Skill target resolution so learning and generation share configuration lookup and legacy default-path normalization.
+
+### Fixes
+
+- Fixed local learning causing nil-pointer crashes, producing only a few low-quality patterns, and weakening history learning semantics; removed the associated local analyzer, deterministic curation, and redundant source-collection code.
+- Fixed recovery state losing hash algorithm, timestamps, provenance, selection reason, and analysis status by persisting complete file-analysis records for reliable resume behavior.
+- Fixed changed workspace relationship fingerprints still skipping analysis, AI output replacing configured default routes or system rules, and unknown project references surviving until generation.
+- Fixed child routes still targeting the legacy `skills-seed-skills` directory, rule evidence escaping the project root through symlinks, and Go modules without test files missing a baseline compilation-check command.
+
 ## [v0.14.0]
 
 ### Changes

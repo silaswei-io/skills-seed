@@ -600,7 +600,7 @@ other = "Saving patterns to database"
 other = "Codebase analysis completed"
 
 [LearnShort]
-other = "Learn from current code and enrich evidence from history"
+other = "Learn from Git history"
 
 [LearnNotInitialized]
 other = "skills-seed not initialized"
@@ -609,7 +609,7 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [LearnLongDesc]
-other = "Learn patterns from current code or enrich existing pattern evidence from Git history.\n\nCurrent-code learning uses the local, hybrid, or Agent workflow selected by learning.backend. History always correlates evidence locally and does not generate new patterns."
+other = "Learn coding patterns from current code or Git commit history.\n\nThis command will:\n  • Analyze current code or recent Git commits\n  • Extract coding patterns using the configured AI agent\n  • Save learned patterns to the database\n  • Provide project convention input for check and generate skills"
 
 [LearnExample]
 other = "  # Learn from current code\n  skills-seed learn current\n\n  # Learn from Git history\n  skills-seed learn history --limit=50\n\n  # Learn only from a focused directory\n  skills-seed learn current --focus internal/service --profile skip"
@@ -1853,7 +1853,7 @@ other = "Fix confidence: {{.Confidence}}%"
 
 # 日志 - 学习服务
 [LoggerLearnerStart]
-other = "Starting history evidence enrichment"
+other = "Starting learning"
 
 [LoggerLearnerInvalidBatchSize]
 other = "Invalid batch size, using 1"
@@ -1865,13 +1865,13 @@ other = "No commits to learn"
 other = "Failed to check commit status"
 
 [LoggerLearnerCommitsToLearn]
-other = "History commits to process"
+other = "Commits to learn"
 
 [LoggerLearnerBatchStart]
-other = "Batch history evidence correlation"
+other = "Batch learning"
 
 [LoggerLearnerBatchFailed]
-other = "Batch history evidence correlation failed"
+other = "Batch learning failed"
 
 [LoggerLearnerBatchComplete]
 other = "Batch learning completed"
@@ -1886,7 +1886,7 @@ other = "New pattern"
 other = "Failed to mark commit as analyzed"
 
 [LoggerLearnerComplete]
-other = "History evidence enrichment completed"
+other = "Learning completed"
 
 # 日志 - 更新服务
 [LoggerUpdaterStart]
@@ -2056,19 +2056,19 @@ other = "Event statistics updated"
 other = "Learn from current codebase"
 
 [LearnCurrentLongDesc]
-other = "Analyze current codebase and extract coding patterns, business methods, best practices, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use local, hybrid, or Agent learning according to learning.backend\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/store/documents/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate skills"
+other = "Analyze current codebase and extract coding patterns, business methods, best practices, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/store/documents/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate skills"
 
 [LearnCurrentExample]
 other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip project profile sync\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance from multiple files or directories\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
 [LearnHistoryShort]
-other = "Enrich pattern evidence from Git history"
+other = "Learn from Git history"
 
 [LearnHistoryLongDesc]
-other = "Use Git commit history to enrich source evidence on existing patterns.\n\nThis command will:\n  • Read unprocessed commits and changed paths locally\n  • Correlate them with existing pattern evidence\n  • Save first/last seen times, commit counts, and co-changed paths\n  • Never call an Agent or generate new patterns"
+other = "Learn coding patterns from Git commit history.\n\nThis command will:\n  • Analyze Git commit history\n  • Use configured AI agent to extract coding patterns\n  • Extract business methods and tools\n  • Save learned patterns to database"
 
 [LearnHistoryExample]
-other = "  # Process the last 50 commits\n  skills-seed learn history --limit 50\n\n  # Process commits from the last 30 days\n  skills-seed learn history --since 30d\n\n  # Handle 5 commits per local transaction\n  skills-seed learn history --limit 40 --batch-size 5"
+other = "  # Learn from the last 50 commits\n  skills-seed learn history --limit 50\n\n  # Learn from commits in the last 30 days\n  skills-seed learn history --since 30d\n\n  # Call the agent once per batch of 5 commits\n  skills-seed learn history --limit 40 --batch-size 5"
 
 [LearnFlagLimit]
 other = "Number of commits to analyze; already learned commits are skipped"
@@ -2220,7 +2220,7 @@ other = "Current-code incremental learning failed: {{.Error}}"
 
 # 历史学习命令消息
 [LearnHistoryStart]
-other = "Starting Git history evidence enrichment"
+other = "Starting to learn from Git history"
 
 [LearnHistoryInfo]
 other = "Commit limit: {{.Limit}}\nTime range: {{.Since}}\nBatch size: {{.BatchSize}}"
@@ -2229,7 +2229,7 @@ other = "Commit limit: {{.Limit}}\nTime range: {{.Since}}\nBatch size: {{.BatchS
 other = "Failed to learn from Git history: {{.Error}}"
 
 [LearnHistoryComplete]
-other = "Git history evidence enrichment completed"
+other = "Git history learning completed"
 
 [LearnHistoryTotalPatterns]
 other = "Total {{.Count}} patterns in database"

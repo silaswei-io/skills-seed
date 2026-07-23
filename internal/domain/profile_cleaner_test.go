@@ -143,10 +143,13 @@ func TestCleanProjectProfileOnlyCollapsesEquivalentPatternText(t *testing.T) {
 	assert.Len(t, cleaned.ConfigPatterns, 2)
 }
 
-func TestNewProjectSpecFromProfilePreservesValidationCommands(t *testing.T) {
+func TestNewProjectSpecFromProfilePreservesAuthoritativeProfileData(t *testing.T) {
 	spec := NewProjectSpecFromProfile(&ProjectProfile{
 		ProjectName: "demo",
 		Language:    "unknown",
+		EngineeringRules: []EngineeringRule{
+			{Title: "Validation", Rule: "Run task verify", Source: "AGENTS.md", Evidence: []string{"AGENTS.md"}},
+		},
 		ValidationCommands: []ValidationCommand{
 			{Command: "task verify", When: "after changes", Source: "Taskfile.yml"},
 		},
@@ -156,6 +159,8 @@ func TestNewProjectSpecFromProfilePreservesValidationCommands(t *testing.T) {
 	require.Len(t, spec.ValidationCommands, 1)
 	assert.Equal(t, "task verify", spec.ValidationCommands[0].Command)
 	assert.Equal(t, "Taskfile.yml", spec.ValidationCommands[0].Source)
+	require.Len(t, spec.EngineeringRules, 1)
+	assert.Equal(t, "AGENTS.md", spec.EngineeringRules[0].Source)
 }
 
 func TestNewProjectSpecFromProfileDemotesScopedAndSingleEvidencePatterns(t *testing.T) {

@@ -386,19 +386,6 @@ func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *
 	assert.Greater(t, specific.Metrics.EffectiveScore, generic.Metrics.EffectiveScore)
 }
 
-func TestPattern_RefreshMetricsIncludesHistoricalSupport(t *testing.T) {
-	pattern := NewPattern("history-backed", "History Backed", CategoryStructure)
-	pattern.Confidence = 0.8
-	pattern.Description = "A source-backed project structure convention with stable evidence."
-	pattern.Rule = "Preserve the demonstrated project structure boundary when changing this module."
-	pattern.EvidenceLocations = []PatternEvidenceLocation{{Path: "service.go"}}
-	pattern.HistoryEvidence.CommitHashes = []string{"a", "b", "c"}
-
-	pattern.RefreshMetrics()
-
-	assert.Equal(t, 3, pattern.Metrics.HistoricalSupport)
-}
-
 // ==================== Issue 测试 ====================
 
 func TestNewIssue(t *testing.T) {

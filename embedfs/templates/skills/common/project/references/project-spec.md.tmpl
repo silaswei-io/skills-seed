@@ -22,17 +22,12 @@
 {{end}}{{if .ConfigPatterns}}- [配置约定](#配置约定)
 {{end}}- [改动触点](#改动触点)
 
-{{if .SourceOfTruth}}## 修改来源
+## 规则
 
-| 领域 | 应修改 | 不应直接修改 |
-|---|---|---|
-{{range .SourceOfTruth}}| {{.Area}} | {{.Edit}} | {{.DoNotEdit}} |
-{{end}}
-{{end}}## 规则
-
-{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
-{{end}}{{else}}*尚未提取权威硬规则；这不代表项目没有可复用实现，请继续检查下方约定和分类 references。*
-{{end}}
+{{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**：{{.Rule}}（来源：`{{.Source}}`{{if .Evidence}}；证据：{{range $i, $path := .Evidence}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}）
+{{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*尚未提取权威硬规则；这不代表项目没有可复用实现，请继续检查下方约定和分类 references。*
+{{end}}{{end}}
 {{if .PatternGuidance}}## 源码支持的复用约定
 
 以下内容来自源码证据，可用于定位并优先复用已有解决方案，但不能覆盖当前代码行为或作为硬约束：

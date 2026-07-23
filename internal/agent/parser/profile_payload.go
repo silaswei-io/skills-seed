@@ -20,6 +20,7 @@ func projectProfileToAnalyzeProjectResult(p aicontract.ProjectProfileOutput, now
 		FrameworkPatterns:  stringsOrEmpty(p.FrameworkPatterns),
 		ConfigPatterns:     stringsOrEmpty(p.ConfigPatterns),
 		Dependencies:       stringsOrEmpty(p.Dependencies),
+		EngineeringRules:   engineeringRulesToDomain(p.EngineeringRules),
 		ValidationCommands: validationCommandsToDomain(p.ValidationCommands),
 		Summary:            p.Summary,
 		Layers:             architectureLayersToDomain(p.Layers),
@@ -29,6 +30,19 @@ func projectProfileToAnalyzeProjectResult(p aicontract.ProjectProfileOutput, now
 
 	result.BusinessMethods = businessMethodsToDomain(p.BusinessMethods, now)
 	return result
+}
+
+func engineeringRulesToDomain(rules []aicontract.EngineeringRuleOutput) []domain.EngineeringRule {
+	out := make([]domain.EngineeringRule, len(rules))
+	for i, rule := range rules {
+		out[i] = domain.EngineeringRule{
+			Title:    rule.Title,
+			Rule:     rule.Rule,
+			Source:   rule.Source,
+			Evidence: stringsOrEmpty(rule.Evidence),
+		}
+	}
+	return out
 }
 
 func architectureLayersToDomain(layers []aicontract.ArchitectureLayerOutput) []domain.ArchitectureLayer {

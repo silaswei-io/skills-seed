@@ -59,9 +59,6 @@ func addCmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			if err := commandutil.RequireAgentAvailable(cont); err != nil {
-				return err
-			}
 
 			description, err := commandutil.ResolveRuntimeContext(userContext, contextPath...)
 			if err != nil {
@@ -69,6 +66,9 @@ func addCmd(cont *container.Container) *cobra.Command {
 			}
 			description, err = resolvePatternContext(description, i18n.Get("PatternsAddRequireContext"))
 			if err != nil {
+				return err
+			}
+			if err := commandutil.RequireAgentAvailable(cont); err != nil {
 				return err
 			}
 			result, err := runUserDefinePattern(cmd.Context(), cont, agent.UserDefinePatternRequest{

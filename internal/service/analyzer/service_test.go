@@ -16,7 +16,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
-	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -191,12 +190,20 @@ func TestAnalyzeProjectCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
 		NameVal: "test", AvailableVal: true,
 		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
-			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+			return &agent.AnalyzeProjectResult{
+				Language: "go",
+				EngineeringRules: []domain.EngineeringRule{{
+					Title:    "Validation",
+					Rule:     "Run go test ./...",
+					Source:   "AGENTS.md",
+					Evidence: []string{"AGENTS.md"},
+				}},
+			}, nil
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, nil)
 
-	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
+	result, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
 		ProjectName: "test",
 		RootPath:    tmpDir,
 		FocusPaths:  []string{"internal/service"},
@@ -204,6 +211,8 @@ func TestAnalyzeProjectCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []string{"AGENTS.md", "Taskfile.yml"}, received.EngineeringKnowledge)
+	require.Len(t, result.EngineeringRules, 1)
+	require.Equal(t, "AGENTS.md", result.EngineeringRules[0].Source)
 }
 
 func TestAnalyzeProjectSkipsStructuralContextWithoutSeeds(t *testing.T) {
@@ -734,7 +743,6 @@ func TestAnalyzeCodebaseFullDoesNotDiffGitIgnoredSnapshotFiles(t *testing.T) {
 	configRepo, err := config.NewRepository(seedPath, "zh-CN")
 	require.NoError(t, err)
 	cfg := configRepo.Get()
-	cfg.Learning.Backend = config.LearningBackendAgent
 	require.NoError(t, configRepo.Update(cfg))
 	svc := NewAnalyzerService(mockAgent, configRepo)
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
@@ -1090,28 +1098,6 @@ func TestAnalyzeCodebaseFullWithOptions_PassesRuntimeUserContext(t *testing.T) {
 type fakeStructuralCollector struct {
 	context string
 	err     error
-}
-
-func TestAnalyzeLocalUnitUsesStructuredSymbolsWithoutAgent(t *testing.T) {
-	svc := &AnalyzerService{symbolCollector: fakeSymbolCollector{catalog: sourcecode.Catalog{
-		"internal/a.go": {{Name: "NewAlpha", Kind: "function", Line: 4}},
-		"internal/b.go": {{Name: "NewBeta", Kind: "function", Line: 8}},
-	}}}
-	result := svc.analyzeLocalUnit(context.Background(), t.TempDir(), domain.AnalysisUnit{ID: "internal", Name: "internal"}, []string{"internal/a.go", "internal/b.go"})
-
-	require.Len(t, result.Patterns, 1)
-	require.Equal(t, domain.CategoryStructure, result.Patterns[0].Category)
-	require.Len(t, result.Patterns[0].EvidenceLocations, 2)
-	require.Empty(t, result.Unresolved)
-}
-
-type fakeSymbolCollector struct {
-	catalog sourcecode.Catalog
-	err     error
-}
-
-func (f fakeSymbolCollector) Collect(context.Context, string, []string) (sourcecode.Catalog, error) {
-	return f.catalog, f.err
 }
 
 func (f fakeStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {

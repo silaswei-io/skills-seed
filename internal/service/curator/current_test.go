@@ -6,41 +6,10 @@ import (
 	"fmt"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
-
-func TestLocalCurationNeverCallsAgent(t *testing.T) {
-	candidate := newCuratorTestPattern("local", "Local", domain.CategoryStructure)
-	candidate.Confidence = 0.9
-	candidate.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "a.go", Symbol: "NewA"}}
-	ag := &mocks.MockAgent{CuratePatternsFn: func(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-		t.Fatal("local curation must not call Agent")
-		return nil, nil
-	}}
-	result, err := NewServiceWithBackend(ag, &mocks.MockPatternRepository{}, config.LearningBackendLocal).CurateAndStore(context.Background(), CurateRequest{Operation: OperationLearnCurrent, Candidates: []domain.Pattern{*candidate}})
-	require.NoError(t, err)
-	require.Len(t, result.Written, 1)
-}
-
-func TestHybridCurationSendsOnlyAmbiguousCandidatesToAgent(t *testing.T) {
-	strong := newCuratorTestPattern("strong", "Strong", domain.CategoryStructure)
-	strong.Confidence = 0.9
-	strong.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "a.go", Symbol: "NewA"}}
-	weak := newCuratorTestPattern("weak", "Weak", domain.CategoryBusiness)
-	weak.Confidence = 0.4
-	weak.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "b.go", Symbol: "Run"}}
-	ag := &mocks.MockAgent{CuratePatternsFn: func(_ context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-		require.Len(t, req.CandidatePatterns, 1)
-		require.Equal(t, "weak", req.CandidatePatterns[0].ID)
-		return &agent.CuratePatternsResult{Patterns: []agent.CuratedPattern{{ID: weak.ID, Name: weak.Name, Category: string(weak.Category), Rule: weak.Rule, SourceIDs: []string{weak.ID}}}}, nil
-	}}
-	result, err := NewServiceWithBackend(ag, &mocks.MockPatternRepository{}, config.LearningBackendHybrid).CurateAndStore(context.Background(), CurateRequest{Operation: OperationLearnCurrent, Candidates: []domain.Pattern{*strong, *weak}})
-	require.NoError(t, err)
-	require.Len(t, result.Written, 2)
-}
 
 func TestCurateAndStoreUsesSemanticCurationForLearnCurrent(t *testing.T) {
 	keep := newCuratorTestPattern("keep", "Keep", domain.CategoryBusiness)

@@ -12,8 +12,8 @@
 
 | 工作目录 | 命令 | 测试文件数 | 模块证据 |
 |---|---|---:|---|
-{{range .Inventory.Modules}}{{if .TestFiles}}| `{{.Workdir}}` | `go test ./...` | {{len .TestFiles}} | `{{.ModFile}}` |
-{{end}}{{end}}
+{{range .Inventory.Modules}}| `{{.Workdir}}` | `go test ./...` | {{len .TestFiles}} | `{{.ModFile}}` |
+{{end}}
 
 ## 测试文件证据
 
@@ -23,6 +23,6 @@
 {{end}}
 {{end}}{{end}}## 覆盖缺口
 
-{{range .Inventory.Modules}}{{if not .TestFiles}}- 模块 `{{.Workdir}}`（`{{.ModFile}}`）没有 `_test.go`，因此不生成测试命令。
+{{range .Inventory.Modules}}{{if not .TestFiles}}- 模块 `{{.Workdir}}`（`{{.ModFile}}`）没有 `_test.go`；仍使用 `go test ./...` 做包加载和编译校验，但缺少自动化测试覆盖。
 {{end}}{{end}}{{range .Inventory.UnownedTestFiles}}- `{{.}}` 不属于任何 `go.mod`，需要先确认模块边界。
 {{end}}

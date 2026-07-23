@@ -814,14 +814,14 @@ func projectOverviewData() map[string]interface{} {
 		"PatternRules": []domain.ProjectSpecPatternRule{
 			{Name: "Error Wrapping", Category: "error", Description: "wrap errors", Rule: "use %w", Confidence: 0.9, Frequency: 2},
 		},
+		"EngineeringRules": []domain.EngineeringRule{
+			{Title: "Validation", Rule: "Run task verify", Source: "AGENTS.md", Evidence: []string{"AGENTS.md"}},
+		},
 		"PatternGuidance": []domain.ProjectSpecPatternRule{
 			{Name: "Naming Observation", Category: "naming", Description: "names align", Rule: "prefer local names", Confidence: 0.7, Frequency: 1},
 		},
 		"Touchpoints": []domain.ProjectSpecTouchpoint{
 			{Kind: "business_method", Name: "Demo", Path: "internal/demo.go:10", Description: "demo"},
-		},
-		"SourceOfTruth": []map[string]string{
-			{"Area": "业务规则", "Edit": "`internal/service`", "DoNotEdit": "generated files"},
 		},
 		"BusinessMethodIndex": map[string]interface{}{
 			"Total": 1,

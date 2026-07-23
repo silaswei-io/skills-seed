@@ -89,5 +89,5 @@ func hasResumableSyncCommandState(ctx context.Context, seedPath, stateScope stri
 		}
 		return false, err
 	}
-	return state != nil && len(state.Inputs) > 0 && len(state.Units) > 0, nil
+	return state != nil && len(state.Files)+len(state.Deleted) > 0 && len(state.Units) > 0, nil
 }

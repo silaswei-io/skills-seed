@@ -734,6 +734,6 @@ func TestGenerateSkills_RendersLocalMultiModuleTestMatrix(t *testing.T) {
 	require.Contains(t, testingReference, "| `plugins/a` | `go test ./...` | 2 | `plugins/a/go.mod` |")
 	require.Contains(t, testingReference, "`plugins/a/child/b_test.go`")
 	require.Contains(t, testingReference, "模块 `plugins/without`")
-	require.NotContains(t, testingReference, "| `plugins/without` | `go test ./...`")
+	require.Contains(t, testingReference, "| `plugins/without` | `go test ./...` | 0 | `plugins/without/go.mod` |")
 	assertNoBrokenMarkdownLinks(t, outputPath)
 }

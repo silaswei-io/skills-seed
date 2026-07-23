@@ -81,6 +81,26 @@ func TestCurateSchemaContainsOnlyDecisionFields(t *testing.T) {
 	require.NotContains(t, schema, `"summary"`)
 }
 
+func TestWorkspaceContractsKeepIdentityOutOfAIOutput(t *testing.T) {
+	profile := decodeSchema(t, ContractWorkspaceProfile)
+	profileProperties := profile["properties"].(map[string]any)
+	require.NotContains(t, profileProperties, "name")
+	require.NotContains(t, profileProperties, "root_path")
+	projectID, _, ok := findSchemaPropertyWithContainer(profile, "project_id")
+	require.True(t, ok)
+	require.Equal(t, "string", projectID["type"])
+
+	spec := decodeSchema(t, ContractWorkspaceSpec)
+	specProperties := spec["properties"].(map[string]any)
+	require.NotContains(t, specProperties, "name")
+	require.NotContains(t, specProperties, "root_path")
+	require.NotContains(t, specProperties, "projects")
+	kind, _, ok := findSchemaPropertyWithContainer(spec, "kind")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"project", "role", "path"}, schemaStringList(kind["enum"]))
+	require.Contains(t, specProperties["change_order"].(map[string]any)["description"], "without numeric or list prefixes")
+}
+
 func TestJSONSchemaRejectsUnknownContract(t *testing.T) {
 	schema, err := JSONSchema("MissingOutput")
 

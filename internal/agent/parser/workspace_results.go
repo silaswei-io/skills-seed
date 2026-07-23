@@ -50,9 +50,6 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 		return nil, err
 	}
 	spec := workspaceSpecToDomain(payload)
-	if spec.Projects == nil {
-		spec.Projects = []domain.WorkspaceProject{}
-	}
 	if spec.Routing == nil {
 		spec.Routing = []domain.WorkspaceRoute{}
 	}
@@ -88,10 +85,8 @@ func analysisUnitsToDomain(units []aicontract.AnalysisUnitOutput) []domain.Analy
 
 func workspaceProfileToDomain(profile aicontract.WorkspaceProfileOutput) domain.WorkspaceProfile {
 	return domain.WorkspaceProfile{
-		Name:         profile.Name,
-		RootPath:     profile.RootPath,
 		Summary:      profile.Summary,
-		Projects:     workspaceProjectsToDomain(profile.Projects),
+		Projects:     workspaceProjectAnalysesToDomain(profile.Projects),
 		Shared:       workspacePathsToDomain(profile.Shared),
 		Contracts:    workspacePathsToDomain(profile.Contracts),
 		Infra:        workspacePathsToDomain(profile.Infra),
@@ -102,9 +97,6 @@ func workspaceProfileToDomain(profile aicontract.WorkspaceProfileOutput) domain.
 
 func workspaceSpecToDomain(spec aicontract.WorkspaceSpecOutput) domain.WorkspaceSpec {
 	return domain.WorkspaceSpec{
-		Name:                   spec.Name,
-		RootPath:               spec.RootPath,
-		Projects:               workspaceProjectsToDomain(spec.Projects),
 		Routing:                workspaceRoutesToDomain(spec.Routing),
 		Rules:                  workspaceRulesToDomain(spec.Rules),
 		ChangeOrder:            stringsOrEmpty(spec.ChangeOrder),
@@ -113,14 +105,11 @@ func workspaceSpecToDomain(spec aicontract.WorkspaceSpecOutput) domain.Workspace
 	}
 }
 
-func workspaceProjectsToDomain(projects []aicontract.WorkspaceProjectOutput) []domain.WorkspaceProject {
+func workspaceProjectAnalysesToDomain(projects []aicontract.WorkspaceProjectAnalysisOutput) []domain.WorkspaceProject {
 	out := make([]domain.WorkspaceProject, len(projects))
 	for i, project := range projects {
 		out[i] = domain.WorkspaceProject{
-			ID:             project.ID,
-			Path:           project.Path,
-			Type:           project.Type,
-			Language:       project.Language,
+			ID:             project.ProjectID,
 			Responsibility: project.Responsibility,
 			Frameworks:     stringsOrEmpty(project.Frameworks),
 		}
@@ -146,9 +135,9 @@ func workspaceDependenciesToDomain(dependencies []aicontract.WorkspaceDependency
 	out := make([]domain.WorkspaceDependency, len(dependencies))
 	for i, dependency := range dependencies {
 		out[i] = domain.WorkspaceDependency{
-			From:   dependency.From,
-			To:     dependency.To,
-			Reason: dependency.Reason,
+			FromProjectID: dependency.FromProjectID,
+			To:            workspaceReferenceToDomain(dependency.To),
+			Reason:        dependency.Reason,
 		}
 	}
 	return out
@@ -172,7 +161,9 @@ func workspaceRulesToDomain(rules []aicontract.WorkspaceRuleOutput) []domain.Wor
 		out[i] = domain.WorkspaceRule{
 			Title:       rule.Title,
 			Description: rule.Description,
-			AppliesTo:   stringsOrEmpty(rule.AppliesTo),
+			AppliesTo:   workspaceReferencesToDomain(rule.AppliesTo),
+			Source:      rule.Source,
+			Evidence:    stringsOrEmpty(rule.Evidence),
 		}
 	}
 	return out
@@ -182,12 +173,27 @@ func workspaceParallelGuidanceToDomain(items []aicontract.WorkspaceParallelGuida
 	out := make([]domain.WorkspaceParallelGuidance, len(items))
 	for i, item := range items {
 		out[i] = domain.WorkspaceParallelGuidance{
-			Scope:     item.Scope,
+			Scope:     workspaceReferenceToDomain(item.Scope),
 			Allowed:   item.Allowed,
 			Condition: item.Condition,
 		}
 	}
 	return out
+}
+
+func workspaceReferencesToDomain(refs []aicontract.WorkspaceReferenceOutput) []domain.WorkspaceReference {
+	out := make([]domain.WorkspaceReference, len(refs))
+	for i, ref := range refs {
+		out[i] = workspaceReferenceToDomain(ref)
+	}
+	return out
+}
+
+func workspaceReferenceToDomain(ref aicontract.WorkspaceReferenceOutput) domain.WorkspaceReference {
+	return domain.WorkspaceReference{
+		Kind:  domain.WorkspaceReferenceKind(ref.Kind),
+		Value: ref.Value,
+	}
 }
 
 func workspaceLoadMultipleSkillsToDomain(items []aicontract.WorkspaceLoadMultipleSkillOutput) []domain.WorkspaceLoadMultipleSkill {

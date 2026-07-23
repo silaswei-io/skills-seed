@@ -57,8 +57,6 @@ agent:
 # 控制 learn current 和 learn history 的默认学习范围
 ########################################################################
 learning:
-  # 学习后端：hybrid 本地优先并仅用 Agent 处理疑难项；local 全流程不调用 Agent；agent 使用完整 Agent 流程
-  backend: "hybrid"
   current:
     # 学习模式：normal 最稳妥，平衡质量和速度；fast 只保留高价值核心模式；deep 会读取更深分支和异常路径
     mode: "normal"
@@ -84,7 +82,7 @@ learning:
   history:
     # 默认分析的 Git 提交数量
     max_commits: 50
-    # 单次本地证据事务处理的 commit 数量
+    # 批量分析时，单次 AI 调用分析的 commit 数量
     batch_size: 5
 
 ########################################################################

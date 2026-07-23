@@ -42,7 +42,7 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 ## Child Project Dependencies
 
 {{range .Dependencies}}
-- `{{.From}}` -> `{{.To}}`: {{.Reason}}
+- `{{.FromProjectID}}` -> `{{.To.Value}}` ({{.To.Kind}}): {{.Reason}}
 {{end}}
 {{end}}
 

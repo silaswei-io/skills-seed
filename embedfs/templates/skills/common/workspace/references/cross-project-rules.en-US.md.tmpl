@@ -15,7 +15,17 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 ## Workspace-Specific Rules
 
 {{range .Rules}}
-- **{{.Title}}**: {{.Description}}{{if .AppliesTo}} (applies to {{range $i, $id := .AppliesTo}}{{if $i}}, {{end}}`{{$id}}`{{end}}){{end}}
+- **{{.Title}}**: {{.Description}}{{if .AppliesTo}} (applies to {{range $i, $ref := .AppliesTo}}{{if $i}}, {{end}}`{{$ref.Value}}` ({{$ref.Kind}}){{end}}){{end}} (source: `{{.Source}}`)
+{{end}}
+{{end}}
+
+{{if .HasGuidance}}
+## Workspace Analysis Guidance
+
+The following items are inferred from workspace facts and are not unconditional rules:
+
+{{range .Guidance}}
+- **{{.Title}}**: {{.Description}}{{if .AppliesTo}} (applies to {{range $i, $ref := .AppliesTo}}{{if $i}}, {{end}}`{{$ref.Value}}` ({{$ref.Kind}}){{end}}){{end}}
 {{end}}
 {{end}}
 
@@ -107,7 +117,7 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 ### Workspace-Specific Parallel Rules
 
 {{range .ParallelGuidance}}
-- `{{.Scope}}`: {{if .Allowed}}parallel work is allowed{{else}}parallel work is not allowed{{end}}. Condition: {{.Condition}}
+- `{{.Scope.Value}}` ({{.Scope.Kind}}): {{if .Allowed}}parallel work is allowed{{else}}parallel work is not allowed{{end}}. Condition: {{.Condition}}
 {{end}}
 {{end}}
 

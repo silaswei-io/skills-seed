@@ -234,6 +234,7 @@ type AnalyzeProjectResult struct {
 	DataFlow           string
 	FrameworkPatterns  []string
 	BusinessMethods    []domain.BusinessMethod
+	EngineeringRules   []domain.EngineeringRule
 	ValidationCommands []domain.ValidationCommand
 	Summary            string // 项目总结
 }

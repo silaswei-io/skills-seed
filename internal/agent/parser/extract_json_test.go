@@ -56,29 +56,25 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) 
 
 func TestParseWorkspaceSpecParsesStringChangeOrder(t *testing.T) {
 	output := `{
-	  "name": "hsm-workspace",
-	  "root_path": "/workspace",
-	  "routing": [],
-	  "rules": [],
-	  "change_order": [
-	    "1. 确认契约或共享接口稳定：修改 proto、API、SDK 前先确认兼容性。",
-	    "2. 更新消费方：同步适配依赖方。"
+		  "routing": [],
+		  "rules": [],
+		  "change_order": [
+		    "确认契约或共享接口稳定：修改 proto、API、SDK 前先确认兼容性。",
+		    "更新消费方：同步适配依赖方。"
 	  ]
 	}`
 
 	result, err := ParseWorkspaceSpec(output)
 	require.NoError(t, err)
 	require.Equal(t, []string{
-		"1. 确认契约或共享接口稳定：修改 proto、API、SDK 前先确认兼容性。",
-		"2. 更新消费方：同步适配依赖方。",
+		"确认契约或共享接口稳定：修改 proto、API、SDK 前先确认兼容性。",
+		"更新消费方：同步适配依赖方。",
 	}, result.ChangeOrder)
 }
 
 func TestParseWorkspaceSpecRejectsObjectChangeOrder(t *testing.T) {
 	output := `{
-	  "name": "hsm-workspace",
-	  "root_path": "/workspace",
-	  "routing": [],
+		  "routing": [],
 	  "rules": [],
 	  "change_order": [
 	    {"step": 1, "action": "确认契约或共享接口稳定", "details": "修改 proto、API、SDK 前先确认兼容性。"}

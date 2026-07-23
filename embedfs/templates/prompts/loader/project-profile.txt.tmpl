@@ -76,7 +76,8 @@ Identify:
 3. Module dependency graph and key data flow.
 4. Common utilities and configuration patterns.
 5. Validation commands explicitly documented by project evidence.
-6. If an existing project profile already contains `business_methods`, preserve entries that are still supported by evidence; otherwise record only real reusable business or utility entry points, and do not add ordinary startup, scaffolding, or infrastructure methods just to fill the profile. Derive each description, usage, prerequisite, and return statement from that method's body; do not infer semantics from its name or neighboring methods.
+6. Explicit engineering constraints from the authoritative engineering knowledge list or user context.
+7. If an existing project profile already contains `business_methods`, preserve entries that are still supported by evidence; otherwise record only real reusable business or utility entry points, and do not add ordinary startup, scaffolding, or infrastructure methods just to fill the profile. Derive each description, usage, prerequisite, and return statement from that method's body; do not infer semantics from its name or neighboring methods.
 
 You are running in the project root; read entry files, the README, and necessary source files by path. Do not invent unsupported facts. If information is not visible from the project, leave the related array empty or use a concise TODO-style note in the relevant description
 
@@ -87,6 +88,8 @@ The project profile is a navigation and ownership map, not a pattern store and n
 For each module, include `dependencies` and `dependents` only when imports, calls, registration/configuration, or an existing still-supported profile directly shows the relationship. Use concrete repository module names or paths, and omit uncertain relationships. Do not infer a dependency merely because two modules have related names or belong to adjacent layers.
 
 Validation commands must come only from explicit repository evidence or user-provided context, such as README files, scripts, task configuration, CI configuration, build configuration, or an existing project profile. Preserve the command text exactly as evidenced. Do not infer default commands from language, framework, file extension, or common practice. Use a repository-relative path for `source`; if the evidence only comes from user-provided context, write `user_context`. Use `scope_paths` for relative paths or directories actually covered by the command, and `evidence` for relative paths proving that scope. Leave scope fields empty when the scope is genuinely unclear, but never describe a local command as global. If there is no explicit evidence, return an empty `validation_commands` array.
+
+`engineering_rules` contains only explicit constraints stated by a path from the authoritative engineering knowledge list or by user-provided context. Use that exact repository-relative path as `source`, or `user_context` for a user constraint, and cite concrete repository-relative evidence paths. Do not promote conventions inferred from ordinary source code, README prose outside the authority list, or general best practices into engineering rules. If no explicit authoritative constraint exists, return an empty array.
 
 `validation_commands` must include only commands that validate a completed change, such as repository-evidenced tests, checks, static analysis, builds, code generation, or contract generation. Do not output tool installation, new-project scaffolding, service startup, deployment, debugging, dependency fetching, demo execution, or one-time environment setup commands; those are operating instructions, not validation commands.
 

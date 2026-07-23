@@ -1515,6 +1515,7 @@ func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T
 	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
 	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "shared"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, "internal", "api"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "internal", "api", "handler.go"), []byte("package api\n"), 0644))
 	require.DirExists(t, childRoot)
@@ -1530,11 +1531,9 @@ func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T
 		require.Contains(t, workspaceInput, "internal/api: 管理 API 入口")
 		require.Contains(t, userContext, "工作区用于离线交付")
 		return &domain.WorkspaceProfile{
-			Name:     req.WorkspaceName,
-			RootPath: req.WorkspaceRoot,
-			Summary:  "学习阶段分析：工作区用于离线交付。",
+			Summary: "学习阶段分析：工作区用于离线交付。",
 			Projects: []domain.WorkspaceProject{
-				{ID: "backend", Path: "backend", Type: "backend", Language: "go", Responsibility: "负责管理 API", Frameworks: []string{"Gin"}},
+				{ID: "backend", Responsibility: "负责管理 API", Frameworks: []string{"Gin"}},
 			},
 			Shared: []domain.WorkspacePath{
 				{Path: "shared", Description: "离线交付共享配置", Consumers: []string{"backend"}},
@@ -1548,10 +1547,13 @@ func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T
 		require.Contains(t, profileInput, "学习阶段分析：工作区用于离线交付。")
 		require.Contains(t, userContext, "工作区用于离线交付")
 		return &domain.WorkspaceSpec{
-			Name:     req.WorkspaceName,
-			RootPath: req.WorkspaceRoot,
 			Rules: []domain.WorkspaceRule{
-				{Title: "离线交付边界", Description: "变更 backend 时必须保留离线安装包验证。", AppliesTo: []string{"backend"}},
+				{
+					Title:       "离线交付边界",
+					Description: "变更 backend 时必须保留离线安装包验证。",
+					AppliesTo:   []domain.WorkspaceReference{{Kind: domain.WorkspaceReferenceProject, Value: "backend"}},
+					Source:      "user_context",
+				},
 			},
 		}, nil
 	}
@@ -1575,8 +1577,10 @@ func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T
 
 	spec, err := cont.WorkspaceSpecRepo.Get(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "离线交付边界", spec.Rules[0].Title)
-	require.Contains(t, spec.Rules[0].Description, "离线安装包验证")
+	require.Len(t, spec.Rules, 2)
+	require.Equal(t, domain.WorkspaceRuleAuthoritySystem, spec.Rules[0].Authority)
+	require.Equal(t, "离线交付边界", spec.Rules[1].Title)
+	require.Contains(t, spec.Rules[1].Description, "离线安装包验证")
 }
 
 func TestRunLearnWorkspaceCurrentShowsRootAnalysisProgress(t *testing.T) {
@@ -1638,7 +1642,7 @@ func TestRunLearnWorkspaceCurrentSkipsWorkspaceArtifactsWhenInputUnchanged(t *te
 	require.Contains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
 }
 
-func TestRunLearnWorkspaceCurrentSkipsWorkspaceArtifactsWhenChildrenUnchangedWithLegacyFingerprint(t *testing.T) {
+func TestRunLearnWorkspaceCurrentRefreshesWorkspaceArtifactsWhenFingerprintChanged(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
 	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
@@ -1665,20 +1669,24 @@ func TestRunLearnWorkspaceCurrentSkipsWorkspaceArtifactsWhenChildrenUnchangedWit
 			LastAnalyzedAt: time.Now().Format(time.RFC3339),
 		},
 	}))
+	profileCalls := 0
+	specCalls := 0
 	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceProfileFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
-		t.Fatal("workspace profile analysis should be skipped when children are unchanged")
-		return nil, nil
+		profileCalls++
+		return &domain.WorkspaceProfile{Projects: []domain.WorkspaceProject{{ID: "backend"}}}, nil
 	}
 	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceSpecFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
-		t.Fatal("workspace spec analysis should be skipped when children are unchanged")
-		return nil, nil
+		specCalls++
+		return &domain.WorkspaceSpec{}, nil
 	}
 
 	output := captureLearnStdout(t, func() {
 		requireRunLearnCurrentNoError(t, cont, opts)
 	})
 
-	require.Contains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
+	require.NotContains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
+	require.Equal(t, 1, profileCalls)
+	require.Equal(t, 1, specCalls)
 	record, err := cont.FileTracker.GetAnalyzedFile(ctx, workspaceRelationshipFingerprintScope(), "workspace-relationships.json")
 	require.NoError(t, err)
 	require.NotNil(t, record)
@@ -2029,7 +2037,6 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 	cfg.Project.Locale = "zh-CN"
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Workspace.Projects = projects
 	require.NoError(t, configRepo.Update(cfg))
 
@@ -2181,7 +2188,6 @@ func initLearnWorkspaceChildProjectWithProvider(t *testing.T, workspaceRoot stri
 	cfg.Project.Locale = "zh-CN"
 	cfg.Agent.Engine = provider
 	cfg.Agent.Commands = map[string]string{provider: provider}
-	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Learning.Current.Structural.Enabled = false
 	require.NoError(t, childConfigRepo.Update(cfg))
 	return childRoot

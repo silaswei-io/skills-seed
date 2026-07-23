@@ -94,10 +94,7 @@ func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) 
 	}
 	r.flushTokenUsage()
 
-	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(r.ctx, r.cont, r.workspaceName, r.projectRoot, r.workspaceConfig, workspaceRelationshipOptions{
-		ChangedProjectIDs: r.changedProjects,
-		ProfileMode:       r.opts.profileMode,
-	})
+	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(r.ctx, r.cont, r.workspaceName, r.projectRoot, r.workspaceConfig)
 	if err != nil {
 		return domain.LearnCurrentResult{}, err
 	}

@@ -156,13 +156,11 @@ init -> learn current / learn history -> generate skills -> check
 |---|---|---|
 | Initialize | `skills-seed init` | `.skills-seed/config.yaml`, local database, default context files |
 | Learn current code | `skills-seed learn current` | patterns, business methods, utilities, project profile |
-| Learn history | `skills-seed learn history` | local historical evidence attached to existing patterns |
+| Learn history | `skills-seed learn history` | long-lived rules extracted from Git evolution |
 | Generate skills | `skills-seed generate skills` | `SKILL.md`, project overview, specs, pattern references |
 | Check later changes | `skills-seed check` | issues, fix suggestions, and pattern hits based on learned rules |
 
 Starting in 0.10.6, running `skills-seed init` without flags opens an interactive initialization flow. Starting in 0.11.1, the default path asks only for tool language, initialization type, Agent, total Agent parallelism, and the execution plan; analysis depth, unit split scope, Skills language, and Skills type live under optional advanced settings. Running `skills-seed sync` without flags prompts to resume or restart when unfinished state exists. Use `--no-interactive` in scripts, and `sync --resume` / `sync --restart` to control resume behavior explicitly.
-
-`learning.backend` supports `local`, `hybrid`, and `agent`. The default `hybrid` backend uses CodeGraph for local unit planning and deterministic pattern extraction, sending only uncovered files and contested curation candidates to the Agent. `local` never creates an Agent during learning and supports offline, zero-token runs; `agent` preserves the full AI workflow. `learn history` is local evidence enrichment under every backend and no longer synthesizes patterns with an Agent.
 
 Starting in 0.10.7, `patterns add` and user-pattern sync use `--context` for the natural-language description, `patterns update <id> --context "<request>"` can revise one pattern while preserving its ID and workspace ownership, and `patterns show` supports `--sort updated|score|hits|category`. Model-output parsing now also repairs trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
 

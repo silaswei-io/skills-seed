@@ -22,10 +22,6 @@ func newCurrentCurationCheckpoint(repo *commandstate.Repository, state *commands
 	return &currentCurationCheckpoint{repo: repo, state: state, imported: imported}
 }
 
-func (c *currentCurationCheckpoint) HasFullDecision() bool {
-	return c != nil && c.imported != nil
-}
-
 func (r *learnCurrentProjectRun) loadImportedCuration() error {
 	path := strings.TrimSpace(r.opts.curationOutput)
 	if path == "" {
@@ -57,12 +53,11 @@ func (c *currentCurationCheckpoint) Load(ctx context.Context, candidateHash stri
 		return c.imported, true, nil
 	}
 	if checkpoint := c.state.Curation; checkpoint != nil {
-		decision, found := checkpoint.Decisions[candidateHash]
-		if !found {
-			return nil, false, nil
+		if checkpoint.CandidateHash != candidateHash {
+			return nil, false, fmt.Errorf("curation candidate hash changed")
 		}
 		var result agent.CuratePatternsResult
-		if err := json.Unmarshal(decision, &result); err != nil {
+		if err := json.Unmarshal(checkpoint.Decision, &result); err != nil {
 			return nil, false, fmt.Errorf("decode curation decision: %w", err)
 		}
 		return &result, true, nil
@@ -78,12 +73,9 @@ func (c *currentCurationCheckpoint) Save(ctx context.Context, candidateHash stri
 	if err != nil {
 		return fmt.Errorf("encode curation decision: %w", err)
 	}
-	if c.state.Curation == nil {
-		c.state.Curation = &commandstate.CurationCheckpoint{Decisions: map[string]json.RawMessage{}}
+	c.state.Curation = &commandstate.CurationCheckpoint{
+		CandidateHash: candidateHash,
+		Decision:      data,
 	}
-	if c.state.Curation.Decisions == nil {
-		c.state.Curation.Decisions = map[string]json.RawMessage{}
-	}
-	c.state.Curation.Decisions[candidateHash] = data
 	return c.repo.Save(ctx, c.state)
 }

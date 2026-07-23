@@ -77,25 +77,3 @@ func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
 	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")
 	require.NotContains(t, prompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
 }
-
-func TestNewContainerLocalBackendDoesNotCreateAgent(t *testing.T) {
-	projectRoot := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
-	seedPath := filepath.Join(projectRoot, ".skills-seed")
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	cfg.Project.Mode = domain.ModeProject
-	cfg.Project.RootPath = projectRoot
-	cfg.Learning.Backend = config.LearningBackendLocal
-	cfg.Agent.Engine = "unregistered"
-	cfg.Agent.Commands = map[string]string{"unregistered": "missing-command"}
-	require.NoError(t, configRepo.Update(cfg))
-
-	cont, err := NewContainer(context.Background(), seedPath)
-	require.NoError(t, err)
-	defer cont.Close()
-	require.Nil(t, cont.Agent)
-	require.NotNil(t, cont.AnalyzerSvc)
-	require.NotNil(t, cont.CuratorSvc)
-}

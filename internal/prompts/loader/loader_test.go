@@ -1506,7 +1506,7 @@ func TestLoader_RenderWorkspaceSpecPromptRequiresStringChangeOrder(t *testing.T)
 	require.NoError(t, err)
 	require.Contains(t, prompt, "source of truth for field names, types")
 	require.Contains(t, prompt, `"change_order"`)
-	require.Contains(t, prompt, `"description": "ordered string steps; include step numbers inside each string"`)
+	require.Contains(t, prompt, `"description": "ordered step text without numeric or list prefixes; presentation adds numbering"`)
 	require.NotContains(t, prompt, `{"step": 1, "action": "confirm contract or shared interface"`)
 }
 

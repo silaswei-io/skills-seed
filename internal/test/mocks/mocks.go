@@ -613,14 +613,6 @@ func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentC
 // GetLearningConfig 模拟获取学习配置
 func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.LearningCfg }
 
-// GetLearningBackend 模拟获取学习后端。
-func (m *MockConfigReader) GetLearningBackend() config.LearningBackend {
-	if m.LearningCfg.Backend == "" {
-		return config.LearningBackendAgent
-	}
-	return config.NormalizeLearningBackend(string(m.LearningCfg.Backend))
-}
-
 // GetCurrentLearningConfig 模拟获取 learn current 配置
 func (m *MockConfigReader) GetCurrentLearningConfig() config.CurrentLearningConfig {
 	return m.LearningCfg.Current

@@ -45,7 +45,8 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 - If a relationship cannot be confirmed from repository structure, config, README, or build files, record the uncertainty in `summary` or use an empty array. Do not invent facts.
 - The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
 - Preserve paths, commands, config keys, environment variables, interface names, file names, project IDs, and code identifiers exactly when needed.
-- For stable output, keep configured project IDs and paths unchanged, sort repeated arrays by project ID then path, and do not rename responsibilities or relationships merely for wording variety.
+- Project identity is owned by configuration. In `projects`, return only the exact configured `project_id` plus analysis-owned responsibility and framework fields. Never return or redefine project paths, types, languages, workspace name, or workspace root.
+- For stable output, keep configured project IDs unchanged, sort repeated arrays by project ID then path, and do not rename responsibilities or relationships merely for wording variety.
 
 # Output Format
 

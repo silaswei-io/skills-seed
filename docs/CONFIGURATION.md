@@ -45,7 +45,6 @@ agent:
     max_interval: 120
 
 learning:
-  backend: "hybrid"
   current:
     mode: "normal"
     scope: "flow"
@@ -162,16 +161,6 @@ exclude:
 4. 子项目已有 `.skills-seed` 目录但缺少 `config.yaml` 时会报错，避免覆盖半初始化状态。
 5. 只有 workspace 根目录第一层且拥有独立 `.git` 的目录会被识别为子项目。
 6. `go.mod`、`package.json`、安装脚本、Helm/Terraform 等标记只用于识别 `type` 和 `language`，不再决定目录是否是项目。
-
-### `learning.backend`
-
-| 值 | 行为 |
-|---|---|
-| `hybrid` | 默认。本地规划分析单元并用 CodeGraph 提取确定性模式，仅把未覆盖文件和有竞争关系的策展候选交给 Agent |
-| `local` | 学习全流程不创建或调用 Agent；本地构建分析单元、模式、项目/工作区画像并确定性策展 |
-| `agent` | 保留完整 Agent 文件筛选、单元规划、代码分析、画像和策展流程 |
-
-学习后端与 `learning.current.mode` 相互独立。`structural.provider` 仍决定源码事实来源；`local` 默认同样优先使用 CodeGraph，只有 `auto` 下 CodeGraph 不可用或显式配置 `treesitter` 时才使用内嵌 parser。
 
 ### `learning.current`
 
@@ -315,7 +304,7 @@ skills-seed workflow --context "发布前检查环境变量和构建产物，发
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `max_commits` | `50` | `learn history` 默认最多分析的 Git 提交数量 |
-| `batch_size` | `5` | 单次本地历史证据事务处理的 commit 数量 |
+| `batch_size` | `5` | 批量学习历史提交时，单次 AI 调用包含的 commit 数量 |
 
 #### 命令覆盖
 
@@ -324,8 +313,6 @@ skills-seed learn history --limit 100 --batch-size 10
 ```
 
 命令参数只影响本次执行，不会改写配置文件。
-
-`learn history` 只把 commit 变更路径与已有模式的源码证据关联，记录首次/末次出现、提交数和共同变更路径；它不调用 Agent，也不再从历史独立生成新模式。
 
 ### `.skills-seed` 目录结构
 

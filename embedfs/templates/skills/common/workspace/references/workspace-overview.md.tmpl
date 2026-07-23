@@ -42,7 +42,7 @@
 ## 子项目依赖
 
 {{range .Dependencies}}
-- `{{.From}}` -> `{{.To}}`：{{.Reason}}
+- `{{.FromProjectID}}` -> `{{.To.Value}}`（{{.To.Kind}}）：{{.Reason}}
 {{end}}
 {{end}}
 

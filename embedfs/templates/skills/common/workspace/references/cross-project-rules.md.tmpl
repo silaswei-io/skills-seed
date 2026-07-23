@@ -15,7 +15,17 @@
 ## 工作区特定规则
 
 {{range .Rules}}
-- **{{.Title}}**：{{.Description}}{{if .AppliesTo}}（适用：{{range $i, $id := .AppliesTo}}{{if $i}}、{{end}}`{{$id}}`{{end}}）{{end}}
+- **{{.Title}}**：{{.Description}}{{if .AppliesTo}}（适用：{{range $i, $ref := .AppliesTo}}{{if $i}}、{{end}}`{{$ref.Value}}`（{{$ref.Kind}}）{{end}}）{{end}}（来源：`{{.Source}}`）
+{{end}}
+{{end}}
+
+{{if .HasGuidance}}
+## 工作区分析建议
+
+以下内容由工作区事实推导，不作为无条件硬规则：
+
+{{range .Guidance}}
+- **{{.Title}}**：{{.Description}}{{if .AppliesTo}}（适用：{{range $i, $ref := .AppliesTo}}{{if $i}}、{{end}}`{{$ref.Value}}`（{{$ref.Kind}}）{{end}}）{{end}}
 {{end}}
 {{end}}
 
@@ -107,7 +117,7 @@
 ### 工作区特定并发规则
 
 {{range .ParallelGuidance}}
-- `{{.Scope}}`：{{if .Allowed}}允许并发{{else}}不允许并发{{end}}。条件：{{.Condition}}
+- `{{.Scope.Value}}`（{{.Scope.Kind}}）：{{if .Allowed}}允许并发{{else}}不允许并发{{end}}。条件：{{.Condition}}
 {{end}}
 {{end}}
 
