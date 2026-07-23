@@ -3,13 +3,15 @@ package learn
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/spf13/cobra"
-	"time"
 )
 
 const (
@@ -28,14 +30,15 @@ const (
 )
 
 type learnCurrentOptions struct {
-	language    string
-	focusPaths  []string
-	profileMode string
-	contextText string
-	contextPath []string
-	userContext string
-	stateScope  string
-	force       bool
+	language       string
+	focusPaths     []string
+	profileMode    string
+	contextText    string
+	contextPath    []string
+	userContext    string
+	stateScope     string
+	curationOutput string
+	force          bool
 }
 
 type learnHistoryOptions struct {
@@ -80,6 +83,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 	currentCmd.Flags().StringVar(&currentOpts.profileMode, "profile", learnCurrentProfileAuto, i18n.Get("LearnFlagProfile"))
 	currentCmd.Flags().StringVar(&currentOpts.contextText, "context", "", i18n.Get("LearnFlagContext"))
 	currentCmd.Flags().StringArrayVar(&currentOpts.contextPath, "context-path", nil, i18n.Get("LearnFlagContextPath"))
+	currentCmd.Flags().StringVar(&currentOpts.curationOutput, "curation-output", "", i18n.Get("LearnFlagCurationOutput"))
 	currentCmd.Flags().BoolVar(&currentOpts.force, "force", false, i18n.Get("LearnFlagForce"))
 
 	// learn history 子命令
@@ -141,15 +145,18 @@ func RunLearnCurrentWithStateScope(cont *container.Container, stateScope string,
 type CurrentRunOptions struct {
 	// Force 表示忽略已保存的文件指纹，重新学习当前扫描范围。
 	Force bool
+	// CurationOutput 指向已完成的 CuratePatterns 输出，用于恢复时跳过 AI 策展。
+	CurationOutput string
 }
 
 // RunLearnCurrentWithStateScopeOptions 从当前代码库学习，并允许调用方指定运行选项。
 func RunLearnCurrentWithStateScopeOptions(cont *container.Container, stateScope string, userContext string, opts CurrentRunOptions) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(cont, learnCurrentOptions{
-		profileMode: learnCurrentProfileAuto,
-		userContext: userContext,
-		stateScope:  stateScope,
-		force:       opts.Force,
+		profileMode:    learnCurrentProfileAuto,
+		userContext:    userContext,
+		stateScope:     stateScope,
+		curationOutput: opts.CurationOutput,
+		force:          opts.Force,
 	})
 }
 
@@ -165,13 +172,16 @@ func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domai
 		opts.userContext = userContext
 	}
 	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
+		if strings.TrimSpace(opts.curationOutput) != "" {
+			return domain.LearnCurrentResult{}, fmt.Errorf("curation output must be resumed from the matching child project")
+		}
 		return runLearnWorkspaceCurrent(cont, opts)
 	}
 	return runLearnCurrentProject(cont, opts)
 }
 
 func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
-	result, err := runLearnCurrentProjectWithOptions(cont, learnCurrentProjectOptions{
+	result, err := runLearnCurrentProjectWithOptions(context.Background(), cont, learnCurrentProjectOptions{
 		showProgress:     true,
 		showDetailedLogs: true,
 		userContext:      opts.userContext,
@@ -179,6 +189,7 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 		focusPaths:       opts.focusPaths,
 		profileMode:      opts.profileMode,
 		stateScope:       opts.stateScope,
+		curationOutput:   opts.curationOutput,
 		force:            opts.force,
 	})
 	if err != nil {
@@ -207,6 +218,7 @@ type learnCurrentProjectOptions struct {
 	focusPaths       []string
 	profileMode      string
 	stateScope       string
+	curationOutput   string
 	force            bool
 }
 

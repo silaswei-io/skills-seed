@@ -1,12 +1,15 @@
 package generator
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +24,7 @@ func TestSanitizeGenerationInputsKeepsExistingDirectoryModulePaths(t *testing.T)
 		}},
 	}
 
-	sanitized, _ := sanitizeGenerationInputs(profile, nil, root)
+	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
 
 	require.Len(t, sanitized.KeyModules, 1)
 	assert.Equal(t, "plugins/key_manage", sanitized.KeyModules[0].Path)
@@ -36,7 +39,7 @@ func TestSanitizeGenerationInputsDropsUnverifiableExternalUtilityLocations(t *te
 		}},
 	}
 
-	sanitized, _ := sanitizeGenerationInputs(profile, nil, root)
+	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
 
 	assert.Empty(t, sanitized.CommonUtils)
 }
@@ -55,7 +58,7 @@ func TestSanitizeGenerationInputsKeepsSourceVerifiedUtility(t *testing.T) {
 		Signature: "func BuildResponse(value any) error",
 	}}}
 
-	sanitized, _ := sanitizeGenerationInputs(profile, nil, root)
+	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
 
 	require.Len(t, sanitized.CommonUtils, 1)
 	assert.Equal(t, "internal/helper/response.go:3", sanitized.CommonUtils[0].File)
@@ -70,7 +73,7 @@ func TestSanitizeGenerationInputsDropsMissingProjectUtilityLocations(t *testing.
 		}},
 	}
 
-	sanitized, _ := sanitizeGenerationInputs(profile, nil, root)
+	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
 
 	assert.Empty(t, sanitized.CommonUtils)
 }
@@ -84,7 +87,7 @@ func TestSanitizeGenerationInputsDropsMissingModulePaths(t *testing.T) {
 		}},
 	}
 
-	sanitized, _ := sanitizeGenerationInputs(profile, nil, root)
+	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
 
 	assert.Empty(t, sanitized.KeyModules)
 }
@@ -97,7 +100,7 @@ func TestSanitizeGenerationInputsDropsGoodExampleNotFoundInEvidenceFile(t *testi
 	pattern.GoodExample = "func RefactoredSummary() error {\n\treturn nil\n}"
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/service/login.go", Line: 3, Symbol: "Login", Kind: "function"}}
 
-	_, patterns := sanitizeGenerationInputs(&domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
+	_, patterns := sanitizeGenerationInputsForTest(t, &domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
 
 	require.Len(t, patterns, 1)
 	assert.Empty(t, patterns[0].GoodExample)
@@ -113,7 +116,7 @@ func TestSanitizeGenerationInputsKeepsGoodExampleFoundInEvidenceFile(t *testing.
 	pattern.GoodExample = snippet
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/service/login.go", Line: 3, Symbol: "Login", Kind: "function"}}
 
-	_, patterns := sanitizeGenerationInputs(&domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
+	_, patterns := sanitizeGenerationInputsForTest(t, &domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
 
 	require.Len(t, patterns, 1)
 	assert.Equal(t, strings.TrimSpace(snippet), patterns[0].GoodExample)
@@ -128,7 +131,7 @@ func TestSanitizeGenerationInputsDropsUnverifiedSymbolEvidence(t *testing.T) {
 	pattern.Frequency = 4
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "policy.txt", Symbol: "UnsupportedSymbol", Kind: "function"}}
 
-	_, patterns := sanitizeGenerationInputs(&domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
+	_, patterns := sanitizeGenerationInputsForTest(t, &domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
 
 	require.Empty(t, patterns)
 }
@@ -140,7 +143,7 @@ func TestSanitizeGenerationInputsKeepsExplicitFileEvidence(t *testing.T) {
 	pattern.Description = "The file defines the observed local behavior."
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "policy.txt", Kind: "file"}}
 
-	_, patterns := sanitizeGenerationInputs(&domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
+	_, patterns := sanitizeGenerationInputsForTest(t, &domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
 
 	require.Len(t, patterns, 1)
 	require.Equal(t, []domain.PatternEvidenceLocation{{Path: "policy.txt", Kind: "file"}}, patterns[0].EvidenceLocations)
@@ -152,7 +155,7 @@ func TestSanitizeGenerationInputsKeepsExistingScopeWithoutEvidence(t *testing.T)
 	pattern := domain.NewPattern("policy", "Policy", domain.CategoryBusiness)
 	pattern.ScopePath = "internal/policy"
 
-	_, patterns := sanitizeGenerationInputs(&domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
+	_, patterns := sanitizeGenerationInputsForTest(t, &domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
 
 	require.Len(t, patterns, 1)
 	require.Equal(t, "internal/policy", patterns[0].ScopePath)
@@ -195,7 +198,7 @@ func (c *Custom) Publish() error { return nil }
 		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/custom.go:7"},
 	}
 
-	sanitized, patterns := sanitizeGenerationInputs(profile, []domain.Pattern{*pattern}, root)
+	sanitized, patterns := sanitizeGenerationInputsForTest(t, profile, []domain.Pattern{*pattern}, root)
 
 	require.Len(t, sanitized.BusinessMethods, 2)
 	assert.ElementsMatch(t, []string{"Start", "Publish"}, []string{
@@ -209,4 +212,12 @@ func (c *Custom) Publish() error { return nil }
 	require.Len(t, patterns, 1)
 	require.NotNil(t, patterns[0].BusinessMethod)
 	assert.Equal(t, "Publish", patterns[0].BusinessMethod.Name)
+}
+
+func sanitizeGenerationInputsForTest(t *testing.T, profile *domain.ProjectProfile, patterns []domain.Pattern, root string) (*domain.ProjectProfile, []domain.Pattern) {
+	t.Helper()
+	resolver := sourcecode.NewResolver(config.StructuralConfig{Provider: config.StructuralProviderTreeSitter})
+	sanitized, validated, err := sanitizeGenerationInputs(context.Background(), profile, patterns, root, resolver)
+	require.NoError(t, err)
+	return sanitized, validated
 }

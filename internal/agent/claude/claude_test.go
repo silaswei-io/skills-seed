@@ -210,6 +210,60 @@ func TestSelectFilesStoresPromptAndOutputWithSharedRuntimeName(t *testing.T) {
 	require.Equal(t, strings.TrimSuffix(promptName, "-file-select.md")+"-claude-file-select.md", outputName)
 }
 
+func TestFileSelectionAndAnalysisPlanningKeepRepositoryReadTools(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		invoke func(context.Context, *ClaudeAgent, string) error
+	}{
+		{
+			name:   "file-selection",
+			output: `{"type":"result","structured_output":{"selected_paths":["internal/auth/login.go"],"reason":"auth"}}`,
+			invoke: func(ctx context.Context, ag *ClaudeAgent, projectRoot string) error {
+				_, err := ag.SelectFiles(ctx, &agent.SelectFilesRequest{
+					FileTree:          "internal/auth/login.go",
+					Candidates:        []agent.FileSelectionCandidate{{Path: "internal/auth/login.go", Changed: true}},
+					StructuralContext: "internal/auth/login.go defines the login entry",
+					CandidateNum:      1,
+				})
+				return err
+			},
+		},
+		{
+			name:   "analysis-planning",
+			output: `{"type":"result","structured_output":{"units":[{"id":"auth","name":"Auth","entry_paths":["internal/auth/login.go"]}]}}`,
+			invoke: func(ctx context.Context, ag *ClaudeAgent, projectRoot string) error {
+				_, err := ag.PlanAnalysisUnits(ctx, &agent.PlanAnalysisUnitsRequest{
+					ProjectName:       "demo",
+					RootPath:          projectRoot,
+					Language:          "go",
+					FocusPaths:        []string{"internal/auth/login.go"},
+					StructuralContext: "internal/auth/login.go defines the login entry",
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			seedPath := filepath.Join(projectRoot, ".skills-seed")
+			require.NoError(t, os.MkdirAll(seedPath, 0755))
+			commandPath, argsPath := writeFakeClaudeCommandCapturingArgs(t, tt.output)
+			ag := New(commandPath, 5*time.Second, promptloader.New("claude", "zh-CN", seedPath), false, config.DefaultRetryConfig())
+			ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+			require.NoError(t, tt.invoke(ctx, ag, projectRoot))
+
+			argsData, err := os.ReadFile(argsPath)
+			require.NoError(t, err)
+			args := strings.Split(strings.TrimSpace(string(argsData)), "\n")
+			require.Equal(t, "Read,Glob,Grep,LS", requireArgValue(t, args, "--tools"))
+		})
+	}
+}
+
 func TestSelectFilesRetryDoesNotPrintFinalFailureWarning(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	projectRoot := t.TempDir()
@@ -305,6 +359,16 @@ func writeFakeClaudeCommand(t *testing.T, output string) string {
 	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s' " + shellQuote(output) + "\n"
 	require.NoError(t, os.WriteFile(path, []byte(script), 0755))
 	return path
+}
+
+func writeFakeClaudeCommandCapturingArgs(t *testing.T, output string) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "claude")
+	argsPath := filepath.Join(dir, "args.txt")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + shellQuote(argsPath) + "\ncat >/dev/null\nprintf '%s' " + shellQuote(output) + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0755))
+	return path, argsPath
 }
 
 func writeFakeClaudeRetryCommand(t *testing.T, firstOutput, successOutput string) string {

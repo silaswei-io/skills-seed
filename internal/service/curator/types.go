@@ -2,6 +2,9 @@
 package curator
 
 import (
+	"context"
+
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
@@ -47,8 +50,15 @@ const (
 
 // CurateRequest 表示候选模式入库请求。
 type CurateRequest struct {
-	Operation  Operation
-	Candidates []domain.Pattern
+	Operation          Operation
+	Candidates         []domain.Pattern
+	DecisionCheckpoint DecisionCheckpoint
+}
+
+// DecisionCheckpoint 保存高成本 AI 策展决策，使本地校验或入库失败后可以直接重放。
+type DecisionCheckpoint interface {
+	Load(context.Context, string) (*agent.CuratePatternsResult, bool, error)
+	Save(context.Context, string, *agent.CuratePatternsResult) error
 }
 
 // ProgressHooks 接收策展过程进度事件；为空时服务不写终端输出。

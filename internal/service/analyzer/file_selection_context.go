@@ -45,7 +45,7 @@ func newFileSelectionContextCollector(cfg config.StructuralConfig) structuralCol
 }
 
 // CollectFileSelectionContext 在 AI 文件筛选前收集结构化候选线索。
-// 该阶段只使用 CodeGraph/auto provider，避免 tree-sitter 在没有明确 seed 时全仓扫描。
+// 该阶段只使用 CodeGraph/auto provider，避免未显式选择的 tree-sitter 全仓扫描。
 func (s *AnalyzerService) CollectFileSelectionContext(ctx context.Context, projectRoot string, req FileSelectionContextRequest) string {
 	if s == nil || projectRoot == "" || s.fileSelectionContextCollector == nil {
 		return ""

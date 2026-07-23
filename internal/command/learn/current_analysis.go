@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
+	"github.com/silaswei-io/skills-seed/internal/service/learner"
 )
 
 type learnCurrentUnitResult struct {
@@ -84,22 +87,12 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 		if r.analysisState == nil {
 			return nil
 		}
-		if r.restoreAnalysisCheckpoint() {
-			var err error
-			r.codebaseRunContext, err = r.buildCodebaseRunContext()
-			return err
-		}
+		r.restoreAnalysisCheckpoint()
 		if len(r.plannedUnits) == 0 {
-			return r.saveAnalysisCheckpoint(true)
+			return r.completeAnalysis()
 		}
 		if r.analysisArtifactsCommitted() {
-			runContext, err := r.buildCodebaseRunContext()
-			if err != nil {
-				return err
-			}
-			r.codebaseRunContext = runContext
-			r.completedAnalysisUnits = append(r.completedAnalysisUnits, r.plannedUnits...)
-			return nil
+			return fmt.Errorf("analysis artifacts are committed with %d pending units", len(r.plannedUnits))
 		}
 		runContext, err := r.buildCodebaseRunContext()
 		if err != nil {
@@ -110,7 +103,7 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 		if err != nil {
 			return err
 		}
-		return r.saveAnalysisCheckpoint(true)
+		return r.completeAnalysis()
 	}); err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.analyze_codebase",
@@ -217,7 +210,7 @@ func (r *learnCurrentProjectRun) analyzePlannedBatchesSerial(analyzeLabel string
 			return completedUnits, err
 		}
 		completedUnits += r.mergeUnitResults(results)
-		if err := r.saveAnalysisCheckpoint(false); err != nil {
+		if err := r.saveAnalysisCheckpoint(); err != nil {
 			return completedUnits, err
 		}
 	}
@@ -243,6 +236,7 @@ func (r *learnCurrentProjectRun) analyzePlannedBatchesParallel(analyzeLabel stri
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer logger.BindScope(ctx)()
 			for batch := range jobs {
 				for _, job := range batch.units {
 					running.start(job.index, learnCurrentProgressSubject(job.unit))
@@ -305,7 +299,7 @@ func (r *learnCurrentProjectRun) collectParallelUnitResults(results <-chan []lea
 		r.mergeUnitResult(result)
 	}
 	if len(collected) > 0 {
-		if err := r.saveAnalysisCheckpoint(false); err != nil {
+		if err := r.saveAnalysisCheckpoint(); err != nil {
 			return completedUnits, err
 		}
 	}
@@ -431,16 +425,13 @@ func (r *learnCurrentProjectRun) mergeUnitResults(results []learnCurrentUnitResu
 	return completed
 }
 
-func (r *learnCurrentProjectRun) commitUnitSuccess(ctx context.Context, unit domain.AnalysisUnit) error {
+func (r *learnCurrentProjectRun) commitCurrentAnalysis(ctx context.Context) error {
 	if r.codebaseRunContext != nil && r.codebaseRunContext.SnapshotFlow != nil {
-		r.snapshotCommitMu.Lock()
-		err := r.codebaseRunContext.SnapshotFlow.CommitScoped(unitFocusPaths(unit, r.incrementalChanges))
-		r.snapshotCommitMu.Unlock()
-		if err != nil {
+		if err := r.codebaseRunContext.SnapshotFlow.CommitScoped(analysisCandidatePaths(r.incrementalChanges)); err != nil {
 			return err
 		}
 	}
-	return commitUnitFileRecords(ctx, r.cont.FileTracker, unitCommittedRecords(unit, r.incrementalChanges))
+	return fileanalysis.CommitCurrentChanges(ctx, r.cont.FileTracker, r.incrementalChanges)
 }
 
 func (r *learnCurrentProjectRun) mergeUnitResult(result learnCurrentUnitResult) {
@@ -474,7 +465,11 @@ func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
 					r.patternStageDetail(stepLabel, label)
 				},
 			}
-			saved, err := r.cont.LearnerSvc.CurateAndSavePatternsWithHooks(r.ctx, r.patterns, curator.OperationLearnCurrent, hooks)
+			checkpoint := newCurrentCurationCheckpoint(r.stateRepo, r.analysisState, r.importedCuration)
+			saved, err := r.cont.LearnerSvc.CurateAndSavePatternsWithOptions(r.ctx, r.patterns, curator.OperationLearnCurrent, learner.CurateOptions{
+				Hooks:              hooks,
+				DecisionCheckpoint: checkpoint,
+			})
 			if err != nil {
 				return err
 			}
@@ -486,13 +481,11 @@ func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
 				return err
 			}
 		}
-		analyzeLabel := i18n.Get("ProgressLearnCurrentAnalyzeCodebase")
-		for index, unit := range r.completedAnalysisUnits {
-			params := r.unitProgressParams(r.analysisState, unit, index+1, len(r.completedAnalysisUnits))
-			r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeCommitUnit", params)
-			if err := r.commitUnitSuccess(r.ctx, unit); err != nil {
-				return err
-			}
+		r.detail(stepLabel, "ProgressLearnCurrentCommitFiles", map[string]interface{}{
+			"Count": len(r.incrementalChanges.Records) + len(r.incrementalChanges.Deleted),
+		})
+		if err := r.commitCurrentAnalysis(r.ctx); err != nil {
+			return err
 		}
 		return nil
 	}); err != nil {
@@ -510,6 +503,33 @@ func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
 	return nil
 }
 
+func (r *learnCurrentProjectRun) completeAnalysis() error {
+	if err := r.validateCompletedAnalysis(); err != nil {
+		return err
+	}
+	return r.saveAnalysisCheckpoint()
+}
+
+func (r *learnCurrentProjectRun) validateCompletedAnalysis() error {
+	missing := make([]string, 0)
+	if r.analysisState != nil {
+		for _, unit := range r.analysisState.Units {
+			if len(unitFocusPaths(unit, r.incrementalChanges)) == 0 || analysisUnitIncluded(r.completedAnalysisUnits, unit) {
+				continue
+			}
+			missing = append(missing, learnCurrentProgressSubject(unit))
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("analysis plan has incomplete units: %s", strings.Join(missing, ", "))
+	}
+	uncovered := uncoveredAnalysisPaths(r.completedAnalysisUnits, analysisCandidatePaths(r.incrementalChanges))
+	if len(uncovered) == 0 {
+		return nil
+	}
+	return fmt.Errorf("analysis plan completed without covering files: %s", strings.Join(uncovered, ", "))
+}
+
 func (r *learnCurrentProjectRun) patternStageDetail(baseLabel, detail string) {
 	r.detail(baseLabel, "ProgressLearnCurrentPatternStageDetail", map[string]interface{}{
 		"Detail": detail,
@@ -524,12 +544,11 @@ func (r *learnCurrentProjectRun) profileCommitted() bool {
 	return r.analysisState != nil && r.analysisState.ProfileCommitted
 }
 
-func (r *learnCurrentProjectRun) saveAnalysisCheckpoint(complete bool) error {
+func (r *learnCurrentProjectRun) saveAnalysisCheckpoint() error {
 	if r.analysisState == nil {
 		return nil
 	}
 	r.analysisState.Analysis = &commandstate.AnalysisCheckpoint{
-		Complete:             complete,
 		Patterns:             append([]domain.Pattern(nil), r.patterns...),
 		CompletedUnits:       append([]domain.AnalysisUnit(nil), r.completedAnalysisUnits...),
 		ProfileRefreshNeeded: r.profileRefreshRecommended.Needed,
@@ -538,9 +557,9 @@ func (r *learnCurrentProjectRun) saveAnalysisCheckpoint(complete bool) error {
 	return r.stateRepo.Save(r.ctx, r.analysisState)
 }
 
-func (r *learnCurrentProjectRun) restoreAnalysisCheckpoint() bool {
+func (r *learnCurrentProjectRun) restoreAnalysisCheckpoint() {
 	if r.analysisState == nil || r.analysisState.Analysis == nil {
-		return false
+		return
 	}
 	checkpoint := r.analysisState.Analysis
 	r.patterns = append(r.patterns, checkpoint.Patterns...)
@@ -549,13 +568,13 @@ func (r *learnCurrentProjectRun) restoreAnalysisCheckpoint() bool {
 		Needed: checkpoint.ProfileRefreshNeeded,
 		Reason: checkpoint.ProfileRefreshReason,
 	}
-	return checkpoint.Complete
 }
 
 func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	profileStartedAt := time.Now()
 	if r.refreshProfile && !r.profileCommitted() && !r.analysisArtifactsCommitted() {
-		if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSaveProfile"), func() error {
+		label := r.afterAnalysisLabel(i18n.Get("ProgressLearnCurrentSaveProfile"))
+		if err := r.steps.Run(label, func() error {
 			profile, err := analyzeProjectProfile(r.ctx, r.cont, r.projectRoot, r.projectName, r.currentLanguage, r.effectiveFocusPaths, r.existingProfile)
 			if err != nil {
 				return err
@@ -586,7 +605,8 @@ func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 			logger.Info(i18n.Get("LearnCurrentProfileSaved"))
 		}
 	} else {
-		if err := r.steps.Run(i18n.Get("ProgressLearnCurrentSkipProfile"), func() error { return nil }); err != nil {
+		label := r.afterAnalysisLabel(i18n.Get("ProgressLearnCurrentSkipProfile"))
+		if err := r.steps.Run(label, func() error { return nil }); err != nil {
 			return err
 		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -599,4 +619,34 @@ func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 		}
 	}
 	return nil
+}
+
+func (r *learnCurrentProjectRun) afterAnalysisLabel(label string) string {
+	completed, total := r.analysisUnitProgress()
+	if total == 0 {
+		return label
+	}
+	return i18n.GetWithParams("ProgressLearnCurrentAfterAnalysis", map[string]interface{}{
+		"Label":     label,
+		"Completed": completed,
+		"Total":     total,
+	})
+}
+
+func (r *learnCurrentProjectRun) analysisUnitProgress() (int, int) {
+	if r.analysisState == nil {
+		return 0, 0
+	}
+	completed := 0
+	total := 0
+	for _, unit := range r.analysisState.Units {
+		if len(unitFocusPaths(unit, r.incrementalChanges)) == 0 {
+			continue
+		}
+		total++
+		if analysisUnitIncluded(r.completedAnalysisUnits, unit) {
+			completed++
+		}
+	}
+	return completed, total
 }

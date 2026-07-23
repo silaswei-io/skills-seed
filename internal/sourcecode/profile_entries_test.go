@@ -15,7 +15,7 @@ func TestVerifierKeepsOnlySourceBackedUtilities(t *testing.T) {
 
 func BuildResponse(value any) error { return nil }
 `), 0o644))
-	verifier := NewVerifier(root)
+	verifier := newTestVerifier(t, root)
 
 	utilities := verifier.VerifyUtilities([]domain.UtilityFunction{
 		{Name: "BuildResponse", File: "helper.go:99", Signature: "func BuildResponse(value any) error", Description: "unverified description"},
@@ -34,7 +34,7 @@ func TestVerifierKeepsOnlyVerifiedMethodFacts(t *testing.T) {
 
 func Check(uuid string) error { return nil }
 `), 0o644))
-	verifier := NewVerifier(root)
+	verifier := newTestVerifier(t, root)
 
 	methods := verifier.VerifyBusinessMethods([]domain.BusinessMethod{
 		{
@@ -74,7 +74,7 @@ type Service struct{}
 
 func (s *Service) Publish(ctx string) (bool, error) { return true, nil }
 `), 0o644))
-	verifier := NewVerifier(root)
+	verifier := newTestVerifier(t, root)
 
 	methods := verifier.VerifyBusinessMethods([]domain.BusinessMethod{
 		{
@@ -95,7 +95,7 @@ func TestVerifierKeepsOnlyASTBackedEvidenceLocations(t *testing.T) {
 
 func Publish() {}
 `), 0o644))
-	verifier := NewVerifier(root)
+	verifier := newTestVerifier(t, root)
 
 	locations := verifier.VerifyEvidenceLocations([]domain.PatternEvidenceLocation{
 		{Path: "service.go", Line: 99, Symbol: "Publish", Kind: "function", Description: "unverified semantics"},
@@ -110,4 +110,22 @@ func Publish() {}
 		Kind:       "function",
 		Confidence: 1,
 	}, locations[0])
+}
+
+func newTestVerifier(t *testing.T, root string) *Verifier {
+	t.Helper()
+	entries, err := os.ReadDir(root)
+	require.NoError(t, err)
+	catalog := Catalog{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		src, err := os.ReadFile(filepath.Join(root, entry.Name()))
+		require.NoError(t, err)
+		symbols, err := parseSymbols(entry.Name(), src)
+		require.NoError(t, err)
+		catalog[entry.Name()] = symbols
+	}
+	return NewVerifier(catalog)
 }

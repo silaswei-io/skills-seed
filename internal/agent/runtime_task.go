@@ -13,6 +13,11 @@ type RuntimeTask struct {
 	PromptOnly bool
 }
 
+// NewRepositoryReadRuntimeTask 创建允许读取 runtime 输入和仓库源码的只读任务。
+func NewRepositoryReadRuntimeTask(slug string) RuntimeTask {
+	return NewRuntimeTask(slug)
+}
+
 // NewPromptOnlyRuntimeTask 创建不需要仓库读取工具的自包含任务。
 func NewPromptOnlyRuntimeTask(slug string) RuntimeTask {
 	task := NewRuntimeTask(slug)

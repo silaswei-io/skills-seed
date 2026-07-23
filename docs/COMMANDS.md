@@ -59,7 +59,7 @@
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | 从 Git 历史学习 | `current`, `history` | `--help, -h` = `false` |
-| `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | 从 Git 历史学习 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
 | `skills-seed patterns` | 管理已学习的 patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
@@ -78,7 +78,7 @@
 | `skills-seed review` | 导入评审评论并查看防漏统计 | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | 从 JSON 文件导入评审评论 | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | 查看评审评论防漏统计 | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | 一键同步 skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed sync` | 一键同步 skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | 管理用户工作流 | `show [workflow-id]` | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workflow show [workflow-id]` | 查看已有工作流的摘要或完整详情 | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
@@ -327,7 +327,7 @@ skills-seed learn history --limit 40 --batch-size 5
 6. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
 7. 长期有效的项目上下文写入 `.skills-seed/context/`；`--context` 和 `--context-path` 只影响本次命令。
 8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
-9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 优先 CodeGraph，必要时自动初始化或修复索引，不可用时降级到内嵌 tree-sitter。没有边界输入时不会因此全仓扫描。
+9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 使用 CodeGraph，并在必要时自动初始化或修复索引。只有显式配置 `provider: treesitter` 才使用内嵌 parser。没有边界输入时不会因此全仓扫描。
 10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，终端也会输出包含等待时间和 API 原因的稳定提示，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
@@ -685,12 +685,17 @@ skills-seed profile refresh --language go
 |---|---|---|---|
 | `skills-seed sync` | learn current → generate skills | `skills-seed sync` | 优先恢复未完成的 sync 状态；有学习变化时生成 skills |
 | `skills-seed sync --context <背景>` | learn current with context → generate skills | `skills-seed sync --context "私有化部署，不是 SaaS"` | 给本次分析提供一次性背景，不写入用户模式 |
+| `skills-seed sync --resume --curation-output <文件>` | 使用已完成的 AI 策展输出恢复提交 | `skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/...raw.txt` | 必须在产生该输出的子项目目录执行，并保留原运行的 context |
+
 #### 参数
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--context` | 空 | 本次学习的额外背景，只影响 learn current 提示词 |
 | `--context-path` | 空 | 从文件或目录读取本次学习的额外背景；可重复传入 |
+| `--resume` | `false` | 继续上一次未完成的 sync 状态 |
+| `--restart` | `false` | 清理本次 sync 的恢复状态并重新开始 |
+| `--curation-output` | 空 | 导入已完成的 CuratePatterns 结构化输出，跳过新的 AI 策展调用 |
 | `--help`, `-h` | `false` | 查看 `sync` 帮助 |
 
 #### 常用示例
@@ -700,13 +705,15 @@ skills-seed sync
 skills-seed sync --context "私有化部署，不是 SaaS"
 skills-seed sync --context-path docs/plan.md --context-path docs/specs
 skills-seed sync --restart
+skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-pattern-curate.raw.txt
 ```
 
 #### 注意事项
 
 1. `sync` 默认会先执行 `learn current`；只有本轮学习写入新/更新模式或 workspace 关系产物变化时，才继续执行 `generate skills`。
 2. `sync --context` 不会添加用户模式，只影响本次学习分析；需要补充用户模式时使用 `patterns add` 或 `patterns update`。
-3. 中间步骤失败会中断后续步骤。
+3. AI 策展成功后会立即保存结构化决策；后续本地校验或入库失败时，`sync --resume` 会直接重放，不会再次调用 Agent。
+4. 旧版本尚未写入策展 checkpoint 时，可用 `--curation-output` 导入对应的 `.raw.txt` 或 `.md` 归档。该参数不接受工作区级混用，需进入匹配的子项目执行。
 
 ### `skills-seed check`
 

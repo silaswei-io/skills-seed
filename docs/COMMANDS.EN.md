@@ -59,7 +59,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | Learn from Git history | `current`, `history` | `--help, -h` = `false` |
-| `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
@@ -78,7 +78,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed review` | Import review comments and show prevention statistics | `import`, `stats` | `--help, -h` = `false` |
 | `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
 | `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
-| `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | Manage user workflows | `show [workflow-id]` | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workflow show [workflow-id]` | Show existing workflow summaries or full details | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
@@ -327,7 +327,7 @@ skills-seed learn history --limit 40 --batch-size 5
 6. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
 7. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
 8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
-9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` prefers CodeGraph, automatically initializes or repairs its index when needed, and falls back to embedded tree-sitter when unavailable. Without bounded inputs, it does not scan the whole repository.
+9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` uses CodeGraph and automatically initializes or repairs its index when needed. Embedded tree-sitter is used only when `provider: treesitter` is explicitly configured. Without bounded inputs, it does not scan the whole repository.
 10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, the terminal also prints a stable notice with the wait duration and API reason, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
@@ -685,12 +685,17 @@ One-step sync: learn current code, then generate skills. `--context` and `--cont
 |---|---|---|---|
 | `skills-seed sync` | learn current → generate skills | `skills-seed sync` | Resumes unfinished sync state first; generates skills when learning changed output |
 | `skills-seed sync --context <background>` | learn current with context → generate skills | `skills-seed sync --context "On-prem deployment, not SaaS"` | Provides one-shot analysis background and does not write a user pattern |
+| `skills-seed sync --resume --curation-output <file>` | Resume commit from a completed AI curation output | `skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/...raw.txt` | Run from the child project that produced the output and preserve the original context |
+
 #### Flags
 
 | Flag | Default | Description |
 |---|---:|---|
 | `--context` | empty | Extra background for this learning run; only affects learn current prompts |
 | `--context-path` | empty | Read extra background for this learning run from files or directories; may be repeated |
+| `--resume` | `false` | Resume the previous incomplete sync state |
+| `--restart` | `false` | Clear this sync recovery state and start again |
+| `--curation-output` | empty | Import a completed CuratePatterns structured output and skip a new AI curation call |
 | `--help`, `-h` | `false` | Show `sync` help |
 
 #### Common Examples
@@ -700,13 +705,15 @@ skills-seed sync
 skills-seed sync --context "On-prem deployment, not SaaS"
 skills-seed sync --context-path docs/plan.md --context-path docs/specs
 skills-seed sync --restart
+skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-pattern-curate.raw.txt
 ```
 
 #### Notes
 
 1. `sync` runs `learn current` first by default; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
 2. `sync --context` does not add a user pattern; it only affects this learning analysis. Use `patterns add` or `patterns update` to add user-defined patterns.
-3. If any step fails, subsequent steps are skipped.
+3. A successful AI curation decision is checkpointed immediately. If local validation or storage later fails, `sync --resume` replays it without calling the Agent again.
+4. For output produced before curation checkpoints existed, use `--curation-output` with the matching `.raw.txt` or `.md` archive. Run it from the matching child project, not the workspace root.
 
 ### `skills-seed check`
 

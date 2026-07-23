@@ -837,8 +837,8 @@ other = "{{.Label}} · unit {{.Current}}/{{.Total}} · {{.Name}}"
 [ProgressLearnCurrentAnalyzeSaveUnitPatterns]
 other = "{{.Label}} · saving patterns {{.Current}}/{{.Total}} · {{.Name}}"
 
-[ProgressLearnCurrentAnalyzeCommitUnit]
-other = "{{.Label}} · committing fingerprints {{.Current}}/{{.Total}} · {{.Name}}"
+[ProgressLearnCurrentCommitFiles]
+other = "{{.Label}} · committing {{.Count}} file states"
 
 [ProgressLearnCurrentCurateAndSavePatterns]
 other = "Curating and saving pattern store"
@@ -858,6 +858,9 @@ other = "Synchronizing project profile"
 [ProgressLearnCurrentSkipProfile]
 other = "Skipping project profile sync"
 
+[ProgressLearnCurrentAfterAnalysis]
+other = "{{.Label}} (code analysis {{.Completed}}/{{.Total}} complete)"
+
 [ProgressLearnWorkspaceProjects]
 other = "Learning workspace child projects"
 
@@ -866,6 +869,9 @@ other = "Analyzing batch {{.Current}}/{{.Total}} (commits {{.Start}}-{{.End}}/{{
 
 [ProgressCuratePatternsAI]
 other = "Curating patterns with AI"
+
+[ProgressCuratePatternsReplay]
+other = "Replay saved AI curation decision"
 
 [ProgressGenerateFixesAI]
 other = "Generate fix suggestions"
@@ -1946,7 +1952,7 @@ other = "Pattern curation result has structural issues; continuing with determin
 other = "Pattern curation coverage is incomplete; recovering only unclassified candidates locally"
 
 [LoggerAgentCuratePatternsSanitized]
-other = "Pattern curation result contains non-candidate dropped entries; ignored those entries and continued"
+other = "Pattern curation result contains invalid or duplicate decisions; normalized them and continued"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
@@ -2090,6 +2096,9 @@ other = "Read additional guidance for this learn run from files or directories; 
 
 [LearnFlagForce]
 other = "Ignore file fingerprints and relearn the current scan scope"
+
+[LearnFlagCurationOutput]
+other = "Resume commit from a completed CuratePatterns output without calling AI curation again"
 
 # 当前学习命令消息
 [LearnCurrentStart]
@@ -2673,11 +2682,17 @@ other = "Resume the previous incomplete sync state"
 [SyncFlagRestart]
 other = "Clear this sync command's resumable state and start again"
 
+[SyncFlagCurationOutput]
+other = "Resume commit from a completed CuratePatterns output; use it from the matching child project"
+
 [SyncRunModeConflict]
 other = "--resume and --restart cannot be used together"
 
 [SyncResumeStateMissing]
 other = "No resumable sync state was found; remove --resume to sync normally, or use --restart to start over"
+
+[SyncCurationOutputRequiresResume]
+other = "--curation-output must be used with --resume"
 
 [InteractiveSyncInterruptedTitle]
 other = "A previous sync did not finish. How should this run proceed?"

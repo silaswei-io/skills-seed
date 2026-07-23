@@ -1,14 +1,12 @@
 package sourcecode
 
 import (
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
 type symbolFile struct {
@@ -16,18 +14,21 @@ type symbolFile struct {
 	symbols []Symbol
 }
 
-// Verifier 使用本地源码校验领域对象中引用的源码事实。
+// Verifier 使用已解析符号目录校验领域对象中的源码事实。
 type Verifier struct {
-	root  string
 	files map[string]symbolFile
 }
 
-// NewVerifier 创建以项目根目录为边界的源码事实校验器。
-func NewVerifier(root string) *Verifier {
-	return &Verifier{
-		root:  filepath.Clean(root),
-		files: make(map[string]symbolFile),
+// NewVerifier 创建不负责文件读取和 parser 选择的源码事实校验器。
+func NewVerifier(catalog Catalog) *Verifier {
+	files := make(map[string]symbolFile, len(catalog))
+	for path, symbols := range catalog {
+		path = normalizeReferencePath(path)
+		if path != "" {
+			files[path] = symbolFile{path: path, symbols: symbols}
+		}
 	}
+	return &Verifier{files: files}
 }
 
 // VerifyUtilities 校验工具函数的符号身份，并以源码事实替换 AI 字段。
@@ -52,7 +53,7 @@ func (v *Verifier) VerifyUtilities(values []domain.UtilityFunction) []domain.Uti
 	return verified
 }
 
-// VerifyEvidenceLocations 只保留能由本地 AST 确认的符号位置。
+// VerifyEvidenceLocations 只保留能由结构化符号目录确认的位置。
 func (v *Verifier) VerifyEvidenceLocations(values []domain.PatternEvidenceLocation) []domain.PatternEvidenceLocation {
 	verified := make([]domain.PatternEvidenceLocation, 0, len(values))
 	for _, value := range values {
@@ -117,36 +118,15 @@ func (v *Verifier) VerifyBusinessMethods(values []domain.BusinessMethod) []domai
 
 func (v *Verifier) load(location string) (symbolFile, int, bool) {
 	path, line := splitLocation(location)
-	if path == "" || v.root == "" || v.root == "." || filepath.IsAbs(path) {
+	path = normalizeReferencePath(path)
+	if path == "" {
 		return symbolFile{}, 0, false
 	}
-	clean := filepath.Clean(filepath.FromSlash(path))
-	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+	file, ok := v.files[path]
+	if !ok {
 		return symbolFile{}, 0, false
 	}
-	relative := filepath.ToSlash(clean)
-	if cached, ok := v.files[relative]; ok {
-		return cached, line, len(cached.symbols) > 0
-	}
-	fullPath := filepath.Join(v.root, clean)
-	resolved, err := utils.CanonicalPathWithinRoot(v.root, fullPath)
-	if err != nil {
-		v.files[relative] = symbolFile{}
-		return symbolFile{}, 0, false
-	}
-	src, err := os.ReadFile(resolved)
-	if err != nil {
-		v.files[relative] = symbolFile{}
-		return symbolFile{}, 0, false
-	}
-	symbols, err := ParseSymbols(relative, src)
-	if err != nil {
-		v.files[relative] = symbolFile{}
-		return symbolFile{}, 0, false
-	}
-	file := symbolFile{path: relative, symbols: symbols}
-	v.files[relative] = file
-	return file, line, len(symbols) > 0
+	return file, line, len(file.symbols) > 0
 }
 
 func findCallable(symbols []Symbol, line int, name string) (Symbol, bool) {

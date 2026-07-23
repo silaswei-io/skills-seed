@@ -1,4 +1,4 @@
-// Package sourcecode 提供基于 tree-sitter 的只读源码事实提取。
+// Package sourcecode 提供可切换 provider 的只读源码事实提取与校验。
 package sourcecode
 
 import (
@@ -18,8 +18,8 @@ type Symbol struct {
 	Signature string
 }
 
-// ParseSymbols 使用 grammar 自带或自动推导的 tags query 提取符号。
-func ParseSymbols(filename string, src []byte) ([]Symbol, error) {
+// parseSymbols 使用 grammar 自带或自动推导的 tags query 提取符号。
+func parseSymbols(filename string, src []byte) ([]Symbol, error) {
 	entry := grammars.DetectLanguage(filepath.Base(filename))
 	if entry == nil {
 		return nil, fmt.Errorf("unsupported file type: %s", filename)

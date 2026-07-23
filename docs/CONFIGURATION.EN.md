@@ -12,7 +12,7 @@ The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates 
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
 - Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec during `learn current` from repository evidence, child project profiles, and one-shot user context. They are not read from config, and generation only consumes learned artifacts.
 - Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
-- `analysis.codegraph` was removed. Structural context is now configured through `learning.current.structural`; the default `provider: auto` prefers CodeGraph and falls back to embedded tree-sitter when unavailable.
+- `analysis.codegraph` was removed. Structural context and symbol verification are now configured through `learning.current.structural`; the default `provider: auto` uses CodeGraph, while embedded tree-sitter requires explicit selection.
 
 ## Config Example
 
@@ -177,13 +177,13 @@ exclude:
 | `select_relevant_files` | `true` | Select the most relevant files from the candidate file tree before AI analysis to reduce noisy inputs |
 | `select_relevant_files_min_candidates` | `200` | Only call AI file filtering when the candidate count reaches this threshold; smaller projects use local filtering to avoid an extra AI call |
 | `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
-| `structural.provider` | `auto` | Structural context source: `auto` prefers CodeGraph with automatic repair and falls back to tree-sitter when unavailable; `codegraph` or `treesitter` can be forced |
+| `structural.provider` | `auto` | Structural context and symbol-verification source: `auto`/`codegraph` use CodeGraph with automatic repair; `treesitter` explicitly selects the embedded parser |
 | `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |
 | `structural.max_file_size` | `512` | Per-source-file size limit in KB; larger files are skipped |
 
 #### `structural`
 
-Structural context gives the Agent symbols, imports, entry points, and module clues. The default `provider: auto` prefers CodeGraph; it automatically initializes missing project indexes, attempts repair when sync or status checks fail, and falls back to embedded tree-sitter only when the CodeGraph command is unavailable or repair fails. `provider: codegraph` forces CodeGraph only, while `provider: treesitter` uses only embedded tree-sitter.
+The structural provider gives the Agent symbols, imports, entry points, and module clues and also verifies source symbols returned by AI. The default `provider: auto` uses CodeGraph; it automatically initializes missing project indexes and attempts repair when sync or status checks fail. `provider: codegraph` has the same behavior as an explicit selection, while `provider: treesitter` uses the embedded parser. A CodeGraph context failure is reported and that context is skipped; a symbol-verification failure is returned as an error. Neither path silently switches parsers in the same run.
 
 Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the same file-filtering policy: source files, build config, and dependency config are included by default, while documents, generated outputs, paths matched by global `exclude`, and generated Skills output directories are skipped.
 
@@ -199,7 +199,7 @@ Starting in 0.9.11, file filtering also applies Git ignore rules by default. Sta
 2. Set `select_relevant_files` to `false` when relevant-file filtering is not needed.
 3. Raise `select_relevant_files_min_candidates` for small projects to skip AI file filtering, or lower it for large projects to narrow scope earlier.
 4. Set `structural.enabled` to `false` when structural context is not needed.
-5. Lower `structural.max_file_size` for large repositories when using tree-sitter or auto fallback to avoid generated files, bundles, or unusually large files.
+5. Lower `structural.max_file_size` for large repositories when explicitly using tree-sitter to avoid generated files, bundles, or unusually large files.
 6. Structural context only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
 
 ### Prompt Runtime Debugging
@@ -323,7 +323,7 @@ Command flags affect only the current run and do not rewrite the config file.
 | `.skills-seed/store/project.db` | Indexed data such as patterns, hit stats, file fingerprints, and reviews |
 | `.skills-seed/store/documents/` | Readable JSON documents such as profiles, specs, state, and changelog |
 | `.skills-seed/cache/snapshots/` | Rebuildable file snapshot cache |
-| `.skills-seed/cache/commands/<command>/state.json` | Resumable state for an unfinished command, such as `learn-current` or `sync`; safe to delete, then that command detects changes and plans again |
+| `.skills-seed/cache/commands/<command>/state.json` | Resumable state for unfinished commands, including unit-analysis results not yet stored; cleared after persistence and safe to delete for a fresh detection and plan |
 | `.skills-seed/runtime/logs/` | Runtime logs |
 | `.skills-seed/runtime/rendered-prompts/` | Rendered prompts and manifests |
 | `.skills-seed/runtime/agent-outputs/` | Archived Agent outputs |

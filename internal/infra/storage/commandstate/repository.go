@@ -43,11 +43,16 @@ type FileInput struct {
 
 // AnalysisCheckpoint 保存高成本分析的阶段结果，供失败后从未完成单元继续。
 type AnalysisCheckpoint struct {
-	Complete             bool                  `json:"complete,omitempty"`
 	Patterns             []domain.Pattern      `json:"patterns,omitempty"`
 	CompletedUnits       []domain.AnalysisUnit `json:"completed_units,omitempty"`
 	ProfileRefreshNeeded bool                  `json:"profile_refresh_needed,omitempty"`
 	ProfileRefreshReason string                `json:"profile_refresh_reason,omitempty"`
+}
+
+// CurationCheckpoint 保存一次已完成的 AI 策展决策，等待本地校验和原子提交。
+type CurationCheckpoint struct {
+	CandidateHash string          `json:"candidate_hash"`
+	Decision      json.RawMessage `json:"decision"`
 }
 
 // State 是命令未完成执行的可恢复状态。
@@ -64,8 +69,10 @@ type State struct {
 	InputSummary   *InputSummary         `json:"input_summary,omitempty"`
 	Inputs         []FileInput           `json:"inputs"`
 	Units          []domain.AnalysisUnit `json:"units"`
-	// Analysis 保存已完成单元及其结果；Complete 表示整个分析阶段已经完成。
+	// Analysis 保存已完成单元及其结果；阶段完成状态由计划覆盖关系推导。
 	Analysis *AnalysisCheckpoint `json:"analysis,omitempty"`
+	// Curation 保存与当前候选集合绑定的 AI 策展决策。
+	Curation *CurationCheckpoint `json:"curation,omitempty"`
 	// ProfileCommitted 表示本轮需要刷新的项目画像已经持久化。
 	ProfileCommitted bool `json:"profile_committed,omitempty"`
 	// ArtifactsCommitted 表示本轮 patterns 已成功持久化，恢复时只需提交快照与指纹。

@@ -11,7 +11,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
-	github.com/odvcencio/gotreesitter v0.20.2
+	github.com/odvcencio/gotreesitter v0.46.0
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/silaswei-io/jsonrepair-go v1.1.1

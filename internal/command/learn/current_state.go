@@ -21,6 +21,8 @@ import (
 
 const (
 	commandStateLearnCurrent = "learn-current"
+	// currentAnalysisPlanContract 标识分析计划必须完整覆盖待分析文件的当前契约。
+	currentAnalysisPlanContract = "full-file-coverage-v1"
 )
 
 type currentStateSession struct {
@@ -122,6 +124,7 @@ func learnCurrentStateMode(mode, scope string) string {
 
 func learnCurrentInvocationHash(configRepo config.Reader, focusPaths []string, profileMode string, force bool) string {
 	type invocation struct {
+		PlanContract  string                       `json:"plan_contract"`
 		FocusPaths    []string                     `json:"focus_paths"`
 		ProfileMode   string                       `json:"profile_mode"`
 		Force         bool                         `json:"force"`
@@ -130,9 +133,10 @@ func learnCurrentInvocationHash(configRepo config.Reader, focusPaths []string, p
 		SkillsConfig  config.SkillsConfig          `json:"skills_config"`
 	}
 	value := invocation{
-		FocusPaths:  normalizeStatePaths(focusPaths),
-		ProfileMode: strings.ToLower(strings.TrimSpace(profileMode)),
-		Force:       force,
+		PlanContract: currentAnalysisPlanContract,
+		FocusPaths:   normalizeStatePaths(focusPaths),
+		ProfileMode:  strings.ToLower(strings.TrimSpace(profileMode)),
+		Force:        force,
 	}
 	if configRepo != nil {
 		value.CurrentConfig = configRepo.GetCurrentLearningConfig()
@@ -362,6 +366,9 @@ func restoreCurrentState(
 		return nil, err
 	}
 	if !canResumeCurrentState(state, projectName, language, mode, userContext, invocationHash) {
+		if err := repo.Clear(); err != nil {
+			return nil, err
+		}
 		return nil, nil
 	}
 	analyzedRecords, err := tracker.ListAnalyzedFiles(ctx, domain.FileAnalysisScope{})
@@ -398,20 +405,21 @@ func loadOrCreateCurrentState(
 	if canReuseCurrentState(state, changes, projectName, language, stateMode, userContext, invocationHash) {
 		return state, nil
 	}
-	units, err := analyzerSvc.PlanAnalysisUnits(ctx, &analyzer.PlanAnalysisUnitsRequest{
-		ProjectName:   projectName,
-		RootPath:      projectRoot,
-		Language:      language,
-		LearningMode:  config.NormalizeLearningMode(mode),
-		LearningScope: config.NormalizeLearningScope(scope),
-		FocusPaths:    focusRelPaths,
-		UserContext:   userContext,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(units) == 0 {
-		units = []domain.AnalysisUnit{fallbackAnalysisUnit(focusRelPaths)}
+	var units []domain.AnalysisUnit
+	if len(focusRelPaths) > 0 {
+		units, err = analyzerSvc.PlanAnalysisUnits(ctx, &analyzer.PlanAnalysisUnitsRequest{
+			ProjectName:   projectName,
+			RootPath:      projectRoot,
+			Language:      language,
+			LearningMode:  config.NormalizeLearningMode(mode),
+			LearningScope: config.NormalizeLearningScope(scope),
+			FocusPaths:    focusRelPaths,
+			UserContext:   userContext,
+		})
+		if err != nil {
+			return nil, err
+		}
+		units = reconcileAnalysisUnits(units, focusRelPaths)
 	}
 	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateInputs(changes), units).
 		WithInvocationHash(invocationHash).
@@ -423,7 +431,7 @@ func loadOrCreateCurrentState(
 }
 
 func pendingAnalysisUnits(state *commandstate.State, changes *fileanalysis.FileChanges) []domain.AnalysisUnit {
-	if state == nil || changes == nil || (state.Analysis != nil && state.Analysis.Complete) {
+	if state == nil || changes == nil {
 		return nil
 	}
 	pending := pathSet(analysisCandidatePaths(changes))
@@ -464,39 +472,84 @@ func fallbackAnalysisUnit(paths []string) domain.AnalysisUnit {
 	}
 }
 
+// reconcileAnalysisUnits 把 AI 计划收敛为仅包含候选文件且完整覆盖候选集合的执行计划。
+func reconcileAnalysisUnits(units []domain.AnalysisUnit, allowedPaths []string) []domain.AnalysisUnit {
+	allowedPaths = normalizeStatePaths(allowedPaths)
+	allowed := pathSet(allowedPaths)
+	normalized := make([]domain.AnalysisUnit, 0, len(units)+1)
+	for _, unit := range units {
+		unit.EntryPaths = filterAnalysisUnitPaths(unit.EntryPaths, allowed, nil)
+		entryPaths := pathSet(unit.EntryPaths)
+		unit.RelatedPaths = filterAnalysisUnitPaths(unit.RelatedPaths, allowed, entryPaths)
+		if len(unit.EntryPaths)+len(unit.RelatedPaths) == 0 {
+			continue
+		}
+		normalized = append(normalized, unit)
+	}
+
+	uncovered := uncoveredAnalysisPaths(normalized, allowedPaths)
+	if len(uncovered) == 0 {
+		return normalized
+	}
+	fallback := fallbackAnalysisUnit(uncovered)
+	fallback.ID = uniqueAnalysisUnitID(fallback.ID, normalized)
+	return append(normalized, fallback)
+}
+
+func filterAnalysisUnitPaths(paths []string, allowed, excluded map[string]bool) []string {
+	filtered := make([]string, 0, len(paths))
+	seen := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		path = normalizeStatePath(path)
+		if path == "" || !allowed[path] || excluded[path] || seen[path] {
+			continue
+		}
+		seen[path] = true
+		filtered = append(filtered, path)
+	}
+	sort.Strings(filtered)
+	return filtered
+}
+
+func uniqueAnalysisUnitID(id string, units []domain.AnalysisUnit) string {
+	used := make(map[string]bool, len(units))
+	for _, unit := range units {
+		used[unit.ID] = true
+	}
+	if !used[id] {
+		return id
+	}
+	for suffix := 2; ; suffix++ {
+		candidate := id + "-" + strconv.Itoa(suffix)
+		if !used[candidate] {
+			return candidate
+		}
+	}
+}
+
+func uncoveredAnalysisPaths(units []domain.AnalysisUnit, paths []string) []string {
+	covered := make(map[string]bool)
+	for _, unit := range units {
+		for _, path := range append(append([]string{}, unit.EntryPaths...), unit.RelatedPaths...) {
+			covered[normalizeStatePath(path)] = true
+		}
+	}
+	paths = normalizeStatePaths(paths)
+	uncovered := make([]string, 0)
+	for _, path := range paths {
+		if !covered[path] {
+			uncovered = append(uncovered, path)
+		}
+	}
+	return uncovered
+}
+
 func unitFocusPaths(unit domain.AnalysisUnit, changes *fileanalysis.FileChanges) []string {
 	if changes == nil {
 		return nil
 	}
 	allowed := pathSet(analysisCandidatePaths(changes))
 	return intersectUnitPaths(unit, allowed)
-}
-
-func unitAnalyzedRecords(unit domain.AnalysisUnit, changes *fileanalysis.FileChanges) []domain.FileAnalysisRecord {
-	allowed := pathSet(unitFocusPaths(unit, changes))
-	out := make([]domain.FileAnalysisRecord, 0, len(changes.Records))
-	for _, record := range changes.Records {
-		if !allowed[normalizeStatePath(record.Path)] {
-			continue
-		}
-		record.AnalysisStatus = domain.FileAnalysisStatusAnalyzed
-		record.SelectionReason = ""
-		out = append(out, record)
-	}
-	return out
-}
-
-func skippedSelectionRecords(changes *fileanalysis.FileChanges) []domain.FileAnalysisRecord {
-	if changes == nil {
-		return nil
-	}
-	out := make([]domain.FileAnalysisRecord, 0, len(changes.Records))
-	for _, record := range changes.Records {
-		if record.AnalysisStatus == domain.FileAnalysisStatusAISkipped {
-			out = append(out, record)
-		}
-	}
-	return out
 }
 
 func analysisCandidatePaths(changes *fileanalysis.FileChanges) []string {
@@ -513,20 +566,6 @@ func analysisCandidatePaths(changes *fileanalysis.FileChanges) []string {
 	paths = append(paths, changes.Deleted...)
 	sort.Strings(paths)
 	return paths
-}
-
-func unitCommittedRecords(unit domain.AnalysisUnit, changes *fileanalysis.FileChanges) []domain.FileAnalysisRecord {
-	records := unitAnalyzedRecords(unit, changes)
-	records = append(records, skippedSelectionRecords(changes)...)
-	sort.Slice(records, func(i, j int) bool { return records[i].Path < records[j].Path })
-	return records
-}
-
-func commitUnitFileRecords(ctx context.Context, tracker domain.FileAnalysisTracker, records []domain.FileAnalysisRecord) error {
-	if len(records) == 0 {
-		return nil
-	}
-	return tracker.SaveAnalyzedFiles(ctx, records)
 }
 
 func normalizeStatePath(path string) string {

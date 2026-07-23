@@ -70,7 +70,7 @@ func (s *Service) planCompaction(ctx context.Context, patterns []domain.Pattern,
 	curated := deterministicCurate(patterns, nil)
 	if useAI {
 		var err error
-		curated, err = s.curate(ctx, OperationCompact, patterns, patterns, true, compactRelatedPatterns(patterns), hooks)
+		curated, err = s.curate(ctx, OperationCompact, patterns, patterns, true, compactRelatedPatterns(patterns), nil, hooks)
 		if err != nil {
 			return nil, fmt.Errorf("compact patterns with AI: %w", err)
 		}

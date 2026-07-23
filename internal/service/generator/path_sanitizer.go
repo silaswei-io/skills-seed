@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,13 +12,21 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
-func sanitizeGenerationInputs(profile *domain.ProjectProfile, patterns []domain.Pattern, projectRoot string) (*domain.ProjectProfile, []domain.Pattern) {
+func sanitizeGenerationInputs(ctx context.Context, profile *domain.ProjectProfile, patterns []domain.Pattern, projectRoot string, resolver sourcecode.Resolver) (*domain.ProjectProfile, []domain.Pattern, error) {
 	if strings.TrimSpace(projectRoot) == "" {
-		return profile, patterns
+		return profile, patterns, nil
+	}
+	if resolver == nil {
+		return nil, nil, fmt.Errorf("symbol resolver is required")
+	}
+	refs := generationReferences(profile, patterns)
+	catalog, err := resolver.Resolve(ctx, projectRoot, refs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve generation symbols: %w", err)
 	}
 	sanitizer := projectPathSanitizer{
 		root:     projectRoot,
-		verifier: sourcecode.NewVerifier(projectRoot),
+		verifier: sourcecode.NewVerifier(catalog),
 	}
 	sanitizedProfile := sanitizer.profile(profile)
 	sanitizedPatterns := make([]domain.Pattern, 0, len(patterns))
@@ -27,7 +37,22 @@ func sanitizeGenerationInputs(profile *domain.ProjectProfile, patterns []domain.
 		}
 	}
 	sanitizedProfile = enrichVerifiedProfileEntries(sanitizedProfile, sanitizedPatterns)
-	return sanitizedProfile, sanitizedPatterns
+	return sanitizedProfile, sanitizedPatterns, nil
+}
+
+func generationReferences(profile *domain.ProjectProfile, patterns []domain.Pattern) []sourcecode.Reference {
+	var refs []sourcecode.Reference
+	if profile != nil {
+		refs = append(refs, sourcecode.UtilityReferences(profile.CommonUtils)...)
+		refs = append(refs, sourcecode.BusinessMethodReferences(profile.BusinessMethods)...)
+	}
+	for _, pattern := range patterns {
+		refs = append(refs, sourcecode.EvidenceReferences(pattern.EvidenceLocations)...)
+		if pattern.BusinessMethod != nil {
+			refs = append(refs, sourcecode.BusinessMethodReferences([]domain.BusinessMethod{*pattern.BusinessMethod})...)
+		}
+	}
+	return refs
 }
 
 type projectPathSanitizer struct {

@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"context"
+
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
@@ -14,9 +16,12 @@ type verifiedKnowledgeSnapshot struct {
 	GoTests       sourcecode.GoTestInventory
 }
 
-func (s *GeneratorService) buildVerifiedKnowledgeSnapshot(profile *domain.ProjectProfile, patterns []domain.Pattern, projectRoot string) (verifiedKnowledgeSnapshot, error) {
+func (s *GeneratorService) buildVerifiedKnowledgeSnapshot(ctx context.Context, profile *domain.ProjectProfile, patterns []domain.Pattern, projectRoot string) (verifiedKnowledgeSnapshot, error) {
 	profile = cleanProjectProfile(profile)
-	profile, patterns = sanitizeGenerationInputs(profile, patterns, projectRoot)
+	profile, patterns, err := sanitizeGenerationInputs(ctx, profile, patterns, projectRoot, s.symbolResolver)
+	if err != nil {
+		return verifiedKnowledgeSnapshot{}, err
+	}
 	goTests, err := sourcecode.DiscoverGoTests(projectRoot)
 	if err != nil {
 		return verifiedKnowledgeSnapshot{}, err

@@ -1,6 +1,8 @@
 package analyzer
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,17 +21,41 @@ type currentPatternSource struct {
 
 type currentPatternValidator struct {
 	projectRoot string
+	catalog     sourcecode.Catalog
 	files       map[string]currentPatternSource
 }
 
-func validateCurrentPatterns(projectRoot string, patterns []domain.Pattern) []domain.Pattern {
-	validator := currentPatternValidator{
-		projectRoot: projectRoot,
-		files:       make(map[string]currentPatternSource),
+func validateCurrentPatterns(ctx context.Context, projectRoot string, patterns []domain.Pattern, resolver sourcecode.Resolver) ([]domain.Pattern, error) {
+	validator, err := newCurrentPatternValidator(ctx, projectRoot, patterns, resolver)
+	if err != nil {
+		return nil, err
 	}
+	return validator.validatePatterns(patterns), nil
+}
+
+func newCurrentPatternValidator(ctx context.Context, projectRoot string, patterns []domain.Pattern, resolver sourcecode.Resolver) (*currentPatternValidator, error) {
+	if resolver == nil {
+		return nil, fmt.Errorf("symbol resolver is required")
+	}
+	refs := make([]sourcecode.Reference, 0)
+	for _, pattern := range patterns {
+		refs = append(refs, sourcecode.EvidenceReferences(pattern.EvidenceLocations)...)
+	}
+	catalog, err := resolver.Resolve(ctx, projectRoot, refs)
+	if err != nil {
+		return nil, fmt.Errorf("resolve pattern evidence: %w", err)
+	}
+	return &currentPatternValidator{
+		projectRoot: projectRoot,
+		catalog:     catalog,
+		files:       make(map[string]currentPatternSource),
+	}, nil
+}
+
+func (v *currentPatternValidator) validatePatterns(patterns []domain.Pattern) []domain.Pattern {
 	validated := make([]domain.Pattern, 0, len(patterns))
 	for _, pattern := range patterns {
-		if candidate, ok := validator.validate(pattern); ok {
+		if candidate, ok := v.validate(pattern); ok {
 			validated = append(validated, candidate)
 		}
 	}
@@ -130,10 +156,7 @@ func (v *currentPatternValidator) source(path string) (string, currentPatternSou
 	source := currentPatternSource{
 		content:   normalized,
 		lineCount: len(strings.Split(normalized, "\n")),
-	}
-	if tree, language, parseErr := parseTree(path, content); parseErr == nil {
-		source.symbols = sourcecode.ExtractSymbols(tree.RootNode(), language, path, content)
-		tree.Release()
+		symbols:   v.catalog[path],
 	}
 	v.files[path] = source
 	return path, source, true

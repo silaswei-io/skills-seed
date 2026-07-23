@@ -29,6 +29,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/silaswei-io/skills-seed/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -174,8 +175,11 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 		EnsureChildInitialized: initcmd.EnsureWorkspaceChildInitializedAt,
 	}))
 	rootCmd.AddCommand(synccmd.Cmd(cont, synccmd.Dependencies{
-		LearnCurrent: func(cont *container.Container, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error) {
-			return learn.RunLearnCurrentWithStateScopeOptions(cont, stateScope, userContext, learn.CurrentRunOptions{Force: force})
+		LearnCurrent: func(cont *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+			return learn.RunLearnCurrentWithStateScopeOptions(cont, req.StateScope, req.UserContext, learn.CurrentRunOptions{
+				Force:          req.Force,
+				CurationOutput: req.CurationOutput,
+			})
 		},
 		Generate: generate.RunGenerate,
 	}))

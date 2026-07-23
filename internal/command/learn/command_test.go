@@ -902,6 +902,7 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
 	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
 	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
 	gitAddAll(t, projectRoot)
@@ -952,7 +953,6 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	require.Equal(t, learnCurrentStateMode(string(config.LearningModeNormal), string(config.LearningScopeFlow)), cachedState.Mode)
 	require.Len(t, cachedState.Units, 2)
 	require.NotNil(t, cachedState.Analysis)
-	require.False(t, cachedState.Analysis.Complete)
 	require.Equal(t, []domain.AnalysisUnit{cachedState.Units[0]}, cachedState.Analysis.CompletedUnits)
 	require.Len(t, cachedState.Analysis.Patterns, 1)
 
@@ -987,7 +987,7 @@ func TestRunLearnCurrentResumesPendingUnitFromCachedPlan(t *testing.T) {
 	require.Equal(t, []string{"batch-001"}, labels)
 	require.Equal(t, []string{"key"}, units)
 	require.Contains(t, output, "恢复未完成的 learn-current 执行计划")
-	require.Contains(t, output, "本地候选: 可学习 3，待处理 3")
+	require.Contains(t, output, "本地候选: 可学习 2，待处理 2")
 	require.Contains(t, output, "AI 筛选: 输入 -，保留 -")
 	require.Contains(t, output, "恢复后: 待分析 1，分析单元 2")
 	require.Contains(t, output, "分析当前代码库 · 单元 2/2 · 密钥创建")
@@ -1011,6 +1011,7 @@ func TestRunLearnCurrentCheckpointsSuccessfulParallelBatch(t *testing.T) {
 	cfg.Learning.Current.Parallelism = 2
 	require.NoError(t, cont.ConfigRepo.Update(cfg))
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
 	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
 	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
 	gitAddAll(t, projectRoot)
@@ -1045,7 +1046,6 @@ func TestRunLearnCurrentCheckpointsSuccessfulParallelBatch(t *testing.T) {
 	state, err := stateRepo.Load(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, state.Analysis)
-	require.False(t, state.Analysis.Complete)
 	require.Len(t, state.Analysis.CompletedUnits, 1)
 	require.Equal(t, "auth", state.Analysis.CompletedUnits[0].ID)
 	require.Len(t, state.Analysis.Patterns, 1)
@@ -1131,6 +1131,7 @@ func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
 	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
 	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
 	gitAddAll(t, projectRoot)
@@ -1202,6 +1203,7 @@ func TestRunLearnCurrentAnalyzesPlannedUnitsOnePerCallByDefault(t *testing.T) {
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
 	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
 	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
 	gitAddAll(t, projectRoot)
@@ -1251,6 +1253,7 @@ func TestRunLearnCurrentAnalyzesPlannedUnitsInBatchWhenConfigured(t *testing.T) 
 	cfg.Learning.Current.MaxUnitsPerCall = 2
 	require.NoError(t, cont.ConfigRepo.Update(cfg))
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
 	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
 	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
 	gitAddAll(t, projectRoot)
@@ -1286,6 +1289,55 @@ func TestRunLearnCurrentAnalyzesPlannedUnitsInBatchWhenConfigured(t *testing.T) 
 	require.Equal(t, "key", batches[0].Units[1].AnalysisUnit.ID)
 }
 
+func TestRunLearnCurrentDoesNotReprocessFilesOmittedByAnalysisPlanner(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/uncovered.go", "package internal\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	planCalls := 0
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		planCalls++
+		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{{
+			ID:         "main",
+			Name:       "Main",
+			EntryPaths: []string{"main.go"},
+		}}}, nil
+	}
+	var analyzedPaths []string
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		results := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(req.Units))
+		for _, unit := range req.Units {
+			analyzedPaths = append(analyzedPaths, unit.FocusPaths...)
+			results = append(results, agent.AnalyzeCurrentCodebaseUnitResult{
+				UnitID:   unit.AnalysisUnit.ID,
+				UnitName: unit.AnalysisUnit.Name,
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Units: results}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.Equal(t, 1, planCalls)
+	require.ElementsMatch(t, []string{"main.go", "internal/uncovered.go"}, analyzedPaths)
+
+	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+		t.Fatal("PlanAnalysisUnits should not be called when files are unchanged")
+		return nil, nil
+	}
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		t.Fatal("AnalyzeCurrentCodebaseBatch should not be called when files are unchanged")
+		return nil, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+}
+
 func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	tokenusage.Reset()
@@ -1293,6 +1345,7 @@ func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
 	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
 	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
 	gitAddAll(t, projectRoot)
@@ -1311,7 +1364,7 @@ func TestRunLearnCurrentShowsAnalysisUnitProgressDetails(t *testing.T) {
 
 	require.Contains(t, output, "分析单元规划")
 	require.Contains(t, output, "分析当前代码库 · 单元 1/2 · 认证登录")
-	require.Contains(t, output, "分析当前代码库 · 提交指纹 2/2 · 密钥创建")
+	require.Contains(t, output, "策展并保存模式库 · 提交 2 个文件状态")
 }
 
 func TestRunLearnCurrentIncludesAnalysisUnitInFailure(t *testing.T) {
@@ -1321,6 +1374,7 @@ func TestRunLearnCurrentIncludesAnalysisUnitInFailure(t *testing.T) {
 
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
 	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
 	gitAddAll(t, projectRoot)
 
@@ -1416,6 +1470,28 @@ func TestRunLearnWorkspaceCurrentDelegatesIncrementalSkipToChildProject(t *testi
 
 	require.Zero(t, atomic.LoadInt32(&learnWorkspaceMockAnalyzeCalls))
 	require.Contains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnWorkspaceCurrentPropagatesForceToChildProject(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	tokenusage.Reset()
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	opts.force = true
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Positive(t, atomic.LoadInt32(&learnWorkspaceMockAnalyzeCalls))
 }
 
 func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T) {
@@ -1738,6 +1814,7 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	require.Contains(t, output, "本地文件过滤")
 	require.Contains(t, output, "分析单元规划")
 	require.Contains(t, output, "分析当前代码库 · 单元 1/1 · 当前代码变更")
+	require.Contains(t, output, "代码分析 1/1 已完成")
 	require.NotContains(t, output, "项目根路径:")
 	require.NotContains(t, output, "本地过滤统计:")
 	require.NotContains(t, output, "后续可执行:")

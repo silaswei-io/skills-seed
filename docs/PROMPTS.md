@@ -22,7 +22,7 @@ Other files under `embedfs/templates/prompts/append/` are reusable fragments sel
 | `user-define-pattern` | `CodexAgent.UserDefinePattern`, `ClaudeAgent.UserDefinePattern` | Convert user-provided pattern descriptions into structured pattern output. |
 | `workflow-optimize` | `CodexAgent.OptimizeWorkflow`, `ClaudeAgent.OptimizeWorkflow` | Normalize a user workflow description into structured workflow steps. |
 
-File selection, analysis-unit planning, and pattern curation are prompt-only tasks because their prompts already contain all required inputs. Claude runs them with repository tools disabled, preventing multi-turn repository reads from inflating token usage. Current-code analysis and project profiling still retain read-only source tools because their prompts intentionally reference repository files.
+File selection and analysis-unit planning retain read-only repository tools because their prompts intentionally reference runtime candidate lists, structural context, and repository paths. Pattern curation is prompt-only because its complete candidate payload is already in the prompt. Current-code analysis and project profiling also retain read-only source tools because their prompts intentionally reference repository files.
 
 ## Redundancy Status
 

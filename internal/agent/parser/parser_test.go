@@ -32,6 +32,22 @@ func TestParseCuratePatternsResultPreservesDecisionFields(t *testing.T) {
 	require.Len(t, result.Dropped, 1)
 }
 
+func TestParseCuratePatternsArtifactReadsClaudeEnvelope(t *testing.T) {
+	result, err := ParseCuratePatternsArtifact(`{"type":"result","structured_output":{"patterns":[{"id":"candidate","name":"Candidate","category":"business","description":"desc","rule":"rule","confidence":0.8,"source_ids":["candidate"]}],"dropped":[]}}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Patterns, 1)
+	require.Equal(t, "candidate", result.Patterns[0].ID)
+}
+
+func TestParseCuratePatternsArtifactReadsArchivedMarkdown(t *testing.T) {
+	result, err := ParseCuratePatternsArtifact("```json\n{\"patterns\":[],\"dropped\":[{\"id\":\"local\",\"reason\":\"not reusable\"}]}\n```")
+
+	require.NoError(t, err)
+	require.Len(t, result.Dropped, 1)
+	require.Equal(t, "local", result.Dropped[0].ID)
+}
+
 func TestParseGenerateFixesResultPreservesSummaryAndWarnings(t *testing.T) {
 	output := `{
   "fixes": {

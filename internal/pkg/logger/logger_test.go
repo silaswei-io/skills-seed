@@ -1,9 +1,12 @@
 package logger
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,4 +29,30 @@ func TestInitWithRetentionRemovesOldLogFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, matches, 2)
 	require.FileExists(t, CurrentLogPath())
+}
+
+func TestWithScopedLogCapturesWorkerLogsAndFinalError(t *testing.T) {
+	logDir := t.TempDir()
+	wantErr := errors.New("duplicate dropped candidate")
+	var logPath string
+
+	err := WithScopedLog(context.Background(), logDir, "learn", INFO, 0, func(ctx context.Context, path string) error {
+		logPath = path
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			defer BindScope(ctx)()
+			Diagnostic("worker marker")
+		}()
+		<-done
+		return wantErr
+	})
+
+	require.ErrorIs(t, err, wantErr)
+	content, readErr := os.ReadFile(logPath)
+	require.NoError(t, readErr)
+	text := string(content)
+	require.Contains(t, text, "worker marker")
+	require.Contains(t, text, wantErr.Error())
+	require.Contains(t, strings.ToLower(text), "error")
 }

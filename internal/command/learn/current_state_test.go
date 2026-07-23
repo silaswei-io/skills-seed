@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -34,6 +35,49 @@ func TestBuildStateInputsPreservesAISelectionState(t *testing.T) {
 	}, inputs)
 }
 
+func TestReconcileAnalysisUnitsFiltersInvalidPathsAndCoversEveryCandidate(t *testing.T) {
+	units := []domain.AnalysisUnit{
+		{
+			ID:           "auth",
+			Name:         "Auth",
+			EntryPaths:   []string{"internal/auth/login.go", "internal/auth", "outside.go"},
+			RelatedPaths: []string{"internal/auth/login.go", "internal/auth/types.go"},
+		},
+	}
+	allowed := []string{
+		"internal/auth/login.go",
+		"internal/auth/types.go",
+		"internal/key/create.go",
+	}
+
+	got := reconcileAnalysisUnits(units, allowed)
+
+	require.Equal(t, []domain.AnalysisUnit{
+		{
+			ID:           "auth",
+			Name:         "Auth",
+			EntryPaths:   []string{"internal/auth/login.go"},
+			RelatedPaths: []string{"internal/auth/types.go"},
+		},
+		fallbackAnalysisUnit([]string{"internal/key/create.go"}),
+	}, got)
+	require.Empty(t, uncoveredAnalysisPaths(got, allowed))
+}
+
+func TestReconcileAnalysisUnitsUsesUniqueFallbackID(t *testing.T) {
+	units := []domain.AnalysisUnit{{
+		ID:         "current-codebase",
+		Name:       "Existing",
+		EntryPaths: []string{"main.go"},
+	}}
+
+	got := reconcileAnalysisUnits(units, []string{"main.go", "other.go"})
+
+	require.Len(t, got, 2)
+	require.Equal(t, "current-codebase-2", got[1].ID)
+	require.Equal(t, []string{"other.go"}, got[1].EntryPaths)
+}
+
 func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{{Path: "main.go", Hash: "hash", Status: "present"}}, []domain.AnalysisUnit{{ID: "all", EntryPaths: []string{"main.go"}}})
 	state.ArtifactsCommitted = true
@@ -50,13 +94,16 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	unit := domain.AnalysisUnit{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}}
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []commandstate.FileInput{{Path: "internal/auth.go", Hash: "hash", Status: "present"}}, []domain.AnalysisUnit{unit})
 	state.Analysis = &commandstate.AnalysisCheckpoint{
-		Complete:             true,
 		Patterns:             []domain.Pattern{*pattern},
 		CompletedUnits:       []domain.AnalysisUnit{unit},
 		ProfileRefreshNeeded: true,
 		ProfileRefreshReason: "module boundary changed",
 	}
 	state.ProfileCommitted = true
+	state.Curation = &commandstate.CurationCheckpoint{
+		CandidateHash: "candidate-hash",
+		Decision:      json.RawMessage(`{"patterns":[],"dropped":[]}`),
+	}
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	require.NoError(t, repo.Save(context.Background(), state))
 
@@ -64,13 +111,63 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, loaded.Analysis)
-	require.True(t, loaded.Analysis.Complete)
 	require.Len(t, loaded.Analysis.Patterns, 1)
 	require.Equal(t, "checkpoint", loaded.Analysis.Patterns[0].ID)
 	require.Equal(t, []domain.AnalysisUnit{unit}, loaded.Analysis.CompletedUnits)
 	require.True(t, loaded.Analysis.ProfileRefreshNeeded)
 	require.Equal(t, "module boundary changed", loaded.Analysis.ProfileRefreshReason)
 	require.True(t, loaded.ProfileCommitted)
+	require.Equal(t, state.Curation.CandidateHash, loaded.Curation.CandidateHash)
+	require.JSONEq(t, string(state.Curation.Decision), string(loaded.Curation.Decision))
+}
+
+func TestPendingAnalysisUnitsDerivesCompletionFromCompletedUnits(t *testing.T) {
+	units := []domain.AnalysisUnit{
+		{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}},
+		{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}},
+	}
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, units)
+	state.Analysis = &commandstate.AnalysisCheckpoint{CompletedUnits: units[:1]}
+	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{
+		{Path: "internal/auth.go"},
+		{Path: "internal/key.go"},
+	}}
+
+	pending := pendingAnalysisUnits(state, changes)
+	require.Len(t, pending, 1)
+	require.Equal(t, "key", pending[0].ID)
+}
+
+func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {
+	units := []domain.AnalysisUnit{
+		{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/shared.go"}},
+		{ID: "key", Name: "Key", EntryPaths: []string{"internal/shared.go"}},
+	}
+	run := &learnCurrentProjectRun{
+		analysisState:          commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, units),
+		incrementalChanges:     &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
+		completedAnalysisUnits: units[:1],
+	}
+
+	err := run.validateCompletedAnalysis()
+
+	require.ErrorContains(t, err, "Key")
+}
+
+func TestCompleteAnalysisDoesNotCheckpointIncompletePlan(t *testing.T) {
+	unit := domain.AnalysisUnit{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}
+	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
+	run := &learnCurrentProjectRun{
+		ctx:                context.Background(),
+		stateRepo:          repo,
+		analysisState:      commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, []domain.AnalysisUnit{unit}),
+		incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/key.go"}}},
+	}
+
+	err := run.completeAnalysis()
+
+	require.ErrorContains(t, err, "Key")
+	require.NoFileExists(t, repo.Path())
 }
 
 func TestCurrentStateInputsMatchProjectDetectsChangedFiles(t *testing.T) {
@@ -116,6 +213,36 @@ func TestCanReuseCurrentStateRequiresExactInputSet(t *testing.T) {
 	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "main.go", Hash: "main-hash"}}}
 
 	require.False(t, canReuseCurrentState(state, changes, "demo", "go", mode, "", invocationHash))
+}
+
+func TestRestoreCurrentStateClearsIncompatibleCheckpoint(t *testing.T) {
+	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
+	state := commandstate.NewStateWithMode(
+		commandStateLearnCurrent,
+		"demo",
+		"go",
+		"normal|scope=flow",
+		"",
+		[]commandstate.FileInput{{Path: "main.go", Hash: "hash", Status: "present"}},
+		[]domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}},
+	).WithInvocationHash("old-invocation")
+	require.NoError(t, repo.Save(context.Background(), state))
+
+	session, err := restoreCurrentState(
+		context.Background(),
+		repo,
+		nil,
+		"demo",
+		"go",
+		"normal|scope=flow",
+		"",
+		"new-invocation",
+	)
+
+	require.NoError(t, err)
+	require.Nil(t, session)
+	_, err = repo.Load(context.Background())
+	require.ErrorIs(t, err, commandstate.ErrStateNotFound)
 }
 
 func TestLearnCurrentInvocationHashIncludesExecutionOptions(t *testing.T) {

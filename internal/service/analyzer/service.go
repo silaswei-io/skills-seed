@@ -38,18 +38,24 @@ import (
 type AnalyzerService struct {
 	agent                         agent.Agent
 	configRepo                    config.Reader
+	symbolResolver                sourcecode.Resolver
 	structuralCollector           structuralCollector
 	fileSelectionContextCollector structuralCollector
 }
 
 // NewAnalyzerService 创建分析服务
 func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerService {
+	structuralConfig := config.StructuralConfig{Provider: config.StructuralProviderAuto}
+	if configRepo != nil {
+		structuralConfig = configRepo.GetCurrentLearningConfig().Structural
+	}
 	svc := &AnalyzerService{
-		agent:      ag,
-		configRepo: configRepo,
+		agent:          ag,
+		configRepo:     configRepo,
+		symbolResolver: sourcecode.NewResolver(structuralConfig),
 	}
 	if configRepo != nil {
-		cfg := configRepo.GetCurrentLearningConfig().Structural
+		cfg := structuralConfig
 		if cfg.Enabled {
 			svc.structuralCollector = newStructuralCollector(cfg)
 			svc.fileSelectionContextCollector = newFileSelectionContextCollector(cfg)
@@ -292,7 +298,12 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	if err := agent.RequireResult(result, "AnalyzeProject"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeProjectFailed"), err)
 	}
-	entryVerifier := sourcecode.NewVerifier(req.RootPath)
+	refs := append(sourcecode.UtilityReferences(result.CommonUtils), sourcecode.BusinessMethodReferences(result.BusinessMethods)...)
+	catalog, err := s.symbolResolver.Resolve(ctx, req.RootPath, refs)
+	if err != nil {
+		return nil, fmt.Errorf("resolve project profile symbols: %w", err)
+	}
+	entryVerifier := sourcecode.NewVerifier(catalog)
 	result.CommonUtils = entryVerifier.VerifyUtilities(result.CommonUtils)
 	result.BusinessMethods = entryVerifier.VerifyBusinessMethods(result.BusinessMethods)
 
@@ -490,8 +501,12 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
 	)
 
+	patterns, err := validateCurrentPatterns(ctx, req.RootPath, result.Patterns, s.symbolResolver)
+	if err != nil {
+		return nil, err
+	}
 	return &AnalyzeCurrentCodebaseResult{
-		Patterns:                  validateCurrentPatterns(req.RootPath, result.Patterns),
+		Patterns:                  patterns,
 		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
 	}, nil
 }
@@ -559,13 +574,21 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
 
+	allPatterns := make([]domain.Pattern, 0)
+	for _, unitResult := range result.Units {
+		allPatterns = append(allPatterns, unitResult.Patterns...)
+	}
+	validator, err := newCurrentPatternValidator(ctx, projectRoot, allPatterns, s.symbolResolver)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]AnalyzeCurrentCodebaseUnitResult, 0, len(result.Units))
 	for _, unitResult := range result.Units {
 		unit := unitByID[unitResult.UnitID]
 		if unit.ID == "" && len(opts.Units) == 1 {
 			unit = opts.Units[0].AnalysisUnit
 		}
-		patterns := validateCurrentPatterns(projectRoot, unitResult.Patterns)
+		patterns := validator.validatePatterns(unitResult.Patterns)
 		for i := range patterns {
 			if patterns[i].AnalysisUnitID == "" {
 				patterns[i].AnalysisUnitID = unit.ID

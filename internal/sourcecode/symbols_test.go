@@ -44,7 +44,7 @@ func TestExtractSymbolsDoesNotRetainDefinitions(t *testing.T) {
 	require.NotEmpty(t, symbols)
 	require.Empty(t, symbols[0].Signature)
 
-	parsed, err := ParseSymbols("service.go", src)
+	parsed, err := parseSymbols("service.go", src)
 	require.NoError(t, err)
 	require.NotEmpty(t, parsed)
 	require.Equal(t, "func Start() error", parsed[0].Signature)

@@ -12,7 +12,7 @@
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
 - workspace 公共库、契约和基础设施影响会在 `learn current` 阶段根据仓库证据、子项目画像和一次性用户说明分析并沉淀到 workspace profile/spec，不从配置文件读取；生成阶段只消费已沉淀结果。
 - workspace 根配置的 `profile.language` 默认留空，因为一个工作区可以包含多种语言子项目。
-- `analysis.codegraph` 已移除，结构化上下文统一配置在 `learning.current.structural`；默认 `provider: auto` 优先 CodeGraph，不可用时降级到内嵌 tree-sitter。
+- `analysis.codegraph` 已移除，结构化上下文与符号校验统一配置在 `learning.current.structural`；默认 `provider: auto` 使用 CodeGraph，只有显式配置时才使用内嵌 tree-sitter。
 
 ## 配置示例
 
@@ -177,13 +177,13 @@ exclude:
 | `select_relevant_files` | `true` | 是否先基于候选文件树筛选最值得分析的相关文件，减少无意义文件进入 AI 分析 |
 | `select_relevant_files_min_candidates` | `200` | 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果，避免额外 AI 调用 |
 | `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
-| `structural.provider` | `auto` | 结构化上下文来源：`auto` 优先 CodeGraph 并自动修复，不可用时降级 tree-sitter；也可强制 `codegraph` 或 `treesitter` |
+| `structural.provider` | `auto` | 结构化上下文与符号校验来源：`auto`/`codegraph` 使用 CodeGraph 并自动修复；`treesitter` 显式选择内嵌 parser |
 | `structural.max_symbols` | `30` | 输出到结构化上下文的最大符号数 |
 | `structural.max_file_size` | `512` | 单个源码文件大小上限，单位 KB；超过时跳过该文件 |
 
 #### `structural`
 
-结构化上下文用于给 Agent 提供符号、导入、入口点和模块线索。默认 `provider: auto` 会优先使用 CodeGraph；如果目标项目未初始化会自动执行初始化，索引同步或状态检查异常时会尝试自动修复，只有 CodeGraph 命令不可用或修复失败时才降级到内嵌 tree-sitter。`provider: codegraph` 会强制只使用 CodeGraph；`provider: treesitter` 会只使用内嵌 tree-sitter。
+结构化 provider 同时用于给 Agent 提供符号、导入、入口点和模块线索，以及校验 AI 返回的源码符号。默认 `provider: auto` 使用 CodeGraph；如果目标项目未初始化会自动执行初始化，索引同步或状态检查异常时会尝试自动修复。`provider: codegraph` 语义相同但表达显式选择；`provider: treesitter` 才会使用内嵌 parser。CodeGraph 上下文失败会记录警告并跳过该上下文，符号校验失败会直接返回错误；两者都不会在同一次运行中静默切换解析引擎。
 
 0.7.1 起，结构化预扫描、`learn current` 和 `preview` 共用同一套文件过滤策略：默认只纳入源码、构建配置和依赖配置；文档、生成产物、全局 `exclude` 命中的路径以及已生成 Skills 输出目录会被跳过。
 
@@ -199,7 +199,7 @@ exclude:
 2. 明确不需要相关文件筛选时，把 `select_relevant_files` 设为 `false`。
 3. 小项目可提高 `select_relevant_files_min_candidates`，直接跳过 AI 文件筛选；大型项目可降低该值以更早收敛范围。
 4. 明确不需要结构化上下文时，把 `structural.enabled` 设为 `false`。
-5. 大型仓库在使用 tree-sitter 或 auto 降级时可降低 `structural.max_file_size`，避免解析生成文件、bundle 或异常大文件。
+5. 大型仓库显式使用 tree-sitter 时可降低 `structural.max_file_size`，避免解析生成文件、bundle 或异常大文件。
 6. 结构化上下文只消费已有边界输入，不在没有 seed 时全仓扫描。
 
 ### Prompt 运行时调试
@@ -323,7 +323,7 @@ skills-seed learn history --limit 100 --batch-size 10
 | `.skills-seed/store/project.db` | patterns、命中统计、文件指纹、评审等索引数据 |
 | `.skills-seed/store/documents/` | 画像、规范、状态和变更记录等可读 JSON 文档 |
 | `.skills-seed/cache/snapshots/` | 可重建的文件快照缓存 |
-| `.skills-seed/cache/commands/<command>/state.json` | 未完成命令的可恢复状态，例如 `learn-current` 或 `sync`；可删除，删除后该命令会重新检测和规划 |
+| `.skills-seed/cache/commands/<command>/state.json` | 未完成命令的可恢复状态，包括尚未入库的单元分析结果；全部持久化后自动清除，可删除并重新检测和规划 |
 | `.skills-seed/runtime/logs/` | 运行日志 |
 | `.skills-seed/runtime/rendered-prompts/` | 渲染后的 prompt 和 manifest |
 | `.skills-seed/runtime/agent-outputs/` | Agent 输出归档 |

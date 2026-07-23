@@ -10,8 +10,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
-func (s *Service) curateCurrent(ctx context.Context, candidates []domain.Pattern, retrieved retrievalResult, hooks ProgressHooks) (*proposal, error) {
-	result, err := s.curate(ctx, OperationLearnCurrent, candidates, retrieved.related, false, retrieved.existingByCandidate, hooks)
+func (s *Service) curateCurrent(ctx context.Context, candidates []domain.Pattern, retrieved retrievalResult, checkpoint DecisionCheckpoint, hooks ProgressHooks) (*proposal, error) {
+	result, err := s.curate(ctx, OperationLearnCurrent, candidates, retrieved.related, false, retrieved.existingByCandidate, checkpoint, hooks)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,23 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.13.12]
+
+### Changes
+
+- Consolidated CodeGraph index lifecycle, structural context, and source-symbol resolution into shared infrastructure. `auto` now uses and maintains CodeGraph consistently, embedded tree-sitter is selected only through an explicit `treesitter` provider, and gotreesitter was upgraded to eliminate stack overflows on deeply nested syntax trees.
+- Refactored current-code and workspace learning into stateful run objects. Analysis-unit results are checkpointed batch by batch, resume starts at the first unfinished unit, and project logs, worker log scopes, and concurrent workspace errors retain their originating project.
+- Delayed file-fingerprint and source-snapshot commits until every unit, project-profile update, pattern curation, and pattern-store write succeeds, preventing interrupted results from being marked as learned.
+- Added candidate-bound curation decision checkpoints and `sync --resume --curation-output` for importing existing Claude/Codex structured archives. Local validation or storage failures now replay completed curation without another AI call or token cost.
+- Unified source-location validation behind a selectable symbol resolver so generation reuses the same CodeGraph/tree-sitter fact catalog as learning and validation.
+
+### Fixes
+
+- Fixed AI curation assigning one source to kept, merged, and dropped decisions simultaneously, producing duplicate ownership, duplicate drops, or coverage gaps. Same-ID outputs own their source, unresolved conflicts use deterministic local recovery, and final strict validation remains authoritative.
+- Fixed workspace child failures being replaced by sibling cancellation errors, final project errors missing from scoped logs, worker goroutines losing log scope, and completed projects repeating file selection, planning, and analysis on the next run.
+- Fixed incomplete analysis plans advancing to project-profile sync, partial unit completion committing file state, and incompatible command parameters reusing stale recovery plans.
+- Fixed file selection and analysis planning being unable to read path-referenced runtime inputs or necessary repository source, plus duplicated source parsing and inconsistent symbol verification during generation.
+
 ## [v0.13.11]
 
 ### Changes

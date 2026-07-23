@@ -94,28 +94,36 @@ func (s *LearnerService) marshalKnownPatterns(ctx context.Context) (string, int)
 
 // CurateAndSavePatterns 策展并保存多个候选模式。
 func (s *LearnerService) CurateAndSavePatterns(ctx context.Context, patterns []domain.Pattern, operation curator.Operation) (int, error) {
-	return s.curateAndSavePatterns(ctx, patterns, operation, domain.AnalysisUnit{}, curator.ProgressHooks{})
+	return s.curateAndSavePatterns(ctx, patterns, operation, CurateOptions{})
 }
 
 // CurateAndSavePatternsWithMetadata 策展并保存候选模式，同时补充学习范围。
 func (s *LearnerService) CurateAndSavePatternsWithMetadata(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, unit domain.AnalysisUnit) (int, error) {
-	return s.curateAndSavePatterns(ctx, patterns, operation, unit, curator.ProgressHooks{})
+	return s.curateAndSavePatterns(ctx, patterns, operation, CurateOptions{Unit: unit})
 }
 
-// CurateAndSavePatternsWithHooks 策展并保存候选模式，同时报告内部阶段。
-func (s *LearnerService) CurateAndSavePatternsWithHooks(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, hooks curator.ProgressHooks) (int, error) {
-	return s.curateAndSavePatterns(ctx, patterns, operation, domain.AnalysisUnit{}, hooks)
+// CurateOptions 描述一次候选模式策展的附加执行能力。
+type CurateOptions struct {
+	Unit               domain.AnalysisUnit
+	Hooks              curator.ProgressHooks
+	DecisionCheckpoint curator.DecisionCheckpoint
 }
 
-func (s *LearnerService) curateAndSavePatterns(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, unit domain.AnalysisUnit, hooks curator.ProgressHooks) (int, error) {
+// CurateAndSavePatternsWithOptions 策展并保存候选模式。
+func (s *LearnerService) CurateAndSavePatternsWithOptions(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, opts CurateOptions) (int, error) {
+	return s.curateAndSavePatterns(ctx, patterns, operation, opts)
+}
+
+func (s *LearnerService) curateAndSavePatterns(ctx context.Context, patterns []domain.Pattern, operation curator.Operation, opts CurateOptions) (int, error) {
 	if s.curatorSvc == nil {
 		return 0, fmt.Errorf("pattern curator is not configured")
 	}
-	patterns = attachAnalysisUnit(patterns, unit)
+	patterns = attachAnalysisUnit(patterns, opts.Unit)
 	result, err := s.curatorSvc.CurateAndStoreWithHooks(ctx, curator.CurateRequest{
-		Operation:  operation,
-		Candidates: patterns,
-	}, hooks)
+		Operation:          operation,
+		Candidates:         patterns,
+		DecisionCheckpoint: opts.DecisionCheckpoint,
+	}, opts.Hooks)
 	if err != nil {
 		return 0, err
 	}

@@ -106,9 +106,10 @@ Given candidate patterns and related existing patterns, output the final canonic
 Before returning JSON, validate internally:
 1. Every candidate pattern must be covered by `patterns[].source_ids` or appear in `dropped[].id`.
 2. `source_ids` and `dropped.id` may reference only real input IDs. Re-read the literal ID values in the Candidate Patterns and Related Existing Patterns sections; never create aliases, sequence IDs, symbol names, or grouping IDs.
-3. No two output patterns express the same core rule; duplicate rules must be merged.
-4. Keep routeable project-specific knowledge even when local; drop only unsupported, contradictory, exactly duplicated, or non-reusable candidates.
-5. The output contains only semantic canonical fields and source ownership decisions. Never invent source material or statistics.
+3. Each candidate ID appears in `dropped` at most once and cannot be both dropped and represented by a pattern. Each canonical pattern ID also appears at most once.
+4. No two output patterns express the same core rule; duplicate rules must be merged.
+5. Keep routeable project-specific knowledge even when local; drop only unsupported, contradictory, exactly duplicated, or non-reusable candidates.
+6. The output contains only semantic canonical fields and source ownership decisions. Never invent source material or statistics.
 
 # Output Format
 

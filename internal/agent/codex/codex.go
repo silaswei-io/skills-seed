@@ -198,7 +198,7 @@ func (c *CodexAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixes
 
 // SelectFiles 基于候选文件树选择当前代码学习范围。
 func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
-	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("file-select", ""))
+	task := agent.NewRepositoryReadRuntimeTask(agent.RuntimeSlug("file-select", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-file-select")
 	if err != nil {
 		return nil, err
@@ -374,7 +374,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent
 
 // PlanAnalysisUnits 将当前待学习文件拆成可续跑的业务分析单元。
 func (c *CodexAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
-	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
+	task := agent.NewRepositoryReadRuntimeTask(agent.RuntimeSlug("analysis-plan", ""))
 	session, err := agent.NewPromptInputSessionForContext(ctx, "skills-seed-analysis-plan")
 	if err != nil {
 		return nil, err

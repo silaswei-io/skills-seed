@@ -1,12 +1,15 @@
 package analyzer
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +27,7 @@ func TestValidateCurrentPatternsUsesVerifiedSourceEvidence(t *testing.T) {
 		{Path: "service.go", Line: 99, Symbol: "LoadUser", Kind: "function"},
 	}
 
-	patterns := validateCurrentPatterns(root, []domain.Pattern{*pattern})
+	patterns := validateCurrentPatternsForTest(t, root, []domain.Pattern{*pattern})
 
 	require.Len(t, patterns, 1)
 	require.Equal(t, domain.SourceLearnedCurrent, patterns[0].Source)
@@ -47,7 +50,7 @@ func TestValidateCurrentPatternsAcceptsTypeFamilyEvidence(t *testing.T) {
 		{Path: "service.py", Symbol: "User", Kind: "type"},
 	}
 
-	patterns := validateCurrentPatterns(root, []domain.Pattern{*pattern})
+	patterns := validateCurrentPatternsForTest(t, root, []domain.Pattern{*pattern})
 
 	require.Len(t, patterns, 1)
 	require.Equal(t, "class", patterns[0].EvidenceLocations[0].Kind)
@@ -69,7 +72,7 @@ func TestValidateCurrentPatternsRejectsUnverifiedEvidence(t *testing.T) {
 	missingSymbol.Rule = "Preserve the missing symbol behavior."
 	missingSymbol.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "service.go", Symbol: "Unknown", Kind: "function"}}
 
-	patterns := validateCurrentPatterns(root, []domain.Pattern{*missingRule, *missingFile, *missingSymbol})
+	patterns := validateCurrentPatternsForTest(t, root, []domain.Pattern{*missingRule, *missingFile, *missingSymbol})
 
 	require.Empty(t, patterns)
 }
@@ -83,7 +86,7 @@ func TestValidateCurrentPatternsDropsNonContiguousGoodExample(t *testing.T) {
 	pattern.GoodExample = "func LoadUser() {\n\t// ...\n}"
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "service.go", Symbol: "LoadUser", Kind: "function"}}
 
-	patterns := validateCurrentPatterns(root, []domain.Pattern{*pattern})
+	patterns := validateCurrentPatternsForTest(t, root, []domain.Pattern{*pattern})
 
 	require.Len(t, patterns, 1)
 	require.Empty(t, patterns[0].GoodExample)
@@ -101,7 +104,7 @@ func TestValidateCurrentPatternsHasNoQuantityLimit(t *testing.T) {
 		candidates[i] = *pattern
 	}
 
-	require.Len(t, validateCurrentPatterns(root, candidates), len(candidates))
+	require.Len(t, validateCurrentPatternsForTest(t, root, candidates), len(candidates))
 }
 
 func TestValidateCurrentPatternsRejectsSymlinkEvidenceOutsideRoot(t *testing.T) {
@@ -113,5 +116,13 @@ func TestValidateCurrentPatternsRejectsSymlinkEvidenceOutsideRoot(t *testing.T) 
 	pattern.Rule = "Use Secret."
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "linked.go", Symbol: "Secret", Kind: "function"}}
 
-	require.Empty(t, validateCurrentPatterns(root, []domain.Pattern{*pattern}))
+	require.Empty(t, validateCurrentPatternsForTest(t, root, []domain.Pattern{*pattern}))
+}
+
+func validateCurrentPatternsForTest(t *testing.T, root string, patterns []domain.Pattern) []domain.Pattern {
+	t.Helper()
+	resolver := sourcecode.NewResolver(config.StructuralConfig{Provider: config.StructuralProviderTreeSitter})
+	validated, err := validateCurrentPatterns(context.Background(), root, patterns, resolver)
+	require.NoError(t, err)
+	return validated
 }

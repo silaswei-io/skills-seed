@@ -2,7 +2,9 @@ package workspace
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -16,6 +18,29 @@ func TestEffectiveParallelism(t *testing.T) {
 	require.Equal(t, 3, EffectiveParallelism(domain.ModeWorkspace, 0, 3))
 	require.Equal(t, defaultWorkspaceParallelismCap, EffectiveParallelism(domain.ModeWorkspace, 0, 20))
 	require.Equal(t, 9, EffectiveParallelism(domain.ModeWorkspace, 9, 20))
+}
+
+func TestRunProjectTasksReturnsOriginatingErrorInsteadOfSiblingCancellation(t *testing.T) {
+	rootCause := errors.New("curation failed")
+	var started sync.WaitGroup
+	started.Add(2)
+
+	err := RunProjectTasks(context.Background(), []config.WorkspaceProjectConfig{
+		{ID: "canceled-project", Path: "a"},
+		{ID: "failed-project", Path: "b"},
+	}, 2, func(ctx context.Context, project config.WorkspaceProjectConfig) error {
+		started.Done()
+		started.Wait()
+		if project.ID == "failed-project" {
+			return rootCause
+		}
+		<-ctx.Done()
+		return ctx.Err()
+	})
+
+	require.ErrorIs(t, err, rootCause)
+	require.ErrorContains(t, err, "failed-project")
+	require.NotContains(t, err.Error(), "canceled-project")
 }
 
 func TestRunProjectTasksReturnsCanceledContextWithoutRunningTasks(t *testing.T) {

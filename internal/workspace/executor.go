@@ -35,6 +35,11 @@ func EffectiveParallelism(mode string, configured, projectCount int) int {
 // ProjectTask 是一个子项目并发任务
 type ProjectTask func(ctx context.Context, project config.WorkspaceProjectConfig) error
 
+type projectTaskError struct {
+	project config.WorkspaceProjectConfig
+	err     error
+}
+
 // RunProjectTasks 按并发上限执行子项目任务
 func RunProjectTasks(ctx context.Context, projects []config.WorkspaceProjectConfig, parallelism int, task ProjectTask) error {
 	if len(projects) == 0 {
@@ -52,11 +57,12 @@ func RunProjectTasks(ctx context.Context, projects []config.WorkspaceProjectConf
 		return ordered[i].Path < ordered[j].Path
 	})
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	parentCtx := ctx
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
 	jobs := make(chan config.WorkspaceProjectConfig)
-	errs := make(chan error, len(ordered))
+	errs := make(chan projectTaskError, len(ordered))
 	var wg sync.WaitGroup
 
 	for i := 0; i < parallelism; i++ {
@@ -65,8 +71,8 @@ func RunProjectTasks(ctx context.Context, projects []config.WorkspaceProjectConf
 			defer wg.Done()
 			for project := range jobs {
 				if err := task(ctx, project); err != nil {
-					errs <- fmt.Errorf("%s: %w", project.ID, err)
-					cancel()
+					errs <- projectTaskError{project: project, err: err}
+					cancel(err)
 					return
 				}
 			}
@@ -79,12 +85,7 @@ func RunProjectTasks(ctx context.Context, projects []config.WorkspaceProjectConf
 			close(jobs)
 			wg.Wait()
 			close(errs)
-			for err := range errs {
-				if err != nil {
-					return err
-				}
-			}
-			return ctx.Err()
+			return firstProjectTaskError(errs, parentCtx.Err())
 		case jobs <- project:
 		}
 	}
@@ -92,12 +93,32 @@ func RunProjectTasks(ctx context.Context, projects []config.WorkspaceProjectConf
 	wg.Wait()
 	close(errs)
 
-	for err := range errs {
-		if err != nil {
-			return err
+	return firstProjectTaskError(errs, parentCtx.Err())
+}
+
+func firstProjectTaskError(errs <-chan projectTaskError, parentErr error) error {
+	var first *projectTaskError
+	for taskErr := range errs {
+		if taskErr.err != nil && first == nil {
+			item := taskErr
+			first = &item
 		}
 	}
+	if parentErr != nil {
+		return parentErr
+	}
+	if first != nil {
+		return formatProjectTaskError(*first)
+	}
 	return nil
+}
+
+func formatProjectTaskError(taskErr projectTaskError) error {
+	projectName := taskErr.project.ID
+	if projectName == "" {
+		projectName = taskErr.project.Path
+	}
+	return fmt.Errorf("%s: %w", projectName, taskErr.err)
 }
 
 // ProjectRoot 返回子项目绝对路径

@@ -63,20 +63,25 @@ type learnCurrentProjectRun struct {
 	codebaseRunContext        *analyzer.CodebaseRunContext
 	savedCount                int
 	completedAnalysisUnits    []domain.AnalysisUnit
-	snapshotCommitMu          sync.Mutex
+	importedCuration          *agent.CuratePatternsResult
 	progressDetailMu          sync.Mutex
 }
 
-func runLearnCurrentProjectWithOptions(cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
-	if err := commandutil.RequireAgentAvailable(cont); err != nil {
+func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
+	run := newLearnCurrentProjectRun(ctx, cont, opts)
+	if err := run.loadImportedCuration(); err != nil {
 		return nil, err
 	}
-	run := newLearnCurrentProjectRun(cont, opts)
+	if !run.hasCurationDecision() {
+		if err := commandutil.RequireAgentAvailable(cont); err != nil {
+			return nil, err
+		}
+	}
 	return run.execute()
 }
 
-func newLearnCurrentProjectRun(cont *container.Container, opts learnCurrentProjectOptions) *learnCurrentProjectRun {
-	ctx := agent.WithTokenUsageScope(context.Background(), opts.tokenScope)
+func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) *learnCurrentProjectRun {
+	ctx = agent.WithTokenUsageScope(ctx, opts.tokenScope)
 	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	steps := commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
@@ -96,6 +101,14 @@ func newLearnCurrentProjectRun(cont *container.Container, opts learnCurrentProje
 		startedAt: time.Now(),
 		steps:     steps,
 	}
+}
+
+func (r *learnCurrentProjectRun) hasCurationDecision() bool {
+	if r.importedCuration != nil {
+		return true
+	}
+	state, err := r.stateRepo.Load(r.ctx)
+	return err == nil && state.Curation != nil
 }
 
 func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
@@ -134,10 +147,6 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 		return nil, err
 	}
 	if err := r.curateAndSavePatternsStep(); err != nil {
-		return nil, err
-	}
-
-	if err := r.cont.FileTracker.DeleteAnalyzedFiles(r.ctx, r.incrementalChanges.Scope, r.incrementalChanges.Deleted); err != nil {
 		return nil, err
 	}
 

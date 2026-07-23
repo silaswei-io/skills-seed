@@ -15,8 +15,16 @@ type ChangeRecorder interface {
 	Detail(message string)
 }
 
-// LearnCurrentFunc 执行当前代码学习，并允许调用方指定恢复状态范围。
-type LearnCurrentFunc func(ctx context.Context, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error)
+// LearnCurrentFunc 执行当前代码学习。
+type LearnCurrentFunc func(ctx context.Context, req LearnRequest) (domain.LearnCurrentResult, error)
+
+// LearnRequest 描述 sync 传给学习阶段的恢复参数。
+type LearnRequest struct {
+	StateScope     string
+	UserContext    string
+	Force          bool
+	CurationOutput string
+}
 
 // GenerateFunc 执行 skills 生成。
 type GenerateFunc func(ctx context.Context) error
@@ -33,10 +41,8 @@ type Service struct {
 
 // Request 描述一次 sync 运行的输入。
 type Request struct {
-	StateScope  string
-	UserContext string
-	ForceLearn  bool
-	Change      ChangeRecorder
+	Learn  LearnRequest
+	Change ChangeRecorder
 }
 
 // Run 执行当前代码学习，并在必要时生成 skills。
@@ -50,7 +56,7 @@ func (s Service) Run(ctx context.Context, req Request) error {
 	}
 
 	logger.Info(i18n.Get("SyncStepLearn"))
-	result, err := s.LearnCurrent(ctx, req.StateScope, req.UserContext, req.ForceLearn)
+	result, err := s.LearnCurrent(ctx, req.Learn)
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}

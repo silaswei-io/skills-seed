@@ -2,6 +2,9 @@ package curator
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -54,7 +57,7 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
 	var curated *proposal
 	if req.Operation == OperationLearnCurrent {
-		curated, err = s.curateCurrent(ctx, candidates, retrieved, hooks)
+		curated, err = s.curateCurrent(ctx, candidates, retrieved, req.DecisionCheckpoint, hooks)
 		if err != nil {
 			return nil, fmt.Errorf("curate current patterns: %w", err)
 		}
@@ -97,12 +100,37 @@ func activeCuratorPatterns(patterns []domain.Pattern) []domain.Pattern {
 	return out
 }
 
-func (s *Service) curate(ctx context.Context, operation Operation, candidates, existing []domain.Pattern, allExisting bool, existingByCandidate map[string][]string, hooks ProgressHooks) (*proposal, error) {
+func (s *Service) curate(ctx context.Context, operation Operation, candidates, existing []domain.Pattern, allExisting bool, existingByCandidate map[string][]string, checkpoint DecisionCheckpoint, hooks ProgressHooks) (*proposal, error) {
+	request := &agent.CuratePatternsRequest{
+		Operation:           string(operation),
+		CandidatePatterns:   candidates,
+		ExistingPatterns:    existing,
+		AllExisting:         allExisting,
+		ExistingByCandidate: existingByCandidate,
+	}
+	decisionKey, err := curationDecisionKey(candidates)
+	if err != nil {
+		return nil, err
+	}
+	if checkpoint != nil {
+		result, found, err := checkpoint.Load(ctx, decisionKey)
+		if err != nil {
+			return nil, fmt.Errorf("load curation decision: %w", err)
+		}
+		if found {
+			if err := agent.RequireResult(result, "CuratePatterns"); err != nil {
+				return nil, fmt.Errorf("load curation decision: %w", err)
+			}
+			label := i18n.Get("ProgressCuratePatternsReplay")
+			notifyProgress(hooks.OnStepStart, label)
+			notifyProgress(hooks.OnStepComplete, label)
+			return proposalFromAgent(result), nil
+		}
+	}
 	if s.agent == nil {
 		return nil, fmt.Errorf("pattern curator agent is not configured")
 	}
 
-	var result *agent.CuratePatternsResult
 	retryProgress := agent.NewRetryProgressBinder(hooks.OnStepUpdate)
 	ctx = retryProgress.WithContext(ctx)
 	label := i18n.Get("ProgressCuratePatternsAI")
@@ -110,14 +138,7 @@ func (s *Service) curate(ctx context.Context, operation Operation, candidates, e
 		hooks.OnStepStart(label)
 	}
 	retryProgress.StartStep(label)
-	var callErr error
-	result, callErr = s.agent.CuratePatterns(ctx, &agent.CuratePatternsRequest{
-		Operation:           string(operation),
-		CandidatePatterns:   candidates,
-		ExistingPatterns:    existing,
-		AllExisting:         allExisting,
-		ExistingByCandidate: existingByCandidate,
-	})
+	result, callErr := s.agent.CuratePatterns(ctx, request)
 	retryProgress.FinishStep(label, callErr == nil)
 	if hooks.OnStepComplete != nil {
 		hooks.OnStepComplete(label)
@@ -128,11 +149,25 @@ func (s *Service) curate(ctx context.Context, operation Operation, candidates, e
 	if err := agent.RequireResult(result, "CuratePatterns"); err != nil {
 		return nil, err
 	}
+	if checkpoint != nil {
+		if err := checkpoint.Save(ctx, decisionKey, result); err != nil {
+			return nil, fmt.Errorf("save curation decision: %w", err)
+		}
+	}
 	return proposalFromAgent(result), nil
 }
 
+func curationDecisionKey(candidates []domain.Pattern) (string, error) {
+	data, err := json.Marshal(candidates)
+	if err != nil {
+		return "", fmt.Errorf("hash curation candidates: %w", err)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
+}
+
 func logCurationAssessment(operation Operation, assessment curationAssessment) {
-	if len(assessment.IgnoredDroppedIDs) == 0 && len(assessment.IgnoredConflictingDroppedIDs) == 0 && len(assessment.IgnoredMergedFromIDs) == 0 && len(assessment.IgnoredPatternIDs) == 0 && assessment.Coverage.MissingCount() == 0 {
+	if len(assessment.IgnoredDroppedIDs) == 0 && len(assessment.IgnoredConflictingDroppedIDs) == 0 && len(assessment.IgnoredMergedFromIDs) == 0 && len(assessment.IgnoredPatternIDs) == 0 && len(assessment.ResolvedOwnershipIDs) == 0 && assessment.Coverage.MissingCount() == 0 {
 		return
 	}
 	logger.Info(i18n.Get("LoggerAgentCuratePatternsSanitized"),
@@ -141,6 +176,7 @@ func logCurationAssessment(operation Operation, assessment curationAssessment) {
 		"ignored_conflicting_dropped_ids", assessment.IgnoredConflictingDroppedIDs,
 		"ignored_merged_from_ids", assessment.IgnoredMergedFromIDs,
 		"ignored_pattern_ids", assessment.IgnoredPatternIDs,
+		"resolved_ownership_ids", assessment.ResolvedOwnershipIDs,
 		"unclassified_ids", assessment.Coverage.MissingIDs,
 		"coverage_ratio", 1-assessment.Coverage.MissingRatio(),
 		"reason", "references may only use current candidate or retrieved existing pattern ids",

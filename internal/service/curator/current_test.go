@@ -92,6 +92,78 @@ func TestCurateAndStorePrefersCurrentPatternOverConflictingDrop(t *testing.T) {
 	require.Empty(t, result.Dropped)
 }
 
+func TestCurateAndStoreResolvesOverlappingSourceOwnership(t *testing.T) {
+	contextInjection := newCuratorTestPattern("plugin-core-context-injection", "Plugin Context", domain.CategoryStructure)
+	pluginLifecycle := newCuratorTestPattern("plugin-lifecycle-registration", "Plugin Lifecycle", domain.CategoryStructure)
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			return &agent.CuratePatternsResult{
+				Patterns: []agent.CuratedPattern{
+					{
+						ID:        contextInjection.ID,
+						Name:      contextInjection.Name,
+						Category:  string(contextInjection.Category),
+						Rule:      contextInjection.Rule,
+						SourceIDs: []string{contextInjection.ID},
+					},
+					{
+						ID:        pluginLifecycle.ID,
+						Name:      pluginLifecycle.Name,
+						Category:  string(pluginLifecycle.Category),
+						Rule:      pluginLifecycle.Rule,
+						SourceIDs: []string{pluginLifecycle.ID, contextInjection.ID},
+					},
+				},
+				Dropped: []agent.CuratedDrop{{ID: contextInjection.ID, Reason: "merged into lifecycle"}},
+			}, nil
+		},
+	}
+
+	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*contextInjection, *pluginLifecycle},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 2)
+	require.Empty(t, result.Dropped)
+	written := make(map[string]domain.Pattern, len(result.Written))
+	for _, pattern := range result.Written {
+		written[pattern.ID] = pattern
+	}
+	require.Equal(t, []string{contextInjection.ID}, written[contextInjection.ID].MergedFrom)
+	require.Equal(t, []string{pluginLifecycle.ID}, written[pluginLifecycle.ID].MergedFrom)
+}
+
+func TestCurateAndStoreRecoversAmbiguousSourceOwnership(t *testing.T) {
+	candidate := newCuratorTestPattern("shared-source", "Shared Source", domain.CategoryBusiness)
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			return &agent.CuratePatternsResult{Patterns: []agent.CuratedPattern{
+				{ID: "first-output", Name: "First", Category: string(domain.CategoryBusiness), Rule: "First rule", SourceIDs: []string{candidate.ID}},
+				{ID: "second-output", Name: "Second", Category: string(domain.CategoryBusiness), Rule: "Second rule", SourceIDs: []string{candidate.ID}},
+			}}, nil
+		},
+	}
+
+	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, candidate.ID, result.Written[0].ID)
+}
+
 func TestCurateAndStoreRecoversUnclassifiedCoverageLocally(t *testing.T) {
 	first := newCuratorTestPattern("first", "First", domain.CategoryError)
 	first.Rule = "Wrap repository errors with operation context."
@@ -129,6 +201,35 @@ func TestCurateAndStoreRecoversUnclassifiedCoverageLocally(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Written, 2)
 	require.Len(t, saved, 2)
+}
+
+func TestCurateAndStoreCanonicalizesDuplicateDroppedDecisions(t *testing.T) {
+	dropped := newCuratorTestPattern("service-group-coordinated-startup", "Service Startup", domain.CategoryStructure)
+	recovered := newCuratorTestPattern("login-log-list-query", "Login Log Query", domain.CategoryDatabase)
+
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			return &agent.CuratePatternsResult{Dropped: []agent.CuratedDrop{
+				{ID: dropped.ID, Reason: "framework convention"},
+				{ID: dropped.ID, Reason: "framework convention"},
+			}}, nil
+		},
+	}
+
+	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*dropped, *recovered},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Dropped, 1)
+	require.Equal(t, dropped.ID, result.Dropped[0].ID)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, recovered.ID, result.Written[0].ID)
 }
 
 func TestCurateAndStoreDoesNotRetryIncompleteCoverage(t *testing.T) {
@@ -429,4 +530,63 @@ func TestCurateAndStoreDoesNotPersistCurrentCandidatesWhenSemanticCurationFails(
 	require.ErrorContains(t, err, "curate current patterns")
 	require.Nil(t, result)
 	require.False(t, saved)
+}
+
+func TestCurateAndStoreReplaysSavedAIDecision(t *testing.T) {
+	candidate := newCuratorTestPattern("candidate", "Candidate", domain.CategoryBusiness)
+	checkpoint := &memoryDecisionCheckpoint{}
+	calls := 0
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			calls++
+			return &agent.CuratePatternsResult{Patterns: []agent.CuratedPattern{{
+				ID:        candidate.ID,
+				Name:      candidate.Name,
+				Category:  string(candidate.Category),
+				Rule:      candidate.Rule,
+				SourceIDs: []string{candidate.ID},
+			}}}, nil
+		},
+	}
+	request := CurateRequest{
+		Operation:          OperationLearnCurrent,
+		Candidates:         []domain.Pattern{*candidate},
+		DecisionCheckpoint: checkpoint,
+	}
+
+	first, err := NewService(mockAgent, &mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}).CurateAndStore(context.Background(), request)
+	require.NoError(t, err)
+	require.Len(t, first.Written, 1)
+	require.Equal(t, 1, calls)
+	require.Equal(t, 1, checkpoint.saves)
+
+	second, err := NewService(nil, &mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}).CurateAndStore(context.Background(), request)
+	require.NoError(t, err)
+	require.Len(t, second.Written, 1)
+	require.Equal(t, 1, calls)
+}
+
+type memoryDecisionCheckpoint struct {
+	key      string
+	decision *agent.CuratePatternsResult
+	saves    int
+}
+
+func (c *memoryDecisionCheckpoint) Load(_ context.Context, key string) (*agent.CuratePatternsResult, bool, error) {
+	if c.key != key || c.decision == nil {
+		return nil, false, nil
+	}
+	return c.decision, true, nil
+}
+
+func (c *memoryDecisionCheckpoint) Save(_ context.Context, key string, result *agent.CuratePatternsResult) error {
+	c.key = key
+	c.decision = result
+	c.saves++
+	return nil
 }

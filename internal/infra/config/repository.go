@@ -82,7 +82,7 @@ func (c *ExcludeConfig) UnmarshalYAML(value *yaml.Node) error {
 type StructuralProvider string
 
 const (
-	StructuralProviderAuto       StructuralProvider = "auto"       // 优先 CodeGraph，可用性修复失败后降级 tree-sitter
+	StructuralProviderAuto       StructuralProvider = "auto"       // 使用 CodeGraph，并自动维护项目索引
 	StructuralProviderCodeGraph  StructuralProvider = "codegraph"  // 仅使用 CodeGraph，不可用时跳过结构化上下文
 	StructuralProviderTreeSitter StructuralProvider = "treesitter" // 仅使用内嵌 tree-sitter
 )
@@ -102,7 +102,7 @@ func NormalizeStructuralProvider(provider string) StructuralProvider {
 // StructuralConfig 结构化分析配置。
 type StructuralConfig struct {
 	Enabled     bool               `yaml:"enabled"`       // 是否启用结构化分析
-	Provider    StructuralProvider `yaml:"provider"`      // 结构化上下文来源：auto、codegraph、treesitter
+	Provider    StructuralProvider `yaml:"provider"`      // 结构化上下文与符号校验来源：auto、codegraph、treesitter
 	MaxSymbols  int                `yaml:"max_symbols"`   // context 最大符号数
 	MaxFileSize int                `yaml:"max_file_size"` // 跳过超过此大小的文件（KB），默认 512
 

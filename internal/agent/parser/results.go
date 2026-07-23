@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -108,6 +109,21 @@ func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, erro
 	}
 
 	return curateResult, nil
+}
+
+// ParseCuratePatternsArtifact 解析直接结构化输出或 Claude CLI 保存的 JSON envelope。
+func ParseCuratePatternsArtifact(output string) (*agent.CuratePatternsResult, error) {
+	trimmed := strings.TrimSpace(output)
+	if strings.HasPrefix(trimmed, "```json") && strings.HasSuffix(trimmed, "```") {
+		trimmed = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "```json"), "```"))
+	}
+	var envelope struct {
+		StructuredOutput json.RawMessage `json:"structured_output"`
+	}
+	if json.Unmarshal([]byte(trimmed), &envelope) == nil && len(envelope.StructuredOutput) > 0 && string(envelope.StructuredOutput) != "null" {
+		trimmed = string(envelope.StructuredOutput)
+	}
+	return ParseCuratePatternsResult(trimmed)
 }
 
 // ParseUserDefinePatternResult 解析用户自定义模式结果。

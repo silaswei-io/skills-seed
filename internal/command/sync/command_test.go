@@ -159,7 +159,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	}
 	stateScope := commandutil.CommandStateScope("sync")
 
-	err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil, commandDependenciesForTest())
+	err = syncLearn(context.Background(), cont, stateScope, userContext, "", syncRunAuto, nil, commandDependenciesForTest())
 
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
@@ -245,7 +245,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil),
 	}
 
-	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())
+	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", "", syncRunRestart, nil, commandDependenciesForTest())
 
 	require.NoError(t, err)
 	require.Equal(t, 1, planCalls)
@@ -254,8 +254,11 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 
 func commandDependenciesForTest() Dependencies {
 	return Dependencies{
-		LearnCurrent: func(cont *container.Container, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error) {
-			return learncmd.RunLearnCurrentWithStateScopeOptions(cont, stateScope, userContext, learncmd.CurrentRunOptions{Force: force})
+		LearnCurrent: func(cont *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+			return learncmd.RunLearnCurrentWithStateScopeOptions(cont, req.StateScope, req.UserContext, learncmd.CurrentRunOptions{
+				Force:          req.Force,
+				CurationOutput: req.CurationOutput,
+			})
 		},
 		Generate: gencmd.RunGenerate,
 	}
@@ -315,9 +318,38 @@ func TestSyncCmdOnlyExposesSyncFlags(t *testing.T) {
 	require.NotNil(t, cmd.Flags().Lookup("resume"))
 	require.NotNil(t, cmd.Flags().Lookup("restart"))
 	require.NotNil(t, cmd.Flags().Lookup("no-interactive"))
+	require.NotNil(t, cmd.Flags().Lookup("curation-output"))
 	require.Nil(t, cmd.Flags().Lookup("pattern"))
 	require.Nil(t, cmd.Flags().Lookup("files"))
 	require.Nil(t, cmd.Flags().Lookup("category"))
+}
+
+func TestSyncCurationOutputRequiresExplicitResume(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	cmd := Cmd(&container.Container{})
+	cmd.SetArgs([]string{"--curation-output", "curation.raw.txt", "--no-interactive"})
+
+	err := cmd.Execute()
+
+	require.ErrorContains(t, err, "--curation-output 必须与 --resume 一起使用")
+}
+
+func TestSyncLearnPassesCurationOutputToLearning(t *testing.T) {
+	var received syncflow.LearnRequest
+	err := syncLearn(context.Background(), nil, "sync", "context", "curation.raw.txt", syncRunResume, nil, Dependencies{
+		LearnCurrent: func(_ *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+			received = req
+			return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, nil
+		},
+		Generate: func(*container.Container) error { return nil },
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, syncflow.LearnRequest{
+		StateScope:     "sync",
+		UserContext:    "context",
+		CurationOutput: "curation.raw.txt",
+	}, received)
 }
 
 func TestInteractiveSyncRunModeOptionsDifferForFirstRun(t *testing.T) {

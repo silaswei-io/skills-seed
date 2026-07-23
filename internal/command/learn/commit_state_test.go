@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCommitUnitSuccessDoesNotSaveFingerprintWhenSnapshotFails(t *testing.T) {
+func TestCommitCurrentAnalysisDoesNotSaveFingerprintWhenSnapshotFails(t *testing.T) {
 	saved := false
 	run := &learnCurrentProjectRun{
 		cont: &container.Container{FileTracker: &mocks.MockFileAnalysisTracker{
@@ -32,7 +32,7 @@ func TestCommitUnitSuccessDoesNotSaveFingerprintWhenSnapshotFails(t *testing.T) 
 		}},
 	}
 
-	err := run.commitUnitSuccess(context.Background(), domain.AnalysisUnit{EntryPaths: []string{"../outside.go"}})
+	err := run.commitCurrentAnalysis(context.Background())
 
 	require.Error(t, err)
 	require.False(t, saved)

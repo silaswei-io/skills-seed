@@ -35,6 +35,8 @@ type scopedLog struct {
 	startedAt time.Time
 }
 
+type scopedLogContextKey struct{}
+
 // Level 表示日志级别
 type Level = slog.Level
 
@@ -229,6 +231,9 @@ func CurrentLevel() Level {
 // WithScopedLog 运行 fn，并把当前 goroutine 的文件日志路由到独立日志文件。
 // 控制台输出保持不变。
 func WithScopedLog(ctx context.Context, logDir string, commandName string, level Level, maxLogFiles int, fn func(context.Context, string) error) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	gid := currentGoroutineID()
 	if gid == 0 {
 		return fn(ctx, "")
@@ -258,7 +263,14 @@ func WithScopedLog(ctx context.Context, logDir string, commandName string, level
 		"cwd", currentWorkingDir(),
 	)
 
-	err = fn(ctx, scope.logPath)
+	scopedCtx := context.WithValue(ctx, scopedLogContextKey{}, scope)
+	err = fn(scopedCtx, scope.logPath)
+	if err != nil {
+		scope.logger.Error(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", commandName,
+			"error", err,
+		)
+	}
 	scope.logger.Info(i18n.Get("LoggerRuntimeClosing"),
 		"log_path", scope.logPath,
 		"uptime", time.Since(scope.startedAt),
@@ -268,6 +280,39 @@ func WithScopedLog(ctx context.Context, logDir string, commandName string, level
 		err = closeErr
 	}
 	return err
+}
+
+// BindScope 将 ctx 中的日志作用域绑定到当前 goroutine。
+// 并发 worker 在启动时调用，并在退出时执行返回的释放函数。
+func BindScope(ctx context.Context) func() {
+	if ctx == nil {
+		return func() {}
+	}
+	scope, _ := ctx.Value(scopedLogContextKey{}).(*scopedLog)
+	if scope == nil {
+		return func() {}
+	}
+	gid := currentGoroutineID()
+	if gid == 0 {
+		return func() {}
+	}
+
+	mu.Lock()
+	previous := scopedLogs[gid]
+	scopedLogs[gid] = scope
+	mu.Unlock()
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if scopedLogs[gid] != scope {
+			return
+		}
+		if previous == nil {
+			delete(scopedLogs, gid)
+			return
+		}
+		scopedLogs[gid] = previous
+	}
 }
 
 // 添加颜色

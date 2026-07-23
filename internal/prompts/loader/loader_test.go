@@ -1235,6 +1235,7 @@ func TestLoader_RenderCuratePromptPreservesRouteableProjectKnowledge(t *testing.
 	require.Contains(t, prompt, "Keep a single-file or local candidate as a scoped observation")
 	require.Contains(t, prompt, "a desire to reduce the output count are not sufficient reasons to merge")
 	require.Contains(t, prompt, "same solution with compatible applicability, behavior, and boundaries")
+	require.Contains(t, prompt, "Each candidate ID appears in `dropped` at most once")
 	require.Contains(t, prompt, "extend only when the current boundary does not fit")
 	require.Contains(t, prompt, "not source evidence")
 	require.Contains(t, prompt, "`frequency` is recomputed locally")

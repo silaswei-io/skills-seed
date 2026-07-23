@@ -29,7 +29,7 @@ const (
 
 // Dependencies 描述 sync 命令需要调用的应用用例。
 type Dependencies struct {
-	LearnCurrent func(cont *container.Container, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error)
+	LearnCurrent func(cont *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error)
 	Generate     func(cont *container.Container) error
 }
 
@@ -44,6 +44,7 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 	resume := false
 	restart := false
 	noInteractive := false
+	curationOutput := ""
 
 	cmd := &cobra.Command{
 		Use:     "sync",
@@ -54,9 +55,6 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
-			}
-			if err := commandutil.RequireAgentAvailable(cont); err != nil {
-				return err
 			}
 			ctx := cmd.Context()
 			stateScope := commandutil.CommandStateScopeForCobra(cmd)
@@ -73,6 +71,9 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 			resolvedMode, err := syncModeFromFlags(resume, restart)
 			if err != nil {
 				return err
+			}
+			if strings.TrimSpace(curationOutput) != "" && resolvedMode != syncRunResume {
+				return fmt.Errorf("%s", i18n.Get("SyncCurationOutputRequiresResume"))
 			}
 			if shouldRunInteractiveSync(cmd, inputs.UserContext, noInteractive) {
 				mode, err := resolveInteractiveSync(ctx, cmd, cont, stateScope)
@@ -99,7 +100,7 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 				}
 			}
 			change := changelog.Start(cont.SeedPath, "sync")
-			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, resolvedMode, change, dependencies); err != nil {
+			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, curationOutput, resolvedMode, change, dependencies); err != nil {
 				return err
 			}
 			return change.Save(i18n.Get("ChangeLogSummarySync"))
@@ -111,6 +112,7 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 	cmd.Flags().BoolVar(&resume, "resume", false, i18n.Get("SyncFlagResume"))
 	cmd.Flags().BoolVar(&restart, "restart", false, i18n.Get("SyncFlagRestart"))
 	cmd.Flags().BoolVar(&noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
+	cmd.Flags().StringVar(&curationOutput, "curation-output", "", i18n.Get("SyncFlagCurationOutput"))
 
 	return cmd
 }
@@ -138,15 +140,15 @@ func normalizeSyncInputs(inputs syncInputs) (syncInputs, error) {
 }
 
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
-func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder, deps ...Dependencies) error {
+func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, curationOutput string, mode syncRunMode, change *changelog.Builder, deps ...Dependencies) error {
 	dependencies := Dependencies{}
 	if len(deps) > 0 {
 		dependencies = deps[0]
 	}
 	var learnCurrent syncflow.LearnCurrentFunc
 	if dependencies.LearnCurrent != nil {
-		learnCurrent = func(ctx context.Context, stateScope string, userContext string, force bool) (domain.LearnCurrentResult, error) {
-			return dependencies.LearnCurrent(cont, stateScope, userContext, force)
+		learnCurrent = func(ctx context.Context, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+			return dependencies.LearnCurrent(cont, req)
 		}
 	}
 	var generate syncflow.GenerateFunc
@@ -163,10 +165,13 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 		},
 	}
 	return service.Run(ctx, syncflow.Request{
-		StateScope:  stateScope,
-		UserContext: userContext,
-		ForceLearn:  mode == syncRunRestart,
-		Change:      change,
+		Learn: syncflow.LearnRequest{
+			StateScope:     stateScope,
+			UserContext:    userContext,
+			Force:          mode == syncRunRestart,
+			CurationOutput: strings.TrimSpace(curationOutput),
+		},
+		Change: change,
 	})
 }
 
