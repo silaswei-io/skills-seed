@@ -58,9 +58,9 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
-| `skills-seed learn` | Learn from Git history | `current`, `history` | `--help, -h` = `false` |
+| `skills-seed learn` | Learn from current code and enrich evidence from history | `current`, `history` | `--help, -h` = `false` |
 | `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
-| `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
+| `skills-seed learn history` | Enrich pattern evidence from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
 | `skills-seed patterns add (--context <description> \| --context-path <path>)` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
@@ -292,7 +292,7 @@ Learn coding patterns, business methods, and best practices from the current cod
 |---|---:|---|
 | `--limit`, `-n` | `learning.history.max_commits`, default `50` | Maximum number of commits to analyze |
 | `--since`, `-s` | empty | Time range, such as `7d`, `30d`, `6m`, or `1y` |
-| `--batch-size`, `-b` | `learning.history.batch_size`; `10` when config is not loaded | Commits per batch; each batch is analyzed by one agent call and candidate patterns are curated before storage |
+| `--batch-size`, `-b` | `learning.history.batch_size`; `10` when config is not loaded | Commits per local history-evidence transaction; no Agent call or new pattern generation |
 | `--help`, `-h` | `false` | Show `learn history` help |
 
 #### `--profile` Values

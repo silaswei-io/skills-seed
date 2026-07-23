@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.14.0]
+
+### Changes
+
+- Added `learning.backend: local|hybrid|agent`. The default `hybrid` backend uses CodeGraph for local unit planning and deterministic pattern discovery, sending only uncovered files and contested curation candidates to the Agent. `local` creates no Agent during learning, while `agent` preserves the full AI workflow.
+- Consolidated local source facts behind a shared `SymbolCollector`: `auto`/`codegraph` prefer and maintain CodeGraph, while `auto` falls back to tree-sitter only when CodeGraph is unavailable. Local patterns require repeated source-backed signals.
+- Split current-pattern curation into deterministic and ambiguous candidates. Ambiguous candidates use Agent batches of at most 25, each batch is checkpointed independently, and all decisions share final ownership normalization, coverage validation, and one atomic store mutation.
+- Reduced `learn history` to fully local historical evidence enrichment. It correlates Git change paths with source evidence on existing patterns and records commits, first/last seen times, and co-changed paths idempotently, without asking an Agent to synthesize new patterns.
+
+### Fixes
+
+- Fixed incompatible recovery state being reused after backend changes, old checkpoint schemas blocking a new run, and newly initialized workspace children not inheriting the root learning backend.
+- Fixed local learning still requiring a configured Agent provider or CLI, and project/workspace profile paths still reaching an Agent in local mode.
+
 ## [v0.13.12]
 
 ### Changes

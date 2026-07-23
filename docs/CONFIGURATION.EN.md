@@ -45,6 +45,7 @@ agent:
     max_interval: 120
 
 learning:
+  backend: "hybrid"
   current:
     mode: "normal"
     scope: "flow"
@@ -161,6 +162,16 @@ exclude:
 4. If a child has a `.skills-seed` directory but no `config.yaml`, the command fails instead of overwriting partial state.
 5. Only first-level directories under the workspace root that have their own `.git` are recognized as child projects.
 6. Markers such as `go.mod`, `package.json`, install scripts, Helm charts, and Terraform files classify `type` and `language`; they no longer decide whether a directory is a project.
+
+### `learning.backend`
+
+| Value | Behavior |
+|---|---|
+| `hybrid` | Default. Plans units locally, extracts deterministic patterns with CodeGraph, and sends only uncovered files and contested curation candidates to the Agent |
+| `local` | Never creates or calls an Agent during learning; units, patterns, project/workspace profiles, and curation are local |
+| `agent` | Keeps the full Agent file-selection, unit-planning, analysis, profile, and curation workflow |
+
+The learning backend is independent of `learning.current.mode`. `structural.provider` still selects the source-fact provider; local learning also prefers CodeGraph and uses the embedded parser only when `auto` cannot use CodeGraph or `treesitter` is selected explicitly.
 
 ### `learning.current`
 
@@ -304,7 +315,7 @@ When skills are generated, workflows are written to output `workflows/`, and mat
 | Field | Default | Description |
 |---|---:|---|
 | `max_commits` | `50` | Default maximum number of Git commits analyzed by `learn history` |
-| `batch_size` | `5` | Number of commits per AI call when learning history in batches |
+| `batch_size` | `5` | Number of commits handled by one local history-evidence transaction |
 
 #### Command Overrides
 
@@ -313,6 +324,8 @@ skills-seed learn history --limit 100 --batch-size 10
 ```
 
 Command flags affect only the current run and do not rewrite the config file.
+
+`learn history` only correlates commit paths with source evidence on existing patterns and records first/last seen times, commit counts, and co-changed paths. It does not call an Agent or synthesize new patterns from history.
 
 ### `.skills-seed` Layout
 

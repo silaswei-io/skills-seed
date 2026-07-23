@@ -39,6 +39,7 @@ type AnalyzerService struct {
 	agent                         agent.Agent
 	configRepo                    config.Reader
 	symbolResolver                sourcecode.Resolver
+	symbolCollector               sourcecode.SymbolCollector
 	structuralCollector           structuralCollector
 	fileSelectionContextCollector structuralCollector
 }
@@ -50,9 +51,10 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerServi
 		structuralConfig = configRepo.GetCurrentLearningConfig().Structural
 	}
 	svc := &AnalyzerService{
-		agent:          ag,
-		configRepo:     configRepo,
-		symbolResolver: sourcecode.NewResolver(structuralConfig),
+		agent:           ag,
+		configRepo:      configRepo,
+		symbolResolver:  sourcecode.NewResolver(structuralConfig),
+		symbolCollector: sourcecode.NewSymbolCollector(structuralConfig),
 	}
 	if configRepo != nil {
 		cfg := structuralConfig
@@ -398,6 +400,9 @@ type PlanAnalysisUnitsRequest struct {
 
 // PlanAnalysisUnits 按业务能力拆分当前待学习文件。
 func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalysisUnitsRequest) ([]domain.AnalysisUnit, error) {
+	if s.learningBackend() != config.LearningBackendAgent {
+		return planLocalAnalysisUnits(req.FocusPaths, req.LearningScope), nil
+	}
 	structuralContext := req.StructuralContext
 	if structuralContext == "" {
 		var err error
@@ -436,6 +441,17 @@ func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalys
 // 从现有代码中提取初始模式（不依赖 commit 历史）
 func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *AnalyzeCurrentCodebaseRequest) (*AnalyzeCurrentCodebaseResult, error) {
 	startedAt := time.Now()
+	backend := s.learningBackend()
+	local := localAnalysis{}
+	if backend != config.LearningBackendAgent {
+		local = s.analyzeLocalUnit(ctx, req.RootPath, req.AnalysisUnit, req.FocusPaths)
+		if backend == config.LearningBackendLocal || len(local.Unresolved) == 0 {
+			return &AnalyzeCurrentCodebaseResult{Patterns: local.Patterns}, nil
+		}
+		req.FocusPaths = local.Unresolved
+		req.SampleFiles = filterSampleFilesByFocus(req.SampleFiles, local.Unresolved)
+		req.DiffFiles = filterDiffFilesByFocus(req.DiffFiles, local.Unresolved)
+	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "analyzer.analyze_current_codebase",
 		"project_name", req.ProjectName,
@@ -505,6 +521,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 	if err != nil {
 		return nil, err
 	}
+	patterns = append(local.Patterns, patterns...)
 	return &AnalyzeCurrentCodebaseResult{
 		Patterns:                  patterns,
 		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
@@ -513,6 +530,23 @@ func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *Analy
 
 func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCurrentCodebaseBatchOptions) (*AnalyzeCurrentCodebaseBatchResult, error) {
 	startedAt := time.Now()
+	originalUnits := append([]AnalyzeCurrentCodebaseBatchUnit(nil), opts.Units...)
+	localResults := make(map[string]AnalyzeCurrentCodebaseUnitResult)
+	if s.learningBackend() != config.LearningBackendAgent {
+		pending := make([]AnalyzeCurrentCodebaseBatchUnit, 0, len(opts.Units))
+		for _, item := range opts.Units {
+			paths := utils.RelativePaths(projectRoot, item.FocusAbsPaths)
+			local := s.analyzeLocalUnit(ctx, projectRoot, item.AnalysisUnit, paths)
+			localResults[item.AnalysisUnit.ID] = AnalyzeCurrentCodebaseUnitResult{AnalysisUnit: item.AnalysisUnit, Patterns: local.Patterns}
+			if s.learningBackend() == config.LearningBackendHybrid && len(local.Unresolved) > 0 {
+				pending = append(pending, AnalyzeCurrentCodebaseBatchUnit{AnalysisUnit: item.AnalysisUnit, FocusAbsPaths: absoluteLocalPaths(projectRoot, local.Unresolved)})
+			}
+		}
+		if s.learningBackend() == config.LearningBackendLocal || len(pending) == 0 {
+			return &AnalyzeCurrentCodebaseBatchResult{Units: orderedLocalResults(originalUnits, localResults)}, nil
+		}
+		opts.Units = pending
+	}
 	runContext := opts.RunContext
 	if runContext == nil {
 		var err error
@@ -575,8 +609,22 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 	}
 
 	allPatterns := make([]domain.Pattern, 0)
+	returnedUnits := make(map[string]bool, len(result.Units))
 	for _, unitResult := range result.Units {
 		allPatterns = append(allPatterns, unitResult.Patterns...)
+		unitID := unitResult.UnitID
+		if unitID == "" && len(opts.Units) == 1 {
+			unitID = opts.Units[0].AnalysisUnit.ID
+		}
+		if returnedUnits[unitID] {
+			return nil, fmt.Errorf("analysis batch returned duplicate unit %q", unitID)
+		}
+		returnedUnits[unitID] = true
+	}
+	for _, requested := range opts.Units {
+		if !returnedUnits[requested.AnalysisUnit.ID] {
+			return nil, fmt.Errorf("analysis batch omitted unit %q", requested.AnalysisUnit.ID)
+		}
 	}
 	validator, err := newCurrentPatternValidator(ctx, projectRoot, allPatterns, s.symbolResolver)
 	if err != nil {
@@ -603,12 +651,46 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 			ProfileRefreshRecommended: unitResult.ProfileRefreshRecommended,
 		})
 	}
+	if len(localResults) > 0 {
+		for _, item := range out {
+			local := localResults[item.AnalysisUnit.ID]
+			local.Patterns = append(local.Patterns, item.Patterns...)
+			local.ProfileRefreshRecommended = item.ProfileRefreshRecommended
+			localResults[item.AnalysisUnit.ID] = local
+		}
+		out = orderedLocalResults(originalUnits, localResults)
+	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.analyze_current_codebase_batch",
 		"duration", time.Since(startedAt),
 		"units_count", len(out),
 	)
 	return &AnalyzeCurrentCodebaseBatchResult{Units: out}, nil
+}
+
+func (s *AnalyzerService) learningBackend() config.LearningBackend {
+	if s.configRepo == nil {
+		return config.LearningBackendAgent
+	}
+	return s.configRepo.GetLearningBackend()
+}
+
+func absoluteLocalPaths(root string, paths []string) []string {
+	out := make([]string, 0, len(paths))
+	for _, path := range paths {
+		out = append(out, filepath.Join(root, filepath.FromSlash(path)))
+	}
+	return out
+}
+
+func orderedLocalResults(units []AnalyzeCurrentCodebaseBatchUnit, results map[string]AnalyzeCurrentCodebaseUnitResult) []AnalyzeCurrentCodebaseUnitResult {
+	out := make([]AnalyzeCurrentCodebaseUnitResult, 0, len(units))
+	for _, unit := range units {
+		result := results[unit.AnalysisUnit.ID]
+		result.AnalysisUnit = unit.AnalysisUnit
+		out = append(out, result)
+	}
+	return out
 }
 
 // GetProjectStructure 获取项目目录结构
@@ -753,6 +835,9 @@ type AnalyzeProjectOptions struct {
 // AnalyzeProjectFullWithOptions 完整项目分析，支持基于已有画像和指定路径做增量刷新
 func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, projectRoot, projectName, requestedLanguage string, opts AnalyzeProjectOptions) (*AnalyzeProjectResult, error) {
 	startedAt := time.Now()
+	if s.learningBackend() == config.LearningBackendLocal {
+		return s.analyzeLocalProject(projectRoot, projectName, requestedLanguage, opts.FocusPaths), nil
+	}
 	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
 	existingProfileJSON := ""
 	if len(focusPaths) > 0 {

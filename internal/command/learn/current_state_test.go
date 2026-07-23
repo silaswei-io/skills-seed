@@ -101,8 +101,7 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	}
 	state.ProfileCommitted = true
 	state.Curation = &commandstate.CurationCheckpoint{
-		CandidateHash: "candidate-hash",
-		Decision:      json.RawMessage(`{"patterns":[],"dropped":[]}`),
+		Decisions: map[string]json.RawMessage{"candidate-hash": json.RawMessage(`{"patterns":[],"dropped":[]}`)},
 	}
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	require.NoError(t, repo.Save(context.Background(), state))
@@ -117,8 +116,7 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	require.True(t, loaded.Analysis.ProfileRefreshNeeded)
 	require.Equal(t, "module boundary changed", loaded.Analysis.ProfileRefreshReason)
 	require.True(t, loaded.ProfileCommitted)
-	require.Equal(t, state.Curation.CandidateHash, loaded.Curation.CandidateHash)
-	require.JSONEq(t, string(state.Curation.Decision), string(loaded.Curation.Decision))
+	require.JSONEq(t, string(state.Curation.Decisions["candidate-hash"]), string(loaded.Curation.Decisions["candidate-hash"]))
 }
 
 func TestPendingAnalysisUnitsDerivesCompletionFromCompletedUnits(t *testing.T) {

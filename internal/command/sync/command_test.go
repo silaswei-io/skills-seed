@@ -115,6 +115,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	cfg.Project.Language = "go"
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Skills.Target = "codex"
 	cfg.Skills.Locale = "zh-CN"
 	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
@@ -184,6 +185,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 	cfg.Project.Language = "go"
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Skills.Target = "codex"
 	cfg.Skills.Locale = "zh-CN"
 	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}

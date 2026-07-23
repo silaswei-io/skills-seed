@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -125,6 +126,7 @@ func learnCurrentStateMode(mode, scope string) string {
 func learnCurrentInvocationHash(configRepo config.Reader, focusPaths []string, profileMode string, force bool) string {
 	type invocation struct {
 		PlanContract  string                       `json:"plan_contract"`
+		Backend       config.LearningBackend       `json:"backend"`
 		FocusPaths    []string                     `json:"focus_paths"`
 		ProfileMode   string                       `json:"profile_mode"`
 		Force         bool                         `json:"force"`
@@ -139,6 +141,7 @@ func learnCurrentInvocationHash(configRepo config.Reader, focusPaths []string, p
 		Force:        force,
 	}
 	if configRepo != nil {
+		value.Backend = configRepo.GetLearningBackend()
 		value.CurrentConfig = configRepo.GetCurrentLearningConfig()
 		value.ExcludeConfig = configRepo.GetExcludeConfig()
 		value.SkillsConfig = configRepo.GetSkillsConfig()
@@ -362,6 +365,9 @@ func restoreCurrentState(
 	if err != nil {
 		if err == commandstate.ErrStateNotFound {
 			return nil, nil
+		}
+		if errors.Is(err, commandstate.ErrUnsupportedSchemaVersion) {
+			return nil, repo.Clear()
 		}
 		return nil, err
 	}

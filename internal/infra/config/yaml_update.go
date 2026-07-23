@@ -56,6 +56,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
 
+	setYAMLString(doc, []string{"learning", "backend"}, string(cfg.Learning.Backend))
 	setYAMLString(doc, []string{"learning", "current", "mode"}, string(cfg.Learning.Current.Mode))
 	setYAMLString(doc, []string{"learning", "current", "scope"}, string(cfg.Learning.Current.Scope))
 	setYAMLInt(doc, []string{"learning", "current", "parallelism"}, cfg.Learning.Current.Parallelism)

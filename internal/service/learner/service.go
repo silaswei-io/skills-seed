@@ -1,14 +1,14 @@
 // Package learner 提供学习服务（流程编排层）
 //
-// 本包实现从 Git 历史学习编码模式的流程编排
-//   - Learn: 批量学习 Git 提交历史
-//   - LearnFromCommit: 从单个提交学习
-//   - LearnFromStaged: 从暂存文件路径学习
+// 本包实现历史证据增强和显式提交学习的流程编排
+//   - Learn: 本地批量增强 Git 历史证据
+//   - LearnFromCommit: 处理单个显式提交
+//   - LearnFromStaged: 处理暂存文件路径
 //
 // 服务职责
-//   - 流程编排：协调 Git、Agent、Curator 完成学习
+//   - 流程编排：协调 Git、模式仓储和可选 Agent 完成学习
 //   - 增量学习：只处理未分析的提交
-//   - 候选入库：把 AI 学到的候选模式交给 Curator 规范化入库
+//   - 历史增强：把 commit 变更路径关联到已有模式证据
 //
 // 不负责
 //   - AI 分析（由 Agent 负责）
@@ -20,13 +20,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 )
 
@@ -38,6 +41,7 @@ type LearnerService struct {
 	patternRepo   domain.PatternRepository
 	commitTracker domain.CommitAnalysisTracker
 	curatorSvc    *curator.Service
+	backend       config.LearningBackend
 }
 
 // NewLearnerService 创建学习服务
@@ -48,13 +52,105 @@ func NewLearnerService(
 	commitTracker domain.CommitAnalysisTracker,
 	curatorSvc *curator.Service,
 ) *LearnerService {
+	return NewLearnerServiceWithBackend(ag, gitRepo, patternRepo, commitTracker, curatorSvc, config.LearningBackendAgent)
+}
+
+// NewLearnerServiceWithBackend 创建使用指定学习后端的学习服务。
+func NewLearnerServiceWithBackend(
+	ag agent.Agent,
+	gitRepo domain.GitRepository,
+	patternRepo domain.PatternRepository,
+	commitTracker domain.CommitAnalysisTracker,
+	curatorSvc *curator.Service,
+	backend config.LearningBackend,
+) *LearnerService {
 	return &LearnerService{
 		agent:         ag,
 		gitRepo:       gitRepo,
 		patternRepo:   patternRepo,
 		commitTracker: commitTracker,
 		curatorSvc:    curatorSvc,
+		backend:       config.NormalizeLearningBackend(string(backend)),
 	}
+}
+
+type historyCommit struct {
+	Commit domain.CommitInfo
+	Paths  []string
+}
+
+func enrichPatternsWithHistory(patterns []domain.Pattern, commits []historyCommit) []domain.Pattern {
+	updated := map[string]domain.Pattern{}
+	for _, change := range commits {
+		changed := normalizedHistoryPaths(change.Paths)
+		for index := range patterns {
+			if !patternTouchesPaths(patterns[index], changed) || containsString(patterns[index].HistoryEvidence.CommitHashes, change.Commit.Hash) {
+				continue
+			}
+			evidence := &patterns[index].HistoryEvidence
+			evidence.CommitHashes = append(evidence.CommitHashes, change.Commit.Hash)
+			evidence.CommitCount = len(evidence.CommitHashes)
+			if evidence.FirstSeenAt.IsZero() || change.Commit.Date.Before(evidence.FirstSeenAt) {
+				evidence.FirstSeenAt = change.Commit.Date
+			}
+			if change.Commit.Date.After(evidence.LastSeenAt) {
+				evidence.LastSeenAt = change.Commit.Date
+			}
+			evidence.CoChangedPaths = mergeHistoryPaths(evidence.CoChangedPaths, changed)
+			updated[patterns[index].ID] = patterns[index]
+		}
+	}
+	result := make([]domain.Pattern, 0, len(updated))
+	for _, pattern := range updated {
+		result = append(result, pattern)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	return result
+}
+
+func patternTouchesPaths(pattern domain.Pattern, changed map[string]bool) bool {
+	for _, location := range pattern.EvidenceLocations {
+		if changed[filepath.ToSlash(filepath.Clean(location.Path))] {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizedHistoryPaths(paths []string) map[string]bool {
+	result := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		path = filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
+		if path != "" && path != "." && !filepath.IsAbs(path) && !strings.HasPrefix(path, "../") {
+			result[path] = true
+		}
+	}
+	return result
+}
+
+func mergeHistoryPaths(existing []string, additions map[string]bool) []string {
+	seen := make(map[string]bool, len(existing)+len(additions))
+	for _, path := range existing {
+		seen[path] = true
+	}
+	for path := range additions {
+		seen[path] = true
+	}
+	result := make([]string, 0, len(seen))
+	for path := range seen {
+		result = append(result, path)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 // marshalKnownPatterns 序列化已知模式为 JSON
@@ -151,7 +247,7 @@ func (s *LearnerService) KnownPatternsSnapshot(ctx context.Context) (string, int
 	return s.marshalKnownPatterns(ctx)
 }
 
-// Learn 从 Git 历史学习模式（流程编排）
+// Learn 使用 Git 历史为当前模式补充源码证据，不生成新的语义模式。
 //
 // 参数
 //   - ctx: 上下文
@@ -166,18 +262,15 @@ func (s *LearnerService) KnownPatternsSnapshot(ctx context.Context) (string, int
 //  1. 获取 Git 提交历史
 //  2. 过滤掉已分析的提交（增量学习）
 //  3. 批量处理提交（batchSize 个一批）
-//  4. 调用 AI 分析每个批次
-//  5. 策展并保存候选模式
+//  4. 将变更路径与当前模式的源码证据匹配
+//  5. 原子保存历史证据
 //  6. 标记提交为已分析
-//  7. 发布学习完成事件
 //
 // 增量学习
 //   - 使用 patternRepo.IsCommitAnalyzed() 检查提交是否已分析
 //   - 使用 commitTracker.MarkCommitsAnalyzed() 原子标记批次已分析
 //
-// 模式入库
-//   - Learner 只产生候选模式
-//   - Curator 负责新增、更新、合并或丢弃候选模式
+// 历史证据只增强已有模式，不参与规则生成和模式策展。
 func (s *LearnerService) Learn(ctx context.Context, limit int, since string, batchSize int) error {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
@@ -282,21 +375,13 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 		"count", len(unanalyzedCommits),
 	)
 
-	// 4. 获取已知模式 JSON
-	marshalStartedAt := time.Now()
-	knownPatternsJSON, knownPatternsCount := s.marshalKnownPatterns(ctx)
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "learner.marshal_known_patterns",
-		"duration", time.Since(marshalStartedAt),
-		"known_patterns_count", knownPatternsCount,
-		"known_patterns_json_length", len(knownPatternsJSON),
-	)
-	patternsLearned := 0
+	patterns, err := s.patternRepo.GetAll(ctx)
+	if err != nil {
+		return fmt.Errorf("load patterns for history evidence: %w", err)
+	}
+	evidenceUpdated := 0
 	var batchErrors []error
 	totalBatches := (len(unanalyzedCommits) + batchSize - 1) / batchSize
-	batchProgress := progress.New(totalBatches)
-	retryProgress := agent.NewRetryProgressBinder(batchProgress.UpdateStep)
-	ctx = retryProgress.WithContext(ctx)
 
 	// 5. 批量处理 commits
 	for i := 0; i < len(unanalyzedCommits); i += batchSize {
@@ -332,81 +417,27 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 			"batch_id", i/batchSize+1,
 			"total_batches", totalBatches,
 			"batch_commits_count", len(learnableBatch),
-			"known_patterns_count", knownPatternsCount,
+			"patterns_count", len(patterns),
 		)
-
-		// 调用 Agent 批量学习
-		req := &agent.BatchLearnRequest{
-			Commits:            learnableBatch,
-			CommitFiles:        commitFiles,
-			KnownPatternsJSON:  knownPatternsJSON,
-			KnownPatternsCount: knownPatternsCount,
-		}
-
-		var result *agent.BatchLearnResult
-		progressLabel := i18n.GetWithParams("ProgressLearnHistoryBatch", map[string]interface{}{
-			"Current":     i/batchSize + 1,
-			"Total":       totalBatches,
-			"Start":       i + 1,
-			"End":         end,
-			"CommitTotal": len(unanalyzedCommits),
-		})
-		// 单个批次的 AI 调用可能持续较久，使用动态进度提示避免终端长时间无输出
-		err := batchProgress.RunStep(progressLabel, func() error {
-			retryProgress.StartStep(progressLabel)
-			var callErr error
-			result, callErr = s.agent.BatchLearnFromCommits(ctx, req)
-			retryProgress.FinishStep(progressLabel, callErr == nil)
-			if callErr != nil {
-				return callErr
+		updated := enrichPatternsWithHistory(patterns, commitFiles)
+		if len(updated) > 0 {
+			save := make([]*domain.Pattern, 0, len(updated))
+			for index := range updated {
+				save = append(save, &updated[index])
 			}
-			return agent.RequireResult(result, "BatchLearnFromCommits")
-		})
-		if err != nil {
-			logger.Warn(i18n.Get("LoggerLearnerBatchFailed"),
-				"operation", "learn",
-				"batch_id", i/batchSize+1,
-				"error", err,
-			)
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-				"operation", "learner.batch",
-				"batch_id", i/batchSize+1,
-				"duration", time.Since(batchStartedAt),
-				"batch_commits_count", len(learnableBatch),
-				"error", err,
-			)
-			batchErrors = append(batchErrors, fmt.Errorf("batch %d agent: %w", i/batchSize+1, err))
-			continue
+			if saveErr := s.patternRepo.ApplyPatternMutation(ctx, domain.PatternMutation{Save: save}); saveErr != nil {
+				logger.Warn(i18n.Get("LoggerLearnerBatchFailed"),
+					"operation", "learn",
+					"batch_id", i/batchSize+1,
+					"error", saveErr,
+				)
+				batchErrors = append(batchErrors, fmt.Errorf("batch %d save history evidence: %w", i/batchSize+1, saveErr))
+				continue
+			}
+			evidenceUpdated += len(updated)
 		}
 
-		logger.Info(i18n.Get("LoggerLearnerBatchComplete"),
-			"operation", "learn",
-			"batch_id", i/batchSize+1,
-			"patterns_count", len(result.Patterns),
-		)
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "learner.batch.agent",
-			"batch_id", i/batchSize+1,
-			"duration", time.Since(batchStartedAt),
-			"batch_commits_count", len(learnableBatch),
-			"patterns_count", len(result.Patterns),
-		)
-
-		// 6. 策展并保存新模式
-		beforeSaveCount := patternsLearned
-		savedCount, saveErr := s.CurateAndSavePatterns(ctx, result.Patterns, curator.OperationLearnHistory)
-		if saveErr != nil {
-			logger.Warn(i18n.Get("LoggerLearnerBatchFailed"),
-				"operation", "learn",
-				"batch_id", i/batchSize+1,
-				"error", saveErr,
-			)
-			batchErrors = append(batchErrors, fmt.Errorf("batch %d save patterns: %w", i/batchSize+1, saveErr))
-			continue
-		}
-		patternsLearned += savedCount
-
-		// 7. 标记这些 commits 已被分析
+		// 证据持久化完成后再提交 commit 状态。
 		commitHashes := make([]string, 0, len(learnableBatch))
 		for _, commit := range learnableBatch {
 			commitHashes = append(commitHashes, commit.Hash)
@@ -420,8 +451,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 			"batch_id", i/batchSize+1,
 			"duration", time.Since(batchStartedAt),
 			"batch_commits_count", len(learnableBatch),
-			"patterns_count", len(result.Patterns),
-			"saved_patterns_count", patternsLearned-beforeSaveCount,
+			"updated_patterns_count", len(updated),
 		)
 	}
 
@@ -434,7 +464,7 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 		"duration", time.Since(startedAt),
 		"commits_count", len(commits),
 		"unanalyzed_count", len(unanalyzedCommits),
-		"patterns_learned", patternsLearned,
+		"patterns_enriched", evidenceUpdated,
 		"total_batches", totalBatches,
 	)
 
@@ -444,8 +474,8 @@ func (s *LearnerService) Learn(ctx context.Context, limit int, since string, bat
 	return nil
 }
 
-func (s *LearnerService) collectCommitFiles(ctx context.Context, commits []domain.CommitInfo, operation string) ([]agent.CommitFileChange, error) {
-	commitFiles := make([]agent.CommitFileChange, 0, len(commits))
+func (s *LearnerService) collectCommitFiles(ctx context.Context, commits []domain.CommitInfo, operation string) ([]historyCommit, error) {
+	commitFiles := make([]historyCommit, 0, len(commits))
 	var collectErrors []error
 	for _, c := range commits {
 		files, err := s.gitRepo.GetChangedFiles(ctx, c.Hash)
@@ -458,15 +488,15 @@ func (s *LearnerService) collectCommitFiles(ctx context.Context, commits []domai
 			collectErrors = append(collectErrors, fmt.Errorf("commit %s: %w", shortHash(c.Hash), err))
 			continue
 		}
-		commitFiles = append(commitFiles, agent.CommitFileChange{
+		commitFiles = append(commitFiles, historyCommit{
 			Commit: c,
-			Files:  files,
+			Paths:  files,
 		})
 	}
 	return commitFiles, errors.Join(collectErrors...)
 }
 
-func commitInfos(commitFiles []agent.CommitFileChange) []domain.CommitInfo {
+func commitInfos(commitFiles []historyCommit) []domain.CommitInfo {
 	commits := make([]domain.CommitInfo, 0, len(commitFiles))
 	for _, commitFile := range commitFiles {
 		commits = append(commits, commitFile.Commit)
@@ -483,6 +513,9 @@ func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInf
 			i18n.Get("LearnerGetCommitFilesFailed"),
 			err,
 		).WithContext("commit_hash", c.Hash)
+	}
+	if s.backend == config.LearningBackendLocal {
+		return s.enrichSingleCommit(ctx, c, changedFiles)
 	}
 
 	knownPatternsJSON, knownPatternsCount := s.marshalKnownPatterns(ctx)
@@ -512,6 +545,9 @@ func (s *LearnerService) LearnFromCommit(ctx context.Context, c domain.CommitInf
 
 // LearnFromStaged 从暂存文件路径学习
 func (s *LearnerService) LearnFromStaged(ctx context.Context, commitInfo domain.CommitInfo) error {
+	if s.backend == config.LearningBackendLocal {
+		return nil
+	}
 	knownPatternsJSON, knownPatternsCount := s.marshalKnownPatterns(ctx)
 	stagedFiles, err := s.gitRepo.GetStagedFiles(ctx)
 	if err != nil {
@@ -549,6 +585,22 @@ func (s *LearnerService) LearnFromStaged(ctx context.Context, commitInfo domain.
 
 	_, err = s.CurateAndSavePatterns(ctx, result.Patterns, curator.OperationLearnStaged)
 	return err
+}
+
+func (s *LearnerService) enrichSingleCommit(ctx context.Context, commit domain.CommitInfo, paths []string) error {
+	patterns, err := s.patternRepo.GetAll(ctx)
+	if err != nil {
+		return err
+	}
+	updated := enrichPatternsWithHistory(patterns, []historyCommit{{Commit: commit, Paths: paths}})
+	save := make([]*domain.Pattern, 0, len(updated))
+	for index := range updated {
+		save = append(save, &updated[index])
+	}
+	if len(save) == 0 {
+		return nil
+	}
+	return s.patternRepo.ApplyPatternMutation(ctx, domain.PatternMutation{Save: save})
 }
 
 // shortHash 安全截取 hash 前 7 位

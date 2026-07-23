@@ -600,7 +600,7 @@ other = "保存模式到数据库"
 other = "代码库分析完成"
 
 [LearnShort]
-other = "从 Git 历史学习"
+other = "从当前代码学习并用历史增强证据"
 
 [LearnNotInitialized]
 other = "skills-seed 未初始化"
@@ -609,7 +609,7 @@ other = "skills-seed 未初始化"
 other = "请先运行 'skills-seed init' 初始化项目"
 
 [LearnLongDesc]
-other = "从当前代码或 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析当前代码或最近的 Git 提交\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 为 check 和 generate skills 提供项目规范输入"
+other = "从当前代码学习模式，或用 Git 历史增强已有模式证据。\n\n当前代码学习按 learning.backend 使用本地、混合或 Agent 流程；历史命令始终在本地关联证据，不生成新模式。"
 
 [LearnExample]
 other = "  # 从当前代码学习\n  skills-seed learn current\n\n  # 从 Git 历史学习\n  skills-seed learn history --limit=50\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service --profile skip"
@@ -1854,7 +1854,7 @@ other = "修复置信度: {{.Confidence}}%"
 
 # 日志 - 学习服务
 [LoggerLearnerStart]
-other = "开始学习"
+other = "开始补充历史证据"
 
 [LoggerLearnerInvalidBatchSize]
 other = "批次大小无效，使用 1"
@@ -1866,13 +1866,13 @@ other = "没有待学习的提交"
 other = "无法检查commit状态"
 
 [LoggerLearnerCommitsToLearn]
-other = "待学习提交"
+other = "待处理历史提交"
 
 [LoggerLearnerBatchStart]
-other = "批量学习"
+other = "批量关联历史证据"
 
 [LoggerLearnerBatchFailed]
-other = "批量学习失败"
+other = "批量关联历史证据失败"
 
 [LoggerLearnerBatchComplete]
 other = "批量学习完成"
@@ -1887,7 +1887,7 @@ other = "新增模式"
 other = "标记commit为已分析失败"
 
 [LoggerLearnerComplete]
-other = "学习完成"
+other = "历史证据增强完成"
 
 # 日志 - 更新服务
 [LoggerUpdaterStart]
@@ -2057,19 +2057,19 @@ other = "事件统计"
 other = "从当前代码学习"
 
 [LearnCurrentLongDesc]
-other = "分析当前代码库，提取编码模式、业务方法、最佳实践与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备完整 project-overview 输入"
+other = "分析当前代码库，提取编码模式、业务方法、最佳实践与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 按 learning.backend 使用本地、混合或 Agent 学习\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备完整 project-overview 输入"
 
 [LearnCurrentExample]
 other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不同步项目画像\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
 [LearnHistoryShort]
-other = "从 Git 历史学习"
+other = "从 Git 历史增强模式证据"
 
 [LearnHistoryLongDesc]
-other = "从 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析 Git 提交历史\n  • 使用配置的 AI Agent 提取编码模式\n  • 提取业务方法和工具\n  • 保存学到的 patterns 到数据库\n\n学习完成后，可以使用 'skills-seed check' 来检查代码质量。"
+other = "使用 Git 提交历史增强已有模式的源码证据。\n\n此命令将：\n  • 本地读取尚未处理的提交及变更路径\n  • 关联已有模式的源码证据\n  • 保存首次、末次、提交数和共同变更路径\n  • 不调用 Agent，也不生成新模式"
 
 [LearnHistoryExample]
-other = "  # 学习最近 50 个提交\n  skills-seed learn history --limit 50\n\n  # 学习最近 30 天提交\n  skills-seed learn history --since 30d\n\n  # 每批 5 个提交调用一次 Agent\n  skills-seed learn history --limit 40 --batch-size 5"
+other = "  # 处理最近 50 个提交\n  skills-seed learn history --limit 50\n\n  # 处理最近 30 天提交\n  skills-seed learn history --since 30d\n\n  # 每个本地事务处理 5 个提交\n  skills-seed learn history --limit 40 --batch-size 5"
 
 [LearnFlagLimit]
 other = "要分析的提交数量；已学习过的 commit 会跳过"
@@ -2221,7 +2221,7 @@ other = "当前代码增量学习失败: {{.Error}}"
 
 # 历史学习命令消息
 [LearnHistoryStart]
-other = "开始从 Git 历史学习"
+other = "开始从 Git 历史增强模式证据"
 
 [LearnHistoryInfo]
 other = "提交数量: {{.Limit}}\n时间范围: {{.Since}}\n批量大小: {{.BatchSize}}"
@@ -2230,7 +2230,7 @@ other = "提交数量: {{.Limit}}\n时间范围: {{.Since}}\n批量大小: {{.Ba
 other = "从 Git 历史学习失败: {{.Error}}"
 
 [LearnHistoryComplete]
-other = "Git 历史学习完成"
+other = "Git 历史证据增强完成"
 
 [LearnHistoryTotalPatterns]
 other = "数据库中共有 {{.Count}} 个模式"

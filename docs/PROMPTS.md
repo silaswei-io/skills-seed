@@ -12,7 +12,7 @@ Other files under `embedfs/templates/prompts/append/` are reusable fragments sel
 | `file-select` | `CodexAgent.SelectFiles`, `ClaudeAgent.SelectFiles` | AI relevant-file selection before current-code learning; local validation still enforces candidate boundaries and focus paths. |
 | `fix-generate` | `CodexAgent.GenerateFixes`, `ClaudeAgent.GenerateFixes` | Generate fixes for check/analyze findings. |
 | `learn-analyze` | `CodexAgent.AnalyzeCode`, `ClaudeAgent.AnalyzeCode` | Analyze files for `check`-style issue detection. |
-| `learn-batch` | `CodexAgent.LearnFromCommit`, `CodexAgent.BatchLearnFromCommits`, Claude equivalents | Learn pattern candidates from git commit history batches. |
+| `learn-batch` | `CodexAgent.LearnFromCommit`, Claude equivalent | Legacy single-commit/staged Agent learning outside `learn history`; history evidence enrichment itself is local. |
 | `pattern-curate` | `CodexAgent.CuratePatterns`, `ClaudeAgent.CuratePatterns` | Decide canonical text and real source IDs for current-code candidates; source-owned fields are hydrated locally before storage. |
 | `pattern-learn-current` | `CodexAgent.AnalyzeCurrentCodebase`, `ClaudeAgent.AnalyzeCurrentCodebase` | Learn patterns from one current-code analysis unit. |
 | `pattern-learn-current-batch` | `CodexAgent.AnalyzeCurrentCodebaseBatch`, `ClaudeAgent.AnalyzeCurrentCodebaseBatch` | Learn patterns from one or more current-code analysis units in a single agent call. |

@@ -10,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 )
 
@@ -17,13 +18,20 @@ import (
 type Service struct {
 	agent       curationAgent
 	patternRepo patternStore
+	backend     config.LearningBackend
 }
 
 // NewService 创建模式策展服务。
 func NewService(ag curationAgent, repo patternStore) *Service {
+	return NewServiceWithBackend(ag, repo, config.LearningBackendAgent)
+}
+
+// NewServiceWithBackend 创建使用指定学习后端的模式策展服务。
+func NewServiceWithBackend(ag curationAgent, repo patternStore, backend config.LearningBackend) *Service {
 	return &Service{
 		agent:       ag,
 		patternRepo: repo,
+		backend:     config.NormalizeLearningBackend(string(backend)),
 	}
 }
 

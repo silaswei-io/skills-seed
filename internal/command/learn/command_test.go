@@ -2029,6 +2029,7 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 	cfg.Project.Locale = "zh-CN"
 	cfg.Agent.Engine = "mock"
 	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Workspace.Projects = projects
 	require.NoError(t, configRepo.Update(cfg))
 
@@ -2180,6 +2181,7 @@ func initLearnWorkspaceChildProjectWithProvider(t *testing.T, workspaceRoot stri
 	cfg.Project.Locale = "zh-CN"
 	cfg.Agent.Engine = provider
 	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Learning.Backend = config.LearningBackendAgent
 	cfg.Learning.Current.Structural.Enabled = false
 	require.NoError(t, childConfigRepo.Update(cfg))
 	return childRoot

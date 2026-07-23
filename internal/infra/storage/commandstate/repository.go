@@ -18,7 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 var (
 	ErrStateNotFound            = errors.New("command state not found")
@@ -49,10 +49,9 @@ type AnalysisCheckpoint struct {
 	ProfileRefreshReason string                `json:"profile_refresh_reason,omitempty"`
 }
 
-// CurationCheckpoint 保存一次已完成的 AI 策展决策，等待本地校验和原子提交。
+// CurationCheckpoint 保存已完成的 AI 策展批次决策，等待本地校验和原子提交。
 type CurationCheckpoint struct {
-	CandidateHash string          `json:"candidate_hash"`
-	Decision      json.RawMessage `json:"decision"`
+	Decisions map[string]json.RawMessage `json:"decisions"`
 }
 
 // State 是命令未完成执行的可恢复状态。

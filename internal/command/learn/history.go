@@ -11,17 +11,13 @@ import (
 )
 
 func runLearnHistory(cont *container.Container, opts learnHistoryOptions) error {
-	if err := commandutil.RequireAgentAvailable(cont); err != nil {
-		return err
-	}
-
 	ctx := context.Background()
 	startedAt := time.Now()
 
 	logger.Info(i18n.Get("LearnHistoryStart"))
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "command.learn_history",
-		"agent", cont.Agent.Name(),
+		"backend", "local-history-evidence",
 		"limit", opts.limit,
 		"since", opts.since,
 		"batch_size", opts.batchSize,

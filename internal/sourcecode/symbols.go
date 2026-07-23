@@ -3,12 +3,22 @@ package sourcecode
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/grammars"
 )
+
+// ReadSymbols 读取单个源码文件并返回 tree-sitter 提取的定义符号。
+func ReadSymbols(filename string) ([]Symbol, error) {
+	src, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	return parseSymbols(filename, src)
+}
 
 // Symbol 是 tree-sitter tags query 返回的统一符号定义。
 type Symbol struct {

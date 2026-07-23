@@ -118,11 +118,12 @@ func TestLearn_AllCommitsAnalyzed(t *testing.T) {
 
 func TestLearn_Success(t *testing.T) {
 	commits := []domain.CommitInfo{
-		{Hash: "abc123", Message: "test", Author: "dev"},
-		{Hash: "def456", Message: "test2", Author: "dev"},
+		{Hash: "abc123", Message: "test", Author: "dev", Date: time.Now().Add(-time.Hour)},
+		{Hash: "def456", Message: "test2", Author: "dev", Date: time.Now()},
 	}
-
-	savedPatterns := []string{}
+	pattern := newLearnerTestPattern("p1", "Error Handling", domain.CategoryError)
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/abc123.go"}, {Path: "internal/def456.go"}}
+	var saved *domain.Pattern
 	mockGit := &mocks.MockGitRepository{
 		CommitsFn: func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error) {
 			return commits, nil
@@ -133,10 +134,10 @@ func TestLearn_Success(t *testing.T) {
 	}
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{}, nil
+			return []domain.Pattern{*pattern}, nil
 		},
 		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
-			savedPatterns = append(savedPatterns, p.Name)
+			saved = p
 			return nil
 		},
 	}
@@ -150,30 +151,17 @@ func TestLearn_Success(t *testing.T) {
 		markCalled = append(markCalled, hash)
 		return nil
 	}
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		BatchLearnFromCommitsFn: func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
-			require.Len(t, req.Commits, 2)
-			require.Len(t, req.CommitFiles, 2)
-			assert.Equal(t, "abc123", req.Commits[0].Hash)
-			assert.Equal(t, []string{"internal/abc123.go"}, req.CommitFiles[0].Files)
-			assert.Equal(t, "def456", req.Commits[1].Hash)
-			assert.Equal(t, []string{"internal/def456.go"}, req.CommitFiles[1].Files)
-			return &agent.BatchLearnResult{
-				Patterns: []domain.Pattern{
-					*newLearnerTestPattern("p1", "Error Handling", domain.CategoryError),
-					*newLearnerTestPattern("p2", "Naming Convention", domain.CategoryNaming),
-				},
-				LearnedAt: time.Now(),
-			}, nil
-		},
-	}
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true, BatchLearnFromCommitsFn: func(context.Context, *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
+		t.Fatal("history evidence must not call Agent")
+		return nil, nil
+	}}
 	mockCurator := curator.NewService(mockAgent, mockPattern)
 
 	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.Learn(context.Background(), 10, "", 5)
 	assert.NoError(t, err)
-	assert.Len(t, savedPatterns, 2)
+	require.NotNil(t, saved)
+	require.Equal(t, 2, saved.HistoryEvidence.CommitCount)
 	assert.Len(t, markCalled, 2)
 }
 
@@ -188,6 +176,11 @@ func TestLearn_DoesNotMarkCommitsWhenPatternSaveFails(t *testing.T) {
 		},
 	}
 	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			pattern := newLearnerTestPattern("p1", "Pattern", domain.CategoryError)
+			pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "main.go"}}
+			return []domain.Pattern{*pattern}, nil
+		},
 		SaveFn: func(ctx context.Context, pattern *domain.Pattern) error {
 			return errors.New("store failed")
 		},
@@ -200,19 +193,14 @@ func TestLearn_DoesNotMarkCommitsWhenPatternSaveFails(t *testing.T) {
 			return nil
 		},
 	}
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		BatchLearnFromCommitsFn: func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
-			return &agent.BatchLearnResult{Patterns: []domain.Pattern{*newLearnerTestPattern("p1", "Pattern", domain.CategoryError)}}, nil
-		},
-	}
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
 
 	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, curator.NewService(mockAgent, mockPattern))
 	require.Error(t, svc.Learn(context.Background(), 10, "", 5))
 	require.False(t, marked)
 }
 
-func TestLearn_SavesNewPatternWhenNoSimilarPattern(t *testing.T) {
+func TestLearn_DoesNotCreatePatternsFromHistory(t *testing.T) {
 	commits := []domain.CommitInfo{{Hash: "abc123", Message: "test", Author: "dev"}}
 	savedPatterns := []string{}
 
@@ -238,21 +226,16 @@ func TestLearn_SavesNewPatternWhenNoSimilarPattern(t *testing.T) {
 			return false, nil
 		},
 	}
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		BatchLearnFromCommitsFn: func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
-			return &agent.BatchLearnResult{
-				Patterns:  []domain.Pattern{*newLearnerTestPattern("p1", "New Pattern", domain.CategoryError)},
-				LearnedAt: time.Now(),
-			}, nil
-		},
-	}
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true, BatchLearnFromCommitsFn: func(context.Context, *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
+		t.Fatal("history evidence must not call Agent")
+		return nil, nil
+	}}
 	mockCurator := curator.NewService(mockAgent, mockPattern)
 
 	svc := NewLearnerService(mockAgent, mockGit, mockPattern, mockTracker, mockCurator)
 	err := svc.Learn(context.Background(), 10, "", 5)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"New Pattern"}, savedPatterns)
+	assert.Empty(t, savedPatterns)
 }
 
 func TestLearnFromCommit_DoesNotFetchOrSendDiff(t *testing.T) {

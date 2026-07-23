@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.14.0]
+
+### 变更
+
+- 新增 `learning.backend: local|hybrid|agent`。默认 `hybrid` 使用 CodeGraph 本地规划分析单元并提取确定性模式，仅把未覆盖文件和有竞争关系的策展候选交给 Agent；`local` 学习全流程不创建 Agent，`agent` 保留完整 AI 流程。
+- 将本地源码事实收敛到共享 `SymbolCollector`：`auto`/`codegraph` 优先使用并维护 CodeGraph，`auto` 不可用时才回退 tree-sitter；本地模式只在同类源码信号有重复证据时成立。
+- 将当前模式策展拆成确定性候选和疑难候选，疑难候选以最多 25 条的小批次调用 Agent；每个批次独立 checkpoint，最终结果统一做来源归属、覆盖校验和一次原子模式库变更。
+- 将 `learn history` 弱化为纯本地历史证据增强：只把 Git 变更路径关联到已有模式的源码证据，幂等记录提交、首次/末次出现和共同变更路径，不再从历史调用 Agent 生成新模式。
+
+### 修复
+
+- 修复学习后端切换后复用不兼容恢复状态、旧 checkpoint schema 阻断新运行，以及工作区新子项目未继承根学习后端的问题。
+- 修复纯本地学习仍要求 Agent provider/CLI 可用，以及项目画像和工作区画像仍可能调用 Agent 的问题。
+
 ## [v0.13.12]
 
 ### 变更

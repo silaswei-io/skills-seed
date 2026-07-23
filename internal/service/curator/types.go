@@ -61,6 +61,10 @@ type DecisionCheckpoint interface {
 	Save(context.Context, string, *agent.CuratePatternsResult) error
 }
 
+type fullDecisionCheckpoint interface {
+	HasFullDecision() bool
+}
+
 // ProgressHooks 接收策展过程进度事件；为空时服务不写终端输出。
 type ProgressHooks struct {
 	OnStepStart       func(label string)

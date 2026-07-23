@@ -58,9 +58,9 @@
 | `skills-seed hook run` | 手动运行 pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
-| `skills-seed learn` | 从 Git 历史学习 | `current`, `history` | `--help, -h` = `false` |
+| `skills-seed learn` | 从当前代码学习并用历史增强证据 | `current`, `history` | `--help, -h` = `false` |
 | `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
-| `skills-seed learn history` | 从 Git 历史学习 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
+| `skills-seed learn history` | 从 Git 历史增强模式证据 | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
 | `skills-seed patterns` | 管理已学习的 patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
 | `skills-seed patterns add (--context <description> \| --context-path <path>)` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
@@ -292,7 +292,7 @@ skills-seed reset --workspace
 |---|---:|---|
 | `--limit`, `-n` | `learning.history.max_commits`，默认 `50` | 最多分析的提交数量 |
 | `--since`, `-s` | 空 | 时间范围，例如 `7d`、`30d`、`6m`、`1y` |
-| `--batch-size`, `-b` | `learning.history.batch_size`；未加载配置时为 `10` | 每批提交数量；每批调用一次 Agent 分析并在入库前策展候选模式 |
+| `--batch-size`, `-b` | `learning.history.batch_size`；未加载配置时为 `10` | 每次本地历史证据事务处理的提交数量；不会调用 Agent 或生成新模式 |
 | `--help`, `-h` | `false` | 查看 `learn history` 帮助 |
 
 #### `--profile` 取值

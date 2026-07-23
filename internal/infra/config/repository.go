@@ -194,6 +194,7 @@ func (r RetryConfig) WaitDuration(attempt int) time.Duration {
 
 // LearningConfig 控制 learn current 和 learn history 的默认学习范围。
 type LearningConfig struct {
+	Backend LearningBackend       `yaml:"backend"` // 学习后端：local、hybrid、agent
 	Current CurrentLearningConfig `yaml:"current"` // learn current 的文件范围和结构化上下文配置
 	History HistoryLearningConfig `yaml:"history"` // learn history 的提交范围配置
 
@@ -202,9 +203,31 @@ type LearningConfig struct {
 
 func defaultLearningConfig() LearningConfig {
 	return LearningConfig{
+		Backend:         LearningBackendHybrid,
 		Current:         defaultCurrentLearningConfig(),
 		History:         defaultHistoryLearningConfig(),
 		defaultsApplied: true,
+	}
+}
+
+// LearningBackend 控制学习阶段使用本地确定性能力还是外部 Agent。
+type LearningBackend string
+
+const (
+	LearningBackendLocal  LearningBackend = "local"  // 全部学习阶段只使用本地能力
+	LearningBackendHybrid LearningBackend = "hybrid" // 本地优先，仅把疑难项交给 Agent
+	LearningBackendAgent  LearningBackend = "agent"  // 使用完整 Agent 学习流程
+)
+
+// NormalizeLearningBackend 把配置值归一化为受支持的学习后端。
+func NormalizeLearningBackend(backend string) LearningBackend {
+	switch LearningBackend(strings.ToLower(strings.TrimSpace(backend))) {
+	case LearningBackendLocal:
+		return LearningBackendLocal
+	case LearningBackendAgent:
+		return LearningBackendAgent
+	default:
+		return LearningBackendHybrid
 	}
 }
 
@@ -302,8 +325,8 @@ func (c *CurrentLearningConfig) UnmarshalYAML(value *yaml.Node) error {
 
 // HistoryLearningConfig 控制 learn history 的提交范围。
 type HistoryLearningConfig struct {
-	MaxCommits int `yaml:"max_commits"` // 默认分析的提交数量
-	BatchSize  int `yaml:"batch_size"`  // 批量分析 commit 数量
+	MaxCommits int `yaml:"max_commits"` // 默认处理的提交数量
+	BatchSize  int `yaml:"batch_size"`  // 单次本地证据事务处理的 commit 数量
 }
 
 func defaultHistoryLearningConfig() HistoryLearningConfig {
@@ -570,6 +593,7 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if !cfg.Learning.defaultsApplied {
 		cfg.Learning = defaultLearningConfig()
 	}
+	cfg.Learning.Backend = NormalizeLearningBackend(string(cfg.Learning.Backend))
 	if !cfg.Learning.Current.defaultsApplied {
 		cfg.Learning.Current = defaultCurrentLearningConfig()
 	}
@@ -704,6 +728,7 @@ type Reader interface {
 	GetWorkspaceConfig() WorkspaceConfig
 	GetAgentConfig() AgentConfig
 	GetLearningConfig() LearningConfig
+	GetLearningBackend() LearningBackend
 	GetCurrentLearningConfig() CurrentLearningConfig
 	GetAutoFixConfig() AutoFixConfig
 	GetSkillsConfig() SkillsConfig
@@ -737,6 +762,11 @@ func (r *Repository) GetAgentConfig() AgentConfig {
 // GetLearningConfig 获取学习配置
 func (r *Repository) GetLearningConfig() LearningConfig {
 	return r.config.Learning
+}
+
+// GetLearningBackend 获取学习阶段采用的执行后端。
+func (r *Repository) GetLearningBackend() LearningBackend {
+	return r.config.Learning.Backend
 }
 
 // GetCurrentLearningConfig 获取 learn current 配置。

@@ -58,7 +58,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 	}
 	generatedAt := time.Now().Format(time.RFC3339)
 	baseProfile := workspacediscovery.ProfileFromConfig(workspaceName, projectRoot, workspaceConfig)
-	if cont.Agent == nil {
+	if cont.ConfigRepo.GetLearningBackend() == config.LearningBackendLocal || cont.Agent == nil {
 		return true, saveWorkspaceRelationshipFallback(ctx, cont, baseProfile, generatedAt)
 	}
 

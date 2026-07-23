@@ -668,6 +668,7 @@ func initializeWorkspaceChildAt(workspaceRoot string, project config.WorkspacePr
 	childConfig.Agent.Parallelism = 0
 	inheritWorkspaceChildSkills(childConfig, rootConfigRepo.GetSkillsConfig(), rootConfigRepo.GetSkillsLocale())
 	childConfig.Learning.Current = rootConfigRepo.GetCurrentLearningConfig()
+	childConfig.Learning.Backend = rootConfigRepo.GetLearningBackend()
 	if err := childConfigRepo.Update(childConfig); err != nil {
 		return err
 	}

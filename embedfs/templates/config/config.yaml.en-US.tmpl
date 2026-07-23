@@ -57,6 +57,8 @@ agent:
 # Controls the default scope for learn current and learn history
 ########################################################################
 learning:
+  # Learning backend: hybrid is local-first and sends only ambiguous work to the Agent; local never calls an Agent; agent uses the full Agent workflow
+  backend: "hybrid"
   current:
     # Learning mode: normal is the safest balance; fast keeps only high-value core patterns; deep reads deeper branches and exceptional paths
     mode: "normal"
@@ -82,7 +84,7 @@ learning:
   history:
     # Default number of Git commits to analyze
     max_commits: 50
-    # Number of commits to analyze per AI call in batch mode
+    # Number of commits handled by one local evidence transaction
     batch_size: 5
 
 ########################################################################
