@@ -12,10 +12,11 @@ description: {{.SkillDescription}}
 **Last updated**: {{.LastUpdated}}
 **Learned patterns**: {{.PatternCount}}
 
-This project entry skill only routes tasks to the smallest necessary references and confirms constraint sources. Read the matching reference before deciding from business rules, architecture details, code evidence, test facts, or validation commands.
+{{if .HasKnowledge}}This project entry skill only routes tasks to the smallest necessary references and confirms constraint sources. Read the matching reference before deciding from business rules, architecture details, code evidence, test facts, or validation commands.{{else}}This project workflow entry skill routes matching tasks to user-maintained workflow documents.{{end}}
 
 ## Usage
 
+{{if .HasKnowledge}}
 1. Read the smallest necessary reference set for the task. Do not load every reference at once. After entering a category pattern, check its "Related References" section first and continue when a cross-boundary hint matches the task.
 {{if .References.Enabled}}{{if .References.BusinessPatterns}}2. For business rules, state transitions, or cross-entity flows, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.
 {{else}}2. For business rules, state transitions, or cross-entity flows, inspect current code and reuse nearby implementations.
@@ -29,6 +30,14 @@ This project entry skill only routes tasks to the smallest necessary references 
 {{end}}
 
 Only explicit user-maintained or built-in rules are hard constraints. Source-backed learned patterns locate reusable solutions but are not mandatory rules. Current code wins when it conflicts with a reference; report missing evidence instead of inventing project rules.
+{{else}}{{if .WorkflowReferences}}1. Choose the user workflow that best matches the task goal.
+2. Read the workflow document before acting; do not execute from the list summary alone.
+3. When the latest user instruction conflicts with the saved workflow, follow the latest instruction and call out the difference.
+{{else}}1. No workflow is available; read the user request and current project context directly.
+{{end}}
+
+Workflows are user-maintained task procedures and can guide execution steps. When code patterns and the project profile are absent, do not invent project rules.
+{{end}}
 
 {{if .WorkflowReferences}}
 ## User Workflows
@@ -41,6 +50,7 @@ Only explicit user-maintained or built-in rules are hard constraints. Source-bac
 {{range .StateSummaries}}- {{.}}
 {{end}}
 {{end}}
+{{if .HasKnowledge}}
 ## Pattern References
 
 {{if .References.Enabled}}- **[Project Spec](./references/project-spec.md)** - Boundaries, rules, configuration, and touchpoints
@@ -58,7 +68,7 @@ Only explicit user-maintained or built-in rules are hard constraints. Source-bac
 ### {{.Title}}
 
 {{range .Items}}- **[{{.Title}}]({{.Path}})** - {{.Description}}
-{{end}}{{end}}{{else if .References.Enabled}}
+{{end}}{{end}}{{else if and .References.Enabled .HasPatterns}}
 *No category pattern references were generated.*
 {{end}}
 
@@ -74,10 +84,11 @@ Only explicit user-maintained or built-in rules are hard constraints. Source-bac
 
 {{range .KeyInsights}}- {{.}}
 {{end}}
-{{end}}## Pattern Statistics
+{{end}}{{if .HasPatterns}}## Pattern Statistics
 
 - **Total patterns**: {{.PatternCount}}
 - **Categories**: {{.Categories}}
+{{end}}{{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}---
 

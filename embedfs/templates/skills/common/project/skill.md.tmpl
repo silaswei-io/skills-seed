@@ -12,10 +12,11 @@ description: {{.SkillDescription}}
 **最后更新**: {{.LastUpdated}}
 **已学习模式**: {{.PatternCount}}
 
-这是项目入口 skill，只负责把任务路由到最小必要参考并确认约束来源。业务规则、架构细节、代码证据、测试事实和验证命令必须进入对应 reference 后再决策。
+{{if .HasKnowledge}}这是项目入口 skill，只负责把任务路由到最小必要参考并确认约束来源。业务规则、架构细节、代码证据、测试事实和验证命令必须进入对应 reference 后再决策。{{else}}这是项目工作流入口 skill，只负责把匹配任务路由到用户维护的工作流文档。{{end}}
 
 ## 使用方式
 
+{{if .HasKnowledge}}
 1. 先按任务类型读取最小必要参考，不要一次性读取所有 references。进入任何分类模式后，先检查其中的“相关参考”；任务命中跨边界提示时继续读取对应 reference。
 {{if .References.Enabled}}{{if .References.BusinessPatterns}}2. 业务规则、状态流转或跨实体流程：先读 [业务模式地图](./references/patterns/business.md)，再进入命中的详情页。
 {{else}}2. 业务规则、状态流转或跨实体流程：检查当前代码并复用附近实现。
@@ -29,6 +30,14 @@ description: {{.SkillDescription}}
 {{end}}
 
 只有用户维护或内置的显式规则可作为硬约束；有源码证据的 AI 学习模式用于定位并优先复用已有解决方案，不自动提升为强制规则。references 与当前代码冲突时，以当前代码为准；缺少依据时说明缺口，不要补造项目规则。
+{{else}}{{if .WorkflowReferences}}1. 先从“用户工作流”中选择与任务目标最匹配的流程。
+2. 读取对应 workflow 文档后再执行，不要根据列表摘要直接操作。
+3. 用户本次指令与已保存工作流冲突时，以用户本次指令为准，并说明偏离点。
+{{else}}1. 当前没有可用工作流；先读取用户指令和当前项目上下文。
+{{end}}
+
+工作流是用户维护的任务流程，可作为执行步骤来源；缺少代码模式和项目画像时，不要补造项目规则。
+{{end}}
 
 {{if .WorkflowReferences}}
 ## 用户工作流
@@ -41,6 +50,7 @@ description: {{.SkillDescription}}
 {{range .StateSummaries}}- {{.}}
 {{end}}
 {{end}}
+{{if .HasKnowledge}}
 ## 模式参考
 
 {{if .References.Enabled}}- **[项目规范](./references/project-spec.md)** - 边界、规则、配置和改动触点
@@ -58,7 +68,7 @@ description: {{.SkillDescription}}
 ### {{.Title}}
 
 {{range .Items}}- **[{{.Title}}]({{.Path}})** - {{.Description}}
-{{end}}{{end}}{{else if .References.Enabled}}
+{{end}}{{end}}{{else if and .References.Enabled .HasPatterns}}
 *暂未生成分类模式参考。*
 {{end}}
 
@@ -74,10 +84,11 @@ description: {{.SkillDescription}}
 
 {{range .KeyInsights}}- {{.}}
 {{end}}
-{{end}}## 模式统计
+{{end}}{{if .HasPatterns}}## 模式统计
 
 - **模式总数**: {{.PatternCount}}
 - **分类数量**: {{.Categories}}
+{{end}}{{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}---
 

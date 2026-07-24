@@ -51,12 +51,24 @@ func workspaceRuleKey(rule domain.WorkspaceRule) string {
 
 func cleanWorkspacePaths(items []domain.WorkspacePath) []domain.WorkspacePath {
 	out := make([]domain.WorkspacePath, 0, len(items))
+	indexByPath := make(map[string]int, len(items))
 	for _, item := range items {
 		item.Path = cleanRelativePath(item.Path)
 		item.Description = strings.TrimSpace(item.Description)
 		item.Consumers = cleanStrings(item.Consumers)
 		item.Producers = cleanStrings(item.Producers)
 		item.AffectedProjects = cleanStrings(item.AffectedProjects)
+		if item.Path == "." {
+			continue
+		}
+		if index, ok := indexByPath[item.Path]; ok {
+			out[index].Description = firstNonEmpty(out[index].Description, item.Description)
+			out[index].Consumers = cleanStrings(append(out[index].Consumers, item.Consumers...))
+			out[index].Producers = cleanStrings(append(out[index].Producers, item.Producers...))
+			out[index].AffectedProjects = cleanStrings(append(out[index].AffectedProjects, item.AffectedProjects...))
+			continue
+		}
+		indexByPath[item.Path] = len(out)
 		out = append(out, item)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Path < out[j].Path })

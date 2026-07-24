@@ -9,6 +9,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
+	"github.com/silaswei-io/skills-seed/internal/agent/promptio"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -20,15 +21,9 @@ import (
 type CodexAgent struct {
 	commandPath      string
 	timeout          time.Duration
-	promptLoader     promptRenderer
+	promptLoader     promptio.Renderer
 	allowUserPlugins bool
 	retryCfg         config.RetryConfig
-}
-
-// promptRenderer 是 Agent 依赖的最小提示词渲染能力，便于测试渲染错误链路
-type promptRenderer interface {
-	Render(name string, data interface{}) (string, error)
-	RenderForRuntimeTask(name string, data interface{}, task promptloader.RuntimeTask) (string, error)
 }
 
 // New 创建代理
@@ -209,7 +204,7 @@ func (c *CodexAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequ
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.RenderForRuntimeTask("file-select", data, promptRuntimeTask(task))
+	prompt, err := c.promptLoader.RenderForRuntimeTask("file-select", data, promptio.RuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalyzePromptFailed"))
 	}
@@ -232,7 +227,7 @@ func (c *CodexAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatter
 		"ExistingByCandidate": req.ExistingByCandidate,
 		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
-	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-curate", data, promptRuntimeTask(task))
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-curate", data, promptio.RuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderCuratePatternsPromptFailed"))
 	}
@@ -313,7 +308,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Anal
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-learn-current", data, promptRuntimeTask(task))
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-learn-current", data, promptio.RuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
@@ -350,7 +345,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-learn-current-batch", data, promptRuntimeTask(task))
+	prompt, err := c.promptLoader.RenderForRuntimeTask("pattern-learn-current-batch", data, promptio.RuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
@@ -385,7 +380,7 @@ func (c *CodexAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnaly
 	if err != nil {
 		return nil, err
 	}
-	prompt, err := c.promptLoader.RenderForRuntimeTask("analysis-plan", data, promptRuntimeTask(task))
+	prompt, err := c.promptLoader.RenderForRuntimeTask("analysis-plan", data, promptio.RuntimeTask(task))
 	if err != nil || prompt == "" {
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderAnalysisPlanPromptFailed"))
 	}

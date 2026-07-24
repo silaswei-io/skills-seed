@@ -564,9 +564,20 @@ func (r *Repository) defaultConfig(locale string) *Config {
 }
 
 func (r *Repository) normalizeConfig(cfg *Config) {
+	normalizeExcludeConfig(cfg)
+	normalizeLearningConfig(cfg)
+	normalizeAgentConfig(cfg)
+	normalizeSkillsConfig(cfg)
+	normalizeProjectConfig(cfg)
+}
+
+func normalizeExcludeConfig(cfg *Config) {
 	if !cfg.Exclude.defaultsApplied {
 		cfg.Exclude = defaultExcludeConfig()
 	}
+}
+
+func normalizeLearningConfig(cfg *Config) {
 	if !cfg.Learning.defaultsApplied {
 		cfg.Learning = defaultLearningConfig()
 	}
@@ -601,7 +612,9 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Learning.History.BatchSize <= 0 {
 		cfg.Learning.History.BatchSize = 5
 	}
+}
 
+func normalizeAgentConfig(cfg *Config) {
 	if cfg.Agent.Commands == nil {
 		cfg.Agent.Commands = map[string]string{}
 	}
@@ -621,7 +634,9 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Agent.Timeout == 0 {
 		cfg.Agent.Timeout = 1800
 	}
+}
 
+func normalizeSkillsConfig(cfg *Config) {
 	if strings.TrimSpace(cfg.Skills.Target) == "" {
 		cfg.Skills.Target = cfg.Agent.Engine
 	}
@@ -632,7 +647,9 @@ func (r *Repository) normalizeConfig(cfg *Config) {
 	if cfg.Skills.Paths[cfg.Skills.Target] == "" {
 		cfg.Skills.Paths[cfg.Skills.Target] = DefaultSkillsPathForTarget(cfg.Skills.Target)
 	}
+}
 
+func normalizeProjectConfig(cfg *Config) {
 	if cfg.Project.Mode == "" {
 		cfg.Project.Mode = domain.ModeProject
 	}

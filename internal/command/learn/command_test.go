@@ -1527,6 +1527,8 @@ func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T
 		workspaceInput := readLearnFilePath(t, req.WorkspaceInputPath)
 		userContext := readLearnFilePath(t, req.UserContextPath)
 		require.Contains(t, workspaceInput, `"project_profile_path"`)
+		require.Contains(t, workspaceInput, `"project_ref": "project:backend"`)
+		require.Contains(t, workspaceInput, `"path_ref": "path:backend"`)
 		require.Contains(t, workspaceInput, "backend 是私有化部署主后端。")
 		require.Contains(t, workspaceInput, "internal/api: 管理 API 入口")
 		require.Contains(t, userContext, "工作区用于离线交付")

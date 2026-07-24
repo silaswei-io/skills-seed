@@ -329,6 +329,7 @@ skills-seed learn history --limit 40 --batch-size 5
 8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
 9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 使用 CodeGraph，并在必要时自动初始化或修复索引。只有显式配置 `provider: treesitter` 才使用内嵌 parser。没有边界输入时不会因此全仓扫描。
 10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，终端也会输出包含等待时间和 API 原因的稳定提示，并在下一次调用开始时切换为“第 N 次尝试”。
+11. Agent Token 消耗只展示 Token 数量和上下文处理量；终端输出、诊断字段和运行时 manifest 不再展示费用明细。
 
 ### `skills-seed generate`
 

@@ -19,7 +19,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 )
 
 func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, error) {
@@ -41,69 +40,20 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt, outputCon
 		return "", err
 	}
 
-	maxRetries := c.retryCfg.EffectiveMaxRetries()
-	retried := false
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		attemptNumber := attempt + 1
-		if attempt > 0 {
-			agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
-				AgentName:  c.Name(),
-				Operation:  operation,
-				Attempt:    attemptNumber,
-				MaxRetries: maxRetries,
-			})
-		}
-		output, callDuration, isRetryable, err := c.doCallCodex(ctx, operation, prompt, schemaPath, attemptNumber, agent.FirstRuntimeTask(task))
-		if err == nil {
-			if retried {
-				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
-					AgentName:    c.Name(),
-					Operation:    operation,
-					Attempt:      attemptNumber,
-					MaxRetries:   maxRetries,
-					CallDuration: callDuration,
-				})
-			}
-			return output, nil
-		}
-		if !isRetryable || attempt == maxRetries {
-			return "", err
-		}
-
-		retried = true
-		waitDuration := c.retryCfg.WaitDuration(attempt)
-		agent.ReportRetryForContext(ctx, agent.RetryInfo{
-			AgentName:    c.Name(),
-			Operation:    operation,
-			Attempt:      attemptNumber,
-			MaxRetries:   maxRetries,
-			WaitDuration: waitDuration,
-			CallDuration: callDuration,
-			Reason:       agent.RetryReasonFromOutput(output, ""),
-		})
-
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-time.After(waitDuration):
-		}
-	}
-
-	logger.Error(i18n.Get("LoggerAgentRetryExhausted"), "max_retries", maxRetries)
-	return "", fmt.Errorf("%s: %d", i18n.Get("AgentRetryExhausted"), maxRetries)
+	return agent.RunRetryingCall(ctx, agent.RetryingCallOptions[string]{
+		AgentName: c.Name(),
+		Operation: operation,
+		Policy:    c.retryCfg,
+		Call: func(attempt int) (string, string, time.Duration, bool, error) {
+			output, duration, retryable, err := c.doCallCodex(ctx, operation, prompt, schemaPath, attempt, agent.FirstRuntimeTask(task))
+			return output, output, duration, retryable, err
+		},
+	})
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
 func isCodexRetryableError(stdout, stderr string) bool {
-	combined := stdout + stderr
-	if agent.HTTPStatusRetryableRegex.MatchString(combined) {
-		return true
-	}
-	return strings.Contains(combined, "overloaded_error") ||
-		strings.Contains(combined, "rate limit") ||
-		strings.Contains(combined, "速率限制") ||
-		strings.Contains(combined, "请求频率") ||
-		strings.Contains(combined, "访问量过大")
+	return agent.IsRetryableOutputError(stdout, stderr)
 }
 
 // doCallCodex 执行单次 Codex CLI 调用
@@ -268,10 +218,6 @@ func codexExecArgs(allowUserPlugins bool, outputSchemaPath string) []string {
 		args = append(codexDisableUserPluginArgs(), args...)
 	}
 	return args
-}
-
-func promptRuntimeTask(task agent.RuntimeTask) promptloader.RuntimeTask {
-	return promptloader.RuntimeTask{ID: task.ID, Slug: task.Slug}
 }
 
 func codexDisableUserPluginArgs() []string {

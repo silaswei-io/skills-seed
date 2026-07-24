@@ -902,7 +902,7 @@ other = "生成 AI Agent skills..."
 other = "统计模式失败: {{.Error}}"
 
 [GenerateNoPatterns]
-other = "还没有学习任何模式。请先运行 'skills-seed learn current'。"
+other = "还没有学习任何模式，也没有保存工作流。请先运行 'skills-seed learn current' 或 'skills-seed workflow --context \"...\"'。"
 
 [GenerateFoundPatterns]
 other = "找到 {{.Count}} 个模式"
@@ -1992,13 +1992,13 @@ other = "Agent 调用完成"
 other = "Agent token 消耗统计"
 
 [AgentTokenUsageConsole]
-other = "Token 消耗: {{.Agent}}/{{.Operation}} 本次非缓存 {{.Current}}、上下文处理 {{.CurrentProcessed}}（{{.Detail}}），累计非缓存 {{.Cumulative}}、处理 {{.CumulativeProcessed}}{{.Cost}}"
+other = "Token 消耗: {{.Agent}}/{{.Operation}} 本次非缓存 {{.Current}}、上下文处理 {{.CurrentProcessed}}（{{.Detail}}），累计非缓存 {{.Cumulative}}、处理 {{.CumulativeProcessed}}"
 
 [AgentTokenUsageConsoleScoped]
-other = "Token 消耗: 子项目 {{.Scope}} {{.Agent}}/{{.Operation}} 本次非缓存 {{.Current}}、上下文处理 {{.CurrentProcessed}}（{{.Detail}}），累计非缓存 {{.Cumulative}}、处理 {{.CumulativeProcessed}}{{.Cost}}"
+other = "Token 消耗: 子项目 {{.Scope}} {{.Agent}}/{{.Operation}} 本次非缓存 {{.Current}}、上下文处理 {{.CurrentProcessed}}（{{.Detail}}），累计非缓存 {{.Cumulative}}、处理 {{.CumulativeProcessed}}"
 
 [AgentTokenUsageSummaryConsole]
-other = "Token 消耗汇总: 累计非缓存 {{.Total}}、上下文处理 {{.Processed}}（{{.Detail}}）{{.Cost}}"
+other = "Token 消耗汇总: 累计非缓存 {{.Total}}、上下文处理 {{.Processed}}（{{.Detail}}）"
 
 [AgentTokenUsageInputDetail]
 other = "输入 {{.Value}}"
@@ -2017,12 +2017,6 @@ other = "推理 {{.Value}}"
 
 [AgentTokenUsageDetailSeparator]
 other = "，"
-
-[AgentTokenUsageCostSuffix]
-other = "，费用 {{.CurrentCost}}，累计费用 {{.CumulativeCost}}"
-
-[AgentTokenUsageSummaryCostSuffix]
-other = "，费用 {{.Cost}}"
 
 [LoggerDiagnosticAgentParseComplete]
 other = "Agent 输出解析完成"

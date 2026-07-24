@@ -771,77 +771,74 @@ func (f FileInfo) LineCount() int {
 	return count + 1
 }
 
+// languageByExtension 记录常见文件扩展名到语言名的稳定映射。
+var languageByExtension = map[string]string{
+	"go":         "go",
+	"js":         "javascript",
+	"jsx":        "javascript",
+	"ts":         "typescript",
+	"tsx":        "typescript",
+	"py":         "python",
+	"java":       "java",
+	"cpp":        "cpp",
+	"cc":         "cpp",
+	"cxx":        "cpp",
+	"c":          "c",
+	"rs":         "rust",
+	"rb":         "ruby",
+	"php":        "php",
+	"swift":      "swift",
+	"kt":         "kotlin",
+	"scala":      "scala",
+	"md":         "markdown",
+	"yaml":       "yaml",
+	"yml":        "yaml",
+	"json":       "json",
+	"xml":        "xml",
+	"sql":        "sql",
+	"sh":         "shell",
+	"dockerfile": "dockerfile",
+	"makefile":   "makefile",
+}
+
+// languageByFilename 记录没有常规扩展名但需要识别的文件名。
+var languageByFilename = map[string]string{
+	"Dockerfile": "dockerfile",
+	"Makefile":   "makefile",
+	"go.mod":     "go",
+	"go.sum":     "go",
+}
+
 // detectLanguage 根据文件扩展名检测语言
 func detectLanguage(path string) string {
 	if len(path) == 0 {
 		return ""
 	}
 
-	// 获取扩展名
+	if ext := extensionBeforeSlash(path); ext != "" {
+		if language, ok := languageByExtension[ext]; ok {
+			return language
+		}
+		return ext
+	}
+
+	if language, ok := languageByFilename[path]; ok {
+		return language
+	}
+	return ""
+}
+
+func extensionBeforeSlash(path string) string {
 	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '.' {
-			ext := path[i+1:]
-			switch ext {
-			case "go":
-				return "go"
-			case "js", "jsx":
-				return "javascript"
-			case "ts", "tsx":
-				return "typescript"
-			case "py":
-				return "python"
-			case "java":
-				return "java"
-			case "cpp", "cc", "cxx":
-				return "cpp"
-			case "c":
-				return "c"
-			case "rs":
-				return "rust"
-			case "rb":
-				return "ruby"
-			case "php":
-				return "php"
-			case "swift":
-				return "swift"
-			case "kt":
-				return "kotlin"
-			case "scala":
-				return "scala"
-			case "md":
-				return "markdown"
-			case "yaml", "yml":
-				return "yaml"
-			case "json":
-				return "json"
-			case "xml":
-				return "xml"
-			case "sql":
-				return "sql"
-			case "sh":
-				return "shell"
-			case "dockerfile":
-				return "dockerfile"
-			case "makefile":
-				return "makefile"
-			default:
-				return ext
+		switch path[i] {
+		case '.':
+			if i == len(path)-1 {
+				return ""
 			}
-		}
-		if path[i] == '/' {
-			break
+			return path[i+1:]
+		case '/':
+			return ""
 		}
 	}
-
-	// 检查特殊文件名
-	switch path {
-	case "Dockerfile":
-		return "dockerfile"
-	case "Makefile":
-		return "makefile"
-	case "go.mod", "go.sum":
-		return "go"
-	}
-
 	return ""
 }

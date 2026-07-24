@@ -51,86 +51,7 @@ func Cmd() *cobra.Command {
 		Example: i18n.Get("InitExample"),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			projectRoot, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
-			}
-			initialized, err := isProjectInitialized(projectRoot)
-			if err != nil {
-				return err
-			}
-			if initialized && shouldRunInteractiveInit(cmd, opts) {
-				action, err := resolveInteractiveExistingInit(cmd, projectRoot)
-				if err != nil {
-					if errors.Is(err, interactive.ErrCanceled) {
-						return nil
-					}
-					return err
-				}
-				switch action {
-				case initExistingInspect:
-					return printExistingInitSummary(projectRoot, cmd)
-				case initExistingInstallGlobalCLISkills:
-					return installGlobalCLISkillsFromInit(cmd, cliskillscmd.TargetAuto)
-				case initExistingReset:
-					resolved, err := resolveInteractiveInit(cmd, opts)
-					if err != nil {
-						if errors.Is(err, interactive.ErrCanceled) {
-							return nil
-						}
-						return err
-					}
-					opts = resolved
-					if !isValidLocale(opts.locale) {
-						return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
-					}
-					if !isValidLocale(opts.skillsLocale) {
-						return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
-					}
-					effectiveMode := opts.mode
-					if opts.workspace {
-						effectiveMode = domain.ModeWorkspace
-					}
-					if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
-						return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
-					}
-					if opts.installGlobalCLISkills {
-						return installGlobalCLISkillsFromInit(cmd, opts.globalCLISkillsTarget)
-					}
-					return nil
-				}
-				return nil
-			}
-			if shouldRunInteractiveInit(cmd, opts) {
-				resolved, err := resolveInteractiveInit(cmd, opts)
-				if err != nil {
-					if errors.Is(err, interactive.ErrCanceled) {
-						return nil
-					}
-					return err
-				}
-				opts = resolved
-			}
-			// 验证 locale 参数
-			if !isValidLocale(opts.locale) {
-				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
-			}
-			if !isValidLocale(opts.skillsLocale) {
-				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
-			}
-
-			effectiveMode := opts.mode
-			if opts.workspace {
-				effectiveMode = domain.ModeWorkspace
-			}
-
-			if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveMode, opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
-				return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
-			}
-			if opts.installGlobalCLISkills {
-				return installGlobalCLISkillsFromInit(cmd, opts.globalCLISkillsTarget)
-			}
-			return nil
+			return runInitCommand(cmd, &opts)
 		},
 	}
 
@@ -144,6 +65,105 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().BoolVar(&opts.noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
 
 	return initCmd
+}
+
+func runInitCommand(cmd *cobra.Command, opts *commandOptions) error {
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
+	}
+	initialized, err := isProjectInitialized(projectRoot)
+	if err != nil {
+		return err
+	}
+	if initialized && shouldRunInteractiveInit(cmd, *opts) {
+		return runExistingInitCommand(cmd, projectRoot, opts)
+	}
+	if err := resolveInitOptions(cmd, opts); err != nil {
+		if errors.Is(err, interactive.ErrCanceled) {
+			return nil
+		}
+		return err
+	}
+	if err := validateInitOptions(*opts); err != nil {
+		return err
+	}
+	if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
+		return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
+	}
+	return maybeInstallGlobalCLISkills(cmd, *opts)
+}
+
+func runExistingInitCommand(cmd *cobra.Command, projectRoot string, opts *commandOptions) error {
+	action, err := resolveInteractiveExistingInit(cmd, projectRoot)
+	if err != nil {
+		if errors.Is(err, interactive.ErrCanceled) {
+			return nil
+		}
+		return err
+	}
+	switch action {
+	case initExistingInspect:
+		return printExistingInitSummary(projectRoot, cmd)
+	case initExistingInstallGlobalCLISkills:
+		return installGlobalCLISkillsFromInit(cmd, cliskillscmd.TargetAuto)
+	case initExistingReset:
+		return runExistingInitReset(cmd, opts)
+	default:
+		return nil
+	}
+}
+
+func runExistingInitReset(cmd *cobra.Command, opts *commandOptions) error {
+	if err := resolveInitOptions(cmd, opts); err != nil {
+		if errors.Is(err, interactive.ErrCanceled) {
+			return nil
+		}
+		return err
+	}
+	if err := validateInitOptions(*opts); err != nil {
+		return err
+	}
+	if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
+		return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
+	}
+	return maybeInstallGlobalCLISkills(cmd, *opts)
+}
+
+func resolveInitOptions(cmd *cobra.Command, opts *commandOptions) error {
+	if !shouldRunInteractiveInit(cmd, *opts) {
+		return nil
+	}
+	resolved, err := resolveInteractiveInit(cmd, *opts)
+	if err != nil {
+		return err
+	}
+	*opts = resolved
+	return nil
+}
+
+func validateInitOptions(opts commandOptions) error {
+	if !isValidLocale(opts.locale) {
+		return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
+	}
+	if !isValidLocale(opts.skillsLocale) {
+		return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
+	}
+	return nil
+}
+
+func effectiveInitMode(opts commandOptions) string {
+	if opts.workspace {
+		return domain.ModeWorkspace
+	}
+	return opts.mode
+}
+
+func maybeInstallGlobalCLISkills(cmd *cobra.Command, opts commandOptions) error {
+	if !opts.installGlobalCLISkills {
+		return nil
+	}
+	return installGlobalCLISkillsFromInit(cmd, opts.globalCLISkillsTarget)
 }
 
 func installGlobalCLISkillsFromInit(cmd *cobra.Command, target string) error {
@@ -244,26 +264,15 @@ type initializeSkillOptions struct {
 
 func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializeSkillOptions) error {
 	mode = normalizeInitMode(mode)
-	// 如果指定了 locale，先初始化 i18n
-	if locale != "" {
-		if err := i18n.Init(locale); err != nil {
-			return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
-		}
-	}
-
-	// 检查是否是 Git 仓库
-	gitDir := filepath.Join(projectRoot, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		return fmt.Errorf("%s", i18n.GetWithParams("ErrInitNotGitRepo", map[string]interface{}{"Path": projectRoot}))
-	}
-
-	// 检查是否已经初始化
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
-	if _, err := os.Stat(seedPath); err == nil {
-		return fmt.Errorf("%s", i18n.Get("ErrInitAlreadyInitialized"))
-	} else if !os.IsNotExist(err) {
+
+	if err := initializeI18nForInit(locale); err != nil {
 		return err
 	}
+	if err := ensureInitProjectRoot(projectRoot, seedPath); err != nil {
+		return err
+	}
+
 	seedCreated := false
 	initSucceeded := false
 	defer func() {
@@ -272,7 +281,84 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		}
 	}()
 
-	// 创建目录结构
+	created, err := createInitSeedDirectories(seedPath)
+	seedCreated = created
+	if err != nil {
+		return err
+	}
+	configRepo, err := config.NewRepository(seedPath, locale)
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitCreateConfigFailed"), err)
+	}
+	if err := syncInitLocale(configRepo, locale); err != nil {
+		return err
+	}
+	closeLogger, err := startInitLogger(seedPath, configRepo, opts.initLogger)
+	if err != nil {
+		return err
+	}
+	defer closeLogger()
+
+	if opts.showUserSummary {
+		logger.Info(i18n.Get("InitStart"))
+	}
+
+	projectName, err := configureInitializedProject(projectRoot, mode, configRepo, opts)
+	if err != nil {
+		return err
+	}
+	if err := ensureInitializedProjectContext(projectRoot, seedPath, projectName, configRepo); err != nil {
+		logger.Error(i18n.Get("InitCreateProjectContextFailed"), "error", err)
+		return err
+	}
+	if mode == domain.ModeWorkspace {
+		if err := configureInitializedWorkspace(projectRoot, seedPath, projectName, configRepo, opts); err != nil {
+			logger.Error(i18n.Get("InitCreateProjectContextFailed"), "error", err)
+			return err
+		}
+	}
+	if err := saveInitialRuntimeState(seedPath, mode); err != nil {
+		return err
+	}
+	if mode == domain.ModeWorkspace {
+		if err := initializeWorkspaceChildrenWithRepo(projectRoot, locale, configRepo); err != nil {
+			return err
+		}
+	}
+
+	if opts.showUserSummary {
+		logger.Info(i18n.GetWithParams("InitSuccess", map[string]interface{}{"Path": relativeSeedPath(projectRoot, seedPath)}))
+		logger.Info(i18n.GetWithParams("InitDocumentation", map[string]interface{}{"URL": versionedReadmeURL()}))
+	}
+
+	initSucceeded = true
+	return nil
+}
+
+func initializeI18nForInit(locale string) error {
+	if locale == "" {
+		return nil
+	}
+	if err := i18n.Init(locale); err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
+	}
+	return nil
+}
+
+func ensureInitProjectRoot(projectRoot, seedPath string) error {
+	gitDir := filepath.Join(projectRoot, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return fmt.Errorf("%s", i18n.GetWithParams("ErrInitNotGitRepo", map[string]interface{}{"Path": projectRoot}))
+	}
+	if _, err := os.Stat(seedPath); err == nil {
+		return fmt.Errorf("%s", i18n.Get("ErrInitAlreadyInitialized"))
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func createInitSeedDirectories(seedPath string) (bool, error) {
 	seedLayout := layout.New(seedPath)
 	dirs := []string{
 		seedPath,
@@ -281,92 +367,96 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		seedLayout.Runtime(),
 	}
 
+	seedCreated := false
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("%s: %w", i18n.GetWithParams("InitCreateDirFailed", map[string]interface{}{"Path": dir}), err)
+			return seedCreated, fmt.Errorf("%s: %w", i18n.GetWithParams("InitCreateDirFailed", map[string]interface{}{"Path": dir}), err)
 		}
 		if dir == seedPath {
 			seedCreated = true
 		}
 	}
+	return seedCreated, nil
+}
 
-	// 生成配置
-	configRepo, err := config.NewRepository(seedPath, locale)
-	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("InitCreateConfigFailed"), err)
-	}
-
-	// 如果指定了 locale 但配置还未初始化，确保 i18n 使用正确的语言
+func syncInitLocale(configRepo *config.Repository, locale string) error {
 	if locale != "" {
-		configLocale := configRepo.GetToolLocale()
-		if configLocale != locale {
-			// 更新配置中的 locale
+		if configRepo.GetToolLocale() != locale {
 			if err := configRepo.SetLocale(locale); err != nil {
 				return fmt.Errorf("%s: %w", i18n.Get("InitSetLocaleFailed"), err)
 			}
 		}
-		// 重新初始化 i18n 以使用正确的语言
 		if err := i18n.Init(locale); err != nil {
 			return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
 		}
-	} else {
-		// 从配置中读取 locale 并初始化 i18n
-		configLocale := configRepo.GetToolLocale()
-		if err := i18n.Init(configLocale); err != nil {
-			return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
-		}
+		return nil
 	}
-
-	if opts.initLogger {
-		loggingConfig := configRepo.GetLoggingConfig()
-		logDir := filepath.Join(seedPath, loggingConfig.LogsPath)
-		logLevel := logger.ParseLevel(loggingConfig.Level)
-
-		if err := logger.InitWithRetention(logDir, "init", logLevel, loggingConfig.MaxLogFiles); err != nil {
-			return fmt.Errorf("%s: %w", i18n.Get("InitLoggerInitFailed"), err)
-		}
-		defer logger.Close()
+	if err := i18n.Init(configRepo.GetToolLocale()); err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitI18nInitFailed"), err)
 	}
+	return nil
+}
 
-	if opts.showUserSummary {
-		logger.Info(i18n.Get("InitStart"))
+func startInitLogger(seedPath string, configRepo *config.Repository, enabled bool) (func(), error) {
+	if !enabled {
+		return func() {}, nil
 	}
+	loggingConfig := configRepo.GetLoggingConfig()
+	logDir := filepath.Join(seedPath, loggingConfig.LogsPath)
+	logLevel := logger.ParseLevel(loggingConfig.Level)
+	if err := logger.InitWithRetention(logDir, "init", logLevel, loggingConfig.MaxLogFiles); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("InitLoggerInitFailed"), err)
+	}
+	return func() { _ = logger.Close() }, nil
+}
 
-	// 获取项目名称（从目录名）
+func configureInitializedProject(projectRoot, mode string, configRepo *config.Repository, opts initializeSkillOptions) (string, error) {
 	projectName := filepath.Base(projectRoot)
 	if err := configRepo.SetProjectMode(mode); err != nil {
-		return err
+		return "", err
 	}
 	if err := configRepo.SetProjectName(projectName); err != nil {
 		logger.Error(i18n.Get("InitSetProjectNameFailed"), "error", err)
-		return err
+		return "", err
 	}
 	if err := setInitializedProjectSkillsPaths(configRepo, projectName, mode); err != nil {
-		return err
+		return "", err
 	}
-
 	if err := configRepo.SetRootPath(projectRoot); err != nil {
 		logger.Error(i18n.Get("InitSetRootPathFailed"), "error", err)
-		return err
+		return "", err
 	}
 	if gitRemote := gitOriginRemote(projectRoot); gitRemote != "" {
 		if err := configRepo.SetGitRemote(gitRemote); err != nil {
-			return err
+			return "", err
 		}
 	}
-	if opts.language != "" {
-		if err := configRepo.SetProjectLanguage(opts.language); err != nil {
-			return err
-		}
-	} else if mode == domain.ModeWorkspace {
-		if err := configRepo.SetProjectLanguage(""); err != nil {
-			return err
-		}
-	} else if _, detectedLanguage, ok := workspacediscovery.DetectProjectKindAndLanguage(projectRoot); ok && detectedLanguage != "" && detectedLanguage != "unknown" {
-		if err := configRepo.SetProjectLanguage(detectedLanguage); err != nil {
-			return err
-		}
+	if err := configureInitializedProjectLanguage(projectRoot, mode, configRepo, opts.language); err != nil {
+		return "", err
 	}
+	if err := applyInitAgentAndSkillsOptions(configRepo, opts, projectName, mode); err != nil {
+		return "", err
+	}
+	if err := applyInitLearningOptions(configRepo, opts, mode); err != nil {
+		return "", err
+	}
+	return projectName, nil
+}
+
+func configureInitializedProjectLanguage(projectRoot, mode string, configRepo *config.Repository, language string) error {
+	if language != "" {
+		return configRepo.SetProjectLanguage(language)
+	}
+	if mode == domain.ModeWorkspace {
+		return configRepo.SetProjectLanguage("")
+	}
+	if _, detectedLanguage, ok := workspacediscovery.DetectProjectKindAndLanguage(projectRoot); ok && detectedLanguage != "" && detectedLanguage != "unknown" {
+		return configRepo.SetProjectLanguage(detectedLanguage)
+	}
+	return nil
+}
+
+func applyInitAgentAndSkillsOptions(configRepo *config.Repository, opts initializeSkillOptions, projectName, mode string) error {
 	if opts.agentEngine != "" {
 		cfg := configRepo.Get()
 		cfg.Agent.Engine = opts.agentEngine
@@ -397,10 +487,12 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		}
 	}
 	if opts.skillsLocale != "" {
-		if err := configRepo.SetSkillsLocale(opts.skillsLocale); err != nil {
-			return err
-		}
+		return configRepo.SetSkillsLocale(opts.skillsLocale)
 	}
+	return nil
+}
+
+func applyInitLearningOptions(configRepo *config.Repository, opts initializeSkillOptions, mode string) error {
 	if opts.learningMode != "" || opts.learningScope != "" {
 		cfg := configRepo.Get()
 		if opts.learningMode != "" {
@@ -417,11 +509,12 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 		cfg := configRepo.Get()
 		cfg.Agent.Parallelism = 0
 		cfg.Learning.Current.Parallelism = opts.agentTotalParallelism
-		if err := configRepo.Update(cfg); err != nil {
-			return err
-		}
+		return configRepo.Update(cfg)
 	}
+	return nil
+}
 
+func ensureInitializedProjectContext(projectRoot, seedPath, projectName string, configRepo *config.Repository) error {
 	projectLanguage := configRepo.Get().Project.Language
 	if projectLanguage == "" {
 		projectLanguage = "unknown"
@@ -431,63 +524,42 @@ func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializ
 	structure, _ := analyzerSvc.GetProjectStructure(projectRoot)
 	mainFiles := analyzerSvc.FindMainFiles(projectRoot)
 
-	contextData := prompts.ProjectContextData{
+	return prompts.EnsureProjectContext(seedPath, prompts.ProjectContextData{
 		ProjectName: projectName,
 		Language:    projectLanguage,
 		ProjectRoot: projectRoot,
 		Structure:   structure,
 		MainFiles:   mainFiles,
 		Locale:      configRepo.GetToolLocale(),
-	}
-	if err := prompts.EnsureProjectContext(seedPath, contextData); err != nil {
-		logger.Error(i18n.Get("InitCreateProjectContextFailed"), "error", err)
+	})
+}
+
+func configureInitializedWorkspace(projectRoot, seedPath, projectName string, configRepo *config.Repository, opts initializeSkillOptions) error {
+	projects := workspacediscovery.DiscoverProjects(projectRoot)
+	workspaceConfig := configRepo.GetWorkspaceConfig()
+	workspaceConfig.Projects = projects
+	if err := configRepo.SetWorkspaceConfig(workspaceConfig); err != nil {
 		return err
 	}
-
-	if mode == domain.ModeWorkspace {
-		projects := workspacediscovery.DiscoverProjects(projectRoot)
-		workspaceConfig := configRepo.GetWorkspaceConfig()
-		workspaceConfig.Projects = projects
-		if err := configRepo.SetWorkspaceConfig(workspaceConfig); err != nil {
-			return err
-		}
-		if opts.agentTotalParallelism > 0 {
-			workspaceParallelism, unitParallelism := allocateWorkspaceParallelism(opts.agentTotalParallelism, len(projects))
-			cfg := configRepo.Get()
-			cfg.Agent.Parallelism = workspaceParallelism
-			cfg.Learning.Current.Parallelism = unitParallelism
-			if err := configRepo.Update(cfg); err != nil {
-				return err
-			}
-		}
-		if err := ensureWorkspaceContextFiles(seedPath, projectRoot, projectName, configRepo); err != nil {
-			logger.Error(i18n.Get("InitCreateProjectContextFailed"), "error", err)
+	if opts.agentTotalParallelism > 0 {
+		workspaceParallelism, unitParallelism := allocateWorkspaceParallelism(opts.agentTotalParallelism, len(projects))
+		cfg := configRepo.Get()
+		cfg.Agent.Parallelism = workspaceParallelism
+		cfg.Learning.Current.Parallelism = unitParallelism
+		if err := configRepo.Update(cfg); err != nil {
 			return err
 		}
 	}
+	return ensureWorkspaceContextFiles(seedPath, projectRoot, projectName, configRepo)
+}
 
+func saveInitialRuntimeState(seedPath, mode string) error {
 	stateRepo := statestore.NewRepository(seedPath)
-	if err := stateRepo.Save(context.Background(), &domain.RuntimeState{
+	return stateRepo.Save(context.Background(), &domain.RuntimeState{
 		Mode:       mode,
 		ModeLocked: false,
 		UpdatedAt:  time.Now().Format(time.RFC3339),
-	}); err != nil {
-		return err
-	}
-
-	if mode == domain.ModeWorkspace {
-		if err := initializeWorkspaceChildrenWithRepo(projectRoot, locale, configRepo); err != nil {
-			return err
-		}
-	}
-
-	if opts.showUserSummary {
-		logger.Info(i18n.GetWithParams("InitSuccess", map[string]interface{}{"Path": relativeSeedPath(projectRoot, seedPath)}))
-		logger.Info(i18n.GetWithParams("InitDocumentation", map[string]interface{}{"URL": versionedReadmeURL()}))
-	}
-
-	initSucceeded = true
-	return nil
+	})
 }
 
 func gitOriginRemote(projectRoot string) string {

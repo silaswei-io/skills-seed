@@ -10,7 +10,16 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
-func validateEngineeringRules(root string, knowledge []string, hasUserContext bool, rules []domain.EngineeringRule) ([]domain.EngineeringRule, error) {
+type engineeringRuleValidationIssue struct {
+	field string
+	err   error
+}
+
+func (i engineeringRuleValidationIssue) Error() string {
+	return fmt.Sprintf("%s: %v", i.field, i.err)
+}
+
+func validateEngineeringRules(root string, knowledge []string, hasUserContext bool, rules []domain.EngineeringRule) ([]domain.EngineeringRule, []error) {
 	allowed := make(map[string]bool, len(knowledge))
 	for _, path := range knowledge {
 		if normalized, ok := projectRelativePath(path); ok {
@@ -19,44 +28,14 @@ func validateEngineeringRules(root string, knowledge []string, hasUserContext bo
 	}
 
 	out := make([]domain.EngineeringRule, 0, len(rules))
+	issues := make([]error, 0)
 	seen := make(map[string]bool, len(rules))
 	for i, rule := range rules {
-		field := fmt.Sprintf("engineering_rules[%d]", i)
-		rule.Title = strings.TrimSpace(rule.Title)
-		rule.Rule = strings.TrimSpace(rule.Rule)
-		rule.Source = strings.TrimSpace(rule.Source)
-		if rule.Title == "" || rule.Rule == "" {
-			return nil, fmt.Errorf("%s: title and rule are required", field)
+		rule, err := validateEngineeringRule(root, allowed, hasUserContext, i, rule)
+		if err != nil {
+			issues = append(issues, err)
+			continue
 		}
-		if rule.Source == "user_context" {
-			if !hasUserContext {
-				return nil, fmt.Errorf("%s.source: user_context was not provided", field)
-			}
-		} else {
-			source, ok := projectRelativePath(rule.Source)
-			if !ok || !allowed[source] {
-				return nil, fmt.Errorf("%s.source: %q is not an authoritative engineering knowledge file", field, rule.Source)
-			}
-			if err := validateProjectFile(root, source); err != nil {
-				return nil, fmt.Errorf("%s.source: %w", field, err)
-			}
-			rule.Source = source
-			if len(rule.Evidence) == 0 {
-				return nil, fmt.Errorf("%s.evidence: repository rule requires evidence paths", field)
-			}
-		}
-		evidence := make([]string, 0, len(rule.Evidence))
-		for j, path := range rule.Evidence {
-			normalized, ok := projectRelativePath(path)
-			if !ok {
-				return nil, fmt.Errorf("%s.evidence[%d]: invalid project-relative path %q", field, j, path)
-			}
-			if err := validateProjectFile(root, normalized); err != nil {
-				return nil, fmt.Errorf("%s.evidence[%d]: %w", field, j, err)
-			}
-			evidence = append(evidence, normalized)
-		}
-		rule.Evidence = evidence
 		key := rule.Source + "\x00" + strings.ToLower(rule.Title) + "\x00" + rule.Rule
 		if seen[key] {
 			continue
@@ -64,7 +43,47 @@ func validateEngineeringRules(root string, knowledge []string, hasUserContext bo
 		seen[key] = true
 		out = append(out, rule)
 	}
-	return out, nil
+	return out, issues
+}
+
+func validateEngineeringRule(root string, allowed map[string]bool, hasUserContext bool, index int, rule domain.EngineeringRule) (domain.EngineeringRule, error) {
+	field := fmt.Sprintf("engineering_rules[%d]", index)
+	rule.Title = strings.TrimSpace(rule.Title)
+	rule.Rule = strings.TrimSpace(rule.Rule)
+	rule.Source = strings.TrimSpace(rule.Source)
+	if rule.Title == "" || rule.Rule == "" {
+		return domain.EngineeringRule{}, engineeringRuleValidationIssue{field: field, err: fmt.Errorf("title and rule are required")}
+	}
+	if rule.Source == "user_context" {
+		if !hasUserContext {
+			return domain.EngineeringRule{}, engineeringRuleValidationIssue{field: field + ".source", err: fmt.Errorf("user_context was not provided")}
+		}
+	} else {
+		source, ok := projectRelativePath(rule.Source)
+		if !ok || !allowed[source] {
+			return domain.EngineeringRule{}, engineeringRuleValidationIssue{field: field + ".source", err: fmt.Errorf("%q is not an authoritative engineering knowledge file", rule.Source)}
+		}
+		if err := validateProjectFile(root, source); err != nil {
+			return domain.EngineeringRule{}, engineeringRuleValidationIssue{field: field + ".source", err: err}
+		}
+		rule.Source = source
+		if len(rule.Evidence) == 0 {
+			return domain.EngineeringRule{}, engineeringRuleValidationIssue{field: field + ".evidence", err: fmt.Errorf("repository rule requires evidence paths")}
+		}
+	}
+	evidence := make([]string, 0, len(rule.Evidence))
+	for j, path := range rule.Evidence {
+		normalized, ok := projectRelativePath(path)
+		if !ok {
+			return domain.EngineeringRule{}, engineeringRuleValidationIssue{field: fmt.Sprintf("%s.evidence[%d]", field, j), err: fmt.Errorf("invalid project-relative path %q", path)}
+		}
+		if err := validateProjectFile(root, normalized); err != nil {
+			return domain.EngineeringRule{}, engineeringRuleValidationIssue{field: fmt.Sprintf("%s.evidence[%d]", field, j), err: err}
+		}
+		evidence = append(evidence, normalized)
+	}
+	rule.Evidence = evidence
+	return rule, nil
 }
 
 func validateProjectFile(root, path string) error {

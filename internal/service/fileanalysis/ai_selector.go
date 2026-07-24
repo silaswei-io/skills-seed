@@ -388,24 +388,44 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSe
 	if result == nil {
 		return aiSelectionDecision{Selected: candidates}
 	}
+	candidateSet := candidatePathSet(candidates)
+	selected := make(map[string]bool)
+	addSelectedPaths(selected, candidateSet, result.SelectedPaths)
+	suppressedBroadInclude := applyIncludedPaths(selected, candidates, result.Include)
+	if len(selected) == 0 && len(result.Include) == 0 && len(result.SelectedPaths) == 0 {
+		for _, candidate := range candidates {
+			selected[candidate] = true
+		}
+	}
+	excluded := applyExcludedPaths(selected, candidates, result.Exclude)
+	return aiSelectionDecision{
+		Selected:               sortedSelectionKeys(selected),
+		Excluded:               sortedSelectionKeys(excluded),
+		SuppressedBroadInclude: suppressedBroadInclude,
+	}
+}
+
+func candidatePathSet(candidates []string) map[string]bool {
 	candidateSet := make(map[string]bool, len(candidates))
 	for _, path := range candidates {
 		candidateSet[path] = true
 	}
-	selected := make(map[string]bool)
-	excluded := make(map[string]bool)
-	suppressedBroadInclude := false
-	addPath := func(path string) {
+	return candidateSet
+}
+
+func addSelectedPaths(selected, candidateSet map[string]bool, paths []string) {
+	for _, path := range paths {
 		path = cleanRelativePath(path)
 		if path == "" || !candidateSet[path] {
-			return
+			continue
 		}
 		selected[path] = true
 	}
-	for _, path := range result.SelectedPaths {
-		addPath(path)
-	}
-	for _, include := range result.Include {
+}
+
+func applyIncludedPaths(selected map[string]bool, candidates, includes []string) bool {
+	suppressedBroadInclude := false
+	for _, include := range includes {
 		include = cleanPattern(include)
 		if include == "" {
 			continue
@@ -425,12 +445,12 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSe
 			selected[candidate] = true
 		}
 	}
-	if len(selected) == 0 && len(result.Include) == 0 && len(result.SelectedPaths) == 0 {
-		for _, candidate := range candidates {
-			selected[candidate] = true
-		}
-	}
-	for _, exclude := range result.Exclude {
+	return suppressedBroadInclude
+}
+
+func applyExcludedPaths(selected map[string]bool, candidates, excludes []string) map[string]bool {
+	excluded := make(map[string]bool)
+	for _, exclude := range excludes {
 		exclude = cleanPattern(exclude)
 		if exclude == "" {
 			continue
@@ -446,21 +466,16 @@ func applyAISelection(candidates []string, result *agent.SelectFilesResult) aiSe
 			}
 		}
 	}
-	out := make([]string, 0, len(selected))
-	for path := range selected {
+	return excluded
+}
+
+func sortedSelectionKeys(values map[string]bool) []string {
+	out := make([]string, 0, len(values))
+	for path := range values {
 		out = append(out, path)
 	}
 	sort.Strings(out)
-	excludedOut := make([]string, 0, len(excluded))
-	for path := range excluded {
-		excludedOut = append(excludedOut, path)
-	}
-	sort.Strings(excludedOut)
-	return aiSelectionDecision{
-		Selected:               out,
-		Excluded:               excludedOut,
-		SuppressedBroadInclude: suppressedBroadInclude,
-	}
+	return out
 }
 
 func matchedCandidatePaths(candidates []string, pattern string) []string {

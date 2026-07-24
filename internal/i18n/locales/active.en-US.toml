@@ -902,7 +902,7 @@ other = "Generating AI Agent skills..."
 other = "Failed to count patterns: {{.Error}}"
 
 [GenerateNoPatterns]
-other = "No patterns learned yet. Run 'skills-seed learn current' first."
+other = "No learned patterns or saved workflows yet. Run 'skills-seed learn current' or 'skills-seed workflow --context \"...\"' first."
 
 [GenerateFoundPatterns]
 other = "Found {{.Count}} patterns"
@@ -1991,13 +1991,13 @@ other = "Agent call completed"
 other = "Agent token usage"
 
 [AgentTokenUsageConsole]
-other = "Token usage: {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}{{.Cost}}"
+other = "Token usage: {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}"
 
 [AgentTokenUsageConsoleScoped]
-other = "Token usage: child project {{.Scope}} {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}{{.Cost}}"
+other = "Token usage: child project {{.Scope}} {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}"
 
 [AgentTokenUsageSummaryConsole]
-other = "Token usage summary: cumulative uncached {{.Total}}, context processed {{.Processed}} ({{.Detail}}){{.Cost}}"
+other = "Token usage summary: cumulative uncached {{.Total}}, context processed {{.Processed}} ({{.Detail}})"
 
 [AgentTokenUsageInputDetail]
 other = "input {{.Value}}"
@@ -2016,12 +2016,6 @@ other = "reasoning {{.Value}}"
 
 [AgentTokenUsageDetailSeparator]
 other = ", "
-
-[AgentTokenUsageCostSuffix]
-other = ", cost {{.CurrentCost}}, cumulative cost {{.CumulativeCost}}"
-
-[AgentTokenUsageSummaryCostSuffix]
-other = ", cost {{.Cost}}"
 
 [LoggerDiagnosticAgentParseComplete]
 other = "Agent output parsed"

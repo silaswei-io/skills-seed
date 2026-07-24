@@ -49,27 +49,16 @@ func (e *ConflictError) Error() string {
 
 // UpsertWorkflow 创建或更新用户工作流。
 func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domain.Workflow, error) {
-	if s == nil || s.repo == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("WorkflowRepositoryMissing"))
+	context, err := s.validateUpsertRequest(req)
+	if err != nil {
+		return nil, err
 	}
-	if s.optimizer == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerMissing"))
-	}
-	context := strings.TrimSpace(req.Context)
-	if context == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("WorkflowContextRequired"))
-	}
-
 	name := strings.TrimSpace(req.Name)
 	id := runtimefiles.SafePart(name, "")
 	now := time.Now()
-	var existing *domain.Workflow
-	if id != "" {
-		var err error
-		existing, err = s.repo.Get(id)
-		if err != nil && !errors.Is(err, workflowstore.ErrNotFound) {
-			return nil, err
-		}
+	existing, err := s.existingWorkflow(id)
+	if err != nil {
+		return nil, err
 	}
 	optimized, err := s.optimizer.OptimizeWorkflow(ctx, &agent.OptimizeWorkflowRequest{
 		ID:              id,
@@ -82,23 +71,9 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 	if err != nil {
 		return nil, err
 	}
-	if err := agent.RequireResult(optimized, "OptimizeWorkflow"); err != nil {
+	optimizedContent, title, err := validateOptimizedWorkflow(optimized, name)
+	if err != nil {
 		return nil, err
-	}
-	conflicts := normalizeConflicts(optimized.Conflicts)
-	if len(conflicts) > 0 {
-		return nil, &ConflictError{Conflicts: conflicts}
-	}
-	optimizedContent := strings.TrimSpace(optimized.Content)
-	if optimizedContent == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyContent"))
-	}
-	title := strings.TrimSpace(optimized.Title)
-	if title == "" {
-		title = name
-	}
-	if title == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyTitle"))
 	}
 	if id == "" {
 		id, err = s.newGeneratedWorkflowID(title)
@@ -109,6 +84,61 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 			return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerUnsafeTitle"))
 		}
 	}
+	workflow := buildWorkflow(id, title, context, optimizedContent, now, existing, req.Overwrite)
+	if err := s.repo.Save(workflow); err != nil {
+		return nil, err
+	}
+	return s.repo.Get(id)
+}
+
+func (s *Service) validateUpsertRequest(req UpsertRequest) (string, error) {
+	if s == nil || s.repo == nil {
+		return "", fmt.Errorf("%s", i18n.Get("WorkflowRepositoryMissing"))
+	}
+	if s.optimizer == nil {
+		return "", fmt.Errorf("%s", i18n.Get("WorkflowOptimizerMissing"))
+	}
+	context := strings.TrimSpace(req.Context)
+	if context == "" {
+		return "", fmt.Errorf("%s", i18n.Get("WorkflowContextRequired"))
+	}
+	return context, nil
+}
+
+func (s *Service) existingWorkflow(id string) (*domain.Workflow, error) {
+	if id == "" {
+		return nil, nil
+	}
+	existing, err := s.repo.Get(id)
+	if err != nil && !errors.Is(err, workflowstore.ErrNotFound) {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func validateOptimizedWorkflow(optimized *agent.OptimizeWorkflowResult, fallbackTitle string) (string, string, error) {
+	if err := agent.RequireResult(optimized, "OptimizeWorkflow"); err != nil {
+		return "", "", err
+	}
+	conflicts := normalizeConflicts(optimized.Conflicts)
+	if len(conflicts) > 0 {
+		return "", "", &ConflictError{Conflicts: conflicts}
+	}
+	content := strings.TrimSpace(optimized.Content)
+	if content == "" {
+		return "", "", fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyContent"))
+	}
+	title := strings.TrimSpace(optimized.Title)
+	if title == "" {
+		title = fallbackTitle
+	}
+	if title == "" {
+		return "", "", fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyTitle"))
+	}
+	return content, title, nil
+}
+
+func buildWorkflow(id, title, context, content string, now time.Time, existing *domain.Workflow, overwrite bool) domain.Workflow {
 	workflow := domain.Workflow{
 		ID:        id,
 		Name:      title,
@@ -126,17 +156,14 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 		Content:   context,
 		CreatedAt: now,
 	}
-	if req.Overwrite {
+	if overwrite {
 		workflow.Contexts = []domain.WorkflowContext{nextContext}
 	} else {
 		workflow.Contexts = append(workflow.Contexts, nextContext)
 	}
-	workflow.Content = optimizedContent
+	workflow.Content = content
 	workflow.Name = title
-	if err := s.repo.Save(workflow); err != nil {
-		return nil, err
-	}
-	return s.repo.Get(id)
+	return workflow
 }
 
 func (s *Service) newGeneratedWorkflowID(title string) (string, error) {

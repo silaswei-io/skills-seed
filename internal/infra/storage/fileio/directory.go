@@ -44,42 +44,19 @@ func ReplaceDirWithOptions(target string, opts ReplaceDirOptions, build func(sta
 	if err != nil {
 		return err
 	}
-	parent := filepath.Dir(target)
-	if err := validateDirectoryTarget(opts.Validate); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(parent, 0o755); err != nil {
-		return err
-	}
-	lockFile, err := lockPath(target)
+	parent, transactionFile, unlock, err := prepareDirectoryReplacement(target, opts.Validate)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(lockFile), 0o700); err != nil {
-		return err
-	}
-	lock := flock.New(lockFile)
-	if err := lock.Lock(); err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("DirectoryLockTargetFailed"), err)
-	}
-	defer lock.Unlock()
-	transactionFile := lockFile + ".transaction.json"
-	if err := validateDirectoryTarget(opts.Validate); err != nil {
-		return err
-	}
-	if err := recoverDirectoryTransaction(target, transactionFile); err != nil {
-		return err
-	}
+	defer unlock()
 
 	backup := backupPath(target)
-	if _, err := os.Lstat(backup); err == nil {
-		return fmt.Errorf("%s", i18n.GetWithParams("DirectoryBackupPathExists", map[string]interface{}{"Path": backup}))
-	} else if !os.IsNotExist(err) {
+	if err := ensureBackupPathAvailable(backup); err != nil {
 		return err
 	}
-	_, targetErr := os.Lstat(target)
-	if targetErr != nil && !os.IsNotExist(targetErr) {
-		return targetErr
+	targetExists, err := directoryExists(target)
+	if err != nil {
+		return err
 	}
 
 	staging, err := os.MkdirTemp(parent, "."+filepath.Base(target)+"-staging-*")
@@ -90,7 +67,7 @@ func ReplaceDirWithOptions(target string, opts ReplaceDirOptions, build func(sta
 		Target:    target,
 		Staging:   staging,
 		Backup:    backup,
-		HadTarget: targetErr == nil,
+		HadTarget: targetExists,
 	}
 	if err := saveDirectoryTransaction(transactionFile, tx); err != nil {
 		_ = os.RemoveAll(staging)
@@ -115,28 +92,96 @@ func ReplaceDirWithOptions(target string, opts ReplaceDirOptions, build func(sta
 	}
 
 	cleanupBeforePublish = false
+	if err := publishDirectoryTransaction(tx); err != nil {
+		return err
+	}
+	if err := removeCommittedDirectoryTransaction(transactionFile); err != nil {
+		return err
+	}
+	return nil
+}
+
+func prepareDirectoryReplacement(target string, validate func() error) (string, string, func(), error) {
+	parent := filepath.Dir(target)
+	if err := validateDirectoryTarget(validate); err != nil {
+		return "", "", func() {}, err
+	}
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return "", "", func() {}, err
+	}
+	lockFile, err := lockPath(target)
+	if err != nil {
+		return "", "", func() {}, err
+	}
+	if err := os.MkdirAll(filepath.Dir(lockFile), 0o700); err != nil {
+		return "", "", func() {}, err
+	}
+	lock := flock.New(lockFile)
+	if err := lock.Lock(); err != nil {
+		return "", "", func() {}, fmt.Errorf("%s: %w", i18n.Get("DirectoryLockTargetFailed"), err)
+	}
+	unlock := func() { _ = lock.Unlock() }
+	transactionFile := lockFile + ".transaction.json"
+	if err := validateDirectoryTarget(validate); err != nil {
+		unlock()
+		return "", "", func() {}, err
+	}
+	if err := recoverDirectoryTransaction(target, transactionFile); err != nil {
+		unlock()
+		return "", "", func() {}, err
+	}
+	return parent, transactionFile, unlock, nil
+}
+
+func ensureBackupPathAvailable(backup string) error {
+	if _, err := os.Lstat(backup); err == nil {
+		return fmt.Errorf("%s", i18n.GetWithParams("DirectoryBackupPathExists", map[string]interface{}{"Path": backup}))
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func directoryExists(path string) (bool, error) {
+	if _, err := os.Lstat(path); err == nil {
+		return true, nil
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+	return false, nil
+}
+
+func publishDirectoryTransaction(tx directoryTransaction) error {
 	if tx.HadTarget {
-		if err := os.Rename(target, backup); err != nil {
+		if err := os.Rename(tx.Target, tx.Backup); err != nil {
 			return fmt.Errorf("%s: %w", i18n.Get("DirectoryBackupFailed"), err)
 		}
 	}
-	if err := os.Rename(staging, target); err != nil {
-		if !tx.HadTarget {
-			return fmt.Errorf("%s: %w", i18n.Get("DirectoryPublishFailed"), err)
-		}
-		if rollbackErr := os.Rename(backup, target); rollbackErr != nil {
-			return errors.Join(
-				fmt.Errorf("%s: %w", i18n.Get("DirectoryPublishFailed"), err),
-				fmt.Errorf("%s: %w", i18n.Get("DirectoryRestoreFailed"), rollbackErr),
-			)
-		}
-		return fmt.Errorf("%s: %w", i18n.Get("DirectoryPublishFailed"), err)
+	if err := os.Rename(tx.Staging, tx.Target); err != nil {
+		return rollbackDirectoryPublish(tx, err)
 	}
 	if tx.HadTarget {
-		if err := os.RemoveAll(backup); err != nil {
+		if err := os.RemoveAll(tx.Backup); err != nil {
 			return fmt.Errorf("%s: %w", i18n.Get("DirectoryRemoveBackupFailed"), err)
 		}
 	}
+	return nil
+}
+
+func rollbackDirectoryPublish(tx directoryTransaction, publishErr error) error {
+	if !tx.HadTarget {
+		return fmt.Errorf("%s: %w", i18n.Get("DirectoryPublishFailed"), publishErr)
+	}
+	if rollbackErr := os.Rename(tx.Backup, tx.Target); rollbackErr != nil {
+		return errors.Join(
+			fmt.Errorf("%s: %w", i18n.Get("DirectoryPublishFailed"), publishErr),
+			fmt.Errorf("%s: %w", i18n.Get("DirectoryRestoreFailed"), rollbackErr),
+		)
+	}
+	return fmt.Errorf("%s: %w", i18n.Get("DirectoryPublishFailed"), publishErr)
+}
+
+func removeCommittedDirectoryTransaction(transactionFile string) error {
 	if err := os.Remove(transactionFile); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("%s: %w", i18n.Get("DirectoryRemoveTransactionFailed"), err)
 	}

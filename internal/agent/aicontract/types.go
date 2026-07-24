@@ -202,7 +202,7 @@ type WorkspaceProjectAnalysisOutput struct {
 }
 
 type WorkspacePathOutput struct {
-	Path             string   `json:"path" jsonschema_description:"workspace relative path"`
+	Path             string   `json:"path" jsonschema_description:"concrete existing workspace-root file or directory; not a glob pattern, child-project-local path, platform name, registry name, URL, Jenkins job, or external endpoint"`
 	Description      string   `json:"description,omitempty" jsonschema_description:"path responsibility"`
 	Consumers        []string `json:"consumers,omitempty" jsonschema_description:"consumer project ids"`
 	Producers        []string `json:"producers,omitempty" jsonschema_description:"producer project ids"`
@@ -211,13 +211,13 @@ type WorkspacePathOutput struct {
 
 type WorkspaceDependencyOutput struct {
 	FromProjectID string                   `json:"from_project_id" jsonschema_description:"exact configured source project id"`
-	To            WorkspaceReferenceOutput `json:"to" jsonschema_description:"typed target project, role, or declared shared path"`
+	To            WorkspaceReferenceOutput `json:"to" jsonschema_description:"typed target; use project for configured child projects and path only for declared shared, contract, or infrastructure paths"`
 	Reason        string                   `json:"reason" jsonschema_description:"evidenced dependency reason"`
 }
 
 type WorkspaceReferenceOutput struct {
 	Kind  string `json:"kind" jsonschema:"enum=project,enum=role,enum=path" jsonschema_description:"project|role|path"`
-	Value string `json:"value" jsonschema_description:"exact configured project id, configured role, or workspace-relative path/pattern"`
+	Value string `json:"value" jsonschema_description:"exact configured project id, configured role, or declared workspace-relative path/pattern; do not include project: or path: helper prefixes"`
 }
 
 type WorkspaceRouteOutput struct {

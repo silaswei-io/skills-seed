@@ -35,6 +35,8 @@ func TestTokenUsageConsoleMessageUsesCompactUnits(t *testing.T) {
 	require.Contains(t, message, "缓存读 2k")
 	require.Contains(t, message, "缓存写 500")
 	require.Contains(t, message, "累计非缓存 1.2m")
+	require.NotContains(t, message, "费用")
+	require.NotContains(t, message, "$")
 }
 
 func TestTokenUsageSummaryConsoleMessageUsesCompactUnits(t *testing.T) {
@@ -51,7 +53,8 @@ func TestTokenUsageSummaryConsoleMessageUsesCompactUnits(t *testing.T) {
 	require.Contains(t, message, "累计非缓存 1.2m")
 	require.Contains(t, message, "输入 1.2m")
 	require.Contains(t, message, "输出 34.5k")
-	require.Contains(t, message, "费用 $1.23")
+	require.NotContains(t, message, "费用")
+	require.NotContains(t, message, "$")
 }
 
 func TestScopedTokenUsageDefersConsoleOutputUntilFlush(t *testing.T) {

@@ -44,6 +44,20 @@ type RetryInfo struct {
 // RetryReporter 接收重试事件，让命令进度 UI 可以实时更新。
 type RetryReporter func(RetryInfo)
 
+// RetryPolicy 提供 Agent CLI 重试次数和等待间隔。
+type RetryPolicy interface {
+	EffectiveMaxRetries() int
+	WaitDuration(attempt int) time.Duration
+}
+
+// RetryingCallOptions 描述一次可重试 Agent CLI 调用。
+type RetryingCallOptions[T any] struct {
+	AgentName string
+	Operation string
+	Policy    RetryPolicy
+	Call      func(attempt int) (result T, retryOutput string, duration time.Duration, retryable bool, err error)
+}
+
 type RetryProgressBinder struct {
 	mu           sync.Mutex
 	currentLabel string
@@ -149,6 +163,91 @@ func RetryReasonFromOutput(stdout, stderr string) string {
 		reason = firstNonEmptyLine(stderr)
 	}
 	return truncateRetryReason(normalizeRetryReason(reason))
+}
+
+// RunRetryingCall 执行带重试的 Agent CLI 调用，并统一上报重试进度。
+func RunRetryingCall[T any](ctx context.Context, opts RetryingCallOptions[T]) (T, error) {
+	var zero T
+	if opts.Call == nil {
+		return zero, fmt.Errorf("agent retry call is nil")
+	}
+	maxRetries := 0
+	if opts.Policy != nil {
+		maxRetries = opts.Policy.EffectiveMaxRetries()
+	}
+	retried := false
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		attemptNumber := attempt + 1
+		if attempt > 0 {
+			ReportRetryAttemptForContext(ctx, RetryInfo{
+				AgentName:  opts.AgentName,
+				Operation:  opts.Operation,
+				Attempt:    attemptNumber,
+				MaxRetries: maxRetries,
+			})
+		}
+		result, retryOutput, callDuration, retryable, err := opts.Call(attemptNumber)
+		if err == nil {
+			if retried {
+				ReportRetryRecoveredForContext(ctx, RetryInfo{
+					AgentName:    opts.AgentName,
+					Operation:    opts.Operation,
+					Attempt:      attemptNumber,
+					MaxRetries:   maxRetries,
+					CallDuration: callDuration,
+				})
+			}
+			return result, nil
+		}
+		if !retryable || attempt == maxRetries {
+			return result, err
+		}
+
+		retried = true
+		waitDuration := time.Duration(0)
+		if opts.Policy != nil {
+			waitDuration = opts.Policy.WaitDuration(attempt)
+		}
+		ReportRetryForContext(ctx, RetryInfo{
+			AgentName:    opts.AgentName,
+			Operation:    opts.Operation,
+			Attempt:      attemptNumber,
+			MaxRetries:   maxRetries,
+			WaitDuration: waitDuration,
+			CallDuration: callDuration,
+			Reason:       RetryReasonFromOutput(retryOutput, ""),
+		})
+
+		select {
+		case <-ctx.Done():
+			return zero, ctx.Err()
+		case <-time.After(waitDuration):
+		}
+	}
+
+	logger.Error(i18n.Get("LoggerAgentRetryExhausted"), "max_retries", maxRetries)
+	return zero, fmt.Errorf("%s: %d", i18n.Get("AgentRetryExhausted"), maxRetries)
+}
+
+// IsRetryableOutputError 检测 CLI 输出是否表示瞬时错误。
+func IsRetryableOutputError(stdout, stderr string, extraMarkers ...string) bool {
+	combined := stdout + stderr
+	if HTTPStatusRetryableRegex.MatchString(combined) {
+		return true
+	}
+	markers := append([]string{
+		"overloaded_error",
+		"rate limit",
+		"速率限制",
+		"请求频率",
+		"访问量过大",
+	}, extraMarkers...)
+	for _, marker := range markers {
+		if strings.Contains(combined, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // ReportRetryForContext 上报一次重试事件，并写入结构化诊断日志。

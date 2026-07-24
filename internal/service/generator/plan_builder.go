@@ -52,7 +52,8 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 		templateLanguage = profile.Language
 	}
 	locale := b.skillsLoader.GetLocale()
-	references := referenceAvailability(profile, patterns, !opts.SkipReferences)
+	hasKnowledge := !opts.WorkflowOnly
+	references := referenceAvailability(profile, patterns, !opts.SkipReferences && hasKnowledge)
 	references.Validation = references.Enabled
 	references.Testing = references.Enabled && (snapshot.GoTests.HasModules() || snapshot.GoTests.HasTests())
 	triggerDescription := skillTriggerDescription(templateProjectName, templateLanguage, locale, profile)
@@ -65,6 +66,8 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 		SkillName:           skillName,
 		SkillDescription:    triggerDescription,
 		Language:            templateLanguage,
+		HasKnowledge:        hasKnowledge,
+		HasPatterns:         len(patterns) > 0,
 		PatternCount:        len(patterns),
 		Categories:          len(summaryResult.CategorySummaries),
 		LastUpdated:         time.Now().Format("2006-01-02 15:04:05"),
@@ -80,7 +83,7 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 	p.AddFile("SKILL.md", skillgen.CatalogTemplate, "project-skill", data)
 	p.AgentMetadataData = data
 
-	if !opts.SkipReferences {
+	if !opts.SkipReferences && hasKnowledge {
 		if err := b.appendReferenceFiles(p, summaryResult.CategorySummaries, snapshot, references); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "generator.append_reference_files",
@@ -365,5 +368,6 @@ type PlanOptions struct {
 	ProgramVersion      string
 	SkillsTemplatesHash string
 	SkipReferences      bool
+	WorkflowOnly        bool
 	WorkflowReferences  []WorkflowReference
 }

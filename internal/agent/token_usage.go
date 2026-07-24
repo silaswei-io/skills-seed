@@ -107,7 +107,6 @@ func tokenUsageConsoleMessageWithScope(scope, agentName, operation string, usage
 		"Detail":              tokenUsageDetail(usage),
 		"Cumulative":          tokenusage.FormatCount(total.UncachedTokens()),
 		"CumulativeProcessed": tokenusage.FormatCount(total.TotalTokens),
-		"Cost":                tokenUsageCost(usage, total),
 	}
 	if strings.TrimSpace(scope) != "" {
 		return i18n.GetWithParams("AgentTokenUsageConsoleScoped", params)
@@ -121,7 +120,6 @@ func tokenUsageSummaryConsoleMessage(total tokenusage.Usage) string {
 		"Total":     tokenusage.FormatCount(total.UncachedTokens()),
 		"Processed": tokenusage.FormatCount(total.TotalTokens),
 		"Detail":    tokenUsageDetail(total),
-		"Cost":      tokenUsageSummaryCost(total),
 	})
 }
 
@@ -150,25 +148,6 @@ func tokenUsageDetail(usage tokenusage.Usage) string {
 		}))
 	}
 	return strings.Join(parts, i18n.Get("AgentTokenUsageDetailSeparator"))
-}
-
-func tokenUsageCost(usage, total tokenusage.Usage) string {
-	if !usage.HasCost && !total.HasCost {
-		return ""
-	}
-	return i18n.GetWithParams("AgentTokenUsageCostSuffix", map[string]interface{}{
-		"CurrentCost":    tokenusage.FormatCostUSD(usage.CostUSD),
-		"CumulativeCost": tokenusage.FormatCostUSD(total.CostUSD),
-	})
-}
-
-func tokenUsageSummaryCost(total tokenusage.Usage) string {
-	if !total.HasCost {
-		return ""
-	}
-	return i18n.GetWithParams("AgentTokenUsageSummaryCostSuffix", map[string]interface{}{
-		"Cost": tokenusage.FormatCostUSD(total.CostUSD),
-	})
 }
 
 func tokenUsageScopeFromContext(ctx context.Context) *tokenUsageScope {

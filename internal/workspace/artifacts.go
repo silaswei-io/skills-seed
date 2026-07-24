@@ -56,6 +56,7 @@ func assembleProfile(base, analyzed *domain.WorkspaceProfile, strictIdentity boo
 		ImpactRoutes: cleanWorkspaceRoutes(analyzed.ImpactRoutes),
 		GeneratedAt:  analyzed.GeneratedAt,
 	}
+	newWorkspaceCandidateSanitizer(profile.RootPath, projectSet).sanitizeProfile(profile)
 	validateProfile(profile, projectSet, issues)
 	if err := issues.err(); err != nil {
 		return nil, err
@@ -65,6 +66,7 @@ func assembleProfile(base, analyzed *domain.WorkspaceProfile, strictIdentity boo
 
 func assembleProjects(base, analyzed []domain.WorkspaceProject, strict bool, issues *validationIssues) ([]domain.WorkspaceProject, map[string]domain.WorkspaceProject) {
 	known := make(map[string]domain.WorkspaceProject, len(base))
+	aliases := make(map[string]string, len(base)*2)
 	result := make([]domain.WorkspaceProject, 0, len(base))
 	for i, project := range base {
 		project.ID = strings.TrimSpace(project.ID)
@@ -80,6 +82,10 @@ func assembleProjects(base, analyzed []domain.WorkspaceProject, strict bool, iss
 			continue
 		}
 		known[project.ID] = project
+		addWorkspaceProjectAlias(aliases, project.ID, project.ID)
+		if project.Path != "" {
+			addWorkspaceProjectAlias(aliases, project.Path, project.ID)
+		}
 		result = append(result, project)
 	}
 
@@ -89,6 +95,9 @@ func assembleProjects(base, analyzed []domain.WorkspaceProject, strict bool, iss
 	seen := make(map[string]bool, len(analyzed))
 	for i, candidate := range analyzed {
 		id := strings.TrimSpace(candidate.ID)
+		if resolved, ok := aliases[projectIDAlias(id)]; ok {
+			id = resolved
+		}
 		configured, ok := known[id]
 		if !ok {
 			issues.add(fmt.Sprintf("projects[%d].id", i), "unknown project %q", id)
@@ -145,6 +154,11 @@ func assembleSpec(base, analyzed *domain.WorkspaceSpec, profile *domain.Workspac
 	}
 
 	issues := &validationIssues{}
+	root := opts.RootPath
+	if root == "" && profile != nil {
+		root = profile.RootPath
+	}
+	newWorkspaceCandidateSanitizer(root, workspaceProjectMap(profile)).sanitizeSpec(spec)
 	validateSpec(spec, profile, opts, persisted, issues)
 	if err := issues.err(); err != nil {
 		return nil, err
@@ -174,21 +188,21 @@ func SpecFromProfile(profile *domain.WorkspaceProfile, locale string) *domain.Wo
 	projectIDs := ProjectIDs(profile.Projects)
 	for _, path := range profile.Contracts {
 		routing = append(routing, domain.WorkspaceRoute{
-			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
+			PathPattern: routePatternForPath(path.Path),
 			ProjectIDs:  nonEmptyStrings(append(append([]string{}, path.Producers...), path.Consumers...), projectIDs),
 			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteContractReason")),
 		})
 	}
 	for _, path := range profile.Shared {
 		routing = append(routing, domain.WorkspaceRoute{
-			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
-			ProjectIDs:  nonEmptyStrings(path.Consumers, projectIDs),
+			PathPattern: routePatternForPath(path.Path),
+			ProjectIDs:  nonEmptyStrings(append(append([]string{}, path.Producers...), path.Consumers...), projectIDs),
 			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteSharedReason")),
 		})
 	}
 	for _, path := range profile.Infra {
 		routing = append(routing, domain.WorkspaceRoute{
-			PathPattern: filepath.ToSlash(filepath.Join(path.Path, "**")),
+			PathPattern: routePatternForPath(path.Path),
 			ProjectIDs:  nonEmptyStrings(path.AffectedProjects, projectIDs),
 			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteInfraReason")),
 		})
@@ -198,7 +212,7 @@ func SpecFromProfile(profile *domain.WorkspaceProfile, locale string) *domain.Wo
 		refs = append(refs, domain.WorkspaceReference{Kind: domain.WorkspaceReferenceProject, Value: id})
 	}
 	return &domain.WorkspaceSpec{
-		Routing: routing,
+		Routing: mergeRoutes(nil, routing),
 		Rules: []domain.WorkspaceRule{{
 			Title:       i18n.GetForLocale(locale, "WorkspaceRuleBoundaryTitle"),
 			Description: i18n.GetForLocale(locale, "WorkspaceRuleBoundaryDescription"),

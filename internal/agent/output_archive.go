@@ -27,27 +27,26 @@ type AgentOutputArchive struct {
 }
 
 type agentOutputManifest struct {
-	Agent            string  `json:"agent"`
-	Operation        string  `json:"operation"`
-	RuntimeID        string  `json:"runtime_id,omitempty"`
-	Slug             string  `json:"slug,omitempty"`
-	Label            string  `json:"label,omitempty"`
-	Attempt          int     `json:"attempt"`
-	ContentPath      string  `json:"content_path,omitempty"`
-	RawPath          string  `json:"raw_path,omitempty"`
-	StderrPath       string  `json:"stderr_path,omitempty"`
-	ContentLength    int     `json:"content_length,omitempty"`
-	RawOutputLength  int     `json:"raw_output_length,omitempty"`
-	StderrLength     int     `json:"stderr_length,omitempty"`
-	ExitError        bool    `json:"exit_error,omitempty"`
-	TokenUsageKnown  bool    `json:"token_usage_known,omitempty"`
-	InputTokens      int64   `json:"input_tokens,omitempty"`
-	OutputTokens     int64   `json:"output_tokens,omitempty"`
-	TotalTokens      int64   `json:"total_tokens,omitempty"`
-	CacheReadTokens  int64   `json:"cache_read_input_tokens,omitempty"`
-	CacheWriteTokens int64   `json:"cache_creation_input_tokens,omitempty"`
-	CostUSD          float64 `json:"cost_usd,omitempty"`
-	CreatedAtRFC3339 string  `json:"created_at"`
+	Agent            string `json:"agent"`
+	Operation        string `json:"operation"`
+	RuntimeID        string `json:"runtime_id,omitempty"`
+	Slug             string `json:"slug,omitempty"`
+	Label            string `json:"label,omitempty"`
+	Attempt          int    `json:"attempt"`
+	ContentPath      string `json:"content_path,omitempty"`
+	RawPath          string `json:"raw_path,omitempty"`
+	StderrPath       string `json:"stderr_path,omitempty"`
+	ContentLength    int    `json:"content_length,omitempty"`
+	RawOutputLength  int    `json:"raw_output_length,omitempty"`
+	StderrLength     int    `json:"stderr_length,omitempty"`
+	ExitError        bool   `json:"exit_error,omitempty"`
+	TokenUsageKnown  bool   `json:"token_usage_known,omitempty"`
+	InputTokens      int64  `json:"input_tokens,omitempty"`
+	OutputTokens     int64  `json:"output_tokens,omitempty"`
+	TotalTokens      int64  `json:"total_tokens,omitempty"`
+	CacheReadTokens  int64  `json:"cache_read_input_tokens,omitempty"`
+	CacheWriteTokens int64  `json:"cache_creation_input_tokens,omitempty"`
+	CreatedAtRFC3339 string `json:"created_at"`
 }
 
 // AgentOutputArchiveOptions 描述需要归档的 Agent 调用输出。
@@ -175,7 +174,6 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		TotalTokens:      usage.TotalTokens,
 		CacheReadTokens:  usage.CacheReadInputTokens,
 		CacheWriteTokens: usage.CacheCreationInputTokens,
-		CostUSD:          usage.CostUSD,
 		CreatedAtRFC3339: time.Now().Format(time.RFC3339Nano),
 	}
 	data, err := json.MarshalIndent(manifest, "", "  ")

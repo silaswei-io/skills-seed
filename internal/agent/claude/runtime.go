@@ -17,7 +17,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 )
 
 // 调用外部命令行程序，并处理可重试的瞬时错误和结构化输出失败。
@@ -35,6 +34,11 @@ func parseClaudeResult[T any](agentName, operation, output string, archive agent
 	return result, nil
 }
 
+type claudeCallResult struct {
+	output  string
+	archive agent.AgentOutputArchive
+}
+
 func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
 	outputSchema, err := aicontract.StructuredOutputSchema(outputContract)
 	if err != nil {
@@ -45,72 +49,21 @@ func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prom
 		return "", agent.AgentOutputArchive{}, err
 	}
 
-	maxRetries := c.retryCfg.EffectiveMaxRetries()
-	retried := false
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		attemptNumber := attempt + 1
-		if attempt > 0 {
-			agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
-				AgentName:  c.Name(),
-				Operation:  operation,
-				Attempt:    attemptNumber,
-				MaxRetries: maxRetries,
-			})
-		}
-		output, archive, callDuration, isRetryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, attemptNumber, workDir, agent.FirstRuntimeTask(task))
-		if err == nil {
-			if retried {
-				agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
-					AgentName:    c.Name(),
-					Operation:    operation,
-					Attempt:      attemptNumber,
-					MaxRetries:   maxRetries,
-					CallDuration: callDuration,
-				})
-			}
-			return output, archive, nil
-		}
-		if !isRetryable || attempt == maxRetries {
-			return "", archive, err
-		}
-
-		retried = true
-		waitDuration := c.retryCfg.WaitDuration(attempt)
-		agent.ReportRetryForContext(ctx, agent.RetryInfo{
-			AgentName:    c.Name(),
-			Operation:    operation,
-			Attempt:      attemptNumber,
-			MaxRetries:   maxRetries,
-			WaitDuration: waitDuration,
-			CallDuration: callDuration,
-			Reason:       agent.RetryReasonFromOutput(output, ""),
-		})
-
-		select {
-		case <-ctx.Done():
-			return "", agent.AgentOutputArchive{}, ctx.Err()
-		case <-time.After(waitDuration):
-		}
-	}
-
-	logger.Error(i18n.Get("LoggerAgentRetryExhausted"), "max_retries", maxRetries)
-	return "", agent.AgentOutputArchive{}, fmt.Errorf("%s: %d", i18n.Get("AgentRetryExhausted"), maxRetries)
+	result, err := agent.RunRetryingCall(ctx, agent.RetryingCallOptions[claudeCallResult]{
+		AgentName: c.Name(),
+		Operation: operation,
+		Policy:    c.retryCfg,
+		Call: func(attempt int) (claudeCallResult, string, time.Duration, bool, error) {
+			output, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, attempt, workDir, agent.FirstRuntimeTask(task))
+			return claudeCallResult{output: output, archive: archive}, output, duration, retryable, err
+		},
+	})
+	return result.output, result.archive, err
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
 func isRetryableError(stdout, stderr string) bool {
-	combined := stdout + stderr
-	// 使用 HTTP status code 正则匹配，避免正常输出中包含 "429" 等数字被误判
-	if agent.HTTPStatusRetryableRegex.MatchString(combined) {
-		return true
-	}
-	// 非数字类的已知限流/过载信号
-	return strings.Contains(combined, "overloaded_error") ||
-		strings.Contains(combined, "error_max_structured_output_retries") ||
-		strings.Contains(combined, "rate limit") ||
-		strings.Contains(combined, "速率限制") ||
-		strings.Contains(combined, "请求频率") ||
-		strings.Contains(combined, "访问量过大")
+	return agent.IsRetryableOutputError(stdout, stderr, "error_max_structured_output_retries")
 }
 
 // 执行单次命令行调用
@@ -241,10 +194,6 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
 	return output, archive, duration, false, nil
-}
-
-func promptRuntimeTask(task agent.RuntimeTask) promptloader.RuntimeTask {
-	return promptloader.RuntimeTask{ID: task.ID, Slug: task.Slug}
 }
 
 type claudeOutputError struct {

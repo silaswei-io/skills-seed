@@ -146,9 +146,6 @@ func Fields(usage Usage, prefix string) []any {
 		prefix+"cache_read_input_tokens", usage.CacheReadInputTokens,
 		prefix+"reasoning_tokens", usage.ReasoningTokens,
 	)
-	if usage.HasCost {
-		fields = append(fields, prefix+"cost_usd", usage.CostUSD)
-	}
 	if usage.Source != "" {
 		fields = append(fields, prefix+"token_usage_source", usage.Source)
 	}

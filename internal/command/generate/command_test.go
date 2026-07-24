@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
@@ -209,6 +210,47 @@ func TestRunGenerateDoesNotRequireAvailableAgent(t *testing.T) {
 
 	require.NoError(t, RunGenerate(cont))
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
+}
+
+func TestRunGenerateAllowsWorkflowOnlyProject(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
+
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "hsmwebapi"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Language = "go"
+	cfg.Project.Locale = "zh-CN"
+	cfg.Project.RootPath = projectRoot
+	cfg.Agent.Engine = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "hsmwebapi")}
+	require.NoError(t, configRepo.Update(cfg))
+	workflowRepo := workflowstore.NewRepository(seedPath)
+	require.NoError(t, workflowRepo.Save(domain.Workflow{
+		ID:      "test_flow",
+		Name:    "部署到195测试环境",
+		Content: "# 部署到195测试环境\n\n## 适用场景\n部署 cipher_machine 到 195 测试环境。\n",
+	}))
+
+	cont, err := container.NewContainer(context.Background(), seedPath)
+	require.NoError(t, err)
+	defer cont.Close()
+
+	require.NoError(t, RunGenerate(cont))
+
+	outputPath := filepath.Join(projectRoot, ".agents", "skills", "hsmwebapi")
+	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
+	require.FileExists(t, filepath.Join(outputPath, "workflows", "test_flow.md"))
+	require.NoDirExists(t, filepath.Join(outputPath, "references"))
+	skill := readGenerateFile(t, projectRoot, ".agents", "skills", "hsmwebapi", "SKILL.md")
+	require.Contains(t, skill, "## User Workflows")
+	require.NotContains(t, skill, "## Pattern References")
 }
 
 func TestRunGenerateWorkspaceOverwritesExistingChildSkill(t *testing.T) {

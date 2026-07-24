@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.14.2]
+
+### Changes
+
+- Unified Agent CLI retry execution so Claude and Codex share retry reporting, recovery progress, and retryable-output detection.
+- Reduced Agent token-usage reporting to token counts only; terminal output, diagnostic fields, and runtime manifests no longer include cost details.
+- Improved workspace relationship candidate normalization: configuration remains the source of project identity, while project path aliases, external system names, and invalid paths from AI output are normalized or dropped before strict validation.
+
+### Fixes
+
+- Fixed workspace profile learning failing when platform names, registry names, Jenkins URLs, or missing root paths were emitted in `shared`/`contracts`/`infra`.
+- Fixed duplicate workspace default/impact routes, unknown projects caused by child path aliases, and incomplete consumer/producer merging for workspace paths.
+- Fixed generate guidance when saved workflows exist but no learned patterns have been stored.
+
 ## [v0.14.1]
 
 ### Changes

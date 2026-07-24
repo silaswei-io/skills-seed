@@ -116,8 +116,15 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	}
 
 	if count == 0 && !isWorkspaceMode {
-		logger.Warn(i18n.Get("GenerateNoPatterns"))
-		return nil
+		workflowCount, err := countWorkflows(cont)
+		if err != nil {
+			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
+			return err
+		}
+		if workflowCount == 0 {
+			logger.Warn(i18n.Get("GenerateNoPatterns"))
+			return nil
+		}
 	}
 	logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
 
@@ -156,6 +163,17 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	}
 
 	return nil
+}
+
+func countWorkflows(cont *container.Container) (int, error) {
+	if cont == nil || cont.WorkflowRepo == nil {
+		return 0, nil
+	}
+	workflows, err := cont.WorkflowRepo.List()
+	if err != nil {
+		return 0, err
+	}
+	return len(workflows), nil
 }
 
 func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts generateOptions) (string, error) {

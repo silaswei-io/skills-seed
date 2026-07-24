@@ -307,9 +307,13 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	entryVerifier := sourcecode.NewVerifier(catalog)
 	result.CommonUtils = entryVerifier.VerifyUtilities(result.CommonUtils)
 	result.BusinessMethods = entryVerifier.VerifyBusinessMethods(result.BusinessMethods)
-	result.EngineeringRules, err = validateEngineeringRules(req.RootPath, engineeringKnowledge, req.UserContext != "", result.EngineeringRules)
-	if err != nil {
-		return nil, fmt.Errorf("validate engineering rules: %w", err)
+	var engineeringRuleIssues []error
+	result.EngineeringRules, engineeringRuleIssues = validateEngineeringRules(req.RootPath, engineeringKnowledge, req.UserContext != "", result.EngineeringRules)
+	for _, issue := range engineeringRuleIssues {
+		logger.Diagnostic("dropped invalid engineering rule",
+			"operation", "analyzer.validate_engineering_rules",
+			"reason", issue.Error(),
+		)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),

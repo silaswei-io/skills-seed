@@ -129,10 +129,15 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	}
 	rankedPatterns := rankPatternsForGeneration(patterns, patternInsights)
 
+	workflowReferences, err := s.loadWorkflowReferences()
+	if err != nil {
+		return err
+	}
 	var profile *domain.ProjectProfile
+	workflowOnly := false
 	if err := runStep(i18n.Get("ProgressGenerateLoadProfile"), func() error {
 		var profileErr error
-		profile, profileErr = s.loadProjectProfile(ctx)
+		profile, workflowOnly, profileErr = s.loadProjectProfileForGeneration(ctx, workflowReferences)
 		return profileErr
 	}); err != nil {
 		return err
@@ -152,17 +157,12 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	}
 
 	if err := runStep(i18n.Get("ProgressGenerateWriteSkills"), func() error {
-		if s.projectSpecRepo != nil {
+		if s.projectSpecRepo != nil && !workflowOnly {
 			if err := s.projectSpecRepo.SaveSpec(ctx, snapshot.Spec); err != nil {
 				return err
 			}
 		}
 
-		// 确保分类摘要非 nil
-		workflowReferences, err := s.loadWorkflowReferences()
-		if err != nil {
-			return err
-		}
 		return skilloutput.ReplaceWithinRoot(projectRoot, resolvedOutputPath, func(staging string) error {
 			if err := s.writeWorkflowOutputs(staging); err != nil {
 				return err
@@ -174,6 +174,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 				ProgramVersion:      metadata.ProgramVersion,
 				SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
 				SkipReferences:      opts.SkipReferences,
+				WorkflowOnly:        workflowOnly,
 				WorkflowReferences:  workflowReferences,
 			})
 			if err != nil {
@@ -202,17 +203,54 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 	return nil
 }
 
+func (s *GeneratorService) loadProjectProfileForGeneration(ctx context.Context, workflowReferences []WorkflowReference) (*domain.ProjectProfile, bool, error) {
+	profile, err := s.loadProjectProfile(ctx)
+	if err == nil {
+		return profile, false, nil
+	}
+	if len(workflowReferences) == 0 || !errors.Is(err, errProjectProfileMissing) {
+		return nil, false, err
+	}
+	return s.fallbackProjectProfile(), true, nil
+}
+
 func (s *GeneratorService) loadProjectProfile(ctx context.Context) (*domain.ProjectProfile, error) {
 	if s.profileRepo == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
+		return nil, missingProjectProfileError()
 	}
 
 	profile, err := s.profileRepo.Get(ctx)
 	if err != nil {
 		if errors.Is(err, profilestore.ErrProfileNotFound) {
-			return nil, fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
+			return nil, missingProjectProfileError()
 		}
 		return nil, err
 	}
 	return profile, nil
+}
+
+var errProjectProfileMissing = errors.New("project profile missing")
+
+type projectProfileMissingError struct{}
+
+func (projectProfileMissingError) Error() string {
+	return i18n.Get("GenerateProjectProfileMissing")
+}
+
+func (projectProfileMissingError) Is(target error) bool {
+	return target == errProjectProfileMissing
+}
+
+func missingProjectProfileError() error {
+	return projectProfileMissingError{}
+}
+
+func (s *GeneratorService) fallbackProjectProfile() *domain.ProjectProfile {
+	profile := &domain.ProjectProfile{}
+	if s.configRepo != nil {
+		projectConfig := s.configRepo.GetProjectConfig()
+		profile.ProjectName = projectConfig.Name
+		profile.Language = projectConfig.Language
+	}
+	return profile
 }

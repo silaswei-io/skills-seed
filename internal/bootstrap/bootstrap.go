@@ -208,30 +208,48 @@ func commandNeedsProjectRuntime(args []string) bool {
 		return false
 	}
 
-	switch cleaned[0] {
-	case "help", "init", "cli-skills", "hook", "log":
-		return false
-	case "add", "check", "reset", "sync":
-		return true
-	case "generate":
-		return len(cleaned) >= 2 && cleaned[1] == "skills"
-	case "learn":
-		return len(cleaned) >= 2 && (cleaned[1] == "current" || cleaned[1] == "history")
-	case "patterns":
-		return len(cleaned) >= 2 && (cleaned[1] == "stats" || cleaned[1] == "compact" || cleaned[1] == "add" || cleaned[1] == "delete" || cleaned[1] == "remove" || cleaned[1] == "rm" || cleaned[1] == "show")
-	case "preview":
-		return len(cleaned) >= 2 && cleaned[1] == "files"
-	case "profile":
-		return len(cleaned) >= 2 && (cleaned[1] == "show" || cleaned[1] == "refresh")
-	case "review":
-		return len(cleaned) >= 2 && (cleaned[1] == "import" || cleaned[1] == "stats")
-	case "workflow":
-		return true
-	case "workspace":
-		return len(cleaned) >= 2 && cleaned[1] == "add"
-	default:
+	command := cleaned[0]
+	if _, ok := projectRuntimeExcludedCommands[command]; ok {
 		return false
 	}
+	if _, ok := projectRuntimeCommands[command]; ok {
+		return true
+	}
+	if len(cleaned) < 2 {
+		return false
+	}
+	subcommands, ok := projectRuntimeSubcommands[command]
+	if !ok {
+		return false
+	}
+	_, ok = subcommands[cleaned[1]]
+	return ok
+}
+
+var projectRuntimeExcludedCommands = map[string]struct{}{
+	"help":       {},
+	"init":       {},
+	"cli-skills": {},
+	"hook":       {},
+	"log":        {},
+}
+
+var projectRuntimeCommands = map[string]struct{}{
+	"add":      {},
+	"check":    {},
+	"reset":    {},
+	"sync":     {},
+	"workflow": {},
+}
+
+var projectRuntimeSubcommands = map[string]map[string]struct{}{
+	"generate":  {"skills": {}},
+	"learn":     {"current": {}, "history": {}},
+	"patterns":  {"stats": {}, "compact": {}, "add": {}, "delete": {}, "remove": {}, "rm": {}, "show": {}},
+	"preview":   {"files": {}},
+	"profile":   {"show": {}, "refresh": {}},
+	"review":    {"import": {}, "stats": {}},
+	"workspace": {"add": {}},
 }
 
 func leadingNonHelpArgs(args []string) []string {

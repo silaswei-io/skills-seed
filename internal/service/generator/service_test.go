@@ -6,6 +6,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
@@ -46,6 +48,45 @@ func TestGenerateSkills_NoPatterns(t *testing.T) {
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 	assert.NoError(t, err)
+}
+
+func TestGenerateSkillsWorkflowOnlySkipsEmptyKnowledgeTemplates(t *testing.T) {
+	ctx := context.Background()
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return nil, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return nil, profilestore.ErrProfileNotFound
+		},
+	}
+	seedPath := t.TempDir()
+	workflowRepo := workflowstore.NewRepository(seedPath)
+	require.NoError(t, workflowRepo.Save(domain.Workflow{
+		ID:      "test_flow",
+		Name:    "部署到195测试环境",
+		Content: "# 部署到195测试环境\n\n## 适用场景\n部署 cipher_machine 到 195 测试环境。\n",
+	}))
+	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
+	}, workflowRepo)
+	outputPath := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
+
+	skill := readGeneratedFile(t, outputPath, "SKILL.md")
+	require.Contains(t, skill, "## 用户工作流")
+	require.Contains(t, skill, "./workflows/test_flow.md")
+	require.Contains(t, skill, "这是项目工作流入口 skill")
+	require.NotContains(t, skill, "## 模式参考")
+	require.NotContains(t, skill, "## 项目规则")
+	require.NotContains(t, skill, "## 模式统计")
+	require.NoDirExists(t, filepath.Join(outputPath, "references"))
+	workflow := readGeneratedFile(t, outputPath, "workflows", "test_flow.md")
+	require.Contains(t, workflow, "部署 cipher_machine 到 195 测试环境")
+	assertNoBrokenMarkdownLinks(t, outputPath)
 }
 
 func TestGenerateSkills_RepoError(t *testing.T) {

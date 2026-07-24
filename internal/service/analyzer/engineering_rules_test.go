@@ -19,40 +19,68 @@ func TestValidateEngineeringRulesAcceptsCollectedAuthority(t *testing.T) {
 		Evidence: []string{"AGENTS.md"},
 	}}
 
-	got, err := validateEngineeringRules(root, []string{"AGENTS.md"}, false, rules)
+	got, issues := validateEngineeringRules(root, []string{"AGENTS.md"}, false, rules)
 
-	require.NoError(t, err)
+	require.Empty(t, issues)
 	require.Equal(t, rules, got)
 }
 
-func TestValidateEngineeringRulesRejectsUncollectedSource(t *testing.T) {
+func TestValidateEngineeringRulesDropsUncollectedSource(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "README.md"), []byte("80% coverage"), 0644))
 
-	got, err := validateEngineeringRules(root, []string{"AGENTS.md"}, false, []domain.EngineeringRule{{
+	got, issues := validateEngineeringRules(root, []string{"AGENTS.md"}, false, []domain.EngineeringRule{{
 		Title:    "覆盖率",
 		Rule:     "覆盖率必须达到 80%",
 		Source:   "README.md",
 		Evidence: []string{"README.md"},
 	}})
 
-	require.Nil(t, got)
-	require.ErrorContains(t, err, "is not an authoritative engineering knowledge file")
+	require.Empty(t, got)
+	require.Len(t, issues, 1)
+	require.ErrorContains(t, issues[0], "is not an authoritative engineering knowledge file")
 }
 
-func TestValidateEngineeringRulesRejectsSymlinkOutsideProject(t *testing.T) {
+func TestValidateEngineeringRulesDropsSymlinkOutsideProject(t *testing.T) {
 	root := t.TempDir()
 	outside := filepath.Join(t.TempDir(), "AGENTS.md")
 	require.NoError(t, os.WriteFile(outside, []byte("external rule"), 0644))
 	require.NoError(t, os.Symlink(outside, filepath.Join(root, "AGENTS.md")))
 
-	got, err := validateEngineeringRules(root, []string{"AGENTS.md"}, false, []domain.EngineeringRule{{
+	got, issues := validateEngineeringRules(root, []string{"AGENTS.md"}, false, []domain.EngineeringRule{{
 		Title:    "验证",
 		Rule:     "修改后运行测试",
 		Source:   "AGENTS.md",
 		Evidence: []string{"AGENTS.md"},
 	}})
 
-	require.Nil(t, got)
-	require.ErrorContains(t, err, "outside the project root")
+	require.Empty(t, got)
+	require.Len(t, issues, 1)
+	require.ErrorContains(t, issues[0], "outside the project root")
+}
+
+func TestValidateEngineeringRulesKeepsValidRulesWhenDroppingInvalidOnes(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("run tests"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "README.md"), []byte("ordinary prose"), 0644))
+
+	got, issues := validateEngineeringRules(root, []string{"AGENTS.md"}, false, []domain.EngineeringRule{
+		{
+			Title:    "验证",
+			Rule:     "修改后运行测试",
+			Source:   "AGENTS.md",
+			Evidence: []string{"AGENTS.md"},
+		},
+		{
+			Title:    "普通文档",
+			Rule:     "不要把普通 README 当硬规则",
+			Source:   "README.md",
+			Evidence: []string{"README.md"},
+		},
+	})
+
+	require.Len(t, got, 1)
+	require.Equal(t, "AGENTS.md", got[0].Source)
+	require.Len(t, issues, 1)
+	require.ErrorContains(t, issues[0], "README.md")
 }

@@ -39,6 +39,8 @@ type skillTemplateData struct {
 	SkillName           string
 	SkillDescription    string
 	Language            string
+	HasKnowledge        bool
+	HasPatterns         bool
 	PatternCount        int
 	Categories          int
 	LastUpdated         string

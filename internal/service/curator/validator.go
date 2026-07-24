@@ -73,6 +73,30 @@ func validateCurateResult(result *proposal, candidates, existing []domain.Patter
 		return fmt.Errorf("curation result is nil")
 	}
 
+	state := newCurateValidationState(candidates, existing, len(result.Patterns))
+	for i := range result.Patterns {
+		if err := state.validatePattern(&result.Patterns[i]); err != nil {
+			return err
+		}
+	}
+	if err := state.validateDropped(result.Dropped); err != nil {
+		return err
+	}
+	if err := state.validateCandidateCoverage(); err != nil {
+		return err
+	}
+	return validateProposalOwnership(result)
+}
+
+type curateValidationState struct {
+	candidateIDs      map[string]struct{}
+	allIDs            map[string]struct{}
+	coveredCandidates map[string]struct{}
+	mergedCandidates  map[string]struct{}
+	outputIDs         map[string]struct{}
+}
+
+func newCurateValidationState(candidates, existing []domain.Pattern, outputCount int) curateValidationState {
 	candidateIDs := patternIDSet(candidates)
 	existingIDs := patternIDSet(existing)
 	allIDs := make(map[string]struct{}, len(candidateIDs)+len(existingIDs))
@@ -82,67 +106,80 @@ func validateCurateResult(result *proposal, candidates, existing []domain.Patter
 	for id := range existingIDs {
 		allIDs[id] = struct{}{}
 	}
+	return curateValidationState{
+		candidateIDs:      candidateIDs,
+		allIDs:            allIDs,
+		coveredCandidates: make(map[string]struct{}, len(candidateIDs)),
+		mergedCandidates:  make(map[string]struct{}, len(candidateIDs)),
+		outputIDs:         make(map[string]struct{}, outputCount),
+	}
+}
 
-	coveredCandidates := make(map[string]struct{}, len(candidateIDs))
-	mergedCandidates := make(map[string]struct{}, len(candidateIDs))
-	outputIDs := make(map[string]struct{}, len(result.Patterns))
-	for i := range result.Patterns {
-		pattern := &result.Patterns[i]
-		pattern.Category = domain.NormalizePatternCategory(pattern.Category)
-		if strings.TrimSpace(pattern.ID) == "" {
-			return fmt.Errorf("curated pattern has empty id")
+func (s curateValidationState) validatePattern(pattern *domain.Pattern) error {
+	pattern.Category = domain.NormalizePatternCategory(pattern.Category)
+	if strings.TrimSpace(pattern.ID) == "" {
+		return fmt.Errorf("curated pattern has empty id")
+	}
+	if _, exists := s.outputIDs[pattern.ID]; exists {
+		return fmt.Errorf("duplicate curated pattern id %q", pattern.ID)
+	}
+	s.outputIDs[pattern.ID] = struct{}{}
+	if !domain.IsValidPatternCategory(pattern.Category) {
+		return fmt.Errorf("curated pattern %q has invalid category %q", pattern.ID, pattern.Category)
+	}
+	if strings.TrimSpace(pattern.Name) == "" {
+		return fmt.Errorf("curated pattern %q has empty name", pattern.ID)
+	}
+	if strings.TrimSpace(pattern.Rule) == "" {
+		return fmt.Errorf("curated pattern %q has empty rule", pattern.ID)
+	}
+	if pattern.Confidence < 0 || pattern.Confidence > 1 {
+		return fmt.Errorf("curated pattern %q has confidence outside [0,1]", pattern.ID)
+	}
+	if hasPlaceholderExample(pattern.GoodExample) {
+		return fmt.Errorf("curated pattern %q has placeholder good example", pattern.ID)
+	}
+	return s.validateMergedFrom(pattern)
+}
+
+func (s curateValidationState) validateMergedFrom(pattern *domain.Pattern) error {
+	for _, id := range pattern.MergedFrom {
+		if _, ok := s.allIDs[id]; !ok {
+			return fmt.Errorf("curated pattern %q references unknown merged_from id %q", pattern.ID, id)
 		}
-		if _, exists := outputIDs[pattern.ID]; exists {
-			return fmt.Errorf("duplicate curated pattern id %q", pattern.ID)
-		}
-		outputIDs[pattern.ID] = struct{}{}
-		if !domain.IsValidPatternCategory(pattern.Category) {
-			return fmt.Errorf("curated pattern %q has invalid category %q", pattern.ID, pattern.Category)
-		}
-		if strings.TrimSpace(pattern.Name) == "" {
-			return fmt.Errorf("curated pattern %q has empty name", pattern.ID)
-		}
-		if strings.TrimSpace(pattern.Rule) == "" {
-			return fmt.Errorf("curated pattern %q has empty rule", pattern.ID)
-		}
-		if pattern.Confidence < 0 || pattern.Confidence > 1 {
-			return fmt.Errorf("curated pattern %q has confidence outside [0,1]", pattern.ID)
-		}
-		if hasPlaceholderExample(pattern.GoodExample) {
-			return fmt.Errorf("curated pattern %q has placeholder good example", pattern.ID)
-		}
-		for _, id := range pattern.MergedFrom {
-			if _, ok := allIDs[id]; !ok {
-				return fmt.Errorf("curated pattern %q references unknown merged_from id %q", pattern.ID, id)
-			}
-			if _, ok := candidateIDs[id]; ok {
-				coveredCandidates[id] = struct{}{}
-				mergedCandidates[id] = struct{}{}
-			}
+		if _, ok := s.candidateIDs[id]; ok {
+			s.coveredCandidates[id] = struct{}{}
+			s.mergedCandidates[id] = struct{}{}
 		}
 	}
+	return nil
+}
 
-	droppedIDs := make(map[string]struct{}, len(result.Dropped))
-	for _, dropped := range result.Dropped {
-		if _, ok := candidateIDs[dropped.ID]; !ok {
+func (s curateValidationState) validateDropped(droppedPatterns []Drop) error {
+	droppedIDs := make(map[string]struct{}, len(droppedPatterns))
+	for _, dropped := range droppedPatterns {
+		if _, ok := s.candidateIDs[dropped.ID]; !ok {
 			return fmt.Errorf("dropped pattern id %q is not a current candidate id; dropped may only reference current candidates", dropped.ID)
 		}
 		if _, exists := droppedIDs[dropped.ID]; exists {
 			return fmt.Errorf("duplicate dropped candidate id %q", dropped.ID)
 		}
-		if _, merged := mergedCandidates[dropped.ID]; merged {
+		if _, merged := s.mergedCandidates[dropped.ID]; merged {
 			return fmt.Errorf("candidate pattern %q is both merged and dropped", dropped.ID)
 		}
 		droppedIDs[dropped.ID] = struct{}{}
-		coveredCandidates[dropped.ID] = struct{}{}
+		s.coveredCandidates[dropped.ID] = struct{}{}
 	}
+	return nil
+}
 
-	for id := range candidateIDs {
-		if _, ok := coveredCandidates[id]; !ok {
+func (s curateValidationState) validateCandidateCoverage() error {
+	for id := range s.candidateIDs {
+		if _, ok := s.coveredCandidates[id]; !ok {
 			return fmt.Errorf("candidate pattern %q is not covered by curated result", id)
 		}
 	}
-	return validateProposalOwnership(result)
+	return nil
 }
 
 func patternIDSet(patterns []domain.Pattern) map[string]struct{} {
