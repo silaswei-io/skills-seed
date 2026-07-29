@@ -27,11 +27,13 @@ func TestCurateAndStoreAddsNewCandidate(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewService(&mocks.MockAgent{NameVal: "mock", AvailableVal: true}, repo)
+	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
+	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -69,9 +71,57 @@ func newDeterministicCuratorAgent() *mocks.MockAgent {
 				})
 			}
 			for _, item := range planned.Dropped {
-				result.Dropped = append(result.Dropped, agent.CuratedDrop{ID: item.ID, Reason: item.Reason})
+				result.Dropped = append(result.Dropped, agent.CuratedDrop{
+					ID:         item.ID,
+					ReasonCode: item.ReasonCode,
+					Reason:     item.Reason,
+				})
 			}
 			return result, nil
 		},
 	}
+}
+
+type curatorTestLearningSession struct {
+	agent testCurationAgent
+}
+
+type testCurationAgent interface {
+	CuratePatterns(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
+}
+
+func newCuratorTestLearningSession(ag testCurationAgent) agent.LearningSession {
+	return curatorTestLearningSession{agent: ag}
+}
+
+func (s curatorTestLearningSession) SessionID() string {
+	return "curator-test-session"
+}
+
+func (s curatorTestLearningSession) SelectLearningCandidates(context.Context, *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
+	return &agent.SelectLearningCandidatesResult{}, nil
+}
+
+func (s curatorTestLearningSession) PlanLearningAgenda(context.Context, *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+	return &agent.PlanLearningAgendaResult{}, nil
+}
+
+func (s curatorTestLearningSession) AnalyzeCurrentCodebaseBatch(context.Context, *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+	return &agent.AnalyzeCurrentCodebaseBatchResult{}, nil
+}
+
+func (s curatorTestLearningSession) AnalyzeCurrentDeltaBatch(context.Context, *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
+	return &agent.AnalyzeCurrentDeltaBatchResult{}, nil
+}
+
+func (s curatorTestLearningSession) RefreshProjectProfile(context.Context, *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	return &agent.AnalyzeProjectResult{}, nil
+}
+
+func (s curatorTestLearningSession) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+	return s.agent.CuratePatterns(ctx, req)
+}
+
+func (s curatorTestLearningSession) Close(context.Context) error {
+	return nil
 }

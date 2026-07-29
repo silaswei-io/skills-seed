@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +25,7 @@ func Cmd() *cobra.Command {
 }
 
 func run(cmd *cobra.Command) error {
-	seedPath, err := utils.GetSeedPath()
+	seedPath, err := projectpath.FindSeedPath()
 	if err != nil {
 		return err
 	}

@@ -34,32 +34,6 @@ Boundaries:
 - Use `sync` when learning and generation should be coordinated.
 - Use `preview files --mode current` first when file selection is unclear.
 
-## `skills-seed learn history`
-
-Purpose:
-
-- Learn conventions from recent Git commits.
-- Extract patterns from committed changes rather than current working tree state.
-
-Flags:
-
-- `--limit, -n`: maximum commits to inspect.
-- `--since, -s`: lower bound such as a date or Git revision expression.
-- `--batch-size, -b`: commits per learning batch.
-
-Use cases:
-
-- Learn recent history: `skills-seed learn history`
-- Limit commits: `skills-seed learn history --limit 20`
-- Learn since a date: `skills-seed learn history --since 2026-01-01`
-- Tune batches: `skills-seed learn history --limit 50 --batch-size 5`
-
-When to use history:
-
-- A repository already has meaningful commit history.
-- You want stable conventions from reviewed changes.
-- Current working tree changes are not representative.
-
 After learning:
 
 - Run `skills-seed patterns show` to inspect learned rules.

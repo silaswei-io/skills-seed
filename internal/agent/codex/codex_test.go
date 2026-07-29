@@ -1,16 +1,10 @@
 package codex
 
 import (
-	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
-	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,44 +57,24 @@ enabled = true
 	require.NotContains(t, args, `plugins."superpowers@openai-curated".enabled=false`)
 }
 
-func TestAnalyzeProjectPassesStructuralContextToTemplate(t *testing.T) {
-	loader := promptloader.New("codex", "zh-CN", "")
-	ag := New("__skills_seed_missing_codex__", time.Second, loader, false, config.DefaultRetryConfig())
+func TestCodexSessionArgsStayReadOnly(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
 
-	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
-		ProjectName:       "demo",
-		RootPath:          t.TempDir(),
-		Language:          "go",
-		Structure:         "main.go",
-		StructuralContext: "## Structural Context\n- handler symbol",
-		MainFiles:         []string{"main.go"},
-	})
+	startArgs := codexSessionStartArgs(false, "/tmp/output-schema.json")
+	resumeArgs := codexSessionResumeArgs(false, "/tmp/output-schema.json", "thread-123")
 
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "__skills_seed_missing_codex__")
-	require.NotContains(t, err.Error(), "StructuralContext")
-	require.NotContains(t, err.Error(), "project-profile prompt")
-}
-
-func TestAnalyzeProjectRenderErrorIncludesTemplateReason(t *testing.T) {
-	renderErr := fmt.Errorf("template: project-profile:18:7: missing StructuralContext")
-	ag := &CodexAgent{
-		commandPath:  "__skills_seed_missing_codex__",
-		timeout:      time.Second,
-		promptLoader: failingPromptRenderer{err: renderErr},
+	for _, args := range [][]string{startArgs, resumeArgs} {
+		require.Contains(t, args, "--ask-for-approval")
+		require.Equal(t, "never", requireArgValue(t, args, "--ask-for-approval"))
+		require.Contains(t, args, "--sandbox")
+		require.Equal(t, "read-only", requireArgValue(t, args, "--sandbox"))
+		require.Contains(t, args, "--json")
+		require.Contains(t, args, "--output-schema")
 	}
-
-	_, err := ag.AnalyzeProject(context.Background(), &agent.AnalyzeProjectRequest{
-		ProjectName: "demo",
-		RootPath:    t.TempDir(),
-		Language:    "go",
-		Structure:   "main.go",
-	})
-
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "渲染 project-profile prompt 失败")
-	require.Contains(t, err.Error(), "template:")
-	require.ErrorIs(t, err, renderErr)
+	require.Contains(t, resumeArgs, "resume")
+	require.Contains(t, resumeArgs, "thread-123")
+	require.NotContains(t, startArgs, "--ephemeral")
+	require.NotContains(t, resumeArgs, "--ephemeral")
 }
 
 func TestExtractFinalContent_NoFinalMessage(t *testing.T) {
@@ -149,14 +123,13 @@ func TestExtractFinalContent_PrefersLastJSONMessageOverProgressMessages(t *testi
 	require.Equal(t, `{"patterns":[],"profile_refresh_recommended":{"needed":false}}`, content)
 }
 
-type failingPromptRenderer struct {
-	err error
-}
-
-func (f failingPromptRenderer) Render(string, interface{}) (string, error) {
-	return "", f.err
-}
-
-func (f failingPromptRenderer) RenderForRuntimeTask(string, interface{}, promptloader.RuntimeTask) (string, error) {
-	return "", f.err
+func requireArgValue(t *testing.T, args []string, name string) string {
+	t.Helper()
+	for i, arg := range args {
+		if arg == name && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	t.Fatalf("argument %s not found in %v", name, args)
+	return ""
 }

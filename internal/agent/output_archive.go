@@ -12,10 +12,10 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // AgentOutputArchive 表示单次 Agent 调用输出归档后的文件路径。
@@ -40,28 +40,21 @@ type agentOutputManifest struct {
 	RawOutputLength  int    `json:"raw_output_length,omitempty"`
 	StderrLength     int    `json:"stderr_length,omitempty"`
 	ExitError        bool   `json:"exit_error,omitempty"`
-	TokenUsageKnown  bool   `json:"token_usage_known,omitempty"`
-	InputTokens      int64  `json:"input_tokens,omitempty"`
-	OutputTokens     int64  `json:"output_tokens,omitempty"`
-	TotalTokens      int64  `json:"total_tokens,omitempty"`
-	CacheReadTokens  int64  `json:"cache_read_input_tokens,omitempty"`
-	CacheWriteTokens int64  `json:"cache_creation_input_tokens,omitempty"`
 	CreatedAtRFC3339 string `json:"created_at"`
 }
 
 // AgentOutputArchiveOptions 描述需要归档的 Agent 调用输出。
 type AgentOutputArchiveOptions struct {
-	Agent      string
-	Operation  string
-	RuntimeID  string
-	Slug       string
-	Label      string
-	Attempt    int
-	Content    string
-	RawOutput  string
-	Stderr     string
-	ExitError  bool
-	TokenUsage tokenusage.Usage
+	Agent     string
+	Operation string
+	RuntimeID string
+	Slug      string
+	Label     string
+	Attempt   int
+	Content   string
+	RawOutput string
+	Stderr    string
+	ExitError bool
 }
 
 // SaveAgentOutputForContext 把 Agent 输出保存到当前项目 .skills-seed/runtime/agent-outputs。
@@ -72,6 +65,9 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	}
 	if opts.Label == "" {
 		opts.Label = OperationLabel(opts.Operation)
+	}
+	if opts.Operation == OperationLearningConversationStart {
+		return AgentOutputArchive{}
 	}
 
 	dir := layout.New(seedPath).Runtime("agent-outputs")
@@ -153,7 +149,6 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	}
 
 	manifestPath := filepath.Join(dir, base+".manifest.json")
-	usage := opts.TokenUsage.Normalize()
 	manifest := agentOutputManifest{
 		Agent:            opts.Agent,
 		Operation:        opts.Operation,
@@ -168,12 +163,6 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		RawOutputLength:  len(opts.RawOutput),
 		StderrLength:     len(opts.Stderr),
 		ExitError:        opts.ExitError,
-		TokenUsageKnown:  usage.Known(),
-		InputTokens:      usage.InputTokens,
-		OutputTokens:     usage.OutputTokens,
-		TotalTokens:      usage.TotalTokens,
-		CacheReadTokens:  usage.CacheReadInputTokens,
-		CacheWriteTokens: usage.CacheCreationInputTokens,
 		CreatedAtRFC3339: time.Now().Format(time.RFC3339Nano),
 	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
@@ -231,14 +220,8 @@ func OperationName(operation string) string {
 }
 
 func renderAgentOutputContent(content string) string {
-	trimmed := strings.TrimSpace(content)
-	if trimmed != "" && json.Valid([]byte(trimmed)) {
-		var value any
-		if err := json.Unmarshal([]byte(trimmed), &value); err == nil {
-			if data, err := json.MarshalIndent(value, "", "  "); err == nil {
-				return "```json\n" + string(data) + "\n```"
-			}
-		}
+	if formatted, ok := jsonx.FormatIfJSON(content); ok {
+		return "```json\n" + formatted + "\n```"
 	}
 	return strings.TrimRight(content, "\n")
 }

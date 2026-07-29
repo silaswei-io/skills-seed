@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 type Renderer struct {

@@ -53,7 +53,7 @@ func TestInitializeWorkspaceInitializesDetectedChildProjects(t *testing.T) {
 	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
 }
 
-func TestInitializeProjectUsesTotalParallelismAsUnitParallelism(t *testing.T) {
+func TestInitializeProjectKeepsCurrentLearningSerial(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)
 
@@ -61,16 +61,13 @@ func TestInitializeProjectUsesTotalParallelismAsUnitParallelism(t *testing.T) {
 		initLogger:            true,
 		showUserSummary:       true,
 		agentTotalParallelism: 4,
-		learningMode:          config.LearningModeDeep,
-		learningScope:         config.LearningScopeDomain,
 	}))
 
 	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, 0, configRepo.GetAgentConfig().Parallelism)
-	require.Equal(t, 4, configRepo.GetCurrentLearningConfig().Parallelism)
-	require.Equal(t, config.LearningModeDeep, configRepo.GetCurrentLearningConfig().Mode)
-	require.Equal(t, config.LearningScopeDomain, configRepo.GetCurrentLearningConfig().Scope)
+	require.Equal(t, config.LearningModeNormal, configRepo.GetCurrentLearningConfig().Mode)
+	require.Equal(t, config.LearningScopeFlow, configRepo.GetCurrentLearningConfig().Scope)
 }
 
 func TestInitializeWorkspaceAllocatesTotalParallelism(t *testing.T) {
@@ -87,20 +84,17 @@ func TestInitializeWorkspaceAllocatesTotalParallelism(t *testing.T) {
 		initLogger:            true,
 		showUserSummary:       true,
 		agentTotalParallelism: 6,
-		learningScope:         config.LearningScopeDomain,
 	}))
 
 	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, 3, rootConfig.GetAgentConfig().Parallelism)
-	require.Equal(t, 2, rootConfig.GetCurrentLearningConfig().Parallelism)
-	require.Equal(t, config.LearningScopeDomain, rootConfig.GetCurrentLearningConfig().Scope)
+	require.Equal(t, config.LearningScopeFlow, rootConfig.GetCurrentLearningConfig().Scope)
 
 	childConfig, err := config.NewRepository(filepath.Join(workspaceRoot, "api", ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, 0, childConfig.GetAgentConfig().Parallelism)
-	require.Equal(t, 2, childConfig.GetCurrentLearningConfig().Parallelism)
-	require.Equal(t, config.LearningScopeDomain, childConfig.GetCurrentLearningConfig().Scope)
+	require.Equal(t, config.LearningScopeFlow, childConfig.GetCurrentLearningConfig().Scope)
 }
 
 func TestAllocateWorkspaceParallelism(t *testing.T) {
@@ -109,18 +103,16 @@ func TestAllocateWorkspaceParallelism(t *testing.T) {
 		total         int
 		projects      int
 		wantWorkspace int
-		wantUnit      int
 	}{
-		{name: "disabled", total: 0, projects: 3, wantWorkspace: 0, wantUnit: 1},
-		{name: "no projects", total: 4, projects: 0, wantWorkspace: 0, wantUnit: 4},
-		{name: "more total than projects", total: 6, projects: 3, wantWorkspace: 3, wantUnit: 2},
-		{name: "fewer total than projects", total: 2, projects: 5, wantWorkspace: 2, wantUnit: 1},
+		{name: "disabled", total: 0, projects: 3, wantWorkspace: 0},
+		{name: "no projects", total: 4, projects: 0, wantWorkspace: 0},
+		{name: "more total than projects", total: 6, projects: 3, wantWorkspace: 3},
+		{name: "fewer total than projects", total: 2, projects: 5, wantWorkspace: 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotWorkspace, gotUnit := allocateWorkspaceParallelism(tt.total, tt.projects)
+			gotWorkspace := allocateWorkspaceParallelism(tt.total, tt.projects)
 			require.Equal(t, tt.wantWorkspace, gotWorkspace)
-			require.Equal(t, tt.wantUnit, gotUnit)
 		})
 	}
 }
@@ -150,19 +142,17 @@ func TestInteractiveInitDefaultsMatchNoArgDefaults(t *testing.T) {
 	require.Equal(t, "claude", opts.agent)
 	require.Equal(t, "claude", opts.skills)
 	require.False(t, opts.installGlobalCLISkills)
-	require.Equal(t, config.LearningModeNormal, opts.learningMode)
-	require.Equal(t, config.LearningScopeFlow, opts.learningScope)
 }
 
 func TestInteractiveInitParallelismPlanSummary(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 
 	require.Equal(t,
-		"单项目：learning.current.parallelism=4",
+		"单项目：当前代码学习使用分段会话串行执行",
 		initParallelismPlanSummary(domain.ModeProject, 4, 0),
 	)
 	require.Equal(t,
-		"工作区：检测到 3 个子项目，agent.parallelism=3，learning.current.parallelism=2",
+		"工作区：检测到 3 个子项目，agent.parallelism=3，每个子项目内分段会话串行",
 		initParallelismPlanSummary(domain.ModeWorkspace, 6, 3),
 	)
 }

@@ -12,9 +12,9 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
-	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
 	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +29,7 @@ const (
 
 // Dependencies 描述 sync 命令需要调用的应用用例。
 type Dependencies struct {
-	LearnCurrent func(cont *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error)
+	LearnCurrent func(cont *container.Container, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error)
 	Generate     func(cont *container.Container) error
 }
 
@@ -147,7 +147,7 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 	}
 	var learnCurrent syncflow.LearnCurrentFunc
 	if dependencies.LearnCurrent != nil {
-		learnCurrent = func(ctx context.Context, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+		learnCurrent = func(ctx context.Context, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
 			return dependencies.LearnCurrent(cont, req)
 		}
 	}
@@ -165,7 +165,7 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 		},
 	}
 	return service.Run(ctx, syncflow.Request{
-		Learn: syncflow.LearnRequest{
+		Learn: syncflow.LearnCurrentRequest{
 			StateScope:     stateScope,
 			UserContext:    userContext,
 			Force:          mode == syncRunRestart,

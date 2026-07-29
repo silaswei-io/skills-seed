@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -21,7 +20,7 @@ func TestBuildStateFilesPreservesAnalysisMetadata(t *testing.T) {
 	changes := &fileanalysis.FileChanges{
 		Records: []domain.FileAnalysisRecord{
 			{Path: "internal/key/create.go", Hash: "key-hash", HashAlgorithm: domain.FileAnalysisHashMD5, Size: 42, Source: domain.FileAnalysisSourceCurrentCode, AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
-			{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusAISkipped, SelectionReason: "low signal"},
+			{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusSelectionSkipped, SelectionReason: "low signal"},
 		},
 		Deleted: []string{"internal/removed.go"},
 	}
@@ -42,7 +41,7 @@ func TestChangesFromCurrentStateRestoresCompleteRecords(t *testing.T) {
 		Size:            42,
 		ModTime:         "2026-07-23T12:00:00+08:00",
 		Source:          domain.FileAnalysisSourceCurrentCode,
-		AnalysisStatus:  domain.FileAnalysisStatusAISkipped,
+		AnalysisStatus:  domain.FileAnalysisStatusSelectionSkipped,
 		SelectionReason: "low signal",
 		LastAnalyzedAt:  "2026-07-23T12:01:00+08:00",
 	}
@@ -54,8 +53,8 @@ func TestChangesFromCurrentStateRestoresCompleteRecords(t *testing.T) {
 	require.Equal(t, []string{"internal/removed.go"}, changes.Deleted)
 }
 
-func TestReconcileAnalysisUnitsFiltersInvalidPathsAndCoversEveryCandidate(t *testing.T) {
-	units := []domain.AnalysisUnit{
+func TestReconcileEvidenceFocusesFiltersInvalidPathsAndCoversEveryCandidate(t *testing.T) {
+	focuses := []domain.EvidenceFocus{
 		{
 			ID:           "auth",
 			Name:         "Auth",
@@ -69,28 +68,28 @@ func TestReconcileAnalysisUnitsFiltersInvalidPathsAndCoversEveryCandidate(t *tes
 		"internal/key/create.go",
 	}
 
-	got := reconcileAnalysisUnits(units, allowed)
+	got := reconcileEvidenceFocuses(focuses, allowed)
 
-	require.Equal(t, []domain.AnalysisUnit{
+	require.Equal(t, []domain.EvidenceFocus{
 		{
 			ID:           "auth",
 			Name:         "Auth",
 			EntryPaths:   []string{"internal/auth/login.go"},
 			RelatedPaths: []string{"internal/auth/types.go"},
 		},
-		fallbackAnalysisUnit([]string{"internal/key/create.go"}),
+		fallbackEvidenceFocus([]string{"internal/key/create.go"}),
 	}, got)
 	require.Empty(t, uncoveredAnalysisPaths(got, allowed))
 }
 
-func TestReconcileAnalysisUnitsUsesUniqueFallbackID(t *testing.T) {
-	units := []domain.AnalysisUnit{{
+func TestReconcileEvidenceFocusesUsesUniqueFallbackID(t *testing.T) {
+	focuses := []domain.EvidenceFocus{{
 		ID:         "current-codebase",
 		Name:       "Existing",
 		EntryPaths: []string{"main.go"},
 	}}
 
-	got := reconcileAnalysisUnits(units, []string{"main.go", "other.go"})
+	got := reconcileEvidenceFocuses(focuses, []string{"main.go", "other.go"})
 
 	require.Len(t, got, 2)
 	require.Equal(t, "current-codebase-2", got[1].ID)
@@ -98,7 +97,7 @@ func TestReconcileAnalysisUnitsUsesUniqueFallbackID(t *testing.T) {
 }
 
 func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
-	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}}, nil, []domain.AnalysisUnit{{ID: "all", EntryPaths: []string{"main.go"}}})
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}}, nil, []domain.EvidenceFocus{{ID: "all", EntryPaths: []string{"main.go"}}})
 	state.ArtifactsCommitted = true
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	require.NoError(t, repo.Save(context.Background(), state))
@@ -110,11 +109,11 @@ func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
 
 func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	pattern := domain.NewPattern("checkpoint", "Checkpoint", domain.CategoryBusiness)
-	unit := domain.AnalysisUnit{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}}
-	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "internal/auth.go", Hash: "hash"}}, nil, []domain.AnalysisUnit{unit})
+	unit := domain.EvidenceFocus{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}}
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "internal/auth.go", Hash: "hash"}}, nil, []domain.EvidenceFocus{unit})
 	state.Analysis = &commandstate.AnalysisCheckpoint{
 		Patterns:             []domain.Pattern{*pattern},
-		CompletedUnits:       []domain.AnalysisUnit{unit},
+		CompletedFocuses:     []domain.EvidenceFocus{unit},
 		ProfileRefreshNeeded: true,
 		ProfileRefreshReason: "module boundary changed",
 	}
@@ -132,7 +131,7 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	require.NotNil(t, loaded.Analysis)
 	require.Len(t, loaded.Analysis.Patterns, 1)
 	require.Equal(t, "checkpoint", loaded.Analysis.Patterns[0].ID)
-	require.Equal(t, []domain.AnalysisUnit{unit}, loaded.Analysis.CompletedUnits)
+	require.Equal(t, []domain.EvidenceFocus{unit}, loaded.Analysis.CompletedFocuses)
 	require.True(t, loaded.Analysis.ProfileRefreshNeeded)
 	require.Equal(t, "module boundary changed", loaded.Analysis.ProfileRefreshReason)
 	require.True(t, loaded.ProfileCommitted)
@@ -140,32 +139,32 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	require.JSONEq(t, string(state.Curation.Decision), string(loaded.Curation.Decision))
 }
 
-func TestPendingAnalysisUnitsDerivesCompletionFromCompletedUnits(t *testing.T) {
-	units := []domain.AnalysisUnit{
+func TestPendingEvidenceFocusesDerivesCompletionFromCompletedFocuses(t *testing.T) {
+	focuses := []domain.EvidenceFocus{
 		{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}},
 		{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}},
 	}
-	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, units)
-	state.Analysis = &commandstate.AnalysisCheckpoint{CompletedUnits: units[:1]}
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses)
+	state.Analysis = &commandstate.AnalysisCheckpoint{CompletedFocuses: focuses[:1]}
 	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{
 		{Path: "internal/auth.go"},
 		{Path: "internal/key.go"},
 	}}
 
-	pending := pendingAnalysisUnits(state, changes)
+	pending := pendingEvidenceFocuses(state, changes)
 	require.Len(t, pending, 1)
 	require.Equal(t, "key", pending[0].ID)
 }
 
 func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {
-	units := []domain.AnalysisUnit{
+	focuses := []domain.EvidenceFocus{
 		{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/shared.go"}},
 		{ID: "key", Name: "Key", EntryPaths: []string{"internal/shared.go"}},
 	}
 	run := &learnCurrentProjectRun{
-		analysisState:          commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, units),
-		incrementalChanges:     &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
-		completedAnalysisUnits: units[:1],
+		analysisState:            commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses),
+		incrementalChanges:       &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
+		completedEvidenceFocuses: focuses[:1],
 	}
 
 	err := run.validateCompletedAnalysis()
@@ -174,12 +173,12 @@ func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {
 }
 
 func TestCompleteAnalysisDoesNotCheckpointIncompletePlan(t *testing.T) {
-	unit := domain.AnalysisUnit{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}
+	unit := domain.EvidenceFocus{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	run := &learnCurrentProjectRun{
 		ctx:                context.Background(),
 		stateRepo:          repo,
-		analysisState:      commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, []domain.AnalysisUnit{unit}),
+		analysisState:      commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, []domain.EvidenceFocus{unit}),
 		incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/key.go"}}},
 	}
 
@@ -213,7 +212,7 @@ func TestCurrentStateInputsMatchProjectChecksDeletedFiles(t *testing.T) {
 func TestCurrentChangesCoveredByStateRejectsUnplannedInput(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{
 		{Path: "main.go", Hash: "main-hash"},
-	}, nil, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})
+	}, nil, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}})
 	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{
 		{Path: "main.go", Hash: "main-hash"},
 		{Path: "new.go", Hash: "new-hash"},
@@ -227,7 +226,7 @@ func TestCanReuseCurrentStateRequiresExactInputSet(t *testing.T) {
 	mode := learnCurrentStateMode(string(config.LearningModeNormal), string(config.LearningScopeFlow))
 	state := commandstate.NewStateWithMode(commandStateLearnCurrent, "demo", "go", mode, "", []domain.FileAnalysisRecord{
 		{Path: "main.go", Hash: "main-hash"},
-	}, []string{"removed.go"}, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}}).WithInvocationHash(invocationHash)
+	}, []string{"removed.go"}, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}}).WithInvocationHash(invocationHash)
 	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "main.go", Hash: "main-hash"}}}
 
 	require.False(t, canReuseCurrentState(state, changes, "demo", "go", mode, "", invocationHash))
@@ -243,7 +242,7 @@ func TestRestoreCurrentStateClearsIncompatibleCheckpoint(t *testing.T) {
 		"",
 		[]domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}},
 		nil,
-		[]domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}},
+		[]domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}},
 	).WithInvocationHash("old-invocation")
 	require.NoError(t, repo.Save(context.Background(), state))
 
@@ -275,8 +274,8 @@ func TestLearnCurrentInvocationHashIncludesExecutionOptions(t *testing.T) {
 func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{
 		{Path: "internal/key/create.go", Hash: "key-hash", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
-		{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusAISkipped},
-	}, nil, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key/create.go"}}}).
+		{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusSelectionSkipped},
+	}, nil, []domain.EvidenceFocus{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key/create.go"}}}).
 		WithInputSummary(commandstate.InputSummary{
 			SourceFiles:         10,
 			LocalPlanInputFiles: 8,
@@ -296,17 +295,17 @@ func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
 
 	require.Equal(t, "10", summary.SourceFiles)
 	require.Equal(t, 8, summary.LocalPlanInputs)
-	require.Equal(t, "8", summary.AISelectionInputs)
-	require.Equal(t, "1", summary.AISelectedFiles)
+	require.Equal(t, "8", summary.SelectionInputs)
+	require.Equal(t, "1", summary.SelectedFiles)
 	require.Equal(t, 1, summary.PendingAnalyzeFiles)
-	require.Equal(t, 1, summary.Units)
+	require.Equal(t, 1, summary.Focuses)
 }
 
 func TestBuildLearnCurrentResumeSummaryDerivesMissingMetrics(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{
 		{Path: "internal/key/create.go", Hash: "key-hash", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
-		{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusAISkipped},
-	}, []string{"internal/removed.go"}, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key/create.go"}}})
+		{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusSelectionSkipped},
+	}, []string{"internal/removed.go"}, []domain.EvidenceFocus{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key/create.go"}}})
 	session := &currentStateSession{
 		State: state,
 		Changes: &fileanalysis.FileChanges{
@@ -320,8 +319,8 @@ func TestBuildLearnCurrentResumeSummaryDerivesMissingMetrics(t *testing.T) {
 
 	require.Equal(t, "-", summary.SourceFiles)
 	require.Equal(t, 3, summary.LocalPlanInputs)
-	require.Equal(t, "2", summary.AISelectionInputs)
-	require.Equal(t, "1", summary.AISelectedFiles)
+	require.Equal(t, "2", summary.SelectionInputs)
+	require.Equal(t, "1", summary.SelectedFiles)
 	require.Equal(t, 2, summary.PendingAnalyzeFiles)
 }
 
@@ -329,9 +328,8 @@ func TestCurrentStateInputSummaryUsesSelectionStages(t *testing.T) {
 	changes := &fileanalysis.FileChanges{SourceFileCount: 12}
 	selectionPlan := currentFileSelectionPlan{
 		Candidates: []string{"a.go", "b.go", "c.go"},
-		Eligible:   true,
 	}
-	selectionSummary := aiFileSelectionSummary{
+	selectionSummary := fileSelectionSummary{
 		Applied:        true,
 		CandidateCount: 3,
 		SelectedCount:  1,
@@ -342,30 +340,25 @@ func TestCurrentStateInputSummaryUsesSelectionStages(t *testing.T) {
 
 	require.Equal(t, commandstate.InputSummary{
 		SourceFiles:         12,
-		LocalPlanInputFiles: 3,
+		LocalPlanInputFiles: 1,
 		SelectionInputFiles: 3,
 		SelectedFiles:       1,
 		SkippedFiles:        2,
 	}, summary)
 }
 
-func TestCurrentStateInputSummaryRecordsAttemptedSelection(t *testing.T) {
+func TestCurrentStateInputSummaryRecordsSkippedSelection(t *testing.T) {
 	changes := &fileanalysis.FileChanges{SourceFileCount: 12}
 	selectionPlan := currentFileSelectionPlan{
 		Candidates: []string{"a.go", "b.go", "c.go"},
-		Eligible:   true,
 	}
-	selectionSummary := aiFileSelectionSummary{
-		Attempted:      true,
-		CandidateCount: 3,
-	}
+	selectionSummary := fileSelectionSummary{}
 
 	summary := currentStateInputSummary(changes, selectionPlan, selectionSummary)
 
 	require.Equal(t, commandstate.InputSummary{
 		SourceFiles:         12,
 		LocalPlanInputFiles: 3,
-		SelectionInputFiles: 3,
 	}, summary)
 }
 
@@ -374,7 +367,7 @@ func TestFilterCompletedStateChangesKeepsOnlyUnfinishedInputs(t *testing.T) {
 		Records: []domain.FileAnalysisRecord{
 			{Path: "internal/auth/login.go", Hash: "auth-hash"},
 			{Path: "internal/key/create.go", Hash: "key-hash"},
-			{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusAISkipped},
+			{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusSelectionSkipped},
 		},
 		AddedOrModified: []string{
 			"internal/auth/login.go",
@@ -385,7 +378,7 @@ func TestFilterCompletedStateChangesKeepsOnlyUnfinishedInputs(t *testing.T) {
 	}
 	analyzed := []domain.FileAnalysisRecord{
 		{Path: "internal/auth/login.go", Hash: "auth-hash", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
-		{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusAISkipped},
+		{Path: "internal/types/types.go", Hash: "types-hash", AnalysisStatus: domain.FileAnalysisStatusSelectionSkipped},
 	}
 
 	filtered := filterCompletedStateChanges(changes, analyzed)
@@ -410,27 +403,4 @@ func TestFilterCompletedStateChangesKeepsChangedHashPending(t *testing.T) {
 
 	require.Equal(t, []string{"internal/key/create.go"}, filtered.AddedOrModified)
 	require.Len(t, filtered.Records, 1)
-}
-
-func TestRunningUnitsProgressStartsFromCompletedOriginalPlan(t *testing.T) {
-	units := make([]domain.AnalysisUnit, 0, 19)
-	for i := 1; i <= 19; i++ {
-		units = append(units, domain.AnalysisUnit{
-			ID:         "unit-" + strconv.Itoa(i),
-			Name:       "单元 " + strconv.Itoa(i),
-			EntryPaths: []string{"internal/unit" + strconv.Itoa(i) + ".go"},
-		})
-	}
-	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, units)
-	pending := units[17:]
-
-	running := newLearnCurrentRunningUnits(state, pending)
-
-	params := running.progressParams(2)
-	require.Equal(t, 18, params["Current"])
-	require.Equal(t, 19, params["Total"])
-	running.start(0, "单元 18")
-	require.Equal(t, 18, running.progressParams(2)["Current"])
-	running.finish(0, true)
-	require.Equal(t, 19, running.progressParams(2)["Current"])
 }

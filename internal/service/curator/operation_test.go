@@ -9,7 +9,7 @@ import (
 )
 
 func TestCurateAndStoreRejectsUnknownOperation(t *testing.T) {
-	service := NewService(nil, &mocks.MockPatternRepository{})
+	service := NewService(&mocks.MockPatternRepository{})
 
 	result, err := service.CurateAndStore(context.Background(), CurateRequest{Operation: Operation("learn_curent")})
 

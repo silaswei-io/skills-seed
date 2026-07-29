@@ -11,13 +11,13 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-`Claude Code` · `Codex` · `Local Skills` · `Workspace` · `Code Review`
+`Claude Code` · `Codex` · `Local Skills` · `Workspace`
 
 [Core Features](#core-features) · [Quick Start](#quick-start) · [Case Study](#case-study) · [Output Preview](#output-preview) · [Agent Cost](#agent-cost-guidance) · [Context](#project-context-and-one-time-guidance) · [Design Principles](#design-principles) · [Workspace](#workspace) · [Command Reference](docs/COMMANDS.EN.md)
 
 </div>
 
-Skills Seed is built for existing projects. It reads current code, Git history, project structure, and recorded check hits, then turns real team practices into local knowledge: naming, error handling, directory layout, business methods, utilities, testing habits, and API conventions.
+Skills Seed is built for existing projects. It reads current code, project structure, explicit project context, and source-backed evidence, then turns real team practices into local knowledge: naming, error handling, directory layout, business methods, utilities, testing habits, and API conventions.
 
 It solves a specific problem: when an AI Agent enters a project for the first time, it usually does not know how this project should be changed. Skills Seed extracts those implicit rules from real code and turns them into local skills that can be loaded, refreshed, and checked.
 
@@ -26,7 +26,7 @@ What you get is not a generic project summary. It is Agent working context gener
 - Which directories own which capabilities, and where to look first for a change.
 - Which business methods, utilities, error-handling patterns, and test habits are already established.
 - Which child project in a workspace should handle a request, and how cross-project changes should be inspected.
-- Which rules repeatedly appear in `check` or review and should be prioritized in generated skills.
+- Which source-backed reusable knowledge should enter generated skill routing, references, and validation guidance.
 
 All data is local by default. The generated skills type is selected by `skills.target`; the Agent CLI used for analysis, learning, and summaries is selected by `agent.engine`. That means you can use `claude` for analysis and summarization while producing `codex` skills.
 
@@ -45,13 +45,13 @@ Skills Seed does not generate a static project summary. It turns project knowled
 ### Low-friction setup and sync
 
 - **Interactive `init` / `sync`**: First runs guide project mode, Agent, parallelism, and execution plan; daily sync can distinguish first generation, incremental sync, resume, and restart.
-- **Flexible configuration**: Agent, Skills target, output path, language, learning mode, unit scope, parallelism, budgets, excludes, retry policy, hooks, and autofix behavior can be configured through flags or `.skills-seed/config.yaml`.
+- **Flexible configuration**: Agent, Skills target, output path, language, learning mode, evidence-focus scope, workspace parallelism, excludes, retry policy, and hooks can be configured through flags or `.skills-seed/config.yaml`.
 
 ### Knowledge learned from real code
 
-- **Learns from code**: Current code, Git history, directory structure, check hits, and review records are the primary inputs, so users do not need to write a long project description first.
+- **Learns from code**: Current code, directory structure, explicit project context, and source evidence are the primary inputs, so users do not need to write a long project description first.
 - **Incremental learning**: `learn current` processes added, modified, and deleted files by default while skipping unchanged files; deleted files clear file fingerprints and are passed into learning as deletion diffs.
-- **Pattern lifecycle**: Patterns have `active`, `stale`, `superseded`, and `deprecated` states. Check, generate, and stats consume active patterns by default. Stale patterns are not physically deleted automatically; use `patterns delete` / `patterns compact` for governance.
+- **Pattern lifecycle**: Patterns have `active`, `stale`, `superseded`, and `deprecated` states. Generation and stats consume active patterns by default. Stale patterns are not physically deleted automatically; use `patterns delete` / `patterns compact` for governance.
 
 ### Skills that refresh and load on demand
 
@@ -105,19 +105,19 @@ Model tier is controlled by the Agent CLI itself. If you need to pin a low-cost 
 
 | Problem | What Skills Seed Does |
 |---|---|
-| You need to explain the same project structure to AI repeatedly | Generates reusable skills from code, Git history, and project profiles |
-| Team conventions live in code, reviews, and individual memory | Extracts patterns, business methods, utilities, and test habits |
+| You need to explain the same project structure to AI repeatedly | Generates reusable skills from current code, project context, and project profiles |
+| Team conventions live in code and individual memory | Extracts patterns, business methods, utilities, and test habits |
 | A multi-project workspace makes context selection unclear | Root skill handles routing; child skills stay independent |
 | Generated skills could feed back into later learning | Excludes `.skills-seed`, skills outputs, and build artifacts by default |
-| You do not know whether generated rules are useful | Records pattern hits from `check`; `patterns stats` shows quality and usage |
+| You do not know whether generated rules are useful | `patterns stats` shows quality metrics, and `patterns compact` can clean duplicate or low-value patterns |
 
 ## Use Cases
 
 - You want an AI Agent to work on an existing business system without re-explaining the project structure and constraints every time.
 - Your team has stable conventions for naming, layout, error handling, business methods, and tests, and you want those conventions available to the assistant.
 - Your workspace contains multiple independent Git child projects, and you want child projects to learn and generate independently while the root skill handles routing and cross-project impact.
-- You want `check` / pre-commit hooks to apply learned rules to future changes and record which rules are actually hit.
-- You want to import local review comments and see which recurring review issues are already covered by learned patterns.
+- You want pre-commit hooks to keep generated Skills fresh before commits.
+- You want reusable source-backed knowledge without maintaining a large hand-written project guide.
 
 ## Output Preview
 
@@ -149,46 +149,42 @@ After `generate skills`, the default output looks like this:
 ## Workflow
 
 ```text
-init -> learn current / learn history -> generate skills -> check
+init -> learn current -> generate skills
 ```
 
 | Stage | Command | Output |
 |---|---|---|
 | Initialize | `skills-seed init` | `.skills-seed/config.yaml`, local database, default context files |
 | Learn current code | `skills-seed learn current` | patterns, business methods, utilities, project profile |
-| Learn history | `skills-seed learn history` | long-lived rules extracted from Git evolution |
 | Generate skills | `skills-seed generate skills` | `SKILL.md`, project overview, specs, pattern references |
-| Check later changes | `skills-seed check` | issues, fix suggestions, and pattern hits based on learned rules |
 
-Starting in 0.10.6, running `skills-seed init` without flags opens an interactive initialization flow. Starting in 0.11.1, the default path asks only for tool language, initialization type, Agent, total Agent parallelism, and the execution plan; analysis depth, unit split scope, Skills language, and Skills type live under optional advanced settings. Running `skills-seed sync` without flags prompts to resume or restart when unfinished state exists. Use `--no-interactive` in scripts, and `sync --resume` / `sync --restart` to control resume behavior explicitly.
+Starting in 0.10.6, running `skills-seed init` without flags opens an interactive initialization flow. The default path asks only for tool language, initialization type, Agent, workspace parallelism, and the execution plan; Skills language and Skills type live under optional advanced settings. Learning strategy defaults are written to `.skills-seed/config.yaml` and can be edited later. Running `skills-seed sync` without flags prompts to resume or restart when unfinished state exists. Use `--no-interactive` in scripts, and `sync --resume` / `sync --restart` to control resume behavior explicitly.
 
-Starting in 0.10.7, `patterns add` and user-pattern sync use `--context` for the natural-language description, `patterns update <id> --context "<request>"` can revise one pattern while preserving its ID and workspace ownership, and `patterns show` supports `--sort updated|score|hits|category`. Model-output parsing now also repairs trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
+Starting in 0.10.7, `patterns add` and user-pattern sync use `--context` for the natural-language description, `patterns update <id> --context "<request>"` can revise one pattern while preserving its ID and workspace ownership, and `patterns show` supports `--sort updated|score|category`. Model-output parsing now also repairs trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
 
 Starting in 0.11.0, `learning.current.mode` supports `fast`, `normal`, and `deep` learning strategies. Generated skills now include related-reference routing, business-pattern importance layers, change-scope validation matrices, and module-grouped entry method indexes. Reference generation also validates source evidence paths before rendering, reducing links to files that do not exist.
 
-Starting in 0.11.1, `learn current` supports `learning.current.parallelism` for in-project analysis-unit concurrency, while workspace root `agent.parallelism` only controls child-project concurrency. `learning.current.scope` supports `domain`, `flow`, and `module` to guide analysis-unit splitting by business domain, workflow, or module granularity. Model-output parsing also repairs invalid evidence line ranges, for example normalizing `"line": 29-43` to a single line number.
+Starting in 0.11.1, workspace root `agent.parallelism` controls child-project concurrency. Inside one project, `learn current` uses segmented short conversations serially because each evidence pack depends on one explicit conversation state. `learning.current.scope` supports `domain`, `flow`, and `module` to guide evidence-focus planning by business domain, workflow, or module granularity. Model-output parsing also repairs invalid evidence line ranges, for example normalizing `"line": 29-43` to a single line number.
 
-Starting in 0.11.2, `learning.current.max_units_per_call` controls how many units one AI call may analyze, with the default `1` meaning no batching; raise it explicitly when reducing call count matters more. Batch results use top-level `units`. Claude and Codex calls now enforce the same DTO-generated schema through their native structured-output flags, while `jsonrepair-go` remains a syntax-repair layer before strict DTO decoding. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer so one-off examples are not promoted into mandatory standards.
+Current learning uses a segmented conversation workflow: candidate narrowing runs before the planning conversation, each evidence pack is analyzed in its own short conversation, diff learning stays anchored to changed hunks, and global curation runs in a separate prompt-only conversation. Claude and Codex calls enforce the same DTO-generated schema through their native structured-output flags, while `jsonrepair-go` remains a syntax-repair layer before strict DTO decoding. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer so one-off examples are not promoted into mandatory standards.
 
 Starting in 0.11.6, current-code and history-learning prompts use a stricter Candidate Admission Gate: facts, summaries, weak local evidence, and generic engineering practice are dropped unless they become source-backed, project-specific, routeable rules that can guide future changes. Business coverage matrices now prevent missed strong candidates instead of forcing pattern output.
 
-Current `sync` / `learn current` file filtering first applies local rules, then writes candidate metadata and, when available, CodeGraph-backed structural context into runtime so AI can make relevance recommendations and assist later analysis-unit planning. Missing or unhealthy CodeGraph indexes are initialized, synced, or repaired automatically; embedded tree-sitter is used only when `provider: treesitter` is explicitly configured. Candidate and focused file lists are referenced as runtime input files instead of being inlined into analysis prompts; file selection, analysis planning, and learning prompts also include stable decision rules to reduce drift for identical inputs. Console progress shows only the important stages plus a compact file-filtering result; candidate counts, timings, and other diagnostic details are kept in runtime logs.
+Current `sync` / `learn current` file filtering first applies local rules, then candidate narrowing chooses the inputs for evidence-pack planning. Large candidate sets can trigger AI candidate narrowing according to `learning.current.select_relevant_files_min_candidates`; smaller changes use deterministic local narrowing. Missing or unhealthy CodeGraph indexes are initialized, synced, or repaired automatically; embedded tree-sitter is used only when `provider: treesitter` is explicitly configured. Candidate and focused file lists are referenced as runtime input files instead of being inlined into analysis prompts; evidence-pack planning and learning prompts also include stable decision rules to reduce drift for identical inputs. Console progress shows only the important stages plus compact filtering and candidate-narrowing summaries; counts, timings, and other diagnostic details are kept in runtime logs.
 
-File selection and analysis-unit planning may read runtime candidate lists, structural context, and necessary repository source in read-only mode so path-referenced inputs remain usable. Pattern curation remains a self-contained prompt-only task and does not rescan the repository. `learn current` checkpoints analysis output, project-profile commit state, and completed AI curation decisions; after local validation or storage failure, `sync --resume` replays the decision without rerunning completed units or calling AI curation again. Curation archives left by older versions can be resumed from the matching child project with `sync --resume --curation-output <file>`. Progress distinguishes AI curation, validation, and pattern-store writes, while token summaries separate uncached tokens from total context processed.
+Evidence-pack planning may read runtime candidate lists, structural context, and necessary repository source in read-only mode so path-referenced inputs remain usable. Pattern curation remains a self-contained prompt-only task and does not rescan the repository. `learn current` checkpoints analysis output, project-profile commit state, and completed AI curation decisions; after local validation or storage failure, `sync --resume` replays the decision without rerunning completed evidence packs or calling AI curation again. Curation archives left by older versions can be resumed from the matching child project with `sync --resume --curation-output <file>`. Progress distinguishes AI curation, validation, and pattern-store writes, while detailed diagnostics are kept in runtime logs.
 
 Starting in 0.13.2, the repository is clean under `staticcheck ./...`; alongside `go test`, `go vet`, and builds, staticcheck is recommended as a release-time quality gate.
 
-AI file filtering provides the final relevance recommendation for the analysis scope, with local validation to keep paths inside the candidate set and force-keep explicit user focus paths. Identical inputs reuse the filtering cache, but the local policy no longer expands narrow AI recommendations to a fixed budget.
-
-Starting in 0.9.0, pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current`, `learn history`, and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact historical patterns, use `skills-seed patterns compact`.
+Pattern deduplication and consolidation happen before storage. Candidate patterns from `learn current` and `patterns add` are curated by AI and validated by the service before they are written to the local pattern store. `generate skills` only reads stored data and no longer merges or repairs the pattern store. To explicitly compact stored patterns, use `skills-seed patterns compact`.
 
 Starting in 0.10.4, the local deterministic merger keeps its internal pattern set unique by pattern ID. It remains the curation path for non-current learning and the recovery path for unclassified current-code candidates; when a candidate reuses an existing ID, or historical data already contains duplicate IDs, it collapses them into one higher-quality pattern before writing.
 
-Starting in 0.10.5, `learn current` unit analysis no longer injects the existing pattern store into every unit prompt, preventing context from growing with the number of saved patterns. Current-code candidates now use the minimal semantic curation contract described above, with deterministic local recovery for missing coverage; use `skills-seed patterns compact --ai` when explicit whole-store semantic compaction is needed.
+Current-code pack analysis no longer injects the existing pattern store into every evidence prompt, preventing context from growing with the number of saved patterns. Current-code candidates use a minimal semantic curation contract with deterministic local recovery for missing coverage; use `skills-seed patterns compact` when explicit whole-store compaction is needed.
 
 Starting in 0.9.1, `learn current` can narrow large candidate file sets through AI relevant-file filtering before analysis. When `generate skills` is run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds it. The root `completion` command has been removed, and Chinese help text is now consistent.
 
-`generate skills` ranks learned patterns by quality: rules with higher effective score, more check hits, and higher confidence are favored, reducing generic or duplicated rules in the final skills.
+`generate skills` ranks learned patterns by quality: rules with higher effective score and confidence are favored, reducing generic or duplicated rules in the final skills.
 
 Learning and project-profile analysis use bounded structural context when focus paths, diffs, samples, or entry files exist. Configure it under `learning.current.structural`: `provider: auto` uses CodeGraph and automatically initializes or repairs its index; `provider: treesitter` explicitly selects the embedded parser.
 
@@ -202,7 +198,7 @@ Generated metadata and unfilled placeholder text in default context files are fi
 
 Starting in 0.7.2, project-profile analysis performs a narrow JSON recovery for duplicated object-start fragments inside object arrays in model output. If parsing still fails, it returns an error and keeps the existing profile instead of saving an `unknown/parse failed` placeholder as a successful result.
 
-Starting in 0.7.3, current-code learning commits file-analysis fingerprints only after patterns are persisted, preventing unsuccessfully learned files from being skipped by later incremental learning. Pattern, file-fingerprint, hit, and review-comment records maintain `created_at/updated_at`; business-method code locations are stored in the DB as language-agnostic snapshot metadata, and `patterns show <pattern-id>` prints the full detail view for one saved pattern.
+Starting in 0.7.3, current-code learning commits file-analysis fingerprints only after patterns are persisted, preventing unsuccessfully learned files from being skipped by later incremental learning. Pattern and file-fingerprint records maintain `created_at/updated_at`; business-method code locations are stored in the DB as language-agnostic snapshot metadata, and `patterns show <pattern-id>` prints the full detail view for one saved pattern.
 
 Starting in 0.9.8, patterns store `evidence_locations` separately as pattern-level source evidence locations. The `patterns show` overview prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first evidence location and the detail view prints the full evidence-location list.
 
@@ -309,10 +305,10 @@ The only user-facing workspace config field is `workspace.projects`. Shared libr
 ## Design Principles
 
 - **Local-first**: learned data, config, and generated output stay in the current repository by default.
-- **Existing-code-first**: real code, Git history, and check hits are the source of truth, instead of requiring users to hand-write a large project guide.
+- **Existing-code-first**: real code, project structure, explicit context, and source evidence are the source of truth, instead of requiring users to hand-write a large project guide.
 - **Agent-agnostic**: `agent.engine` and `skills.target` are separate, so one Agent can analyze while another Agent's skill format is generated.
 - **Workspace-aware**: root workspaces handle routing and cross-project relationships; child repos learn and generate independently.
-- **Feedback-driven**: `check` and review hits feed back into pattern quality, making useful rules more likely to reach the final skills.
+- **Evidence-backed**: learned output remains reusable knowledge supported by source evidence, not automatically an authoritative hard rule.
 
 ## Agent And Skills Target
 
@@ -350,7 +346,6 @@ Built-in targets:
 | `skills-seed workspace add .` | Auto-detect and add all child projects from a workspace root |
 | `skills-seed workspace add <child...>` | Add specific child projects from a workspace root |
 | `skills-seed learn current` | Incrementally learn rules and profile from current code |
-| `skills-seed learn history` | Learn long-lived rules from Git history |
 | `skills-seed generate skills` | Generate skills for the current `skills.target` |
 | `skills-seed workflow show --format json` | List existing workflow summaries |
 | `skills-seed workflow --context "<notes>"` | Infer and save a user workflow through the Agent; omit `--name` to generate a name, same-name workflows merge by default, use `--overwrite` to replace |
@@ -358,10 +353,8 @@ Built-in targets:
 | `skills-seed patterns update <id> --context "<request>"` | Update a specific user pattern |
 | `skills-seed patterns compact` | Explicitly compact similar stored patterns |
 | `skills-seed sync` | Learn current code in one command and generate skills when changes are found |
-| `skills-seed check` | Check staged files or Git-tracked files |
-| `skills-seed patterns stats` | Show pattern quality, hit counts, and recent hits |
+| `skills-seed patterns stats` | Show pattern quality metrics |
 | `skills-seed patterns show` | Show pattern timestamps, business-method locations, and pattern evidence locations from the DB |
-| `skills-seed review import --from-file` | Import local review comments |
 | `skills-seed hook install` | Install the local pre-commit hook |
 
 See [Command Reference](docs/COMMANDS.EN.md) for all flags and forms.
@@ -371,8 +364,8 @@ User-provided goals, constraints, background, paths, or rough notes are inferred
 ## Local And Safety Boundaries
 
 - Project code is not uploaded to a remote knowledge base by default; learned data is written to `.skills-seed` in the current repository.
-- `check` and `generate skills` call the configured Agent CLI, so network behavior depends on the `claude` / `codex` CLI you use.
-- `.skills-seed/memory/project.db` is a local BoltDB file and can only be opened by one `skills-seed` process at a time. If another command is learning, compacting, or inspecting patterns, a new command may report that the database is in use; wait for the running command to finish and retry.
+- Learning, generation, workflow optimization, and user-pattern commands may call the configured Agent CLI, so network behavior depends on the `claude` / `codex` CLI you use.
+- `.skills-seed/store/project.db` is a local BoltDB file and can only be opened by one `skills-seed` process at a time. If another command is learning, compacting, or inspecting patterns, a new command may report that the database is in use; wait for the running command to finish and retry.
 - Generated skills directories, `.git/**`, `.skills-seed/**`, and common build outputs are excluded by default so generated content does not feed back into later learning.
 - Configured Skill output directories are fully rebuilt by skills-seed. Put durable custom guidance in `.skills-seed/context/`, patterns, or workflows instead of editing generated files.
 
@@ -395,7 +388,7 @@ go build -o skills-seed ./cmd/skills-seed
 
 ## Requirements
 
-- Go 1.25.6+
+- Go 1.26+
 - A Git repository
 - An available AI Agent CLI: default `claude`; switch with `--agent codex` or `agent.engine`
 

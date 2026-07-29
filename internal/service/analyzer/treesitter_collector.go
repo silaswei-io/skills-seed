@@ -11,10 +11,11 @@ import (
 	"github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/grammars"
 
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 // structuralContextRequest 定义结构化分析所需的输入参数。
@@ -24,6 +25,22 @@ type structuralContextRequest struct {
 	Purpose     string
 	FocusPaths  []string
 	SeedPaths   []string
+	Progress    func(structuralContextStage)
+}
+
+type structuralContextStage string
+
+const (
+	structuralContextStageCodeGraphIndex   structuralContextStage = "codegraph_index"
+	structuralContextStageCodeGraphContext structuralContextStage = "codegraph_context"
+	structuralContextStageCodeGraphRepair  structuralContextStage = "codegraph_repair"
+	structuralContextStageTreeSitter       structuralContextStage = "treesitter"
+)
+
+func (r structuralContextRequest) report(stage structuralContextStage) {
+	if r.Progress != nil {
+		r.Progress(stage)
+	}
 }
 
 // structuralCollector 从源码文件中提取符号、import 和入口点。
@@ -116,6 +133,7 @@ func (c *treesitterCollector) Collect(ctx context.Context, projectRoot string, r
 	if len(seedRoots) == 0 {
 		return nil, nil
 	}
+	req.report(structuralContextStageTreeSitter)
 
 	var results []fileResult
 	langCounts := map[string]int{}
@@ -137,7 +155,7 @@ func (c *treesitterCollector) Collect(ctx context.Context, projectRoot string, r
 
 	data := c.toStructuralContext(results, langCounts, stats)
 
-	logger.Diagnostic("operation complete",
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.treesitter_collect",
 		"duration", time.Since(startedAt),
 		"project_root", projectRoot,

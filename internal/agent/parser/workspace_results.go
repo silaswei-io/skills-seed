@@ -6,13 +6,33 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-// ParsePlanAnalysisUnitsResult 解析业务分析单元规划结果。
-func ParsePlanAnalysisUnitsResult(output string) (*agent.PlanAnalysisUnitsResult, error) {
-	var payload aicontract.PlanAnalysisUnitsOutput
+// ParsePlanLearningAgendaResult 解析业务学习议程规划结果。
+func ParsePlanLearningAgendaResult(output string) (*agent.PlanLearningAgendaResult, error) {
+	var payload aicontract.PlanLearningAgendaOutput
 	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
-	return &agent.PlanAnalysisUnitsResult{Units: analysisUnitsToDomain(payload.Units)}, nil
+	return &agent.PlanLearningAgendaResult{Focuses: evidenceFocusesToDomain(payload.Focuses)}, nil
+}
+
+// ParseSelectLearningCandidatesResult 解析当前代码学习候选文件收敛结果。
+func ParseSelectLearningCandidatesResult(output string) (*agent.SelectLearningCandidatesResult, error) {
+	var payload aicontract.SelectLearningCandidatesOutput
+	if err := parseJSONPayload(output, &payload); err != nil {
+		return nil, err
+	}
+	result := &agent.SelectLearningCandidatesResult{
+		SelectedPaths: stringsOrEmpty(payload.SelectedPaths),
+		SkippedPaths:  make([]agent.LearningCandidateSkip, 0, len(payload.SkippedPaths)),
+		Reason:        payload.Reason,
+	}
+	for _, skipped := range payload.SkippedPaths {
+		result.SkippedPaths = append(result.SkippedPaths, agent.LearningCandidateSkip{
+			Path:   skipped.Path,
+			Reason: skipped.Reason,
+		})
+	}
+	return result, nil
 }
 
 // ParseWorkspaceProfile 解析工作区画像结果。
@@ -68,10 +88,10 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 	return &spec, nil
 }
 
-func analysisUnitsToDomain(units []aicontract.AnalysisUnitOutput) []domain.AnalysisUnit {
-	out := make([]domain.AnalysisUnit, len(units))
-	for i, unit := range units {
-		out[i] = domain.AnalysisUnit{
+func evidenceFocusesToDomain(focuses []aicontract.EvidenceFocusOutput) []domain.EvidenceFocus {
+	out := make([]domain.EvidenceFocus, len(focuses))
+	for i, unit := range focuses {
+		out[i] = domain.EvidenceFocus{
 			ID:           unit.ID,
 			Name:         unit.Name,
 			RouteTerms:   stringsOrEmpty(unit.RouteTerms),

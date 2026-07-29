@@ -3,6 +3,7 @@ package parser
 import (
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +20,7 @@ func TestParseCuratePatternsResultPreservesDecisionFields(t *testing.T) {
       "source_ids": ["existing-error-handling", "candidate-error-handling"]
     }
   ],
-  "dropped": [{"id":"candidate-generic","reason":"规则过于泛化"}]
+  "dropped": [{"id":"candidate-generic","reason_code":"low_signal_boilerplate","reason":"规则过于泛化"}]
 }`
 
 	result, err := ParseCuratePatternsResult(output)
@@ -30,6 +31,7 @@ func TestParseCuratePatternsResultPreservesDecisionFields(t *testing.T) {
 	require.Equal(t, "existing-error-handling", pattern.ID)
 	require.Equal(t, []string{"existing-error-handling", "candidate-error-handling"}, pattern.SourceIDs)
 	require.Len(t, result.Dropped, 1)
+	require.Equal(t, agent.CuratedDropLowSignalBoilerplate, result.Dropped[0].ReasonCode)
 }
 
 func TestParseCuratePatternsArtifactReadsClaudeEnvelope(t *testing.T) {
@@ -41,26 +43,15 @@ func TestParseCuratePatternsArtifactReadsClaudeEnvelope(t *testing.T) {
 }
 
 func TestParseCuratePatternsArtifactReadsArchivedMarkdown(t *testing.T) {
-	result, err := ParseCuratePatternsArtifact("```json\n{\"patterns\":[],\"dropped\":[{\"id\":\"local\",\"reason\":\"not reusable\"}]}\n```")
+	result, err := ParseCuratePatternsArtifact("```json\n{\"patterns\":[],\"dropped\":[{\"id\":\"local\",\"reason_code\":\"no_routeable_value\",\"reason\":\"not reusable\"}]}\n```")
 
 	require.NoError(t, err)
 	require.Len(t, result.Dropped, 1)
 	require.Equal(t, "local", result.Dropped[0].ID)
 }
 
-func TestParseGenerateFixesResultPreservesSummaryAndWarnings(t *testing.T) {
-	output := `{
-  "fixes": {
-    "main.go": "package main\n"
-  },
-  "confidence": 0.82,
-  "summary": "修复 main.go 的错误包装",
-  "warnings": ["未运行集成测试"]
-}`
+func TestParseCuratePatternsResultRejectsInvalidDropReasonCode(t *testing.T) {
+	_, err := ParseCuratePatternsResult(`{"patterns":[],"dropped":[{"id":"local","reason_code":"generic","reason":"too generic"}]}`)
 
-	result, err := ParseGenerateFixesResult(output)
-
-	require.NoError(t, err)
-	require.Equal(t, "修复 main.go 的错误包装", result.Summary)
-	require.Equal(t, []string{"未运行集成测试"}, result.Warnings)
+	require.ErrorContains(t, err, "reason_code=generic")
 }

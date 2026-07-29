@@ -10,19 +10,17 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 // Service 是模式库唯一的规范入库边界。
 type Service struct {
-	agent       curationAgent
 	patternRepo patternStore
 }
 
 // NewService 创建模式策展服务。
-func NewService(ag curationAgent, repo patternStore) *Service {
+func NewService(repo patternStore) *Service {
 	return &Service{
-		agent:       ag,
 		patternRepo: repo,
 	}
 }
@@ -38,8 +36,11 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 		return nil, fmt.Errorf("unsupported curate operation %q", req.Operation)
 	}
 	candidates := validateCandidates(req.Candidates)
+	precompactionCount := len(candidates)
 	if req.Operation == OperationLearnCurrent {
 		candidates = coalesceCurrentCandidates(validateCurrentCandidates(candidates))
+		precompactionCount = len(candidates)
+		candidates = compactCurrentCandidatesForAI(candidates)
 	}
 	if len(candidates) == 0 {
 		return &CurateResult{
@@ -57,7 +58,7 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
 	var curated *proposal
 	if req.Operation == OperationLearnCurrent {
-		curated, err = s.curateCurrent(ctx, candidates, retrieved, req.DecisionCheckpoint, hooks)
+		curated, err = s.curateCurrent(ctx, candidates, precompactionCount, retrieved, req.DecisionCheckpoint, req.LearningSession, hooks)
 		if err != nil {
 			return nil, fmt.Errorf("curate current patterns: %w", err)
 		}
@@ -100,10 +101,11 @@ func activeCuratorPatterns(patterns []domain.Pattern) []domain.Pattern {
 	return out
 }
 
-func (s *Service) curate(ctx context.Context, operation Operation, candidates, existing []domain.Pattern, allExisting bool, existingByCandidate map[string][]string, checkpoint DecisionCheckpoint, hooks ProgressHooks) (*proposal, error) {
+func (s *Service) curate(ctx context.Context, operation Operation, candidates, existing []domain.Pattern, precompactionCount int, allExisting bool, existingByCandidate map[string][]string, checkpoint DecisionCheckpoint, session agent.LearningSession, hooks ProgressHooks) (*proposal, error) {
 	request := &agent.CuratePatternsRequest{
 		Operation:           string(operation),
 		CandidatePatterns:   candidates,
+		PrecompactionCount:  precompactionCount,
 		ExistingPatterns:    existing,
 		AllExisting:         allExisting,
 		ExistingByCandidate: existingByCandidate,
@@ -127,8 +129,11 @@ func (s *Service) curate(ctx context.Context, operation Operation, candidates, e
 			return proposalFromAgent(result), nil
 		}
 	}
-	if s.agent == nil {
-		return nil, fmt.Errorf("pattern curator agent is not configured")
+	if operation == OperationLearnCurrent && session == nil {
+		return nil, fmt.Errorf("%s", i18n.Get("CuratorLearningSessionRequiredForCurrent"))
+	}
+	if session == nil {
+		return nil, fmt.Errorf("%s", i18n.Get("CuratorLearningSessionRequiredForAI"))
 	}
 
 	retryProgress := agent.NewRetryProgressBinder(hooks.OnStepUpdate)
@@ -138,7 +143,9 @@ func (s *Service) curate(ctx context.Context, operation Operation, candidates, e
 		hooks.OnStepStart(label)
 	}
 	retryProgress.StartStep(label)
-	result, callErr := s.agent.CuratePatterns(ctx, request)
+	var result *agent.CuratePatternsResult
+	var callErr error
+	result, callErr = session.CuratePatterns(ctx, request)
 	retryProgress.FinishStep(label, callErr == nil)
 	if hooks.OnStepComplete != nil {
 		hooks.OnStepComplete(label)

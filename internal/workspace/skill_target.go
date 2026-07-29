@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
-	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
 // ChildSkillTarget 是工作区子项目 Skill 的规范输出位置。
@@ -33,7 +33,7 @@ func ResolveChildSkillTarget(workspaceRoot string, project config.WorkspaceProje
 		configReader = childConfig
 		projectName = firstConfiguredName(childConfig.GetProjectConfig().Name, project.ID)
 	}
-	outputPath, err := utils.ConfiguredSkillOutputPath(projectRoot, configReader)
+	outputPath, err := projectpath.ConfiguredSkillOutput(projectRoot, configReader)
 	if err != nil {
 		return ChildSkillTarget{}, err
 	}

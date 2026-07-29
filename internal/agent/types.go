@@ -2,123 +2,15 @@ package agent
 
 import (
 	"context"
-	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 )
 
-// ProjectContext 项目上下文
-type ProjectContext struct {
-	Name         string   // 项目名称
-	Language     string   // 主要语言
-	Frameworks   []string // 使用的框架
-	Dependencies []string // 依赖项
-}
-
-// AnalyzeRequest 分析请求
-type AnalyzeRequest struct {
-	Files         []domain.FileInfo   // 待分析文件
-	DiffFiles     []DiffFileRef       // 变更文件 diff 引用
-	Context       ProjectContext      // 项目上下文
-	Patterns      []domain.Pattern    // 已知模式
-	RecentCommits []domain.CommitInfo // 最近提交
-}
-
 // DiffFileRef 指向 runtime 目录中的文件 diff。
 type DiffFileRef struct {
 	Path     string // 原文件路径
 	DiffPath string // runtime 中的 diff 文件路径
-}
-
-// AnalyzeResult 分析结果
-type AnalyzeResult struct {
-	Issues      []domain.Issue // 发现的问题
-	Suggestions []string       // 改进建议
-	Confidence  float64        // 置信度
-	AnalyzedAt  time.Time      // 分析时间
-}
-
-// LearnRequest 学习请求
-type LearnRequest struct {
-	Commit             domain.CommitInfo // 提交信息
-	ChangedFiles       []string          // 变更文件路径
-	KnownPatternsJSON  string            // 已知模式 JSON（不包含代码示例）
-	KnownPatternsPath  string            // 已知模式 JSON 文件路径
-	KnownPatternsCount int               // 已知模式数量（快速参考）
-}
-
-// CommitFileChange 关联提交元数据和对应的变更文件路径
-type CommitFileChange struct {
-	Commit domain.CommitInfo
-	Files  []string
-}
-
-// LearnResult 学习结果
-type LearnResult struct {
-	Patterns  []domain.Pattern // 新学习的模式
-	LearnedAt time.Time        // 学习时间
-}
-
-// BatchLearnRequest 批量学习请求
-type BatchLearnRequest struct {
-	Commits            []domain.CommitInfo // 批量提交信息
-	CommitFiles        []CommitFileChange  // 批量提交变更文件路径
-	KnownPatternsJSON  string              // 已知模式 JSON（不包含代码示例）
-	KnownPatternsPath  string              // 已知模式 JSON 文件路径
-	KnownPatternsCount int                 // 已知模式数量
-}
-
-// BatchLearnResult 批量学习结果
-type BatchLearnResult struct {
-	Patterns  []domain.Pattern // 新学习的模式（从所有 commits 中提取）
-	LearnedAt time.Time        // 学习时间
-}
-
-// GenerateFixesRequest 生成修复请求
-type GenerateFixesRequest struct {
-	Issues  []domain.Issue    // 问题列表（直接内嵌）
-	Files   []domain.FileInfo // 相关文件（直接内嵌）
-	Context ProjectContext    // 项目上下文
-}
-
-// GenerateFixesResult 生成修复结果
-type GenerateFixesResult struct {
-	Fixes       map[string]string // 文件路径 -> 修复后的内容
-	Confidence  float64           // 置信度
-	Summary     string            // 修复摘要
-	Warnings    []string          // 需要人工审查的警告
-	GeneratedAt time.Time         // 生成时间
-}
-
-// GenerateSkillsResult AI汇总生成Skills的结果
-type GenerateSkillsResult struct {
-	CategorySummaries      map[string]CategorySummary // 按分类的汇总内容
-	KeyPatterns            []PatternSummary           // 关键模式列表
-	BusinessRules          []string                   // 业务规则总结
-	BestPractices          []string                   // 最佳实践总结
-	CommonPatterns         []string                   // 通用模式总结
-	KeyInsights            []string                   // 关键洞察
-	ImprovementSuggestions []string                   // 改进建议
-}
-
-// CategorySummary 分类汇总
-type CategorySummary struct {
-	Category        string                   // 分类名称
-	Summary         string                   // 汇总描述
-	Patterns        []string                 // 模式列表
-	UsageScenes     []string                 // 使用场景
-	Priority        int                      // 优先级（1-5，5最高）
-	BusinessMethods []*domain.BusinessMethod // 业务方法（仅 business 分类）
-}
-
-// PatternSummary 模式摘要
-type PatternSummary struct {
-	Name       string // 模式名称
-	Category   string // 分类
-	Importance string // 重要性（high/medium/low）
-	Summary    string // 简短摘要
-	WhenToUse  string // 何时使用
 }
 
 // UserDefinePatternRequest 用户自定义模式请求
@@ -142,8 +34,9 @@ type UserDefinePatternResult struct {
 
 // CuratePatternsRequest 模式策展请求。
 type CuratePatternsRequest struct {
-	Operation           string              // 操作来源，如 learn_current、learn_history、manual_compact
+	Operation           string              // 操作来源，如 learn_current、manual_compact
 	CandidatePatterns   []domain.Pattern    // 本次分析产出的候选模式
+	PrecompactionCount  int                 // 当前学习候选在本地重复合并前的数量，仅用于提示 AI 理解输入已预处理
 	ExistingPatterns    []domain.Pattern    // 与候选相关的既有规范模式
 	AllExisting         bool                // ExistingPatterns 是否代表整个模式集合
 	ExistingByCandidate map[string][]string // 候选模式 ID -> 相关既有模式 ID
@@ -160,43 +53,53 @@ type CuratedPattern struct {
 	SourceIDs   []string // 组成该规范模式的候选或既有模式 ID
 }
 
+// CuratedDropReasonCode 标识候选模式不入库的结构化原因。
+type CuratedDropReasonCode string
+
+const (
+	// CuratedDropExactDuplicate 表示候选已被另一个输出完整代表。
+	CuratedDropExactDuplicate CuratedDropReasonCode = "exact_duplicate"
+	// CuratedDropUnsupportedEvidence 表示候选缺少可验证源码归属。
+	CuratedDropUnsupportedEvidence CuratedDropReasonCode = "unsupported_evidence"
+	// CuratedDropContradictory 表示候选与输入中的源码或既有知识冲突。
+	CuratedDropContradictory CuratedDropReasonCode = "contradictory"
+	// CuratedDropUnsafeGuidance 表示候选会把危险历史行为提升为复用建议。
+	CuratedDropUnsafeGuidance CuratedDropReasonCode = "unsafe_guidance"
+	// CuratedDropNoRouteableValue 表示候选没有未来可路由的实现、验证或维护价值。
+	CuratedDropNoRouteableValue CuratedDropReasonCode = "no_routeable_value"
+	// CuratedDropLowSignalBoilerplate 表示候选只是无项目决策价值的样板或薄转发。
+	CuratedDropLowSignalBoilerplate CuratedDropReasonCode = "low_signal_boilerplate"
+	// CuratedDropOverfilteredSourceBacked 表示候选有源码证据但被过度压缩过滤。
+	CuratedDropOverfilteredSourceBacked CuratedDropReasonCode = "overfiltered_source_backed"
+)
+
+// Valid 报告丢弃原因码是否属于约定枚举。
+func (c CuratedDropReasonCode) Valid() bool {
+	switch c {
+	case CuratedDropExactDuplicate,
+		CuratedDropUnsupportedEvidence,
+		CuratedDropContradictory,
+		CuratedDropUnsafeGuidance,
+		CuratedDropNoRouteableValue,
+		CuratedDropLowSignalBoilerplate,
+		CuratedDropOverfilteredSourceBacked:
+		return true
+	default:
+		return false
+	}
+}
+
 // CuratedDrop 表示不入库的候选模式。
 type CuratedDrop struct {
-	ID     string // 候选模式 ID
-	Reason string // 丢弃原因
+	ID         string                // 候选模式 ID
+	ReasonCode CuratedDropReasonCode // 结构化丢弃原因
+	Reason     string                // 丢弃原因
 }
 
 // CuratePatternsResult 模式策展结果。
 type CuratePatternsResult struct {
 	Patterns []CuratedPattern // 应写入模式库的规范模式
 	Dropped  []CuratedDrop    // 明确不入库的候选模式
-}
-
-// FileSelectionCandidate 是 AI 文件筛选器可见的候选文件元数据。
-type FileSelectionCandidate struct {
-	Path    string `json:"path"`              // 相对项目根路径
-	Status  string `json:"status,omitempty"`  // 文件状态，如 added、modified、deleted
-	Size    int64  `json:"size,omitempty"`    // 文件大小（字节）
-	Kind    string `json:"kind,omitempty"`    // 文件类型，如 source、config、schema
-	Changed bool   `json:"changed,omitempty"` // 是否属于本次新增或修改
-}
-
-// SelectFilesRequest 请求 AI 基于候选文件树筛选本次应分析的文件。
-type SelectFilesRequest struct {
-	FileTree              string                   // 候选文件树，不包含源码内容
-	Candidates            []FileSelectionCandidate // 候选文件元数据
-	UserContext           string                   // 一次性用户上下文
-	StructuralContext     string                   // 结构化候选线索，优先来自 CodeGraph
-	StructuralContextPath string                   // 结构化候选线索文件路径
-	CandidateNum          int                      // 候选文件数量
-}
-
-// SelectFilesResult 是 AI 文件筛选器返回的结构化范围。
-type SelectFilesResult struct {
-	Include       []string `json:"include"`        // 需要纳入的相对路径或 glob
-	Exclude       []string `json:"exclude"`        // 需要从 include 中剔除的相对路径或 glob
-	SelectedPaths []string `json:"selected_paths"` // 可选，明确选择的相对文件路径
-	Reason        string   `json:"reason"`         // 简短通用理由
 }
 
 // AnalyzeProjectRequest 项目分析请求
@@ -244,58 +147,54 @@ type SampleFile struct {
 	Path string // 文件路径
 }
 
-// AnalyzeCurrentCodebaseRequest 分析当前代码库请求
+// AnalyzeCurrentCodebaseRequest 描述单个证据焦点的当前代码分析输入。
+// 真实 agent provider 不再直接消费该请求；它只作为服务层和测试适配器的内部 DTO。
 type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName           string // 项目名称
-	RootPath              string // 项目根路径
-	Language              string // 主要语言
-	RuntimeLabel          string // runtime 文件名标签，用于关联本次 prompt 和输出
-	AnalysisUnit          domain.AnalysisUnit
-	FocusPaths            []string      // 指定扫描范围（相对项目根）
-	Structure             string        // 目录结构
-	StructurePath         string        // 目录结构文件路径
-	StructuralContext     string        // 结构化分析上下文
-	StructuralContextPath string        // 结构化分析上下文文件路径
-	MainFiles             []string      // 主要入口文件路径
-	SampleFiles           []SampleFile  // 示例文件路径
-	DiffFiles             []DiffFileRef // 变更文件 diff 引用
-	KnownPatternsJSON     string        // 已知模式 JSON（不包含代码示例）
-	KnownPatternsPath     string        // 已知模式 JSON 文件路径
-	KnownPatternsCount    int           // 已知模式数量
-	FileCount             int           // 文件总数
-	DirCount              int           // 目录总数
-	UserContext           string        // 本次学习传入的一次性用户上下文
-	UserContextPath       string        // 本次学习传入的一次性用户上下文文件路径
+	ProjectName           string
+	RootPath              string
+	Language              string
+	RuntimeLabel          string
+	EvidenceFocus         domain.EvidenceFocus
+	FocusPaths            []string
+	Structure             string
+	StructurePath         string
+	StructuralContext     string
+	StructuralContextPath string
+	MainFiles             []string
+	SampleFiles           []SampleFile
+	DiffFiles             []DiffFileRef
+	KnownPatternsJSON     string
+	KnownPatternsPath     string
+	KnownPatternsCount    int
+	FileCount             int
+	DirCount              int
+	UserContext           string
+	UserContextPath       string
 	LearningMode          config.LearningMode
 	ChangeProfile         string
 }
 
-// AllowedCategories 返回提示词可展示的合法模式分类列表。
-func (r *AnalyzeCurrentCodebaseRequest) AllowedCategories() string {
-	return domain.AllowedPatternCategoriesText()
-}
-
-// AnalyzeCurrentCodebaseResult 分析当前代码库结果
+// AnalyzeCurrentCodebaseResult 描述单个证据焦点的当前代码分析结果。
 type AnalyzeCurrentCodebaseResult struct {
-	Patterns                  []domain.Pattern             // 提取的候选模式
-	ProfileRefreshRecommended ProfileRefreshRecommendation // 是否建议重新分析完整项目画像
+	Patterns                  []domain.Pattern
+	ProfileRefreshRecommended ProfileRefreshRecommendation
 }
 
-// AnalyzeCurrentCodebaseBatchUnit 描述批量当前代码学习中的单个分析单元输入。
-type AnalyzeCurrentCodebaseBatchUnit struct {
-	AnalysisUnit domain.AnalysisUnit
-	FocusPaths   []string
-	SampleFiles  []SampleFile
-	DiffFiles    []DiffFileRef
+// AnalyzeCurrentEvidenceFocus 描述批量当前代码学习中的单个证据焦点输入。
+type AnalyzeCurrentEvidenceFocus struct {
+	EvidenceFocus domain.EvidenceFocus
+	FocusPaths    []string
+	SampleFiles   []SampleFile
+	DiffFiles     []DiffFileRef
 }
 
-// AnalyzeCurrentCodebaseBatchRequest 请求在一次 Agent 调用中分析多个业务单元。
+// AnalyzeCurrentCodebaseBatchRequest 请求在一次 Agent 调用中分析多个证据焦点。
 type AnalyzeCurrentCodebaseBatchRequest struct {
 	ProjectName           string
 	RootPath              string
 	Language              string
 	RuntimeLabel          string
-	Units                 []AnalyzeCurrentCodebaseBatchUnit
+	Focuses               []AnalyzeCurrentEvidenceFocus
 	Structure             string
 	StructurePath         string
 	StructuralContext     string
@@ -312,21 +211,85 @@ func (r *AnalyzeCurrentCodebaseBatchRequest) AllowedCategories() string {
 	return domain.AllowedPatternCategoriesText()
 }
 
-// AnalyzeCurrentCodebaseUnitResult 是批量当前代码学习返回的单个分析单元结果。
-type AnalyzeCurrentCodebaseUnitResult struct {
-	UnitID                    string
-	UnitName                  string
+// AnalyzeCurrentEvidenceResult 是批量当前代码学习返回的单个证据焦点结果。
+type AnalyzeCurrentEvidenceResult struct {
+	FocusID                   string
+	FocusName                 string
 	Patterns                  []domain.Pattern
 	ProfileRefreshRecommended ProfileRefreshRecommendation
 }
 
 // AnalyzeCurrentCodebaseBatchResult 是批量当前代码学习的结果。
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Units []AnalyzeCurrentCodebaseUnitResult
+	Focuses []AnalyzeCurrentEvidenceResult
 }
 
-// PlanAnalysisUnitsRequest 请求按业务能力拆分当前待学习文件。
-type PlanAnalysisUnitsRequest struct {
+// AnalyzeCurrentDeltaFocus 描述增量学习中的单个 diff 锚定证据焦点输入。
+type AnalyzeCurrentDeltaFocus struct {
+	EvidenceFocus   domain.EvidenceFocus
+	FocusPaths      []string
+	ContextFiles    []SampleFile
+	DiffFiles       []DiffFileRef
+	RelatedPatterns []domain.Pattern
+}
+
+// AnalyzeCurrentDeltaBatchRequest 请求基于 diff anchor 判断知识变化。
+type AnalyzeCurrentDeltaBatchRequest struct {
+	ProjectName           string
+	RootPath              string
+	Language              string
+	RuntimeLabel          string
+	Focuses               []AnalyzeCurrentDeltaFocus
+	Structure             string
+	StructurePath         string
+	StructuralContext     string
+	StructuralContextPath string
+	UserContext           string
+	UserContextPath       string
+	LearningMode          config.LearningMode
+	ChangeProfile         string
+}
+
+// AllowedCategories 返回提示词可展示的合法模式分类列表。
+func (r *AnalyzeCurrentDeltaBatchRequest) AllowedCategories() string {
+	return domain.AllowedPatternCategoriesText()
+}
+
+// AnalyzeCurrentDeltaBatchResult 是 diff 锚定增量学习的结构化结果。
+type AnalyzeCurrentDeltaBatchResult struct {
+	Changes                   []domain.KnowledgeChange
+	ProfileRefreshRecommended ProfileRefreshRecommendation
+}
+
+// SelectLearningCandidatesRequest 请求从本地候选文件中收敛值得进入议程规划的文件。
+type SelectLearningCandidatesRequest struct {
+	ProjectName           string
+	RootPath              string
+	Language              string
+	CandidatePaths        []string
+	RequiredPaths         []string
+	StructuralContext     string
+	StructuralContextPath string
+	UserContext           string
+	UserContextPath       string
+	LearningMode          config.LearningMode
+	LearningScope         config.LearningScope
+}
+
+type LearningCandidateSkip struct {
+	Path   string
+	Reason string
+}
+
+// SelectLearningCandidatesResult 是 AI 候选收敛结果。
+type SelectLearningCandidatesResult struct {
+	SelectedPaths []string
+	SkippedPaths  []LearningCandidateSkip
+	Reason        string
+}
+
+// PlanLearningAgendaRequest 请求按业务能力拆分当前待学习文件。
+type PlanLearningAgendaRequest struct {
 	ProjectName           string
 	RootPath              string
 	Language              string
@@ -338,9 +301,9 @@ type PlanAnalysisUnitsRequest struct {
 	LearningScope         config.LearningScope
 }
 
-// PlanAnalysisUnitsResult 是 AI 生成的业务分析单元计划。
-type PlanAnalysisUnitsResult struct {
-	Units []domain.AnalysisUnit `json:"units"`
+// PlanLearningAgendaResult 是 AI 生成的业务证据焦点计划。
+type PlanLearningAgendaResult struct {
+	Focuses []domain.EvidenceFocus `json:"focuses"`
 }
 
 // ProfileRefreshRecommendation 描述是否需要额外刷新完整项目画像。
@@ -383,43 +346,13 @@ type OptimizeWorkflowResult struct {
 	Conflicts []string
 }
 
-// CodeAnalyzer 代码分析接口
-type CodeAnalyzer interface {
-	AnalyzeCode(ctx context.Context, req *AnalyzeRequest) (*AnalyzeResult, error)
-}
-
-// PatternLearner 模式学习接口
-type PatternLearner interface {
-	LearnFromCommit(ctx context.Context, req *LearnRequest) (*LearnResult, error)
-	BatchLearnFromCommits(ctx context.Context, req *BatchLearnRequest) (*BatchLearnResult, error)
-}
-
-// FixGenerator 修复生成接口
-type FixGenerator interface {
-	GenerateFixes(ctx context.Context, req *GenerateFixesRequest) (*GenerateFixesResult, error)
-}
-
-// PatternCurator 模式策展接口
-type PatternCurator interface {
-	CuratePatterns(ctx context.Context, req *CuratePatternsRequest) (*CuratePatternsResult, error)
-}
-
 // UserPatternDefiner 用户自定义模式接口
 type UserPatternDefiner interface {
 	UserDefinePattern(ctx context.Context, req *UserDefinePatternRequest) (*UserDefinePatternResult, error)
 }
 
-// FileSelector 基于候选文件树选择当前代码学习范围。
-type FileSelector interface {
-	SelectFiles(ctx context.Context, req *SelectFilesRequest) (*SelectFilesResult, error)
-}
-
 // ProjectAnalyzer 项目分析接口
 type ProjectAnalyzer interface {
-	AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
-	PlanAnalysisUnits(ctx context.Context, req *PlanAnalysisUnitsRequest) (*PlanAnalysisUnitsResult, error)
-	AnalyzeCurrentCodebase(ctx context.Context, req *AnalyzeCurrentCodebaseRequest) (*AnalyzeCurrentCodebaseResult, error)
-	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeWorkspaceProfile(ctx context.Context, req *AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpec(ctx context.Context, req *AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 }
@@ -433,12 +366,8 @@ type WorkflowOptimizer interface {
 type Agent interface {
 	Name() string
 	IsAvailable() bool
-	CodeAnalyzer
-	PatternLearner
-	FixGenerator
-	PatternCurator
+	LearningSessionProvider
 	UserPatternDefiner
-	FileSelector
 	ProjectAnalyzer
 	WorkflowOptimizer
 }

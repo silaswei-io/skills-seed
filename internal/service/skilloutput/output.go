@@ -7,7 +7,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 )
 
 // Replace 在 staging 目录完整生成 Skill，并事务性替换现有输出。
@@ -20,15 +20,15 @@ func ReplaceWithinRoot(projectRoot, outputPath string, build func(staging string
 	if strings.TrimSpace(projectRoot) == "" {
 		return Replace(outputPath, build)
 	}
-	if _, err := utils.ResolveProjectOutputPath(projectRoot, outputPath); err != nil {
+	if _, err := projectpath.ResolveOutput(projectRoot, outputPath); err != nil {
 		return err
 	}
-	canonicalTarget, err := utils.CanonicalPathWithinRoot(projectRoot, outputPath)
+	canonicalTarget, err := projectpath.CanonicalWithinRoot(projectRoot, outputPath)
 	if err != nil {
 		return err
 	}
 	validate := func() error {
-		current, err := utils.CanonicalPathWithinRoot(projectRoot, outputPath)
+		current, err := projectpath.CanonicalWithinRoot(projectRoot, outputPath)
 		if err != nil {
 			return err
 		}

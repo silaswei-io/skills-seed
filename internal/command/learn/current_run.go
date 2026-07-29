@@ -14,19 +14,17 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
-	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
-	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 type currentFileSelectionPlan struct {
 	Candidates []string
-	Eligible   bool
 	SkipReason string
 }
 
@@ -50,22 +48,33 @@ type learnCurrentProjectRun struct {
 	incrementalChanges  *fileanalysis.FileChanges
 	effectiveFocusPaths []string
 	selectedFiles       []domain.FileInfo
-	selectionSummary    aiFileSelectionSummary
+	selectionSummary    fileSelectionSummary
 	selectionPlan       currentFileSelectionPlan
 	stateSession        *currentStateSession
 	resumeSummary       *learnCurrentResumeSummary
 	changeProfile       currentChangeProfile
 	analysisState       *commandstate.State
-	plannedUnits        []domain.AnalysisUnit
+	plannedFocuses      []domain.EvidenceFocus
 
-	patterns                  []domain.Pattern
-	profileRefreshRecommended agent.ProfileRefreshRecommendation
-	codebaseRunContext        *analyzer.CodebaseRunContext
-	savedCount                int
-	completedAnalysisUnits    []domain.AnalysisUnit
-	importedCuration          *agent.CuratePatternsResult
-	progressDetailMu          sync.Mutex
+	patterns                   []domain.Pattern
+	profileRefreshRecommended  agent.ProfileRefreshRecommendation
+	codebaseRunContext         *analyzer.CodebaseRunContext
+	savedCount                 int
+	completedEvidenceFocuses   []domain.EvidenceFocus
+	importedCuration           *agent.CuratePatternsResult
+	activeLearningSession      agent.LearningSession
+	learningSessionCache       *currentLearningSessionCache
+	progressDetailMu           sync.Mutex
+	fileSelectionSummaryLogged bool
 }
+
+const (
+	learningStagePlanning       = "planning"
+	learningStagePackAnalysis   = "pack-analysis"
+	learningStageDeltaAnalysis  = "delta-analysis"
+	learningStageProfileRefresh = "profile-refresh"
+	learningStageGlobalCuration = "global-curation"
+)
 
 func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
 	run := newLearnCurrentProjectRun(ctx, cont, opts)
@@ -81,7 +90,6 @@ func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Cont
 }
 
 func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) *learnCurrentProjectRun {
-	ctx = agent.WithTokenUsageScope(ctx, opts.tokenScope)
 	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	steps := commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
@@ -127,15 +135,11 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if err := r.detectChanges(); err != nil {
 		return nil, err
 	}
-	if err := r.selectRelevantFilesWithAI(); err != nil {
+	if err := r.runPlanningStage(); err != nil {
 		return nil, err
 	}
-	r.logFileSelectionSummary()
 	if !r.incrementalChanges.HasChanges() {
 		return r.finishWithoutChanges()
-	}
-	if err := r.planAnalysisUnits(); err != nil {
-		return nil, err
 	}
 	if err := r.analyzeCodebase(); err != nil {
 		return nil, err
@@ -167,8 +171,125 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 			return nil, err
 		}
 	}
+	if err := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); err != nil {
+		return nil, err
+	}
 
 	return r.buildResult(false), nil
+}
+
+func (r *learnCurrentProjectRun) runPlanningStage() error {
+	if !r.incrementalChanges.HasChanges() || r.stateSession != nil {
+		if err := r.narrowLearningCandidates(); err != nil {
+			return err
+		}
+		r.logFileSelectionSummaryOnce()
+		if !r.incrementalChanges.HasChanges() {
+			return nil
+		}
+		return r.planLearningAgenda()
+	}
+	return r.withLearningSession(learningStagePlanning, func(agent.LearningSession) error {
+		if err := r.narrowLearningCandidates(); err != nil {
+			return err
+		}
+		r.logFileSelectionSummaryOnce()
+		return r.planLearningAgenda()
+	})
+}
+
+func (r *learnCurrentProjectRun) startLearningSession(stage string) error {
+	resumeSessionID := ""
+	if r.stateSession != nil {
+		cache, err := loadCurrentLearningSessionCache(r.ctx, r.cont.SeedPath, r.stateRepo.Command())
+		if err != nil {
+			return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentLoadLearningSessionCacheFailed"), err)
+		}
+		if cache.matches(r.cont.Agent.Name(), r.currentStateInvocationHash()) && cache.Step == stage {
+			r.learningSessionCache = cache
+			resumeSessionID = cache.SessionID
+		}
+	}
+	session, err := r.cont.Agent.StartLearningSession(r.ctx, agent.LearningSessionRequest{
+		ProjectName:     r.projectName,
+		RootPath:        r.projectRoot,
+		Language:        r.currentLanguage,
+		Stage:           stage,
+		LearningMode:    r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		LearningScope:   r.cont.ConfigRepo.GetCurrentLearningConfig().Scope,
+		ChangeProfile:   string(r.changeProfile),
+		UserContext:     r.opts.userContext,
+		UserContextPath: "",
+		ResumeSessionID: resumeSessionID,
+	})
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentStartLearningSessionFailed"), err)
+	}
+	if session == nil {
+		return fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentLearningSessionMissing", map[string]interface{}{"Agent": r.cont.Agent.Name()}))
+	}
+	r.activeLearningSession = session
+	r.markLearningSessionStep(stage)
+	return nil
+}
+
+func (r *learnCurrentProjectRun) ensureLearningSession(stage string) error {
+	if r.activeLearningSession != nil {
+		return nil
+	}
+	return r.startLearningSession(stage)
+}
+
+func (r *learnCurrentProjectRun) withLearningSession(stage string, run func(agent.LearningSession) error) (err error) {
+	if r.activeLearningSession != nil {
+		return run(r.activeLearningSession)
+	}
+	if err = r.ensureLearningSession(stage); err != nil {
+		return err
+	}
+	defer func() {
+		r.closeLearningSession()
+		if err == nil {
+			if clearErr := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); clearErr != nil {
+				err = clearErr
+			}
+		}
+	}()
+	return run(r.activeLearningSession)
+}
+
+func (r *learnCurrentProjectRun) markLearningSessionStep(step string) {
+	if r.activeLearningSession == nil {
+		return
+	}
+	cache := currentLearningSessionCache{
+		AgentName:      r.cont.Agent.Name(),
+		SessionID:      r.activeLearningSession.SessionID(),
+		Step:           step,
+		InvocationHash: r.currentStateInvocationHash(),
+	}
+	if err := saveCurrentLearningSessionCache(r.ctx, r.cont.SeedPath, r.stateRepo.Command(), cache); err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "command.learn_current.save_learning_session_cache",
+			"step", step,
+			"error", err,
+		)
+		return
+	}
+	r.learningSessionCache = &cache
+}
+
+func (r *learnCurrentProjectRun) closeLearningSession() {
+	if r.activeLearningSession == nil {
+		return
+	}
+	if err := r.activeLearningSession.Close(r.ctx); err != nil {
+		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			"operation", "command.learn_current.close_learning_session",
+			"error", err,
+		)
+	}
+	r.activeLearningSession = nil
 }
 
 func (r *learnCurrentProjectRun) prepareProject() error {
@@ -230,7 +351,7 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		"project_root", r.projectRoot,
 		"project_name", r.projectName,
 		"language", r.currentLanguage,
-		"focus_paths", strings.Join(utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths), ","),
+		"focus_paths", strings.Join(projectpath.Relative(r.projectRoot, r.resolvedFocusPaths), ","),
 		"profile_mode", r.opts.profileMode,
 		"refresh_profile", r.refreshProfile,
 	)
@@ -242,7 +363,7 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		}))
 		if len(r.resolvedFocusPaths) > 0 {
 			logger.Info(i18n.GetWithParams("LearnCurrentFocusInfo", map[string]interface{}{
-				"Focus":       strings.Join(utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths), ", "),
+				"Focus":       strings.Join(projectpath.Relative(r.projectRoot, r.resolvedFocusPaths), ", "),
 				"ProfileMode": r.opts.profileMode,
 			}))
 		}
@@ -263,6 +384,9 @@ func (r *learnCurrentProjectRun) detectChanges() error {
 	}
 	r.logDetectedChanges(detectStartedAt)
 	r.changeProfile = classifyCurrentChangeProfile(r.incrementalChanges)
+	if r.stateSession != nil && r.stateSession.State != nil && strings.TrimSpace(r.stateSession.State.ChangeProfile) != "" {
+		r.changeProfile = currentChangeProfile(r.stateSession.State.ChangeProfile)
+	}
 	r.selectionPlan = r.buildFileSelectionPlan()
 	return nil
 }
@@ -291,6 +415,9 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 			if err := r.stateRepo.Clear(); err != nil {
 				return err
 			}
+			if err := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); err != nil {
+				return err
+			}
 			session = nil
 			if r.opts.force {
 				detected = nil
@@ -309,7 +436,7 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 			"state_scope", r.stateRepo.Command(),
 			"inputs_count", currentStateInputCount(session.State),
 			"pending_count", len(r.incrementalChanges.AddedOrModified)+len(r.incrementalChanges.Deleted),
-			"units_count", len(session.State.Units),
+			"focuses_count", len(session.State.Agenda.Focuses),
 		)
 		return nil
 	}
@@ -333,23 +460,16 @@ func (r *learnCurrentProjectRun) detectCurrentChanges(force bool) (*fileanalysis
 }
 
 func (r *learnCurrentProjectRun) currentStateInvocationHash() string {
-	focusPaths := utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths)
+	focusPaths := projectpath.Relative(r.projectRoot, r.resolvedFocusPaths)
 	return learnCurrentInvocationHash(r.cont.ConfigRepo, focusPaths, r.opts.profileMode, r.opts.force)
 }
 
 func (r *learnCurrentProjectRun) buildFileSelectionPlan() currentFileSelectionPlan {
 	focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
-	currentLearningConfig := r.cont.ConfigRepo.GetCurrentLearningConfig()
 	if r.stateSession != nil {
 		return currentFileSelectionPlan{
 			Candidates: focusRelPaths,
 			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipRestored"),
-		}
-	}
-	if !currentLearningConfig.SelectRelevantFiles {
-		return currentFileSelectionPlan{
-			Candidates: focusRelPaths,
-			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipDisabled"),
 		}
 	}
 	if len(focusRelPaths) == 0 {
@@ -358,110 +478,175 @@ func (r *learnCurrentProjectRun) buildFileSelectionPlan() currentFileSelectionPl
 			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipNoCandidates"),
 		}
 	}
-	if len(focusRelPaths) < currentLearningConfig.SelectRelevantFilesMinCandidates {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-			"operation", "command.learn_current.select_relevant_files",
-			"candidate_count", len(focusRelPaths),
-			"min_candidates", currentLearningConfig.SelectRelevantFilesMinCandidates,
-			"skipped", true,
-		)
-		return currentFileSelectionPlan{
-			Candidates: focusRelPaths,
-			SkipReason: i18n.GetWithParams("ProgressLearnCurrentFileSelectionSkipBelowThreshold", map[string]interface{}{
-				"Candidates":    len(focusRelPaths),
-				"MinCandidates": currentLearningConfig.SelectRelevantFilesMinCandidates,
-			}),
-		}
-	}
-	return currentFileSelectionPlan{Candidates: focusRelPaths, Eligible: true}
+	return currentFileSelectionPlan{Candidates: focusRelPaths}
 }
 
-func (r *learnCurrentProjectRun) selectRelevantFilesWithAI() error {
-	if !r.selectionPlan.Eligible {
-		return r.steps.Run(i18n.GetWithParams("ProgressLearnCurrentSkipAIFileSelection", map[string]interface{}{
-			"Reason": r.selectionPlan.SkipReason,
-		}), func() error { return nil })
-	}
-
-	selectStartedAt := time.Now()
-	selectLabel := i18n.Get("ProgressLearnCurrentAIFileSelection")
-	var selectionResult *fileanalysis.AISelectorResult
-	var selectErr error
-	if err := r.steps.Run(selectLabel, func() error {
-		structuralContext := r.fileSelectionStructuralContext()
-		selectionResult, selectErr = fileanalysis.ApplyAIFileSelector(r.ctx, r.cont.Agent, fileanalysis.AISelectorOptions{
-			ProjectRoot:       r.projectRoot,
-			Candidates:        r.selectionPlan.Candidates,
-			Changes:           r.incrementalChanges,
-			UserContext:       r.opts.userContext,
-			StructuralContext: structuralContext,
-			CachePath:         layout.New(r.cont.SeedPath).Cache("ai-file-selection", r.stateRepo.Command(), "current.json"),
-			RequiredPaths:     utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
-		})
-		if selectErr != nil {
-			logger.Warn(i18n.Get("LearnCurrentAIFileSelectorFallback"))
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-				"operation", "command.learn_current.select_relevant_files",
-				"error", selectErr,
-				"candidate_count", len(r.selectionPlan.Candidates),
-			)
+func (r *learnCurrentProjectRun) narrowLearningCandidates() error {
+	if r.stateSession != nil || len(r.selectionPlan.Candidates) == 0 {
+		r.selectionSummary = fileSelectionSummary{
+			Status: i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
+				"Reason": r.selectionPlan.SkipReason,
+			}),
 		}
+		return nil
+	}
+	selectStartedAt := time.Now()
+	selectLabel := r.candidateSelectionProgressLabel()
+	var selectionResult fileanalysis.LearningCandidateSelectionResult
+	if err := r.steps.Run(selectLabel, func() error {
+		selectionResult = r.selectLearningCandidates()
 		return nil
 	}); err != nil {
 		return err
 	}
-	if selectErr != nil || selectionResult == nil || len(selectionResult.SelectedPaths) == 0 {
-		r.selectionSummary = aiFileSelectionSummary{
-			Attempted:      true,
-			CandidateCount: len(r.selectionPlan.Candidates),
-			Status:         i18n.Get("LearnCurrentAIFileSelectorFallback"),
-		}
-		return nil
-	}
-
 	r.effectiveFocusPaths = resolveIncrementalFocusPaths(r.projectRoot, selectionResult.SelectedPaths)
 	r.selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(selectionResult.SelectedPaths, r.incrementalChanges.AddedOrModified))
-	r.incrementalChanges.ApplyAISelection(selectionResult.SelectedPaths, selectionResult.Reason)
-	r.selectionSummary = aiFileSelectionSummary{
+	r.incrementalChanges.ApplyLearningSelection(selectionResult.SelectedPaths, selectionResult.Reason)
+	selectionStatus := strings.TrimSpace(selectionResult.Reason)
+	if selectionStatus == "" {
+		selectionStatus = i18n.Get("LearnCurrentFileSelectionApplied")
+	}
+	r.selectionSummary = fileSelectionSummary{
 		Applied:        true,
-		Attempted:      true,
 		CandidateCount: len(r.selectionPlan.Candidates),
 		SelectedCount:  len(selectionResult.SelectedPaths),
 		SkippedCount:   len(selectionResult.SkippedPaths),
 		Reason:         selectionResult.Reason,
-		Status:         i18n.Get("LearnCurrentFileSelectionApplied"),
+		Status:         selectionStatus,
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "command.learn_current.select_relevant_files",
+		"operation", "command.learn_current.select_learning_candidates",
 		"duration", time.Since(selectStartedAt),
 		"candidate_count", len(r.selectionPlan.Candidates),
 		"selected_count", len(selectionResult.SelectedPaths),
 		"skipped_count", len(selectionResult.SkippedPaths),
 		"fingerprint_record_count", len(r.incrementalChanges.Records),
-		"reason", selectionResult.Reason,
 	)
 	return nil
 }
 
-func (r *learnCurrentProjectRun) fileSelectionStructuralContext() string {
-	if r.cont == nil || r.cont.AnalyzerSvc == nil {
-		return ""
+func (r *learnCurrentProjectRun) candidateSelectionProgressLabel() string {
+	if r.shouldRunAICandidateSelection() {
+		return i18n.Get("ProgressLearnCurrentAIFileSelection")
 	}
-	return r.cont.AnalyzerSvc.CollectFileSelectionContext(r.ctx, r.projectRoot, analyzer.FileSelectionContextRequest{
-		ProjectName:    r.projectName,
-		Language:       r.currentLanguage,
-		FocusPaths:     utils.RelativePaths(r.projectRoot, r.resolvedFocusPaths),
-		CandidateCount: len(r.selectionPlan.Candidates),
-		UserContext:    r.opts.userContext,
+	return i18n.Get("ProgressLearnCurrentLocalFileSelection")
+}
+
+func (r *learnCurrentProjectRun) selectLearningCandidates() fileanalysis.LearningCandidateSelectionResult {
+	if r.shouldRunAICandidateSelection() {
+		return r.selectLearningCandidatesWithAI()
+	}
+	result := fileanalysis.SelectLearningCandidates(fileanalysis.LearningCandidateSelectionOptions{
+		Candidates:    r.selectionPlan.Candidates,
+		Changes:       r.incrementalChanges,
+		RequiredPaths: projectpath.Relative(r.projectRoot, r.resolvedFocusPaths),
 	})
+	result.Reason = i18n.Get("LearnCurrentFileSelectionLocalReason")
+	return result
+}
+
+func (r *learnCurrentProjectRun) shouldRunAICandidateSelection() bool {
+	if r.cont == nil || r.cont.AnalyzerSvc == nil || r.activeLearningSession == nil {
+		return false
+	}
+	cfg := r.cont.ConfigRepo.GetCurrentLearningConfig()
+	return cfg.SelectRelevantFiles && len(r.selectionPlan.Candidates) >= cfg.SelectRelevantFilesMinCandidates
+}
+
+func (r *learnCurrentProjectRun) selectLearningCandidatesWithAI() fileanalysis.LearningCandidateSelectionResult {
+	candidates := normalizeStatePaths(r.selectionPlan.Candidates)
+	required := projectpath.Relative(r.projectRoot, r.resolvedFocusPaths)
+	seedPaths := fileanalysis.SelectLearningContextSeeds(fileanalysis.LearningCandidateSelectionOptions{
+		Candidates:    candidates,
+		Changes:       r.incrementalChanges,
+		RequiredPaths: required,
+	})
+	selectLabel := r.candidateSelectionProgressLabel()
+	result, err := r.cont.AnalyzerSvc.SelectLearningCandidates(r.ctx, &analyzer.SelectLearningCandidatesRequest{
+		ProjectName:         r.projectName,
+		RootPath:            r.projectRoot,
+		Language:            r.currentLanguage,
+		LearningMode:        r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		LearningScope:       r.cont.ConfigRepo.GetCurrentLearningConfig().Scope,
+		CandidatePaths:      candidates,
+		RequiredPaths:       required,
+		StructuralSeedPaths: seedPaths,
+		UserContext:         r.opts.userContext,
+		Progress: func(stage analyzer.SelectLearningCandidatesStage) {
+			switch stage {
+			case analyzer.SelectLearningCandidatesStageStructuralContext:
+				r.detail(selectLabel, "ProgressLearnCurrentCandidateSelectionStructuralContext", map[string]interface{}{
+					"SeedPaths": len(seedPaths),
+				})
+			case analyzer.SelectLearningCandidatesStageCodeGraphIndex:
+				r.detail(selectLabel, "ProgressLearnCurrentCandidateSelectionCodeGraphIndex", map[string]interface{}{
+					"SeedPaths": len(seedPaths),
+				})
+			case analyzer.SelectLearningCandidatesStageCodeGraphContext:
+				r.detail(selectLabel, "ProgressLearnCurrentCandidateSelectionCodeGraphContext", map[string]interface{}{
+					"SeedPaths": len(seedPaths),
+				})
+			case analyzer.SelectLearningCandidatesStageCodeGraphRepair:
+				r.detail(selectLabel, "ProgressLearnCurrentCandidateSelectionCodeGraphRepair", map[string]interface{}{
+					"SeedPaths": len(seedPaths),
+				})
+			case analyzer.SelectLearningCandidatesStageTreeSitterContext:
+				r.detail(selectLabel, "ProgressLearnCurrentCandidateSelectionTreeSitterContext", map[string]interface{}{
+					"SeedPaths": len(seedPaths),
+				})
+			case analyzer.SelectLearningCandidatesStageAgent:
+				r.detail(selectLabel, "ProgressLearnCurrentCandidateSelectionAgent", map[string]interface{}{
+					"CandidatePaths": len(candidates),
+				})
+			}
+		},
+		LearningSession: r.activeLearningSession,
+	})
+	if err != nil {
+		return fileanalysis.LearningCandidateSelectionResult{
+			SelectedPaths: candidates,
+			SkippedPaths:  nil,
+			Reason: i18n.GetWithParams("LearnCurrentFileSelectionAIFailed", map[string]interface{}{
+				"Error": err.Error(),
+			}),
+		}
+	}
+	selected := sanitizeSelectedLearningCandidates(candidates, result.SelectedPaths, required)
+	if len(selected) == 0 {
+		selected = candidates
+	}
+	return fileanalysis.LearningCandidateSelectionResult{
+		SelectedPaths: selected,
+		SkippedPaths:  subtractStatePaths(candidates, selected),
+		Reason: i18n.GetWithParams("LearnCurrentFileSelectionAIReason", map[string]interface{}{
+			"Reason": strings.TrimSpace(result.Reason),
+		}),
+	}
+}
+
+func sanitizeSelectedLearningCandidates(candidates, selected, required []string) []string {
+	allowed := pathSet(candidates)
+	out := make(map[string]bool, len(selected)+len(required))
+	for _, path := range normalizeStatePaths(selected) {
+		if allowed[path] {
+			out[path] = true
+		}
+	}
+	for _, path := range normalizeStatePaths(required) {
+		if allowed[path] {
+			out[path] = true
+		}
+	}
+	return sortedBoolPaths(out)
 }
 
 func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectResult, error) {
 	recoveredArtifacts := r.stateSession != nil && r.stateSession.State.ArtifactsCommitted
+	needsProfileRefresh := r.refreshProfile && !recoveredArtifacts
 	if r.opts.showDetailedLogs {
 		logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
 	}
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentPlanUnits"), func() error { return nil }); err != nil {
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentPlanFocuses"), func() error { return nil }); err != nil {
 		return nil, err
 	}
 	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
@@ -472,14 +657,14 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 	}
 	profileStartedAt := time.Now()
 	profileStep := i18n.Get("ProgressLearnCurrentSkipProfile")
-	if r.refreshProfile && !recoveredArtifacts {
+	if needsProfileRefresh {
 		profileStep = i18n.Get("ProgressLearnCurrentSaveProfile")
 	}
 	if err := r.steps.Run(profileStep, func() error {
-		if !r.refreshProfile || recoveredArtifacts {
+		if !needsProfileRefresh {
 			return nil
 		}
-		profile, err := analyzeProjectProfile(r.ctx, r.cont, r.projectRoot, r.projectName, r.currentLanguage, nil, nil)
+		profile, err := r.refreshProjectProfileWithSession()
 		if err != nil {
 			return err
 		}
@@ -493,7 +678,7 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 		return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileFailed", map[string]interface{}{"Error": err.Error()}))
 	}
 	if r.opts.showDetailedLogs {
-		if r.refreshProfile && !recoveredArtifacts {
+		if needsProfileRefresh {
 			logger.Info(i18n.Get("LearnCurrentProfileSaved"))
 		} else {
 			logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
@@ -515,6 +700,11 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 			return nil, err
 		}
 	}
+	if r.learningSessionCache != nil {
+		if err := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); err != nil {
+			return nil, err
+		}
+	}
 	return r.buildResult(true), nil
 }
 
@@ -528,33 +718,8 @@ func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectR
 		savedCount:    r.savedCount,
 		skipped:       skipped,
 		duration:      time.Since(r.startedAt),
-		tokenContext:  r.ctx,
-	}
-	if r.opts.showDetailedLogs {
-		agent.FlushTokenUsageScope(r.ctx)
 	}
 	return result
-}
-
-func analyzeProjectProfile(
-	ctx context.Context,
-	cont *container.Container,
-	projectRoot string,
-	projectName string,
-	language string,
-	focusPaths []string,
-	existingProfile *domain.ProjectProfile,
-) (*domain.ProjectProfile, error) {
-	projectOptions := analyzer.AnalyzeProjectOptions{}
-	if existingProfile != nil && len(focusPaths) > 0 {
-		projectOptions.ExistingProfile = existingProfile
-		projectOptions.FocusPaths = focusPaths
-	}
-	result, err := cont.AnalyzerSvc.AnalyzeProjectFullWithOptions(ctx, projectRoot, projectName, language, projectOptions)
-	if err != nil {
-		return nil, err
-	}
-	return analyzer.NewProjectProfile(result, projectName, language), nil
 }
 
 func resolveIncrementalFocusPaths(projectRoot string, relPaths []string) []string {
@@ -624,7 +789,7 @@ func resolveFocusPaths(projectRoot string, paths []string) ([]string, error) {
 			continue
 		}
 
-		path, err := utils.ResolvePath(projectAbs, rawPath)
+		path, err := projectpath.Resolve(projectAbs, rawPath)
 		if err != nil {
 			return nil, err
 		}
@@ -665,5 +830,3 @@ func shouldRefreshProfile(projectRoot string, focusPaths []string, mode string, 
 		return false, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileModeInvalid", map[string]interface{}{"Mode": mode}))
 	}
 }
-
-// runLearnHistory 从 Git 历史提交学习

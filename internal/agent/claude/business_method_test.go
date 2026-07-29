@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseBatchLearnResultWithBusinessMethod(t *testing.T) {
+func TestPatternOutputWithBusinessMethod(t *testing.T) {
 	jsonStr := `{
   "patterns": [
     {

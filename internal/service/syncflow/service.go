@@ -7,7 +7,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 // ChangeRecorder 记录 sync 流程产生的变更摘要。
@@ -16,10 +16,10 @@ type ChangeRecorder interface {
 }
 
 // LearnCurrentFunc 执行当前代码学习。
-type LearnCurrentFunc func(ctx context.Context, req LearnRequest) (domain.LearnCurrentResult, error)
+type LearnCurrentFunc func(ctx context.Context, req LearnCurrentRequest) (domain.LearnCurrentResult, error)
 
-// LearnRequest 描述 sync 传给学习阶段的恢复参数。
-type LearnRequest struct {
+// LearnCurrentRequest 描述 sync 传给当前学习阶段的恢复参数。
+type LearnCurrentRequest struct {
 	StateScope     string
 	UserContext    string
 	Force          bool
@@ -41,7 +41,7 @@ type Service struct {
 
 // Request 描述一次 sync 运行的输入。
 type Request struct {
-	Learn  LearnRequest
+	Learn  LearnCurrentRequest
 	Change ChangeRecorder
 }
 

@@ -1,109 +1,19 @@
 package learn
 
 import (
-	"fmt"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
-type learnCurrentRunningUnits struct {
-	mu        sync.Mutex
-	labels    map[int]string
-	order     []int
-	completed int
-	total     int
-}
-
-func newLearnCurrentRunningUnits(state *commandstate.State, plannedUnits []domain.AnalysisUnit) *learnCurrentRunningUnits {
-	completed, total := learnCurrentPendingUnitProgress(state, plannedUnits)
-	return &learnCurrentRunningUnits{
-		labels:    make(map[int]string),
-		completed: completed,
-		total:     total,
-	}
-}
-
-func (r *learnCurrentRunningUnits) start(index int, label string) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.labels[index]; !exists {
-		r.order = append(r.order, index)
-		sort.Ints(r.order)
-	}
-	r.labels[index] = label
-	return r.runningTextLocked()
-}
-
-func (r *learnCurrentRunningUnits) finish(index int, completed bool) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.labels, index)
-	if completed {
-		r.completed++
-	}
-	out := r.order[:0]
-	for _, candidate := range r.order {
-		if _, exists := r.labels[candidate]; exists {
-			out = append(out, candidate)
-		}
-	}
-	r.order = out
-	return r.runningTextLocked()
-}
-
-func (r *learnCurrentRunningUnits) progressParams(parallelism int) map[string]interface{} {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	current := r.completed + 1
-	if current > r.total {
-		current = r.total
-	}
-	if current < 1 {
-		current = 1
-	}
-	return map[string]interface{}{
-		"Current":      current,
-		"Total":        r.total,
-		"Parallelism":  parallelism,
-		"Running":      r.runningTextLocked(),
-		"RunningCount": len(r.order),
-	}
-}
-
-func (r *learnCurrentRunningUnits) runningTextLocked() string {
-	if len(r.order) == 0 {
-		return "-"
-	}
-	names := make([]string, 0, 2)
-	for _, index := range r.order {
-		if label := r.labels[index]; label != "" {
-			names = append(names, shortenRunes(label, learnCurrentRunningSubjectMaxRunes))
-		}
-		if len(names) >= 2 {
-			break
-		}
-	}
-	if len(names) == 0 {
-		return "-"
-	}
-	if extra := len(r.order) - len(names); extra > 0 {
-		names = append(names, fmt.Sprintf("+%d", extra))
-	}
-	return strings.Join(names, ", ")
-}
-
-type aiFileSelectionSummary struct {
+type fileSelectionSummary struct {
 	Applied        bool
-	Attempted      bool
 	CandidateCount int
 	SelectedCount  int
 	SkippedCount   int
@@ -111,17 +21,13 @@ type aiFileSelectionSummary struct {
 	Status         string
 }
 
-func currentStateInputSummary(changes *fileanalysis.FileChanges, selectionPlan currentFileSelectionPlan, selectionSummary aiFileSelectionSummary) commandstate.InputSummary {
+func currentStateInputSummary(changes *fileanalysis.FileChanges, selectionPlan currentFileSelectionPlan, selectionSummary fileSelectionSummary) commandstate.InputSummary {
 	localPlanInputs := len(selectionPlan.Candidates)
-	aiSelectionInputs := 0
-	aiSelectedFiles := 0
-	aiSkippedFiles := 0
-	if selectionSummary.Attempted || selectionSummary.Applied {
-		aiSelectionInputs = selectionSummary.CandidateCount
-	}
+	selectionInputs := selectionSummary.CandidateCount
+	selectedFiles := selectionSummary.SelectedCount
+	skippedFiles := selectionSummary.SkippedCount
 	if selectionSummary.Applied {
-		aiSelectedFiles = selectionSummary.SelectedCount
-		aiSkippedFiles = selectionSummary.SkippedCount
+		localPlanInputs = selectionSummary.SelectedCount
 	}
 	sourceFiles := 0
 	if changes != nil {
@@ -130,9 +36,9 @@ func currentStateInputSummary(changes *fileanalysis.FileChanges, selectionPlan c
 	return commandstate.InputSummary{
 		SourceFiles:         sourceFiles,
 		LocalPlanInputFiles: localPlanInputs,
-		SelectionInputFiles: aiSelectionInputs,
-		SelectedFiles:       aiSelectedFiles,
-		SkippedFiles:        aiSkippedFiles,
+		SelectionInputFiles: selectionInputs,
+		SelectedFiles:       selectedFiles,
+		SkippedFiles:        skippedFiles,
 	}
 }
 
@@ -144,13 +50,13 @@ func learnCurrentProgressDetail(baseLabel, detailKey string, params map[string]i
 	return i18n.GetWithParams(detailKey, params)
 }
 
-func learnCurrentProgressSubject(unit domain.AnalysisUnit) string {
-	subject := strings.TrimSpace(unit.Name)
+func learnCurrentProgressSubject(focus domain.EvidenceFocus) string {
+	subject := strings.TrimSpace(focus.Name)
 	if subject == "" {
-		subject = strings.TrimSpace(unit.ID)
+		subject = strings.TrimSpace(focus.ID)
 	}
 	if subject == "" {
-		subject = "unit"
+		subject = i18n.Get("LearnCurrentFallbackFocusName")
 	}
 	return shortenRunes(subject, learnCurrentProgressSubjectMaxRunes)
 }
@@ -169,31 +75,19 @@ func shortenRunes(value string, maxRunes int) string {
 	return string(runes[:maxRunes-3]) + "..."
 }
 
-func learnCurrentUnitProgress(state *commandstate.State, fallbackIndex, fallbackTotal int, unit domain.AnalysisUnit) (int, int) {
-	if state == nil || len(state.Units) == 0 {
+func learnCurrentFocusProgress(state *commandstate.State, fallbackIndex, fallbackTotal int, focus domain.EvidenceFocus) (int, int) {
+	if state == nil || len(state.Agenda.Focuses) == 0 {
 		return fallbackIndex, fallbackTotal
 	}
-	for index, planned := range state.Units {
-		if analysisUnitSame(planned, unit) {
-			return index + 1, len(state.Units)
+	for index, planned := range state.Agenda.Focuses {
+		if evidenceFocusSame(planned, focus) {
+			return index + 1, len(state.Agenda.Focuses)
 		}
 	}
-	return fallbackIndex, len(state.Units)
+	return fallbackIndex, len(state.Agenda.Focuses)
 }
 
-func learnCurrentPendingUnitProgress(state *commandstate.State, plannedUnits []domain.AnalysisUnit) (int, int) {
-	total := len(plannedUnits)
-	if state != nil && len(state.Units) > 0 {
-		total = len(state.Units)
-	}
-	completed := total - len(plannedUnits)
-	if completed < 0 {
-		completed = 0
-	}
-	return completed, total
-}
-
-func analysisUnitSame(a, b domain.AnalysisUnit) bool {
+func evidenceFocusSame(a, b domain.EvidenceFocus) bool {
 	if a.ID != "" || b.ID != "" {
 		return a.ID == b.ID
 	}
@@ -213,31 +107,39 @@ func (r *learnCurrentProjectRun) logFileSelectionSummary() {
 	if r.resumeSummary != nil {
 		return
 	}
-	aiInput := "-"
-	aiSelected := "-"
-	aiStatus := i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
+	selectionInput := "-"
+	selectionSelected := "-"
+	selectionStatus := i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
 		"Reason": r.selectionPlan.SkipReason,
 	})
-	if r.selectionSummary.Attempted {
-		aiInput = strconv.Itoa(r.selectionSummary.CandidateCount)
-		aiStatus = strings.TrimSpace(r.selectionSummary.Status)
-		if aiStatus == "" {
-			aiStatus = i18n.Get("LearnCurrentAIFileSelectorFallback")
+	if r.selectionSummary.CandidateCount > 0 {
+		selectionInput = strconv.Itoa(r.selectionSummary.CandidateCount)
+		selectionStatus = strings.TrimSpace(r.selectionSummary.Status)
+		if selectionStatus == "" {
+			selectionStatus = i18n.Get("LearnCurrentFileSelectionApplied")
 		}
 	}
 	if r.selectionSummary.Applied {
-		aiSelected = strconv.Itoa(r.selectionSummary.SelectedCount)
+		selectionSelected = strconv.Itoa(r.selectionSummary.SelectedCount)
 	}
 	logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentFileSelectionSummary", map[string]interface{}{
 		"ScannedFiles":        r.incrementalChanges.ScannedFileCount,
 		"LocalSkippedFiles":   len(r.incrementalChanges.Skipped),
 		"SourceFiles":         r.incrementalChanges.SourceFileCount,
 		"LocalPlanInputs":     len(r.selectionPlan.Candidates),
-		"AISelectionInputs":   aiInput,
-		"AISelectedFiles":     aiSelected,
-		"AISelectionStatus":   aiStatus,
+		"SelectionInputs":     selectionInput,
+		"SelectedFiles":       selectionSelected,
+		"SelectionStatus":     selectionStatus,
 		"PendingAnalyzeFiles": len(analysisCandidatePaths(r.incrementalChanges)),
 	}))
+}
+
+func (r *learnCurrentProjectRun) logFileSelectionSummaryOnce() {
+	if r.fileSelectionSummaryLogged {
+		return
+	}
+	r.fileSelectionSummaryLogged = true
+	r.logFileSelectionSummary()
 }
 
 func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
@@ -248,10 +150,10 @@ func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
 				"CreatedAt":           r.resumeSummary.CreatedAt,
 				"SourceFiles":         r.resumeSummary.SourceFiles,
 				"LocalPlanInputs":     r.resumeSummary.LocalPlanInputs,
-				"AISelectionInputs":   r.resumeSummary.AISelectionInputs,
-				"AISelectedFiles":     r.resumeSummary.AISelectedFiles,
+				"SelectionInputs":     r.resumeSummary.SelectionInputs,
+				"SelectedFiles":       r.resumeSummary.SelectedFiles,
 				"PendingAnalyzeFiles": r.resumeSummary.PendingAnalyzeFiles,
-				"Units":               r.resumeSummary.Units,
+				"Focuses":             r.resumeSummary.Focuses,
 			}))
 		} else {
 			logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{

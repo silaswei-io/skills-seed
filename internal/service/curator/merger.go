@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 func deterministicCurate(candidates, existing []domain.Pattern) *proposal {
@@ -138,12 +139,6 @@ func mergeKeepingBestPattern(left, right domain.Pattern) domain.Pattern {
 	if primary.WorkspaceRole == "" {
 		primary.WorkspaceRole = secondary.WorkspaceRole
 	}
-	if primary.AnalysisUnitID == "" {
-		primary.AnalysisUnitID = secondary.AnalysisUnitID
-	}
-	if primary.AnalysisUnitName == "" {
-		primary.AnalysisUnitName = secondary.AnalysisUnitName
-	}
 	if primary.BusinessMethod == nil {
 		primary.BusinessMethod = secondary.BusinessMethod
 	}
@@ -157,7 +152,7 @@ func mergedPatternSources(left, right domain.Pattern) []string {
 	values = append(values, left.MergedFrom...)
 	values = append(values, right.MergedFrom...)
 	values = append(values, left.ID, right.ID)
-	return uniqueStrings(values)
+	return stringx.UniqueNonEmpty(values)
 }
 
 func patternQualityScore(pattern domain.Pattern) float64 {
@@ -204,25 +199,9 @@ func mergeEvidenceLocations(left, right []domain.PatternEvidenceLocation) []doma
 
 func patternWithSources(pattern domain.Pattern, mergedFrom []string) domain.Pattern {
 	pattern = normalizeCandidate(pattern)
-	pattern.MergedFrom = uniqueStrings(mergedFrom)
+	pattern.MergedFrom = stringx.UniqueNonEmpty(mergedFrom)
 	pattern.Merged = len(pattern.MergedFrom) > 1
 	pattern.BusinessMethod = cloneBusinessMethod(pattern.BusinessMethod)
 	pattern.EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...)
 	return pattern
-}
-
-func uniqueStrings(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-	return result
 }

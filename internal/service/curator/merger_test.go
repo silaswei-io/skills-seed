@@ -36,11 +36,13 @@ func TestCurateAndStoreMergesLocallyAndKeepsHigherQualityPattern(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewService(newDeterministicCuratorAgent(), repo)
+	mockAgent := newDeterministicCuratorAgent()
+	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -85,11 +87,13 @@ func TestCurateAndStoreMergesMultipleDuplicatesLocally(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewService(newDeterministicCuratorAgent(), repo)
+	mockAgent := newDeterministicCuratorAgent()
+	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidateA, *candidateB},
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidateA, *candidateB},
 	})
 
 	require.NoError(t, err)
@@ -124,11 +128,13 @@ func TestCurateAndStoreUpdatesExistingPatternWithSameIDOnce(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewService(newDeterministicCuratorAgent(), repo)
+	mockAgent := newDeterministicCuratorAgent()
+	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -178,11 +184,13 @@ func TestCurateAndStoreDoesNotUseAIDroppedCandidates(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewService(newDeterministicCuratorAgent(), repo)
+	mockAgent := newDeterministicCuratorAgent()
+	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -210,11 +218,13 @@ func TestCurateAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testi
 			return nil
 		},
 	}
-	svc := NewService(newDeterministicCuratorAgent(), repo)
+	mockAgent := newDeterministicCuratorAgent()
+	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)

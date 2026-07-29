@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 func hydrateCurateResult(result *proposal, candidates, existing []domain.Pattern) error {
@@ -39,6 +40,7 @@ func hydrateCurateResult(result *proposal, candidates, existing []domain.Pattern
 			return fmt.Errorf("curated pattern %q has no merged sources", pattern.ID)
 		}
 
+		pattern.MergedFrom = expandHydratedSources(pattern.MergedFrom, sources)
 		sources = prioritizeCurrentSources(pattern.ID, sources)
 		sourceEvidence := evidenceFromSources(sources)
 		pattern.GoodExample, pattern.BadExample = currentExamples(sources)
@@ -76,6 +78,15 @@ func hydrateCurateResult(result *proposal, candidates, existing []domain.Pattern
 		}
 	}
 	return nil
+}
+
+func expandHydratedSources(sourceIDs []string, sources []domain.Pattern) []string {
+	expanded := make([]string, 0, len(sourceIDs)+len(sources))
+	expanded = append(expanded, sourceIDs...)
+	for _, source := range sources {
+		expanded = append(expanded, source.MergedFrom...)
+	}
+	return stringx.UniqueNonEmpty(expanded)
 }
 
 func evidenceFromSources(sources []domain.Pattern) []domain.PatternEvidenceLocation {
@@ -143,8 +154,6 @@ func hydrateCurrentProvenance(pattern *domain.Pattern, sources []domain.Pattern)
 	pattern.ProjectID = commonSourceValue(sources, func(source domain.Pattern) string { return source.ProjectID })
 	pattern.ScopePath = commonSourceValue(sources, func(source domain.Pattern) string { return source.ScopePath })
 	pattern.WorkspaceRole = commonSourceValue(sources, func(source domain.Pattern) string { return source.WorkspaceRole })
-	pattern.AnalysisUnitID = commonSourceValue(sources, func(source domain.Pattern) string { return source.AnalysisUnitID })
-	pattern.AnalysisUnitName = commonSourceValue(sources, func(source domain.Pattern) string { return source.AnalysisUnitName })
 }
 
 func commonSourceValue(sources []domain.Pattern, value func(domain.Pattern) string) string {

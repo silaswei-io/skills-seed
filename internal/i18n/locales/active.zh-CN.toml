@@ -272,47 +272,32 @@ other = "不支持的 Agent engine: {{.Provider}}"
 [AgentNotAvailable]
 other = "Agent {{.Agent}} 不可用，请检查 agent 命令配置"
 
-[AgentRenderAnalyzePromptFailed]
-other = "渲染 learn-analyze prompt 失败"
-
-[AgentRenderBatchLearnPromptFailed]
-other = "渲染 learn-batch prompt 失败"
-
-[AgentRenderGenerateFixesPromptFailed]
-other = "渲染 fix-generate prompt 失败"
-
-[AgentRenderCuratePatternsPromptFailed]
-other = "渲染 pattern-curate prompt 失败"
-
-[AgentRenderAnalysisPlanPromptFailed]
-other = "渲染 analysis-plan prompt 失败"
-
 [AgentRenderOptimizeWorkflowPromptFailed]
-other = "渲染 workflow-optimize prompt 失败"
+other = "渲染 core-workflow-optimize prompt 失败"
 
 [AgentOptimizeWorkflowFailed]
 other = "优化工作流失败"
 
 [AgentRenderProjectAnalysisPromptFailed]
-other = "渲染 project-profile prompt 失败"
+other = "渲染项目或工作区分析 prompt 失败"
 
 [AgentRenderInitSkillsPromptFailed]
-other = "渲染 pattern-learn-current prompt 失败"
+other = "渲染当前学习阶段 prompt 失败"
 
-[AgentCodexAnalyzeFailed]
-other = "Codex 分析代码失败"
+[AgentClaudeLearningSessionIDFailed]
+other = "生成 Claude 学习会话 ID 失败"
 
-[AgentCodexLearnFailed]
-other = "Codex 学习提交失败"
+[AgentCodexLearningSessionIDMissing]
+other = "Codex 学习会话未返回可恢复的会话 ID"
 
-[AgentCodexBatchLearnFailed]
-other = "Codex 批量学习失败"
+[AgentCodexLearningSessionIDLost]
+other = "Codex 学习会话在 {{.Operation}} 期间丢失可恢复的会话 ID"
 
-[AgentCodexGenerateFixesFailed]
-other = "Codex 生成修复失败"
+[AgentPromptInputWriteFailed]
+other = "写入 prompt 输入文件 {{.Name}} 失败"
 
-[AgentCodexCuratePatternsFailed]
-other = "Codex 策展模式失败"
+[AgentLearningSessionNotReady]
+other = "学习会话未就绪: {{.Summary}}"
 
 [AgentCodexProjectAnalysisFailed]
 other = "Codex 项目分析失败"
@@ -419,8 +404,62 @@ other = "AI 分析失败"
 [AnalyzerAnalyzeProjectFailed]
 other = "项目分析失败"
 
+[AnalyzerLearningSessionRequired]
+other = "项目画像同步需要学习会话"
+
 [AnalyzerAnalyzeCodebaseFailed]
 other = "代码库分析失败"
+
+[AnalyzerCollectEngineeringKnowledgeFailed]
+other = "收集工程知识失败"
+
+[AnalyzerResolveProjectProfileSymbolsFailed]
+other = "解析项目画像符号失败"
+
+[AnalyzerDroppedInvalidEngineeringRule]
+other = "已丢弃无效工程规则"
+
+[AnalyzerMarshalProjectProfileFailed]
+other = "序列化项目画像失败"
+
+[AnalyzerLearningSessionRequiredForAgenda]
+other = "当前学习议程规划需要学习会话"
+
+[AnalyzerLearningSessionRequiredForBatch]
+other = "当前代码批次分析需要学习会话"
+
+[AnalyzerLearningSessionRequiredForDelta]
+other = "当前代码增量分析需要学习会话"
+
+[AnalyzerAnalyzeBatchNoFocusResults]
+other = "当前代码批次未返回证据焦点结果"
+
+[AnalyzerAnalyzeBatchUnknownFocus]
+other = "分析批次返回了未知证据焦点 {{.Focus}}"
+
+[AnalyzerAnalyzeBatchOmittedFocus]
+other = "分析批次遗漏了证据焦点 {{.Focus}}"
+
+[LearnCurrentAnalyzeBatchUnknownFocus]
+other = "分析批次返回了未知证据焦点 {{.Focus}}"
+
+[LearnCurrentAnalyzeBatchMissedFocus]
+other = "分析批次遗漏了证据焦点 {{.Focus}}"
+
+[LearnCurrentDeltaBatchUnknownFocus]
+other = "增量分析批次返回了未知证据焦点 {{.Focus}}"
+
+[LearnCurrentDeltaBatchMissedFocus]
+other = "增量分析批次遗漏了证据焦点 {{.Focus}}"
+
+[LearnCurrentLoadRelatedDeltaPatternsFailed]
+other = "加载增量学习相关模式失败"
+
+[LearnCurrentAgendaIncomplete]
+other = "学习议程仍有未完成焦点: {{.Focuses}}"
+
+[LearnCurrentAgendaCoverageMissing]
+other = "学习议程已完成但未覆盖文件: {{.Paths}}"
 
 [AnalyzerStructuralCollectFailed]
 other = "结构化分析失败，将跳过结构化预扫描并继续使用普通文件分析。"
@@ -470,21 +509,6 @@ other = "创建 Git 分支失败"
 [GitCheckoutFailed]
 other = "切换 Git 分支失败"
 
-[AgentClaudeAnalyzeFailed]
-other = "Claude 分析代码失败"
-
-[AgentClaudeLearnFailed]
-other = "Claude 学习提交失败"
-
-[AgentClaudeBatchLearnFailed]
-other = "Claude 批量学习失败"
-
-[AgentClaudeGenerateFixesFailed]
-other = "Claude 生成修复失败"
-
-[AgentClaudeCuratePatternsFailed]
-other = "Claude 策展模式失败"
-
 [AgentClaudeProjectAnalysisFailed]
 other = "Claude 项目分析失败"
 
@@ -493,6 +517,15 @@ other = "Claude CLI 调用失败"
 
 [AgentClaudeRetryable]
 other = "Claude 调用出现可重试错误"
+
+[AgentClaudeStructuredOutputMissing]
+other = "Claude CLI 成功响应中未找到结构化 JSON 输出"
+
+[AgentClaudeEnvelopeParseFailed]
+other = "解析 Claude JSON envelope 失败"
+
+[AgentClaudeUnexpectedEnvelopeType]
+other = "Claude JSON envelope type 为 {{.Type}}，期望 result"
 
 [AgentCodexRetryable]
 other = "Codex 调用出现可重试错误"
@@ -505,6 +538,12 @@ other = "解析 AI 结果失败"
 
 [AgentJSONUnmarshalSimpleFailed]
 other = "解析 JSON 失败"
+
+[AgentRequiredOutputFieldMissing]
+other = "AI 输出缺少必填字段 {{.Field}}"
+
+[AgentInvalidCuratedDropReasonCode]
+other = "AI 策展输出包含无效丢弃原因码: id={{.ID}}, reason_code={{.ReasonCode}}"
 
 [AgentDiagnosticError]
 other = "Agent 诊断: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
@@ -600,7 +639,7 @@ other = "保存模式到数据库"
 other = "代码库分析完成"
 
 [LearnShort]
-other = "从 Git 历史学习"
+other = "从当前代码学习"
 
 [LearnNotInitialized]
 other = "skills-seed 未初始化"
@@ -609,37 +648,10 @@ other = "skills-seed 未初始化"
 other = "请先运行 'skills-seed init' 初始化项目"
 
 [LearnLongDesc]
-other = "从当前代码或 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析当前代码或最近的 Git 提交\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 为 check 和 generate skills 提供项目规范输入"
+other = "从当前代码库学习编码模式。\n\n此命令将：\n  • 使用分段 AI 学习会话规划、分析和策展\n  • 分析当前代码或 diff 锚定变更\n  • 提取有源码证据的编码模式\n  • 保存学到的 patterns 到数据库\n  • 为生成 skills 准备项目知识"
 
 [LearnExample]
-other = "  # 从当前代码学习\n  skills-seed learn current\n\n  # 从 Git 历史学习\n  skills-seed learn history --limit=50\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service --profile skip"
-
-[LearnFromHistory]
-other = "从 Git 历史学习中"
-
-[LearnAnalyzingCommits]
-other = "正在分析 {{.Count}} 个提交..."
-
-[CheckShort]
-other = "检查暂存的文件"
-
-[CheckNotInitialized]
-other = "skills-seed 未初始化"
-
-[CheckRunInitFirst]
-other = "请先运行 'skills-seed init' 初始化项目"
-
-[CheckLongDesc]
-other = "检查暂存的文件是否符合编码规范。\n\n此命令将：\n  • 获取 Git 暂存的文件，或在 --all 时检查所有 Git 跟踪文件\n  • 使用配置的 AI Agent 分析代码\n  • 基于学到的 patterns 发现问题\n  • 提供修复建议\n\n通常通过 Git pre-commit hook 自动运行。"
-
-[CheckFlagInteractive]
-other = "启用交互式修复确认（默认 true；hook 中通常使用 --interactive=false）"
-
-[CheckFlagAll]
-other = "检查所有文件，而不是只检查暂存文件"
-
-[CheckExample]
-other = "  # 检查暂存区文件，发现问题后进入交互式处理\n  skills-seed check\n\n  # 检查所有 Git 跟踪文件\n  skills-seed check --all\n\n  # 在脚本或 hook 中关闭交互\n  skills-seed check --interactive=false"
+other = "  # 从当前代码增量学习\n  skills-seed learn current\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service --profile skip"
 
 [GenerateShort]
 other = "生成 AI Agent skills"
@@ -771,21 +783,6 @@ other = "Hook 运行失败: {{.Error}}"
 other = "  项目根目录: {{.Path}}"
 
 # 学习
-[LearnStarting]
-other = "开始从 Git 历史学习..."
-
-[LearnAnalyzingCommitsCount]
-other = "分析最多 {{.Count}} 个提交"
-
-[LearnNoCommits]
-other = "没有新的提交需要学习"
-
-[LearnBatchStarting]
-other = "正在批量学习提交..."
-
-[LearnBatchProgress]
-other = "正在批量学习提交 {{.Current}}/{{.Total}} 个"
-
 [ProgressLearnCurrentPrepareProject]
 other = "准备项目上下文"
 
@@ -801,41 +798,47 @@ other = "{{.Label}}：检查可恢复计划"
 [ProgressLearnCurrentDetectScanFiles]
 other = "{{.Label}}：扫描文件指纹"
 
-[ProgressLearnCurrentAIFileSelection]
-other = "AI 文件筛选"
+[ProgressLearnCurrentLocalFileSelection]
+other = "本地候选收敛"
 
-[ProgressLearnCurrentSkipAIFileSelection]
-other = "跳过 AI 文件筛选（{{.Reason}}）"
+[ProgressLearnCurrentAIFileSelection]
+other = "AI 候选收敛"
+
+[ProgressLearnCurrentCandidateSelectionStructuralContext]
+other = "{{.Label}} · 准备结构化上下文（入口 {{.SeedPaths}}）"
+
+[ProgressLearnCurrentCandidateSelectionCodeGraphIndex]
+other = "{{.Label}} · CodeGraph 检查索引（入口 {{.SeedPaths}}）"
+
+[ProgressLearnCurrentCandidateSelectionCodeGraphContext]
+other = "{{.Label}} · CodeGraph 提取候选线索（入口 {{.SeedPaths}}）"
+
+[ProgressLearnCurrentCandidateSelectionCodeGraphRepair]
+other = "{{.Label}} · CodeGraph 修复索引（入口 {{.SeedPaths}}）"
+
+[ProgressLearnCurrentCandidateSelectionTreeSitterContext]
+other = "{{.Label}} · 解析结构化入口（入口 {{.SeedPaths}}）"
+
+[ProgressLearnCurrentCandidateSelectionAgent]
+other = "{{.Label}} · 调用 Agent 收敛候选（候选 {{.CandidatePaths}}）"
 
 [ProgressLearnCurrentFileSelectionSkipRestored]
 other = "已恢复分析计划"
 
-[ProgressLearnCurrentFileSelectionSkipDisabled]
-other = "AI 文件筛选已关闭"
-
 [ProgressLearnCurrentFileSelectionSkipNoCandidates]
 other = "无候选文件"
-
-[ProgressLearnCurrentFileSelectionSkipBelowThreshold]
-other = "候选 {{.Candidates}} 个，未达到阈值 {{.MinCandidates}}"
 
 [ProgressLearnCurrentAnalyzeCodebase]
 other = "分析当前代码库"
 
-[ProgressLearnCurrentPlanUnits]
-other = "分析单元规划"
+[ProgressLearnCurrentPlanFocuses]
+other = "学习议程规划"
 
-[ProgressLearnCurrentPlanUnitsRestored]
-other = "恢复分析单元计划（{{.Units}} 个）"
+[ProgressLearnCurrentPlanFocusesRestored]
+other = "恢复学习议程（{{.Focuses}} 个焦点）"
 
-[ProgressLearnCurrentAnalyzeParallelUnits]
-other = "{{.Label}}：{{.Current}}/{{.Total}}，运行中 {{.RunningCount}} 个（{{.Running}}），并发 {{.Parallelism}}"
-
-[ProgressLearnCurrentAnalyzeUnit]
-other = "{{.Label}} · 单元 {{.Current}}/{{.Total}} · {{.Name}}"
-
-[ProgressLearnCurrentAnalyzeSaveUnitPatterns]
-other = "{{.Label}} · 保存模式 {{.Current}}/{{.Total}} · {{.Name}}"
+[ProgressLearnCurrentAnalyzeFocus]
+other = "{{.Label}} · 焦点 {{.Current}}/{{.Total}} · {{.Name}}"
 
 [ProgressLearnCurrentCommitFiles]
 other = "{{.Label}} · 提交 {{.Count}} 个文件状态"
@@ -864,26 +867,14 @@ other = "{{.Label}}（代码分析 {{.Completed}}/{{.Total}} 已完成）"
 [ProgressLearnWorkspaceProjects]
 other = "学习工作区子项目"
 
-[ProgressLearnHistoryBatch]
-other = "分析批次 {{.Current}}/{{.Total}}（提交 {{.Start}}-{{.End}}/{{.CommitTotal}}）"
-
 [ProgressCuratePatternsAI]
 other = "AI 策展模式"
 
 [ProgressCuratePatternsReplay]
 other = "重放已保存的 AI 策展决策"
 
-[ProgressGenerateFixesAI]
-other = "生成修复建议"
-
-[ProgressCheckAnalyzeAI]
-other = "分析代码问题"
-
 [ProgressUserDefinePatternAI]
 other = "生成用户定义模式"
-
-[ProgressProfileRefreshAI]
-other = "分析项目画像"
 
 [LearnFailed]
 other = "学习失败: {{.Error}}"
@@ -956,7 +947,7 @@ other = "Skills 生成成功！"
 other = "输出路径: {{.Path}}"
 
 [GenerateProjectProfileMissing]
-other = "缺少项目画像，无法生成项目概览。请先运行 'skills-seed learn current' 或 'skills-seed profile refresh'。"
+other = "缺少项目画像，无法生成项目概览。请先运行 'skills-seed learn current'。"
 
 [GenerateWorkspaceChildGenerating]
 other = "子项目 {{.ProjectName}} 开始生成 skills"
@@ -987,7 +978,7 @@ other = "本次生成的补充说明，会传给 AI Agent 作为额外约束"
 other = "管理已学习的 patterns"
 
 [PatternsLongDesc]
-other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 通过 --context 添加用户自定义候选模式，并在入库前完成策展\n  update  - 通过 --context 修订指定 pattern\n  delete  - 删除指定 pattern\n  compact - 本地整理已有 patterns，减少重复规则；可显式 --ai 进行语义合并\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量和命中统计。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
+other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 通过 --context 添加用户自定义候选模式，并在入库前完成策展\n  update  - 通过 --context 修订指定 pattern\n  delete  - 删除指定 pattern\n  compact - 本地整理已有 patterns，减少重复规则\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量指标。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
 
 [PatternsExample]
 other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  # 查看单条 pattern 详情\n  skills-seed patterns show business-create-order\n\n  # 整理所有分类中的相似 patterns\n  skills-seed patterns compact"
@@ -996,19 +987,16 @@ other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  #
 other = "整理相似 patterns"
 
 [PatternsCompactLongDesc]
-other = "默认使用本地确定性规则整理已学习 patterns，将高度相似的条目合并为更少、更清晰的 patterns，不调用 Agent。\n\n默认会写回数据库；使用 --dry-run 可只预览整理摘要。可用 --category 限定分类；需要 AI 语义合并时显式传入 --ai。"
+other = "默认使用本地确定性规则整理已学习 patterns，将高度相似的条目合并为更少、更清晰的 patterns，不调用 Agent。\n\n默认会写回数据库；使用 --dry-run 可只预览整理摘要。可用 --category 限定分类。"
 
 [PatternsCompactExample]
-other = "  # 本地整理所有相似 patterns 并写回数据库\n  skills-seed patterns compact\n\n  # 只整理 api 分类\n  skills-seed patterns compact --category api\n\n  # 预览整理结果，不写入数据库\n  skills-seed patterns compact --dry-run\n\n  # 使用 AI 进行语义合并并预览\n  skills-seed patterns compact --ai --dry-run"
+other = "  # 本地整理所有相似 patterns 并写回数据库\n  skills-seed patterns compact\n\n  # 只整理 api 分类\n  skills-seed patterns compact --category api\n\n  # 预览整理结果，不写入数据库\n  skills-seed patterns compact --dry-run"
 
 [PatternsCompactFlagCategory]
 other = "只整理指定分类，如 business、api、testing；留空表示所有分类"
 
 [PatternsCompactFlagDryRun]
 other = "只预览整理结果，不写入数据库"
-
-[PatternsCompactFlagAI]
-other = "使用 AI 进行语义合并；默认使用本地确定性合并"
 
 [PatternsCompactComplete]
 other = "Patterns 整理完成: 输入 {{.TotalInput}}，写入 {{.TotalWritten}}，丢弃 {{.TotalDropped}}，合并分组 {{.MergeCount}}"
@@ -1080,10 +1068,10 @@ other = "需要提供 pattern ID：skills-seed patterns delete <pattern-id>"
 other = "Pattern 已删除: {{.PatternID}}"
 
 [PatternsStatsShort]
-other = "查看 pattern 质量和 check 命中统计"
+other = "查看 pattern 质量指标"
 
 [PatternsStatsLongDesc]
-other = "查看已学习 pattern 的质量指标和 check 命中统计，包括具体度、置信度、有效分、命中次数和最近命中时间。"
+other = "查看已学习 pattern 的质量指标，包括具体度、置信度和有效分。"
 
 [PatternsStatsExample]
 other = "skills-seed patterns stats"
@@ -1102,12 +1090,6 @@ other = "置信度"
 
 [PatternsStatsHeaderEffective]
 other = "有效分"
-
-[PatternsStatsHeaderHits]
-other = "命中数"
-
-[PatternsStatsHeaderLastHit]
-other = "最近命中"
 
 [PatternsShowShort]
 other = "查看已学习 pattern 的概览或完整详情"
@@ -1344,6 +1326,12 @@ other = "生成 skills 失败"
 [PatternCuratorNotConfigured]
 other = "模式策展服务未配置"
 
+[CuratorLearningSessionRequiredForCurrent]
+other = "当前代码模式策展需要学习会话"
+
+[CuratorLearningSessionRequiredForAI]
+other = "AI 模式策展需要学习会话"
+
 [PreviewShort]
 other = "预览分析输入"
 
@@ -1398,57 +1386,6 @@ other = "已删除文件"
 [PreviewFilesOutputMore]
 other = "... 还有 {{.Count}} 个文件"
 
-[ReviewShort]
-other = "导入评审评论并查看防漏统计"
-
-[ReviewLongDesc]
-other = "导入本地评审评论，并与已记录的 pattern 命中按文件和行号窗口对比，用于观察哪些评论已被现有 patterns 覆盖。"
-
-[ReviewExample]
-other = "skills-seed review import --from-file review-comments.json\nskills-seed review stats"
-
-[ReviewImportShort]
-other = "从 JSON 文件导入评审评论"
-
-[ReviewImportLongDesc]
-other = "从 JSON 数组文件导入本地评审评论，并保存到 skills-seed 记忆数据库。"
-
-[ReviewImportExample]
-other = "skills-seed review import --from-file review-comments.json"
-
-[ReviewImportFlagFromFile]
-other = "包含评审评论数组的 JSON 文件"
-
-[ReviewImportComplete]
-other = "已导入 {{.Count}} 条评审评论"
-
-[ReviewStatsShort]
-other = "查看评审评论防漏统计"
-
-[ReviewStatsLongDesc]
-other = "查看已导入评审评论在指定行号窗口内命中已记录 pattern 的数量。"
-
-[ReviewStatsExample]
-other = "skills-seed review stats"
-
-[ReviewStatsFlagLineWindow]
-other = "匹配评审评论与 pattern 命中时允许的行号距离"
-
-[ReviewStatsOutputTotal]
-other = "总评论数"
-
-[ReviewStatsOutputPrevented]
-other = "已防漏"
-
-[ReviewStatsOutputMissed]
-other = "未命中"
-
-[ReviewStatsOutputPattern]
-other = "PATTERN"
-
-[ReviewStatsOutputComments]
-other = "评论数"
-
 # workspace
 [WorkspaceShort]
 other = "管理工作区子项目"
@@ -1487,13 +1424,13 @@ other = "AI 生成用户自定义模式失败"
 
 # 画像
 [ProfileShort]
-other = "查看或更新项目画像"
+other = "查看项目画像"
 
 [ProfileLongDesc]
-other = "查看或更新由 learn current 产出的项目画像。\n\n项目画像保存于 .skills-seed/store/documents/project-profile.json，用于生成 references/project-overview.md，并为 generate skills 提供项目结构、依赖、关键模块和业务方法上下文。"
+other = "查看由 learn current 产出的项目画像。\n\n项目画像保存于 .skills-seed/store/documents/project-profile.json，用于生成 references/project-overview.md，并为 generate skills 提供项目结构、依赖、关键模块和业务方法上下文。画像同步属于当前学习流程，增量学习会基于变更和 AI 建议判断是否更新。"
 
 [ProfileExample]
-other = "  # 查看当前项目画像摘要\n  skills-seed profile show\n\n  # 重新分析项目并更新画像\n  skills-seed profile refresh"
+other = "  # 查看当前项目画像摘要\n  skills-seed profile show\n\n  # 在当前学习中自动判断并刷新画像\n  skills-seed learn current --profile auto"
 
 [ProfileShowShort]
 other = "显示当前项目画像摘要"
@@ -1504,29 +1441,14 @@ other = "读取 .skills-seed/store/documents/project-profile.json，并输出项
 [ProfileShowExample]
 other = "  # 显示当前项目画像摘要\n  skills-seed profile show"
 
-[ProfileRefreshShort]
-other = "重新分析项目并保存项目画像"
-
-[ProfileRefreshLongDesc]
-other = "重新分析当前项目并覆盖保存项目画像，但不学习 patterns。\n\n当项目结构、依赖或关键模块发生变化，而不需要重新学习代码模式时使用。执行前需要 agent.engine 对应的 CLI 可用。"
-
-[ProfileRefreshExample]
-other = "  # 自动使用配置中的项目语言更新画像\n  skills-seed profile refresh\n\n  # 临时指定语言\n  skills-seed profile refresh --language go"
-
 [ProfileMissing]
-other = "项目画像不存在。请先运行 'skills-seed learn current' 或 'skills-seed profile refresh'。"
+other = "项目画像不存在。请先运行 'skills-seed learn current'。"
 
 [ProfileShowHeader]
 other = "项目画像: {{.ProjectName}} ({{.Language}})\n生成时间: {{.GeneratedAt}}"
 
 [ProfileShowStats]
 other = "统计: 框架 {{.Frameworks}}，依赖 {{.Dependencies}}，模块 {{.Modules}}，业务方法 {{.BusinessMethods}}"
-
-[ProfileRefreshStarting]
-other = "更新项目画像: {{.ProjectName}}\n项目根路径: {{.ProjectRoot}}\n语言: {{.Language}}"
-
-[ProfileRefreshComplete]
-other = "项目画像更新完成"
 
 [ProjectProfileReadFailed]
 other = "读取项目画像失败"
@@ -1603,116 +1525,6 @@ other = "序列化工作区规范失败"
 [WorkspaceSpecWriteFailed]
 other = "写入工作区规范失败"
 
-# 检查
-[CheckStarting]
-other = "检查代码质量..."
-
-[CheckAllFiles]
-other = "检查所有文件..."
-
-[CheckStagedFiles]
-other = "检查暂存的文件..."
-
-[CheckFailed]
-other = "检查失败: {{.Error}}"
-
-[CheckNoIssues]
-other = "未发现问题！"
-
-[CheckFoundIssues]
-other = "发现 {{.Count}} 个问题:"
-
-[CheckSuggestion]
-other = "   建议: {{.Suggestion}}"
-
-
-# 交互式检查选项
-[InteractiveFoundIssues]
-other = "发现 {{.Count}} 个问题"
-
-[InteractiveSelectAction]
-other = "请选择如何处理这些问题："
-
-[InteractiveAutoFix]
-other = "自动修复并提交"
-
-[InteractiveAutoFixDesc]
-other = "先提交用户修改，再应用自动修复（修复内容不提交）"
-
-[InteractiveManualFix]
-other = "手动修复"
-
-[InteractiveManualFixDesc]
-other = "退出并手动修复这些问题"
-
-[InteractiveLearnAndCommit]
-other = "学习并继续提交"
-
-[InteractiveLearnAndCommitDesc]
-other = "将当前代码作为新模式学习，然后继续提交"
-
-[InteractiveAutoFixing]
-other = "正在自动修复..."
-
-[InteractiveManualFixHint]
-other = "请手动修复上述问题后重新提交"
-
-[InteractiveLearning]
-other = "正在学习..."
-
-[InteractiveLearningFailed]
-other = "学习失败: {{.Error}}"
-
-[InteractiveLearningSuccess]
-other = "学习完成，继续提交"
-
-# 策略选择
-[InteractiveSelectStrategy]
-other = "选择自动修复策略"
-
-[InteractiveSelectStrategyHint]
-other = "请选择如何应用自动修复："
-
-[StrategyPatch]
-other = "Patch 补丁模式"
-
-[StrategyPatchDesc]
-other = "生成 .patch 补丁文件，可审查后手动应用（推荐）"
-
-[StrategyBackup]
-other = "Backup 备份模式"
-
-[StrategyBackupDesc]
-other = "备份原文件后直接修改，可随时恢复"
-
-[StrategyStash]
-other = "Stash 暂存模式"
-
-[StrategyStashDesc]
-other = "使用 git stash 暂存修复，可随时弹出"
-
-[StrategyBranch]
-other = "Branch 分支模式"
-
-[StrategyBranchDesc]
-other = "在新分支上应用修复，原分支保持不变"
-
-# 自动修复
-[AutoFixPatchCreated]
-other = "已创建补丁文件: {{.Path}}\n使用 'git apply {{.Path}}' 应用补丁"
-
-[AutoFixBackupCreated]
-other = "已创建备份: {{.Path}}\n文件已修改，如需回退请从备份恢复"
-
-[AutoFixDirectApplied]
-other = "修复已直接应用（无备份）"
-
-[AutoFixStashCreated]
-other = "已创建 stash: {{.Message}}\n使用 'git stash pop' 恢复修复"
-
-[AutoFixBranchCreated]
-other = "已创建新分支: {{.BranchName}}\n在新分支上应用了修复，原分支未修改"
-
 # 生成服务
 [GeneratorNoPatterns]
 other = "没有学习到任何模式，跳过 skills 生成"
@@ -1775,82 +1587,6 @@ other = "\n=== 事件统计 ==="
 other = "{{.EventType}}: {{.Count}}"
 
 # ==================== 日志消息 ====================
-
-# 日志 - 检查命令
-[LoggerCheckIssueFormat]
-other = "%d. %s %s:%d"
-
-[LoggerCheckIssueMessage]
-other = "   %s"
-
-[LoggerCheckSelectorError]
-other = "选择器错误: {{.Error}}"
-
-[LoggerCheckStrategyError]
-other = "策略选择错误: {{.Error}}"
-
-[LoggerCheckAutoFixApplying]
-other = "正在应用自动修复..."
-
-[LoggerCheckAutoFixFailed]
-other = "自动修复失败: {{.Error}}"
-
-[LoggerCheckUsingStrategy]
-other = "使用策略: {{.Strategy}}"
-
-[LoggerCheckNoFixGenerated]
-other = "未能生成任何修复"
-
-[LoggerCheckFixCount]
-other = "生成了 {{.Count}} 个文件的修复"
-
-[LoggerCheckReviewPatch]
-other = "\n审查补丁:"
-
-[LoggerCheckCatPatch]
-other = "  cat {{.Path}}"
-
-[LoggerCheckApplyPatch]
-other = "\n应用补丁:"
-
-[LoggerCheckGitApply]
-other = "  git apply {{.Path}}"
-
-[LoggerCheckReversePatch]
-other = "\n撤回补丁:"
-
-[LoggerCheckGitApplyReverse]
-other = "  git apply --reverse {{.Path}}"
-
-[LoggerCheckRestoreNeeded]
-other = "\n如需恢复:"
-
-[LoggerCheckCpBackup]
-other = "  cp -r {{.Path}}/* ."
-
-[LoggerCheckRestoreFix]
-other = "\n恢复修复:"
-
-[LoggerCheckGitStashPop]
-other = "  git stash pop"
-
-[LoggerCheckViewFix]
-other = "\n查看修复:"
-
-[LoggerCheckGitDiffMain]
-other = "  git diff main"
-
-[LoggerCheckCreatePR]
-other = "\n创建 PR:"
-
-[LoggerCheckGhPRCreate]
-other = "  gh pr create --base main --head {{.Branch}}"
-
-[LoggerCheckFileReadError]
-other = "无法读取文件 {{.File}}: {{.Error}}"
-
-[LoggerCheckConfidence]
-other = "修复置信度: {{.Confidence}}%"
 
 # 日志 - 学习服务
 [LoggerLearnerStart]
@@ -1940,17 +1676,11 @@ other = "解析结果失败，返回空结果"
 [LoggerAgentParseResultFailedNonFallback]
 other = "解析结果失败"
 
-[LoggerAgentCuratePatternsCallFailed]
-other = "模式策展调用失败"
-
-[LoggerAgentCuratePatternsParseFallback]
-other = "模式策展结果解析失败"
-
-[LoggerAgentCuratePatternsValidationFallback]
-other = "模式策展结果存在结构性问题，已使用确定性合并结果继续"
-
 [LoggerAgentCuratePatternsCoverageRecovered]
 other = "模式策展候选覆盖率异常，仅对未分类候选执行本地确定性恢复"
+
+[LoggerAgentCuratePatternsRecallRecovered]
+other = "模式策展疑似过度过滤，已恢复有源码证据的候选"
 
 [LoggerAgentCuratePatternsSanitized]
 other = "模式策展结果包含无效或重复决策，已规范化后继续"
@@ -1987,36 +1717,6 @@ other = "Agent 调用开始"
 
 [LoggerDiagnosticAgentCallComplete]
 other = "Agent 调用完成"
-
-[LoggerDiagnosticAgentTokenUsage]
-other = "Agent token 消耗统计"
-
-[AgentTokenUsageConsole]
-other = "Token 消耗: {{.Agent}}/{{.Operation}} 本次非缓存 {{.Current}}、上下文处理 {{.CurrentProcessed}}（{{.Detail}}），累计非缓存 {{.Cumulative}}、处理 {{.CumulativeProcessed}}"
-
-[AgentTokenUsageConsoleScoped]
-other = "Token 消耗: 子项目 {{.Scope}} {{.Agent}}/{{.Operation}} 本次非缓存 {{.Current}}、上下文处理 {{.CurrentProcessed}}（{{.Detail}}），累计非缓存 {{.Cumulative}}、处理 {{.CumulativeProcessed}}"
-
-[AgentTokenUsageSummaryConsole]
-other = "Token 消耗汇总: 累计非缓存 {{.Total}}、上下文处理 {{.Processed}}（{{.Detail}}）"
-
-[AgentTokenUsageInputDetail]
-other = "输入 {{.Value}}"
-
-[AgentTokenUsageOutputDetail]
-other = "输出 {{.Value}}"
-
-[AgentTokenUsageCacheReadDetail]
-other = "缓存读 {{.Value}}"
-
-[AgentTokenUsageCacheWriteDetail]
-other = "缓存写 {{.Value}}"
-
-[AgentTokenUsageReasoningDetail]
-other = "推理 {{.Value}}"
-
-[AgentTokenUsageDetailSeparator]
-other = "，"
 
 [LoggerDiagnosticAgentParseComplete]
 other = "Agent 输出解析完成"
@@ -2056,24 +1756,6 @@ other = "分析当前代码库，提取编码模式、业务方法、最佳实�
 [LearnCurrentExample]
 other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不同步项目画像\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
-[LearnHistoryShort]
-other = "从 Git 历史学习"
-
-[LearnHistoryLongDesc]
-other = "从 Git 提交历史中学习编码模式。\n\n此命令将：\n  • 分析 Git 提交历史\n  • 使用配置的 AI Agent 提取编码模式\n  • 提取业务方法和工具\n  • 保存学到的 patterns 到数据库\n\n学习完成后，可以使用 'skills-seed check' 来检查代码质量。"
-
-[LearnHistoryExample]
-other = "  # 学习最近 50 个提交\n  skills-seed learn history --limit 50\n\n  # 学习最近 30 天提交\n  skills-seed learn history --since 30d\n\n  # 每批 5 个提交调用一次 Agent\n  skills-seed learn history --limit 40 --batch-size 5"
-
-[LearnFlagLimit]
-other = "要分析的提交数量；已学习过的 commit 会跳过"
-
-[LearnFlagSince]
-other = "时间范围（如 7d, 30d, 6m, 1y）"
-
-[LearnFlagBatchSize]
-other = "每批提交数量；每批调用一次 Agent 分析，并在入库前策展候选模式"
-
 [LearnFlagLanguage]
 other = "项目主要编程语言；留空时使用配置或自动识别"
 
@@ -2095,6 +1777,9 @@ other = "忽略文件指纹，强制重新学习当前扫描范围"
 [LearnFlagCurationOutput]
 other = "读取已完成的 CuratePatterns 输出并恢复提交，不再调用 AI 策展"
 
+[LearnCurrentCurationOutputRequiresChildResume]
+other = "--curation-output 必须在对应子项目目录恢复使用"
+
 # 当前学习命令消息
 [LearnCurrentStart]
 other = "开始当前代码增量学习"
@@ -2105,11 +1790,53 @@ other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语�
 [LearnCurrentFocusInfo]
 other = "指定扫描范围: {{.Focus}}\n项目画像策略: {{.ProfileMode}}"
 
+[LearnCurrentFallbackFocusName]
+other = "当前代码变更"
+
+[LearnCurrentFallbackFocusRouteChange]
+other = "当前变更"
+
+[LearnCurrentFallbackFocusRouteLearning]
+other = "代码学习"
+
+[LearnCurrentFallbackFocusReason]
+other = "AI 未返回有效证据焦点时，使用当前待学习文件作为兜底分析范围"
+
+[LearnCurrentLoadLearningSessionCacheFailed]
+other = "加载学习会话缓存失败"
+
+[LearnCurrentStartLearningSessionFailed]
+other = "启动学习会话失败"
+
+[LearnCurrentLearningSessionMissing]
+other = "启动学习会话失败: Agent {{.Agent}} 未返回会话"
+
+[LearnCurrentReadCurationOutputFailed]
+other = "读取策展输出失败"
+
+[LearnCurrentParseCurationOutputFailed]
+other = "解析策展输出失败"
+
+[LearnCurrentCurationCandidateChanged]
+other = "策展候选集已变化"
+
+[LearnCurrentDecodeCurationDecisionFailed]
+other = "解码策展决策失败"
+
+[LearnCurrentCurationCheckpointMissing]
+other = "策展检查点未初始化"
+
+[LearnCurrentEncodeCurationDecisionFailed]
+other = "编码策展决策失败"
+
+[LearnCurrentArtifactsCommittedWithPendingFocuses]
+other = "分析产物已提交，但仍有 {{.Count}} 个证据焦点待处理"
+
 [LearnCurrentIncrementalSummary]
 other = "本地过滤统计:\n  • 文件范围: 扫描 {{.ScannedFiles}}，本地排除 {{.LocalSkippedFiles}}，可学习 {{.SourceFiles}}\n  • 增量候选: 新增/修改 {{.Changed}}，删除 {{.Deleted}}，未变化 {{.Unchanged}}\n  • 待处理候选: {{.LocalPlanInputs}}"
 
 [LearnCurrentResumeSummary]
-other = "恢复未完成的 {{.Command}} 执行计划:\n  • 计划创建时间: {{.CreatedAt}}\n  • 本地候选: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • AI 筛选: 输入 {{.AISelectionInputs}}，保留 {{.AISelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，分析单元 {{.Units}}\n  • 本次复用已保存计划，不重复执行文件扫描、本地过滤和 AI 文件筛选"
+other = "恢复未完成的 {{.Command}} 执行计划:\n  • 本地过滤: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • 候选收敛: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，证据焦点 {{.Focuses}}\n  • 本次复用已保存议程，不重复执行文件扫描、本地过滤和候选收敛"
 
 [LearnCurrentNoFileChanges]
 other = "未检测到可学习文件变化，已跳过 patterns 学习"
@@ -2118,16 +1845,22 @@ other = "未检测到可学习文件变化，已跳过 patterns 学习"
 other = "已排除生成的 skills 目录:\n {{.Paths}}"
 
 [LearnCurrentFileSelectionSummary]
-other = "文件筛选结果:\n  • AI 筛选: 输入 {{.AISelectionInputs}}，保留 {{.AISelectedFiles}}\n  • 状态: {{.AISelectionStatus}}\n  • 最终待分析: {{.PendingAnalyzeFiles}}"
+other = "候选收敛结果:\n  • 候选收敛: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 状态: {{.SelectionStatus}}\n  • 最终待分析: {{.PendingAnalyzeFiles}}"
 
 [LearnCurrentFileSelectionApplied]
-other = "AI 文件筛选已生效"
+other = "候选收敛已生效"
+
+[LearnCurrentFileSelectionLocalReason]
+other = "本地确定性候选收敛"
+
+[LearnCurrentFileSelectionAIReason]
+other = "AI 候选收敛已生效{{if .Reason}}：{{.Reason}}{{end}}"
+
+[LearnCurrentFileSelectionAIFailed]
+other = "AI 候选收敛失败，降级为使用全部候选：{{.Error}}"
 
 [LearnCurrentFileSelectionSkipped]
 other = "已跳过（{{.Reason}}）"
-
-[LearnCurrentAIFileSelectorFallback]
-other = "AI 文件筛选失败，降级为使用全部增量候选"
 
 [LearnCurrentFocusOutsideRoot]
 other = "focus 路径 {{.Path}} 位于项目根目录之外"
@@ -2141,11 +1874,8 @@ other = "无效的项目画像策略 {{.Mode}}，可选值为 auto、skip 或 re
 [LearnCurrentResult]
 other = "分析结果:\n  • 新增模式数: {{.PatternsCount}}"
 
-[LearnCurrentAnalyzeParallelUnits]
-other = "开始并发分析项目单元：{{.Total}} 个单元，并发 {{.Parallelism}}"
-
-[LearnCurrentAnalyzeUnitsSummary]
-other = "分析单元完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}} 个，并发 {{.Parallelism}}"
+[LearnCurrentAnalyzeFocusesSummary]
+other = "证据焦点完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}} 个，项目内串行"
 
 [LearnCurrentSavePatternFailed]
 other = "保存模式失败 [{{.ID}}]: {{.Error}}"
@@ -2163,7 +1893,7 @@ other = "项目画像同步已跳过"
 other = "项目画像同步失败: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并发 {{.Parallelism}}，单项目分析单元并发 {{.UnitParallelism}}"
+other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并发 {{.Parallelism}}，子项目内分段会话串行"
 
 [LearnWorkspaceProjectInfo]
 other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}\n子项目路径: {{.Path}}"
@@ -2213,22 +1943,6 @@ other = "当前代码增量学习完成"
 [LearnCurrentFailed]
 other = "当前代码增量学习失败: {{.Error}}"
 
-# 历史学习命令消息
-[LearnHistoryStart]
-other = "开始从 Git 历史学习"
-
-[LearnHistoryInfo]
-other = "提交数量: {{.Limit}}\n时间范围: {{.Since}}\n批量大小: {{.BatchSize}}"
-
-[LearnHistoryFailed]
-other = "从 Git 历史学习失败: {{.Error}}"
-
-[LearnHistoryComplete]
-other = "Git 历史学习完成"
-
-[LearnHistoryTotalPatterns]
-other = "数据库中共有 {{.Count}} 个模式"
-
 # ==================== 命令错误消息 ====================
 [ErrNotInitialized]
 other = "skills-seed 未初始化，请先运行 'skills-seed init'"
@@ -2238,9 +1952,6 @@ other = "需要手动修复"
 
 [ErrInvalidAction]
 other = "无效的操作"
-
-[ErrFailedToGenerateFixes]
-other = "生成修复失败: {{.Error}}"
 
 [ErrFailedToGetCurrentDir]
 other = "获取当前目录失败: {{.Error}}"
@@ -2504,7 +2215,7 @@ other = "选择 Skills 类型"
 other = "填写 Agent 总并发数"
 
 [InteractiveInitCustomizeAdvanced]
-other = "是否自定义分析深度、切分范围或 Skills 模板配置？"
+other = "是否自定义 Skills 输出语言或类型？"
 
 [InteractiveInitGlobalCLISkills]
 other = "检测到当前环境的全局 skills-seed CLI Skill 未安装或已过期，是否安装/更新？"
@@ -2531,34 +2242,10 @@ other = "只写入 Claude 的全局 Skills 目录。"
 other = "只写入 Codex 的全局 Skills 目录。"
 
 [InteractiveInitParallelismPlanProject]
-other = "单项目：learning.current.parallelism={{.UnitParallelism}}"
+other = "单项目：当前代码学习使用分段会话串行执行"
 
 [InteractiveInitParallelismPlanWorkspace]
-other = "工作区：检测到 {{.Projects}} 个子项目，agent.parallelism={{.WorkspaceParallelism}}，learning.current.parallelism={{.UnitParallelism}}"
-
-[InteractiveInitLearningMode]
-other = "选择分析深度"
-
-[InteractiveInitLearningModeFastDesc]
-other = "更快，合并更多相近能力，只学习高价值稳定模式。"
-
-[InteractiveInitLearningModeNormalDesc]
-other = "默认且最稳妥，平衡质量和速度。"
-
-[InteractiveInitLearningModeDeepDesc]
-other = "更深入，会读取更深分支、外部依赖和异常路径。"
-
-[InteractiveInitLearningScope]
-other = "选择单元切分范围"
-
-[InteractiveInitLearningScopeDomainDesc]
-other = "更粗，按业务域合并，模式更少；适合沉淀高层长期规则。"
-
-[InteractiveInitLearningScopeFlowDesc]
-other = "默认且最稳定，按业务流程、资源动作或外部系统职责拆分。"
-
-[InteractiveInitLearningScopeModuleDesc]
-other = "更细，按模块、插件或接口拆分；适合边界清晰的插件化仓库。"
+other = "工作区：检测到 {{.Projects}} 个子项目，agent.parallelism={{.WorkspaceParallelism}}，每个子项目内分段会话串行"
 
 [InteractiveInitSummaryTitle]
 other = "即将执行"
@@ -2589,12 +2276,6 @@ other = "Agent 总并发数"
 
 [InteractiveInitSummaryParallelismPlan]
 other = "并发配置"
-
-[InteractiveInitSummaryLearningMode]
-other = "分析深度"
-
-[InteractiveInitSummaryLearningScope]
-other = "切分范围"
 
 [InteractiveInitAlreadyInitializedTitle]
 other = "当前仓库已初始化 skills-seed，本次要做什么？"
@@ -2708,7 +2389,7 @@ other = "学习当前代码并在有学习结果时生成第一版 Skills。"
 other = "继续上次未完成的同步"
 
 [InteractiveSyncResumeDesc]
-other = "复用已有运行状态，跳过已完成单元，继续未完成任务。"
+other = "复用已有运行状态，跳过已完成焦点，继续未完成任务。"
 
 [InteractiveSyncRestart]
 other = "重新开始同步"
@@ -2843,7 +2524,7 @@ other = "项目特定模式"
 other = "入口方法索引"
 
 [GeneratorProfileReferenceBusinessMethodsDescription]
-other = "项目级业务入口、跨模块编排入口和高价值工具入口索引"
+other = "常用业务入口、模块扩展入口、跨模块编排入口和高价值工具入口索引"
 
 [GeneratorProfileReferenceModulesTitle]
 other = "关键模块"
@@ -2871,9 +2552,6 @@ other = "skills 由已入库模式、项目画像和工作流确定性生成；�
 
 [GeneratorInsightCoveredCategories]
 other = "已覆盖模式分类：{{.Categories}}"
-
-[GeneratorInsightCheckHitOrdering]
-other = "已结合 check 命中统计排序。"
 
 [GeneratorOverviewArchitectureSummary]
 other = "已从当前代码学习到 {{.Count}} 个架构层次；本节用于导航已沉淀的结构事实，具体职责以“架构层次”和“关键模块”章节为准。"
@@ -3007,30 +2685,6 @@ other = "跨项目改动先定边界"
 [WorkspaceRuleBoundaryDescription]
 other = "修改契约、共享代码或基础设施前，先确认受影响子项目并读取对应 skill。"
 
-[CheckerGetStagedFilesFailed]
-other = "获取暂存文件失败"
-
-[CheckerWalkProjectFailed]
-other = "遍历项目文件失败"
-
-[CheckerBuildSnapshotDiffFailed]
-other = "生成文件快照差异失败"
-
-[CheckerReplaceSnapshotFailed]
-other = "替换文件快照失败"
-
-[CheckerGetPatternsFailed]
-other = "获取已知模式失败"
-
-[CheckerGetRecentCommitsFailed]
-other = "获取最近提交失败"
-
-[CheckerAnalyzeFailed]
-other = "AI 分析失败"
-
-[CheckerSavePatternHitsFailed]
-other = "保存模式命中记录失败"
-
 [InteractiveSelectRequiresOption]
 other = "交互选择至少需要一个选项"
 
@@ -3142,5 +2796,5 @@ other = "子命令"
 [CommandDocsHeaderFlags]
 other = "参数"
 
-[AutoFixPatchHeader]
-other = "# skills-seed 自动生成补丁\n# 生成时间: {{.GeneratedAt}}\n# 修复问题数: {{.IssueCount}}"
+[GeneratorBusinessCoverageSinglePatternWarning]
+other = "该子域当前只有 1 个已学习模式，覆盖可能不完整；命中时先按证据路径复核当前代码，不要推断为完整规则集。"

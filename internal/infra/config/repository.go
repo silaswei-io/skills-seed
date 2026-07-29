@@ -21,7 +21,6 @@ type Config struct {
 	Workspace WorkspaceConfig `yaml:"workspace"`
 	Agent     AgentConfig     `yaml:"agent"`
 	Learning  LearningConfig  `yaml:"learning"`
-	AutoFix   AutoFixConfig   `yaml:"autofix"`
 	Skills    SkillsConfig    `yaml:"skills"`
 	Logging   LoggingConfig   `yaml:"logging"`
 	Exclude   ExcludeConfig   `yaml:"exclude"` // 全局排除配置
@@ -192,10 +191,9 @@ func (r RetryConfig) WaitDuration(attempt int) time.Duration {
 	return wait
 }
 
-// LearningConfig 控制 learn current 和 learn history 的默认学习范围。
+// LearningConfig 控制 learn current 的默认学习范围。
 type LearningConfig struct {
 	Current CurrentLearningConfig `yaml:"current"` // learn current 的文件范围和结构化上下文配置
-	History HistoryLearningConfig `yaml:"history"` // learn history 的提交范围配置
 
 	defaultsApplied bool `yaml:"-"`
 }
@@ -203,7 +201,6 @@ type LearningConfig struct {
 func defaultLearningConfig() LearningConfig {
 	return LearningConfig{
 		Current:         defaultCurrentLearningConfig(),
-		History:         defaultHistoryLearningConfig(),
 		defaultsApplied: true,
 	}
 }
@@ -241,7 +238,7 @@ func NormalizeLearningMode(mode string) LearningMode {
 	}
 }
 
-// LearningScope 控制 learn current 规划分析单元时采用的切分范围。
+// LearningScope 控制 learn current 规划学习焦点时采用的学习取向。
 type LearningScope string
 
 const (
@@ -265,11 +262,10 @@ func NormalizeLearningScope(scope string) LearningScope {
 // CurrentLearningConfig 控制 learn current 的文件选择和结构化上下文。
 type CurrentLearningConfig struct {
 	Mode                             LearningMode     `yaml:"mode"`                                 // 学习模式：fast、normal、deep
-	Scope                            LearningScope    `yaml:"scope"`                                // 分析单元切分范围：domain、flow、module
-	Parallelism                      int              `yaml:"parallelism"`                          // 单项目分析单元并发数，0 或 1 表示串行
-	MaxUnitsPerCall                  int              `yaml:"max_units_per_call"`                   // 单次 AI 调用最多分析的单元数，1 表示不合批
-	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否先筛选最值得分析的相关文件
-	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 文件筛选
+	Scope                            LearningScope    `yaml:"scope"`                                // 学习焦点规划取向：domain、flow、module
+	MaxFocusesPerCall                int              `yaml:"max_focuses_per_call"`                 // 单次 AI 调用最多分析的焦点数，1 表示不合批
+	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否在大候选集上启用 AI 候选收敛
+	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 候选收敛
 	Structural                       StructuralConfig `yaml:"structural"`                           // 结构化上下文配置
 
 	defaultsApplied bool `yaml:"-"`
@@ -279,8 +275,7 @@ func defaultCurrentLearningConfig() CurrentLearningConfig {
 	return CurrentLearningConfig{
 		Mode:                             LearningModeNormal,
 		Scope:                            LearningScopeFlow,
-		Parallelism:                      1,
-		MaxUnitsPerCall:                  1,
+		MaxFocusesPerCall:                1,
 		SelectRelevantFiles:              true,
 		SelectRelevantFilesMinCandidates: 200,
 		Structural:                       defaultStructuralConfig(),
@@ -298,25 +293,6 @@ func (c *CurrentLearningConfig) UnmarshalYAML(value *yaml.Node) error {
 	*c = CurrentLearningConfig(defaults)
 	c.defaultsApplied = true
 	return nil
-}
-
-// HistoryLearningConfig 控制 learn history 的提交范围。
-type HistoryLearningConfig struct {
-	MaxCommits int `yaml:"max_commits"` // 默认分析的提交数量
-	BatchSize  int `yaml:"batch_size"`  // 批量分析 commit 数量
-}
-
-func defaultHistoryLearningConfig() HistoryLearningConfig {
-	return HistoryLearningConfig{
-		MaxCommits: 50,
-		BatchSize:  5,
-	}
-}
-
-// AutoFixConfig 控制检查自动修复的修复产物和回滚策略。
-type AutoFixConfig struct {
-	Strategy   string `yaml:"strategy"`    // 修复策略：patch, backup, stash, branch
-	BackupPath string `yaml:"backup_path"` // 备份路径（相对于 .skills-seed 目录）
 }
 
 // LoggingConfig 控制命令运行日志的级别、目录和保留数量。
@@ -487,7 +463,7 @@ func (r *Repository) loadConfigYAMLNode(cfg *Config) (*yaml.Node, error) {
 		return nil, err
 	}
 	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("%s", i18n.Get("ConfigYAMLRootNotMapping"))
+		return nil, errors.New(i18n.Get("ConfigYAMLRootNotMapping"))
 	}
 	return &root, nil
 }
@@ -589,11 +565,11 @@ func normalizeLearningConfig(cfg *Config) {
 	}
 	cfg.Learning.Current.Mode = NormalizeLearningMode(string(cfg.Learning.Current.Mode))
 	cfg.Learning.Current.Scope = NormalizeLearningScope(string(cfg.Learning.Current.Scope))
-	if cfg.Learning.Current.Parallelism < 0 {
-		cfg.Learning.Current.Parallelism = 1
+	if cfg.Learning.Current.MaxFocusesPerCall <= 0 {
+		cfg.Learning.Current.MaxFocusesPerCall = 1
 	}
-	if cfg.Learning.Current.MaxUnitsPerCall <= 0 {
-		cfg.Learning.Current.MaxUnitsPerCall = 1
+	if cfg.Learning.Current.SelectRelevantFilesMinCandidates <= 0 {
+		cfg.Learning.Current.SelectRelevantFilesMinCandidates = 200
 	}
 	if cfg.Learning.Current.Structural.MaxSymbols <= 0 {
 		cfg.Learning.Current.Structural.MaxSymbols = 30
@@ -602,16 +578,7 @@ func normalizeLearningConfig(cfg *Config) {
 		cfg.Learning.Current.Structural.MaxFileSize = 512
 	}
 	cfg.Learning.Current.Structural.Provider = NormalizeStructuralProvider(string(cfg.Learning.Current.Structural.Provider))
-	if cfg.Learning.Current.SelectRelevantFilesMinCandidates <= 0 {
-		cfg.Learning.Current.SelectRelevantFilesMinCandidates = 200
-	}
 	cfg.Learning.Current.defaultsApplied = true
-	if cfg.Learning.History.MaxCommits <= 0 {
-		cfg.Learning.History.MaxCommits = 50
-	}
-	if cfg.Learning.History.BatchSize <= 0 {
-		cfg.Learning.History.BatchSize = 5
-	}
 }
 
 func normalizeAgentConfig(cfg *Config) {
@@ -694,10 +661,6 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			Parallelism:      0,
 		},
 		Learning: defaultLearningConfig(),
-		AutoFix: AutoFixConfig{
-			Strategy:   "patch",
-			BackupPath: "backups",
-		},
 		Skills: SkillsConfig{
 			Target: "agent",
 			Locale: DefaultSkillsLocale,
@@ -722,7 +685,6 @@ type Reader interface {
 	GetAgentConfig() AgentConfig
 	GetLearningConfig() LearningConfig
 	GetCurrentLearningConfig() CurrentLearningConfig
-	GetAutoFixConfig() AutoFixConfig
 	GetSkillsConfig() SkillsConfig
 	GetLoggingConfig() LoggingConfig
 	GetExcludeConfig() ExcludeConfig
@@ -759,11 +721,6 @@ func (r *Repository) GetLearningConfig() LearningConfig {
 // GetCurrentLearningConfig 获取 learn current 配置。
 func (r *Repository) GetCurrentLearningConfig() CurrentLearningConfig {
 	return r.config.Learning.Current
-}
-
-// GetAutoFixConfig 获取自动修复配置
-func (r *Repository) GetAutoFixConfig() AutoFixConfig {
-	return r.config.AutoFix
 }
 
 // GetSkillsConfig 获取 Skills 配置
@@ -875,11 +832,5 @@ func (r *Repository) SetSkillsLocale(locale string) error {
 // SetWorkspaceConfig 设置工作区配置
 func (r *Repository) SetWorkspaceConfig(workspace WorkspaceConfig) error {
 	r.config.Workspace = workspace
-	return r.Update(r.config)
-}
-
-// SetAutoFixStrategy 设置自动修复策略
-func (r *Repository) SetAutoFixStrategy(strategy string) error {
-	r.config.AutoFix.Strategy = strategy
 	return r.Update(r.config)
 }

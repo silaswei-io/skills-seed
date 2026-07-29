@@ -34,12 +34,12 @@ type InputSummary struct {
 	SkippedFiles        int `json:"skipped_files,omitempty"`
 }
 
-// AnalysisCheckpoint 保存高成本分析的阶段结果，供失败后从未完成单元继续。
+// AnalysisCheckpoint 保存高成本分析的阶段结果，供失败后从未完成证据焦点继续。
 type AnalysisCheckpoint struct {
-	Patterns             []domain.Pattern      `json:"patterns,omitempty"`
-	CompletedUnits       []domain.AnalysisUnit `json:"completed_units,omitempty"`
-	ProfileRefreshNeeded bool                  `json:"profile_refresh_needed,omitempty"`
-	ProfileRefreshReason string                `json:"profile_refresh_reason,omitempty"`
+	Patterns             []domain.Pattern       `json:"patterns,omitempty"`
+	CompletedFocuses     []domain.EvidenceFocus `json:"completed_focuses,omitempty"`
+	ProfileRefreshNeeded bool                   `json:"profile_refresh_needed,omitempty"`
+	ProfileRefreshReason string                 `json:"profile_refresh_reason,omitempty"`
 }
 
 // CurationCheckpoint 保存一次已完成的 AI 策展决策，等待本地校验和原子提交。
@@ -55,6 +55,7 @@ type State struct {
 	ProjectName   string `json:"project_name"`
 	Language      string `json:"language"`
 	Mode          string `json:"mode,omitempty"`
+	ChangeProfile string `json:"change_profile,omitempty"`
 	UserContext   string `json:"user_context_hash,omitempty"`
 	// InvocationHash 绑定影响分析范围和计划的命令参数及配置，防止不兼容调用复用旧状态。
 	InvocationHash string                      `json:"invocation_hash,omitempty"`
@@ -62,8 +63,8 @@ type State struct {
 	InputSummary   *InputSummary               `json:"input_summary,omitempty"`
 	Files          []domain.FileAnalysisRecord `json:"files"`
 	Deleted        []string                    `json:"deleted"`
-	Units          []domain.AnalysisUnit       `json:"units"`
-	// Analysis 保存已完成单元及其结果；阶段完成状态由计划覆盖关系推导。
+	Agenda         domain.LearningAgenda       `json:"agenda"`
+	// Analysis 保存已完成证据焦点及其结果；阶段完成状态由议程覆盖关系推导。
 	Analysis *AnalysisCheckpoint `json:"analysis,omitempty"`
 	// Curation 保存与当前候选集合绑定的 AI 策展决策。
 	Curation *CurationCheckpoint `json:"curation,omitempty"`
@@ -139,12 +140,12 @@ func (r *Repository) Clear() error {
 }
 
 // NewState 创建规范化命令状态。
-func NewState(command, projectName, language, userContext string, files []domain.FileAnalysisRecord, deleted []string, units []domain.AnalysisUnit) *State {
-	return NewStateWithMode(command, projectName, language, "", userContext, files, deleted, units)
+func NewState(command, projectName, language, userContext string, files []domain.FileAnalysisRecord, deleted []string, focuses []domain.EvidenceFocus) *State {
+	return NewStateWithMode(command, projectName, language, "", userContext, files, deleted, focuses)
 }
 
 // NewStateWithMode 创建包含学习模式的命令状态。
-func NewStateWithMode(command, projectName, language, mode, userContext string, files []domain.FileAnalysisRecord, deleted []string, units []domain.AnalysisUnit) *State {
+func NewStateWithMode(command, projectName, language, mode, userContext string, files []domain.FileAnalysisRecord, deleted []string, focuses []domain.EvidenceFocus) *State {
 	return &State{
 		SchemaVersion: schemaVersion,
 		Command:       normalizeCommand(command),
@@ -155,7 +156,7 @@ func NewStateWithMode(command, projectName, language, mode, userContext string, 
 		CreatedAt:     time.Now().Format(time.RFC3339),
 		Files:         normalizeFiles(files),
 		Deleted:       normalizePaths(deleted),
-		Units:         normalizeUnits(units),
+		Agenda:        domain.LearningAgenda{Focuses: normalizeFocuses(focuses)},
 	}
 }
 
@@ -174,6 +175,15 @@ func (s *State) WithInvocationHash(hash string) *State {
 		return nil
 	}
 	s.InvocationHash = strings.TrimSpace(hash)
+	return s
+}
+
+// WithChangeProfile 设置本轮 learn current 的增量类型。
+func (s *State) WithChangeProfile(profile string) *State {
+	if s == nil {
+		return nil
+	}
+	s.ChangeProfile = strings.TrimSpace(profile)
 	return s
 }
 
@@ -241,18 +251,18 @@ func normalizeFiles(files []domain.FileAnalysisRecord) []domain.FileAnalysisReco
 	return out
 }
 
-func normalizeUnits(units []domain.AnalysisUnit) []domain.AnalysisUnit {
-	out := make([]domain.AnalysisUnit, 0, len(units))
-	for _, unit := range units {
-		unit.ID = strings.TrimSpace(unit.ID)
-		unit.Name = strings.TrimSpace(unit.Name)
-		unit.EntryPaths = normalizePaths(unit.EntryPaths)
-		unit.RelatedPaths = normalizePaths(unit.RelatedPaths)
-		unit.RouteTerms = normalizeStrings(unit.RouteTerms)
-		if unit.ID == "" || len(unitPaths(unit)) == 0 {
+func normalizeFocuses(focuses []domain.EvidenceFocus) []domain.EvidenceFocus {
+	out := make([]domain.EvidenceFocus, 0, len(focuses))
+	for _, focus := range focuses {
+		focus.ID = strings.TrimSpace(focus.ID)
+		focus.Name = strings.TrimSpace(focus.Name)
+		focus.EntryPaths = normalizePaths(focus.EntryPaths)
+		focus.RelatedPaths = normalizePaths(focus.RelatedPaths)
+		focus.RouteTerms = normalizeStrings(focus.RouteTerms)
+		if focus.ID == "" || len(focusPaths(focus)) == 0 {
 			continue
 		}
-		out = append(out, unit)
+		out = append(out, focus)
 	}
 	return out
 }
@@ -287,9 +297,9 @@ func normalizeStrings(values []string) []string {
 	return out
 }
 
-func unitPaths(unit domain.AnalysisUnit) []string {
-	paths := append([]string{}, unit.EntryPaths...)
-	paths = append(paths, unit.RelatedPaths...)
+func focusPaths(focus domain.EvidenceFocus) []string {
+	paths := append([]string{}, focus.EntryPaths...)
+	paths = append(paths, focus.RelatedPaths...)
 	return normalizePaths(paths)
 }
 
@@ -302,8 +312,8 @@ func (s State) MarshalJSON() ([]byte, error) {
 	if s.Deleted == nil {
 		s.Deleted = []string{}
 	}
-	if s.Units == nil {
-		s.Units = []domain.AnalysisUnit{}
+	if s.Agenda.Focuses == nil {
+		s.Agenda.Focuses = []domain.EvidenceFocus{}
 	}
 	return json.Marshal(alias(s))
 }

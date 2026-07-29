@@ -6,33 +6,33 @@
 {{end}}{{if .WorkspaceRole}}**Workspace Role**: {{.WorkspaceRole}}
 {{end}}**Generated At**: {{.GeneratedAt}}
 
-## Usage Principles
+## Usage
 
 - This spec keeps executable constraints, generated/config conventions, and change touchpoints only.
 - For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for entry methods read [Entry Method Index](./business-methods.md){{end}}; for verification read [Validation Strategy](./validation.md){{if .References.Testing}} and [Test Matrix](./testing.md){{end}}.
-- "Rules" only include source-backed user-maintained or built-in constraints. AI-learned results with evidence appear under "Source-Backed Reuse Guidance" without becoming hard constraints.
+- Authoritative rules only come from user-maintained or built-in constraints. AI-learned results are listed separately as a source-backed reuse index.
 - Framework and configuration items are navigation aids from the learned profile. Confirm them against current code, manifests, and configuration files.
 - Trust current code when it conflicts with this spec.
 
 ## Table Of Contents
 
-- [Rules](#rules)
-{{if .PatternGuidance}}- [Source-Backed Reuse Guidance](#source-backed-reuse-guidance)
+- [Authoritative Rules](#authoritative-rules)
+{{if .PatternGuidance}}- [Source-Backed Reuse Index](#source-backed-reuse-index)
 {{end}}{{if .FrameworkPatterns}}- [Framework Conventions](#framework-conventions)
 {{end}}{{if .ConfigPatterns}}- [Configuration Conventions](#configuration-conventions)
 {{end}}- [Change Touchpoints](#change-touchpoints)
 
-## Rules
+## Authoritative Rules
 
 {{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**: {{.Rule}} (source: `{{.Source}}`{{if .Evidence}}; evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}})
 {{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
-{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*No authoritative hard rules have been extracted. Continue with the guidance below and category references for reusable implementations.*
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*No authoritative rules have been extracted. Continue with the guidance below and category references for reusable implementations.*
 {{end}}{{end}}
-{{if .PatternGuidance}}## Source-Backed Reuse Guidance
+{{if .PatternGuidance}}## Source-Backed Reuse Index
 
-These items come from source evidence and identify existing solutions to inspect and prefer. They do not override current behavior or become hard constraints:
+Open the matching category reference and then read the current source evidence. This spec does not repeat every pattern body.
 
-{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{if .Description}}{{.Description}}{{else}}{{.Name}}{{end}}
+{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}})
 {{end}}
 {{end}}{{if .FrameworkPatterns}}## Framework Conventions
 

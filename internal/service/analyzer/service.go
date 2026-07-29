@@ -1,9 +1,10 @@
 // Package analyzer 提供代码分析服务
 //
-// 本包实现代码模式分析、项目结构分析和代码库分析功能
-//   - AnalyzePatterns: 分析代码模式，发现问题
+// 本包实现项目结构分析和当前代码学习上下文分析功能
 //   - AnalyzeProject: 分析项目结构和特点
-//   - AnalyzeCurrentCodebase: 分析现有代码库（不依赖 commit 历史）
+//   - PlanLearningAgenda: 为当前代码学习规划证据焦点
+//   - AnalyzeCurrentCodebaseBatch: 在当前学习阶段会话中提取模式
+//   - AnalyzeCurrentDeltaBatch: 基于 diff 判断知识变化
 //
 // 服务职责
 //   - 调用 AI Agent 进行代码分析
@@ -25,22 +26,21 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/service/snapshotflow"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 // AnalyzerService 代码分析服务
 // 职责：分析代码、提取模式、分析项目结构
 type AnalyzerService struct {
-	agent                         agent.Agent
-	configRepo                    config.Reader
-	symbolResolver                sourcecode.Resolver
-	structuralCollector           structuralCollector
-	fileSelectionContextCollector structuralCollector
+	agent               agent.Agent
+	configRepo          config.Reader
+	symbolResolver      sourcecode.Resolver
+	structuralCollector structuralCollector
 }
 
 // NewAnalyzerService 创建分析服务
@@ -58,7 +58,6 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerServi
 		cfg := structuralConfig
 		if cfg.Enabled {
 			svc.structuralCollector = newStructuralCollector(cfg)
-			svc.fileSelectionContextCollector = newFileSelectionContextCollector(cfg)
 		}
 	}
 	return svc
@@ -118,85 +117,6 @@ func structuralSeedPaths(focusPaths []string, sampleFiles []agent.SampleFile, di
 	return seeds
 }
 
-// AnalyzePatternsRequest 分析模式请求
-type AnalyzePatternsRequest struct {
-	Files         []domain.FileInfo
-	KnownPatterns []domain.Pattern
-	RecentCommits []domain.CommitInfo
-}
-
-// AnalyzePatternsResult 分析模式结果
-type AnalyzePatternsResult struct {
-	Issues      []domain.Issue
-	Suggestions []string
-	Confidence  float64
-}
-
-// AnalyzePatterns 分析代码模式
-// 从文件和提交中分析编码模式，发现潜在问题
-func (s *AnalyzerService) AnalyzePatterns(ctx context.Context, req *AnalyzePatternsRequest) (*AnalyzePatternsResult, error) {
-	startedAt := time.Now()
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
-		"operation", "analyzer.analyze_patterns",
-		"files_count", len(req.Files),
-		"known_patterns_count", len(req.KnownPatterns),
-		"recent_commits_count", len(req.RecentCommits),
-	)
-
-	projectContext := agent.ProjectContext{
-		Name:     "project",
-		Language: "unknown",
-	}
-	if s.configRepo != nil {
-		projectConfig := s.configRepo.GetProjectConfig()
-		if projectConfig.Name != "" {
-			projectContext.Name = projectConfig.Name
-		}
-		if projectConfig.Language != "" {
-			projectContext.Language = projectConfig.Language
-		}
-	}
-
-	// 调用 Agent
-	analyzeReq := &agent.AnalyzeRequest{
-		Files:         req.Files,
-		Patterns:      req.KnownPatterns,
-		RecentCommits: req.RecentCommits,
-		Context:       projectContext,
-	}
-
-	result, err := s.agent.AnalyzeCode(ctx, analyzeReq)
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "analyzer.analyze_patterns",
-			"duration", time.Since(startedAt),
-			"error", err,
-		)
-		return nil, domain.NewDomainError(
-			domain.ErrAIService,
-			i18n.Get("AnalyzerAnalyzePatternsFailed"),
-			err,
-		)
-	}
-	if err := agent.RequireResult(result, "AnalyzeCode"); err != nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzePatternsFailed"), err)
-	}
-
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "analyzer.analyze_patterns",
-		"duration", time.Since(startedAt),
-		"issues_count", len(result.Issues),
-		"suggestions_count", len(result.Suggestions),
-		"confidence", result.Confidence,
-	)
-
-	return &AnalyzePatternsResult{
-		Issues:      result.Issues,
-		Suggestions: result.Suggestions,
-		Confidence:  result.Confidence,
-	}, nil
-}
-
 // AnalyzeProjectRequest 项目分析请求
 type AnalyzeProjectRequest struct {
 	ProjectName          string
@@ -210,6 +130,7 @@ type AnalyzeProjectRequest struct {
 	ExistingProfileJSON  string
 	FocusPaths           []string
 	UserContext          string
+	LearningSession      agent.LearningSession
 }
 
 // AnalyzeProjectResult 项目分析结果
@@ -232,8 +153,8 @@ type AnalyzeProjectResult struct {
 	Summary            string
 }
 
-// AnalyzeProject 分析项目结构和特点
-func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error) {
+// analyzeProjectProfile 在当前学习阶段会话中分析项目结构和特点。
+func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error) {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
 		"operation", "analyzer.analyze_project",
@@ -265,7 +186,7 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	if engineeringKnowledge == nil {
 		engineeringKnowledge, err = engineeringKnowledgePaths(req.RootPath)
 		if err != nil {
-			return nil, fmt.Errorf("collect engineering knowledge: %w", err)
+			return nil, fmt.Errorf("%s: %w", i18n.Get("AnalyzerCollectEngineeringKnowledgeFailed"), err)
 		}
 	}
 
@@ -283,7 +204,10 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 		UserContext:          req.UserContext,
 	}
 
-	result, err := s.agent.AnalyzeProject(ctx, agentReq)
+	if req.LearningSession == nil {
+		return nil, fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequired"))
+	}
+	result, err := req.LearningSession.RefreshProjectProfile(ctx, agentReq)
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_project",
@@ -302,7 +226,7 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	refs := append(sourcecode.UtilityReferences(result.CommonUtils), sourcecode.BusinessMethodReferences(result.BusinessMethods)...)
 	catalog, err := s.symbolResolver.Resolve(ctx, req.RootPath, refs)
 	if err != nil {
-		return nil, fmt.Errorf("resolve project profile symbols: %w", err)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AnalyzerResolveProjectProfileSymbolsFailed"), err)
 	}
 	entryVerifier := sourcecode.NewVerifier(catalog)
 	result.CommonUtils = entryVerifier.VerifyUtilities(result.CommonUtils)
@@ -310,7 +234,7 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	var engineeringRuleIssues []error
 	result.EngineeringRules, engineeringRuleIssues = validateEngineeringRules(req.RootPath, engineeringKnowledge, req.UserContext != "", result.EngineeringRules)
 	for _, issue := range engineeringRuleIssues {
-		logger.Diagnostic("dropped invalid engineering rule",
+		logger.Diagnostic(i18n.Get("AnalyzerDroppedInvalidEngineeringRule"),
 			"operation", "analyzer.validate_engineering_rules",
 			"reason", issue.Error(),
 		)
@@ -345,57 +269,52 @@ func (s *AnalyzerService) AnalyzeProject(ctx context.Context, req *AnalyzeProjec
 	}, nil
 }
 
-// AnalyzeCurrentCodebaseRequest 当前代码库分析请求
-type AnalyzeCurrentCodebaseRequest struct {
-	ProjectName        string
-	RootPath           string
-	Language           string
-	LearningMode       config.LearningMode
-	RuntimeLabel       string
-	AnalysisUnit       domain.AnalysisUnit
-	FocusPaths         []string
-	Structure          string
-	StructuralContext  string
-	MainFiles          []string
-	SampleFiles        []agent.SampleFile
-	DiffFiles          []agent.DiffFileRef
-	KnownPatternsJSON  string
-	KnownPatternsCount int
-	UserContext        string
-	ChangeProfile      string
-}
-
-// AnalyzeCurrentCodebaseResult 当前代码库分析结果
-type AnalyzeCurrentCodebaseResult struct {
-	Patterns                  []domain.Pattern
-	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
-}
-
-type AnalyzeCurrentCodebaseBatchUnit struct {
-	AnalysisUnit  domain.AnalysisUnit
+type AnalyzeCurrentEvidenceFocus struct {
+	EvidenceFocus domain.EvidenceFocus
 	FocusAbsPaths []string
 }
 
 type AnalyzeCurrentCodebaseBatchOptions struct {
-	RuntimeLabel  string
-	LearningMode  config.LearningMode
-	ChangeProfile string
-	RunContext    *CodebaseRunContext
-	Units         []AnalyzeCurrentCodebaseBatchUnit
+	RuntimeLabel    string
+	LearningMode    config.LearningMode
+	ChangeProfile   string
+	RunContext      *CodebaseRunContext
+	LearningSession agent.LearningSession
+	Focuses         []AnalyzeCurrentEvidenceFocus
 }
 
-type AnalyzeCurrentCodebaseUnitResult struct {
-	AnalysisUnit              domain.AnalysisUnit
+type AnalyzeCurrentEvidenceResult struct {
+	EvidenceFocus             domain.EvidenceFocus
 	Patterns                  []domain.Pattern
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
 }
 
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Units []AnalyzeCurrentCodebaseUnitResult
+	Focuses []AnalyzeCurrentEvidenceResult
 }
 
-// PlanAnalysisUnitsRequest 请求按业务能力规划当前待学习文件。
-type PlanAnalysisUnitsRequest struct {
+type AnalyzeCurrentDeltaFocus struct {
+	EvidenceFocus   domain.EvidenceFocus
+	FocusAbsPaths   []string
+	RelatedPatterns []domain.Pattern
+}
+
+type AnalyzeCurrentDeltaBatchOptions struct {
+	RuntimeLabel    string
+	LearningMode    config.LearningMode
+	ChangeProfile   string
+	RunContext      *CodebaseRunContext
+	LearningSession agent.LearningSession
+	Focuses         []AnalyzeCurrentDeltaFocus
+}
+
+type AnalyzeCurrentDeltaBatchResult struct {
+	Changes                   []domain.KnowledgeChange
+	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
+}
+
+// PlanLearningAgendaRequest 请求按业务能力规划当前待学习文件。
+type PlanLearningAgendaRequest struct {
 	ProjectName       string
 	RootPath          string
 	Language          string
@@ -404,17 +323,98 @@ type PlanAnalysisUnitsRequest struct {
 	FocusPaths        []string
 	StructuralContext string
 	UserContext       string
+	LearningSession   agent.LearningSession
 }
 
-// PlanAnalysisUnits 按业务能力拆分当前待学习文件。
-func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalysisUnitsRequest) ([]domain.AnalysisUnit, error) {
+// SelectLearningCandidatesRequest 请求 AI 从本地候选文件中收敛学习入口。
+type SelectLearningCandidatesRequest struct {
+	ProjectName         string
+	RootPath            string
+	Language            string
+	LearningMode        config.LearningMode
+	LearningScope       config.LearningScope
+	CandidatePaths      []string
+	RequiredPaths       []string
+	StructuralSeedPaths []string
+	UserContext         string
+	Progress            func(SelectLearningCandidatesStage)
+	LearningSession     agent.LearningSession
+}
+
+type SelectLearningCandidatesStage string
+
+const (
+	SelectLearningCandidatesStageStructuralContext SelectLearningCandidatesStage = "structural_context"
+	SelectLearningCandidatesStageCodeGraphIndex    SelectLearningCandidatesStage = "codegraph_index"
+	SelectLearningCandidatesStageCodeGraphContext  SelectLearningCandidatesStage = "codegraph_context"
+	SelectLearningCandidatesStageCodeGraphRepair   SelectLearningCandidatesStage = "codegraph_repair"
+	SelectLearningCandidatesStageTreeSitterContext SelectLearningCandidatesStage = "treesitter_context"
+	SelectLearningCandidatesStageAgent             SelectLearningCandidatesStage = "agent"
+)
+
+// SelectLearningCandidates 在大候选集上执行 AI 候选收敛。
+func (s *AnalyzerService) SelectLearningCandidates(ctx context.Context, req *SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
+	structuralContext := ""
+	var err error
+	report := func(stage SelectLearningCandidatesStage) {
+		if req.Progress != nil {
+			req.Progress(stage)
+		}
+	}
+	report(SelectLearningCandidatesStageStructuralContext)
+	structuralContext, err = s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
+		ProjectName: req.ProjectName,
+		Language:    req.Language,
+		Purpose:     "current codebase learning candidate selection",
+		FocusPaths:  req.StructuralSeedPaths,
+		SeedPaths:   req.StructuralSeedPaths,
+		Progress: func(stage structuralContextStage) {
+			switch stage {
+			case structuralContextStageCodeGraphIndex:
+				report(SelectLearningCandidatesStageCodeGraphIndex)
+			case structuralContextStageCodeGraphContext:
+				report(SelectLearningCandidatesStageCodeGraphContext)
+			case structuralContextStageCodeGraphRepair:
+				report(SelectLearningCandidatesStageCodeGraphRepair)
+			case structuralContextStageTreeSitter:
+				report(SelectLearningCandidatesStageTreeSitterContext)
+			}
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	report(SelectLearningCandidatesStageAgent)
+	agentReq := &agent.SelectLearningCandidatesRequest{
+		ProjectName:       req.ProjectName,
+		RootPath:          req.RootPath,
+		Language:          req.Language,
+		LearningMode:      req.LearningMode,
+		LearningScope:     req.LearningScope,
+		CandidatePaths:    req.CandidatePaths,
+		RequiredPaths:     req.RequiredPaths,
+		StructuralContext: structuralContext,
+		UserContext:       req.UserContext,
+	}
+	if req.LearningSession == nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequiredForAgenda")))
+	}
+	result, err := req.LearningSession.SelectLearningCandidates(ctx, agentReq)
+	if err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
+	return result, nil
+}
+
+// PlanLearningAgenda 按业务能力拆分当前待学习文件。
+func (s *AnalyzerService) PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) ([]domain.EvidenceFocus, error) {
 	structuralContext := req.StructuralContext
 	if structuralContext == "" {
 		var err error
 		structuralContext, err = s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
 			ProjectName: req.ProjectName,
 			Language:    req.Language,
-			Purpose:     "current codebase analysis planning",
+			Purpose:     "current codebase learning agenda planning",
 			FocusPaths:  req.FocusPaths,
 			SeedPaths:   req.FocusPaths,
 		})
@@ -422,7 +422,7 @@ func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalys
 			return nil, err
 		}
 	}
-	agentReq := &agent.PlanAnalysisUnitsRequest{
+	agentReq := &agent.PlanLearningAgendaRequest{
 		ProjectName:       req.ProjectName,
 		RootPath:          req.RootPath,
 		Language:          req.Language,
@@ -432,93 +432,17 @@ func (s *AnalyzerService) PlanAnalysisUnits(ctx context.Context, req *PlanAnalys
 		StructuralContext: structuralContext,
 		UserContext:       req.UserContext,
 	}
-	result, err := s.agent.PlanAnalysisUnits(ctx, agentReq)
+	if req.LearningSession == nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequiredForAgenda")))
+	}
+	result, err := req.LearningSession.PlanLearningAgenda(ctx, agentReq)
 	if err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
-	if err := agent.RequireResult(result, "PlanAnalysisUnits"); err != nil {
+	if err := agent.RequireResult(result, "PlanLearningAgenda"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
-	return result.Units, nil
-}
-
-// AnalyzeCurrentCodebase 分析当前代码库
-// 从现有代码中提取初始模式（不依赖 commit 历史）
-func (s *AnalyzerService) AnalyzeCurrentCodebase(ctx context.Context, req *AnalyzeCurrentCodebaseRequest) (*AnalyzeCurrentCodebaseResult, error) {
-	startedAt := time.Now()
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
-		"operation", "analyzer.analyze_current_codebase",
-		"project_name", req.ProjectName,
-		"root_path", req.RootPath,
-		"language", req.Language,
-		"structure_length", len(req.Structure),
-		"main_files_count", len(req.MainFiles),
-		"sample_files_count", len(req.SampleFiles),
-	)
-
-	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
-		ProjectName: req.ProjectName,
-		Language:    req.Language,
-		Purpose:     "current codebase pattern extraction",
-		FocusPaths:  req.FocusPaths,
-		SeedPaths:   structuralSeedPaths(nil, req.SampleFiles, req.DiffFiles, req.MainFiles),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if req.StructuralContext != "" {
-		structuralContext = req.StructuralContext
-	}
-
-	agentReq := &agent.AnalyzeCurrentCodebaseRequest{
-		ProjectName:       req.ProjectName,
-		RootPath:          req.RootPath,
-		Language:          req.Language,
-		LearningMode:      req.LearningMode,
-		RuntimeLabel:      req.RuntimeLabel,
-		AnalysisUnit:      req.AnalysisUnit,
-		FocusPaths:        req.FocusPaths,
-		Structure:         req.Structure,
-		StructuralContext: structuralContext,
-		MainFiles:         req.MainFiles,
-		SampleFiles:       req.SampleFiles,
-		DiffFiles:         req.DiffFiles,
-		UserContext:       req.UserContext,
-		ChangeProfile:     req.ChangeProfile,
-	}
-
-	result, err := s.agent.AnalyzeCurrentCodebase(ctx, agentReq)
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "analyzer.analyze_current_codebase",
-			"duration", time.Since(startedAt),
-			"error", err,
-		)
-		return nil, domain.NewDomainError(
-			domain.ErrAIService,
-			i18n.Get("AnalyzerAnalyzeCodebaseFailed"),
-			err,
-		)
-	}
-	if err := agent.RequireResult(result, "AnalyzeCurrentCodebase"); err != nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
-	}
-
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "analyzer.analyze_current_codebase",
-		"duration", time.Since(startedAt),
-		"patterns_count", len(result.Patterns),
-		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
-	)
-
-	patterns, err := validateCurrentPatterns(ctx, req.RootPath, result.Patterns, s.symbolResolver)
-	if err != nil {
-		return nil, err
-	}
-	return &AnalyzeCurrentCodebaseResult{
-		Patterns:                  patterns,
-		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
-	}, nil
+	return result.Focuses, nil
 }
 
 func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCurrentCodebaseBatchOptions) (*AnalyzeCurrentCodebaseBatchResult, error) {
@@ -532,17 +456,19 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		}
 	}
 
-	units := make([]agent.AnalyzeCurrentCodebaseBatchUnit, 0, len(opts.Units))
-	unitByID := make(map[string]domain.AnalysisUnit, len(opts.Units))
-	for _, unit := range opts.Units {
-		focusPaths := utils.RelativePaths(projectRoot, unit.FocusAbsPaths)
-		units = append(units, agent.AnalyzeCurrentCodebaseBatchUnit{
-			AnalysisUnit: unit.AnalysisUnit,
-			FocusPaths:   focusPaths,
-			SampleFiles:  filterSampleFilesByFocus(runContext.SampleFiles, focusPaths),
-			DiffFiles:    filterDiffFilesByFocus(runContext.DiffFiles, focusPaths),
+	focuses := make([]agent.AnalyzeCurrentEvidenceFocus, 0, len(opts.Focuses))
+	focusByID := make(map[string]domain.EvidenceFocus, len(opts.Focuses))
+	focusByName := make(map[string]domain.EvidenceFocus, len(opts.Focuses))
+	for _, focus := range opts.Focuses {
+		focusPaths := projectpath.Relative(projectRoot, focus.FocusAbsPaths)
+		focuses = append(focuses, agent.AnalyzeCurrentEvidenceFocus{
+			EvidenceFocus: focus.EvidenceFocus,
+			FocusPaths:    focusPaths,
+			SampleFiles:   filterSampleFilesByFocus(runContext.SampleFiles, focusPaths),
+			DiffFiles:     filterDiffFilesByFocus(runContext.DiffFiles, focusPaths),
 		})
-		unitByID[unit.AnalysisUnit.ID] = unit.AnalysisUnit
+		focusByID[focus.EvidenceFocus.ID] = focus.EvidenceFocus
+		focusByName[focus.EvidenceFocus.Name] = focus.EvidenceFocus
 	}
 
 	agentReq := &agent.AnalyzeCurrentCodebaseBatchRequest{
@@ -551,7 +477,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		Language:          language,
 		LearningMode:      opts.LearningMode,
 		RuntimeLabel:      opts.RuntimeLabel,
-		Units:             units,
+		Focuses:           focuses,
 		Structure:         runContext.ProjectStructure,
 		MainFiles:         append([]string(nil), runContext.MainFiles...),
 		UserContext:       runtimecontext.UserContext(ctx),
@@ -563,15 +489,18 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		ProjectName: projectName,
 		Language:    language,
 		Purpose:     "current codebase batch pattern extraction",
-		FocusPaths:  batchFocusPaths(units),
-		SeedPaths:   batchSeedPaths(units, runContext.MainFiles),
+		FocusPaths:  batchFocusPaths(focuses),
+		SeedPaths:   batchSeedPaths(focuses, runContext.MainFiles),
 	})
 	if err != nil {
 		return nil, err
 	}
 	agentReq.StructuralContext = structuralContext
 
-	result, err := s.agent.AnalyzeCurrentCodebaseBatch(ctx, agentReq)
+	if opts.LearningSession == nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequiredForBatch")))
+	}
+	result, err := opts.LearningSession.AnalyzeCurrentCodebaseBatch(ctx, agentReq)
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_current_codebase_batch",
@@ -584,55 +513,68 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
 
-	allPatterns := make([]domain.Pattern, 0)
-	returnedUnits := make(map[string]bool, len(result.Units))
-	for _, unitResult := range result.Units {
-		allPatterns = append(allPatterns, unitResult.Patterns...)
-		unitID := unitResult.UnitID
-		if unitID == "" && len(opts.Units) == 1 {
-			unitID = opts.Units[0].AnalysisUnit.ID
+	mergedResults := make(map[string]agent.AnalyzeCurrentEvidenceResult, len(opts.Focuses))
+	for _, focusResult := range result.Focuses {
+		focus, ok := resolveBatchResultFocus(focusResult, focusByID, focusByName)
+		if !ok && len(opts.Focuses) == 1 {
+			focus = opts.Focuses[0].EvidenceFocus
+			ok = true
 		}
-		if returnedUnits[unitID] {
-			return nil, fmt.Errorf("analysis batch returned duplicate unit %q", unitID)
+		if !ok {
+			return nil, fmt.Errorf("%s", i18n.GetWithParams("AnalyzerAnalyzeBatchUnknownFocus", map[string]interface{}{"Focus": focusResult.FocusID}))
 		}
-		returnedUnits[unitID] = true
+		existing := mergedResults[focus.ID]
+		if existing.FocusID == "" {
+			existing.FocusID = focus.ID
+			existing.FocusName = focus.Name
+		}
+		existing.Patterns = append(existing.Patterns, focusResult.Patterns...)
+		if focusResult.ProfileRefreshRecommended.Needed {
+			existing.ProfileRefreshRecommended = focusResult.ProfileRefreshRecommended
+		}
+		mergedResults[focus.ID] = existing
 	}
-	for _, requested := range opts.Units {
-		if !returnedUnits[requested.AnalysisUnit.ID] {
-			return nil, fmt.Errorf("analysis batch omitted unit %q", requested.AnalysisUnit.ID)
+	for _, requested := range opts.Focuses {
+		if _, ok := mergedResults[requested.EvidenceFocus.ID]; !ok {
+			return nil, fmt.Errorf("%s", i18n.GetWithParams("AnalyzerAnalyzeBatchOmittedFocus", map[string]interface{}{"Focus": requested.EvidenceFocus.ID}))
 		}
+	}
+	allPatterns := make([]domain.Pattern, 0)
+	for _, result := range mergedResults {
+		allPatterns = append(allPatterns, result.Patterns...)
 	}
 	validator, err := newCurrentPatternValidator(ctx, projectRoot, allPatterns, s.symbolResolver)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]AnalyzeCurrentCodebaseUnitResult, 0, len(result.Units))
-	for _, unitResult := range result.Units {
-		unit := unitByID[unitResult.UnitID]
-		if unit.ID == "" && len(opts.Units) == 1 {
-			unit = opts.Units[0].AnalysisUnit
-		}
-		patterns := validator.validatePatterns(unitResult.Patterns)
-		for i := range patterns {
-			if patterns[i].AnalysisUnitID == "" {
-				patterns[i].AnalysisUnitID = unit.ID
-			}
-			if patterns[i].AnalysisUnitName == "" {
-				patterns[i].AnalysisUnitName = unit.Name
-			}
-		}
-		out = append(out, AnalyzeCurrentCodebaseUnitResult{
-			AnalysisUnit:              unit,
+	out := make([]AnalyzeCurrentEvidenceResult, 0, len(opts.Focuses))
+	for _, requested := range opts.Focuses {
+		focusResult := mergedResults[requested.EvidenceFocus.ID]
+		patterns := validator.validatePatterns(focusResult.Patterns)
+		out = append(out, AnalyzeCurrentEvidenceResult{
+			EvidenceFocus:             requested.EvidenceFocus,
 			Patterns:                  patterns,
-			ProfileRefreshRecommended: unitResult.ProfileRefreshRecommended,
+			ProfileRefreshRecommended: focusResult.ProfileRefreshRecommended,
 		})
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.analyze_current_codebase_batch",
 		"duration", time.Since(startedAt),
-		"units_count", len(out),
+		"focuses_count", len(out),
 	)
-	return &AnalyzeCurrentCodebaseBatchResult{Units: out}, nil
+	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out}, nil
+}
+
+func resolveBatchResultFocus(result agent.AnalyzeCurrentEvidenceResult, byID, byName map[string]domain.EvidenceFocus) (domain.EvidenceFocus, bool) {
+	if focus, ok := byID[result.FocusID]; ok {
+		return focus, true
+	}
+	if result.FocusName != "" {
+		if focus, ok := byName[result.FocusName]; ok {
+			return focus, true
+		}
+	}
+	return domain.EvidenceFocus{}, false
 }
 
 // GetProjectStructure 获取项目目录结构
@@ -758,26 +700,17 @@ func (s *AnalyzerService) FindReadmePath(projectRoot string) string {
 	return "README.md"
 }
 
-// AnalyzeProjectFull 完整项目分析
-func (s *AnalyzerService) AnalyzeProjectFull(ctx context.Context, projectRoot, projectName string) (*AnalyzeProjectResult, error) {
-	return s.AnalyzeProjectFullWithLanguage(ctx, projectRoot, projectName, "")
-}
-
-// AnalyzeProjectFullWithLanguage 完整项目分析，可由命令行显式指定语言覆盖配置
-func (s *AnalyzerService) AnalyzeProjectFullWithLanguage(ctx context.Context, projectRoot, projectName, requestedLanguage string) (*AnalyzeProjectResult, error) {
-	return s.AnalyzeProjectFullWithOptions(ctx, projectRoot, projectName, requestedLanguage, AnalyzeProjectOptions{})
-}
-
-// AnalyzeProjectOptions 控制 AnalyzeProjectFullWithOptions 的项目画像分析上下文
+// AnalyzeProjectOptions 控制项目画像刷新上下文。
 type AnalyzeProjectOptions struct {
 	ExistingProfile *domain.ProjectProfile
 	FocusPaths      []string
+	LearningSession agent.LearningSession
 }
 
-// AnalyzeProjectFullWithOptions 完整项目分析，支持基于已有画像和指定路径做增量刷新
-func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, projectRoot, projectName, requestedLanguage string, opts AnalyzeProjectOptions) (*AnalyzeProjectResult, error) {
+// buildProjectProfileResult 完整分析项目画像，支持基于已有画像和指定路径做增量刷新。
+func (s *AnalyzerService) buildProjectProfileResult(ctx context.Context, projectRoot, projectName, requestedLanguage string, opts AnalyzeProjectOptions) (*AnalyzeProjectResult, error) {
 	startedAt := time.Now()
-	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
+	focusPaths := projectpath.Relative(projectRoot, opts.FocusPaths)
 	existingProfileJSON := ""
 	if len(focusPaths) > 0 {
 		existingProfileJSON = marshalProjectProfile(opts.ExistingProfile)
@@ -817,9 +750,10 @@ func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, pro
 		ExistingProfileJSON: existingProfileJSON,
 		FocusPaths:          focusPaths,
 		UserContext:         runtimecontext.UserContext(ctx),
+		LearningSession:     opts.LearningSession,
 	}
 
-	result, err := s.AnalyzeProject(ctx, req)
+	result, err := s.analyzeProjectProfile(ctx, req)
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_project_full",
@@ -842,13 +776,22 @@ func (s *AnalyzerService) AnalyzeProjectFullWithOptions(ctx context.Context, pro
 	return result, nil
 }
 
+// RefreshProjectProfile 刷新并返回可直接持久化的项目画像。
+func (s *AnalyzerService) RefreshProjectProfile(ctx context.Context, projectRoot, projectName, requestedLanguage string, opts AnalyzeProjectOptions) (*domain.ProjectProfile, error) {
+	result, err := s.buildProjectProfileResult(ctx, projectRoot, projectName, requestedLanguage, opts)
+	if err != nil {
+		return nil, err
+	}
+	return NewProjectProfile(result, projectName, requestedLanguage), nil
+}
+
 func marshalProjectProfile(profile *domain.ProjectProfile) string {
 	if profile == nil {
 		return ""
 	}
 	data, err := json.MarshalIndent(profile, "", "  ")
 	if err != nil {
-		logger.Warn("marshal project profile failed", "error", err)
+		logger.Warn(i18n.Get("AnalyzerMarshalProjectProfileFailed"), "error", err)
 		return ""
 	}
 	return string(data)
@@ -892,7 +835,7 @@ func NewProjectProfile(result *AnalyzeProjectResult, projectName, language strin
 type AnalyzeCodebaseOptions struct {
 	FocusPaths         []string
 	RuntimeLabel       string
-	AnalysisUnit       domain.AnalysisUnit
+	EvidenceFocus      domain.EvidenceFocus
 	LearningMode       config.LearningMode
 	SelectedFiles      []domain.FileInfo
 	SelectedFilesSet   bool
@@ -913,7 +856,7 @@ type CodebaseRunContext struct {
 	SnapshotFlow     *snapshotflow.Result
 }
 
-// BuildCodebaseRunContext 预收集 learn current 中多个分析单元可复用的上下文。
+// BuildCodebaseRunContext 预收集 learn current 中多个证据焦点可复用的上下文。
 func (s *AnalyzerService) BuildCodebaseRunContext(ctx context.Context, projectRoot, language string, opts AnalyzeCodebaseOptions) (*CodebaseRunContext, error) {
 	structure, _ := s.GetProjectStructure(projectRoot)
 	mainFiles := s.FindMainFiles(projectRoot)
@@ -921,7 +864,7 @@ func (s *AnalyzerService) BuildCodebaseRunContext(ctx context.Context, projectRo
 	var diffFiles []agent.DiffFileRef
 	var snapshotFlow *snapshotflow.Result
 	var err error
-	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
+	focusPaths := projectpath.Relative(projectRoot, opts.FocusPaths)
 	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
 		selectedFiles := append([]domain.FileInfo(nil), opts.SelectedFiles...)
 		selectionPolicy := fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot)
@@ -956,92 +899,6 @@ func (s *AnalyzerService) BuildCodebaseRunContext(ctx context.Context, projectRo
 	}, nil
 }
 
-// AnalyzeCodebaseFull 完整代码库分析（提取模式并转换为 domain.Pattern）
-func (s *AnalyzerService) AnalyzeCodebaseFull(ctx context.Context, projectRoot, projectName, language string) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
-	return s.AnalyzeCodebaseFullWithOptions(ctx, projectRoot, projectName, language, AnalyzeCodebaseOptions{UseSnapshotDiffs: true})
-}
-
-// AnalyzeCodebaseFullWithOptions 完整代码库分析，支持指定扫描范围
-func (s *AnalyzerService) AnalyzeCodebaseFullWithOptions(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCodebaseOptions) (*AnalyzeCurrentCodebaseResult, []domain.Pattern, error) {
-	startedAt := time.Now()
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
-		"operation", "analyzer.analyze_codebase_full",
-		"project_root", projectRoot,
-		"project_name", projectName,
-		"language", language,
-		"focus_paths_count", len(opts.FocusPaths),
-		"selected_files_count", len(opts.SelectedFiles),
-	)
-
-	runContext := opts.RunContext
-	if runContext == nil {
-		var err error
-		runContext, err = s.BuildCodebaseRunContext(ctx, projectRoot, language, opts)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	structure := runContext.ProjectStructure
-	focusPaths := utils.RelativePaths(projectRoot, opts.FocusPaths)
-	if len(focusPaths) > 0 {
-		structure = focusedStructure(focusPaths)
-	}
-	mainFiles := append([]string(nil), runContext.MainFiles...)
-	sampleFiles := filterSampleFilesByFocus(runContext.SampleFiles, focusPaths)
-	diffFiles := filterDiffFilesByFocus(runContext.DiffFiles, focusPaths)
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "analyzer.collect_codebase_context",
-		"duration", time.Since(startedAt),
-		"structure_length", len(structure),
-		"focus_paths_count", len(focusPaths),
-		"main_files_count", len(mainFiles),
-		"sample_files_count", len(sampleFiles),
-		"diff_files_count", len(diffFiles),
-	)
-
-	req := &AnalyzeCurrentCodebaseRequest{
-		ProjectName:  projectName,
-		RootPath:     projectRoot,
-		Language:     language,
-		LearningMode: opts.LearningMode,
-		RuntimeLabel: opts.RuntimeLabel,
-		AnalysisUnit: opts.AnalysisUnit,
-		FocusPaths:   focusPaths,
-		Structure:    structure,
-		MainFiles:    mainFiles,
-		SampleFiles:  sampleFiles,
-		DiffFiles:    diffFiles,
-		UserContext:  runtimecontext.UserContext(ctx),
-	}
-
-	result, err := s.AnalyzeCurrentCodebase(ctx, req)
-	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "analyzer.analyze_codebase_full",
-			"duration", time.Since(startedAt),
-			"error", err,
-		)
-		return nil, nil, err
-	}
-	for i := range result.Patterns {
-		if result.Patterns[i].AnalysisUnitID == "" {
-			result.Patterns[i].AnalysisUnitID = opts.AnalysisUnit.ID
-		}
-		if result.Patterns[i].AnalysisUnitName == "" {
-			result.Patterns[i].AnalysisUnitName = opts.AnalysisUnit.Name
-		}
-	}
-
-	// Patterns 已经是 []domain.Pattern，直接使用
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "analyzer.analyze_codebase_full",
-		"duration", time.Since(startedAt),
-		"patterns_count", len(result.Patterns),
-	)
-	return result, result.Patterns, nil
-}
-
 func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
 	limit := len(files)
 	if limit > maxSampleFiles {
@@ -1057,11 +914,11 @@ func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
 	return samples
 }
 
-func batchFocusPaths(units []agent.AnalyzeCurrentCodebaseBatchUnit) []string {
+func batchFocusPaths(focuses []agent.AnalyzeCurrentEvidenceFocus) []string {
 	seen := make(map[string]bool)
 	var paths []string
-	for _, unit := range units {
-		for _, path := range unit.FocusPaths {
+	for _, focus := range focuses {
+		for _, path := range focus.FocusPaths {
 			path = normalizeRelPath(path)
 			if path == "" || seen[path] {
 				continue
@@ -1074,7 +931,7 @@ func batchFocusPaths(units []agent.AnalyzeCurrentCodebaseBatchUnit) []string {
 	return paths
 }
 
-func batchSeedPaths(units []agent.AnalyzeCurrentCodebaseBatchUnit, mainFiles []string) []string {
+func batchSeedPaths(focuses []agent.AnalyzeCurrentEvidenceFocus, mainFiles []string) []string {
 	seen := make(map[string]bool)
 	var paths []string
 	add := func(path string) {
@@ -1088,14 +945,14 @@ func batchSeedPaths(units []agent.AnalyzeCurrentCodebaseBatchUnit, mainFiles []s
 	for _, path := range mainFiles {
 		add(path)
 	}
-	for _, unit := range units {
-		for _, path := range unit.FocusPaths {
+	for _, focus := range focuses {
+		for _, path := range focus.FocusPaths {
 			add(path)
 		}
-		for _, file := range unit.SampleFiles {
+		for _, file := range focus.SampleFiles {
 			add(file.Path)
 		}
-		for _, file := range unit.DiffFiles {
+		for _, file := range focus.DiffFiles {
 			add(file.Path)
 		}
 	}
@@ -1149,11 +1006,6 @@ func normalizeRelPath(path string) string {
 		return ""
 	}
 	return strings.TrimPrefix(path, "./")
-}
-
-// collectSampleFiles 收集项目中的代表性代码文件
-func (s *AnalyzerService) collectSampleFiles(projectRoot, language string) []agent.SampleFile {
-	return s.collectSampleFilesFromRoots(projectRoot, nil, language)
 }
 
 func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRoots []string, language string) []agent.SampleFile {

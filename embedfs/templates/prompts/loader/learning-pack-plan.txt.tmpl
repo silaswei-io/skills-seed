@@ -1,0 +1,55 @@
+# Plan Learning Packs
+
+This is the short planning conversation for current-code learning. Build a high-recall set of self-contained evidence packs for the files listed below. Prefer preserving source-backed knowledge boundaries over minimizing the number of packs.
+
+Project:
+- name: {{.ProjectName}}
+- path: {{.RootPath}}
+- language: {{.Language}}
+- learning mode: {{.LearningMode}}
+- learning scope: {{.LearningScope}}
+
+Learning strategy guidance:
+- `fast`: plan compact packs, but still preserve clear source-backed knowledge lanes.
+- `normal`: balance coverage and cost; keep distinct routeable business or technical boundaries.
+- `deep`: preserve more source-backed local boundaries when they are useful for future implementation decisions.
+- The mode changes prioritization only. It is not a fixed count, file budget, or permission to invent weak packs.
+
+Learning scope guidance:
+- `domain`: prefer broader business/domain packs when files share the same long-lived responsibility.
+- `flow`: prefer packs around workflows, resource actions, external-system responsibilities, state transitions, and policies.
+- `module`: prefer finer packs around modules, plugins, APIs, adapters, or generated-contract boundaries when those boundaries drive future edits.
+- The scope is a planning lens, not a hard taxonomy. Source evidence and future decision value decide the final pack shape.
+
+Input files are available at `{{.FocusPathsPath}}` ({{.FocusPathCount}} paths).
+{{- if .StructuralContextPath}}
+Structural context is available at `{{.StructuralContextPath}}`; use it only for entry, symbol, import, call, dependency, and ownership clues.
+{{- end}}
+{{- if .UserContextPath}}
+User context is available at `{{.UserContextPath}}`; use it only to interpret intent.
+{{- end}}
+
+Planning rules:
+- Each returned focus is an evidence pack, not a permanent project partition and not durable taxonomy.
+- Every evidence pack must be self-contained enough for a later isolated pack-analysis conversation: name the business/technical route terms, entry paths, related paths, and a precise scope reason.
+- Do not plan a directory inventory. Group files that are likely to contain knowledge with future implementation, routing, validation, reuse, reusable entry-method selection, debugging, or agent navigation value.
+- Preserve these knowledge lanes when present in the input: business behavior, API/contract shape, error handling, validation/testing, persistence/query behavior, configuration, framework/language integration, generated-code boundaries, security-sensitive handling, operational lifecycle, background jobs, adapters, and reusable utilities.
+- Before grouping, scan for decision-bearing cues: actors, resources/entities, operations/capabilities, verified callable entries, states/phases, policies/rules, permissions, audit records, configuration gates, external systems, protocols/contracts, generated contract sources, framework/language usage conventions, background jobs, operational lifecycle paths, exceptions, and compensation behavior.
+- Do not let central framework, startup, generated wrapper, or middleware paths crowd out decision-bearing domain or code-pattern paths. Include separate packs for materially different business or technical boundaries even when they share the same handler, service, repository, plugin, or generated-code shape.
+- Plan horizontal packs when the input contains reusable cross-cutting repository behavior such as API response/request contracts, error taxonomy, validation commands, utility helpers, reusable entry-method families, generated-code source files, configuration conventions, logging/audit conventions, or persistence/query construction. These packs are useful even when they are not a business subdomain.
+- Include only entry and related paths from the provided file list or structural context. Do not invent files and do not expand into unlisted directories.
+- Merge files into one pack only when a future request would naturally modify them together and the same source boundary explains the behavior.
+- Split packs when route terms, state/data boundaries, authorization/audit semantics, external dependency contracts, operational risk, or change triggers are materially different.
+- If the input is a small diff-oriented set, prefer compact packs anchored to the changed files instead of planning a broad project learning run.
+- Use deterministic ordering: business routeability first, then changed/source entry importance, then path vocabulary, then lexicographic path order.
+
+Pre-output self-check:
+- Every provided file that should be learned is covered by at least one pack entry or related path.
+- No pack is only a vague directory, framework, or layer summary.
+- No pack exists only to inventory a language, framework, or module when no future decision value is visible.
+- No two packs are duplicates with different names.
+- Pack IDs and names are stable, routeable, and do not use sequence numbers as meaning.
+
+Return JSON only.
+
+{{ jsonContract "PlanLearningAgendaOutput" }}

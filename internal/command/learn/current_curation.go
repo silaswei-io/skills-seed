@@ -9,7 +9,9 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 type currentCurationCheckpoint struct {
@@ -29,14 +31,14 @@ func (r *learnCurrentProjectRun) loadImportedCuration() error {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read curation output: %w", err)
+		return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentReadCurationOutputFailed"), err)
 	}
 	result, err := parser.ParseCuratePatternsArtifact(string(data))
 	if err != nil {
-		return fmt.Errorf("parse curation output: %w", err)
+		return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentParseCurationOutputFailed"), err)
 	}
 	if err := agent.RequireResult(result, "CuratePatterns"); err != nil {
-		return fmt.Errorf("parse curation output: %w", err)
+		return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentParseCurationOutputFailed"), err)
 	}
 	r.importedCuration = result
 	return nil
@@ -54,11 +56,11 @@ func (c *currentCurationCheckpoint) Load(ctx context.Context, candidateHash stri
 	}
 	if checkpoint := c.state.Curation; checkpoint != nil {
 		if checkpoint.CandidateHash != candidateHash {
-			return nil, false, fmt.Errorf("curation candidate hash changed")
+			return nil, false, fmt.Errorf("%s", i18n.Get("LearnCurrentCurationCandidateChanged"))
 		}
 		var result agent.CuratePatternsResult
-		if err := json.Unmarshal(checkpoint.Decision, &result); err != nil {
-			return nil, false, fmt.Errorf("decode curation decision: %w", err)
+		if err := jsonx.Unmarshal(checkpoint.Decision, &result); err != nil {
+			return nil, false, fmt.Errorf("%s: %w", i18n.Get("LearnCurrentDecodeCurationDecisionFailed"), err)
 		}
 		return &result, true, nil
 	}
@@ -67,11 +69,11 @@ func (c *currentCurationCheckpoint) Load(ctx context.Context, candidateHash stri
 
 func (c *currentCurationCheckpoint) Save(ctx context.Context, candidateHash string, result *agent.CuratePatternsResult) error {
 	if c == nil || c.state == nil || c.repo == nil {
-		return fmt.Errorf("curation checkpoint is not initialized")
+		return fmt.Errorf("%s", i18n.Get("LearnCurrentCurationCheckpointMissing"))
 	}
 	data, err := json.Marshal(result)
 	if err != nil {
-		return fmt.Errorf("encode curation decision: %w", err)
+		return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentEncodeCurationDecisionFailed"), err)
 	}
 	c.state.Curation = &commandstate.CurationCheckpoint{
 		CandidateHash: candidateHash,

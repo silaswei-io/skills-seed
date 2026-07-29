@@ -213,176 +213,23 @@ func TestPatternRepository_PreservesPatternCreatedAtOnUpdate(t *testing.T) {
 	require.Equal(t, "internal/service/order.go:84", replaced.BusinessMethod.CodeLocation.CurrentLocation)
 }
 
-func TestPatternRepository_RecordPatternHitsAndStats(t *testing.T) {
+func TestPatternRepository_GetPatternStats(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
 
-	p1 := newTestPattern("p-001", "specific check", domain.CategoryError, 0.9)
-	p1.Description = "Wrap errors from internal/service/checker/service.go with domain.NewDomainError."
-	p2 := newTestPattern("p-002", "unused check", domain.CategoryTesting, 0.7)
+	p1 := newTestPattern("p-001", "specific pattern", domain.CategoryError, 0.9)
+	p1.Metrics.EffectiveScore = 0.8
+	p2 := newTestPattern("p-002", "lower pattern", domain.CategoryTesting, 0.7)
+	p2.Metrics.EffectiveScore = 0.5
 	require.NoError(t, repo.Save(ctx, p1))
 	require.NoError(t, repo.Save(ctx, p2))
 
-	now := time.Now().UTC()
-	require.NoError(t, repo.RecordPatternHits(ctx, []domain.PatternHit{
-		{
-			PatternID:  "p-001",
-			File:       "internal/service/checker/service.go",
-			Line:       81,
-			Severity:   domain.SeverityWarning,
-			Confidence: 0.82,
-			CheckRunID: "run-1",
-			CreatedAt:  now,
-		},
-		{
-			PatternID:  "p-001",
-			File:       "internal/service/checker/service.go",
-			Line:       83,
-			Severity:   domain.SeverityError,
-			Confidence: 0.9,
-			CheckRunID: "run-2",
-			CreatedAt:  now.Add(time.Minute),
-		},
-		{
-			PatternID: "",
-			File:      "ignored.go",
-		},
-	}))
-
-	stats, err := repo.GetPatternHitStats(ctx)
+	stats, err := repo.GetPatternStats(ctx)
 	require.NoError(t, err)
 	require.Len(t, stats, 2)
 
 	assert.Equal(t, "p-001", stats[0].Pattern.ID)
-	assert.Equal(t, 2, stats[0].HitCount)
-	assert.WithinDuration(t, now.Add(time.Minute), stats[0].LastHitAt, time.Second)
 	assert.Equal(t, "p-002", stats[1].Pattern.ID)
-	assert.Equal(t, 0, stats[1].HitCount)
-	assert.True(t, stats[1].LastHitAt.IsZero())
-}
-
-func TestPatternRepository_RecordPatternHitsMaintainsTimestamps(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	require.NoError(t, repo.RecordPatternHits(ctx, []domain.PatternHit{
-		{
-			PatternID:  "p-001",
-			File:       "internal/service/checker/service.go",
-			Line:       81,
-			Severity:   domain.SeverityWarning,
-			Confidence: 0.82,
-		},
-	}))
-
-	var hits []domain.PatternHit
-	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketPatternHits)
-		return bucket.ForEach(func(k, v []byte) error {
-			var hit domain.PatternHit
-			if err := json.Unmarshal(v, &hit); err != nil {
-				return err
-			}
-			hits = append(hits, hit)
-			return nil
-		})
-	}))
-	require.Len(t, hits, 1)
-	require.False(t, hits[0].CreatedAt.IsZero())
-	require.False(t, hits[0].UpdatedAt.IsZero())
-	require.True(t, hits[0].UpdatedAt.Equal(hits[0].CreatedAt))
-}
-
-func TestPatternRepository_ImportReviewCommentsAndStats(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	now := time.Date(2026, 5, 28, 9, 0, 0, 0, time.UTC)
-	require.NoError(t, repo.RecordPatternHits(ctx, []domain.PatternHit{
-		{
-			PatternID:  "p-error-wrap",
-			File:       "internal/service/checker/service.go",
-			Line:       82,
-			Severity:   domain.SeverityWarning,
-			Confidence: 0.86,
-			CheckRunID: "run-1",
-			CreatedAt:  now,
-		},
-		{
-			PatternID:  "p-naming",
-			File:       "internal/domain/models.go",
-			Line:       44,
-			Severity:   domain.SeverityInfo,
-			Confidence: 0.71,
-			CheckRunID: "run-2",
-			CreatedAt:  now.Add(time.Minute),
-		},
-	}))
-
-	comments := []domain.ReviewComment{
-		{
-			ID:        "c-1",
-			Provider:  "local",
-			ReviewID:  "review-1",
-			Commit:    "abc123",
-			File:      "internal/service/checker/service.go",
-			Line:      84,
-			Author:    "reviewer",
-			Body:      "wrap checker errors",
-			Resolved:  true,
-			CreatedAt: now.Add(2 * time.Minute),
-		},
-		{
-			ID:        "c-2",
-			Provider:  "local",
-			ReviewID:  "review-1",
-			Commit:    "abc123",
-			File:      "internal/service/generator/service.go",
-			Line:      20,
-			Author:    "reviewer",
-			Body:      "new uncovered feedback",
-			Resolved:  false,
-			CreatedAt: now.Add(3 * time.Minute),
-		},
-	}
-
-	require.NoError(t, repo.ImportReviewComments(ctx, comments))
-
-	stats, err := repo.GetReviewStats(ctx, 3)
-	require.NoError(t, err)
-	assert.Equal(t, 2, stats.TotalComments)
-	assert.Equal(t, 1, stats.PreventedComments)
-	assert.Equal(t, 1, stats.MissedComments)
-	require.Len(t, stats.MatchedPatterns, 1)
-	assert.Equal(t, "p-error-wrap", stats.MatchedPatterns[0].PatternID)
-	assert.Equal(t, 1, stats.MatchedPatterns[0].CommentCount)
-}
-
-func TestPatternRepository_ImportReviewCommentsMaintainsTimestamps(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	require.NoError(t, repo.ImportReviewComments(ctx, []domain.ReviewComment{
-		{
-			ID:       "c-1",
-			Provider: "local",
-			File:     "internal/service/checker/service.go",
-			Line:     84,
-			Body:     "wrap checker errors",
-		},
-	}))
-
-	first := readReviewCommentForTest(t, repo, "c-1")
-	require.False(t, first.CreatedAt.IsZero())
-	require.False(t, first.UpdatedAt.IsZero())
-
-	time.Sleep(2 * time.Millisecond)
-	first.Body = "wrap checker errors with domain error"
-	require.NoError(t, repo.ImportReviewComments(ctx, []domain.ReviewComment{first}))
-
-	updated := readReviewCommentForTest(t, repo, "c-1")
-	require.True(t, updated.CreatedAt.Equal(first.CreatedAt))
-	require.True(t, updated.UpdatedAt.After(first.UpdatedAt))
 }
 
 func TestPatternRepository_Get_NotFound(t *testing.T) {
@@ -622,75 +469,6 @@ func TestPatternRepository_Save_Invalid(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid pattern")
 }
 
-func TestPatternRepository_CommitTracking(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	// 初始状态下没有已分析提交。
-	analyzed, err := repo.IsCommitAnalyzed(ctx, "abc123")
-	require.NoError(t, err)
-	assert.False(t, analyzed)
-
-	commits, err := repo.GetAnalyzedCommits(ctx)
-	require.NoError(t, err)
-	assert.Empty(t, commits)
-
-	// 标记一个提交为已分析。
-	err = repo.MarkCommitAnalyzed(ctx, "abc123")
-	require.NoError(t, err)
-
-	// 此时该提交应为已分析。
-	analyzed, err = repo.IsCommitAnalyzed(ctx, "abc123")
-	require.NoError(t, err)
-	assert.True(t, analyzed)
-
-	// 标记另一个提交。
-	err = repo.MarkCommitAnalyzed(ctx, "def456")
-	require.NoError(t, err)
-
-	commits, err = repo.GetAnalyzedCommits(ctx)
-	require.NoError(t, err)
-	assert.Len(t, commits, 2)
-	assert.Contains(t, commits, "abc123")
-	assert.Contains(t, commits, "def456")
-
-	// 重复标记同一提交应保持幂等。
-	err = repo.MarkCommitAnalyzed(ctx, "abc123")
-	require.NoError(t, err)
-
-	commits, err = repo.GetAnalyzedCommits(ctx)
-	require.NoError(t, err)
-	assert.Len(t, commits, 2) // 仍为 2，不应变成 3
-}
-
-func TestPatternRepository_MarkCommitAnalyzedStoresTimestampedRecords(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	require.NoError(t, repo.MarkCommitAnalyzed(ctx, "abc123"))
-
-	var records []domain.AnalyzedCommitRecord
-	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
-		data := tx.Bucket(bucketMetadata).Get(keyAnalyzedCommits)
-		return json.Unmarshal(data, &records)
-	}))
-	require.Len(t, records, 1)
-	require.Equal(t, "abc123", records[0].Hash)
-	require.False(t, records[0].CreatedAt.IsZero())
-	require.False(t, records[0].UpdatedAt.IsZero())
-}
-
-func TestPatternRepository_MarkCommitsAnalyzedStoresBatch(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	require.NoError(t, repo.MarkCommitsAnalyzed(ctx, []string{"abc123", "def456", "abc123"}))
-
-	commits, err := repo.GetAnalyzedCommits(ctx)
-	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"abc123", "def456"}, commits)
-}
-
 func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -706,7 +484,7 @@ func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 			Size:            12,
 			ModTime:         "2026-05-26T00:00:00Z",
 			Source:          domain.FileAnalysisSourceCurrentCode,
-			AnalysisStatus:  domain.FileAnalysisStatusAISkipped,
+			AnalysisStatus:  domain.FileAnalysisStatusSelectionSkipped,
 			SelectionReason: "generated file",
 			LastAnalyzedAt:  "2026-05-26T00:00:01Z",
 		},
@@ -718,7 +496,7 @@ func TestPatternRepository_FileAnalysisTracking(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, "abc", got.Hash)
-	assert.Equal(t, domain.FileAnalysisStatusAISkipped, got.AnalysisStatus)
+	assert.Equal(t, domain.FileAnalysisStatusSelectionSkipped, got.AnalysisStatus)
 	assert.Equal(t, "generated file", got.SelectionReason)
 
 	list, err := repo.ListAnalyzedFiles(ctx, scope)
@@ -812,15 +590,4 @@ func TestPatternRepository_FileAnalysisTrackingScopesRecords(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, frontend)
 	assert.Equal(t, "frontend", frontend.Hash)
-}
-
-func readReviewCommentForTest(t *testing.T, repo *PatternRepository, id string) domain.ReviewComment {
-	t.Helper()
-
-	var comment domain.ReviewComment
-	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
-		data := tx.Bucket(bucketReviewComments).Get([]byte(id))
-		return json.Unmarshal(data, &comment)
-	}))
-	return comment
 }

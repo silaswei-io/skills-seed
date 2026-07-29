@@ -12,24 +12,24 @@ description: {{.SkillDescription}}
 **Last updated**: {{.LastUpdated}}
 **Learned patterns**: {{.PatternCount}}
 
-{{if .HasKnowledge}}This project entry skill only routes tasks to the smallest necessary references and confirms constraint sources. Read the matching reference before deciding from business rules, architecture details, code evidence, test facts, or validation commands.{{else}}This project workflow entry skill routes matching tasks to user-maintained workflow documents.{{end}}
+{{if .HasKnowledge}}This project entry skill only routes tasks to the smallest necessary references. Read the matching reference before deciding from business rules, architecture details, code evidence, test facts, or validation commands.{{else}}This project workflow entry skill routes matching tasks to user-maintained workflow documents.{{end}}
 
-## Usage
+## Task Routing
 
 {{if .HasKnowledge}}
 1. Read the smallest necessary reference set for the task. Do not load every reference at once. After entering a category pattern, check its "Related References" section first and continue when a cross-boundary hint matches the task.
 {{if .References.Enabled}}{{if .References.BusinessPatterns}}2. For business rules, state transitions, or cross-entity flows, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.
 {{else}}2. For business rules, state transitions, or cross-entity flows, inspect current code and reuse nearby implementations.
-{{end}}{{if .References.BusinessMethods}}3. For project-level business entries, cross-module orchestration, or tool entries, read the [Entry Method Index](./references/business-methods.md).
+{{end}}{{if .References.BusinessMethods}}3. For common business entries, module extension points, cross-module orchestration, or tool entries, read the [Entry Method Index](./references/business-methods.md).
 {{else}}3. Confirm project-level entries from current code and module entry points.
 {{end}}4. For APIs, contracts, adapters, derived artifacts, or configuration conventions, read [Project Spec](./references/project-spec.md) and the related category pattern.
 {{if .References.KeyModules}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md).
 {{else}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md).
-{{end}}6. To validate a change, read [Validation Strategy](./references/validation.md){{if .References.Testing}}; for Go code, also read the [Test Matrix](./references/testing.md){{end}}.
+{{end}}6. To validate a change, read [Validation Strategy](./references/validation.md){{if .References.Testing}}; when the change touches a detected test ecosystem, also read the [Test Matrix](./references/testing.md){{end}}.
 {{else}}2. References were omitted from this generation. Read current code and prefer nearby implementations.
 {{end}}
 
-Only explicit user-maintained or built-in rules are hard constraints. Source-backed learned patterns locate reusable solutions but are not mandatory rules. Current code wins when it conflicts with a reference; report missing evidence instead of inventing project rules.
+{{if .References.ProjectSpec}}[Project Spec](./references/project-spec.md) distinguishes constraint sources. Pattern pages locate reusable implementations from source evidence.{{else}}Confirm constraint sources from current code and project configuration. Learned patterns only locate reusable implementations.{{end}} Current code wins when it conflicts with a reference; report missing evidence.
 {{else}}{{if .WorkflowReferences}}1. Choose the user workflow that best matches the task goal.
 2. Read the workflow document before acting; do not execute from the list summary alone.
 3. When the latest user instruction conflicts with the saved workflow, follow the latest instruction and call out the difference.
@@ -51,12 +51,12 @@ Workflows are user-maintained task procedures and can guide execution steps. Whe
 {{end}}
 {{end}}
 {{if .HasKnowledge}}
-## Pattern References
+## Reference Entry Points
 
 {{if .References.Enabled}}- **[Project Spec](./references/project-spec.md)** - Boundaries, rules, configuration, and touchpoints
 - **[Project Overview](./references/project-overview.md)** - Architecture, technology stack, and key modules
 - **[Validation Strategy](./references/validation.md)** - Learned commands, applicability, and validation gaps
-{{if .References.Testing}}- **[Test Matrix](./references/testing.md)** - Go modules, test commands, and test-file evidence
+{{if .References.Testing}}- **[Test Matrix](./references/testing.md)** - Test scope, commands, and test-file evidence
 {{end}}{{else}}*References were omitted from this generation.*
 {{end}}{{if .OverviewReferences}}
 
@@ -72,22 +72,17 @@ Workflows are user-maintained task procedures and can guide execution steps. Whe
 *No category pattern references were generated.*
 {{end}}
 
-## Project Rules
+## Execution Principles
 
 - Check nearby code before introducing a pattern or abstraction.
 - Reuse project-specific entries and utilities from references when available.
 {{if .References.ProjectSpec}}- Follow [Project Spec](./references/project-spec.md) for derived artifacts, interface models, adapters, and configuration conventions.{{else}}- Follow current code and project configuration for derived artifacts, interface models, adapters, and configuration conventions.{{end}}
-- Treat only explicit user-maintained or built-in rules as hard constraints; verify learned patterns against source.
 - Current code wins when references disagree.
 
 {{if .KeyInsights}}### Key Insights
 
 {{range .KeyInsights}}- {{.}}
 {{end}}
-{{end}}{{if .HasPatterns}}## Pattern Statistics
-
-- **Total patterns**: {{.PatternCount}}
-- **Categories**: {{.Categories}}
 {{end}}{{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}---

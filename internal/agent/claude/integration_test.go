@@ -12,7 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,33 +87,6 @@ func getProjectStructure(t *testing.T) string {
 	return strings.Join(relPaths, "\n")
 }
 
-// getRecentCommits 获取最近 N 条提交
-func getRecentCommits(t *testing.T, n int) []domain.CommitInfo {
-	t.Helper()
-	cmd := exec.Command("git", "-C", testProjectPath, "log", "--pretty=format:%H|%an|%ai|%s", "-n", stringify(n))
-	out, err := cmd.Output()
-	require.NoError(t, err)
-
-	var commits []domain.CommitInfo
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, "|", 4)
-		if len(parts) < 4 {
-			continue
-		}
-		date, _ := time.Parse("2006-01-02 15:04:05 -0700", parts[2])
-		commits = append(commits, domain.CommitInfo{
-			Hash:    parts[0],
-			Author:  parts[1],
-			Date:    date,
-			Message: parts[3],
-		})
-	}
-	return commits
-}
-
 // getMainFiles 获取项目入口文件
 func getMainFiles(t *testing.T) []string {
 	t.Helper()
@@ -133,152 +106,9 @@ func getMainFiles(t *testing.T) []string {
 	return files
 }
 
-// stringify 简单的 int → string
-func stringify(n int) string {
-	return strings.TrimSpace(strings.TrimLeft(strings.TrimLeft(
-		strings.Replace(
-			strings.Replace(string(rune('0'+n%10)), "", "", -1),
-			"", "", -1),
-		" "), " "))
-}
+// ========== E2E 测试：一个核心模板一个测试 ==========
 
-// ========== E2E 测试：一个模板一个测试 ==========
-
-// TestE2E_Analyze 测试 analyze 模板：渲染 → Claude → 解析
-// 模板绑定: AnalyzeRequest (Files, Context, Patterns, RecentCommits)
-// 输出格式: {"issues":[...], "suggestions":[...], "confidence":0.85}
-func TestE2E_Analyze(t *testing.T) {
-	ag := skipIfShort(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	req := &agent.AnalyzeRequest{
-		Files: []domain.FileInfo{
-			{Path: "cmd/skills-seed/main.go", Language: "go"},
-		},
-		Context: agent.ProjectContext{
-			Name:     "skills-seed",
-			Language: "go",
-		},
-		Patterns: []domain.Pattern{
-			{
-				ID:          "error-wrapping",
-				Name:        "Error Wrapping",
-				Category:    domain.CategoryError,
-				Rule:        "Always wrap errors with fmt.Errorf and %w",
-				Confidence:  0.9,
-				Description: "Wrap errors with context",
-			},
-		},
-		RecentCommits: getRecentCommits(t, 5),
-	}
-
-	result, err := ag.AnalyzeCode(ctx, req)
-	require.NoError(t, err, "AnalyzeCode should succeed")
-	require.NotNil(t, result, "Result should not be nil")
-
-	t.Logf("Issues: %d, Confidence: %.2f", len(result.Issues), result.Confidence)
-	for _, issue := range result.Issues {
-		t.Logf("  - [%s] %s:%d %s", issue.Severity, issue.File, issue.Line, issue.Message)
-	}
-}
-
-// TestE2E_BatchLearn 测试 learn-batch 模板：渲染 → Claude → 解析
-// 模板绑定: Commits, CommitFiles, KnownPatternsJSON, KnownPatternsCount
-// 输出格式: {"patterns":[...]}
-func TestE2E_BatchLearn(t *testing.T) {
-	ag := skipIfShort(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	commits := getRecentCommits(t, 3)
-	require.NotEmpty(t, commits, "Should have commits to analyze")
-
-	req := &agent.BatchLearnRequest{
-		Commits:            commits,
-		KnownPatternsJSON:  "[]",
-		KnownPatternsCount: 0,
-	}
-
-	result, err := ag.BatchLearnFromCommits(ctx, req)
-	require.NoError(t, err, "BatchLearnFromCommits should succeed")
-	require.NotNil(t, result, "Result should not be nil")
-
-	t.Logf("Patterns learned: %d", len(result.Patterns))
-	for _, p := range result.Patterns {
-		t.Logf("  - [%s] %s (confidence: %.2f)", p.Category, p.Name, p.Confidence)
-	}
-}
-
-// TestE2E_LearnFromCommit 测试 learn-batch 模板（单提交模式）：渲染 → Claude → 解析
-// 模板绑定: Commit (单条), ChangedFiles, KnownPatternsJSON, KnownPatternsCount
-// 输出格式: {"patterns":[...]}
-func TestE2E_LearnFromCommit(t *testing.T) {
-	ag := skipIfShort(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	commits := getRecentCommits(t, 1)
-	require.NotEmpty(t, commits, "Should have at least one commit")
-
-	req := &agent.LearnRequest{
-		Commit:             commits[0],
-		KnownPatternsJSON:  "[]",
-		KnownPatternsCount: 0,
-	}
-
-	result, err := ag.LearnFromCommit(ctx, req)
-	require.NoError(t, err, "LearnFromCommit should succeed")
-	require.NotNil(t, result, "Result should not be nil")
-
-	t.Logf("Patterns learned: %d", len(result.Patterns))
-	for _, p := range result.Patterns {
-		t.Logf("  - [%s] %s (confidence: %.2f)", p.Category, p.Name, p.Confidence)
-	}
-}
-
-// TestE2E_GenerateFixes 测试 fix-generate 模板：渲染 → Claude → 解析
-// 模板绑定: Issues, Files, Context
-// 输出格式: {"fixes":{"file/path.go":"content"}, "confidence":0.88}
-func TestE2E_GenerateFixes(t *testing.T) {
-	ag := skipIfShort(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	req := &agent.GenerateFixesRequest{
-		Issues: []domain.Issue{
-			{
-				File:       "main.go",
-				Line:       1,
-				Severity:   domain.SeverityWarning,
-				Message:    "Missing package comment",
-				Suggestion: "Add package documentation comment",
-			},
-		},
-		Files: []domain.FileInfo{
-			{Path: "cmd/skills-seed/main.go", Language: "go"},
-		},
-		Context: agent.ProjectContext{
-			Name:     "skills-seed",
-			Language: "go",
-		},
-	}
-
-	result, err := ag.GenerateFixes(ctx, req)
-	require.NoError(t, err, "GenerateFixes should succeed")
-	require.NotNil(t, result, "Result should not be nil")
-
-	t.Logf("Confidence: %.2f, Fixes: %d files", result.Confidence, len(result.Fixes))
-	for path := range result.Fixes {
-		t.Logf("  - Fixed: %s", path)
-	}
-}
-
-// TestE2E_CuratePatterns 测试 pattern-curate 模板：渲染 → Claude → 解析
+// TestE2E_CuratePatterns 测试会话式模式策展：渲染 → Claude → 解析
 // 模板绑定: Operation, CandidatePatterns, ExistingPatterns, AllExisting, ExistingByCandidate
 // 输出格式: {"patterns":[...], "dropped":[...], "summary":{...}}
 func TestE2E_CuratePatterns(t *testing.T) {
@@ -308,7 +138,15 @@ func TestE2E_CuratePatterns(t *testing.T) {
 		},
 	}
 
-	result, err := ag.CuratePatterns(ctx, req)
+	session, err := ag.StartLearningSession(ctx, agent.LearningSessionRequest{
+		ProjectName: "skills-seed",
+		RootPath:    testProjectPath,
+		Language:    "go",
+	})
+	require.NoError(t, err)
+	defer session.Close(ctx)
+
+	result, err := session.CuratePatterns(ctx, req)
 	require.NoError(t, err, "CuratePatterns should succeed")
 	require.NotNil(t, result, "Result should not be nil")
 
@@ -318,7 +156,7 @@ func TestE2E_CuratePatterns(t *testing.T) {
 	}
 }
 
-// TestE2E_ProjectAnalysis 测试 project-profile 模板：渲染 → Claude → 解析
+// TestE2E_ProjectAnalysis 测试会话式项目画像刷新：渲染 → Claude → 解析
 // 模板绑定: ProjectName, RootPath, Structure, ReadmePath, MainFiles
 // 输出格式: {"project_name":"...", "language":"go", "frameworks":[...], ...}
 func TestE2E_ProjectAnalysis(t *testing.T) {
@@ -338,7 +176,15 @@ func TestE2E_ProjectAnalysis(t *testing.T) {
 		MainFiles:   mainFiles,
 	}
 
-	result, err := ag.AnalyzeProject(ctx, req)
+	session, err := ag.StartLearningSession(ctx, agent.LearningSessionRequest{
+		ProjectName: "skills-seed",
+		RootPath:    testProjectPath,
+		Language:    "go",
+	})
+	require.NoError(t, err)
+	defer session.Close(ctx)
+
+	result, err := session.RefreshProjectProfile(ctx, req)
 	require.NoError(t, err, "AnalyzeProject should succeed")
 	require.NotNil(t, result, "Result should not be nil")
 
@@ -347,57 +193,4 @@ func TestE2E_ProjectAnalysis(t *testing.T) {
 	t.Logf("Summary: %s", result.Summary)
 	assert.NotEmpty(t, result.Language, "Language should not be empty")
 	assert.NotEmpty(t, result.Summary, "Summary should not be empty")
-}
-
-// TestE2E_InitSkills 测试 pattern-learn-current 模板：渲染 → Claude → 解析
-// 模板绑定: ProjectName, RootPath, Language, Structure, MainFiles, SampleFiles
-// 输出格式: {"patterns":[...], "profile_refresh_recommended":{...}}
-func TestE2E_InitSkills(t *testing.T) {
-	ag := skipIfShort(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	structure := getProjectStructure(t)
-	mainFiles := getMainFiles(t)
-
-	// 收集示例文件（选几个代表性的）
-	sampleFiles := []agent.SampleFile{
-		{Path: "cmd/skills-seed/main.go"},
-	}
-
-	// 尝试读取 domain 层的示例文件
-	domainDir := filepath.Join(testProjectPath, "internal", "domain")
-	if entries, err := os.ReadDir(domainDir); err == nil && len(entries) > 0 {
-		for _, e := range entries {
-			if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") && !strings.HasSuffix(e.Name(), "_test.go") {
-				sampleFiles = append(sampleFiles, agent.SampleFile{
-					Path: filepath.Join("internal", "domain", e.Name()),
-				})
-				if len(sampleFiles) >= 3 {
-					break
-				}
-			}
-		}
-	}
-
-	req := &agent.AnalyzeCurrentCodebaseRequest{
-		ProjectName: "skills-seed",
-		RootPath:    testProjectPath,
-		Language:    "go",
-		Structure:   structure,
-		MainFiles:   mainFiles,
-		SampleFiles: sampleFiles,
-	}
-
-	result, err := ag.AnalyzeCurrentCodebase(ctx, req)
-	require.NoError(t, err, "AnalyzeCurrentCodebase should succeed")
-	require.NotNil(t, result, "Result should not be nil")
-
-	t.Logf("Patterns: %d, ProfileRefreshRecommended: %t",
-		len(result.Patterns), result.ProfileRefreshRecommended.Needed)
-	for _, p := range result.Patterns {
-		t.Logf("  - [%s] %s (confidence: %.2f)", p.Category, p.Name, p.Confidence)
-	}
-	assert.NotNil(t, result.Patterns, "Patterns should be present")
 }

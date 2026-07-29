@@ -1,0 +1,60 @@
+# Sync Project Profile
+
+This is a bounded profile-sync conversation. Update the project profile from explicit inputs in this turn; do not rely on hidden memory from planning, pack analysis, or curation conversations.
+
+This turn is only for the project profile: compact routing facts, architecture/module navigation, dependency relationships, entry files, configuration and validation hints, and explicit engineering constraints. Do not inventory the project for completeness. Do not learn or summarize reusable business/code patterns here; reusable rules, state transitions, framework/code conventions, authorization, audit, external dependency contracts, and cross-entity orchestration belong to pack analysis and pattern curation.
+
+Project:
+- name: {{.ProjectName}}
+- path: {{.RootPath}}
+- language: {{.Language}}
+{{- if .StructurePath}}
+
+Project structure is available at `{{.StructurePath}}`. Use it only as the allowed analysis boundary and directory ownership clue for this profile turn.
+{{- end}}
+{{- if .StructuralContextPath}}
+Structural context is available at `{{.StructuralContextPath}}`. Use it for symbols, imports, entry points, and module clues; read source files only when needed to confirm profile facts.
+{{- end}}
+{{- if .FocusPathsPath}}
+Changed or focused paths are available at `{{.FocusPathsPath}}` ({{.FocusPathCount}} paths). Treat this as the focused refresh boundary. Preserve existing profile entries outside this boundary unless direct evidence in this turn invalidates them.
+{{- end}}
+{{- if .ExistingProfilePath}}
+Existing project profile JSON is available at `{{.ExistingProfilePath}}`. Read it and return one complete merged profile, not a patch.
+{{- end}}
+{{- if .ReadmePath}}
+README path: `{{.ReadmePath}}`
+{{- end}}
+{{- if .EngineeringKnowledgePath}}
+Project-level engineering knowledge paths are available at `{{.EngineeringKnowledgePath}}` ({{.EngineeringKnowledgeCount}} files). Read every listed file before producing `validation_commands` or `engineering_rules`.
+{{- end}}
+{{- if .UserContextPath}}
+User context is available at `{{.UserContextPath}}`; use it to interpret this profile sync, but do not copy it verbatim.
+{{- end}}
+{{- if .MainFiles}}
+
+Entry files:
+{{range .MainFiles}}- {{.}}
+{{end}}
+{{- end}}
+
+Profile rules:
+- Return a complete profile JSON.
+- Use only explicit runtime files, structural context, authoritative files, user context, and direct source evidence from this turn.
+- Preserve existing IDs, names, and ordering when still valid.
+- Add, update, or remove entries only when focused paths, structural context, authoritative files, user context, or direct source evidence support the change.
+- Language, framework, architecture, and module facts are profile routing aids, not learned patterns. Include or update them only when they are evidenced and useful for future navigation, validation, or change routing.
+- `key_modules`, `common_utils`, and `business_methods` require confirmed repository-relative paths or locations. Omit uncertain entries.
+- `business_methods` are routing facts for commonly reused business capabilities, cross-module orchestration entries, domain reusable entries, adapters, jobs, handlers, or high-value project utilities with clear signatures and locations. Capture module-level entries when they are the normal place future work should inspect or extend; project-level exposure is not required.
+- Do not add ordinary startup, registration, scaffolding, generated wrappers, thin forwarding, or simple record operations unless source evidence shows they are the routeable owner of a repository-specific business rule, policy, integration boundary, validation path, or reusable utility contract.
+- Module descriptions may summarize responsibilities, but reusable business rules, state transitions, authorization, audit, external dependency contracts, and lifecycle policies belong to learned patterns rather than profile prose.
+- Avoid exact capability counts in module descriptions unless direct evidence proves the complete closed list and the number changes a future implementation decision. Prefer representative examples or qualitative wording for supported variants, resource types, routes, and status sets.
+- `validation_commands` must come only from explicit repository evidence or user context. Preserve command text exactly.
+- `engineering_rules` must come only from project-level engineering knowledge paths or user context. Extract explicit project instructions that constrain future changes: required commands, forbidden operations, review gates, directory ownership rules, generated-code rules, configuration edit rules, migration safety rules, security/privacy constraints, release steps, naming conventions, and workspace/project boundary rules.
+- Do not turn learned source observations, common language/framework practice, inferred architecture style, or repeated implementation shape into `engineering_rules`.
+- Do not promote local module/plugin/package documents into repository-wide rules unless they are listed in the project-level engineering knowledge paths or the user context explicitly says they are global.
+- Each `engineering_rules` item must have a clear source path, concise imperative rule text, and evidence pointing back to the project-level engineering file or user context. If the authoritative text is advisory or conditional, keep that scope in the rule instead of making it absolute.
+- Do not output placeholders such as `unknown`, `unconfirmed`, `TODO`, `待确认`, or `未确认` in path or location fields.
+
+Return JSON only.
+
+{{ jsonContract "ProjectProfileOutput" }}

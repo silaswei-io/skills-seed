@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
-	"github.com/silaswei-io/skills-seed/internal/agent"
-	"github.com/silaswei-io/skills-seed/internal/command/check"
 	cliskillscmd "github.com/silaswei-io/skills-seed/internal/command/cliskills"
 	"github.com/silaswei-io/skills-seed/internal/command/generate"
 	"github.com/silaswei-io/skills-seed/internal/command/hook"
@@ -19,7 +17,6 @@ import (
 	patternscmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	previewcmd "github.com/silaswei-io/skills-seed/internal/command/preview"
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
-	reviewcmd "github.com/silaswei-io/skills-seed/internal/command/review"
 	synccmd "github.com/silaswei-io/skills-seed/internal/command/sync"
 	workflowcmd "github.com/silaswei-io/skills-seed/internal/command/workflow"
 	workspacecmd "github.com/silaswei-io/skills-seed/internal/command/workspace"
@@ -28,15 +25,15 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/spf13/cobra"
 )
 
 // Run 初始化运行时依赖并执行命令行入口
 func Run() error {
-	seedPath, err := utils.GetSeedPath()
+	seedPath, err := projectpath.FindSeedPath()
 	hasSeedDir := err == nil && seedPath != ""
 
 	if err := initI18n(seedPath, hasSeedDir); err != nil {
@@ -57,7 +54,6 @@ func Run() error {
 			return err
 		}
 		defer func() {
-			agent.LogTokenUsageSummary()
 			_ = cont.Close()
 			_ = logger.Close()
 		}()
@@ -79,7 +75,7 @@ func getLocale(seedPath string, hasSeedDir bool) string {
 		return locale
 	}
 
-	configData, err := utils.LoadConfig(seedPath)
+	configData, err := projectpath.LoadConfig(seedPath)
 	if err != nil || configData == nil || configData.Project.Locale == "" {
 		return locale
 	}
@@ -175,7 +171,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 		EnsureChildInitialized: initcmd.EnsureWorkspaceChildInitializedAt,
 	}))
 	rootCmd.AddCommand(synccmd.Cmd(cont, synccmd.Dependencies{
-		LearnCurrent: func(cont *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
 			return learn.RunLearnCurrentWithStateScopeOptions(cont, req.StateScope, req.UserContext, learn.CurrentRunOptions{
 				Force:          req.Force,
 				CurationOutput: req.CurationOutput,
@@ -185,12 +181,10 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	}))
 	rootCmd.AddCommand(workflowcmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))
-	rootCmd.AddCommand(check.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
 	rootCmd.AddCommand(logcmd.Cmd())
 	rootCmd.AddCommand(patternscmd.Cmd(cont))
 	rootCmd.AddCommand(previewcmd.Cmd(cont))
-	rootCmd.AddCommand(reviewcmd.Cmd(cont))
 	rootCmd.AddCommand(profilecmd.Cmd(cont))
 	rootCmd.AddCommand(hook.Cmd())
 }
@@ -236,7 +230,6 @@ var projectRuntimeExcludedCommands = map[string]struct{}{
 
 var projectRuntimeCommands = map[string]struct{}{
 	"add":      {},
-	"check":    {},
 	"reset":    {},
 	"sync":     {},
 	"workflow": {},
@@ -244,11 +237,10 @@ var projectRuntimeCommands = map[string]struct{}{
 
 var projectRuntimeSubcommands = map[string]map[string]struct{}{
 	"generate":  {"skills": {}},
-	"learn":     {"current": {}, "history": {}},
+	"learn":     {"current": {}},
 	"patterns":  {"stats": {}, "compact": {}, "add": {}, "delete": {}, "remove": {}, "rm": {}, "show": {}},
 	"preview":   {"files": {}},
-	"profile":   {"show": {}, "refresh": {}},
-	"review":    {"import": {}, "stats": {}},
+	"profile":   {"show": {}},
 	"workspace": {"add": {}},
 }
 

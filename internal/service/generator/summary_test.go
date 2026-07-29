@@ -65,12 +65,6 @@ func TestGenerateSkillsDeterministicSummaryUsesMetricsAndHitStatsInRankedOrder(t
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
 			return []domain.Pattern{*generic, *specific}, nil
 		},
-		GetPatternHitStatsFn: func(ctx context.Context) ([]domain.PatternHitStats, error) {
-			return []domain.PatternHitStats{
-				{Pattern: *generic, HitCount: 0},
-				{Pattern: *specific, HitCount: 4},
-			}, nil
-		},
 	}
 
 	svc := newTestService(mockPattern)
@@ -84,7 +78,7 @@ func TestGenerateSkillsDeterministicSummaryUsesMetricsAndHitStatsInRankedOrder(t
 	assert.Contains(t, errorPatterns, "Generic Rule")
 }
 
-func TestRankPatternsForGenerationUsesEffectiveScoreHitsAndConfidence(t *testing.T) {
+func TestRankPatternsForGenerationUsesEffectiveScoreAndConfidence(t *testing.T) {
 	lowValue := domain.NewPattern("low", "Low Value", domain.CategoryError)
 	lowValue.Confidence = 0.95
 	lowValue.Metrics = domain.PatternMetrics{EffectiveScore: 0.2}
@@ -95,8 +89,8 @@ func TestRankPatternsForGenerationUsesEffectiveScoreHitsAndConfidence(t *testing
 
 	input := []domain.Pattern{*lowValue, *highValue}
 	insights := map[string]domain.PatternInsight{
-		"low":  {HitCount: 0},
-		"high": {HitCount: 3},
+		"low":  {},
+		"high": {},
 	}
 
 	ranked := rankPatternsForGeneration(input, insights)
@@ -105,8 +99,8 @@ func TestRankPatternsForGenerationUsesEffectiveScoreHitsAndConfidence(t *testing
 	assert.Equal(t, "high", ranked[0].ID)
 	assert.Equal(t, "low", ranked[1].ID)
 	assert.Equal(t, "low", input[0].ID)
-	assert.Equal(t, 0.89, insights["high"].GenerationRank)
-	assert.Equal(t, 0.22, insights["low"].GenerationRank)
+	assert.Equal(t, 0.84, insights["high"].GenerationRank)
+	assert.Equal(t, 0.31, insights["low"].GenerationRank)
 }
 
 func TestGenerateSkillsDoesNotUseRuntimeUserContextDuringGenerate(t *testing.T) {
@@ -194,8 +188,8 @@ func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t 
 			return &domain.ProjectProfile{
 				ProjectName:  "hsmwebapi",
 				Language:     "go",
-				Summary:      "home-info单元使用go-zero框架实现首页仪表盘功能",
-				Architecture: "home-info单元采用典型的go-zero分层架构",
+				Summary:      "home-info模块使用go-zero框架实现首页仪表盘功能",
+				Architecture: "home-info模块采用典型的go-zero分层架构",
 				GeneratedAt:  "2026-05-19 12:00:00",
 				KeyModules: []domain.ModuleInfo{
 					{Name: "home", Path: "internal/logic/home"},
@@ -221,6 +215,6 @@ func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t 
 	require.Contains(t, text, "当前项目画像已覆盖 2 个模块/业务域")
 	require.Contains(t, text, "home")
 	require.Contains(t, text, "key-manage")
-	require.NotContains(t, text, "## 项目概览摘要\n\nhome-info单元")
-	require.NotContains(t, text, "## 技术架构\n\nhome-info单元")
+	require.NotContains(t, text, "## 项目概览摘要\n\nhome-info模块")
+	require.NotContains(t, text, "## 技术架构\n\nhome-info模块")
 }

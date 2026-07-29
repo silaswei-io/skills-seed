@@ -105,7 +105,7 @@ func TestCleanProjectProfileDropsUnconfirmedProfileEntries(t *testing.T) {
 		},
 		CommonUtils: []UtilityFunction{
 			{Name: "SearchHint", File: "unconfirmed", Signature: "func SearchHint()"},
-			{Name: "Confirmed", File: "internal/pkg/confirmed.go", Signature: "func Confirmed()"},
+			{Name: "Confirmed", File: "internal/shared/confirmed.go", Signature: "func Confirmed()"},
 		},
 		ValidationCommands: []ValidationCommand{
 			{Command: "task test", ScopePaths: []string{"unconfirmed", "internal/service"}, Evidence: []string{"未确认", "Taskfile.yml"}},
@@ -256,7 +256,6 @@ func TestNewProjectSpecFromProfileKeepsStrongLearnedPatternAsGuidance(t *testing
 	stable := NewPattern("kmip-success", "KMIP JSON 响应检查成功码", CategoryError)
 	stable.Confidence = 0.93
 	stable.Frequency = 6
-	stable.AnalysisUnitID = "key-manage-lifecycle"
 	stable.SetRule("KMIP JSON 响应解析后必须检查 Code 是否为 Success，失败时返回当前业务动作对应的错误。")
 	stable.EvidenceLocations = []PatternEvidenceLocation{
 		{Path: "plugins/key_manage/internal/logic/key_manage/create.go", Line: 10, Symbol: "Create"},
@@ -268,7 +267,6 @@ func TestNewProjectSpecFromProfileKeepsStrongLearnedPatternAsGuidance(t *testing
 	local := NewPattern("local-flow", "单文件初始化流程", CategoryBusiness)
 	local.Confidence = 0.95
 	local.Frequency = 2
-	local.AnalysisUnitID = "system-init"
 	local.SetRule("创建初始化管理员后写入 FirstInit 完成状态。")
 	local.EvidenceLocations = []PatternEvidenceLocation{
 		{Path: "internal/logic/system/initialization/create_admin.go", Line: 10, Symbol: "CreateAdmin"},

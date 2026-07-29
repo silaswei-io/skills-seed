@@ -10,7 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/spf13/cobra"
 )
 
@@ -41,12 +41,6 @@ type learnCurrentOptions struct {
 	force          bool
 }
 
-type learnHistoryOptions struct {
-	limit     int
-	since     string
-	batchSize int
-}
-
 // Cmd 返回 learn 命令
 func Cmd(cont *container.Container) *cobra.Command {
 	learnCmd := &cobra.Command{
@@ -55,7 +49,6 @@ func Cmd(cont *container.Container) *cobra.Command {
 		Long:    i18n.Get("LearnLongDesc"),
 		Example: i18n.Get("LearnExample"),
 	}
-	defaultLimit, defaultBatchSize := historyDefaults(cont)
 
 	// learn current 子命令
 	currentOpts := learnCurrentOptions{profileMode: learnCurrentProfileAuto}
@@ -86,44 +79,9 @@ func Cmd(cont *container.Container) *cobra.Command {
 	currentCmd.Flags().StringVar(&currentOpts.curationOutput, "curation-output", "", i18n.Get("LearnFlagCurationOutput"))
 	currentCmd.Flags().BoolVar(&currentOpts.force, "force", false, i18n.Get("LearnFlagForce"))
 
-	// learn history 子命令
-	historyOpts := learnHistoryOptions{limit: defaultLimit, batchSize: defaultBatchSize}
-	historyCmd := &cobra.Command{
-		Use:     "history",
-		Short:   i18n.Get("LearnHistoryShort"),
-		Long:    i18n.Get("LearnHistoryLongDesc"),
-		Example: i18n.Get("LearnHistoryExample"),
-		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if cont == nil {
-				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
-			}
-			return runLearnHistory(cont, historyOpts)
-		},
-	}
-	historyCmd.Flags().IntVarP(&historyOpts.limit, "limit", "n", defaultLimit, i18n.Get("LearnFlagLimit"))
-	historyCmd.Flags().StringVarP(&historyOpts.since, "since", "s", "", i18n.Get("LearnFlagSince"))
-	historyCmd.Flags().IntVarP(&historyOpts.batchSize, "batch-size", "b", defaultBatchSize, i18n.Get("LearnFlagBatchSize"))
-
-	learnCmd.AddCommand(currentCmd, historyCmd)
+	learnCmd.AddCommand(currentCmd)
 
 	return learnCmd
-}
-
-func historyDefaults(cont *container.Container) (int, int) {
-	defaultLimit := 50
-	defaultBatchSize := 10
-	if cont == nil || cont.ConfigRepo == nil {
-		return defaultLimit, defaultBatchSize
-	}
-	learningConfig := cont.ConfigRepo.GetLearningConfig()
-	if learningConfig.History.MaxCommits > 0 {
-		defaultLimit = learningConfig.History.MaxCommits
-	}
-	if learningConfig.History.BatchSize > 0 {
-		defaultBatchSize = learningConfig.History.BatchSize
-	}
-	return defaultLimit, defaultBatchSize
 }
 
 // RunLearnCurrent 导出：从当前代码库学习，并返回学习摘要。
@@ -173,7 +131,7 @@ func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domai
 	}
 	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
 		if strings.TrimSpace(opts.curationOutput) != "" {
-			return domain.LearnCurrentResult{}, fmt.Errorf("curation output must be resumed from the matching child project")
+			return domain.LearnCurrentResult{}, fmt.Errorf("%s", i18n.Get("LearnCurrentCurationOutputRequiresChildResume"))
 		}
 		return runLearnWorkspaceCurrent(cont, opts)
 	}
@@ -207,7 +165,6 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 }
 
 type learnCurrentProjectOptions struct {
-	tokenScope       string
 	showProgress     bool
 	showDetailedLogs bool
 	userContext      string
@@ -231,5 +188,4 @@ type learnCurrentProjectResult struct {
 	savedCount    int
 	skipped       bool
 	duration      time.Duration
-	tokenContext  context.Context
 }

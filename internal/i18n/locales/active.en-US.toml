@@ -272,47 +272,32 @@ other = "Unsupported agent engine: {{.Provider}}"
 [AgentNotAvailable]
 other = "Agent {{.Agent}} is not available; check agent command configuration"
 
-[AgentRenderAnalyzePromptFailed]
-other = "Failed to render learn-analyze prompt"
-
-[AgentRenderBatchLearnPromptFailed]
-other = "Failed to render learn-batch prompt"
-
-[AgentRenderGenerateFixesPromptFailed]
-other = "Failed to render fix-generate prompt"
-
-[AgentRenderCuratePatternsPromptFailed]
-other = "Failed to render pattern-curate prompt"
-
-[AgentRenderAnalysisPlanPromptFailed]
-other = "Failed to render analysis-plan prompt"
-
 [AgentRenderOptimizeWorkflowPromptFailed]
-other = "Failed to render workflow-optimize prompt"
+other = "Failed to render core-workflow-optimize prompt"
 
 [AgentOptimizeWorkflowFailed]
 other = "Failed to optimize workflow"
 
 [AgentRenderProjectAnalysisPromptFailed]
-other = "Failed to render project-profile prompt"
+other = "Failed to render project or workspace analysis prompt"
 
 [AgentRenderInitSkillsPromptFailed]
-other = "Failed to render pattern-learn-current prompt"
+other = "Failed to render current learning stage prompt"
 
-[AgentCodexAnalyzeFailed]
-other = "Codex analyze code failed"
+[AgentClaudeLearningSessionIDFailed]
+other = "Failed to generate Claude learning session ID"
 
-[AgentCodexLearnFailed]
-other = "Codex learn from commit failed"
+[AgentCodexLearningSessionIDMissing]
+other = "Codex learning session did not return a resumable session ID"
 
-[AgentCodexBatchLearnFailed]
-other = "Codex batch learn failed"
+[AgentCodexLearningSessionIDLost]
+other = "Codex learning session lost resumable session ID during {{.Operation}}"
 
-[AgentCodexGenerateFixesFailed]
-other = "Codex generate fixes failed"
+[AgentPromptInputWriteFailed]
+other = "Failed to write prompt input file {{.Name}}"
 
-[AgentCodexCuratePatternsFailed]
-other = "Codex curate patterns failed"
+[AgentLearningSessionNotReady]
+other = "Learning session is not ready: {{.Summary}}"
 
 [AgentCodexProjectAnalysisFailed]
 other = "Codex project analysis failed"
@@ -419,8 +404,62 @@ other = "AI analysis failed"
 [AnalyzerAnalyzeProjectFailed]
 other = "Project analysis failed"
 
+[AnalyzerLearningSessionRequired]
+other = "A learning session is required to refresh the project profile"
+
 [AnalyzerAnalyzeCodebaseFailed]
 other = "Codebase analysis failed"
+
+[AnalyzerCollectEngineeringKnowledgeFailed]
+other = "Failed to collect engineering knowledge"
+
+[AnalyzerResolveProjectProfileSymbolsFailed]
+other = "Failed to resolve project profile symbols"
+
+[AnalyzerDroppedInvalidEngineeringRule]
+other = "Dropped invalid engineering rule"
+
+[AnalyzerMarshalProjectProfileFailed]
+other = "Failed to marshal project profile"
+
+[AnalyzerLearningSessionRequiredForAgenda]
+other = "A learning session is required for current learning agenda planning"
+
+[AnalyzerLearningSessionRequiredForBatch]
+other = "A learning session is required for current code batch analysis"
+
+[AnalyzerLearningSessionRequiredForDelta]
+other = "A learning session is required for current code delta analysis"
+
+[AnalyzerAnalyzeBatchNoFocusResults]
+other = "Current code batch returned no evidence focus results"
+
+[AnalyzerAnalyzeBatchUnknownFocus]
+other = "Analysis batch returned unknown evidence focus {{.Focus}}"
+
+[AnalyzerAnalyzeBatchOmittedFocus]
+other = "Analysis batch omitted evidence focus {{.Focus}}"
+
+[LearnCurrentAnalyzeBatchUnknownFocus]
+other = "Analysis batch returned unknown evidence focus {{.Focus}}"
+
+[LearnCurrentAnalyzeBatchMissedFocus]
+other = "Analysis batch missed evidence focus {{.Focus}}"
+
+[LearnCurrentDeltaBatchUnknownFocus]
+other = "Delta batch returned unknown evidence focus {{.Focus}}"
+
+[LearnCurrentDeltaBatchMissedFocus]
+other = "Delta batch missed evidence focus {{.Focus}}"
+
+[LearnCurrentLoadRelatedDeltaPatternsFailed]
+other = "Failed to load related delta patterns"
+
+[LearnCurrentAgendaIncomplete]
+other = "Learning agenda has incomplete focuses: {{.Focuses}}"
+
+[LearnCurrentAgendaCoverageMissing]
+other = "Learning agenda completed without covering files: {{.Paths}}"
 
 [AnalyzerStructuralCollectFailed]
 other = "Structural analysis failed. Skipping structural pre-scan and continuing with normal file analysis."
@@ -470,21 +509,6 @@ other = "Failed to create Git branch"
 [GitCheckoutFailed]
 other = "Failed to switch Git branch"
 
-[AgentClaudeAnalyzeFailed]
-other = "Claude analyze code failed"
-
-[AgentClaudeLearnFailed]
-other = "Claude learn from commit failed"
-
-[AgentClaudeBatchLearnFailed]
-other = "Claude batch learn failed"
-
-[AgentClaudeGenerateFixesFailed]
-other = "Claude generate fixes failed"
-
-[AgentClaudeCuratePatternsFailed]
-other = "Claude curate patterns failed"
-
 [AgentClaudeProjectAnalysisFailed]
 other = "Claude project analysis failed"
 
@@ -493,6 +517,15 @@ other = "Claude CLI call failed"
 
 [AgentClaudeRetryable]
 other = "Claude call hit a retryable error"
+
+[AgentClaudeStructuredOutputMissing]
+other = "Claude CLI success response did not contain structured JSON output"
+
+[AgentClaudeEnvelopeParseFailed]
+other = "Failed to parse Claude JSON envelope"
+
+[AgentClaudeUnexpectedEnvelopeType]
+other = "Claude JSON envelope type is {{.Type}}, expected result"
 
 [AgentCodexRetryable]
 other = "Codex call hit a retryable error"
@@ -505,6 +538,12 @@ other = "Failed to parse AI result"
 
 [AgentJSONUnmarshalSimpleFailed]
 other = "Failed to unmarshal JSON"
+
+[AgentRequiredOutputFieldMissing]
+other = "AI output is missing required field {{.Field}}"
+
+[AgentInvalidCuratedDropReasonCode]
+other = "AI curation output contains an invalid drop reason code: id={{.ID}}, reason_code={{.ReasonCode}}"
 
 [AgentDiagnosticError]
 other = "Agent diagnostics: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
@@ -600,7 +639,7 @@ other = "Saving patterns to database"
 other = "Codebase analysis completed"
 
 [LearnShort]
-other = "Learn from Git history"
+other = "Learn from current code"
 
 [LearnNotInitialized]
 other = "skills-seed not initialized"
@@ -609,37 +648,10 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [LearnLongDesc]
-other = "Learn coding patterns from current code or Git commit history.\n\nThis command will:\n  • Analyze current code or recent Git commits\n  • Extract coding patterns using the configured AI agent\n  • Save learned patterns to the database\n  • Provide project convention input for check and generate skills"
+other = "Learn coding patterns from the current codebase.\n\nThis command will:\n  • Use segmented AI learning conversations for planning, analysis, and curation\n  • Analyze current code or diff-anchored changes\n  • Extract source-backed coding patterns\n  • Save learned patterns to the database\n  • Prepare project knowledge for generated skills"
 
 [LearnExample]
-other = "  # Learn from current code\n  skills-seed learn current\n\n  # Learn from Git history\n  skills-seed learn history --limit=50\n\n  # Learn only from a focused directory\n  skills-seed learn current --focus internal/service --profile skip"
-
-[LearnFromHistory]
-other = "Learning from Git history"
-
-[LearnAnalyzingCommits]
-other = "Analyzing {{.Count}} commits..."
-
-[CheckShort]
-other = "Check staged files"
-
-[CheckNotInitialized]
-other = "skills-seed not initialized"
-
-[CheckRunInitFirst]
-other = "Please run 'skills-seed init' first"
-
-[CheckLongDesc]
-other = "Check whether staged files comply with learned coding standards.\n\nThis command will:\n  • Get Git staged files, or check all Git-tracked files when --all is set\n  • Analyze code using the configured AI agent\n  • Find issues based on learned patterns\n  • Provide fix suggestions\n\nUsually runs automatically via Git pre-commit hook."
-
-[CheckFlagInteractive]
-other = "Enable interactive fix confirmation (default true; hooks usually use --interactive=false)"
-
-[CheckFlagAll]
-other = "Check all files instead of only staged files"
-
-[CheckExample]
-other = "  # Check staged files and enter interactive handling when issues are found\n  skills-seed check\n\n  # Check all Git-tracked files\n  skills-seed check --all\n\n  # Disable interactivity for scripts or hooks\n  skills-seed check --interactive=false"
+other = "  # Incrementally learn from current code\n  skills-seed learn current\n\n  # Learn only from a focused directory\n  skills-seed learn current --focus internal/service --profile skip"
 
 [GenerateShort]
 other = "Generate AI Agent outputs"
@@ -771,21 +783,6 @@ other = "Hook run failed: {{.Error}}"
 other = "  Project root: {{.Path}}"
 
 # 学习
-[LearnStarting]
-other = "Starting to learn from Git history..."
-
-[LearnAnalyzingCommitsCount]
-other = "Analyzing up to {{.Count}} commits"
-
-[LearnNoCommits]
-other = "No new commits to learn"
-
-[LearnBatchStarting]
-other = "Batch learning commits..."
-
-[LearnBatchProgress]
-other = "Batch learning commits {{.Current}}/{{.Total}}"
-
 [ProgressLearnCurrentPrepareProject]
 other = "Preparing project context"
 
@@ -793,7 +790,7 @@ other = "Preparing project context"
 other = "Local file filtering"
 
 [ProgressLearnCurrentResumeState]
-other = "Resuming previous analysis plan"
+other = "Resuming previous learning agenda"
 
 [ProgressLearnCurrentDetectRestoreState]
 other = "{{.Label}}: checking resumable plan"
@@ -801,41 +798,47 @@ other = "{{.Label}}: checking resumable plan"
 [ProgressLearnCurrentDetectScanFiles]
 other = "{{.Label}}: scanning file fingerprints"
 
-[ProgressLearnCurrentAIFileSelection]
-other = "AI file filtering"
+[ProgressLearnCurrentLocalFileSelection]
+other = "Local candidate narrowing"
 
-[ProgressLearnCurrentSkipAIFileSelection]
-other = "Skipping AI file filtering ({{.Reason}})"
+[ProgressLearnCurrentAIFileSelection]
+other = "AI candidate narrowing"
+
+[ProgressLearnCurrentCandidateSelectionStructuralContext]
+other = "{{.Label}} · preparing structural context (seeds {{.SeedPaths}})"
+
+[ProgressLearnCurrentCandidateSelectionCodeGraphIndex]
+other = "{{.Label}} · CodeGraph checking index (seeds {{.SeedPaths}})"
+
+[ProgressLearnCurrentCandidateSelectionCodeGraphContext]
+other = "{{.Label}} · CodeGraph extracting candidate cues (seeds {{.SeedPaths}})"
+
+[ProgressLearnCurrentCandidateSelectionCodeGraphRepair]
+other = "{{.Label}} · CodeGraph repairing index (seeds {{.SeedPaths}})"
+
+[ProgressLearnCurrentCandidateSelectionTreeSitterContext]
+other = "{{.Label}} · parsing structural seeds (seeds {{.SeedPaths}})"
+
+[ProgressLearnCurrentCandidateSelectionAgent]
+other = "{{.Label}} · calling Agent to narrow candidates (candidates {{.CandidatePaths}})"
 
 [ProgressLearnCurrentFileSelectionSkipRestored]
-other = "analysis plan restored"
-
-[ProgressLearnCurrentFileSelectionSkipDisabled]
-other = "AI file filtering is disabled"
+other = "learning agenda restored"
 
 [ProgressLearnCurrentFileSelectionSkipNoCandidates]
 other = "no candidate files"
 
-[ProgressLearnCurrentFileSelectionSkipBelowThreshold]
-other = "{{.Candidates}} candidates below threshold {{.MinCandidates}}"
-
 [ProgressLearnCurrentAnalyzeCodebase]
 other = "Analyzing current codebase"
 
-[ProgressLearnCurrentPlanUnits]
-other = "Analysis unit planning"
+[ProgressLearnCurrentPlanFocuses]
+other = "Learning agenda planning"
 
-[ProgressLearnCurrentPlanUnitsRestored]
-other = "Restoring analysis unit plan ({{.Units}} units)"
+[ProgressLearnCurrentPlanFocusesRestored]
+other = "Restoring learning agenda ({{.Focuses}} focuses)"
 
-[ProgressLearnCurrentAnalyzeParallelUnits]
-other = "{{.Label}}: {{.Current}}/{{.Total}}, {{.RunningCount}} running ({{.Running}}), parallelism {{.Parallelism}}"
-
-[ProgressLearnCurrentAnalyzeUnit]
-other = "{{.Label}} · unit {{.Current}}/{{.Total}} · {{.Name}}"
-
-[ProgressLearnCurrentAnalyzeSaveUnitPatterns]
-other = "{{.Label}} · saving patterns {{.Current}}/{{.Total}} · {{.Name}}"
+[ProgressLearnCurrentAnalyzeFocus]
+other = "{{.Label}} · focus {{.Current}}/{{.Total}} · {{.Name}}"
 
 [ProgressLearnCurrentCommitFiles]
 other = "{{.Label}} · committing {{.Count}} file states"
@@ -864,26 +867,14 @@ other = "{{.Label}} (code analysis {{.Completed}}/{{.Total}} complete)"
 [ProgressLearnWorkspaceProjects]
 other = "Learning workspace child projects"
 
-[ProgressLearnHistoryBatch]
-other = "Analyzing batch {{.Current}}/{{.Total}} (commits {{.Start}}-{{.End}}/{{.CommitTotal}})"
-
 [ProgressCuratePatternsAI]
 other = "Curating patterns with AI"
 
 [ProgressCuratePatternsReplay]
 other = "Replay saved AI curation decision"
 
-[ProgressGenerateFixesAI]
-other = "Generate fix suggestions"
-
-[ProgressCheckAnalyzeAI]
-other = "Analyze code issues"
-
 [ProgressUserDefinePatternAI]
 other = "Generate user-defined pattern"
-
-[ProgressProfileRefreshAI]
-other = "Analyze project profile"
 
 [LearnFailed]
 other = "Failed to learn: {{.Error}}"
@@ -956,7 +947,7 @@ other = "Skills generated successfully!"
 other = "Output: {{.Path}}"
 
 [GenerateProjectProfileMissing]
-other = "Project profile is missing, so project overview cannot be generated. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
+other = "Project profile is missing, so project overview cannot be generated. Run 'skills-seed learn current' first."
 
 [GenerateWorkspaceChildGenerating]
 other = "Generating skills for child project {{.ProjectName}}"
@@ -987,7 +978,7 @@ other = "Additional guidance for this generate run, passed to the AI agent as ex
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern through --context and curate it before storage\n  update  - Update a specific pattern through --context\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules; use --ai explicitly for semantic merging\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern through --context and curate it before storage\n  update  - Update a specific pattern through --context\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
 
 [PatternsExample]
 other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Compact similar patterns in all categories\n  skills-seed patterns compact"
@@ -996,19 +987,16 @@ other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Sh
 other = "Compact similar patterns"
 
 [PatternsCompactLongDesc]
-other = "Use local deterministic rules by default to compact highly similar learned patterns into fewer, clearer entries without calling the Agent.\n\nBy default this writes back to the database. Use --dry-run to preview the summary only. Use --category to limit compaction to one category; pass --ai explicitly for AI semantic merging."
+other = "Use local deterministic rules by default to compact highly similar learned patterns into fewer, clearer entries without calling the Agent.\n\nBy default this writes back to the database. Use --dry-run to preview the summary only. Use --category to limit compaction to one category."
 
 [PatternsCompactExample]
-other = "  # Locally compact all similar patterns and write back to the database\n  skills-seed patterns compact\n\n  # Compact only the api category\n  skills-seed patterns compact --category api\n\n  # Preview compact results without writing\n  skills-seed patterns compact --dry-run\n\n  # Use AI for semantic merging and preview the result\n  skills-seed patterns compact --ai --dry-run"
+other = "  # Locally compact all similar patterns and write back to the database\n  skills-seed patterns compact\n\n  # Compact only the api category\n  skills-seed patterns compact --category api\n\n  # Preview compact results without writing\n  skills-seed patterns compact --dry-run"
 
 [PatternsCompactFlagCategory]
 other = "Only compact the specified category, such as business, api, or testing; empty means all categories"
 
 [PatternsCompactFlagDryRun]
 other = "Preview compact results without writing to the database"
-
-[PatternsCompactFlagAI]
-other = "Use AI for semantic merging; default uses local deterministic merging"
 
 [PatternsCompactComplete]
 other = "Patterns compacted: input {{.TotalInput}}, written {{.TotalWritten}}, dropped {{.TotalDropped}}, merged groups {{.MergeCount}}"
@@ -1080,10 +1068,10 @@ other = "pattern ID required: skills-seed patterns delete <pattern-id>"
 other = "Pattern deleted: {{.PatternID}}"
 
 [PatternsStatsShort]
-other = "Show learned pattern quality and check hit statistics"
+other = "Show learned pattern quality metrics"
 
 [PatternsStatsLongDesc]
-other = "Show learned pattern quality metrics and check hit statistics, including specificity, confidence, effective score, hit count, and last hit time."
+other = "Show learned pattern quality metrics, including specificity, confidence, and effective score."
 
 [PatternsStatsExample]
 other = "skills-seed patterns stats"
@@ -1102,12 +1090,6 @@ other = "CONFIDENCE"
 
 [PatternsStatsHeaderEffective]
 other = "EFFECTIVE"
-
-[PatternsStatsHeaderHits]
-other = "HITS"
-
-[PatternsStatsHeaderLastHit]
-other = "LAST_HIT"
 
 [PatternsShowShort]
 other = "Show learned pattern overview or full details"
@@ -1306,7 +1288,7 @@ other = "location_history"
 other = "Sync skills"
 
 [SyncLongDesc]
-other = "Run learn current → generate skills in one command.\n\nBy default, sync resumes the previous unfinished analysis plan when one exists; use --restart to discard it and rescan.\n--context is passed only as extra background for this learning run. To manually add a user pattern, use patterns add or patterns update."
+other = "Run learn current → generate skills in one command.\n\nBy default, sync resumes the previous unfinished learning agenda when one exists; use --restart to discard it and rescan.\n--context is passed only as extra background for this learning run. To manually add a user pattern, use patterns add or patterns update."
 
 [SyncExample]
 other = "  # Full pipeline: learn + generate\n  skills-seed sync\n\n  # Add background for this learning run\n  skills-seed sync --context \"On-prem deployment, not SaaS\"\n\n  # Read background from multiple files or directories\n  skills-seed sync --context-path docs/plan.md --context-path docs/specs\n\n  # Discard unfinished state and relearn\n  skills-seed sync --restart"
@@ -1343,6 +1325,12 @@ other = "Generate skills failed"
 
 [PatternCuratorNotConfigured]
 other = "pattern curator service is not configured"
+
+[CuratorLearningSessionRequiredForCurrent]
+other = "A learning session is required for current code pattern curation"
+
+[CuratorLearningSessionRequiredForAI]
+other = "A learning session is required for AI pattern curation"
 
 [PreviewShort]
 other = "Preview analysis inputs"
@@ -1398,57 +1386,6 @@ other = "DELETED_FILES"
 [PreviewFilesOutputMore]
 other = "... {{.Count}} more"
 
-[ReviewShort]
-other = "Import review comments and show prevention statistics"
-
-[ReviewLongDesc]
-other = "Import local review comments and compare them with recorded pattern hits by file and line window to observe which comments are already covered by existing patterns."
-
-[ReviewExample]
-other = "skills-seed review import --from-file review-comments.json\nskills-seed review stats"
-
-[ReviewImportShort]
-other = "Import review comments from a JSON file"
-
-[ReviewImportLongDesc]
-other = "Import local review comments from a JSON array file into the skills-seed memory database."
-
-[ReviewImportExample]
-other = "skills-seed review import --from-file review-comments.json"
-
-[ReviewImportFlagFromFile]
-other = "JSON file containing review comments"
-
-[ReviewImportComplete]
-other = "Imported {{.Count}} review comments"
-
-[ReviewStatsShort]
-other = "Show review comment prevention statistics"
-
-[ReviewStatsLongDesc]
-other = "Show how many imported review comments match recorded pattern hits within the configured line window."
-
-[ReviewStatsExample]
-other = "skills-seed review stats"
-
-[ReviewStatsFlagLineWindow]
-other = "Line distance used to match review comments to pattern hits"
-
-[ReviewStatsOutputTotal]
-other = "TOTAL"
-
-[ReviewStatsOutputPrevented]
-other = "PREVENTED"
-
-[ReviewStatsOutputMissed]
-other = "MISSED"
-
-[ReviewStatsOutputPattern]
-other = "PATTERN"
-
-[ReviewStatsOutputComments]
-other = "COMMENTS"
-
 # workspace
 [WorkspaceShort]
 other = "Manage workspace sub-projects"
@@ -1487,13 +1424,13 @@ other = "AI failed to generate user-defined pattern"
 
 # 画像
 [ProfileShort]
-other = "Show or update the project profile"
+other = "Show the project profile"
 
 [ProfileLongDesc]
-other = "Show or update the project profile generated by learn current.\n\nThe profile is stored at .skills-seed/store/documents/project-profile.json. It is used to render references/project-overview.md and gives generate skills project structure, dependency, key module, and business method context."
+other = "Show the project profile generated by learn current.\n\nThe profile is stored at .skills-seed/store/documents/project-profile.json. It is used to render references/project-overview.md and gives generate skills project structure, dependency, key module, and business method context. Profile sync belongs to current learning, and incremental learning decides whether to update it from detected changes and AI recommendations."
 
 [ProfileExample]
-other = "  # Show the current project profile summary\n  skills-seed profile show\n\n  # Re-analyze the project and update the profile\n  skills-seed profile refresh"
+other = "  # Show the current project profile summary\n  skills-seed profile show\n\n  # Let current learning decide whether the profile needs a refresh\n  skills-seed learn current --profile auto"
 
 [ProfileShowShort]
 other = "Show the current project profile summary"
@@ -1504,29 +1441,14 @@ other = "Read .skills-seed/store/documents/project-profile.json and print projec
 [ProfileShowExample]
 other = "  # Show the current project profile summary\n  skills-seed profile show"
 
-[ProfileRefreshShort]
-other = "Re-analyze the project and save the project profile"
-
-[ProfileRefreshLongDesc]
-other = "Re-analyze the current project and overwrite the saved project profile without learning patterns.\n\nUse this when project structure, dependencies, or key modules changed but you do not need to re-learn code patterns. The CLI configured by agent.engine must be available."
-
-[ProfileRefreshExample]
-other = "  # Update the profile using the configured project language\n  skills-seed profile refresh\n\n  # Temporarily specify the language\n  skills-seed profile refresh --language go"
-
 [ProfileMissing]
-other = "Project profile does not exist. Run 'skills-seed learn current' or 'skills-seed profile refresh' first."
+other = "Project profile does not exist. Run 'skills-seed learn current' first."
 
 [ProfileShowHeader]
 other = "Project profile: {{.ProjectName}} ({{.Language}})\nGenerated at: {{.GeneratedAt}}"
 
 [ProfileShowStats]
 other = "Stats: frameworks {{.Frameworks}}, dependencies {{.Dependencies}}, modules {{.Modules}}, business methods {{.BusinessMethods}}"
-
-[ProfileRefreshStarting]
-other = "Updating project profile: {{.ProjectName}}\nProject root: {{.ProjectRoot}}\nLanguage: {{.Language}}"
-
-[ProfileRefreshComplete]
-other = "Project profile updated"
 
 [ProjectProfileReadFailed]
 other = "Failed to read project profile"
@@ -1603,115 +1525,6 @@ other = "Failed to serialize workspace spec"
 [WorkspaceSpecWriteFailed]
 other = "Failed to write workspace spec"
 
-# 检查
-[CheckStarting]
-other = "Checking code quality..."
-
-[CheckAllFiles]
-other = "Checking all files..."
-
-[CheckStagedFiles]
-other = "Checking staged files..."
-
-[CheckFailed]
-other = "Failed to check: {{.Error}}"
-
-[CheckNoIssues]
-other = "No issues found!"
-
-[CheckFoundIssues]
-other = "Found {{.Count}} issues:"
-
-[CheckSuggestion]
-other = "   Suggestion: {{.Suggestion}}"
-
-# 交互式检查选项
-[InteractiveFoundIssues]
-other = "Found {{.Count}} issues"
-
-[InteractiveSelectAction]
-other = "How would you like to handle these issues?"
-
-[InteractiveAutoFix]
-other = "Auto Fix and Commit"
-
-[InteractiveAutoFixDesc]
-other = "Commit user changes first, then apply auto-fixes (fixes not committed)"
-
-[InteractiveManualFix]
-other = "Manual Fix"
-
-[InteractiveManualFixDesc]
-other = "Exit and manually fix these issues"
-
-[InteractiveLearnAndCommit]
-other = "Learn and Continue"
-
-[InteractiveLearnAndCommitDesc]
-other = "Learn current code as new patterns, then continue committing"
-
-[InteractiveAutoFixing]
-other = "Auto-fixing..."
-
-[InteractiveManualFixHint]
-other = "Please manually fix the issues above and try again"
-
-[InteractiveLearning]
-other = "Learning from current code patterns..."
-
-[InteractiveLearningFailed]
-other = "Learning failed: {{.Error}}"
-
-[InteractiveLearningSuccess]
-other = "Learning completed, continuing with commit"
-
-# 策略选择
-[InteractiveSelectStrategy]
-other = "Select Auto-Fix Strategy"
-
-[InteractiveSelectStrategyHint]
-other = "Choose how to apply automatic fixes:"
-
-[StrategyPatch]
-other = "Patch Mode"
-
-[StrategyPatchDesc]
-other = "Generate .patch file for review before applying (recommended)"
-
-[StrategyBackup]
-other = "Backup Mode"
-
-[StrategyBackupDesc]
-other = "Backup files then modify directly, easy to restore"
-
-[StrategyStash]
-other = "Stash Mode"
-
-[StrategyStashDesc]
-other = "Use git stash to store fixes, can pop anytime"
-
-[StrategyBranch]
-other = "Branch Mode"
-
-[StrategyBranchDesc]
-other = "Apply fixes on new branch, original branch unchanged"
-
-# 自动修复
-[AutoFixPatchCreated]
-other = "Patch file created: {{.Path}}\nApply with 'git apply {{.Path}}'"
-
-[AutoFixBackupCreated]
-other = "Backup created: {{.Path}}\nFiles modified, restore from backup if needed"
-
-[AutoFixDirectApplied]
-other = "Fixes applied directly (no backup)"
-
-[AutoFixStashCreated]
-other = "Stash created: {{.Message}}\nRestore fixes with 'git stash pop'"
-
-[AutoFixBranchCreated]
-other = "New branch created: {{.BranchName}}\nFixes applied on new branch, original branch unchanged"
-
 # 生成服务
 [GeneratorNoPatterns]
 other = "No patterns learned, skipping skills generation"
@@ -1774,82 +1587,6 @@ other = "\n=== Event Statistics ==="
 other = "{{.EventType}}: {{.Count}}"
 
 # ==================== 日志消息 ====================
-
-# 日志 - 检查命令
-[LoggerCheckIssueFormat]
-other = "%d. %s %s:%d"
-
-[LoggerCheckIssueMessage]
-other = "   %s"
-
-[LoggerCheckSelectorError]
-other = "Selector error: {{.Error}}"
-
-[LoggerCheckStrategyError]
-other = "Strategy selection error: {{.Error}}"
-
-[LoggerCheckAutoFixApplying]
-other = "Applying auto-fix..."
-
-[LoggerCheckAutoFixFailed]
-other = "Auto-fix failed: {{.Error}}"
-
-[LoggerCheckUsingStrategy]
-other = "Using strategy: {{.Strategy}}"
-
-[LoggerCheckNoFixGenerated]
-other = "No fixes generated"
-
-[LoggerCheckFixCount]
-other = "Generated fixes for {{.Count}} files"
-
-[LoggerCheckReviewPatch]
-other = "\nReview patch:"
-
-[LoggerCheckCatPatch]
-other = "  cat {{.Path}}"
-
-[LoggerCheckApplyPatch]
-other = "\nApply patch:"
-
-[LoggerCheckGitApply]
-other = "  git apply {{.Path}}"
-
-[LoggerCheckReversePatch]
-other = "\nReverse patch:"
-
-[LoggerCheckGitApplyReverse]
-other = "  git apply --reverse {{.Path}}"
-
-[LoggerCheckRestoreNeeded]
-other = "\nTo restore:"
-
-[LoggerCheckCpBackup]
-other = "  cp -r {{.Path}}/* ."
-
-[LoggerCheckRestoreFix]
-other = "\nRestore fix:"
-
-[LoggerCheckGitStashPop]
-other = "  git stash pop"
-
-[LoggerCheckViewFix]
-other = "\nView fix:"
-
-[LoggerCheckGitDiffMain]
-other = "  git diff main"
-
-[LoggerCheckCreatePR]
-other = "\nCreate PR:"
-
-[LoggerCheckGhPRCreate]
-other = "  gh pr create --base main --head {{.Branch}}"
-
-[LoggerCheckFileReadError]
-other = "Cannot read file {{.File}}: {{.Error}}"
-
-[LoggerCheckConfidence]
-other = "Fix confidence: {{.Confidence}}%"
 
 # 日志 - 学习服务
 [LoggerLearnerStart]
@@ -1939,17 +1676,11 @@ other = "Failed to parse result, returning empty result"
 [LoggerAgentParseResultFailedNonFallback]
 other = "Failed to parse result"
 
-[LoggerAgentCuratePatternsCallFailed]
-other = "Pattern curation call failed"
-
-[LoggerAgentCuratePatternsParseFallback]
-other = "Pattern curation result parsing failed"
-
-[LoggerAgentCuratePatternsValidationFallback]
-other = "Pattern curation result has structural issues; continuing with deterministic merge result"
-
 [LoggerAgentCuratePatternsCoverageRecovered]
 other = "Pattern curation coverage is incomplete; recovering only unclassified candidates locally"
+
+[LoggerAgentCuratePatternsRecallRecovered]
+other = "Pattern curation appears over-filtered; recovered source-backed candidates"
 
 [LoggerAgentCuratePatternsSanitized]
 other = "Pattern curation result contains invalid or duplicate decisions; normalized them and continued"
@@ -1986,36 +1717,6 @@ other = "Agent call started"
 
 [LoggerDiagnosticAgentCallComplete]
 other = "Agent call completed"
-
-[LoggerDiagnosticAgentTokenUsage]
-other = "Agent token usage"
-
-[AgentTokenUsageConsole]
-other = "Token usage: {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}"
-
-[AgentTokenUsageConsoleScoped]
-other = "Token usage: child project {{.Scope}} {{.Agent}}/{{.Operation}} current uncached {{.Current}}, context processed {{.CurrentProcessed}} ({{.Detail}}), cumulative uncached {{.Cumulative}}, processed {{.CumulativeProcessed}}"
-
-[AgentTokenUsageSummaryConsole]
-other = "Token usage summary: cumulative uncached {{.Total}}, context processed {{.Processed}} ({{.Detail}})"
-
-[AgentTokenUsageInputDetail]
-other = "input {{.Value}}"
-
-[AgentTokenUsageOutputDetail]
-other = "output {{.Value}}"
-
-[AgentTokenUsageCacheReadDetail]
-other = "cache read {{.Value}}"
-
-[AgentTokenUsageCacheWriteDetail]
-other = "cache write {{.Value}}"
-
-[AgentTokenUsageReasoningDetail]
-other = "reasoning {{.Value}}"
-
-[AgentTokenUsageDetailSeparator]
-other = ", "
 
 [LoggerDiagnosticAgentParseComplete]
 other = "Agent output parsed"
@@ -2055,24 +1756,6 @@ other = "Analyze current codebase and extract coding patterns, business methods,
 [LearnCurrentExample]
 other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip project profile sync\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance from multiple files or directories\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
-[LearnHistoryShort]
-other = "Learn from Git history"
-
-[LearnHistoryLongDesc]
-other = "Learn coding patterns from Git commit history.\n\nThis command will:\n  • Analyze Git commit history\n  • Use configured AI agent to extract coding patterns\n  • Extract business methods and tools\n  • Save learned patterns to database"
-
-[LearnHistoryExample]
-other = "  # Learn from the last 50 commits\n  skills-seed learn history --limit 50\n\n  # Learn from commits in the last 30 days\n  skills-seed learn history --since 30d\n\n  # Call the agent once per batch of 5 commits\n  skills-seed learn history --limit 40 --batch-size 5"
-
-[LearnFlagLimit]
-other = "Number of commits to analyze; already learned commits are skipped"
-
-[LearnFlagSince]
-other = "Time range (e.g., 7d, 30d, 6m, 1y)"
-
-[LearnFlagBatchSize]
-other = "Number of commits per batch; each batch is analyzed by one agent call and candidate patterns are curated before storage"
-
 [LearnFlagLanguage]
 other = "Primary programming language of the project; empty uses config or auto-detection"
 
@@ -2094,6 +1777,9 @@ other = "Ignore file fingerprints and relearn the current scan scope"
 [LearnFlagCurationOutput]
 other = "Resume commit from a completed CuratePatterns output without calling AI curation again"
 
+[LearnCurrentCurationOutputRequiresChildResume]
+other = "--curation-output must be resumed from the matching child project"
+
 # 当前学习命令消息
 [LearnCurrentStart]
 other = "Starting current-code incremental learning"
@@ -2104,11 +1790,53 @@ other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguag
 [LearnCurrentFocusInfo]
 other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMode}}"
 
+[LearnCurrentFallbackFocusName]
+other = "Current code changes"
+
+[LearnCurrentFallbackFocusRouteChange]
+other = "current changes"
+
+[LearnCurrentFallbackFocusRouteLearning]
+other = "code learning"
+
+[LearnCurrentFallbackFocusReason]
+other = "The agent did not return a valid evidence focus, so skills-seed uses the current learnable files as the fallback analysis scope"
+
+[LearnCurrentLoadLearningSessionCacheFailed]
+other = "Failed to load learning session cache"
+
+[LearnCurrentStartLearningSessionFailed]
+other = "Failed to start learning session"
+
+[LearnCurrentLearningSessionMissing]
+other = "Failed to start learning session: agent {{.Agent}} did not return a session"
+
+[LearnCurrentReadCurationOutputFailed]
+other = "Failed to read curation output"
+
+[LearnCurrentParseCurationOutputFailed]
+other = "Failed to parse curation output"
+
+[LearnCurrentCurationCandidateChanged]
+other = "Curation candidate set changed"
+
+[LearnCurrentDecodeCurationDecisionFailed]
+other = "Failed to decode curation decision"
+
+[LearnCurrentCurationCheckpointMissing]
+other = "Curation checkpoint is not initialized"
+
+[LearnCurrentEncodeCurationDecisionFailed]
+other = "Failed to encode curation decision"
+
+[LearnCurrentArtifactsCommittedWithPendingFocuses]
+other = "Analysis artifacts are committed with {{.Count}} pending evidence focuses"
+
 [LearnCurrentIncrementalSummary]
 other = "Local filtering statistics:\n  • file scope: scanned {{.ScannedFiles}}, locally excluded {{.LocalSkippedFiles}}, learnable {{.SourceFiles}}\n  • incremental candidates: added/modified {{.Changed}}, deleted {{.Deleted}}, unchanged {{.Unchanged}}\n  • pending candidates: {{.LocalPlanInputs}}"
 
 [LearnCurrentResumeSummary]
-other = "Resuming unfinished {{.Command}} execution plan:\n  • plan created at: {{.CreatedAt}}\n  • local candidates: learnable {{.SourceFiles}}, pending {{.LocalPlanInputs}}\n  • AI filtering: input {{.AISelectionInputs}}, retained {{.AISelectedFiles}}\n  • after resume: analysis files {{.PendingAnalyzeFiles}}, units {{.Units}}\n  • this run reuses the saved plan and will not repeat file scanning, local filtering, or AI file filtering"
+other = "Resuming unfinished {{.Command}} execution plan:\n  • local filtering: learnable {{.SourceFiles}}, pending {{.LocalPlanInputs}}\n  • candidate narrowing: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • after resume: analysis files {{.PendingAnalyzeFiles}}, evidence focuses {{.Focuses}}\n  • this run reuses the saved agenda and will not repeat file scanning, local filtering, or candidate narrowing"
 
 [LearnCurrentNoFileChanges]
 other = "No learnable file changes detected; skipped pattern learning"
@@ -2117,16 +1845,22 @@ other = "No learnable file changes detected; skipped pattern learning"
 other = "Excluded generated skills directories: {{.Paths}}"
 
 [LearnCurrentFileSelectionSummary]
-other = "File filtering result:\n  • AI filtering: input {{.AISelectionInputs}}, retained {{.AISelectedFiles}}\n  • status: {{.AISelectionStatus}}\n  • final analysis files: {{.PendingAnalyzeFiles}}"
+other = "Candidate narrowing result:\n  • candidate narrowing: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • status: {{.SelectionStatus}}\n  • final analysis files: {{.PendingAnalyzeFiles}}"
 
 [LearnCurrentFileSelectionApplied]
-other = "AI file filtering applied"
+other = "Candidate narrowing applied"
+
+[LearnCurrentFileSelectionLocalReason]
+other = "local deterministic candidate narrowing"
+
+[LearnCurrentFileSelectionAIReason]
+other = "AI candidate narrowing applied{{if .Reason}}: {{.Reason}}{{end}}"
+
+[LearnCurrentFileSelectionAIFailed]
+other = "AI candidate narrowing failed; falling back to all candidates: {{.Error}}"
 
 [LearnCurrentFileSelectionSkipped]
 other = "skipped ({{.Reason}})"
-
-[LearnCurrentAIFileSelectorFallback]
-other = "AI file filtering failed; falling back to all incremental candidates"
 
 [LearnCurrentFocusOutsideRoot]
 other = "Focus path {{.Path}} is outside the project root"
@@ -2140,11 +1874,8 @@ other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or ref
 [LearnCurrentResult]
 other = "Analysis result:\n  • new patterns: {{.PatternsCount}}"
 
-[LearnCurrentAnalyzeParallelUnits]
-other = "Starting concurrent project-unit learning: {{.Total}} units, parallelism {{.Parallelism}}"
-
-[LearnCurrentAnalyzeUnitsSummary]
-other = "Analysis units completed: {{.Completed}}/{{.Total}}, batches {{.Batches}}, parallelism {{.Parallelism}}"
+[LearnCurrentAnalyzeFocusesSummary]
+other = "Evidence focuses completed: {{.Completed}}/{{.Total}}, batches {{.Batches}}, in-project serial"
 
 [LearnCurrentSavePatternFailed]
 other = "Failed to save pattern [{{.ID}}]: {{.Error}}"
@@ -2162,7 +1893,7 @@ other = "Project profile sync skipped"
 other = "Failed to sync project profile: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "Starting workspace incremental learning: {{.Projects}} projects, project parallelism {{.Parallelism}}, analysis-unit parallelism per project {{.UnitParallelism}}"
+other = "Starting workspace incremental learning: {{.Projects}} projects, project parallelism {{.Parallelism}}, segmented sessions run serially inside each child project"
 
 [LearnWorkspaceProjectInfo]
 other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}\nChild project path: {{.Path}}"
@@ -2212,22 +1943,6 @@ other = "Current-code incremental learning completed"
 [LearnCurrentFailed]
 other = "Current-code incremental learning failed: {{.Error}}"
 
-# 历史学习命令消息
-[LearnHistoryStart]
-other = "Starting to learn from Git history"
-
-[LearnHistoryInfo]
-other = "Commit limit: {{.Limit}}\nTime range: {{.Since}}\nBatch size: {{.BatchSize}}"
-
-[LearnHistoryFailed]
-other = "Failed to learn from Git history: {{.Error}}"
-
-[LearnHistoryComplete]
-other = "Git history learning completed"
-
-[LearnHistoryTotalPatterns]
-other = "Total {{.Count}} patterns in database"
-
 # ==================== 命令错误消息 ====================
 [ErrNotInitialized]
 other = "skills-seed not initialized, run 'skills-seed init' first"
@@ -2237,9 +1952,6 @@ other = "Manual fix required"
 
 [ErrInvalidAction]
 other = "Invalid action"
-
-[ErrFailedToGenerateFixes]
-other = "Failed to generate fixes: {{.Error}}"
 
 [ErrFailedToGetCurrentDir]
 other = "Failed to get current directory: {{.Error}}"
@@ -2503,7 +2215,7 @@ other = "Select Skills type"
 other = "Enter total Agent parallelism"
 
 [InteractiveInitCustomizeAdvanced]
-other = "Customize analysis depth, split scope, or Skills template settings?"
+other = "Customize Skills output language or type?"
 
 [InteractiveInitGlobalCLISkills]
 other = "The global skills-seed CLI Skill for this environment is missing or outdated. Install/update it?"
@@ -2530,34 +2242,10 @@ other = "Write only the Claude global Skills directory."
 other = "Write only the Codex global Skills directory."
 
 [InteractiveInitParallelismPlanProject]
-other = "Project: learning.current.parallelism={{.UnitParallelism}}"
+other = "Project: current-code learning runs segmented sessions serially"
 
 [InteractiveInitParallelismPlanWorkspace]
-other = "Workspace: detected {{.Projects}} child projects, agent.parallelism={{.WorkspaceParallelism}}, learning.current.parallelism={{.UnitParallelism}}"
-
-[InteractiveInitLearningMode]
-other = "Select analysis depth"
-
-[InteractiveInitLearningModeFastDesc]
-other = "Faster; merges nearby capabilities and learns only high-value stable patterns."
-
-[InteractiveInitLearningModeNormalDesc]
-other = "Default and safest balance between quality and speed."
-
-[InteractiveInitLearningModeDeepDesc]
-other = "More thorough; reads deeper branches, external dependencies, and exceptional paths."
-
-[InteractiveInitLearningScope]
-other = "Select unit split scope"
-
-[InteractiveInitLearningScopeDomainDesc]
-other = "Coarser; groups by business domain with fewer patterns, suitable for long-lived high-level rules."
-
-[InteractiveInitLearningScopeFlowDesc]
-other = "Default and most stable; splits by business workflow, resource action, or external-system responsibility."
-
-[InteractiveInitLearningScopeModuleDesc]
-other = "Finer; splits by module, plugin, or API, suitable for repositories with clear module/plugin boundaries."
+other = "Workspace: detected {{.Projects}} child projects, agent.parallelism={{.WorkspaceParallelism}}, segmented sessions run serially inside each child project"
 
 [InteractiveInitSummaryTitle]
 other = "Execution plan"
@@ -2588,12 +2276,6 @@ other = "Total Agent parallelism"
 
 [InteractiveInitSummaryParallelismPlan]
 other = "Parallelism config"
-
-[InteractiveInitSummaryLearningMode]
-other = "Analysis depth"
-
-[InteractiveInitSummaryLearningScope]
-other = "Split scope"
 
 [InteractiveInitAlreadyInitializedTitle]
 other = "This repository is already initialized. What should init do?"
@@ -2707,7 +2389,7 @@ other = "Learn current code and generate the first Skills when learning produces
 other = "Resume the incomplete sync"
 
 [InteractiveSyncResumeDesc]
-other = "Reuse the existing run state, skip completed units, and continue pending work."
+other = "Reuse the existing run state, skip completed focuses, and continue pending work."
 
 [InteractiveSyncRestart]
 other = "Restart sync"
@@ -2842,7 +2524,7 @@ other = "Project-specific patterns"
 other = "Entry Method Index"
 
 [GeneratorProfileReferenceBusinessMethodsDescription]
-other = "Project-level business, cross-module orchestration, and high-value utility entry points"
+other = "Common business, module extension, cross-module orchestration, and high-value utility entry points"
 
 [GeneratorProfileReferenceModulesTitle]
 other = "Key Modules"
@@ -2870,9 +2552,6 @@ other = "Skills are deterministically generated from stored patterns, project pr
 
 [GeneratorInsightCoveredCategories]
 other = "Covered pattern categories: {{.Categories}}"
-
-[GeneratorInsightCheckHitOrdering]
-other = "Pattern ordering includes check hit statistics."
 
 [GeneratorOverviewArchitectureSummary]
 other = "The current codebase has {{.Count}} learned architecture layers. This section is a navigation summary; use the Architecture Layers and Key Modules sections for concrete responsibilities."
@@ -3006,30 +2685,6 @@ other = "Define cross-project boundaries first"
 [WorkspaceRuleBoundaryDescription]
 other = "Before changing contracts, shared code, or infrastructure, identify affected child projects and read their skills."
 
-[CheckerGetStagedFilesFailed]
-other = "Failed to get staged files"
-
-[CheckerWalkProjectFailed]
-other = "Failed to scan project files"
-
-[CheckerBuildSnapshotDiffFailed]
-other = "Failed to build file snapshot diff"
-
-[CheckerReplaceSnapshotFailed]
-other = "Failed to replace file snapshot"
-
-[CheckerGetPatternsFailed]
-other = "Failed to get known patterns"
-
-[CheckerGetRecentCommitsFailed]
-other = "Failed to get recent commits"
-
-[CheckerAnalyzeFailed]
-other = "AI analysis failed"
-
-[CheckerSavePatternHitsFailed]
-other = "Failed to save pattern hit records"
-
 [InteractiveSelectRequiresOption]
 other = "Interactive selection requires at least one option"
 
@@ -3141,5 +2796,5 @@ other = "Subcommands"
 [CommandDocsHeaderFlags]
 other = "Flags"
 
-[AutoFixPatchHeader]
-other = "# Auto-generated patch by skills-seed\n# Generated at: {{.GeneratedAt}}\n# Issues fixed: {{.IssueCount}}"
+[GeneratorBusinessCoverageSinglePatternWarning]
+other = "This domain currently has only 1 learned pattern. Treat it as incomplete coverage; verify current code through the evidence path before generalizing."

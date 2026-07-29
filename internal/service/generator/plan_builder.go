@@ -8,11 +8,11 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/knowledge/claim"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 // planBuilder 负责把已学习知识转换成可渲染的 Skills 生成计划。
@@ -289,7 +289,7 @@ func (b *planBuilder) appendCategoryPattern(p *skillgen.Plan, categoryName strin
 		Category:          summary.Category,
 		Summary:           summary.Summary,
 		PatternObjects:    patternsForTemplate(categoryPatterns),
-		ClaimGroups:       claim.Groups(categoryPatterns, b.skillsLoader.GetLocale()),
+		ClaimGroups:       knowledge.ClaimGroups(categoryPatterns, b.skillsLoader.GetLocale()),
 		PatternCount:      len(categoryPatterns),
 		LastUpdated:       time.Now().Format("2006-01-02 15:04:05"),
 		CodeFenceLanguage: codeFenceLanguage(language),

@@ -13,8 +13,8 @@ const (
 	FileAnalysisSourceCurrentCode = "current_code"
 	// FileAnalysisStatusAnalyzed 表示文件内容已进入 AI 深度分析范围。
 	FileAnalysisStatusAnalyzed = "analyzed"
-	// FileAnalysisStatusAISkipped 表示文件内容本轮已扫描，但被 AI 文件筛选器判定为低优先级。
-	FileAnalysisStatusAISkipped = "ai_skipped"
+	// FileAnalysisStatusSelectionSkipped 表示文件本轮已指纹记录，但未进入深度学习候选集合。
+	FileAnalysisStatusSelectionSkipped = "selection_skipped"
 	// FileAnalysisStatusInputDigest 表示记录来自非文件内容的输入摘要。
 	FileAnalysisStatusInputDigest = "input_digest"
 )

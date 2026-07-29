@@ -12,7 +12,7 @@ func TestPatternAllowsHardConstraintOnlyForMaintainedSources(t *testing.T) {
 		pattern := Pattern{Source: source}
 		assert.True(t, pattern.AllowsHardConstraint(), source)
 	}
-	for _, source := range []Source{SourceLearned, SourceLearnedCurrent, SourceLearnedHistory, SourceInit} {
+	for _, source := range []Source{SourceLearned, SourceLearnedCurrent, SourceInit} {
 		pattern := Pattern{Source: source}
 		assert.False(t, pattern.AllowsHardConstraint(), source)
 	}

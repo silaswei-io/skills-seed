@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateCurrentPatternsUsesVerifiedSourceEvidence(t *testing.T) {
+func TestCurrentPatternValidatorUsesVerifiedSourceEvidence(t *testing.T) {
 	root := t.TempDir()
 	source := "package service\n\nfunc LoadUser() error {\n\treturn nil\n}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte(source), 0o644))
@@ -39,7 +39,7 @@ func TestValidateCurrentPatternsUsesVerifiedSourceEvidence(t *testing.T) {
 	require.Equal(t, pattern.GoodExample, patterns[0].GoodExample)
 }
 
-func TestValidateCurrentPatternsAcceptsTypeFamilyEvidence(t *testing.T) {
+func TestCurrentPatternValidatorAcceptsTypeFamilyEvidence(t *testing.T) {
 	root := t.TempDir()
 	source := "class Base:\n    pass\n\nclass User(Base):\n    pass\n"
 	require.NoError(t, os.WriteFile(filepath.Join(root, "service.py"), []byte(source), 0o644))
@@ -57,7 +57,7 @@ func TestValidateCurrentPatternsAcceptsTypeFamilyEvidence(t *testing.T) {
 	require.Equal(t, 4, patterns[0].EvidenceLocations[0].Line)
 }
 
-func TestValidateCurrentPatternsRejectsUnverifiedEvidence(t *testing.T) {
+func TestCurrentPatternValidatorRejectsUnverifiedEvidence(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte("package service\n"), 0o644))
 
@@ -77,7 +77,7 @@ func TestValidateCurrentPatternsRejectsUnverifiedEvidence(t *testing.T) {
 	require.Empty(t, patterns)
 }
 
-func TestValidateCurrentPatternsDropsNonContiguousGoodExample(t *testing.T) {
+func TestCurrentPatternValidatorDropsNonContiguousGoodExample(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte("package service\nfunc LoadUser() {}\n"), 0o644))
 
@@ -92,7 +92,7 @@ func TestValidateCurrentPatternsDropsNonContiguousGoodExample(t *testing.T) {
 	require.Empty(t, patterns[0].GoodExample)
 }
 
-func TestValidateCurrentPatternsHasNoQuantityLimit(t *testing.T) {
+func TestCurrentPatternValidatorHasNoQuantityLimit(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte("package service\n"), 0o644))
 
@@ -107,7 +107,7 @@ func TestValidateCurrentPatternsHasNoQuantityLimit(t *testing.T) {
 	require.Len(t, validateCurrentPatternsForTest(t, root, candidates), len(candidates))
 }
 
-func TestValidateCurrentPatternsRejectsSymlinkEvidenceOutsideRoot(t *testing.T) {
+func TestCurrentPatternValidatorRejectsSymlinkEvidenceOutsideRoot(t *testing.T) {
 	root := t.TempDir()
 	outside := filepath.Join(t.TempDir(), "outside.go")
 	require.NoError(t, os.WriteFile(outside, []byte("package outside\nfunc Secret() {}\n"), 0o644))
@@ -122,7 +122,7 @@ func TestValidateCurrentPatternsRejectsSymlinkEvidenceOutsideRoot(t *testing.T) 
 func validateCurrentPatternsForTest(t *testing.T, root string, patterns []domain.Pattern) []domain.Pattern {
 	t.Helper()
 	resolver := sourcecode.NewResolver(config.StructuralConfig{Provider: config.StructuralProviderTreeSitter})
-	validated, err := validateCurrentPatterns(context.Background(), root, patterns, resolver)
+	validator, err := newCurrentPatternValidator(context.Background(), root, patterns, resolver)
 	require.NoError(t, err)
-	return validated
+	return validator.validatePatterns(patterns)
 }

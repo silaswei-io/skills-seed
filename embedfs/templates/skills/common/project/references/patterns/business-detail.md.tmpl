@@ -6,6 +6,8 @@
 
 {{.GroupSummary.Description}}
 
+本页只反映已学习到且有源码证据的复用点；模式较少的子域仍应按下方证据入口回到当前源码确认完整业务边界。
+
 ## 需求匹配
 
 {{if .GroupSummary.IsFallback}}当需求涉及业务规则、状态变化、运行期行为或跨模块流程，但无法从需求词或路径匹配到稳定子域时，读取本页。{{else}}当需求提到 {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}，出现同义业务动作、状态变化、规则策略、入口渠道或外部依赖，或改动路径位于 {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}本子域相关代码{{end}} 时，优先读取本页。{{end}}
@@ -30,12 +32,12 @@
 
 ## 可复用解决方案与证据
 
-有源码证据的 AI 学习模式用于定位并优先复用已有实现；只有用户维护或内置的显式规则才可作为硬约束。
+按证据定位并优先复用已有实现；权威规则见项目规范。
 
 {{range .PatternObjects}}
 ### {{.Name}}
 
-{{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用与实现观察（需按源码复核）**: {{.Description}}{{end}}
+{{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用边界**: {{.Description}}{{end}}
 
 {{end}}
 {{if .Rule}}**用户规则**: {{.Rule}}{{end}}
@@ -45,20 +47,6 @@
 {{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}
 {{end}}
 {{end}}{{if .BusinessMethod}}**已验证入口**: `{{.BusinessMethod.DisplayLocation}}` - {{.BusinessMethod.Name}}
-{{end}}
-
-{{if .GoodExample}}
-#### 代码证据
-
-```{{$.CodeFenceLanguage}}
-{{.GoodExample}}
-```
-{{end}}
-
-{{if .BadExample}}
-#### 避免示例
-
-{{.BadExample}}
 {{end}}
 
 ---

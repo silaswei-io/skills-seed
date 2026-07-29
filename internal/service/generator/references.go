@@ -7,7 +7,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/knowledge/policy"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -245,7 +245,7 @@ func patternsForTemplate(patterns []domain.Pattern) []patternRenderModel {
 	for _, pattern := range patterns {
 		pattern = patternForTemplate(pattern)
 		hardConstraint := pattern.AllowsHardConstraint()
-		statement := policy.DisplayPatternText(pattern)
+		statement := knowledge.DisplayPatternText(pattern)
 		if !hardConstraint {
 			pattern.BadExample = ""
 			pattern.Rule = ""

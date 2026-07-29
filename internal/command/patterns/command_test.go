@@ -83,7 +83,7 @@ func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 		ConfigRepo:  rootConfigRepo,
 		PatternRepo: rootPatternRepo,
 		Agent:       mockAgent,
-		CuratorSvc:  curator.NewService(mockAgent, rootPatternRepo),
+		CuratorSvc:  curator.NewService(rootPatternRepo),
 	}
 	cmd := addCmd(cont)
 	cmd.SetArgs([]string{"--context", "hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码"})
@@ -150,7 +150,7 @@ func TestAddCmdReadsContextPath(t *testing.T) {
 	cont := &container.Container{
 		Config:     &config.Config{Project: config.ProjectConfig{RootPath: projectRoot, Language: "go"}},
 		Agent:      mockAgent,
-		CuratorSvc: curator.NewService(mockAgent, patternRepo),
+		CuratorSvc: curator.NewService(patternRepo),
 	}
 	cmd := addCmd(cont)
 	cmd.SetArgs([]string{"--context-path", contextPath, "--category", "api"})
@@ -373,7 +373,7 @@ func TestDeleteCmdInWorkspaceRootDeletesRootAndLinkedChildPattern(t *testing.T) 
 
 }
 
-func TestStatsCmdPrintsPatternMetricsAndHits(t *testing.T) {
+func TestStatsCmdPrintsPatternMetrics(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	p := domain.NewPattern("domain-error-wrap", "领域错误包装", domain.CategoryError)
 	p.Confidence = 0.8
@@ -383,12 +383,11 @@ func TestStatsCmdPrintsPatternMetricsAndHits(t *testing.T) {
 		EffectiveScore:   0.66,
 		EvidenceCount:    3,
 	}
-	lastHit := time.Date(2026, 5, 28, 10, 30, 0, 0, time.UTC)
 	cont := &container.Container{
 		PatternStats: &mocks.MockPatternStatsRepository{
-			GetPatternHitStatsFn: func(ctx context.Context) ([]domain.PatternHitStats, error) {
-				return []domain.PatternHitStats{
-					{Pattern: *p, HitCount: 2, LastHitAt: lastHit},
+			GetPatternStatsFn: func(ctx context.Context) ([]domain.PatternStats, error) {
+				return []domain.PatternStats{
+					{Pattern: *p},
 				}, nil
 			},
 		},
@@ -402,13 +401,11 @@ func TestStatsCmdPrintsPatternMetricsAndHits(t *testing.T) {
 
 	text := out.String()
 	require.Contains(t, text, "具体度")
-	require.Contains(t, text, "命中数")
 	require.Contains(t, text, "domain-error-wrap")
 	require.Contains(t, text, "error")
 	require.Contains(t, text, "0.72")
 	require.Contains(t, text, "0.66")
-	require.Contains(t, text, "2")
-	require.Contains(t, text, "2026-05-28")
+	require.NotContains(t, text, "命中数")
 }
 
 func TestShowCmdPrintsPatternDatabaseFields(t *testing.T) {

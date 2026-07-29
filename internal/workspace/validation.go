@@ -8,7 +8,8 @@ import (
 	"unicode"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 // ValidationOptions 提供无法从工作区候选结果中可信推导的校验上下文。
@@ -84,7 +85,7 @@ func validateSpec(spec *domain.WorkspaceSpec, profile *domain.WorkspaceProfile, 
 		issues.add("profile", "workspace profile is required")
 		return
 	}
-	root := firstNonEmpty(opts.RootPath, profile.RootPath)
+	root := stringx.FirstNonEmpty(opts.RootPath, profile.RootPath)
 	projects := make(map[string]domain.WorkspaceProject, len(profile.Projects))
 	for _, project := range profile.Projects {
 		projects[project.ID] = project
@@ -184,7 +185,7 @@ func validateExistingRelativePath(root, path, field string, issues *validationIs
 		issues.add(field, "invalid workspace-relative path %q", path)
 		return
 	}
-	resolved, err := utils.CanonicalPathWithinRoot(root, filepath.Join(root, filepath.FromSlash(clean)))
+	resolved, err := projectpath.CanonicalWithinRoot(root, filepath.Join(root, filepath.FromSlash(clean)))
 	if err != nil {
 		issues.add(field, "path %q is outside the workspace root", clean)
 		return
@@ -204,7 +205,7 @@ func validateExistingPathPattern(root, pattern, field string, issues *validation
 	if prefix == "" {
 		return
 	}
-	resolved, err := utils.CanonicalPathWithinRoot(root, filepath.Join(root, filepath.FromSlash(prefix)))
+	resolved, err := projectpath.CanonicalWithinRoot(root, filepath.Join(root, filepath.FromSlash(prefix)))
 	if err != nil {
 		issues.add(field, "static path prefix %q is outside the workspace root", prefix)
 		return

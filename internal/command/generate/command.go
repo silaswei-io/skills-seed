@@ -12,12 +12,12 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -213,10 +213,6 @@ func workspaceGenerateOptions(opts generateOptions) ws.WorkspaceGenerateOptions 
 		workspaceOpts.RootOutputPath = opts.outputPath
 	}
 	return workspaceOpts
-}
-
-func generateWorkspaceChildSkills(ctx context.Context, cont *container.Container, trackers ...*progress.MultiTracker) error {
-	return generateWorkspaceChildSkillsWithOptions(ctx, cont, generateOptions{}, trackers...)
 }
 
 func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *container.Container, opts generateOptions, trackers ...*progress.MultiTracker) error {

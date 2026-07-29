@@ -15,12 +15,12 @@ func TestConsoleStepRunnerKeepsDetailLabelOnFailure(t *testing.T) {
 	runner := NewConsoleStepRunner(ConsoleStepRunnerOptions{TotalSteps: 2})
 
 	err := runner.Run("分析当前代码库", func() error {
-		runner.Detail("分析当前代码库", "分析当前代码库 · 单元 1/1 · 认证登录")
+		runner.Detail("分析当前代码库", "分析当前代码库 · 焦点 1/1 · 认证登录")
 		return errors.New("解析结果失败")
 	})
 
 	require.Error(t, err)
-	require.Equal(t, "分析当前代码库 · 单元 1/1 · 认证登录", runner.DisplayLabel("分析当前代码库"))
+	require.Equal(t, "分析当前代码库 · 焦点 1/1 · 认证登录", runner.DisplayLabel("分析当前代码库"))
 }
 
 func TestConsoleStepRunnerUpdatesCallbacksAndCompletesBaseStep(t *testing.T) {
@@ -55,7 +55,7 @@ func TestConsoleStepRunnerBindsAgentRetryProgressToCurrentDetail(t *testing.T) {
 	ctx := runner.WithContext(context.Background())
 
 	err := runner.Run("分析当前代码库", func() error {
-		runner.Detail("分析当前代码库", "分析当前代码库 · 单元 1/1 · 认证登录")
+		runner.Detail("分析当前代码库", "分析当前代码库 · 焦点 1/1 · 认证登录")
 		agent.ReportRetryForContext(ctx, agent.RetryInfo{
 			Attempt:      1,
 			MaxRetries:   3,
@@ -70,9 +70,9 @@ func TestConsoleStepRunnerBindsAgentRetryProgressToCurrentDetail(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []string{
-		"分析当前代码库 · 单元 1/1 · 认证登录",
-		"分析当前代码库 · 单元 1/1 · 认证登录（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）",
-		"分析当前代码库 · 单元 1/1 · 认证登录（第2次尝试）",
-		"分析当前代码库 · 单元 1/1 · 认证登录",
+		"分析当前代码库 · 焦点 1/1 · 认证登录",
+		"分析当前代码库 · 焦点 1/1 · 认证登录（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）",
+		"分析当前代码库 · 焦点 1/1 · 认证登录（第2次尝试）",
+		"分析当前代码库 · 焦点 1/1 · 认证登录",
 	}, updates)
 }

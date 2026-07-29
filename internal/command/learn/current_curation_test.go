@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/stretchr/testify/require"
 )
@@ -41,6 +42,7 @@ func TestCurrentCurationCheckpointPersistsImportedDecision(t *testing.T) {
 }
 
 func TestCurrentCurationCheckpointRejectsChangedCandidates(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
 	state := commandstate.NewState("sync", "demo", "go", "", nil, nil, nil)
 	state.Curation = &commandstate.CurationCheckpoint{
 		CandidateHash: "old-hash",
@@ -50,5 +52,5 @@ func TestCurrentCurationCheckpointRejectsChangedCandidates(t *testing.T) {
 
 	_, _, err := checkpoint.Load(context.Background(), "new-hash")
 
-	require.ErrorContains(t, err, "curation candidate hash changed")
+	require.ErrorContains(t, err, i18n.Get("LearnCurrentCurationCandidateChanged"))
 }

@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
-	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
 type currentPatternSource struct {
@@ -23,14 +23,6 @@ type currentPatternValidator struct {
 	projectRoot string
 	catalog     sourcecode.Catalog
 	files       map[string]currentPatternSource
-}
-
-func validateCurrentPatterns(ctx context.Context, projectRoot string, patterns []domain.Pattern, resolver sourcecode.Resolver) ([]domain.Pattern, error) {
-	validator, err := newCurrentPatternValidator(ctx, projectRoot, patterns, resolver)
-	if err != nil {
-		return nil, err
-	}
-	return validator.validatePatterns(patterns), nil
 }
 
 func newCurrentPatternValidator(ctx context.Context, projectRoot string, patterns []domain.Pattern, resolver sourcecode.Resolver) (*currentPatternValidator, error) {
@@ -135,7 +127,7 @@ func (v *currentPatternValidator) source(path string) (string, currentPatternSou
 		return "", currentPatternSource{}, false
 	}
 	fullPath := filepath.Join(v.projectRoot, clean)
-	resolvedPath, err := utils.CanonicalPathWithinRoot(v.projectRoot, fullPath)
+	resolvedPath, err := projectpath.CanonicalWithinRoot(v.projectRoot, fullPath)
 	if err != nil {
 		return "", currentPatternSource{}, false
 	}

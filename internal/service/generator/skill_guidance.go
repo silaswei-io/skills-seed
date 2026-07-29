@@ -4,10 +4,10 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/knowledge/validation"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 )
 
-type validationCommand = validation.Command
+type validationCommand = knowledge.ValidationCommand
 
 func skillTriggerDescription(projectName, language, locale string, profile *domain.ProjectProfile) string {
 	project := strings.TrimSpace(projectName)
@@ -31,7 +31,7 @@ func skillTriggerDescription(projectName, language, locale string, profile *doma
 }
 
 func validationCommands(profile *domain.ProjectProfile) []validationCommand {
-	return validation.Commands(profile)
+	return knowledge.ValidationCommands(profile)
 }
 
 func validationGaps(profile *domain.ProjectProfile, matrix []ValidationMatrixItem, locale string) []string {
@@ -39,7 +39,7 @@ func validationGaps(profile *domain.ProjectProfile, matrix []ValidationMatrixIte
 	hasTest := false
 	hasStaticCheck := false
 	for _, command := range commands {
-		switch validation.Kind(command) {
+		switch knowledge.ValidationCommandKind(command) {
 		case domain.ValidationCommandTest:
 			hasTest = true
 		case domain.ValidationCommandStaticCheck:

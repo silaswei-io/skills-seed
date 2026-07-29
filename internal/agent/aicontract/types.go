@@ -15,6 +15,15 @@ type EvidenceLocationOutput struct {
 	Confidence  float64 `json:"confidence,omitempty" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 }
 
+// DiffAnchorOutput 描述增量学习候选由哪段变更触发。
+type DiffAnchorOutput struct {
+	Path        string `json:"path" jsonschema_description:"repository-relative changed file path from this evidence focus"`
+	Line        int    `json:"line,omitempty" jsonschema:"minimum=1" jsonschema_description:"1-based line in the changed file when available"`
+	Symbol      string `json:"symbol,omitempty" jsonschema_description:"changed function, method, type, config key, state, or route term when available"`
+	ChangeKind  string `json:"change_kind" jsonschema:"enum=added,enum=modified,enum=deleted" jsonschema_description:"added|modified|deleted"`
+	Description string `json:"description" jsonschema_description:"why this changed hunk triggers the candidate pattern"`
+}
+
 // BusinessMethodOutput 描述可路由、可复用的业务或工具入口。
 type BusinessMethodOutput struct {
 	Name          string             `json:"name" jsonschema_description:"qualified code identifier only; do not put a signature in this field"`
@@ -38,10 +47,8 @@ type PatternOutput struct {
 	Rule              string                   `json:"rule" jsonschema_description:"non-mandatory reuse guidance naming verified existing entries or boundaries to prefer and when extension is appropriate; never generalize beyond source evidence"`
 	Confidence        float64                  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 	Frequency         int                      `json:"frequency" jsonschema:"minimum=1" jsonschema_description:"positive integer occurrence count"`
-	AnalysisUnitID    string                   `json:"analysis_unit_id,omitempty" jsonschema_description:"input analysis unit id"`
-	AnalysisUnitName  string                   `json:"analysis_unit_name,omitempty" jsonschema_description:"input analysis unit name"`
 	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"minimum source-backed implementation chain needed for correct reuse"`
-	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"canonical reusable callable entry with verified signature and location, or null"`
+	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"canonical reusable callable entry with verified name, repository-relative location, complete signature, prerequisites, return/error semantics, and source-backed usage; include for business, orchestration, adapter, job, handler, or common utility patterns when directly verified, otherwise null"`
 }
 
 // CuratedPatternOutput 只承载 AI 拥有的规范文本和来源决策。
@@ -123,76 +130,71 @@ type ProfileRefreshRecommendationOutput struct {
 	Reason string `json:"reason,omitempty" jsonschema_description:"reason when refresh is needed"`
 }
 
-type SelectFilesOutput struct {
-	Include       []string `json:"include" jsonschema_description:"relative paths or broad globs to include"`
-	Exclude       []string `json:"exclude" jsonschema_description:"relative paths or globs to exclude"`
-	SelectedPaths []string `json:"selected_paths" jsonschema_description:"explicit relative file paths sorted lexicographically"`
-	Reason        string   `json:"reason" jsonschema_description:"brief generic rationale"`
-}
-
-type AnalyzeIssueOutput struct {
-	File       string `json:"file" jsonschema_description:"relative file path"`
-	Line       int    `json:"line" jsonschema:"minimum=1" jsonschema_description:"single 1-based line number"`
-	Severity   string `json:"severity" jsonschema:"enum=error,enum=warning,enum=info" jsonschema_description:"error|warning|info"`
-	Message    string `json:"message" jsonschema_description:"issue description"`
-	Suggestion string `json:"suggestion" jsonschema_description:"specific fix suggestion"`
-	PatternID  string `json:"pattern_id" jsonschema_description:"matched pattern id or empty string"`
-}
-
-type AnalyzeCodeOutput struct {
-	Issues      []AnalyzeIssueOutput `json:"issues" jsonschema_description:"found issues, empty array when none"`
-	Suggestions []string             `json:"suggestions" jsonschema_description:"general improvement suggestions"`
-	Confidence  float64              `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
-}
-
-type GenerateFixesOutput struct {
-	Fixes      map[string]string `json:"fixes" jsonschema_description:"complete fixed content for that file"`
-	Confidence float64           `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
-	Summary    string            `json:"summary" jsonschema_description:"overall fix summary or empty string"`
-	Warnings   []string          `json:"warnings" jsonschema_description:"manual review warnings"`
-}
-
-type LearnPatternsOutput struct {
-	Patterns []PatternOutput `json:"patterns" jsonschema_description:"learned patterns"`
-}
-
 type CuratePatternsOutput struct {
 	Patterns []CuratedPatternOutput `json:"patterns" jsonschema_description:"final canonical patterns to write"`
 	Dropped  []CuratedDropOutput    `json:"dropped" jsonschema_description:"candidate patterns not written"`
 }
 
 type CuratedDropOutput struct {
-	ID     string `json:"id" jsonschema_description:"candidate id"`
-	Reason string `json:"reason" jsonschema_description:"why it should not be written"`
+	ID         string `json:"id" jsonschema_description:"candidate id"`
+	ReasonCode string `json:"reason_code" jsonschema:"enum=exact_duplicate,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overfiltered_source_backed" jsonschema_description:"structured drop reason; use overfiltered_source_backed only when the candidate has evidence but would otherwise be dropped merely for being simple, local, common, framework-specific, language-specific, config-only, API-only, error-only, or utility-only"`
+	Reason     string `json:"reason" jsonschema_description:"specific human-readable reason that cites the semantic issue, duplicate owner, missing evidence, unsafe guidance, or lack of routeable decision value"`
 }
 
-type AnalyzeCurrentCodebaseOutput struct {
-	Patterns                  []PatternOutput                    `json:"patterns" jsonschema_description:"candidate patterns"`
-	ProfileRefreshRecommended ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"whether a full project profile refresh is needed"`
+type LearningSessionAckOutput struct {
+	Ready   bool   `json:"ready" jsonschema_description:"true when the session has accepted the learning policy"`
+	Summary string `json:"summary" jsonschema_description:"brief summary of the bounded learning policy for later turns"`
 }
 
 type AnalyzeCurrentCodebaseBatchOutput struct {
-	Units []AnalyzeCurrentCodebaseBatchUnitOutput `json:"units" jsonschema_description:"one result object for every evidenced input unit"`
+	Focuses []AnalyzeCurrentEvidenceFocusOutput `json:"focuses" jsonschema_description:"one result object for every evidenced input learning focus"`
 }
 
-type AnalyzeCurrentCodebaseBatchUnitOutput struct {
-	UnitID                    string                             `json:"unit_id" jsonschema_description:"input unit id"`
-	UnitName                  string                             `json:"unit_name" jsonschema_description:"input unit name"`
-	Patterns                  []PatternOutput                    `json:"patterns" jsonschema_description:"candidate patterns for this unit"`
-	ProfileRefreshRecommended ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"whether this unit requires full profile refresh"`
+type AnalyzeCurrentEvidenceFocusOutput struct {
+	FocusID                   string                              `json:"focus_id" jsonschema_description:"input learning focus id"`
+	FocusName                 string                              `json:"focus_name" jsonschema_description:"input learning focus name"`
+	Patterns                  []PatternOutput                     `json:"patterns" jsonschema_description:"candidate patterns for this learning focus"`
+	ProfileRefreshRecommended *ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"whether this learning focus indicates a full profile refresh"`
 }
 
-type AnalysisUnitOutput struct {
+type KnowledgeChangeOutput struct {
+	FocusAction   string             `json:"focus_action" jsonschema:"enum=existing,enum=extend,enum=new,enum=no_change" jsonschema_description:"how the diff relates to the listed learning focuses"`
+	FocusID       string             `json:"focus_id,omitempty" jsonschema_description:"matched or proposed learning focus id"`
+	FocusName     string             `json:"focus_name,omitempty" jsonschema_description:"matched or proposed learning focus name"`
+	PatternAction string             `json:"pattern_action" jsonschema:"enum=add,enum=update,enum=reinforce,enum=retire,enum=no_change" jsonschema_description:"how the diff changes pattern knowledge"`
+	PatternID     string             `json:"pattern_id,omitempty" jsonschema_description:"existing pattern id for update, reinforce, retire, or proposed id for add"`
+	Proposal      *PatternOutput     `json:"proposal,omitempty" jsonschema_description:"candidate pattern only for add, update, or reinforce; omit for no_change or retire without source-backed replacement"`
+	Anchors       []DiffAnchorOutput `json:"anchors" jsonschema_description:"changed hunks that triggered this knowledge change"`
+	Reason        string             `json:"reason" jsonschema_description:"why this action follows from the diff anchors and bounded context"`
+}
+
+type AnalyzeCurrentDeltaBatchOutput struct {
+	KnowledgeChanges          []KnowledgeChangeOutput             `json:"knowledge_changes" jsonschema_description:"diff-triggered knowledge changes; do not output ordinary inventory patterns"`
+	ProfileRefreshRecommended *ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"true only when broad structure or technology changes require full refresh"`
+}
+
+type LearningCandidateSkipOutput struct {
+	Path   string `json:"path" jsonschema_description:"repository-relative path from the exact candidate file list; never output an absolute path, directory, glob, invented path, or path containing .."`
+	Reason string `json:"reason" jsonschema_description:"brief reason this file has low learning value for this run"`
+}
+
+type SelectLearningCandidatesOutput struct {
+	SelectedPaths []string                      `json:"selected_paths" jsonschema_description:"complete lexicographically sorted repository-relative file list worth sending into evidence-pack planning; every path must come from the exact candidate file list, required paths must be included when present there, and absolute paths, directories, globs, invented paths, or paths containing .. are forbidden"`
+	SkippedPaths  []LearningCandidateSkipOutput `json:"skipped_paths" jsonschema_description:"lexicographically sorted candidate files intentionally skipped as low learning value; each item must come from the exact candidate file list and must not duplicate selected_paths"`
+	Reason        string                        `json:"reason" jsonschema_description:"one short sentence summarizing the selection strategy; do not repeat the full file list"`
+}
+
+type EvidenceFocusOutput struct {
 	ID           string   `json:"id" jsonschema_description:"kebab-case-id"`
-	Name         string   `json:"name" jsonschema_description:"business analysis unit name"`
+	Name         string   `json:"name" jsonschema_description:"learning focus name"`
 	RouteTerms   []string `json:"route_terms,omitempty" jsonschema_description:"requirement, state, action, resource, or external system terms"`
 	EntryPaths   []string `json:"entry_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
 	RelatedPaths []string `json:"related_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
 	ScopeReason  string   `json:"scope_reason,omitempty" jsonschema_description:"why these files belong together"`
 }
 
-type PlanAnalysisUnitsOutput struct {
-	Units []AnalysisUnitOutput `json:"units" jsonschema_description:"business analysis units"`
+type PlanLearningAgendaOutput struct {
+	Focuses []EvidenceFocusOutput `json:"focuses" jsonschema_description:"learning focuses for this run"`
 }
 
 type WorkspaceProjectAnalysisOutput struct {

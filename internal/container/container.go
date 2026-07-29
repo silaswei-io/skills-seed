@@ -21,9 +21,8 @@ import (
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
-	"github.com/silaswei-io/skills-seed/internal/service/checker"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/learner"
@@ -43,7 +42,6 @@ type Container struct {
 	PatternReader         domain.PatternRepository
 	FileTracker           domain.FileAnalysisTracker
 	PatternStats          domain.PatternStatsRepository
-	ReviewRepo            domain.ReviewRepository
 	ProfileRepo           *profilestore.Repository
 	StateRepo             *statestore.Repository
 	WorkspaceProfileRepo  *workspacestore.ProfileRepository
@@ -52,7 +50,6 @@ type Container struct {
 	Agent                 agent.Agent
 	AnalyzerSvc           *analyzer.AnalyzerService
 	LearnerSvc            *learner.LearnerService
-	CheckerSvc            *checker.CheckerService
 	GeneratorSvc          *generator.GeneratorService
 	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
 	WorkflowSvc           *workflowsvc.Service
@@ -152,10 +149,9 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 	// 7. 创建服务
 	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo)
-	curatorSvc := curator.NewService(agentImpl, patternRepo)
-	learnerSvc := learner.NewLearnerService(agentImpl, gitRepo, patternRepo, patternRepo, curatorSvc)
+	curatorSvc := curator.NewService(patternRepo)
+	learnerSvc := learner.NewLearnerService(curatorSvc)
 
-	checkerSvc := checker.NewCheckerService(agentImpl, gitRepo, patternRepo, configRepo)
 	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, cfg.Project.Language)
 	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo)
 	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo, workflowRepo)
@@ -169,7 +165,6 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		PatternReader:         patternRepo,
 		FileTracker:           patternRepo,
 		PatternStats:          patternRepo,
-		ReviewRepo:            patternRepo,
 		ProfileRepo:           profileRepo,
 		StateRepo:             stateRepo,
 		WorkspaceProfileRepo:  workspaceProfileRepo,
@@ -178,7 +173,6 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		Agent:                 agentImpl,
 		AnalyzerSvc:           analyzerSvc,
 		LearnerSvc:            learnerSvc,
-		CheckerSvc:            checkerSvc,
 		GeneratorSvc:          generatorSvc,
 		WorkspaceGeneratorSvc: workspaceGeneratorSvc,
 		WorkflowSvc:           workflowSvc,

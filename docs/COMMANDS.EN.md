@@ -12,16 +12,14 @@ This is the complete command reference. Every command supports `--help`. Command
 | Initialization | [`skills-seed init`](#skills-seed-init) | Initialize a single project or workspace root | `skills-seed init --mode project` |
 | Workspace | [`skills-seed workspace`](#skills-seed-workspace) | Add or manage workspace child projects | `skills-seed workspace add .` |
 | Reset | [`skills-seed reset`](#skills-seed-reset) | Back up and recreate `.skills-seed` | `skills-seed reset --mode workspace` |
-| Learning | [`skills-seed learn`](#skills-seed-learn) | Learn patterns from current code or Git history | `skills-seed learn current` |
+| Learning | [`skills-seed learn`](#skills-seed-learn) | Learn patterns from current code | `skills-seed learn current` |
 | Generation | [`skills-seed generate`](#skills-seed-generate) | Generate skills from profiles and patterns | `skills-seed generate skills` |
 | Preview | [`skills-seed preview`](#skills-seed-preview) | Preview files selected for full or incremental analysis | `skills-seed preview files` |
 | Pattern Management | [`skills-seed patterns`](#skills-seed-patterns) | Add, delete, curate, and inspect patterns | `skills-seed patterns show` |
 | Workflow | [`skills-seed workflow`](#skills-seed-workflow) | Add or update user task workflows | `skills-seed workflow --context "..."` |
-| Review Metrics | [`skills-seed review`](#skills-seed-review) | Import review comments and measure pattern coverage | `skills-seed review stats` |
-| Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show or update the project profile | `skills-seed profile show` |
+| Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show the project profile | `skills-seed profile show` |
 | One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
 | Change History | [`skills-seed log`](#skills-seed-log) | Show learned change history | `skills-seed log` |
-| Checks | [`skills-seed check`](#skills-seed-check) | Check staged or tracked files | `skills-seed check` |
 | Git Hook | [`skills-seed hook`](#skills-seed-hook) | Install, remove, or manually run the pre-commit hook | `skills-seed hook install` |
 | Help | [`skills-seed help`](#skills-seed-help) | Show help for any command path | `skills-seed help learn current` |
 
@@ -46,8 +44,7 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `check`, `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `review`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
-| `skills-seed check` | Check staged files | - | `--all, -a` = `false`<br>`--help, -h` = `false`<br>`--interactive, -i` = `true` |
+| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed cli-skills` | Manage global skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | Install/update global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | Uninstall global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
@@ -58,26 +55,21 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
-| `skills-seed learn` | Learn from Git history | `current`, `history` | `--help, -h` = `false` |
+| `skills-seed learn` | Learn from current code | `current` | `--help, -h` = `false` |
 | `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
-| `skills-seed learn history` | Learn from Git history | - | `--batch-size, -b` = `10`<br>`--help, -h` = `false`<br>`--limit, -n` = `50`<br>`--since, -s` = `` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
 | `skills-seed patterns add (--context <description> \| --context-path <path>)` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
-| `skills-seed patterns compact` | Compact similar patterns | - | `--ai` = `false`<br>`--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
+| `skills-seed patterns compact` | Compact similar patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern | - | `--help, -h` = `false` |
 | `skills-seed patterns show [pattern-id]` | Show learned pattern overview or full details | - | `--format` = `table`<br>`--help, -h` = `false`<br>`--sort` = `updated` |
-| `skills-seed patterns stats` | Show learned pattern quality and check hit statistics | - | `--help, -h` = `false` |
+| `skills-seed patterns stats` | Show learned pattern quality metrics | - | `--help, -h` = `false` |
 | `skills-seed patterns update <pattern-id> (--context <description> \| --context-path <path>)` | Update a pattern | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | Preview analysis inputs | `files` | `--help, -h` = `false` |
 | `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
-| `skills-seed profile` | Show or update the project profile | `refresh`, `show` | `--help, -h` = `false` |
-| `skills-seed profile refresh` | Re-analyze the project and save the project profile | - | `--help, -h` = `false`<br>`--language, -l` = `` |
+| `skills-seed profile` | Show the project profile | `show` | `--help, -h` = `false` |
 | `skills-seed profile show` | Show the current project profile summary | - | `--help, -h` = `false` |
 | `skills-seed reset` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
-| `skills-seed review` | Import review comments and show prevention statistics | `import`, `stats` | `--help, -h` = `false` |
-| `skills-seed review import` | Import review comments from a JSON file | - | `--from-file` = ``<br>`--help, -h` = `false` |
-| `skills-seed review stats` | Show review comment prevention statistics | - | `--help, -h` = `false`<br>`--line-window` = `3` |
 | `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | Manage user workflows | `show [workflow-id]` | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workflow show [workflow-id]` | Show existing workflow summaries or full details | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
@@ -260,14 +252,13 @@ skills-seed reset --workspace
 
 #### Command Overview
 
-Learn coding patterns, business methods, and best practices from the current codebase or Git history, then store them in the `.skills-seed` database.
+Learn coding patterns, business methods, and best practices from the current codebase, then store them in the `.skills-seed` database.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed learn current` | Incrementally learn from the current codebase | `skills-seed learn current --focus internal/service --profile skip` | Compares file md5 values and learns only added, modified, or deleted files; add `--force` after prompt or template upgrades to relearn the current scan scope |
-| `skills-seed learn history` | Learn from Git commit history | `skills-seed learn history --limit 50 --batch-size 5` | Already learned commits are skipped |
 
 #### `learn` Flags
 
@@ -286,15 +277,6 @@ Learn coding patterns, business methods, and best practices from the current cod
 | `--context-path` | empty | Read one-time guidance for this learn run from files or directories; may be repeated and is not written to `.skills-seed/context/` |
 | `--help`, `-h` | `false` | Show `learn current` help |
 
-#### `learn history` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--limit`, `-n` | `learning.history.max_commits`, default `50` | Maximum number of commits to analyze |
-| `--since`, `-s` | empty | Time range, such as `7d`, `30d`, `6m`, or `1y` |
-| `--batch-size`, `-b` | `learning.history.batch_size`; `10` when config is not loaded | Commits per batch; each batch is analyzed by one agent call and candidate patterns are curated before storage |
-| `--help`, `-h` | `false` | Show `learn history` help |
-
 #### `--profile` Values
 
 | Value | Description |
@@ -312,9 +294,6 @@ skills-seed learn current --force --profile refresh
 skills-seed learn current -f internal/agent -f internal/service
 skills-seed learn current --context "Focus on compatibility boundaries"
 skills-seed learn current --context-path .skills-seed/context.md
-skills-seed learn history --limit 50
-skills-seed learn history --since 30d
-skills-seed learn history --limit 40 --batch-size 5
 ```
 
 #### Notes
@@ -329,7 +308,6 @@ skills-seed learn history --limit 40 --batch-size 5
 8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
 9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` uses CodeGraph and automatically initializes or repairs its index when needed. Embedded tree-sitter is used only when `provider: treesitter` is explicitly configured. Without bounded inputs, it does not scan the whole repository.
 10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, the terminal also prints a stable notice with the wait duration and API reason, then switches to `attempt N` when the next call starts.
-11. Agent token usage reports only token counts and context processed; terminal output, diagnostic fields, and runtime manifests no longer show cost details.
 
 ### `skills-seed generate`
 
@@ -395,7 +373,7 @@ references/
 
 1. Workspace mode regenerates each child skill using that child's own config first, then regenerates the workspace root skill.
 2. The configured output directory is exclusively managed by skills-seed and fully rebuilt on every generation; store durable custom guidance in `.skills-seed/context/`, patterns, or workflows.
-3. Generation ranking uses `EffectiveScore*0.6 + normalized(HitCount)*0.3 + Confidence*0.1`. `review stats` remains observational and does not directly affect generation.
+3. Generation ranking is based primarily on pattern quality score and confidence. Hit statistics no longer affect generation order.
 4. `generate skills` does not check a generation-input fingerprint. When run explicitly, it deletes the old skills-seed generated output directory and fully rebuilds from the current profile, patterns, and workflows.
 
 ### `skills-seed preview`
@@ -445,7 +423,7 @@ skills-seed preview files --limit 500
 
 #### Command Overview
 
-Manage learned patterns. Supports adding user-defined patterns, compacting semantically similar patterns, and inspecting DB fields, pattern quality, and check-hit statistics.
+Manage learned patterns. Supports adding user-defined patterns, compacting semantically similar patterns, and inspecting DB fields and pattern quality metrics.
 
 #### Command Forms
 
@@ -454,8 +432,8 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 | `skills-seed patterns add --context <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add --context "Use RESTful API routes" --category api` | Calls the AI agent |
 | `skills-seed patterns update <pattern-id> --context <request>` | Update one pattern while preserving its original ID and ownership | `skills-seed patterns update resp-extra-update-logging --context "Require audit logging"` | Calls the AI agent |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern by ID | `skills-seed patterns delete plugin-source-editing-rule` | Workspace root also deletes the linked child project pattern |
-| `skills-seed patterns compact` | Compact similar patterns locally by default; call the Agent for semantic merging only with `--ai` | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
-| `skills-seed patterns stats` | Show pattern quality and check-hit statistics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
+| `skills-seed patterns compact` | Compact similar patterns with local rules | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
+| `skills-seed patterns stats` | Show pattern quality metrics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
 | `skills-seed patterns show [pattern-id]` | Show the overview without arguments, or full details for one ID | `skills-seed patterns show business-create-order --format json` | Does not call the AI agent or modify the database |
 
 #### `patterns` Flags
@@ -494,7 +472,6 @@ When run from a workspace root, `patterns add` writes the root pattern first. If
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--ai` | `false` | Use AI for semantic merging; default uses local deterministic merging and does not call the Agent |
 | `--category`, `-c` | empty | Compact only one category, such as `business`, `api`, or `testing`; empty means all |
 | `--dry-run` | `false` | Preview compact results without writing to the database |
 | `--help`, `-h` | `false` | Show `patterns compact` help |
@@ -511,7 +488,7 @@ When run from a workspace root, `patterns add` writes the root pattern first. If
 |---|---:|---|
 | `--format` | `table` | Output format: `table` or `json` |
 | `--help`, `-h` | `false` | Show `patterns show` help |
-| `--sort` | `updated` | Overview sort: `updated`, `score`, `hits`, or `category` |
+| `--sort` | `updated` | Overview sort: `updated`, `score`, or `category` |
 
 #### Common Examples
 
@@ -525,7 +502,6 @@ skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
 skills-seed patterns compact --category business --dry-run
-skills-seed patterns compact --ai --dry-run
 skills-seed patterns stats
 skills-seed patterns show
 skills-seed patterns show --sort score
@@ -535,86 +511,23 @@ skills-seed patterns show business-create-order --format json
 
 #### Notes
 
-1. `patterns compact` uses local deterministic merging by default and does not call the Agent. It calls the CLI configured by the current `agent.engine` only when `--ai` is set.
+1. `patterns compact` uses local deterministic merging and does not call the Agent.
 2. Use `--dry-run` first when you want to inspect the curation result.
-3. `patterns stats` uses recorded check-hit data. Hit counts appear only after checks produce issues with `PatternID`.
-4. `patterns show` without arguments prints the pattern overview list, sorted by latest update by default. Use `--sort score` for high-value rules, `--sort hits` for frequently hit rules, and `--sort category` for category grouping. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.
+3. `patterns stats` shows quality metrics such as specificity, confidence, and effective score so you can judge which patterns are ready for generated Skills.
+4. `patterns show` without arguments prints the pattern overview list, sorted by latest update by default. Use `--sort score` for high-value rules and `--sort category` for category grouping. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.
 5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/store/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
-
-### `skills-seed review`
-
-#### Command Overview
-
-Import local code review comments and compare them with recorded pattern hits by file and line window to measure which comments may already be covered by existing patterns.
-
-#### Command Forms
-
-| Command Form | Description | Common Example | Notes |
-|---|---|---|---|
-| `skills-seed review import --from-file <file>` | Import a JSON array of review comments | `skills-seed review import --from-file review-comments.json` | Saved by comment `id`; importing the same comment again does not duplicate counts |
-| `skills-seed review stats` | Show review comment prevention statistics | `skills-seed review stats --line-window 3` | Does not call the AI agent or modify the database |
-
-#### `review` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--help`, `-h` | `false` | Show `review` help |
-
-#### `review import` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--from-file` | required | JSON file containing a review comment array |
-| `--help`, `-h` | `false` | Show `review import` help |
-
-#### `review stats` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--line-window` | `3` | Allowed line distance when matching a review comment to an existing pattern hit |
-| `--help`, `-h` | `false` | Show `review stats` help |
-
-#### Import JSON Fields
-
-| Field | Description |
-|---|---|
-| `id` | Unique comment ID |
-| `provider` | Source, such as `local`, `github`, or `gitlab` |
-| `review_id` | Review ID |
-| `commit` | Related commit |
-| `file` | File path |
-| `line` | Comment line number |
-| `author` | Comment author |
-| `body` | Comment body |
-| `resolved` | Whether the comment is resolved |
-| `created_at` | RFC3339 timestamp, such as `2026-05-28T09:02:00Z` |
-
-#### Common Examples
-
-```bash
-skills-seed review import --from-file review-comments.json
-skills-seed review stats
-skills-seed review stats --line-window 5
-```
-
-#### Notes
-
-1. The MVP supports local JSON import only; it does not connect to GitHub or GitLab directly.
-2. `review stats` depends on existing `check` hit records. Without pattern hits, imported comments are counted as missed.
-3. Matching requires the same file path and a line distance within `--line-window`.
 
 ### `skills-seed profile`
 
 #### Command Overview
 
-Show or update the project profile. The profile is stored at `.skills-seed/store/documents/project-profile.json` and is used to generate `references/project-overview.md`.
+Show the project profile. The profile is stored at `.skills-seed/store/documents/project-profile.json` and is used to generate `references/project-overview.md`. Profile sync is part of `learn current`; incremental learning decides whether to update it from detected changes and AI recommendations, and `learn current --profile refresh` can still force it.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
 | `skills-seed profile show` | Print the current project profile summary | `skills-seed profile show` | Does not call the AI agent or modify the database |
-| `skills-seed profile refresh` | Re-analyze the project and overwrite the profile | `skills-seed profile refresh --language go` | Does not learn patterns; only updates the profile |
 
 #### `profile` Flags
 
@@ -622,25 +535,18 @@ Show or update the project profile. The profile is stored at `.skills-seed/store
 |---|---:|---|
 | `--help`, `-h` | `false` | Show `profile` help |
 
-#### `profile refresh` Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--language`, `-l` | config or auto-detect | Temporarily specify the project language |
-| `--help`, `-h` | `false` | Show `profile refresh` help |
-
 #### Common Examples
 
 ```bash
 skills-seed profile show
-skills-seed profile refresh
-skills-seed profile refresh --language go
+skills-seed learn current --profile auto
+skills-seed learn current --profile refresh
 ```
 
 #### Notes
 
 1. `profile show` is useful for quickly checking the current profile.
-2. `profile refresh` overwrites the existing project profile, but does not run pattern learning.
+2. Project profile sync belongs to current learning; incremental learning decides whether the complete profile should be updated from the change set and AI recommendation.
 
 ### `skills-seed workflow`
 
@@ -706,7 +612,7 @@ skills-seed sync
 skills-seed sync --context "On-prem deployment, not SaaS"
 skills-seed sync --context-path docs/plan.md --context-path docs/specs
 skills-seed sync --restart
-skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-pattern-curate.raw.txt
+skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-learning-global-curate.raw.txt
 ```
 
 #### Notes
@@ -715,40 +621,6 @@ skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/2
 2. `sync --context` does not add a user pattern; it only affects this learning analysis. Use `patterns add` or `patterns update` to add user-defined patterns.
 3. A successful AI curation decision is checkpointed immediately. If local validation or storage later fails, `sync --resume` replays it without calling the Agent again.
 4. For output produced before curation checkpoints existed, use `--curation-output` with the matching `.raw.txt` or `.md` archive. Run it from the matching child project, not the workspace root.
-
-### `skills-seed check`
-
-#### Command Overview
-
-Check staged files or all Git-tracked files against learned patterns, with optional interactive handling.
-
-#### Command Forms
-
-| Command Form | Description | Common Example | Notes |
-|---|---|---|---|
-| `skills-seed check` | Check staged files or all Git-tracked files | `skills-seed check --all --interactive=false` | Defaults to staged files only |
-
-#### Flags
-
-| Flag | Default | Description |
-|---|---:|---|
-| `--interactive`, `-i` | `true` | Enable interactive fix confirmation; hooks usually use `false` |
-| `--all`, `-a` | `false` | Check all Git-tracked files; default checks staged files only |
-| `--help`, `-h` | `false` | Show `check` help |
-
-#### Common Examples
-
-```bash
-skills-seed check
-skills-seed check --all
-skills-seed check --interactive=false
-```
-
-#### Notes
-
-1. Run `skills-seed check --interactive=false` directly when you only need checks.
-2. Without `--all`, only the Git staging area is checked.
-3. When interactive fix generation is used, the agent's fix summary is printed to logs. Files that cannot be safely rewritten in full are surfaced as manual-review warnings instead of being forced into incomplete fixes.
 
 ### `skills-seed hook`
 

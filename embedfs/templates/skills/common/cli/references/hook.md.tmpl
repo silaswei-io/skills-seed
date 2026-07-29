@@ -1,0 +1,27 @@
+# Hook
+
+Use `hook` commands for pre-commit behavior.
+
+## Hook Commands
+
+### `skills-seed hook install`
+
+Installs a Git pre-commit hook that delegates to `skills-seed hook run`.
+
+Use when the repository should prompt before commits.
+
+### `skills-seed hook run`
+
+Runs the pre-commit hook workflow manually.
+
+Use for debugging hook behavior before committing.
+
+### `skills-seed hook uninstall`
+
+Removes the installed pre-commit hook.
+
+## Hook Troubleshooting
+
+- If the hook cannot find `skills-seed`, ensure the binary directory is on PATH for non-interactive shells.
+- If hook behavior differs from manual runs, compare working directory and environment variables.
+- If hooks are too slow, keep routine learning manual and run `skills-seed sync` explicitly.

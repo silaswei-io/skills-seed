@@ -105,8 +105,7 @@ func canonicalPatternCategory(category Category) Category {
 type Source string
 
 const (
-	SourceLearned        Source = "learned"         // 从 commit 历史学习（向后兼容）
-	SourceLearnedHistory Source = "learned_history" // learn history
+	SourceLearned        Source = "learned"         // 从早期学习入口写入的历史来源
 	SourceLearnedCurrent Source = "learned_current" // learn current
 	SourceUserDefined    Source = "user_defined"    // 用户自定义 patterns add
 	SourceDefault        Source = "default"         // 默认规则
@@ -233,6 +232,16 @@ type PatternEvidenceLocation struct {
 	Confidence  float64 `json:"confidence,omitempty"`  // 证据位置置信度，0.0-1.0
 }
 
+// PatternDiffAnchor 描述 learn current 增量候选由哪段变更触发。
+// 该字段仅用于本次分析验收，不属于长期模式库事实。
+type PatternDiffAnchor struct {
+	Path        string `json:"path,omitempty"`        // 相对项目根路径
+	Line        int    `json:"line,omitempty"`        // 变更后文件中的 1-based 行号；删除文件可为空
+	Symbol      string `json:"symbol,omitempty"`      // 变更触达的函数、方法、类型或配置键
+	ChangeKind  string `json:"change_kind,omitempty"` // added、modified、deleted
+	Description string `json:"description,omitempty"` // 该变更为何触发此候选模式
+}
+
 // DisplayLocation 返回适合 CLI 展示的证据位置。
 func (l PatternEvidenceLocation) DisplayLocation() string {
 	path := strings.TrimSpace(l.Path)
@@ -267,8 +276,7 @@ type Pattern struct {
 	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
 	ScopePath         string                    `json:"scope_path,omitempty"`     // workspace 模式下的路径范围
 	WorkspaceRole     string                    `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
-	AnalysisUnitID    string                    `json:"analysis_unit_id,omitempty"`
-	AnalysisUnitName  string                    `json:"analysis_unit_name,omitempty"`
+	DiffAnchors       []PatternDiffAnchor       `json:"-"`                        // 仅用于增量学习候选验收，禁止持久化
 	Status            PatternStatus             `json:"status,omitempty"`
 	LastSeenAt        time.Time                 `json:"last_seen_at,omitempty"`
 	StaleReason       string                    `json:"stale_reason,omitempty"`
@@ -561,8 +569,7 @@ func (p *Pattern) IsSimilar(other *Pattern) bool {
 	return p.Name == other.Name &&
 		p.Category == other.Category &&
 		p.ProjectID == other.ProjectID &&
-		p.ScopePath == other.ScopePath &&
-		p.AnalysisUnitID == other.AnalysisUnitID
+		p.ScopePath == other.ScopePath
 }
 
 // ==================== 问题 ====================
@@ -588,59 +595,9 @@ type Issue struct {
 	Confidence float64  // 置信度（0.0-1.0）
 }
 
-// PatternHit 表示一次 check 对某条模式的命中。
-type PatternHit struct {
-	PatternID  string
-	File       string
-	Line       int
-	Severity   Severity
-	Confidence float64
-	CheckRunID string
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-}
-
-// PatternHitStats 表示模式质量指标与 check 命中统计的聚合视图。
-type PatternHitStats struct {
-	Pattern   Pattern
-	HitCount  int
-	LastHitAt time.Time
-}
-
-// ReviewComment 表示导入的代码评审评论。
-type ReviewComment struct {
-	ID        string    `json:"id"`
-	Provider  string    `json:"provider"`
-	ReviewID  string    `json:"review_id"`
-	Commit    string    `json:"commit"`
-	File      string    `json:"file"`
-	Line      int       `json:"line"`
-	Author    string    `json:"author"`
-	Body      string    `json:"body"`
-	Resolved  bool      `json:"resolved"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// AnalyzedCommitRecord 保存 learn history 已分析提交的持久化记录。
-type AnalyzedCommitRecord struct {
-	Hash      string    `json:"hash"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// ReviewMatchedPatternStats 表示评审评论命中的模式统计。
-type ReviewMatchedPatternStats struct {
-	PatternID    string
-	CommentCount int
-}
-
-// ReviewStats 表示评审评论与 check 命中的匹配统计。
-type ReviewStats struct {
-	TotalComments     int
-	PreventedComments int
-	MissedComments    int
-	MatchedPatterns   []ReviewMatchedPatternStats
+// PatternStats 表示模式质量指标聚合视图。
+type PatternStats struct {
+	Pattern Pattern
 }
 
 // NewIssue 创建新问题

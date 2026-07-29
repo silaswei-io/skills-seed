@@ -335,7 +335,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 				CommonUtils: []domain.UtilityFunction{
 					{
 						Name:        "NormalizeSerial",
-						File:        "internal/pkg/serial.go",
+						File:        "internal/shared/serial.go",
 						Signature:   "func NormalizeSerial(serial string) string",
 						Description: "normalizes certificate serial values",
 						Usage:       "before serial comparison",
@@ -532,8 +532,8 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	assert.NotContains(t, skill, "`jzero gen`")
 	assert.NotContains(t, skill, "`go test ./...`")
 	assert.NotContains(t, skill, "`go test ./internal/application/vocab`")
-	assert.Contains(t, skill, "只有用户维护或内置的显式规则可视为硬约束")
-	assert.Contains(t, skill, "## 模式参考")
+	assert.Contains(t, skill, "约束来源由 [项目规范](./references/project-spec.md) 区分")
+	assert.Contains(t, skill, "## 参考入口")
 	validation := readGeneratedFile(t, tmpDir, "references", "validation.md")
 	assert.NotContains(t, validation, "## 范围矩阵")
 	assert.Contains(t, validation, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
@@ -562,9 +562,10 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	assert.NotContains(t, businessIndex, "## 规则断言")
 	assert.Contains(t, businessIndex, "## 子域路由")
 	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "vocab.md")
-	assert.Contains(t, businessDetail, "适用与实现观察（需按源码复核）")
+	assert.Contains(t, businessDetail, "适用边界")
 	assert.Contains(t, businessDetail, "Only one plan can be active")
 	assert.NotContains(t, businessDetail, "复用建议（需按源码复核）")
+	assert.NotContains(t, businessDetail, "适用与实现观察（需按源码复核）")
 	assert.NotContains(t, businessDetail, "Deactivate existing active plans before creating or activating a plan")
 	assert.Contains(t, businessDetail, "ActivatePlan")
 }
@@ -603,7 +604,7 @@ func TestGenerateSkills_DisambiguatesDuplicateModuleHeadings(t *testing.T) {
 	assert.Contains(t, modules, "## home (handler/home)")
 	assert.Contains(t, modules, "## home (logic/home)")
 	assert.Contains(t, modules, "**源码路径**: `internal/handler/home`")
-	assert.Contains(t, modules, "职责观察（需按源码复核）")
+	assert.Contains(t, modules, "**职责**")
 }
 
 func TestGenerateSkills_FiltersMissingEvidencePaths(t *testing.T) {

@@ -109,7 +109,7 @@ func TestPrepareIncrementalFileChangesDoesNotDeleteCurrentGitIgnoredRecords(t *t
 	require.Empty(t, changes.Deleted)
 }
 
-func TestIncrementalFileChangesApplyAISelectionMarksUnselectedRecords(t *testing.T) {
+func TestIncrementalFileChangesApplyLearningSelectionMarksUnselectedRecords(t *testing.T) {
 	changes := &fileanalysis.FileChanges{
 		Records: []domain.FileAnalysisRecord{
 			{Path: "internal/logic/create.go", AnalysisStatus: domain.FileAnalysisStatusAnalyzed},
@@ -117,7 +117,7 @@ func TestIncrementalFileChangesApplyAISelectionMarksUnselectedRecords(t *testing
 		},
 	}
 
-	changes.ApplyAISelection([]string{"internal/logic/create.go"}, "generated contract")
+	changes.ApplyLearningSelection([]string{"internal/logic/create.go"}, "generated contract")
 
 	byPath := map[string]domain.FileAnalysisRecord{}
 	for _, record := range changes.Records {
@@ -125,7 +125,7 @@ func TestIncrementalFileChangesApplyAISelectionMarksUnselectedRecords(t *testing
 	}
 	require.Equal(t, domain.FileAnalysisStatusAnalyzed, byPath["internal/logic/create.go"].AnalysisStatus)
 	require.Empty(t, byPath["internal/logic/create.go"].SelectionReason)
-	require.Equal(t, domain.FileAnalysisStatusAISkipped, byPath["internal/types/types.go"].AnalysisStatus)
+	require.Equal(t, domain.FileAnalysisStatusSelectionSkipped, byPath["internal/types/types.go"].AnalysisStatus)
 	require.Equal(t, "generated contract", byPath["internal/types/types.go"].SelectionReason)
 }
 

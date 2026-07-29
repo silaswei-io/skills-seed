@@ -2,7 +2,7 @@ package generator
 
 import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	workflowoutput "github.com/silaswei-io/skills-seed/internal/service/workflow/output"
+	workflowoutput "github.com/silaswei-io/skills-seed/internal/service/workflow"
 )
 
 func (s *GeneratorService) loadWorkflowReferences() ([]WorkflowReference, error) {

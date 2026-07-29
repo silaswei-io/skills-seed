@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
-	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
 func (g *WorkspaceGenerator) workspaceRootOutputPath(projectRoot, workspaceName string) (string, error) {
@@ -18,7 +18,7 @@ func legacyWorkspaceSkillName(workspaceName string) string {
 }
 
 func (g *WorkspaceGenerator) targetSkillOutputPath(projectRoot, skillName string) (string, error) {
-	resolvedOutputPath, err := utils.ConfiguredSkillOutputPath(projectRoot, g.configRepo)
+	resolvedOutputPath, err := projectpath.ConfiguredSkillOutput(projectRoot, g.configRepo)
 	if err != nil {
 		return "", err
 	}

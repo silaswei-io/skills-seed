@@ -102,18 +102,6 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		return resolved, err
 	}
 	if customizeAdvanced {
-		learningMode, err := interactive.Select(i18n.Get("InteractiveInitLearningMode"), learningModeOptions(), resolved.learningMode)
-		if err != nil {
-			return resolved, err
-		}
-		resolved.learningMode = learningMode
-
-		learningScope, err := interactive.Select(i18n.Get("InteractiveInitLearningScope"), learningScopeOptions(), resolved.learningScope)
-		if err != nil {
-			return resolved, err
-		}
-		resolved.learningScope = learningScope
-
 		skillsLocale, err := interactive.Select(i18n.Get("InteractiveInitSkillsLocale"), []interactive.Option[string]{
 			{Value: i18n.LocaleEnglish, Title: "en-US"},
 			{Value: i18n.LocaleChinese, Title: "zh-CN"},
@@ -151,8 +139,6 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		{Label: i18n.Get("InteractiveInitSummaryAgent"), Value: resolved.agent},
 		{Label: i18n.Get("InteractiveInitSummaryAgentTotalParallelism"), Value: fmt.Sprintf("%d", resolved.agentTotalParallelism)},
 		{Label: i18n.Get("InteractiveInitSummaryParallelismPlan"), Value: initParallelismPlanSummary(resolved.mode, resolved.agentTotalParallelism, projectCount)},
-		{Label: i18n.Get("InteractiveInitSummaryLearningMode"), Value: string(resolved.learningMode)},
-		{Label: i18n.Get("InteractiveInitSummaryLearningScope"), Value: string(resolved.learningScope)},
 		{Label: i18n.Get("InteractiveInitSummarySkills"), Value: resolved.skills},
 		{Label: i18n.Get("InteractiveInitSummaryGlobalCLISkills"), Value: localizedGlobalCLISkillsTarget(resolved)},
 	})
@@ -216,16 +202,14 @@ func detectedWorkspaceProjectCount(mode string) int {
 func initParallelismPlanSummary(mode string, totalParallelism, projectCount int) string {
 	if mode != domain.ModeWorkspace {
 		return i18n.GetWithParams("InteractiveInitParallelismPlanProject", map[string]interface{}{
-			"Total":           totalParallelism,
-			"UnitParallelism": totalParallelism,
+			"Total": totalParallelism,
 		})
 	}
-	workspaceParallelism, unitParallelism := allocateWorkspaceParallelism(totalParallelism, projectCount)
+	workspaceParallelism := allocateWorkspaceParallelism(totalParallelism, projectCount)
 	return i18n.GetWithParams("InteractiveInitParallelismPlanWorkspace", map[string]interface{}{
 		"Total":                totalParallelism,
 		"Projects":             projectCount,
 		"WorkspaceParallelism": workspaceParallelism,
-		"UnitParallelism":      unitParallelism,
 	})
 }
 
@@ -256,14 +240,6 @@ func withInitDefaults(opts commandOptions) commandOptions {
 	if opts.agentTotalParallelism <= 0 {
 		opts.agentTotalParallelism = 1
 	}
-	if opts.learningMode == "" {
-		opts.learningMode = config.LearningModeNormal
-	}
-	opts.learningMode = config.NormalizeLearningMode(string(opts.learningMode))
-	if opts.learningScope == "" {
-		opts.learningScope = config.LearningScopeFlow
-	}
-	opts.learningScope = config.NormalizeLearningScope(string(opts.learningScope))
 	opts.workspace = opts.mode == domain.ModeWorkspace || opts.workspace
 	if opts.workspace {
 		opts.mode = domain.ModeWorkspace
@@ -275,22 +251,6 @@ func agentOptions() []interactive.Option[string] {
 	return []interactive.Option[string]{
 		{Value: "claude", Title: "claude"},
 		{Value: "codex", Title: "codex"},
-	}
-}
-
-func learningModeOptions() []interactive.Option[config.LearningMode] {
-	return []interactive.Option[config.LearningMode]{
-		{Value: config.LearningModeNormal, Title: "normal", Description: i18n.Get("InteractiveInitLearningModeNormalDesc")},
-		{Value: config.LearningModeFast, Title: "fast", Description: i18n.Get("InteractiveInitLearningModeFastDesc")},
-		{Value: config.LearningModeDeep, Title: "deep", Description: i18n.Get("InteractiveInitLearningModeDeepDesc")},
-	}
-}
-
-func learningScopeOptions() []interactive.Option[config.LearningScope] {
-	return []interactive.Option[config.LearningScope]{
-		{Value: config.LearningScopeFlow, Title: "flow", Description: i18n.Get("InteractiveInitLearningScopeFlowDesc")},
-		{Value: config.LearningScopeDomain, Title: "domain", Description: i18n.Get("InteractiveInitLearningScopeDomainDesc")},
-		{Value: config.LearningScopeModule, Title: "module", Description: i18n.Get("InteractiveInitLearningScopeModuleDesc")},
 	}
 }
 

@@ -22,7 +22,7 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 		return &CompactResult{Summary: Summary{}}, nil
 	}
 
-	curated, err := s.planCompaction(ctx, patterns, req.UseAI, hooks)
+	curated, err := s.planCompaction(patterns)
 	if err != nil {
 		return nil, err
 	}
@@ -66,39 +66,15 @@ func (s *Service) loadCompactPatterns(ctx context.Context, categoryValue string)
 	return validateCandidates(patterns), nil
 }
 
-func (s *Service) planCompaction(ctx context.Context, patterns []domain.Pattern, useAI bool, hooks ProgressHooks) (*proposal, error) {
+func (s *Service) planCompaction(patterns []domain.Pattern) (*proposal, error) {
 	curated := deterministicCurate(patterns, nil)
-	if useAI {
-		var err error
-		curated, err = s.curate(ctx, OperationCompact, patterns, patterns, true, compactRelatedPatterns(patterns), nil, hooks)
-		if err != nil {
-			return nil, fmt.Errorf("compact patterns with AI: %w", err)
-		}
-	}
 	assessment := assessCuration(curated, patterns, patterns)
 	logCurationAssessment(OperationCompact, assessment)
 	if assessment.Coverage.MissingCount() > 0 {
 		return nil, fmt.Errorf("compact curation left %d of %d patterns unclassified", assessment.Coverage.MissingCount(), assessment.Coverage.CandidateCount)
 	}
-	if useAI {
-		if err := hydrateCurateResult(assessment.Result, patterns, patterns); err != nil {
-			return nil, fmt.Errorf("hydrate compact curation: %w", err)
-		}
-	}
 	if err := validateCurateResult(assessment.Result, patterns, patterns); err != nil {
 		return nil, fmt.Errorf("validate compact curation: %w", err)
 	}
 	return assessment.Result, nil
-}
-
-func compactRelatedPatterns(patterns []domain.Pattern) map[string][]string {
-	byCandidate := make(map[string][]string, len(patterns))
-	for _, pattern := range patterns {
-		for _, related := range patterns {
-			if pattern.ID != related.ID && patternSimilarity(pattern, related) > 0 {
-				byCandidate[pattern.ID] = append(byCandidate[pattern.ID], related.ID)
-			}
-		}
-	}
-	return byCandidate
 }

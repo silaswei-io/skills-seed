@@ -2,16 +2,16 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
-	textutil "github.com/silaswei-io/skills-seed/internal/utils/text"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 func promptLearningMode(mode config.LearningMode) config.LearningMode {
@@ -42,21 +42,6 @@ func NewPromptInputSessionForContext(ctx context.Context, prefix string) (*Promp
 	return newPromptInputSessionIn(layout.New(seedPath).Runtime(), prefix)
 }
 
-// BatchLearnPromptData 返回提交学习所需的提示词数据。
-func BatchLearnPromptData(session *PromptInputSession, commits []domain.CommitInfo, commitFiles []CommitFileChange, knownPatternsJSON, knownPatternsPath string, knownPatternsCount int) (map[string]interface{}, error) {
-	path, err := session.UsePathOrWrite(knownPatternsPath, "known-patterns.json", knownPatternsJSON)
-	if err != nil {
-		return nil, fmt.Errorf("write known patterns prompt input: %w", err)
-	}
-	return map[string]interface{}{
-		"Commits":            commits,
-		"CommitFiles":        commitFiles,
-		"KnownPatternsPath":  path,
-		"KnownPatternsCount": knownPatternsCount,
-		"AllowedCategories":  domain.AllowedPatternCategoriesText(),
-	}, nil
-}
-
 // UserDefinePatternPromptData 返回用户自定义模式所需的提示词数据。
 func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePatternRequest) (map[string]interface{}, error) {
 	return map[string]interface{}{
@@ -68,42 +53,8 @@ func UserDefinePatternPromptData(session *PromptInputSession, req *UserDefinePat
 	}, nil
 }
 
-// SelectFilesPromptData 返回 AI 文件筛选器所需的提示词数据。
-func SelectFilesPromptData(session *PromptInputSession, req *SelectFilesRequest) (map[string]interface{}, error) {
-	fileListPath, err := session.Write("candidate-files.txt", req.FileTree)
-	if err != nil {
-		return nil, fmt.Errorf("write file filtering candidate files: %w", err)
-	}
-	candidatesPath, err := session.Write("candidates.json", mustJSON(req.Candidates))
-	if err != nil {
-		return nil, fmt.Errorf("write file filtering candidates: %w", err)
-	}
-	userContextPath, err := session.Write("user-context.md", req.UserContext)
-	if err != nil {
-		return nil, fmt.Errorf("write file filtering user context: %w", err)
-	}
-	structuralContextPath := strings.TrimSpace(req.StructuralContextPath)
-	if structuralContextPath == "" && strings.TrimSpace(req.StructuralContext) != "" {
-		structuralContextPath, err = session.Write("structural-context.md", req.StructuralContext)
-		if err != nil {
-			return nil, fmt.Errorf("write file filtering structural context: %w", err)
-		}
-	}
-	return map[string]interface{}{
-		"FileListPath":          fileListPath,
-		"CandidatesPath":        candidatesPath,
-		"UserContextPath":       userContextPath,
-		"StructuralContextPath": structuralContextPath,
-		"CandidateNum":          req.CandidateNum,
-	}, nil
-}
-
-func mustJSON(value interface{}) string {
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return "[]"
-	}
-	return string(data)
+func promptInputWriteError(name string, err error) error {
+	return fmt.Errorf("%s: %w", i18n.GetWithParams("AgentPromptInputWriteFailed", map[string]interface{}{"Name": name}), err)
 }
 
 func writePathListInput(session *PromptInputSession, name string, paths []string) (string, int, error) {
@@ -128,19 +79,38 @@ func writePathListInput(session *PromptInputSession, name string, paths []string
 	return path, len(normalized), nil
 }
 
-// PlanAnalysisUnitsPromptData 返回业务分析单元规划所需的提示词数据。
-func PlanAnalysisUnitsPromptData(session *PromptInputSession, req *PlanAnalysisUnitsRequest) (map[string]interface{}, error) {
+// LearningSessionPromptData 返回当前代码学习阶段会话初始化所需的提示词数据。
+func LearningSessionPromptData(session *PromptInputSession, req LearningSessionRequest) (map[string]interface{}, error) {
+	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
+	if err != nil {
+		return nil, promptInputWriteError("user-context.md", err)
+	}
+	return map[string]interface{}{
+		"ProjectName":       req.ProjectName,
+		"RootPath":          req.RootPath,
+		"Language":          req.Language,
+		"Stage":             req.Stage,
+		"LearningMode":      promptLearningMode(req.LearningMode),
+		"LearningScope":     promptLearningScope(req.LearningScope),
+		"ChangeProfile":     req.ChangeProfile,
+		"UserContextPath":   userContextPath,
+		"AllowedCategories": domain.AllowedPatternCategoriesText(),
+	}, nil
+}
+
+// PlanLearningAgendaPromptData 返回业务学习议程规划所需的提示词数据。
+func PlanLearningAgendaPromptData(session *PromptInputSession, req *PlanLearningAgendaRequest) (map[string]interface{}, error) {
 	focusPathsPath, focusPathCount, err := writePathListInput(session, "analysis-files.txt", req.FocusPaths)
 	if err != nil {
-		return nil, fmt.Errorf("write analysis plan file list: %w", err)
+		return nil, promptInputWriteError("analysis-files.txt", err)
 	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
-		return nil, fmt.Errorf("write analysis plan structural context: %w", err)
+		return nil, promptInputWriteError("structural-context.md", err)
 	}
 	userContextPath, err := session.Write("user-context.md", req.UserContext)
 	if err != nil {
-		return nil, fmt.Errorf("write analysis plan user context: %w", err)
+		return nil, promptInputWriteError("user-context.md", err)
 	}
 	return map[string]interface{}{
 		"ProjectName":           req.ProjectName,
@@ -155,42 +125,64 @@ func PlanAnalysisUnitsPromptData(session *PromptInputSession, req *PlanAnalysisU
 	}, nil
 }
 
-// CheckPromptData 返回检查场景所需的提示词数据。
-func CheckPromptData(session *PromptInputSession, req *AnalyzeRequest) (map[string]interface{}, error) {
+// SelectLearningCandidatesPromptData 返回当前代码学习候选文件 AI 收敛所需的提示词数据。
+func SelectLearningCandidatesPromptData(session *PromptInputSession, req *SelectLearningCandidatesRequest) (map[string]interface{}, error) {
+	candidatesPath, candidateCount, err := writePathListInput(session, "candidate-files.txt", req.CandidatePaths)
+	if err != nil {
+		return nil, promptInputWriteError("candidate-files.txt", err)
+	}
+	requiredPath, requiredCount, err := writePathListInput(session, "required-files.txt", req.RequiredPaths)
+	if err != nil {
+		return nil, promptInputWriteError("required-files.txt", err)
+	}
+	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
+	if err != nil {
+		return nil, promptInputWriteError("structural-context.md", err)
+	}
+	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
+	if err != nil {
+		return nil, promptInputWriteError("user-context.md", err)
+	}
 	return map[string]interface{}{
-		"Files":         req.Files,
-		"DiffFiles":     req.DiffFiles,
-		"Context":       req.Context,
-		"Patterns":      req.Patterns,
-		"RecentCommits": req.RecentCommits,
+		"ProjectName":           req.ProjectName,
+		"RootPath":              req.RootPath,
+		"Language":              req.Language,
+		"CandidatePathsPath":    candidatesPath,
+		"CandidatePathCount":    candidateCount,
+		"RequiredPathsPath":     requiredPath,
+		"RequiredPathCount":     requiredCount,
+		"StructuralContextPath": structuralContextPath,
+		"UserContextPath":       userContextPath,
+		"LearningMode":          promptLearningMode(req.LearningMode),
+		"LearningScope":         promptLearningScope(req.LearningScope),
 	}, nil
 }
 
 // AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
 func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRequest) (map[string]interface{}, error) {
-	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", textutil.NormalizeStructureSummary(req.Structure))
+	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", stringx.NormalizeStructureSummary(req.Structure))
 	if err != nil {
-		return nil, fmt.Errorf("write project structure prompt input: %w", err)
+		return nil, promptInputWriteError("project-structure.txt", err)
 	}
 	focusPathsPath, focusPathCount, err := writePathListInput(session, "focused-paths.txt", req.FocusPaths)
 	if err != nil {
-		return nil, fmt.Errorf("write project profile focused paths: %w", err)
+		return nil, promptInputWriteError("focused-paths.txt", err)
 	}
 	engineeringKnowledgePath, engineeringKnowledgeCount, err := writePathListInput(session, "engineering-knowledge-paths.txt", req.EngineeringKnowledge)
 	if err != nil {
-		return nil, fmt.Errorf("write engineering knowledge paths: %w", err)
+		return nil, promptInputWriteError("engineering-knowledge-paths.txt", err)
 	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
-		return nil, fmt.Errorf("write structural context prompt input: %w", err)
+		return nil, promptInputWriteError("structural-context.md", err)
 	}
 	existingProfilePath, err := session.UsePathOrWrite(req.ExistingProfilePath, "existing-profile.json", req.ExistingProfileJSON)
 	if err != nil {
-		return nil, fmt.Errorf("write existing profile prompt input: %w", err)
+		return nil, promptInputWriteError("existing-profile.json", err)
 	}
 	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
 	if err != nil {
-		return nil, fmt.Errorf("write user context prompt input: %w", err)
+		return nil, promptInputWriteError("user-context.md", err)
 	}
 	return map[string]interface{}{
 		"ProjectName":               req.ProjectName,
@@ -209,34 +201,29 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 	}, nil
 }
 
-// AnalyzeCurrentCodebasePromptData 返回当前代码库分析所需的提示词数据。
-func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeCurrentCodebaseRequest) (map[string]interface{}, error) {
-	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", textutil.NormalizeStructureSummary(req.Structure))
+// AnalyzeCurrentCodebaseBatchPromptData 返回批量当前代码库分析所需的提示词数据。
+func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *AnalyzeCurrentCodebaseBatchRequest) (map[string]interface{}, error) {
+	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", stringx.NormalizeStructureSummary(req.Structure))
 	if err != nil {
-		return nil, fmt.Errorf("write project structure prompt input: %w", err)
+		return nil, promptInputWriteError("project-structure.txt", err)
 	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
-		return nil, fmt.Errorf("write structural context prompt input: %w", err)
+		return nil, promptInputWriteError("structural-context.md", err)
 	}
 	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
 	if err != nil {
-		return nil, fmt.Errorf("write user context prompt input: %w", err)
+		return nil, promptInputWriteError("user-context.md", err)
 	}
 	return map[string]interface{}{
 		"ProjectName":           req.ProjectName,
 		"RootPath":              req.RootPath,
 		"Language":              req.Language,
 		"RuntimeLabel":          req.RuntimeLabel,
-		"AnalysisUnit":          req.AnalysisUnit,
-		"FocusPaths":            req.FocusPaths,
+		"Focuses":               req.Focuses,
 		"StructurePath":         structurePath,
 		"StructuralContextPath": structuralContextPath,
 		"MainFiles":             req.MainFiles,
-		"SampleFiles":           req.SampleFiles,
-		"DiffFiles":             req.DiffFiles,
-		"FileCount":             req.FileCount,
-		"DirCount":              req.DirCount,
 		"UserContextPath":       userContextPath,
 		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
 		"LearningMode":          promptLearningMode(req.LearningMode),
@@ -244,29 +231,28 @@ func AnalyzeCurrentCodebasePromptData(session *PromptInputSession, req *AnalyzeC
 	}, nil
 }
 
-// AnalyzeCurrentCodebaseBatchPromptData 返回批量当前代码库分析所需的提示词数据。
-func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *AnalyzeCurrentCodebaseBatchRequest) (map[string]interface{}, error) {
-	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", textutil.NormalizeStructureSummary(req.Structure))
+// AnalyzeCurrentDeltaBatchPromptData 返回 diff 锚定增量学习所需的提示词数据。
+func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *AnalyzeCurrentDeltaBatchRequest) (map[string]interface{}, error) {
+	structurePath, err := session.UsePathOrWrite(req.StructurePath, "focused-structure.txt", stringx.NormalizeStructureSummary(req.Structure))
 	if err != nil {
-		return nil, fmt.Errorf("write project structure prompt input: %w", err)
+		return nil, promptInputWriteError("focused-structure.txt", err)
 	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
-		return nil, fmt.Errorf("write structural context prompt input: %w", err)
+		return nil, promptInputWriteError("structural-context.md", err)
 	}
 	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
 	if err != nil {
-		return nil, fmt.Errorf("write user context prompt input: %w", err)
+		return nil, promptInputWriteError("user-context.md", err)
 	}
 	return map[string]interface{}{
 		"ProjectName":           req.ProjectName,
 		"RootPath":              req.RootPath,
 		"Language":              req.Language,
 		"RuntimeLabel":          req.RuntimeLabel,
-		"Units":                 req.Units,
+		"Focuses":               req.Focuses,
 		"StructurePath":         structurePath,
 		"StructuralContextPath": structuralContextPath,
-		"MainFiles":             req.MainFiles,
 		"UserContextPath":       userContextPath,
 		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
 		"LearningMode":          promptLearningMode(req.LearningMode),

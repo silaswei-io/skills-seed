@@ -22,7 +22,7 @@
 {{if .HasGuidance}}
 ## 工作区分析建议
 
-以下内容由工作区事实推导，不作为无条件硬规则：
+以下内容由工作区事实推导，执行前按相关子项目源码确认：
 
 {{range .Guidance}}
 - **{{.Title}}**：{{.Description}}{{if .AppliesTo}}（适用：{{range $i, $ref := .AppliesTo}}{{if $i}}、{{end}}`{{$ref.Value}}`（{{$ref.Kind}}）{{end}}）{{end}}

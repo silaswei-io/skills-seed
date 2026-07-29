@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // Labels 保存 JSON 文件持久化时面向用户的错误前缀。
@@ -43,7 +44,7 @@ func (s Store[T]) Get(ctx context.Context) (*T, error) {
 	}
 
 	var value T
-	if err := json.Unmarshal(data, &value); err != nil {
+	if err := jsonx.Unmarshal(data, &value); err != nil {
 		return nil, wrapLabel(s.Labels.Parse, err)
 	}
 	return &value, nil

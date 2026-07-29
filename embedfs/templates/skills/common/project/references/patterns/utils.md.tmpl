@@ -33,26 +33,12 @@
 {{range .PatternObjects}}
 ### {{.Name}}
 
-{{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用与实现观察（需按源码复核）**: {{.Description}}{{end}}
+{{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用边界**: {{.Description}}{{end}}
 
 {{end}}
 {{if .Rule}}**用户规则**: {{.Rule}}{{end}}
 
 **证据**: {{len .EvidenceLocations}} 个已验证源码符号，来源 {{.Source}}
-
-{{if .GoodExample}}
-#### 代码证据
-
-```{{$.CodeFenceLanguage}}
-{{.GoodExample}}
-```
-{{end}}
-
-{{if .BadExample}}
-#### 避免示例
-
-{{.BadExample}}
-{{end}}
 
 ---
 

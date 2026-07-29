@@ -13,7 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
-	workflowoutput "github.com/silaswei-io/skills-seed/internal/service/workflow/output"
+	workflowoutput "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	"github.com/spf13/cobra"
 )
 

@@ -5,8 +5,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/gitignore"
-	"github.com/silaswei-io/skills-seed/internal/utils/filefilter"
-	"github.com/silaswei-io/skills-seed/internal/utils/sourcefiles"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
 type SkipReason string
@@ -63,15 +62,15 @@ func (p SelectionPolicy) Decide(path string) Decision {
 	if !p.SourceOnly {
 		return Decision{Path: path, Include: true, Reason: SkipReasonNone}
 	}
-	if sourcefiles.IsAnalyzable(path) {
+	if sourcecode.IsAnalyzable(path) {
 		return Decision{Path: path, Include: true, Reason: SkipReasonNone}
 	}
-	if sourcefiles.IsDocument(path) {
+	if sourcecode.IsDocument(path) {
 		return Decision{Path: path, Include: false, Reason: SkipReasonDocument}
 	}
 	return Decision{Path: path, Include: false, Reason: SkipReasonNonSource}
 }
 
 func (p SelectionPolicy) IsExcluded(path string) bool {
-	return filefilter.MatchExcluded(path, p.ExcludePatterns) || p.GitIgnore.Match(path)
+	return matchExcluded(path, p.ExcludePatterns) || p.GitIgnore.Match(path)
 }

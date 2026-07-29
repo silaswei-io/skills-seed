@@ -38,34 +38,9 @@ type PatternMutation struct {
 	Save      []*Pattern
 }
 
-// PatternHitRecorder 保存检查命中记录。
-type PatternHitRecorder interface {
-	RecordPatternHits(ctx context.Context, hits []PatternHit) error
-}
-
-// PatternStatsRepository 查询 pattern 质量和命中统计。
+// PatternStatsRepository 查询 pattern 质量统计。
 type PatternStatsRepository interface {
-	GetPatternHitStats(ctx context.Context) ([]PatternHitStats, error)
-}
-
-// ReviewRepository 导入并统计代码评审评论。
-type ReviewRepository interface {
-	ImportReviewComments(ctx context.Context, comments []ReviewComment) error
-	GetReviewStats(ctx context.Context, lineWindow int) (ReviewStats, error)
-}
-
-// CommitAnalysisTracker 提交分析追踪接口
-type CommitAnalysisTracker interface {
-	// MarkCommitAnalyzed 标记commit已被分析
-	MarkCommitAnalyzed(ctx context.Context, commitHash string) error
-	// MarkCommitsAnalyzed 在一个仓储事务中标记一批 commit。
-	MarkCommitsAnalyzed(ctx context.Context, commitHashes []string) error
-
-	// IsCommitAnalyzed 检查commit是否已被分析
-	IsCommitAnalyzed(ctx context.Context, commitHash string) (bool, error)
-
-	// GetAnalyzedCommits 获取所有已分析的commit列表
-	GetAnalyzedCommits(ctx context.Context) ([]string, error)
+	GetPatternStats(ctx context.Context) ([]PatternStats, error)
 }
 
 // FileAnalysisTracker 文件分析追踪接口

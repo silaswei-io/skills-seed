@@ -15,8 +15,8 @@ func TestAssessCurationDoesNotMutateAgentResult(t *testing.T) {
 			SourceIDs: []string{"candidate", "invented-source"},
 		}},
 		Dropped: []agent.CuratedDrop{
-			{ID: "candidate", Reason: "duplicate"},
-			{ID: "invented-drop", Reason: "invalid"},
+			{ID: "candidate", ReasonCode: agent.CuratedDropExactDuplicate, Reason: "duplicate"},
+			{ID: "invented-drop", ReasonCode: agent.CuratedDropUnsupportedEvidence, Reason: "invalid"},
 		},
 	}
 	candidates := []domain.Pattern{{ID: "candidate"}}
@@ -26,7 +26,7 @@ func TestAssessCurationDoesNotMutateAgentResult(t *testing.T) {
 	require.Equal(t, []string{"candidate", "invented-source"}, result.Patterns[0].SourceIDs)
 	require.Len(t, result.Dropped, 2)
 	require.Equal(t, []string{"candidate"}, assessment.Result.Patterns[0].MergedFrom)
-	require.Equal(t, []Drop{{ID: "candidate", Reason: "duplicate"}}, assessment.Result.Dropped)
+	require.Equal(t, []Drop{{ID: "candidate", ReasonCode: agent.CuratedDropExactDuplicate, Reason: "duplicate"}}, assessment.Result.Dropped)
 }
 
 func TestAssessCurationDropsOrphanProposalAndInfersMatchingSource(t *testing.T) {

@@ -2,8 +2,7 @@ package generator
 
 import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/knowledge/claim"
-	"github.com/silaswei-io/skills-seed/internal/knowledge/routing"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
@@ -56,7 +55,7 @@ type categoryPatternTemplateData struct {
 	Category          string
 	Summary           string
 	PatternObjects    []patternRenderModel
-	ClaimGroups       []claim.Group
+	ClaimGroups       []knowledge.ClaimGroup
 	PatternCount      int
 	LastUpdated       string
 	CodeFenceLanguage string
@@ -76,7 +75,7 @@ type businessIndexTemplateData struct {
 type businessDetailTemplateData struct {
 	Category          string
 	GroupTitle        string
-	GroupSummary      routing.BusinessGroupSummary
+	GroupSummary      knowledge.BusinessGroupSummary
 	PatternObjects    []patternRenderModel
 	PatternCount      int
 	LastUpdated       string
@@ -147,7 +146,7 @@ func (p patternRenderModel) AllowsHardConstraint() bool {
 }
 
 type patternGroup struct {
-	routing.BusinessGroup
+	knowledge.BusinessGroup
 	Patterns []patternRenderModel
 }
 

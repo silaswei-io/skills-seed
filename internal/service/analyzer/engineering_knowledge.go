@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/silaswei-io/skills-seed/internal/utils/sourcefiles"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
 func engineeringKnowledgePaths(projectRoot string) ([]string, error) {
@@ -26,7 +26,7 @@ func engineeringKnowledgePaths(projectRoot string) ([]string, error) {
 			}
 			return nil
 		}
-		if sourcefiles.IsEngineeringKnowledge(relative) {
+		if isProjectEngineeringAuthority(relative) {
 			paths = append(paths, relative)
 		}
 		return nil
@@ -36,6 +36,17 @@ func engineeringKnowledgePaths(projectRoot string) ([]string, error) {
 	}
 	sort.Strings(paths)
 	return paths, nil
+}
+
+func isProjectEngineeringAuthority(path string) bool {
+	path = strings.TrimPrefix(filepath.ToSlash(strings.TrimSpace(path)), "./")
+	if path == "" || !sourcecode.IsEngineeringKnowledge(path) {
+		return false
+	}
+	if strings.HasPrefix(path, ".github/workflows/") || strings.HasPrefix(path, ".skills-seed/context/") {
+		return true
+	}
+	return !strings.Contains(path, "/")
 }
 
 func skipEngineeringKnowledgeDir(path string) bool {

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
@@ -25,11 +24,6 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 		Content:   `{"patterns":[]}`,
 		RawOutput: `{"type":"result","result":"{\"patterns\":[]}"}`,
 		Stderr:    "warning",
-		TokenUsage: tokenusage.Usage{
-			InputTokens:  10,
-			OutputTokens: 5,
-			HasTokens:    true,
-		},
 	})
 
 	require.Contains(t, filepath.ToSlash(archive.ContentPath), ".skills-seed/runtime/agent-outputs/")
@@ -55,13 +49,11 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	require.NotEmpty(t, manifestPath)
 
 	var manifest struct {
-		Agent           string `json:"agent"`
-		Operation       string `json:"operation"`
-		ContentPath     string `json:"content_path"`
-		RawPath         string `json:"raw_path"`
-		StderrPath      string `json:"stderr_path"`
-		TokenUsageKnown bool   `json:"token_usage_known"`
-		TotalTokens     int64  `json:"total_tokens"`
+		Agent       string `json:"agent"`
+		Operation   string `json:"operation"`
+		ContentPath string `json:"content_path"`
+		RawPath     string `json:"raw_path"`
+		StderrPath  string `json:"stderr_path"`
 	}
 	data, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
@@ -71,8 +63,8 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	require.Equal(t, archive.ContentPath, manifest.ContentPath)
 	require.Equal(t, archive.RawPath, manifest.RawPath)
 	require.Equal(t, archive.StderrPath, manifest.StderrPath)
-	require.True(t, manifest.TokenUsageKnown)
-	require.EqualValues(t, 15, manifest.TotalTokens)
+	require.NotContains(t, string(data), "token_usage")
+	require.NotContains(t, string(data), "tokens")
 }
 
 func TestSaveAgentOutputForContextPreservesRetryAttempts(t *testing.T) {
@@ -99,12 +91,12 @@ func TestSaveAgentOutputForContextLabelsUnitOperation(t *testing.T) {
 
 	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
 		Agent:     "claude",
-		Operation: "AnalyzeCurrentCodebase/unit-auth",
+		Operation: "AnalyzeCurrentCodebase/focus-auth",
 		Attempt:   1,
 		Content:   `{"patterns":[]}`,
 	})
 
-	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase-unit-auth\.md$`, filepath.Base(archive.ContentPath))
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase-focus-auth\.md$`, filepath.Base(archive.ContentPath))
 
 	entries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "agent-outputs"))
 	require.NoError(t, err)
@@ -123,8 +115,8 @@ func TestSaveAgentOutputForContextLabelsUnitOperation(t *testing.T) {
 	data, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(data, &manifest))
-	require.Equal(t, "AnalyzeCurrentCodebase/unit-auth", manifest.Operation)
-	require.Equal(t, "unit-auth", manifest.Label)
+	require.Equal(t, "AnalyzeCurrentCodebase/focus-auth", manifest.Operation)
+	require.Equal(t, "focus-auth", manifest.Label)
 }
 
 func TestSaveAgentOutputForContextUsesSharedRuntimeTask(t *testing.T) {
@@ -134,14 +126,14 @@ func TestSaveAgentOutputForContextUsesSharedRuntimeTask(t *testing.T) {
 
 	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
 		Agent:     "claude",
-		Operation: "SelectFiles",
+		Operation: "CuratePatterns",
 		RuntimeID: "20260626-183633",
-		Slug:      "file-select",
+		Slug:      "core-pattern-curate",
 		Attempt:   1,
-		Content:   `{"include":[]}`,
+		Content:   `{"patterns":[],"dropped":[]}`,
 	})
 
-	require.Equal(t, "20260626-183633-claude-file-select.md", filepath.Base(archive.ContentPath))
+	require.Equal(t, "20260626-183633-claude-core-pattern-curate.md", filepath.Base(archive.ContentPath))
 	entries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "agent-outputs"))
 	require.NoError(t, err)
 	var manifestPath string
@@ -158,7 +150,7 @@ func TestSaveAgentOutputForContextUsesSharedRuntimeTask(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(data, &manifest))
 	require.Equal(t, "20260626-183633", manifest.RuntimeID)
-	require.Equal(t, "file-select", manifest.Slug)
+	require.Equal(t, "core-pattern-curate", manifest.Slug)
 }
 
 func TestSaveAgentOutputForContextKeepsReadableUnitSlug(t *testing.T) {
@@ -168,14 +160,14 @@ func TestSaveAgentOutputForContextKeepsReadableUnitSlug(t *testing.T) {
 
 	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
 		Agent:     "claude",
-		Operation: "AnalyzeCurrentCodebase/unit-auth-admin-login",
+		Operation: "AnalyzeCurrentCodebaseBatch/focus-auth-admin-login",
 		RuntimeID: "20260626-192529",
-		Slug:      RuntimeSlug("pattern-learn-current", "unit-auth-admin-login"),
+		Slug:      RuntimeSlug("learning-pack-analyze", "focus-auth-admin-login"),
 		Attempt:   1,
 		Content:   `{"patterns":[]}`,
 	})
 
-	require.Equal(t, "20260626-192529-claude-pattern-learn-current-unit-auth-admin-login.md", filepath.Base(archive.ContentPath))
+	require.Equal(t, "20260626-192529-claude-learning-pack-analyze-focus-auth-admin-login.md", filepath.Base(archive.ContentPath))
 }
 
 func TestSaveAgentOutputForContextKeepsNonJSONContentAsMarkdown(t *testing.T) {
@@ -194,6 +186,28 @@ func TestSaveAgentOutputForContextKeepsNonJSONContentAsMarkdown(t *testing.T) {
 	content, err := os.ReadFile(archive.ContentPath)
 	require.NoError(t, err)
 	require.Equal(t, "plain text\n", string(content))
+}
+
+func TestSaveAgentOutputForContextSkipsLearningConversationStartArchive(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+
+	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
+		Agent:     "claude",
+		Operation: OperationLearningConversationStart,
+		RuntimeID: "20260729-111645",
+		Slug:      RuntimeSlug("learning-conversation-start", "pack-analysis"),
+		Attempt:   1,
+		Content:   `{"ready":true}`,
+		RawOutput: "raw output",
+		Stderr:    "stderr",
+		ExitError: true,
+	})
+
+	require.Empty(t, archive.ContentPath)
+	require.Empty(t, archive.RawPath)
+	require.Empty(t, archive.StderrPath)
+	require.NoDirExists(t, filepath.Join(seedPath, "runtime", "agent-outputs"))
 }
 
 func TestSaveAgentOutputForContextSkipsWhenSeedPathMissing(t *testing.T) {

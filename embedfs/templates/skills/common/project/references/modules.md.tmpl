@@ -1,6 +1,6 @@
 # {{.ProjectName}} 关键模块
 
-本文件提供项目画像中的模块导航。模块路径来自当前源码，入口只展示经过源码签名校验的方法；职责和依赖关系是学习观察，修改前需按源码复核。
+本文件提供模块导航。模块路径来自当前源码，入口只展示经过源码签名校验的方法；职责和依赖关系用于定位，修改前需回到源码确认。
 
 {{if .KeyModules}}
 {{if gt (len .KeyModules) 5}}
@@ -14,8 +14,8 @@
 ## {{.DisplayName}}
 
 - **源码路径**: `{{.Path}}`
-{{if .Description}}- **职责观察（需按源码复核）**: {{.Description}}
-{{end}}{{if .Responsibilities}}- **具体职责观察**:
+{{if .Description}}- **职责**: {{.Description}}
+{{end}}{{if .Responsibilities}}- **职责线索**:
 {{range .Responsibilities}}  - {{.}}
 {{end}}{{end}}{{if .Dependencies}}- **依赖线索**:
 {{range .Dependencies}}  - {{.}}

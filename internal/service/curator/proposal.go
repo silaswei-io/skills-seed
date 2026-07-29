@@ -32,7 +32,7 @@ func proposalFromAgent(result *agent.CuratePatternsResult) *proposal {
 		out.Patterns = append(out.Patterns, pattern)
 	}
 	for _, item := range result.Dropped {
-		out.Dropped = append(out.Dropped, Drop{ID: item.ID, Reason: item.Reason})
+		out.Dropped = append(out.Dropped, Drop{ID: item.ID, ReasonCode: item.ReasonCode, Reason: item.Reason})
 	}
 	return out
 }

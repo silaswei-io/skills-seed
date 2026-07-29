@@ -2,7 +2,6 @@ package sourcecode
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +12,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/codegraph"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 const codeGraphQueryLimit = 100
@@ -158,7 +158,7 @@ func (r *codeGraphResolver) query(ctx context.Context, projectRoot, name string)
 		return nil, fmt.Errorf("query CodeGraph symbol %q: %w: %s", name, err, strings.TrimSpace(output))
 	}
 	var results []codeGraphResult
-	if err := json.Unmarshal([]byte(output), &results); err != nil {
+	if err := jsonx.Unmarshal([]byte(output), &results); err != nil {
 		return nil, fmt.Errorf("decode CodeGraph symbol %q: %w", name, err)
 	}
 	nodes := make([]codeGraphNode, 0, len(results))
@@ -251,7 +251,7 @@ func resolveProjectFile(projectRoot, path string) (string, bool) {
 	if path == "" {
 		return "", false
 	}
-	resolved, err := utils.CanonicalPathWithinRoot(projectRoot, filepath.Join(projectRoot, filepath.FromSlash(path)))
+	resolved, err := projectpath.CanonicalWithinRoot(projectRoot, filepath.Join(projectRoot, filepath.FromSlash(path)))
 	return resolved, err == nil
 }
 

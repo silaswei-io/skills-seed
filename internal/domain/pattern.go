@@ -3,7 +3,6 @@ package domain
 import (
 	"sort"
 	"strings"
-	"time"
 )
 
 // AllowsHardConstraint 表示模式来源是否具备直接约束代码修改的权威性。
@@ -83,23 +82,15 @@ func CategoryNamesWithPatterns(patterns []Pattern) []string {
 
 // PatternInsight 记录单个模式在生成阶段的辅助信息
 type PatternInsight struct {
-	HitCount       int
-	LastHitAt      time.Time
 	GenerationRank float64
 }
 
 // RankPatternsForGeneration 根据洞察分数对模式排序，用于生成优先级
 func RankPatternsForGeneration(patterns []Pattern, insights map[string]PatternInsight) []Pattern {
 	ranked := append([]Pattern(nil), patterns...)
-	maxHits := 0
-	for _, insight := range insights {
-		if insight.HitCount > maxHits {
-			maxHits = insight.HitCount
-		}
-	}
 	for i, pattern := range ranked {
 		insight := insights[pattern.ID]
-		insight.GenerationRank = patternGenerationRank(pattern, insight.HitCount, maxHits)
+		insight.GenerationRank = patternGenerationRank(pattern)
 		insights[pattern.ID] = insight
 		ranked[i] = pattern
 	}
@@ -112,9 +103,6 @@ func RankPatternsForGeneration(patterns []Pattern, insights map[string]PatternIn
 		if ranked[i].Metrics.EffectiveScore != ranked[j].Metrics.EffectiveScore {
 			return ranked[i].Metrics.EffectiveScore > ranked[j].Metrics.EffectiveScore
 		}
-		if insights[ranked[i].ID].HitCount != insights[ranked[j].ID].HitCount {
-			return insights[ranked[i].ID].HitCount > insights[ranked[j].ID].HitCount
-		}
 		if ranked[i].Confidence != ranked[j].Confidence {
 			return ranked[i].Confidence > ranked[j].Confidence
 		}
@@ -123,12 +111,8 @@ func RankPatternsForGeneration(patterns []Pattern, insights map[string]PatternIn
 	return ranked
 }
 
-func patternGenerationRank(pattern Pattern, hitCount, maxHits int) float64 {
-	normalizedHits := 0.0
-	if maxHits > 0 {
-		normalizedHits = float64(hitCount) / float64(maxHits)
-	}
-	return roundFloat(pattern.Metrics.EffectiveScore*0.6 + normalizedHits*0.3 + pattern.Confidence*0.1)
+func patternGenerationRank(pattern Pattern) float64 {
+	return roundFloat(pattern.Metrics.EffectiveScore*0.85 + pattern.Confidence*0.15)
 }
 
 func roundFloat(v float64) float64 {

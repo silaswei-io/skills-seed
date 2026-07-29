@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -10,7 +9,8 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // retryReasonMaxLength 限制终端进度行中的重试原因长度，避免长错误撑开界面。
@@ -252,10 +252,6 @@ func IsRetryableOutputError(stdout, stderr string, extraMarkers ...string) bool 
 
 // ReportRetryForContext 上报一次重试事件，并写入结构化诊断日志。
 func ReportRetryForContext(ctx context.Context, info RetryInfo) {
-	scopeLabel := ""
-	if scope := tokenUsageScopeFromContext(ctx); scope != nil {
-		scopeLabel = scope.label
-	}
 	info.Status = RetryProgressStatusWaiting
 	info.Reason = truncateRetryReason(normalizeRetryReason(info.Reason))
 	if info.Reason == "" {
@@ -273,7 +269,6 @@ func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 		"max_retries", info.MaxRetries,
 		"wait_seconds", info.WaitDuration.Seconds(),
 		"reason", info.Reason,
-		"token_scope", scopeLabel,
 	}
 	if info.CallDuration > 0 {
 		fields = append(fields, "call_duration_seconds", info.CallDuration.Seconds())
@@ -370,7 +365,7 @@ func retryReasonFromJSON(output string) string {
 			continue
 		}
 		var value interface{}
-		if err := json.Unmarshal([]byte(line), &value); err != nil {
+		if err := jsonx.Unmarshal([]byte(line), &value); err != nil {
 			continue
 		}
 		if reason := retryReasonFromValue(value); reason != "" {

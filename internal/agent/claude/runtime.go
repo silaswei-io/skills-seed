@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,23 +16,14 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/tokenusage"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // 调用外部命令行程序，并处理可重试的瞬时错误和结构化输出失败。
 func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, error) {
 	output, _, err := c.callClaudeWithArchive(ctx, operation, prompt, outputContract, task...)
 	return output, err
-}
-
-func parseClaudeResult[T any](agentName, operation, output string, archive agent.AgentOutputArchive, parse func(string) (T, error)) (T, error) {
-	result, err := parse(output)
-	if err != nil {
-		var zero T
-		return zero, agent.NewResultContractError(agentName, operation, err, output, archive)
-	}
-	return result, nil
 }
 
 type claudeCallResult struct {
@@ -55,6 +47,28 @@ func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prom
 		Policy:    c.retryCfg,
 		Call: func(attempt int) (claudeCallResult, string, time.Duration, bool, error) {
 			output, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, attempt, workDir, agent.FirstRuntimeTask(task))
+			return claudeCallResult{output: output, archive: archive}, output, duration, retryable, err
+		},
+	})
+	return result.output, result.archive, err
+}
+
+func (c *ClaudeAgent) callClaudeSession(ctx context.Context, operation, prompt, outputContract, sessionID string, resume bool, task agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
+	outputSchema, err := aicontract.StructuredOutputSchema(outputContract)
+	if err != nil {
+		return "", agent.AgentOutputArchive{}, err
+	}
+	workDir, err := agent.WorkDirForContext(ctx)
+	if err != nil {
+		return "", agent.AgentOutputArchive{}, err
+	}
+
+	result, err := agent.RunRetryingCall(ctx, agent.RetryingCallOptions[claudeCallResult]{
+		AgentName: c.Name(),
+		Operation: operation,
+		Policy:    c.retryCfg,
+		Call: func(attempt int) (claudeCallResult, string, time.Duration, bool, error) {
+			output, archive, duration, retryable, err := c.doCallClaudeSession(ctx, operation, prompt, outputSchema, sessionID, resume, attempt, workDir, task)
 			return claudeCallResult{output: output, archive: archive}, output, duration, retryable, err
 		},
 	})
@@ -100,20 +114,17 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
-		usage := tokenusage.Extract(stdoutStr)
 		retryable := isRetryableError(stdoutStr, stderrStr)
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:      c.Name(),
-			Operation:  operation,
-			RuntimeID:  task.ID,
-			Slug:       task.Slug,
-			Attempt:    attempt,
-			RawOutput:  stdoutStr,
-			Stderr:     stderrStr,
-			ExitError:  true,
-			TokenUsage: usage,
+			Agent:     c.Name(),
+			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
+			Attempt:   attempt,
+			RawOutput: stdoutStr,
+			Stderr:    stderrStr,
+			ExitError: true,
 		})
-		agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 
 		if retryable {
 			logger.Diagnostic(i18n.Get("LoggerAgentClaudeCallRetryable"),
@@ -147,19 +158,17 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	}
 
 	rawOutput := stdout.String()
-	output, usage, outputErr := parseClaudeOutput(rawOutput)
-	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-		Agent:      c.Name(),
-		Operation:  operation,
-		RuntimeID:  task.ID,
-		Slug:       task.Slug,
-		Attempt:    attempt,
-		Content:    output,
-		RawOutput:  rawOutput,
-		Stderr:     stderr.String(),
-		TokenUsage: usage,
-	})
+	output, outputErr := parseClaudeOutput(rawOutput)
 	if outputErr != nil {
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:     c.Name(),
+			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
+			Attempt:   attempt,
+			RawOutput: rawOutput,
+			Stderr:    stderr.String(),
+		})
 		retryable := isRetryableError(rawOutput, stderr.String())
 		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
 			"agent", c.Name(),
@@ -171,12 +180,21 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 			"stderr_path", archive.StderrPath,
 			"retryable", retryable,
 		)
-		agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
 		if retryable || outputErr.invocation {
 			return rawOutput + stderr.String(), archive, duration, retryable, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, outputErr, rawOutput, stderr.String(), archive))
 		}
 		return "", archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, outputErr, rawOutput, archive))
 	}
+	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+		Agent:     c.Name(),
+		Operation: operation,
+		RuntimeID: task.ID,
+		Slug:      task.Slug,
+		Attempt:   attempt,
+		Content:   output,
+		RawOutput: rawOutput,
+		Stderr:    stderr.String(),
+	})
 	callCompleteFields := []any{
 		"agent", c.Name(),
 		"operation", operation,
@@ -189,9 +207,104 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 		"raw_output_path", archive.RawPath,
 		"stderr_path", archive.StderrPath,
 	}
-	callCompleteFields = append(callCompleteFields, tokenusage.Fields(usage, "")...)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
-	agent.LogTokenUsageForContext(ctx, c.Name(), operation, usage)
+
+	return output, archive, duration, false, nil
+}
+
+func (c *ClaudeAgent) doCallClaudeSession(ctx context.Context, operation, prompt, outputSchema, sessionID string, resume bool, attempt int, workDir string, task agent.RuntimeTask) (string, agent.AgentOutputArchive, time.Duration, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	args := claudeSessionPrintArgs(c.allowUserPlugins, outputSchema, task.PromptOnly, sessionID, resume)
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
+		"agent", c.Name(),
+		"operation", operation,
+		"command", c.commandPath,
+		"timeout", c.timeout,
+		"work_dir", workDir,
+		"prompt_length", len(prompt),
+		"session_id", sessionID,
+		"args", claudeArgsForLog(args),
+		"attempt", attempt,
+	)
+
+	cmd := exec.CommandContext(ctx, c.commandPath, args...)
+	cmd.Dir = workDir
+	cmd.Stdin = strings.NewReader(prompt)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	startTime := time.Now()
+	err := cmd.Run()
+	duration := time.Since(startTime)
+
+	if err != nil {
+		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
+		stdoutStr := stdout.String()
+		stderrStr := stderr.String()
+		retryable := isRetryableError(stdoutStr, stderrStr)
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:     c.Name(),
+			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
+			Attempt:   attempt,
+			RawOutput: stdoutStr,
+			Stderr:    stderrStr,
+			ExitError: true,
+		})
+
+		if retryable {
+			return stdoutStr + stderrStr, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+		}
+		return "", archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+	}
+
+	rawOutput := stdout.String()
+	output, outputErr := parseClaudeOutput(rawOutput)
+	if outputErr != nil {
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:     c.Name(),
+			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
+			Attempt:   attempt,
+			RawOutput: rawOutput,
+			Stderr:    stderr.String(),
+		})
+		retryable := isRetryableError(rawOutput, stderr.String())
+		if retryable || outputErr.invocation {
+			return rawOutput + stderr.String(), archive, duration, retryable, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, outputErr, rawOutput, stderr.String(), archive))
+		}
+		return "", archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, outputErr, rawOutput, archive))
+	}
+	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+		Agent:     c.Name(),
+		Operation: operation,
+		RuntimeID: task.ID,
+		Slug:      task.Slug,
+		Attempt:   attempt,
+		Content:   output,
+		RawOutput: rawOutput,
+		Stderr:    stderr.String(),
+	})
+	callCompleteFields := []any{
+		"agent", c.Name(),
+		"operation", operation,
+		"attempt", attempt,
+		"output_length", len(output),
+		"raw_output_length", stdout.Len(),
+		"stderr_length", stderr.Len(),
+		"duration", duration,
+		"session_id", sessionID,
+		"output_path", archive.ContentPath,
+		"raw_output_path", archive.RawPath,
+		"stderr_path", archive.StderrPath,
+	}
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
 
 	return output, archive, duration, false, nil
 }
@@ -204,8 +317,7 @@ type claudeOutputError struct {
 func (e *claudeOutputError) Error() string { return e.cause.Error() }
 func (e *claudeOutputError) Unwrap() error { return e.cause }
 
-func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage, *claudeOutputError) {
-	usage := tokenusage.Extract(rawOutput)
+func parseClaudeOutput(rawOutput string) (string, *claudeOutputError) {
 	var result struct {
 		Type             string          `json:"type"`
 		Subtype          string          `json:"subtype"`
@@ -214,11 +326,11 @@ func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage, *claudeOutpu
 		Errors           []string        `json:"errors"`
 		StructuredOutput json.RawMessage `json:"structured_output"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(rawOutput)), &result); err != nil {
-		return "", usage, &claudeOutputError{cause: fmt.Errorf("解析 Claude JSON envelope: %w", err)}
+	if err := jsonx.Unmarshal([]byte(strings.TrimSpace(rawOutput)), &result); err != nil {
+		return "", &claudeOutputError{cause: fmt.Errorf("%s: %w", i18n.Get("AgentClaudeEnvelopeParseFailed"), err)}
 	}
 	if result.Type != "result" {
-		return "", usage, &claudeOutputError{cause: fmt.Errorf("claude JSON envelope type 为 %q，期望 result", result.Type)}
+		return "", &claudeOutputError{cause: errors.New(i18n.GetWithParams("AgentClaudeUnexpectedEnvelopeType", map[string]interface{}{"Type": result.Type}))}
 	}
 	if result.IsError || strings.HasPrefix(result.Subtype, "error_") {
 		detail := strings.TrimSpace(result.Result)
@@ -228,16 +340,60 @@ func parseClaudeOutput(rawOutput string) (string, tokenusage.Usage, *claudeOutpu
 		if detail == "" {
 			detail = result.Subtype
 		}
-		return "", usage, &claudeOutputError{
+		return "", &claudeOutputError{
 			cause:      fmt.Errorf("claude CLI 返回失败结果: %s", detail),
 			invocation: true,
 		}
 	}
 	structuredOutput := bytes.TrimSpace(result.StructuredOutput)
 	if len(structuredOutput) > 0 && !bytes.Equal(structuredOutput, []byte("null")) {
-		return string(structuredOutput), usage, nil
+		return string(structuredOutput), nil
 	}
-	return "", usage, &claudeOutputError{cause: fmt.Errorf("claude CLI 成功响应缺少 structured_output")}
+	resultJSON, ok := claudeStructuredResult(result.Result)
+	if ok {
+		return resultJSON, nil
+	}
+	return "", &claudeOutputError{cause: errors.New(i18n.Get("AgentClaudeStructuredOutputMissing"))}
+}
+
+func claudeStructuredResult(value string) (string, bool) {
+	raw := bytes.TrimSpace([]byte(stripJSONFence(value)))
+	if len(raw) == 0 {
+		return "", false
+	}
+	if repaired, ok := repairClaudeJSONCandidate(string(raw)); ok {
+		return repaired, true
+	}
+	// Claude CLI 的 result 字段有时会在目标 JSON 前后追加解释文本。
+	// 这里仅抽取语法有效的 JSON 候选，字段契约仍由后续业务 parser 校验。
+	for _, candidate := range jsonx.Candidates(string(raw)) {
+		return candidate, true
+	}
+	return "", false
+}
+
+func repairClaudeJSONCandidate(value string) (string, bool) {
+	return jsonx.RepairCandidate(value)
+}
+
+func stripJSONFence(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if !strings.HasPrefix(trimmed, "```") {
+		return trimmed
+	}
+	firstLineEnd := strings.IndexByte(trimmed, '\n')
+	if firstLineEnd < 0 {
+		return trimmed
+	}
+	fenceHeader := strings.TrimSpace(trimmed[:firstLineEnd])
+	if fenceHeader != "```" && !strings.EqualFold(fenceHeader, "```json") {
+		return trimmed
+	}
+	body := strings.TrimSpace(trimmed[firstLineEnd+1:])
+	if !strings.HasSuffix(body, "```") {
+		return trimmed
+	}
+	return strings.TrimSpace(strings.TrimSuffix(body, "```"))
 }
 
 func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool) []string {
@@ -251,6 +407,32 @@ func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool
 		"json",
 		"--json-schema",
 		outputSchema,
+	}
+	if !allowUserPlugins {
+		if settings := claudeDisableUserPluginSettings(); settings != "" {
+			args = append(args, "--settings", settings)
+		}
+	}
+	tools := "Read,Glob,Grep,LS"
+	if promptOnly {
+		tools = ""
+	}
+	return append(args, "--tools", tools)
+}
+
+func claudeSessionPrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool, sessionID string, resume bool) []string {
+	args := []string{
+		"--print",
+		"--disable-slash-commands",
+		"--output-format",
+		"json",
+		"--json-schema",
+		outputSchema,
+	}
+	if resume {
+		args = append(args, "--resume", sessionID)
+	} else {
+		args = append(args, "--session-id", sessionID)
 	}
 	if !allowUserPlugins {
 		if settings := claudeDisableUserPluginSettings(); settings != "" {
@@ -337,7 +519,7 @@ func claudeInstalledUserPluginNames() []string {
 	}
 
 	var cfg claudeInstalledPluginsConfig
-	if err := json.Unmarshal(content, &cfg); err != nil {
+	if err := jsonx.Unmarshal(content, &cfg); err != nil {
 		logger.Debug("读取 Claude 已安装插件配置失败",
 			"config_path", configPath,
 			"error", err,
@@ -368,7 +550,7 @@ func claudeEnabledUserPluginNames() []string {
 	}
 
 	var settings claudeUserSettings
-	if err := json.Unmarshal(content, &settings); err != nil {
+	if err := jsonx.Unmarshal(content, &settings); err != nil {
 		logger.Debug("读取 Claude 用户设置失败",
 			"settings_path", settingsPath,
 			"error", err,

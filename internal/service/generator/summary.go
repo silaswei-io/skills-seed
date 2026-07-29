@@ -32,22 +32,5 @@ func deterministicKeyInsights(patterns []domain.Pattern, insights map[string]dom
 			"Categories": strings.Join(categories, ", "),
 		}))
 	}
-	hitCount := 0
-	for _, insight := range insights {
-		hitCount += insight.HitCount
-	}
-	if hitCount > 0 {
-		out = append(out, generatorText(locale, "GeneratorInsightCheckHitOrdering"))
-	}
 	return out
-}
-
-func firstNonEmptyString(values ...string) string {
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			return value
-		}
-	}
-	return ""
 }

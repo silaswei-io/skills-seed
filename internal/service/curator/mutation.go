@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 type mutationIntent int
@@ -63,7 +64,7 @@ func buildMutationPlan(curated []domain.Pattern, dropped []Drop, existing []doma
 		plan.Written = append(plan.Written, domainPattern)
 		plan.Mutation.Save = append(plan.Mutation.Save, &plan.Written[len(plan.Written)-1])
 	}
-	plan.Mutation.DeleteIDs = uniqueStrings(deleteIDs)
+	plan.Mutation.DeleteIDs = stringx.UniqueNonEmpty(deleteIDs)
 	return plan
 }
 

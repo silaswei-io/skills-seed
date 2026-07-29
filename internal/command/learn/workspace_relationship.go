@@ -13,10 +13,11 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
@@ -345,7 +346,7 @@ func readChildProjectProfile(ctx context.Context, cont *container.Container, pro
 		return nil, err
 	}
 	var profile domain.ProjectProfile
-	if err := json.Unmarshal(data, &profile); err != nil {
+	if err := jsonx.Unmarshal(data, &profile); err != nil {
 		return nil, err
 	}
 	return &profile, nil

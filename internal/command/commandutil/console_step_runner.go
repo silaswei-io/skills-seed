@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
-	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
+	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
 )
 
 // ConsoleStepRunnerOptions 定义命令行步骤进度渲染参数。

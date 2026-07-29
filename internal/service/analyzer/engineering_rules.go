@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 )
 
 type engineeringRuleValidationIssue struct {
@@ -87,7 +87,7 @@ func validateEngineeringRule(root string, allowed map[string]bool, hasUserContex
 }
 
 func validateProjectFile(root, path string) error {
-	resolved, err := utils.CanonicalPathWithinRoot(root, filepath.Join(root, filepath.FromSlash(path)))
+	resolved, err := projectpath.CanonicalWithinRoot(root, filepath.Join(root, filepath.FromSlash(path)))
 	if err != nil {
 		return fmt.Errorf("path %q is outside the project root: %w", path, err)
 	}

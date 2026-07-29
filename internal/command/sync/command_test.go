@@ -129,7 +129,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	defer patternRepo.Close()
 	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
 	gitRepo := git.NewRepository(projectRoot)
-	curatorSvc := curator.NewService(mockAgent, patternRepo)
+	curatorSvc := curator.NewService(patternRepo)
 	cont := &container.Container{
 		SeedPath:    seedPath,
 		Config:      configRepo.Get(),
@@ -140,17 +140,17 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 		ProfileRepo: profilestore.NewRepository(seedPath),
 		Agent:       mockAgent,
 		AnalyzerSvc: analyzer.NewAnalyzerService(mockAgent, configRepo),
-		LearnerSvc:  servicelearner.NewLearnerService(mockAgent, gitRepo, patternRepo, patternRepo, curatorSvc),
+		LearnerSvc:  servicelearner.NewLearnerService(curatorSvc),
 	}
 	staleLearnState := commandstate.NewState("learn-current", "demo", "go", userContext, []domain.FileAnalysisRecord{
 		{Path: "internal/stale.go", Hash: "stale"},
-	}, nil, []domain.AnalysisUnit{{ID: "stale", EntryPaths: []string{"internal/stale.go"}}})
+	}, nil, []domain.EvidenceFocus{{ID: "stale", EntryPaths: []string{"internal/stale.go"}}})
 	require.NoError(t, commandstate.NewRepository(seedPath, "learn-current").Save(context.Background(), staleLearnState))
 
 	planCalls := 0
-	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
 		planCalls++
-		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
 			{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}},
 		}}, nil
 	}
@@ -168,7 +168,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	var syncState commandstate.State
 	require.NoError(t, json.Unmarshal(syncStateBytes, &syncState))
 	require.Equal(t, "sync", syncState.Command)
-	require.Equal(t, []domain.AnalysisUnit{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}}, syncState.Units)
+	require.Equal(t, []domain.EvidenceFocus{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}}, syncState.Agenda.Focuses)
 	require.FileExists(t, commandstate.NewRepository(seedPath, "learn-current").Path())
 }
 
@@ -209,9 +209,9 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 
 	planCalls := 0
 	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
-	mockAgent.PlanAnalysisUnitsFn = func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
 		planCalls++
-		return &agent.PlanAnalysisUnitsResult{Units: []domain.AnalysisUnit{{ID: "main", Name: "Main", EntryPaths: []string{"main.go"}}}}, nil
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{{ID: "main", Name: "Main", EntryPaths: []string{"main.go"}}}}, nil
 	}
 	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 		pattern := domain.NewPattern("sync-restart-pattern", "Restart Pattern", domain.CategoryBusiness)
@@ -229,7 +229,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		Summary:     "profile",
 		GeneratedAt: "2026-01-01 00:00:00",
 	}))
-	curatorSvc := curator.NewService(mockAgent, patternRepo)
+	curatorSvc := curator.NewService(patternRepo)
 	cont := &container.Container{
 		SeedPath:     seedPath,
 		Config:       configRepo.Get(),
@@ -241,7 +241,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		StateRepo:    statestore.NewRepository(seedPath),
 		Agent:        mockAgent,
 		AnalyzerSvc:  analyzer.NewAnalyzerService(mockAgent, configRepo),
-		LearnerSvc:   servicelearner.NewLearnerService(mockAgent, git.NewRepository(projectRoot), patternRepo, patternRepo, curatorSvc),
+		LearnerSvc:   servicelearner.NewLearnerService(curatorSvc),
 		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil),
 	}
 
@@ -254,7 +254,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 
 func commandDependenciesForTest() Dependencies {
 	return Dependencies{
-		LearnCurrent: func(cont *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
 			return learncmd.RunLearnCurrentWithStateScopeOptions(cont, req.StateScope, req.UserContext, learncmd.CurrentRunOptions{
 				Force:          req.Force,
 				CurationOutput: req.CurationOutput,
@@ -274,14 +274,14 @@ func TestHasSyncCommandState(t *testing.T) {
 
 	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []domain.FileAnalysisRecord{
 		{Path: "main.go", Hash: "hash"},
-	}, nil, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
+	}, nil, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}})))
 
 	hasState, err = hasSyncCommandState(context.Background(), seedPath, "sync")
 	require.NoError(t, err)
 	require.True(t, hasState)
 }
 
-func TestHasResumableSyncCommandStateRequiresInputsAndUnits(t *testing.T) {
+func TestHasResumableSyncCommandStateRequiresInputsAndFocuses(t *testing.T) {
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	repo := commandstate.NewRepository(seedPath, "sync")
 
@@ -296,7 +296,7 @@ func TestHasResumableSyncCommandStateRequiresInputsAndUnits(t *testing.T) {
 
 	require.NoError(t, repo.Save(context.Background(), commandstate.NewState("sync", "demo", "go", "", []domain.FileAnalysisRecord{
 		{Path: "main.go", Hash: "hash"},
-	}, nil, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})))
+	}, nil, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}})))
 	resumable, err = hasResumableSyncCommandState(context.Background(), seedPath, "sync")
 	require.NoError(t, err)
 	require.True(t, resumable)
@@ -335,9 +335,9 @@ func TestSyncCurationOutputRequiresExplicitResume(t *testing.T) {
 }
 
 func TestSyncLearnPassesCurationOutputToLearning(t *testing.T) {
-	var received syncflow.LearnRequest
+	var received syncflow.LearnCurrentRequest
 	err := syncLearn(context.Background(), nil, "sync", "context", "curation.raw.txt", syncRunResume, nil, Dependencies{
-		LearnCurrent: func(_ *container.Container, req syncflow.LearnRequest) (domain.LearnCurrentResult, error) {
+		LearnCurrent: func(_ *container.Container, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
 			received = req
 			return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, nil
 		},
@@ -345,7 +345,7 @@ func TestSyncLearnPassesCurationOutputToLearning(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, syncflow.LearnRequest{
+	require.Equal(t, syncflow.LearnCurrentRequest{
 		StateScope:     "sync",
 		UserContext:    "context",
 		CurationOutput: "curation.raw.txt",
@@ -415,7 +415,7 @@ func TestSyncRestartClearsOnlySyncCommandState(t *testing.T) {
 	learnRepo := commandstate.NewRepository(seedPath, "learn-current")
 	state := commandstate.NewState("sync", "demo", "go", "", []domain.FileAnalysisRecord{
 		{Path: "main.go", Hash: "hash"},
-	}, nil, []domain.AnalysisUnit{{ID: "main", EntryPaths: []string{"main.go"}}})
+	}, nil, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}})
 	require.NoError(t, syncRepo.Save(context.Background(), state))
 	require.NoError(t, learnRepo.Save(context.Background(), state))
 

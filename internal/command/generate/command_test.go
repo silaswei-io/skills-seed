@@ -17,7 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/spf13/cobra"
@@ -250,7 +250,7 @@ func TestRunGenerateAllowsWorkflowOnlyProject(t *testing.T) {
 	require.NoDirExists(t, filepath.Join(outputPath, "references"))
 	skill := readGenerateFile(t, projectRoot, ".agents", "skills", "hsmwebapi", "SKILL.md")
 	require.Contains(t, skill, "## User Workflows")
-	require.NotContains(t, skill, "## Pattern References")
+	require.NotContains(t, skill, "## Reference Entry Points")
 }
 
 func TestRunGenerateWorkspaceOverwritesExistingChildSkill(t *testing.T) {
@@ -293,7 +293,7 @@ func TestGenerateWorkspaceChildSkillsUsesConfiguredParallelism(t *testing.T) {
 	cfg.Agent.Parallelism = 2
 	require.NoError(t, cont.ConfigRepo.Update(cfg))
 
-	require.NoError(t, generateWorkspaceChildSkills(context.Background(), cont))
+	require.NoError(t, generateWorkspaceChildSkillsWithOptions(context.Background(), cont, generateOptions{}))
 
 	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "backend")))
 	require.NotEmpty(t, childGeneratedSkillFiles(t, filepath.Join(workspaceRoot, "frontend")))
@@ -371,7 +371,7 @@ func TestGenerateWorkspaceChildSkillsDoesNotCallSummary(t *testing.T) {
 	defer cont.Close()
 
 	ctx := runtimecontext.WithUserContext(context.Background(), "workspace 根说明不能透传给子项目")
-	require.NoError(t, generateWorkspaceChildSkills(ctx, cont))
+	require.NoError(t, generateWorkspaceChildSkillsWithOptions(ctx, cont, generateOptions{}))
 	require.FileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 func projectOverviewSummary(profile *domain.ProjectProfile, locale string) string {
@@ -82,7 +83,7 @@ func learnedDomainTotal(profile *domain.ProjectProfile) int {
 		seen[strings.ToLower(value)] = true
 	}
 	for _, module := range profile.KeyModules {
-		add(firstNonEmptyString(module.Name, module.Path))
+		add(stringx.FirstNonBlank(module.Name, module.Path))
 	}
 	for _, method := range profile.BusinessMethods {
 		add(method.Name)
@@ -112,7 +113,7 @@ func learnedDomainNames(profile *domain.ProjectProfile, limit int) []string {
 		out = append(out, value)
 	}
 	for _, module := range profile.KeyModules {
-		add(firstNonEmptyString(module.Name, module.Path))
+		add(stringx.FirstNonBlank(module.Name, module.Path))
 		if len(out) >= limit {
 			return out
 		}

@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +53,7 @@ func TestLoader_Render(t *testing.T) {
 			"为外部调用补充超时测试",
 		},
 		"OverviewReferences": []ReferenceItem{
-			{Title: "业务方法", Path: "./references/business-methods.md", Description: "项目级业务入口和可复用方法索引"},
+			{Title: "业务方法", Path: "./references/business-methods.md", Description: "常用业务入口和可复用方法索引"},
 		},
 		"WorkflowReferences": []map[string]string{
 			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查"},
@@ -324,7 +323,7 @@ func TestLoader_RenderReferenceFile(t *testing.T) {
 	assert.Contains(t, content, "func Demo()")
 }
 
-func TestLoader_RenderReferencesUseConfiguredCodeFenceLanguage(t *testing.T) {
+func TestLoader_RenderPatternReferencesDoNotExpandExamples(t *testing.T) {
 	loader := NewLoader("zh-CN")
 	pattern := domain.NewPattern("p1", "API Pattern", domain.CategoryAPI)
 	pattern.SetExamples("function demo() {\n  return true\n}", "")
@@ -336,7 +335,9 @@ func TestLoader_RenderReferencesUseConfiguredCodeFenceLanguage(t *testing.T) {
 	content, err := loader.RenderPattern("api", data)
 
 	require.NoError(t, err)
-	require.Contains(t, content, "```typescript")
+	require.Contains(t, content, "API Pattern")
+	require.NotContains(t, content, "function demo()")
+	require.NotContains(t, content, "```typescript")
 	require.NotContains(t, content, "```go")
 }
 
@@ -357,7 +358,7 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 			detailChecks: []string{
 				"同义业务动作",
 				"入口渠道或外部依赖",
-				"有源码证据的 AI 学习模式用于定位并优先复用已有实现",
+				"按证据定位并优先复用已有实现",
 			},
 		},
 		{
@@ -371,7 +372,7 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 			detailChecks: []string{
 				"synonymous business actions",
 				"entry channels, or external dependencies",
-				"AI-learned patterns with source evidence identify existing solutions to inspect and prefer",
+				"Use the evidence below to locate and prefer existing implementations",
 			},
 		},
 	}
@@ -701,8 +702,8 @@ func fullSkillData() map[string]interface{} {
 		"AvgConfidence":       90.0,
 		"Categories":          1,
 		"LastUpdated":         "2026-05-19 00:00:00",
-		"CategorySummaries":   map[string]agent.CategorySummary{},
-		"KeyPatterns":         []agent.PatternSummary{},
+		"CategorySummaries":   map[string]interface{}{},
+		"KeyPatterns":         []map[string]interface{}{},
 		"BusinessRules":       []string{"business rule"},
 		"BestPractices":       []string{"best practice"},
 		"CommonPatterns":      []string{"common pattern"},

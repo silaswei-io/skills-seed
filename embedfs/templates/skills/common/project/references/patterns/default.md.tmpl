@@ -32,7 +32,7 @@
 {{if .ClaimGroups}}
 ## 用户规则与可复用解决方案
 
-用户维护或内置规则可以约束修改；有源码证据的 AI 学习结果用于定位并优先复用已有实现。具体适用边界仍以当前代码为准。
+按证据复用；权威规则见项目规范。
 
 {{range .ClaimGroups}}
 ### {{.Title}}
@@ -50,7 +50,7 @@
 {{else}}
 ## 可复用解决方案
 
-以下模式用于定位并优先复用已有实现；AI 学习结果不能单独作为硬约束。
+以下模式用于定位并优先复用已有实现。
 
 {{range .PatternObjects}}
 ### {{.Name}}
@@ -58,10 +58,6 @@
 {{if .Description}}{{.Description}}
 {{end}}{{if .Rule}}- 用户规则：{{.Rule}}
 {{end}}{{if .EvidenceLocations}}- 位置：{{range .EvidenceLocations}}`{{.DisplayLocation}}` {{end}}
-{{end}}{{if .GoodExample}}
-```{{$.CodeFenceLanguage}}
-{{.GoodExample}}
-```
 {{end}}
 {{end}}
 {{end}}

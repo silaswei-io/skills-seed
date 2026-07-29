@@ -18,7 +18,7 @@ func classifyCurrentChangeProfile(changes *fileanalysis.FileChanges) currentChan
 	}
 	changed := len(changes.AddedOrModified)
 	deleted := len(changes.Deleted)
-	if changed > 0 && deleted == 0 && len(changes.Unchanged) == 0 {
+	if changed > 0 && deleted == 0 && changes.PreviousAnalyzedCount == 0 {
 		return currentChangeProfileInitial
 	}
 	if deleted > 0 {

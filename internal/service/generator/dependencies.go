@@ -10,10 +10,6 @@ type patternReader interface {
 	GetAll(context.Context) ([]domain.Pattern, error)
 }
 
-type patternStatsReader interface {
-	GetPatternHitStats(context.Context) ([]domain.PatternHitStats, error)
-}
-
 type profileReader interface {
 	Get(context.Context) (*domain.ProjectProfile, error)
 }

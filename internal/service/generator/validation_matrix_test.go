@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -370,7 +371,7 @@ func TestValidationMatrixOmitsGenericCheckAndBroadRaceTestFallback(t *testing.T)
 }
 
 func TestValidationCommandPaths(t *testing.T) {
-	paths := validationCommandPaths("go test ./plugins/server_manage/internal/logic/service_manage/ ./internal/handler/home/...")
+	paths := knowledge.ValidationCommandPaths("go test ./plugins/server_manage/internal/logic/service_manage/ ./internal/handler/home/...")
 
 	assert.Equal(t, []string{
 		"plugins/server_manage/internal/logic/service_manage",

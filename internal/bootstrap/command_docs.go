@@ -10,11 +10,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const (
-	commandDocsStartMarker = "<!-- COMMAND_TREE_START -->"
-	commandDocsEndMarker   = "<!-- COMMAND_TREE_END -->"
-)
-
 // RenderCommandTreeDocs 渲染由 Cobra 命令树生成的命令索引区块。
 func RenderCommandTreeDocs(locale string) (string, error) {
 	if err := i18n.Init(locale); err != nil {

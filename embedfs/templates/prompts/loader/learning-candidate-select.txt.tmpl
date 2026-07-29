@@ -1,0 +1,45 @@
+# Select Learning Candidates
+
+This is the candidate-narrowing conversation for current-code learning. Select the repository-relative files that are worth sending into evidence-pack planning. Favor recall for source-backed repository knowledge; later steps can merge duplicates, but they cannot recover files removed here.
+
+Project:
+- name: {{.ProjectName}}
+- path: {{.RootPath}}
+- language: {{.Language}}
+- learning mode: {{.LearningMode}}
+- learning scope: {{.LearningScope}}
+
+Input files:
+- candidate paths: `{{.CandidatePathsPath}}` ({{.CandidatePathCount}} paths)
+{{- if .RequiredPathsPath}}
+- required paths: `{{.RequiredPathsPath}}` ({{.RequiredPathCount}} paths)
+{{- end}}
+{{- if .StructuralContextPath}}
+- structural context: `{{.StructuralContextPath}}`
+{{- end}}
+{{- if .UserContextPath}}
+- user context: `{{.UserContextPath}}`
+{{- end}}
+
+Selection goal:
+- Treat structural context as advisory seed-derived context. It may be incomplete; never use it to invent paths or to ignore candidate-list boundaries.
+- Keep files likely to change future implementation, routing, validation, reuse, maintenance, debugging, reusable entry-method selection, or agent navigation decisions.
+- Keep source-backed knowledge lanes when they appear in the candidate list: business behavior, API/contract shape, error handling, validation/testing, persistence/query behavior, configuration, framework/language integration, generated-code boundaries, security-sensitive handling, operational lifecycle, background jobs, adapters, and reusable utilities.
+- Drop files only when they have low learning value for this run: generated artifacts without source-of-truth value, trivial tests/fixtures, repeated CRUD shells with no repository-specific invariant, broad docs without operational instructions, build outputs, or files whose path gives no decision-bearing clue.
+- Do not drop DTO, schema, API, config, error, utility, migration, or registration files merely because they look simple. Keep them when they define repository-specific contracts, conventions, source-of-truth values, validation behavior, generated-code inputs, or routing/debugging anchors.
+- Preserve coverage across distinct business or technical boundaries when paths show different resources, capabilities, entry methods, states, policies, external systems, jobs, adapters, configuration gates, generated-contract sources, framework integration points, validation, errors, transactions, or lifecycle behavior.
+- Required paths must be included in `selected_paths` when they are present in the candidate list.
+- Do not select files outside the candidate list. Do not return absolute paths, `..` paths, directories, glob patterns, or invented paths.
+- Do not use a fixed percentage, top-N cap, or minimum quota. Select every candidate needed for useful evidence-pack planning, and skip the rest.
+- Use deterministic ordering: selected paths sorted lexicographically, skipped paths sorted lexicographically.
+
+Output rules:
+- `selected_paths` is the complete file list that should enter evidence-pack planning.
+- Every `selected_paths` item must come from `candidate paths` exactly as written; required paths must appear in `selected_paths` when they exist in `candidate paths`.
+- `skipped_paths` explains intentionally skipped candidates. It may omit obvious low-value paths when the skipped set is large, but all listed skipped paths must come from the candidate list.
+- `skipped_paths` must not contain any path that appears in `selected_paths`.
+- `reason` summarizes the selection strategy in one short sentence.
+- The JSON must satisfy the schema below; the schema field descriptions are part of the output contract.
+- Return JSON only.
+
+{{ jsonContract "SelectLearningCandidatesOutput" }}

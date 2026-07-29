@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 )
 
 type SelectOptions struct {
@@ -27,7 +27,7 @@ type FileSelection struct {
 }
 
 func SelectFiles(opts SelectOptions) (*FileSelection, error) {
-	focusRelPaths := utils.RelativePaths(opts.Root, opts.FocusAbsPaths)
+	focusRelPaths := projectpath.Relative(opts.Root, opts.FocusAbsPaths)
 	selection := &FileSelection{
 		Files:   []domain.FileInfo{},
 		Skipped: []SkippedFile{},
@@ -60,7 +60,7 @@ func SelectFiles(opts SelectOptions) (*FileSelection, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if _, err := utils.ResolvePathWithinRoot(opts.Root, path); err != nil {
+		if _, err := projectpath.ResolveWithinRoot(opts.Root, path); err != nil {
 			selection.addSkipped(relPath, SkipReasonUnreadable)
 			return nil
 		}

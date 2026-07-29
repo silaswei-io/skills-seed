@@ -1,6 +1,6 @@
 # {{.ProjectName}} Key Modules
 
-This file provides module navigation from the project profile. Module paths come from current source, and entry points are shown only after source-signature verification. Responsibilities and dependency relationships are learned observations that must be checked against source before changes.
+This file provides module navigation. Module paths come from current source, and entry points are shown only after source-signature verification. Confirm responsibilities and dependencies against source before changing behavior.
 
 {{if .KeyModules}}
 {{if gt (len .KeyModules) 5}}
@@ -14,8 +14,8 @@ This file provides module navigation from the project profile. Module paths come
 ## {{.DisplayName}}
 
 - **Source path**: `{{.Path}}`
-{{if .Description}}- **Responsibility observation (verify against source)**: {{.Description}}
-{{end}}{{if .Responsibilities}}- **Specific responsibility observations**:
+{{if .Description}}- **Responsibility**: {{.Description}}
+{{end}}{{if .Responsibilities}}- **Responsibility hints**:
 {{range .Responsibilities}}  - {{.}}
 {{end}}{{end}}{{if .Dependencies}}- **Dependency hints**:
 {{range .Dependencies}}  - {{.}}

@@ -2,11 +2,11 @@ package generator
 
 import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/knowledge/validation"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 )
 
 func validationMatrix(profile *domain.ProjectProfile, patterns []domain.Pattern, locale string) []ValidationMatrixItem {
-	recommendations := validation.Matrix(profile, patterns, locale)
+	recommendations := knowledge.ValidationMatrix(profile, patterns, locale)
 	matrix := make([]ValidationMatrixItem, 0, len(recommendations))
 	for _, recommendation := range recommendations {
 		matrix = append(matrix, ValidationMatrixItem{
@@ -18,8 +18,4 @@ func validationMatrix(profile *domain.ProjectProfile, patterns []domain.Pattern,
 		})
 	}
 	return matrix
-}
-
-func validationCommandPaths(command string) []string {
-	return validation.CommandPaths(command)
 }

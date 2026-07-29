@@ -11,7 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
-	textutil "github.com/silaswei-io/skills-seed/internal/utils/text"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 var contextFileNames = []string{
@@ -153,7 +153,7 @@ func renderWorkspaceContextTemplate(locale string, data WorkspaceContextData) (s
 }
 
 func normalizeProjectContextData(data ProjectContextData) ProjectContextData {
-	data.Structure = textutil.NormalizeStructureSummary(data.Structure)
+	data.Structure = stringx.NormalizeStructureSummary(data.Structure)
 	return data
 }
 

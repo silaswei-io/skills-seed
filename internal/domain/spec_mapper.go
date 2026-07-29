@@ -3,6 +3,8 @@ package domain
 import (
 	"sort"
 	"strings"
+
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 	"time"
 )
 
@@ -165,7 +167,7 @@ func collapseProjectSpecPatterns(patterns []Pattern) []Pattern {
 }
 
 func projectSpecPatternKey(pattern Pattern) string {
-	text := strings.ToLower(strings.TrimSpace(firstNonEmpty(pattern.Rule, pattern.Description, pattern.Name)))
+	text := strings.ToLower(strings.TrimSpace(stringx.FirstNonEmpty(pattern.Rule, pattern.Description, pattern.Name)))
 	if text == "" {
 		return ""
 	}
@@ -215,11 +217,11 @@ func projectSpecEvidenceCount(pattern Pattern) int {
 }
 
 func projectSpecGuidanceText(pattern Pattern) string {
-	return strings.TrimSpace(firstNonEmpty(pattern.Description, pattern.Rule, pattern.Name))
+	return strings.TrimSpace(stringx.FirstNonEmpty(pattern.Description, pattern.Rule, pattern.Name))
 }
 
 func projectSpecLooksScoped(pattern Pattern) bool {
-	if strings.TrimSpace(pattern.ScopePath) != "" || strings.TrimSpace(pattern.AnalysisUnitID) != "" {
+	if strings.TrimSpace(pattern.ScopePath) != "" {
 		return true
 	}
 	paths := map[string]bool{}
@@ -265,13 +267,4 @@ func uniquePatternEvidenceLocations(locations []PatternEvidenceLocation) []Patte
 		out = append(out, location)
 	}
 	return out
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

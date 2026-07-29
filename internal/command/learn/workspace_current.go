@@ -8,15 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
@@ -55,14 +54,12 @@ type learnWorkspaceCurrentRun struct {
 	projectRoot     string
 	workspaceName   string
 	parallelism     int
-	unitParallelism int
 	showDetails     bool
 	tracker         *progress.MultiTracker
 
 	consoleMu       sync.Mutex
 	resultMu        sync.Mutex
 	changedProjects []string
-	tokenContexts   []context.Context
 }
 
 type workspaceProjectProgress struct {
@@ -92,7 +89,6 @@ func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) 
 	if err := workspacediscovery.RunProjectTasks(r.ctx, r.workspaceConfig.Projects, r.parallelism, r.runProject); err != nil {
 		return domain.LearnCurrentResult{}, err
 	}
-	r.flushTokenUsage()
 
 	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(r.ctx, r.cont, r.workspaceName, r.projectRoot, r.workspaceConfig)
 	if err != nil {
@@ -139,10 +135,6 @@ func (r *learnWorkspaceCurrentRun) prepare() error {
 	}
 
 	r.parallelism = workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, r.cont.ConfigRepo.GetAgentConfig().Parallelism, len(r.workspaceConfig.Projects))
-	r.unitParallelism = r.cont.ConfigRepo.GetCurrentLearningConfig().Parallelism
-	if r.unitParallelism <= 0 {
-		r.unitParallelism = 1
-	}
 	r.showDetails = r.parallelism == 1
 	if !r.showDetails {
 		r.tracker = progress.NewMulti(commandutil.WorkspaceProjectProgressNames(r.workspaceConfig.Projects))
@@ -154,10 +146,9 @@ func (r *learnWorkspaceCurrentRun) prepare() error {
 
 func (r *learnWorkspaceCurrentRun) logStart() {
 	logger.Info(i18n.GetWithParams("LearnWorkspaceStart", map[string]interface{}{
-		"Projects":        len(r.workspaceConfig.Projects),
-		"Parallelism":     r.parallelism,
-		"UnitParallelism": r.unitParallelism,
-	}), "projects", len(r.workspaceConfig.Projects), "parallelism", r.parallelism, "unit_parallelism", r.unitParallelism)
+		"Projects":    len(r.workspaceConfig.Projects),
+		"Parallelism": r.parallelism,
+	}), "projects", len(r.workspaceConfig.Projects), "parallelism", r.parallelism)
 }
 
 func (r *learnWorkspaceCurrentRun) runProject(ctx context.Context, project config.WorkspaceProjectConfig) error {
@@ -205,7 +196,6 @@ func (r *learnWorkspaceCurrentRun) runChild(ctx context.Context, childCont *cont
 		logPath = scopedLogPath
 		var err error
 		result, err = runLearnCurrentProjectWithOptions(scopedCtx, childCont, learnCurrentProjectOptions{
-			tokenScope:       scope,
 			showProgress:     r.showDetails,
 			showDetailedLogs: r.showDetails,
 			onStepStart:      projectProgress.start,
@@ -241,9 +231,6 @@ func (r *learnWorkspaceCurrentRun) recordProjectResult(project config.WorkspaceP
 	if result.savedCount > 0 {
 		r.changedProjects = append(r.changedProjects, scope)
 	}
-	if !r.showDetails {
-		r.tokenContexts = append(r.tokenContexts, result.tokenContext)
-	}
 	r.resultMu.Unlock()
 
 	if !r.showDetails {
@@ -252,20 +239,10 @@ func (r *learnWorkspaceCurrentRun) recordProjectResult(project config.WorkspaceP
 	r.consoleMu.Lock()
 	defer r.consoleMu.Unlock()
 	logLearnWorkspaceProjectSummary(project.ID, result)
-	agent.FlushTokenUsageScope(result.tokenContext)
 	logger.Info(i18n.GetWithParams("LearnWorkspaceProjectDelegated", map[string]interface{}{
 		"ProjectName": project.ID,
 		"LogPath":     logPath,
 	}))
-}
-
-func (r *learnWorkspaceCurrentRun) flushTokenUsage() {
-	if r.showDetails {
-		return
-	}
-	for _, tokenContext := range r.tokenContexts {
-		agent.FlushTokenUsageScope(tokenContext)
-	}
 }
 
 func (p *workspaceProjectProgress) start(label string) {

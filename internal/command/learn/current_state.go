@@ -12,12 +12,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
-	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
 const (
@@ -36,10 +38,10 @@ type learnCurrentResumeSummary struct {
 	CreatedAt           string
 	SourceFiles         string
 	LocalPlanInputs     int
-	AISelectionInputs   string
-	AISelectedFiles     string
+	SelectionInputs     string
+	SelectedFiles       string
 	PendingAnalyzeFiles int
-	Units               int
+	Focuses             int
 }
 
 func learnCurrentStateRepo(seedPath, scope string) *commandstate.Repository {
@@ -53,40 +55,40 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 	if session == nil || session.State == nil || session.Changes == nil {
 		return nil
 	}
-	aiSkipped := 0
+	selectionSkipped := 0
 	for _, record := range session.State.Files {
 		switch record.AnalysisStatus {
-		case domain.FileAnalysisStatusAISkipped:
-			aiSkipped++
+		case domain.FileAnalysisStatusSelectionSkipped:
+			selectionSkipped++
 		}
 	}
 	summary := session.State.InputSummary
 	sourceFiles := "-"
 	localPlanInputs := currentStateInputCount(session.State)
-	aiSelectionInputs := "-"
-	aiSelectedFiles := "-"
+	selectionInputs := "-"
+	selectedFiles := "-"
 	if summary != nil {
 		sourceFiles = displayCount(summary.SourceFiles)
 		if summary.LocalPlanInputFiles > 0 {
 			localPlanInputs = summary.LocalPlanInputFiles
 		}
-		aiSelectionInputs = displayCount(summary.SelectionInputFiles)
+		selectionInputs = displayCount(summary.SelectionInputFiles)
 		if summary.SelectionInputFiles > 0 {
-			aiSelectedFiles = displayCount(summary.SelectedFiles)
+			selectedFiles = displayCount(summary.SelectedFiles)
 		}
-	} else if aiSkipped > 0 {
-		aiSelectionInputs = displayCount(len(session.State.Files))
-		aiSelectedFiles = displayCount(len(session.State.Files) - aiSkipped)
+	} else if selectionSkipped > 0 {
+		selectionInputs = displayCount(len(session.State.Files))
+		selectedFiles = displayCount(len(session.State.Files) - selectionSkipped)
 	}
 	return &learnCurrentResumeSummary{
 		Command:             session.State.Command,
 		CreatedAt:           session.State.CreatedAt,
 		SourceFiles:         sourceFiles,
 		LocalPlanInputs:     localPlanInputs,
-		AISelectionInputs:   aiSelectionInputs,
-		AISelectedFiles:     aiSelectedFiles,
+		SelectionInputs:     selectionInputs,
+		SelectedFiles:       selectedFiles,
 		PendingAnalyzeFiles: pendingResumeAnalysisFiles(session),
-		Units:               len(session.State.Units),
+		Focuses:             len(session.State.Agenda.Focuses),
 	}
 }
 
@@ -98,8 +100,8 @@ func pendingResumeAnalysisFiles(session *currentStateSession) int {
 		return len(analysisCandidatePaths(session.Changes))
 	}
 	pending := pathSet(nil)
-	for _, unit := range pendingAnalysisUnits(session.State, session.Changes) {
-		for _, path := range unitFocusPaths(unit, session.Changes) {
+	for _, focus := range pendingEvidenceFocuses(session.State, session.Changes) {
+		for _, path := range evidenceFocusPaths(focus, session.Changes) {
 			pending[path] = true
 		}
 	}
@@ -179,7 +181,7 @@ func canReuseCurrentState(state *commandstate.State, changes *fileanalysis.FileC
 			return false
 		}
 	}
-	return len(state.Units) > 0
+	return len(state.Agenda.Focuses) > 0
 }
 
 func canResumeCurrentState(state *commandstate.State, projectName, language, mode, userContext, invocationHash string) bool {
@@ -189,7 +191,7 @@ func canResumeCurrentState(state *commandstate.State, projectName, language, mod
 		state.Mode == mode &&
 		state.UserContext == commandstate.HashText(userContext) &&
 		state.InvocationHash == invocationHash &&
-		len(state.Units) > 0 &&
+		len(state.Agenda.Focuses) > 0 &&
 		currentStateInputCount(state) > 0
 }
 
@@ -227,7 +229,7 @@ func sameStatePaths(left, right []string) bool {
 func currentStateInputsMatchProject(projectRoot string, files []domain.FileAnalysisRecord, deleted []string) bool {
 	for _, record := range files {
 		path := filepath.Join(projectRoot, filepath.FromSlash(normalizeStatePath(record.Path)))
-		resolved, err := utils.CanonicalPathWithinRoot(projectRoot, path)
+		resolved, err := projectpath.CanonicalWithinRoot(projectRoot, path)
 		if err != nil {
 			return false
 		}
@@ -244,7 +246,7 @@ func currentStateInputsMatchProject(projectRoot string, files []domain.FileAnaly
 	}
 	for _, deletedPath := range deleted {
 		path := filepath.Join(projectRoot, filepath.FromSlash(normalizeStatePath(deletedPath)))
-		resolved, err := utils.CanonicalPathWithinRoot(projectRoot, path)
+		resolved, err := projectpath.CanonicalWithinRoot(projectRoot, path)
 		if err != nil {
 			return false
 		}
@@ -260,6 +262,7 @@ func changesFromCurrentState(state *commandstate.State) *fileanalysis.FileChange
 		return nil
 	}
 	changes := &fileanalysis.FileChanges{Deleted: normalizeStatePaths(state.Deleted)}
+	changes.PreviousAnalyzedCount = currentStateInputCount(state)
 	for _, stored := range state.Files {
 		path := normalizeStatePath(stored.Path)
 		if path == "" {
@@ -317,8 +320,8 @@ func stateRecordCompleted(expected, tracked domain.FileAnalysisRecord) bool {
 		return false
 	}
 	switch expected.AnalysisStatus {
-	case domain.FileAnalysisStatusAISkipped:
-		return completedAnalysisStatus(tracked.AnalysisStatus) == domain.FileAnalysisStatusAISkipped ||
+	case domain.FileAnalysisStatusSelectionSkipped:
+		return completedAnalysisStatus(tracked.AnalysisStatus) == domain.FileAnalysisStatusSelectionSkipped ||
 			completedAnalysisStatus(tracked.AnalysisStatus) == domain.FileAnalysisStatusAnalyzed
 	default:
 		return completedAnalysisStatus(tracked.AnalysisStatus) == domain.FileAnalysisStatusAnalyzed
@@ -372,6 +375,7 @@ func loadOrCreateCurrentState(
 	ctx context.Context,
 	repo *commandstate.Repository,
 	analyzerSvc *analyzer.AnalyzerService,
+	learningSession agent.LearningSession,
 	projectName string,
 	projectRoot string,
 	language string,
@@ -380,6 +384,7 @@ func loadOrCreateCurrentState(
 	focusRelPaths []string,
 	changes *fileanalysis.FileChanges,
 	inputSummary commandstate.InputSummary,
+	changeProfile currentChangeProfile,
 	userContext string,
 	invocationHash string,
 ) (*commandstate.State, error) {
@@ -391,98 +396,100 @@ func loadOrCreateCurrentState(
 	if canReuseCurrentState(state, changes, projectName, language, stateMode, userContext, invocationHash) {
 		return state, nil
 	}
-	var units []domain.AnalysisUnit
+	var focuses []domain.EvidenceFocus
 	if len(focusRelPaths) > 0 {
-		units, err = analyzerSvc.PlanAnalysisUnits(ctx, &analyzer.PlanAnalysisUnitsRequest{
-			ProjectName:   projectName,
-			RootPath:      projectRoot,
-			Language:      language,
-			LearningMode:  config.NormalizeLearningMode(mode),
-			LearningScope: config.NormalizeLearningScope(scope),
-			FocusPaths:    focusRelPaths,
-			UserContext:   userContext,
+		focuses, err = analyzerSvc.PlanLearningAgenda(ctx, &analyzer.PlanLearningAgendaRequest{
+			ProjectName:     projectName,
+			RootPath:        projectRoot,
+			Language:        language,
+			LearningMode:    config.NormalizeLearningMode(mode),
+			LearningScope:   config.NormalizeLearningScope(scope),
+			FocusPaths:      focusRelPaths,
+			UserContext:     userContext,
+			LearningSession: learningSession,
 		})
 		if err != nil {
 			return nil, err
 		}
-		units = reconcileAnalysisUnits(units, focusRelPaths)
+		focuses = reconcileEvidenceFocuses(focuses, focusRelPaths)
 	}
-	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateFiles(changes), changes.Deleted, units).
+	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateFiles(changes), changes.Deleted, focuses).
 		WithInvocationHash(invocationHash).
-		WithInputSummary(inputSummary)
+		WithInputSummary(inputSummary).
+		WithChangeProfile(string(changeProfile))
 	if err := repo.Save(ctx, state); err != nil {
 		return nil, err
 	}
 	return state, nil
 }
 
-func pendingAnalysisUnits(state *commandstate.State, changes *fileanalysis.FileChanges) []domain.AnalysisUnit {
+func pendingEvidenceFocuses(state *commandstate.State, changes *fileanalysis.FileChanges) []domain.EvidenceFocus {
 	if state == nil || changes == nil {
 		return nil
 	}
 	pending := pathSet(analysisCandidatePaths(changes))
-	var completed []domain.AnalysisUnit
+	var completed []domain.EvidenceFocus
 	if state.Analysis != nil {
-		completed = state.Analysis.CompletedUnits
+		completed = state.Analysis.CompletedFocuses
 	}
-	units := make([]domain.AnalysisUnit, 0, len(state.Units))
-	for _, unit := range state.Units {
-		if analysisUnitIncluded(completed, unit) {
+	focuses := make([]domain.EvidenceFocus, 0, len(state.Agenda.Focuses))
+	for _, focus := range state.Agenda.Focuses {
+		if evidenceFocusIncluded(completed, focus) {
 			continue
 		}
-		if len(intersectUnitPaths(unit, pending)) == 0 {
+		if len(intersectFocusPaths(focus, pending)) == 0 {
 			continue
 		}
-		units = append(units, unit)
+		focuses = append(focuses, focus)
 	}
-	return units
+	return focuses
 }
 
-func analysisUnitIncluded(units []domain.AnalysisUnit, target domain.AnalysisUnit) bool {
-	for _, unit := range units {
-		if analysisUnitSame(unit, target) {
+func evidenceFocusIncluded(focuses []domain.EvidenceFocus, target domain.EvidenceFocus) bool {
+	for _, focus := range focuses {
+		if evidenceFocusSame(focus, target) {
 			return true
 		}
 	}
 	return false
 }
 
-func fallbackAnalysisUnit(paths []string) domain.AnalysisUnit {
-	return domain.AnalysisUnit{
+func fallbackEvidenceFocus(paths []string) domain.EvidenceFocus {
+	return domain.EvidenceFocus{
 		ID:           "current-codebase",
-		Name:         "当前代码变更",
-		RouteTerms:   []string{"当前变更", "代码学习"},
+		Name:         i18n.Get("LearnCurrentFallbackFocusName"),
+		RouteTerms:   []string{i18n.Get("LearnCurrentFallbackFocusRouteChange"), i18n.Get("LearnCurrentFallbackFocusRouteLearning")},
 		EntryPaths:   normalizeStatePaths(paths),
 		RelatedPaths: nil,
-		ScopeReason:  "AI 未返回有效业务单元时，使用当前待学习文件作为兜底分析范围",
+		ScopeReason:  i18n.Get("LearnCurrentFallbackFocusReason"),
 	}
 }
 
-// reconcileAnalysisUnits 把 AI 计划收敛为仅包含候选文件且完整覆盖候选集合的执行计划。
-func reconcileAnalysisUnits(units []domain.AnalysisUnit, allowedPaths []string) []domain.AnalysisUnit {
+// reconcileEvidenceFocuses 把 AI 计划收敛为仅包含候选文件且完整覆盖候选集合的执行计划。
+func reconcileEvidenceFocuses(focuses []domain.EvidenceFocus, allowedPaths []string) []domain.EvidenceFocus {
 	allowedPaths = normalizeStatePaths(allowedPaths)
 	allowed := pathSet(allowedPaths)
-	normalized := make([]domain.AnalysisUnit, 0, len(units)+1)
-	for _, unit := range units {
-		unit.EntryPaths = filterAnalysisUnitPaths(unit.EntryPaths, allowed, nil)
-		entryPaths := pathSet(unit.EntryPaths)
-		unit.RelatedPaths = filterAnalysisUnitPaths(unit.RelatedPaths, allowed, entryPaths)
-		if len(unit.EntryPaths)+len(unit.RelatedPaths) == 0 {
+	normalized := make([]domain.EvidenceFocus, 0, len(focuses)+1)
+	for _, focus := range focuses {
+		focus.EntryPaths = filterEvidenceFocusPaths(focus.EntryPaths, allowed, nil)
+		entryPaths := pathSet(focus.EntryPaths)
+		focus.RelatedPaths = filterEvidenceFocusPaths(focus.RelatedPaths, allowed, entryPaths)
+		if len(focus.EntryPaths)+len(focus.RelatedPaths) == 0 {
 			continue
 		}
-		normalized = append(normalized, unit)
+		normalized = append(normalized, focus)
 	}
 
 	uncovered := uncoveredAnalysisPaths(normalized, allowedPaths)
 	if len(uncovered) == 0 {
 		return normalized
 	}
-	fallback := fallbackAnalysisUnit(uncovered)
-	fallback.ID = uniqueAnalysisUnitID(fallback.ID, normalized)
+	fallback := fallbackEvidenceFocus(uncovered)
+	fallback.ID = uniqueEvidenceFocusID(fallback.ID, normalized)
 	return append(normalized, fallback)
 }
 
-func filterAnalysisUnitPaths(paths []string, allowed, excluded map[string]bool) []string {
+func filterEvidenceFocusPaths(paths []string, allowed, excluded map[string]bool) []string {
 	filtered := make([]string, 0, len(paths))
 	seen := make(map[string]bool, len(paths))
 	for _, path := range paths {
@@ -497,10 +504,10 @@ func filterAnalysisUnitPaths(paths []string, allowed, excluded map[string]bool) 
 	return filtered
 }
 
-func uniqueAnalysisUnitID(id string, units []domain.AnalysisUnit) string {
-	used := make(map[string]bool, len(units))
-	for _, unit := range units {
-		used[unit.ID] = true
+func uniqueEvidenceFocusID(id string, focuses []domain.EvidenceFocus) string {
+	used := make(map[string]bool, len(focuses))
+	for _, focus := range focuses {
+		used[focus.ID] = true
 	}
 	if !used[id] {
 		return id
@@ -513,10 +520,10 @@ func uniqueAnalysisUnitID(id string, units []domain.AnalysisUnit) string {
 	}
 }
 
-func uncoveredAnalysisPaths(units []domain.AnalysisUnit, paths []string) []string {
+func uncoveredAnalysisPaths(focuses []domain.EvidenceFocus, paths []string) []string {
 	covered := make(map[string]bool)
-	for _, unit := range units {
-		for _, path := range append(append([]string{}, unit.EntryPaths...), unit.RelatedPaths...) {
+	for _, focus := range focuses {
+		for _, path := range append(append([]string{}, focus.EntryPaths...), focus.RelatedPaths...) {
 			covered[normalizeStatePath(path)] = true
 		}
 	}
@@ -530,12 +537,32 @@ func uncoveredAnalysisPaths(units []domain.AnalysisUnit, paths []string) []strin
 	return uncovered
 }
 
-func unitFocusPaths(unit domain.AnalysisUnit, changes *fileanalysis.FileChanges) []string {
+func subtractStatePaths(all, selected []string) []string {
+	selectedSet := pathSet(selected)
+	out := make([]string, 0)
+	for _, path := range normalizeStatePaths(all) {
+		if !selectedSet[path] {
+			out = append(out, path)
+		}
+	}
+	return out
+}
+
+func sortedBoolPaths(paths map[string]bool) []string {
+	out := make([]string, 0, len(paths))
+	for path := range paths {
+		out = append(out, path)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func evidenceFocusPaths(focus domain.EvidenceFocus, changes *fileanalysis.FileChanges) []string {
 	if changes == nil {
 		return nil
 	}
 	allowed := pathSet(analysisCandidatePaths(changes))
-	return intersectUnitPaths(unit, allowed)
+	return intersectFocusPaths(focus, allowed)
 }
 
 func analysisCandidatePaths(changes *fileanalysis.FileChanges) []string {
@@ -544,7 +571,7 @@ func analysisCandidatePaths(changes *fileanalysis.FileChanges) []string {
 	}
 	paths := make([]string, 0, len(changes.Records)+len(changes.Deleted))
 	for _, record := range changes.Records {
-		if record.AnalysisStatus == domain.FileAnalysisStatusAISkipped {
+		if record.AnalysisStatus == domain.FileAnalysisStatusSelectionSkipped {
 			continue
 		}
 		paths = append(paths, record.Path)
@@ -588,9 +615,9 @@ func pathSet(paths []string) map[string]bool {
 	return set
 }
 
-func intersectUnitPaths(unit domain.AnalysisUnit, allowed map[string]bool) []string {
-	paths := append([]string{}, unit.EntryPaths...)
-	paths = append(paths, unit.RelatedPaths...)
+func intersectFocusPaths(focus domain.EvidenceFocus, allowed map[string]bool) []string {
+	paths := append([]string{}, focus.EntryPaths...)
+	paths = append(paths, focus.RelatedPaths...)
 	paths = normalizeStatePaths(paths)
 	out := make([]string, 0, len(paths))
 	for _, path := range paths {

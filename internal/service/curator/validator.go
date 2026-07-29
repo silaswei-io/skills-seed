@@ -44,11 +44,20 @@ func coalesceCurrentCandidates(candidates []domain.Pattern) []domain.Pattern {
 		merged.ProjectID = commonPairValue(previous.ProjectID, candidate.ProjectID)
 		merged.ScopePath = commonPairValue(previous.ScopePath, candidate.ScopePath)
 		merged.WorkspaceRole = commonPairValue(previous.WorkspaceRole, candidate.WorkspaceRole)
-		merged.AnalysisUnitID = commonPairValue(previous.AnalysisUnitID, candidate.AnalysisUnitID)
-		merged.AnalysisUnitName = commonPairValue(previous.AnalysisUnitName, candidate.AnalysisUnitName)
 		coalesced[index] = merged
 	}
 	return coalesced
+}
+
+func compactCurrentCandidatesForAI(candidates []domain.Pattern) []domain.Pattern {
+	if len(candidates) < 2 {
+		return candidates
+	}
+	compact := deterministicCurate(candidates, nil)
+	if compact == nil || len(compact.Patterns) == 0 {
+		return candidates
+	}
+	return compact.Patterns
 }
 
 func commonPairValue(left, right string) string {
@@ -106,12 +115,25 @@ func newCurateValidationState(candidates, existing []domain.Pattern, outputCount
 	for id := range existingIDs {
 		allIDs[id] = struct{}{}
 	}
+	addPatternSourceIDs(allIDs, candidates)
+	addPatternSourceIDs(allIDs, existing)
 	return curateValidationState{
 		candidateIDs:      candidateIDs,
 		allIDs:            allIDs,
 		coveredCandidates: make(map[string]struct{}, len(candidateIDs)),
 		mergedCandidates:  make(map[string]struct{}, len(candidateIDs)),
 		outputIDs:         make(map[string]struct{}, outputCount),
+	}
+}
+
+func addPatternSourceIDs(ids map[string]struct{}, patterns []domain.Pattern) {
+	for _, pattern := range patterns {
+		for _, sourceID := range pattern.MergedFrom {
+			sourceID = strings.TrimSpace(sourceID)
+			if sourceID != "" {
+				ids[sourceID] = struct{}{}
+			}
+		}
 	}
 }
 
@@ -167,6 +189,12 @@ func (s curateValidationState) validateDropped(droppedPatterns []Drop) error {
 		if _, merged := s.mergedCandidates[dropped.ID]; merged {
 			return fmt.Errorf("candidate pattern %q is both merged and dropped", dropped.ID)
 		}
+		if !dropped.ReasonCode.Valid() {
+			return fmt.Errorf("dropped pattern %q has invalid reason_code %q", dropped.ID, dropped.ReasonCode)
+		}
+		if strings.TrimSpace(dropped.Reason) == "" {
+			return fmt.Errorf("dropped pattern %q has empty reason", dropped.ID)
+		}
 		droppedIDs[dropped.ID] = struct{}{}
 		s.coveredCandidates[dropped.ID] = struct{}{}
 	}
@@ -203,8 +231,6 @@ func normalizeCandidate(pattern domain.Pattern) domain.Pattern {
 	pattern.ProjectID = strings.TrimSpace(pattern.ProjectID)
 	pattern.ScopePath = strings.TrimSpace(pattern.ScopePath)
 	pattern.WorkspaceRole = strings.TrimSpace(pattern.WorkspaceRole)
-	pattern.AnalysisUnitID = strings.TrimSpace(pattern.AnalysisUnitID)
-	pattern.AnalysisUnitName = strings.TrimSpace(pattern.AnalysisUnitName)
 	pattern.Category = domain.NormalizePatternCategory(pattern.Category)
 	if pattern.Source == "" {
 		pattern.Source = domain.SourceLearned

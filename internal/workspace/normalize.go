@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 func mergeRoutes(base, analyzed []domain.WorkspaceRoute) []domain.WorkspaceRoute {
@@ -62,7 +63,7 @@ func cleanWorkspacePaths(items []domain.WorkspacePath) []domain.WorkspacePath {
 			continue
 		}
 		if index, ok := indexByPath[item.Path]; ok {
-			out[index].Description = firstNonEmpty(out[index].Description, item.Description)
+			out[index].Description = stringx.FirstNonEmpty(out[index].Description, item.Description)
 			out[index].Consumers = cleanStrings(append(out[index].Consumers, item.Consumers...))
 			out[index].Producers = cleanStrings(append(out[index].Producers, item.Producers...))
 			out[index].AffectedProjects = cleanStrings(append(out[index].AffectedProjects, item.AffectedProjects...))
@@ -171,13 +172,4 @@ func cleanStrings(values []string) []string {
 
 func cleanRelativePath(path string) string {
 	return filepath.ToSlash(filepath.Clean(filepath.FromSlash(strings.TrimSpace(path))))
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

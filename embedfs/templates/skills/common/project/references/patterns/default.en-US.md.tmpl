@@ -32,7 +32,7 @@ This page only covers {{.Category}} category conventions. If the task crosses on
 {{if .ClaimGroups}}
 ## User Rules And Reusable Solutions
 
-User-maintained or built-in rules may constrain changes. AI-learned results with source evidence identify existing solutions to inspect and prefer. Current code remains the source of truth for applicability.
+Reuse by evidence; authoritative rules live in Project Spec.
 
 {{range .ClaimGroups}}
 ### {{.Title}}
@@ -50,7 +50,7 @@ User-maintained or built-in rules may constrain changes. AI-learned results with
 {{else}}
 ## Reusable Solutions
 
-Use these patterns to locate and prefer existing implementations. AI-learned results are not hard constraints by themselves.
+Use these patterns to locate and prefer existing implementations.
 
 {{range .PatternObjects}}
 ### {{.Name}}
@@ -58,10 +58,6 @@ Use these patterns to locate and prefer existing implementations. AI-learned res
 {{if .Description}}{{.Description}}
 {{end}}{{if .Rule}}- User rule: {{.Rule}}
 {{end}}{{if .EvidenceLocations}}- Locations: {{range .EvidenceLocations}}`{{.DisplayLocation}}` {{end}}
-{{end}}{{if .GoodExample}}
-```{{$.CodeFenceLanguage}}
-{{.GoodExample}}
-```
 {{end}}
 {{end}}
 {{end}}

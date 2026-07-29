@@ -8,13 +8,12 @@ import (
 )
 
 func TestSameScopeUsesOnlySemanticWorkspaceScope(t *testing.T) {
-	left := domain.Pattern{AnalysisUnitID: "unit-a"}
-	right := domain.Pattern{AnalysisUnitID: "unit-a"}
+	left := domain.Pattern{}
+	right := domain.Pattern{}
 	require.False(t, sameScope(left, right))
 
 	left.ScopePath = "services/ca-admin"
 	right.ScopePath = "services/ca-admin"
-	right.AnalysisUnitID = "unit-b"
 	require.True(t, sameScope(left, right))
 
 	right.ScopePath = "services/other"

@@ -13,26 +13,26 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 // GeneratorService 生成服务
 type GeneratorService struct {
-	patternRepo      patternReader
-	patternStatsRepo patternStatsReader
-	profileRepo      profileReader
-	projectSpecRepo  projectSpecWriter
-	workflowRepo     domain.WorkflowRepository
-	skillsLoader     *skills.Loader
-	planBuilder      *planBuilder
-	renderer         *skillgen.Renderer
-	configRepo       config.Reader
-	symbolResolver   sourcecode.Resolver
+	patternRepo     patternReader
+	profileRepo     profileReader
+	projectSpecRepo projectSpecWriter
+	workflowRepo    domain.WorkflowRepository
+	skillsLoader    *skills.Loader
+	planBuilder     *planBuilder
+	renderer        *skillgen.Renderer
+	configRepo      config.Reader
+	symbolResolver  sourcecode.Resolver
 }
 
 // NewGeneratorService 创建生成服务
@@ -44,22 +44,20 @@ func NewGeneratorService(
 	workflowRepo domain.WorkflowRepository,
 ) *GeneratorService {
 	projectSpecRepo, _ := profileRepo.(projectSpecWriter)
-	patternStatsRepo, _ := patternRepo.(patternStatsReader)
 	structuralConfig := config.StructuralConfig{Provider: config.StructuralProviderAuto}
 	if configRepo != nil {
 		structuralConfig = configRepo.GetCurrentLearningConfig().Structural
 	}
 	return &GeneratorService{
-		patternRepo:      patternRepo,
-		patternStatsRepo: patternStatsRepo,
-		profileRepo:      profileRepo,
-		projectSpecRepo:  projectSpecRepo,
-		workflowRepo:     workflowRepo,
-		skillsLoader:     skillsLoader,
-		planBuilder:      newPlanBuilder(skillsLoader),
-		renderer:         skillgen.NewRenderer(skillsLoader),
-		configRepo:       configRepo,
-		symbolResolver:   sourcecode.NewResolver(structuralConfig),
+		patternRepo:     patternRepo,
+		profileRepo:     profileRepo,
+		projectSpecRepo: projectSpecRepo,
+		workflowRepo:    workflowRepo,
+		skillsLoader:    skillsLoader,
+		planBuilder:     newPlanBuilder(skillsLoader),
+		renderer:        skillgen.NewRenderer(skillsLoader),
+		configRepo:      configRepo,
+		symbolResolver:  sourcecode.NewResolver(structuralConfig),
 	}
 }
 
@@ -143,7 +141,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		return err
 	}
 	projectConfig := s.configRepo.GetProjectConfig()
-	projectRoot := firstNonEmptyString(projectConfig.RootPath, runtimecontext.ProjectRoot(ctx))
+	projectRoot := stringx.FirstNonBlank(projectConfig.RootPath, runtimecontext.ProjectRoot(ctx))
 	snapshot, err := s.buildVerifiedKnowledgeSnapshot(ctx, profile, rankedPatterns, projectRoot)
 	if err != nil {
 		return fmt.Errorf("scan project validation facts: %w", err)

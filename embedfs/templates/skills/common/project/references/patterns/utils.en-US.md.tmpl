@@ -33,26 +33,12 @@ This page only covers {{.Category}} category conventions. If the task crosses on
 {{range .PatternObjects}}
 ### {{.Name}}
 
-{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability and implementation observation (verify in source)**: {{.Description}}{{end}}
+{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability**: {{.Description}}{{end}}
 
 {{end}}
 {{if .Rule}}**User rule**: {{.Rule}}{{end}}
 
 **Evidence**: {{len .EvidenceLocations}} verified source symbols, source {{.Source}}
-
-{{if .GoodExample}}
-#### Code Evidence
-
-```{{$.CodeFenceLanguage}}
-{{.GoodExample}}
-```
-{{end}}
-
-{{if .BadExample}}
-#### Avoid
-
-{{.BadExample}}
-{{end}}
 
 ---
 

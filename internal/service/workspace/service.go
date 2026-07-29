@@ -15,12 +15,12 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
@@ -111,7 +111,7 @@ func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context, opts W
 
 func (g *WorkspaceGenerator) resolveWorkspaceRootOutputPath(projectRoot, workspaceName string, opts WorkspaceGenerateOptions) (string, error) {
 	if strings.TrimSpace(opts.RootOutputPath) != "" {
-		return utils.ResolveProjectOutputPath(projectRoot, opts.RootOutputPath)
+		return projectpath.ResolveOutput(projectRoot, opts.RootOutputPath)
 	}
 	return g.workspaceRootOutputPath(projectRoot, workspaceName)
 }

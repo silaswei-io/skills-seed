@@ -3,7 +3,7 @@
 **Language**: {{.Language}}
 **Generated At**: {{.GeneratedAt}}
 
-Architecture narrative comes from the learned project profile and is for navigation, not a hard constraint. File paths and entry methods are checked against current source during generation; confirm other descriptions against current code and configuration before changing behavior.
+Use this page for architecture navigation. File paths and entry methods are checked against current source during generation; confirm other descriptions against current code and configuration before changing behavior.
 
 ---
 
@@ -110,7 +110,7 @@ Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 ## Business Entry Methods
 
 {{if .BusinessMethods}}
-{{len .BusinessMethods}} project-level business, cross-module orchestration, or high-value utility entry methods were recorded. See [Entry Method Index](./business-methods.md) for signatures, prerequisites, and usage scenarios. Business rules are governed by the [Business Pattern Map](./patterns/business.md).
+{{len .BusinessMethods}} commonly reused business capability, module extension, cross-module orchestration, or high-value utility entry methods were recorded. See [Entry Method Index](./business-methods.md) for signatures, prerequisites, and usage scenarios. Business rules are governed by the [Business Pattern Map](./patterns/business.md).
 {{else}}
 *Business entry methods have not been recorded yet*
 {{end}}

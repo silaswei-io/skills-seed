@@ -18,11 +18,11 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
-	"github.com/silaswei-io/skills-seed/internal/pkg/changelog"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
-	"github.com/silaswei-io/skills-seed/internal/pkg/progress"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -313,8 +313,6 @@ func UpdateUserDefinedPattern(ctx context.Context, cont *container.Container, ex
 	revised.ProjectID = existing.ProjectID
 	revised.ScopePath = existing.ScopePath
 	revised.WorkspaceRole = existing.WorkspaceRole
-	revised.AnalysisUnitID = existing.AnalysisUnitID
-	revised.AnalysisUnitName = existing.AnalysisUnitName
 	revised.CreatedAt = existing.CreatedAt
 	revised.Generated = existing.Generated
 	if len(revised.MergedFrom) == 0 {
@@ -467,7 +465,7 @@ func statsCmd(cont *container.Container) *cobra.Command {
 			if cont == nil || cont.PatternStats == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			stats, err := cont.PatternStats.GetPatternHitStats(context.Background())
+			stats, err := cont.PatternStats.GetPatternStats(context.Background())
 			if err != nil {
 				return err
 			}
@@ -529,7 +527,7 @@ func showCmd(cont *container.Container) *cobra.Command {
 
 func isValidPatternSort(sortBy string) bool {
 	switch sortBy {
-	case "", "updated", "score", "hits", "category":
+	case "", "updated", "score", "category":
 		return true
 	default:
 		return false
@@ -549,36 +547,28 @@ func requirePatternRepository(cont *container.Container) (domain.PatternReposito
 	return nil, fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 }
 
-func writeStats(w io.Writer, stats []domain.PatternHitStats) error {
+func writeStats(w io.Writer, stats []domain.PatternStats) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	if _, err := fmt.Fprintf(
 		tw,
-		"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		"%s\t%s\t%s\t%s\t%s\n",
 		i18n.Get("PatternsStatsHeaderPattern"),
 		i18n.Get("PatternsStatsHeaderCategory"),
 		i18n.Get("PatternsStatsHeaderSpecificity"),
 		i18n.Get("PatternsStatsHeaderConfidence"),
 		i18n.Get("PatternsStatsHeaderEffective"),
-		i18n.Get("PatternsStatsHeaderHits"),
-		i18n.Get("PatternsStatsHeaderLastHit"),
 	); err != nil {
 		return err
 	}
 	for _, stat := range stats {
-		lastHit := "-"
-		if !stat.LastHitAt.IsZero() {
-			lastHit = stat.LastHitAt.Format("2006-01-02 15:04:05")
-		}
 		if _, err := fmt.Fprintf(
 			tw,
-			"%s\t%s\t%.2f\t%.2f\t%.2f\t%d\t%s\n",
+			"%s\t%s\t%.2f\t%.2f\t%.2f\n",
 			stat.Pattern.ID,
 			stat.Pattern.Category,
 			stat.Pattern.Metrics.SpecificityScore,
 			stat.Pattern.Confidence,
 			stat.Pattern.Metrics.EffectiveScore,
-			stat.HitCount,
-			lastHit,
 		); err != nil {
 			return err
 		}
@@ -900,7 +890,6 @@ func trimRightEmpty(values []string) []string {
 func compactCmd(cont *container.Container) *cobra.Command {
 	var category string
 	var dryRun bool
-	var useAI bool
 
 	cmd := &cobra.Command{
 		Use:     "compact",
@@ -912,11 +901,6 @@ func compactCmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			if useAI {
-				if err := commandutil.RequireAgentAvailable(cont); err != nil {
-					return err
-				}
-			}
 			if cont.CuratorSvc == nil {
 				return fmt.Errorf("%s", i18n.Get("PatternCuratorNotConfigured"))
 			}
@@ -924,7 +908,6 @@ func compactCmd(cont *container.Container) *cobra.Command {
 			result, err := cont.CuratorSvc.CompactWithHooks(cmd.Context(), curator.CompactRequest{
 				Category: category,
 				DryRun:   dryRun,
-				UseAI:    useAI,
 			}, curatorProgressHooks(tracker))
 			if err != nil {
 				return err
@@ -941,7 +924,6 @@ func compactCmd(cont *container.Container) *cobra.Command {
 
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsCompactFlagCategory"))
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, i18n.Get("PatternsCompactFlagDryRun"))
-	cmd.Flags().BoolVar(&useAI, "ai", false, i18n.Get("PatternsCompactFlagAI"))
 	return cmd
 }
 

@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 type curationCoverage struct {
@@ -119,7 +120,7 @@ func assessCuration(result *proposal, candidates, existing []domain.Pattern) cur
 func normalizeSourceOwnership(patterns []domain.Pattern) ([]domain.Pattern, []string) {
 	claims := make(map[string][]int)
 	for i := range patterns {
-		patterns[i].MergedFrom = uniqueStrings(patterns[i].MergedFrom)
+		patterns[i].MergedFrom = stringx.UniqueNonEmpty(patterns[i].MergedFrom)
 		for _, sourceID := range patterns[i].MergedFrom {
 			claims[sourceID] = append(claims[sourceID], i)
 		}

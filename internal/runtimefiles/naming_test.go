@@ -11,9 +11,9 @@ import (
 )
 
 func TestNameUsesShortTimeAndReadableParts(t *testing.T) {
-	name := Name("pattern-learn-current", "unit-auth")
+	name := Name("learning-pack-analyze", "focus-auth")
 
-	require.Regexp(t, regexp.MustCompile(`^\d{8}-\d{6}(?:-\d{3,})?-pattern-learn-current-unit-auth$`), name)
+	require.Regexp(t, regexp.MustCompile(`^\d{8}-\d{6}(?:-\d{3,})?-learning-pack-analyze-focus-auth$`), name)
 }
 
 func TestNewIDUsesSecondPrecisionAndSequence(t *testing.T) {
@@ -49,8 +49,8 @@ func TestSafePartKeepsASCIIMeaningAndBoundsLength(t *testing.T) {
 }
 
 func TestTempPatternIsValidMkdirTempPrefix(t *testing.T) {
-	pattern := TempPattern("prompt-input", "skills-seed", "unit-auth")
+	pattern := TempPattern("prompt-input", "skills-seed", "focus-auth")
 
 	require.NotContains(t, filepath.Base(pattern), string(filepath.Separator))
-	require.Regexp(t, regexp.MustCompile(`^\d{8}-\d{6}(?:-\d{3,})?-prompt-input-skills-seed-unit-auth-$`), pattern)
+	require.Regexp(t, regexp.MustCompile(`^\d{8}-\d{6}(?:-\d{3,})?-prompt-input-skills-seed-focus-auth-$`), pattern)
 }

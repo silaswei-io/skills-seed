@@ -6,6 +6,8 @@
 
 {{.GroupSummary.Description}}
 
+This page reflects only learned reuse points with source evidence. For sparse domains, inspect the verified source entries below to confirm the full current boundary before changing behavior.
+
 ## Request Matching
 
 {{if .GroupSummary.IsFallback}}Read this page when the task changes business rules, state transitions, runtime behavior, or cross-module flows but cannot be mapped to a stable domain from request terms or paths.{{else}}Read this page first when the request mentions {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}, uses synonymous business actions, state changes, rules or policies, entry channels, or external dependencies, or changes code under {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}this domain's related code{{end}}.{{end}}
@@ -30,12 +32,12 @@ This page only covers business-domain rules. If the task touches cross-boundary 
 
 ## Reusable Solutions And Evidence
 
-AI-learned patterns with source evidence identify existing solutions to inspect and prefer. Only explicit user-maintained or built-in rules may be treated as hard constraints.
+Use the evidence below to locate and prefer existing implementations. Authoritative rules live in Project Spec.
 
 {{range .PatternObjects}}
 ### {{.Name}}
 
-{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability and implementation observation (verify in source)**: {{.Description}}{{end}}
+{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability**: {{.Description}}{{end}}
 
 {{end}}
 {{if .Rule}}**User rule**: {{.Rule}}{{end}}
@@ -45,20 +47,6 @@ AI-learned patterns with source evidence identify existing solutions to inspect 
 {{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}
 {{end}}
 {{end}}{{if .BusinessMethod}}**Verified Entry Point**: `{{.BusinessMethod.DisplayLocation}}` - {{.BusinessMethod.Name}}
-{{end}}
-
-{{if .GoodExample}}
-#### Code Evidence
-
-```{{$.CodeFenceLanguage}}
-{{.GoodExample}}
-```
-{{end}}
-
-{{if .BadExample}}
-#### Avoid
-
-{{.BadExample}}
 {{end}}
 
 ---

@@ -11,9 +11,9 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	snapshotdiff "github.com/silaswei-io/skills-seed/internal/snapshot"
-	"github.com/silaswei-io/skills-seed/internal/utils"
 )
 
 // Result 保存通过当前文件与快照对比推导出的 AI 请求输入。
@@ -155,7 +155,7 @@ func readCurrentFiles(projectRoot string, files []domain.FileInfo) (map[string]s
 	current := make(map[string]string, len(files))
 	for _, file := range files {
 		path := filepath.Join(projectRoot, filepath.FromSlash(file.Path))
-		path, err := utils.CanonicalPathWithinRoot(projectRoot, path)
+		path, err := projectpath.CanonicalWithinRoot(projectRoot, path)
 		if err != nil {
 			return nil, fmt.Errorf("resolve current file %s: %w", file.Path, err)
 		}

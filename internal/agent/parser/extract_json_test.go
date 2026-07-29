@@ -17,12 +17,12 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) {
+func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelFocuses(t *testing.T) {
 	output := `{
-  "units": [
+  "focuses": [
     {
-      "unit_id": "auth-login-flow",
-      "unit_name": "认证登录流程",
+      "focus_id": "auth-login-flow",
+      "focus_name": "认证登录流程",
       "patterns": [
         {
           "id": "login-failure-lock-mechanism",
@@ -33,9 +33,7 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) 
           "bad_example": "",
           "rule": "登录失败达到阈值时锁定账号",
           "confidence": 0.9,
-          "frequency": 1,
-          "analysis_unit_id": "auth-login-flow",
-          "analysis_unit_name": "认证登录流程"
+          "frequency": 1
         }
       ],
       "profile_refresh_recommended": {"needed": false, "reason": ""}
@@ -46,12 +44,12 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelUnits(t *testing.T) 
 	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
 
 	require.NoError(t, err)
-	require.Len(t, result.Units, 1)
-	assert.Equal(t, "auth-login-flow", result.Units[0].UnitID)
-	assert.Equal(t, "认证登录流程", result.Units[0].UnitName)
-	require.Len(t, result.Units[0].Patterns, 1)
-	assert.Equal(t, "login-failure-lock-mechanism", result.Units[0].Patterns[0].ID)
-	assert.Equal(t, domain.SourceLearnedCurrent, result.Units[0].Patterns[0].Source)
+	require.Len(t, result.Focuses, 1)
+	assert.Equal(t, "auth-login-flow", result.Focuses[0].FocusID)
+	assert.Equal(t, "认证登录流程", result.Focuses[0].FocusName)
+	require.Len(t, result.Focuses[0].Patterns, 1)
+	assert.Equal(t, "login-failure-lock-mechanism", result.Focuses[0].Patterns[0].ID)
+	assert.Equal(t, domain.SourceLearnedCurrent, result.Focuses[0].Patterns[0].Source)
 }
 
 func TestParseWorkspaceSpecParsesStringChangeOrder(t *testing.T) {
@@ -180,9 +178,9 @@ func TestParseAnalyzeProjectResultRejectsSemanticTypeMismatch(t *testing.T) {
 	require.Nil(t, result)
 }
 
-func TestParseAnalyzeCurrentCodebaseResultRejectsStringCodeLocation(t *testing.T) {
-	output := `{
-  "patterns": [{
+func TestParseAnalyzeCurrentCodebaseBatchResultRejectsStringCodeLocation(t *testing.T) {
+	output := currentBatchOutput(`[
+  {
     "id": "business-run",
     "name": "Business Run",
     "category": "business",
@@ -200,19 +198,18 @@ func TestParseAnalyzeCurrentCodebaseResultRejectsStringCodeLocation(t *testing.T
       "type": "domain",
       "function": "func Run() error"
     }
-  }],
-  "profile_refresh_recommended": {"needed": false}
-}`
+  }
+]`)
 
-	result, err := ParseAnalyzeCurrentCodebaseResult(output)
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
 
 	require.Error(t, err)
 	require.Nil(t, result)
 }
 
-func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
-	output := `{
-  "patterns": [{
+func TestParseAnalyzeCurrentCodebaseBatchResultWithBusinessMethod(t *testing.T) {
+	output := currentBatchOutput(`[
+  {
     "id": "business-run",
     "name": "Business Run",
     "category": "business",
@@ -232,22 +229,23 @@ func TestParseAnalyzeCurrentCodebaseResult_WithBusinessMethod(t *testing.T) {
       "prerequisites": "config loaded",
       "returns": "error"
     }
-  }],
-  "profile_refresh_recommended": {"needed": false}
-}`
+  }
+]`)
 
-	result, err := ParseAnalyzeCurrentCodebaseResult(output)
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
 	assert.NoError(t, err)
-	assert.Len(t, result.Patterns, 1)
-	assert.NotNil(t, result.Patterns[0].BusinessMethod)
-	assert.Equal(t, "internal/service/demo.go:10", result.Patterns[0].BusinessMethod.DisplayLocation())
-	assert.Equal(t, "config loaded", result.Patterns[0].BusinessMethod.Prerequisites)
-	assert.Equal(t, "error", result.Patterns[0].BusinessMethod.Returns)
+	require.Len(t, result.Focuses, 1)
+	require.Len(t, result.Focuses[0].Patterns, 1)
+	pattern := result.Focuses[0].Patterns[0]
+	assert.NotNil(t, pattern.BusinessMethod)
+	assert.Equal(t, "internal/service/demo.go:10", pattern.BusinessMethod.DisplayLocation())
+	assert.Equal(t, "config loaded", pattern.BusinessMethod.Prerequisites)
+	assert.Equal(t, "error", pattern.BusinessMethod.Returns)
 }
 
-func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
-	output := `{
-  "patterns": [{
+func TestParseAnalyzeCurrentCodebaseBatchResultWithEvidenceLocations(t *testing.T) {
+	output := currentBatchOutput(`[
+  {
     "id": "error-wrap",
     "name": "Error Wrap",
     "category": "error",
@@ -257,8 +255,6 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
     "rule": "Wrap errors at module boundaries",
     "confidence": 0.9,
     "frequency": 1,
-    "analysis_unit_id": "auth",
-    "analysis_unit_name": "Authentication",
     "evidence_locations": [
       {
         "path": "internal/service/config.go",
@@ -270,52 +266,96 @@ func TestParseAnalyzeCurrentCodebaseResult_WithEvidenceLocations(t *testing.T) {
       }
     ],
     "business_method": null
-  }],
-  "profile_refresh_recommended": {"needed": false}
-}`
+  }
+]`)
 
-	result, err := ParseAnalyzeCurrentCodebaseResult(output)
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
 	assert.NoError(t, err)
-	assert.Len(t, result.Patterns, 1)
-	assert.Nil(t, result.Patterns[0].BusinessMethod)
-	assert.Len(t, result.Patterns[0].EvidenceLocations, 1)
-	assert.Equal(t, "auth", result.Patterns[0].AnalysisUnitID)
-	assert.Equal(t, "Authentication", result.Patterns[0].AnalysisUnitName)
-	assert.Equal(t, "internal/service/config.go", result.Patterns[0].EvidenceLocations[0].Path)
-	assert.Equal(t, 42, result.Patterns[0].EvidenceLocations[0].Line)
-	assert.Equal(t, "LoadConfig", result.Patterns[0].EvidenceLocations[0].Symbol)
-	assert.Equal(t, "internal/service/config.go:42", result.Patterns[0].EvidenceLocations[0].DisplayLocation())
-	assert.Equal(t, domain.SourceLearnedCurrent, result.Patterns[0].Source)
+	require.Len(t, result.Focuses, 1)
+	require.Len(t, result.Focuses[0].Patterns, 1)
+	pattern := result.Focuses[0].Patterns[0]
+	assert.Nil(t, pattern.BusinessMethod)
+	assert.Len(t, pattern.EvidenceLocations, 1)
+	assert.Equal(t, "internal/service/config.go", pattern.EvidenceLocations[0].Path)
+	assert.Equal(t, 42, pattern.EvidenceLocations[0].Line)
+	assert.Equal(t, "LoadConfig", pattern.EvidenceLocations[0].Symbol)
+	assert.Equal(t, "internal/service/config.go:42", pattern.EvidenceLocations[0].DisplayLocation())
+	assert.Equal(t, domain.SourceLearnedCurrent, pattern.Source)
 }
 
-func TestParseAnalyzeCurrentCodebaseResultRejectsRemovedProfileDelta(t *testing.T) {
-	result, err := ParseAnalyzeCurrentCodebaseResult(`{
-  "patterns": [],
-  "profile_delta": {},
-  "profile_refresh_recommended": {"needed": false}
+func TestParseAnalyzeCurrentCodebaseBatchResultExtractsJSONFromText(t *testing.T) {
+	output := `I now have a complete picture of this pack.
+
+{
+  "focuses": [
+    {
+      "focus_id": "auth",
+      "focus_name": "Authentication",
+      "patterns": [],
+      "profile_refresh_recommended": {"needed": false}
+    }
+  ]
+}`
+
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(output)
+
+	require.NoError(t, err)
+	require.Len(t, result.Focuses, 1)
+	assert.Equal(t, "auth", result.Focuses[0].FocusID)
+}
+
+func TestParseAnalyzeCurrentCodebaseBatchResultRejectsRemovedProfileDelta(t *testing.T) {
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(`{
+  "focuses": [
+    {
+      "focus_id": "auth",
+      "focus_name": "Authentication",
+      "patterns": [],
+      "profile_delta": {},
+      "profile_refresh_recommended": {"needed": false}
+    }
+  ]
 }`)
 
 	require.Error(t, err)
 	require.Nil(t, result)
 }
 
-func TestParseAnalyzeResultReturnsErrorWhenJSONMissing(t *testing.T) {
-	result, err := ParseAnalyzeResult("plain text without json")
+func TestParseAnalyzeCurrentCodebaseBatchResultRejectsMissingProfileRefreshRecommendation(t *testing.T) {
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(`{
+  "focuses": [
+    {
+      "focus_id": "auth",
+      "focus_name": "Authentication",
+      "patterns": []
+    }
+  ]
+}`)
 
-	assert.Error(t, err)
-	assert.Nil(t, result)
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "focuses[].profile_refresh_recommended")
 }
 
-func TestParseLearnResultReturnsErrorWhenJSONMissing(t *testing.T) {
-	result, err := ParseLearnResult("plain text without json")
+func TestParseAnalyzeCurrentDeltaBatchResultRejectsMissingProfileRefreshRecommendation(t *testing.T) {
+	result, err := ParseAnalyzeCurrentDeltaBatchResult(`{
+  "knowledge_changes": []
+}`)
 
-	assert.Error(t, err)
-	assert.Nil(t, result)
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "profile_refresh_recommended")
 }
 
-func TestParseBatchLearnResultReturnsErrorWhenJSONMissing(t *testing.T) {
-	result, err := ParseBatchLearnResult("plain text without json")
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
+func currentBatchOutput(patterns string) string {
+	return `{
+  "focuses": [
+    {
+      "focus_id": "auth",
+      "focus_name": "Authentication",
+      "patterns": ` + patterns + `,
+      "profile_refresh_recommended": {"needed": false}
+    }
+  ]
+}`
 }

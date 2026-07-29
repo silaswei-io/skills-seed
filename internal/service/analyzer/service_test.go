@@ -3,9 +3,7 @@ package analyzer
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,7 +12,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	snapshotstore "github.com/silaswei-io/skills-seed/internal/infra/storage/snapshot"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
@@ -65,45 +62,14 @@ func TestFindMainFiles(t *testing.T) {
 	assert.Contains(t, mainFiles, "main.go")
 }
 
-func TestAnalyzePatterns(t *testing.T) {
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCodeFn: func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
-			return &agent.AnalyzeResult{
-				Issues: []domain.Issue{
-					{File: "main.go", Severity: "warning", Message: "test"},
-				},
-				Confidence: 0.9,
-			}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-	result, err := svc.AnalyzePatterns(context.Background(), &AnalyzePatternsRequest{
-		Files: []domain.FileInfo{{Path: "main.go", Content: "package main"}},
-	})
-	require.NoError(t, err)
-	assert.Len(t, result.Issues, 1)
-	assert.Equal(t, 0.9, result.Confidence)
-}
-
-func TestAnalyzePatterns_AIError(t *testing.T) {
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCodeFn: func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
-			return nil, errors.New("AI error")
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-	_, err := svc.AnalyzePatterns(context.Background(), &AnalyzePatternsRequest{})
-	assert.Error(t, err)
-}
-
-func TestAnalyzeProject(t *testing.T) {
+func TestAnalyzeProjectProfile(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "helper.go"), []byte("package helper\n\nfunc BuildResponse(value any) error { return nil }\n"), 0o644))
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			return &agent.AnalyzeProjectResult{
 				Language:     "go",
 				Frameworks:   []string{"gin"},
@@ -118,9 +84,10 @@ func TestAnalyzeProject(t *testing.T) {
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, nil)
-	result, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
+	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
+		ProjectName:     "test",
+		RootPath:        tmpDir,
+		LearningSession: session,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "go", result.Language)
@@ -131,6 +98,31 @@ func TestAnalyzeProject(t *testing.T) {
 	assert.Empty(t, result.CommonUtils[0].Description)
 	require.Len(t, result.ValidationCommands, 1)
 	assert.Equal(t, "task verify", result.ValidationCommands[0].Command)
+}
+
+func TestAnalyzeProjectProfileUsesLearningSession(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+	}
+	session := &profileRefreshTestSession{
+		result: &agent.AnalyzeProjectResult{
+			Language: "go",
+			Summary:  "session profile",
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+
+	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
+		ProjectName:     "test",
+		RootPath:        tmpDir,
+		LearningSession: session,
+	})
+
+	require.NoError(t, err)
+	require.True(t, session.called)
+	assert.Equal(t, "go", result.Language)
+	assert.Equal(t, "session profile", result.Summary)
 }
 
 func TestNewProjectProfilePreservesValidationCommands(t *testing.T) {
@@ -146,12 +138,14 @@ func TestNewProjectProfilePreservesValidationCommands(t *testing.T) {
 	assert.Equal(t, "Taskfile.yml", profile.ValidationCommands[0].Source)
 }
 
-func TestAnalyzeProjectAddsStructuralContext(t *testing.T) {
+func TestAnalyzeProjectProfileAddsStructuralContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
@@ -169,18 +163,19 @@ func TestAnalyzeProjectAddsStructuralContext(t *testing.T) {
 		context: "## Structural Context\n- main calls service",
 	}
 
-	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-		MainFiles:   []string{"main.go"},
+	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
+		ProjectName:     "test",
+		RootPath:        tmpDir,
+		Language:        "go",
+		MainFiles:       []string{"main.go"},
+		LearningSession: session,
 	})
 
 	require.NoError(t, err)
 	require.Contains(t, received.StructuralContext, "main calls service")
 }
 
-func TestAnalyzeProjectCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
+func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "AGENTS.md"), []byte("go test ./..."), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "Taskfile.yml"), []byte("version: '3'"), 0o644))
@@ -188,7 +183,9 @@ func TestAnalyzeProjectCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{
 				Language: "go",
@@ -203,10 +200,11 @@ func TestAnalyzeProjectCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
 	}
 	svc := NewAnalyzerService(mockAgent, nil)
 
-	result, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		FocusPaths:  []string{"internal/service"},
+	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
+		ProjectName:     "test",
+		RootPath:        tmpDir,
+		FocusPaths:      []string{"internal/service"},
+		LearningSession: session,
 	})
 
 	require.NoError(t, err)
@@ -215,12 +213,14 @@ func TestAnalyzeProjectCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
 	require.Equal(t, "AGENTS.md", result.EngineeringRules[0].Source)
 }
 
-func TestAnalyzeProjectSkipsStructuralContextWithoutSeeds(t *testing.T) {
+func TestAnalyzeProjectProfileSkipsStructuralContextWithoutSeeds(t *testing.T) {
 	tmpDir := t.TempDir()
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
@@ -238,22 +238,25 @@ func TestAnalyzeProjectSkipsStructuralContextWithoutSeeds(t *testing.T) {
 		context: "## Structural Context\n- should not be used",
 	}
 
-	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
+	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
+		ProjectName:     "test",
+		RootPath:        tmpDir,
+		Language:        "go",
+		LearningSession: session,
 	})
 
 	require.NoError(t, err)
 	require.Empty(t, received.StructuralContext)
 }
 
-func TestAnalyzeProjectSkipsUnavailableOptionalStructuralContext(t *testing.T) {
+func TestAnalyzeProjectProfileSkipsUnavailableOptionalStructuralContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
@@ -271,80 +274,118 @@ func TestAnalyzeProjectSkipsUnavailableOptionalStructuralContext(t *testing.T) {
 		err: errors.New("unavailable"),
 	}
 
-	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-		MainFiles:   []string{"main.go"},
+	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
+		ProjectName:     "test",
+		RootPath:        tmpDir,
+		Language:        "go",
+		MainFiles:       []string{"main.go"},
+		LearningSession: session,
 	})
 
 	require.NoError(t, err)
 	require.Empty(t, received.StructuralContext)
 }
 
-func TestCollectFileSelectionContextUsesDedicatedCollector(t *testing.T) {
+func TestSelectLearningCandidatesUsesStructuralSeedPaths(t *testing.T) {
 	tmpDir := t.TempDir()
-	collector := &recordingStructuralCollector{context: "## Structural Context\n- graph entry"}
-	svc := NewAnalyzerService(&mocks.MockAgent{}, nil)
-	svc.fileSelectionContextCollector = collector
-
-	contextText := svc.CollectFileSelectionContext(context.Background(), tmpDir, FileSelectionContextRequest{
-		ProjectName:    "demo",
-		Language:       "go",
-		FocusPaths:     []string{"cmd/server/main.go"},
-		CandidateCount: 13524,
-		UserContext:    "focus runtime behavior",
-	})
-
-	require.Contains(t, contextText, "graph entry")
-	require.Equal(t, "demo", collector.req.ProjectName)
-	require.Equal(t, "go", collector.req.Language)
-	require.Equal(t, []string{"cmd/server/main.go"}, collector.req.FocusPaths)
-	require.Equal(t, []string{"cmd/server/main.go"}, collector.req.SeedPaths)
-	require.Contains(t, collector.req.Purpose, "local candidate count: 13524")
-	require.Contains(t, collector.req.Purpose, "user guidance is present")
-}
-
-func TestCollectFileSelectionContextSkipsTreeSitterProvider(t *testing.T) {
-	svc := NewAnalyzerService(&mocks.MockAgent{}, &mocks.MockConfigReader{
+	var agentReq agent.SelectLearningCandidatesRequest
+	var structuralReqs []structuralContextRequest
+	var stages []SelectLearningCandidatesStage
+	session := &profileRefreshTestSession{
+		selectFn: func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
+			agentReq = *req
+			return &agent.SelectLearningCandidatesResult{
+				SelectedPaths: []string{"internal/auth/service.go"},
+				Reason:        "service entry is enough",
+			}, nil
+		},
+	}
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
 		LearningCfg: config.LearningConfig{
 			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{
-					Enabled:  true,
-					Provider: config.StructuralProviderTreeSitter,
-				},
+				Structural: config.StructuralConfig{Enabled: true},
 			},
 		},
 	})
+	svc.structuralCollector = recordingStructuralCollector{
+		context:  "## Structural Context\n- service routes auth",
+		requests: &structuralReqs,
+	}
 
-	contextText := svc.CollectFileSelectionContext(context.Background(), t.TempDir(), FileSelectionContextRequest{
-		CandidateCount: 10,
+	result, err := svc.SelectLearningCandidates(context.Background(), &SelectLearningCandidatesRequest{
+		ProjectName:         "test",
+		RootPath:            tmpDir,
+		Language:            "go",
+		CandidatePaths:      []string{"internal/auth/service.go", "internal/auth/types.go"},
+		StructuralSeedPaths: []string{"internal/auth/service.go"},
+		Progress: func(stage SelectLearningCandidatesStage) {
+			stages = append(stages, stage)
+		},
+		LearningSession: session,
 	})
 
-	require.Empty(t, contextText)
-	require.Nil(t, svc.fileSelectionContextCollector)
+	require.NoError(t, err)
+	require.Equal(t, []string{"internal/auth/service.go"}, result.SelectedPaths)
+	require.Len(t, structuralReqs, 1)
+	require.Equal(t, []string{"internal/auth/service.go"}, structuralReqs[0].SeedPaths)
+	require.Equal(t, []string{"internal/auth/service.go"}, structuralReqs[0].FocusPaths)
+	require.Contains(t, agentReq.StructuralContext, "service routes auth")
+	require.Equal(t, []SelectLearningCandidatesStage{
+		SelectLearningCandidatesStageStructuralContext,
+		SelectLearningCandidatesStageAgent,
+	}, stages)
 }
 
-func TestCollectFileSelectionContextFallsBackWhenCollectorFails(t *testing.T) {
-	svc := NewAnalyzerService(&mocks.MockAgent{}, nil)
-	svc.fileSelectionContextCollector = fakeStructuralCollector{err: errors.New("codegraph unavailable")}
+func TestSelectLearningCandidatesSkipsStructuralContextWithoutSeeds(t *testing.T) {
+	tmpDir := t.TempDir()
+	var agentReq agent.SelectLearningCandidatesRequest
+	var structuralReqs []structuralContextRequest
+	session := &profileRefreshTestSession{
+		selectFn: func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
+			agentReq = *req
+			return &agent.SelectLearningCandidatesResult{
+				SelectedPaths: req.CandidatePaths,
+				Reason:        "no structural seed needed",
+			}, nil
+		},
+	}
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+		LearningCfg: config.LearningConfig{
+			Current: config.CurrentLearningConfig{
+				Structural: config.StructuralConfig{Enabled: true},
+			},
+		},
+	})
+	svc.structuralCollector = recordingStructuralCollector{
+		context:  "## Structural Context\n- should not be collected",
+		requests: &structuralReqs,
+	}
 
-	contextText := svc.CollectFileSelectionContext(context.Background(), t.TempDir(), FileSelectionContextRequest{
-		CandidateCount: 10,
+	result, err := svc.SelectLearningCandidates(context.Background(), &SelectLearningCandidatesRequest{
+		ProjectName:     "test",
+		RootPath:        tmpDir,
+		Language:        "go",
+		CandidatePaths:  []string{"a.go", "b.go"},
+		LearningSession: session,
 	})
 
-	require.Empty(t, contextText)
+	require.NoError(t, err)
+	require.Equal(t, []string{"a.go", "b.go"}, result.SelectedPaths)
+	require.Empty(t, structuralReqs)
+	require.Empty(t, agentReq.StructuralContext)
 }
 
-func TestAnalyzeProject_AIError(t *testing.T) {
+func TestAnalyzeProjectProfile_AIError(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			return nil, errors.New("AI error")
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, nil)
-	_, err := svc.AnalyzeProject(context.Background(), &AnalyzeProjectRequest{})
+	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{LearningSession: session})
 	assert.Error(t, err)
 }
 
@@ -371,461 +412,6 @@ func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {
 	require.NotContains(t, result, "Large")
 }
 
-func TestAnalyzeCurrentCodebase(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n"), 0o644))
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			return &agent.AnalyzeCurrentCodebaseResult{
-				Patterns: []domain.Pattern{
-					currentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go"),
-				},
-			}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-	result, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-	})
-	require.NoError(t, err)
-	assert.Len(t, result.Patterns, 1)
-}
-
-func TestAnalyzeCurrentCodebaseAddsStructuralContext(t *testing.T) {
-	tmpDir := t.TempDir()
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		LearningCfg: config.LearningConfig{
-			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{
-					Enabled: true,
-				},
-			},
-		},
-	})
-	svc.structuralCollector = fakeStructuralCollector{
-		context: "## Structural Context\n- service has 3 callers",
-	}
-
-	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-		SampleFiles: []agent.SampleFile{{Path: "internal/service.go"}},
-	})
-
-	require.NoError(t, err)
-	require.Contains(t, received.StructuralContext, "service has 3 callers")
-}
-
-func TestAnalyzeCurrentCodebasePassesBoundedSeedsToStructuralCollector(t *testing.T) {
-	tmpDir := t.TempDir()
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		LearningCfg: config.LearningConfig{
-			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{
-					Enabled: true,
-				},
-			},
-		},
-	})
-	collector := &recordingStructuralCollector{context: "## Structural Context\n"}
-	svc.structuralCollector = collector
-
-	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-		FocusPaths:  []string{"internal/service"},
-		MainFiles:   []string{"cmd/app/main.go"},
-		SampleFiles: []agent.SampleFile{{Path: "internal/new.go"}},
-		DiffFiles:   []agent.DiffFileRef{{Path: "internal/changed.go", DiffPath: "/tmp/changed.go.diff"}},
-	})
-
-	require.NoError(t, err)
-	require.ElementsMatch(t, []string{
-		"cmd/app/main.go",
-		"internal/new.go",
-		"internal/changed.go",
-	}, collector.req.SeedPaths)
-}
-
-func TestAnalyzeCurrentCodebase_AIError(t *testing.T) {
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			return nil, errors.New("AI error")
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-	// AnalyzeCurrentCodebase 在 AI 失败时返回领域错误。
-	_, err := svc.AnalyzeCurrentCodebase(context.Background(), &AnalyzeCurrentCodebaseRequest{})
-	assert.Error(t, err)
-}
-
-func TestAnalyzeCodebaseFull(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\nfunc main() {}"), 0644))
-
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			return &agent.AnalyzeCurrentCodebaseResult{
-				Patterns: []domain.Pattern{
-					currentPatternForTest("p1", "Test Pattern", domain.CategoryNaming, "main.go"),
-				},
-			}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-	result, patterns, err := svc.AnalyzeCodebaseFull(context.Background(), tmpDir, "test", "go")
-	require.NoError(t, err)
-	assert.Len(t, result.Patterns, 1)
-	assert.Len(t, patterns, 1)
-}
-
-func TestAnalyzeCodebaseFullWithFocusPathsOnlySendsFocusedSamples(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "prompts"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "agent", "agent.go"), []byte("package agent\nfunc Agent() {}\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "prompts", "loader.go"), []byte("package prompts\nfunc Loader() {}\n"), 0644))
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{
-				Patterns: []domain.Pattern{
-					currentPatternForTest("agent-pattern", "Agent Pattern", domain.CategoryStructure, "internal/agent/agent.go"),
-				},
-			}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-
-	_, patterns, err := svc.AnalyzeCodebaseFullWithOptions(context.Background(), tmpDir, "test", "go", AnalyzeCodebaseOptions{
-		FocusPaths: []string{filepath.Join(tmpDir, "internal", "agent")},
-	})
-
-	require.NoError(t, err)
-	require.Len(t, patterns, 1)
-	require.Equal(t, []string{"internal/agent"}, received.FocusPaths)
-	require.NotEmpty(t, received.SampleFiles)
-	for _, file := range received.SampleFiles {
-		require.Contains(t, file.Path, "internal/agent")
-		require.NotContains(t, file.Path, "internal/prompts")
-	}
-}
-
-func TestAnalyzeCodebaseFullWithFocusPathsOnlyDiffsFocusedFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	seedPath := filepath.Join(tmpDir, ".skills-seed")
-	require.NoError(t, os.MkdirAll(seedPath, 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "prompts"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "agent", "agent.go"), []byte("package agent\nfunc NewAgent() {}\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "prompts", "loader.go"), []byte("package prompts\nfunc NewLoader() {}\n"), 0o644))
-	repo := snapshotstore.NewRepository(seedPath)
-	require.NoError(t, repo.Replace(map[string]string{
-		"internal/agent/agent.go":    "package agent\nfunc OldAgent() {}\n",
-		"internal/agent/deleted.go":  "package agent\nfunc Deleted() {}\n",
-		"internal/prompts/loader.go": "package prompts\nfunc OldLoader() {}\n",
-		"internal/unchanged/keep.go": "package unchanged\n",
-	}))
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
-		Exclude:    []string{".*"},
-	})
-	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
-
-	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{
-		FocusPaths:       []string{filepath.Join(tmpDir, "internal", "agent")},
-		UseSnapshotDiffs: true,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, received.DiffFiles, 2)
-	require.Equal(t, "internal/agent/agent.go", received.DiffFiles[0].Path)
-	require.Equal(t, "internal/agent/deleted.go", received.DiffFiles[1].Path)
-	require.Empty(t, received.SampleFiles)
-	loaded, err := repo.Load()
-	require.NoError(t, err)
-	require.Equal(t, "package agent\nfunc OldAgent() {}\n", loaded["internal/agent/agent.go"])
-	require.Equal(t, "package agent\nfunc Deleted() {}\n", loaded["internal/agent/deleted.go"])
-	require.Equal(t, "package prompts\nfunc OldLoader() {}\n", loaded["internal/prompts/loader.go"])
-	require.Equal(t, "package unchanged\n", loaded["internal/unchanged/keep.go"])
-}
-
-func TestAnalyzeCodebaseFullDoesNotPassKnownPatternsToCurrentAnalysis(t *testing.T) {
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal:      "mock",
-		AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\n"), 0644))
-
-	_, _, err := svc.AnalyzeCodebaseFullWithOptions(context.Background(), tmpDir, "demo", "go", AnalyzeCodebaseOptions{
-		KnownPatternsJSON:  `[{"id":"known"}]`,
-		KnownPatternsCount: 1,
-	})
-
-	require.NoError(t, err)
-	require.Empty(t, received.KnownPatternsJSON)
-	require.Zero(t, received.KnownPatternsCount)
-}
-
-func TestAnalyzeCodebaseFullUsesSnapshotDiffsWithoutCommittingSnapshots(t *testing.T) {
-	tmpDir := t.TempDir()
-	seedPath := filepath.Join(tmpDir, ".skills-seed")
-	require.NoError(t, os.MkdirAll(seedPath, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "added.go"), []byte("package added\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "modified.go"), []byte("package main\nfunc newName() {}\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "unchanged.go"), []byte("package same\n"), 0o644))
-	repo := snapshotstore.NewRepository(seedPath)
-	require.NoError(t, repo.Replace(map[string]string{
-		"modified.go":  "package main\nfunc oldName() {}\n",
-		"unchanged.go": "package same\n",
-	}))
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{
-				Patterns: []domain.Pattern{currentPatternForTest("p1", "Snapshot Pattern", domain.CategoryStructure, "modified.go")},
-			}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
-		Exclude:    []string{".*"},
-	})
-	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
-
-	_, patterns, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{})
-
-	require.NoError(t, err)
-	require.Len(t, patterns, 1)
-	require.Len(t, received.SampleFiles, 1)
-	require.Equal(t, "added.go", received.SampleFiles[0].Path)
-	require.Len(t, received.DiffFiles, 1)
-	require.Equal(t, "modified.go", received.DiffFiles[0].Path)
-	diffContent, err := os.ReadFile(received.DiffFiles[0].DiffPath)
-	require.NoError(t, err)
-	require.Contains(t, string(diffContent), "-func oldName() {}")
-	require.Contains(t, string(diffContent), "+func newName() {}")
-
-	loaded, err := repo.Load()
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{
-		"modified.go":  "package main\nfunc oldName() {}\n",
-		"unchanged.go": "package same\n",
-	}, loaded)
-}
-
-func currentPatternForTest(id, name string, category domain.Category, path string) domain.Pattern {
-	pattern := domain.NewPattern(id, name, category)
-	pattern.Rule = "When changing this behavior, preserve the evidenced project constraint."
-	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: path, Kind: "file"}}
-	return *pattern
-}
-
-func TestAnalyzeCodebaseFullWithExternalRunContextDoesNotCommitSnapshots(t *testing.T) {
-	tmpDir := t.TempDir()
-	seedPath := filepath.Join(tmpDir, ".skills-seed")
-	require.NoError(t, os.MkdirAll(seedPath, 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "auth"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "key"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "auth", "login.go"), []byte("package auth\nfunc NewLogin() {}\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "key", "create.go"), []byte("package key\nfunc NewCreate() {}\n"), 0o644))
-	repo := snapshotstore.NewRepository(seedPath)
-	require.NoError(t, repo.Replace(map[string]string{
-		"internal/auth/login.go": "package auth\nfunc OldLogin() {}\n",
-		"internal/key/create.go": "package key\nfunc OldCreate() {}\n",
-	}))
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
-		Exclude:    []string{".*"},
-	})
-	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
-	runContext, err := svc.BuildCodebaseRunContext(ctx, tmpDir, "go", AnalyzeCodebaseOptions{
-		SelectedFiles: []domain.FileInfo{
-			{Path: "internal/auth/login.go"},
-			{Path: "internal/key/create.go"},
-		},
-		SelectedFilesSet: true,
-		UseSnapshotDiffs: true,
-	})
-	require.NoError(t, err)
-
-	_, _, err = svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{
-		FocusPaths:       []string{filepath.Join(tmpDir, "internal", "auth")},
-		UseSnapshotDiffs: true,
-		RunContext:       runContext,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, received.DiffFiles, 1)
-	require.Equal(t, "internal/auth/login.go", received.DiffFiles[0].Path)
-	loaded, err := repo.Load()
-	require.NoError(t, err)
-	require.Equal(t, "package auth\nfunc OldLogin() {}\n", loaded["internal/auth/login.go"])
-	require.Equal(t, "package key\nfunc OldCreate() {}\n", loaded["internal/key/create.go"])
-}
-
-func TestAnalyzeCodebaseFullDoesNotDiffGitIgnoredSnapshotFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	seedPath := filepath.Join(tmpDir, ".skills-seed")
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "ignored"), 0o755))
-	require.NoError(t, os.MkdirAll(seedPath, 0o755))
-	require.NoError(t, exec.Command("git", "-C", tmpDir, "init", "-q").Run())
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte("ignored/\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main\nfunc NewMain() {}\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "ignored", "generated.go"), []byte("package ignored\nfunc Generated() {}\n"), 0o644))
-	repo := snapshotstore.NewRepository(seedPath)
-	require.NoError(t, repo.Replace(map[string]string{
-		"main.go":              "package main\nfunc OldMain() {}\n",
-		"ignored/generated.go": "package ignored\nfunc OldGenerated() {}\n",
-	}))
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	require.NoError(t, configRepo.Update(cfg))
-	svc := NewAnalyzerService(mockAgent, configRepo)
-	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
-
-	_, _, err = svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{
-		SelectedFiles: []domain.FileInfo{
-			{Path: "main.go"},
-			{Path: "ignored/generated.go"},
-		},
-		SelectedFilesSet: true,
-		UseSnapshotDiffs: true,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, received.DiffFiles, 1)
-	require.Equal(t, "main.go", received.DiffFiles[0].Path)
-	for _, diff := range received.DiffFiles {
-		require.NotEqual(t, "ignored/generated.go", diff.Path)
-	}
-	loaded, err := repo.Load()
-	require.NoError(t, err)
-	require.Equal(t, "package ignored\nfunc OldGenerated() {}\n", loaded["ignored/generated.go"])
-}
-
-func TestAnalyzeCodebaseFullSkipsDocumentsButKeepsDocsSourceInSnapshotDiffs(t *testing.T) {
-	tmpDir := t.TempDir()
-	seedPath := filepath.Join(tmpDir, ".skills-seed")
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "docs", "examples"), 0o755))
-	require.NoError(t, os.MkdirAll(seedPath, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "README.MD"), []byte("# readme\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "docs", "Guide.MD"), []byte("# guide\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "docs", "examples", "main.go"), []byte("package examples\n"), 0o644))
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
-		Exclude:    []string{".*"},
-	})
-	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
-
-	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{})
-
-	require.NoError(t, err)
-	require.Equal(t, []agent.SampleFile{{Path: "docs/examples/main.go"}}, received.SampleFiles)
-	require.Empty(t, received.DiffFiles)
-}
-
-func TestAnalyzeCodebaseFullCapsSnapshotAddedSampleFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	seedPath := filepath.Join(tmpDir, ".skills-seed")
-	require.NoError(t, os.MkdirAll(seedPath, 0o755))
-	for i := 0; i < 20; i++ {
-		path := filepath.Join(tmpDir, fmt.Sprintf("added_%02d.go", i))
-		require.NoError(t, os.WriteFile(path, []byte("package added\n"), 0o644))
-	}
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
-		Exclude:    []string{".*"},
-	})
-	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
-
-	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test", "go", AnalyzeCodebaseOptions{})
-
-	require.NoError(t, err)
-	require.Len(t, received.SampleFiles, maxSampleFiles)
-}
-
 func TestCollectSampleFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
@@ -834,7 +420,7 @@ func TestCollectSampleFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main_test.go"), []byte("package main"), 0644))
 
 	svc := &AnalyzerService{}
-	files := svc.collectSampleFiles(tmpDir, "go")
+	files := svc.collectSampleFilesFromRoots(tmpDir, nil, "go")
 	assert.NotEmpty(t, files)
 	assertSamplePathsContain(t, files, "main.go", "internal/service/user.go", "main_test.go")
 }
@@ -845,7 +431,7 @@ func TestCollectSampleFiles_ReturnsPathsWithoutEmbeddingContent(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "webshell.go"), []byte(longUTF8Content), 0644))
 
 	svc := &AnalyzerService{}
-	files := svc.collectSampleFiles(tmpDir, "go")
+	files := svc.collectSampleFilesFromRoots(tmpDir, nil, "go")
 
 	require.Len(t, files, 1)
 	assert.Equal(t, "webshell.go", files[0].Path)
@@ -858,7 +444,7 @@ func TestCollectSampleFiles_DoesNotTreatVendorAsKeyword(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main"), 0644))
 
 	svc := &AnalyzerService{}
-	files := svc.collectSampleFiles(tmpDir, "go")
+	files := svc.collectSampleFilesFromRoots(tmpDir, nil, "go")
 	assertSamplePathsContain(t, files, "main.go", "vendor/pkg/lib.go")
 }
 
@@ -869,7 +455,7 @@ func TestCollectSampleFilesKeepsSourceFilesUnderDocs(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "docs", "Guide.MD"), []byte("# guide"), 0644))
 
 	svc := &AnalyzerService{}
-	files := svc.collectSampleFiles(tmpDir, "go")
+	files := svc.collectSampleFilesFromRoots(tmpDir, nil, "go")
 
 	require.Len(t, files, 1)
 	require.Equal(t, "docs/examples/main.go", files[0].Path)
@@ -888,7 +474,7 @@ func TestCollectSampleFiles_UsesConfiguredExclude(t *testing.T) {
 		Exclude:    []string{"internal/generated/**"},
 	})
 
-	files := svc.collectSampleFiles(tmpDir, "go")
+	files := svc.collectSampleFilesFromRoots(tmpDir, nil, "go")
 	require.NotEmpty(t, files)
 	for _, f := range files {
 		assert.NotContains(t, f.Path, "internal/generated")
@@ -912,13 +498,15 @@ func TestNewAnalyzerService_DefaultLocale(t *testing.T) {
 	assert.NotNil(t, svc)
 }
 
-func TestAnalyzeProjectFull_WithMock(t *testing.T) {
+func TestRefreshProjectProfile_WithMock(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "pkg"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "pkg", "response.go"), []byte("package pkg\n\nfunc Response(value any) error { return nil }\n"), 0o644))
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			return &agent.AnalyzeProjectResult{
 				Language:       "go",
 				Frameworks:     []string{"gin", "gorm"},
@@ -935,36 +523,42 @@ func TestAnalyzeProjectFull_WithMock(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, err := svc.AnalyzeProjectFull(ctx, tmpDir, "test-project")
+	profile, err := svc.RefreshProjectProfile(ctx, tmpDir, "test-project", "", AnalyzeProjectOptions{
+		LearningSession: session,
+	})
 	require.NoError(t, err)
-	assert.Equal(t, "go", result.Language)
-	assert.Contains(t, result.Frameworks, "gin")
-	assert.Contains(t, result.Frameworks, "gorm")
-	assert.NotEmpty(t, result.KeyModules)
-	assert.NotEmpty(t, result.CommonUtils)
+	assert.Equal(t, "go", profile.Language)
+	assert.Contains(t, profile.Frameworks, "gin")
+	assert.Contains(t, profile.Frameworks, "gorm")
+	assert.NotEmpty(t, profile.KeyModules)
+	assert.NotEmpty(t, profile.CommonUtils)
 }
 
-func TestAnalyzeProjectFull_PassesReadmePathWithoutContent(t *testing.T) {
+func TestRefreshProjectProfile_PassesReadmePathWithoutContent(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# secret readme content"), 0644))
 
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, nil)
 
-	_, err := svc.AnalyzeProjectFull(context.Background(), tmpDir, "test-project")
+	_, err := svc.RefreshProjectProfile(context.Background(), tmpDir, "test-project", "", AnalyzeProjectOptions{
+		LearningSession: session,
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "README.md", received.ReadmePath)
 }
 
-func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testing.T) {
+func TestBuildProjectProfileResult_PassesIncrementalProfileContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0755))
@@ -974,7 +568,9 @@ func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testin
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
@@ -987,9 +583,10 @@ func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testin
 		KeyModules:   []domain.ModuleInfo{{Name: "service", Path: "internal/service"}},
 	}
 
-	_, err := svc.AnalyzeProjectFullWithOptions(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
+	_, err := svc.buildProjectProfileResult(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
 		ExistingProfile: existingProfile,
 		FocusPaths:      []string{filepath.Join(tmpDir, "internal", "service")},
+		LearningSession: session,
 	})
 
 	require.NoError(t, err)
@@ -999,7 +596,7 @@ func TestAnalyzeProjectFullWithOptions_PassesIncrementalProfileContext(t *testin
 	assert.Contains(t, received.Structure, "internal/service")
 }
 
-func TestAnalyzeProjectFullWithOptions_FocusedStructureOmitsUnfocusedTree(t *testing.T) {
+func TestBuildProjectProfileResult_FocusedStructureOmitsUnfocusedTree(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0755))
@@ -1009,15 +606,18 @@ func TestAnalyzeProjectFullWithOptions_FocusedStructureOmitsUnfocusedTree(t *tes
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
 	svc := NewAnalyzerService(mockAgent, nil)
 
-	_, err := svc.AnalyzeProjectFullWithOptions(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
-		FocusPaths: []string{filepath.Join(tmpDir, "internal", "service")},
+	_, err := svc.buildProjectProfileResult(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
+		FocusPaths:      []string{filepath.Join(tmpDir, "internal", "service")},
+		LearningSession: session,
 	})
 
 	require.NoError(t, err)
@@ -1027,41 +627,15 @@ func TestAnalyzeProjectFullWithOptions_FocusedStructureOmitsUnfocusedTree(t *tes
 	assert.NotContains(t, received.Structure, "Project structure:")
 }
 
-func TestAnalyzeCodebaseFullWithOptions_FocusedStructureOmitsUnfocusedTree(t *testing.T) {
-	tmpDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "service"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "internal", "agent"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "service", "service.go"), []byte("package service\n"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "agent", "agent.go"), []byte("package agent\n"), 0644))
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-
-	_, _, err := svc.AnalyzeCodebaseFullWithOptions(context.Background(), tmpDir, "test-project", "go", AnalyzeCodebaseOptions{
-		FocusPaths: []string{filepath.Join(tmpDir, "internal", "service")},
-	})
-
-	require.NoError(t, err)
-	assert.Contains(t, received.Structure, "Focused scan paths")
-	assert.Contains(t, received.Structure, "internal/service")
-	assert.NotContains(t, received.Structure, "internal/agent")
-	assert.NotContains(t, received.Structure, "Project structure:")
-}
-
-func TestAnalyzeProjectFullWithOptions_PassesRuntimeUserContext(t *testing.T) {
+func TestBuildProjectProfileResult_PassesRuntimeUserContext(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	var received agent.AnalyzeProjectRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
-		AnalyzeProjectFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	}
+	session := &profileRefreshTestSession{
+		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 			received = *req
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
@@ -1069,30 +643,12 @@ func TestAnalyzeProjectFullWithOptions_PassesRuntimeUserContext(t *testing.T) {
 	svc := NewAnalyzerService(mockAgent, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), "私有化 HSM 工作区，交付物是离线安装包。")
 
-	_, err := svc.AnalyzeProjectFullWithOptions(ctx, tmpDir, "test-project", "go", AnalyzeProjectOptions{})
+	_, err := svc.buildProjectProfileResult(ctx, tmpDir, "test-project", "go", AnalyzeProjectOptions{
+		LearningSession: session,
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "私有化 HSM 工作区，交付物是离线安装包。", received.UserContext)
-}
-
-func TestAnalyzeCodebaseFullWithOptions_PassesRuntimeUserContext(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	var received agent.AnalyzeCurrentCodebaseRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-			received = *req
-			return &agent.AnalyzeCurrentCodebaseResult{}, nil
-		},
-	}
-	svc := NewAnalyzerService(mockAgent, nil)
-	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 是管理 API，core-engine 是核心能力库。")
-
-	_, _, err := svc.AnalyzeCodebaseFullWithOptions(ctx, tmpDir, "test-project", "go", AnalyzeCodebaseOptions{})
-
-	require.NoError(t, err)
-	assert.Equal(t, "hsmwebapi 是管理 API，core-engine 是核心能力库。", received.UserContext)
 }
 
 type fakeStructuralCollector struct {
@@ -1100,17 +656,65 @@ type fakeStructuralCollector struct {
 	err     error
 }
 
+type recordingStructuralCollector struct {
+	context  string
+	err      error
+	requests *[]structuralContextRequest
+}
+
+type profileRefreshTestSession struct {
+	called   bool
+	result   *agent.AnalyzeProjectResult
+	fn       func(context.Context, *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
+	selectFn func(context.Context, *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error)
+}
+
+func (s *profileRefreshTestSession) SessionID() string {
+	return "profile-refresh-test"
+}
+
+func (s *profileRefreshTestSession) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
+	if s.selectFn != nil {
+		return s.selectFn(ctx, req)
+	}
+	return &agent.SelectLearningCandidatesResult{}, nil
+}
+
+func (s *profileRefreshTestSession) PlanLearningAgenda(context.Context, *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+	return &agent.PlanLearningAgendaResult{}, nil
+}
+
+func (s *profileRefreshTestSession) AnalyzeCurrentCodebaseBatch(context.Context, *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+	return &agent.AnalyzeCurrentCodebaseBatchResult{}, nil
+}
+
+func (s *profileRefreshTestSession) AnalyzeCurrentDeltaBatch(context.Context, *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
+	return &agent.AnalyzeCurrentDeltaBatchResult{}, nil
+}
+
+func (s *profileRefreshTestSession) RefreshProjectProfile(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	s.called = true
+	if s.fn != nil {
+		return s.fn(ctx, req)
+	}
+	return s.result, nil
+}
+
+func (s *profileRefreshTestSession) CuratePatterns(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+	return &agent.CuratePatternsResult{}, nil
+}
+
+func (s *profileRefreshTestSession) Close(context.Context) error {
+	return nil
+}
+
 func (f fakeStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
 	return f.context, f.err
 }
 
-type recordingStructuralCollector struct {
-	context string
-	err     error
-	req     structuralContextRequest
-}
-
-func (r *recordingStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
-	r.req = req
-	return r.context, r.err
+func (f recordingStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
+	if f.requests != nil {
+		*f.requests = append(*f.requests, req)
+	}
+	return f.context, f.err
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
+const OperationLearningConversationStart = "LearningConversationStart"
+
 // RuntimeTask 标识一次 agent 调用中共享的 runtime 文件名前缀。
 type RuntimeTask struct {
 	ID         string

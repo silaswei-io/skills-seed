@@ -12,6 +12,12 @@ import (
 
 	"github.com/gofrs/flock"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
+)
+
+const (
+	// lockDirMode 是跨进程目录替换锁的目录权限，仅允许当前用户访问锁文件。
+	lockDirMode os.FileMode = 0o700
 )
 
 // ReplaceDirOptions 配置目录替换的权限和发布前边界复检。
@@ -113,7 +119,7 @@ func prepareDirectoryReplacement(target string, validate func() error) (string, 
 	if err != nil {
 		return "", "", func() {}, err
 	}
-	if err := os.MkdirAll(filepath.Dir(lockFile), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(lockFile), lockDirMode); err != nil {
 		return "", "", func() {}, err
 	}
 	lock := flock.New(lockFile)
@@ -244,7 +250,7 @@ func loadDirectoryTransaction(path string) (directoryTransaction, error) {
 		return directoryTransaction{}, err
 	}
 	var tx directoryTransaction
-	if err := json.Unmarshal(data, &tx); err != nil {
+	if err := jsonx.Unmarshal(data, &tx); err != nil {
 		return directoryTransaction{}, fmt.Errorf("%s: %w", i18n.Get("DirectoryParseTransactionFailed"), err)
 	}
 	return tx, nil
@@ -281,11 +287,36 @@ func lockPath(target string) (string, error) {
 		absTarget = filepath.Join(resolvedParent, filepath.Base(absTarget))
 	}
 	cacheDir, err := os.UserCacheDir()
-	if err != nil {
-		return "", err
-	}
+	lockDir := writableLockDir(cacheDir, err)
 	sum := sha256.Sum256([]byte(filepath.Clean(absTarget)))
-	return filepath.Join(cacheDir, "skills-seed", "locks", hex.EncodeToString(sum[:])+".lock"), nil
+	return filepath.Join(lockDir, hex.EncodeToString(sum[:])+".lock"), nil
+}
+
+func writableLockDir(userCacheDir string, userCacheErr error) string {
+	if userCacheErr == nil && userCacheDir != "" {
+		lockDir := filepath.Join(userCacheDir, "skills-seed", "locks")
+		if ensureWritableDir(lockDir) == nil {
+			return lockDir
+		}
+	}
+	return filepath.Join(os.TempDir(), "skills-seed", "locks")
+}
+
+func ensureWritableDir(path string) error {
+	if err := os.MkdirAll(path, lockDirMode); err != nil {
+		return err
+	}
+	probe, err := os.CreateTemp(path, ".write-check-")
+	if err != nil {
+		return err
+	}
+	name := probe.Name()
+	closeErr := probe.Close()
+	removeErr := os.Remove(name)
+	if closeErr != nil {
+		return closeErr
+	}
+	return removeErr
 }
 
 func backupPath(target string) string {

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/knowledge/routing"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 )
 
 type businessMethodIndex struct {
@@ -83,11 +83,11 @@ func businessMethodGroupTitle(module, locale string) string {
 	if module == "" || module == "project" {
 		return generatorText(locale, "GeneratorBusinessMethodProjectGroupTitle")
 	}
-	words := routing.SplitBusinessGroupWords(module)
+	words := knowledge.SplitBusinessGroupWords(module)
 	if len(words) == 0 {
 		return module
 	}
-	return routing.TitleFromWords(words)
+	return knowledge.TitleFromWords(words)
 }
 
 func businessMethodGroupSummary(group businessMethodGroup, locale string) string {

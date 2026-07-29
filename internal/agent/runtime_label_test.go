@@ -8,40 +8,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRuntimeLabelFromAnalysisUnitPrefersID(t *testing.T) {
-	label := RuntimeLabelFromAnalysisUnit("auth-login", "认证登录")
+func TestRuntimeLabelFromEvidenceFocusPrefersID(t *testing.T) {
+	label := RuntimeLabelFromEvidenceFocus("auth-login", "认证登录")
 
-	require.Equal(t, "unit-auth-login", label)
+	require.Equal(t, "focus-auth-login", label)
 }
 
-func TestRuntimeLabelFromAnalysisUnitFallsBackToBoundedName(t *testing.T) {
-	label := RuntimeLabelFromAnalysisUnit("", strings.Repeat("payment-", 20))
+func TestRuntimeLabelFromEvidenceFocusFallsBackToBoundedName(t *testing.T) {
+	label := RuntimeLabelFromEvidenceFocus("", strings.Repeat("payment-", 20))
 
-	require.True(t, strings.HasPrefix(label, "unit-payment"))
-	require.LessOrEqual(t, len([]rune(strings.TrimPrefix(label, "unit-"))), runtimefiles.MaxSafePartLength)
+	require.True(t, strings.HasPrefix(label, "focus-payment"))
+	require.LessOrEqual(t, len([]rune(strings.TrimPrefix(label, "focus-"))), runtimefiles.MaxSafePartLength)
 }
 
-func TestRuntimeLabelFromAnalysisUnitSkipsNonASCIIName(t *testing.T) {
-	label := RuntimeLabelFromAnalysisUnit("", "认证登录")
+func TestRuntimeLabelFromEvidenceFocusSkipsNonASCIIName(t *testing.T) {
+	label := RuntimeLabelFromEvidenceFocus("", "认证登录")
 
 	require.Empty(t, label)
 }
 
-func TestAnalyzeCurrentCodebaseOperationIncludesRuntimeLabel(t *testing.T) {
-	operation := AnalyzeCurrentCodebaseOperation(&AnalyzeCurrentCodebaseRequest{RuntimeLabel: "unit-auth-login"})
+func TestAnalyzeCurrentCodebaseBatchOperationIncludesRuntimeLabel(t *testing.T) {
+	operation := AnalyzeCurrentCodebaseBatchOperation(&AnalyzeCurrentCodebaseBatchRequest{RuntimeLabel: "focus-auth-login"})
 
-	require.Equal(t, "AnalyzeCurrentCodebase/unit-auth-login", operation)
-	require.Equal(t, "unit-auth-login", OperationLabel(operation))
+	require.Equal(t, "AnalyzeCurrentCodebaseBatch/focus-auth-login", operation)
+	require.Equal(t, "focus-auth-login", OperationLabel(operation))
 }
 
 func TestRuntimeSlugKeepsDistinctLabel(t *testing.T) {
-	slug := RuntimeSlug("pattern-learn-current", "unit-auth")
+	slug := RuntimeSlug("learning-pack-analyze", "focus-auth")
 
-	require.Equal(t, "pattern-learn-current-unit-auth", slug)
+	require.Equal(t, "learning-pack-analyze-focus-auth", slug)
 }
 
 func TestRuntimeSlugTrimsOverlappingBatchLabel(t *testing.T) {
-	slug := RuntimeSlug("pattern-learn-current-batch", "batch-008")
+	slug := RuntimeSlug("learning-pack-analyze-batch", "batch-008")
 
-	require.Equal(t, "pattern-learn-current-batch-008", slug)
+	require.Equal(t, "learning-pack-analyze-batch-008", slug)
 }

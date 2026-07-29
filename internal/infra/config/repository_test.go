@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,11 +87,11 @@ func TestNewRepository(t *testing.T) {
 		require.NotContains(t, text, `shared:`)
 		require.NotContains(t, text, `contracts:`)
 		require.NotContains(t, text, `infra:`)
-		require.Contains(t, text, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
-		require.Contains(t, text, "# 学习模式：normal 最稳妥，平衡质量和速度；fast 只保留高价值核心模式；deep 会读取更深分支和异常路径\n    mode: \"normal\"")
-		require.Contains(t, text, "# 分析单元切分范围：flow 默认且最稳定，按业务流程/资源动作拆分；domain 更粗、模式更少；module 更细，适合插件/模块边界清晰的仓库\n    scope: \"flow\"")
-		require.Contains(t, text, "# 单次 AI 调用最多分析的单元数；1 表示不合批，降低单次输出过大和跨单元串扰风险\n    max_units_per_call: 1")
-		require.Contains(t, text, "# 候选文件数达到该阈值时才调用 AI 文件筛选；小项目直接使用本地过滤结果\n    select_relevant_files_min_candidates: 200")
+		require.Contains(t, text, "# 学习策略：normal 平衡质量和速度；fast 保留紧凑但直接有证据的模式；deep 更愿意保留有证据的局部业务/代码模式\n    mode: \"normal\"")
+		require.Contains(t, text, "# 学习焦点规划取向：flow 默认且最稳定，优先关注业务流程/资源动作；domain 更偏长期业务职责；module 更偏模块/插件/契约边界\n    scope: \"flow\"")
+		require.Contains(t, text, "# 单次 AI 调用最多分析的焦点数；1 表示不合批，降低单次输出过大和跨焦点串扰风险\n    max_focuses_per_call: 1")
+		require.Contains(t, text, "select_relevant_files: true")
+		require.Contains(t, text, "select_relevant_files_min_candidates: 200")
 		require.Contains(t, text, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
 		require.Contains(t, text, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界\n########################################################################\nexclude:")
 		require.Contains(t, text, "# 是否排除 Git ignore 命中的文件\n  gitignore: true")
@@ -128,15 +129,12 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
 	assert.False(t, cfg.Agent.AllowUserPlugins)
-	assert.Equal(t, 1, cfg.Learning.Current.MaxUnitsPerCall)
+	assert.Equal(t, 1, cfg.Learning.Current.MaxFocusesPerCall)
 	assert.True(t, cfg.Learning.Current.SelectRelevantFiles)
 	assert.Equal(t, 200, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
 	assert.True(t, cfg.Learning.Current.Structural.Enabled)
 	assert.Equal(t, 30, cfg.Learning.Current.Structural.MaxSymbols)
 	assert.Equal(t, 512, cfg.Learning.Current.Structural.MaxFileSize)
-	assert.Equal(t, 50, cfg.Learning.History.MaxCommits)
-	assert.Equal(t, 5, cfg.Learning.History.BatchSize)
-	assert.Equal(t, "patch", cfg.AutoFix.Strategy)
 	assert.Equal(t, "claude", cfg.Skills.Target)
 	assert.Equal(t, "en-US", cfg.Skills.Locale)
 	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Skills.Paths["claude"])
@@ -183,8 +181,6 @@ agent:
     codex: "codex"
 learning:
   max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   target: "codex"
   paths:
@@ -266,7 +262,6 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 			Timeout: 1800,
 		},
 		Learning: defaultLearningConfig(),
-		AutoFix:  AutoFixConfig{Strategy: "patch", BackupPath: "backups"},
 		Skills: SkillsConfig{Target: "codex", Paths: map[string]string{
 			"claude": ".claude/skills/skills-seed-skills",
 			"codex":  ".agents/skills/skills-seed-skills",
@@ -278,7 +273,16 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 		},
 	}
 
-	content := repo.replaceConfigValues(string(templateData), cfg)
+	repo.normalizeConfig(cfg)
+	var root yaml.Node
+	require.NoError(t, yaml.Unmarshal(templateData, &root))
+	applyConfigNodeValues(&root, cfg)
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	require.NoError(t, encoder.Encode(&root))
+	require.NoError(t, encoder.Close())
+	content := formatTopLevelModuleSpacing(buf.String())
 	var parsed Config
 	require.NoError(t, yaml.Unmarshal([]byte(content), &parsed), content)
 	require.Contains(t, content, "\nprofile:")
@@ -296,7 +300,8 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.Contains(t, content, `- "*.log"`)
 	require.NotContains(t, content, `analysis:`)
 	require.NotContains(t, content, `ai_file_selector:`)
-	require.Contains(t, content, "# 启用相关文件筛选，先基于候选文件树收敛 learn current 的分析范围\n    select_relevant_files: true")
+	require.Contains(t, content, "select_relevant_files: true")
+	require.Contains(t, content, "select_relevant_files_min_candidates: 200")
 	require.Contains(t, content, `enabled: true`)
 	require.Contains(t, content, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界")
 	require.Contains(t, content, "# 是否排除 Git ignore 命中的文件\n  gitignore: true")
@@ -399,13 +404,7 @@ learning:
       enabled: true # 自定义结构化上下文注释
       max_symbols: 30
       max_file_size: 512
-  history:
-    max_commits: 50
-    batch_size: 5
 
-autofix:
-  strategy: "patch"
-  backup_path: "backups"
 
 skills:
   target: "claude"
@@ -436,9 +435,9 @@ exclude:
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 	}
 	cfg.Learning.Current.Structural.Enabled = false
-	cfg.Learning.Current.MaxUnitsPerCall = 3
+	cfg.Learning.Current.MaxFocusesPerCall = 3
 	cfg.Learning.Current.SelectRelevantFiles = false
-	cfg.Learning.Current.SelectRelevantFilesMinCandidates = 40
+	cfg.Learning.Current.SelectRelevantFilesMinCandidates = 25
 	cfg.Exclude.GitIgnore = false
 	cfg.Exclude.Paths = []string{".*", "dist/**"}
 	require.NoError(t, repo.Update(cfg))
@@ -451,7 +450,9 @@ exclude:
 	require.Contains(t, text, "# 自定义工作区注释")
 	require.Contains(t, text, "# 自定义子项目注释\n  projects:")
 	require.Contains(t, text, "# 自定义结构化上下文注释\n      enabled: false")
-	require.Contains(t, text, "max_units_per_call: 3")
+	require.Contains(t, text, "max_focuses_per_call: 3")
+	require.Contains(t, text, "select_relevant_files: false")
+	require.Contains(t, text, "select_relevant_files_min_candidates: 25")
 	require.Contains(t, text, "exclude:\n  gitignore: false")
 	require.Contains(t, text, "# 保留点号文件注释\n    - \".*\"")
 	require.NotContains(t, text, "\nfile_filter:")
@@ -470,9 +471,7 @@ exclude:
 	require.Equal(t, "workspace", reloaded.GetProjectConfig().Mode)
 	require.False(t, reloaded.GetCurrentLearningConfig().Structural.Enabled)
 	require.Equal(t, LearningModeNormal, reloaded.GetCurrentLearningConfig().Mode)
-	require.Equal(t, 3, reloaded.GetCurrentLearningConfig().MaxUnitsPerCall)
-	require.False(t, reloaded.GetCurrentLearningConfig().SelectRelevantFiles)
-	require.Equal(t, 40, reloaded.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
+	require.Equal(t, 3, reloaded.GetCurrentLearningConfig().MaxFocusesPerCall)
 	require.False(t, reloaded.GetExcludeConfig().GitIgnore)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 1)
 	require.Equal(t, []string{".*", "dist/**"}, reloaded.GetExclude())
@@ -507,10 +506,6 @@ profile:
 agent:
   engine: "claude"
 learning:
-  history:
-    max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   paths: {}
 logging:
@@ -535,10 +530,6 @@ profile:
 agent:
   engine: "claude"
 learning:
-  history:
-    max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   paths: {}
 logging:
@@ -564,10 +555,6 @@ profile:
 agent:
   engine: "claude"
 learning:
-  history:
-    max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   paths: {}
 logging:
@@ -593,10 +580,6 @@ agent:
 file_filter:
   apply_git_ignore: false
 learning:
-  history:
-    max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   paths: {}
 logging:
@@ -621,10 +604,6 @@ profile:
 agent:
   engine: "claude"
 learning:
-  history:
-    max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   paths: {}
 logging:
@@ -638,8 +617,6 @@ exclude:
 
 	cfg := repo.GetCurrentLearningConfig().Structural
 	require.Equal(t, LearningModeNormal, repo.GetCurrentLearningConfig().Mode)
-	require.True(t, repo.GetCurrentLearningConfig().SelectRelevantFiles)
-	require.Equal(t, 200, repo.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.True(t, cfg.Enabled)
 	require.Equal(t, 30, cfg.MaxSymbols)
 	require.Equal(t, 512, cfg.MaxFileSize)
@@ -658,14 +635,11 @@ agent:
 learning:
   current:
     select_relevant_files: false
+    select_relevant_files_min_candidates: 50
     structural:
       enabled: false
       max_symbols: 12
       max_file_size: 256
-  history:
-    max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   paths: {}
 logging:
@@ -679,8 +653,6 @@ exclude:
 
 	cfg := repo.GetCurrentLearningConfig().Structural
 	require.Equal(t, LearningModeNormal, repo.GetCurrentLearningConfig().Mode)
-	require.False(t, repo.GetCurrentLearningConfig().SelectRelevantFiles)
-	require.Equal(t, 200, repo.GetCurrentLearningConfig().SelectRelevantFilesMinCandidates)
 	require.False(t, cfg.Enabled)
 	require.Equal(t, 12, cfg.MaxSymbols)
 	require.Equal(t, 256, cfg.MaxFileSize)
@@ -715,10 +687,6 @@ learning:
     mode: "`+tt.raw+`"
     structural:
       enabled: true
-  history:
-    max_commits: 50
-autofix:
-  strategy: "patch"
 skills:
   paths: {}
 logging:
@@ -766,11 +734,7 @@ func TestRepository_GetLearningConfig(t *testing.T) {
 	repo := setupTestConfig(t)
 	learningCfg := repo.GetLearningConfig()
 
-	assert.True(t, learningCfg.Current.SelectRelevantFiles)
-	assert.Equal(t, 200, learningCfg.Current.SelectRelevantFilesMinCandidates)
 	assert.True(t, learningCfg.Current.Structural.Enabled)
-	assert.Equal(t, 50, learningCfg.History.MaxCommits)
-	assert.Equal(t, 5, learningCfg.History.BatchSize)
 	assert.Equal(t, learningCfg.Current, repo.GetCurrentLearningConfig())
 }
 
@@ -806,31 +770,6 @@ func TestRepository_SetLocale(t *testing.T) {
 	repo2, err := NewRepository(seedPath, "en-US")
 	require.NoError(t, err)
 	assert.Equal(t, "en-US", repo2.Get().Project.Locale)
-}
-
-func TestRepository_SetAutoFixStrategy(t *testing.T) {
-	seedPath := t.TempDir()
-	repo, err := NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-
-	err = repo.SetAutoFixStrategy("backup")
-	require.NoError(t, err)
-
-	// 校验内存中的值。
-	assert.Equal(t, "backup", repo.Get().AutoFix.Strategy)
-
-	// 重新读取磁盘，校验已持久化。
-	repo2, err := NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	assert.Equal(t, "backup", repo2.Get().AutoFix.Strategy)
-}
-
-func TestRepository_GetAutoFixConfig(t *testing.T) {
-	repo := setupTestConfig(t)
-	autoFixCfg := repo.GetAutoFixConfig()
-
-	assert.Equal(t, "patch", autoFixCfg.Strategy)
-	assert.Equal(t, "backups", autoFixCfg.BackupPath)
 }
 
 func TestRepository_GetSkillsConfig(t *testing.T) {
@@ -875,14 +814,12 @@ func TestRepository_Update(t *testing.T) {
 
 	cfg := repo.Get()
 	cfg.Agent.Timeout = 3600
-	cfg.Learning.History.MaxCommits = 100
 
 	err := repo.Update(cfg)
 	require.NoError(t, err)
 
 	updated := repo.Get()
 	assert.Equal(t, 3600, updated.Agent.Timeout)
-	assert.Equal(t, 100, updated.Learning.History.MaxCommits)
 }
 
 func TestRepository_SetProjectLanguage(t *testing.T) {

@@ -3,6 +3,7 @@ package curator
 import (
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +22,7 @@ func TestValidateProposalOwnershipRejectsSourceUsedByMultipleOutputs(t *testing.
 func TestValidateProposalOwnershipRejectsOutputThatIsDropped(t *testing.T) {
 	result := &proposal{
 		Patterns: []domain.Pattern{{ID: "candidate", MergedFrom: []string{"candidate"}}},
-		Dropped:  []Drop{{ID: "candidate", Reason: "noise"}},
+		Dropped:  []Drop{{ID: "candidate", ReasonCode: agent.CuratedDropUnsupportedEvidence, Reason: "noise"}},
 	}
 
 	err := validateProposalOwnership(result)

@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/codegraph"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 type codeGraphProvider struct {
@@ -39,14 +40,17 @@ func (p *codeGraphProvider) Collect(ctx context.Context, projectRoot string, req
 		return nil, nil
 	}
 	startedAt := time.Now()
+	req.report(structuralContextStageCodeGraphIndex)
 	status, err := p.client.EnsureReady(ctx, projectRoot)
 	if err != nil {
 		return nil, err
 	}
 
 	args := []string{"context", "-p", projectRoot, "-n", fmt.Sprintf("%d", p.maxSymbols), "--no-code", codeGraphTask(req)}
+	req.report(structuralContextStageCodeGraphContext)
 	contextOutput, err := p.client.Run(ctx, projectRoot, args...)
 	if err != nil {
+		req.report(structuralContextStageCodeGraphRepair)
 		repairedStatus, repairErr := p.client.Repair(ctx, projectRoot)
 		if repairErr != nil {
 			return nil, fmt.Errorf("%w: context failed: %v: %s; repair failed: %v",
@@ -57,6 +61,7 @@ func (p *codeGraphProvider) Collect(ctx context.Context, projectRoot string, req
 			)
 		}
 		status = repairedStatus
+		req.report(structuralContextStageCodeGraphContext)
 		contextOutput, err = p.client.Run(ctx, projectRoot, args...)
 		if err != nil {
 			return nil, fmt.Errorf("%w: context failed after repair: %v: %s", codegraph.ErrNotReady, err, strings.TrimSpace(contextOutput))
@@ -74,7 +79,7 @@ func (p *codeGraphProvider) Collect(ctx context.Context, projectRoot string, req
 		},
 	}
 
-	logger.Diagnostic("operation complete",
+	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "analyzer.codegraph_collect",
 		"duration", time.Since(startedAt),
 		"context_bytes", len(contextOutput),

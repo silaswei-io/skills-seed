@@ -42,14 +42,19 @@ func TestCurateAndStoreUsesSemanticCurationForLearnCurrent(t *testing.T) {
 					Rule:      keep.Rule,
 					SourceIDs: []string{keep.ID},
 				}},
-				Dropped: []agent.CuratedDrop{{ID: drop.ID, Reason: "local fact without a reusable invariant"}},
+				Dropped: []agent.CuratedDrop{{
+					ID:         drop.ID,
+					ReasonCode: agent.CuratedDropNoRouteableValue,
+					Reason:     "local fact without a reusable invariant",
+				}},
 			}, nil
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*keep, *drop},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*keep, *drop},
 	})
 
 	require.NoError(t, err)
@@ -59,6 +64,48 @@ func TestCurateAndStoreUsesSemanticCurationForLearnCurrent(t *testing.T) {
 	require.Len(t, saved, 1)
 	require.Equal(t, 1, saved[0].Frequency)
 	require.Equal(t, 0.80, saved[0].Confidence)
+}
+
+func TestCurateAndStoreRecoversSourceBackedCandidatesDroppedAsTooGeneric(t *testing.T) {
+	apiContract := newCuratorTestPattern("api-contract-error-response", "API Contract Error Response", domain.CategoryAPI)
+	apiContract.Description = "Handlers return the repository-specific error response envelope from the generated API boundary."
+	apiContract.Rule = "When changing API handlers, preserve the verified response envelope and error mapping entry."
+	apiContract.GoodExample = "return response.Error(ctx, err)"
+	apiContract.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/handler/user.go", Line: 42, Symbol: "UserHandler", Kind: "function"}}
+
+	var saved []*domain.Pattern
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
+		SaveFn: func(ctx context.Context, pattern *domain.Pattern) error {
+			saved = append(saved, pattern)
+			return nil
+		},
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			return &agent.CuratePatternsResult{
+				Dropped: []agent.CuratedDrop{{
+					ID:         apiContract.ID,
+					ReasonCode: agent.CuratedDropOverfilteredSourceBacked,
+					Reason:     "generic framework convention, not project-specific",
+				}},
+			}, nil
+		},
+	}
+
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*apiContract},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Empty(t, result.Dropped)
+	require.Len(t, saved, 1)
+	require.Equal(t, apiContract.ID, saved[0].ID)
+	require.Equal(t, []string{apiContract.ID}, saved[0].MergedFrom)
 }
 
 func TestCurateAndStorePrefersCurrentPatternOverConflictingDrop(t *testing.T) {
@@ -77,14 +124,19 @@ func TestCurateAndStorePrefersCurrentPatternOverConflictingDrop(t *testing.T) {
 					Rule:      candidate.Rule,
 					SourceIDs: []string{candidate.ID},
 				}},
-				Dropped: []agent.CuratedDrop{{ID: candidate.ID, Reason: "duplicate decision"}},
+				Dropped: []agent.CuratedDrop{{
+					ID:         candidate.ID,
+					ReasonCode: agent.CuratedDropExactDuplicate,
+					Reason:     "duplicate decision",
+				}},
 			}, nil
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -118,14 +170,19 @@ func TestCurateAndStoreResolvesOverlappingSourceOwnership(t *testing.T) {
 						SourceIDs: []string{pluginLifecycle.ID, contextInjection.ID},
 					},
 				},
-				Dropped: []agent.CuratedDrop{{ID: contextInjection.ID, Reason: "merged into lifecycle"}},
+				Dropped: []agent.CuratedDrop{{
+					ID:         contextInjection.ID,
+					ReasonCode: agent.CuratedDropExactDuplicate,
+					Reason:     "merged into lifecycle",
+				}},
 			}, nil
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*contextInjection, *pluginLifecycle},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*contextInjection, *pluginLifecycle},
 	})
 
 	require.NoError(t, err)
@@ -154,9 +211,10 @@ func TestCurateAndStoreRecoversAmbiguousSourceOwnership(t *testing.T) {
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -193,9 +251,10 @@ func TestCurateAndStoreRecoversUnclassifiedCoverageLocally(t *testing.T) {
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*first, *second},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*first, *second},
 	})
 
 	require.NoError(t, err)
@@ -214,15 +273,16 @@ func TestCurateAndStoreCanonicalizesDuplicateDroppedDecisions(t *testing.T) {
 		NameVal: "mock", AvailableVal: true,
 		CuratePatternsFn: func(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
 			return &agent.CuratePatternsResult{Dropped: []agent.CuratedDrop{
-				{ID: dropped.ID, Reason: "framework convention"},
-				{ID: dropped.ID, Reason: "framework convention"},
+				{ID: dropped.ID, ReasonCode: agent.CuratedDropExactDuplicate, Reason: "exact duplicate represented by another source"},
+				{ID: dropped.ID, ReasonCode: agent.CuratedDropExactDuplicate, Reason: "exact duplicate represented by another source"},
 			}}, nil
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*dropped, *recovered},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*dropped, *recovered},
 	})
 
 	require.NoError(t, err)
@@ -261,9 +321,10 @@ func TestCurateAndStoreDoesNotRetryIncompleteCoverage(t *testing.T) {
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: candidates,
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      candidates,
 	})
 
 	require.NoError(t, err)
@@ -297,9 +358,10 @@ func TestCurateAndStoreIgnoresUnknownMergedSourceWhenKnownSourcesRemain(t *testi
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -331,14 +393,19 @@ func TestCurateAndStoreIgnoresOrphanPatternWithoutTraceableSource(t *testing.T) 
 					Rule:      "Invented rule",
 					SourceIDs: []string{"invented-source"},
 				}},
-				Dropped: []agent.CuratedDrop{{ID: candidate.ID, Reason: "not reusable"}},
+				Dropped: []agent.CuratedDrop{{
+					ID:         candidate.ID,
+					ReasonCode: agent.CuratedDropNoRouteableValue,
+					Reason:     "not reusable",
+				}},
 			}, nil
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -348,7 +415,7 @@ func TestCurateAndStoreIgnoresOrphanPatternWithoutTraceableSource(t *testing.T) 
 	require.False(t, saved)
 }
 
-func TestLearnCurrentCurationRegressionKeepsEighteenPatternsInsteadOfAllCandidates(t *testing.T) {
+func TestLearnCurrentCurationAllowsExplicitLocalDuplicateDrops(t *testing.T) {
 	const (
 		candidateCount = 206
 		curatedCount   = 18
@@ -381,7 +448,11 @@ func TestLearnCurrentCurationRegressionKeepsEighteenPatternsInsteadOfAllCandidat
 	curated[0].SourceIDs = append(curated[0].SourceIDs, "ca-layered-error-code-pattern")
 	dropped := make([]agent.CuratedDrop, 0, droppedCount)
 	for i := mergeCandidateCount; i < candidateCount; i++ {
-		dropped = append(dropped, agent.CuratedDrop{ID: candidates[i].ID, Reason: "local duplicate"})
+		dropped = append(dropped, agent.CuratedDrop{
+			ID:         candidates[i].ID,
+			ReasonCode: agent.CuratedDropExactDuplicate,
+			Reason:     "local duplicate",
+		})
 	}
 
 	var saved int
@@ -399,9 +470,10 @@ func TestLearnCurrentCurationRegressionKeepsEighteenPatternsInsteadOfAllCandidat
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: candidates,
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      candidates,
 	})
 
 	require.NoError(t, err)
@@ -425,22 +497,60 @@ func TestHydrateCurrentCurateResultReplacesEvidenceFromUndeclaredSource(t *testi
 	require.Equal(t, first.EvidenceLocations, curated.Patterns[0].EvidenceLocations)
 }
 
-func TestCoalesceCurrentCandidatesCombinesEvidenceAcrossUnits(t *testing.T) {
+func TestCoalesceCurrentCandidatesCombinesEvidenceAcrossFocuses(t *testing.T) {
 	first := newCuratorTestPattern("shared-rule", "Shared Rule", domain.CategoryBusiness)
-	first.AnalysisUnitID = "unit-a"
-	first.AnalysisUnitName = "Unit A"
 	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "a.go", Line: 10, Symbol: "A", Kind: "func"}}
 	second := newCuratorTestPattern("shared-rule", "Shared Rule", domain.CategoryBusiness)
-	second.AnalysisUnitID = "unit-b"
-	second.AnalysisUnitName = "Unit B"
 	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "b.go", Line: 20, Symbol: "B", Kind: "func"}}
 
 	coalesced := coalesceCurrentCandidates([]domain.Pattern{*first, *second})
 
 	require.Len(t, coalesced, 1)
 	require.ElementsMatch(t, append(first.EvidenceLocations, second.EvidenceLocations...), coalesced[0].EvidenceLocations)
-	require.Empty(t, coalesced[0].AnalysisUnitID)
-	require.Empty(t, coalesced[0].AnalysisUnitName)
+}
+
+func TestCurateAndStoreCompactsDuplicateCurrentCandidatesBeforeAI(t *testing.T) {
+	first := newCuratorTestPattern("first", "Shared Error Rule", domain.CategoryError)
+	first.Rule = "Wrap repository errors with operation context."
+	first.Confidence = 0.70
+	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "first.go", Line: 10, Symbol: "First", Kind: "func"}}
+	second := newCuratorTestPattern("second", "Shared Error Rule", domain.CategoryError)
+	second.Rule = "Wrap repository errors with operation context."
+	second.Confidence = 0.90
+	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "second.go", Line: 20, Symbol: "Second", Kind: "func"}}
+
+	var aiCandidates []domain.Pattern
+	repo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}
+	mockAgent := &mocks.MockAgent{
+		NameVal: "mock", AvailableVal: true,
+		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+			aiCandidates = append([]domain.Pattern(nil), req.CandidatePatterns...)
+			require.Equal(t, 2, req.PrecompactionCount)
+			require.Len(t, req.CandidatePatterns, 1)
+			candidate := req.CandidatePatterns[0]
+			return &agent.CuratePatternsResult{Patterns: []agent.CuratedPattern{{
+				ID:        candidate.ID,
+				Name:      candidate.Name,
+				Category:  string(candidate.Category),
+				Rule:      candidate.Rule,
+				SourceIDs: []string{candidate.ID},
+			}}}, nil
+		},
+	}
+
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*first, *second},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, aiCandidates, 1)
+	require.ElementsMatch(t, append(first.EvidenceLocations, second.EvidenceLocations...), aiCandidates[0].EvidenceLocations)
+	require.Len(t, result.Written, 1)
+	require.ElementsMatch(t, append(first.EvidenceLocations, second.EvidenceLocations...), result.Written[0].EvidenceLocations)
 }
 
 func TestCurateAndStoreHydratesSourceOwnedFieldsFromMergedSources(t *testing.T) {
@@ -453,8 +563,6 @@ func TestCurateAndStoreHydratesSourceOwnedFieldsFromMergedSources(t *testing.T) 
 	candidate.ProjectID = "ca-admin"
 	candidate.ScopePath = "services/ca-admin"
 	candidate.WorkspaceRole = "service"
-	candidate.AnalysisUnitID = "repository-errors"
-	candidate.AnalysisUnitName = "Repository errors"
 
 	var saved []*domain.Pattern
 	repo := &mocks.MockPatternRepository{
@@ -480,11 +588,12 @@ func TestCurateAndStoreHydratesSourceOwnedFieldsFromMergedSources(t *testing.T) 
 			}, nil
 		},
 	}
-	svc := NewService(mockAgent, repo)
+	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -498,8 +607,6 @@ func TestCurateAndStoreHydratesSourceOwnedFieldsFromMergedSources(t *testing.T) 
 	require.Equal(t, candidate.ProjectID, saved[0].ProjectID)
 	require.Equal(t, candidate.ScopePath, saved[0].ScopePath)
 	require.Equal(t, candidate.WorkspaceRole, saved[0].WorkspaceRole)
-	require.Equal(t, candidate.AnalysisUnitID, saved[0].AnalysisUnitID)
-	require.Equal(t, candidate.AnalysisUnitName, saved[0].AnalysisUnitName)
 	require.Equal(t, 1, result.Summary.TotalCandidates)
 	require.Equal(t, 1, result.Summary.TotalWritten)
 	require.Zero(t, result.Summary.TotalDropped)
@@ -522,9 +629,10 @@ func TestCurateAndStoreDoesNotPersistCurrentCandidatesWhenSemanticCurationFails(
 		},
 	}
 
-	result, err := NewService(mockAgent, repo).CurateAndStore(context.Background(), CurateRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+	result, err := NewService(repo).CurateAndStore(context.Background(), CurateRequest{
+		Operation:       OperationLearnCurrent,
+		LearningSession: newCuratorTestLearningSession(mockAgent),
+		Candidates:      []domain.Pattern{*candidate},
 	})
 
 	require.ErrorContains(t, err, "curate current patterns")
@@ -551,11 +659,12 @@ func TestCurateAndStoreReplaysSavedAIDecision(t *testing.T) {
 	}
 	request := CurateRequest{
 		Operation:          OperationLearnCurrent,
+		LearningSession:    newCuratorTestLearningSession(mockAgent),
 		Candidates:         []domain.Pattern{*candidate},
 		DecisionCheckpoint: checkpoint,
 	}
 
-	first, err := NewService(mockAgent, &mocks.MockPatternRepository{
+	first, err := NewService(&mocks.MockPatternRepository{
 		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
 	}).CurateAndStore(context.Background(), request)
 	require.NoError(t, err)
@@ -563,7 +672,7 @@ func TestCurateAndStoreReplaysSavedAIDecision(t *testing.T) {
 	require.Equal(t, 1, calls)
 	require.Equal(t, 1, checkpoint.saves)
 
-	second, err := NewService(nil, &mocks.MockPatternRepository{
+	second, err := NewService(&mocks.MockPatternRepository{
 		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
 	}).CurateAndStore(context.Background(), request)
 	require.NoError(t, err)

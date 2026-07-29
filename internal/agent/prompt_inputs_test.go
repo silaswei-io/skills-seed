@@ -11,46 +11,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAnalyzeCurrentCodebasePromptDataNormalizesStructureInputFile(t *testing.T) {
-	session := &PromptInputSession{dir: t.TempDir()}
-
-	data, err := AnalyzeCurrentCodebasePromptData(session, &AnalyzeCurrentCodebaseRequest{
-		Structure: "demo\n\u00a0\u00a0cmd\n&nbsp;&nbsp;main.go   \n",
-	})
-	require.NoError(t, err)
-
-	structurePath, ok := data["StructurePath"].(string)
-	require.True(t, ok)
-	require.Equal(t, filepath.Join(session.dir, "project-structure.txt"), structurePath)
-
-	content, err := os.ReadFile(structurePath)
-	require.NoError(t, err)
-	text := string(content)
-	require.Equal(t, "demo\n  cmd\n  main.go\n", text)
-	require.NotContains(t, text, "\u00a0")
-	require.NotContains(t, text, "&nbsp;")
-	require.NotContains(t, text, "main.go   ")
-}
-
 func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
-	planData, err := PlanAnalysisUnitsPromptData(session, &PlanAnalysisUnitsRequest{})
+	planData, err := PlanLearningAgendaPromptData(session, &PlanLearningAgendaRequest{})
 	require.NoError(t, err)
 	require.Equal(t, config.LearningModeNormal, planData["LearningMode"])
 	require.Equal(t, config.LearningScopeFlow, planData["LearningScope"])
 
-	currentData, err := AnalyzeCurrentCodebasePromptData(session, &AnalyzeCurrentCodebaseRequest{
+	currentData, err := AnalyzeCurrentCodebaseBatchPromptData(session, &AnalyzeCurrentCodebaseBatchRequest{
 		LearningMode: config.LearningModeDeep,
 	})
 	require.NoError(t, err)
 	require.Equal(t, config.LearningModeDeep, currentData["LearningMode"])
 }
 
-func TestPlanAnalysisUnitsPromptDataWritesFocusedPathList(t *testing.T) {
+func TestPlanLearningAgendaPromptDataWritesFocusedPathList(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
-	data, err := PlanAnalysisUnitsPromptData(session, &PlanAnalysisUnitsRequest{
+	data, err := PlanLearningAgendaPromptData(session, &PlanLearningAgendaRequest{
 		FocusPaths: []string{"internal/key/create.go", "internal/auth/login.go", "internal/auth/login.go"},
 	})
 	require.NoError(t, err)
@@ -66,42 +45,29 @@ func TestPlanAnalysisUnitsPromptDataWritesFocusedPathList(t *testing.T) {
 	require.NotContains(t, data, "FocusPaths")
 }
 
-func TestSelectFilesPromptDataWritesRuntimeInputs(t *testing.T) {
+func TestSelectLearningCandidatesPromptDataWritesCandidateAndRequiredPathLists(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
-	data, err := SelectFilesPromptData(session, &SelectFilesRequest{
-		FileTree:   "cmd/server/main.go\ninternal/orders/handler.go\n",
-		Candidates: []FileSelectionCandidate{{Path: "cmd/server/main.go", Kind: "source"}},
+	data, err := SelectLearningCandidatesPromptData(session, &SelectLearningCandidatesRequest{
+		CandidatePaths: []string{"internal/key/create.go", "internal/auth/login.go", "internal/auth/login.go"},
+		RequiredPaths:  []string{"internal/auth/login.go"},
 	})
 	require.NoError(t, err)
 
-	fileListPath, ok := data["FileListPath"].(string)
+	candidatePath, ok := data["CandidatePathsPath"].(string)
 	require.True(t, ok)
-	require.Equal(t, filepath.Join(session.dir, "candidate-files.txt"), fileListPath)
+	require.Equal(t, filepath.Join(session.dir, "candidate-files.txt"), candidatePath)
+	require.Equal(t, 2, data["CandidatePathCount"])
 
-	fileList, err := os.ReadFile(fileListPath)
-	require.NoError(t, err)
-	require.Contains(t, string(fileList), "cmd/server/main.go")
-	require.Empty(t, data["StructuralContextPath"])
-	require.NoFileExists(t, filepath.Join(session.dir, "structural-context.md"))
-}
-
-func TestSelectFilesPromptDataWritesStructuralContextWhenPresent(t *testing.T) {
-	session := &PromptInputSession{dir: t.TempDir()}
-
-	data, err := SelectFilesPromptData(session, &SelectFilesRequest{
-		FileTree:          "cmd/server/main.go\n",
-		StructuralContext: "## Structural Context\n- cmd/server/main.go defines main",
-	})
-	require.NoError(t, err)
-
-	contextPath, ok := data["StructuralContextPath"].(string)
+	requiredPath, ok := data["RequiredPathsPath"].(string)
 	require.True(t, ok)
-	require.Equal(t, filepath.Join(session.dir, "structural-context.md"), contextPath)
+	require.Equal(t, filepath.Join(session.dir, "required-files.txt"), requiredPath)
+	require.Equal(t, 1, data["RequiredPathCount"])
 
-	content, err := os.ReadFile(contextPath)
+	content, err := os.ReadFile(candidatePath)
 	require.NoError(t, err)
-	require.Contains(t, string(content), "cmd/server/main.go defines main")
+	require.Equal(t, "internal/auth/login.go\ninternal/key/create.go\n", string(content))
+	require.NotContains(t, data, "CandidatePaths")
 }
 
 func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {
@@ -164,7 +130,7 @@ func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
 
-	session, err := NewPromptInputSessionForContext(ctx, "skills-seed-project-profile")
+	session, err := NewPromptInputSessionForContext(ctx, "skills-seed-learning-profile-refresh")
 	require.NoError(t, err)
 	inputPath, err := session.Write("project-structure.txt", "demo\n  main.go")
 	require.NoError(t, err)
@@ -173,5 +139,5 @@ func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T
 
 	require.FileExists(t, inputPath)
 	require.Contains(t, filepath.ToSlash(inputPath), ".skills-seed/runtime")
-	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-prompt-input-skills-seed-project-profile-\d+$`, filepath.Base(filepath.Dir(inputPath)))
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-prompt-input-skills-seed-learning-profile-refresh-\d+$`, filepath.Base(filepath.Dir(inputPath)))
 }

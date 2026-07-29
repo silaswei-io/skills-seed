@@ -13,7 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts/loader"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/require"
 	bberrors "go.etcd.io/bbolt/errors"
 )
@@ -68,7 +68,7 @@ func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
 	defer cont.Close()
 
 	require.Same(t, cont.PromptLoader, capturedLoader)
-	prompt, err := cont.PromptLoader.Render("workflow-optimize", agent.OptimizeWorkflowRequest{
+	prompt, err := cont.PromptLoader.Render("core-workflow-optimize", agent.OptimizeWorkflowRequest{
 		ID:       "release",
 		Context:  "整理发版流程",
 		Language: "go",

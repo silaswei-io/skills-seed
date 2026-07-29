@@ -54,22 +54,21 @@ Purpose:
 Flags:
 
 - `--format`: `table` or `json`.
-- `--sort`: `updated`, `score`, `hits`, or `category`.
+- `--sort`: `updated`, `score`, or `category`.
 
 Use cases:
 
 - List patterns: `skills-seed patterns show`
 - Show one: `skills-seed patterns show pat_123`
 - Machine-readable output: `skills-seed patterns show --format json`
-- Sort by usage: `skills-seed patterns show --sort hits`
 
 ## `skills-seed patterns stats`
 
 Purpose:
 
-- Show pattern quality and check hit statistics.
+- Show learned pattern quality metrics.
 
-Use stats to see which patterns are active, useful, or possibly stale.
+Use stats to inspect specificity, confidence, and effective score.
 
 ## `skills-seed patterns compact`
 
@@ -81,12 +80,11 @@ Flags:
 
 - `--category, -c`: restrict compaction to one category.
 - `--dry-run`: preview changes.
-- `--ai`: use AI assistance for compaction.
 
 Recommended flow:
 
 1. `skills-seed patterns compact --dry-run`
 2. Review planned changes.
-3. Run compaction with a category or AI only when needed.
+3. Run compaction with a category when needed.
 
 After pattern changes, run `skills-seed generate skills` to update generated Skill files.

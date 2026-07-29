@@ -22,7 +22,7 @@ Use this file to evaluate cross-project impact, choose change order, and constra
 {{if .HasGuidance}}
 ## Workspace Analysis Guidance
 
-The following items are inferred from workspace facts and are not unconditional rules:
+The following items are inferred from workspace facts. Confirm them against affected child-project source before execution:
 
 {{range .Guidance}}
 - **{{.Title}}**: {{.Description}}{{if .AppliesTo}} (applies to {{range $i, $ref := .AppliesTo}}{{if $i}}, {{end}}`{{$ref.Value}}` ({{$ref.Kind}}){{end}}){{end}}

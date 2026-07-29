@@ -40,7 +40,7 @@ func TestGet(t *testing.T) {
 		wantEmpty bool
 	}{
 		{"existing key", "LearnTitle", false},
-		{"another existing key", "LearnNoCommits", false},
+		{"another existing key", "ProgressLearnCurrentPrepareProject", false},
 		{"non-existing key returns key itself", "NonExistingKey12345", false},
 	}
 

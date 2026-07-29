@@ -18,6 +18,11 @@ import (
 
 var unresolvedI18nKeyPattern = regexp.MustCompile(`^[A-Z][A-Za-z0-9]*(Short|LongDesc|Example|Flag[A-Za-z0-9]*)$`)
 
+const (
+	commandDocsStartMarker = "<!-- COMMAND_TREE_START -->"
+	commandDocsEndMarker   = "<!-- COMMAND_TREE_END -->"
+)
+
 func TestCommandHelpCoverage(t *testing.T) {
 	for _, locale := range []string{"en-US", "zh-CN"} {
 		t.Run(locale, func(t *testing.T) {
@@ -90,7 +95,6 @@ func TestRootHelpUsesConciseIntro(t *testing.T) {
 	helpText := out.String()
 	require.Contains(t, helpText, "Usage:")
 	require.Contains(t, helpText, "Available Commands:")
-	require.Contains(t, helpText, "check")
 	require.Contains(t, helpText, "generate")
 	require.Contains(t, helpText, "sync")
 	require.Contains(t, helpText, "workspace")
@@ -168,26 +172,8 @@ func TestChineseHelpDoesNotExposeEnglishCommandDescriptions(t *testing.T) {
 		{
 			name:    "patterns stats",
 			args:    []string{"patterns", "stats", "--help"},
-			want:    []string{"查看已学习 pattern 的质量指标和 check 命中统计"},
+			want:    []string{"查看已学习 pattern 的质量指标"},
 			notWant: []string{"Show learned pattern quality"},
-		},
-		{
-			name:    "review",
-			args:    []string{"review", "--help"},
-			want:    []string{"导入本地评审评论，并与已记录的 pattern 命中"},
-			notWant: []string{"Import review comments and show prevention statistics"},
-		},
-		{
-			name:    "review import",
-			args:    []string{"review", "import", "--help"},
-			want:    []string{"从 JSON 数组文件导入本地评审评论", "包含评审评论数组的 JSON 文件"},
-			notWant: []string{"Import review comments from a JSON file", "JSON file containing review comments"},
-		},
-		{
-			name:    "review stats",
-			args:    []string{"review", "stats", "--help"},
-			want:    []string{"查看已导入评审评论在指定行号窗口内命中", "匹配评审评论与 pattern 命中时允许的行号距离"},
-			notWant: []string{"Show review comment prevention statistics", "Line distance used to match review comments"},
 		},
 	}
 
@@ -269,12 +255,10 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "log", args: []string{"log"}, want: false},
 		{name: "unknown command", args: []string{"unknown"}, want: false},
 		{name: "add", args: []string{"workspace", "add", "."}, want: true},
-		{name: "check", args: []string{"check"}, want: true},
 		{name: "generate skills", args: []string{"generate", "skills"}, want: true},
 		{name: "sync", args: []string{"sync"}, want: true},
 		{name: "learn parent help", args: []string{"learn"}, want: false},
 		{name: "learn current", args: []string{"learn", "current"}, want: true},
-		{name: "learn history", args: []string{"learn", "history"}, want: true},
 		{name: "patterns parent help", args: []string{"patterns"}, want: false},
 		{name: "patterns stats", args: []string{"patterns", "stats"}, want: true},
 		{name: "patterns compact", args: []string{"patterns", "compact"}, want: true},
@@ -283,10 +267,6 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "patterns show", args: []string{"patterns", "show"}, want: true},
 		{name: "profile parent help", args: []string{"profile"}, want: false},
 		{name: "profile show", args: []string{"profile", "show"}, want: true},
-		{name: "profile refresh", args: []string{"profile", "refresh"}, want: true},
-		{name: "review parent help", args: []string{"review"}, want: false},
-		{name: "review import", args: []string{"review", "import", "--from-file", "comments.json"}, want: true},
-		{name: "review stats", args: []string{"review", "stats"}, want: true},
 	}
 
 	for _, tt := range tests {
@@ -305,17 +285,12 @@ func TestNoArgCommandsRejectPositionalHelpArgument(t *testing.T) {
 	commandPaths := [][]string{
 		{"init"},
 		{"reset"},
-		{"check"},
 		{"generate", "skills"},
 		{"learn", "current"},
-		{"learn", "history"},
 		{"log"},
 		{"patterns", "stats"},
 		{"patterns", "compact"},
 		{"profile", "show"},
-		{"profile", "refresh"},
-		{"review", "import"},
-		{"review", "stats"},
 		{"hook"},
 		{"hook", "install"},
 		{"hook", "uninstall"},

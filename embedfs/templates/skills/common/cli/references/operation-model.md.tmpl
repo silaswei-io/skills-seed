@@ -7,11 +7,11 @@
 | Group | Commands | Role |
 |---|---|---|
 | Setup | `init`, `reset`, `workspace add` | Create or rebuild local skills-seed state. |
-| Learning | `sync`, `learn current`, `learn history` | Extract conventions, workflows, profiles, specs, and patterns. |
+| Learning | `sync`, `learn current` | Extract conventions, workflows, profiles, specs, and patterns. |
 | Rendering | `generate skills` | Write `SKILL.md`, `references/`, workflow files, and provider metadata. |
-| Knowledge management | `patterns ...`, `workflow`, `profile ...`, `review ...` | Add, inspect, curate, and validate durable knowledge. |
+| Knowledge management | `patterns ...`, `workflow`, `profile ...` | Add, inspect, curate, and validate durable knowledge. |
 | Diagnostics | `preview files`, `log`, `--version`, `help` | Inspect inputs, state, and CLI/template fingerprints. |
-| Quality | `check`, `hook ...` | Review files and integrate pre-commit behavior. |
+| Hook | `hook ...` | Integrate pre-commit behavior. |
 | Global CLI Skill maintenance | `cli-skills install`, `cli-skills uninstall` | Install or remove this global operation manual. |
 
 ## Runtime Boundary
@@ -30,14 +30,11 @@ Commands that need `.skills-seed` project state:
 
 - `skills-seed sync`
 - `skills-seed learn current`
-- `skills-seed learn history`
 - `skills-seed generate skills`
 - `skills-seed patterns ...`
 - `skills-seed workflow`
 - `skills-seed preview files`
 - `skills-seed profile ...`
-- `skills-seed review ...`
-- `skills-seed check`
 
 ## State Model
 
@@ -58,7 +55,7 @@ The CLI works with these durable state categories:
 - Use `patterns add` when the user gives a durable rule.
 - Use `workflow` when the user gives a repeatable task process.
 - Use `preview files` when analysis input selection is unclear.
-- Use `check` when the task is review-oriented or pre-commit-oriented.
+- Use `hook` commands when the repository needs pre-commit integration.
 
 ## Context Rules
 

@@ -6,13 +6,13 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
-// RuntimeLabelFromAnalysisUnit 生成用于 runtime 文件名的短标签。
-func RuntimeLabelFromAnalysisUnit(unitID, unitName string) string {
-	if safe := runtimefiles.SafePart(unitID, ""); safe != "" {
-		return "unit-" + safe
+// RuntimeLabelFromEvidenceFocus 生成用于 runtime 文件名的短标签。
+func RuntimeLabelFromEvidenceFocus(focusID, focusName string) string {
+	if safe := runtimefiles.SafePart(focusID, ""); safe != "" {
+		return "focus-" + safe
 	}
-	if safe := runtimefiles.SafePart(unitName, ""); safe != "" {
-		return "unit-" + safe
+	if safe := runtimefiles.SafePart(focusName, ""); safe != "" {
+		return "focus-" + safe
 	}
 	return ""
 }
@@ -26,18 +26,18 @@ func RuntimePromptInputPrefix(base, label string) string {
 	return base + "-" + label
 }
 
-// AnalyzeCurrentCodebaseOperation 返回当前代码库分析的可读运行操作名。
-func AnalyzeCurrentCodebaseOperation(req *AnalyzeCurrentCodebaseRequest) string {
-	if req == nil || strings.TrimSpace(req.RuntimeLabel) == "" {
-		return "AnalyzeCurrentCodebase"
-	}
-	return "AnalyzeCurrentCodebase/" + req.RuntimeLabel
-}
-
 // AnalyzeCurrentCodebaseBatchOperation 返回当前代码库批量分析的可读运行操作名。
 func AnalyzeCurrentCodebaseBatchOperation(req *AnalyzeCurrentCodebaseBatchRequest) string {
 	if req == nil || strings.TrimSpace(req.RuntimeLabel) == "" {
 		return "AnalyzeCurrentCodebaseBatch"
 	}
 	return "AnalyzeCurrentCodebaseBatch/" + req.RuntimeLabel
+}
+
+// AnalyzeCurrentDeltaBatchOperation 返回当前代码库增量分析的可读运行操作名。
+func AnalyzeCurrentDeltaBatchOperation(req *AnalyzeCurrentDeltaBatchRequest) string {
+	if req == nil || strings.TrimSpace(req.RuntimeLabel) == "" {
+		return "AnalyzeCurrentDeltaBatch"
+	}
+	return "AnalyzeCurrentDeltaBatch/" + req.RuntimeLabel
 }

@@ -6,16 +6,13 @@ Templates are organized by two different dimensions.
 
 `templates/prompts` stores prompt templates used to ask the AI agent for analysis or generated data.
 
-- `loader/` stores English runtime agent prompts rendered by `internal/prompts/loader`.
+- `loader/` stores English runtime agent prompts rendered by `internal/prompts`.
 - `append/` stores mandatory English fragments appended after runtime prompts, such as final output contracts and output-language rules.
 
 Runtime prompt IDs use kebab-case prefixes:
 
-- `learn-*` for learning and code analysis prompts.
-- `fix-*` for fix generation prompts.
-- `pattern-*` for pattern maintenance prompts.
-- `project-*` for project profile analysis prompts.
-- `skill-project-*` and `skill-workspace-*` for prompts that produce data consumed by generated skills.
+- `learning-*` for segmented repository learning prompts.
+- `core-*` for non-learning prompts that are still core command behavior.
 
 ## Seed
 

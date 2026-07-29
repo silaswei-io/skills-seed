@@ -12,7 +12,8 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/utils"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 type FileChanges struct {
@@ -21,6 +22,7 @@ type FileChanges struct {
 	ScannedFileCount int
 	// SourceFileCount 是本地选择策略接受的当前源文件数，不包含排除文件、非源码文件和焦点外文件。
 	SourceFileCount            int
+	PreviousAnalyzedCount      int
 	Records                    []domain.FileAnalysisRecord
 	AddedOrModified            []string
 	Deleted                    []string
@@ -43,7 +45,7 @@ func PrepareCurrentChangesWithOptions(ctx context.Context, tracker domain.FileAn
 	if tracker == nil {
 		return nil, fmt.Errorf("file analysis tracker is nil")
 	}
-	focusRelPaths := utils.RelativePaths(scanRoot, focusAbsPaths)
+	focusRelPaths := projectpath.Relative(scanRoot, focusAbsPaths)
 
 	records, err := tracker.ListAnalyzedFiles(ctx, scope)
 	if err != nil {
@@ -70,6 +72,7 @@ func PrepareCurrentChangesWithOptions(ctx context.Context, tracker domain.FileAn
 		Scope:                      scope,
 		ScannedFileCount:           len(selection.Files) + len(selection.Skipped),
 		SourceFileCount:            len(selection.Files),
+		PreviousAnalyzedCount:      len(previous),
 		ExcludedGeneratedSkillDirs: GeneratedSkillExcludeDirs(configRepo, scanRoot),
 		SkippedFiles:               append([]SkippedFile{}, selection.Skipped...),
 	}
@@ -150,7 +153,7 @@ func (c FileChanges) SkippedCount(reason SkipReason) int {
 	return count
 }
 
-func (c *FileChanges) ApplyAISelection(selectedPaths []string, reason string) {
+func (c *FileChanges) ApplyLearningSelection(selectedPaths []string, reason string) {
 	if c == nil {
 		return
 	}
@@ -165,7 +168,7 @@ func (c *FileChanges) ApplyAISelection(selectedPaths []string, reason string) {
 			c.Records[i].SelectionReason = ""
 			continue
 		}
-		c.Records[i].AnalysisStatus = domain.FileAnalysisStatusAISkipped
+		c.Records[i].AnalysisStatus = domain.FileAnalysisStatusSelectionSkipped
 		c.Records[i].SelectionReason = reason
 	}
 }
@@ -181,7 +184,7 @@ func (c *FileChanges) addSkipped(path string, reason SkipReason) {
 
 func fingerprintLearnFile(projectRoot string, scope domain.FileAnalysisScope, relPath string) (domain.FileAnalysisRecord, error) {
 	path := filepath.Join(projectRoot, filepath.FromSlash(relPath))
-	path, err := utils.CanonicalPathWithinRoot(projectRoot, path)
+	path, err := projectpath.CanonicalWithinRoot(projectRoot, path)
 	if err != nil {
 		return domain.FileAnalysisRecord{}, err
 	}
@@ -234,7 +237,7 @@ func GeneratedSkillExcludeDirs(configRepo config.Reader, projectRoot string) []s
 			if outputPath == "" {
 				continue
 			}
-			resolved, err := utils.ResolvePath(projectRoot, outputPath)
+			resolved, err := projectpath.Resolve(projectRoot, outputPath)
 			if err != nil {
 				continue
 			}
@@ -245,18 +248,5 @@ func GeneratedSkillExcludeDirs(configRepo config.Reader, projectRoot string) []s
 		}
 	}
 	sort.Strings(dirs)
-	return uniqueStrings(dirs)
-}
-
-func uniqueStrings(values []string) []string {
-	out := make([]string, 0, len(values))
-	seen := make(map[string]bool, len(values))
-	for _, value := range values {
-		if value == "" || seen[value] {
-			continue
-		}
-		seen[value] = true
-		out = append(out, value)
-	}
-	return out
+	return stringx.UniqueNonEmpty(dirs)
 }

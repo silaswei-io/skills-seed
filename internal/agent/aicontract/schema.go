@@ -10,32 +10,28 @@ import (
 
 // AI 输出契约名称统一绑定 DTO，供提示词和 Agent CLI 复用同一份 Schema。
 const (
-	ContractAnalyzeCode                 = "AnalyzeCodeOutput"
-	ContractGenerateFixes               = "GenerateFixesOutput"
-	ContractLearnPatterns               = "LearnPatternsOutput"
 	ContractCuratePatterns              = "CuratePatternsOutput"
 	ContractUserDefinePattern           = "UserDefinePatternOutput"
 	ContractProjectProfile              = "ProjectProfileOutput"
-	ContractAnalyzeCurrentCodebase      = "AnalyzeCurrentCodebaseOutput"
 	ContractAnalyzeCurrentCodebaseBatch = "AnalyzeCurrentCodebaseBatchOutput"
-	ContractPlanAnalysisUnits           = "PlanAnalysisUnitsOutput"
-	ContractSelectFiles                 = "SelectFilesOutput"
+	ContractAnalyzeCurrentDeltaBatch    = "AnalyzeCurrentDeltaBatchOutput"
+	ContractSelectLearningCandidates    = "SelectLearningCandidatesOutput"
+	ContractLearningSessionAck          = "LearningSessionAckOutput"
+	ContractPlanLearningAgenda          = "PlanLearningAgendaOutput"
 	ContractWorkspaceProfile            = "WorkspaceProfileOutput"
 	ContractWorkspaceSpec               = "WorkspaceSpecOutput"
 	ContractOptimizeWorkflow            = "OptimizeWorkflowOutput"
 )
 
 var outputTypes = map[string]reflect.Type{
-	ContractAnalyzeCode:                 reflect.TypeOf(AnalyzeCodeOutput{}),
-	ContractGenerateFixes:               reflect.TypeOf(GenerateFixesOutput{}),
-	ContractLearnPatterns:               reflect.TypeOf(LearnPatternsOutput{}),
 	ContractCuratePatterns:              reflect.TypeOf(CuratePatternsOutput{}),
 	ContractUserDefinePattern:           reflect.TypeOf(PatternOutput{}),
 	ContractProjectProfile:              reflect.TypeOf(ProjectProfileOutput{}),
-	ContractAnalyzeCurrentCodebase:      reflect.TypeOf(AnalyzeCurrentCodebaseOutput{}),
 	ContractAnalyzeCurrentCodebaseBatch: reflect.TypeOf(AnalyzeCurrentCodebaseBatchOutput{}),
-	ContractPlanAnalysisUnits:           reflect.TypeOf(PlanAnalysisUnitsOutput{}),
-	ContractSelectFiles:                 reflect.TypeOf(SelectFilesOutput{}),
+	ContractAnalyzeCurrentDeltaBatch:    reflect.TypeOf(AnalyzeCurrentDeltaBatchOutput{}),
+	ContractSelectLearningCandidates:    reflect.TypeOf(SelectLearningCandidatesOutput{}),
+	ContractLearningSessionAck:          reflect.TypeOf(LearningSessionAckOutput{}),
+	ContractPlanLearningAgenda:          reflect.TypeOf(PlanLearningAgendaOutput{}),
 	ContractWorkspaceProfile:            reflect.TypeOf(WorkspaceProfileOutput{}),
 	ContractWorkspaceSpec:               reflect.TypeOf(WorkspaceSpecOutput{}),
 	ContractOptimizeWorkflow:            reflect.TypeOf(OptimizeWorkflowOutput{}),

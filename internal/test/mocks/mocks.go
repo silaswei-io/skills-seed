@@ -2,7 +2,6 @@ package mocks
 
 import (
 	"context"
-	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -11,22 +10,20 @@ import (
 
 // MockAgent 模拟 AI Agent
 type MockAgent struct {
-	NameVal                   string
-	AvailableVal              bool
-	AnalyzeCodeFn             func(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error)
-	LearnFromCommitFn         func(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error)
-	BatchLearnFromCommitsFn   func(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error)
-	GenerateFixesFn           func(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error)
-	CuratePatternsFn          func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
-	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
-	SelectFilesFn             func(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error)
-	AnalyzeProjectFn          func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
-	PlanAnalysisUnitsFn       func(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error)
-	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
-	AnalyzeCurrentBatchFn     func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error)
-	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
-	AnalyzeWorkspaceSpecFn    func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
-	OptimizeWorkflowFn        func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error)
+	NameVal                    string
+	AvailableVal               bool
+	CuratePatternsFn           func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
+	UserDefinePatternFn        func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
+	RefreshProjectProfileFn    func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
+	SelectLearningCandidatesFn func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error)
+	PlanLearningAgendaFn       func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error)
+	AnalyzeCurrentCodebaseFn   func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
+	AnalyzeCurrentBatchFn      func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error)
+	AnalyzeCurrentDeltaFn      func(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error)
+	StartLearningSessionFn     func(ctx context.Context, req agent.LearningSessionRequest) (agent.LearningSession, error)
+	AnalyzeWorkspaceProfileFn  func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
+	AnalyzeWorkspaceSpecFn     func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
+	OptimizeWorkflowFn         func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error)
 }
 
 // Name 返回模拟 Agent 名称
@@ -35,36 +32,12 @@ func (m *MockAgent) Name() string { return m.NameVal }
 // IsAvailable 返回模拟 Agent 是否可用
 func (m *MockAgent) IsAvailable() bool { return m.AvailableVal }
 
-// AnalyzeCode 模拟代码分析
-func (m *MockAgent) AnalyzeCode(ctx context.Context, req *agent.AnalyzeRequest) (*agent.AnalyzeResult, error) {
-	if m.AnalyzeCodeFn != nil {
-		return m.AnalyzeCodeFn(ctx, req)
+// StartLearningSession 模拟当前代码学习会话。
+func (m *MockAgent) StartLearningSession(ctx context.Context, req agent.LearningSessionRequest) (agent.LearningSession, error) {
+	if m.StartLearningSessionFn != nil {
+		return m.StartLearningSessionFn(ctx, req)
 	}
-	return &agent.AnalyzeResult{Issues: []domain.Issue{}, Confidence: 0.5}, nil
-}
-
-// LearnFromCommit 模拟单提交学习
-func (m *MockAgent) LearnFromCommit(ctx context.Context, req *agent.LearnRequest) (*agent.LearnResult, error) {
-	if m.LearnFromCommitFn != nil {
-		return m.LearnFromCommitFn(ctx, req)
-	}
-	return &agent.LearnResult{Patterns: []domain.Pattern{}, LearnedAt: time.Now()}, nil
-}
-
-// BatchLearnFromCommits 模拟批量提交学习
-func (m *MockAgent) BatchLearnFromCommits(ctx context.Context, req *agent.BatchLearnRequest) (*agent.BatchLearnResult, error) {
-	if m.BatchLearnFromCommitsFn != nil {
-		return m.BatchLearnFromCommitsFn(ctx, req)
-	}
-	return &agent.BatchLearnResult{Patterns: []domain.Pattern{}, LearnedAt: time.Now()}, nil
-}
-
-// GenerateFixes 模拟生成修复
-func (m *MockAgent) GenerateFixes(ctx context.Context, req *agent.GenerateFixesRequest) (*agent.GenerateFixesResult, error) {
-	if m.GenerateFixesFn != nil {
-		return m.GenerateFixesFn(ctx, req)
-	}
-	return &agent.GenerateFixesResult{Fixes: map[string]string{}, Confidence: 0.8}, nil
+	return mockLearningSession{agent: m}, nil
 }
 
 // CuratePatterns 模拟模式策展
@@ -98,28 +71,28 @@ func (m *MockAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefine
 	return &agent.UserDefinePatternResult{}, nil
 }
 
-// SelectFiles 模拟 AI 文件筛选器
-func (m *MockAgent) SelectFiles(ctx context.Context, req *agent.SelectFilesRequest) (*agent.SelectFilesResult, error) {
-	if m.SelectFilesFn != nil {
-		return m.SelectFilesFn(ctx, req)
-	}
-	return &agent.SelectFilesResult{}, nil
-}
-
 // AnalyzeProject 模拟项目分析
-func (m *MockAgent) AnalyzeProject(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-	if m.AnalyzeProjectFn != nil {
-		return m.AnalyzeProjectFn(ctx, req)
+func (m *MockAgent) RefreshProjectProfile(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	if m.RefreshProjectProfileFn != nil {
+		return m.RefreshProjectProfileFn(ctx, req)
 	}
 	return &agent.AnalyzeProjectResult{}, nil
 }
 
-// PlanAnalysisUnits 模拟业务分析单元规划。
-func (m *MockAgent) PlanAnalysisUnits(ctx context.Context, req *agent.PlanAnalysisUnitsRequest) (*agent.PlanAnalysisUnitsResult, error) {
-	if m.PlanAnalysisUnitsFn != nil {
-		return m.PlanAnalysisUnitsFn(ctx, req)
+// SelectLearningCandidates 模拟当前代码学习候选收敛。
+func (m *MockAgent) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
+	if m.SelectLearningCandidatesFn != nil {
+		return m.SelectLearningCandidatesFn(ctx, req)
 	}
-	return &agent.PlanAnalysisUnitsResult{}, nil
+	return &agent.SelectLearningCandidatesResult{SelectedPaths: append([]string(nil), req.CandidatePaths...), Reason: "mock selects all candidates"}, nil
+}
+
+// PlanLearningAgenda 模拟业务学习议程规划。
+func (m *MockAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+	if m.PlanLearningAgendaFn != nil {
+		return m.PlanLearningAgendaFn(ctx, req)
+	}
+	return &agent.PlanLearningAgendaResult{}, nil
 }
 
 // AnalyzeCurrentCodebase 模拟当前代码库分析
@@ -135,15 +108,16 @@ func (m *MockAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.
 	if m.AnalyzeCurrentBatchFn != nil {
 		return m.AnalyzeCurrentBatchFn(ctx, req)
 	}
-	units := make([]agent.AnalyzeCurrentCodebaseUnitResult, 0, len(req.Units))
-	for _, unit := range req.Units {
+	focuses := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+	for _, unit := range req.Focuses {
 		if m.AnalyzeCurrentCodebaseFn != nil {
 			result, err := m.AnalyzeCurrentCodebaseFn(ctx, &agent.AnalyzeCurrentCodebaseRequest{
 				ProjectName:       req.ProjectName,
 				RootPath:          req.RootPath,
 				Language:          req.Language,
 				RuntimeLabel:      req.RuntimeLabel,
-				AnalysisUnit:      unit.AnalysisUnit,
+				ChangeProfile:     req.ChangeProfile,
+				EvidenceFocus:     unit.EvidenceFocus,
 				FocusPaths:        unit.FocusPaths,
 				Structure:         req.Structure,
 				StructurePath:     req.StructurePath,
@@ -158,20 +132,213 @@ func (m *MockAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.
 			if err != nil {
 				return nil, err
 			}
-			units = append(units, agent.AnalyzeCurrentCodebaseUnitResult{
-				UnitID:                    unit.AnalysisUnit.ID,
-				UnitName:                  unit.AnalysisUnit.Name,
+			focuses = append(focuses, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:                   unit.EvidenceFocus.ID,
+				FocusName:                 unit.EvidenceFocus.Name,
 				Patterns:                  result.Patterns,
 				ProfileRefreshRecommended: result.ProfileRefreshRecommended,
 			})
 			continue
 		}
-		units = append(units, agent.AnalyzeCurrentCodebaseUnitResult{
-			UnitID:   unit.AnalysisUnit.ID,
-			UnitName: unit.AnalysisUnit.Name,
+		focuses = append(focuses, agent.AnalyzeCurrentEvidenceResult{
+			FocusID:   unit.EvidenceFocus.ID,
+			FocusName: unit.EvidenceFocus.Name,
 		})
 	}
-	return &agent.AnalyzeCurrentCodebaseBatchResult{Units: units}, nil
+	return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: focuses}, nil
+}
+
+// AnalyzeCurrentDeltaBatch 模拟 diff 锚定增量分析。
+func (m *MockAgent) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
+	if m.AnalyzeCurrentDeltaFn != nil {
+		return m.AnalyzeCurrentDeltaFn(ctx, req)
+	}
+	if m.AnalyzeCurrentBatchFn != nil {
+		batchReq := &agent.AnalyzeCurrentCodebaseBatchRequest{
+			ProjectName:           req.ProjectName,
+			RootPath:              req.RootPath,
+			Language:              req.Language,
+			RuntimeLabel:          req.RuntimeLabel,
+			Focuses:               make([]agent.AnalyzeCurrentEvidenceFocus, 0, len(req.Focuses)),
+			Structure:             req.Structure,
+			StructurePath:         req.StructurePath,
+			StructuralContext:     req.StructuralContext,
+			StructuralContextPath: req.StructuralContextPath,
+			UserContext:           req.UserContext,
+			UserContextPath:       req.UserContextPath,
+			LearningMode:          req.LearningMode,
+			ChangeProfile:         req.ChangeProfile,
+		}
+		for _, unit := range req.Focuses {
+			batchReq.Focuses = append(batchReq.Focuses, agent.AnalyzeCurrentEvidenceFocus{
+				EvidenceFocus: unit.EvidenceFocus,
+				FocusPaths:    unit.FocusPaths,
+				SampleFiles:   unit.ContextFiles,
+				DiffFiles:     unit.DiffFiles,
+			})
+		}
+		result, err := m.AnalyzeCurrentBatchFn(ctx, batchReq)
+		if err != nil {
+			return nil, err
+		}
+		return currentBatchResultToDeltaResult(req.Focuses, result), nil
+	}
+	if m.AnalyzeCurrentCodebaseFn != nil {
+		var changes []domain.KnowledgeChange
+		for _, unit := range req.Focuses {
+			result, err := m.AnalyzeCurrentCodebaseFn(ctx, &agent.AnalyzeCurrentCodebaseRequest{
+				ProjectName:     req.ProjectName,
+				RootPath:        req.RootPath,
+				Language:        req.Language,
+				RuntimeLabel:    req.RuntimeLabel,
+				EvidenceFocus:   unit.EvidenceFocus,
+				FocusPaths:      unit.FocusPaths,
+				Structure:       req.Structure,
+				StructurePath:   req.StructurePath,
+				DiffFiles:       unit.DiffFiles,
+				SampleFiles:     unit.ContextFiles,
+				UserContext:     req.UserContext,
+				UserContextPath: req.UserContextPath,
+				LearningMode:    req.LearningMode,
+				ChangeProfile:   req.ChangeProfile,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if len(result.Patterns) == 0 {
+				changes = append(changes, mockNoChange(unit))
+			}
+			for _, pattern := range result.Patterns {
+				anchorPath := ""
+				if len(unit.FocusPaths) > 0 {
+					anchorPath = unit.FocusPaths[0]
+				}
+				pattern.DiffAnchors = []domain.PatternDiffAnchor{{Path: anchorPath, ChangeKind: "modified", Description: "mock delta anchor"}}
+				changes = append(changes, domain.KnowledgeChange{
+					FocusAction:   domain.KnowledgeFocusExisting,
+					FocusID:       unit.EvidenceFocus.ID,
+					FocusName:     unit.EvidenceFocus.Name,
+					PatternAction: domain.KnowledgePatternAdd,
+					PatternID:     pattern.ID,
+					Proposal:      &pattern,
+					Anchors:       pattern.DiffAnchors,
+					Reason:        "mock delta analysis",
+				})
+			}
+			if result.ProfileRefreshRecommended.Needed {
+				return &agent.AnalyzeCurrentDeltaBatchResult{
+					Changes:                   changes,
+					ProfileRefreshRecommended: result.ProfileRefreshRecommended,
+				}, nil
+			}
+		}
+		return &agent.AnalyzeCurrentDeltaBatchResult{Changes: changes}, nil
+	}
+	return &agent.AnalyzeCurrentDeltaBatchResult{}, nil
+}
+
+func currentBatchResultToDeltaResult(inputFocuses []agent.AnalyzeCurrentDeltaFocus, result *agent.AnalyzeCurrentCodebaseBatchResult) *agent.AnalyzeCurrentDeltaBatchResult {
+	if result == nil {
+		return &agent.AnalyzeCurrentDeltaBatchResult{}
+	}
+	focusesByID := make(map[string]agent.AnalyzeCurrentDeltaFocus, len(inputFocuses))
+	focusesByName := make(map[string]agent.AnalyzeCurrentDeltaFocus, len(inputFocuses))
+	for _, unit := range inputFocuses {
+		focusesByID[unit.EvidenceFocus.ID] = unit
+		focusesByName[unit.EvidenceFocus.Name] = unit
+	}
+	var changes []domain.KnowledgeChange
+	for _, unitResult := range result.Focuses {
+		inputUnit, ok := focusesByID[unitResult.FocusID]
+		if !ok && unitResult.FocusName != "" {
+			inputUnit, ok = focusesByName[unitResult.FocusName]
+		}
+		if !ok {
+			inputUnit = agent.AnalyzeCurrentDeltaFocus{
+				EvidenceFocus: domain.EvidenceFocus{ID: unitResult.FocusID, Name: unitResult.FocusName},
+			}
+		}
+		if len(unitResult.Patterns) == 0 {
+			changes = append(changes, mockNoChange(inputUnit))
+			continue
+		}
+		for _, pattern := range unitResult.Patterns {
+			anchorPath := ""
+			if len(inputUnit.FocusPaths) > 0 {
+				anchorPath = inputUnit.FocusPaths[0]
+			}
+			pattern.DiffAnchors = []domain.PatternDiffAnchor{{Path: anchorPath, ChangeKind: "modified", Description: "mock delta anchor"}}
+			changes = append(changes, domain.KnowledgeChange{
+				FocusAction:   domain.KnowledgeFocusExisting,
+				FocusID:       inputUnit.EvidenceFocus.ID,
+				FocusName:     inputUnit.EvidenceFocus.Name,
+				PatternAction: domain.KnowledgePatternAdd,
+				PatternID:     pattern.ID,
+				Proposal:      &pattern,
+				Anchors:       pattern.DiffAnchors,
+				Reason:        "mock delta analysis",
+			})
+		}
+	}
+	out := &agent.AnalyzeCurrentDeltaBatchResult{Changes: changes}
+	for _, unitResult := range result.Focuses {
+		if unitResult.ProfileRefreshRecommended.Needed {
+			out.ProfileRefreshRecommended = unitResult.ProfileRefreshRecommended
+			break
+		}
+	}
+	return out
+}
+
+func mockNoChange(unit agent.AnalyzeCurrentDeltaFocus) domain.KnowledgeChange {
+	anchorPath := ""
+	if len(unit.FocusPaths) > 0 {
+		anchorPath = unit.FocusPaths[0]
+	}
+	return domain.KnowledgeChange{
+		FocusAction:   domain.KnowledgeFocusExisting,
+		FocusID:       unit.EvidenceFocus.ID,
+		FocusName:     unit.EvidenceFocus.Name,
+		PatternAction: domain.KnowledgePatternNoChange,
+		Anchors:       []domain.PatternDiffAnchor{{Path: anchorPath, ChangeKind: "modified", Description: "mock delta no change"}},
+		Reason:        "mock delta analysis",
+	}
+}
+
+type mockLearningSession struct {
+	agent *MockAgent
+}
+
+func (s mockLearningSession) SessionID() string {
+	return "mock-learning-session"
+}
+
+func (s mockLearningSession) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
+	return s.agent.SelectLearningCandidates(ctx, req)
+}
+
+func (s mockLearningSession) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+	return s.agent.PlanLearningAgenda(ctx, req)
+}
+
+func (s mockLearningSession) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+	return s.agent.AnalyzeCurrentCodebaseBatch(ctx, req)
+}
+
+func (s mockLearningSession) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
+	return s.agent.AnalyzeCurrentDeltaBatch(ctx, req)
+}
+
+func (s mockLearningSession) RefreshProjectProfile(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+	return s.agent.RefreshProjectProfile(ctx, req)
+}
+
+func (s mockLearningSession) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+	return s.agent.CuratePatterns(ctx, req)
+}
+
+func (s mockLearningSession) Close(context.Context) error {
+	return nil
 }
 
 // AnalyzeWorkspaceProfile 模拟工作区画像分析
@@ -292,8 +459,7 @@ type MockPatternRepository struct {
 	FindSimilarFn          func(ctx context.Context, pattern *domain.Pattern) (*domain.Pattern, error)
 	DeleteFn               func(ctx context.Context, id string) error
 	CountFn                func(ctx context.Context) (int, error)
-	RecordPatternHitsFn    func(ctx context.Context, hits []domain.PatternHit) error
-	GetPatternHitStatsFn   func(ctx context.Context) ([]domain.PatternHitStats, error)
+	GetPatternStatsFn      func(ctx context.Context) ([]domain.PatternStats, error)
 }
 
 // Get 模拟按 ID 获取模式
@@ -378,52 +544,24 @@ func (m *MockPatternRepository) Count(ctx context.Context) (int, error) {
 	return 0, nil
 }
 
-// RecordPatternHits 模拟保存模式命中记录。
-func (m *MockPatternRepository) RecordPatternHits(ctx context.Context, hits []domain.PatternHit) error {
-	if m.RecordPatternHitsFn != nil {
-		return m.RecordPatternHitsFn(ctx, hits)
+// GetPatternStats 模拟获取模式质量统计。
+func (m *MockPatternRepository) GetPatternStats(ctx context.Context) ([]domain.PatternStats, error) {
+	if m.GetPatternStatsFn != nil {
+		return m.GetPatternStatsFn(ctx)
 	}
-	return nil
-}
-
-// GetPatternHitStats 模拟获取模式命中统计。
-func (m *MockPatternRepository) GetPatternHitStats(ctx context.Context) ([]domain.PatternHitStats, error) {
-	if m.GetPatternHitStatsFn != nil {
-		return m.GetPatternHitStatsFn(ctx)
-	}
-	return []domain.PatternHitStats{}, nil
+	return []domain.PatternStats{}, nil
 }
 
 // MockPatternStatsRepository 模拟模式统计仓储。
 type MockPatternStatsRepository struct {
-	GetPatternHitStatsFn func(ctx context.Context) ([]domain.PatternHitStats, error)
+	GetPatternStatsFn func(ctx context.Context) ([]domain.PatternStats, error)
 }
 
-func (m *MockPatternStatsRepository) GetPatternHitStats(ctx context.Context) ([]domain.PatternHitStats, error) {
-	if m.GetPatternHitStatsFn != nil {
-		return m.GetPatternHitStatsFn(ctx)
+func (m *MockPatternStatsRepository) GetPatternStats(ctx context.Context) ([]domain.PatternStats, error) {
+	if m.GetPatternStatsFn != nil {
+		return m.GetPatternStatsFn(ctx)
 	}
-	return []domain.PatternHitStats{}, nil
-}
-
-// MockReviewRepository 模拟评审评论仓储。
-type MockReviewRepository struct {
-	ImportReviewCommentsFn func(ctx context.Context, comments []domain.ReviewComment) error
-	GetReviewStatsFn       func(ctx context.Context, lineWindow int) (domain.ReviewStats, error)
-}
-
-func (m *MockReviewRepository) ImportReviewComments(ctx context.Context, comments []domain.ReviewComment) error {
-	if m.ImportReviewCommentsFn != nil {
-		return m.ImportReviewCommentsFn(ctx, comments)
-	}
-	return nil
-}
-
-func (m *MockReviewRepository) GetReviewStats(ctx context.Context, lineWindow int) (domain.ReviewStats, error) {
-	if m.GetReviewStatsFn != nil {
-		return m.GetReviewStatsFn(ctx, lineWindow)
-	}
-	return domain.ReviewStats{}, nil
+	return []domain.PatternStats{}, nil
 }
 
 // MockProjectProfileRepository 模拟项目画像仓储
@@ -507,51 +645,6 @@ func (m *MockProjectProfileRepository) SaveSpecForProject(ctx context.Context, p
 	return nil
 }
 
-// MockCommitTracker 模拟提交追踪
-type MockCommitTracker struct {
-	MarkAnalyzedFn func(ctx context.Context, hash string) error
-	MarkManyFn     func(ctx context.Context, hashes []string) error
-	IsAnalyzedFn   func(ctx context.Context, hash string) (bool, error)
-	GetAnalyzedFn  func(ctx context.Context) ([]string, error)
-}
-
-// MarkCommitsAnalyzed 模拟批量标记提交。
-func (m *MockCommitTracker) MarkCommitsAnalyzed(ctx context.Context, hashes []string) error {
-	if m.MarkManyFn != nil {
-		return m.MarkManyFn(ctx, hashes)
-	}
-	for _, hash := range hashes {
-		if err := m.MarkCommitAnalyzed(ctx, hash); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// MarkCommitAnalyzed 模拟标记提交已分析
-func (m *MockCommitTracker) MarkCommitAnalyzed(ctx context.Context, hash string) error {
-	if m.MarkAnalyzedFn != nil {
-		return m.MarkAnalyzedFn(ctx, hash)
-	}
-	return nil
-}
-
-// IsCommitAnalyzed 模拟判断提交是否已分析
-func (m *MockCommitTracker) IsCommitAnalyzed(ctx context.Context, hash string) (bool, error) {
-	if m.IsAnalyzedFn != nil {
-		return m.IsAnalyzedFn(ctx, hash)
-	}
-	return false, nil
-}
-
-// GetAnalyzedCommits 模拟获取已分析提交
-func (m *MockCommitTracker) GetAnalyzedCommits(ctx context.Context) ([]string, error) {
-	if m.GetAnalyzedFn != nil {
-		return m.GetAnalyzedFn(ctx)
-	}
-	return []string{}, nil
-}
-
 // MockFileAnalysisTracker 模拟文件分析追踪器
 type MockFileAnalysisTracker struct {
 	GetAnalyzedFileFn     func(ctx context.Context, scope domain.FileAnalysisScope, path string) (*domain.FileAnalysisRecord, error)
@@ -594,7 +687,6 @@ type MockConfigReader struct {
 	WorkspaceCfg config.WorkspaceConfig
 	AgentCfg     config.AgentConfig
 	LearningCfg  config.LearningConfig
-	AutoFixCfg   config.AutoFixConfig
 	SkillsCfg    config.SkillsConfig
 	LoggingCfg   config.LoggingConfig
 	ExcludeCfg   config.ExcludeConfig
@@ -617,9 +709,6 @@ func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.
 func (m *MockConfigReader) GetCurrentLearningConfig() config.CurrentLearningConfig {
 	return m.LearningCfg.Current
 }
-
-// GetAutoFixConfig 模拟获取自动修复配置
-func (m *MockConfigReader) GetAutoFixConfig() config.AutoFixConfig { return m.AutoFixCfg }
 
 // GetSkillsConfig 模拟获取 Skills 配置
 func (m *MockConfigReader) GetSkillsConfig() config.SkillsConfig { return m.SkillsCfg }

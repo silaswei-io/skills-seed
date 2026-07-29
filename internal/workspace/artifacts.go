@@ -7,6 +7,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 const (
@@ -190,21 +191,21 @@ func SpecFromProfile(profile *domain.WorkspaceProfile, locale string) *domain.Wo
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: routePatternForPath(path.Path),
 			ProjectIDs:  nonEmptyStrings(append(append([]string{}, path.Producers...), path.Consumers...), projectIDs),
-			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteContractReason")),
+			Reason:      stringx.FirstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteContractReason")),
 		})
 	}
 	for _, path := range profile.Shared {
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: routePatternForPath(path.Path),
 			ProjectIDs:  nonEmptyStrings(append(append([]string{}, path.Producers...), path.Consumers...), projectIDs),
-			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteSharedReason")),
+			Reason:      stringx.FirstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteSharedReason")),
 		})
 	}
 	for _, path := range profile.Infra {
 		routing = append(routing, domain.WorkspaceRoute{
 			PathPattern: routePatternForPath(path.Path),
 			ProjectIDs:  nonEmptyStrings(path.AffectedProjects, projectIDs),
-			Reason:      firstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteInfraReason")),
+			Reason:      stringx.FirstNonEmpty(path.Description, i18n.GetForLocale(locale, "WorkspaceRouteInfraReason")),
 		})
 	}
 	refs := make([]domain.WorkspaceReference, 0, len(projectIDs))

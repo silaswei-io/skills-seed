@@ -1,40 +1,12 @@
 package config
 
 import (
-	"bytes"
 	"sort"
 	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
-
-// replaceConfigValues 通过 yaml.Node 更新配置值，保证注释继续附着在描述的节点上。
-// 该方法用于测试和模板渲染失败后的后备保存路径。
-func (r *Repository) replaceConfigValues(content string, cfg *Config) string {
-	if cfg != nil {
-		normalized := *cfg
-		r.normalizeConfig(&normalized)
-		cfg = &normalized
-	}
-	var root yaml.Node
-	if err := yaml.Unmarshal([]byte(content), &root); err != nil {
-		return content
-	}
-	applyConfigNodeValues(&root, cfg)
-
-	var buf bytes.Buffer
-	encoder := yaml.NewEncoder(&buf)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(&root); err != nil {
-		_ = encoder.Close()
-		return content
-	}
-	if err := encoder.Close(); err != nil {
-		return content
-	}
-	return formatTopLevelModuleSpacing(buf.String())
-}
 
 func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	doc := configDocument(root)
@@ -58,8 +30,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 
 	setYAMLString(doc, []string{"learning", "current", "mode"}, string(cfg.Learning.Current.Mode))
 	setYAMLString(doc, []string{"learning", "current", "scope"}, string(cfg.Learning.Current.Scope))
-	setYAMLInt(doc, []string{"learning", "current", "parallelism"}, cfg.Learning.Current.Parallelism)
-	setYAMLInt(doc, []string{"learning", "current", "max_units_per_call"}, cfg.Learning.Current.MaxUnitsPerCall)
+	setYAMLInt(doc, []string{"learning", "current", "max_focuses_per_call"}, cfg.Learning.Current.MaxFocusesPerCall)
 	setYAMLBool(doc, []string{"learning", "current", "select_relevant_files"}, cfg.Learning.Current.SelectRelevantFiles)
 	setYAMLInt(doc, []string{"learning", "current", "select_relevant_files_min_candidates"}, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
 	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "budget")
@@ -73,12 +44,6 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLInt(doc, []string{"agent", "timeout"}, cfg.Agent.Timeout)
 	setYAMLBool(doc, []string{"agent", "allow_user_plugins"}, cfg.Agent.AllowUserPlugins)
 	setYAMLInt(doc, []string{"agent", "parallelism"}, cfg.Agent.Parallelism)
-
-	setYAMLInt(doc, []string{"learning", "history", "max_commits"}, cfg.Learning.History.MaxCommits)
-	setYAMLInt(doc, []string{"learning", "history", "batch_size"}, cfg.Learning.History.BatchSize)
-
-	setYAMLString(doc, []string{"autofix", "strategy"}, cfg.AutoFix.Strategy)
-	setYAMLString(doc, []string{"autofix", "backup_path"}, cfg.AutoFix.BackupPath)
 
 	setYAMLString(doc, []string{"skills", "target"}, cfg.Skills.Target)
 	setYAMLString(doc, []string{"skills", "locale"}, cfg.Skills.Locale)

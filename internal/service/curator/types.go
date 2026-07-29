@@ -9,14 +9,8 @@ import (
 )
 
 const (
-	// OperationLearnHistory 表示从 Git 历史学习得到候选模式。
-	OperationLearnHistory Operation = "learn_history"
 	// OperationLearnCurrent 表示从当前代码库分析得到候选模式。
 	OperationLearnCurrent Operation = "learn_current"
-	// OperationLearnCommit 表示从单个提交学习得到候选模式。
-	OperationLearnCommit Operation = "learn_commit"
-	// OperationLearnStaged 表示从暂存区学习得到候选模式。
-	OperationLearnStaged Operation = "learn_staged"
 	// OperationUserDefined 表示用户自然语言补充得到候选模式。
 	OperationUserDefined Operation = "user_defined"
 	// OperationCompact 表示人工触发的模式库整理。
@@ -29,10 +23,7 @@ type Operation string
 // Valid 报告操作是否具有明确的策展语义。
 func (o Operation) Valid() bool {
 	switch o {
-	case OperationLearnHistory,
-		OperationLearnCurrent,
-		OperationLearnCommit,
-		OperationLearnStaged,
+	case OperationLearnCurrent,
 		OperationUserDefined,
 		OperationCompact:
 		return true
@@ -53,6 +44,7 @@ type CurateRequest struct {
 	Operation          Operation
 	Candidates         []domain.Pattern
 	DecisionCheckpoint DecisionCheckpoint
+	LearningSession    agent.LearningSession
 }
 
 // DecisionCheckpoint 保存高成本 AI 策展决策，使本地校验或入库失败后可以直接重放。
@@ -79,8 +71,9 @@ type CurateResult struct {
 
 // Drop 描述一个明确不应入库的候选模式。
 type Drop struct {
-	ID     string
-	Reason string
+	ID         string
+	ReasonCode agent.CuratedDropReasonCode
+	Reason     string
 }
 
 // Summary 描述一次策展的实际输入和输出规模。
@@ -96,7 +89,6 @@ type Summary struct {
 type CompactRequest struct {
 	Category string
 	DryRun   bool
-	UseAI    bool
 }
 
 // CompactResult 表示人工整理模式库结果。

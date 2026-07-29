@@ -28,7 +28,7 @@ workspace:
 
 ########################################################################
 # Agent
-# Controls the Agent engine and concurrency used by learning, checking, and generation
+# Controls the Agent engine and concurrency used by learning and generation
 ########################################################################
 agent:
   # Agent engine used for analysis, learning, and generation summaries; matches keys in commands
@@ -54,21 +54,19 @@ agent:
 
 ########################################################################
 # Learning
-# Controls the default scope for learn current and learn history
+# Controls the default scope for learn current
 ########################################################################
 learning:
   current:
-    # Learning mode: normal is the safest balance; fast keeps only high-value core patterns; deep reads deeper branches and exceptional paths
+    # Learning strategy: normal balances quality and speed; fast keeps compact directly evidenced patterns; deep keeps more source-backed local business/code patterns
     mode: "normal"
-    # Analysis unit scope: flow is the default stable choice by workflow/resource action; domain is coarser with fewer patterns; module is finer for clear module/plugin boundaries
+    # Learning focus planning lens: flow is the default stable choice for workflows/resource actions; domain favors long-lived business responsibilities; module favors module/plugin/contract boundaries
     scope: "flow"
-    # In-project analysis-unit parallelism; used by ordinary projects and workspace child projects, 1 means serial
-    parallelism: 1
-    # Maximum analysis units per AI call; 1 disables batching to reduce oversized outputs and cross-unit bleed
-    max_units_per_call: 1
-    # Enable relevant-file filtering to narrow learn current scope from the candidate file tree
+    # Maximum evidence focuses per AI call; 1 disables batching to reduce oversized outputs and cross-focus bleed
+    max_focuses_per_call: 1
+    # Enable AI candidate narrowing for large candidate sets before evidence-pack planning
     select_relevant_files: true
-    # Only call AI file filtering when candidate files reach this threshold; smaller projects use local filtering
+    # Minimum candidate file count required before AI candidate narrowing is called; smaller changes use local narrowing
     select_relevant_files_min_candidates: 200
     structural:
       # Enable bounded structural context; it does not run without bounded inputs
@@ -79,21 +77,6 @@ learning:
       max_symbols: 30
       # Skip individual files larger than this size (KB)
       max_file_size: 512
-  history:
-    # Default number of Git commits to analyze
-    max_commits: 50
-    # Number of commits to analyze per AI call in batch mode
-    batch_size: 5
-
-########################################################################
-# Auto-Fix
-# Controls the output and rollback strategy for check --fix
-########################################################################
-autofix:
-  # Fix strategy: patch: Generate .patch files (recommended, safe); backup: Backup files before modification; stash: Apply fixes then git stash; branch: Create new branch to apply fixes
-  strategy: "patch"
-  # Backup path (relative to .skills-seed directory)
-  backup_path: "backups"
 
 ########################################################################
 # Skills

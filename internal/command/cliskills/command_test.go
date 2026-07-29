@@ -29,8 +29,8 @@ func TestInstallGlobalAtHomeWritesClaudeAndCodexSkillTrees(t *testing.T) {
 	require.FileExists(t, filepath.Join(codexRoot, "references", "patterns.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "workflow.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "preview.md"))
-	require.FileExists(t, filepath.Join(codexRoot, "references", "check-hook.md"))
-	require.FileExists(t, filepath.Join(codexRoot, "references", "review-profile.md"))
+	require.FileExists(t, filepath.Join(codexRoot, "references", "hook.md"))
+	require.FileExists(t, filepath.Join(codexRoot, "references", "profile.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "log-help-version.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "cli-skills.md"))
 
@@ -118,40 +118,24 @@ func TestRenderSkillDocumentsPublicCommands(t *testing.T) {
 	content := paths["SKILL.md"]
 	require.NotEmpty(t, content)
 
-	for _, command := range []string{
-		"skills-seed --version",
-		"skills-seed help [command]",
-		"skills-seed cli-skills install",
-		"skills-seed cli-skills uninstall",
-		"skills-seed init",
-		"skills-seed reset",
-		"skills-seed workspace add",
-		"skills-seed sync",
-		"skills-seed learn current",
-		"skills-seed learn history",
-		"skills-seed generate skills",
-		"skills-seed patterns add",
-		"skills-seed patterns update",
-		"skills-seed patterns delete",
-		"skills-seed patterns show",
-		"skills-seed patterns stats",
-		"skills-seed patterns compact",
-		"skills-seed workflow",
-		"skills-seed workflow show",
-		"skills-seed preview files",
-		"skills-seed check",
-		"skills-seed review import",
-		"skills-seed review stats",
-		"skills-seed profile show",
-		"skills-seed profile refresh",
-		"skills-seed hook install",
-		"skills-seed hook uninstall",
-		"skills-seed hook run",
-		"skills-seed log",
+	for _, reference := range []string{
+		"./references/operation-model.md",
+		"./references/init-reset.md",
+		"./references/workspace.md",
+		"./references/sync.md",
+		"./references/learn.md",
+		"./references/generate.md",
+		"./references/patterns.md",
+		"./references/workflow.md",
+		"./references/preview.md",
+		"./references/hook.md",
+		"./references/profile.md",
+		"./references/log-help-version.md",
+		"./references/cli-skills.md",
 	} {
-		require.Contains(t, content, command)
+		require.Contains(t, content, reference)
 	}
-	require.Contains(t, content, "./references/workflow.md")
+	require.NotContains(t, content, "## Core Commands")
 	require.Contains(t, content, "Use only when the user explicitly asks to run, inspect, or troubleshoot a concrete skills-seed CLI command")
 	require.Contains(t, content, "Do not load it merely because a task mentions `skills-seed`")
 	require.NotContains(t, content, "operating, explaining, debugging, or automating")
@@ -176,8 +160,8 @@ func TestRenderSkillTreeIncludesPerCommandReferences(t *testing.T) {
 		"references/patterns.md",
 		"references/workflow.md",
 		"references/preview.md",
-		"references/check-hook.md",
-		"references/review-profile.md",
+		"references/hook.md",
+		"references/profile.md",
 		"references/log-help-version.md",
 		"references/cli-skills.md",
 	} {

@@ -18,10 +18,10 @@ import (
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
-	"github.com/silaswei-io/skills-seed/internal/pkg/logger"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -37,8 +37,6 @@ type commandOptions struct {
 	installGlobalCLISkills bool
 	globalCLISkillsTarget  string
 	agentTotalParallelism  int
-	learningMode           config.LearningMode
-	learningScope          config.LearningScope
 }
 
 // Cmd 返回 init 命令
@@ -88,7 +86,7 @@ func runInitCommand(cmd *cobra.Command, opts *commandOptions) error {
 	if err := validateInitOptions(*opts); err != nil {
 		return err
 	}
-	if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
+	if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism); err != nil {
 		return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 	}
 	return maybeInstallGlobalCLISkills(cmd, *opts)
@@ -124,7 +122,7 @@ func runExistingInitReset(cmd *cobra.Command, opts *commandOptions) error {
 	if err := validateInitOptions(*opts); err != nil {
 		return err
 	}
-	if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism, opts.learningMode, opts.learningScope); err != nil {
+	if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism); err != nil {
 		return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 	}
 	return maybeInstallGlobalCLISkills(cmd, *opts)
@@ -233,7 +231,7 @@ func ResetCmd() *cobra.Command {
 	return resetCmd
 }
 
-func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int, learningMode config.LearningMode, learningScope config.LearningScope) error {
+func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -245,8 +243,6 @@ func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, 
 		skillsTarget:          skillsTarget,
 		skillsLocale:          skillsLocale,
 		agentTotalParallelism: agentTotalParallelism,
-		learningMode:          learningMode,
-		learningScope:         learningScope,
 	})
 }
 
@@ -258,8 +254,6 @@ type initializeSkillOptions struct {
 	skillsTarget          string
 	skillsLocale          string
 	agentTotalParallelism int
-	learningMode          config.LearningMode
-	learningScope         config.LearningScope
 }
 
 func initializeSkillWithOptions(projectRoot, locale, mode string, opts initializeSkillOptions) error {
@@ -437,7 +431,7 @@ func configureInitializedProject(projectRoot, mode string, configRepo *config.Re
 	if err := applyInitAgentAndSkillsOptions(configRepo, opts, projectName, mode); err != nil {
 		return "", err
 	}
-	if err := applyInitLearningOptions(configRepo, opts, mode); err != nil {
+	if err := applyInitProjectParallelism(configRepo, opts, mode); err != nil {
 		return "", err
 	}
 	return projectName, nil
@@ -492,23 +486,10 @@ func applyInitAgentAndSkillsOptions(configRepo *config.Repository, opts initiali
 	return nil
 }
 
-func applyInitLearningOptions(configRepo *config.Repository, opts initializeSkillOptions, mode string) error {
-	if opts.learningMode != "" || opts.learningScope != "" {
-		cfg := configRepo.Get()
-		if opts.learningMode != "" {
-			cfg.Learning.Current.Mode = config.NormalizeLearningMode(string(opts.learningMode))
-		}
-		if opts.learningScope != "" {
-			cfg.Learning.Current.Scope = config.NormalizeLearningScope(string(opts.learningScope))
-		}
-		if err := configRepo.Update(cfg); err != nil {
-			return err
-		}
-	}
+func applyInitProjectParallelism(configRepo *config.Repository, opts initializeSkillOptions, mode string) error {
 	if opts.agentTotalParallelism > 0 && mode == domain.ModeProject {
 		cfg := configRepo.Get()
 		cfg.Agent.Parallelism = 0
-		cfg.Learning.Current.Parallelism = opts.agentTotalParallelism
 		return configRepo.Update(cfg)
 	}
 	return nil
@@ -542,10 +523,9 @@ func configureInitializedWorkspace(projectRoot, seedPath, projectName string, co
 		return err
 	}
 	if opts.agentTotalParallelism > 0 {
-		workspaceParallelism, unitParallelism := allocateWorkspaceParallelism(opts.agentTotalParallelism, len(projects))
+		workspaceParallelism := allocateWorkspaceParallelism(opts.agentTotalParallelism, len(projects))
 		cfg := configRepo.Get()
 		cfg.Agent.Parallelism = workspaceParallelism
-		cfg.Learning.Current.Parallelism = unitParallelism
 		if err := configRepo.Update(cfg); err != nil {
 			return err
 		}
@@ -646,25 +626,21 @@ func relativeSeedPath(projectRoot, seedPath string) string {
 	return filepath.ToSlash(relPath)
 }
 
-func allocateWorkspaceParallelism(totalParallelism, projectCount int) (workspaceParallelism, unitParallelism int) {
+func allocateWorkspaceParallelism(totalParallelism, projectCount int) int {
 	if totalParallelism <= 0 {
-		return 0, 1
+		return 0
 	}
 	if projectCount <= 0 {
-		return 0, totalParallelism
+		return 0
 	}
-	workspaceParallelism = totalParallelism
+	workspaceParallelism := totalParallelism
 	if workspaceParallelism > projectCount {
 		workspaceParallelism = projectCount
 	}
 	if workspaceParallelism < 1 {
 		workspaceParallelism = 1
 	}
-	unitParallelism = totalParallelism / workspaceParallelism
-	if unitParallelism < 1 {
-		unitParallelism = 1
-	}
-	return workspaceParallelism, unitParallelism
+	return workspaceParallelism
 }
 
 func versionedReadmeURL() string {
@@ -800,10 +776,10 @@ func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSe
 }
 
 func resetSkill(locale, skillsLocale, mode string) error {
-	return resetSkillWithOptions(locale, skillsLocale, mode, "", "", 0, "", "")
+	return resetSkillWithOptions(locale, skillsLocale, mode, "", "", 0)
 }
 
-func resetSkillWithOptions(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int, learningMode config.LearningMode, learningScope config.LearningScope) error {
+func resetSkillWithOptions(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -827,8 +803,6 @@ func resetSkillWithOptions(locale, skillsLocale, mode, agentEngine, skillsTarget
 		skillsTarget:          skillsTarget,
 		skillsLocale:          skillsLocale,
 		agentTotalParallelism: agentTotalParallelism,
-		learningMode:          learningMode,
-		learningScope:         learningScope,
 	})
 }
 
