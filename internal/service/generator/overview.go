@@ -50,8 +50,8 @@ func hasBroadProfileEvidence(profile *domain.ProjectProfile) bool {
 }
 func learnedCoverageSummary(profile *domain.ProjectProfile, locale string) string {
 	const previewLimit = 8
-	domains := learnedDomainNames(profile, previewLimit)
-	total := learnedDomainTotal(profile)
+	domains := learnedResponsibilityNames(profile, previewLimit)
+	total := learnedResponsibilityTotal(profile)
 	switch {
 	case len(domains) > 0:
 		if total > len(domains) {
@@ -70,7 +70,7 @@ func learnedCoverageSummary(profile *domain.ProjectProfile, locale string) strin
 	}
 }
 
-func learnedDomainTotal(profile *domain.ProjectProfile) int {
+func learnedResponsibilityTotal(profile *domain.ProjectProfile) int {
 	if profile == nil {
 		return 0
 	}
@@ -94,7 +94,7 @@ func learnedDomainTotal(profile *domain.ProjectProfile) int {
 	return len(seen)
 }
 
-func learnedDomainNames(profile *domain.ProjectProfile, limit int) []string {
+func learnedResponsibilityNames(profile *domain.ProjectProfile, limit int) []string {
 	if profile == nil || limit <= 0 {
 		return nil
 	}

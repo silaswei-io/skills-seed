@@ -92,7 +92,7 @@ func (p *codeGraphProvider) Collect(ctx context.Context, projectRoot string, req
 
 func codeGraphTask(req structuralContextRequest) string {
 	var b strings.Builder
-	b.WriteString("Analyze project structure, entry points, key modules, business methods, call relationships, dependency graph, and reusable coding patterns")
+	b.WriteString("Analyze project structure, entry points, key modules, reusable capability entries, call relationships, dependency graph, and reusable coding patterns")
 	if req.ProjectName != "" {
 		b.WriteString(" for project ")
 		b.WriteString(req.ProjectName)

@@ -36,10 +36,8 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 		return nil, fmt.Errorf("unsupported curate operation %q", req.Operation)
 	}
 	candidates := validateCandidates(req.Candidates)
-	precompactionCount := len(candidates)
 	if req.Operation == OperationLearnCurrent {
 		candidates = coalesceCurrentCandidates(validateCurrentCandidates(candidates))
-		precompactionCount = len(candidates)
 		candidates = compactCurrentCandidatesForAI(candidates)
 	}
 	if len(candidates) == 0 {
@@ -58,7 +56,7 @@ func (s *Service) CurateAndStoreWithHooks(ctx context.Context, req CurateRequest
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
 	var curated *proposal
 	if req.Operation == OperationLearnCurrent {
-		curated, err = s.curateCurrent(ctx, candidates, precompactionCount, retrieved, req.DecisionCheckpoint, req.LearningSession, hooks)
+		curated, err = s.curateCurrent(ctx, candidates, retrieved, req.DecisionCheckpoint, hooks)
 		if err != nil {
 			return nil, fmt.Errorf("curate current patterns: %w", err)
 		}
@@ -101,67 +99,34 @@ func activeCuratorPatterns(patterns []domain.Pattern) []domain.Pattern {
 	return out
 }
 
-func (s *Service) curate(ctx context.Context, operation Operation, candidates, existing []domain.Pattern, precompactionCount int, allExisting bool, existingByCandidate map[string][]string, checkpoint DecisionCheckpoint, session agent.LearningSession, hooks ProgressHooks) (*proposal, error) {
-	request := &agent.CuratePatternsRequest{
-		Operation:           string(operation),
-		CandidatePatterns:   candidates,
-		PrecompactionCount:  precompactionCount,
-		ExistingPatterns:    existing,
-		AllExisting:         allExisting,
-		ExistingByCandidate: existingByCandidate,
+func loadCurationDecision(ctx context.Context, checkpoint DecisionCheckpoint, decisionKey string, hooks ProgressHooks) (*agent.CuratePatternsResult, bool, error) {
+	if checkpoint == nil {
+		return nil, false, nil
 	}
-	decisionKey, err := curationDecisionKey(candidates)
+	result, found, err := checkpoint.Load(ctx, decisionKey)
 	if err != nil {
-		return nil, err
+		return nil, false, fmt.Errorf("load curation decision: %w", err)
 	}
-	if checkpoint != nil {
-		result, found, err := checkpoint.Load(ctx, decisionKey)
-		if err != nil {
-			return nil, fmt.Errorf("load curation decision: %w", err)
-		}
-		if found {
-			if err := agent.RequireResult(result, "CuratePatterns"); err != nil {
-				return nil, fmt.Errorf("load curation decision: %w", err)
-			}
-			label := i18n.Get("ProgressCuratePatternsReplay")
-			notifyProgress(hooks.OnStepStart, label)
-			notifyProgress(hooks.OnStepComplete, label)
-			return proposalFromAgent(result), nil
-		}
-	}
-	if operation == OperationLearnCurrent && session == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("CuratorLearningSessionRequiredForCurrent"))
-	}
-	if session == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("CuratorLearningSessionRequiredForAI"))
-	}
-
-	retryProgress := agent.NewRetryProgressBinder(hooks.OnStepUpdate)
-	ctx = retryProgress.WithContext(ctx)
-	label := i18n.Get("ProgressCuratePatternsAI")
-	if hooks.OnStepStart != nil {
-		hooks.OnStepStart(label)
-	}
-	retryProgress.StartStep(label)
-	var result *agent.CuratePatternsResult
-	var callErr error
-	result, callErr = session.CuratePatterns(ctx, request)
-	retryProgress.FinishStep(label, callErr == nil)
-	if hooks.OnStepComplete != nil {
-		hooks.OnStepComplete(label)
-	}
-	if callErr != nil {
-		return nil, callErr
+	if !found {
+		return nil, false, nil
 	}
 	if err := agent.RequireResult(result, "CuratePatterns"); err != nil {
-		return nil, err
+		return nil, false, fmt.Errorf("load curation decision: %w", err)
 	}
-	if checkpoint != nil {
-		if err := checkpoint.Save(ctx, decisionKey, result); err != nil {
-			return nil, fmt.Errorf("save curation decision: %w", err)
-		}
+	label := i18n.Get("ProgressCuratePatternsReplay")
+	notifyProgress(hooks.OnStepStart, label)
+	notifyProgress(hooks.OnStepComplete, label)
+	return result, true, nil
+}
+
+func saveCurationDecision(ctx context.Context, checkpoint DecisionCheckpoint, decisionKey string, result *agent.CuratePatternsResult) error {
+	if checkpoint == nil {
+		return nil
 	}
-	return proposalFromAgent(result), nil
+	if err := checkpoint.Save(ctx, decisionKey, result); err != nil {
+		return fmt.Errorf("save curation decision: %w", err)
+	}
+	return nil
 }
 
 func curationDecisionKey(candidates []domain.Pattern) (string, error) {

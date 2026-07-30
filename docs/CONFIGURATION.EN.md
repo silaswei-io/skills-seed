@@ -39,6 +39,7 @@ agent:
   timeout: 1800
   allow_user_plugins: false
   parallelism: 0
+  model: ""
   retry:
     max_retries: 3
     initial_interval: 15
@@ -162,8 +163,8 @@ exclude:
 | `mode` | `normal` | Learning strategy: `normal` balances quality and speed; `fast` keeps compact directly evidenced patterns; `deep` keeps more source-backed local business/code patterns |
 | `scope` | `flow` | Focus planning lens: `flow` is the default stable choice for workflows/resource actions; `domain` favors long-lived business responsibilities; `module` favors module/plugin/contract boundaries. It guides learning perspective, not a fixed taxonomy or count boundary |
 | `max_focuses_per_call` | `1` | Maximum evidence focuses per AI call; `1` disables batching to reduce oversized outputs, parse failures, and cross-focus conclusion bleed |
-| `select_relevant_files` | `true` | Enable AI candidate narrowing for large candidate sets before agenda planning; when disabled, only deterministic local narrowing is used |
-| `select_relevant_files_min_candidates` | `200` | Minimum candidate file count before AI candidate narrowing is called; smaller changes use local narrowing |
+| `select_relevant_files` | `true` | Enable AI candidate narrowing for large candidate sets before agenda planning; when disabled, conservative local preparation is used |
+| `select_relevant_files_min_candidates` | `200` | Minimum candidate file count before AI candidate narrowing is called; smaller changes keep local candidates |
 | `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
 | `structural.provider` | `auto` | Structural context and symbol-verification source: `auto`/`codegraph` use CodeGraph with automatic repair; `treesitter` explicitly selects the embedded parser |
 | `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |
@@ -177,7 +178,7 @@ Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the
 
 Starting in 0.9.0, project-structure summaries, sample-file collection, and structural pre-scan all use the same configured file-filtering policy. Except for built-in safety boundaries such as `.git`, `.skills-seed`, and configured generated-skills output directories, analyzer no longer keeps extra directory-name keywords. Put dependency, build-output, or project-specific directories in `exclude` when they should be skipped.
 
-The current version applies candidate narrowing after local file filtering: explicit focus paths, incremental changes, and high-signal entry/business/contract files are preferred for agenda planning; an initial full learn does not treat every file being new as a narrowing signal. When candidate count reaches `select_relevant_files_min_candidates` and `select_relevant_files` is enabled, `learning-candidate-select` asks AI to narrow the large candidate set from the candidate list, required paths, and structural context. Smaller changes or AI failures use deterministic local narrowing. Large inputs such as candidate paths, diffs, focused files, and structural context are written into runtime input files and referenced by prompts.
+The current version applies candidate preparation after local file filtering: smaller changes keep their candidates and no longer drop source files by path vocabulary; path signals are used only to choose structural-context seeds. When candidate count reaches `select_relevant_files_min_candidates` and `select_relevant_files` is enabled, `learning-candidate-select` asks AI to narrow the large candidate set from the candidate list, required paths, and structural context. AI failures fall back to all candidates. Large inputs such as candidate paths, diffs, focused files, and structural context are written into runtime input files and referenced by prompts.
 
 Starting in 0.9.11, file filtering also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed. Starting in 0.9.13, snapshots still preserve the full current state, but diffs sent to AI are filtered by `exclude.paths` and `exclude.gitignore`, preventing ignored files from entering analysis as deleted diffs.
 
@@ -203,15 +204,15 @@ Starting in 0.11.1, `learning.current.scope` can be set to `domain`, `flow`, or 
 
 Starting in 0.11.2, `learning.current.max_focuses_per_call` controls how many lightweight learning focuses one AI call may process, with the default `1` disabling batching. Raising it groups multiple focuses into one call and requires the response to return top-level `focuses`. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer, so incidental examples are not rendered as mandatory project standards.
 
-Candidate narrowing decides which files enter agenda planning. AI candidate narrowing, evidence-focus planning, and current-code learning prompts use explicit stable-decision rules; when evidence is equivalent, they prefer structural evidence, routeability, and source vocabulary, then use lexicographic path, ID, or symbol order as the final tie-breaker.
+Candidate preparation decides which files enter agenda planning. AI candidate narrowing, evidence-focus planning, and current-code learning prompts use explicit stable-decision rules; when evidence is equivalent, they prefer structural evidence, routeability, and source vocabulary, then use lexicographic path, ID, or symbol order as the final tie-breaker.
 
-The interactive init prompt asks for total Agent parallelism only to configure workspace-root `agent.parallelism` (child-project parallelism). `learn current` uses segmented short conversations inside one project: after local candidate narrowing, planning creates evidence packs, each evidence pack is analyzed in its own conversation, and final storage curation uses a separate global curation conversation. Project-level evidence-pack parallelism is not enabled.
+The interactive init prompt writes total Agent parallelism into `agent.parallelism`. Workspace root configs use it for child-project concurrency; ordinary project configs use it for current-code evidence-focus batch concurrency. `learn current` still uses segmented short conversations: after candidate preparation, planning creates evidence packs, each evidence-focus batch is analyzed in its own conversation, and pre-storage pattern curation runs on segmented candidate groups before local deterministic cross-shard consolidation.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Starting in 0.10.3, valid JSON final content is formatted as a readable fenced `json` block inside the `.md` archive.
 
 Starting in 0.9.6, debug records under `.skills-seed/runtime` use the `YYYYMMDD-HHMMSS[-NNN]-<kind>-<name>` filename prefix; when multiple runtime IDs are generated in the same second, an incrementing sequence is appended to avoid overwrites. `rendered-prompts/` and their matching `agent-outputs/` share the same date-time ID and semantic name; Agent output files only add the Agent name, making each prompt/output pair easy to correlate. Starting in 0.10.3, valid JSON output is formatted as a readable fenced `json` block inside the `.md` archive.
 
-Starting in 0.9.0, candidates are curated before entering the pattern store. Current `learn current` uses the segmented conversational `learning-global-curate` AI contract where the Agent decides only canonical text, confidence, and real `source_ids`; examples, source evidence, business methods, frequency, provenance, and statistics are restored locally from inputs. Unknown sources are removed, unclassified candidates use deterministic local recovery instead of a full AI rerun, and a traceable canonical pattern wins when the same candidate is also listed as dropped. `generate skills` only reads stored data and performs neither pattern merging nor Agent calls.
+Starting in 0.9.0, candidates are curated before entering the pattern store. Current `learn current` uses the segmented conversational `learning-pattern-curate` AI contract where the Agent decides only canonical text, confidence, and real `source_ids`; examples, source evidence, capability entries, frequency, provenance, and statistics are restored locally from inputs. Unknown sources are removed, unclassified candidates use deterministic local recovery instead of a full AI rerun, and a traceable canonical pattern wins when the same candidate is also listed as dropped. `generate skills` only reads stored data and performs neither pattern merging nor Agent calls.
 
 The current version no longer maintains skills dirty state. `sync` generates skills only when the learning run changes learned output. Explicit `skills-seed generate skills` deletes the old skills-seed generated output directory and fully rebuilds it; after manually adding a user pattern, run this command to refresh generated artifacts.
 
@@ -229,17 +230,18 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 | `commands` | `claude: claude`, `codex: codex` | Engine-to-CLI command mapping |
 | `timeout` | `1800` | AI request timeout in seconds |
 | `allow_user_plugins` | `false` | Whether agents may load user plugins; disabled by default for stable batch runs |
-| `parallelism` | `0` | Workspace child project parallelism in workspace root configs; ignored in ordinary project configs, `0` means automatic |
+| `parallelism` | `0` | Agent parallelism; workspace root configs use it for child projects, ordinary project configs use it for evidence-focus batches, `0` means automatic |
+| `model` | empty | Model name passed to the Agent CLI for skills-seed calls; empty passes no model flag and inherits the local Agent CLI default |
 | `retry.max_retries` | `3` | Maximum retry attempts for retryable errors; `0` uses the default `3` |
 | `retry.initial_interval` | `15` | Initial retry wait in seconds; `0` uses the default `15` |
 | `retry.max_interval` | `120` | Maximum exponential-backoff wait in seconds; `0` uses the default `120` |
 
 #### `parallelism` Notes
 
-1. In `project` mode, `agent.parallelism` is ignored; `learn current` runs segmented stage conversations serially inside the project.
+1. In `project` mode, `agent.parallelism > 1` lets `learn current` analyze independent evidence-focus batches concurrently. Each batch uses its own short conversation, then results are merged and checkpointed in agenda order.
 2. In `workspace` mode, automatic parallelism is the child project count, capped at `6`.
 3. A positive value is used as the explicit concurrency limit.
-4. Workspace child project tasks run through a goroutine worker pool; each child project still runs segmented stage conversations serially internally.
+4. Workspace child project tasks run through a goroutine worker pool. Evidence-focus concurrency inside each child project is controlled by that child project's `agent.parallelism`.
 
 #### `retry` Notes
 
@@ -253,6 +255,7 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 ```yaml
 agent:
   engine: "claude"
+  model: ""
   commands:
     claude: "claude"
     codex: "codex"
@@ -269,6 +272,7 @@ You can also set the agent during initialization:
 
 ```bash
 skills-seed init --mode project --agent codex
+skills-seed init --mode project --agent codex --agent-model gpt-5-mini
 skills-seed init --workspace --agent codex
 ```
 

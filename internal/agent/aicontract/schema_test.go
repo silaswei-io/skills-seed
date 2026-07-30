@@ -13,7 +13,7 @@ func TestJSONSchemaGeneratesDTOContract(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, schema, `"focuses"`)
 	require.Contains(t, schema, `"business_method"`)
-	require.Contains(t, schema, "canonical reusable callable entry")
+	require.Contains(t, schema, "canonical reusable capability entry")
 	require.Contains(t, schema, "complete signature")
 	require.Contains(t, schema, `"current_location"`)
 	require.NotContains(t, schema, `"profile_delta"`)

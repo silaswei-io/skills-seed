@@ -76,7 +76,7 @@ func (v *Verifier) VerifyEvidenceLocations(values []domain.PatternEvidenceLocati
 	return verified
 }
 
-// VerifyBusinessMethods 校验业务入口的符号身份，并以源码事实替换 AI 字段。
+// VerifyBusinessMethods 校验能力入口的符号身份，并以源码事实替换 AI 字段。
 func (v *Verifier) VerifyBusinessMethods(values []domain.BusinessMethod) []domain.BusinessMethod {
 	verified := make([]domain.BusinessMethod, 0, len(values))
 	now := time.Now()

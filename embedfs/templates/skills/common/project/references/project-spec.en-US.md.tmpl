@@ -8,16 +8,16 @@
 
 ## Usage
 
-- This spec keeps executable constraints, generated/config conventions, and change touchpoints only.
-- For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for entry methods read [Entry Method Index](./business-methods.md){{end}}; for verification read [Validation Strategy](./validation.md){{if .References.Testing}} and [Test Matrix](./testing.md){{end}}.
-- Authoritative rules only come from user-maintained or built-in constraints. AI-learned results are listed separately as a source-backed reuse index.
+- This spec keeps executable constraints, generated/config conventions, source-backed change boundaries, and change touchpoints.
+- For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for capability entries read [Capability Entry Index](./business-methods.md){{end}}; for verification read [Validation Strategy](./validation.md){{if .References.Testing}} and [Test Matrix](./testing.md){{end}}.
+- Authoritative rules only come from user-maintained or built-in constraints. Source-learned results are reuse and safety inspection entries only.
 - Framework and configuration items are navigation aids from the learned profile. Confirm them against current code, manifests, and configuration files.
 - Trust current code when it conflicts with this spec.
 
 ## Table Of Contents
 
 - [Authoritative Rules](#authoritative-rules)
-{{if .PatternGuidance}}- [Source-Backed Reuse Index](#source-backed-reuse-index)
+{{if .PatternGuidance}}- [Source-Backed Change Boundaries](#source-backed-change-boundaries)
 {{end}}{{if .FrameworkPatterns}}- [Framework Conventions](#framework-conventions)
 {{end}}{{if .ConfigPatterns}}- [Configuration Conventions](#configuration-conventions)
 {{end}}- [Change Touchpoints](#change-touchpoints)
@@ -28,11 +28,12 @@
 {{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
 {{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*No authoritative rules have been extracted. Continue with the guidance below and category references for reusable implementations.*
 {{end}}{{end}}
-{{if .PatternGuidance}}## Source-Backed Reuse Index
+{{if .PatternGuidance}}## Source-Backed Change Boundaries
 
-Open the matching category reference and then read the current source evidence. This spec does not repeat every pattern body.
+These entries come from source evidence and help locate reuse entries, generated/config boundaries, migration or operational risks, and cross-module conventions. They are not authoritative hard rules. Read the current source evidence before changing behavior.
 
-{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}})
+{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{.Description}}{{if .Evidence}}
+  - Evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}}
 {{end}}
 {{end}}{{if .FrameworkPatterns}}## Framework Conventions
 

@@ -147,8 +147,10 @@ func TestGenerateSkillsUsesDeterministicSummary(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(ctx, tmpDir))
 
-	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "business 分类包含 1 个项目特定模式")
-	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "hsm-delivery-boundary.md"), "HSM Delivery Boundary")
+	business := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, business, "business 分类包含 1 个项目特定模式")
+	assert.Contains(t, business, "HSM Delivery Boundary")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "hsm-delivery-boundary.md"))
 }
 
 func TestGenerateSkillsDoesNotCallAgentSummary(t *testing.T) {
@@ -171,8 +173,10 @@ func TestGenerateSkillsDoesNotCallAgentSummary(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
-	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business.md"), "business 分类包含 1 个项目特定模式")
-	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "ai-rule.md"), "AI Rule")
+	business := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, business, "business 分类包含 1 个项目特定模式")
+	assert.Contains(t, business, "AI Rule")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "ai-rule.md"))
 }
 
 func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t *testing.T) {
@@ -212,7 +216,7 @@ func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t 
 	require.NoError(t, err)
 	text := string(content)
 	require.Contains(t, text, "## 项目概览摘要")
-	require.Contains(t, text, "当前项目画像已覆盖 2 个模块/业务域")
+	require.Contains(t, text, "当前项目画像已覆盖 2 个模块/责任域")
 	require.Contains(t, text, "home")
 	require.Contains(t, text, "key-manage")
 	require.NotContains(t, text, "## 项目概览摘要\n\nhome-info模块")

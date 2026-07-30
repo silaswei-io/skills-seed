@@ -46,16 +46,39 @@ func TestGenerateSkillsRendersBusinessPatternMapFromEvidenceLocations(t *testing
 	require.Contains(t, index, "Order")
 	require.Contains(t, index, "`internal/service/order/transition.go:42`")
 	require.Contains(t, index, "新需求定位方式")
+	require.Contains(t, index, "已学习业务规则")
+	require.Contains(t, index, "适用边界")
+	require.Contains(t, index, "订单状态流转必须经过订单服务的状态校验")
+	require.Contains(t, index, "ApplyOrderTransition")
+	require.NotContains(t, index, "订单状态流转入口")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "order.md"))
+}
 
-	detail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "order.md")
-	require.Contains(t, detail, "需求匹配")
-	require.Contains(t, detail, "可复用解决方案与证据")
-	require.Contains(t, detail, "适用边界")
-	require.NotContains(t, detail, "复用建议（需按源码复核）")
-	require.NotContains(t, detail, "适用与实现观察（需按源码复核）")
-	require.Contains(t, detail, "订单状态流转必须经过订单服务的状态校验")
-	require.Contains(t, detail, "ApplyOrderTransition")
-	require.NotContains(t, detail, "订单状态流转入口")
+func TestGenerateSkillsMarksHighRiskBusinessPatternsAsCheckpoints(t *testing.T) {
+	pattern := domain.NewPattern("resource-destroy", "Resource Destroy Command", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Destroy command deletes resource state and changes an external environment.")
+	pattern.SetRule("Inspect destroy safeguards before changing this operation.")
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path:   "tools/commands/destroy.ts",
+		Line:   12,
+		Symbol: "destroyResource",
+		Kind:   "function",
+	}}
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*pattern}, nil
+		},
+	}
+
+	svc := newTestService(mockPattern)
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	require.Contains(t, index, "Resource Destroy Command")
+	require.Contains(t, index, "风险检查点")
+	require.Contains(t, index, "不要把危险动作当作普通复用建议")
 }
 
 func TestGenerateSkills_HidesCommonUtilsCoveredByBusinessPatterns(t *testing.T) {
@@ -111,6 +134,39 @@ func TestGenerateSkills_HidesCommonUtilsCoveredByBusinessPatterns(t *testing.T) 
 	assert.NotContains(t, string(commonUtils), "SM4Encrypt")
 	assert.Contains(t, string(commonUtils), "FormatFileSize")
 	assertNoBrokenMarkdownLinks(t, tmpDir)
+}
+
+func TestGenerateSkills_SkipsWeakCommonUtilsReference(t *testing.T) {
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*domain.NewPattern("p1", "Business Flow", domain.CategoryBusiness)}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "typescript",
+				Summary:     "profile",
+				CommonUtils: []domain.UtilityFunction{{
+					Name:        "BuildCacheKey",
+					File:        "src/cache/key.ts",
+					Signature:   "function BuildCacheKey(id: string): string",
+					Description: "builds a cache key",
+				}},
+			}, nil
+		},
+	}
+	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "typescript"},
+	})
+	tmpDir := t.TempDir()
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "common-utils.md"))
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	require.NotContains(t, skill, "./references/common-utils.md")
 }
 
 func TestGenerateSkills_GroupsBusinessMethodsBySourceModule(t *testing.T) {
@@ -175,7 +231,7 @@ func TestGenerateSkills_SkipsEmptyBusinessMethodDetails(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
-	content, err := os.ReadFile(filepath.Join(tmpDir, "references", "patterns", "business", "business-flow.md"))
+	content, err := os.ReadFile(filepath.Join(tmpDir, "references", "patterns", "business.md"))
 	require.NoError(t, err)
 	businessPattern := string(content)
 
@@ -230,7 +286,8 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.Contains(t, index, "业务模式地图")
 	assert.Contains(t, index, "./business/billing.md")
-	assert.Contains(t, index, "./business/notification.md")
+	assert.NotContains(t, index, "./business/notification.md")
+	assert.Contains(t, index, "Delivery Rule")
 	assert.NotContains(t, index, "func (s *Service)")
 	assert.NotContains(t, index, "#### ✅ 代码证据")
 
@@ -242,8 +299,7 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 	assert.NotContains(t, billingDetail, "#### 代码证据")
 	assert.NotContains(t, billingDetail, "func ActivatePlan")
 
-	notificationDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "notification.md")
-	assert.Contains(t, notificationDetail, "Delivery Rule")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "notification.md"))
 
 	assertNoBrokenMarkdownLinks(t, tmpDir)
 }

@@ -38,7 +38,6 @@ type CuratePatternsRequest struct {
 	CandidatePatterns   []domain.Pattern    // 本次分析产出的候选模式
 	PrecompactionCount  int                 // 当前学习候选在本地重复合并前的数量，仅用于提示 AI 理解输入已预处理
 	ExistingPatterns    []domain.Pattern    // 与候选相关的既有规范模式
-	AllExisting         bool                // ExistingPatterns 是否代表整个模式集合
 	ExistingByCandidate map[string][]string // 候选模式 ID -> 相关既有模式 ID
 }
 

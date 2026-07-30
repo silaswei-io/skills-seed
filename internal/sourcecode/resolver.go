@@ -187,7 +187,7 @@ func UtilityReferences(values []domain.UtilityFunction) []Reference {
 	return refs
 }
 
-// BusinessMethodReferences 返回业务方法中的符号引用。
+// BusinessMethodReferences 返回能力入口中的符号引用。
 func BusinessMethodReferences(values []domain.BusinessMethod) []Reference {
 	refs := make([]Reference, 0, len(values))
 	for _, value := range values {

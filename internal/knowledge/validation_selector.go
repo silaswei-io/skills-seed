@@ -252,8 +252,8 @@ func commandAppliesToArea(command ValidationCommand, area ValidationArea) bool {
 	if commandKind == "generate" {
 		text := commandText(command)
 		return containsAny(text,
-			"api", "contract", "schema", "proto", "swagger", "openapi", "route", "handler", "desc",
-			"generate", "generated", "codegen", "gen", "契约", "接口", "生成", "路由",
+			"api", "interface", "contract", "schema", "message", "event", "adapter", "proto", "swagger", "openapi", "route", "handler", "component", "desc",
+			"generate", "generated", "codegen", "gen", "契约", "接口", "消息", "事件", "适配", "生成", "路由", "组件",
 		)
 	}
 	return true

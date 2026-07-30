@@ -232,20 +232,18 @@ func TestGenerateSkills_RendersRelatedReferencesForCategoryBoundaries(t *testing
 
 	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.Contains(t, businessIndex, "## 相关参考")
-	assert.Contains(t, businessIndex, "[API 模式](./api.md)")
-	assert.Contains(t, businessIndex, "Extra/Before/After")
-	assert.Contains(t, businessIndex, "[数据库模式](./database.md)")
+	assert.Contains(t, businessIndex, "[接口 / 契约模式](./api.md)")
+	assert.Contains(t, businessIndex, "接口、消息、事件")
+	assert.Contains(t, businessIndex, "[状态 / 持久化模式](./database.md)")
 	assert.NotContains(t, businessIndex, "./error.md")
 
-	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "operate-log-domain-rule.md")
-	assert.Contains(t, businessDetail, "## 相关参考")
-	assert.Contains(t, businessDetail, "[API 模式](../api.md)")
-	assert.Contains(t, businessDetail, "接口返回")
+	assert.Contains(t, businessIndex, "Operate Log Domain Rule")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "operate-log-domain-rule.md"))
 
 	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
 	assert.Contains(t, api, "## 相关参考")
-	assert.Contains(t, api, "[业务模式](./business.md)")
-	assert.Contains(t, api, "操作日志 Extra")
+	assert.Contains(t, api, "[产品 / 领域模式](./business.md)")
+	assert.Contains(t, api, "领域状态")
 	assert.NotContains(t, api, "./middleware.md")
 
 	assertNoBrokenMarkdownLinks(t, tmpDir)
@@ -281,12 +279,12 @@ func TestGenerateSkills_RendersEnglishRelatedReferences(t *testing.T) {
 
 	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
 	assert.Contains(t, api, "## Related References")
-	assert.Contains(t, api, "[Business Patterns](./business.md)")
-	assert.Contains(t, api, "operation-log Extra")
+	assert.Contains(t, api, "[Product / Domain Patterns](./business.md)")
+	assert.Contains(t, api, "domain state")
 
-	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "audit-domain.md")
-	assert.Contains(t, businessDetail, "## Related References")
-	assert.Contains(t, businessDetail, "[API Patterns](../api.md)")
+	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	assert.Contains(t, businessIndex, "Audit Domain")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "audit-domain.md"))
 
 	assertNoBrokenMarkdownLinks(t, tmpDir)
 }
@@ -449,9 +447,9 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	assert.NotContains(t, businessPattern, "## 业务方法汇总")
 	assert.NotContains(t, businessPattern, "DuplicatedMethod")
 
-	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "business-flow.md")
-	assert.Contains(t, businessDetail, "Business Flow")
-	assert.NotContains(t, businessDetail, "DuplicatedMethod")
+	assert.Contains(t, businessPattern, "Business Flow")
+	assert.NotContains(t, businessPattern, "DuplicatedMethod")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "business-flow.md"))
 
 	businessMethods := readGeneratedFile(t, tmpDir, "references", "business-methods.md")
 	assert.Contains(t, businessMethods, "DuplicatedMethod")
@@ -561,13 +559,13 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.NotContains(t, businessIndex, "## 规则断言")
 	assert.Contains(t, businessIndex, "## 子域路由")
-	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "vocab.md")
-	assert.Contains(t, businessDetail, "适用边界")
-	assert.Contains(t, businessDetail, "Only one plan can be active")
-	assert.NotContains(t, businessDetail, "复用建议（需按源码复核）")
-	assert.NotContains(t, businessDetail, "适用与实现观察（需按源码复核）")
-	assert.NotContains(t, businessDetail, "Deactivate existing active plans before creating or activating a plan")
-	assert.Contains(t, businessDetail, "ActivatePlan")
+	assert.Contains(t, businessIndex, "适用边界")
+	assert.Contains(t, businessIndex, "Only one plan can be active")
+	assert.NotContains(t, businessIndex, "复用建议（需按源码复核）")
+	assert.NotContains(t, businessIndex, "适用与实现观察（需按源码复核）")
+	assert.NotContains(t, businessIndex, "Deactivate existing active plans before creating or activating a plan")
+	assert.Contains(t, businessIndex, "ActivatePlan")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "vocab.md"))
 }
 
 func TestGenerateSkills_DisambiguatesDuplicateModuleHeadings(t *testing.T) {

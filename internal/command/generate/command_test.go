@@ -17,7 +17,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/spf13/cobra"
@@ -421,7 +420,7 @@ func registerGenerateWorkspaceMockAgentFactory(t *testing.T) string {
 	t.Helper()
 	provider := "mock-generate-workspace-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
 	generateWorkspaceFactoryMu.Lock()
-	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(opts container.AgentFactoryOptions) agent.Agent {
 		return &mocks.MockAgent{
 			NameVal:      provider,
 			AvailableVal: true,

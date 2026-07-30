@@ -69,7 +69,7 @@ var contextPromptFiles = []contextPromptFile{
 }
 
 var promptAppendFragments = map[string][]string{
-	"learning-global-curate": {"pattern-curation-rules", "pattern-abstraction-rules"},
+	"learning-pattern-curate": {"pattern-curation-rules", "pattern-abstraction-rules"},
 }
 
 // RuntimeTask 标识一次 agent 调用共用的 runtime 文件名前缀。

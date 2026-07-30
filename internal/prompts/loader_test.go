@@ -123,7 +123,7 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 	require.Contains(t, start, "Learning strategy guidance")
 	require.Contains(t, start, "Treat learning mode as curation priority")
 	require.Contains(t, start, "Do not assume or inventory any language, framework, architecture, domain, or fixed output count")
-	require.Contains(t, start, "project-specific business patterns and project-specific code patterns")
+	require.Contains(t, start, "project-specific product/domain patterns and project-specific code patterns")
 
 	plan, err := loader.Render("learning-pack-plan", samplePlanData(t))
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 	require.Contains(t, plan, "Do not plan a directory inventory")
 	require.Contains(t, plan, "Preserve these knowledge lanes")
 	require.Contains(t, plan, "decision-bearing cues")
-	require.Contains(t, plan, "verified callable entries")
+	require.Contains(t, plan, "verified callable or declarative entries")
 	require.Contains(t, plan, "Learning strategy guidance")
 	require.Contains(t, plan, "Learning scope guidance")
 
@@ -148,9 +148,9 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 	require.Contains(t, batch, "isolated pack-analysis conversation")
 	require.Contains(t, batch, "Run a decision-value discovery pass")
 	require.Contains(t, batch, "Pack-local curation")
-	require.Contains(t, batch, "business patterns and code patterns")
+	require.Contains(t, batch, "product/domain patterns and code patterns")
 	require.Contains(t, batch, "Fill `business_method` only when")
-	require.Contains(t, batch, "verified reusable callable entry")
+	require.Contains(t, batch, "verified reusable capability entry")
 	require.Contains(t, batch, "The mode changes curation priority only")
 	require.NotContains(t, batch, "pattern-evidence-rules")
 
@@ -168,15 +168,16 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 	require.Contains(t, profile, "Do not inventory the project for completeness")
 	require.Contains(t, profile, "Avoid exact capability counts")
 
-	curate, err := loader.Render("learning-global-curate", sampleCuratePatternsData())
+	curate, err := loader.Render("learning-pattern-curate", sampleCuratePatternsData())
 	require.NoError(t, err)
-	require.Contains(t, curate, "short global curation conversation")
+	require.Contains(t, curate, "short pattern curation conversation")
+	require.Contains(t, curate, "other curation shards")
 	require.Contains(t, curate, "Do not scan repository files")
 	require.Contains(t, curate, "complete ownership decision")
-	require.Contains(t, curate, "business and code-pattern capabilities")
+	require.Contains(t, curate, "product/domain, interaction, resource, and code-pattern capabilities")
 	require.Contains(t, curate, "Pattern Curation Quality Rules")
 	require.Contains(t, curate, "Pattern Abstraction And Stability Rules")
-	require.Contains(t, curate, "Preserve business-capability and code-pattern candidates")
+	require.Contains(t, curate, "Preserve product/domain, interaction, resource, contract, and code-pattern candidates")
 	require.Contains(t, curate, "dangerous historical implementation")
 }
 
@@ -188,7 +189,7 @@ func currentPromptData(t *testing.T) map[string]interface{} {
 		"learning-pack-analyze":       sampleCurrentBatchData(),
 		"learning-delta-pack-analyze": sampleCurrentDeltaData(),
 		"learning-profile-refresh":    sampleProjectProfileData(t),
-		"learning-global-curate":      sampleCuratePatternsData(),
+		"learning-pattern-curate":     sampleCuratePatternsData(),
 		"core-user-pattern":           sampleUserPatternData(),
 		"core-workflow-optimize":      sampleWorkflowData(),
 		"core-workspace-profile":      sampleWorkspaceData(),
@@ -308,7 +309,6 @@ func sampleCuratePatternsData() map[string]interface{} {
 		"Operation":           "learn_current",
 		"CandidatePatterns":   []domain.Pattern{*samplePattern("candidate-user-flow", "Candidate User Flow")},
 		"ExistingPatterns":    []domain.Pattern{*samplePattern("existing-user-flow", "Existing User Flow")},
-		"AllExisting":         false,
 		"ExistingByCandidate": map[string][]string{"candidate-user-flow": []string{"existing-user-flow"}},
 		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}

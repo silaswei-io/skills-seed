@@ -67,9 +67,9 @@ type businessIndexTemplateData struct {
 	Summary           string
 	PatternCount      int
 	LastUpdated       string
-	Groups            []patternGroup
+	DetailGroups      []patternGroup
+	InlineGroups      []patternGroup
 	RelatedReferences []PatternReferenceLink
-	CoverageWarnings  []CoverageWarning
 }
 
 type businessDetailTemplateData struct {
@@ -130,15 +130,10 @@ type PatternReferenceLink struct {
 	Reason string
 }
 
-type CoverageWarning struct {
-	Title   string
-	Path    string
-	Message string
-}
-
 type patternRenderModel struct {
 	domain.Pattern
-	HardConstraint bool
+	HardConstraint      bool
+	HighRiskOperational bool
 }
 
 func (p patternRenderModel) AllowsHardConstraint() bool {

@@ -31,6 +31,7 @@ type commandOptions struct {
 	skillsLocale           string
 	mode                   string
 	agent                  string
+	agentModel             string
 	skills                 string
 	workspace              bool
 	noInteractive          bool
@@ -58,6 +59,7 @@ func Cmd() *cobra.Command {
 	initCmd.Flags().StringVar(&opts.skillsLocale, "skills-locale", "", i18n.Get("InitFlagSkillsLocale"))
 	initCmd.Flags().StringVar(&opts.mode, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	initCmd.Flags().StringVar(&opts.agent, "agent", "", i18n.Get("InitFlagAgent"))
+	initCmd.Flags().StringVar(&opts.agentModel, "agent-model", "", i18n.Get("InitFlagAgentModel"))
 	initCmd.Flags().StringVar(&opts.skills, "skills", "", i18n.Get("InitFlagSkills"))
 	initCmd.Flags().BoolVar(&opts.workspace, "workspace", false, i18n.Get("InitFlagWorkspace"))
 	initCmd.Flags().BoolVar(&opts.noInteractive, "no-interactive", false, i18n.Get("InteractiveFlagNoInteractive"))
@@ -86,7 +88,7 @@ func runInitCommand(cmd *cobra.Command, opts *commandOptions) error {
 	if err := validateInitOptions(*opts); err != nil {
 		return err
 	}
-	if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism); err != nil {
+	if err := initializeSkillWithOptionsFromCWD(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.agentModel, opts.skills, opts.agentTotalParallelism); err != nil {
 		return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 	}
 	return maybeInstallGlobalCLISkills(cmd, *opts)
@@ -122,7 +124,7 @@ func runExistingInitReset(cmd *cobra.Command, opts *commandOptions) error {
 	if err := validateInitOptions(*opts); err != nil {
 		return err
 	}
-	if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.skills, opts.agentTotalParallelism); err != nil {
+	if err := resetSkillWithOptions(opts.locale, opts.skillsLocale, effectiveInitMode(*opts), opts.agent, opts.agentModel, opts.skills, opts.agentTotalParallelism); err != nil {
 		return fmt.Errorf("%s", i18n.GetWithParams("InitFailed", map[string]interface{}{"Error": err.Error()}))
 	}
 	return maybeInstallGlobalCLISkills(cmd, *opts)
@@ -188,6 +190,7 @@ func printExistingInitSummary(projectRoot string, cmd *cobra.Command) error {
 		{Label: i18n.Get("InteractiveInitSummaryToolLocale"), Value: configRepo.GetToolLocale()},
 		{Label: i18n.Get("InteractiveInitSummarySkillsLocale"), Value: configRepo.GetSkillsLocale()},
 		{Label: i18n.Get("InteractiveInitSummaryAgent"), Value: cfg.Agent.Engine},
+		{Label: i18n.Get("InteractiveInitSummaryAgentModel"), Value: localizedAgentModel(cfg.Agent.Model)},
 		{Label: i18n.Get("InteractiveInitSummarySkills"), Value: cfg.Skills.Target},
 		{Label: "config", Value: filepath.Join(".skills-seed", "config.yaml")},
 	})
@@ -231,7 +234,7 @@ func ResetCmd() *cobra.Command {
 	return resetCmd
 }
 
-func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int) error {
+func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, agentModel, skillsTarget string, agentTotalParallelism int) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -240,6 +243,7 @@ func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, 
 		initLogger:            true,
 		showUserSummary:       true,
 		agentEngine:           agentEngine,
+		agentModel:            agentModel,
 		skillsTarget:          skillsTarget,
 		skillsLocale:          skillsLocale,
 		agentTotalParallelism: agentTotalParallelism,
@@ -251,6 +255,7 @@ type initializeSkillOptions struct {
 	showUserSummary       bool
 	language              string
 	agentEngine           string
+	agentModel            string
 	skillsTarget          string
 	skillsLocale          string
 	agentTotalParallelism int
@@ -473,6 +478,13 @@ func applyInitAgentAndSkillsOptions(configRepo *config.Repository, opts initiali
 			return err
 		}
 	}
+	if opts.agentModel != "" {
+		cfg := configRepo.Get()
+		cfg.Agent.Model = strings.TrimSpace(opts.agentModel)
+		if err := configRepo.Update(cfg); err != nil {
+			return err
+		}
+	}
 	if opts.skillsTarget != "" {
 		cfg := configRepo.Get()
 		ensureSkillsTarget(cfg, opts.skillsTarget, projectName, mode)
@@ -489,7 +501,7 @@ func applyInitAgentAndSkillsOptions(configRepo *config.Repository, opts initiali
 func applyInitProjectParallelism(configRepo *config.Repository, opts initializeSkillOptions, mode string) error {
 	if opts.agentTotalParallelism > 0 && mode == domain.ModeProject {
 		cfg := configRepo.Get()
-		cfg.Agent.Parallelism = 0
+		cfg.Agent.Parallelism = opts.agentTotalParallelism
 		return configRepo.Update(cfg)
 	}
 	return nil
@@ -776,10 +788,10 @@ func reportExistingWorkspaceChild(project config.WorkspaceProjectConfig, childSe
 }
 
 func resetSkill(locale, skillsLocale, mode string) error {
-	return resetSkillWithOptions(locale, skillsLocale, mode, "", "", 0)
+	return resetSkillWithOptions(locale, skillsLocale, mode, "", "", "", 0)
 }
 
-func resetSkillWithOptions(locale, skillsLocale, mode, agentEngine, skillsTarget string, agentTotalParallelism int) error {
+func resetSkillWithOptions(locale, skillsLocale, mode, agentEngine, agentModel, skillsTarget string, agentTotalParallelism int) error {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
@@ -800,6 +812,7 @@ func resetSkillWithOptions(locale, skillsLocale, mode, agentEngine, skillsTarget
 		initLogger:            true,
 		showUserSummary:       true,
 		agentEngine:           agentEngine,
+		agentModel:            agentModel,
 		skillsTarget:          skillsTarget,
 		skillsLocale:          skillsLocale,
 		agentTotalParallelism: agentTotalParallelism,

@@ -64,6 +64,9 @@ func patternSimilarity(left, right domain.Pattern) float64 {
 	if left.Category != "" && right.Category != "" && left.Category != right.Category {
 		return 0
 	}
+	if domain.IsHighRiskOperationalPattern(left) != domain.IsHighRiskOperationalPattern(right) {
+		return 0
+	}
 
 	score := 0.0
 	if left.Category != "" && left.Category == right.Category {

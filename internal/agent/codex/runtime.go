@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
@@ -104,7 +105,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 	if err != nil {
 		return "", 0, false, err
 	}
-	args := codexExecArgs(c.allowUserPlugins, outputSchemaPath)
+	args := codexExecArgs(c.allowUserPlugins, outputSchemaPath, c.runtime)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
 		"operation", operation,
@@ -238,9 +239,9 @@ func (c *CodexAgent) doCallCodexSession(ctx context.Context, operation, prompt, 
 	if err != nil {
 		return "", sessionID, 0, false, err
 	}
-	args := codexSessionStartArgs(c.allowUserPlugins, outputSchemaPath)
+	args := codexSessionStartArgs(c.allowUserPlugins, outputSchemaPath, c.runtime)
 	if strings.TrimSpace(sessionID) != "" {
-		args = codexSessionResumeArgs(c.allowUserPlugins, outputSchemaPath, sessionID)
+		args = codexSessionResumeArgs(c.allowUserPlugins, outputSchemaPath, sessionID, c.runtime)
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
@@ -339,10 +340,11 @@ func (c *CodexAgent) doCallCodexSession(ctx context.Context, operation, prompt, 
 	return content, nextSessionID, duration, false, nil
 }
 
-func codexExecArgs(allowUserPlugins bool, outputSchemaPath string) []string {
+func codexExecArgs(allowUserPlugins bool, outputSchemaPath string, runtime config.AgentRuntimeOptions) []string {
 	// 已经把需要分析的结构和样例代码放进提示词。这里让模型以一次性、
 	// 只读、非交互模式在当前目录运行，避免写入文件或等待工具审批
-	args := []string{
+	args := codexRuntimeArgs(runtime)
+	args = append(args,
 		"--ask-for-approval", "never",
 		"exec",
 		"--skip-git-repo-check",
@@ -353,15 +355,16 @@ func codexExecArgs(allowUserPlugins bool, outputSchemaPath string) []string {
 		"--json",
 		"--output-schema", outputSchemaPath,
 		"-",
-	}
+	)
 	if !allowUserPlugins {
 		args = append(codexDisableUserPluginArgs(), args...)
 	}
 	return args
 }
 
-func codexSessionStartArgs(allowUserPlugins bool, outputSchemaPath string) []string {
-	args := []string{
+func codexSessionStartArgs(allowUserPlugins bool, outputSchemaPath string, runtime config.AgentRuntimeOptions) []string {
+	args := codexRuntimeArgs(runtime)
+	args = append(args,
 		"--ask-for-approval", "never",
 		"exec",
 		"--skip-git-repo-check",
@@ -371,15 +374,16 @@ func codexSessionStartArgs(allowUserPlugins bool, outputSchemaPath string) []str
 		"--json",
 		"--output-schema", outputSchemaPath,
 		"-",
-	}
+	)
 	if !allowUserPlugins {
 		args = append(codexDisableUserPluginArgs(), args...)
 	}
 	return args
 }
 
-func codexSessionResumeArgs(allowUserPlugins bool, outputSchemaPath, sessionID string) []string {
-	args := []string{
+func codexSessionResumeArgs(allowUserPlugins bool, outputSchemaPath, sessionID string, runtime config.AgentRuntimeOptions) []string {
+	args := codexRuntimeArgs(runtime)
+	args = append(args,
 		"--ask-for-approval", "never",
 		"exec",
 		"resume",
@@ -389,7 +393,7 @@ func codexSessionResumeArgs(allowUserPlugins bool, outputSchemaPath, sessionID s
 		"--color", "never",
 		"--json",
 		"--output-schema", outputSchemaPath,
-	}
+	)
 	if strings.TrimSpace(sessionID) == "" {
 		args = append(args, "--last", "-")
 	} else {
@@ -397,6 +401,14 @@ func codexSessionResumeArgs(allowUserPlugins bool, outputSchemaPath, sessionID s
 	}
 	if !allowUserPlugins {
 		args = append(codexDisableUserPluginArgs(), args...)
+	}
+	return args
+}
+
+func codexRuntimeArgs(runtime config.AgentRuntimeOptions) []string {
+	args := make([]string, 0)
+	if model := strings.TrimSpace(runtime.Model); model != "" {
+		args = append(args, "--model", model)
 	}
 	return args
 }

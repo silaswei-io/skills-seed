@@ -41,8 +41,10 @@ agent:
   timeout: 1800
   # Whether agents may load user plugins; disabled by default for batch stability
   allow_user_plugins: false
-  # Workspace child project parallelism; only used by workspace root configs, 0 means automatic
+  # Agent parallelism; workspace roots use it for child projects, project configs use it for evidence-focus batches, 0 means automatic
   parallelism: 0
+  # skills-seed specific model name; empty inherits the local Agent CLI default
+  model: ""
   # Retry configuration for retryable errors such as 429 and 529 overloaded
   retry:
     # Maximum retry attempts; 0 uses default (3)
@@ -66,7 +68,7 @@ learning:
     max_focuses_per_call: 1
     # Enable AI candidate narrowing for large candidate sets before evidence-pack planning
     select_relevant_files: true
-    # Minimum candidate file count required before AI candidate narrowing is called; smaller changes use local narrowing
+    # Minimum candidate file count required before AI candidate narrowing is called; smaller changes use conservative local preparation
     select_relevant_files_min_candidates: 200
     structural:
       # Enable bounded structural context; it does not run without bounded inputs

@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.15.1]
+
+### 变更
+
+- 简化 Agent 模型配置，只保留 `agent.model` 与 `init --agent-model`；空值继承本机 Agent CLI 默认模型，避免引入 profile、effort、预算或 provider 专属配置。
+- Claude 与 Codex 调用统一从 `agent.model` 派生 `--model` 参数，初始化交互仅在高级选项中询问模型名，并在执行摘要中显示当前模型来源。
+- workspace 新初始化的子项目会继承根仓 `agent.model`，确保低成本模型设置在多项目学习中一致生效。
+- 同步配置模板、README、命令文档和配置文档，明确模型名格式由具体 Agent CLI 决定。
+
+### 修复
+
+- 清理未发布测试配置中的 `agent.profile`、`agent.effort`、`agent.max_budget_usd` 和 `agent.provider_options` 残留，避免旧草案字段继续污染配置文件。
+- 修复 Agent 工厂测试签名调整后的未用导入和模型运行参数传递覆盖不足问题。
+
 ## [v0.15.0]
 
 ### 变更

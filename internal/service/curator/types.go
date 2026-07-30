@@ -44,10 +44,9 @@ type CurateRequest struct {
 	Operation          Operation
 	Candidates         []domain.Pattern
 	DecisionCheckpoint DecisionCheckpoint
-	LearningSession    agent.LearningSession
 }
 
-// DecisionCheckpoint 保存高成本 AI 策展决策，使本地校验或入库失败后可以直接重放。
+// DecisionCheckpoint 保存已完成的策展决策，使本地校验或入库失败后可以直接重放。
 type DecisionCheckpoint interface {
 	Load(context.Context, string) (*agent.CuratePatternsResult, bool, error)
 	Save(context.Context, string, *agent.CuratePatternsResult) error

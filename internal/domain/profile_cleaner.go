@@ -254,7 +254,7 @@ func mergeStringLists(base, next []string) []string {
 	return FilterGeneratedPlaceholders(values)
 }
 
-// ValidBusinessMethods 过滤掉无效的业务方法
+// ValidBusinessMethods 过滤掉无效的能力入口。
 func ValidBusinessMethods(methods []*BusinessMethod) []*BusinessMethod {
 	valid := make([]*BusinessMethod, 0, len(methods))
 	for _, method := range methods {
@@ -265,7 +265,7 @@ func ValidBusinessMethods(methods []*BusinessMethod) []*BusinessMethod {
 	return valid
 }
 
-// IsUsableBusinessMethod 判断业务方法是否可用
+// IsUsableBusinessMethod 判断能力入口是否可用。
 func IsUsableBusinessMethod(method *BusinessMethod) bool {
 	return method != nil &&
 		strings.TrimSpace(method.Name) != "" &&

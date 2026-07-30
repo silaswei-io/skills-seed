@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBusinessCoverageWarningsMarksSinglePatternGroups(t *testing.T) {
+func TestSplitBusinessPatternGroupsKeepsSparseGroupsInline(t *testing.T) {
 	one := domain.NewPattern("admin-flow", "管理员流程", domain.CategoryBusiness)
 	one.SetRule("修改管理员流程时必须保持角色校验")
 	one.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/logic/system/admin/create.go", Line: 48}}
@@ -18,9 +18,10 @@ func TestBusinessCoverageWarningsMarksSinglePatternGroups(t *testing.T) {
 	twoB.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "plugins/key_manage/internal/logic/key_manage/delete.go", Line: 12}}
 	groups := businessPatternGroups("zh-CN", []domain.Pattern{*one, *twoA, *twoB})
 
-	warnings := businessCoverageWarnings(groups, "zh-CN")
+	detailGroups, inlineGroups := splitBusinessPatternGroups(groups)
 
-	require.Len(t, warnings, 1)
-	assert.Equal(t, "Admin", warnings[0].Title)
-	assert.Contains(t, warnings[0].Message, "覆盖可能不完整")
+	require.Len(t, detailGroups, 1)
+	assert.Equal(t, "Key Manage", detailGroups[0].Title)
+	require.Len(t, inlineGroups, 1)
+	assert.Equal(t, "Admin", inlineGroups[0].Title)
 }

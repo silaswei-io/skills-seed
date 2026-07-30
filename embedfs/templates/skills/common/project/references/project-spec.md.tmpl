@@ -8,16 +8,16 @@
 
 ## 使用方式
 
-- 本规范只保留当前项目的可执行约束、生成/配置约定和改动触点。
-- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，业务入口读 [入口方法索引](./business-methods.md){{end}}；验证方式读 [验证策略](./validation.md){{if .References.Testing}} 和 [测试矩阵](./testing.md){{end}}。
-- 权威规则只来自用户维护或内置约束；AI 学习结果单独列为源码复用索引。
+- 本规范只保留当前项目的可执行约束、生成/配置约定、源码证据支持的改动边界和改动触点。
+- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，能力入口读 [能力入口索引](./business-methods.md){{end}}；验证方式读 [验证策略](./validation.md){{if .References.Testing}} 和 [测试矩阵](./testing.md){{end}}。
+- 权威规则只来自用户维护或内置约束；源码学习结果只作为复用和安全检查入口。
 - 框架和配置条目来自已学习项目画像，只用于定位；修改前仍需按当前代码、依赖清单和配置文件确认。
 - 当本规范和实际代码不一致时，以当前代码为准。
 
 ## 目录
 
 - [权威规则](#权威规则)
-{{if .PatternGuidance}}- [源码复用索引](#源码复用索引)
+{{if .PatternGuidance}}- [源码改动边界](#源码改动边界)
 {{end}}{{if .FrameworkPatterns}}- [框架使用约定](#框架使用约定)
 {{end}}{{if .ConfigPatterns}}- [配置约定](#配置约定)
 {{end}}- [改动触点](#改动触点)
@@ -28,11 +28,12 @@
 {{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
 {{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*尚未提取权威规则；继续检查下方约定和分类 references。*
 {{end}}{{end}}
-{{if .PatternGuidance}}## 源码复用索引
+{{if .PatternGuidance}}## 源码改动边界
 
-先按分类 reference 找到相关模式，再按证据位置读取当前源码。这里不重复展开模式正文。
+以下条目来自源码证据，用于定位复用入口、生成/配置边界、迁移/操作风险或跨模块约定；它们不是自动生效的权威硬规则。修改前先按证据位置读取当前源码。
 
-{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}})
+{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{.Description}}{{if .Evidence}}
+  - 证据：{{range $i, $path := .Evidence}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}
 {{end}}
 {{end}}{{if .FrameworkPatterns}}## 框架使用约定
 

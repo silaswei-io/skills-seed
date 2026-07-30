@@ -55,6 +55,8 @@
 {{range .PatternObjects}}
 ### {{.Name}}
 
+{{if .HighRiskOperational}}- 风险检查点：涉及不可逆、特权、状态/资源变更或外部副作用；按证据确认保护边界后再修改。
+{{end}}
 {{if .Description}}{{.Description}}
 {{end}}{{if .Rule}}- 用户规则：{{.Rule}}
 {{end}}{{if .EvidenceLocations}}- 位置：{{range .EvidenceLocations}}`{{.DisplayLocation}}` {{end}}

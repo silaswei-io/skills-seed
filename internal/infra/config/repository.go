@@ -130,14 +130,20 @@ func (c *StructuralConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// AgentConfig 控制调用外部 Agent CLI 的引擎、命令、超时和并发策略。
+// AgentConfig 控制调用外部 Agent CLI 的引擎、命令、超时、模型和并发策略。
 type AgentConfig struct {
 	Engine           string            `yaml:"engine"`             // Agent 引擎
 	Commands         map[string]string `yaml:"commands"`           // engine -> CLI 命令
 	Timeout          int               `yaml:"timeout"`            // 超时时间（秒）
 	AllowUserPlugins bool              `yaml:"allow_user_plugins"` // 是否加载用户插件
 	Parallelism      int               `yaml:"parallelism"`        // 并发 Agent 数，0 表示自动
+	Model            string            `yaml:"model"`              // skills-seed 专用模型名，空值继承 Agent CLI 默认配置
 	Retry            RetryConfig       `yaml:"retry"`              // 重试配置
+}
+
+// AgentRuntimeOptions 是传给具体 provider 的有效运行参数。
+type AgentRuntimeOptions struct {
+	Model string
 }
 
 // RetryConfig 可重试错误（429/529 等）的重试配置
@@ -191,6 +197,11 @@ func (r RetryConfig) WaitDuration(attempt int) time.Duration {
 	return wait
 }
 
+// RuntimeOptions 返回传给 Agent CLI 的有效运行参数。
+func (c AgentConfig) RuntimeOptions() AgentRuntimeOptions {
+	return AgentRuntimeOptions{Model: strings.TrimSpace(c.Model)}
+}
+
 // LearningConfig 控制 learn current 的默认学习范围。
 type LearningConfig struct {
 	Current CurrentLearningConfig `yaml:"current"` // learn current 的文件范围和结构化上下文配置
@@ -242,7 +253,7 @@ func NormalizeLearningMode(mode string) LearningMode {
 type LearningScope string
 
 const (
-	LearningScopeDomain LearningScope = "domain" // 优先按业务域合并能力，跨插件/接口/模块也尽量归并
+	LearningScopeDomain LearningScope = "domain" // 优先按产品/责任域合并能力，跨扩展、接口或模块也尽量归并
 	LearningScopeFlow   LearningScope = "flow"   // 按业务流程、资源动作或外部系统职责拆分
 	LearningScopeModule LearningScope = "module" // 允许按插件、接口、子模块等工程边界更细拆分
 )

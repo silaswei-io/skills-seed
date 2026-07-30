@@ -66,7 +66,13 @@ func shouldRecoverDroppedCurrentCandidate(candidate domain.Pattern, dropped Drop
 	if !currentCandidateHasReusableEvidence(candidate) {
 		return false
 	}
-	return dropped.ReasonCode == agent.CuratedDropOverfilteredSourceBacked
+	switch dropped.ReasonCode {
+	case agent.CuratedDropOverfilteredSourceBacked,
+		agent.CuratedDropNoRouteableValue:
+		return true
+	default:
+		return false
+	}
 }
 
 func currentCandidateHasReusableEvidence(candidate domain.Pattern) bool {

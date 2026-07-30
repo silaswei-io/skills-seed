@@ -5,13 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCodexExecArgs_UseCurrentWorkDirMode(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 
-	args := codexExecArgs(false, "/tmp/output-schema.json")
+	args := codexExecArgs(false, "/tmp/output-schema.json", config.AgentRuntimeOptions{})
 
 	require.Equal(t, []string{
 		"--ask-for-approval", "never",
@@ -27,6 +28,15 @@ func TestCodexExecArgs_UseCurrentWorkDirMode(t *testing.T) {
 	}, args)
 }
 
+func TestCodexExecArgsUsesConfiguredModel(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
+
+	args := codexExecArgs(false, "/tmp/output-schema.json", config.AgentRuntimeOptions{Model: "gpt-5-mini"})
+
+	require.Contains(t, args, "--model")
+	require.Equal(t, "gpt-5-mini", requireArgValue(t, args, "--model"))
+}
+
 func TestCodexExecArgs_DisablesUserPluginsByDefault(t *testing.T) {
 	codexHome := t.TempDir()
 	t.Setenv("CODEX_HOME", codexHome)
@@ -38,7 +48,7 @@ enabled = true
 enabled = true
 `), 0o644))
 
-	args := codexExecArgs(false, "/tmp/output-schema.json")
+	args := codexExecArgs(false, "/tmp/output-schema.json", config.AgentRuntimeOptions{})
 
 	require.Contains(t, args, `plugins."superpowers@openai-curated".enabled=false`)
 	require.Contains(t, args, `plugins."local".enabled=false`)
@@ -52,7 +62,7 @@ func TestCodexExecArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 enabled = true
 `), 0o644))
 
-	args := codexExecArgs(true, "/tmp/output-schema.json")
+	args := codexExecArgs(true, "/tmp/output-schema.json", config.AgentRuntimeOptions{})
 
 	require.NotContains(t, args, `plugins."superpowers@openai-curated".enabled=false`)
 }
@@ -60,8 +70,8 @@ enabled = true
 func TestCodexSessionArgsStayReadOnly(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 
-	startArgs := codexSessionStartArgs(false, "/tmp/output-schema.json")
-	resumeArgs := codexSessionResumeArgs(false, "/tmp/output-schema.json", "thread-123")
+	startArgs := codexSessionStartArgs(false, "/tmp/output-schema.json", config.AgentRuntimeOptions{})
+	resumeArgs := codexSessionResumeArgs(false, "/tmp/output-schema.json", "thread-123", config.AgentRuntimeOptions{})
 
 	for _, args := range [][]string{startArgs, resumeArgs} {
 		require.Contains(t, args, "--ask-for-approval")

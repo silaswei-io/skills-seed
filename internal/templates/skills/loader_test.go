@@ -390,8 +390,7 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 				"Summary":           "",
 				"Category":          "business",
 				"CodeFenceLanguage": "go",
-				"CoverageWarnings":  []interface{}{},
-				"Groups": []map[string]interface{}{
+				"DetailGroups": []map[string]interface{}{
 					{
 						"ID":    "resource",
 						"Title": "Resource",
@@ -405,7 +404,8 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 						"Patterns": []domain.Pattern{*pattern},
 					},
 				},
-				"GroupTitle": "Resource",
+				"InlineGroups": []interface{}{},
+				"GroupTitle":   "Resource",
 				"GroupSummary": map[string]interface{}{
 					"Description": "资源业务规则",
 					"Keywords":    []string{"审批", "状态"},

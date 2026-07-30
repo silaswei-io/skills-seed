@@ -15,7 +15,7 @@ This page reflects only learned reuse points with source evidence. For sparse do
 {{if .RelatedReferences}}
 ## Related References
 
-This page only covers business-domain rules. If the task touches cross-boundary conventions such as API returns, persistence, or error semantics, continue with the matching reference.
+This page only covers product/domain rules. If the task touches cross-boundary conventions such as interface/message returns, state/persistence boundaries, or failure semantics, continue with the matching reference.
 
 {{range .RelatedReferences}}
 - [{{.Title}}]({{.Path}}): {{.Reason}}
@@ -37,6 +37,9 @@ Use the evidence below to locate and prefer existing implementations. Authoritat
 {{range .PatternObjects}}
 ### {{.Name}}
 
+{{if .HighRiskOperational}}**Risk Checkpoint**: This pattern involves irreversible, privileged, state/resource-changing, or externally visible behavior. Use it to locate verified safeguards; do not treat the dangerous action as ordinary reuse guidance.
+
+{{end}}
 {{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability**: {{.Description}}{{end}}
 
 {{end}}

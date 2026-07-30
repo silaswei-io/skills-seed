@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,12 +36,28 @@ func TestValidationGapsReportMissingTestStaticCheckAndScopeMatrix(t *testing.T) 
 		Type:    "build",
 	}}}
 
-	gaps := validationGaps(profile, nil, "zh-CN")
+	gaps := validationGaps(profile, nil, sourcecode.GoTestInventory{}, "zh-CN")
 
 	require.Len(t, gaps, 3)
 	require.Contains(t, gaps[0], "测试命令")
 	require.Contains(t, gaps[1], "静态检查命令")
 	require.Contains(t, gaps[2], "验证矩阵")
+}
+
+func TestValidationGapsUseDeterministicGoTestInventory(t *testing.T) {
+	profile := &domain.ProjectProfile{ValidationCommands: []domain.ValidationCommand{{
+		Command: "task build",
+		Type:    "build",
+	}}}
+	inventory := sourcecode.GoTestInventory{Modules: []sourcecode.GoTestModule{{
+		Workdir: ".",
+		ModFile: "go.mod",
+	}}}
+
+	gaps := validationGaps(profile, nil, inventory, "zh-CN")
+
+	require.Len(t, gaps, 1)
+	require.Contains(t, gaps[0], "静态检查命令")
 }
 
 func TestPatternsForTemplatePreservesLearnedStatementWithoutGrantingAuthority(t *testing.T) {

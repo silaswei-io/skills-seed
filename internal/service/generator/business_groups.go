@@ -17,17 +17,17 @@ func businessPatternGroups(locale string, patterns []domain.Pattern) []patternGr
 	return groups
 }
 
-func businessCoverageWarnings(groups []patternGroup, locale string) []CoverageWarning {
-	warnings := make([]CoverageWarning, 0)
+func splitBusinessPatternGroups(groups []patternGroup) (detailGroups []patternGroup, inlineGroups []patternGroup) {
 	for _, group := range groups {
-		if len(group.Patterns) != 1 {
+		if businessGroupNeedsDetail(group) {
+			detailGroups = append(detailGroups, group)
 			continue
 		}
-		warnings = append(warnings, CoverageWarning{
-			Title:   group.Title,
-			Path:    group.Path,
-			Message: generatorText(locale, "GeneratorBusinessCoverageSinglePatternWarning"),
-		})
+		inlineGroups = append(inlineGroups, group)
 	}
-	return warnings
+	return detailGroups, inlineGroups
+}
+
+func businessGroupNeedsDetail(group patternGroup) bool {
+	return len(group.Patterns) > 1
 }

@@ -2,9 +2,11 @@ package learn
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -16,6 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/service/learner"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
 type learnCurrentFocusResult struct {
@@ -29,6 +32,12 @@ type learnCurrentFocusResult struct {
 type learnCurrentBatch struct {
 	index   int
 	focuses []indexedEvidenceFocus
+}
+
+type learnCurrentBatchAnalysisResult struct {
+	batchIndex int
+	results    []learnCurrentFocusResult
+	err        error
 }
 
 type indexedEvidenceFocus struct {
@@ -128,7 +137,15 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 
 func (r *learnCurrentProjectRun) analyzePlannedFocuses(analyzeLabel string, state *commandstate.State, plannedFocuses []domain.EvidenceFocus) (int, error) {
 	batches := r.planAnalysisBatches(plannedFocuses)
-	completedFocuses, err := r.analyzePlannedBatchesSerial(analyzeLabel, state, batches)
+	parallelism := r.analysisParallelism(len(batches))
+	if parallelism <= 1 || len(batches) <= 1 {
+		r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeBatches", map[string]interface{}{
+			"Focuses":     len(plannedFocuses),
+			"Batches":     len(batches),
+			"Parallelism": parallelism,
+		})
+	}
+	completedFocuses, err := r.analyzePlannedBatches(analyzeLabel, state, batches, parallelism)
 	if err != nil {
 		return completedFocuses, err
 	}
@@ -136,7 +153,7 @@ func (r *learnCurrentProjectRun) analyzePlannedFocuses(analyzeLabel string, stat
 		"Completed":   completedFocuses,
 		"Total":       len(plannedFocuses),
 		"Batches":     len(batches),
-		"Parallelism": 1,
+		"Parallelism": parallelism,
 	}))
 	return completedFocuses, nil
 }
@@ -178,6 +195,27 @@ func (r *learnCurrentProjectRun) maxFocusesPerBatch() int {
 	return maxFocuses
 }
 
+func (r *learnCurrentProjectRun) analysisParallelism(batchCount int) int {
+	if batchCount <= 0 {
+		return 1
+	}
+	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeProject, r.cont.ConfigRepo.GetAgentConfig().Parallelism, batchCount)
+	if parallelism < 1 {
+		return 1
+	}
+	if parallelism > batchCount {
+		return batchCount
+	}
+	return parallelism
+}
+
+func (r *learnCurrentProjectRun) analyzePlannedBatches(analyzeLabel string, state *commandstate.State, batches []learnCurrentBatch, parallelism int) (int, error) {
+	if parallelism <= 1 || len(batches) <= 1 {
+		return r.analyzePlannedBatchesSerial(analyzeLabel, state, batches)
+	}
+	return r.analyzePlannedBatchesParallel(analyzeLabel, state, batches, parallelism)
+}
+
 func (r *learnCurrentProjectRun) analyzePlannedBatchesSerial(analyzeLabel string, state *commandstate.State, batches []learnCurrentBatch) (int, error) {
 	completedFocuses := 0
 	for _, batch := range batches {
@@ -193,6 +231,184 @@ func (r *learnCurrentProjectRun) analyzePlannedBatchesSerial(analyzeLabel string
 	return completedFocuses, nil
 }
 
+func (r *learnCurrentProjectRun) analyzePlannedBatchesParallel(analyzeLabel string, state *commandstate.State, batches []learnCurrentBatch, parallelism int) (int, error) {
+	ctx, cancel := context.WithCancelCause(r.ctx)
+	defer cancel(nil)
+
+	progress := newLearnCurrentParallelAnalysisProgress(r, analyzeLabel, state, batches, parallelism)
+	progress.update()
+
+	jobs := make(chan learnCurrentBatch)
+	results := make(chan learnCurrentBatchAnalysisResult, len(batches))
+	var wg sync.WaitGroup
+	for i := 0; i < parallelism; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for batch := range jobs {
+				progress.start(batch)
+				batchResults, err := r.analyzeBatchInDetachedSession(ctx, analyzeLabel, state, batch)
+				if err != nil {
+					results <- learnCurrentBatchAnalysisResult{batchIndex: batch.index, err: err}
+					cancel(err)
+					return
+				}
+				progress.finish(batch)
+				results <- learnCurrentBatchAnalysisResult{batchIndex: batch.index, results: batchResults}
+			}
+		}()
+	}
+
+	go func() {
+		defer close(jobs)
+		for _, batch := range batches {
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- batch:
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	byBatch := make(map[int][]learnCurrentFocusResult, len(batches))
+	var firstErr error
+	for result := range results {
+		if result.err != nil {
+			firstErr = preferredBatchError(firstErr, result.err)
+			continue
+		}
+		byBatch[result.batchIndex] = result.results
+	}
+
+	completedFocuses := 0
+	for _, batch := range batches {
+		batchResults, ok := byBatch[batch.index]
+		if !ok {
+			continue
+		}
+		completedFocuses += r.mergeFocusResults(batchResults)
+		if err := r.saveAnalysisCheckpoint(); err != nil {
+			return completedFocuses, err
+		}
+	}
+	if firstErr != nil {
+		return completedFocuses, firstErr
+	}
+	return completedFocuses, nil
+}
+
+func preferredBatchError(current, candidate error) error {
+	if candidate == nil {
+		return current
+	}
+	if current == nil {
+		return candidate
+	}
+	if errors.Is(current, context.Canceled) && !errors.Is(candidate, context.Canceled) {
+		return candidate
+	}
+	return current
+}
+
+type learnCurrentParallelAnalysisProgress struct {
+	run         *learnCurrentProjectRun
+	baseLabel   string
+	state       *commandstate.State
+	total       int
+	parallelism int
+	mu          sync.Mutex
+	completed   int
+	active      map[int]string
+}
+
+func newLearnCurrentParallelAnalysisProgress(run *learnCurrentProjectRun, baseLabel string, state *commandstate.State, batches []learnCurrentBatch, parallelism int) *learnCurrentParallelAnalysisProgress {
+	total := 0
+	for _, batch := range batches {
+		total += len(batch.focuses)
+	}
+	return &learnCurrentParallelAnalysisProgress{
+		run:         run,
+		baseLabel:   baseLabel,
+		state:       state,
+		total:       total,
+		parallelism: parallelism,
+		active:      make(map[int]string),
+	}
+}
+
+func (p *learnCurrentParallelAnalysisProgress) start(batch learnCurrentBatch) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.active[batch.index] = p.run.analysisBatchProgressLabel(p.state, batch, p.total)
+	p.updateLocked()
+}
+
+func (p *learnCurrentParallelAnalysisProgress) finish(batch learnCurrentBatch) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.active, batch.index)
+	p.completed += len(batch.focuses)
+	p.updateLocked()
+}
+
+func (p *learnCurrentParallelAnalysisProgress) update() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.updateLocked()
+}
+
+func (p *learnCurrentParallelAnalysisProgress) updateLocked() {
+	p.run.detail(p.baseLabel, "ProgressLearnCurrentAnalyzeParallel", map[string]interface{}{
+		"Completed":   p.completed,
+		"Total":       p.total,
+		"Parallelism": p.parallelism,
+		"Active":      p.activeText(),
+	})
+}
+
+func (p *learnCurrentParallelAnalysisProgress) activeText() string {
+	if len(p.active) == 0 {
+		return i18n.Get("LearnCurrentParallelActiveNone")
+	}
+	indices := make([]int, 0, len(p.active))
+	for index := range p.active {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	labels := make([]string, 0, len(indices))
+	for _, index := range indices {
+		labels = append(labels, p.active[index])
+	}
+	return strings.Join(labels, "; ")
+}
+
+func (r *learnCurrentProjectRun) analyzeBatchInDetachedSession(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch) ([]learnCurrentFocusResult, error) {
+	stage := learningStagePackAnalysis
+	if r.useDeltaAnalysis() {
+		stage = learningStageDeltaAnalysis
+	}
+	session, err := r.newLearningSession(ctx, stage, "")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := session.Close(context.Background()); err != nil {
+			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+				"operation", "command.learn_current.close_parallel_learning_session",
+				"stage", stage,
+				"runtime_label", r.analysisBatchRuntimeLabel(state, batch),
+				"error", err,
+			)
+		}
+	}()
+	return r.analyzeBatchWithSession(ctx, analyzeLabel, state, batch, false, session)
+}
+
 func (r *learnCurrentProjectRun) focusProgressParams(state *commandstate.State, focus domain.EvidenceFocus, current, total int) map[string]interface{} {
 	currentFocus, allFocuses := learnCurrentFocusProgress(state, current, total, focus)
 	return map[string]interface{}{
@@ -203,6 +419,20 @@ func (r *learnCurrentProjectRun) focusProgressParams(state *commandstate.State, 
 }
 
 func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool) ([]learnCurrentFocusResult, error) {
+	var results []learnCurrentFocusResult
+	stage := learningStagePackAnalysis
+	if r.useDeltaAnalysis() {
+		stage = learningStageDeltaAnalysis
+	}
+	err := r.withLearningSession(stage, func(session agent.LearningSession) error {
+		var err error
+		results, err = r.analyzeBatchWithSession(ctx, analyzeLabel, state, batch, showDetails, session)
+		return err
+	})
+	return results, err
+}
+
+func (r *learnCurrentProjectRun) analyzeBatchWithSession(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool, session agent.LearningSession) ([]learnCurrentFocusResult, error) {
 	var batchFocuses []analyzer.AnalyzeCurrentEvidenceFocus
 	results := make([]learnCurrentFocusResult, 0, len(batch.focuses))
 	pendingByID := make(map[string]indexedEvidenceFocus, len(batch.focuses))
@@ -230,14 +460,10 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 	if len(batchFocuses) == 0 {
 		return results, nil
 	}
-	stage := learningStagePackAnalysis
-	if r.useDeltaAnalysis() {
-		stage = learningStageDeltaAnalysis
-	}
 
 	batchLabel := r.analysisBatchRuntimeLabel(state, batch)
 	var analyzeResult *analyzer.AnalyzeCurrentCodebaseBatchResult
-	err := r.withLearningSession(stage, func(session agent.LearningSession) error {
+	err := func() error {
 		if r.useDeltaAnalysis() {
 			deltaResults, err := r.analyzeDeltaBatch(ctx, batch, batchFocuses, session)
 			if err != nil {
@@ -256,7 +482,7 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 			Focuses:         batchFocuses,
 		})
 		return err
-	})
+	}()
 	if err != nil {
 		if len(batchFocuses) == 1 {
 			focusID := batchFocuses[0].EvidenceFocus.ID
@@ -324,6 +550,40 @@ func (r *learnCurrentProjectRun) analysisBatchRuntimeLabel(state *commandstate.S
 	return fmt.Sprintf("batch-%03d", index+1)
 }
 
+func (r *learnCurrentProjectRun) analysisBatchProgressLabel(state *commandstate.State, batch learnCurrentBatch, totalFocuses int) string {
+	runtimeLabel := r.analysisBatchRuntimeLabel(state, batch)
+	if len(batch.focuses) == 0 {
+		return runtimeLabel
+	}
+	first := batch.focuses[0]
+	last := batch.focuses[len(batch.focuses)-1]
+	currentStart, allFocuses := learnCurrentFocusProgress(state, first.index+1, totalFocuses, first.focus)
+	currentEnd, _ := learnCurrentFocusProgress(state, last.index+1, totalFocuses, last.focus)
+	subjects := make([]string, 0, len(batch.focuses))
+	for i, item := range batch.focuses {
+		if i >= 2 {
+			subjects = append(subjects, fmt.Sprintf("+%d", len(batch.focuses)-i))
+			break
+		}
+		subjects = append(subjects, shortenRunes(learnCurrentProgressSubject(item.focus), 24))
+	}
+	if currentStart == currentEnd {
+		return i18n.GetWithParams("LearnCurrentParallelActiveSingle", map[string]interface{}{
+			"Batch":   runtimeLabel,
+			"Current": currentStart,
+			"Total":   allFocuses,
+			"Name":    strings.Join(subjects, " / "),
+		})
+	}
+	return i18n.GetWithParams("LearnCurrentParallelActiveRange", map[string]interface{}{
+		"Batch": runtimeLabel,
+		"Start": currentStart,
+		"End":   currentEnd,
+		"Total": allFocuses,
+		"Name":  strings.Join(subjects, " / "),
+	})
+}
+
 func buildAnalyzedFocusResult(focus domain.EvidenceFocus, index int, learnedPatterns []domain.Pattern, refreshRecommend agent.ProfileRefreshRecommendation) learnCurrentFocusResult {
 	return learnCurrentFocusResult{
 		index:            index,
@@ -386,15 +646,9 @@ func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
 				},
 			}
 			checkpoint := newCurrentCurationCheckpoint(r.stateRepo, r.analysisState, r.importedCuration)
-			saved := 0
-			err := r.withLearningSession(learningStageGlobalCuration, func(session agent.LearningSession) error {
-				var err error
-				saved, err = r.cont.LearnerSvc.CurateAndSavePatternsWithOptions(r.ctx, r.patterns, curator.OperationLearnCurrent, learner.CurateOptions{
-					Hooks:              hooks,
-					DecisionCheckpoint: checkpoint,
-					LearningSession:    session,
-				})
-				return err
+			saved, err := r.cont.LearnerSvc.CurateAndSavePatternsWithOptions(r.ctx, r.patterns, curator.OperationLearnCurrent, learner.CurateOptions{
+				Hooks:              hooks,
+				DecisionCheckpoint: checkpoint,
 			})
 			if err != nil {
 				return err
@@ -498,8 +752,8 @@ func (r *learnCurrentProjectRun) restoreAnalysisCheckpoint() {
 
 func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	profileStartedAt := time.Now()
-	if r.refreshProfile && !r.profileCommitted() && !r.analysisArtifactsCommitted() {
-		label := r.afterAnalysisLabel(i18n.Get("ProgressLearnCurrentSaveProfile"))
+	if r.refreshProfile && !r.profileCommitted() {
+		label := i18n.Get("ProgressLearnCurrentSaveProfile")
 		if err := r.steps.Run(label, func() error {
 			profile, err := r.refreshProjectProfileWithSession()
 			if err != nil {
@@ -531,7 +785,7 @@ func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 			logger.Info(i18n.Get("LearnCurrentProfileSaved"))
 		}
 	} else {
-		label := r.afterAnalysisLabel(i18n.Get("ProgressLearnCurrentSkipProfile"))
+		label := i18n.Get("ProgressLearnCurrentSkipProfile")
 		if err := r.steps.Run(label, func() error { return nil }); err != nil {
 			return err
 		}
@@ -566,34 +820,4 @@ func (r *learnCurrentProjectRun) refreshProjectProfileWithSession() (*domain.Pro
 		return err
 	})
 	return profile, err
-}
-
-func (r *learnCurrentProjectRun) afterAnalysisLabel(label string) string {
-	completed, total := r.evidenceFocusProgress()
-	if total == 0 {
-		return label
-	}
-	return i18n.GetWithParams("ProgressLearnCurrentAfterAnalysis", map[string]interface{}{
-		"Label":     label,
-		"Completed": completed,
-		"Total":     total,
-	})
-}
-
-func (r *learnCurrentProjectRun) evidenceFocusProgress() (int, int) {
-	if r.analysisState == nil {
-		return 0, 0
-	}
-	completed := 0
-	total := 0
-	for _, focus := range r.analysisState.Agenda.Focuses {
-		if len(evidenceFocusPaths(focus, r.incrementalChanges)) == 0 {
-			continue
-		}
-		total++
-		if evidenceFocusIncluded(r.completedEvidenceFocuses, focus) {
-			completed++
-		}
-	}
-	return completed, total
 }

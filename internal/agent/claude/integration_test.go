@@ -42,7 +42,7 @@ func findTestProjectPath() string {
 // newE2EAgent 创建 E2E 测试用的 ClaudeAgent
 func newE2EAgent() *ClaudeAgent {
 	loader := promptloader.New("claude", "zh-CN", "")
-	return New("claude", 180*time.Second, loader, false, config.DefaultRetryConfig())
+	return New("claude", 180*time.Second, loader, false, config.DefaultRetryConfig(), config.AgentRuntimeOptions{})
 }
 
 // skipIfShort 跳过 E2E 测试（-short 模式或 Claude CLI 不可用）
@@ -109,7 +109,7 @@ func getMainFiles(t *testing.T) []string {
 // ========== E2E 测试：一个核心模板一个测试 ==========
 
 // TestE2E_CuratePatterns 测试会话式模式策展：渲染 → Claude → 解析
-// 模板绑定: Operation, CandidatePatterns, ExistingPatterns, AllExisting, ExistingByCandidate
+// 模板绑定: Operation, CandidatePatterns, ExistingPatterns, ExistingByCandidate
 // 输出格式: {"patterns":[...], "dropped":[...], "summary":{...}}
 func TestE2E_CuratePatterns(t *testing.T) {
 	ag := skipIfShort(t)

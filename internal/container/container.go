@@ -58,17 +58,27 @@ type Container struct {
 	SkillsLoader          *skills.Loader
 }
 
+// AgentFactoryOptions 是创建指定 engine Agent 所需的运行配置。
+type AgentFactoryOptions struct {
+	CommandPath      string
+	Timeout          time.Duration
+	Loader           *promptloader.Loader
+	AllowUserPlugins bool
+	Retry            config.RetryConfig
+	Runtime          config.AgentRuntimeOptions
+}
+
 // AgentFactory 创建指定 engine 的 Agent
-type AgentFactory func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent
+type AgentFactory func(opts AgentFactoryOptions) agent.Agent
 
 var (
 	agentFactoriesMu sync.RWMutex
 	agentFactories   = map[string]AgentFactory{
-		"claude": func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
-			return claude.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
+		"claude": func(opts AgentFactoryOptions) agent.Agent {
+			return claude.New(opts.CommandPath, opts.Timeout, opts.Loader, opts.AllowUserPlugins, opts.Retry, opts.Runtime)
 		},
-		"codex": func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
-			return codex.New(commandPath, timeout, loader, allowUserPlugins, retryCfg)
+		"codex": func(opts AgentFactoryOptions) agent.Agent {
+			return codex.New(opts.CommandPath, opts.Timeout, opts.Loader, opts.AllowUserPlugins, opts.Retry, opts.Runtime)
 		},
 	}
 )
@@ -198,7 +208,14 @@ func createAgent(cfg *config.Config, promptLoader *promptloader.Loader) (agent.A
 		command = engine
 	}
 
-	return factory(command, timeout, promptLoader, cfg.Agent.AllowUserPlugins, cfg.Agent.Retry), nil
+	return factory(AgentFactoryOptions{
+		CommandPath:      command,
+		Timeout:          timeout,
+		Loader:           promptLoader,
+		AllowUserPlugins: cfg.Agent.AllowUserPlugins,
+		Retry:            cfg.Agent.Retry,
+		Runtime:          cfg.Agent.RuntimeOptions(),
+	}), nil
 }
 
 func patternRepositoryError(err error) error {

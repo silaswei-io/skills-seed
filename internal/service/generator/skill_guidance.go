@@ -5,6 +5,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/knowledge"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
 type validationCommand = knowledge.ValidationCommand
@@ -34,9 +35,9 @@ func validationCommands(profile *domain.ProjectProfile) []validationCommand {
 	return knowledge.ValidationCommands(profile)
 }
 
-func validationGaps(profile *domain.ProjectProfile, matrix []ValidationMatrixItem, locale string) []string {
+func validationGaps(profile *domain.ProjectProfile, matrix []ValidationMatrixItem, tests sourcecode.GoTestInventory, locale string) []string {
 	commands := validationCommands(profile)
-	hasTest := false
+	hasTest := tests.HasModules()
 	hasStaticCheck := false
 	for _, command := range commands {
 		switch knowledge.ValidationCommandKind(command) {
@@ -54,7 +55,7 @@ func validationGaps(profile *domain.ProjectProfile, matrix []ValidationMatrixIte
 	if !hasStaticCheck {
 		gaps = append(gaps, generatorText(locale, "GeneratorValidationGapStaticCheck"))
 	}
-	if len(matrix) == 0 {
+	if len(matrix) == 0 && !tests.HasModules() {
 		gaps = append(gaps, generatorText(locale, "GeneratorValidationGapScopedMatrix"))
 	}
 	return gaps

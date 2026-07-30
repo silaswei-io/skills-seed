@@ -14,7 +14,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -198,7 +197,7 @@ func TestWorkflowShowRequiresInitializedProject(t *testing.T) {
 func newWorkflowWorkspaceContainer(t *testing.T) *container.Container {
 	t.Helper()
 
-	restoreFactory := container.RegisterAgentFactoryForTest("mock", func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+	restoreFactory := container.RegisterAgentFactoryForTest("mock", func(opts container.AgentFactoryOptions) agent.Agent {
 		return &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
 	})
 	t.Cleanup(restoreFactory)

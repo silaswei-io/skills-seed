@@ -55,6 +55,8 @@ Use these patterns to locate and prefer existing implementations.
 {{range .PatternObjects}}
 ### {{.Name}}
 
+{{if .HighRiskOperational}}- Risk checkpoint: involves irreversible, privileged, state/resource-changing, or externally visible behavior; confirm safeguards from evidence before changing it.
+{{end}}
 {{if .Description}}{{.Description}}
 {{end}}{{if .Rule}}- User rule: {{.Rule}}
 {{end}}{{if .EvidenceLocations}}- Locations: {{range .EvidenceLocations}}`{{.DisplayLocation}}` {{end}}

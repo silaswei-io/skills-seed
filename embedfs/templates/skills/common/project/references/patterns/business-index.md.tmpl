@@ -8,7 +8,7 @@
 {{if .RelatedReferences}}
 ## 相关参考
 
-本页用于定位业务规则和领域流程；接口字段、持久化、错误语义等跨边界问题还需要继续读取对应 reference。
+本页用于定位产品/领域规则和行为流程；接口/消息字段、状态/持久化边界、失败语义等跨边界问题还需要继续读取对应 reference。
 
 {{range .RelatedReferences}}
 - [{{.Title}}]({{.Path}}): {{.Reason}}
@@ -17,21 +17,51 @@
 
 ## 新需求定位方式
 
-先从需求里的业务名词、用户动作、状态变化、规则策略、入口渠道、外部依赖、异常现象或改动文件路径匹配下方子域；不要只按代码包名或技术缩写匹配。只读取最相关的详情文件，再回到当前代码确认行为。
+先从需求里的业务名词、用户动作、状态变化、规则策略、入口渠道、外部依赖、异常现象或改动文件路径匹配下方子域或已学习业务规则；不要只按代码包名或技术缩写匹配。先读取最相关的详情页或下方规则，再回到当前代码确认行为。
 
-{{if .CoverageWarnings}}
-## 覆盖提示
-
-{{range .CoverageWarnings}}
-- [{{.Title}}]({{.Path}}): {{.Message}}
-{{end}}
-
-{{end}}
 ## 子域路由
 
-{{range .Groups}}
+{{if .DetailGroups}}
+{{range .DetailGroups}}
 - **[{{.Title}}]({{.Path}})** - {{.Summary.Description}}（{{len .Patterns}} 个模式）
   - 何时读取：{{if .Summary.IsFallback}}需求描述无法匹配具体子域，但涉及业务规则、状态变化、运行期行为或跨模块流程时读取。{{else}}需求提到 {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}，出现同义业务动作/状态变化，或改动路径位于 {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}} 时读取。{{end}}
   {{if .Summary.PrimaryPath}}- 主要证据路径：`{{.Summary.PrimaryPath}}`{{end}}
   {{if .Summary.Keywords}}- 关键词：{{range .Summary.Keywords}}`{{.}}` {{end}}{{end}}
+{{end}}
+{{else}}
+当前没有需要单独成页的业务子域；直接阅读下方已学习业务规则。
+{{end}}
+
+{{if .InlineGroups}}
+## 已学习业务规则
+
+以下规则已有源码证据，但暂不单独成页；命中这些业务词或路径时，先按证据入口回到当前源码确认完整边界。
+
+{{range .InlineGroups}}
+### {{.Title}}
+
+{{.Summary.Description}}
+
+{{if .Summary.PrimaryPath}}- 主要证据路径：`{{.Summary.PrimaryPath}}`
+{{end}}{{if .Summary.Keywords}}- 关键词：{{range .Summary.Keywords}}`{{.}}` {{end}}
+{{end}}
+{{range .Patterns}}
+#### {{.Name}}
+
+{{if .HighRiskOperational}}**风险检查点**: 该模式涉及不可逆、特权、状态/资源变更或外部副作用。仅按已验证入口定位和保留保护边界，不要把危险动作当作普通复用建议。
+
+{{end}}
+{{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用边界**: {{.Description}}{{end}}
+
+{{end}}{{if .Rule}}**用户规则**: {{.Rule}}
+
+{{end}}{{if .EvidenceLocations}}**已验证源码**
+
+{{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}
+{{end}}
+{{end}}{{if .BusinessMethod}}**已验证入口**: `{{.BusinessMethod.DisplayLocation}}` - {{.BusinessMethod.Name}}
+{{end}}
+
+{{end}}
+{{end}}
 {{end}}

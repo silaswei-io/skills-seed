@@ -29,13 +29,16 @@ func PathsToFileInfos(paths []string) []domain.FileInfo {
 	return files
 }
 
-// SelectLearningCandidates 使用本地确定性信号收敛 learn current 的候选文件。
+// SelectLearningCandidates 返回保守的本地候选集。
+//
+// 本地阶段没有源码语义判断能力，不能因为路径词表或文件名看起来低信号就丢弃候选。
+// 路径信号只用于 SelectLearningContextSeeds 挑结构化上下文入口；最终删减只能由 AI
+// 候选收敛执行，且失败时由上层回退到全部候选。
 func SelectLearningCandidates(opts LearningCandidateSelectionOptions) LearningCandidateSelectionResult {
 	candidates := normalizeCandidatePaths(opts.Candidates)
-	selected := localLearningCandidateSelection(candidates, opts.Changes, opts.RequiredPaths)
 	return LearningCandidateSelectionResult{
-		SelectedPaths: selected,
-		SkippedPaths:  subtractPaths(candidates, selected),
+		SelectedPaths: candidates,
+		SkippedPaths:  nil,
 		Reason:        "local deterministic candidate selection",
 	}
 }
@@ -59,26 +62,6 @@ func SelectLearningContextSeeds(opts LearningCandidateSelectionOptions) []string
 	add(opts.RequiredPaths)
 	add(localChangedCandidatePaths(candidates, opts.Changes))
 	add(highSignalCandidatePaths(candidates))
-	return sortedPathMap(selected)
-}
-
-func localLearningCandidateSelection(candidates []string, changes *FileChanges, requiredPaths []string) []string {
-	candidateSet := candidatePathSet(candidates)
-	selected := make(map[string]bool)
-	add := func(paths []string) {
-		for _, path := range normalizeCandidatePaths(paths) {
-			if candidateSet[path] {
-				selected[path] = true
-			}
-		}
-	}
-
-	add(requiredPaths)
-	add(localChangedCandidatePaths(candidates, changes))
-	add(highSignalCandidatePaths(candidates))
-	if len(selected) == 0 {
-		add(candidates)
-	}
 	return sortedPathMap(selected)
 }
 
@@ -112,12 +95,15 @@ func learningCandidatePathScore(path string) int {
 		tokenSet[token] = true
 	}
 	highSignalTerms := []string{
-		"route", "router", "handler", "controller", "workflow", "service", "usecase",
-		"logic", "model", "entity", "schema", "config", "task", "job", "event",
-		"subscriber", "adapter", "client", "provider", "middleware", "policy",
-		"validator", "repository", "repo", "store", "migration", "proto", "api",
-		"command", "action", "processor", "manager", "permission", "audit",
-		"license", "certificate", "cert", "cluster", "snmp", "plugin", "hook",
+		"entry", "main", "route", "router", "screen", "page", "view", "component",
+		"workflow", "flow", "usecase", "logic", "model", "entity", "schema",
+		"contract", "interface", "message", "event", "action", "command",
+		"config", "setting", "policy", "permission", "auth", "audit", "validator",
+		"adapter", "client", "provider", "integration", "protocol", "connector",
+		"task", "job", "processor", "subscriber", "hook", "plugin", "extension",
+		"store", "state", "cache", "migration", "release", "deploy", "script",
+		"source", "template", "license", "key", "secret", "credential", "crypto", "certificate", "cert",
+		"handler", "controller", "service", "repository", "repo", "middleware", "api",
 	}
 	for _, term := range highSignalTerms {
 		if tokenSet[term] {
@@ -191,15 +177,4 @@ func candidatePathSet(candidates []string) map[string]bool {
 		candidateSet[path] = true
 	}
 	return candidateSet
-}
-
-func subtractPaths(all, selected []string) []string {
-	selectedSet := pathSet(selected)
-	out := make([]string, 0)
-	for _, path := range normalizeCandidatePaths(all) {
-		if !selectedSet[path] {
-			out = append(out, path)
-		}
-	}
-	return out
 }

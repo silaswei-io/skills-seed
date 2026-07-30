@@ -33,12 +33,18 @@ This page only covers {{.Category}} category conventions. If the task crosses on
 {{range .PatternObjects}}
 ### {{.Name}}
 
+{{if .HighRiskOperational}}**Risk Checkpoint**: This utility involves irreversible, privileged, state/resource-changing, or externally visible behavior. Confirm safeguards from evidence before reusing it.
+
+{{end}}
 {{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability**: {{.Description}}{{end}}
 
 {{end}}
 {{if .Rule}}**User rule**: {{.Rule}}{{end}}
 
 **Evidence**: {{len .EvidenceLocations}} verified source symbols, source {{.Source}}
+{{if .EvidenceLocations}}**Locations**
+{{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}{{if .Kind}} ({{.Kind}}){{end}}
+{{end}}{{end}}
 
 ---
 

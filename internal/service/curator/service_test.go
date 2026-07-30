@@ -2,11 +2,11 @@ package curator
 
 import (
 	"context"
-	"github.com/silaswei-io/skills-seed/internal/agent"
+	"testing"
+
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCurateAndStoreAddsNewCandidate(t *testing.T) {
@@ -27,13 +27,11 @@ func TestCurateAndStoreAddsNewCandidate(t *testing.T) {
 			return nil
 		},
 	}
-	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
 	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:       OperationLearnCurrent,
-		LearningSession: newCuratorTestLearningSession(mockAgent),
-		Candidates:      []domain.Pattern{*candidate},
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -48,80 +46,4 @@ func newCuratorTestPattern(id, name string, category domain.Category) *domain.Pa
 	pattern.Rule = "Preserve the project-specific " + name + " rule."
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: id + ".go", Line: 1, Kind: "file"}}
 	return pattern
-}
-
-func newDeterministicCuratorAgent() *mocks.MockAgent {
-	return &mocks.MockAgent{
-		NameVal: "mock", AvailableVal: true,
-		CuratePatternsFn: func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-			planned := deterministicCurate(req.CandidatePatterns, req.ExistingPatterns)
-			result := &agent.CuratePatternsResult{
-				Patterns: make([]agent.CuratedPattern, 0, len(planned.Patterns)),
-				Dropped:  make([]agent.CuratedDrop, 0, len(planned.Dropped)),
-			}
-			for _, pattern := range planned.Patterns {
-				result.Patterns = append(result.Patterns, agent.CuratedPattern{
-					ID:          pattern.ID,
-					Name:        pattern.Name,
-					Category:    string(pattern.Category),
-					Description: pattern.Description,
-					Rule:        pattern.Rule,
-					Confidence:  pattern.Confidence,
-					SourceIDs:   pattern.MergedFrom,
-				})
-			}
-			for _, item := range planned.Dropped {
-				result.Dropped = append(result.Dropped, agent.CuratedDrop{
-					ID:         item.ID,
-					ReasonCode: item.ReasonCode,
-					Reason:     item.Reason,
-				})
-			}
-			return result, nil
-		},
-	}
-}
-
-type curatorTestLearningSession struct {
-	agent testCurationAgent
-}
-
-type testCurationAgent interface {
-	CuratePatterns(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
-}
-
-func newCuratorTestLearningSession(ag testCurationAgent) agent.LearningSession {
-	return curatorTestLearningSession{agent: ag}
-}
-
-func (s curatorTestLearningSession) SessionID() string {
-	return "curator-test-session"
-}
-
-func (s curatorTestLearningSession) SelectLearningCandidates(context.Context, *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-	return &agent.SelectLearningCandidatesResult{}, nil
-}
-
-func (s curatorTestLearningSession) PlanLearningAgenda(context.Context, *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	return &agent.PlanLearningAgendaResult{}, nil
-}
-
-func (s curatorTestLearningSession) AnalyzeCurrentCodebaseBatch(context.Context, *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-	return &agent.AnalyzeCurrentCodebaseBatchResult{}, nil
-}
-
-func (s curatorTestLearningSession) AnalyzeCurrentDeltaBatch(context.Context, *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
-	return &agent.AnalyzeCurrentDeltaBatchResult{}, nil
-}
-
-func (s curatorTestLearningSession) RefreshProjectProfile(context.Context, *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-	return &agent.AnalyzeProjectResult{}, nil
-}
-
-func (s curatorTestLearningSession) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	return s.agent.CuratePatterns(ctx, req)
-}
-
-func (s curatorTestLearningSession) Close(context.Context) error {
-	return nil
 }

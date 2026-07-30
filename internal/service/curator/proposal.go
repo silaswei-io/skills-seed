@@ -37,6 +37,35 @@ func proposalFromAgent(result *agent.CuratePatternsResult) *proposal {
 	return out
 }
 
+func agentResultFromProposal(result *proposal) *agent.CuratePatternsResult {
+	if result == nil {
+		return nil
+	}
+	out := &agent.CuratePatternsResult{
+		Patterns: make([]agent.CuratedPattern, 0, len(result.Patterns)),
+		Dropped:  make([]agent.CuratedDrop, 0, len(result.Dropped)),
+	}
+	for _, pattern := range result.Patterns {
+		out.Patterns = append(out.Patterns, agent.CuratedPattern{
+			ID:          pattern.ID,
+			Name:        pattern.Name,
+			Category:    string(pattern.Category),
+			Description: pattern.Description,
+			Rule:        pattern.Rule,
+			Confidence:  pattern.Confidence,
+			SourceIDs:   append([]string(nil), pattern.MergedFrom...),
+		})
+	}
+	for _, item := range result.Dropped {
+		out.Dropped = append(out.Dropped, agent.CuratedDrop{
+			ID:         item.ID,
+			ReasonCode: item.ReasonCode,
+			Reason:     item.Reason,
+		})
+	}
+	return out
+}
+
 func cloneBusinessMethod(method *domain.BusinessMethod) *domain.BusinessMethod {
 	if method == nil {
 		return nil

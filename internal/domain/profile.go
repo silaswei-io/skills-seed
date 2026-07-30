@@ -72,15 +72,16 @@ type ProjectSpecBoundary struct {
 
 // ProjectSpecPatternRule 描述从 patterns 中提炼出的可执行规则
 type ProjectSpecPatternRule struct {
-	Name        string  `json:"name"`
-	Category    string  `json:"category"`
-	Description string  `json:"description,omitempty"`
-	Rule        string  `json:"rule,omitempty"`
-	Confidence  float64 `json:"confidence"`
-	Frequency   int     `json:"frequency"`
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	Description string   `json:"description,omitempty"`
+	Rule        string   `json:"rule,omitempty"`
+	Confidence  float64  `json:"confidence"`
+	Frequency   int      `json:"frequency"`
+	Evidence    []string `json:"evidence,omitempty"`
 }
 
-// ProjectSpecTouchpoint 描述改动时应优先检查的业务方法、工具或模块入口
+// ProjectSpecTouchpoint 描述改动时应优先检查的能力入口、工具或模块入口。
 type ProjectSpecTouchpoint struct {
 	Kind        string `json:"kind"`
 	Name        string `json:"name"`

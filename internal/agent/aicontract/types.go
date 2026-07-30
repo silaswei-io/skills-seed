@@ -24,7 +24,8 @@ type DiffAnchorOutput struct {
 	Description string `json:"description" jsonschema_description:"why this changed hunk triggers the candidate pattern"`
 }
 
-// BusinessMethodOutput 描述可路由、可复用的业务或工具入口。
+// BusinessMethodOutput 描述可路由、可复用的能力入口。
+// 字段名沿用 business_method 契约，语义覆盖产品/领域行为、交互动作、任务、适配器和工具入口。
 type BusinessMethodOutput struct {
 	Name          string             `json:"name" jsonschema_description:"qualified code identifier only; do not put a signature in this field"`
 	CodeLocation  CodeLocationOutput `json:"code_location" jsonschema_description:"object containing current_location; never output code_location as a single string"`
@@ -40,7 +41,7 @@ type BusinessMethodOutput struct {
 type PatternOutput struct {
 	ID                string                   `json:"id" jsonschema_description:"kebab-case-id"`
 	Name              string                   `json:"name" jsonschema_description:"pattern name"`
-	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category"`
+	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key; business means product/domain behavior, api means interface/contract/message/event/adapter, database means state/storage/persistence/cache, middleware means interception/pipeline/filter/hook processing"`
 	Description       string                   `json:"description" jsonschema_description:"source-backed problem or capability, matching triggers, observed behavior, and applicability boundary; for multiple evidence locations include only behavior every location proves"`
 	GoodExample       string                   `json:"good_example" jsonschema_description:"source-backed code evidence as an escaped JSON string"`
 	BadExample        string                   `json:"bad_example" jsonschema_description:"common mistake to avoid or empty string"`
@@ -48,14 +49,14 @@ type PatternOutput struct {
 	Confidence        float64                  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 	Frequency         int                      `json:"frequency" jsonschema:"minimum=1" jsonschema_description:"positive integer occurrence count"`
 	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"minimum source-backed implementation chain needed for correct reuse"`
-	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"canonical reusable callable entry with verified name, repository-relative location, complete signature, prerequisites, return/error semantics, and source-backed usage; include for business, orchestration, adapter, job, handler, or common utility patterns when directly verified, otherwise null"`
+	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"legacy field name for a canonical reusable capability entry with verified name, repository-relative location, complete signature or concrete declaration, prerequisites, return/error/result semantics, and source-backed usage; include for product/domain behavior, UI/CLI/system actions, orchestration, adapters, jobs/tasks, resolvers, declarative entries, or common utilities when directly verified, otherwise null"`
 }
 
 // CuratedPatternOutput 只承载 AI 拥有的规范文本和来源决策。
 type CuratedPatternOutput struct {
 	ID          string   `json:"id" jsonschema_description:"canonical id, preferably an input id"`
 	Name        string   `json:"name" jsonschema_description:"canonical pattern name"`
-	Category    string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category"`
+	Category    string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key; business means product/domain behavior, api means interface/contract/message/event/adapter, database means state/storage/persistence/cache, middleware means interception/pipeline/filter/hook processing"`
 	Description string   `json:"description" jsonschema_description:"factual solved problem, matching triggers, observed behavior, and applicability boundary"`
 	Rule        string   `json:"rule" jsonschema_description:"canonical reuse guidance; normative only for explicit authoritative input"`
 	Confidence  float64  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0 evidence consistency and specificity"`
@@ -116,7 +117,7 @@ type ProjectProfileOutput struct {
 	FrameworkPatterns  []string                  `json:"framework_patterns" jsonschema_description:"concrete framework usage patterns"`
 	Structure          string                    `json:"structure" jsonschema_description:"concrete project structure summary"`
 	KeyModules         []ModuleOutput            `json:"key_modules" jsonschema_description:"key modules"`
-	BusinessMethods    []BusinessMethodOutput    `json:"business_methods" jsonschema_description:"project-level reusable entry points"`
+	BusinessMethods    []BusinessMethodOutput    `json:"business_methods" jsonschema_description:"project-level reusable capability entries"`
 	CommonUtils        []UtilityFunctionOutput   `json:"common_utils" jsonschema_description:"domain-neutral utility functions"`
 	ConfigPatterns     []string                  `json:"config_patterns" jsonschema_description:"configuration conventions"`
 	Dependencies       []string                  `json:"dependencies" jsonschema_description:"important dependencies"`
@@ -137,7 +138,7 @@ type CuratePatternsOutput struct {
 
 type CuratedDropOutput struct {
 	ID         string `json:"id" jsonschema_description:"candidate id"`
-	ReasonCode string `json:"reason_code" jsonschema:"enum=exact_duplicate,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overfiltered_source_backed" jsonschema_description:"structured drop reason; use overfiltered_source_backed only when the candidate has evidence but would otherwise be dropped merely for being simple, local, common, framework-specific, language-specific, config-only, API-only, error-only, or utility-only"`
+	ReasonCode string `json:"reason_code" jsonschema:"enum=exact_duplicate,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overfiltered_source_backed" jsonschema_description:"structured drop reason; use overfiltered_source_backed only when the candidate has evidence but would otherwise be dropped merely for being simple, local, common, framework-specific, language-specific, config-only, interface/contract-only, error-only, or utility-only"`
 	Reason     string `json:"reason" jsonschema_description:"specific human-readable reason that cites the semantic issue, duplicate owner, missing evidence, unsafe guidance, or lack of routeable decision value"`
 }
 

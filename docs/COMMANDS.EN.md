@@ -54,7 +54,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook install` | Install Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
-| `skills-seed init` | Initialize skills-seed project | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed init` | Initialize skills-seed project | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | Learn from current code | `current` | `--help, -h` = `false` |
 | `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
@@ -159,6 +159,7 @@ Initialize `.skills-seed/`, default config, database, project context, and skill
 |---|---:|---|
 | `--mode` | `project` | Initialization mode: `project` for a single project, `workspace` for a multi-project root |
 | `--agent` | empty | Execution Agent engine to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
+| `--agent-model` | empty | Model name passed to the Agent CLI for skills-seed calls; empty inherits the local Agent CLI default |
 | `--skills` | empty | Skills output type to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
 | `--locale`, `-l` | empty | Tool output, config-template, and seed-context template language: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
@@ -170,6 +171,7 @@ Initialize `.skills-seed/`, default config, database, project context, and skill
 ```bash
 skills-seed init --mode project --locale en-US
 skills-seed init --mode project --agent claude --skills codex --locale en-US
+skills-seed init --mode project --agent codex --agent-model gpt-5-mini --skills codex --locale en-US
 skills-seed init --mode workspace --locale en-US
 skills-seed init --workspace
 skills-seed init --workspace --agent codex --skills codex
@@ -180,7 +182,7 @@ skills-seed init --workspace --agent codex --skills codex
 1. `--agent` sets `agent.engine` and ensures the engine exists in `agent.commands`.
 2. `--skills` sets `skills.target` and ensures `skills.paths` contains the target's default output directory.
 3. `--workspace` initializes the root and the child repositories detected at that time.
-4. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `skills.target`, and `skills.paths`.
+4. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `agent.model`, `skills.target`, and `skills.paths`.
 5. Already initialized children are skipped. If a child agent differs from the root, it is reported and preserved.
 6. A successful init prints the relative `.skills-seed` location and the README URL for the current version tag.
 7. Workspace child discovery only treats first-level independent Git repositories as children; marker files classify type and language only.
@@ -252,7 +254,7 @@ skills-seed reset --workspace
 
 #### Command Overview
 
-Learn coding patterns, business methods, and best practices from the current codebase, then store them in the `.skills-seed` database.
+Learn coding patterns, capability entries, and best practices from the current codebase, then store them in the `.skills-seed` database.
 
 #### Command Forms
 
@@ -301,13 +303,14 @@ skills-seed learn current --context-path .skills-seed/context.md
 1. After the first successful run, Skills Seed records md5 fingerprints for analyzed files. If no learnable files changed, pattern learning and project-profile sync are skipped.
 2. Generated skill directories are excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
 3. The workspace root coordinates learning and does not store child patterns in root storage.
-4. Workspace child projects run with real concurrency according to `agent.parallelism`.
-5. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
-6. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
-7. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
-8. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
-9. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` uses CodeGraph and automatically initializes or repairs its index when needed. Embedded tree-sitter is used only when `provider: treesitter` is explicitly configured. Without bounded inputs, it does not scan the whole repository.
-10. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, the terminal also prints a stable notice with the wait duration and API reason, then switches to `attempt N` when the next call starts.
+4. In project mode, `agent.parallelism > 1` analyzes independent evidence-focus batches concurrently; results are still merged and checkpointed in agenda order.
+5. A workspace root config uses `agent.parallelism` for child-project concurrency; evidence-focus concurrency inside each child project is controlled by that child project's config.
+6. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
+7. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
+8. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
+9. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
+10. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` uses CodeGraph and automatically initializes or repairs its index when needed. Embedded tree-sitter is used only when `provider: treesitter` is explicitly configured. Without bounded inputs, it does not scan the whole repository.
+11. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, the terminal also prints a stable notice with the wait duration and API reason, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
 
@@ -429,7 +432,7 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed patterns add --context <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add --context "Use RESTful API routes" --category api` | Calls the AI agent |
+| `skills-seed patterns add --context <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add --context "Keep external contract fields backward-compatible" --category api` | Calls the AI agent |
 | `skills-seed patterns update <pattern-id> --context <request>` | Update one pattern while preserving its original ID and ownership | `skills-seed patterns update resp-extra-update-logging --context "Require audit logging"` | Calls the AI agent |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern by ID | `skills-seed patterns delete plugin-source-editing-rule` | Workspace root also deletes the linked child project pattern |
 | `skills-seed patterns compact` | Compact similar patterns with local rules | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
@@ -493,7 +496,7 @@ When run from a workspace root, `patterns add` writes the root pattern first. If
 #### Common Examples
 
 ```bash
-skills-seed patterns add --context "All API routes use RESTful style"
+skills-seed patterns add --context "Keep external contract fields backward-compatible"
 skills-seed patterns add --context "Errors must wrap context" --category error
 skills-seed patterns add --context-path docs/pattern-notes.md --category database
 skills-seed patterns update resp-extra-update-logging --context "Require audit logging for response extra field updates"
@@ -514,7 +517,7 @@ skills-seed patterns show business-create-order --format json
 1. `patterns compact` uses local deterministic merging and does not call the Agent.
 2. Use `--dry-run` first when you want to inspect the curation result.
 3. `patterns stats` shows quality metrics such as specificity, confidence, and effective score so you can judge which patterns are ready for generated Skills.
-4. `patterns show` without arguments prints the pattern overview list, sorted by latest update by default. Use `--sort score` for high-value rules and `--sort category` for category grouping. The location column prefers business/utility-method `code_location`; when a pattern has no business method, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, business-method fields, code-location history, and language-agnostic symbol snapshots.
+4. `patterns show` without arguments prints the pattern overview list, sorted by latest update by default. Use `--sort score` for high-value rules and `--sort category` for category grouping. The location column prefers capability/helper-entry `code_location`; when a pattern has no capability entry, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, capability-entry fields, code-location history, and language-agnostic symbol snapshots.
 5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/store/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
 
 ### `skills-seed profile`
@@ -612,7 +615,7 @@ skills-seed sync
 skills-seed sync --context "On-prem deployment, not SaaS"
 skills-seed sync --context-path docs/plan.md --context-path docs/specs
 skills-seed sync --restart
-skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-learning-global-curate.raw.txt
+skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-learning-pattern-curate.raw.txt
 ```
 
 #### Notes

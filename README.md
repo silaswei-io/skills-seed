@@ -15,7 +15,7 @@
 
 </div>
 
-Skills Seed 面向已有代码库。它从当前代码、Git 历史、目录结构和检查命中记录中提取团队真实实践，把目录边界、业务入口、错误处理、工具方法、测试习惯和 API 约定沉淀成本地 Skills，供 Claude Code / Codex 直接加载。
+Skills Seed 面向已有代码库。它从当前代码、Git 历史、目录结构和检查命中记录中提取团队真实实践，把目录边界、能力入口、错误处理、可复用工具、测试习惯和接口/契约约定沉淀成本地 Skills，供 Claude Code / Codex 直接加载。
 
 适合你已经有一个老项目、业务系统或多仓 workspace，并希望 AI Agent 不再每次都从零理解项目规则。
 
@@ -26,7 +26,7 @@ Skills Seed 的核心不是生成一份静态项目说明，而是让 Agent 的�
 ### 低成本上手和同步
 
 - **交互式 `init` / `sync`**：第一次运行会引导选择项目模式、Agent、并发和执行计划；日常同步会自动判断首次生成、增量同步、续跑或重来。
-- **自由配置**：Agent、Skills 目标、输出路径、语言、学习模式、证据焦点范围、workspace 并发、排除规则、重试和 hook 都可以通过配置或命令参数控制。
+- **自由配置**：Agent、Skills 目标、输出路径、语言、学习模式、证据焦点范围、Agent 并发、排除规则、重试和 hook 都可以通过配置或命令参数控制。
 
 ### 从真实代码沉淀知识
 
@@ -51,13 +51,13 @@ Skills Seed 的核心不是生成一份静态项目说明，而是让 Agent 的�
 生成结果不是泛泛的项目介绍，而是一套围绕当前仓库组织的 Agent 工作上下文：
 
 - 哪些目录负责什么能力，改动时应该先看哪里。
-- 哪些业务方法、工具方法、错误处理和测试习惯已经被团队长期使用。
+- 哪些能力入口、可复用工具、错误处理和测试习惯已经被团队长期使用。
 - workspace 根仓中哪个子项目应该处理哪类需求，跨项目改动要按什么顺序看。
 - 哪些源码证据支持可复用知识，应进入最终 Skills 的路由、参考和验证建议。
 
 ## 真实项目案例
 
-以 [medusa-demo](https://github.com/silaswei-io/medusa-demo/tree/develop/.claude/skills/skills-seed-skills) 为例，直接使用默认 `sync` 后，Skills Seed 生成了面向 Medusa TypeScript monorepo 的项目级 Skill：入口 `SKILL.md` 只负责任务路由和约束来源，业务规则、架构边界、入口方法、验证命令和代码证据拆到 `references/` 中按需加载。Go 项目还会从真实 `go.mod` 与 `_test.go` 确定性生成多模块测试矩阵，不依赖 AI 是否学到测试命令。
+以 [medusa-demo](https://github.com/silaswei-io/medusa-demo/tree/develop/.claude/skills/skills-seed-skills) 为例，直接使用默认 `sync` 后，Skills Seed 生成了面向 Medusa TypeScript monorepo 的项目级 Skill：入口 `SKILL.md` 只负责任务路由和约束来源，产品/领域规则、架构边界、能力入口、验证命令和代码证据拆到 `references/` 中按需加载。Go 项目还会从真实 `go.mod` 与 `_test.go` 确定性生成多模块测试矩阵，不依赖 AI 是否学到测试命令。
 
 仓库中的 `writing-docs`、`reviewing-prs` 等任务 Skill 负责固定流程和协作规则；Skills Seed 生成的项目 Skill 则在改代码前回答“这个项目应该怎么改、先读哪里、哪些规则有代码证据、该跑什么验证”。
 
@@ -101,7 +101,7 @@ skills-seed sync
 |---|---|
 | AI 每次进项目都不知道该读哪些文件 | 生成入口 `SKILL.md`，按任务引导 Agent 读取相关 references |
 | 团队规范只存在于代码实现里 | 从当前代码、目录结构、显式上下文和源码证据中提取 patterns |
-| 老项目有业务入口、工具方法和隐性边界 | 沉淀业务方法、模块职责、项目画像和验证建议 |
+| 老项目有能力入口、可复用工具和隐性边界 | 沉淀能力入口、模块职责、项目画像和验证建议 |
 | workspace 下多个子项目上下文容易混乱 | 根仓负责路由，子项目独立学习和生成 Skills |
 | 后续改动需要持续更新知识 | 用 `sync` / hook 重新学习当前变更并刷新生成的 Skills |
 
@@ -115,7 +115,7 @@ current code / project context / repository structure
 ```
 
 1. `init` 创建 `.skills-seed/config.yaml`、本地数据库和可编辑项目上下文。
-2. `sync` 分析当前代码和项目上下文，保存 patterns、项目画像、业务入口和验证建议。
+2. `sync` 分析当前代码和项目上下文，保存 patterns、项目画像、能力入口和验证建议。
 3. 生成的 `SKILL.md` 只作为入口，Agent 需要深入时再读取 `references/`。
 
 ## 它会生成什么
@@ -143,7 +143,7 @@ current code / project context / repository structure
         └── utils.md
 ```
 
-`SKILL.md` 是 Agent 入口；`references/` 保存更完整的项目画像、规范、业务入口和模式细节。Agent 先读入口，再按任务深入相关参考文件，避免一次性加载过多上下文。
+`SKILL.md` 是 Agent 入口；`references/` 保存更完整的项目画像、规范、能力入口和模式细节。Agent 先读入口，再按任务深入相关参考文件，避免一次性加载过多上下文。
 
 ## 安装
 
@@ -182,6 +182,7 @@ go build -o skills-seed ./cmd/skills-seed
 | 配置 | 作用 |
 |---|---|
 | `--agent` / `agent.engine` | 选择哪个 Agent CLI 执行分析和学习 |
+| `--agent-model` / `agent.model` | 仅为 skills-seed 调用指定模型；空值继承本机 Agent CLI 默认配置 |
 | `--skills` / `skills.target` | 选择生成哪种 Agent 可加载的 Skills |
 
 两者可以不同，例如用 Claude 分析项目，同时输出 Codex Skills。
@@ -191,7 +192,7 @@ go build -o skills-seed ./cmd/skills-seed
 ```bash
 skills-seed init --agent codex --skills codex
 skills-seed init --agent claude --skills codex
-skills-seed init --mode project --agent codex --skills codex --locale zh-CN --no-interactive
+skills-seed init --mode project --agent codex --agent-model gpt-5-mini --skills codex --locale zh-CN --no-interactive
 ```
 
 也可以直接修改 `.skills-seed/config.yaml`：
@@ -199,6 +200,7 @@ skills-seed init --mode project --agent codex --skills codex --locale zh-CN --no
 ```yaml
 agent:
   engine: "codex"
+  model: "gpt-5-mini"
   commands:
     codex: "codex"
     claude: "claude"
@@ -207,9 +209,9 @@ skills:
   target: "codex"
 ```
 
-模型档位由对应 Agent CLI 自己控制。若需要固定低成本模型，优先在 `codex` / `claude` CLI 的默认配置中设置；如果你的 CLI 只支持命令行参数，可以把 `agent.commands.<engine>` 指向一个包装脚本，由脚本内部调用带模型参数的 Agent CLI。
+`agent.model` 为空时不传模型参数，完全继承本机 Agent CLI 默认配置；填写后会在 skills-seed 调用 Claude 或 Codex CLI 时传入对应模型名。模型名格式由具体 Agent CLI 决定。
 
-当前 `sync` / `learn current` 会先做本地文件过滤，再做候选收敛决定进入证据包规划的输入；大候选集可按 `learning.current.select_relevant_files_min_candidates` 阈值启用 AI 候选收敛，小范围变更使用本地确定性收敛。缺少或异常的 CodeGraph 索引会自动初始化、同步或修复；只有显式配置 `provider: treesitter` 才会使用内嵌 tree-sitter。候选/焦点文件清单会作为 runtime 输入文件按路径引用，不再直接堆进分析 prompt；证据包规划和学习 prompt 也带有稳定决策规则，减少相同输入下的输出漂移。终端只展示关键阶段和精简的过滤、候选收敛结果，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
+当前 `sync` / `learn current` 会先做本地文件过滤，再做候选准备决定进入证据包规划的输入；大候选集可按 `learning.current.select_relevant_files_min_candidates` 阈值启用 AI 候选收敛，小范围变更使用本地保守候选准备，不按路径词表丢弃源码候选。缺少或异常的 CodeGraph 索引会自动初始化、同步或修复；只有显式配置 `provider: treesitter` 才会使用内嵌 tree-sitter。候选/焦点文件清单会作为 runtime 输入文件按路径引用，不再直接堆进分析 prompt；证据包规划和学习 prompt 也带有稳定决策规则，减少相同输入下的输出漂移。终端只展示关键阶段和精简的过滤、候选结果，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
 
 证据包规划会以只读方式读取 runtime 候选清单、结构上下文及必要的仓库源码，确保按路径引用的输入真实可用；模式策展仍是自包含 prompt-only 任务，不重复扫描仓库。`learn current` 会把分析结果、项目画像提交状态及已完成的 AI 策展决策写入可恢复 checkpoint，策展后的本地校验或保存失败时使用 `sync --resume` 可直接重放，不会重跑已完成证据包或再次调用 AI 策展。旧版本留下的策展归档可在对应子项目目录使用 `sync --resume --curation-output <文件>` 恢复。终端会分别显示 AI 策展、结果校验和模式库写入，详细诊断写入 runtime 日志。
 
@@ -220,7 +222,7 @@ skills:
 | 手写说明 | Skills Seed |
 |---|---|
 | 依赖人维护，容易过期 | 从当前仓库和 Git 历史增量更新 |
-| 通常只有概览，缺少证据位置 | patterns、业务入口和 references 保留来源线索 |
+| 通常只有概览，缺少证据位置 | patterns、能力入口和 references 保留来源线索 |
 | 多项目 workspace 容易混在一起 | 根仓路由，子项目独立沉淀 |
 | 很难判断哪些规则真的有用 | `patterns stats` 展示模式质量指标，`patterns compact` 可整理重复或低质模式 |
 

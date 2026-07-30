@@ -81,7 +81,7 @@ func NewProjectSpecFromProfile(profile *ProjectProfile, patterns []Pattern, proj
 
 	for _, method := range profile.BusinessMethods {
 		spec.Touchpoints = append(spec.Touchpoints, ProjectSpecTouchpoint{
-			Kind:        "business_method",
+			Kind:        "capability_entry",
 			Name:        method.Name,
 			Path:        method.DisplayLocation(),
 			Description: method.Description,
@@ -111,6 +111,7 @@ func projectSpecPatternRules(patterns []Pattern) ([]ProjectSpecPatternRule, []Pr
 			Rule:        pattern.Rule,
 			Confidence:  pattern.Confidence,
 			Frequency:   pattern.Frequency,
+			Evidence:    projectSpecEvidence(pattern),
 		}
 		if patternIsGlobalSpecRule(pattern) {
 			rules = append(rules, rule)
@@ -198,12 +199,18 @@ func patternIsUsefulProjectSpecGuidance(pattern Pattern) bool {
 	if !patternHasExecutableEvidence(pattern) {
 		return false
 	}
+	if IsHighRiskOperationalPattern(pattern) {
+		return pattern.Confidence >= 0.75
+	}
 	if pattern.Confidence < 0.85 {
 		return false
 	}
 	evidenceCount := projectSpecEvidenceCount(pattern)
 	if pattern.AllowsHardConstraint() {
 		return pattern.Frequency >= 2 || evidenceCount >= 2
+	}
+	if patternLooksLikeProjectBoundary(pattern) {
+		return true
 	}
 	return pattern.Frequency >= 2 && evidenceCount >= 2
 }
@@ -218,6 +225,76 @@ func projectSpecEvidenceCount(pattern Pattern) int {
 
 func projectSpecGuidanceText(pattern Pattern) string {
 	return strings.TrimSpace(stringx.FirstNonEmpty(pattern.Description, pattern.Rule, pattern.Name))
+}
+
+func projectSpecEvidence(pattern Pattern) []string {
+	seen := make(map[string]bool, len(pattern.EvidenceLocations)+1)
+	out := make([]string, 0, len(pattern.EvidenceLocations)+1)
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			return
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	if pattern.BusinessMethod != nil {
+		add(pattern.BusinessMethod.DisplayLocation())
+	}
+	for _, location := range pattern.EvidenceLocations {
+		add(location.DisplayLocation())
+	}
+	if len(out) > 4 {
+		return out[:4]
+	}
+	return out
+}
+
+func patternLooksLikeProjectBoundary(pattern Pattern) bool {
+	text := projectSpecSearchText(pattern)
+	if text == "" {
+		return false
+	}
+	switch pattern.Category {
+	case CategoryConfig:
+		return true
+	case CategoryDatabase:
+		return containsProjectSpecTerm(text, "state", "storage", "persistence", "schema", "transaction", "migration", "lifecycle", "rollback", "状态", "存储", "持久化", "结构", "事务", "迁移", "生命周期", "回滚")
+	case CategoryStructure:
+		return containsProjectSpecTerm(text, "boundary", "extension", "module", "component", "generated", "derived", "core", "shared", "contract", "drift", "ownership", "边界", "扩展", "模块", "组件", "生成", "派生", "共享", "契约", "归属")
+	case CategoryAPI:
+		return containsProjectSpecTerm(text, "interface", "contract", "schema", "message", "event", "generated", "adapter", "request", "response", "route", "接口", "契约", "结构", "消息", "事件", "生成", "适配", "请求", "响应")
+	case CategoryMiddleware, CategoryError, CategoryTesting:
+		return pattern.Frequency >= 2 || projectSpecEvidenceCount(pattern) >= 2
+	default:
+		return false
+	}
+}
+
+func projectSpecSearchText(pattern Pattern) string {
+	parts := []string{
+		pattern.Name,
+		string(pattern.Category),
+		pattern.Description,
+		pattern.Rule,
+		pattern.ScopePath,
+	}
+	if pattern.BusinessMethod != nil {
+		parts = append(parts, pattern.BusinessMethod.Name, pattern.BusinessMethod.Description, pattern.BusinessMethod.DisplayLocation())
+	}
+	for _, location := range pattern.EvidenceLocations {
+		parts = append(parts, location.Path, location.Symbol, location.Kind, location.Description)
+	}
+	return strings.ToLower(strings.Join(parts, " "))
+}
+
+func containsProjectSpecTerm(text string, terms ...string) bool {
+	for _, term := range terms {
+		if strings.Contains(text, strings.ToLower(term)) {
+			return true
+		}
+	}
+	return false
 }
 
 func projectSpecLooksScoped(pattern Pattern) bool {

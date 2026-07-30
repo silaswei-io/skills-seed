@@ -1,12 +1,18 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	agentpkg "github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +33,7 @@ func TestClaudePrintArgs_ReadOnlyToolsAndUserPluginsDisabledByDefault(t *testing
 	})
 
 	outputSchema := `{"type":"object"}`
-	args := claudePrintArgs(false, outputSchema, false)
+	args := claudePrintArgs(false, outputSchema, false, config.AgentRuntimeOptions{})
 
 	require.NotContains(t, args, "--setting-sources")
 	settings := requireArgValue(t, args, "--settings")
@@ -56,10 +62,17 @@ func TestClaudePrintArgs_ReadOnlyToolsAndUserPluginsDisabledByDefault(t *testing
 }
 
 func TestClaudePrintArgsPromptOnlyDisablesRepositoryTools(t *testing.T) {
-	args := claudePrintArgs(false, `{"type":"object"}`, true)
+	args := claudePrintArgs(false, `{"type":"object"}`, true, config.AgentRuntimeOptions{})
 
 	require.Contains(t, args, "--tools")
 	require.Empty(t, requireArgValue(t, args, "--tools"))
+}
+
+func TestClaudePrintArgsUsesConfiguredModel(t *testing.T) {
+	args := claudePrintArgs(true, `{"type":"object"}`, false, config.AgentRuntimeOptions{Model: "sonnet"})
+
+	require.Contains(t, args, "--model")
+	require.Equal(t, "sonnet", requireArgValue(t, args, "--model"))
 }
 
 func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
@@ -71,14 +84,14 @@ func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {
 		},
 	})
 
-	args := claudePrintArgs(true, `{"type":"object"}`, false)
+	args := claudePrintArgs(true, `{"type":"object"}`, false, config.AgentRuntimeOptions{})
 
 	require.NotContains(t, args, "--setting-sources")
 	require.NotContains(t, args, "--settings")
 }
 
 func TestClaudeArgsForLogRedactsInlineSchema(t *testing.T) {
-	args := claudePrintArgs(true, `{"type":"object"}`, false)
+	args := claudePrintArgs(true, `{"type":"object"}`, false, config.AgentRuntimeOptions{})
 
 	logged := claudeArgsForLog(args)
 
@@ -89,8 +102,8 @@ func TestClaudeArgsForLogRedactsInlineSchema(t *testing.T) {
 func TestClaudeSessionPrintArgsUsePersistentSession(t *testing.T) {
 	outputSchema := `{"type":"object"}`
 
-	startArgs := claudeSessionPrintArgs(false, outputSchema, false, "session-123", false)
-	resumeArgs := claudeSessionPrintArgs(false, outputSchema, false, "session-123", true)
+	startArgs := claudeSessionPrintArgs(false, outputSchema, false, "session-123", false, config.AgentRuntimeOptions{})
+	resumeArgs := claudeSessionPrintArgs(false, outputSchema, false, "session-123", true, config.AgentRuntimeOptions{})
 
 	require.NotContains(t, startArgs, "--no-session-persistence")
 	require.Contains(t, startArgs, "--session-id")
@@ -99,6 +112,52 @@ func TestClaudeSessionPrintArgsUsePersistentSession(t *testing.T) {
 	require.Contains(t, resumeArgs, "--resume")
 	require.Equal(t, "session-123", requireArgValue(t, resumeArgs, "--resume"))
 	require.Equal(t, "Read,Glob,Grep,LS", requireArgValue(t, resumeArgs, "--tools"))
+}
+
+func TestClaudeNewSessionRetryUsesFreshSessionID(t *testing.T) {
+	tmpDir := t.TempDir()
+	commandPath := filepath.Join(tmpDir, "claude")
+	sessionIDsPath := filepath.Join(tmpDir, "session-ids.txt")
+	countPath := filepath.Join(tmpDir, "count")
+	script := `#!/bin/sh
+session=""
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = "--session-id" ]; then
+		shift
+		session="$1"
+	fi
+	shift
+done
+printf '%s\n' "$session" >> "$SKILLS_SEED_TEST_SESSION_IDS"
+if [ ! -f "$SKILLS_SEED_TEST_COUNT" ]; then
+	echo 1 > "$SKILLS_SEED_TEST_COUNT"
+	printf '%s\n' '{"type":"result","subtype":"error_max_structured_output_retries","is_error":true,"result":"temporary structured output failure"}'
+	exit 0
+fi
+printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured_output":{"ready":true,"summary":"ready"}}'
+`
+	require.NoError(t, os.WriteFile(commandPath, []byte(script), 0o755))
+	t.Setenv("SKILLS_SEED_TEST_SESSION_IDS", sessionIDsPath)
+	t.Setenv("SKILLS_SEED_TEST_COUNT", countPath)
+
+	claudeAgent := New(commandPath, 5*time.Second, nil, true, config.RetryConfig{
+		MaxRetries:      1,
+		InitialInterval: 1,
+		MaxInterval:     1,
+	}, config.AgentRuntimeOptions{})
+
+	task := agentpkg.NewRuntimeTask(agentpkg.RuntimeSlug("learning-conversation-start", "test"))
+	output, sessionID, _, err := claudeAgent.callClaudeNewSession(context.Background(), "LearningConversationStart", "start", aicontract.ContractLearningSessionAck, task)
+
+	require.NoError(t, err)
+	require.JSONEq(t, `{"ready":true,"summary":"ready"}`, output)
+	require.NotEmpty(t, sessionID)
+	data, err := os.ReadFile(sessionIDsPath)
+	require.NoError(t, err)
+	sessionIDs := strings.Fields(string(data))
+	require.Len(t, sessionIDs, 2)
+	require.NotEqual(t, sessionIDs[0], sessionIDs[1])
+	require.Equal(t, sessionIDs[1], sessionID)
 }
 
 func TestParseClaudeOutputExtractsStructuredOutput(t *testing.T) {

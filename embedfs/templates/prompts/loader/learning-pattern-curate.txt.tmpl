@@ -1,0 +1,82 @@
+# Curate Learned Patterns
+
+This is a short pattern curation conversation for the candidate set in this prompt. Normalize source ownership before writing to the pattern store. Favor recall: pack analysis already filtered for source-backed value, so your main job is to merge true equivalents within the provided inputs and reject only candidates that are unsupported, duplicate without added ownership, contradictory, unsafe as reusable guidance, or not routeable.
+
+Use only the candidates, related existing patterns, candidate-to-existing index, and appended curation rules in this prompt. Do not rely on hidden memory from file selection, pack planning, pack analysis, delta analysis, other curation shards, or profile sync. Do not scan repository files. Source evidence, examples, capability entries (`business_method`), frequency, provenance, workspace scope, and statistics are restored locally from `source_ids`. Cross-shard consolidation is handled after this response, so keep every routeable source-backed candidate represented in this prompt instead of dropping it to reduce output size.
+
+Your primary job is a complete ownership decision, not summarization. Before deciding text quality, internally build a coverage ledger containing every candidate `id` shown below. The final JSON is invalid unless every candidate ID is assigned exactly once: either represented by one canonical pattern through `patterns[].source_ids`, or rejected once through `dropped[].id` with a structured `reason_code`.
+
+Input:
+- operation: {{.Operation}}
+- candidate count: {{len .CandidatePatterns}}
+{{- $precompactionCount := index . "PrecompactionCount"}}
+{{- if and $precompactionCount (ne $precompactionCount (len .CandidatePatterns))}}
+- candidate count before local duplicate compaction: {{$precompactionCount}}
+{{- end}}
+- related existing count: {{len .ExistingPatterns}}
+- allowed categories: {{.AllowedCategories}}
+
+Candidates:
+{{range $i, $p := .CandidatePatterns}}
+## {{$i}} {{$p.Name}}
+- id: `{{$p.ID}}`
+- category: `{{$p.Category}}`
+- scope: {{$p.ScopePath}}
+- description: {{$p.Description}}
+- rule: {{$p.Rule}}
+- confidence: {{printf "%.2f" $p.Confidence}}
+{{if $p.EvidenceLocations}}- evidence:
+{{range $loc := $p.EvidenceLocations}}  - {{$loc.DisplayLocation}}; {{$loc.Symbol}}; {{$loc.Kind}}; {{$loc.Description}}
+{{end}}{{end}}
+{{end}}
+
+Related existing patterns:
+{{range $i, $p := .ExistingPatterns}}
+## {{$i}} {{$p.Name}}
+- id: `{{$p.ID}}`
+- category: `{{$p.Category}}`
+- scope: {{$p.ScopePath}}
+- description: {{$p.Description}}
+- rule: {{$p.Rule}}
+{{end}}
+
+Candidate to existing index:
+{{range $candidateID, $existingIDs := .ExistingByCandidate}}- `{{$candidateID}}` -> {{range $i, $id := $existingIDs}}{{if $i}}, {{end}}`{{$id}}`{{end}}
+{{end}}
+
+Decision rules:
+- Cover every candidate exactly once by either `patterns[].source_ids` or `dropped[].id`.
+- A candidate is not covered by mentioning only a related existing pattern ID. When updating or reinforcing an existing pattern, `source_ids` must include the existing pattern ID and every candidate ID represented by that decision.
+- Never put the same candidate ID in more than one canonical pattern, in both a pattern and `dropped`, or in `dropped` more than once.
+- Keep routeable, source-backed repository knowledge with future information gain. This includes product/domain behavior, UI or command actions, interface/contract shape, code conventions, language/runtime usage, framework integration, generated-source boundaries, validation/testing, configuration, state or storage behavior, error handling, integration, security, lifecycle, operations, logging/audit, rendering/interaction conventions, and reusable utilities when the candidate points to verified repository evidence.
+- Keep source-backed high-risk operational boundaries when they affect safe modification: destructive cleanup/destroy/reset commands, irreversible state/resource/data changes, privileged administration, credential/secret/certificate behavior, external system or infrastructure lifecycle operations, permission changes, migration/bootstrap shortcuts, release/deployment side effects, and externally visible maintenance flows. Scope the wording to the verified command or entry and preserve safeguards instead of recommending the dangerous action.
+- Merge only semantically equivalent rules with compatible applicability, behavior, risk, and evidence ownership.
+- Preserve distinct product/domain, interaction, resource, and code-pattern capabilities when resource, state lifecycle, user/system action, policy, permission, audit, external dependency, protocol, framework integration, language/runtime usage, configuration gate, operational risk, or correctness semantics differ.
+- Drop only when the candidate is unsupported by source ownership, is an exact duplicate fully represented by another output, is contradictory, turns dangerous historical behavior into advice, or is generic CRUD/simple mapping/boilerplate with no repository-specific trigger, evidence entry, or decision value.
+- Do not drop a candidate merely because the behavior is simple, local, single-file, configuration-only, interface/contract-only, framework-specific, language-specific, utility-focused, or common in many projects. If it has verified repository evidence and helps future implementation, navigation, validation, debugging, or safe modification, keep it with scoped wording.
+- Do not drop high-risk operational candidates merely because they are command-local or sparse. These are routeable repository knowledge when future edits could delete data, alter environments, affect services, change credentials, or bypass safeguards.
+- Do not drop source-backed product/domain or interaction behavior merely because it is a single resource, single lifecycle action, single workflow, or may change in the future. Those are routeable repository knowledge when future work may modify the same capability, state transition, policy, integration, validation, audit behavior, or operational action.
+- When uncertain whether a source-backed candidate is reusable, keep it as scoped repository knowledge rather than dropping it. Prefer a precise narrow rule over losing a useful navigation or implementation anchor.
+- If a candidate is already represented by an existing pattern, keep the existing pattern ID and include both the existing ID and candidate ID in `source_ids`.
+- Output source ownership decisions only. Evidence, examples, frequency, capability entries (`business_method`), and statistics are restored locally from `source_ids`.
+- `source_ids` and `dropped.id` may reference only IDs shown above.
+- Every dropped item must include exactly one `reason_code`:
+  - `exact_duplicate`: fully represented by another output or existing pattern named in the decision.
+  - `unsupported_evidence`: lacks source ownership or cannot be verified from provided inputs.
+  - `contradictory`: conflicts with source-backed candidates or existing knowledge.
+  - `unsafe_guidance`: would turn dangerous historical/bootstrap/environment behavior into reusable guidance.
+  - `no_routeable_value`: has no future implementation, navigation, validation, debugging, or safe-modification trigger even for the same capability or file area. Do not use this code for source-backed single workflows, resource-specific behavior, lifecycle actions, interface/message/event contracts, configuration behavior, validation, audit/logging, external integration, or operational flows.
+  - `low_signal_boilerplate`: only boilerplate, thin forwarding, CRUD shell, or simple mapping with no repository-specific decision value.
+  - `overfiltered_source_backed`: the candidate is source-backed and routeable but would otherwise be dropped only because it is simple, local, common, framework-specific, language-specific, config-only, interface/contract-only, error-only, or utility-only. Prefer keeping such candidates instead of using this code.
+- Use the appended pattern curation quality rules before returning JSON.
+
+Coverage repair procedure:
+- After drafting the JSON, compare the internal candidate ledger against all candidate IDs found in `patterns[].source_ids` and `dropped[].id`.
+- If any candidate ID is missing, add it to the most semantically compatible canonical pattern; if none is compatible, keep it as its own canonical pattern when reusable or drop it with a specific reason when non-reusable.
+- If any candidate ID appears more than once, choose one owner by strongest semantic fit and remove it from all other owners or drops.
+- If any `source_ids` or `dropped.id` value is not listed in the prompt, remove it before returning.
+- Do not return JSON until the ledger is complete and conflict-free.
+
+Return JSON only.
+
+{{ jsonContract "CuratePatternsOutput" }}

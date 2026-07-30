@@ -14,7 +14,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 )
@@ -38,7 +37,6 @@ func (s *LearnerService) CurateAndSavePatterns(ctx context.Context, patterns []d
 type CurateOptions struct {
 	Hooks              curator.ProgressHooks
 	DecisionCheckpoint curator.DecisionCheckpoint
-	LearningSession    agent.LearningSession
 }
 
 // CurateAndSavePatternsWithOptions 策展并保存候选模式。
@@ -54,7 +52,6 @@ func (s *LearnerService) curateAndSavePatterns(ctx context.Context, patterns []d
 		Operation:          operation,
 		Candidates:         patterns,
 		DecisionCheckpoint: opts.DecisionCheckpoint,
-		LearningSession:    opts.LearningSession,
 	}, opts.Hooks)
 	if err != nil {
 		return 0, err

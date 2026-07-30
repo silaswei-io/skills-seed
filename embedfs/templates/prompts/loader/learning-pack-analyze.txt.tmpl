@@ -1,6 +1,6 @@
 # Analyze Learning Pack
 
-This is an isolated pack-analysis conversation. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return the final source-backed repository knowledge for these packs. Favor recall for useful source-backed knowledge; global curation will merge equivalent candidates later.
+This is an isolated pack-analysis conversation. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return the final source-backed repository knowledge for these packs. Favor recall for useful source-backed knowledge; later curation and deterministic consolidation will merge equivalent candidates.
 
 Project:
 - name: {{.ProjectName}}
@@ -12,9 +12,10 @@ Project:
 
 Learning strategy guidance:
 - `fast`: return compact directly evidenced patterns, but do not drop clear source-backed knowledge lanes.
-- `normal`: balance coverage and cost; keep distinct routeable business and code patterns.
-- `deep`: keep more source-backed local business/code patterns when they change future implementation decisions.
+- `normal`: balance coverage and cost; keep distinct routeable product/domain, interaction, resource, contract, and code patterns.
+- `deep`: keep more source-backed local patterns when they change future implementation decisions.
 - The mode changes curation priority only. It is not a fixed output count, file budget, or reason to promote weak evidence.
+- Interpret category names abstractly across project types: `business` means product/domain behavior, `api` means any interface or contract, `database` means state/storage/persistence, `middleware` means interception or pipeline behavior, and `utils` means reusable domain-neutral helpers.
 {{- if .StructurePath}}
 
 Project structure is available at `{{.StructurePath}}`; use it only for boundaries and ownership.
@@ -69,19 +70,20 @@ Evidence packs:
 {{end}}
 
 Pack boundary:
-- Do not rely on hidden context from planning, other packs, profile sync, or global curation.
+- Do not rely on hidden context from planning, other packs, profile sync, or later curation.
 - Treat the explicit pack fields, runtime files, structural context, and listed source/diff files as the complete input.
 - Do not scan outside listed pack files and directly referenced context. If evidence is insufficient, return that pack with `patterns: []`.
 - Pack IDs are execution provenance for this response only; do not copy pack IDs or pack names into pattern fields.
 
 Candidate discovery:
-- Run a decision-value discovery pass before judging candidates. For each pack, ask what future developer decision this evidence changes: where to edit, which verified callable entry to reuse, which boundary to preserve, which validation to run, which generated/config/framework/language convention to follow, or which business rule/state/policy/integration behavior to avoid breaking.
-- Preserve business patterns and code patterns when they are source-backed and routeable. A single-file rule, local convention, config file, API contract, error path, or utility helper is worth keeping when it names a future task trigger and verified source entry.
-- Preserve distinct business capabilities as distinct candidates when their resource, state lifecycle, policy, external dependency, audit semantics, operational risk, or correctness boundary differs.
-- For business patterns, cross-module orchestration patterns, adapters, and reusable utility patterns, also identify the canonical callable entry when the listed evidence directly provides a function, method, handler, command, job, resolver, or equivalent source-level entry. Fill `business_method` only when the name, current location, complete signature, purpose, prerequisites, and return/error semantics are verifiable from this turn. Leave it null rather than guessing.
-- A `business_method` is not limited to business category patterns: use `type: "domain"` for domain or orchestration entries and `type: "common"` for reusable project utilities. Do not create `business_method` for ordinary CRUD shells, generated wrappers, startup registration, or thin forwarding unless the entry is the routeable source of a repository-specific rule.
-- Preserve sparse subdomains when they contain routeable source-backed behavior. Do not drop a pack's only useful business rule merely because it is local, single-file, or less architectural than other packs.
-- Keep high-value reusable technical boundaries when they encode repository behavior: API/request/response contracts, language/runtime usage, framework integration shape, validation strategy, error taxonomy, transaction boundary, idempotency boundary, generated contract source, configuration convention, integration adapter contract, concurrency/lifecycle rule, logging/audit convention, security-sensitive handling, and common utilities.
+- Run a decision-value discovery pass before judging candidates. For each pack, ask what future developer decision this evidence changes: where to edit, which verified capability entry to reuse, which boundary to preserve, which validation to run, which generated/config/framework/language convention to follow, or which product/domain rule, state, policy, interaction, or integration behavior to avoid breaking.
+- Preserve product/domain patterns and code patterns when they are source-backed and routeable. A single-file rule, local convention, config file, interface contract, error path, interaction entry, or utility helper is worth keeping when it names a future task trigger and verified source entry.
+- Preserve distinct capabilities as distinct candidates when their resource, state lifecycle, user/system action, policy, external dependency, audit semantics, operational risk, or correctness boundary differs.
+- For product/domain patterns, cross-boundary orchestration patterns, adapters, UI/command actions, jobs/tasks, and reusable utility patterns, also identify the canonical source entry when the listed evidence directly provides a function, method, component, command, job, resolver, declarative config, route, or equivalent source-level entry. Fill `business_method` only when the name, current location, complete signature or concrete declaration, purpose, prerequisites, and return/error/result semantics are verifiable from this turn. Leave it null rather than guessing.
+- A `business_method` is a legacy field name for a reusable capability entry. It is not limited to business category patterns: use `type: "domain"` for product/domain or orchestration entries and `type: "common"` for reusable project utilities. Do not create it for ordinary CRUD shells, generated wrappers, startup registration, or thin forwarding unless the entry is the routeable source of a repository-specific rule.
+- Preserve sparse subdomains when they contain routeable source-backed behavior. Do not drop a pack's only useful product/domain rule or interaction boundary merely because it is local, single-file, or less architectural than other packs.
+- Keep high-value reusable technical boundaries when they encode repository behavior: interface/request/response/message contracts, language/runtime usage, framework integration shape, validation strategy, error taxonomy, transaction or state consistency boundary, idempotency boundary, generated source, configuration convention, integration adapter contract, concurrency/lifecycle rule, rendering/interaction convention, logging/audit convention, security-sensitive handling, and common utilities.
+- Preserve destructive, irreversible, privileged, environment-mutating, or externally visible operational behavior as high-risk repository knowledge when source-backed. Examples include cleanup/destroy/reset commands, state/resource/data deletion, credential/secret/certificate changes, external system or infrastructure lifecycle operations, permission changes, migration/bootstrap shortcuts, release/deployment side effects, and production-affecting maintenance flows. Phrase them as bounded safety observations and required inspection points, not as advice to repeat the dangerous action.
 - Keep navigation-useful implementation knowledge when it would help a future agent find the right source entry, avoid the wrong sibling flow, or understand where generated/config/runtime behavior originates. Scope it clearly instead of dropping it for being local.
 - Drop ordinary CRUD, simple field mapping, generic builders, thin wrappers, framework registration, model aggregation, and boilerplate only when they do not encode a project-specific invariant or decision.
 
@@ -89,13 +91,14 @@ Pack-local curation:
 - Internally merge exact duplicates within the same pack before output.
 - Merge only equivalent applicability, behavior, and evidence. Shared vocabulary, adjacent layers, sibling lifecycle actions, or reducing output count are not sufficient reasons to merge.
 - If a candidate is similar to an existing learned behavior mentioned in the pack input or structural context, phrase it as the same reusable boundary instead of inventing a sibling pattern.
-- Keep source-backed repository knowledge when routeable and useful for future work, even if it is domain-specific, technology-specific, single-file, locally scoped, configuration-only, API-contract-only, error-handling-only, or utility-focused. Calibrate confidence and scope instead of dropping it for being local or simple.
+- Keep source-backed repository knowledge when routeable and useful for future work, even if it is domain-specific, technology-specific, single-file, locally scoped, configuration-only, interface/contract-only, error-handling-only, or utility-focused. Calibrate confidence and scope instead of dropping it for being local or simple.
 - If source evidence shows destructive schema/data behavior, bootstrap-only setup, or historical compatibility code, describe it as a bounded implementation observation. Do not phrase it as a recommended migration or production change pattern unless authoritative project guidance explicitly says to repeat it.
+- If source evidence shows destructive commands, privileged administration, external side effects, or irreversible operational behavior, return a scoped safety or operational-boundary pattern even when it lives in one command file.
 - Avoid exact counts such as number of paths, cases, enum members, key types, statuses, exclusions, routes, or business variants unless you verified the full closed set from direct source evidence in this turn and the number changes a future implementation decision. Prefer "multiple", "a set of", or representative values.
 
 Pre-output validation:
 - Every returned pattern has routeable wording, minimal evidence locations, and a concise source-backed example.
-- When a returned pattern has a verified reusable callable entry, `business_method.code_location.current_location` uses the same repository-relative file and 1-based line style as evidence, and `business_method.function` contains the complete real signature. If any of those fields is uncertain, omit `business_method`.
+- When a returned pattern has a verified reusable capability entry, `business_method.code_location.current_location` uses the same repository-relative file and 1-based line style as evidence, and `business_method.function` contains the complete real signature or declaration. If any of those fields is uncertain, omit `business_method`.
 - Pattern names identify the reusable behavior, not only a directory, framework, or file.
 - Descriptions state the solved problem, trigger, observed behavior, and applicability boundary.
 - Rules are non-mandatory reuse guidance: inspect/prefer the verified entry and preserve the relevant boundary unless the current task does not fit.

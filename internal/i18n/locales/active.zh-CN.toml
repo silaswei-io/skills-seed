@@ -543,7 +543,7 @@ other = "解析 JSON 失败"
 other = "AI 输出缺少必填字段 {{.Field}}"
 
 [AgentInvalidCuratedDropReasonCode]
-other = "AI 策展输出包含无效丢弃原因码: id={{.ID}}, reason_code={{.ReasonCode}}"
+other = "策展输出包含无效丢弃原因码: id={{.ID}}, reason_code={{.ReasonCode}}"
 
 [AgentDiagnosticError]
 other = "Agent 诊断: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
@@ -799,7 +799,7 @@ other = "{{.Label}}：检查可恢复计划"
 other = "{{.Label}}：扫描文件指纹"
 
 [ProgressLearnCurrentLocalFileSelection]
-other = "本地候选收敛"
+other = "本地候选准备"
 
 [ProgressLearnCurrentAIFileSelection]
 other = "AI 候选收敛"
@@ -840,6 +840,21 @@ other = "恢复学习议程（{{.Focuses}} 个焦点）"
 [ProgressLearnCurrentAnalyzeFocus]
 other = "{{.Label}} · 焦点 {{.Current}}/{{.Total}} · {{.Name}}"
 
+[ProgressLearnCurrentAnalyzeBatches]
+other = "{{.Label}} · 焦点 {{.Focuses}} 个 · 批次 {{.Batches}} 个 · 并发 {{.Parallelism}}"
+
+[ProgressLearnCurrentAnalyzeParallel]
+other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} · 并发 {{.Parallelism}} · 进行中 {{.Active}}"
+
+[LearnCurrentParallelActiveNone]
+other = "-"
+
+[LearnCurrentParallelActiveSingle]
+other = "{{.Batch}} 焦点 {{.Current}}/{{.Total}} {{.Name}}"
+
+[LearnCurrentParallelActiveRange]
+other = "{{.Batch}} 焦点 {{.Start}}-{{.End}}/{{.Total}} {{.Name}}"
+
 [ProgressLearnCurrentCommitFiles]
 other = "{{.Label}} · 提交 {{.Count}} 个文件状态"
 
@@ -855,23 +870,20 @@ other = "校验策展结果"
 [ProgressCuratePatternsStore]
 other = "写入模式库"
 
+[ProgressCuratePatternsLocal]
+other = "本地确定性策展"
+
 [ProgressLearnCurrentSaveProfile]
 other = "同步项目画像"
 
 [ProgressLearnCurrentSkipProfile]
 other = "跳过项目画像同步"
 
-[ProgressLearnCurrentAfterAnalysis]
-other = "{{.Label}}（代码分析 {{.Completed}}/{{.Total}} 已完成）"
-
 [ProgressLearnWorkspaceProjects]
 other = "学习工作区子项目"
 
-[ProgressCuratePatternsAI]
-other = "AI 策展模式"
-
 [ProgressCuratePatternsReplay]
-other = "重放已保存的 AI 策展决策"
+other = "重放已保存的策展决策"
 
 [ProgressUserDefinePatternAI]
 other = "生成用户定义模式"
@@ -1011,7 +1023,7 @@ other = "通过 --context 或 --context-path 使用自然语言描述编码规�
 other = "  # 直接传入描述\n  skills-seed patterns add --context \"所有 service 方法必须返回 domain error\"\n\n  # 指定分类\n  skills-seed patterns add --context \"分页查询统一使用 limit/offset\" --category api\n\n  # 从文件或目录读取较长上下文；多个来源重复传入 --context-path\n  skills-seed patterns add --context-path docs/plan.md --context-path docs/specs --category api"
 
 [PatternsAddFlagCategory]
-other = "指定分类：naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
+other = "指定分类键：naming, error, structure, concurrency, testing, business(产品/领域), api(接口/契约), database(状态/持久化), utils, middleware(拦截/管道), config"
 
 [PatternsAddFlagContext]
 other = "用户输入的自然语言模式描述"
@@ -1095,7 +1107,7 @@ other = "有效分"
 other = "查看已学习 pattern 的概览或完整详情"
 
 [PatternsShowLongDesc]
-other = "无参数时查看已学习 pattern 概览；传入 pattern ID 时查看完整详情，包括示例、质量指标、workspace 归属、业务方法和代码位置元数据。"
+other = "无参数时查看已学习 pattern 概览；传入 pattern ID 时查看完整详情，包括示例、质量指标、workspace 归属、能力入口和代码位置元数据。"
 
 [PatternsShowExample]
 other = "skills-seed patterns show\nskills-seed patterns show --sort score\nskills-seed patterns show business-create-order\nskills-seed patterns show business-create-order --format json"
@@ -1206,19 +1218,19 @@ other = "范围路径"
 other = "工作区角色"
 
 [PatternsShowFieldBusinessMethod]
-other = "业务方法"
+other = "能力入口"
 
 [PatternsShowFieldBusinessDescription]
-other = "方法说明"
+other = "入口说明"
 
 [PatternsShowFieldBusinessUsage]
 other = "使用场景"
 
 [PatternsShowFieldBusinessType]
-other = "方法类型"
+other = "入口类型"
 
 [PatternsShowFieldBusinessFunction]
-other = "函数签名"
+other = "入口签名"
 
 [PatternsShowFieldBusinessPrerequisites]
 other = "前置条件"
@@ -1326,12 +1338,6 @@ other = "生成 skills 失败"
 [PatternCuratorNotConfigured]
 other = "模式策展服务未配置"
 
-[CuratorLearningSessionRequiredForCurrent]
-other = "当前代码模式策展需要学习会话"
-
-[CuratorLearningSessionRequiredForAI]
-other = "AI 模式策展需要学习会话"
-
 [PreviewShort]
 other = "预览分析输入"
 
@@ -1427,7 +1433,7 @@ other = "AI 生成用户自定义模式失败"
 other = "查看项目画像"
 
 [ProfileLongDesc]
-other = "查看由 learn current 产出的项目画像。\n\n项目画像保存于 .skills-seed/store/documents/project-profile.json，用于生成 references/project-overview.md，并为 generate skills 提供项目结构、依赖、关键模块和业务方法上下文。画像同步属于当前学习流程，增量学习会基于变更和 AI 建议判断是否更新。"
+other = "查看由 learn current 产出的项目画像。\n\n项目画像保存于 .skills-seed/store/documents/project-profile.json，用于生成 references/project-overview.md，并为 generate skills 提供项目结构、依赖、关键模块和能力入口上下文。画像同步属于当前学习流程，增量学习会基于变更和 AI 建议判断是否更新。"
 
 [ProfileExample]
 other = "  # 查看当前项目画像摘要\n  skills-seed profile show\n\n  # 在当前学习中自动判断并刷新画像\n  skills-seed learn current --profile auto"
@@ -1448,7 +1454,7 @@ other = "项目画像不存在。请先运行 'skills-seed learn current'。"
 other = "项目画像: {{.ProjectName}} ({{.Language}})\n生成时间: {{.GeneratedAt}}"
 
 [ProfileShowStats]
-other = "统计: 框架 {{.Frameworks}}，依赖 {{.Dependencies}}，模块 {{.Modules}}，业务方法 {{.BusinessMethods}}"
+other = "统计: 框架 {{.Frameworks}}，依赖 {{.Dependencies}}，模块 {{.Modules}}，能力入口 {{.BusinessMethods}}"
 
 [ProjectProfileReadFailed]
 other = "读取项目画像失败"
@@ -1751,7 +1757,7 @@ other = "事件统计"
 other = "从当前代码学习"
 
 [LearnCurrentLongDesc]
-other = "分析当前代码库，提取编码模式、业务方法、最佳实践与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备完整 project-overview 输入"
+other = "分析当前代码库，提取编码模式、能力入口、可复用项目知识与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备完整 project-overview 输入"
 
 [LearnCurrentExample]
 other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不同步项目画像\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
@@ -1775,7 +1781,7 @@ other = "从文件或目录读取本次学习的补充说明，可重复传入�
 other = "忽略文件指纹，强制重新学习当前扫描范围"
 
 [LearnFlagCurationOutput]
-other = "读取已完成的 CuratePatterns 输出并恢复提交，不再调用 AI 策展"
+other = "读取已完成的 CuratePatterns 输出并恢复提交"
 
 [LearnCurrentCurationOutputRequiresChildResume]
 other = "--curation-output 必须在对应子项目目录恢复使用"
@@ -1836,7 +1842,7 @@ other = "分析产物已提交，但仍有 {{.Count}} 个证据焦点待处理"
 other = "本地过滤统计:\n  • 文件范围: 扫描 {{.ScannedFiles}}，本地排除 {{.LocalSkippedFiles}}，可学习 {{.SourceFiles}}\n  • 增量候选: 新增/修改 {{.Changed}}，删除 {{.Deleted}}，未变化 {{.Unchanged}}\n  • 待处理候选: {{.LocalPlanInputs}}"
 
 [LearnCurrentResumeSummary]
-other = "恢复未完成的 {{.Command}} 执行计划:\n  • 本地过滤: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • 候选收敛: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，证据焦点 {{.Focuses}}\n  • 本次复用已保存议程，不重复执行文件扫描、本地过滤和候选收敛"
+other = "恢复未完成的 {{.Command}} 执行计划:\n  • 本地过滤: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • 候选准备: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，证据焦点 {{.Focuses}}\n  • 本次复用已保存议程，不重复执行文件扫描、本地过滤和候选准备"
 
 [LearnCurrentNoFileChanges]
 other = "未检测到可学习文件变化，已跳过 patterns 学习"
@@ -1845,13 +1851,13 @@ other = "未检测到可学习文件变化，已跳过 patterns 学习"
 other = "已排除生成的 skills 目录:\n {{.Paths}}"
 
 [LearnCurrentFileSelectionSummary]
-other = "候选收敛结果:\n  • 候选收敛: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 状态: {{.SelectionStatus}}\n  • 最终待分析: {{.PendingAnalyzeFiles}}"
+other = "候选准备结果:\n  • 候选准备: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 状态: {{.SelectionStatus}}\n  • 最终待分析: {{.PendingAnalyzeFiles}}"
 
 [LearnCurrentFileSelectionApplied]
-other = "候选收敛已生效"
+other = "候选准备已生效"
 
 [LearnCurrentFileSelectionLocalReason]
-other = "本地确定性候选收敛"
+other = "本地保守候选准备"
 
 [LearnCurrentFileSelectionAIReason]
 other = "AI 候选收敛已生效{{if .Reason}}：{{.Reason}}{{end}}"
@@ -1875,7 +1881,7 @@ other = "无效的项目画像策略 {{.Mode}}，可选值为 auto、skip 或 re
 other = "分析结果:\n  • 新增模式数: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeFocusesSummary]
-other = "证据焦点完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}} 个，项目内串行"
+other = "证据焦点完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}} 个，项目内并发 {{.Parallelism}}"
 
 [LearnCurrentSavePatternFailed]
 other = "保存模式失败 [{{.ID}}]: {{.Error}}"
@@ -1893,7 +1899,7 @@ other = "项目画像同步已跳过"
 other = "项目画像同步失败: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并发 {{.Parallelism}}，子项目内分段会话串行"
+other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并发 {{.Parallelism}}；子项目内证据焦点并发由子项目配置控制"
 
 [LearnWorkspaceProjectInfo]
 other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}\n子项目路径: {{.Path}}"
@@ -1985,6 +1991,9 @@ other = "AI 输出、沉淀内容和生成 Skills 语言：zh-CN 或 en-US；不
 
 [InitFlagAgent]
 other = "初始化时写入的 Agent engine，例如 claude 或 codex"
+
+[InitFlagAgentModel]
+other = "skills-seed 调用 Agent 时使用的模型名；留空继承本机 Agent CLI 默认配置"
 
 [InitFlagSkills]
 other = "初始化时写入的 skills 输出类型，例如 claude 或 codex"
@@ -2149,7 +2158,7 @@ other = "其他业务规则"
 other = "接口 / 契约 / 生成链路"
 
 [KnowledgeValidationAreaAPIWhen]
-other = "接口、路由、请求响应类型、生成物或适配层变化后运行。"
+other = "接口、消息、事件、共享 schema、生成物或适配层变化后运行。"
 
 [KnowledgeValidationAreaBusinessName]
 other = "业务流程 / 状态 / 编排"
@@ -2158,16 +2167,16 @@ other = "业务流程 / 状态 / 编排"
 other = "业务规则、状态流转、跨模块编排或幂等逻辑变化后运行。"
 
 [KnowledgeValidationAreaPersistenceName]
-other = "持久化 / 查询 / 迁移"
+other = "状态 / 持久化 / 迁移"
 
 [KnowledgeValidationAreaPersistenceWhen]
-other = "模型、查询、事务、迁移或缓存持久化边界变化后运行。"
+other = "状态结构、存储读写、事务、迁移、缓存或索引边界变化后运行。"
 
 [KnowledgeValidationAreaRuntimeName]
-other = "配置 / 中间件 / 启动链路"
+other = "配置 / 管道 / 运行期"
 
 [KnowledgeValidationAreaRuntimeWhen]
-other = "配置结构、中间件注册、启动参数或插件装配变化后运行。"
+other = "配置结构、拦截/管道注册、启动参数、扩展装配或运行期行为变化后运行。"
 
 [InteractiveFlagNoInteractive]
 other = "禁用交互式向导，按命令参数和默认值直接执行"
@@ -2208,6 +2217,12 @@ other = "选择 AI/Skills 内容语言"
 [InteractiveInitAgent]
 other = "选择 Agent"
 
+[InteractiveInitAgentModel]
+other = "填写 skills-seed 专用 Agent 模型名（留空使用本机 CLI 默认配置）"
+
+[InteractiveInitAgentModelDefault]
+other = "本机 CLI 默认"
+
 [InteractiveInitSkills]
 other = "选择 Skills 类型"
 
@@ -2215,7 +2230,7 @@ other = "选择 Skills 类型"
 other = "填写 Agent 总并发数"
 
 [InteractiveInitCustomizeAdvanced]
-other = "是否自定义 Skills 输出语言或类型？"
+other = "是否自定义 Agent 模型、Skills 输出语言或类型？"
 
 [InteractiveInitGlobalCLISkills]
 other = "检测到当前环境的全局 skills-seed CLI Skill 未安装或已过期，是否安装/更新？"
@@ -2242,10 +2257,10 @@ other = "只写入 Claude 的全局 Skills 目录。"
 other = "只写入 Codex 的全局 Skills 目录。"
 
 [InteractiveInitParallelismPlanProject]
-other = "单项目：当前代码学习使用分段会话串行执行"
+other = "单项目：agent.parallelism>1 时并发分析独立证据焦点批次"
 
 [InteractiveInitParallelismPlanWorkspace]
-other = "工作区：检测到 {{.Projects}} 个子项目，agent.parallelism={{.WorkspaceParallelism}}，每个子项目内分段会话串行"
+other = "工作区：检测到 {{.Projects}} 个子项目，根 agent.parallelism={{.WorkspaceParallelism}} 控制子项目并发；子项目内证据焦点并发由子项目配置控制"
 
 [InteractiveInitSummaryTitle]
 other = "即将执行"
@@ -2261,6 +2276,9 @@ other = "AI/Skills 内容语言"
 
 [InteractiveInitSummaryAgent]
 other = "Agent"
+
+[InteractiveInitSummaryAgentModel]
+other = "Agent 模型"
 
 [InteractiveInitSummarySkills]
 other = "Skills 类型"
@@ -2422,7 +2440,7 @@ other = "project"
 other = "code"
 
 [GeneratorSkillDescriptionDefault]
-other = "修改、调试、测试、审查或扩展 {{.Project}} {{.Language}} 代码时使用，包括 API 与契约、插件与集成、持久化与迁移、配置与运行期以及架构分析"
+other = "修改、调试、测试、审查或扩展 {{.Project}} {{.Language}} 代码时使用，包括接口与契约、插件与集成、状态/持久化、配置与运行期以及架构分析"
 
 [GeneratorValidationGapTest]
 other = "未学习到有仓库证据的测试命令"
@@ -2464,22 +2482,22 @@ other = "命名模式"
 other = "命名约定"
 
 [GeneratorCategoryBusinessTitle]
-other = "业务模式"
+other = "产品 / 领域模式"
 
 [GeneratorCategoryBusinessDescription]
-other = "业务逻辑模式"
+other = "产品能力、领域行为、状态流转与策略"
 
 [GeneratorCategoryDatabaseTitle]
-other = "数据库模式"
+other = "状态 / 持久化模式"
 
 [GeneratorCategoryDatabaseDescription]
-other = "数据库操作"
+other = "状态、存储、事务、迁移与缓存边界"
 
 [GeneratorCategoryAPITitle]
-other = "API 模式"
+other = "接口 / 契约模式"
 
 [GeneratorCategoryAPIDescription]
-other = "API 设计"
+other = "接口、消息、事件、适配层与派生产物"
 
 [GeneratorCategoryErrorTitle]
 other = "错误处理"
@@ -2488,10 +2506,10 @@ other = "错误处理"
 other = "错误处理模式"
 
 [GeneratorCategoryMiddlewareTitle]
-other = "中间件模式"
+other = "拦截 / 管道模式"
 
 [GeneratorCategoryMiddlewareDescription]
-other = "中间件设计"
+other = "拦截器、过滤器、Hook、管道与运行链路"
 
 [GeneratorCategoryConfigTitle]
 other = "配置模式"
@@ -2500,16 +2518,16 @@ other = "配置模式"
 other = "配置管理"
 
 [GeneratorCategoryUtilsTitle]
-other = "工具模式"
+other = "可复用工具模式"
 
 [GeneratorCategoryUtilsDescription]
-other = "工具方法"
+other = "领域中立的复用工具与转换入口"
 
 [GeneratorCategoryConcurrencyTitle]
-other = "并发编程"
+other = "并发 / 生命周期模式"
 
 [GeneratorCategoryConcurrencyDescription]
-other = "并发编程模式"
+other = "并行执行、同步、一致性窗口与生命周期协调"
 
 [GeneratorCategoryTestingTitle]
 other = "测试模式"
@@ -2521,10 +2539,10 @@ other = "测试约定"
 other = "项目特定模式"
 
 [GeneratorProfileReferenceBusinessMethodsTitle]
-other = "入口方法索引"
+other = "能力入口索引"
 
 [GeneratorProfileReferenceBusinessMethodsDescription]
-other = "常用业务入口、模块扩展入口、跨模块编排入口和高价值工具入口索引"
+other = "产品/领域行为、交互动作、模块扩展、跨边界编排和高价值工具入口索引"
 
 [GeneratorProfileReferenceModulesTitle]
 other = "关键模块"
@@ -2539,13 +2557,13 @@ other = "通用工具"
 other = "通用工具方法及使用场景"
 
 [GeneratorBusinessMethodProjectGroupTitle]
-other = "项目入口"
+other = "项目级能力入口"
 
 [GeneratorBusinessMethodProjectGroupSummary]
-other = "未能稳定归属到具体模块的项目级入口。"
+other = "未能稳定归属到具体模块的项目级能力入口。"
 
 [GeneratorBusinessMethodModuleGroupSummary]
-other = "同一模块或相邻路径下的入口方法，优先按本组定位复用能力。"
+other = "同一模块或相邻路径下的能力入口，优先按本组定位复用能力。"
 
 [GeneratorInsightDeterministicGeneration]
 other = "skills 由已入库模式、项目画像和工作流确定性生成；生成阶段不调用 AI。"
@@ -2557,82 +2575,82 @@ other = "已覆盖模式分类：{{.Categories}}"
 other = "已从当前代码学习到 {{.Count}} 个架构层次；本节用于导航已沉淀的结构事实，具体职责以“架构层次”和“关键模块”章节为准。"
 
 [GeneratorOverviewCoveragePreview]
-other = "当前项目画像已覆盖 {{.Total}} 个模块/业务域；此处仅列出前 {{.Preview}} 个用于导航：{{.Domains}}。完整列表见关键模块、入口方法和分类模式；具体业务规则、架构边界和实现细节需结合当前代码确认，不能把局部摘要当作完整项目事实。"
+other = "当前项目画像已覆盖 {{.Total}} 个模块/责任域；此处仅列出前 {{.Preview}} 个用于导航：{{.Domains}}。完整列表见关键模块、能力入口和分类模式；具体产品规则、架构边界和实现细节需结合当前代码确认，不能把局部摘要当作完整项目事实。"
 
 [GeneratorOverviewCoverageFull]
-other = "当前项目画像已覆盖 {{.Total}} 个模块/业务域：{{.Domains}}。本节用于快速定位项目范围和参考入口；具体业务规则、架构边界和实现细节需结合当前代码、项目规范和分类模式确认，不能把单个业务域摘要当作完整项目事实。"
+other = "当前项目画像已覆盖 {{.Total}} 个模块/责任域：{{.Domains}}。本节用于快速定位项目范围和参考入口；具体产品规则、架构边界和实现细节需结合当前代码、项目规范和分类模式确认，不能把单个责任域摘要当作完整项目事实。"
 
 [GeneratorOverviewCoverageMissing]
 other = "项目概览摘要尚未从完整项目画像中稳定提取；请结合当前代码、项目规范和分类模式确认全局结论。"
 
 [GeneratorReferenceLinkBusinessAPI]
-other = "涉及接口输入输出、响应字段、Extra/Before/After 数据或适配层返回时继续阅读。"
+other = "涉及接口、消息、事件、共享 schema、输入输出或适配层返回时继续阅读。"
 
 [GeneratorReferenceLinkBusinessDatabase]
-other = "涉及持久化、事务、查询条件或数据模型字段落库时继续阅读。"
+other = "涉及状态结构、持久化、事务、查询、缓存或索引边界时继续阅读。"
 
 [GeneratorReferenceLinkBusinessError]
 other = "涉及错误码、错误包装、失败分支或用户可见错误语义时继续阅读。"
 
 [GeneratorReferenceLinkAPIBusiness]
-other = "接口字段承载业务状态、操作日志 Extra、Before/After 快照或跨实体规则时继续阅读。"
+other = "接口、消息、事件或适配层字段承载领域状态、审计快照或跨资源规则时继续阅读。"
 
 [GeneratorReferenceLinkAPIError]
-other = "接口需要返回错误码、错误响应结构或失败语义时继续阅读。"
+other = "接口、消息、事件或适配层需要表达错误码、失败结构或错误语义时继续阅读。"
 
 [GeneratorReferenceLinkAPIMiddleware]
-other = "接口行为依赖鉴权、拦截器、上下文注入或请求链路处理时继续阅读。"
+other = "接口、消息、事件或适配层行为依赖鉴权、拦截器、上下文注入、Hook 或管道处理时继续阅读。"
 
 [GeneratorReferenceLinkAPIConfig]
-other = "接口或派生产物受配置开关、路由配置或生成配置影响时继续阅读。"
+other = "接口、契约、派生产物或适配层受配置开关、路由/事件配置或生成配置影响时继续阅读。"
 
 [GeneratorReferenceLinkDatabaseBusiness]
-other = "数据库读写表达业务状态、生命周期、审计或跨实体约束时继续阅读。"
+other = "状态读写、持久化、缓存或索引表达领域状态、生命周期、审计或跨资源约束时继续阅读。"
 
 [GeneratorReferenceLinkDatabaseConcurrency]
 other = "数据修改涉及锁、幂等、并发更新或一致性窗口时继续阅读。"
 
 [GeneratorReferenceLinkDatabaseError]
-other = "查询或事务失败需要特定错误语义、包装或降级处理时继续阅读。"
+other = "状态、查询、事务、缓存或索引失败需要特定错误语义、包装或降级处理时继续阅读。"
 
 [GeneratorReferenceLinkMiddlewareAPI]
-other = "中间件影响接口请求、响应、上下文或鉴权入口时继续阅读。"
+other = "拦截/管道行为影响接口、消息、事件、上下文或鉴权入口时继续阅读。"
 
 [GeneratorReferenceLinkMiddlewareConfig]
-other = "中间件由配置开关、注册顺序或环境参数控制时继续阅读。"
+other = "拦截器、过滤器、Hook 或管道由配置开关、注册顺序或环境参数控制时继续阅读。"
 
 [GeneratorReferenceLinkMiddlewareError]
-other = "中间件需要统一错误响应、拦截失败或恢复 panic 时继续阅读。"
+other = "拦截/管道层需要统一失败结构、拦截错误或恢复异常时继续阅读。"
 
 [GeneratorReferenceLinkConfigAPI]
-other = "配置影响接口、路由、派生产物或客户端契约时继续阅读。"
+other = "配置影响接口、消息、事件、路由、派生产物或外部契约时继续阅读。"
 
 [GeneratorReferenceLinkConfigMiddleware]
-other = "配置影响中间件启停、注册顺序或请求链路行为时继续阅读。"
+other = "配置影响拦截器、过滤器、Hook、管道启停、注册顺序或运行链路时继续阅读。"
 
 [GeneratorReferenceLinkConfigDatabase]
-other = "配置影响数据库连接、迁移、表名、查询或持久化行为时继续阅读。"
+other = "配置影响存储连接、迁移、状态结构、查询、缓存或持久化行为时继续阅读。"
 
 [GeneratorReferenceLinkErrorAPI]
-other = "错误需要映射为接口响应、错误码或客户端可见结构时继续阅读。"
+other = "错误需要映射为接口、消息、事件、错误码或外部可见失败结构时继续阅读。"
 
 [GeneratorReferenceLinkErrorBusiness]
 other = "错误分支表达业务规则、状态限制或审计语义时继续阅读。"
 
 [GeneratorReferenceLinkErrorDatabase]
-other = "错误来自查询、事务、唯一约束或持久化失败时继续阅读。"
+other = "错误来自状态读写、查询、事务、唯一约束、缓存或持久化失败时继续阅读。"
 
 [GeneratorReferenceLinkUtilsBusiness]
 other = "工具函数承载领域规则、审计数据或业务字段格式时继续阅读。"
 
 [GeneratorReferenceLinkUtilsAPI]
-other = "工具函数用于接口模型转换、响应字段或客户端契约时继续阅读。"
+other = "工具函数用于接口、消息、事件、模型转换或外部契约时继续阅读。"
 
 [GeneratorReferenceLinkUtilsTesting]
 other = "工具函数改动需要复用项目测试约定、fixture 或断言模式时继续阅读。"
 
 [GeneratorReferenceLinkConcurrencyDatabase]
-other = "并发控制影响数据一致性、事务边界或持久化顺序时继续阅读。"
+other = "并发控制影响状态一致性、事务边界、缓存或持久化顺序时继续阅读。"
 
 [GeneratorReferenceLinkConcurrencyBusiness]
 other = "锁、队列或异步流程承载业务状态变化时继续阅读。"
@@ -2644,25 +2662,25 @@ other = "并发行为需要 race、时序或重试类测试约定时继续阅读
 other = "测试断言业务规则、状态流转或跨实体行为时继续阅读。"
 
 [GeneratorReferenceLinkTestingAPI]
-other = "测试覆盖接口契约、响应字段、生成代码或适配层时继续阅读。"
+other = "测试覆盖接口、消息、事件、契约、生成代码或适配层时继续阅读。"
 
 [GeneratorReferenceLinkTestingDatabase]
-other = "测试依赖数据库 fixture、事务隔离或持久化断言时继续阅读。"
+other = "测试依赖状态 fixture、事务隔离、缓存或持久化断言时继续阅读。"
 
 [GeneratorReferenceLinkStructureBusiness]
 other = "结构调整影响领域边界、入口编排或跨模块业务流时继续阅读。"
 
 [GeneratorReferenceLinkStructureAPI]
-other = "结构调整影响接口层、适配层、生成目录或契约文件时继续阅读。"
+other = "结构调整影响接口/契约层、消息/事件适配、生成目录或契约文件时继续阅读。"
 
 [GeneratorReferenceLinkStructureConfig]
 other = "结构调整需要同步配置路径、注册点或加载约定时继续阅读。"
 
 [GeneratorReferenceLinkNamingAPI]
-other = "命名影响接口字段、路径、错误码或客户端契约时继续阅读。"
+other = "命名影响接口、消息、事件、路径、错误码或外部契约时继续阅读。"
 
 [GeneratorReferenceLinkNamingDatabase]
-other = "命名影响表、列、索引、查询方法或持久化模型时继续阅读。"
+other = "命名影响状态结构、存储键、索引、查询入口或持久化模型时继续阅读。"
 
 [GeneratorReferenceLinkNamingBusiness]
 other = "命名承载领域概念、状态名称或业务动作时继续阅读。"
@@ -2795,6 +2813,3 @@ other = "子命令"
 
 [CommandDocsHeaderFlags]
 other = "参数"
-
-[GeneratorBusinessCoverageSinglePatternWarning]
-other = "该子域当前只有 1 个已学习模式，覆盖可能不完整；命中时先按证据路径复核当前代码，不要推断为完整规则集。"

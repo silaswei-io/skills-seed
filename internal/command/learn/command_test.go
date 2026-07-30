@@ -24,7 +24,6 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
@@ -340,6 +339,37 @@ func TestRunLearnCurrentAutoRefreshesProfileWhenRecommended(t *testing.T) {
 	require.Equal(t, "profile", profile.Summary)
 }
 
+func TestRunLearnCurrentRefreshesProfileAfterCuration(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	var events []string
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		pattern := learnCurrentPatternForTest("curated-before-profile", "Curated Before Profile", domain.CategoryBusiness, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{*pattern},
+			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{
+				Needed: true,
+				Reason: "business pattern changed",
+			},
+		}, nil
+	}
+	mockAgent.CuratePatternsFn = func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
+		t.Fatal("current learning curation should not call AI")
+		return nil, nil
+	}
+	mockAgent.RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		events = append(events, "profile")
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Equal(t, []string{"profile"}, events)
+}
+
 func TestRunLearnCurrentAutoSkipsExistingProfileWhenNoPatternsSaved(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
@@ -393,7 +423,7 @@ func TestRunLearnCurrentRefreshProfileUsesChangedFilesAsFocusPaths(t *testing.T)
 	require.Equal(t, []string{"main.go"}, profileFocus)
 }
 
-func TestRunLearnCurrentLocalCandidateSelectionNarrowsAnalysisFiles(t *testing.T) {
+func TestRunLearnCurrentLocalCandidateSelectionKeepsAllAnalysisFiles(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 
@@ -402,7 +432,7 @@ func TestRunLearnCurrentLocalCandidateSelectionNarrowsAnalysisFiles(t *testing.T
 
 	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
 	writeLearnFile(t, projectRoot, "internal/logic/create.go", "package logic\nconst selected = true\n")
-	writeLearnFile(t, projectRoot, "internal/types/types.go", "package types\nconst skipped = true\n")
+	writeLearnFile(t, projectRoot, "internal/types/types.go", "package types\nconst alsoSelected = true\n")
 	gitAddAll(t, projectRoot)
 
 	var received agent.AnalyzeCurrentCodebaseRequest
@@ -426,21 +456,20 @@ func TestRunLearnCurrentLocalCandidateSelectionNarrowsAnalysisFiles(t *testing.T
 		requireRunLearnCurrentNoError(t, cont, opts)
 	})
 
-	require.Equal(t, []string{"internal/logic/create.go"}, received.FocusPaths)
-	require.Len(t, received.SampleFiles, 1)
-	require.Equal(t, "internal/logic/create.go", received.SampleFiles[0].Path)
+	require.ElementsMatch(t, []string{"internal/logic/create.go", "internal/types/types.go"}, received.FocusPaths)
+	require.Len(t, received.SampleFiles, 2)
 	require.Len(t, savedRecords, 2)
 	require.ElementsMatch(t, []string{"internal/logic/create.go", "internal/types/types.go"}, fileAnalysisRecordPaths(savedRecords))
 	savedByPath := fileAnalysisRecordByPath(savedRecords)
 	require.Equal(t, domain.FileAnalysisStatusAnalyzed, savedByPath["internal/logic/create.go"].AnalysisStatus)
-	require.Equal(t, domain.FileAnalysisStatusSelectionSkipped, savedByPath["internal/types/types.go"].AnalysisStatus)
-	require.Equal(t, "本地确定性候选收敛", savedByPath["internal/types/types.go"].SelectionReason)
-	require.Contains(t, output, "候选收敛结果:")
-	require.Contains(t, output, "候选收敛: 输入 2，保留 1")
-	require.Contains(t, output, "状态: 本地确定性候选收敛")
-	require.Contains(t, output, "最终待分析: 1")
-	require.Contains(t, output, "本地候选收敛")
-	selectionSummaryIndex := strings.Index(output, "候选收敛结果:")
+	require.Equal(t, domain.FileAnalysisStatusAnalyzed, savedByPath["internal/types/types.go"].AnalysisStatus)
+	require.Empty(t, savedByPath["internal/types/types.go"].SelectionReason)
+	require.Contains(t, output, "候选准备结果:")
+	require.Contains(t, output, "候选准备: 输入 2，保留 2")
+	require.Contains(t, output, "状态: 本地保守候选准备")
+	require.Contains(t, output, "最终待分析: 2")
+	require.Contains(t, output, "本地候选准备")
+	selectionSummaryIndex := strings.Index(output, "候选准备结果:")
 	planningIndex := strings.Index(output, "学习议程规划")
 	require.NotEqual(t, -1, selectionSummaryIndex)
 	require.NotEqual(t, -1, planningIndex)
@@ -497,7 +526,7 @@ func TestRunLearnCurrentAICandidateSelectionNarrowsAnalysisFiles(t *testing.T) {
 	require.Contains(t, output, "AI 候选收敛")
 	require.Contains(t, output, "AI 候选收敛 · 准备结构化上下文")
 	require.Contains(t, output, "AI 候选收敛 · 调用 Agent 收敛候选")
-	require.Contains(t, output, "候选收敛: 输入 2，保留 1")
+	require.Contains(t, output, "候选准备: 输入 2，保留 1")
 	require.Contains(t, output, "状态: AI 候选收敛已生效：types drive public contracts")
 }
 
@@ -574,10 +603,10 @@ func TestRunLearnCurrentAICandidateSelectionFallsBackToAllCandidatesOnError(t *t
 
 	require.ElementsMatch(t, []string{"internal/logic/create.go", "internal/types/types.go"}, received.FocusPaths)
 	require.Contains(t, output, "AI 候选收敛失败，降级为使用全部候选")
-	require.Contains(t, output, "候选收敛: 输入 2，保留 2")
+	require.Contains(t, output, "候选准备: 输入 2，保留 2")
 }
 
-func TestRunLearnCurrentLocalCandidateSelectionCommitsSkippedFileFingerprintsAfterSuccess(t *testing.T) {
+func TestRunLearnCurrentLocalCandidateSelectionCommitsPreparedFileFingerprintsAfterSuccess(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
 
@@ -670,11 +699,11 @@ func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testin
 	state, stateErr := stateRepo.Load(context.Background())
 	require.NoError(t, stateErr)
 	require.NotNil(t, state.Analysis)
-	require.True(t, state.ProfileCommitted)
 	require.False(t, state.ArtifactsCommitted)
+	require.False(t, state.ProfileCommitted)
 	require.Len(t, state.Analysis.Patterns, 1)
 	require.Equal(t, 1, analyzeCalls)
-	require.Equal(t, 1, profileCalls)
+	require.Equal(t, 0, profileCalls)
 
 	failStore = false
 	_, err = runLearnCurrent(cont, opts)
@@ -685,7 +714,7 @@ func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testin
 	require.ErrorIs(t, stateErr, commandstate.ErrStateNotFound)
 }
 
-func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenProfileSaveFails(t *testing.T) {
+func TestRunLearnCurrentResumeAfterProfileSaveFailureDoesNotReanalyze(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
 
@@ -697,31 +726,47 @@ func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenProfileSaveFails(t *test
 	gitAddAll(t, projectRoot)
 
 	mockAgent := cont.Agent.(*mocks.MockAgent)
+	analyzeCalls := 0
+	profileCalls := 0
 	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
 		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{
+				*learnCurrentPatternForTest("profile-after-curation", "Profile After Curation", domain.CategoryBusiness, "main.go"),
+			},
 			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{Needed: true, Reason: "module boundary changed"},
 		}, nil
 	}
 	mockAgent.RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
 		return &agent.AnalyzeProjectResult{Language: "go", Summary: "updated"}, nil
 	}
 
 	profileDocumentsPath := filepath.Join(cont.SeedPath, "store", "documents")
 	require.NoError(t, os.RemoveAll(profileDocumentsPath))
 	require.NoError(t, os.WriteFile(profileDocumentsPath, []byte("blocks profile writes\n"), 0o644))
-	originalTracker := cont.FileTracker
-	cont.FileTracker = &mocks.MockFileAnalysisTracker{
-		ListAnalyzedFilesFn: originalTracker.ListAnalyzedFiles,
-		SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
-			t.Fatalf("file fingerprint should not be committed when profile save fails: %#v", records)
-			return nil
-		},
-		DeleteAnalyzedFilesFn: originalTracker.DeleteAnalyzedFiles,
-	}
 
 	_, err := runLearnCurrent(cont, opts)
 
 	require.Error(t, err)
+	require.Equal(t, 1, analyzeCalls)
+	require.Equal(t, 1, profileCalls)
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	state, stateErr := stateRepo.Load(context.Background())
+	require.NoError(t, stateErr)
+	require.True(t, state.ArtifactsCommitted)
+	require.False(t, state.ProfileCommitted)
+
+	require.NoError(t, os.Remove(profileDocumentsPath))
+	_, err = runLearnCurrent(cont, opts)
+	require.NoError(t, err)
+	require.Equal(t, 1, analyzeCalls)
+	require.Equal(t, 2, profileCalls)
+	profile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "updated", profile.Summary)
+	_, stateErr = stateRepo.Load(context.Background())
+	require.ErrorIs(t, stateErr, commandstate.ErrStateNotFound)
 }
 
 func TestRunLearnCurrentResumeAfterFingerprintFailureDoesNotReanalyze(t *testing.T) {
@@ -941,13 +986,13 @@ func TestRunLearnCurrentResumesPendingFocusFromCachedPlan(t *testing.T) {
 	require.Equal(t, []string{"key"}, focuses)
 	require.Contains(t, output, "恢复未完成的 learn-current 执行计划")
 	require.Contains(t, output, "本地过滤: 可学习 2，待处理 2")
-	require.Contains(t, output, "候选收敛: 输入 2，保留 2")
+	require.Contains(t, output, "候选准备: 输入 2，保留 2")
 	require.Contains(t, output, "恢复后: 待分析 1，证据焦点 2")
 	require.Contains(t, output, "分析当前代码库 · 焦点 2/2 · 密钥创建")
 	require.NotContains(t, output, "分析当前代码库 · 焦点 1/2 · 认证登录")
 	require.NotContains(t, output, "增量文件变化:")
 	require.NotContains(t, output, "计划输入文件:")
-	require.NotContains(t, output, "候选收敛结果:")
+	require.NotContains(t, output, "候选准备结果:")
 	require.NoFileExists(t, stateRepo.Path())
 	patterns, err := cont.PatternRepo.GetAll(context.Background())
 	require.NoError(t, err)
@@ -1304,6 +1349,97 @@ func TestRunLearnCurrentAnalyzesPlannedFocusesInBatchWhenConfigured(t *testing.T
 	require.Len(t, batches[0].Focuses, 2)
 	require.Equal(t, "auth", batches[0].Focuses[0].EvidenceFocus.ID)
 	require.Equal(t, "key", batches[0].Focuses[1].EvidenceFocus.ID)
+}
+
+func TestRunLearnCurrentAnalyzesPlannedFocusesInParallelWhenConfigured(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	var updateMu sync.Mutex
+	var updateLabels []string
+	opts := learnCurrentProjectOptions{
+		showProgress:     true,
+		showDetailedLogs: true,
+		profileMode:      learnCurrentProfileSkip,
+		onStepUpdate: func(label string) {
+			updateMu.Lock()
+			defer updateMu.Unlock()
+			updateLabels = append(updateLabels, label)
+		},
+	}
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	cfg.Learning.Current.MaxFocusesPerCall = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/service.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/service.go", "package key\n")
+	writeLearnFile(t, projectRoot, "internal/audit/service.go", "package audit\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/service.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/service.go"}},
+			{ID: "audit", Name: "审计日志", EntryPaths: []string{"internal/audit/service.go"}},
+		}}, nil
+	}
+
+	var mu sync.Mutex
+	active := 0
+	maxActive := 0
+	var batches []string
+	bothStarted := make(chan struct{})
+	var closeBothStarted sync.Once
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		mu.Lock()
+		active++
+		if active > maxActive {
+			maxActive = active
+		}
+		batches = append(batches, req.RuntimeLabel)
+		if active == 2 {
+			closeBothStarted.Do(func() { close(bothStarted) })
+		}
+		mu.Unlock()
+
+		select {
+		case <-bothStarted:
+		case <-time.After(500 * time.Millisecond):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		defer func() {
+			mu.Lock()
+			active--
+			mu.Unlock()
+		}()
+
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+		for _, unit := range req.Focuses {
+			pattern := learnCurrentPatternForTest("p-"+unit.EvidenceFocus.ID, "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+				Patterns:  []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	_, err := runLearnCurrentProjectWithOptions(context.Background(), cont, opts)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, 2, maxActive)
+	require.ElementsMatch(t, []string{"batch-001", "batch-002"}, batches)
+
+	updateMu.Lock()
+	defer updateMu.Unlock()
+	require.Contains(t, strings.Join(updateLabels, "\n"), "进行中 batch-001 焦点 1-2/3 认证登录 / 密钥创建; batch-002 焦点 3/3 审计日志")
 }
 
 func TestRunLearnCurrentDoesNotReprocessFilesOmittedByAnalysisPlanner(t *testing.T) {
@@ -1826,7 +1962,9 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	require.Contains(t, output, "本地文件过滤")
 	require.Contains(t, output, "学习议程规划")
 	require.Contains(t, output, "分析当前代码库 · 焦点 1/1 · 当前代码变更")
-	require.Contains(t, output, "代码分析 1/1 已完成")
+	require.Contains(t, output, "证据焦点完成：1/1 个")
+	require.Contains(t, output, "跳过项目画像同步")
+	require.NotContains(t, output, "代码分析 1/1 已完成")
 	require.NotContains(t, output, "项目根路径:")
 	require.NotContains(t, output, "本地过滤统计:")
 	require.NotContains(t, output, "后续可执行:")
@@ -2106,7 +2244,7 @@ func registerLearnWorkspaceMockAgentFactoryWithHandlers(t *testing.T, handlers l
 	t.Helper()
 	provider := "mock-workspace-learn-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
 	learnWorkspaceFactoryMu.Lock()
-	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
+	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(opts container.AgentFactoryOptions) agent.Agent {
 		return &mocks.MockAgent{
 			NameVal:      provider,
 			AvailableVal: true,

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	cliskillscmd "github.com/silaswei-io/skills-seed/internal/command/cliskills"
@@ -48,7 +49,7 @@ func hasAnyChangedInitFlag(cmd *cobra.Command) bool {
 	if cmd == nil {
 		return false
 	}
-	for _, name := range []string{"locale", "skills-locale", "mode", "agent", "skills", "workspace"} {
+	for _, name := range []string{"locale", "skills-locale", "mode", "agent", "agent-model", "skills", "workspace"} {
 		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
 			return true
 		}
@@ -116,6 +117,12 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 			return resolved, err
 		}
 		resolved.skills = skills
+
+		agentModel, err := interactive.Text(i18n.Get("InteractiveInitAgentModel"), resolved.agentModel)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.agentModel = agentModel
 	}
 
 	inspection, err := cliskillscmd.InspectGlobal(cliskillscmd.TargetAuto)
@@ -137,6 +144,7 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		{Label: i18n.Get("InteractiveInitSummaryToolLocale"), Value: resolved.locale},
 		{Label: i18n.Get("InteractiveInitSummarySkillsLocale"), Value: resolved.skillsLocale},
 		{Label: i18n.Get("InteractiveInitSummaryAgent"), Value: resolved.agent},
+		{Label: i18n.Get("InteractiveInitSummaryAgentModel"), Value: localizedAgentModel(resolved.agentModel)},
 		{Label: i18n.Get("InteractiveInitSummaryAgentTotalParallelism"), Value: fmt.Sprintf("%d", resolved.agentTotalParallelism)},
 		{Label: i18n.Get("InteractiveInitSummaryParallelismPlan"), Value: initParallelismPlanSummary(resolved.mode, resolved.agentTotalParallelism, projectCount)},
 		{Label: i18n.Get("InteractiveInitSummarySkills"), Value: resolved.skills},
@@ -270,4 +278,12 @@ func localizedGlobalCLISkillsTarget(opts commandOptions) string {
 		target = cliskillscmd.TargetAuto
 	}
 	return i18n.GetWithParams("InteractiveInitSummaryGlobalCLISkillsTarget", map[string]interface{}{"Target": target})
+}
+
+func localizedAgentModel(model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return i18n.Get("InteractiveInitAgentModelDefault")
+	}
+	return model
 }

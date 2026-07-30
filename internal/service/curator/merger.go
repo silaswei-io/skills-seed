@@ -51,7 +51,7 @@ func (m *deterministicMerger) Add(candidate domain.Pattern) {
 		return
 	}
 	m.appendAccepted(candidate)
-	m.output[candidate.ID] = patternWithSources(candidate, []string{candidate.ID})
+	m.output[candidate.ID] = patternWithSources(candidate, patternSourceIDs(candidate))
 }
 
 func (m *deterministicMerger) upsertAccepted(pattern domain.Pattern) {
@@ -149,10 +149,19 @@ func mergeKeepingBestPattern(left, right domain.Pattern) domain.Pattern {
 
 func mergedPatternSources(left, right domain.Pattern) []string {
 	values := make([]string, 0, len(left.MergedFrom)+len(right.MergedFrom)+2)
-	values = append(values, left.MergedFrom...)
-	values = append(values, right.MergedFrom...)
-	values = append(values, left.ID, right.ID)
+	values = append(values, patternSourceIDs(left)...)
+	values = append(values, patternSourceIDs(right)...)
 	return stringx.UniqueNonEmpty(values)
+}
+
+func patternSourceIDs(pattern domain.Pattern) []string {
+	if len(pattern.MergedFrom) > 0 {
+		return pattern.MergedFrom
+	}
+	if pattern.ID == "" {
+		return nil
+	}
+	return []string{pattern.ID}
 }
 
 func patternQualityScore(pattern domain.Pattern) float64 {

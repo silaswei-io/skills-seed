@@ -12,17 +12,17 @@ description: {{.SkillDescription}}
 **最后更新**: {{.LastUpdated}}
 **已学习模式**: {{.PatternCount}}
 
-{{if .HasKnowledge}}这是项目入口 skill，只负责按任务路由到最小必要参考。业务规则、架构细节、代码证据、测试事实和验证命令进入对应 reference 后再决策。{{else}}这是项目工作流入口 skill，只负责把匹配任务路由到用户维护的工作流文档。{{end}}
+{{if .HasKnowledge}}这是项目入口 skill，只负责按任务路由到最小必要参考。产品/领域规则、架构细节、代码证据、测试事实和验证命令进入对应 reference 后再决策。{{else}}这是项目工作流入口 skill，只负责把匹配任务路由到用户维护的工作流文档。{{end}}
 
 ## 任务路由
 
 {{if .HasKnowledge}}
 1. 先按任务类型读取最小必要参考，不要一次性读取所有 references。进入任何分类模式后，先检查其中的“相关参考”；任务命中跨边界提示时继续读取对应 reference。
-{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. 业务规则、状态流转或跨实体流程：先读 [业务模式地图](./references/patterns/business.md)，再进入命中的详情页。
-{{else}}2. 业务规则、状态流转或跨实体流程：检查当前代码并复用附近实现。
-{{end}}{{if .References.BusinessMethods}}3. 常用业务入口、模块级扩展点、跨模块编排或工具入口：读 [入口方法索引](./references/business-methods.md)。
-{{else}}3. 项目级入口：从当前代码和模块入口确认。
-{{end}}4. API、合约、适配层、派生产物或配置约定：读 [项目规范](./references/project-spec.md) 和相关分类模式。
+{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. 产品/领域规则、状态流转、用户动作或跨资源流程：先读 [业务模式地图](./references/patterns/business.md)，再进入命中的详情页。
+{{else}}2. 产品/领域规则、状态流转、用户动作或跨资源流程：检查当前代码并复用附近实现。
+{{end}}{{if .References.BusinessMethods}}3. 可复用能力入口、模块级扩展点、跨边界编排、界面/命令动作或工具入口：读 [能力入口索引](./references/business-methods.md)。
+{{else}}3. 项目级能力入口：从当前代码和模块入口确认。
+{{end}}4. 接口、消息、事件、合约、适配层、派生产物或配置约定：读 [项目规范](./references/project-spec.md) 和相关分类模式。
 {{if .References.KeyModules}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md) 和 [关键模块](./references/modules.md)。
 {{else}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md)。
 {{end}}6. 验证改动：读 [验证策略](./references/validation.md){{if .References.Testing}}；涉及已识别测试生态时再读 [测试矩阵](./references/testing.md){{end}}。
@@ -76,7 +76,7 @@ description: {{.SkillDescription}}
 
 - 引入新模式或抽象前，先检查附近已有代码。
 - 如果参考中已有项目特定入口或工具方法，优先复用。
-{{if .References.ProjectSpec}}- 派生产物、接口模型、适配层和配置约定以 [项目规范](./references/project-spec.md) 为准。{{else}}- 派生产物、接口模型、适配层和配置约定以当前代码和项目配置为准。{{end}}
+{{if .References.ProjectSpec}}- 派生产物、接口/消息模型、适配层和配置约定以 [项目规范](./references/project-spec.md) 为准。{{else}}- 派生产物、接口/消息模型、适配层和配置约定以当前代码和项目配置为准。{{end}}
 - references 与实际代码不一致时，以当前代码为准。
 
 {{if .KeyInsights}}### 关键洞察

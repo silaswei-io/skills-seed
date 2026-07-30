@@ -34,11 +34,11 @@ const (
 	CategoryStructure   Category = "structure"   // 代码结构
 	CategoryConcurrency Category = "concurrency" // 并发模式
 	CategoryTesting     Category = "testing"     // 测试模式
-	CategoryBusiness    Category = "business"    // 业务逻辑模式
-	CategoryAPI         Category = "api"         // API设计模式
-	CategoryDatabase    Category = "database"    // 数据库操作模式
+	CategoryBusiness    Category = "business"    // 产品/领域行为模式
+	CategoryAPI         Category = "api"         // 接口/合约模式
+	CategoryDatabase    Category = "database"    // 状态/存储模式
 	CategoryUtils       Category = "utils"       // 工具方法模式
-	CategoryMiddleware  Category = "middleware"  // 中间件模式
+	CategoryMiddleware  Category = "middleware"  // 拦截/管道模式
 	CategoryConfig      Category = "config"      // 配置管理模式
 )
 
@@ -74,7 +74,40 @@ func AllowedPatternCategoryNames() []string {
 
 // AllowedPatternCategoriesText 返回提示词可直接展示的合法分类列表。
 func AllowedPatternCategoriesText() string {
-	return strings.Join(AllowedPatternCategoryNames(), ", ")
+	descriptions := make([]string, 0, len(allowedPatternCategories))
+	for _, category := range allowedPatternCategories {
+		descriptions = append(descriptions, patternCategoryPromptDescription(category))
+	}
+	return strings.Join(descriptions, "; ")
+}
+
+func patternCategoryPromptDescription(category Category) string {
+	switch category {
+	case CategoryNaming:
+		return "naming (naming conventions)"
+	case CategoryError:
+		return "error (failure semantics, error taxonomy, recovery behavior)"
+	case CategoryStructure:
+		return "structure (ownership, module, component, generated-source, or extension boundaries)"
+	case CategoryConcurrency:
+		return "concurrency (parallelism, lifecycle synchronization, consistency windows)"
+	case CategoryTesting:
+		return "testing (validation strategy, fixtures, assertions, quality gates)"
+	case CategoryBusiness:
+		return "business (product/domain behavior, user or system actions, policies, state transitions)"
+	case CategoryAPI:
+		return "api (interfaces, contracts, messages, events, adapters, generated artifacts)"
+	case CategoryDatabase:
+		return "database (state, storage, persistence, schema, migration, cache boundaries)"
+	case CategoryUtils:
+		return "utils (reusable domain-neutral helpers)"
+	case CategoryMiddleware:
+		return "middleware (interception, pipelines, filters, hooks, request/event processing)"
+	case CategoryConfig:
+		return "config (configuration, feature gates, runtime/deployment settings)"
+	default:
+		return string(category)
+	}
 }
 
 // NormalizePatternCategory 把兼容别名归一化为内部规范分类。
@@ -164,7 +197,7 @@ type CodeLocationHistory struct {
 	Note        string                   `json:"note,omitempty"`
 }
 
-// CodeLocation 保存业务方法或工具函数的可维护代码位置元数据。
+// CodeLocation 保存能力入口或工具函数的可维护代码位置元数据。
 type CodeLocation struct {
 	HistoricalLocation string                   `json:"historical_location,omitempty"`
 	CurrentLocation    string                   `json:"current_location,omitempty"`
@@ -178,15 +211,16 @@ type CodeLocation struct {
 	History            []CodeLocationHistory    `json:"history,omitempty"`
 }
 
-// BusinessMethod 业务方法信息
+// BusinessMethod 描述可复用能力入口。
+// 名称沿用历史模型，语义覆盖产品/领域行为、交互动作、任务、适配器和工具入口。
 type BusinessMethod struct {
-	Name          string       // 方法名称（如 GenerateUUID, CallUserRPC）
+	Name          string       // 入口名称（如 GenerateUUID, PublishAction）
 	CodeLocation  CodeLocation `json:"code_location,omitempty"` // 可维护的位置元数据
 	Description   string       // 功能说明（1-2句话）
 	Usage         string       // 使用场景（何时使用）
 	Type          string       // 方法类型：domain（领域特定）| common（通用）
 	Function      string       // 完整的方法签名（如 func (s *Service) Method(ctx, req) (resp, error)）
-	Prerequisites string       // 调用前需要的设置或依赖（如 context, 已初始化的 service）
+	Prerequisites string       // 调用前需要的上下文、初始化状态或外部依赖
 	Returns       string       // 返回值说明（包括可能的错误情况）
 }
 
@@ -270,12 +304,12 @@ type Pattern struct {
 	Merged         bool            // 是否已被汇总
 	MergedFrom     []string        // 从哪些模式ID汇总而来
 	Generated      bool            // 是否已生成到 skills
-	BusinessMethod *BusinessMethod // 业务方法信息（可选，仅用于 utils 和 business 分类）
+	BusinessMethod *BusinessMethod // 能力入口信息（可选，用于可复用入口定位）
 	// EvidenceLocations 是模式对应的通用源码证据位置，不等同于 BusinessMethod 的可调用位置。
 	EvidenceLocations []PatternEvidenceLocation `json:"evidence_locations,omitempty"`
 	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
 	ScopePath         string                    `json:"scope_path,omitempty"`     // workspace 模式下的路径范围
-	WorkspaceRole     string                    `json:"workspace_role,omitempty"` // frontend/backend/middleware/shared 等
+	WorkspaceRole     string                    `json:"workspace_role,omitempty"` // workspace 子项目角色，如 app、library、service、shared 等
 	DiffAnchors       []PatternDiffAnchor       `json:"-"`                        // 仅用于增量学习候选验收，禁止持久化
 	Status            PatternStatus             `json:"status,omitempty"`
 	LastSeenAt        time.Time                 `json:"last_seen_at,omitempty"`
@@ -305,7 +339,7 @@ func NewPattern(id, name string, category Category) *Pattern {
 	}
 }
 
-// SetBusinessMethod 设置业务方法信息
+// SetBusinessMethod 设置能力入口信息。
 func (p *Pattern) SetBusinessMethod(method *BusinessMethod) {
 	p.BusinessMethod = method
 	p.UpdatedAt = time.Now()
@@ -356,7 +390,7 @@ func (p Pattern) IsActive() bool {
 	return NormalizePatternStatus(p.Status) == PatternStatusActive
 }
 
-// NormalizeCodeLocation 规范化业务方法的结构化代码位置。
+// NormalizeCodeLocation 规范化能力入口的结构化代码位置。
 func (m *BusinessMethod) NormalizeCodeLocation(previous *BusinessMethod, now time.Time) {
 	if m == nil {
 		return

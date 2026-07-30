@@ -51,6 +51,7 @@ type learnCurrentProjectRun struct {
 	selectionSummary    fileSelectionSummary
 	selectionPlan       currentFileSelectionPlan
 	stateSession        *currentStateSession
+	stateInvalidated    bool
 	resumeSummary       *learnCurrentResumeSummary
 	changeProfile       currentChangeProfile
 	analysisState       *commandstate.State
@@ -147,10 +148,10 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed {
 		r.refreshProfile = true
 	}
-	if err := r.saveProfileIfNeeded(); err != nil {
+	if err := r.curateAndSavePatternsStep(); err != nil {
 		return nil, err
 	}
-	if err := r.curateAndSavePatternsStep(); err != nil {
+	if err := r.saveProfileIfNeeded(); err != nil {
 		return nil, err
 	}
 
@@ -210,7 +211,17 @@ func (r *learnCurrentProjectRun) startLearningSession(stage string) error {
 			resumeSessionID = cache.SessionID
 		}
 	}
-	session, err := r.cont.Agent.StartLearningSession(r.ctx, agent.LearningSessionRequest{
+	session, err := r.newLearningSession(r.ctx, stage, resumeSessionID)
+	if err != nil {
+		return err
+	}
+	r.activeLearningSession = session
+	r.markLearningSessionStep(stage)
+	return nil
+}
+
+func (r *learnCurrentProjectRun) newLearningSession(ctx context.Context, stage, resumeSessionID string) (agent.LearningSession, error) {
+	session, err := r.cont.Agent.StartLearningSession(ctx, agent.LearningSessionRequest{
 		ProjectName:     r.projectName,
 		RootPath:        r.projectRoot,
 		Language:        r.currentLanguage,
@@ -223,14 +234,12 @@ func (r *learnCurrentProjectRun) startLearningSession(stage string) error {
 		ResumeSessionID: resumeSessionID,
 	})
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentStartLearningSessionFailed"), err)
+		return nil, fmt.Errorf("%s: %w", i18n.Get("LearnCurrentStartLearningSessionFailed"), err)
 	}
 	if session == nil {
-		return fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentLearningSessionMissing", map[string]interface{}{"Agent": r.cont.Agent.Name()}))
+		return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentLearningSessionMissing", map[string]interface{}{"Agent": r.cont.Agent.Name()}))
 	}
-	r.activeLearningSession = session
-	r.markLearningSessionStep(stage)
-	return nil
+	return session, nil
 }
 
 func (r *learnCurrentProjectRun) ensureLearningSession(stage string) error {
@@ -419,6 +428,7 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 				return err
 			}
 			session = nil
+			r.stateInvalidated = true
 			if r.opts.force {
 				detected = nil
 			}
@@ -539,10 +549,18 @@ func (r *learnCurrentProjectRun) selectLearningCandidates() fileanalysis.Learnin
 	result := fileanalysis.SelectLearningCandidates(fileanalysis.LearningCandidateSelectionOptions{
 		Candidates:    r.selectionPlan.Candidates,
 		Changes:       r.incrementalChanges,
-		RequiredPaths: projectpath.Relative(r.projectRoot, r.resolvedFocusPaths),
+		RequiredPaths: r.learningCandidateRequiredPaths(),
 	})
 	result.Reason = i18n.Get("LearnCurrentFileSelectionLocalReason")
 	return result
+}
+
+func (r *learnCurrentProjectRun) learningCandidateRequiredPaths() []string {
+	required := projectpath.Relative(r.projectRoot, r.resolvedFocusPaths)
+	if r.stateInvalidated {
+		required = append(required, r.selectionPlan.Candidates...)
+	}
+	return normalizeStatePaths(required)
 }
 
 func (r *learnCurrentProjectRun) shouldRunAICandidateSelection() bool {
@@ -555,7 +573,7 @@ func (r *learnCurrentProjectRun) shouldRunAICandidateSelection() bool {
 
 func (r *learnCurrentProjectRun) selectLearningCandidatesWithAI() fileanalysis.LearningCandidateSelectionResult {
 	candidates := normalizeStatePaths(r.selectionPlan.Candidates)
-	required := projectpath.Relative(r.projectRoot, r.resolvedFocusPaths)
+	required := r.learningCandidateRequiredPaths()
 	seedPaths := fileanalysis.SelectLearningContextSeeds(fileanalysis.LearningCandidateSelectionOptions{
 		Candidates:    candidates,
 		Changes:       r.incrementalChanges,
@@ -642,7 +660,7 @@ func sanitizeSelectedLearningCandidates(candidates, selected, required []string)
 
 func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectResult, error) {
 	recoveredArtifacts := r.stateSession != nil && r.stateSession.State.ArtifactsCommitted
-	needsProfileRefresh := r.refreshProfile && !recoveredArtifacts
+	needsProfileRefresh := r.refreshProfile && !r.profileCommitted()
 	if r.opts.showDetailedLogs {
 		logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
 	}

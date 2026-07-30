@@ -543,7 +543,7 @@ other = "Failed to unmarshal JSON"
 other = "AI output is missing required field {{.Field}}"
 
 [AgentInvalidCuratedDropReasonCode]
-other = "AI curation output contains an invalid drop reason code: id={{.ID}}, reason_code={{.ReasonCode}}"
+other = "Curation output contains an invalid drop reason code: id={{.ID}}, reason_code={{.ReasonCode}}"
 
 [AgentDiagnosticError]
 other = "Agent diagnostics: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
@@ -799,7 +799,7 @@ other = "{{.Label}}: checking resumable plan"
 other = "{{.Label}}: scanning file fingerprints"
 
 [ProgressLearnCurrentLocalFileSelection]
-other = "Local candidate narrowing"
+other = "Local candidate preparation"
 
 [ProgressLearnCurrentAIFileSelection]
 other = "AI candidate narrowing"
@@ -840,6 +840,21 @@ other = "Restoring learning agenda ({{.Focuses}} focuses)"
 [ProgressLearnCurrentAnalyzeFocus]
 other = "{{.Label}} · focus {{.Current}}/{{.Total}} · {{.Name}}"
 
+[ProgressLearnCurrentAnalyzeBatches]
+other = "{{.Label}} · focuses {{.Focuses}} · batches {{.Batches}} · parallelism {{.Parallelism}}"
+
+[ProgressLearnCurrentAnalyzeParallel]
+other = "{{.Label}} · completed {{.Completed}}/{{.Total}} · parallelism {{.Parallelism}} · active {{.Active}}"
+
+[LearnCurrentParallelActiveNone]
+other = "-"
+
+[LearnCurrentParallelActiveSingle]
+other = "{{.Batch}} focus {{.Current}}/{{.Total}} {{.Name}}"
+
+[LearnCurrentParallelActiveRange]
+other = "{{.Batch}} focuses {{.Start}}-{{.End}}/{{.Total}} {{.Name}}"
+
 [ProgressLearnCurrentCommitFiles]
 other = "{{.Label}} · committing {{.Count}} file states"
 
@@ -855,23 +870,20 @@ other = "Validating curated patterns"
 [ProgressCuratePatternsStore]
 other = "Writing pattern store"
 
+[ProgressCuratePatternsLocal]
+other = "Local deterministic curation"
+
 [ProgressLearnCurrentSaveProfile]
 other = "Synchronizing project profile"
 
 [ProgressLearnCurrentSkipProfile]
 other = "Skipping project profile sync"
 
-[ProgressLearnCurrentAfterAnalysis]
-other = "{{.Label}} (code analysis {{.Completed}}/{{.Total}} complete)"
-
 [ProgressLearnWorkspaceProjects]
 other = "Learning workspace child projects"
 
-[ProgressCuratePatternsAI]
-other = "Curating patterns with AI"
-
 [ProgressCuratePatternsReplay]
-other = "Replay saved AI curation decision"
+other = "Replay saved curation decision"
 
 [ProgressUserDefinePatternAI]
 other = "Generate user-defined pattern"
@@ -1008,10 +1020,10 @@ other = "Add a user-defined pattern using natural language"
 other = "Describe a coding convention or pattern in natural language through --context or --context-path, and AI will generate a structured Pattern combined with project context.\n\nAI auto-infers category, generates examples, and writes actionable rules. --context-path reads files or directories and is useful for longer notes, draft conventions, or one-shot reference material."
 
 [PatternsAddExample]
-other = "  # Pass a description directly\n  skills-seed patterns add --context \"All service methods must return domain error\"\n\n  # Specify category\n  skills-seed patterns add --context \"Use limit/offset for pagination\" --category api\n\n  # Read longer context from files or directories; repeat --context-path for multiple sources\n  skills-seed patterns add --context-path docs/plan.md --context-path docs/specs --category api"
+other = "  # Pass a description directly\n  skills-seed patterns add --context \"Capability entries must preserve the local error boundary\"\n\n  # Specify category\n  skills-seed patterns add --context \"Use limit/offset for pagination\" --category api\n\n  # Read longer context from files or directories; repeat --context-path for multiple sources\n  skills-seed patterns add --context-path docs/plan.md --context-path docs/specs --category api"
 
 [PatternsAddFlagCategory]
-other = "Category: naming, error, structure, concurrency, testing, business, api, database, utils, middleware, config"
+other = "Category key: naming, error, structure, concurrency, testing, business(product/domain), api(interface/contract), database(state/persistence), utils, middleware(interception/pipeline), config"
 
 [PatternsAddFlagContext]
 other = "Natural-language pattern description from the user"
@@ -1206,25 +1218,25 @@ other = "scope_path"
 other = "workspace_role"
 
 [PatternsShowFieldBusinessMethod]
-other = "business_method"
+other = "capability_entry"
 
 [PatternsShowFieldBusinessDescription]
-other = "business_description"
+other = "capability_description"
 
 [PatternsShowFieldBusinessUsage]
-other = "business_usage"
+other = "capability_usage"
 
 [PatternsShowFieldBusinessType]
-other = "business_type"
+other = "capability_type"
 
 [PatternsShowFieldBusinessFunction]
-other = "business_function"
+other = "capability_signature"
 
 [PatternsShowFieldBusinessPrerequisites]
-other = "business_prerequisites"
+other = "capability_prerequisites"
 
 [PatternsShowFieldBusinessReturns]
-other = "business_returns"
+other = "capability_returns"
 
 [PatternsShowFieldCurrentLocation]
 other = "current_location"
@@ -1326,12 +1338,6 @@ other = "Generate skills failed"
 [PatternCuratorNotConfigured]
 other = "pattern curator service is not configured"
 
-[CuratorLearningSessionRequiredForCurrent]
-other = "A learning session is required for current code pattern curation"
-
-[CuratorLearningSessionRequiredForAI]
-other = "A learning session is required for AI pattern curation"
-
 [PreviewShort]
 other = "Preview analysis inputs"
 
@@ -1427,7 +1433,7 @@ other = "AI failed to generate user-defined pattern"
 other = "Show the project profile"
 
 [ProfileLongDesc]
-other = "Show the project profile generated by learn current.\n\nThe profile is stored at .skills-seed/store/documents/project-profile.json. It is used to render references/project-overview.md and gives generate skills project structure, dependency, key module, and business method context. Profile sync belongs to current learning, and incremental learning decides whether to update it from detected changes and AI recommendations."
+other = "Show the project profile generated by learn current.\n\nThe profile is stored at .skills-seed/store/documents/project-profile.json. It is used to render references/project-overview.md and gives generate skills project structure, dependency, key module, and capability-entry context. Profile sync belongs to current learning, and incremental learning decides whether to update it from detected changes and AI recommendations."
 
 [ProfileExample]
 other = "  # Show the current project profile summary\n  skills-seed profile show\n\n  # Let current learning decide whether the profile needs a refresh\n  skills-seed learn current --profile auto"
@@ -1448,7 +1454,7 @@ other = "Project profile does not exist. Run 'skills-seed learn current' first."
 other = "Project profile: {{.ProjectName}} ({{.Language}})\nGenerated at: {{.GeneratedAt}}"
 
 [ProfileShowStats]
-other = "Stats: frameworks {{.Frameworks}}, dependencies {{.Dependencies}}, modules {{.Modules}}, business methods {{.BusinessMethods}}"
+other = "Stats: frameworks {{.Frameworks}}, dependencies {{.Dependencies}}, modules {{.Modules}}, capability entries {{.BusinessMethods}}"
 
 [ProjectProfileReadFailed]
 other = "Failed to read project profile"
@@ -1751,7 +1757,7 @@ other = "Event statistics updated"
 other = "Learn from current codebase"
 
 [LearnCurrentLongDesc]
-other = "Analyze current codebase and extract coding patterns, business methods, best practices, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/store/documents/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate skills"
+other = "Analyze current codebase and extract coding patterns, capability entries, reusable project knowledge, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/store/documents/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate skills"
 
 [LearnCurrentExample]
 other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip project profile sync\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance from multiple files or directories\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
@@ -1775,7 +1781,7 @@ other = "Read additional guidance for this learn run from files or directories; 
 other = "Ignore file fingerprints and relearn the current scan scope"
 
 [LearnFlagCurationOutput]
-other = "Resume commit from a completed CuratePatterns output without calling AI curation again"
+other = "Resume commit from a completed CuratePatterns output"
 
 [LearnCurrentCurationOutputRequiresChildResume]
 other = "--curation-output must be resumed from the matching child project"
@@ -1836,7 +1842,7 @@ other = "Analysis artifacts are committed with {{.Count}} pending evidence focus
 other = "Local filtering statistics:\n  • file scope: scanned {{.ScannedFiles}}, locally excluded {{.LocalSkippedFiles}}, learnable {{.SourceFiles}}\n  • incremental candidates: added/modified {{.Changed}}, deleted {{.Deleted}}, unchanged {{.Unchanged}}\n  • pending candidates: {{.LocalPlanInputs}}"
 
 [LearnCurrentResumeSummary]
-other = "Resuming unfinished {{.Command}} execution plan:\n  • local filtering: learnable {{.SourceFiles}}, pending {{.LocalPlanInputs}}\n  • candidate narrowing: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • after resume: analysis files {{.PendingAnalyzeFiles}}, evidence focuses {{.Focuses}}\n  • this run reuses the saved agenda and will not repeat file scanning, local filtering, or candidate narrowing"
+other = "Resuming unfinished {{.Command}} execution plan:\n  • local filtering: learnable {{.SourceFiles}}, pending {{.LocalPlanInputs}}\n  • candidate preparation: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • after resume: analysis files {{.PendingAnalyzeFiles}}, evidence focuses {{.Focuses}}\n  • this run reuses the saved agenda and will not repeat file scanning, local filtering, or candidate preparation"
 
 [LearnCurrentNoFileChanges]
 other = "No learnable file changes detected; skipped pattern learning"
@@ -1845,13 +1851,13 @@ other = "No learnable file changes detected; skipped pattern learning"
 other = "Excluded generated skills directories: {{.Paths}}"
 
 [LearnCurrentFileSelectionSummary]
-other = "Candidate narrowing result:\n  • candidate narrowing: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • status: {{.SelectionStatus}}\n  • final analysis files: {{.PendingAnalyzeFiles}}"
+other = "Candidate selection result:\n  • candidate preparation: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • status: {{.SelectionStatus}}\n  • final analysis files: {{.PendingAnalyzeFiles}}"
 
 [LearnCurrentFileSelectionApplied]
-other = "Candidate narrowing applied"
+other = "Candidate preparation applied"
 
 [LearnCurrentFileSelectionLocalReason]
-other = "local deterministic candidate narrowing"
+other = "local conservative candidate preparation"
 
 [LearnCurrentFileSelectionAIReason]
 other = "AI candidate narrowing applied{{if .Reason}}: {{.Reason}}{{end}}"
@@ -1875,7 +1881,7 @@ other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or ref
 other = "Analysis result:\n  • new patterns: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeFocusesSummary]
-other = "Evidence focuses completed: {{.Completed}}/{{.Total}}, batches {{.Batches}}, in-project serial"
+other = "Evidence focuses completed: {{.Completed}}/{{.Total}}, batches {{.Batches}}, in-project parallelism {{.Parallelism}}"
 
 [LearnCurrentSavePatternFailed]
 other = "Failed to save pattern [{{.ID}}]: {{.Error}}"
@@ -1893,7 +1899,7 @@ other = "Project profile sync skipped"
 other = "Failed to sync project profile: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "Starting workspace incremental learning: {{.Projects}} projects, project parallelism {{.Parallelism}}, segmented sessions run serially inside each child project"
+other = "Starting workspace incremental learning: {{.Projects}} projects, project parallelism {{.Parallelism}}; evidence-focus concurrency inside each child is controlled by the child config"
 
 [LearnWorkspaceProjectInfo]
 other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}\nChild project path: {{.Path}}"
@@ -1985,6 +1991,9 @@ other = "Language for AI output, persisted learned content, and generated Skills
 
 [InitFlagAgent]
 other = "Agent engine to write during initialization, for example claude or codex"
+
+[InitFlagAgentModel]
+other = "Model name used when skills-seed invokes the Agent; empty inherits the local Agent CLI default"
 
 [InitFlagSkills]
 other = "Skills output type to write during initialization, for example claude or codex"
@@ -2146,10 +2155,10 @@ other = "Use only as a navigation hint or review checklist, not as a hard constr
 other = "Other Business Rules"
 
 [KnowledgeValidationAreaAPIName]
-other = "API / Contract / Generation Chain"
+other = "Interface / Contract / Generation"
 
 [KnowledgeValidationAreaAPIWhen]
-other = "Run after changing APIs, routes, request/response types, generated artifacts, or adapters."
+other = "Run after changing interfaces, messages, events, shared schemas, generated artifacts, or adapters."
 
 [KnowledgeValidationAreaBusinessName]
 other = "Business Flow / State / Orchestration"
@@ -2158,16 +2167,16 @@ other = "Business Flow / State / Orchestration"
 other = "Run after changing business rules, state transitions, cross-module orchestration, or idempotency logic."
 
 [KnowledgeValidationAreaPersistenceName]
-other = "Persistence / Query / Migration"
+other = "State / Persistence / Migration"
 
 [KnowledgeValidationAreaPersistenceWhen]
-other = "Run after changing models, queries, transactions, migrations, or persistence/cache boundaries."
+other = "Run after changing state structures, storage reads/writes, transactions, migrations, caches, or index boundaries."
 
 [KnowledgeValidationAreaRuntimeName]
-other = "Config / Middleware / Startup"
+other = "Config / Pipeline / Runtime"
 
 [KnowledgeValidationAreaRuntimeWhen]
-other = "Run after changing config structs, middleware registration, startup parameters, or plugin wiring."
+other = "Run after changing config structures, interception/pipeline registration, startup parameters, extension wiring, or runtime behavior."
 
 [InteractiveFlagNoInteractive]
 other = "Disable the interactive wizard and run directly from flags and defaults"
@@ -2208,6 +2217,12 @@ other = "Select AI/Skills content language"
 [InteractiveInitAgent]
 other = "Select Agent"
 
+[InteractiveInitAgentModel]
+other = "Enter the skills-seed specific Agent model name (empty uses the local CLI default)"
+
+[InteractiveInitAgentModelDefault]
+other = "local CLI default"
+
 [InteractiveInitSkills]
 other = "Select Skills type"
 
@@ -2215,7 +2230,7 @@ other = "Select Skills type"
 other = "Enter total Agent parallelism"
 
 [InteractiveInitCustomizeAdvanced]
-other = "Customize Skills output language or type?"
+other = "Customize Agent model, Skills output language, or Skills type?"
 
 [InteractiveInitGlobalCLISkills]
 other = "The global skills-seed CLI Skill for this environment is missing or outdated. Install/update it?"
@@ -2242,10 +2257,10 @@ other = "Write only the Claude global Skills directory."
 other = "Write only the Codex global Skills directory."
 
 [InteractiveInitParallelismPlanProject]
-other = "Project: current-code learning runs segmented sessions serially"
+other = "Project: agent.parallelism>1 analyzes independent evidence-focus batches concurrently"
 
 [InteractiveInitParallelismPlanWorkspace]
-other = "Workspace: detected {{.Projects}} child projects, agent.parallelism={{.WorkspaceParallelism}}, segmented sessions run serially inside each child project"
+other = "Workspace: detected {{.Projects}} child projects, root agent.parallelism={{.WorkspaceParallelism}} controls child-project concurrency; evidence-focus concurrency inside each child is controlled by the child config"
 
 [InteractiveInitSummaryTitle]
 other = "Execution plan"
@@ -2261,6 +2276,9 @@ other = "AI/Skills content language"
 
 [InteractiveInitSummaryAgent]
 other = "Agent"
+
+[InteractiveInitSummaryAgentModel]
+other = "Agent model"
 
 [InteractiveInitSummarySkills]
 other = "Skills type"
@@ -2422,7 +2440,7 @@ other = "project"
 other = "code"
 
 [GeneratorSkillDescriptionDefault]
-other = "Use when modifying, debugging, testing, reviewing, or extending {{.Project}} {{.Language}} code, including APIs and contracts, plugins and integrations, persistence and migrations, configuration and runtime behavior, or architecture analysis"
+other = "Use when modifying, debugging, testing, reviewing, or extending {{.Project}} {{.Language}} code, including interfaces and contracts, plugins and integrations, state/persistence, configuration and runtime behavior, or architecture analysis"
 
 [GeneratorValidationGapTest]
 other = "No repository-evidenced test command has been learned"
@@ -2464,22 +2482,22 @@ other = "Naming Patterns"
 other = "Naming conventions"
 
 [GeneratorCategoryBusinessTitle]
-other = "Business Patterns"
+other = "Product / Domain Patterns"
 
 [GeneratorCategoryBusinessDescription]
-other = "Business logic patterns"
+other = "Product capabilities, domain behavior, state transitions, and policies"
 
 [GeneratorCategoryDatabaseTitle]
-other = "Database Patterns"
+other = "State / Persistence Patterns"
 
 [GeneratorCategoryDatabaseDescription]
-other = "Database operations"
+other = "State, storage, transaction, migration, and cache boundaries"
 
 [GeneratorCategoryAPITitle]
-other = "API Patterns"
+other = "Interface / Contract Patterns"
 
 [GeneratorCategoryAPIDescription]
-other = "API design"
+other = "Interfaces, messages, events, adapters, and derived artifacts"
 
 [GeneratorCategoryErrorTitle]
 other = "Error Handling"
@@ -2488,10 +2506,10 @@ other = "Error Handling"
 other = "Error handling patterns"
 
 [GeneratorCategoryMiddlewareTitle]
-other = "Middleware Patterns"
+other = "Interception / Pipeline Patterns"
 
 [GeneratorCategoryMiddlewareDescription]
-other = "Middleware design"
+other = "Interceptors, filters, hooks, pipelines, and runtime chains"
 
 [GeneratorCategoryConfigTitle]
 other = "Config Patterns"
@@ -2500,16 +2518,16 @@ other = "Config Patterns"
 other = "Configuration management"
 
 [GeneratorCategoryUtilsTitle]
-other = "Utils Patterns"
+other = "Reusable Helper Patterns"
 
 [GeneratorCategoryUtilsDescription]
-other = "Utility methods"
+other = "Domain-neutral reusable helpers and transformation entries"
 
 [GeneratorCategoryConcurrencyTitle]
-other = "Concurrency Patterns"
+other = "Concurrency / Lifecycle Patterns"
 
 [GeneratorCategoryConcurrencyDescription]
-other = "Concurrency programming patterns"
+other = "Parallel execution, synchronization, consistency windows, and lifecycle coordination"
 
 [GeneratorCategoryTestingTitle]
 other = "Testing Patterns"
@@ -2521,10 +2539,10 @@ other = "Testing conventions"
 other = "Project-specific patterns"
 
 [GeneratorProfileReferenceBusinessMethodsTitle]
-other = "Entry Method Index"
+other = "Capability Entry Index"
 
 [GeneratorProfileReferenceBusinessMethodsDescription]
-other = "Common business, module extension, cross-module orchestration, and high-value utility entry points"
+other = "Product/domain behavior, interaction actions, module extension, cross-boundary orchestration, and high-value utility entries"
 
 [GeneratorProfileReferenceModulesTitle]
 other = "Key Modules"
@@ -2539,13 +2557,13 @@ other = "Common Utilities"
 other = "Common utility functions and usage scenarios"
 
 [GeneratorBusinessMethodProjectGroupTitle]
-other = "Project Entry Points"
+other = "Project-Level Capability Entries"
 
 [GeneratorBusinessMethodProjectGroupSummary]
-other = "Project-level entry points that cannot be assigned to a stable module."
+other = "Project-level capability entries that cannot be assigned to a stable module."
 
 [GeneratorBusinessMethodModuleGroupSummary]
-other = "Entry points from the same module or nearby paths; use this group first when locating reusable behavior."
+other = "Capability entries from the same module or nearby paths; use this group first when locating reusable behavior."
 
 [GeneratorInsightDeterministicGeneration]
 other = "Skills are deterministically generated from stored patterns, project profile, and workflows; generation does not call AI."
@@ -2557,82 +2575,82 @@ other = "Covered pattern categories: {{.Categories}}"
 other = "The current codebase has {{.Count}} learned architecture layers. This section is a navigation summary; use the Architecture Layers and Key Modules sections for concrete responsibilities."
 
 [GeneratorOverviewCoveragePreview]
-other = "The learned project profile currently covers {{.Total}} modules or business domains; this preview lists the first {{.Preview}} for navigation: {{.Domains}}. Use Key Modules, entry methods, and category patterns for the full reference set; confirm concrete business rules, architecture boundaries, and implementation details against current code instead of promoting one local summary to whole-project fact."
+other = "The learned project profile currently covers {{.Total}} modules or responsibility domains; this preview lists the first {{.Preview}} for navigation: {{.Domains}}. Use Key Modules, capability entries, and category patterns for the full reference set; confirm concrete product rules, architecture boundaries, and implementation details against current code instead of promoting one local summary to whole-project fact."
 
 [GeneratorOverviewCoverageFull]
-other = "The learned project profile currently covers {{.Total}} modules or business domains: {{.Domains}}. Use this section to quickly locate project scope and reference entry points; confirm concrete business rules, architecture boundaries, and implementation details against current code, Project Spec, and category patterns instead of promoting one domain summary to whole-project fact."
+other = "The learned project profile currently covers {{.Total}} modules or responsibility domains: {{.Domains}}. Use this section to quickly locate project scope and reference entry points; confirm concrete product rules, architecture boundaries, and implementation details against current code, Project Spec, and category patterns instead of promoting one domain summary to whole-project fact."
 
 [GeneratorOverviewCoverageMissing]
 other = "A stable whole-project overview summary has not been extracted yet; confirm global conclusions against current code, Project Spec, and category patterns."
 
 [GeneratorReferenceLinkBusinessAPI]
-other = "Read when the task touches API input/output, response fields, Extra/Before/After data, or adapter returns."
+other = "Read when the task touches interfaces, messages, events, shared schemas, input/output, or adapter returns."
 
 [GeneratorReferenceLinkBusinessDatabase]
-other = "Read when the task touches persistence, transactions, query conditions, or stored model fields."
+other = "Read when the task touches state structures, persistence, transactions, queries, caches, or index boundaries."
 
 [GeneratorReferenceLinkBusinessError]
 other = "Read when the task touches error codes, error wrapping, failure branches, or user-visible error semantics."
 
 [GeneratorReferenceLinkAPIBusiness]
-other = "Read when API fields carry business state, operation-log Extra, Before/After snapshots, or cross-entity rules."
+other = "Read when interface, message, event, or adapter fields carry domain state, audit snapshots, or cross-resource rules."
 
 [GeneratorReferenceLinkAPIError]
-other = "Read when the API must return error codes, error response shapes, or failure semantics."
+other = "Read when interfaces, messages, events, or adapters must express error codes, failure shapes, or failure semantics."
 
 [GeneratorReferenceLinkAPIMiddleware]
-other = "Read when API behavior depends on auth, interceptors, context injection, or request pipeline handling."
+other = "Read when interface, message, event, or adapter behavior depends on auth, interceptors, context injection, hooks, or pipeline handling."
 
 [GeneratorReferenceLinkAPIConfig]
-other = "Read when APIs or generated artifacts are controlled by feature flags, route config, or generation config."
+other = "Read when interfaces, contracts, generated artifacts, or adapters are controlled by feature flags, route/event config, or generation config."
 
 [GeneratorReferenceLinkDatabaseBusiness]
-other = "Read when database reads/writes express business state, lifecycle, audit, or cross-entity constraints."
+other = "Read when state reads/writes, persistence, caches, or indexes express domain state, lifecycle, audit, or cross-resource constraints."
 
 [GeneratorReferenceLinkDatabaseConcurrency]
 other = "Read when data changes involve locks, idempotency, concurrent updates, or consistency windows."
 
 [GeneratorReferenceLinkDatabaseError]
-other = "Read when query or transaction failures need specific error semantics, wrapping, or fallback handling."
+other = "Read when state, query, transaction, cache, or index failures need specific error semantics, wrapping, or fallback handling."
 
 [GeneratorReferenceLinkMiddlewareAPI]
-other = "Read when middleware affects API requests, responses, context, or auth entry points."
+other = "Read when interception or pipeline behavior affects interfaces, messages, events, context, or auth entry points."
 
 [GeneratorReferenceLinkMiddlewareConfig]
-other = "Read when middleware is controlled by config flags, registration order, or environment parameters."
+other = "Read when interceptors, filters, hooks, or pipelines are controlled by config flags, registration order, or environment parameters."
 
 [GeneratorReferenceLinkMiddlewareError]
-other = "Read when middleware must unify error responses, intercept failures, or recover panics."
+other = "Read when an interception or pipeline layer must unify failure shapes, intercept errors, or recover exceptions."
 
 [GeneratorReferenceLinkConfigAPI]
-other = "Read when config affects APIs, routes, generated artifacts, or client contracts."
+other = "Read when config affects interfaces, messages, events, routes, generated artifacts, or external contracts."
 
 [GeneratorReferenceLinkConfigMiddleware]
-other = "Read when config affects middleware enablement, registration order, or request pipeline behavior."
+other = "Read when config affects interceptor, filter, hook, or pipeline enablement, registration order, or runtime chain behavior."
 
 [GeneratorReferenceLinkConfigDatabase]
-other = "Read when config affects database connections, migrations, table names, queries, or persistence behavior."
+other = "Read when config affects storage connections, migrations, state structures, queries, caches, or persistence behavior."
 
 [GeneratorReferenceLinkErrorAPI]
-other = "Read when errors must be mapped to API responses, error codes, or client-visible shapes."
+other = "Read when errors must be mapped to interfaces, messages, events, error codes, or externally visible failure shapes."
 
 [GeneratorReferenceLinkErrorBusiness]
 other = "Read when failure branches express business rules, state constraints, or audit semantics."
 
 [GeneratorReferenceLinkErrorDatabase]
-other = "Read when errors come from queries, transactions, unique constraints, or persistence failures."
+other = "Read when errors come from state reads/writes, queries, transactions, unique constraints, caches, or persistence failures."
 
 [GeneratorReferenceLinkUtilsBusiness]
 other = "Read when utility functions carry domain rules, audit data, or business field formatting."
 
 [GeneratorReferenceLinkUtilsAPI]
-other = "Read when utility functions are used for API model conversion, response fields, or client contracts."
+other = "Read when utility functions are used for interface, message, event, model conversion, or external contracts."
 
 [GeneratorReferenceLinkUtilsTesting]
 other = "Read when utility changes need project testing conventions, fixtures, or assertion patterns."
 
 [GeneratorReferenceLinkConcurrencyDatabase]
-other = "Read when concurrency control affects data consistency, transaction boundaries, or persistence order."
+other = "Read when concurrency control affects state consistency, transaction boundaries, caches, or persistence order."
 
 [GeneratorReferenceLinkConcurrencyBusiness]
 other = "Read when locks, queues, or async flows carry business state transitions."
@@ -2644,25 +2662,25 @@ other = "Read when concurrent behavior needs race, timing, or retry-oriented tes
 other = "Read when tests assert business rules, state transitions, or cross-entity behavior."
 
 [GeneratorReferenceLinkTestingAPI]
-other = "Read when tests cover API contracts, response fields, generated code, or adapters."
+other = "Read when tests cover interfaces, messages, events, contracts, generated code, or adapters."
 
 [GeneratorReferenceLinkTestingDatabase]
-other = "Read when tests depend on database fixtures, transaction isolation, or persistence assertions."
+other = "Read when tests depend on state fixtures, transaction isolation, caches, or persistence assertions."
 
 [GeneratorReferenceLinkStructureBusiness]
 other = "Read when structural changes affect domain boundaries, entry orchestration, or cross-module business flows."
 
 [GeneratorReferenceLinkStructureAPI]
-other = "Read when structural changes affect API layers, adapters, generated directories, or contract files."
+other = "Read when structural changes affect interface/contract layers, message/event adapters, generated directories, or contract files."
 
 [GeneratorReferenceLinkStructureConfig]
 other = "Read when structural changes require config paths, registration points, or loading conventions."
 
 [GeneratorReferenceLinkNamingAPI]
-other = "Read when naming affects API fields, paths, error codes, or client contracts."
+other = "Read when naming affects interfaces, messages, events, paths, error codes, or external contracts."
 
 [GeneratorReferenceLinkNamingDatabase]
-other = "Read when naming affects tables, columns, indexes, query methods, or persistence models."
+other = "Read when naming affects state structures, storage keys, indexes, query entries, or persistence models."
 
 [GeneratorReferenceLinkNamingBusiness]
 other = "Read when naming carries domain concepts, state names, or business actions."
@@ -2795,6 +2813,3 @@ other = "Subcommands"
 
 [CommandDocsHeaderFlags]
 other = "Flags"
-
-[GeneratorBusinessCoverageSinglePatternWarning]
-other = "This domain currently has only 1 learned pattern. Treat it as incomplete coverage; verify current code through the evidence path before generalizing."

@@ -24,10 +24,11 @@ type ClaudeAgent struct {
 	promptLoader     promptloader.Renderer
 	allowUserPlugins bool
 	retryCfg         config.RetryConfig
+	runtime          config.AgentRuntimeOptions
 }
 
 // New 创建代理
-func New(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) *ClaudeAgent {
+func New(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig, runtime config.AgentRuntimeOptions) *ClaudeAgent {
 	if commandPath == "" {
 		commandPath = "claude"
 	}
@@ -41,6 +42,7 @@ func New(commandPath string, timeout time.Duration, loader *promptloader.Loader,
 		promptLoader:     loader,
 		allowUserPlugins: allowUserPlugins,
 		retryCfg:         retryCfg,
+		runtime:          runtime,
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
@@ -29,6 +30,12 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt, outputC
 type claudeCallResult struct {
 	output  string
 	archive agent.AgentOutputArchive
+}
+
+type claudeSessionStartResult struct {
+	output    string
+	archive   agent.AgentOutputArchive
+	sessionID string
 }
 
 func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
@@ -51,6 +58,32 @@ func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prom
 		},
 	})
 	return result.output, result.archive, err
+}
+
+func (c *ClaudeAgent) callClaudeNewSession(ctx context.Context, operation, prompt, outputContract string, task agent.RuntimeTask) (string, string, agent.AgentOutputArchive, error) {
+	outputSchema, err := aicontract.StructuredOutputSchema(outputContract)
+	if err != nil {
+		return "", "", agent.AgentOutputArchive{}, err
+	}
+	workDir, err := agent.WorkDirForContext(ctx)
+	if err != nil {
+		return "", "", agent.AgentOutputArchive{}, err
+	}
+
+	result, err := agent.RunRetryingCall(ctx, agent.RetryingCallOptions[claudeSessionStartResult]{
+		AgentName: c.Name(),
+		Operation: operation,
+		Policy:    c.retryCfg,
+		Call: func(attempt int) (claudeSessionStartResult, string, time.Duration, bool, error) {
+			sessionID, err := newClaudeSessionID()
+			if err != nil {
+				return claudeSessionStartResult{}, "", 0, false, err
+			}
+			output, archive, duration, retryable, err := c.doCallClaudeSession(ctx, operation, prompt, outputSchema, sessionID, false, attempt, workDir, task)
+			return claudeSessionStartResult{output: output, archive: archive, sessionID: sessionID}, output, duration, retryable, err
+		},
+	})
+	return result.output, result.sessionID, result.archive, err
 }
 
 func (c *ClaudeAgent) callClaudeSession(ctx context.Context, operation, prompt, outputContract, sessionID string, resume bool, task agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
@@ -85,7 +118,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	args := claudePrintArgs(c.allowUserPlugins, outputSchema, task.PromptOnly)
+	args := claudePrintArgs(c.allowUserPlugins, outputSchema, task.PromptOnly, c.runtime)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
 		"operation", operation,
@@ -216,7 +249,7 @@ func (c *ClaudeAgent) doCallClaudeSession(ctx context.Context, operation, prompt
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	args := claudeSessionPrintArgs(c.allowUserPlugins, outputSchema, task.PromptOnly, sessionID, resume)
+	args := claudeSessionPrintArgs(c.allowUserPlugins, outputSchema, task.PromptOnly, sessionID, resume, c.runtime)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
 		"operation", operation,
@@ -396,7 +429,7 @@ func stripJSONFence(value string) string {
 	return strings.TrimSpace(strings.TrimSuffix(body, "```"))
 }
 
-func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool) []string {
+func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool, runtime config.AgentRuntimeOptions) []string {
 	// 模型命令行常常在生成最终结构化结果之前尝试检查文件
 	// 将会话保持为非持久化且只读状态，这样批量分析就能顺利完成，而无需授予具备写入权限的工具
 	args := []string{
@@ -408,6 +441,7 @@ func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool
 		"--json-schema",
 		outputSchema,
 	}
+	args = append(args, claudeRuntimeArgs(runtime)...)
 	if !allowUserPlugins {
 		if settings := claudeDisableUserPluginSettings(); settings != "" {
 			args = append(args, "--settings", settings)
@@ -420,7 +454,7 @@ func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool
 	return append(args, "--tools", tools)
 }
 
-func claudeSessionPrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool, sessionID string, resume bool) []string {
+func claudeSessionPrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool, sessionID string, resume bool, runtime config.AgentRuntimeOptions) []string {
 	args := []string{
 		"--print",
 		"--disable-slash-commands",
@@ -434,6 +468,7 @@ func claudeSessionPrintArgs(allowUserPlugins bool, outputSchema string, promptOn
 	} else {
 		args = append(args, "--session-id", sessionID)
 	}
+	args = append(args, claudeRuntimeArgs(runtime)...)
 	if !allowUserPlugins {
 		if settings := claudeDisableUserPluginSettings(); settings != "" {
 			args = append(args, "--settings", settings)
@@ -444,6 +479,14 @@ func claudeSessionPrintArgs(allowUserPlugins bool, outputSchema string, promptOn
 		tools = ""
 	}
 	return append(args, "--tools", tools)
+}
+
+func claudeRuntimeArgs(runtime config.AgentRuntimeOptions) []string {
+	args := make([]string, 0)
+	if model := strings.TrimSpace(runtime.Model); model != "" {
+		args = append(args, "--model", model)
+	}
+	return args
 }
 
 func claudeArgsForLog(args []string) []string {

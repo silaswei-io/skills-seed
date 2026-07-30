@@ -39,6 +39,7 @@ agent:
   timeout: 1800
   allow_user_plugins: false
   parallelism: 0
+  model: ""
   retry:
     max_retries: 3
     initial_interval: 15
@@ -162,8 +163,8 @@ exclude:
 | `mode` | `normal` | 学习策略：`normal` 平衡质量和速度；`fast` 保留紧凑但直接有证据的模式；`deep` 更愿意保留有证据的局部业务/代码模式 |
 | `scope` | `flow` | 焦点规划取向：`flow` 默认且最稳定，优先关注业务流程/资源动作；`domain` 更偏长期业务职责；`module` 更偏模块/插件/契约边界。它是学习视角，不是固定分类或数量边界 |
 | `max_focuses_per_call` | `1` | 单次 AI 调用最多分析的焦点数；`1` 表示不合批，降低单次输出过大、解析失败和跨焦点结论串扰风险 |
-| `select_relevant_files` | `true` | 大候选集是否在议程规划前启用 AI 候选收敛；关闭后只使用本地确定性收敛 |
-| `select_relevant_files_min_candidates` | `200` | 候选文件数达到该阈值时才调用 AI 候选收敛；小范围变更直接走本地收敛 |
+| `select_relevant_files` | `true` | 大候选集是否在议程规划前启用 AI 候选收敛；关闭后使用本地保守候选准备 |
+| `select_relevant_files_min_candidates` | `200` | 候选文件数达到该阈值时才调用 AI 候选收敛；小范围变更直接保留本地候选 |
 | `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
 | `structural.provider` | `auto` | 结构化上下文与符号校验来源：`auto`/`codegraph` 使用 CodeGraph 并自动修复；`treesitter` 显式选择内嵌 parser |
 | `structural.max_symbols` | `30` | 输出到结构化上下文的最大符号数 |
@@ -177,7 +178,7 @@ exclude:
 
 0.9.0 起，项目结构摘要、样例文件收集和结构化预扫描都统一使用同一套配置化文件过滤策略。除 `.git`、`.skills-seed` 和已配置的 skills 输出目录等内置安全边界外，不再在 analyzer 内额外维护目录名关键字；需要排除依赖、构建产物或项目自定义目录时，应写入 `exclude`。
 
-当前版本中，`learn current` 在本地文件过滤后会执行候选收敛：显式 focus、增量变更和高信号入口/业务/契约文件优先进入后续议程规划；初始全量学习不会把“全部文件都是新增”当作收敛信号。候选数达到 `select_relevant_files_min_candidates` 且 `select_relevant_files` 开启时，会先调用 `learning-candidate-select` 让 AI 基于候选清单、必选路径和结构化上下文收敛大候选集；小范围变更或 AI 不可用时使用本地确定性收敛。候选路径、diff、焦点文件和结构化上下文等大块输入会写入 runtime 输入文件，prompt 通过路径引用它们。
+当前版本中，`learn current` 在本地文件过滤后会执行候选准备：小范围变更直接保留候选，不再用路径词表删减源码文件；路径信号只用于挑选结构化上下文入口。候选数达到 `select_relevant_files_min_candidates` 且 `select_relevant_files` 开启时，会先调用 `learning-candidate-select` 让 AI 基于候选清单、必选路径和结构化上下文收敛大候选集；AI 不可用时回退为使用全部候选。候选路径、diff、焦点文件和结构化上下文等大块输入会写入 runtime 输入文件，prompt 通过路径引用它们。
 
 0.9.11 起，文件过滤策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。0.9.13 起，快照仍保存完整当前状态，但发送给 AI 的 diff 会按 `exclude.paths` 和 `exclude.gitignore` 过滤，避免被忽略文件作为删除 diff 进入分析。
 
@@ -203,15 +204,15 @@ exclude:
 
 0.11.2 起，`learning.current.max_focuses_per_call` 可控制一次 AI 调用最多分析的焦点数，默认 `1` 表示不合批；调高后会把多个焦点放入同一次调用并要求响应按顶层 `focuses` 返回。生成 skills 时，低频或局部证据不会进入强约束层，避免把偶发现象误写成必须遵守的项目标准。
 
-候选收敛决定进入议程规划的文件范围；AI 候选收敛、学习焦点规划和当前代码学习 prompt 都使用明确的稳定决策规则。当证据等价时，优先结构证据、可路由性和源码词汇，最后用路径、ID 或符号的字典序作为 tie-breaker。
+候选准备决定进入议程规划的文件范围；AI 候选收敛、学习焦点规划和当前代码学习 prompt 都使用明确的稳定决策规则。当证据等价时，优先结构证据、可路由性和源码词汇，最后用路径、ID 或符号的字典序作为 tie-breaker。
 
-初始化交互中的“Agent 总并发数”只控制 workspace 根配置的 `agent.parallelism`（子项目并发）。`learn current` 在单个项目内使用分段短会话：候选收敛后由 planning 会话生成证据包，每个证据包分析使用独立会话，最终模式入库前再使用独立 global curation 会话；当前不提供项目内证据包并发。
+初始化交互中的“Agent 总并发数”会写入 `agent.parallelism`。workspace 根配置用它控制子项目并发；普通 project 配置用它控制当前代码学习的证据焦点批次并发。`learn current` 仍使用分段短会话：候选准备后由 planning 会话生成证据包，每个证据焦点批次分析使用独立会话，模式入库前按候选归属执行分片 pattern curation，并由本地确定性逻辑完成跨分片合并。
 
 0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。0.10.3 起，最终内容如果是合法 JSON，会在 `.md` 归档中格式化为可读的 `json` 代码块。
 
 0.9.6 起，`.skills-seed/runtime` 下的调试记录使用 `YYYYMMDD-HHMMSS[-NNN]-<kind>-<name>` 文件名前缀；同一秒内生成多个 runtime ID 时追加递增序号避免覆盖。`rendered-prompts/` 与对应的 `agent-outputs/` 共享同一个日期时间 ID 和语义名，Agent 输出文件只额外包含 Agent 名称，方便把同一次调用中的 prompt 和输出一一对应。0.10.3 起，合法 JSON 输出会在 `.md` 归档中格式化为可读的 `json` 代码块。
 
-0.9.0 起，模式库入库前会执行候选策展。当前 `learn current` 使用分段会话式 `learning-global-curate` AI 契约，只让 Agent 决定规范文本、置信度和真实 `source_ids`；示例、源码证据、业务方法、频次、来源和统计由本地代码从输入恢复。未知来源会被清理，未分类候选只执行本地确定性恢复，不再完整重跑 AI；同一候选同时被保留和丢弃时，以可追溯的规范模式为准。`generate skills` 只读取已保存数据，不执行模式合并或 Agent 调用。
+0.9.0 起，模式库入库前会执行候选策展。当前 `learn current` 使用分段会话式 `learning-pattern-curate` AI 契约，只让 Agent 决定规范文本、置信度和真实 `source_ids`；示例、源码证据、能力入口、频次、来源和统计由本地代码从输入恢复。未知来源会被清理，未分类候选只执行本地确定性恢复，不再完整重跑 AI；同一候选同时被保留和丢弃时，以可追溯的规范模式为准。`generate skills` 只读取已保存数据，不执行模式合并或 Agent 调用。
 
 当前版本不再维护 skills dirty state。`sync` 完成学习后仅在本轮有学习变化时生成 skills。显式执行 `skills-seed generate skills` 会删除旧的 skills-seed 生成目录并完整重建；手动添加用户模式后应显式运行该命令刷新产物。
 
@@ -229,17 +230,18 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 | `commands` | `claude: claude`、`codex: codex` | engine 到 CLI 命令的映射 |
 | `timeout` | `1800` | 单次 AI 请求超时时间，单位秒 |
 | `allow_user_plugins` | `false` | 是否允许 Agent 加载用户插件；默认关闭，避免批处理被用户插件影响 |
-| `parallelism` | `0` | workspace 根配置中的子项目并发数；普通项目下不生效，`0` 表示自动 |
+| `parallelism` | `0` | Agent 并发数；workspace 根配置控制子项目并发，普通 project 配置控制证据焦点批次并发，`0` 表示自动 |
+| `model` | 空 | skills-seed 调用 Agent CLI 时使用的模型名；空值不传模型参数，继承本机 Agent CLI 默认配置 |
 | `retry.max_retries` | `3` | 可重试错误的最大重试次数；配置为 `0` 时使用默认值 `3` |
 | `retry.initial_interval` | `15` | 首次重试等待秒数；配置为 `0` 时使用默认值 `15` |
 | `retry.max_interval` | `120` | 指数退避最大等待秒数；配置为 `0` 时使用默认值 `120` |
 
 #### `parallelism` 说明
 
-1. `project` 模式下，`agent.parallelism` 不生效；`learn current` 项目内固定使用分段会话串行执行。
+1. `project` 模式下，`agent.parallelism > 1` 时，`learn current` 会并发分析独立证据焦点批次；每个批次使用独立短会话，结果回到主流程后按议程顺序合并和 checkpoint。
 2. `workspace` 模式下，自动值为子项目数，上限 `6`。
 3. 设置为大于 `0` 的数字时，使用该数字作为并发上限。
-4. workspace 子项目任务会通过 goroutine worker 池并行执行；每个子项目内部仍是分段会话串行。
+4. workspace 子项目任务会通过 goroutine worker 池并行执行；每个子项目内部是否并发分析证据焦点，由该子项目配置的 `agent.parallelism` 决定。
 
 #### `retry` 说明
 
@@ -253,6 +255,7 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 ```yaml
 agent:
   engine: "claude"
+  model: ""
   commands:
     claude: "claude"
     codex: "codex"
@@ -269,6 +272,7 @@ skills:
 
 ```bash
 skills-seed init --mode project --agent codex
+skills-seed init --mode project --agent codex --agent-model gpt-5-mini
 skills-seed init --workspace --agent codex
 ```
 

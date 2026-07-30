@@ -53,7 +53,7 @@ func TestInitializeWorkspaceInitializesDetectedChildProjects(t *testing.T) {
 	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
 }
 
-func TestInitializeProjectKeepsCurrentLearningSerial(t *testing.T) {
+func TestInitializeProjectStoresConfiguredParallelism(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)
 
@@ -65,9 +65,26 @@ func TestInitializeProjectKeepsCurrentLearningSerial(t *testing.T) {
 
 	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
-	require.Equal(t, 0, configRepo.GetAgentConfig().Parallelism)
+	require.Equal(t, 4, configRepo.GetAgentConfig().Parallelism)
 	require.Equal(t, config.LearningModeNormal, configRepo.GetCurrentLearningConfig().Mode)
 	require.Equal(t, config.LearningScopeFlow, configRepo.GetCurrentLearningConfig().Scope)
+}
+
+func TestInitializeProjectStoresConfiguredAgentModel(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{
+		initLogger:      true,
+		showUserSummary: true,
+		agentEngine:     "codex",
+		agentModel:      "gpt-5-mini",
+	}))
+
+	configRepo, err := config.NewRepository(filepath.Join(projectRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "codex", configRepo.GetAgentConfig().Engine)
+	require.Equal(t, "gpt-5-mini", configRepo.GetAgentConfig().Model)
 }
 
 func TestInitializeWorkspaceAllocatesTotalParallelism(t *testing.T) {
@@ -148,11 +165,11 @@ func TestInteractiveInitParallelismPlanSummary(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 
 	require.Equal(t,
-		"单项目：当前代码学习使用分段会话串行执行",
+		"单项目：agent.parallelism>1 时并发分析独立证据焦点批次",
 		initParallelismPlanSummary(domain.ModeProject, 4, 0),
 	)
 	require.Equal(t,
-		"工作区：检测到 3 个子项目，agent.parallelism=3，每个子项目内分段会话串行",
+		"工作区：检测到 3 个子项目，根 agent.parallelism=3 控制子项目并发；子项目内证据焦点并发由子项目配置控制",
 		initParallelismPlanSummary(domain.ModeWorkspace, 6, 3),
 	)
 }
@@ -484,6 +501,7 @@ func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 	cfg.Project.Mode = domain.ModeWorkspace
 	cfg.Project.Locale = "zh-CN"
 	cfg.Project.RootPath = workspaceRoot
+	cfg.Agent.Model = "low-cost-model"
 	cfg.Workspace.Projects = []config.WorkspaceProjectConfig{
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 	}
@@ -497,6 +515,7 @@ func TestInitializeWorkspaceChildrenCreatesProjectModeSeeds(t *testing.T) {
 	require.Equal(t, "backend", childConfig.GetProjectConfig().Name)
 	require.Equal(t, "go", childConfig.GetProjectConfig().Language)
 	require.Equal(t, childRoot, childConfig.GetProjectConfig().RootPath)
+	require.Equal(t, "low-cost-model", childConfig.GetAgentConfig().Model)
 	require.NoFileExists(t, filepath.Join(childRoot, ".skills-seed", "context", "workspace.md"))
 }
 

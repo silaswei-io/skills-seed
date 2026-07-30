@@ -54,7 +54,7 @@
 | `skills-seed hook install` | 安装 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | 手动运行 pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
-| `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | 从当前代码学习 | `current` | `--help, -h` = `false` |
 | `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
@@ -159,6 +159,7 @@ skills-templates-sha256: <hash>
 |---|---:|---|
 | `--mode` | `project` | 初始化模式：`project` 单项目，`workspace` 多子项目根仓 |
 | `--agent` | 空 | 初始化时写入的执行 Agent engine，例如 `claude` 或 `codex`；留空时使用内置默认值 |
+| `--agent-model` | 空 | skills-seed 调用 Agent CLI 时使用的模型名；留空继承本机 Agent CLI 默认配置 |
 | `--skills` | 空 | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex`；留空时使用内置默认值 |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
 | `--locale`, `-l` | 空 | 工具输出、配置模板与 seed context 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
@@ -170,6 +171,7 @@ skills-templates-sha256: <hash>
 ```bash
 skills-seed init --mode project --locale zh-CN
 skills-seed init --mode project --agent claude --skills codex --locale zh-CN
+skills-seed init --mode project --agent codex --agent-model gpt-5-mini --skills codex --locale zh-CN
 skills-seed init --mode workspace --locale zh-CN
 skills-seed init --workspace
 skills-seed init --workspace --agent codex --skills codex
@@ -180,7 +182,7 @@ skills-seed init --workspace --agent codex --skills codex
 1. `--agent` 会设置 `agent.engine`，并确保 `agent.commands` 中存在对应 engine。
 2. `--skills` 会设置 `skills.target`，并确保 `skills.paths` 中存在对应 target 的默认输出目录。
 3. `--workspace` 会初始化根仓，并同步初始化当前检测到的子仓。
-4. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands` 和 `skills.target`、`skills.paths`。
+4. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands`、`agent.model` 和 `skills.target`、`skills.paths`。
 5. 已初始化的子仓会跳过；如果子仓 agent 与根仓不同，只提示，不覆盖。
 6. 初始化成功后会输出相对 `.skills-seed` 位置和当前版本 tag 对应的 README 文档地址。
 7. workspace 子仓发现只认根目录第一层的独立 Git 仓库；标记文件只用于识别类型和语言。
@@ -252,7 +254,7 @@ skills-seed reset --workspace
 
 #### 命令概述
 
-从当前代码库学习编码模式、业务方法和最佳实践，并写入 `.skills-seed` 数据库。
+从当前代码库学习编码模式、能力入口和最佳实践，并写入 `.skills-seed` 数据库。
 
 #### 命令形式
 
@@ -301,13 +303,14 @@ skills-seed learn current --context-path .skills-seed/context.md
 1. 首次成功后会记录已分析文件的 md5；没有可学习文件变化时，会跳过 patterns 学习和项目画像同步。
 2. 生成的 skills 目录默认排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
-4. workspace 子项目按 `agent.parallelism` 真并发执行。
-5. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
-6. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
-7. 长期有效的项目上下文写入 `.skills-seed/context/`；`--context` 和 `--context-path` 只影响本次命令。
-8. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
-9. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 使用 CodeGraph，并在必要时自动初始化或修复索引。只有显式配置 `provider: treesitter` 才使用内嵌 parser。没有边界输入时不会因此全仓扫描。
-10. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，终端也会输出包含等待时间和 API 原因的稳定提示，并在下一次调用开始时切换为“第 N 次尝试”。
+4. project 模式下，`agent.parallelism > 1` 会并发分析独立证据焦点批次；结果仍按学习议程序合并和 checkpoint。
+5. workspace 根配置的 `agent.parallelism` 控制子项目并发；每个子项目内证据焦点并发由该子项目配置决定。
+6. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
+7. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
+8. 长期有效的项目上下文写入 `.skills-seed/context/`；`--context` 和 `--context-path` 只影响本次命令。
+9. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
+10. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 使用 CodeGraph，并在必要时自动初始化或修复索引。只有显式配置 `provider: treesitter` 才使用内嵌 parser。没有边界输入时不会因此全仓扫描。
+11. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，终端也会输出包含等待时间和 API 原因的稳定提示，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
 
@@ -429,7 +432,7 @@ skills-seed preview files --limit 500
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed patterns add --context <描述>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add --context "API 路由使用 RESTful 风格" --category api` | 会调用 AI Agent |
+| `skills-seed patterns add --context <描述>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add --context "对外契约字段保持向后兼容" --category api` | 会调用 AI Agent |
 | `skills-seed patterns update <pattern-id> --context <说明>` | 修订指定 pattern，保留原 ID 和归属信息 | `skills-seed patterns update resp-extra-update-logging --context "补充审计日志要求"` | 会调用 AI Agent |
 | `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | `skills-seed patterns delete plugin-source-editing-rule` | workspace 根目录会同步删除已关联子项目模式 |
 | `skills-seed patterns compact` | 使用本地规则整理相似 patterns | `skills-seed patterns compact --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
@@ -493,7 +496,7 @@ workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果
 #### 常用示例
 
 ```bash
-skills-seed patterns add --context "所有 API 路由使用 RESTful 风格"
+skills-seed patterns add --context "对外契约字段保持向后兼容"
 skills-seed patterns add --context "错误必须包装上下文" --category error
 skills-seed patterns add --context-path docs/pattern-notes.md --category database
 skills-seed patterns update resp-extra-update-logging --context "补充响应额外字段更新的审计日志要求"
@@ -514,7 +517,7 @@ skills-seed patterns show business-create-order --format json
 1. `patterns compact` 使用本地确定性合并，不调用 Agent。
 2. 不确定整理结果时先使用 `--dry-run`。
 3. `patterns stats` 展示 specificity、confidence、effective score 等质量指标，方便判断哪些模式更适合进入生成物。
-4. `patterns show` 无参数时显示模式概览列表，默认按更新时间倒序；可用 `--sort score` 看高价值规则，`--sort category` 使用分类分组视角。位置列优先使用业务/工具方法的 `code_location`，没有业务方法时回退到模式级 `evidence_locations` 的第一条证据位置。传入 `pattern-id` 时显示单条模式完整详情，包括正/反例、质量指标、workspace 归属、证据位置、业务方法字段、代码位置历史和语言无关符号快照。
+4. `patterns show` 无参数时显示模式概览列表，默认按更新时间倒序；可用 `--sort score` 看高价值规则，`--sort category` 使用分类分组视角。位置列优先使用能力/工具入口的 `code_location`，没有能力入口时回退到模式级 `evidence_locations` 的第一条证据位置。传入 `pattern-id` 时显示单条模式完整详情，包括正/反例、质量指标、workspace 归属、证据位置、能力入口字段、代码位置历史和语言无关符号快照。
 5. `patterns stats` 和 `patterns show` 不调用 AI，也不修改数据，但仍需要打开 `.skills-seed/store/project.db`；如果数据库被其他 `skills-seed` 命令占用，CLI 会提示等待当前命令结束或检查残留进程。
 
 ### `skills-seed profile`
@@ -612,7 +615,7 @@ skills-seed sync
 skills-seed sync --context "私有化部署，不是 SaaS"
 skills-seed sync --context-path docs/plan.md --context-path docs/specs
 skills-seed sync --restart
-skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-learning-global-curate.raw.txt
+skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-learning-pattern-curate.raw.txt
 ```
 
 #### 注意事项

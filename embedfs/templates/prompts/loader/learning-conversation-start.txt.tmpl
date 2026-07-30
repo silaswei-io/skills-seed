@@ -15,6 +15,7 @@ Project:
 Learning strategy guidance:
 - Treat learning mode as curation priority, not a fixed output count, file budget, or permission to keep weak evidence.
 - Treat learning scope as a planning lens, not a hard taxonomy. Let source evidence and future decision value decide the final pack and pattern shape.
+- Interpret category names abstractly across project types: `business` means product/domain behavior, `api` means any interface or contract, `database` means state/storage/persistence, `middleware` means interception or pipeline behavior, and `utils` means reusable domain-neutral helpers.
 {{- if .UserContextPath}}
 
 User context is available at `{{.UserContextPath}}`. It may clarify intent, but persisted knowledge still needs source evidence.
@@ -27,11 +28,11 @@ Conversation policy:
 - For the planning stage, produce self-contained evidence packs that later stages can analyze without this conversation.
 - For pack analysis stages, analyze only the packs and source/context files listed in that turn.
 - For diff stages, only use changed hunks and directly necessary surrounding context.
-- For global curation, decide only from explicit candidate and existing pattern inputs; do not scan repository files.
+- For pattern curation, decide only from explicit candidate and existing pattern inputs; do not scan repository files.
 - Do not assume or inventory any language, framework, architecture, domain, or fixed output count. Learn them only when explicit evidence shows they change future implementation, routing, validation, or reuse decisions.
-- Keep project-specific business patterns and project-specific code patterns with decision value: domain behavior, state or policy boundaries, framework usage conventions, language/runtime idioms, generated-code boundaries, validation strategy, error handling, configuration behavior, integration contracts, security-sensitive handling, transactions, lifecycle, jobs, and operational safeguards.
+- Keep project-specific product/domain patterns and project-specific code patterns with decision value: user/system behavior, state or policy boundaries, framework usage conventions, language/runtime idioms, generated-source boundaries, validation strategy, error handling, configuration behavior, integration contracts, security-sensitive handling, transactions, lifecycle, jobs/tasks, interaction behavior, and operational safeguards.
 - Favor recall for source-backed repository knowledge. Later stages may merge true equivalents, but knowledge dropped by an earlier stage cannot be recovered.
-- Keep routeable knowledge when it changes future implementation, navigation, validation, debugging, or safe-modification decisions, even if it is simple, local, single-file, framework-specific, language-specific, config-only, API-only, error-only, or utility-only.
+- Keep routeable knowledge when it changes future implementation, navigation, validation, debugging, or safe-modification decisions, even if it is simple, local, single-file, framework-specific, language-specific, config-only, interface/contract-only, error-only, or utility-only.
 - Reject ordinary CRUD, field mapping, thin forwarding, boilerplate initialization, generic query construction, directory guesses, and transient implementation details only when they do not encode a repository-specific trigger, boundary, contract, invariant, or source entry worth finding again.
 - Treat destructive historical behavior, one-off setup scripts, and migration bootstrap details as observations unless authoritative project guidance says to repeat them. Do not convert them into reusable advice.
 - Do not persist exact counts, totals, or enum cardinalities unless the complete closed list is directly verified in source evidence within the current stage input. Prefer qualitative wording when the boundary may change.

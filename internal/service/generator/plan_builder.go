@@ -180,7 +180,7 @@ func (b *planBuilder) appendValidationReferences(p *skillgen.Plan, profile *doma
 	p.AddFile("references/validation.md", skillgen.ReferenceTemplate, "validation", validationReferenceTemplateData{
 		Commands: validationCommands(profile),
 		Matrix:   matrix,
-		Gaps:     validationGaps(profile, matrix, locale),
+		Gaps:     validationGaps(profile, matrix, goTests, locale),
 	})
 	if references.Testing {
 		p.AddFile("references/testing.md", skillgen.ReferenceTemplate, "testing", testingReferenceTemplateData{Inventory: goTests})
@@ -309,6 +309,7 @@ func (b *planBuilder) appendCategoryPattern(p *skillgen.Plan, categoryName strin
 
 func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, summary categorySummary, categoryPatterns []domain.Pattern, allCategories []string, language string) error {
 	groups := businessPatternGroups(b.skillsLoader.GetLocale(), categoryPatterns)
+	detailGroups, inlineGroups := splitBusinessPatternGroups(groups)
 	p.AddDir(filepath.Join("references", "patterns", string(domain.CategoryBusiness)))
 
 	indexData := businessIndexTemplateData{
@@ -316,9 +317,9 @@ func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, summary cate
 		Summary:           summary.Summary,
 		PatternCount:      len(categoryPatterns),
 		LastUpdated:       time.Now().Format("2006-01-02 15:04:05"),
-		Groups:            groups,
+		DetailGroups:      detailGroups,
+		InlineGroups:      inlineGroups,
 		RelatedReferences: businessPatternReferenceLinks(allCategories, b.skillsLoader.GetLocale(), "./"),
-		CoverageWarnings:  businessCoverageWarnings(groups, b.skillsLoader.GetLocale()),
 	}
 
 	p.AddFile(
@@ -328,7 +329,7 @@ func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, summary cate
 		indexData,
 	)
 
-	for _, group := range groups {
+	for _, group := range detailGroups {
 		data := businessDetailTemplateData{
 			Category:          summary.Category,
 			GroupTitle:        group.Title,

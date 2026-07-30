@@ -160,9 +160,14 @@ func businessGroupKeyFromPathText(location string) businessGroupKey {
 
 func isGenericBusinessDirectory(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "app", "application", "biz", "business", "cmd", "controller", "domain", "handler", "handlers",
-		"internal", "logic", "model", "pkg", "repository", "route", "service", "services", "src", "svc",
-		"usecase", "usecases":
+	case "app", "application", "biz", "business", "cmd", "command", "commands", "component", "components",
+		"controller", "domain", "endpoint", "endpoints", "feature", "features", "flow", "flows",
+		"handler", "handlers", "hook", "hooks", "internal", "job", "jobs", "layout", "layouts",
+		"logic", "model", "models", "mutation", "mutations", "page", "pages", "pkg", "query",
+		"queries", "repository", "resolver", "resolvers", "route", "routes", "screen", "screens",
+		"service", "services", "src", "store", "stores", "svc", "task", "tasks", "template",
+		"templates", "usecase", "usecases", "view", "views", "widget", "widgets", "worker",
+		"workers", "workflow", "workflows":
 		return true
 	default:
 		return false
@@ -182,7 +187,9 @@ func normalizeBusinessFileStem(value string) string {
 
 func isBusinessRoleSuffix(value string) bool {
 	switch value {
-	case "client", "controller", "handler", "logic", "manager", "reloader", "repository", "service":
+	case "adapter", "client", "command", "component", "controller", "handler", "hook", "job", "logic",
+		"manager", "mutation", "page", "query", "reloader", "repository", "resolver", "screen",
+		"service", "task", "view", "widget", "worker":
 		return true
 	default:
 		return false

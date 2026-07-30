@@ -406,7 +406,7 @@ func (s *AnalyzerService) SelectLearningCandidates(ctx context.Context, req *Sel
 	return result, nil
 }
 
-// PlanLearningAgenda 按业务能力拆分当前待学习文件。
+// PlanLearningAgenda 按源码证据焦点拆分当前待学习文件。
 func (s *AnalyzerService) PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) ([]domain.EvidenceFocus, error) {
 	structuralContext := req.StructuralContext
 	if structuralContext == "" {

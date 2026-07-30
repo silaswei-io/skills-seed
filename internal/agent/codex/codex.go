@@ -23,10 +23,11 @@ type CodexAgent struct {
 	promptLoader     promptloader.Renderer
 	allowUserPlugins bool
 	retryCfg         config.RetryConfig
+	runtime          config.AgentRuntimeOptions
 }
 
 // New 创建代理
-func New(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) *CodexAgent {
+func New(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig, runtime config.AgentRuntimeOptions) *CodexAgent {
 	if commandPath == "" {
 		commandPath = "codex"
 	}
@@ -40,6 +41,7 @@ func New(commandPath string, timeout time.Duration, loader *promptloader.Loader,
 		promptLoader:     loader,
 		allowUserPlugins: allowUserPlugins,
 		retryCfg:         retryCfg,
+		runtime:          runtime,
 	}
 }
 

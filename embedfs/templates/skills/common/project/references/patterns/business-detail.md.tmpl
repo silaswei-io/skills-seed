@@ -15,7 +15,7 @@
 {{if .RelatedReferences}}
 ## 相关参考
 
-本页只覆盖业务子域规则；如果任务涉及接口返回、持久化、错误语义等跨边界约定，继续读取对应 reference。
+本页只覆盖产品/领域规则；如果任务涉及接口/消息返回、状态/持久化边界或失败语义等跨边界约定，继续读取对应 reference。
 
 {{range .RelatedReferences}}
 - [{{.Title}}]({{.Path}}): {{.Reason}}
@@ -37,6 +37,9 @@
 {{range .PatternObjects}}
 ### {{.Name}}
 
+{{if .HighRiskOperational}}**风险检查点**: 该模式涉及不可逆、特权、状态/资源变更或外部副作用。仅按已验证入口定位和保留保护边界，不要把危险动作当作普通复用建议。
+
+{{end}}
 {{if .Description}}{{if .AllowsHardConstraint}}**说明**: {{.Description}}{{else}}**适用边界**: {{.Description}}{{end}}
 
 {{end}}

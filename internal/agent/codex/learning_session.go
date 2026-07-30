@@ -123,17 +123,16 @@ func (s *learningSession) RefreshProjectProfile(ctx context.Context, req *agent.
 }
 
 func (s *learningSession) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("learning-global-curate", ""))
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("learning-pattern-curate", ""))
 	data := map[string]interface{}{
 		"Operation":           req.Operation,
 		"CandidatePatterns":   req.CandidatePatterns,
 		"PrecompactionCount":  req.PrecompactionCount,
 		"ExistingPatterns":    req.ExistingPatterns,
-		"AllExisting":         req.AllExisting,
 		"ExistingByCandidate": req.ExistingByCandidate,
 		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
-	output, err := s.callPrepared(ctx, "LearningGlobalCuratePatterns", "learning-global-curate", aicontract.ContractCuratePatterns, task, data)
+	output, err := s.callPrepared(ctx, "LearningPatternCurate", "learning-pattern-curate", aicontract.ContractCuratePatterns, task, data)
 	if err != nil {
 		return nil, err
 	}

@@ -5,30 +5,53 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
-func (s *Service) curateCurrent(ctx context.Context, candidates []domain.Pattern, precompactionCount int, retrieved retrievalResult, checkpoint DecisionCheckpoint, session agent.LearningSession, hooks ProgressHooks) (*proposal, error) {
-	result, err := s.curate(ctx, OperationLearnCurrent, candidates, retrieved.related, precompactionCount, false, retrieved.existingByCandidate, checkpoint, session, hooks)
+func (s *Service) curateCurrent(ctx context.Context, candidates []domain.Pattern, retrieved retrievalResult, checkpoint DecisionCheckpoint, hooks ProgressHooks) (*proposal, error) {
+	decisionKey, err := curationDecisionKey(candidates)
 	if err != nil {
 		return nil, err
 	}
+	if result, found, err := loadCurationDecision(ctx, checkpoint, decisionKey, hooks); err != nil || found {
+		if err != nil {
+			return nil, err
+		}
+		return finalizeCurrentCuration(proposalFromAgent(result), candidates, retrieved.related)
+	}
+
+	label := i18n.Get("ProgressCuratePatternsLocal")
+	notifyProgress(hooks.OnStepStart, label)
+	result := deterministicCurate(candidates, retrieved.related)
+	result, err = finalizeCurrentCuration(result, candidates, retrieved.related)
+	if hooks.OnStepComplete != nil {
+		hooks.OnStepComplete(label)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := saveCurationDecision(ctx, checkpoint, decisionKey, agentResultFromProposal(result)); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func finalizeCurrentCuration(result *proposal, candidates, existing []domain.Pattern) (*proposal, error) {
 	var conflictingDroppedIDs []string
 	result, conflictingDroppedIDs = preferCurrentPatternsOverConflictingDrops(result, candidates)
-	assessment := assessCuration(result, candidates, retrieved.related)
+	assessment := assessCuration(result, candidates, existing)
 	assessment.IgnoredConflictingDroppedIDs = conflictingDroppedIDs
 	var recallRecoveredIDs []string
-	result, recallRecoveredIDs = recoverRecallProtectedDrops(assessment.Result, candidates, retrieved.related)
+	result, recallRecoveredIDs = recoverRecallProtectedDrops(assessment.Result, candidates, existing)
 	if len(recallRecoveredIDs) > 0 {
-		logger.Warn(i18n.Get("LoggerAgentCuratePatternsRecallRecovered"),
+		logger.Diagnostic(i18n.Get("LoggerAgentCuratePatternsRecallRecovered"),
 			"operation", OperationLearnCurrent,
 			"recovered_ids", recallRecoveredIDs,
 			"candidate_count", len(candidates),
 		)
-		assessment = assessCuration(result, candidates, retrieved.related)
+		assessment = assessCuration(result, candidates, existing)
 		assessment.IgnoredConflictingDroppedIDs = conflictingDroppedIDs
 	}
 	logCurationAssessment(OperationLearnCurrent, assessment)
@@ -41,8 +64,8 @@ func (s *Service) curateCurrent(ctx context.Context, candidates []domain.Pattern
 		"candidate_count", assessment.Coverage.CandidateCount,
 		"missing_ratio", assessment.Coverage.MissingRatio(),
 	)
-	result = recoverCurrentCuration(assessment, candidates, retrieved.related)
-	assessment = assessCuration(result, candidates, retrieved.related)
+	result = recoverCurrentCuration(assessment, candidates, existing)
+	assessment = assessCuration(result, candidates, existing)
 	logCurationAssessment(OperationLearnCurrent, assessment)
 	if assessment.Coverage.MissingCount() > 0 {
 		return nil, fmt.Errorf("recover curation coverage: %d of %d candidates remain unclassified", assessment.Coverage.MissingCount(), assessment.Coverage.CandidateCount)

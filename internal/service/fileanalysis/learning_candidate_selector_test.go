@@ -12,11 +12,11 @@ func TestSelectLearningCandidatesKeepsRequiredPaths(t *testing.T) {
 		RequiredPaths: []string{"internal/auth/readme.go"},
 	})
 
-	require.Equal(t, []string{"internal/auth/readme.go"}, result.SelectedPaths)
-	require.Equal(t, []string{"internal/auth/types.go"}, result.SkippedPaths)
+	require.Equal(t, []string{"internal/auth/readme.go", "internal/auth/types.go"}, result.SelectedPaths)
+	require.Empty(t, result.SkippedPaths)
 }
 
-func TestSelectLearningCandidatesUsesChangedPathsWhenDiffIsNarrow(t *testing.T) {
+func TestSelectLearningCandidatesKeepsAllCandidatesWhenDiffIsNarrow(t *testing.T) {
 	result := SelectLearningCandidates(LearningCandidateSelectionOptions{
 		Candidates: []string{"internal/auth/service.go", "internal/auth/types.go", "internal/auth/readme.go"},
 		Changes: &FileChanges{
@@ -24,11 +24,11 @@ func TestSelectLearningCandidatesUsesChangedPathsWhenDiffIsNarrow(t *testing.T) 
 		},
 	})
 
-	require.Equal(t, []string{"internal/auth/service.go", "internal/auth/types.go"}, result.SelectedPaths)
-	require.Equal(t, []string{"internal/auth/readme.go"}, result.SkippedPaths)
+	require.Equal(t, []string{"internal/auth/readme.go", "internal/auth/service.go", "internal/auth/types.go"}, result.SelectedPaths)
+	require.Empty(t, result.SkippedPaths)
 }
 
-func TestSelectLearningCandidatesDoesNotTreatWholeInitialScanAsChangedSignal(t *testing.T) {
+func TestSelectLearningCandidatesKeepsAllInitialScanCandidates(t *testing.T) {
 	paths := []string{"internal/auth/service.go", "internal/auth/types.go", "internal/auth/readme.go"}
 
 	result := SelectLearningCandidates(LearningCandidateSelectionOptions{
@@ -38,11 +38,11 @@ func TestSelectLearningCandidatesDoesNotTreatWholeInitialScanAsChangedSignal(t *
 		},
 	})
 
-	require.Equal(t, []string{"internal/auth/service.go"}, result.SelectedPaths)
-	require.Equal(t, []string{"internal/auth/readme.go", "internal/auth/types.go"}, result.SkippedPaths)
+	require.Equal(t, []string{"internal/auth/readme.go", "internal/auth/service.go", "internal/auth/types.go"}, result.SelectedPaths)
+	require.Empty(t, result.SkippedPaths)
 }
 
-func TestSelectLearningCandidatesKeepsBusinessEntryVocabulary(t *testing.T) {
+func TestSelectLearningCandidatesDoesNotUseVocabularyAsDropSignal(t *testing.T) {
 	result := SelectLearningCandidates(LearningCandidateSelectionOptions{
 		Candidates: []string{
 			"plugins/cert/internal/action/renew.go",
@@ -54,9 +54,11 @@ func TestSelectLearningCandidatesKeepsBusinessEntryVocabulary(t *testing.T) {
 
 	require.Equal(t, []string{
 		"plugins/cert/internal/action/renew.go",
+		"plugins/license/README.md",
 		"plugins/license/internal/processor/check.go",
+		"plugins/report/internal/readme.go",
 	}, result.SelectedPaths)
-	require.Equal(t, []string{"plugins/license/README.md", "plugins/report/internal/readme.go"}, result.SkippedPaths)
+	require.Empty(t, result.SkippedPaths)
 }
 
 func TestSelectLearningCandidatesFallsBackToAllWhenNoSignalExists(t *testing.T) {
@@ -108,5 +110,5 @@ func TestSelectLearningContextSeedsDoesNotTreatWholeInitialScanAsChangedSignal(t
 		},
 	})
 
-	require.Equal(t, []string{"internal/auth/service.go"}, seeds)
+	require.Equal(t, []string{"internal/auth/service.go", "internal/auth/types.go"}, seeds)
 }

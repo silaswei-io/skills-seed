@@ -2,10 +2,11 @@ package curator
 
 import (
 	"context"
+	"testing"
+
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCurateAndStoreMergesLocallyAndKeepsHigherQualityPattern(t *testing.T) {
@@ -36,13 +37,11 @@ func TestCurateAndStoreMergesLocallyAndKeepsHigherQualityPattern(t *testing.T) {
 			return nil
 		},
 	}
-	mockAgent := newDeterministicCuratorAgent()
 	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:       OperationLearnCurrent,
-		LearningSession: newCuratorTestLearningSession(mockAgent),
-		Candidates:      []domain.Pattern{*candidate},
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -87,13 +86,11 @@ func TestCurateAndStoreMergesMultipleDuplicatesLocally(t *testing.T) {
 			return nil
 		},
 	}
-	mockAgent := newDeterministicCuratorAgent()
 	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:       OperationLearnCurrent,
-		LearningSession: newCuratorTestLearningSession(mockAgent),
-		Candidates:      []domain.Pattern{*candidateA, *candidateB},
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidateA, *candidateB},
 	})
 
 	require.NoError(t, err)
@@ -128,13 +125,11 @@ func TestCurateAndStoreUpdatesExistingPatternWithSameIDOnce(t *testing.T) {
 			return nil
 		},
 	}
-	mockAgent := newDeterministicCuratorAgent()
 	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:       OperationLearnCurrent,
-		LearningSession: newCuratorTestLearningSession(mockAgent),
-		Candidates:      []domain.Pattern{*candidate},
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -169,6 +164,26 @@ func TestDeterministicCurateDeduplicatesExistingPatternsByID(t *testing.T) {
 	require.ElementsMatch(t, []string{existingID, "candidate"}, result.Patterns[0].MergedFrom)
 }
 
+func TestDeterministicCurateDoesNotMergeHighRiskBoundaryIntoNormalCapability(t *testing.T) {
+	existing := newCuratorTestPattern("resource-update", "Resource Lifecycle Update", domain.CategoryBusiness)
+	existing.Confidence = 0.9
+	existing.SetDescription("Update resource lifecycle state through the verified capability entry.")
+	existing.SetRule("When changing resource state, inspect the lifecycle entry.")
+	existing.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "src/resource/lifecycle.ts", Symbol: "updateResource"}}
+
+	candidate := newCuratorTestPattern("resource-destroy", "Resource Lifecycle Destroy", domain.CategoryBusiness)
+	candidate.Confidence = 0.9
+	candidate.SetDescription("Destroy command deletes resource state and has external environment side effects.")
+	candidate.SetRule("When changing destroy behavior, inspect the command safeguards before modifying it.")
+	candidate.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "tools/commands/destroy.ts", Symbol: "destroyResource"}}
+
+	result := deterministicCurate([]domain.Pattern{*candidate}, []domain.Pattern{*existing})
+
+	require.Len(t, result.Patterns, 1)
+	require.Equal(t, "resource-destroy", result.Patterns[0].ID)
+	require.Equal(t, []string{"resource-destroy"}, result.Patterns[0].MergedFrom)
+}
+
 func TestCurateAndStoreDoesNotUseAIDroppedCandidates(t *testing.T) {
 	candidate := newCuratorTestPattern("candidate", "Error Handling", domain.CategoryError)
 	candidate.Confidence = 0.9
@@ -184,13 +199,11 @@ func TestCurateAndStoreDoesNotUseAIDroppedCandidates(t *testing.T) {
 			return nil
 		},
 	}
-	mockAgent := newDeterministicCuratorAgent()
 	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:       OperationLearnCurrent,
-		LearningSession: newCuratorTestLearningSession(mockAgent),
-		Candidates:      []domain.Pattern{*candidate},
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)
@@ -218,13 +231,11 @@ func TestCurateAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testi
 			return nil
 		},
 	}
-	mockAgent := newDeterministicCuratorAgent()
 	svc := NewService(repo)
 
 	result, err := svc.CurateAndStore(context.Background(), CurateRequest{
-		Operation:       OperationLearnCurrent,
-		LearningSession: newCuratorTestLearningSession(mockAgent),
-		Candidates:      []domain.Pattern{*candidate},
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*candidate},
 	})
 
 	require.NoError(t, err)

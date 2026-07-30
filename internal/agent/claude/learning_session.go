@@ -28,10 +28,6 @@ func (c *ClaudeAgent) StartLearningSession(ctx context.Context, req agent.Learni
 	if sessionID := strings.TrimSpace(req.ResumeSessionID); sessionID != "" {
 		return &learningSession{agent: c, sessionID: sessionID, resume: true}, nil
 	}
-	sessionID, err := newClaudeSessionID()
-	if err != nil {
-		return nil, err
-	}
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-conversation-start", req.Stage))
 	inputs, err := agent.NewPromptInputSessionForContext(ctx, agent.RuntimePromptInputPrefix("skills-seed-learning-conversation-start", req.Stage))
 	if err != nil {
@@ -48,7 +44,7 @@ func (c *ClaudeAgent) StartLearningSession(ctx context.Context, req agent.Learni
 		return nil, errors.New(i18n.Get("AgentRenderInitSkillsPromptFailed"))
 	}
 
-	output, _, err := c.callClaudeSession(ctx, agent.OperationLearningConversationStart, prompt, aicontract.ContractLearningSessionAck, sessionID, false, task)
+	output, sessionID, _, err := c.callClaudeNewSession(ctx, agent.OperationLearningConversationStart, prompt, aicontract.ContractLearningSessionAck, task)
 	if err != nil {
 		return nil, err
 	}
@@ -128,17 +124,16 @@ func (s *learningSession) RefreshProjectProfile(ctx context.Context, req *agent.
 }
 
 func (s *learningSession) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("learning-global-curate", ""))
+	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("learning-pattern-curate", ""))
 	data := map[string]interface{}{
 		"Operation":           req.Operation,
 		"CandidatePatterns":   req.CandidatePatterns,
 		"PrecompactionCount":  req.PrecompactionCount,
 		"ExistingPatterns":    req.ExistingPatterns,
-		"AllExisting":         req.AllExisting,
 		"ExistingByCandidate": req.ExistingByCandidate,
 		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
-	output, err := s.callPrepared(ctx, "LearningGlobalCuratePatterns", "learning-global-curate", aicontract.ContractCuratePatterns, task, data)
+	output, err := s.callPrepared(ctx, "LearningPatternCurate", "learning-pattern-curate", aicontract.ContractCuratePatterns, task, data)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.15.1]
+
+### Changes
+
+- Simplified Agent model configuration to only `agent.model` and `init --agent-model`; an empty value inherits the local Agent CLI default model, avoiding profile, effort, budget, or provider-specific configuration.
+- Unified Claude and Codex calls so `agent.model` becomes the native `--model` argument. Interactive init asks for the model only in advanced settings and shows the effective source in the summary.
+- Newly initialized workspace children now inherit the root `agent.model`, keeping low-cost model settings consistent across multi-project learning.
+- Updated config templates, README, command docs, and configuration docs to clarify that accepted model-name formats are defined by the selected Agent CLI.
+
+### Fixes
+
+- Removed draft config leftovers for `agent.profile`, `agent.effort`, `agent.max_budget_usd`, and `agent.provider_options` when config files are saved, preventing unpublished fields from lingering.
+- Fixed test coverage and stale imports after the Agent factory signature began carrying runtime model options.
+
 ## [v0.15.0]
 
 ### Changes

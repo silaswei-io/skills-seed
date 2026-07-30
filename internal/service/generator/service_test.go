@@ -315,10 +315,10 @@ func TestGenerateSkills_OverwritesGeneratedSkill(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	businessPattern := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	assert.Contains(t, businessPattern, "./business/generated-rule.md")
+	assert.Contains(t, businessPattern, "Generated Rule")
 	assert.NotContains(t, businessPattern, "#### ✅ 代码证据")
 	assert.NotContains(t, businessPattern, "```go")
-	assert.Contains(t, readGeneratedFile(t, tmpDir, "references", "patterns", "business", "generated-rule.md"), "Generated Rule")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "generated-rule.md"))
 	assert.NotContains(t, readGeneratedFile(t, tmpDir, "SKILL.md"), "old generated skill")
 }
 

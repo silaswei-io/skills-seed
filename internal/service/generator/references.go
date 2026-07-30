@@ -57,6 +57,28 @@ func categoryNamesWithPatterns(patterns []domain.Pattern) []string {
 	return domain.CategoryNamesWithPatterns(patterns)
 }
 
+func patternsForSkillTemplates(patterns []domain.Pattern) []domain.Pattern {
+	out := make([]domain.Pattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		if !patternShouldRender(pattern) {
+			continue
+		}
+		out = append(out, pattern)
+	}
+	return out
+}
+
+func patternShouldRender(pattern domain.Pattern) bool {
+	switch pattern.Category {
+	case domain.CategoryNaming:
+		return domain.IsRenderableNamingPattern(pattern)
+	case domain.CategoryUtils:
+		return domain.IsRenderableUtilityPattern(pattern)
+	default:
+		return true
+	}
+}
+
 func referenceAvailability(profile *domain.ProjectProfile, patterns []domain.Pattern, enabled bool) ReferenceAvailability {
 	refs := ReferenceAvailability{Enabled: enabled}
 	if !enabled {
@@ -251,7 +273,11 @@ func patternsForTemplate(patterns []domain.Pattern) []patternRenderModel {
 			pattern.Rule = ""
 			pattern.Description = statement
 		}
-		result = append(result, patternRenderModel{Pattern: pattern, HardConstraint: hardConstraint})
+		result = append(result, patternRenderModel{
+			Pattern:             pattern,
+			HardConstraint:      hardConstraint,
+			HighRiskOperational: domain.IsHighRiskOperationalPattern(pattern),
+		})
 	}
 	return result
 }
@@ -265,8 +291,23 @@ func profileForSkillTemplates(profile *domain.ProjectProfile, patterns []domain.
 		return nil
 	}
 	filtered := *profile
-	filtered.CommonUtils = filterCommonUtilsCoveredByBusinessPatterns(profile.CommonUtils, patterns)
+	filtered.CommonUtils = filterCommonUtilsForSkillTemplates(profile.CommonUtils, patterns)
 	return &filtered
+}
+
+func filterCommonUtilsForSkillTemplates(utils []domain.UtilityFunction, patterns []domain.Pattern) []domain.UtilityFunction {
+	utils = filterRouteableCommonUtils(utils)
+	return filterCommonUtilsCoveredByBusinessPatterns(utils, patterns)
+}
+
+func filterRouteableCommonUtils(utils []domain.UtilityFunction) []domain.UtilityFunction {
+	out := make([]domain.UtilityFunction, 0, len(utils))
+	for _, utility := range utils {
+		if domain.IsRouteableUtilityFunction(utility) {
+			out = append(out, utility)
+		}
+	}
+	return out
 }
 
 func filterCommonUtilsCoveredByBusinessPatterns(utils []domain.UtilityFunction, patterns []domain.Pattern) []domain.UtilityFunction {

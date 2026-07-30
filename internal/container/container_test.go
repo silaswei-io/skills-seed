@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -57,8 +56,8 @@ func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
 	require.NoError(t, configRepo.Update(cfg))
 
 	var capturedLoader *promptloader.Loader
-	restoreFactory := RegisterAgentFactoryForTest("noop", func(commandPath string, timeout time.Duration, loader *promptloader.Loader, allowUserPlugins bool, retryCfg config.RetryConfig) agent.Agent {
-		capturedLoader = loader
+	restoreFactory := RegisterAgentFactoryForTest("noop", func(opts AgentFactoryOptions) agent.Agent {
+		capturedLoader = opts.Loader
 		return nil
 	})
 	defer restoreFactory()
@@ -76,4 +75,35 @@ func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")
 	require.NotContains(t, prompt, "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN)")
+}
+
+func TestNewContainerPassesAgentModelToFactory(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Locale = "zh-CN"
+	cfg.Project.RootPath = projectRoot
+	cfg.Agent.Engine = "noop-model"
+	cfg.Agent.Commands = map[string]string{"noop-model": "noop"}
+	cfg.Agent.Model = "low-cost-model"
+	require.NoError(t, configRepo.Update(cfg))
+
+	var capturedRuntime config.AgentRuntimeOptions
+	restoreFactory := RegisterAgentFactoryForTest("noop-model", func(opts AgentFactoryOptions) agent.Agent {
+		capturedRuntime = opts.Runtime
+		return nil
+	})
+	defer restoreFactory()
+
+	cont, err := NewContainer(context.Background(), seedPath)
+	require.NoError(t, err)
+	defer cont.Close()
+
+	require.Equal(t, "low-cost-model", capturedRuntime.Model)
 }

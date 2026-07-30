@@ -15,6 +15,7 @@ Learning strategy guidance:
 - `normal`: balance coverage and cost; keep routeable reusable changes with direct hunk anchors.
 - `deep`: keep more source-backed local changes when they affect future implementation decisions.
 - The mode changes curation priority only. It is not a fixed output count, file budget, or permission to learn outside the diff boundary.
+- Interpret category names abstractly across project types: `business` means product/domain behavior, `api` means any interface or contract, `database` means state/storage/persistence, `middleware` means interception or pipeline behavior, and `utils` means reusable domain-neutral helpers.
 {{- if .StructurePath}}
 
 Focused structure is available at `{{.StructurePath}}`; use it only around changed paths.
@@ -56,22 +57,24 @@ Diff evidence packs:
 {{end}}
 
 Diff boundary:
-- Do not rely on hidden context from planning, previous full learning, other packs, profile sync, or global curation.
+- Do not rely on hidden context from planning, previous full learning, other packs, profile sync, or later curation.
 - Every decision must be triggered by a listed diff or changed focus path.
 - Changed hunks are the source anchor. Unchanged context files can explain meaning but cannot independently create a new pattern.
 - `focus_action: "new"` means the diff revealed a new reusable boundary inside a listed pack; it does not authorize scanning beyond listed diffs and direct context.
 - Prefer `update` or `reinforce` when the diff fits a related existing pattern.
-- Use `add` only for a new reusable project-specific decision caused or revealed by the diff: business behavior, reusable callable entry, code convention, language/runtime usage, framework integration shape, lifecycle transition, authorization rule, audit rule, configuration gate, external dependency contract, integration boundary, correctness constraint, validation requirement, or operational safeguard.
+- Use `add` only for a new reusable project-specific decision caused or revealed by the diff: product/domain behavior, UI or command action, reusable source entry, code convention, language/runtime usage, framework integration shape, lifecycle transition, authorization rule, audit rule, configuration gate, external dependency contract, integration boundary, correctness constraint, validation requirement, or operational safeguard.
+- Treat changed destructive, irreversible, privileged, environment-mutating, or externally visible operations as high-risk knowledge. If the diff changes cleanup/destroy/reset commands, state/resource/data deletion, credential/secret/certificate behavior, external system or infrastructure lifecycle operations, permission changes, migration/bootstrap shortcuts, release/deployment side effects, or production-affecting maintenance flows, add or update a scoped safety/operational-boundary pattern rather than hiding it as local implementation detail.
 - Use `no_change` for pure implementation movement, formatting, trivial CRUD, repeated known behavior, or context-only observations.
 - If evidence is insufficient to prove a reusable change, return `no_change` for that pack rather than speculating.
 
 Pack-local decision quality:
 - Compare the diff against related existing patterns before adding a new proposal.
 - If the change is similar to an existing pattern, produce an update/reinforce decision with the existing semantic boundary instead of creating a duplicate.
-- When an add/update/reinforce proposal has a directly changed or verified reusable callable entry, fill `proposal.business_method` with the real name, current location, complete signature, prerequisites, and return/error semantics. Leave it null when the diff only changes data, configuration, prose, or a non-reusable helper.
+- When an add/update/reinforce proposal has a directly changed or verified reusable capability entry, fill `proposal.business_method` with the real name, current location, complete signature or concrete declaration, prerequisites, and return/error/result semantics. Leave it null when the diff only changes data, configuration, prose, or a non-reusable helper.
 - Do not infer a new language, framework, architecture, or domain inventory from a partial diff. Keep only the project-specific change that the diff directly alters or reveals.
 - Do not generalize behavior from one lifecycle action to sibling actions unless the changed hunk proves the same invariant.
 - Treat destructive setup or migration changes conservatively: unless the diff and authoritative project evidence say the behavior is a production rule, record it only as a bounded observation or `no_change`.
+- Do not turn dangerous behavior into a recommendation to perform it. If kept, wording must require inspecting the verified entry and preserving safeguards, prompts, environment checks, rollback expectations, or documented boundaries shown by the diff.
 - Do not introduce exact counts, totals, exclusions, enum cardinalities, or supported variant numbers from a partial diff unless the changed hunk contains the complete closed list and the number changes a future implementation decision.
 
 Pre-output validation:

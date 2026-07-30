@@ -41,8 +41,10 @@ agent:
   timeout: 1800
   # 是否允许 Agent 加载用户插件；默认关闭以避免批处理被插件干扰
   allow_user_plugins: false
-  # 工作区子项目并发数；仅 workspace 根配置生效，0 表示自动
+  # Agent 并发数；workspace 根配置控制子项目并发，project 配置控制证据焦点批次并发，0 表示自动
   parallelism: 0
+  # skills-seed 专用模型名；空值表示继承本机 Agent CLI 默认配置
+  model: ""
   # 可重试错误，如 429、529 过载等的重试配置
   retry:
     # 最大重试次数，0 使用默认值 3
@@ -66,7 +68,7 @@ learning:
     max_focuses_per_call: 1
     # 大候选集启用 AI 候选收敛，在进入议程规划前先筛掉低学习价值文件
     select_relevant_files: true
-    # 候选文件数达到该阈值时才调用 AI 候选收敛；小范围变更使用本地收敛
+    # 候选文件数达到该阈值时才调用 AI 候选收敛；小范围变更使用本地保守候选准备
     select_relevant_files_min_candidates: 200
     structural:
       # 启用有边界的结构化上下文；无边界输入时不会运行

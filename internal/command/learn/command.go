@@ -103,7 +103,7 @@ func RunLearnCurrentWithStateScope(cont *container.Container, stateScope string,
 type CurrentRunOptions struct {
 	// Force 表示忽略已保存的文件指纹，重新学习当前扫描范围。
 	Force bool
-	// CurationOutput 指向已完成的 CuratePatterns 输出，用于恢复时跳过 AI 策展。
+	// CurationOutput 指向已完成的 CuratePatterns 输出，用于恢复提交已完成的策展决策。
 	CurationOutput string
 }
 

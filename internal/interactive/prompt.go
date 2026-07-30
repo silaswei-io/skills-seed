@@ -101,6 +101,24 @@ func Int(title string, defaultValue, minValue int) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(text))
 }
 
+// Text 显示文本输入框并返回去除首尾空白后的值。
+func Text(title, defaultValue string) (string, error) {
+	text := defaultValue
+	err := huh.NewInput().
+		Title(title).
+		Value(&text).
+		WithWidth(promptWidth()).
+		WithTheme(promptTheme()).
+		Run()
+	if err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return "", ErrCanceled
+		}
+		return "", err
+	}
+	return strings.TrimSpace(text), nil
+}
+
 // SummaryItem 是执行前摘要中的一行键值。
 type SummaryItem struct {
 	Label string

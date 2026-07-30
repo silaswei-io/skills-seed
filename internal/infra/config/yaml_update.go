@@ -44,6 +44,8 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLInt(doc, []string{"agent", "timeout"}, cfg.Agent.Timeout)
 	setYAMLBool(doc, []string{"agent", "allow_user_plugins"}, cfg.Agent.AllowUserPlugins)
 	setYAMLInt(doc, []string{"agent", "parallelism"}, cfg.Agent.Parallelism)
+	setYAMLString(doc, []string{"agent", "model"}, cfg.Agent.Model)
+	removeYAMLMappingKeys(doc, []string{"agent"}, "profile", "effort", "max_budget_usd", "provider_options")
 
 	setYAMLString(doc, []string{"skills", "target"}, cfg.Skills.Target)
 	setYAMLString(doc, []string{"skills", "locale"}, cfg.Skills.Locale)

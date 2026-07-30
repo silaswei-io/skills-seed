@@ -26,10 +26,12 @@ func (s *GeneratorService) buildVerifiedKnowledgeSnapshot(ctx context.Context, p
 	if err != nil {
 		return verifiedKnowledgeSnapshot{}, err
 	}
+	renderPatterns := patternsForSkillTemplates(patterns)
+	renderProfile := profileForSkillTemplates(profile, renderPatterns)
 	return verifiedKnowledgeSnapshot{
-		RenderProfile: profileForSkillTemplates(profile, patterns),
-		Patterns:      patterns,
-		Spec:          s.projectSpecFromProfileAndPatterns(profile, patterns, config.WorkspaceProjectConfig{}),
+		RenderProfile: renderProfile,
+		Patterns:      renderPatterns,
+		Spec:          s.projectSpecFromProfileAndPatterns(renderProfile, patterns, config.WorkspaceProjectConfig{}),
 		GoTests:       goTests,
 	}, nil
 }

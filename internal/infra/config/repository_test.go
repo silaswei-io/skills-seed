@@ -129,6 +129,7 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, "codex", cfg.Agent.Commands["codex"])
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
 	assert.False(t, cfg.Agent.AllowUserPlugins)
+	assert.Empty(t, cfg.Agent.Model)
 	assert.Equal(t, 1, cfg.Learning.Current.MaxFocusesPerCall)
 	assert.True(t, cfg.Learning.Current.SelectRelevantFiles)
 	assert.Equal(t, 200, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
@@ -395,6 +396,7 @@ agent:
   timeout: 1800
   allow_user_plugins: false
   parallelism: 0
+  model: ""
 
 learning:
   current:
@@ -711,6 +713,7 @@ func TestRepository_GetAgentConfig(t *testing.T) {
 	assert.Equal(t, "codex", agentCfg.Commands["codex"])
 	assert.Equal(t, 1800, agentCfg.Timeout)
 	assert.False(t, agentCfg.AllowUserPlugins)
+	assert.Empty(t, agentCfg.Model)
 }
 
 func TestEffectiveSkillsPath(t *testing.T) {

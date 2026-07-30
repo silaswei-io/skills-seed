@@ -8,7 +8,7 @@
 {{if .RelatedReferences}}
 ## Related References
 
-This page routes business rules and domain flows. Cross-boundary work such as API fields, persistence, or error semantics also requires the matching reference below.
+This page routes product/domain rules and behavior flows. Cross-boundary work such as interface/message fields, state/persistence boundaries, or failure semantics also requires the matching reference below.
 
 {{range .RelatedReferences}}
 - [{{.Title}}]({{.Path}}): {{.Reason}}
@@ -17,21 +17,51 @@ This page routes business rules and domain flows. Cross-boundary work such as AP
 
 ## Route A New Request
 
-Match the request's business nouns, user actions, state changes, rules or policies, entry channels, external dependencies, exception symptoms, or changed file paths to the domains below. Do not match only by package names or technical abbreviations. Read only the most relevant detail file first, then confirm behavior against current code.
+Match the request's business nouns, user actions, state changes, rules or policies, entry channels, external dependencies, exception symptoms, or changed file paths to the domains or learned business rules below. Do not match only by package names or technical abbreviations. Read the most relevant detail page or inline rule first, then confirm behavior against current code.
 
-{{if .CoverageWarnings}}
-## Coverage Notes
-
-{{range .CoverageWarnings}}
-- [{{.Title}}]({{.Path}}): {{.Message}}
-{{end}}
-
-{{end}}
 ## Domain Routing
 
-{{range .Groups}}
+{{if .DetailGroups}}
+{{range .DetailGroups}}
 - **[{{.Title}}]({{.Path}})** - {{.Summary.Description}} ({{len .Patterns}} patterns)
   - When to read: {{if .Summary.IsFallback}}Read when the task cannot be mapped to a specific domain but changes business rules, state transitions, runtime behavior, or cross-module flows.{{else}}Read when the task mentions {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}, uses synonymous business actions or state changes, or changes code under {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}}.{{end}}
   {{if .Summary.PrimaryPath}}- Primary evidence path: `{{.Summary.PrimaryPath}}`{{end}}
   {{if .Summary.Keywords}}- Keywords: {{range .Summary.Keywords}}`{{.}}` {{end}}{{end}}
+{{end}}
+{{else}}
+No business domain currently needs a separate detail file; read the learned business rules below directly.
+{{end}}
+
+{{if .InlineGroups}}
+## Learned Business Rules
+
+The rules below are source-backed but not large enough to justify separate pages. When a task matches these terms or paths, inspect the verified source entries before changing behavior.
+
+{{range .InlineGroups}}
+### {{.Title}}
+
+{{.Summary.Description}}
+
+{{if .Summary.PrimaryPath}}- Primary evidence path: `{{.Summary.PrimaryPath}}`
+{{end}}{{if .Summary.Keywords}}- Keywords: {{range .Summary.Keywords}}`{{.}}` {{end}}
+{{end}}
+{{range .Patterns}}
+#### {{.Name}}
+
+{{if .HighRiskOperational}}**Risk Checkpoint**: This pattern involves irreversible, privileged, state/resource-changing, or externally visible behavior. Use it to locate verified safeguards; do not treat the dangerous action as ordinary reuse guidance.
+
+{{end}}
+{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability**: {{.Description}}{{end}}
+
+{{end}}{{if .Rule}}**User rule**: {{.Rule}}
+
+{{end}}{{if .EvidenceLocations}}**Verified Source**
+
+{{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}
+{{end}}
+{{end}}{{if .BusinessMethod}}**Verified Entry Point**: `{{.BusinessMethod.DisplayLocation}}` - {{.BusinessMethod.Name}}
+{{end}}
+
+{{end}}
+{{end}}
 {{end}}
