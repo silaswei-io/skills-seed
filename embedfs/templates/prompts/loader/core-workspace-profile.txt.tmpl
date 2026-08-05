@@ -27,6 +27,7 @@ Separate these facts carefully:
 # Input Files
 
 - Workspace input: `{{.WorkspaceInputPath}}`
+- Allowed child project IDs: `{{.ProjectIDList}}`
 {{- if .UserContextPath}}
 - One-shot context for this workspace learn run: `{{.UserContextPath}}`
 {{- end}}
@@ -46,6 +47,7 @@ Use the context only to interpret workspace positioning, delivery boundaries, re
 - The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
 - Preserve paths, commands, config keys, environment variables, interface names, file names, project IDs, and code identifiers exactly when needed.
 - Project identity is owned by configuration. In `projects`, return only the exact configured `project_id` plus analysis-owned responsibility and framework fields. Never return or redefine project paths, types, languages, workspace name, or workspace root.
+- In `consumers`, `producers`, `affected_projects`, `from_project_id`, and `project_ids`, use only exact configured child project IDs from the workspace input. Never use the workspace name, workspace root directory name, service role, platform name, or external system name as a project ID.
 - Workspace input may include `project_ref` and `path_ref` to disambiguate projects from paths. When a dependency target is a configured child project, output `to.kind: "project"` and `to.value` as the exact project ID. Do not copy the `project:` or `path:` prefix into output JSON.
 - Use `to.kind: "path"` only for shared, contract, or infrastructure paths that are also declared in `shared`, `contracts`, or `infra`; never use `path` for a configured child project even when project ID and path are the same string.
 - `shared.path`, `contracts.path`, and `infra.path` must be concrete existing workspace-root files or directories, not glob patterns. A child-project-owned path is allowed only when repository evidence shows it is a cross-project shared asset, contract source, generated-code input, deployment boundary, or runtime integration boundary; otherwise keep child-project internals out of the workspace profile.

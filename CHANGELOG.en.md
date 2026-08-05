@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.15.3]
+
+### Changes
+
+- Workspace profile/spec Agent output schemas now dynamically constrain project IDs from the current workspace config. `project_id`, `from_project_id`, `producers`, `consumers`, `affected_projects`, and `project_ids` can only use configured child project IDs.
+- `learning.current.structural.provider: auto` now prefers CodeGraph and falls back to embedded tree-sitter when the CodeGraph command or index is unavailable. Explicit `provider: codegraph` still requires CodeGraph.
+
+### Fixes
+
+- Fixed workspace relationship learning where the root workspace name could be emitted as a child project ID, causing errors such as `unknown project "ntls-workspace"`.
+- Fixed GitHub CI failures when the runner does not have the `codegraph` command installed, affecting project-profile symbol verification and generated Skill evidence filtering tests.
+
 ## [v0.15.2]
 
 ### Changes

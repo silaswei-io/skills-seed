@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.15.3]
+
+### 变更
+
+- 工作区画像与规范的 Agent 输出 schema 现在会按当前 workspace 配置动态收窄项目 ID，`project_id`、`from_project_id`、`producers`、`consumers`、`affected_projects` 和 `project_ids` 只能使用已配置的子项目 ID。
+- `learning.current.structural.provider: auto` 的语义调整为优先使用 CodeGraph，并在 CodeGraph 命令或索引不可用时回退内嵌 tree-sitter；显式 `provider: codegraph` 仍保持强制 CodeGraph。
+
+### 修复
+
+- 修复工作区关系学习中根工作区名称可能被 Agent 当成子项目 ID，导致 `unknown project "ntls-workspace"` 之类错误的问题。
+- 修复 GitHub CI 环境未安装 `codegraph` 时，项目画像符号校验和生成阶段证据过滤测试失败的问题。
+
 ## [v0.15.2]
 
 ### 变更

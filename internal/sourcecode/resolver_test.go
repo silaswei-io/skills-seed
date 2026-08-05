@@ -3,6 +3,8 @@ package sourcecode
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -14,10 +16,37 @@ import (
 
 func TestNewResolverUsesTreeSitterOnlyWhenExplicit(t *testing.T) {
 	_, treeSitter := NewResolver(config.StructuralConfig{Provider: config.StructuralProviderTreeSitter}).(treeSitterResolver)
-	_, automatic := NewResolver(config.StructuralConfig{Provider: config.StructuralProviderAuto}).(*codeGraphResolver)
 
 	require.True(t, treeSitter)
+}
+
+func TestNewResolverUsesCodeGraphOnlyWhenExplicit(t *testing.T) {
+	_, codeGraph := NewResolver(config.StructuralConfig{Provider: config.StructuralProviderCodeGraph}).(*codeGraphResolver)
+
+	require.True(t, codeGraph)
+}
+
+func TestNewResolverUsesFallbackForAuto(t *testing.T) {
+	_, automatic := NewResolver(config.StructuralConfig{Provider: config.StructuralProviderAuto}).(fallbackResolver)
+
 	require.True(t, automatic)
+}
+
+func TestFallbackResolverUsesTreeSitterWhenCodeGraphFails(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte("package demo\n\nfunc Publish() {}\n"), 0o644))
+	resolver := fallbackResolver{
+		primary:  failingResolver{err: codegraph.ErrUnavailable},
+		fallback: treeSitterResolver{},
+	}
+
+	catalog, err := resolver.Resolve(context.Background(), root, []Reference{{Path: "service.go", Name: "Publish", Kind: "function"}})
+
+	require.NoError(t, err)
+	require.Contains(t, catalog, "service.go")
+	symbol, ok := FindSymbol(catalog["service.go"], "Publish", "function", 3)
+	require.True(t, ok)
+	require.Equal(t, "Publish", symbol.Name)
 }
 
 func TestCodeGraphResolverQueriesUniqueNamesAndFiltersExactPaths(t *testing.T) {
@@ -59,6 +88,14 @@ type fakeCodeGraphClient struct {
 	outputs  map[string]string
 	queryErr error
 	queries  []string
+}
+
+type failingResolver struct {
+	err error
+}
+
+func (r failingResolver) Resolve(context.Context, string, []Reference) (Catalog, error) {
+	return nil, r.err
 }
 
 func (c *fakeCodeGraphClient) EnsureReady(context.Context, string) (*codegraph.Status, error) {

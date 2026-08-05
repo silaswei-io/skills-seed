@@ -120,6 +120,29 @@ func TestWorkspaceContractsKeepIdentityOutOfAIOutput(t *testing.T) {
 	require.Contains(t, specProperties["change_order"].(map[string]any)["description"], "without numeric or list prefixes")
 }
 
+func TestWorkspaceStructuredOutputSchemaConstrainsProjectIDs(t *testing.T) {
+	data, err := StructuredOutputSchemaWithOptions(ContractWorkspaceProfile, StructuredOutputOptions{
+		ProjectIDs: []string{"network", "agent", "agent"},
+	})
+	require.NoError(t, err)
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+
+	projectID, _, ok := findSchemaPropertyWithContainer(schema, "project_id")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"agent", "network"}, schemaStringList(projectID["enum"]))
+	fromProjectID, _, ok := findSchemaPropertyWithContainer(schema, "from_project_id")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"agent", "network"}, schemaStringList(fromProjectID["enum"]))
+	for _, name := range []string{"consumers", "producers", "affected_projects", "project_ids"} {
+		property, _, ok := findSchemaPropertyWithContainer(schema, name)
+		require.True(t, ok, name)
+		items := property["items"].(map[string]any)
+		require.ElementsMatch(t, []string{"agent", "network"}, schemaStringList(items["enum"]), name)
+	}
+	require.NotContains(t, data, "ntls-workspace")
+}
+
 func TestJSONSchemaRejectsUnknownContract(t *testing.T) {
 	schema, err := JSONSchema("MissingOutput")
 

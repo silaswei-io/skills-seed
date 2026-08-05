@@ -3,6 +3,7 @@ package sourcecode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,10 +38,17 @@ type Resolver interface {
 
 // NewResolver 根据结构化 provider 创建唯一的符号解析入口。
 func NewResolver(cfg config.StructuralConfig) Resolver {
-	if config.NormalizeStructuralProvider(string(cfg.Provider)) == config.StructuralProviderTreeSitter {
+	switch config.NormalizeStructuralProvider(string(cfg.Provider)) {
+	case config.StructuralProviderTreeSitter:
 		return treeSitterResolver{}
+	case config.StructuralProviderCodeGraph:
+		return newCodeGraphResolver(codegraph.NewClient("codegraph"))
+	default:
+		return fallbackResolver{
+			primary:  newCodeGraphResolver(codegraph.NewClient("codegraph")),
+			fallback: treeSitterResolver{},
+		}
 	}
-	return newCodeGraphResolver(codegraph.NewClient("codegraph"))
 }
 
 type treeSitterResolver struct{}
@@ -69,9 +77,29 @@ func (treeSitterResolver) Resolve(ctx context.Context, projectRoot string, refs 
 	return catalog, nil
 }
 
+type fallbackResolver struct {
+	primary  Resolver
+	fallback Resolver
+}
+
+func (r fallbackResolver) Resolve(ctx context.Context, projectRoot string, refs []Reference) (Catalog, error) {
+	catalog, err := r.primary.Resolve(ctx, projectRoot, refs)
+	if err == nil {
+		return catalog, nil
+	}
+	if !isCodeGraphFallbackError(err) {
+		return nil, err
+	}
+	return r.fallback.Resolve(ctx, projectRoot, refs)
+}
+
 type codeGraphClient interface {
 	EnsureReady(ctx context.Context, projectRoot string) (*codegraph.Status, error)
 	Run(ctx context.Context, projectRoot string, args ...string) (string, error)
+}
+
+func isCodeGraphFallbackError(err error) bool {
+	return errors.Is(err, codegraph.ErrUnavailable) || errors.Is(err, codegraph.ErrNotReady)
 }
 
 type codeGraphResolver struct {

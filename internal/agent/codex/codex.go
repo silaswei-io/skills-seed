@@ -106,7 +106,14 @@ func (c *CodexAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWo
 
 // AnalyzeWorkspaceProfile 分析工作区结构和跨项目关系
 func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
-	prompt, err := c.promptLoader.Render("core-workspace-profile", agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
+	data := agent.WorkspacePromptData(agent.WorkspacePromptDataRequest{
+		WorkspaceName:      req.WorkspaceName,
+		WorkspaceRoot:      req.WorkspaceRoot,
+		WorkspaceInputPath: req.WorkspaceInputPath,
+		UserContextPath:    req.UserContextPath,
+		ProjectIDs:         req.ProjectIDs,
+	})
+	prompt, err := c.promptLoader.Render("core-workspace-profile", data)
 	if err != nil || prompt == "" {
 		if err != nil {
 			return nil, err
@@ -114,7 +121,7 @@ func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.Ana
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "AnalyzeWorkspaceProfile", prompt, aicontract.ContractWorkspaceProfile)
+	output, err := c.callCodexWithOptions(ctx, "AnalyzeWorkspaceProfile", prompt, aicontract.ContractWorkspaceProfile, aicontract.StructuredOutputOptions{ProjectIDs: req.ProjectIDs})
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexProjectAnalysisFailed"), err)
 	}
@@ -134,7 +141,14 @@ func (c *CodexAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.Ana
 
 // AnalyzeWorkspaceSpec 生成工作区级开发规范
 func (c *CodexAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
-	data := agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
+	data := agent.WorkspacePromptData(agent.WorkspacePromptDataRequest{
+		WorkspaceName:        req.WorkspaceName,
+		WorkspaceRoot:        req.WorkspaceRoot,
+		WorkspaceInputPath:   req.WorkspaceInputPath,
+		WorkspaceProfilePath: req.WorkspaceProfilePath,
+		UserContextPath:      req.UserContextPath,
+		ProjectIDs:           req.ProjectIDs,
+	})
 	prompt, err := c.promptLoader.Render("core-workspace-spec", data)
 	if err != nil || prompt == "" {
 		if err != nil {
@@ -143,7 +157,7 @@ func (c *CodexAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analyz
 		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callCodex(ctx, "AnalyzeWorkspaceSpec", prompt, aicontract.ContractWorkspaceSpec)
+	output, err := c.callCodexWithOptions(ctx, "AnalyzeWorkspaceSpec", prompt, aicontract.ContractWorkspaceSpec, aicontract.StructuredOutputOptions{ProjectIDs: req.ProjectIDs})
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentCodexProjectAnalysisFailed"), err)
 	}

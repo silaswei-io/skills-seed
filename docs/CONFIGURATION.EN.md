@@ -12,7 +12,7 @@ The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates 
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
 - Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec during `learn current` from repository evidence, child project profiles, and one-shot user context. They are not read from config, and generation only consumes learned artifacts.
 - Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
-- `analysis.codegraph` was removed. Structural context and symbol verification are now configured through `learning.current.structural`; the default `provider: auto` uses CodeGraph, while embedded tree-sitter requires explicit selection.
+- `analysis.codegraph` was removed. Structural context and symbol verification are now configured through `learning.current.structural`; the default `provider: auto` prefers CodeGraph and falls back to embedded tree-sitter when CodeGraph is unavailable.
 
 ## Config Example
 
@@ -166,13 +166,13 @@ exclude:
 | `select_relevant_files` | `true` | Enable AI candidate narrowing for large candidate sets before agenda planning; when disabled, conservative local preparation is used |
 | `select_relevant_files_min_candidates` | `200` | Minimum candidate file count before AI candidate narrowing is called; smaller changes keep local candidates |
 | `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
-| `structural.provider` | `auto` | Structural context and symbol-verification source: `auto`/`codegraph` use CodeGraph with automatic repair; `treesitter` explicitly selects the embedded parser |
+| `structural.provider` | `auto` | Structural context and symbol-verification source: `auto` prefers CodeGraph and falls back to tree-sitter when unavailable; `codegraph` requires CodeGraph; `treesitter` explicitly selects the embedded parser |
 | `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |
 | `structural.max_file_size` | `512` | Per-source-file size limit in KB; larger files are skipped |
 
 #### `structural`
 
-The structural provider gives the Agent symbols, imports, entry points, and module clues and also verifies source symbols returned by AI. The default `provider: auto` uses CodeGraph; it automatically initializes missing project indexes and attempts repair when sync or status checks fail. `provider: codegraph` has the same behavior as an explicit selection, while `provider: treesitter` uses the embedded parser. A CodeGraph context failure is reported and that context is skipped; a symbol-verification failure is returned as an error. Neither path silently switches parsers in the same run.
+The structural provider gives the Agent symbols, imports, entry points, and module clues and also verifies source symbols returned by AI. The default `provider: auto` prefers CodeGraph; it automatically initializes missing project indexes and attempts repair when sync or status checks fail, then falls back to embedded tree-sitter when the CodeGraph command or index is unavailable. `provider: codegraph` requires CodeGraph and returns errors directly; `provider: treesitter` uses only the embedded parser.
 
 Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the same file-filtering policy: source files, build config, and dependency config are included by default, while documents, generated outputs, paths matched by global `exclude`, and generated Skills output directories are skipped.
 

@@ -2,6 +2,8 @@ package analyzer
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/codegraph"
@@ -9,8 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStructuralProviderUsesCodeGraphForAuto(t *testing.T) {
+func TestStructuralProviderUsesFallbackForAuto(t *testing.T) {
 	provider := newStructuralProvider(config.StructuralConfig{Provider: config.StructuralProviderAuto})
+
+	_, ok := provider.(fallbackStructuralProvider)
+	require.True(t, ok)
+}
+
+func TestStructuralProviderUsesCodeGraphOnlyWhenExplicit(t *testing.T) {
+	provider := newStructuralProvider(config.StructuralConfig{Provider: config.StructuralProviderCodeGraph})
 
 	_, ok := provider.(*codeGraphProvider)
 	require.True(t, ok)
@@ -21,6 +30,24 @@ func TestStructuralProviderUsesTreeSitterOnlyWhenExplicit(t *testing.T) {
 
 	_, ok := provider.(*treesitterCollector)
 	require.True(t, ok)
+}
+
+func TestFallbackStructuralProviderUsesTreeSitterWhenCodeGraphUnavailable(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644))
+	provider := fallbackStructuralProvider{
+		primary:  failingStructuralProvider{err: codegraph.ErrUnavailable},
+		fallback: newTreeSitterProvider(config.StructuralConfig{}),
+	}
+
+	data, err := provider.Collect(context.Background(), root, structuralContextRequest{
+		ProjectName: "test",
+		SeedPaths:   []string{"main.go"},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, data)
+	require.Equal(t, structuralProviderTreeSitter, data.Source)
 }
 
 func TestCodeGraphProviderReportsProgressStages(t *testing.T) {
@@ -45,6 +72,14 @@ func TestCodeGraphProviderReportsProgressStages(t *testing.T) {
 		structuralContextStageCodeGraphIndex,
 		structuralContextStageCodeGraphContext,
 	}, stages)
+}
+
+type failingStructuralProvider struct {
+	err error
+}
+
+func (p failingStructuralProvider) Collect(context.Context, string, structuralContextRequest) (*structuralContextData, error) {
+	return nil, p.err
 }
 
 type fakeCodeGraphClient struct {

@@ -185,13 +185,13 @@ type WorkspaceProjectAnalysisOutput struct {
 type WorkspacePathOutput struct {
 	Path             string   `json:"path" jsonschema_description:"concrete existing workspace-root file or directory; not a glob pattern, child-project-local path, platform name, registry name, URL, Jenkins job, or external endpoint"`
 	Description      string   `json:"description,omitempty" jsonschema_description:"path responsibility"`
-	Consumers        []string `json:"consumers,omitempty" jsonschema_description:"consumer project ids"`
-	Producers        []string `json:"producers,omitempty" jsonschema_description:"producer project ids"`
-	AffectedProjects []string `json:"affected_projects,omitempty" jsonschema_description:"affected project ids"`
+	Consumers        []string `json:"consumers,omitempty" jsonschema_description:"consumer project ids from the configured child project id set"`
+	Producers        []string `json:"producers,omitempty" jsonschema_description:"producer project ids from the configured child project id set"`
+	AffectedProjects []string `json:"affected_projects,omitempty" jsonschema_description:"affected project ids from the configured child project id set"`
 }
 
 type WorkspaceDependencyOutput struct {
-	FromProjectID string                   `json:"from_project_id" jsonschema_description:"exact configured source project id"`
+	FromProjectID string                   `json:"from_project_id" jsonschema_description:"exact configured source child project id"`
 	To            WorkspaceReferenceOutput `json:"to" jsonschema_description:"typed target; use project for configured child projects and path only for declared shared, contract, or infrastructure paths"`
 	Reason        string                   `json:"reason" jsonschema_description:"evidenced dependency reason"`
 }
@@ -203,7 +203,7 @@ type WorkspaceReferenceOutput struct {
 
 type WorkspaceRouteOutput struct {
 	PathPattern string   `json:"path_pattern" jsonschema_description:"path glob relative to workspace root"`
-	ProjectIDs  []string `json:"project_ids" jsonschema_description:"affected project ids"`
+	ProjectIDs  []string `json:"project_ids" jsonschema_description:"affected project ids from the configured child project id set"`
 	Reason      string   `json:"reason" jsonschema_description:"why this path affects those projects"`
 }
 
@@ -233,7 +233,7 @@ type WorkspaceParallelGuidanceOutput struct {
 
 type WorkspaceLoadMultipleSkillOutput struct {
 	Condition  string   `json:"condition" jsonschema_description:"when multiple child skills are needed"`
-	ProjectIDs []string `json:"project_ids" jsonschema_description:"child project ids to load"`
+	ProjectIDs []string `json:"project_ids" jsonschema_description:"configured child project ids to load"`
 	Reason     string   `json:"reason" jsonschema_description:"why these skills are needed together"`
 }
 

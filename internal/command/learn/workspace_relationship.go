@@ -21,10 +21,11 @@ import (
 )
 
 type workspaceLearnInputData struct {
-	Name       string                       `json:"name"`
-	RootPath   string                       `json:"root_path"`
-	Projects   []workspaceLearnInputProject `json:"projects"`
-	ConfigPath string                       `json:"config_path,omitempty"`
+	Name              string                       `json:"name"`
+	RootPath          string                       `json:"root_path"`
+	AllowedProjectIDs []string                     `json:"allowed_project_ids"`
+	Projects          []workspaceLearnInputProject `json:"projects"`
+	ConfigPath        string                       `json:"config_path,omitempty"`
 }
 
 type workspaceLearnInputProject struct {
@@ -160,6 +161,7 @@ func analyzeWorkspaceRelationshipProfile(ctx context.Context, cont *container.Co
 		WorkspaceRoot:      projectRoot,
 		WorkspaceInputPath: input.inputPath,
 		UserContextPath:    input.userContextPath,
+		ProjectIDs:         workspacediscovery.ProjectIDs(baseProfile.Projects),
 	})
 	if err != nil {
 		return nil, err
@@ -186,6 +188,7 @@ func analyzeWorkspaceRelationshipSpec(ctx context.Context, cont *container.Conta
 		WorkspaceInputPath:   input.inputPath,
 		WorkspaceProfilePath: profilePath,
 		UserContextPath:      input.userContextPath,
+		ProjectIDs:           workspacediscovery.ProjectIDs(profile.Projects),
 	})
 	if err != nil {
 		return nil, err
@@ -291,12 +294,14 @@ func workspaceProfileFromInput(input workspaceLearnInputData) *domain.WorkspaceP
 
 func workspaceLearnInput(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, workspaceConfig config.WorkspaceConfig) (workspaceLearnInputData, error) {
 	input := workspaceLearnInputData{
-		Name:       workspaceName,
-		RootPath:   projectRoot,
-		Projects:   make([]workspaceLearnInputProject, 0, len(workspaceConfig.Projects)),
-		ConfigPath: filepath.ToSlash(filepath.Join(projectRoot, ".skills-seed", "config.yaml")),
+		Name:              workspaceName,
+		RootPath:          projectRoot,
+		AllowedProjectIDs: make([]string, 0, len(workspaceConfig.Projects)),
+		Projects:          make([]workspaceLearnInputProject, 0, len(workspaceConfig.Projects)),
+		ConfigPath:        filepath.ToSlash(filepath.Join(projectRoot, ".skills-seed", "config.yaml")),
 	}
 	for _, project := range workspaceConfig.Projects {
+		input.AllowedProjectIDs = append(input.AllowedProjectIDs, project.ID)
 		projectRootPath, err := workspacediscovery.ResolveProjectRoot(projectRoot, project)
 		if err != nil {
 			return workspaceLearnInputData{}, err

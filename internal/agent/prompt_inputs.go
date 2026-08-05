@@ -22,14 +22,26 @@ func promptLearningScope(scope config.LearningScope) config.LearningScope {
 	return config.NormalizeLearningScope(string(scope))
 }
 
+// WorkspacePromptDataRequest 描述工作区画像和规范提示词共享的输入参数。
+type WorkspacePromptDataRequest struct {
+	WorkspaceName        string
+	WorkspaceRoot        string
+	WorkspaceInputPath   string
+	WorkspaceProfilePath string
+	UserContextPath      string
+	ProjectIDs           []string
+}
+
 // WorkspacePromptData 返回工作区画像和规范提示词共享的路径参数。
-func WorkspacePromptData(workspaceName, workspaceRoot, workspaceInputPath, workspaceProfilePath, userContextPath string) map[string]interface{} {
+func WorkspacePromptData(req WorkspacePromptDataRequest) map[string]interface{} {
 	return map[string]interface{}{
-		"WorkspaceName":        workspaceName,
-		"WorkspaceRoot":        workspaceRoot,
-		"WorkspaceInputPath":   workspaceInputPath,
-		"WorkspaceProfilePath": workspaceProfilePath,
-		"UserContextPath":      userContextPath,
+		"WorkspaceName":        req.WorkspaceName,
+		"WorkspaceRoot":        req.WorkspaceRoot,
+		"WorkspaceInputPath":   req.WorkspaceInputPath,
+		"WorkspaceProfilePath": req.WorkspaceProfilePath,
+		"UserContextPath":      req.UserContextPath,
+		"ProjectIDs":           append([]string(nil), req.ProjectIDs...),
+		"ProjectIDList":        strings.Join(req.ProjectIDs, ", "),
 	}
 }
 

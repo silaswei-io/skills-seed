@@ -23,7 +23,11 @@ import (
 )
 
 func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, error) {
-	outputSchema, err := aicontract.StructuredOutputSchema(outputContract)
+	return c.callCodexWithOptions(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, task...)
+}
+
+func (c *CodexAgent) callCodexWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, task ...agent.RuntimeTask) (string, error) {
+	outputSchema, err := aicontract.StructuredOutputSchemaWithOptions(outputContract, opts)
 	if err != nil {
 		return "", err
 	}

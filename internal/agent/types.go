@@ -244,19 +244,21 @@ type ProfileRefreshRecommendation struct {
 
 // AnalyzeWorkspaceProfileRequest 请求生成工作区事实画像
 type AnalyzeWorkspaceProfileRequest struct {
-	WorkspaceName      string // 工作区名称
-	WorkspaceRoot      string // 工作区根路径
-	WorkspaceInputPath string // 本次工作区生成输入文件路径
-	UserContextPath    string // 本次学习传入的一次性用户上下文文件路径
+	WorkspaceName      string   // 工作区名称
+	WorkspaceRoot      string   // 工作区根路径
+	WorkspaceInputPath string   // 本次工作区生成输入文件路径
+	UserContextPath    string   // 本次学习传入的一次性用户上下文文件路径
+	ProjectIDs         []string // 配置声明的唯一合法子项目 ID
 }
 
 // AnalyzeWorkspaceSpecRequest 请求生成工作区开发规范
 type AnalyzeWorkspaceSpecRequest struct {
-	WorkspaceName        string // 工作区名称
-	WorkspaceRoot        string // 工作区根路径
-	WorkspaceInputPath   string // 本次工作区生成输入文件路径
-	WorkspaceProfilePath string // 本次工作区画像文件路径
-	UserContextPath      string // 本次学习传入的一次性用户上下文文件路径
+	WorkspaceName        string   // 工作区名称
+	WorkspaceRoot        string   // 工作区根路径
+	WorkspaceInputPath   string   // 本次工作区生成输入文件路径
+	WorkspaceProfilePath string   // 本次工作区画像文件路径
+	UserContextPath      string   // 本次学习传入的一次性用户上下文文件路径
+	ProjectIDs           []string // 配置声明的唯一合法子项目 ID
 }
 
 // OptimizeWorkflowRequest 请求把用户口语化说明整理为标准工作流。

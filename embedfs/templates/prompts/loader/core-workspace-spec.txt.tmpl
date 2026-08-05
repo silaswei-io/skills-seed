@@ -24,6 +24,7 @@ You may receive:
 
 - Workspace input: `{{.WorkspaceInputPath}}`
 - Workspace profile: `{{.WorkspaceProfilePath}}`
+- Allowed child project IDs: `{{.ProjectIDList}}`
 {{- if .UserContextPath}}
 - One-shot context for this workspace learn run: `{{.UserContextPath}}`
 {{- end}}
@@ -80,5 +81,6 @@ The JSON Schema below is generated from the AI output DTO and is the source of t
 
 - Preserve paths, commands, config keys, environment variables, project IDs, and code identifiers verbatim.
 - Project identity is owned by configuration. Do not return workspace name, root path, or a duplicate project index.
+- In `project_ids`, use only exact configured child project IDs from the allowed list. Never use the workspace name, workspace root directory name, service role, platform name, or external system name as a project ID.
 - Each `change_order` item contains step text only. Do not include numeric, bullet, or list prefixes; presentation adds numbering.
 - For stable output, order routing rules by path pattern, cross-project flows by dependency order, and parallel rules by project ID. Do not rename rules or reshape groups merely for stylistic variety.

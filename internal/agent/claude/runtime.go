@@ -27,6 +27,11 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt, outputC
 	return output, err
 }
 
+func (c *ClaudeAgent) callClaudeWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, task ...agent.RuntimeTask) (string, error) {
+	output, _, err := c.callClaudeWithArchiveWithOptions(ctx, operation, prompt, outputContract, opts, task...)
+	return output, err
+}
+
 type claudeCallResult struct {
 	output  string
 	archive agent.AgentOutputArchive
@@ -39,7 +44,11 @@ type claudeSessionStartResult struct {
 }
 
 func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
-	outputSchema, err := aicontract.StructuredOutputSchema(outputContract)
+	return c.callClaudeWithArchiveWithOptions(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, task...)
+}
+
+func (c *ClaudeAgent) callClaudeWithArchiveWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
+	outputSchema, err := aicontract.StructuredOutputSchemaWithOptions(outputContract, opts)
 	if err != nil {
 		return "", agent.AgentOutputArchive{}, err
 	}

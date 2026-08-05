@@ -328,7 +328,13 @@ func sampleWorkflowData() agent.OptimizeWorkflowRequest {
 }
 
 func sampleWorkspaceData() map[string]interface{} {
-	return agent.WorkspacePromptData("demo-workspace", "/repo", "/tmp/workspace-input.json", "/tmp/workspace-profile.json", "")
+	return agent.WorkspacePromptData(agent.WorkspacePromptDataRequest{
+		WorkspaceName:        "demo-workspace",
+		WorkspaceRoot:        "/repo",
+		WorkspaceInputPath:   "/tmp/workspace-input.json",
+		WorkspaceProfilePath: "/tmp/workspace-profile.json",
+		ProjectIDs:           []string{"backend", "worker"},
+	})
 }
 
 func samplePattern(id, name string) *domain.Pattern {

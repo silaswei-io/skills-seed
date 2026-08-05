@@ -211,7 +211,7 @@ skills:
 
 `agent.model` 为空时不传模型参数，完全继承本机 Agent CLI 默认配置；填写后会在 skills-seed 调用 Claude 或 Codex CLI 时传入对应模型名。模型名格式由具体 Agent CLI 决定。
 
-当前 `sync` / `learn current` 会先做本地文件过滤，再做候选准备决定进入证据包规划的输入；大候选集可按 `learning.current.select_relevant_files_min_candidates` 阈值启用 AI 候选收敛，小范围变更使用本地保守候选准备，不按路径词表丢弃源码候选。缺少或异常的 CodeGraph 索引会自动初始化、同步或修复；只有显式配置 `provider: treesitter` 才会使用内嵌 tree-sitter。候选/焦点文件清单会作为 runtime 输入文件按路径引用，不再直接堆进分析 prompt；证据包规划和学习 prompt 也带有稳定决策规则，减少相同输入下的输出漂移。终端只展示关键阶段和精简的过滤、候选结果，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
+当前 `sync` / `learn current` 会先做本地文件过滤，再做候选准备决定进入证据包规划的输入；大候选集可按 `learning.current.select_relevant_files_min_candidates` 阈值启用 AI 候选收敛，小范围变更使用本地保守候选准备，不按路径词表丢弃源码候选。默认 `provider: auto` 会优先使用 CodeGraph，并在缺少或异常的索引上自动初始化、同步或修复；当 CodeGraph 命令或索引不可用时会回退到内嵌 tree-sitter。候选/焦点文件清单会作为 runtime 输入文件按路径引用，不再直接堆进分析 prompt；证据包规划和学习 prompt 也带有稳定决策规则，减少相同输入下的输出漂移。终端只展示关键阶段和精简的过滤、候选结果，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
 
 证据包规划会以只读方式读取 runtime 候选清单、结构上下文及必要的仓库源码，确保按路径引用的输入真实可用；当前学习的模式入库使用本地规范化与确定性合并，不重复扫描仓库，也不再为全量候选做二次 AI 审核。`learn current` 会把分析结果、项目画像提交状态及已完成的规范化决策写入可恢复 checkpoint；本地校验或保存失败时使用 `sync --resume` 可直接重放，不会重跑已完成证据包。终端会分别显示规范化校验和模式库写入，详细诊断写入 runtime 日志。
 

@@ -121,7 +121,14 @@ func (c *ClaudeAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeW
 
 // AnalyzeWorkspaceProfile 分析工作区结构和跨项目关系
 func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
-	prompt, err := c.promptLoader.Render("core-workspace-profile", agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, "", req.UserContextPath))
+	data := agent.WorkspacePromptData(agent.WorkspacePromptDataRequest{
+		WorkspaceName:      req.WorkspaceName,
+		WorkspaceRoot:      req.WorkspaceRoot,
+		WorkspaceInputPath: req.WorkspaceInputPath,
+		UserContextPath:    req.UserContextPath,
+		ProjectIDs:         req.ProjectIDs,
+	})
+	prompt, err := c.promptLoader.Render("core-workspace-profile", data)
 	if err != nil || prompt == "" {
 		if err != nil {
 			return nil, err
@@ -129,7 +136,7 @@ func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.An
 		return nil, errors.New(i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "AnalyzeWorkspaceProfile", prompt, aicontract.ContractWorkspaceProfile)
+	output, err := c.callClaudeWithOptions(ctx, "AnalyzeWorkspaceProfile", prompt, aicontract.ContractWorkspaceProfile, aicontract.StructuredOutputOptions{ProjectIDs: req.ProjectIDs})
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
 	}
@@ -149,7 +156,14 @@ func (c *ClaudeAgent) AnalyzeWorkspaceProfile(ctx context.Context, req *agent.An
 
 // AnalyzeWorkspaceSpec 生成工作区级开发规范
 func (c *ClaudeAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
-	data := agent.WorkspacePromptData(req.WorkspaceName, req.WorkspaceRoot, req.WorkspaceInputPath, req.WorkspaceProfilePath, req.UserContextPath)
+	data := agent.WorkspacePromptData(agent.WorkspacePromptDataRequest{
+		WorkspaceName:        req.WorkspaceName,
+		WorkspaceRoot:        req.WorkspaceRoot,
+		WorkspaceInputPath:   req.WorkspaceInputPath,
+		WorkspaceProfilePath: req.WorkspaceProfilePath,
+		UserContextPath:      req.UserContextPath,
+		ProjectIDs:           req.ProjectIDs,
+	})
 	prompt, err := c.promptLoader.Render("core-workspace-spec", data)
 	if err != nil || prompt == "" {
 		if err != nil {
@@ -158,7 +172,7 @@ func (c *ClaudeAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analy
 		return nil, errors.New(i18n.Get("AgentRenderProjectAnalysisPromptFailed"))
 	}
 
-	output, err := c.callClaude(ctx, "AnalyzeWorkspaceSpec", prompt, aicontract.ContractWorkspaceSpec)
+	output, err := c.callClaudeWithOptions(ctx, "AnalyzeWorkspaceSpec", prompt, aicontract.ContractWorkspaceSpec, aicontract.StructuredOutputOptions{ProjectIDs: req.ProjectIDs})
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeProjectAnalysisFailed"), err)
 	}

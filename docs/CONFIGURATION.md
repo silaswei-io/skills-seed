@@ -12,7 +12,7 @@
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
 - workspace 公共库、契约和基础设施影响会在 `learn current` 阶段根据仓库证据、子项目画像和一次性用户说明分析并沉淀到 workspace profile/spec，不从配置文件读取；生成阶段只消费已沉淀结果。
 - workspace 根配置的 `profile.language` 默认留空，因为一个工作区可以包含多种语言子项目。
-- `analysis.codegraph` 已移除，结构化上下文与符号校验统一配置在 `learning.current.structural`；默认 `provider: auto` 使用 CodeGraph，只有显式配置时才使用内嵌 tree-sitter。
+- `analysis.codegraph` 已移除，结构化上下文与符号校验统一配置在 `learning.current.structural`；默认 `provider: auto` 优先使用 CodeGraph，并在 CodeGraph 不可用时回退内嵌 tree-sitter。
 
 ## 配置示例
 
@@ -166,13 +166,13 @@ exclude:
 | `select_relevant_files` | `true` | 大候选集是否在议程规划前启用 AI 候选收敛；关闭后使用本地保守候选准备 |
 | `select_relevant_files_min_candidates` | `200` | 候选文件数达到该阈值时才调用 AI 候选收敛；小范围变更直接保留本地候选 |
 | `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
-| `structural.provider` | `auto` | 结构化上下文与符号校验来源：`auto`/`codegraph` 使用 CodeGraph 并自动修复；`treesitter` 显式选择内嵌 parser |
+| `structural.provider` | `auto` | 结构化上下文与符号校验来源：`auto` 优先 CodeGraph 并在不可用时回退 tree-sitter；`codegraph` 强制使用 CodeGraph；`treesitter` 显式选择内嵌 parser |
 | `structural.max_symbols` | `30` | 输出到结构化上下文的最大符号数 |
 | `structural.max_file_size` | `512` | 单个源码文件大小上限，单位 KB；超过时跳过该文件 |
 
 #### `structural`
 
-结构化 provider 同时用于给 Agent 提供符号、导入、入口点和模块线索，以及校验 AI 返回的源码符号。默认 `provider: auto` 使用 CodeGraph；如果目标项目未初始化会自动执行初始化，索引同步或状态检查异常时会尝试自动修复。`provider: codegraph` 语义相同但表达显式选择；`provider: treesitter` 才会使用内嵌 parser。CodeGraph 上下文失败会记录警告并跳过该上下文，符号校验失败会直接返回错误；两者都不会在同一次运行中静默切换解析引擎。
+结构化 provider 同时用于给 Agent 提供符号、导入、入口点和模块线索，以及校验 AI 返回的源码符号。默认 `provider: auto` 优先使用 CodeGraph；如果目标项目未初始化会自动执行初始化，索引同步或状态检查异常时会尝试自动修复；当 CodeGraph 命令或索引不可用时，会回退到内嵌 tree-sitter。`provider: codegraph` 表示强制使用 CodeGraph，失败会直接暴露错误；`provider: treesitter` 表示只使用内嵌 parser。
 
 0.7.1 起，结构化预扫描、`learn current` 和 `preview` 共用同一套文件过滤策略：默认只纳入源码、构建配置和依赖配置；文档、生成产物、全局 `exclude` 命中的路径以及已生成 Skills 输出目录会被跳过。
 

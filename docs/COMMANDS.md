@@ -309,7 +309,7 @@ skills-seed learn current --context-path .skills-seed/context.md
 7. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
 8. 长期有效的项目上下文写入 `.skills-seed/context/`；`--context` 和 `--context-path` 只影响本次命令。
 9. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
-10. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 使用 CodeGraph，并在必要时自动初始化或修复索引。只有显式配置 `provider: treesitter` 才使用内嵌 parser。没有边界输入时不会因此全仓扫描。
+10. 有 focus、diff、sample 或入口文件等边界输入时，学习和项目画像分析会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 优先使用 CodeGraph，并在 CodeGraph 命令或索引不可用时回退内嵌 tree-sitter。显式 `provider: codegraph` 会强制使用 CodeGraph。没有边界输入时不会因此全仓扫描。
 11. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，终端也会输出包含等待时间和 API 原因的稳定提示，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
