@@ -24,9 +24,8 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
-	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
-	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
@@ -102,6 +101,48 @@ func TestSyncGeneratedSkillMissing(t *testing.T) {
 	require.False(t, syncGeneratedSkillMissing(cont))
 }
 
+func TestSyncGeneratedSkillMissingInWorkspaceChecksChildSkills(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	rootSeedPath := filepath.Join(workspaceRoot, ".skills-seed")
+	rootConfigRepo, err := config.NewRepository(rootSeedPath, "zh-CN")
+	require.NoError(t, err)
+	rootCfg := rootConfigRepo.Get()
+	rootCfg.Project.Name = "demo"
+	rootCfg.Project.Mode = domain.ModeWorkspace
+	rootCfg.Project.RootPath = workspaceRoot
+	rootCfg.Skills.Target = "codex"
+	rootCfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-workspace-dev")}
+	rootCfg.Workspace.Projects = []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}}
+	require.NoError(t, rootConfigRepo.Update(rootCfg))
+
+	childRoot := filepath.Join(workspaceRoot, "backend")
+	childSeedPath := filepath.Join(childRoot, ".skills-seed")
+	childConfigRepo, err := config.NewRepository(childSeedPath, "zh-CN")
+	require.NoError(t, err)
+	childCfg := childConfigRepo.Get()
+	childCfg.Project.Name = "backend"
+	childCfg.Project.Mode = domain.ModeProject
+	childCfg.Project.RootPath = childRoot
+	childCfg.Skills.Target = "codex"
+	childCfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "backend-dev")}
+	require.NoError(t, childConfigRepo.Update(childCfg))
+
+	require.NoError(t, os.MkdirAll(filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace-dev"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md"), []byte("# workspace\n"), 0644))
+	cont := &container.Container{
+		SeedPath:   rootSeedPath,
+		Config:     rootConfigRepo.Get(),
+		ConfigRepo: rootConfigRepo,
+	}
+
+	require.True(t, syncGeneratedSkillMissing(cont))
+
+	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, ".agents", "skills", "backend-dev"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"), []byte("# backend\n"), 0644))
+
+	require.False(t, syncGeneratedSkillMissing(cont))
+}
+
 func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	userContext := "sync context"
 	projectRoot := t.TempDir()
@@ -129,18 +170,18 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	defer patternRepo.Close()
 	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
 	gitRepo := git.NewRepository(projectRoot)
-	curatorSvc := curator.NewService(patternRepo)
+	patternNormSvc := patternnorm.NewService(patternRepo)
 	cont := &container.Container{
-		SeedPath:    seedPath,
-		Config:      configRepo.Get(),
-		ConfigRepo:  configRepo,
-		GitRepo:     gitRepo,
-		PatternRepo: patternRepo,
-		FileTracker: patternRepo,
-		ProfileRepo: profilestore.NewRepository(seedPath),
-		Agent:       mockAgent,
-		AnalyzerSvc: analyzer.NewAnalyzerService(mockAgent, configRepo),
-		LearnerSvc:  servicelearner.NewLearnerService(curatorSvc),
+		SeedPath:       seedPath,
+		Config:         configRepo.Get(),
+		ConfigRepo:     configRepo,
+		GitRepo:        gitRepo,
+		PatternRepo:    patternRepo,
+		FileTracker:    patternRepo,
+		ProfileRepo:    profilestore.NewRepository(seedPath),
+		Agent:          mockAgent,
+		AnalyzerSvc:    analyzer.NewAnalyzerService(mockAgent, configRepo),
+		PatternNormSvc: patternNormSvc,
 	}
 	staleLearnState := commandstate.NewState("learn-current", "demo", "go", userContext, []domain.FileAnalysisRecord{
 		{Path: "internal/stale.go", Hash: "stale"},
@@ -159,7 +200,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	}
 	stateScope := commandutil.CommandStateScope("sync")
 
-	err = syncLearn(context.Background(), cont, stateScope, userContext, "", syncRunAuto, nil, commandDependenciesForTest())
+	err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil, commandDependenciesForTest())
 
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
@@ -229,23 +270,23 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		Summary:     "profile",
 		GeneratedAt: "2026-01-01 00:00:00",
 	}))
-	curatorSvc := curator.NewService(patternRepo)
+	patternNormSvc := patternnorm.NewService(patternRepo)
 	cont := &container.Container{
-		SeedPath:     seedPath,
-		Config:       configRepo.Get(),
-		ConfigRepo:   configRepo,
-		GitRepo:      git.NewRepository(projectRoot),
-		PatternRepo:  patternRepo,
-		FileTracker:  patternRepo,
-		ProfileRepo:  profileRepo,
-		StateRepo:    statestore.NewRepository(seedPath),
-		Agent:        mockAgent,
-		AnalyzerSvc:  analyzer.NewAnalyzerService(mockAgent, configRepo),
-		LearnerSvc:   servicelearner.NewLearnerService(curatorSvc),
-		GeneratorSvc: generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil),
+		SeedPath:       seedPath,
+		Config:         configRepo.Get(),
+		ConfigRepo:     configRepo,
+		GitRepo:        git.NewRepository(projectRoot),
+		PatternRepo:    patternRepo,
+		FileTracker:    patternRepo,
+		ProfileRepo:    profileRepo,
+		StateRepo:      statestore.NewRepository(seedPath),
+		Agent:          mockAgent,
+		AnalyzerSvc:    analyzer.NewAnalyzerService(mockAgent, configRepo),
+		PatternNormSvc: patternNormSvc,
+		GeneratorSvc:   generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil),
 	}
 
-	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", "", syncRunRestart, nil, commandDependenciesForTest())
+	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())
 
 	require.NoError(t, err)
 	require.Equal(t, 1, planCalls)
@@ -254,14 +295,107 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 
 func commandDependenciesForTest() Dependencies {
 	return Dependencies{
-		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
+		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			return learncmd.RunLearnCurrentWithStateScopeOptions(cont, req.StateScope, req.UserContext, learncmd.CurrentRunOptions{
 				Force:          req.Force,
-				CurationOutput: req.CurationOutput,
+				Quiet:          opts.Quiet,
+				OnStepStart:    opts.OnStepStart,
+				OnStepUpdate:   opts.OnStepUpdate,
+				OnStepComplete: opts.OnStepComplete,
 			})
 		},
-		Generate: gencmd.RunGenerate,
+		Generate:                    gencmd.RunGenerate,
+		GenerateChild:               gencmd.RunGenerateQuiet,
+		LearnWorkspaceRelationships: learncmd.RunWorkspaceRelationships,
+		GenerateWorkspaceRoot:       gencmd.RunGenerateWorkspaceRoot,
 	}
+}
+
+func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := container.RegisterAgentFactoryForTest("mock", func(opts container.AgentFactoryOptions) agent.Agent {
+		return &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
+	})
+	t.Cleanup(restoreFactory)
+
+	workspaceRoot := t.TempDir()
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newSyncWorkspaceFlowTestContainer(t, workspaceRoot, []config.WorkspaceProjectConfig{project})
+	initSyncWorkspaceFlowChild(t, workspaceRoot, project)
+
+	var calls []string
+	err := syncLearn(context.Background(), cont, "sync", "", syncRunAuto, nil, Dependencies{
+		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
+			require.True(t, opts.Quiet)
+			require.NotNil(t, opts.OnStepStart)
+			require.NotNil(t, opts.OnStepComplete)
+			calls = append(calls, "learn:"+cont.ConfigRepo.GetProjectConfig().Name)
+			opts.OnStepStart("learn")
+			opts.OnStepComplete("learn")
+			return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{PatternsSaved: 1}}, nil
+		},
+		Generate: func(cont *container.Container) error {
+			calls = append(calls, "generate-default:"+cont.ConfigRepo.GetProjectConfig().Name)
+			return nil
+		},
+		GenerateChild: func(cont *container.Container) error {
+			calls = append(calls, "generate:"+cont.ConfigRepo.GetProjectConfig().Name)
+			return nil
+		},
+		LearnWorkspaceRelationships: func(cont *container.Container, userContext string) (bool, error) {
+			calls = append(calls, "relationships")
+			return false, nil
+		},
+		GenerateWorkspaceRoot: func(cont *container.Container) error {
+			calls = append(calls, "generate:workspace")
+			return nil
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"learn:backend", "generate:backend", "relationships", "generate:workspace"}, calls)
+}
+
+func newSyncWorkspaceFlowTestContainer(t *testing.T, workspaceRoot string, projects []config.WorkspaceProjectConfig) *container.Container {
+	t.Helper()
+	seedPath := filepath.Join(workspaceRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo-workspace"
+	cfg.Project.Mode = domain.ModeWorkspace
+	cfg.Project.RootPath = workspaceRoot
+	cfg.Agent.Engine = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Agent.Parallelism = 1
+	cfg.Workspace.Projects = projects
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-workspace-dev")}
+	require.NoError(t, configRepo.Update(cfg))
+	return &container.Container{
+		SeedPath:   seedPath,
+		Config:     configRepo.Get(),
+		ConfigRepo: configRepo,
+	}
+}
+
+func initSyncWorkspaceFlowChild(t *testing.T, workspaceRoot string, project config.WorkspaceProjectConfig) {
+	t.Helper()
+	childRoot := filepath.Join(workspaceRoot, filepath.FromSlash(project.Path))
+	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, ".git"), 0755))
+	childSeedPath := filepath.Join(childRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(childSeedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = project.ID
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.RootPath = childRoot
+	cfg.Project.Language = project.Language
+	cfg.Agent.Engine = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", project.ID+"-dev")}
+	require.NoError(t, configRepo.Update(cfg))
 }
 
 func TestHasSyncCommandState(t *testing.T) {
@@ -302,6 +436,63 @@ func TestHasResumableSyncCommandStateRequiresInputsAndFocuses(t *testing.T) {
 	require.True(t, resumable)
 }
 
+func TestHasSyncCommandStateForTargetFindsWorkspaceChildState(t *testing.T) {
+	ctx := context.Background()
+	workspaceRoot := t.TempDir()
+	cont := newSyncWorkspaceStateTestContainer(t, workspaceRoot)
+	childSeedPath := filepath.Join(workspaceRoot, "backend", ".skills-seed")
+	require.NoError(t, commandstate.NewRepository(childSeedPath, "sync").Save(ctx, commandstate.NewState("sync", "backend", "go", "", []domain.FileAnalysisRecord{
+		{Path: "main.go", Hash: "hash"},
+	}, nil, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}})))
+
+	hasState, err := hasSyncCommandStateForTarget(ctx, cont, "sync")
+	require.NoError(t, err)
+	require.True(t, hasState)
+
+	resumable, err := hasResumableSyncCommandStateForTarget(ctx, cont, "sync")
+	require.NoError(t, err)
+	require.True(t, resumable)
+}
+
+func TestClearSyncCommandStatesClearsWorkspaceChildState(t *testing.T) {
+	ctx := context.Background()
+	workspaceRoot := t.TempDir()
+	cont := newSyncWorkspaceStateTestContainer(t, workspaceRoot)
+	rootRepo := commandstate.NewRepository(cont.SeedPath, "sync")
+	childRepo := commandstate.NewRepository(filepath.Join(workspaceRoot, "backend", ".skills-seed"), "sync")
+	state := commandstate.NewState("sync", "backend", "go", "", []domain.FileAnalysisRecord{
+		{Path: "main.go", Hash: "hash"},
+	}, nil, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}})
+	require.NoError(t, rootRepo.Save(ctx, state))
+	require.NoError(t, childRepo.Save(ctx, state))
+
+	require.NoError(t, clearSyncCommandStates(cont, "sync"))
+
+	_, err := rootRepo.Load(ctx)
+	require.ErrorIs(t, err, commandstate.ErrStateNotFound)
+	_, err = childRepo.Load(ctx)
+	require.ErrorIs(t, err, commandstate.ErrStateNotFound)
+}
+
+func newSyncWorkspaceStateTestContainer(t *testing.T, workspaceRoot string) *container.Container {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Join(workspaceRoot, "backend"), 0755))
+	seedPath := filepath.Join(workspaceRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = domain.ModeWorkspace
+	cfg.Project.RootPath = workspaceRoot
+	cfg.Workspace.Projects = []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}}
+	require.NoError(t, configRepo.Update(cfg))
+	return &container.Container{
+		SeedPath:   seedPath,
+		Config:     configRepo.Get(),
+		ConfigRepo: configRepo,
+	}
+}
+
 func TestNormalizeSyncInputsTrimsAndRejectsUnsafeFiles(t *testing.T) {
 	inputs, err := normalizeSyncInputs(syncInputs{
 		UserContext: " context ",
@@ -318,26 +509,15 @@ func TestSyncCmdOnlyExposesSyncFlags(t *testing.T) {
 	require.NotNil(t, cmd.Flags().Lookup("resume"))
 	require.NotNil(t, cmd.Flags().Lookup("restart"))
 	require.NotNil(t, cmd.Flags().Lookup("no-interactive"))
-	require.NotNil(t, cmd.Flags().Lookup("curation-output"))
 	require.Nil(t, cmd.Flags().Lookup("pattern"))
 	require.Nil(t, cmd.Flags().Lookup("files"))
 	require.Nil(t, cmd.Flags().Lookup("category"))
 }
 
-func TestSyncCurationOutputRequiresExplicitResume(t *testing.T) {
-	require.NoError(t, i18n.Init("zh-CN"))
-	cmd := Cmd(&container.Container{})
-	cmd.SetArgs([]string{"--curation-output", "curation.raw.txt", "--no-interactive"})
-
-	err := cmd.Execute()
-
-	require.ErrorContains(t, err, "--curation-output 必须与 --resume 一起使用")
-}
-
-func TestSyncLearnPassesCurationOutputToLearning(t *testing.T) {
+func TestSyncLearnPassesStateScopeAndForceToLearning(t *testing.T) {
 	var received syncflow.LearnCurrentRequest
-	err := syncLearn(context.Background(), nil, "sync", "context", "curation.raw.txt", syncRunResume, nil, Dependencies{
-		LearnCurrent: func(_ *container.Container, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
+	err := syncLearn(context.Background(), nil, "sync", "context", syncRunRestart, nil, Dependencies{
+		LearnCurrent: func(_ *container.Container, req syncflow.LearnCurrentRequest, _ LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			received = req
 			return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, nil
 		},
@@ -346,9 +526,9 @@ func TestSyncLearnPassesCurationOutputToLearning(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, syncflow.LearnCurrentRequest{
-		StateScope:     "sync",
-		UserContext:    "context",
-		CurationOutput: "curation.raw.txt",
+		StateScope:  "sync",
+		UserContext: "context",
+		Force:       true,
 	}, received)
 }
 

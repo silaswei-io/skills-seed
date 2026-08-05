@@ -20,10 +20,9 @@ type LearnCurrentFunc func(ctx context.Context, req LearnCurrentRequest) (domain
 
 // LearnCurrentRequest 描述 sync 传给当前学习阶段的恢复参数。
 type LearnCurrentRequest struct {
-	StateScope     string
-	UserContext    string
-	Force          bool
-	CurationOutput string
+	StateScope  string
+	UserContext string
+	Force       bool
 }
 
 // GenerateFunc 执行 skills 生成。

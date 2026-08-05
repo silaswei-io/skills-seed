@@ -15,7 +15,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Learning | [`skills-seed learn`](#skills-seed-learn) | Learn patterns from current code | `skills-seed learn current` |
 | Generation | [`skills-seed generate`](#skills-seed-generate) | Generate skills from profiles and patterns | `skills-seed generate skills` |
 | Preview | [`skills-seed preview`](#skills-seed-preview) | Preview files selected for full or incremental analysis | `skills-seed preview files` |
-| Pattern Management | [`skills-seed patterns`](#skills-seed-patterns) | Add, delete, curate, and inspect patterns | `skills-seed patterns show` |
+| Pattern Management | [`skills-seed patterns`](#skills-seed-patterns) | Add, delete, compact, and inspect patterns | `skills-seed patterns show` |
 | Workflow | [`skills-seed workflow`](#skills-seed-workflow) | Add or update user task workflows | `skills-seed workflow --context "..."` |
 | Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show the project profile | `skills-seed profile show` |
 | One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
@@ -56,7 +56,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | Initialize skills-seed project | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | Learn from current code | `current` | `--help, -h` = `false` |
-| `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
 | `skills-seed patterns add (--context <description> \| --context-path <path>)` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
@@ -70,7 +70,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed profile` | Show the project profile | `show` | `--help, -h` = `false` |
 | `skills-seed profile show` | Show the current project profile summary | - | `--help, -h` = `false` |
 | `skills-seed reset` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
-| `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--curation-output` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
 | `skills-seed workflow` | Manage user workflows | `show [workflow-id]` | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workflow show [workflow-id]` | Show existing workflow summaries or full details | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
@@ -515,7 +515,7 @@ skills-seed patterns show business-create-order --format json
 #### Notes
 
 1. `patterns compact` uses local deterministic merging and does not call the Agent.
-2. Use `--dry-run` first when you want to inspect the curation result.
+2. Use `--dry-run` first when you want to inspect the normalization result.
 3. `patterns stats` shows quality metrics such as specificity, confidence, and effective score so you can judge which patterns are ready for generated Skills.
 4. `patterns show` without arguments prints the pattern overview list, sorted by latest update by default. Use `--sort score` for high-value rules and `--sort category` for category grouping. The location column prefers capability/helper-entry `code_location`; when a pattern has no capability entry, it falls back to the first pattern-level `evidence_locations` entry. Passing a `pattern-id` prints the full detail view for one pattern, including good/bad examples, quality metrics, workspace ownership, evidence locations, capability-entry fields, code-location history, and language-agnostic symbol snapshots.
 5. `patterns stats` and `patterns show` do not call AI and do not modify data, but they still need to open `.skills-seed/store/project.db`. If another `skills-seed` command is holding the database, the CLI asks you to wait for that command to finish or check for a stale process.
@@ -595,7 +595,6 @@ One-step sync: learn current code, then generate skills. `--context` and `--cont
 |---|---|---|---|
 | `skills-seed sync` | learn current → generate skills | `skills-seed sync` | Resumes unfinished sync state first; generates skills when learning changed output |
 | `skills-seed sync --context <background>` | learn current with context → generate skills | `skills-seed sync --context "On-prem deployment, not SaaS"` | Provides one-shot analysis background and does not write a user pattern |
-| `skills-seed sync --resume --curation-output <file>` | Resume commit from a completed AI curation output | `skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/...raw.txt` | Run from the child project that produced the output and preserve the original context |
 
 #### Flags
 
@@ -605,7 +604,6 @@ One-step sync: learn current code, then generate skills. `--context` and `--cont
 | `--context-path` | empty | Read extra background for this learning run from files or directories; may be repeated |
 | `--resume` | `false` | Resume the previous incomplete sync state |
 | `--restart` | `false` | Clear this sync recovery state and start again |
-| `--curation-output` | empty | Import a completed CuratePatterns structured output and skip a new AI curation call |
 | `--help`, `-h` | `false` | Show `sync` help |
 
 #### Common Examples
@@ -615,15 +613,14 @@ skills-seed sync
 skills-seed sync --context "On-prem deployment, not SaaS"
 skills-seed sync --context-path docs/plan.md --context-path docs/specs
 skills-seed sync --restart
-skills-seed sync --resume --curation-output .skills-seed/runtime/agent-outputs/20260723-134541-claude-learning-pattern-curate.raw.txt
+skills-seed sync --resume
 ```
 
 #### Notes
 
 1. `sync` runs `learn current` first by default; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
 2. `sync --context` does not add a user pattern; it only affects this learning analysis. Use `patterns add` or `patterns update` to add user-defined patterns.
-3. A successful AI curation decision is checkpointed immediately. If local validation or storage later fails, `sync --resume` replays it without calling the Agent again.
-4. For output produced before curation checkpoints existed, use `--curation-output` with the matching `.raw.txt` or `.md` archive. Run it from the matching child project, not the workspace root.
+3. Normalization decisions are checkpointed immediately. If local validation or storage later fails, `sync --resume` replays them without rerunning completed evidence packs.
 
 ### `skills-seed hook`
 

@@ -21,7 +21,7 @@ func TestEffectiveParallelism(t *testing.T) {
 }
 
 func TestRunProjectTasksReturnsOriginatingErrorInsteadOfSiblingCancellation(t *testing.T) {
-	rootCause := errors.New("curation failed")
+	rootCause := errors.New("normalization failed")
 	var started sync.WaitGroup
 	started.Add(2)
 

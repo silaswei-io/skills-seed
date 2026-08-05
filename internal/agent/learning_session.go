@@ -33,7 +33,6 @@ type LearningSession interface {
 	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeCurrentDeltaBatch(ctx context.Context, req *AnalyzeCurrentDeltaBatchRequest) (*AnalyzeCurrentDeltaBatchResult, error)
 	RefreshProjectProfile(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
-	CuratePatterns(ctx context.Context, req *CuratePatternsRequest) (*CuratePatternsResult, error)
 	Close(ctx context.Context) error
 }
 

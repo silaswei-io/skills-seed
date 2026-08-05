@@ -11,7 +11,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // Entry 表示一次学习或生成对项目沉淀产生的变更。
@@ -129,7 +128,7 @@ func readFile(seedPath string) (file, error) {
 		return file{}, err
 	}
 	var logFile file
-	if err := jsonx.Unmarshal(data, &logFile); err != nil {
+	if err := json.Unmarshal(data, &logFile); err != nil {
 		return file{}, err
 	}
 	return logFile, nil

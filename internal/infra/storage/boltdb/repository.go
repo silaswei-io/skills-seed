@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -82,7 +81,7 @@ func (r *PatternRepository) Get(ctx context.Context, id string) (*domain.Pattern
 			data := categoryBucket.Get([]byte(id))
 			if data != nil {
 				var found domain.Pattern
-				if err := jsonx.Unmarshal(data, &found); err != nil {
+				if err := json.Unmarshal(data, &found); err != nil {
 					return err
 				}
 				found.NormalizeAfterLoad()
@@ -121,7 +120,7 @@ func (r *PatternRepository) GetAll(ctx context.Context) ([]domain.Pattern, error
 			// 遍历该分类下的所有模式
 			return categoryBucket.ForEach(func(k, v []byte) error {
 				var p domain.Pattern
-				if err := jsonx.Unmarshal(v, &p); err != nil {
+				if err := json.Unmarshal(v, &p); err != nil {
 					return err
 				}
 				p.NormalizeAfterLoad()
@@ -153,7 +152,7 @@ func (r *PatternRepository) GetByCategory(ctx context.Context, category domain.C
 
 		return categoryBucket.ForEach(func(k, v []byte) error {
 			var p domain.Pattern
-			if err := jsonx.Unmarshal(v, &p); err != nil {
+			if err := json.Unmarshal(v, &p); err != nil {
 				return err
 			}
 			p.NormalizeAfterLoad()
@@ -296,7 +295,7 @@ func (r *PatternRepository) FindSimilar(ctx context.Context, pattern *domain.Pat
 
 		return categoryBucket.ForEach(func(k, v []byte) error {
 			var p domain.Pattern
-			if err := jsonx.Unmarshal(v, &p); err != nil {
+			if err := json.Unmarshal(v, &p); err != nil {
 				return err
 			}
 
@@ -372,7 +371,7 @@ func (r *PatternRepository) GetAnalyzedFile(ctx context.Context, scope domain.Fi
 		}
 
 		var found domain.FileAnalysisRecord
-		if err := jsonx.Unmarshal(data, &found); err != nil {
+		if err := json.Unmarshal(data, &found); err != nil {
 			return err
 		}
 		normalizeFileAnalysisRecordDefaults(&found)
@@ -396,7 +395,7 @@ func (r *PatternRepository) ListAnalyzedFiles(ctx context.Context, scope domain.
 			}
 
 			var record domain.FileAnalysisRecord
-			if err := jsonx.Unmarshal(v, &record); err != nil {
+			if err := json.Unmarshal(v, &record); err != nil {
 				return err
 			}
 			normalizeFileAnalysisRecordDefaults(&record)
@@ -419,7 +418,7 @@ func (r *PatternRepository) SaveAnalyzedFiles(ctx context.Context, records []dom
 			key := []byte(scope.KeyForPath(record.Path))
 			previous := domain.FileAnalysisRecord{}
 			if data := bucket.Get(key); data != nil {
-				if err := jsonx.Unmarshal(data, &previous); err != nil {
+				if err := json.Unmarshal(data, &previous); err != nil {
 					return err
 				}
 			}
@@ -490,7 +489,7 @@ func findPatternInTx(mainBucket *bolt.Bucket, id string) (*domain.Pattern, error
 			return nil
 		}
 		var pattern domain.Pattern
-		if err := jsonx.Unmarshal(data, &pattern); err != nil {
+		if err := json.Unmarshal(data, &pattern); err != nil {
 			return err
 		}
 		pattern.NormalizeAfterLoad()

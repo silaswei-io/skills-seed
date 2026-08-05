@@ -12,11 +12,6 @@ import (
 // ErrNoJSONCandidate 表示文本中没有可修复的 JSON 片段。
 var ErrNoJSONCandidate = jsonrepair.ErrNoJSONCandidate
 
-// Unmarshal 解析可信 JSON 数据，行为等同 encoding/json.Unmarshal。
-func Unmarshal(data []byte, target any) error {
-	return json.Unmarshal(data, target)
-}
-
 // UnmarshalStrict 解析可信 JSON 数据，并拒绝未知字段和尾随 JSON 值。
 func UnmarshalStrict(data []byte, target any) error {
 	return decodeStrict(string(data), target)
@@ -69,6 +64,9 @@ func RepairCandidate(text string) (string, bool) {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" || (trimmed[0] != '{' && trimmed[0] != '[') {
 		return "", false
+	}
+	if json.Valid([]byte(trimmed)) {
+		return trimmed, true
 	}
 	repaired, err := jsonrepair.Repair(trimmed)
 	if err != nil || !json.Valid([]byte(repaired)) {

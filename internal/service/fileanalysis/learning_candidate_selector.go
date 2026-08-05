@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 type LearningCandidateSelectionOptions struct {
@@ -18,6 +19,32 @@ type LearningCandidateSelectionResult struct {
 	SelectedPaths []string
 	SkippedPaths  []string
 	Reason        string
+}
+
+var highSignalTerms = []string{
+	"entry", "main", "route", "router", "screen", "page", "view", "component",
+	"workflow", "flow", "usecase", "logic", "model", "entity", "schema",
+	"contract", "interface", "message", "event", "action", "command",
+	"config", "setting", "policy", "permission", "auth", "audit", "validator",
+	"adapter", "client", "provider", "integration", "protocol", "connector",
+	"task", "job", "processor", "subscriber", "hook", "plugin", "extension",
+	"store", "state", "cache", "migration", "release", "deploy", "script",
+	"source", "template", "license", "key", "secret", "credential", "crypto", "certificate", "cert",
+	"handler", "controller", "service", "repository", "repo", "middleware", "api",
+}
+
+var lowSignalTerms = []string{
+	"test", "spec", "fixture", "mock", "stub", "readme", "doc", "docs",
+	"example", "examples", "sample", "samples", "generated", "vendor",
+}
+
+var entryNames = []string{
+	"main",
+	"index",
+	"app",
+	"server",
+	"bootstrap",
+	"startup",
 }
 
 func PathsToFileInfos(paths []string) []domain.FileInfo {
@@ -94,35 +121,22 @@ func learningCandidatePathScore(path string) int {
 	for _, token := range tokens {
 		tokenSet[token] = true
 	}
-	highSignalTerms := []string{
-		"entry", "main", "route", "router", "screen", "page", "view", "component",
-		"workflow", "flow", "usecase", "logic", "model", "entity", "schema",
-		"contract", "interface", "message", "event", "action", "command",
-		"config", "setting", "policy", "permission", "auth", "audit", "validator",
-		"adapter", "client", "provider", "integration", "protocol", "connector",
-		"task", "job", "processor", "subscriber", "hook", "plugin", "extension",
-		"store", "state", "cache", "migration", "release", "deploy", "script",
-		"source", "template", "license", "key", "secret", "credential", "crypto", "certificate", "cert",
-		"handler", "controller", "service", "repository", "repo", "middleware", "api",
-	}
 	for _, term := range highSignalTerms {
 		if tokenSet[term] {
 			score += 10
 		}
-	}
-	lowSignalTerms := []string{
-		"test", "spec", "fixture", "mock", "stub", "readme", "doc", "docs",
-		"example", "examples", "sample", "samples", "generated", "vendor",
 	}
 	for _, term := range lowSignalTerms {
 		if tokenSet[term] {
 			score -= 20
 		}
 	}
-	lower := strings.ToLower(filepath.ToSlash(path))
-	if strings.HasSuffix(lower, "/main.go") || strings.HasSuffix(lower, "/main.ts") ||
-		strings.HasSuffix(lower, "/index.ts") || strings.HasSuffix(lower, "/index.js") {
-		score += 8
+	name := learningCandidateBaseName(path)
+	for _, entryName := range entryNames {
+		if name == strings.ToLower(strings.TrimSpace(entryName)) {
+			score += 8
+			break
+		}
 	}
 	return score
 }
@@ -146,29 +160,17 @@ func learningCandidatePathTokens(path string) []string {
 	return out
 }
 
-func normalizeCandidatePaths(paths []string) []string {
-	out := make([]string, 0, len(paths))
-	seen := make(map[string]bool, len(paths))
-	for _, path := range paths {
-		path = cleanRelativePath(path)
-		if path == "" || seen[path] {
-			continue
-		}
-		seen[path] = true
-		out = append(out, path)
-	}
-	sort.Strings(out)
-	return out
-}
-
-func cleanRelativePath(path string) string {
+func learningCandidateBaseName(path string) string {
 	path = strings.TrimSpace(filepath.ToSlash(path))
-	path = strings.TrimPrefix(path, "./")
-	path = strings.Trim(path, "/")
-	if path == "" || path == "." || filepath.IsAbs(path) || strings.HasPrefix(path, "../") || strings.Contains(path, "/../") {
+	if path == "" {
 		return ""
 	}
-	return filepath.ToSlash(filepath.Clean(path))
+	base := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	return strings.ToLower(base)
+}
+
+func normalizeCandidatePaths(paths []string) []string {
+	return pathx.CleanRelativeList(paths)
 }
 
 func candidatePathSet(candidates []string) map[string]bool {

@@ -86,7 +86,6 @@ func patternSearchText(pattern Pattern) string {
 	parts := []string{
 		pattern.ID,
 		pattern.Name,
-		string(pattern.Category),
 		pattern.Description,
 		pattern.Rule,
 		pattern.GoodExample,
@@ -113,12 +112,49 @@ func patternSearchText(pattern Pattern) string {
 }
 
 func containsAny(text string, terms []string) bool {
+	var tokens map[string]bool
 	for _, term := range terms {
+		term = strings.ToLower(strings.TrimSpace(term))
+		if term == "" {
+			continue
+		}
+		if shouldMatchTermAsToken(term) {
+			if tokens == nil {
+				tokens = textTokenSet(text)
+			}
+			if tokens[term] {
+				return true
+			}
+			continue
+		}
 		if strings.Contains(text, term) {
 			return true
 		}
 	}
 	return false
+}
+
+func shouldMatchTermAsToken(term string) bool {
+	for _, r := range term {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func textTokenSet(text string) map[string]bool {
+	fields := strings.FieldsFunc(text, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+	})
+	tokens := make(map[string]bool, len(fields))
+	for _, field := range fields {
+		if field != "" {
+			tokens[field] = true
+		}
+	}
+	return tokens
 }
 
 func pathHasHighRiskContext(path string) bool {

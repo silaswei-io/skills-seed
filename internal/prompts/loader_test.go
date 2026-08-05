@@ -65,7 +65,6 @@ func TestLoaderRejectsRemovedPrompts(t *testing.T) {
 		"learning-session-current-batch",
 		"learning-session-current-delta",
 		"learning-session-project-profile",
-		"learning-session-curate",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := loader.Render(name, map[string]interface{}{})
@@ -121,7 +120,7 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 	require.Contains(t, start, "short stage conversation")
 	require.Contains(t, start, "explicit prompt inputs as the complete cross-stage memory")
 	require.Contains(t, start, "Learning strategy guidance")
-	require.Contains(t, start, "Treat learning mode as curation priority")
+	require.Contains(t, start, "Treat learning mode as recall/precision priority")
 	require.Contains(t, start, "Do not assume or inventory any language, framework, architecture, domain, or fixed output count")
 	require.Contains(t, start, "project-specific product/domain patterns and project-specific code patterns")
 
@@ -147,11 +146,11 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, batch, "isolated pack-analysis conversation")
 	require.Contains(t, batch, "Run a decision-value discovery pass")
-	require.Contains(t, batch, "Pack-local curation")
+	require.Contains(t, batch, "Pack-local refinement")
 	require.Contains(t, batch, "product/domain patterns and code patterns")
 	require.Contains(t, batch, "Fill `business_method` only when")
 	require.Contains(t, batch, "verified reusable capability entry")
-	require.Contains(t, batch, "The mode changes curation priority only")
+	require.Contains(t, batch, "The mode changes recall/precision priority only")
 	require.NotContains(t, batch, "pattern-evidence-rules")
 
 	delta, err := loader.Render("learning-delta-pack-analyze", sampleCurrentDeltaData())
@@ -168,17 +167,6 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 	require.Contains(t, profile, "Do not inventory the project for completeness")
 	require.Contains(t, profile, "Avoid exact capability counts")
 
-	curate, err := loader.Render("learning-pattern-curate", sampleCuratePatternsData())
-	require.NoError(t, err)
-	require.Contains(t, curate, "short pattern curation conversation")
-	require.Contains(t, curate, "other curation shards")
-	require.Contains(t, curate, "Do not scan repository files")
-	require.Contains(t, curate, "complete ownership decision")
-	require.Contains(t, curate, "product/domain, interaction, resource, and code-pattern capabilities")
-	require.Contains(t, curate, "Pattern Curation Quality Rules")
-	require.Contains(t, curate, "Pattern Abstraction And Stability Rules")
-	require.Contains(t, curate, "Preserve product/domain, interaction, resource, contract, and code-pattern candidates")
-	require.Contains(t, curate, "dangerous historical implementation")
 }
 
 func currentPromptData(t *testing.T) map[string]interface{} {
@@ -189,7 +177,6 @@ func currentPromptData(t *testing.T) map[string]interface{} {
 		"learning-pack-analyze":       sampleCurrentBatchData(),
 		"learning-delta-pack-analyze": sampleCurrentDeltaData(),
 		"learning-profile-refresh":    sampleProjectProfileData(t),
-		"learning-pattern-curate":     sampleCuratePatternsData(),
 		"core-user-pattern":           sampleUserPatternData(),
 		"core-workflow-optimize":      sampleWorkflowData(),
 		"core-workspace-profile":      sampleWorkspaceData(),
@@ -301,16 +288,6 @@ func sampleDeltaFocus() agent.AnalyzeCurrentDeltaFocus {
 		RelatedPatterns: []domain.Pattern{
 			pattern,
 		},
-	}
-}
-
-func sampleCuratePatternsData() map[string]interface{} {
-	return map[string]interface{}{
-		"Operation":           "learn_current",
-		"CandidatePatterns":   []domain.Pattern{*samplePattern("candidate-user-flow", "Candidate User Flow")},
-		"ExistingPatterns":    []domain.Pattern{*samplePattern("existing-user-flow", "Existing User Flow")},
-		"ExistingByCandidate": map[string][]string{"candidate-user-flow": []string{"existing-user-flow"}},
-		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
 	}
 }
 

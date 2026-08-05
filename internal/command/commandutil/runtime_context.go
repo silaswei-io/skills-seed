@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 // ResolveRuntimeContext 合并 learn/generate 的一次性用户上下文参数。
@@ -87,7 +89,7 @@ func expandRuntimeContextPath(path string) ([]string, error) {
 	}
 	if !info.IsDir() {
 		if !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("context path is not a regular file: %s", path)
+			return nil, fmt.Errorf("%s", i18n.GetWithParams("RuntimeContextPathNotRegularFile", map[string]interface{}{"Path": path}))
 		}
 		return []string{path}, nil
 	}

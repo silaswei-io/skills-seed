@@ -1,14 +1,15 @@
 package generator
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/knowledge"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/patternview"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 func (s *GeneratorService) ensureCategorySummaries(
@@ -65,7 +66,7 @@ func patternsForSkillTemplates(patterns []domain.Pattern) []domain.Pattern {
 		}
 		out = append(out, pattern)
 	}
-	return out
+	return patternview.Render(out)
 }
 
 func patternShouldRender(pattern domain.Pattern) bool {
@@ -355,14 +356,7 @@ func businessPatternEvidenceIndex(patterns []domain.Pattern) map[string]bool {
 }
 
 func normalizeReferencePath(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	if idx := strings.Index(value, ":"); idx > 0 && strings.Contains(value[:idx], "/") {
-		value = value[:idx]
-	}
-	return strings.ToLower(strings.Trim(filepath.ToSlash(value), "` "))
+	return pathx.CleanEvidenceLocationPath(value)
 }
 
 func generatorText(locale, key string) string {

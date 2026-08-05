@@ -16,7 +16,8 @@ Use this page for architecture navigation. File paths and capability entries are
 - [Main Frameworks](#main-frameworks)
 - [Key Modules](#key-modules)
 - [Capability Entries](#capability-entries)
-- [Common Utilities](#common-utilities)
+{{if .CommonUtils}}- [Common Utilities](#common-utilities)
+{{end}}
 - [Configuration Patterns](#configuration-patterns)
 
 ## Project Overview Summary
@@ -115,12 +116,9 @@ Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 *Capability entries have not been recorded yet*
 {{end}}
 
-## Common Utilities
+{{if .CommonUtils}}## Common Utilities
 
-{{if .CommonUtils}}
 {{len .CommonUtils}} common utility functions were extracted. See [Common Utilities](./common-utils.md) for signatures and usage scenarios
-{{else}}
-*Common utility information has not been extracted yet*
 {{end}}
 
 ## Configuration Patterns

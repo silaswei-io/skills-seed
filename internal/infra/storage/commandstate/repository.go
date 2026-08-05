@@ -42,8 +42,8 @@ type AnalysisCheckpoint struct {
 	ProfileRefreshReason string                 `json:"profile_refresh_reason,omitempty"`
 }
 
-// CurationCheckpoint 保存一次已完成的 AI 策展决策，等待本地校验和原子提交。
-type CurationCheckpoint struct {
+// DecisionCheckpoint 保存一次已完成的规范化决策，等待本地校验和原子提交。
+type DecisionCheckpoint struct {
 	CandidateHash string          `json:"candidate_hash"`
 	Decision      json.RawMessage `json:"decision"`
 }
@@ -66,8 +66,8 @@ type State struct {
 	Agenda         domain.LearningAgenda       `json:"agenda"`
 	// Analysis 保存已完成证据焦点及其结果；阶段完成状态由议程覆盖关系推导。
 	Analysis *AnalysisCheckpoint `json:"analysis,omitempty"`
-	// Curation 保存与当前候选集合绑定的 AI 策展决策。
-	Curation *CurationCheckpoint `json:"curation,omitempty"`
+	// Decision 保存与当前候选集合绑定的规范化决策。
+	Decision *DecisionCheckpoint `json:"decision,omitempty"`
 	// ProfileCommitted 表示本轮需要刷新的项目画像已经持久化。
 	ProfileCommitted bool `json:"profile_committed,omitempty"`
 	// ArtifactsCommitted 表示本轮 patterns 已成功持久化，恢复时只需提交快照与指纹。

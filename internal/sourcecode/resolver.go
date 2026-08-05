@@ -2,6 +2,7 @@ package sourcecode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 const codeGraphQueryLimit = 100
@@ -158,7 +159,7 @@ func (r *codeGraphResolver) query(ctx context.Context, projectRoot, name string)
 		return nil, fmt.Errorf("query CodeGraph symbol %q: %w: %s", name, err, strings.TrimSpace(output))
 	}
 	var results []codeGraphResult
-	if err := jsonx.Unmarshal([]byte(output), &results); err != nil {
+	if err := json.Unmarshal([]byte(output), &results); err != nil {
 		return nil, fmt.Errorf("decode CodeGraph symbol %q: %w", name, err)
 	}
 	nodes := make([]codeGraphNode, 0, len(results))
@@ -235,15 +236,7 @@ func wantedReferences(refs []Reference) map[string]map[string]bool {
 }
 
 func normalizeReferencePath(path string) string {
-	path = strings.TrimSpace(filepath.ToSlash(path))
-	if path == "" || filepath.IsAbs(path) {
-		return ""
-	}
-	clean := filepath.Clean(filepath.FromSlash(path))
-	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return ""
-	}
-	return filepath.ToSlash(clean)
+	return pathx.CleanEvidenceLocationPath(path)
 }
 
 func resolveProjectFile(projectRoot, path string) (string, bool) {

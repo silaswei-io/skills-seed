@@ -10,10 +10,11 @@ import (
 
 // verifiedKnowledgeSnapshot 是生成阶段唯一允许消费的已核验知识输入。
 type verifiedKnowledgeSnapshot struct {
-	RenderProfile *domain.ProjectProfile
-	Patterns      []domain.Pattern
-	Spec          *domain.ProjectSpec
-	GoTests       sourcecode.GoTestInventory
+	RenderProfile      *domain.ProjectProfile
+	Patterns           []domain.Pattern
+	Spec               *domain.ProjectSpec
+	GoTests            sourcecode.GoTestInventory
+	ValidationCommands []domain.ValidationCommand
 }
 
 func (s *GeneratorService) buildVerifiedKnowledgeSnapshot(ctx context.Context, profile *domain.ProjectProfile, patterns []domain.Pattern, projectRoot string) (verifiedKnowledgeSnapshot, error) {
@@ -26,12 +27,15 @@ func (s *GeneratorService) buildVerifiedKnowledgeSnapshot(ctx context.Context, p
 	if err != nil {
 		return verifiedKnowledgeSnapshot{}, err
 	}
+	validationCommands := validationCommandsForGeneration(profile, sourcecode.DiscoverValidationCommands(projectRoot, goTests))
 	renderPatterns := patternsForSkillTemplates(patterns)
 	renderProfile := profileForSkillTemplates(profile, renderPatterns)
+	renderProfile.ValidationCommands = validationCommands
 	return verifiedKnowledgeSnapshot{
-		RenderProfile: renderProfile,
-		Patterns:      renderPatterns,
-		Spec:          s.projectSpecFromProfileAndPatterns(renderProfile, patterns, config.WorkspaceProjectConfig{}),
-		GoTests:       goTests,
+		RenderProfile:      renderProfile,
+		Patterns:           renderPatterns,
+		Spec:               s.projectSpecFromProfileAndPatterns(renderProfile, renderPatterns, config.WorkspaceProjectConfig{}),
+		GoTests:            goTests,
+		ValidationCommands: validationCommands,
 	}, nil
 }

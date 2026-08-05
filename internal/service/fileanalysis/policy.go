@@ -50,11 +50,6 @@ func NewConfiguredSelectionPolicy(configRepo config.Reader, projectRoot string) 
 	return policy
 }
 
-func (p SelectionPolicy) Include(path string) (bool, SkipReason) {
-	decision := p.Decide(path)
-	return decision.Include, decision.Reason
-}
-
 func (p SelectionPolicy) Decide(path string) Decision {
 	if p.IsExcluded(path) {
 		return Decision{Path: path, Include: false, Reason: SkipReasonExcluded}

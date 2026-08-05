@@ -112,3 +112,9 @@ func TestSelectLearningContextSeedsDoesNotTreatWholeInitialScanAsChangedSignal(t
 
 	require.Equal(t, []string{"internal/auth/service.go", "internal/auth/types.go"}, seeds)
 }
+
+func TestLearningCandidatePathScoreScoresEntryNamesWithoutLanguageSuffix(t *testing.T) {
+	require.Positive(t, learningCandidatePathScore("src/bootstrap.rs"))
+	require.Positive(t, learningCandidatePathScore("app/index.py"))
+	require.Positive(t, learningCandidatePathScore("server/main"))
+}

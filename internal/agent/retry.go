@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // retryReasonMaxLength 限制终端进度行中的重试原因长度，避免长错误撑开界面。
@@ -365,7 +365,7 @@ func retryReasonFromJSON(output string) string {
 			continue
 		}
 		var value interface{}
-		if err := jsonx.Unmarshal([]byte(line), &value); err != nil {
+		if err := json.Unmarshal([]byte(line), &value); err != nil {
 			continue
 		}
 		if reason := retryReasonFromValue(value); reason != "" {

@@ -62,7 +62,6 @@ type learnCurrentProjectRun struct {
 	codebaseRunContext         *analyzer.CodebaseRunContext
 	savedCount                 int
 	completedEvidenceFocuses   []domain.EvidenceFocus
-	importedCuration           *agent.CuratePatternsResult
 	activeLearningSession      agent.LearningSession
 	learningSessionCache       *currentLearningSessionCache
 	progressDetailMu           sync.Mutex
@@ -70,19 +69,16 @@ type learnCurrentProjectRun struct {
 }
 
 const (
-	learningStagePlanning       = "planning"
-	learningStagePackAnalysis   = "pack-analysis"
-	learningStageDeltaAnalysis  = "delta-analysis"
-	learningStageProfileRefresh = "profile-refresh"
-	learningStageGlobalCuration = "global-curation"
+	learningStagePlanning            = "planning"
+	learningStagePackAnalysis        = "pack-analysis"
+	learningStageDeltaAnalysis       = "delta-analysis"
+	learningStageProfileRefresh      = "profile-refresh"
+	learningStageGlobalNormalization = "global-normalization"
 )
 
 func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
 	run := newLearnCurrentProjectRun(ctx, cont, opts)
-	if err := run.loadImportedCuration(); err != nil {
-		return nil, err
-	}
-	if !run.hasCurationDecision() {
+	if !run.hasDecisionCheckpoint() {
 		if err := commandutil.RequireAgentAvailable(cont); err != nil {
 			return nil, err
 		}
@@ -112,12 +108,9 @@ func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, o
 	}
 }
 
-func (r *learnCurrentProjectRun) hasCurationDecision() bool {
-	if r.importedCuration != nil {
-		return true
-	}
+func (r *learnCurrentProjectRun) hasDecisionCheckpoint() bool {
 	state, err := r.stateRepo.Load(r.ctx)
-	return err == nil && state.Curation != nil
+	return err == nil && state.Decision != nil
 }
 
 func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
@@ -148,7 +141,7 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed {
 		r.refreshProfile = true
 	}
-	if err := r.curateAndSavePatternsStep(); err != nil {
+	if err := r.normalizeAndSavePatternsStep(); err != nil {
 		return nil, err
 	}
 	if err := r.saveProfileIfNeeded(); err != nil {
@@ -670,7 +663,7 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
 		return nil, err
 	}
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentCurateAndSavePatterns"), func() error { return nil }); err != nil {
+	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentNormalizeAndSavePatterns"), func() error { return nil }); err != nil {
 		return nil, err
 	}
 	profileStartedAt := time.Now()

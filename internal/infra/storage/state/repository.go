@@ -12,7 +12,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // ErrStateNotFound 表示运行状态文件尚不存在
@@ -53,7 +52,7 @@ func (r *Repository) Get(ctx context.Context) (*domain.RuntimeState, error) {
 	}
 
 	var state domain.RuntimeState
-	if err := jsonx.Unmarshal(data, &state); err != nil {
+	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("parse runtime state: %w", err)
 	}
 	return &state, nil

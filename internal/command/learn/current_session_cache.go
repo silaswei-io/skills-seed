@@ -12,7 +12,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 type currentLearningSessionCache struct {
@@ -43,7 +42,7 @@ func loadCurrentLearningSessionCache(ctx context.Context, seedPath, scope string
 		return nil, err
 	}
 	var cache currentLearningSessionCache
-	if err := jsonx.Unmarshal(data, &cache); err != nil {
+	if err := json.Unmarshal(data, &cache); err != nil {
 		return nil, err
 	}
 	return &cache, nil

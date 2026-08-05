@@ -1,9 +1,10 @@
 package domain
 
 import (
-	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 // CleanProjectProfile 清洗 profile 中的占位符和无效数据
@@ -76,7 +77,7 @@ func cleanEngineeringRules(rules []EngineeringRule) []EngineeringRule {
 		rule.Title = strings.TrimSpace(rule.Title)
 		rule.Rule = strings.TrimSpace(rule.Rule)
 		rule.Source = normalizeProfileEvidencePath(rule.Source)
-		rule.Evidence = cleanProfilePaths(rule.Evidence)
+		rule.Evidence = cleanProfileEvidenceLocations(rule.Evidence)
 		key := rule.Source + "\x00" + strings.ToLower(rule.Title) + "\x00" + rule.Rule
 		if rule.Title == "" || rule.Rule == "" || rule.Source == "" || seen[key] {
 			continue
@@ -97,7 +98,7 @@ func CleanValidationCommands(commands []ValidationCommand) []ValidationCommand {
 		command.Source = strings.TrimSpace(command.Source)
 		command.Workdir = normalizeProfileEvidencePath(command.Workdir)
 		command.ScopePaths = cleanProfilePaths(command.ScopePaths)
-		command.Evidence = cleanProfilePaths(command.Evidence)
+		command.Evidence = cleanProfileEvidenceLocations(command.Evidence)
 		command.Type = strings.TrimSpace(command.Type)
 		if isInvalidValidationCommand(command.Command) {
 			continue
@@ -131,20 +132,34 @@ func cleanProfilePaths(paths []string) []string {
 	return cleaned
 }
 
-func normalizeProfilePath(path string) string {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return ""
+func cleanProfileEvidenceLocations(paths []string) []string {
+	cleaned := make([]string, 0, len(paths))
+	seen := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		path = normalizeProfileEvidenceLocation(path)
+		if path == "" || seen[path] {
+			continue
+		}
+		seen[path] = true
+		cleaned = append(cleaned, path)
 	}
-	path = filepath.ToSlash(filepath.Clean(path))
-	if path == "." {
+	return cleaned
+}
+
+func normalizeProfilePath(path string) string {
+	return pathx.CleanEvidenceLocationPath(path)
+}
+
+func normalizeProfileEvidencePath(path string) string {
+	path = normalizeProfilePath(path)
+	if isUnconfirmedProfileValue(path) {
 		return ""
 	}
 	return path
 }
 
-func normalizeProfileEvidencePath(path string) string {
-	path = normalizeProfilePath(path)
+func normalizeProfileEvidenceLocation(path string) string {
+	path = pathx.CleanEvidenceLocation(path)
 	if isUnconfirmedProfileValue(path) {
 		return ""
 	}

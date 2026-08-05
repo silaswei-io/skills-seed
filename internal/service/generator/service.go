@@ -185,6 +185,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 			"operation", "generator.generate_skills",
 			"duration", time.Since(startedAt),
 			"patterns_count", len(patterns),
+			"render_patterns_count", len(snapshot.Patterns),
 			"resolved_output_path", resolvedOutputPath,
 			"error", err,
 		)
@@ -195,6 +196,7 @@ func (s *GeneratorService) GenerateSkillsWithHooks(ctx context.Context, outputPa
 		"operation", "generator.generate_skills",
 		"duration", time.Since(startedAt),
 		"patterns_count", len(patterns),
+		"render_patterns_count", len(snapshot.Patterns),
 		"resolved_output_path", resolvedOutputPath,
 		"categories_count", len(domain.CategoryNamesWithPatterns(snapshot.Patterns)),
 	)

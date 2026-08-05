@@ -12,7 +12,6 @@ import (
 
 	"github.com/gofrs/flock"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 const (
@@ -250,7 +249,7 @@ func loadDirectoryTransaction(path string) (directoryTransaction, error) {
 		return directoryTransaction{}, err
 	}
 	var tx directoryTransaction
-	if err := jsonx.Unmarshal(data, &tx); err != nil {
+	if err := json.Unmarshal(data, &tx); err != nil {
 		return directoryTransaction{}, fmt.Errorf("%s: %w", i18n.Get("DirectoryParseTransactionFailed"), err)
 	}
 	return tx, nil

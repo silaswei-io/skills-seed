@@ -116,6 +116,7 @@ type validationReferenceTemplateData struct {
 
 type testingReferenceTemplateData struct {
 	Inventory sourcecode.GoTestInventory
+	Gaps      []string
 }
 
 type categoryReferenceMeta struct {

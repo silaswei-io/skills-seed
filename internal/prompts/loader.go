@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -51,7 +50,6 @@ type renderedPromptManifest struct {
 	Locale      string            `json:"locale"`
 	RuntimeID   string            `json:"runtime_id,omitempty"`
 	Slug        string            `json:"slug,omitempty"`
-	Label       string            `json:"label,omitempty"`
 	FinalLength int               `json:"final_length"`
 	Parts       []promptPartDebug `json:"parts"`
 }
@@ -68,9 +66,7 @@ var contextPromptFiles = []contextPromptFile{
 	{partName: "context-workspace", fileName: "workspace.md"},
 }
 
-var promptAppendFragments = map[string][]string{
-	"learning-pattern-curate": {"pattern-curation-rules", "pattern-abstraction-rules"},
-}
+var promptAppendFragments = map[string][]string{}
 
 // RuntimeTask 标识一次 agent 调用共用的 runtime 文件名前缀。
 type RuntimeTask struct {
@@ -253,7 +249,6 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		Locale:      locale,
 		RuntimeID:   task.ID,
 		Slug:        task.Slug,
-		Label:       promptRuntimeLabel(data),
 		FinalLength: len(rendered),
 		Parts:       debugParts,
 	})
@@ -479,11 +474,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 
 	slug := strings.TrimSpace(manifest.Slug)
 	if slug == "" {
-		parts := []string{name}
-		if strings.TrimSpace(manifest.Label) != "" {
-			parts = append(parts, manifest.Label)
-		}
-		slug = strings.Join(parts, "-")
+		slug = name
 	}
 	filename := runtimefiles.NameWithID(manifest.RuntimeID, slug) + ".md"
 	path := filepath.Join(dir, filename)
@@ -521,46 +512,8 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		"template", name,
 		"path", path,
 		"manifest_path", manifestPath,
-		"label", manifest.Label,
 		"content_length", len(content),
 	)
-}
-
-func promptRuntimeLabel(data interface{}) string {
-	return promptStringField(data, "RuntimeLabel")
-}
-
-func promptStringField(data interface{}, fieldName string) string {
-	if data == nil {
-		return ""
-	}
-	value := reflect.ValueOf(data)
-	if value.Kind() == reflect.Pointer {
-		if value.IsNil() {
-			return ""
-		}
-		value = value.Elem()
-	}
-	if value.Kind() == reflect.Map {
-		for _, key := range value.MapKeys() {
-			keyText := fmt.Sprint(key.Interface())
-			if keyText == fieldName || keyText == strings.ToUpper(fieldName) {
-				mapValue := value.MapIndex(key)
-				if mapValue.IsValid() {
-					return fmt.Sprint(mapValue.Interface())
-				}
-			}
-		}
-		return ""
-	}
-	if value.Kind() != reflect.Struct {
-		return ""
-	}
-	field := value.FieldByName(fieldName)
-	if field.IsValid() && field.Kind() == reflect.String {
-		return field.String()
-	}
-	return ""
 }
 
 func funcMap(locale string) template.FuncMap {

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -461,6 +462,50 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	assertNoExcessiveBlankLines(t, tmpDir)
 }
 
+func TestGenerateSkillsRendersCompactedPatternView(t *testing.T) {
+	first := domain.NewPattern("auth-error-wrap", "Error Wrapping", domain.CategoryError)
+	first.Confidence = 0.8
+	first.SetDescription("Repository errors are wrapped with operation context before returning.")
+	first.SetRule("When repository calls fail, keep operation context in returned errors.")
+	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/auth/repo.go", Line: 10, Symbol: "LoadAuth", Kind: "func"}}
+
+	second := domain.NewPattern("order-error-wrap", "Error Wrapping", domain.CategoryError)
+	second.Confidence = 0.9
+	second.SetDescription("Repository errors are wrapped with operation context before returning.")
+	second.SetRule("When repository calls fail, keep operation context in returned errors.")
+	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/order/repo.go", Line: 20, Symbol: "LoadOrder", Kind: "func"}}
+
+	mockPattern := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{*first, *second}, nil
+		},
+	}
+	mockProfile := &mocks.MockProjectProfileRepository{
+		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
+			return &domain.ProjectProfile{
+				ProjectName: "test",
+				Language:    "go",
+				Summary:     "Profile-backed project overview",
+				GeneratedAt: "2026-05-19 12:00:00",
+			}, nil
+		},
+	}
+
+	loader := skills.NewLoader("zh-CN")
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+	}
+	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
+
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	errorPatterns := readGeneratedFile(t, tmpDir, "references", "patterns", "error.md")
+	assert.Equal(t, 1, strings.Count(errorPatterns, "**Error Wrapping**"))
+	assert.Contains(t, errorPatterns, "internal/auth/repo.go:10")
+	assert.Contains(t, errorPatterns, "internal/order/repo.go:20")
+}
+
 func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	apiPattern := domain.NewPattern("api", "JZero Code Generation Convention", domain.CategoryAPI)
 	apiPattern.Confidence = 0.95
@@ -696,6 +741,52 @@ func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {
 	assert.Contains(t, validation, "未学习到有仓库证据的验证命令")
 	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
 	assert.NotContains(t, overview, "## 验证命令")
+	assert.NotContains(t, overview, "## 通用工具")
+	assert.NotContains(t, overview, "通用工具信息尚未提取")
+}
+
+func TestGenerateSkillsUsesRepositoryValidationEvidence(t *testing.T) {
+	projectRoot := t.TempDir()
+	for path, content := range map[string]string{
+		"go.mod":          "module example/backend\n",
+		"service_test.go": "package backend\n",
+		".jzero.yaml":     "gen:\n  hooks:\n    after:\n      - jzero format\n",
+		"Dockerfile":      "RUN --mount=type=cache,target=/go/pkg CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -ldflags=\"$LDFLAGS\" -o /dist/app main.go \\\n    && jzero gen swagger\n",
+	} {
+		fullPath := filepath.Join(projectRoot, filepath.FromSlash(path))
+		require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0755))
+		require.NoError(t, os.WriteFile(fullPath, []byte(content), 0644))
+	}
+	mockPattern := &mocks.MockPatternRepository{GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+		return []domain.Pattern{*domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)}, nil
+	}}
+	mockProfile := &mocks.MockProjectProfileRepository{GetFn: func(context.Context) (*domain.ProjectProfile, error) {
+		return &domain.ProjectProfile{
+			ProjectName: "backend",
+			Language:    "go",
+			ValidationCommands: []domain.ValidationCommand{{
+				Command: "go test -race ./...",
+				Source:  "用户上下文(golang测试规则)",
+				Type:    "test",
+			}},
+		}, nil
+	}}
+	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go", RootPath: projectRoot},
+	})
+	outputPath := filepath.Join(projectRoot, ".agents", "skills", "backend-dev")
+
+	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
+
+	validation := readGeneratedFile(t, outputPath, "references", "validation.md")
+	require.Contains(t, validation, "`go test ./...`")
+	require.Contains(t, validation, "来源：`go.mod`")
+	require.Contains(t, validation, "`jzero format`")
+	require.Contains(t, validation, "来源：`.jzero.yaml`")
+	require.Contains(t, validation, "`CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -ldflags=\"$LDFLAGS\" -o /dist/app main.go`")
+	require.Contains(t, validation, "来源：`Dockerfile`")
+	require.NotContains(t, validation, "go test -race")
+	require.NotContains(t, validation, "用户上下文")
 }
 
 func TestGenerateSkills_RendersLocalMultiModuleTestMatrix(t *testing.T) {
@@ -734,5 +825,6 @@ func TestGenerateSkills_RendersLocalMultiModuleTestMatrix(t *testing.T) {
 	require.Contains(t, testingReference, "`plugins/a/child/b_test.go`")
 	require.Contains(t, testingReference, "模块 `plugins/without`")
 	require.Contains(t, testingReference, "| `plugins/without` | `go test ./...` | 0 | `plugins/without/go.mod` |")
+	require.NotContains(t, testingReference, "未发现可由当前源码确定的覆盖缺口")
 	assertNoBrokenMarkdownLinks(t, outputPath)
 }

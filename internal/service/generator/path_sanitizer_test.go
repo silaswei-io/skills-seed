@@ -92,6 +92,23 @@ func TestSanitizeGenerationInputsDropsMissingModulePaths(t *testing.T) {
 	assert.Empty(t, sanitized.KeyModules)
 }
 
+func TestSanitizeGenerationInputsDropsModulePathOutsideProjectRoot(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "project")
+	require.NoError(t, os.MkdirAll(root, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(parent, "outside"), 0o755))
+	profile := &domain.ProjectProfile{
+		KeyModules: []domain.ModuleInfo{{
+			Name: "outside",
+			Path: "../outside",
+		}},
+	}
+
+	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
+
+	assert.Empty(t, sanitized.KeyModules)
+}
+
 func TestSanitizeGenerationInputsDropsGoodExampleNotFoundInEvidenceFile(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "service"), 0755))
@@ -104,6 +121,21 @@ func TestSanitizeGenerationInputsDropsGoodExampleNotFoundInEvidenceFile(t *testi
 
 	require.Len(t, patterns, 1)
 	assert.Empty(t, patterns[0].GoodExample)
+}
+
+func TestSanitizeGenerationInputsDoesNotReadGoodExampleFromOutsideProjectRoot(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "project")
+	require.NoError(t, os.MkdirAll(root, 0o755))
+	snippet := "func Outside() error { return nil }"
+	require.NoError(t, os.WriteFile(filepath.Join(parent, "outside.go"), []byte("package outside\n"+snippet+"\n"), 0o644))
+	pattern := domain.NewPattern("outside", "Outside", domain.CategoryBusiness)
+	pattern.GoodExample = snippet
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "../outside.go", Kind: "file"}}
+
+	_, patterns := sanitizeGenerationInputsForTest(t, &domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
+
+	require.Empty(t, patterns)
 }
 
 func TestSanitizeGenerationInputsKeepsGoodExampleFoundInEvidenceFile(t *testing.T) {

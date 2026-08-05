@@ -2,6 +2,21 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.15.2]
+
+### Changes
+
+- Adjusted workspace `sync` so each child project completes `learn current` and its own Skill generation before the workspace root Skill is generated after all children and workspace-level artifacts finish.
+- Improved workspace sync progress output to reduce noisy concurrent child logs while keeping the active child project, step, and elapsed time visible on the refresh line.
+- Moved current-learning pattern curation from an Agent prompt to deterministic local normalization, merging, and validation. Removed the `learning-pattern-curate` prompt and `--curation-output` debug path to reduce AI round trips and schema drift risk.
+- Improved generated Skill quality by merging duplicate patterns, preferring repository-backed validation commands, producing deterministic testing coverage gaps, and hiding empty Common Utilities sections.
+
+### Fixes
+
+- Fixed learning failures where already-valid Agent JSON was repaired first, causing nested objects to be extracted as top-level results and raising errors such as `unknown field "needed"` or `unknown field "profile_refresh_recommended"`.
+- Upgraded `github.com/silaswei-io/jsonrepair-go` to `v1.1.2` and added a valid-JSON fast path in the local JSON parsing entrypoint so normal structured output is parsed strictly as returned.
+- Fixed workspace resume output/state alignment so resumed child-project flows no longer look like a fresh terminal run while reusing prior child learning memory.
+
 ## [v0.15.1]
 
 ### Changes

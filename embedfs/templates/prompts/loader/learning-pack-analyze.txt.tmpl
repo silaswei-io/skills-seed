@@ -1,6 +1,6 @@
 # Analyze Learning Pack
 
-This is an isolated pack-analysis conversation. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return the final source-backed repository knowledge for these packs. Favor recall for useful source-backed knowledge; later curation and deterministic consolidation will merge equivalent candidates.
+This is an isolated pack-analysis conversation. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return the final source-backed repository knowledge for these packs. Favor recall for useful source-backed knowledge; later normalization and deterministic consolidation will merge true equivalents.
 
 Project:
 - name: {{.ProjectName}}
@@ -14,7 +14,7 @@ Learning strategy guidance:
 - `fast`: return compact directly evidenced patterns, but do not drop clear source-backed knowledge lanes.
 - `normal`: balance coverage and cost; keep distinct routeable product/domain, interaction, resource, contract, and code patterns.
 - `deep`: keep more source-backed local patterns when they change future implementation decisions.
-- The mode changes curation priority only. It is not a fixed output count, file budget, or reason to promote weak evidence.
+- The mode changes recall/precision priority only. It is not a fixed output count, file budget, or reason to promote weak evidence.
 - Interpret category names abstractly across project types: `business` means product/domain behavior, `api` means any interface or contract, `database` means state/storage/persistence, `middleware` means interception or pipeline behavior, and `utils` means reusable domain-neutral helpers.
 {{- if .StructurePath}}
 
@@ -70,7 +70,7 @@ Evidence packs:
 {{end}}
 
 Pack boundary:
-- Do not rely on hidden context from planning, other packs, profile sync, or later curation.
+- Do not rely on hidden context from planning, other packs, profile sync, or later normalization.
 - Treat the explicit pack fields, runtime files, structural context, and listed source/diff files as the complete input.
 - Do not scan outside listed pack files and directly referenced context. If evidence is insufficient, return that pack with `patterns: []`.
 - Pack IDs are execution provenance for this response only; do not copy pack IDs or pack names into pattern fields.
@@ -87,7 +87,7 @@ Candidate discovery:
 - Keep navigation-useful implementation knowledge when it would help a future agent find the right source entry, avoid the wrong sibling flow, or understand where generated/config/runtime behavior originates. Scope it clearly instead of dropping it for being local.
 - Drop ordinary CRUD, simple field mapping, generic builders, thin wrappers, framework registration, model aggregation, and boilerplate only when they do not encode a project-specific invariant or decision.
 
-Pack-local curation:
+Pack-local refinement:
 - Internally merge exact duplicates within the same pack before output.
 - Merge only equivalent applicability, behavior, and evidence. Shared vocabulary, adjacent layers, sibling lifecycle actions, or reducing output count are not sufficient reasons to merge.
 - If a candidate is similar to an existing learned behavior mentioned in the pack input or structural context, phrase it as the same reusable boundary instead of inventing a sibling pattern.

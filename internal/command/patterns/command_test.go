@@ -15,7 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
-	"github.com/silaswei-io/skills-seed/internal/service/curator"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -78,12 +78,12 @@ func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 		},
 	}
 	cont := &container.Container{
-		SeedPath:    filepath.Join(workspaceRoot, ".skills-seed"),
-		Config:      rootConfigRepo.Get(),
-		ConfigRepo:  rootConfigRepo,
-		PatternRepo: rootPatternRepo,
-		Agent:       mockAgent,
-		CuratorSvc:  curator.NewService(rootPatternRepo),
+		SeedPath:       filepath.Join(workspaceRoot, ".skills-seed"),
+		Config:         rootConfigRepo.Get(),
+		ConfigRepo:     rootConfigRepo,
+		PatternRepo:    rootPatternRepo,
+		Agent:          mockAgent,
+		PatternNormSvc: patternnorm.NewService(rootPatternRepo),
 	}
 	cmd := addCmd(cont)
 	cmd.SetArgs([]string{"--context", "hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码"})
@@ -148,9 +148,9 @@ func TestAddCmdReadsContextPath(t *testing.T) {
 	require.NoError(t, err)
 	defer patternRepo.Close()
 	cont := &container.Container{
-		Config:     &config.Config{Project: config.ProjectConfig{RootPath: projectRoot, Language: "go"}},
-		Agent:      mockAgent,
-		CuratorSvc: curator.NewService(patternRepo),
+		Config:         &config.Config{Project: config.ProjectConfig{RootPath: projectRoot, Language: "go"}},
+		Agent:          mockAgent,
+		PatternNormSvc: patternnorm.NewService(patternRepo),
 	}
 	cmd := addCmd(cont)
 	cmd.SetArgs([]string{"--context-path", contextPath, "--category", "api"})

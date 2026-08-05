@@ -96,31 +96,8 @@ func TestPlanningAndSelectionSchemasRequireDecisionFields(t *testing.T) {
 	requireRequiredFields(t, plan, "focuses")
 	requireRequiredFields(t, mustFindSchemaContainer(t, plan, "id"), "id", "name")
 
-	curate := decodeSchema(t, ContractCuratePatterns)
-	requireRequiredFields(t, curate, "patterns", "dropped")
-	requireRequiredFields(t, mustFindSchemaContainer(t, curate, "source_ids"), "id", "name", "category", "description", "rule", "confidence", "source_ids")
-	requireRequiredFields(t, mustFindSchemaContainer(t, curate, "reason_code"), "id", "reason_code", "reason")
-	reasonCode, _, ok := findSchemaPropertyWithContainer(curate, "reason_code")
-	require.True(t, ok)
-	require.ElementsMatch(t, []string{
-		"exact_duplicate", "unsupported_evidence", "contradictory", "unsafe_guidance",
-		"no_routeable_value", "low_signal_boilerplate", "overfiltered_source_backed",
-	}, schemaStringList(reasonCode["enum"]))
-
 	ack := decodeSchema(t, ContractLearningSessionAck)
 	requireRequiredFields(t, ack, "ready", "summary")
-}
-
-func TestCurateSchemaContainsOnlyDecisionFields(t *testing.T) {
-	schema, err := StructuredOutputSchema(ContractCuratePatterns)
-
-	require.NoError(t, err)
-	require.Contains(t, schema, `"source_ids"`)
-	require.NotContains(t, schema, `"merged_from"`)
-	require.NotContains(t, schema, `"good_example"`)
-	require.NotContains(t, schema, `"evidence_locations"`)
-	require.NotContains(t, schema, `"business_method"`)
-	require.NotContains(t, schema, `"summary"`)
 }
 
 func TestWorkspaceContractsKeepIdentityOutOfAIOutput(t *testing.T) {

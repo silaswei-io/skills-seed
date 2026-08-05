@@ -11,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 type currentPatternSource struct {
@@ -118,24 +119,15 @@ func (v *currentPatternValidator) validateLocation(location domain.PatternEviden
 }
 
 func (v *currentPatternValidator) source(path string) (string, currentPatternSource, bool) {
-	path = strings.TrimSpace(filepath.ToSlash(path))
-	if path == "" || filepath.IsAbs(path) {
+	path = pathx.CleanEvidenceLocationPath(path)
+	if path == "" {
 		return "", currentPatternSource{}, false
 	}
-	clean := filepath.Clean(filepath.FromSlash(path))
-	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return "", currentPatternSource{}, false
-	}
-	fullPath := filepath.Join(v.projectRoot, clean)
+	fullPath := filepath.Join(v.projectRoot, filepath.FromSlash(path))
 	resolvedPath, err := projectpath.CanonicalWithinRoot(v.projectRoot, fullPath)
 	if err != nil {
 		return "", currentPatternSource{}, false
 	}
-	relative, err := filepath.Rel(v.projectRoot, fullPath)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", currentPatternSource{}, false
-	}
-	path = filepath.ToSlash(relative)
 	if source, ok := v.files[path]; ok {
 		return path, source, true
 	}

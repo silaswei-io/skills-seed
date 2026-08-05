@@ -43,7 +43,7 @@ type KnowledgeChange struct {
 	Reason        string
 }
 
-// CarriesPattern 判断该知识变更是否携带可进入模式策展的候选。
+// CarriesPattern 判断该知识变更是否携带可进入模式规范化与入库的候选。
 func (c KnowledgeChange) CarriesPattern() bool {
 	switch c.PatternAction {
 	case KnowledgePatternAdd, KnowledgePatternUpdate, KnowledgePatternReinforce:

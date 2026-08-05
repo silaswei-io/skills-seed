@@ -3,7 +3,6 @@ package learn
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
@@ -37,8 +36,11 @@ type learnCurrentOptions struct {
 	contextPath    []string
 	userContext    string
 	stateScope     string
-	curationOutput string
 	force          bool
+	quiet          bool
+	onStepStart    func(label string)
+	onStepUpdate   func(label string)
+	onStepComplete func(label string)
 }
 
 // Cmd 返回 learn 命令
@@ -76,7 +78,6 @@ func Cmd(cont *container.Container) *cobra.Command {
 	currentCmd.Flags().StringVar(&currentOpts.profileMode, "profile", learnCurrentProfileAuto, i18n.Get("LearnFlagProfile"))
 	currentCmd.Flags().StringVar(&currentOpts.contextText, "context", "", i18n.Get("LearnFlagContext"))
 	currentCmd.Flags().StringArrayVar(&currentOpts.contextPath, "context-path", nil, i18n.Get("LearnFlagContextPath"))
-	currentCmd.Flags().StringVar(&currentOpts.curationOutput, "curation-output", "", i18n.Get("LearnFlagCurationOutput"))
 	currentCmd.Flags().BoolVar(&currentOpts.force, "force", false, i18n.Get("LearnFlagForce"))
 
 	learnCmd.AddCommand(currentCmd)
@@ -103,8 +104,11 @@ func RunLearnCurrentWithStateScope(cont *container.Container, stateScope string,
 type CurrentRunOptions struct {
 	// Force 表示忽略已保存的文件指纹，重新学习当前扫描范围。
 	Force bool
-	// CurationOutput 指向已完成的 CuratePatterns 输出，用于恢复提交已完成的策展决策。
-	CurationOutput string
+	// Quiet 表示作为上层工作区流程的子步骤运行，不直接输出项目级进度和详细日志。
+	Quiet          bool
+	OnStepStart    func(label string)
+	OnStepUpdate   func(label string)
+	OnStepComplete func(label string)
 }
 
 // RunLearnCurrentWithStateScopeOptions 从当前代码库学习，并允许调用方指定运行选项。
@@ -113,8 +117,11 @@ func RunLearnCurrentWithStateScopeOptions(cont *container.Container, stateScope 
 		profileMode:    learnCurrentProfileAuto,
 		userContext:    userContext,
 		stateScope:     stateScope,
-		curationOutput: opts.CurationOutput,
 		force:          opts.Force,
+		quiet:          opts.Quiet,
+		onStepStart:    opts.OnStepStart,
+		onStepUpdate:   opts.OnStepUpdate,
+		onStepComplete: opts.OnStepComplete,
 	})
 }
 
@@ -130,9 +137,6 @@ func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domai
 		opts.userContext = userContext
 	}
 	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
-		if strings.TrimSpace(opts.curationOutput) != "" {
-			return domain.LearnCurrentResult{}, fmt.Errorf("%s", i18n.Get("LearnCurrentCurationOutputRequiresChildResume"))
-		}
 		return runLearnWorkspaceCurrent(cont, opts)
 	}
 	return runLearnCurrentProject(cont, opts)
@@ -140,14 +144,16 @@ func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domai
 
 func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	result, err := runLearnCurrentProjectWithOptions(context.Background(), cont, learnCurrentProjectOptions{
-		showProgress:     true,
-		showDetailedLogs: true,
+		showProgress:     !opts.quiet,
+		showDetailedLogs: !opts.quiet,
+		onStepStart:      opts.onStepStart,
+		onStepUpdate:     opts.onStepUpdate,
+		onStepComplete:   opts.onStepComplete,
 		userContext:      opts.userContext,
 		language:         opts.language,
 		focusPaths:       opts.focusPaths,
 		profileMode:      opts.profileMode,
 		stateScope:       opts.stateScope,
-		curationOutput:   opts.curationOutput,
 		force:            opts.force,
 	})
 	if err != nil {
@@ -175,7 +181,6 @@ type learnCurrentProjectOptions struct {
 	focusPaths       []string
 	profileMode      string
 	stateScope       string
-	curationOutput   string
 	force            bool
 }
 

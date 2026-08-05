@@ -60,6 +60,60 @@ func TestValidationGapsUseDeterministicGoTestInventory(t *testing.T) {
 	require.Contains(t, gaps[0], "静态检查命令")
 }
 
+func TestValidationCommandsForGenerationDropsUserContextCommands(t *testing.T) {
+	profile := &domain.ProjectProfile{ValidationCommands: []domain.ValidationCommand{
+		{Command: "go test -race ./...", Source: "用户上下文(golang测试规则)", Type: "test"},
+		{Command: "task verify", Source: "Taskfile.yml", Type: "test"},
+	}}
+
+	commands := validationCommandsForGeneration(profile, []domain.ValidationCommand{{
+		Command: "go test ./...",
+		Source:  "go.mod",
+		Type:    "test",
+	}})
+
+	require.Equal(t, []string{"task verify", "go test ./..."}, validationCommandNamesForTest(commands))
+}
+
+func TestTestingCoverageGapsReportsKeyModuleWithoutNearbyTests(t *testing.T) {
+	profile := &domain.ProjectProfile{KeyModules: []domain.ModuleInfo{{
+		Path: "internal/service/hotback",
+	}}}
+	tests := sourcecode.GoTestInventory{Modules: []sourcecode.GoTestModule{{
+		Workdir:   ".",
+		ModFile:   "go.mod",
+		TestFiles: []string{"internal/logic/hotback/edit_test.go"},
+	}}}
+
+	gaps := testingCoverageGaps(profile, nil, tests, "zh-CN")
+
+	require.Len(t, gaps, 1)
+	require.Contains(t, gaps[0], "internal/service/hotback")
+}
+
+func TestTestingCoverageGapsStatesWhenNoDeterministicGapExists(t *testing.T) {
+	profile := &domain.ProjectProfile{KeyModules: []domain.ModuleInfo{{
+		Path: "internal/service/hotback",
+	}}}
+	tests := sourcecode.GoTestInventory{Modules: []sourcecode.GoTestModule{{
+		Workdir:   ".",
+		ModFile:   "go.mod",
+		TestFiles: []string{"internal/service/hotback/edit_test.go"},
+	}}}
+
+	gaps := testingCoverageGaps(profile, nil, tests, "zh-CN")
+
+	require.Equal(t, []string{"未发现可由当前源码确定的覆盖缺口。"}, gaps)
+}
+
+func validationCommandNamesForTest(commands []domain.ValidationCommand) []string {
+	names := make([]string, 0, len(commands))
+	for _, command := range commands {
+		names = append(names, command.Command)
+	}
+	return names
+}
+
 func TestPatternsForTemplatePreservesLearnedStatementWithoutGrantingAuthority(t *testing.T) {
 	pattern := domain.NewPattern("logic-structure", "Logic Structure", domain.CategoryStructure)
 	pattern.Source = domain.SourceLearnedCurrent

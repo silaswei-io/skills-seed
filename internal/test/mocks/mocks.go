@@ -12,7 +12,6 @@ import (
 type MockAgent struct {
 	NameVal                    string
 	AvailableVal               bool
-	CuratePatternsFn           func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error)
 	UserDefinePatternFn        func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
 	RefreshProjectProfileFn    func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	SelectLearningCandidatesFn func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error)
@@ -38,29 +37,6 @@ func (m *MockAgent) StartLearningSession(ctx context.Context, req agent.Learning
 		return m.StartLearningSessionFn(ctx, req)
 	}
 	return mockLearningSession{agent: m}, nil
-}
-
-// CuratePatterns 模拟模式策展
-func (m *MockAgent) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	if m.CuratePatternsFn != nil {
-		return m.CuratePatternsFn(ctx, req)
-	}
-	patterns := make([]agent.CuratedPattern, 0, len(req.CandidatePatterns))
-	for _, candidate := range req.CandidatePatterns {
-		patterns = append(patterns, agent.CuratedPattern{
-			ID:          candidate.ID,
-			Name:        candidate.Name,
-			Category:    string(candidate.Category),
-			Description: candidate.Description,
-			Rule:        candidate.Rule,
-			Confidence:  candidate.Confidence,
-			SourceIDs:   []string{candidate.ID},
-		})
-	}
-	return &agent.CuratePatternsResult{
-		Patterns: patterns,
-		Dropped:  []agent.CuratedDrop{},
-	}, nil
 }
 
 // UserDefinePattern 模拟用户自定义模式
@@ -331,10 +307,6 @@ func (s mockLearningSession) AnalyzeCurrentDeltaBatch(ctx context.Context, req *
 
 func (s mockLearningSession) RefreshProjectProfile(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 	return s.agent.RefreshProjectProfile(ctx, req)
-}
-
-func (s mockLearningSession) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	return s.agent.CuratePatterns(ctx, req)
 }
 
 func (s mockLearningSession) Close(context.Context) error {

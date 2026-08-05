@@ -58,8 +58,8 @@ func TestReconcileEvidenceFocusesFiltersInvalidPathsAndCoversEveryCandidate(t *t
 		{
 			ID:           "auth",
 			Name:         "Auth",
-			EntryPaths:   []string{"internal/auth/login.go", "internal/auth", "outside.go"},
-			RelatedPaths: []string{"internal/auth/login.go", "internal/auth/types.go"},
+			EntryPaths:   []string{"internal/auth/login.go", "internal/auth", "outside.go", "../escape.go"},
+			RelatedPaths: []string{"internal/auth/login.go", "internal/auth/types.go", "/tmp/escape.go"},
 		},
 	}
 	allowed := []string{
@@ -118,7 +118,7 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 		ProfileRefreshReason: "module boundary changed",
 	}
 	state.ProfileCommitted = true
-	state.Curation = &commandstate.CurationCheckpoint{
+	state.Decision = &commandstate.DecisionCheckpoint{
 		CandidateHash: "candidate-hash",
 		Decision:      json.RawMessage(`{"patterns":[],"dropped":[]}`),
 	}
@@ -135,8 +135,8 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	require.True(t, loaded.Analysis.ProfileRefreshNeeded)
 	require.Equal(t, "module boundary changed", loaded.Analysis.ProfileRefreshReason)
 	require.True(t, loaded.ProfileCommitted)
-	require.Equal(t, state.Curation.CandidateHash, loaded.Curation.CandidateHash)
-	require.JSONEq(t, string(state.Curation.Decision), string(loaded.Curation.Decision))
+	require.Equal(t, state.Decision.CandidateHash, loaded.Decision.CandidateHash)
+	require.JSONEq(t, string(state.Decision.Decision), string(loaded.Decision.Decision))
 }
 
 func TestPendingEvidenceFocusesDerivesCompletionFromCompletedFocuses(t *testing.T) {

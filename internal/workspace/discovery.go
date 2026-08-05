@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 )
 
 // ignoredDirs 是工作区自动发现时跳过的目录，避免依赖、构建产物和生成内容被识别为子项目。
@@ -288,7 +288,7 @@ func inferNodeLanguage(abs string, markers map[string]bool) string {
 		Dependencies    map[string]string `json:"dependencies"`
 		DevDependencies map[string]string `json:"devDependencies"`
 	}
-	if err := jsonx.Unmarshal(data, &pkg); err != nil {
+	if err := json.Unmarshal(data, &pkg); err != nil {
 		return "javascript"
 	}
 	for _, deps := range []map[string]string{pkg.Dependencies, pkg.DevDependencies} {
@@ -322,7 +322,7 @@ func isFrontendPackage(path string) bool {
 		DevDependencies map[string]string `json:"devDependencies"`
 		Scripts         map[string]string `json:"scripts"`
 	}
-	if err := jsonx.Unmarshal(data, &pkg); err != nil {
+	if err := json.Unmarshal(data, &pkg); err != nil {
 		return false
 	}
 

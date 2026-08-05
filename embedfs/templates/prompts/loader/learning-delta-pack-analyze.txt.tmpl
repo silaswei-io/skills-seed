@@ -14,7 +14,7 @@ Learning strategy guidance:
 - `fast`: return compact semantic changes clearly caused by the diff, but keep directly evidenced routeable changes.
 - `normal`: balance coverage and cost; keep routeable reusable changes with direct hunk anchors.
 - `deep`: keep more source-backed local changes when they affect future implementation decisions.
-- The mode changes curation priority only. It is not a fixed output count, file budget, or permission to learn outside the diff boundary.
+- The mode changes recall/precision priority only. It is not a fixed output count, file budget, or permission to learn outside the diff boundary.
 - Interpret category names abstractly across project types: `business` means product/domain behavior, `api` means any interface or contract, `database` means state/storage/persistence, `middleware` means interception or pipeline behavior, and `utils` means reusable domain-neutral helpers.
 {{- if .StructurePath}}
 
@@ -57,7 +57,7 @@ Diff evidence packs:
 {{end}}
 
 Diff boundary:
-- Do not rely on hidden context from planning, previous full learning, other packs, profile sync, or later curation.
+- Do not rely on hidden context from planning, previous full learning, other packs, profile sync, or later normalization.
 - Every decision must be triggered by a listed diff or changed focus path.
 - Changed hunks are the source anchor. Unchanged context files can explain meaning but cannot independently create a new pattern.
 - `focus_action: "new"` means the diff revealed a new reusable boundary inside a listed pack; it does not authorize scanning beyond listed diffs and direct context.

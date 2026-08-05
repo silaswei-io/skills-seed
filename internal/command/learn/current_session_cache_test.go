@@ -104,10 +104,6 @@ func (s testLearningSession) RefreshProjectProfile(context.Context, *agent.Analy
 	return &agent.AnalyzeProjectResult{}, nil
 }
 
-func (s testLearningSession) CuratePatterns(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	return &agent.CuratePatternsResult{}, nil
-}
-
 func (s testLearningSession) Close(context.Context) error {
 	return nil
 }

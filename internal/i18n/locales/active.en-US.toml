@@ -25,6 +25,9 @@ other = "help for skills-seed"
 [CobraFlagVersion]
 other = "version for skills-seed"
 
+[RuntimeContextPathNotRegularFile]
+other = "context path is not a regular file: {{.Path}}"
+
 [WorkflowShort]
 other = "Manage user workflows"
 
@@ -542,9 +545,6 @@ other = "Failed to unmarshal JSON"
 [AgentRequiredOutputFieldMissing]
 other = "AI output is missing required field {{.Field}}"
 
-[AgentInvalidCuratedDropReasonCode]
-other = "Curation output contains an invalid drop reason code: id={{.ID}}, reason_code={{.ReasonCode}}"
-
 [AgentDiagnosticError]
 other = "Agent diagnostics: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
 
@@ -648,7 +648,7 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [LearnLongDesc]
-other = "Learn coding patterns from the current codebase.\n\nThis command will:\n  • Use segmented AI learning conversations for planning, analysis, and curation\n  • Analyze current code or diff-anchored changes\n  • Extract source-backed coding patterns\n  • Save learned patterns to the database\n  • Prepare project knowledge for generated skills"
+other = "Learn coding patterns from the current codebase.\n\nThis command will:\n  • Use segmented AI learning conversations for planning and analysis\n  • Analyze current code or diff-anchored changes\n  • Extract source-backed coding patterns\n  • Normalize learned patterns into the database\n  • Prepare compactable project knowledge for generated skills"
 
 [LearnExample]
 other = "  # Incrementally learn from current code\n  skills-seed learn current\n\n  # Learn only from a focused directory\n  skills-seed learn current --focus internal/service --profile skip"
@@ -858,20 +858,20 @@ other = "{{.Batch}} focuses {{.Start}}-{{.End}}/{{.Total}} {{.Name}}"
 [ProgressLearnCurrentCommitFiles]
 other = "{{.Label}} · committing {{.Count}} file states"
 
-[ProgressLearnCurrentCurateAndSavePatterns]
-other = "Curating and saving pattern store"
+[ProgressLearnCurrentNormalizeAndSavePatterns]
+other = "Normalizing and saving pattern store"
 
 [ProgressLearnCurrentPatternStageDetail]
 other = "{{.Label}} · {{.Detail}}"
 
-[ProgressCuratePatternsValidation]
-other = "Validating curated patterns"
+[ProgressNormalizePatternsValidation]
+other = "Validating normalized patterns"
 
-[ProgressCuratePatternsStore]
+[ProgressNormalizePatternsStore]
 other = "Writing pattern store"
 
-[ProgressCuratePatternsLocal]
-other = "Local deterministic curation"
+[ProgressNormalizePatternsLocal]
+other = "Local deterministic normalization"
 
 [ProgressLearnCurrentSaveProfile]
 other = "Synchronizing project profile"
@@ -882,8 +882,8 @@ other = "Skipping project profile sync"
 [ProgressLearnWorkspaceProjects]
 other = "Learning workspace child projects"
 
-[ProgressCuratePatternsReplay]
-other = "Replay saved curation decision"
+[ProgressNormalizePatternsReplay]
+other = "Replay saved normalization decision"
 
 [ProgressUserDefinePatternAI]
 other = "Generate user-defined pattern"
@@ -990,7 +990,7 @@ other = "Additional guidance for this generate run, passed to the AI agent as ex
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern through --context and curate it before storage\n  update  - Update a specific pattern through --context\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern through --context and normalize it before storage\n  update  - Update a specific pattern through --context\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
 
 [PatternsExample]
 other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Compact similar patterns in all categories\n  skills-seed patterns compact"
@@ -1335,8 +1335,8 @@ other = "Learn failed"
 [SyncGenerateFailed]
 other = "Generate skills failed"
 
-[PatternCuratorNotConfigured]
-other = "pattern curator service is not configured"
+[PatternNormalizerNotConfigured]
+other = "pattern normalization service is not configured"
 
 [PreviewShort]
 other = "Preview analysis inputs"
@@ -1682,14 +1682,14 @@ other = "Failed to parse result, returning empty result"
 [LoggerAgentParseResultFailedNonFallback]
 other = "Failed to parse result"
 
-[LoggerAgentCuratePatternsCoverageRecovered]
-other = "Pattern curation coverage is incomplete; recovering only unclassified candidates locally"
+[LoggerPatternNormCoverageRecovered]
+other = "Pattern normalization coverage is incomplete; recovering only unclassified candidates locally"
 
-[LoggerAgentCuratePatternsRecallRecovered]
-other = "Pattern curation appears over-filtered; recovered source-backed candidates"
+[LoggerPatternNormRecallRecovered]
+other = "Pattern normalization appears over-filtered; recovered source-backed candidates"
 
-[LoggerAgentCuratePatternsSanitized]
-other = "Pattern curation result contains invalid or duplicate decisions; normalized them and continued"
+[LoggerPatternNormSanitized]
+other = "Pattern normalization result contains invalid or duplicate decisions; cleaned them and continued"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
@@ -1780,12 +1780,6 @@ other = "Read additional guidance for this learn run from files or directories; 
 [LearnFlagForce]
 other = "Ignore file fingerprints and relearn the current scan scope"
 
-[LearnFlagCurationOutput]
-other = "Resume commit from a completed CuratePatterns output"
-
-[LearnCurrentCurationOutputRequiresChildResume]
-other = "--curation-output must be resumed from the matching child project"
-
 # 当前学习命令消息
 [LearnCurrentStart]
 other = "Starting current-code incremental learning"
@@ -1817,23 +1811,17 @@ other = "Failed to start learning session"
 [LearnCurrentLearningSessionMissing]
 other = "Failed to start learning session: agent {{.Agent}} did not return a session"
 
-[LearnCurrentReadCurationOutputFailed]
-other = "Failed to read curation output"
+[LearnCurrentDecisionCandidateChanged]
+other = "Normalization candidate set changed"
 
-[LearnCurrentParseCurationOutputFailed]
-other = "Failed to parse curation output"
+[LearnCurrentDecodeDecisionFailed]
+other = "Failed to decode normalization decision"
 
-[LearnCurrentCurationCandidateChanged]
-other = "Curation candidate set changed"
+[LearnCurrentDecisionCheckpointMissing]
+other = "Normalization checkpoint is not initialized"
 
-[LearnCurrentDecodeCurationDecisionFailed]
-other = "Failed to decode curation decision"
-
-[LearnCurrentCurationCheckpointMissing]
-other = "Curation checkpoint is not initialized"
-
-[LearnCurrentEncodeCurationDecisionFailed]
-other = "Failed to encode curation decision"
+[LearnCurrentEncodeDecisionFailed]
+other = "Failed to encode normalization decision"
 
 [LearnCurrentArtifactsCommittedWithPendingFocuses]
 other = "Analysis artifacts are committed with {{.Count}} pending evidence focuses"
@@ -2376,17 +2364,11 @@ other = "Resume the previous incomplete sync state"
 [SyncFlagRestart]
 other = "Clear this sync command's resumable state and start again"
 
-[SyncFlagCurationOutput]
-other = "Resume commit from a completed CuratePatterns output; use it from the matching child project"
-
 [SyncRunModeConflict]
 other = "--resume and --restart cannot be used together"
 
 [SyncResumeStateMissing]
 other = "No resumable sync state was found; remove --resume to sync normally, or use --restart to start over"
-
-[SyncCurationOutputRequiresResume]
-other = "--curation-output must be used with --resume"
 
 [InteractiveSyncInterruptedTitle]
 other = "A previous sync did not finish. How should this run proceed?"
@@ -2813,3 +2795,36 @@ other = "Subcommands"
 
 [CommandDocsHeaderFlags]
 other = "Flags"
+
+[AgentClaudeResultError]
+other = "Claude CLI returned an error result: {{.Detail}}"
+
+[AgentClaudeDisableUserPluginsFailed]
+other = "Failed to generate Claude user plugin disable config"
+
+[AgentClaudeReadInstalledPluginsFailed]
+other = "Failed to read Claude installed plugin config"
+
+[AgentClaudeReadUserSettingsFailed]
+other = "Failed to read Claude user settings"
+
+[AgentCodexReadUserPluginsFailed]
+other = "Failed to read Codex user plugin config"
+
+[PatternNormUnsupportedOperation]
+other = "Unsupported pattern storage operation: {{.Operation}}"
+
+[PatternNormLoadExistingPatternsFailed]
+other = "Failed to load existing patterns"
+
+[PatternNormLearnCurrentFailed]
+other = "Failed to normalize current-code patterns"
+
+[PatternNormValidateCurrentFailed]
+other = "Failed to validate current-code normalization"
+
+[PatternNormValidateDeterministicFailed]
+other = "Failed to validate deterministic normalization"
+
+[PatternNormApplyPatternsFailed]
+other = "Failed to apply normalized patterns"

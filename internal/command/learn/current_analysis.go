@@ -14,9 +14,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
-	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
-	"github.com/silaswei-io/skills-seed/internal/service/learner"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
@@ -249,6 +248,7 @@ func (r *learnCurrentProjectRun) analyzePlannedBatchesParallel(analyzeLabel stri
 				progress.start(batch)
 				batchResults, err := r.analyzeBatchInDetachedSession(ctx, analyzeLabel, state, batch)
 				if err != nil {
+					progress.stop(batch)
 					results <- learnCurrentBatchAnalysisResult{batchIndex: batch.index, err: err}
 					cancel(err)
 					return
@@ -353,6 +353,13 @@ func (p *learnCurrentParallelAnalysisProgress) finish(batch learnCurrentBatch) {
 	defer p.mu.Unlock()
 	delete(p.active, batch.index)
 	p.completed += len(batch.focuses)
+	p.updateLocked()
+}
+
+func (p *learnCurrentParallelAnalysisProgress) stop(batch learnCurrentBatch) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.active, batch.index)
 	p.updateLocked()
 }
 
@@ -626,12 +633,12 @@ func (r *learnCurrentProjectRun) mergeFocusResult(result learnCurrentFocusResult
 	}
 }
 
-func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
+func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 	startedAt := time.Now()
-	stepLabel := i18n.Get("ProgressLearnCurrentCurateAndSavePatterns")
+	stepLabel := i18n.Get("ProgressLearnCurrentNormalizeAndSavePatterns")
 	if err := r.steps.Run(stepLabel, func() error {
 		if !r.analysisArtifactsCommitted() && len(r.patterns) > 0 {
-			hooks := curator.ProgressHooks{
+			hooks := patternnorm.ProgressHooks{
 				OnStepStart: func(label string) {
 					r.patternStageDetail(stepLabel, label)
 				},
@@ -645,15 +652,16 @@ func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
 					r.patternStageDetail(stepLabel, label)
 				},
 			}
-			checkpoint := newCurrentCurationCheckpoint(r.stateRepo, r.analysisState, r.importedCuration)
-			saved, err := r.cont.LearnerSvc.CurateAndSavePatternsWithOptions(r.ctx, r.patterns, curator.OperationLearnCurrent, learner.CurateOptions{
-				Hooks:              hooks,
+			checkpoint := newCurrentDecisionCheckpoint(r.stateRepo, r.analysisState)
+			result, err := r.cont.PatternNormSvc.NormalizeAndStoreWithHooks(r.ctx, patternnorm.NormalizeRequest{
+				Operation:          patternnorm.OperationLearnCurrent,
+				Candidates:         r.patterns,
 				DecisionCheckpoint: checkpoint,
-			})
+			}, hooks)
 			if err != nil {
 				return err
 			}
-			r.savedCount = saved
+			r.savedCount = len(result.Written)
 		}
 		if !r.analysisArtifactsCommitted() && r.analysisState != nil {
 			r.analysisState.ArtifactsCommitted = true
@@ -672,7 +680,7 @@ func (r *learnCurrentProjectRun) curateAndSavePatternsStep() error {
 		return err
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "command.learn_current.curate_and_save_patterns",
+		"operation", "command.learn_current.normalize_and_save_patterns",
 		"duration", time.Since(startedAt),
 		"patterns_count", len(r.patterns),
 		"saved_count", r.savedCount,

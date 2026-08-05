@@ -700,10 +700,6 @@ func (s *profileRefreshTestSession) RefreshProjectProfile(ctx context.Context, r
 	return s.result, nil
 }
 
-func (s *profileRefreshTestSession) CuratePatterns(context.Context, *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	return &agent.CuratePatternsResult{}, nil
-}
-
 func (s *profileRefreshTestSession) Close(context.Context) error {
 	return nil
 }

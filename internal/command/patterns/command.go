@@ -20,7 +20,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
-	"github.com/silaswei-io/skills-seed/internal/service/curator"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
 	"github.com/spf13/cobra"
@@ -80,8 +80,8 @@ func addCmd(cont *container.Container) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if cont.CuratorSvc == nil {
-				return fmt.Errorf("%s", i18n.Get("PatternCuratorNotConfigured"))
+			if cont.PatternNormSvc == nil {
+				return fmt.Errorf("%s", i18n.Get("PatternNormalizerNotConfigured"))
 			}
 
 			written, err := StoreUserDefinedPattern(cmd.Context(), cont, description, *result.Pattern)
@@ -252,7 +252,7 @@ func StoreUserDefinedPattern(ctx context.Context, cont *container.Container, des
 	if cont.ConfigRepo != nil && cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
 		return storeWorkspaceUserDefinedPattern(ctx, cont, description, pattern)
 	}
-	return curateAndStoreUserDefinedPattern(ctx, cont.CuratorSvc, pattern)
+	return normalizeAndStoreUserDefinedPattern(ctx, cont.PatternNormSvc, pattern)
 }
 
 func storeWorkspaceUserDefinedPattern(ctx context.Context, cont *container.Container, description string, pattern domain.Pattern) (domain.Pattern, error) {
@@ -269,7 +269,7 @@ func storeWorkspaceUserDefinedPattern(ctx context.Context, cont *container.Conta
 			}
 		}
 	}
-	written, err := curateAndStoreUserDefinedPattern(ctx, cont.CuratorSvc, rootPattern)
+	written, err := normalizeAndStoreUserDefinedPattern(ctx, cont.PatternNormSvc, rootPattern)
 	if err != nil {
 		return domain.Pattern{}, err
 	}
@@ -281,23 +281,23 @@ func storeWorkspaceUserDefinedPattern(ctx context.Context, cont *container.Conta
 	return written, nil
 }
 
-func curateAndStoreUserDefinedPattern(ctx context.Context, svc *curator.Service, pattern domain.Pattern) (domain.Pattern, error) {
-	curateTracker := progress.New(1)
-	curated, err := svc.CurateAndStoreWithHooks(ctx, curator.CurateRequest{
-		Operation:  curator.OperationUserDefined,
+func normalizeAndStoreUserDefinedPattern(ctx context.Context, svc *patternnorm.Service, pattern domain.Pattern) (domain.Pattern, error) {
+	normalizeTracker := progress.New(1)
+	normalized, err := svc.NormalizeAndStoreWithHooks(ctx, patternnorm.NormalizeRequest{
+		Operation:  patternnorm.OperationUserDefined,
 		Candidates: []domain.Pattern{pattern},
-	}, curatorProgressHooks(curateTracker))
+	}, patternNormProgressHooks(normalizeTracker))
 	if err != nil {
 		return domain.Pattern{}, err
 	}
-	if len(curated.Written) == 0 {
+	if len(normalized.Written) == 0 {
 		reason := i18n.Get("PatternsNotWritten")
-		if len(curated.Dropped) > 0 && curated.Dropped[0].Reason != "" {
-			reason = curated.Dropped[0].Reason
+		if len(normalized.Dropped) > 0 && normalized.Dropped[0].Reason != "" {
+			reason = normalized.Dropped[0].Reason
 		}
 		return domain.Pattern{}, fmt.Errorf("%s", reason)
 	}
-	return curated.Written[0], nil
+	return normalized.Written[0], nil
 }
 
 // UpdateUserDefinedPattern 保存用户对既有模式的修订。
@@ -901,14 +901,14 @@ func compactCmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			if cont.CuratorSvc == nil {
-				return fmt.Errorf("%s", i18n.Get("PatternCuratorNotConfigured"))
+			if cont.PatternNormSvc == nil {
+				return fmt.Errorf("%s", i18n.Get("PatternNormalizerNotConfigured"))
 			}
 			tracker := progress.New(1)
-			result, err := cont.CuratorSvc.CompactWithHooks(cmd.Context(), curator.CompactRequest{
+			result, err := cont.PatternNormSvc.CompactWithHooks(cmd.Context(), patternnorm.CompactRequest{
 				Category: category,
 				DryRun:   dryRun,
-			}, curatorProgressHooks(tracker))
+			}, patternNormProgressHooks(tracker))
 			if err != nil {
 				return err
 			}
@@ -927,8 +927,8 @@ func compactCmd(cont *container.Container) *cobra.Command {
 	return cmd
 }
 
-func curatorProgressHooks(tracker *progress.Tracker) curator.ProgressHooks {
-	return curator.ProgressHooks{
+func patternNormProgressHooks(tracker *progress.Tracker) patternnorm.ProgressHooks {
+	return patternnorm.ProgressHooks{
 		OnStepStart:    tracker.StartStep,
 		OnStepUpdate:   tracker.UpdateStep,
 		OnStepComplete: tracker.CompleteStep,

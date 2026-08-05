@@ -10,7 +10,6 @@ import (
 
 // AI 输出契约名称统一绑定 DTO，供提示词和 Agent CLI 复用同一份 Schema。
 const (
-	ContractCuratePatterns              = "CuratePatternsOutput"
 	ContractUserDefinePattern           = "UserDefinePatternOutput"
 	ContractProjectProfile              = "ProjectProfileOutput"
 	ContractAnalyzeCurrentCodebaseBatch = "AnalyzeCurrentCodebaseBatchOutput"
@@ -24,7 +23,6 @@ const (
 )
 
 var outputTypes = map[string]reflect.Type{
-	ContractCuratePatterns:              reflect.TypeOf(CuratePatternsOutput{}),
 	ContractUserDefinePattern:           reflect.TypeOf(PatternOutput{}),
 	ContractProjectProfile:              reflect.TypeOf(ProjectProfileOutput{}),
 	ContractAnalyzeCurrentCodebaseBatch: reflect.TypeOf(AnalyzeCurrentCodebaseBatchOutput{}),

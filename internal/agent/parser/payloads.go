@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -32,18 +31,6 @@ func patternToDomain(p aicontract.PatternOutput, source domain.Source, now time.
 	}
 	pattern.BusinessMethod = businessMethodToDomain(p.BusinessMethod, pattern.CreatedAt)
 	return pattern
-}
-
-func curatedPatternToAgent(p aicontract.CuratedPatternOutput) agent.CuratedPattern {
-	return agent.CuratedPattern{
-		ID:          p.ID,
-		Name:        p.Name,
-		Category:    p.Category,
-		Description: p.Description,
-		Rule:        p.Rule,
-		Confidence:  p.Confidence,
-		SourceIDs:   p.SourceIDs,
-	}
 }
 
 func businessMethodToDomain(p *aicontract.BusinessMethodOutput, now time.Time) *domain.BusinessMethod {

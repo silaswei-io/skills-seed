@@ -32,6 +32,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/snapshotflow"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 // AnalyzerService 代码分析服务
@@ -1001,11 +1002,7 @@ func pathInFocus(path string, focusPaths []string) bool {
 }
 
 func normalizeRelPath(path string) string {
-	path = strings.TrimSpace(filepath.ToSlash(filepath.Clean(path)))
-	if path == "." {
-		return ""
-	}
-	return strings.TrimPrefix(path, "./")
+	return pathx.CleanRelative(path)
 }
 
 func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRoots []string, language string) []agent.SampleFile {

@@ -9,7 +9,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
-	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 )
@@ -58,7 +57,7 @@ func (s *learningSession) SessionID() string {
 }
 
 func (s *learningSession) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-	output, err := s.call(ctx, "LearningCandidateSelect", "learning-candidate-select", "skills-seed-learning-candidate-select", aicontract.ContractSelectLearningCandidates, agent.NewRepositoryReadRuntimeTask(agent.RuntimeSlug("learning-candidate-select", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, err := s.call(ctx, "LearningCandidateSelect", "learning-candidate-select", "skills-seed-learning-candidate-select", aicontract.ContractSelectLearningCandidates, agent.NewRuntimeTask(agent.RuntimeSlug("learning-candidate-select", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.SelectLearningCandidatesPromptData(inputs, req)
 	})
 	if err != nil {
@@ -68,7 +67,7 @@ func (s *learningSession) SelectLearningCandidates(ctx context.Context, req *age
 }
 
 func (s *learningSession) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	output, err := s.call(ctx, "LearningPackPlan", "learning-pack-plan", "skills-seed-learning-pack-plan", aicontract.ContractPlanLearningAgenda, agent.NewRepositoryReadRuntimeTask(agent.RuntimeSlug("learning-pack-plan", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, err := s.call(ctx, "LearningPackPlan", "learning-pack-plan", "skills-seed-learning-pack-plan", aicontract.ContractPlanLearningAgenda, agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-plan", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.PlanLearningAgendaPromptData(inputs, req)
 	})
 	if err != nil {
@@ -120,27 +119,6 @@ func (s *learningSession) RefreshProjectProfile(ctx context.Context, req *agent.
 		return nil, err
 	}
 	return result, agent.RequireResult(result, "AnalyzeProject")
-}
-
-func (s *learningSession) CuratePatterns(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-	task := agent.NewPromptOnlyRuntimeTask(agent.RuntimeSlug("learning-pattern-curate", ""))
-	data := map[string]interface{}{
-		"Operation":           req.Operation,
-		"CandidatePatterns":   req.CandidatePatterns,
-		"PrecompactionCount":  req.PrecompactionCount,
-		"ExistingPatterns":    req.ExistingPatterns,
-		"ExistingByCandidate": req.ExistingByCandidate,
-		"AllowedCategories":   domain.AllowedPatternCategoriesText(),
-	}
-	output, err := s.callPrepared(ctx, "LearningPatternCurate", "learning-pattern-curate", aicontract.ContractCuratePatterns, task, data)
-	if err != nil {
-		return nil, err
-	}
-	result, err := parser.ParseCuratePatternsResult(output)
-	if err != nil {
-		return nil, err
-	}
-	return result, agent.RequireResult(result, "CuratePatterns")
 }
 
 func (s *learningSession) Close(context.Context) error {

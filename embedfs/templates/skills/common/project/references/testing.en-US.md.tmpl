@@ -21,8 +21,10 @@ This file is generated deterministically from the current source tree and does n
 
 {{range .TestFiles}}- `{{.}}`
 {{end}}
-{{end}}{{end}}## Coverage Gaps
+{{end}}{{end}}
+## Coverage Gaps
 
 {{range .Inventory.Modules}}{{if not .TestFiles}}- Module `{{.Workdir}}` (`{{.ModFile}}`) has no `_test.go`; `go test ./...` still checks package loading and compilation, but automated test coverage is missing.
 {{end}}{{end}}{{range .Inventory.UnownedTestFiles}}- `{{.}}` does not belong to a `go.mod`; confirm its module boundary first.
+{{end}}{{range .Gaps}}- {{.}}
 {{end}}

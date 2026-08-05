@@ -26,7 +26,7 @@ func shouldRunInteractiveSync(cmd *cobra.Command, userContext string, noInteract
 }
 
 func resolveInteractiveSync(ctx context.Context, _ *cobra.Command, cont *container.Container, stateScope string) (syncRunMode, error) {
-	hasState, err := hasSyncCommandState(ctx, cont.SeedPath, stateScope)
+	hasState, err := hasSyncCommandStateForTarget(ctx, cont, stateScope)
 	if err != nil {
 		return syncRunAuto, err
 	}
@@ -90,4 +90,38 @@ func hasResumableSyncCommandState(ctx context.Context, seedPath, stateScope stri
 		return false, err
 	}
 	return state != nil && len(state.Files)+len(state.Deleted) > 0 && len(state.Agenda.Focuses) > 0, nil
+}
+
+func hasSyncCommandStateForTarget(ctx context.Context, cont *container.Container, stateScope string) (bool, error) {
+	seedPaths, err := syncCommandStateSeedPaths(cont)
+	if err != nil {
+		return false, err
+	}
+	for _, seedPath := range seedPaths {
+		hasState, err := hasSyncCommandState(ctx, seedPath, stateScope)
+		if err != nil {
+			return false, err
+		}
+		if hasState {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func hasResumableSyncCommandStateForTarget(ctx context.Context, cont *container.Container, stateScope string) (bool, error) {
+	seedPaths, err := syncCommandStateSeedPaths(cont)
+	if err != nil {
+		return false, err
+	}
+	for _, seedPath := range seedPaths {
+		resumable, err := hasResumableSyncCommandState(ctx, seedPath, stateScope)
+		if err != nil {
+			return false, err
+		}
+		if resumable {
+			return true, nil
+		}
+	}
+	return false, nil
 }

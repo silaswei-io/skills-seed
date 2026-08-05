@@ -23,9 +23,8 @@ import (
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
-	"github.com/silaswei-io/skills-seed/internal/service/curator"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
-	"github.com/silaswei-io/skills-seed/internal/service/learner"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	workflowsvc "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
@@ -49,11 +48,10 @@ type Container struct {
 	WorkflowRepo          *workflowstore.Repository
 	Agent                 agent.Agent
 	AnalyzerSvc           *analyzer.AnalyzerService
-	LearnerSvc            *learner.LearnerService
 	GeneratorSvc          *generator.GeneratorService
 	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
 	WorkflowSvc           *workflowsvc.Service
-	CuratorSvc            *curator.Service
+	PatternNormSvc        *patternnorm.Service
 	PromptLoader          *promptloader.Loader
 	SkillsLoader          *skills.Loader
 }
@@ -159,8 +157,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 	// 7. 创建服务
 	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo)
-	curatorSvc := curator.NewService(patternRepo)
-	learnerSvc := learner.NewLearnerService(curatorSvc)
+	patternNormSvc := patternnorm.NewService(patternRepo)
 
 	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, cfg.Project.Language)
 	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo)
@@ -182,11 +179,10 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		WorkflowRepo:          workflowRepo,
 		Agent:                 agentImpl,
 		AnalyzerSvc:           analyzerSvc,
-		LearnerSvc:            learnerSvc,
 		GeneratorSvc:          generatorSvc,
 		WorkspaceGeneratorSvc: workspaceGeneratorSvc,
 		WorkflowSvc:           workflowSvc,
-		CuratorSvc:            curatorSvc,
+		PatternNormSvc:        patternNormSvc,
 		PromptLoader:          promptLoader,
 		SkillsLoader:          skillsLoader,
 	}, nil

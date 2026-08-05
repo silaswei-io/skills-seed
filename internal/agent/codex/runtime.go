@@ -3,6 +3,7 @@ package codex
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,7 +19,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
-	"github.com/silaswei-io/skills-seed/internal/utils/jsonx"
 	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
@@ -433,7 +433,7 @@ func codexUserPluginNames() []string {
 		Plugins map[string]interface{} `toml:"plugins"`
 	}
 	if err := toml.Unmarshal(content, &cfg); err != nil {
-		logger.Debug("读取 Codex 用户插件配置失败",
+		logger.Debug(i18n.Get("AgentCodexReadUserPluginsFailed"),
 			"config_path", configPath,
 			"error", err,
 		)
@@ -472,7 +472,7 @@ func extractFinalContent(output string) (string, error) {
 		}
 
 		var evt map[string]interface{}
-		if err := jsonx.Unmarshal([]byte(line), &evt); err != nil {
+		if err := json.Unmarshal([]byte(line), &evt); err != nil {
 			continue
 		}
 
@@ -529,7 +529,7 @@ func extractCodexSessionID(output string) string {
 		}
 
 		var evt map[string]interface{}
-		if err := jsonx.Unmarshal([]byte(line), &evt); err != nil {
+		if err := json.Unmarshal([]byte(line), &evt); err != nil {
 			continue
 		}
 		for _, key := range []string{"thread_id", "session_id", "conversation_id"} {

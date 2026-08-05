@@ -52,17 +52,6 @@ type PatternOutput struct {
 	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"legacy field name for a canonical reusable capability entry with verified name, repository-relative location, complete signature or concrete declaration, prerequisites, return/error/result semantics, and source-backed usage; include for product/domain behavior, UI/CLI/system actions, orchestration, adapters, jobs/tasks, resolvers, declarative entries, or common utilities when directly verified, otherwise null"`
 }
 
-// CuratedPatternOutput 只承载 AI 拥有的规范文本和来源决策。
-type CuratedPatternOutput struct {
-	ID          string   `json:"id" jsonschema_description:"canonical id, preferably an input id"`
-	Name        string   `json:"name" jsonschema_description:"canonical pattern name"`
-	Category    string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key; business means product/domain behavior, api means interface/contract/message/event/adapter, database means state/storage/persistence/cache, middleware means interception/pipeline/filter/hook processing"`
-	Description string   `json:"description" jsonschema_description:"factual solved problem, matching triggers, observed behavior, and applicability boundary"`
-	Rule        string   `json:"rule" jsonschema_description:"canonical reuse guidance; normative only for explicit authoritative input"`
-	Confidence  float64  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0 evidence consistency and specificity"`
-	SourceIDs   []string `json:"source_ids" jsonschema_description:"all real candidate or existing pattern ids represented by this canonical pattern"`
-}
-
 type ValidationCommandOutput struct {
 	Command    string   `json:"command" jsonschema_description:"exact full validation command shown by evidence"`
 	When       string   `json:"when,omitempty" jsonschema_description:"when to run this command"`
@@ -129,17 +118,6 @@ type ProjectProfileOutput struct {
 type ProfileRefreshRecommendationOutput struct {
 	Needed bool   `json:"needed" jsonschema_description:"true only when broad structure or technology changes require full refresh"`
 	Reason string `json:"reason,omitempty" jsonschema_description:"reason when refresh is needed"`
-}
-
-type CuratePatternsOutput struct {
-	Patterns []CuratedPatternOutput `json:"patterns" jsonschema_description:"final canonical patterns to write"`
-	Dropped  []CuratedDropOutput    `json:"dropped" jsonschema_description:"candidate patterns not written"`
-}
-
-type CuratedDropOutput struct {
-	ID         string `json:"id" jsonschema_description:"candidate id"`
-	ReasonCode string `json:"reason_code" jsonschema:"enum=exact_duplicate,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overfiltered_source_backed" jsonschema_description:"structured drop reason; use overfiltered_source_backed only when the candidate has evidence but would otherwise be dropped merely for being simple, local, common, framework-specific, language-specific, config-only, interface/contract-only, error-only, or utility-only"`
-	Reason     string `json:"reason" jsonschema_description:"specific human-readable reason that cites the semantic issue, duplicate owner, missing evidence, unsafe guidance, or lack of routeable decision value"`
 }
 
 type LearningSessionAckOutput struct {

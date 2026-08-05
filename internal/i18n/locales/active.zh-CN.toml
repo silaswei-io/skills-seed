@@ -25,6 +25,9 @@ other = "查看帮助"
 [CobraFlagVersion]
 other = "查看版本信息"
 
+[RuntimeContextPathNotRegularFile]
+other = "context 路径不是普通文件: {{.Path}}"
+
 [WorkflowShort]
 other = "管理用户工作流"
 
@@ -542,9 +545,6 @@ other = "解析 JSON 失败"
 [AgentRequiredOutputFieldMissing]
 other = "AI 输出缺少必填字段 {{.Field}}"
 
-[AgentInvalidCuratedDropReasonCode]
-other = "策展输出包含无效丢弃原因码: id={{.ID}}, reason_code={{.ReasonCode}}"
-
 [AgentDiagnosticError]
 other = "Agent 诊断: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
 
@@ -648,7 +648,7 @@ other = "skills-seed 未初始化"
 other = "请先运行 'skills-seed init' 初始化项目"
 
 [LearnLongDesc]
-other = "从当前代码库学习编码模式。\n\n此命令将：\n  • 使用分段 AI 学习会话规划、分析和策展\n  • 分析当前代码或 diff 锚定变更\n  • 提取有源码证据的编码模式\n  • 保存学到的 patterns 到数据库\n  • 为生成 skills 准备项目知识"
+other = "从当前代码库学习编码模式。\n\n此命令将：\n  • 使用分段 AI 学习会话规划和分析\n  • 分析当前代码或 diff 锚定变更\n  • 提取有源码证据的编码模式\n  • 规范化保存学到的 patterns 到数据库\n  • 为生成 skills 准备可收敛的项目知识"
 
 [LearnExample]
 other = "  # 从当前代码增量学习\n  skills-seed learn current\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service --profile skip"
@@ -858,20 +858,20 @@ other = "{{.Batch}} 焦点 {{.Start}}-{{.End}}/{{.Total}} {{.Name}}"
 [ProgressLearnCurrentCommitFiles]
 other = "{{.Label}} · 提交 {{.Count}} 个文件状态"
 
-[ProgressLearnCurrentCurateAndSavePatterns]
-other = "策展并保存模式库"
+[ProgressLearnCurrentNormalizeAndSavePatterns]
+other = "规范化并保存模式库"
 
 [ProgressLearnCurrentPatternStageDetail]
 other = "{{.Label}} · {{.Detail}}"
 
-[ProgressCuratePatternsValidation]
-other = "校验策展结果"
+[ProgressNormalizePatternsValidation]
+other = "校验规范化结果"
 
-[ProgressCuratePatternsStore]
+[ProgressNormalizePatternsStore]
 other = "写入模式库"
 
-[ProgressCuratePatternsLocal]
-other = "本地确定性策展"
+[ProgressNormalizePatternsLocal]
+other = "本地确定性规范化"
 
 [ProgressLearnCurrentSaveProfile]
 other = "同步项目画像"
@@ -882,8 +882,8 @@ other = "跳过项目画像同步"
 [ProgressLearnWorkspaceProjects]
 other = "学习工作区子项目"
 
-[ProgressCuratePatternsReplay]
-other = "重放已保存的策展决策"
+[ProgressNormalizePatternsReplay]
+other = "重放已保存的规范化决策"
 
 [ProgressUserDefinePatternAI]
 other = "生成用户定义模式"
@@ -990,7 +990,7 @@ other = "本次生成的补充说明，会传给 AI Agent 作为额外约束"
 other = "管理已学习的 patterns"
 
 [PatternsLongDesc]
-other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 通过 --context 添加用户自定义候选模式，并在入库前完成策展\n  update  - 通过 --context 修订指定 pattern\n  delete  - 删除指定 pattern\n  compact - 本地整理已有 patterns，减少重复规则\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量指标。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
+other = "管理已学习的代码模式。\n\n当前支持：\n  add     - 通过 --context 添加用户自定义候选模式，并在入库前完成规范化\n  update  - 通过 --context 修订指定 pattern\n  delete  - 删除指定 pattern\n  compact - 本地整理已有 patterns，减少重复规则\n  show    - 查看数据库中的 pattern 字段、时间和代码位置元数据\n  stats   - 查看模式质量指标。\n\n整理前建议先运行 'skills-seed patterns show' 检查已有内容。"
 
 [PatternsExample]
 other = "  # 查看 patterns 数据库字段\n  skills-seed patterns show\n\n  # 查看单条 pattern 详情\n  skills-seed patterns show business-create-order\n\n  # 整理所有分类中的相似 patterns\n  skills-seed patterns compact"
@@ -1335,8 +1335,8 @@ other = "学习失败"
 [SyncGenerateFailed]
 other = "生成 skills 失败"
 
-[PatternCuratorNotConfigured]
-other = "模式策展服务未配置"
+[PatternNormalizerNotConfigured]
+other = "模式规范化服务未配置"
 
 [PreviewShort]
 other = "预览分析输入"
@@ -1682,14 +1682,14 @@ other = "解析结果失败，返回空结果"
 [LoggerAgentParseResultFailedNonFallback]
 other = "解析结果失败"
 
-[LoggerAgentCuratePatternsCoverageRecovered]
-other = "模式策展候选覆盖率异常，仅对未分类候选执行本地确定性恢复"
+[LoggerPatternNormCoverageRecovered]
+other = "模式规范化候选覆盖率异常，仅对未分类候选执行本地确定性恢复"
 
-[LoggerAgentCuratePatternsRecallRecovered]
-other = "模式策展疑似过度过滤，已恢复有源码证据的候选"
+[LoggerPatternNormRecallRecovered]
+other = "模式规范化疑似过度过滤，已恢复有源码证据的候选"
 
-[LoggerAgentCuratePatternsSanitized]
-other = "模式策展结果包含无效或重复决策，已规范化后继续"
+[LoggerPatternNormSanitized]
+other = "模式规范化结果包含无效或重复决策，已整理后继续"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "项目分析提示词模板渲染失败"
@@ -1780,12 +1780,6 @@ other = "从文件或目录读取本次学习的补充说明，可重复传入�
 [LearnFlagForce]
 other = "忽略文件指纹，强制重新学习当前扫描范围"
 
-[LearnFlagCurationOutput]
-other = "读取已完成的 CuratePatterns 输出并恢复提交"
-
-[LearnCurrentCurationOutputRequiresChildResume]
-other = "--curation-output 必须在对应子项目目录恢复使用"
-
 # 当前学习命令消息
 [LearnCurrentStart]
 other = "开始当前代码增量学习"
@@ -1817,23 +1811,17 @@ other = "启动学习会话失败"
 [LearnCurrentLearningSessionMissing]
 other = "启动学习会话失败: Agent {{.Agent}} 未返回会话"
 
-[LearnCurrentReadCurationOutputFailed]
-other = "读取策展输出失败"
+[LearnCurrentDecisionCandidateChanged]
+other = "规范化候选集已变化"
 
-[LearnCurrentParseCurationOutputFailed]
-other = "解析策展输出失败"
+[LearnCurrentDecodeDecisionFailed]
+other = "解码规范化决策失败"
 
-[LearnCurrentCurationCandidateChanged]
-other = "策展候选集已变化"
+[LearnCurrentDecisionCheckpointMissing]
+other = "规范化检查点未初始化"
 
-[LearnCurrentDecodeCurationDecisionFailed]
-other = "解码策展决策失败"
-
-[LearnCurrentCurationCheckpointMissing]
-other = "策展检查点未初始化"
-
-[LearnCurrentEncodeCurationDecisionFailed]
-other = "编码策展决策失败"
+[LearnCurrentEncodeDecisionFailed]
+other = "编码规范化决策失败"
 
 [LearnCurrentArtifactsCommittedWithPendingFocuses]
 other = "分析产物已提交，但仍有 {{.Count}} 个证据焦点待处理"
@@ -2376,17 +2364,11 @@ other = "继续上一次未完成的 sync 状态"
 [SyncFlagRestart]
 other = "清理本次 sync 的可恢复状态并重新开始"
 
-[SyncFlagCurationOutput]
-other = "读取已完成的 CuratePatterns 输出并恢复提交；必须在对应子项目目录使用"
-
 [SyncRunModeConflict]
 other = "--resume 与 --restart 不能同时使用"
 
 [SyncResumeStateMissing]
 other = "没有可恢复的 sync 状态；请去掉 --resume 正常同步，或使用 --restart 重新开始"
-
-[SyncCurationOutputRequiresResume]
-other = "--curation-output 必须与 --resume 一起使用"
 
 [InteractiveSyncInterruptedTitle]
 other = "检测到上一次 sync 未完成，本次如何执行？"
@@ -2813,3 +2795,36 @@ other = "子命令"
 
 [CommandDocsHeaderFlags]
 other = "参数"
+
+[AgentClaudeResultError]
+other = "Claude CLI 返回失败结果: {{.Detail}}"
+
+[AgentClaudeDisableUserPluginsFailed]
+other = "生成 Claude 用户插件禁用配置失败"
+
+[AgentClaudeReadInstalledPluginsFailed]
+other = "读取 Claude 已安装插件配置失败"
+
+[AgentClaudeReadUserSettingsFailed]
+other = "读取 Claude 用户设置失败"
+
+[AgentCodexReadUserPluginsFailed]
+other = "读取 Codex 用户插件配置失败"
+
+[PatternNormUnsupportedOperation]
+other = "不支持的模式入库操作: {{.Operation}}"
+
+[PatternNormLoadExistingPatternsFailed]
+other = "加载已有模式失败"
+
+[PatternNormLearnCurrentFailed]
+other = "当前代码模式规范化失败"
+
+[PatternNormValidateCurrentFailed]
+other = "校验当前代码规范化结果失败"
+
+[PatternNormValidateDeterministicFailed]
+other = "校验确定性规范化结果失败"
+
+[PatternNormApplyPatternsFailed]
+other = "写入规范模式失败"

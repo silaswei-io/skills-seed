@@ -20,6 +20,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 const (
@@ -582,37 +583,15 @@ func analysisCandidatePaths(changes *fileanalysis.FileChanges) []string {
 }
 
 func normalizeStatePath(path string) string {
-	path = filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
-	if path == "." {
-		return ""
-	}
-	return strings.TrimPrefix(path, "./")
+	return pathx.CleanRelative(path)
 }
 
 func normalizeStatePaths(paths []string) []string {
-	out := make([]string, 0, len(paths))
-	seen := map[string]bool{}
-	for _, path := range paths {
-		path = normalizeStatePath(path)
-		if path == "" || seen[path] {
-			continue
-		}
-		seen[path] = true
-		out = append(out, path)
-	}
-	sort.Strings(out)
-	return out
+	return pathx.CleanRelativeList(paths)
 }
 
 func pathSet(paths []string) map[string]bool {
-	set := make(map[string]bool, len(paths))
-	for _, path := range paths {
-		path = normalizeStatePath(path)
-		if path != "" {
-			set[path] = true
-		}
-	}
-	return set
+	return pathx.CleanRelativeSet(paths)
 }
 
 func intersectFocusPaths(focus domain.EvidenceFocus, allowed map[string]bool) []string {

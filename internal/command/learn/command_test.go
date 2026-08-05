@@ -25,8 +25,7 @@ import (
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
-	"github.com/silaswei-io/skills-seed/internal/service/curator"
-	servicelearner "github.com/silaswei-io/skills-seed/internal/service/learner"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
@@ -339,7 +338,7 @@ func TestRunLearnCurrentAutoRefreshesProfileWhenRecommended(t *testing.T) {
 	require.Equal(t, "profile", profile.Summary)
 }
 
-func TestRunLearnCurrentRefreshesProfileAfterCuration(t *testing.T) {
+func TestRunLearnCurrentRefreshesProfileAfterNormalization(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
 
@@ -347,7 +346,7 @@ func TestRunLearnCurrentRefreshesProfileAfterCuration(t *testing.T) {
 	mockAgent := cont.Agent.(*mocks.MockAgent)
 	var events []string
 	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-		pattern := learnCurrentPatternForTest("curated-before-profile", "Curated Before Profile", domain.CategoryBusiness, "main.go")
+		pattern := learnCurrentPatternForTest("normalized-before-profile", "Normalized Before Profile", domain.CategoryBusiness, "main.go")
 		return &agent.AnalyzeCurrentCodebaseResult{
 			Patterns: []domain.Pattern{*pattern},
 			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{
@@ -355,10 +354,6 @@ func TestRunLearnCurrentRefreshesProfileAfterCuration(t *testing.T) {
 				Reason: "business pattern changed",
 			},
 		}, nil
-	}
-	mockAgent.CuratePatternsFn = func(ctx context.Context, req *agent.CuratePatternsRequest) (*agent.CuratePatternsResult, error) {
-		t.Fatal("current learning curation should not call AI")
-		return nil, nil
 	}
 	mockAgent.RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 		events = append(events, "profile")
@@ -657,7 +652,7 @@ func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternStoreFails(t *tes
 	_, err := runLearnCurrent(cont, opts)
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "patterns")
+	require.Contains(t, err.Error(), i18n.Get("PatternNormLoadExistingPatternsFailed"))
 }
 
 func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testing.T) {
@@ -689,9 +684,8 @@ func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testin
 			return nil
 		},
 	}
-	curatorSvc := curator.NewService(patternRepo)
-	cont.CuratorSvc = curatorSvc
-	cont.LearnerSvc = servicelearner.NewLearnerService(curatorSvc)
+	patternNormSvc := patternnorm.NewService(patternRepo)
+	cont.PatternNormSvc = patternNormSvc
 
 	_, err := runLearnCurrent(cont, opts)
 	require.ErrorContains(t, err, "pattern store failed")
@@ -732,7 +726,7 @@ func TestRunLearnCurrentResumeAfterProfileSaveFailureDoesNotReanalyze(t *testing
 		analyzeCalls++
 		return &agent.AnalyzeCurrentCodebaseResult{
 			Patterns: []domain.Pattern{
-				*learnCurrentPatternForTest("profile-after-curation", "Profile After Curation", domain.CategoryBusiness, "main.go"),
+				*learnCurrentPatternForTest("profile-after-normalization", "Profile After Normalization", domain.CategoryBusiness, "main.go"),
 			},
 			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{Needed: true, Reason: "module boundary changed"},
 		}, nil
@@ -1515,7 +1509,7 @@ func TestRunLearnCurrentShowsEvidenceFocusProgressDetails(t *testing.T) {
 
 	require.Contains(t, output, "学习议程规划")
 	require.Contains(t, output, "分析当前代码库 · 焦点 1/2 · 认证登录")
-	require.Contains(t, output, "策展并保存模式库 · 提交 2 个文件状态")
+	require.Contains(t, output, "规范化并保存模式库 · 提交 2 个文件状态")
 }
 
 func TestRunLearnCurrentIncludesEvidenceFocusInFailure(t *testing.T) {
@@ -2198,7 +2192,7 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		},
 	}
 	gitRepo := git.NewRepository(projectRoot)
-	curatorSvc := curator.NewService(patternRepo)
+	patternNormSvc := patternnorm.NewService(patternRepo)
 
 	return &container.Container{
 		SeedPath:             seedPath,
@@ -2212,9 +2206,8 @@ func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.W
 		WorkspaceSpecRepo:    workspacestore.NewSpecRepository(seedPath),
 		Agent:                mockAgent,
 		AnalyzerSvc:          analyzer.NewAnalyzerService(mockAgent, configRepo),
-		LearnerSvc:           servicelearner.NewLearnerService(curatorSvc),
 		FileTracker:          patternRepo,
-		CuratorSvc:           curatorSvc,
+		PatternNormSvc:       patternNormSvc,
 	}
 }
 

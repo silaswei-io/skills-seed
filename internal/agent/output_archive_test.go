@@ -126,14 +126,14 @@ func TestSaveAgentOutputForContextUsesSharedRuntimeTask(t *testing.T) {
 
 	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
 		Agent:     "claude",
-		Operation: "CuratePatterns",
+		Operation: "AnalyzeCurrentCodebaseBatch",
 		RuntimeID: "20260626-183633",
-		Slug:      "core-pattern-curate",
+		Slug:      "learning-pack-analyze-core",
 		Attempt:   1,
 		Content:   `{"patterns":[],"dropped":[]}`,
 	})
 
-	require.Equal(t, "20260626-183633-claude-core-pattern-curate.md", filepath.Base(archive.ContentPath))
+	require.Equal(t, "20260626-183633-claude-learning-pack-analyze-core.md", filepath.Base(archive.ContentPath))
 	entries, err := os.ReadDir(filepath.Join(seedPath, "runtime", "agent-outputs"))
 	require.NoError(t, err)
 	var manifestPath string
@@ -150,7 +150,7 @@ func TestSaveAgentOutputForContextUsesSharedRuntimeTask(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(data, &manifest))
 	require.Equal(t, "20260626-183633", manifest.RuntimeID)
-	require.Equal(t, "core-pattern-curate", manifest.Slug)
+	require.Equal(t, "learning-pack-analyze-core", manifest.Slug)
 }
 
 func TestSaveAgentOutputForContextKeepsReadableUnitSlug(t *testing.T) {

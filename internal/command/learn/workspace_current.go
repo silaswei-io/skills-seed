@@ -78,6 +78,29 @@ func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOption
 	return run.execute()
 }
 
+// RunWorkspaceRelationships 保存工作区关系产物，用于工作区 sync 在子项目闭环完成后收尾。
+func RunWorkspaceRelationships(cont *container.Container, userContext string) (bool, error) {
+	if cont == nil {
+		return false, fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+	}
+	run := &learnWorkspaceCurrentRun{
+		cont: cont,
+		opts: learnCurrentOptions{userContext: userContext},
+		ctx:  runtimecontext.WithUserContext(runtimecontext.WithSeedPath(context.Background(), cont.SeedPath), userContext),
+	}
+	if err := run.prepareWorkspaceContext(); err != nil {
+		return false, err
+	}
+	relationshipsChanged, err := saveWorkspaceRelationshipArtifacts(run.ctx, run.cont, run.workspaceName, run.projectRoot, run.workspaceConfig)
+	if err != nil {
+		return false, err
+	}
+	if err := commandutil.MarkLearned(run.ctx, run.cont); err != nil {
+		return false, err
+	}
+	return relationshipsChanged, nil
+}
+
 func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) {
 	if err := r.prepare(); err != nil {
 		return domain.LearnCurrentResult{}, err
@@ -113,6 +136,20 @@ func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) 
 }
 
 func (r *learnWorkspaceCurrentRun) prepare() error {
+	if err := r.prepareWorkspaceContext(); err != nil {
+		return err
+	}
+	r.parallelism = workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, r.cont.ConfigRepo.GetAgentConfig().Parallelism, len(r.workspaceConfig.Projects))
+	r.showDetails = r.parallelism == 1
+	if !r.showDetails {
+		r.tracker = progress.NewMulti(commandutil.WorkspaceProjectProgressNames(r.workspaceConfig.Projects))
+		r.tracker.SetLabel(i18n.Get("ProgressLearnWorkspaceProjects"))
+		r.tracker.SetTaskTotal(learnCurrentProjectStepTotal)
+	}
+	return nil
+}
+
+func (r *learnWorkspaceCurrentRun) prepareWorkspaceContext() error {
 	r.workspaceConfig = r.cont.ConfigRepo.GetWorkspaceConfig()
 	if len(r.workspaceConfig.Projects) == 0 {
 		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
@@ -132,14 +169,6 @@ func (r *learnWorkspaceCurrentRun) prepare() error {
 	}
 	if err := commandutil.LockConfiguredMode(r.ctx, r.cont); err != nil {
 		return err
-	}
-
-	r.parallelism = workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, r.cont.ConfigRepo.GetAgentConfig().Parallelism, len(r.workspaceConfig.Projects))
-	r.showDetails = r.parallelism == 1
-	if !r.showDetails {
-		r.tracker = progress.NewMulti(commandutil.WorkspaceProjectProgressNames(r.workspaceConfig.Projects))
-		r.tracker.SetLabel(i18n.Get("ProgressLearnWorkspaceProjects"))
-		r.tracker.SetTaskTotal(learnCurrentProjectStepTotal)
 	}
 	return nil
 }
@@ -206,7 +235,6 @@ func (r *learnWorkspaceCurrentRun) runChild(ctx context.Context, childCont *cont
 			focusPaths:       r.opts.focusPaths,
 			profileMode:      r.opts.profileMode,
 			stateScope:       r.opts.stateScope,
-			curationOutput:   r.opts.curationOutput,
 			force:            r.opts.force,
 		})
 		return err

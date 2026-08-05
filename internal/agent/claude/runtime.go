@@ -359,7 +359,7 @@ func parseClaudeOutput(rawOutput string) (string, *claudeOutputError) {
 		Errors           []string        `json:"errors"`
 		StructuredOutput json.RawMessage `json:"structured_output"`
 	}
-	if err := jsonx.Unmarshal([]byte(strings.TrimSpace(rawOutput)), &result); err != nil {
+	if err := json.Unmarshal([]byte(strings.TrimSpace(rawOutput)), &result); err != nil {
 		return "", &claudeOutputError{cause: fmt.Errorf("%s: %w", i18n.Get("AgentClaudeEnvelopeParseFailed"), err)}
 	}
 	if result.Type != "result" {
@@ -374,7 +374,7 @@ func parseClaudeOutput(rawOutput string) (string, *claudeOutputError) {
 			detail = result.Subtype
 		}
 		return "", &claudeOutputError{
-			cause:      fmt.Errorf("claude CLI 返回失败结果: %s", detail),
+			cause:      fmt.Errorf("%s", i18n.GetWithParams("AgentClaudeResultError", map[string]interface{}{"Detail": detail})),
 			invocation: true,
 		}
 	}
@@ -531,7 +531,7 @@ func claudeDisableUserPluginSettings() string {
 
 	data, err := json.Marshal(settings)
 	if err != nil {
-		logger.Debug("生成 Claude 用户插件禁用配置失败", "error", err)
+		logger.Debug(i18n.Get("AgentClaudeDisableUserPluginsFailed"), "error", err)
 		return ""
 	}
 	return string(data)
@@ -562,8 +562,8 @@ func claudeInstalledUserPluginNames() []string {
 	}
 
 	var cfg claudeInstalledPluginsConfig
-	if err := jsonx.Unmarshal(content, &cfg); err != nil {
-		logger.Debug("读取 Claude 已安装插件配置失败",
+	if err := json.Unmarshal(content, &cfg); err != nil {
+		logger.Debug(i18n.Get("AgentClaudeReadInstalledPluginsFailed"),
 			"config_path", configPath,
 			"error", err,
 		)
@@ -593,8 +593,8 @@ func claudeEnabledUserPluginNames() []string {
 	}
 
 	var settings claudeUserSettings
-	if err := jsonx.Unmarshal(content, &settings); err != nil {
-		logger.Debug("读取 Claude 用户设置失败",
+	if err := json.Unmarshal(content, &settings); err != nil {
+		logger.Debug(i18n.Get("AgentClaudeReadUserSettingsFailed"),
 			"settings_path", settingsPath,
 			"error", err,
 		)

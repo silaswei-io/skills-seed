@@ -14,6 +14,23 @@ func TestPatternClassificationDetectsHighRiskOperationalBoundary(t *testing.T) {
 	require.True(t, IsHighRiskOperationalPattern(*pattern))
 }
 
+func TestPatternClassificationDoesNotMatchEnglishTermSubstrings(t *testing.T) {
+	highRisk := NewPattern("statement-builder", "Statement Builder", CategoryDatabase)
+	highRisk.SetDescription("The statement builder removes empty clauses before compiling queries.")
+	highRisk.EvidenceLocations = []PatternEvidenceLocation{{Path: "internal/query/builder.go", Symbol: "BuildStatement"}}
+
+	naming := NewPattern("username-validator", "Username Validator", CategoryNaming)
+	naming.SetDescription("Username validation appears across account DTOs.")
+	naming.Frequency = 2
+	naming.EvidenceLocations = []PatternEvidenceLocation{
+		{Path: "src/auth/user.ts", Symbol: "ValidateUsername"},
+		{Path: "src/admin/user.ts", Symbol: "ValidateUsername"},
+	}
+
+	require.False(t, IsHighRiskOperationalPattern(*highRisk))
+	require.False(t, IsRenderableNamingPattern(*naming))
+}
+
 func TestRenderableNamingPatternRequiresNamingEvidence(t *testing.T) {
 	weak := NewPattern("login-model", "LoginWithPassword Model", CategoryNaming)
 	weak.SetDescription("LoginWithPassword appears near model code.")

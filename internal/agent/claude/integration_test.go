@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
-	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/assert"
@@ -107,54 +106,6 @@ func getMainFiles(t *testing.T) []string {
 }
 
 // ========== E2E 测试：一个核心模板一个测试 ==========
-
-// TestE2E_CuratePatterns 测试会话式模式策展：渲染 → Claude → 解析
-// 模板绑定: Operation, CandidatePatterns, ExistingPatterns, ExistingByCandidate
-// 输出格式: {"patterns":[...], "dropped":[...], "summary":{...}}
-func TestE2E_CuratePatterns(t *testing.T) {
-	ag := skipIfShort(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	p1 := domain.NewPattern("err-01", "Error Wrapping", domain.CategoryError)
-	p1.SetDescription("Use fmt.Errorf with %w to wrap errors")
-	p1.SetRule("Always wrap errors with context")
-	p1.Confidence = 0.85
-	p1.Frequency = 5
-
-	p2 := domain.NewPattern("err-02", "Error Wrapping", domain.CategoryError)
-	p2.SetDescription("Use contextual error wrapping")
-	p2.SetRule("Always wrap errors with context")
-	p2.Confidence = 0.80
-	p2.Frequency = 3
-
-	req := &agent.CuratePatternsRequest{
-		Operation:         "learn_current",
-		CandidatePatterns: []domain.Pattern{*p2},
-		ExistingPatterns:  []domain.Pattern{*p1},
-		ExistingByCandidate: map[string][]string{
-			p2.ID: []string{p1.ID},
-		},
-	}
-
-	session, err := ag.StartLearningSession(ctx, agent.LearningSessionRequest{
-		ProjectName: "skills-seed",
-		RootPath:    testProjectPath,
-		Language:    "go",
-	})
-	require.NoError(t, err)
-	defer session.Close(ctx)
-
-	result, err := session.CuratePatterns(ctx, req)
-	require.NoError(t, err, "CuratePatterns should succeed")
-	require.NotNil(t, result, "Result should not be nil")
-
-	t.Logf("Written: %d, Dropped: %d", len(result.Patterns), len(result.Dropped))
-	for _, pattern := range result.Patterns {
-		t.Logf("  Curated: %s (from %v)", pattern.Name, pattern.SourceIDs)
-	}
-}
 
 // TestE2E_ProjectAnalysis 测试会话式项目画像刷新：渲染 → Claude → 解析
 // 模板绑定: ProjectName, RootPath, Structure, ReadmePath, MainFiles

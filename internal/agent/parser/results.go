@@ -23,51 +23,6 @@ func ParseLearningSessionAck(output string) error {
 	return nil
 }
 
-// ParseCuratePatternsResult 解析模式策展结果。
-func ParseCuratePatternsResult(output string) (*agent.CuratePatternsResult, error) {
-	var result aicontract.CuratePatternsOutput
-
-	if err := parseJSONPayload(output, &result); err != nil {
-		return nil, err
-	}
-
-	curateResult := &agent.CuratePatternsResult{
-		Patterns: make([]agent.CuratedPattern, len(result.Patterns)),
-		Dropped:  make([]agent.CuratedDrop, len(result.Dropped)),
-	}
-
-	for i, p := range result.Patterns {
-		curateResult.Patterns[i] = curatedPatternToAgent(p)
-	}
-	for i, dropped := range result.Dropped {
-		if strings.TrimSpace(dropped.ID) == "" {
-			return nil, missingRequiredOutputField("dropped[].id")
-		}
-		reasonCode := agent.CuratedDropReasonCode(dropped.ReasonCode)
-		if !reasonCode.Valid() {
-			return nil, errors.New(i18n.GetWithParams("AgentInvalidCuratedDropReasonCode", map[string]interface{}{
-				"ID":         strings.TrimSpace(dropped.ID),
-				"ReasonCode": strings.TrimSpace(dropped.ReasonCode),
-			}))
-		}
-		if strings.TrimSpace(dropped.Reason) == "" {
-			return nil, missingRequiredOutputField("dropped[].reason")
-		}
-		curateResult.Dropped[i] = agent.CuratedDrop{
-			ID:         dropped.ID,
-			ReasonCode: reasonCode,
-			Reason:     dropped.Reason,
-		}
-	}
-
-	return curateResult, nil
-}
-
-// ParseCuratePatternsArtifact 解析直接结构化输出或 Claude CLI 保存的 JSON envelope。
-func ParseCuratePatternsArtifact(output string) (*agent.CuratePatternsResult, error) {
-	return ParseCuratePatternsResult(output)
-}
-
 // ParseUserDefinePatternResult 解析用户自定义模式结果。
 func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult, error) {
 	var payload aicontract.PatternOutput

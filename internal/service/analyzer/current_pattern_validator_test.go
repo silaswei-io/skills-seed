@@ -92,6 +92,21 @@ func TestCurrentPatternValidatorDropsNonContiguousGoodExample(t *testing.T) {
 	require.Empty(t, patterns[0].GoodExample)
 }
 
+func TestCurrentPatternValidatorCleansEvidencePathWithLineSuffix(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte("package service\nfunc LoadUser() {}\n"), 0o644))
+
+	pattern := domain.NewPattern("load-user", "Load User", domain.CategoryBusiness)
+	pattern.Rule = "When loading a user, use LoadUser."
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "service.go:2", Symbol: "LoadUser", Kind: "function"}}
+
+	patterns := validateCurrentPatternsForTest(t, root, []domain.Pattern{*pattern})
+
+	require.Len(t, patterns, 1)
+	require.Equal(t, "service.go", patterns[0].EvidenceLocations[0].Path)
+	require.Equal(t, "service.go", patterns[0].ScopePath)
+}
+
 func TestCurrentPatternValidatorHasNoQuantityLimit(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte("package service\n"), 0o644))

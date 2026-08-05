@@ -94,7 +94,7 @@
       cmdInit: "Interactively initialize the current project or workspace.",
       cmdSync: "Interactively learn current code and refresh Skills.",
       cmdWorkspace: "Manage workspace child projects.",
-      cmdPatterns: "Inspect, add, revise, or curate pattern rules.",
+      cmdPatterns: "Inspect, add, revise, or compact pattern rules.",
       cmdWorkflow: "Add or update common team workflows.",
       cmdHook: "Manage the pre-commit workflow.",
       workspaceTitle: "Keep context boundaries in multi-project workspaces",

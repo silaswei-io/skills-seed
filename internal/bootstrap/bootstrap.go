@@ -171,13 +171,19 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 		EnsureChildInitialized: initcmd.EnsureWorkspaceChildInitializedAt,
 	}))
 	rootCmd.AddCommand(synccmd.Cmd(cont, synccmd.Dependencies{
-		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
+		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest, opts synccmd.LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			return learn.RunLearnCurrentWithStateScopeOptions(cont, req.StateScope, req.UserContext, learn.CurrentRunOptions{
 				Force:          req.Force,
-				CurationOutput: req.CurationOutput,
+				Quiet:          opts.Quiet,
+				OnStepStart:    opts.OnStepStart,
+				OnStepUpdate:   opts.OnStepUpdate,
+				OnStepComplete: opts.OnStepComplete,
 			})
 		},
-		Generate: generate.RunGenerate,
+		Generate:                    generate.RunGenerate,
+		GenerateChild:               generate.RunGenerateQuiet,
+		LearnWorkspaceRelationships: learn.RunWorkspaceRelationships,
+		GenerateWorkspaceRoot:       generate.RunGenerateWorkspaceRoot,
 	}))
 	rootCmd.AddCommand(workflowcmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))

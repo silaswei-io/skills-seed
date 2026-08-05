@@ -1,14 +1,12 @@
 package hook
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"text/template"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -111,15 +109,7 @@ func preCommitHookContent() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tmpl, err := template.New("pre-commit-hook").Option("missingkey=error").Parse(string(data))
-	if err != nil {
-		return "", err
-	}
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, nil); err != nil {
-		return "", err
-	}
-	return content.String(), nil
+	return string(data), nil
 }
 
 func uninstallHook() error {

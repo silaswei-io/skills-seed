@@ -28,6 +28,7 @@ type generateOptions struct {
 	outputPath    string
 	outputChanged bool
 	noReferences  bool
+	quiet         bool
 }
 
 // Cmd 返回 generate 命令
@@ -84,10 +85,32 @@ func RunGenerate(cont *container.Container) error {
 	return runGenerate(cont, generateOptions{})
 }
 
+// RunGenerateQuiet 生成 skills，但不直接输出项目级进度和提示。
+func RunGenerateQuiet(cont *container.Container) error {
+	return runGenerate(cont, generateOptions{quiet: true})
+}
+
+// RunGenerateWorkspaceRoot 只生成工作区根 skill。
+func RunGenerateWorkspaceRoot(cont *container.Container) error {
+	if cont == nil {
+		return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
+	}
+	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
+	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
+		return err
+	}
+	if err := cont.WorkspaceGeneratorSvc.GenerateWorkspaceSkillsWithOptions(ctx, ws.WorkspaceGenerateOptions{}); err != nil {
+		return err
+	}
+	return commandutil.MarkSkillsGenerated(ctx, cont)
+}
+
 func runGenerate(cont *container.Container, opts generateOptions) error {
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
 
-	logger.Info(i18n.Get("GenerateStarting"))
+	if !opts.quiet {
+		logger.Info(i18n.Get("GenerateStarting"))
+	}
 	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
 		return err
 	}
@@ -98,7 +121,13 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	var tracker *progress.Tracker
 	if !isWorkspaceMode {
 		tracker = progress.New(2)
-		if err := tracker.RunStep(i18n.Get("ProgressGenerateCountPatterns"), func() error {
+		runStep := tracker.RunStep
+		if opts.quiet {
+			runStep = func(_ string, fn func() error) error {
+				return fn()
+			}
+		}
+		if err := runStep(i18n.Get("ProgressGenerateCountPatterns"), func() error {
 			var countErr error
 			count, countErr = cont.PatternRepo.Count(ctx)
 			return countErr
@@ -122,11 +151,15 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 			return err
 		}
 		if workflowCount == 0 {
-			logger.Warn(i18n.Get("GenerateNoPatterns"))
+			if !opts.quiet {
+				logger.Warn(i18n.Get("GenerateNoPatterns"))
+			}
 			return nil
 		}
 	}
-	logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
+	if !opts.quiet {
+		logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
+	}
 
 	effectiveOutputPath := opts.outputPath
 	if !opts.outputChanged {
@@ -143,9 +176,19 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		generatedOutputPath = rootOutputPath
 	} else {
 		generateLabel := i18n.Get("ProgressGenerateWriteSkills")
-		retryProgress := agent.NewRetryProgressBinder(tracker.UpdateStep)
+		updateStep := tracker.UpdateStep
+		if opts.quiet {
+			updateStep = func(string) {}
+		}
+		retryProgress := agent.NewRetryProgressBinder(updateStep)
 		generateCtx := retryProgress.WithContext(ctx)
-		if err := tracker.RunStep(generateLabel, func() error {
+		runStep := tracker.RunStep
+		if opts.quiet {
+			runStep = func(_ string, fn func() error) error {
+				return fn()
+			}
+		}
+		if err := runStep(generateLabel, func() error {
 			retryProgress.StartStep(generateLabel)
 			callErr := cont.GeneratorSvc.GenerateSkillsWithHooks(generateCtx, effectiveOutputPath, generator.GenerateProgressHooks{}, generator.GenerateOptions{SkipReferences: opts.noReferences})
 			retryProgress.FinishStep(generateLabel, callErr == nil)
@@ -156,8 +199,10 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		}
 	}
 
-	logger.Info(i18n.Get("GenerateSuccessMsg"))
-	logger.Info(i18n.GetWithParams("GenerateOutputPath", map[string]interface{}{"Path": generatedOutputPath}))
+	if !opts.quiet {
+		logger.Info(i18n.Get("GenerateSuccessMsg"))
+		logger.Info(i18n.GetWithParams("GenerateOutputPath", map[string]interface{}{"Path": generatedOutputPath}))
+	}
 	if err := commandutil.MarkSkillsGenerated(ctx, cont); err != nil {
 		return err
 	}

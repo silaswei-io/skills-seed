@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 func sanitizeGenerationInputs(ctx context.Context, profile *domain.ProjectProfile, patterns []domain.Pattern, projectRoot string, resolver sourcecode.Resolver) (*domain.ProjectProfile, []domain.Pattern, error) {
@@ -190,21 +191,51 @@ func (s projectPathSanitizer) evidenceLocations(locations []domain.PatternEviden
 func (s projectPathSanitizer) validPathList(paths []string) []string {
 	out := make([]string, 0, len(paths))
 	for _, path := range paths {
-		if s.exists(path) {
-			out = append(out, path)
+		if clean, _, ok := s.dirOrFilePath(path); ok {
+			out = append(out, clean)
 		}
 	}
 	return out
 }
 
 func (s projectPathSanitizer) exists(location string) bool {
-	path := referencePathOnly(location)
-	if path == "" {
-		return false
+	_, _, ok := s.dirOrFilePath(location)
+	return ok
+}
+
+func (s projectPathSanitizer) resolve(location string) (string, string, bool) {
+	path := pathx.CleanEvidenceLocationPath(location)
+	if path == "" || strings.TrimSpace(s.root) == "" {
+		return "", "", false
 	}
-	fullPath := filepath.Join(s.root, path)
-	_, err := os.Stat(fullPath)
-	return err == nil
+	fullPath, err := projectpath.CanonicalWithinRoot(s.root, filepath.Join(s.root, filepath.FromSlash(path)))
+	if err != nil {
+		return "", "", false
+	}
+	return path, fullPath, true
+}
+
+func (s projectPathSanitizer) filePath(location string) (string, string, bool) {
+	path, fullPath, ok := s.resolve(location)
+	if !ok {
+		return "", "", false
+	}
+	info, err := os.Stat(fullPath)
+	if err != nil || info.IsDir() {
+		return "", "", false
+	}
+	return path, fullPath, true
+}
+
+func (s projectPathSanitizer) dirOrFilePath(location string) (string, string, bool) {
+	path, fullPath, ok := s.resolve(location)
+	if !ok {
+		return "", "", false
+	}
+	if _, err := os.Stat(fullPath); err != nil {
+		return "", "", false
+	}
+	return path, fullPath, true
 }
 
 func (s projectPathSanitizer) snippetExists(snippet string, paths []string) bool {
@@ -213,11 +244,11 @@ func (s projectPathSanitizer) snippetExists(snippet string, paths []string) bool
 		return true
 	}
 	for _, path := range paths {
-		path = referencePathOnly(path)
-		if path == "" || !looksProjectRelativeReference(path) {
+		_, fullPath, ok := s.filePath(path)
+		if !ok {
 			continue
 		}
-		content, err := os.ReadFile(filepath.Join(s.root, path))
+		content, err := os.ReadFile(fullPath)
 		if err != nil {
 			continue
 		}
@@ -245,39 +276,5 @@ func patternSnippetPaths(pattern domain.Pattern) []string {
 }
 
 func referencePathOnly(location string) string {
-	location = strings.Trim(strings.TrimSpace(location), "`")
-	if location == "" {
-		return ""
-	}
-	if idx := strings.Index(location, ":"); idx > 0 {
-		next := location[idx+1:]
-		if next == "" || isLineSuffix(next) {
-			location = location[:idx]
-		}
-	}
-	return filepath.Clean(filepath.ToSlash(location))
-}
-
-func looksProjectRelativeReference(location string) bool {
-	path := referencePathOnly(location)
-	if path == "" || filepath.IsAbs(path) || strings.Contains(path, "://") {
-		return false
-	}
-	parts := strings.Split(path, "/")
-	if len(parts) > 1 && strings.Contains(parts[0], ".") {
-		return false
-	}
-	return true
-}
-
-func isLineSuffix(value string) bool {
-	for _, part := range strings.Split(value, ":") {
-		if part == "" {
-			return false
-		}
-		if _, err := strconv.Atoi(part); err != nil {
-			return false
-		}
-	}
-	return true
+	return pathx.CleanEvidenceLocationPath(location)
 }

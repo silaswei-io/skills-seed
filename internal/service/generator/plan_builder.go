@@ -183,7 +183,10 @@ func (b *planBuilder) appendValidationReferences(p *skillgen.Plan, profile *doma
 		Gaps:     validationGaps(profile, matrix, goTests, locale),
 	})
 	if references.Testing {
-		p.AddFile("references/testing.md", skillgen.ReferenceTemplate, "testing", testingReferenceTemplateData{Inventory: goTests})
+		p.AddFile("references/testing.md", skillgen.ReferenceTemplate, "testing", testingReferenceTemplateData{
+			Inventory: goTests,
+			Gaps:      testingCoverageGaps(profile, patterns, goTests, locale),
+		})
 	}
 }
 
