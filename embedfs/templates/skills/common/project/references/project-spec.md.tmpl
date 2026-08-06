@@ -16,21 +16,21 @@
 
 ## 目录
 
-- [权威规则](#权威规则)
+- [权威规则（用户/内置）](#权威规则用户内置)
 {{if .PatternGuidance}}- [源码改动边界](#源码改动边界)
 {{end}}{{if .FrameworkPatterns}}- [框架使用约定](#框架使用约定)
 {{end}}{{if .ConfigPatterns}}- [配置约定](#配置约定)
 {{end}}- [改动触点](#改动触点)
 
-## 权威规则
+## 权威规则（用户/内置）
 
 {{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**：{{.Rule}}（来源：`{{.Source}}`{{if .Evidence}}；证据：{{range $i, $path := .Evidence}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}）
 {{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
-{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*尚未提取权威规则；继续检查下方约定和分类 references。*
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*尚未提取用户或内置权威规则；源码学习模式见下方改动边界和分类 references。*
 {{end}}{{end}}
 {{if .PatternGuidance}}## 源码改动边界
 
-以下条目来自源码证据，用于定位复用入口、生成/配置边界、迁移/操作风险或跨模块约定；它们不是自动生效的权威硬规则。修改前先按证据位置读取当前源码。
+以下条目来自源码证据，用于定位复用入口、生成/配置边界、迁移/操作风险或跨模块约定；它们不是自动生效的权威硬规则，也不是安全保证。修改前先按证据位置读取当前源码。
 
 {{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{.Description}}{{if .Evidence}}
   - 证据：{{range $i, $path := .Evidence}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}

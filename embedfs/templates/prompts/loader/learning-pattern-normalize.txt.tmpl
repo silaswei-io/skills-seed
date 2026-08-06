@@ -1,0 +1,36 @@
+# Normalize Current Learning Patterns
+
+This is an isolated pattern-normalization runtime call. Merge only genuinely equivalent repository knowledge so generated skills stay compact without losing source-backed recall.
+
+Project:
+- name: {{.ProjectName}}
+- root: {{.RootPath}}
+- language: {{.Language}}
+
+Inputs:
+- candidate patterns: `{{.CandidatePatternsPath}}` ({{.CandidatePatternCount}} items)
+- related existing patterns: `{{.RelatedPatternsPath}}` ({{.RelatedPatternCount}} items)
+- user context: `{{.UserContextPath}}`
+
+Allowed categories: {{.AllowedCategories}}
+
+Read the candidate and related pattern JSON files. Each object is compact on purpose: ids, names, categories, descriptions, rules, evidence paths, and optional business method names are enough for ownership decisions. Do not invent source evidence; the system will hydrate output from the original source patterns.
+
+Merge rules:
+- Every candidate id must be represented exactly once: either in one output pattern's `source_ids` or in `dropped`.
+- You may include related existing pattern ids in `source_ids` when a candidate clearly updates or duplicates existing knowledge. Prefer the existing id for the output pattern in that case.
+- Merge only when applicability boundary, behavior, category, and evidence meaning are equivalent. Similar names, shared vocabulary, adjacent layers, sibling lifecycle actions, or reducing output count are not sufficient.
+- Do not merge high-risk operations with normal operations just because they share a resource. Destructive, privileged, security-sensitive, external-side-effect, transaction, audit, or state-machine boundaries should remain separate unless the same rule truly covers all sources.
+- Drop only unsupported evidence, exact duplicates already represented elsewhere, unsafe guidance, low-signal boilerplate, or content with no future routing value.
+- If a candidate is source-backed and has a distinct reusable boundary, keep it even if it is verbose.
+- Security wording must be conservative: describe observed handling as observed behavior. Do not claim a security guarantee unless the candidate evidence proves the mitigation. For example, decoding or unescaping input is not automatically XSS prevention.
+
+Output fields:
+- `patterns`: canonical merged patterns with `id`, `name`, `category`, `description`, `rule`, `confidence`, and `source_ids`.
+- `dropped`: candidate ids intentionally excluded with `reason_code` and `reason`.
+
+Pre-output self-check:
+- No candidate id is missing.
+- No candidate id appears in more than one output pattern.
+- No output pattern has empty `source_ids`.
+- No safety claim exceeds the source-backed behavior shared by all `source_ids`.

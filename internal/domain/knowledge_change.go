@@ -1,6 +1,6 @@
 package domain
 
-// KnowledgeFocusAction 表示增量学习对会话证据焦点的判断。
+// KnowledgeFocusAction 表示增量学习对证据焦点的判断。
 type KnowledgeFocusAction string
 
 const (

@@ -66,10 +66,6 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	if opts.Label == "" {
 		opts.Label = OperationLabel(opts.Operation)
 	}
-	if opts.Operation == OperationLearningConversationStart {
-		return AgentOutputArchive{}
-	}
-
 	dir := layout.New(seedPath).Runtime("agent-outputs")
 	if config.DefaultAutoDeleteAgentOutputs {
 		if err := os.RemoveAll(dir); err != nil {

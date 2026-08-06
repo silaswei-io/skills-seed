@@ -60,21 +60,12 @@ type learnCurrentProjectRun struct {
 	patterns                   []domain.Pattern
 	profileRefreshRecommended  agent.ProfileRefreshRecommendation
 	codebaseRunContext         *analyzer.CodebaseRunContext
+	sharedLearningContextPath  string
 	savedCount                 int
 	completedEvidenceFocuses   []domain.EvidenceFocus
-	activeLearningSession      agent.LearningSession
-	learningSessionCache       *currentLearningSessionCache
 	progressDetailMu           sync.Mutex
 	fileSelectionSummaryLogged bool
 }
-
-const (
-	learningStagePlanning            = "planning"
-	learningStagePackAnalysis        = "pack-analysis"
-	learningStageDeltaAnalysis       = "delta-analysis"
-	learningStageProfileRefresh      = "profile-refresh"
-	learningStageGlobalNormalization = "global-normalization"
-)
 
 func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
 	run := newLearnCurrentProjectRun(ctx, cont, opts)
@@ -165,133 +156,18 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 			return nil, err
 		}
 	}
-	if err := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); err != nil {
-		return nil, err
-	}
-
 	return r.buildResult(false), nil
 }
 
 func (r *learnCurrentProjectRun) runPlanningStage() error {
-	if !r.incrementalChanges.HasChanges() || r.stateSession != nil {
-		if err := r.narrowLearningCandidates(); err != nil {
-			return err
-		}
-		r.logFileSelectionSummaryOnce()
-		if !r.incrementalChanges.HasChanges() {
-			return nil
-		}
-		return r.planLearningAgenda()
-	}
-	return r.withLearningSession(learningStagePlanning, func(agent.LearningSession) error {
-		if err := r.narrowLearningCandidates(); err != nil {
-			return err
-		}
-		r.logFileSelectionSummaryOnce()
-		return r.planLearningAgenda()
-	})
-}
-
-func (r *learnCurrentProjectRun) startLearningSession(stage string) error {
-	resumeSessionID := ""
-	if r.stateSession != nil {
-		cache, err := loadCurrentLearningSessionCache(r.ctx, r.cont.SeedPath, r.stateRepo.Command())
-		if err != nil {
-			return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentLoadLearningSessionCacheFailed"), err)
-		}
-		if cache.matches(r.cont.Agent.Name(), r.currentStateInvocationHash()) && cache.Step == stage {
-			r.learningSessionCache = cache
-			resumeSessionID = cache.SessionID
-		}
-	}
-	session, err := r.newLearningSession(r.ctx, stage, resumeSessionID)
-	if err != nil {
+	if err := r.narrowLearningCandidates(); err != nil {
 		return err
 	}
-	r.activeLearningSession = session
-	r.markLearningSessionStep(stage)
-	return nil
-}
-
-func (r *learnCurrentProjectRun) newLearningSession(ctx context.Context, stage, resumeSessionID string) (agent.LearningSession, error) {
-	session, err := r.cont.Agent.StartLearningSession(ctx, agent.LearningSessionRequest{
-		ProjectName:     r.projectName,
-		RootPath:        r.projectRoot,
-		Language:        r.currentLanguage,
-		Stage:           stage,
-		LearningMode:    r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-		LearningScope:   r.cont.ConfigRepo.GetCurrentLearningConfig().Scope,
-		ChangeProfile:   string(r.changeProfile),
-		UserContext:     r.opts.userContext,
-		UserContextPath: "",
-		ResumeSessionID: resumeSessionID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("LearnCurrentStartLearningSessionFailed"), err)
-	}
-	if session == nil {
-		return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentLearningSessionMissing", map[string]interface{}{"Agent": r.cont.Agent.Name()}))
-	}
-	return session, nil
-}
-
-func (r *learnCurrentProjectRun) ensureLearningSession(stage string) error {
-	if r.activeLearningSession != nil {
+	r.logFileSelectionSummaryOnce()
+	if !r.incrementalChanges.HasChanges() {
 		return nil
 	}
-	return r.startLearningSession(stage)
-}
-
-func (r *learnCurrentProjectRun) withLearningSession(stage string, run func(agent.LearningSession) error) (err error) {
-	if r.activeLearningSession != nil {
-		return run(r.activeLearningSession)
-	}
-	if err = r.ensureLearningSession(stage); err != nil {
-		return err
-	}
-	defer func() {
-		r.closeLearningSession()
-		if err == nil {
-			if clearErr := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); clearErr != nil {
-				err = clearErr
-			}
-		}
-	}()
-	return run(r.activeLearningSession)
-}
-
-func (r *learnCurrentProjectRun) markLearningSessionStep(step string) {
-	if r.activeLearningSession == nil {
-		return
-	}
-	cache := currentLearningSessionCache{
-		AgentName:      r.cont.Agent.Name(),
-		SessionID:      r.activeLearningSession.SessionID(),
-		Step:           step,
-		InvocationHash: r.currentStateInvocationHash(),
-	}
-	if err := saveCurrentLearningSessionCache(r.ctx, r.cont.SeedPath, r.stateRepo.Command(), cache); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "command.learn_current.save_learning_session_cache",
-			"step", step,
-			"error", err,
-		)
-		return
-	}
-	r.learningSessionCache = &cache
-}
-
-func (r *learnCurrentProjectRun) closeLearningSession() {
-	if r.activeLearningSession == nil {
-		return
-	}
-	if err := r.activeLearningSession.Close(r.ctx); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "command.learn_current.close_learning_session",
-			"error", err,
-		)
-	}
-	r.activeLearningSession = nil
+	return r.planLearningAgenda()
 }
 
 func (r *learnCurrentProjectRun) prepareProject() error {
@@ -415,9 +291,6 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 		}
 		if !currentStateInputsMatchProject(r.projectRoot, session.State.Files, session.State.Deleted) || !currentChangesCoveredByState(session.State, detected) {
 			if err := r.stateRepo.Clear(); err != nil {
-				return err
-			}
-			if err := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); err != nil {
 				return err
 			}
 			session = nil
@@ -557,7 +430,7 @@ func (r *learnCurrentProjectRun) learningCandidateRequiredPaths() []string {
 }
 
 func (r *learnCurrentProjectRun) shouldRunAICandidateSelection() bool {
-	if r.cont == nil || r.cont.AnalyzerSvc == nil || r.activeLearningSession == nil {
+	if r.cont == nil || r.cont.AnalyzerSvc == nil {
 		return false
 	}
 	cfg := r.cont.ConfigRepo.GetCurrentLearningConfig()
@@ -611,7 +484,6 @@ func (r *learnCurrentProjectRun) selectLearningCandidatesWithAI() fileanalysis.L
 				})
 			}
 		},
-		LearningSession: r.activeLearningSession,
 	})
 	if err != nil {
 		return fileanalysis.LearningCandidateSelectionResult{
@@ -675,7 +547,7 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 		if !needsProfileRefresh {
 			return nil
 		}
-		profile, err := r.refreshProjectProfileWithSession()
+		profile, err := r.refreshProjectProfile()
 		if err != nil {
 			return err
 		}
@@ -708,11 +580,6 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 			return nil, err
 		}
 		if err := r.stateRepo.Clear(); err != nil {
-			return nil, err
-		}
-	}
-	if r.learningSessionCache != nil {
-		if err := clearCurrentLearningSessionCache(r.cont.SeedPath, r.stateRepo.Command()); err != nil {
 			return nil, err
 		}
 	}

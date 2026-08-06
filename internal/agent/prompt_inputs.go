@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -91,25 +92,6 @@ func writePathListInput(session *PromptInputSession, name string, paths []string
 	return path, len(normalized), nil
 }
 
-// LearningSessionPromptData 返回当前代码学习阶段会话初始化所需的提示词数据。
-func LearningSessionPromptData(session *PromptInputSession, req LearningSessionRequest) (map[string]interface{}, error) {
-	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
-	if err != nil {
-		return nil, promptInputWriteError("user-context.md", err)
-	}
-	return map[string]interface{}{
-		"ProjectName":       req.ProjectName,
-		"RootPath":          req.RootPath,
-		"Language":          req.Language,
-		"Stage":             req.Stage,
-		"LearningMode":      promptLearningMode(req.LearningMode),
-		"LearningScope":     promptLearningScope(req.LearningScope),
-		"ChangeProfile":     req.ChangeProfile,
-		"UserContextPath":   userContextPath,
-		"AllowedCategories": domain.AllowedPatternCategoriesText(),
-	}, nil
-}
-
 // PlanLearningAgendaPromptData 返回业务学习议程规划所需的提示词数据。
 func PlanLearningAgendaPromptData(session *PromptInputSession, req *PlanLearningAgendaRequest) (map[string]interface{}, error) {
 	focusPathsPath, focusPathCount, err := writePathListInput(session, "analysis-files.txt", req.FocusPaths)
@@ -168,6 +150,88 @@ func SelectLearningCandidatesPromptData(session *PromptInputSession, req *Select
 		"LearningMode":          promptLearningMode(req.LearningMode),
 		"LearningScope":         promptLearningScope(req.LearningScope),
 	}, nil
+}
+
+type normalizePatternInput struct {
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Category       string   `json:"category"`
+	Description    string   `json:"description,omitempty"`
+	Rule           string   `json:"rule,omitempty"`
+	EvidencePaths  []string `json:"evidence_paths,omitempty"`
+	BusinessMethod string   `json:"business_method,omitempty"`
+}
+
+// NormalizePatternsPromptData 返回当前模式合并优化所需的提示词数据。
+func NormalizePatternsPromptData(session *PromptInputSession, req *NormalizePatternsRequest) (map[string]interface{}, error) {
+	candidatesPath, err := writeNormalizePatternsInput(session, "candidate-patterns.json", req.Candidates)
+	if err != nil {
+		return nil, promptInputWriteError("candidate-patterns.json", err)
+	}
+	relatedPath, err := writeNormalizePatternsInput(session, "related-patterns.json", req.RelatedPatterns)
+	if err != nil {
+		return nil, promptInputWriteError("related-patterns.json", err)
+	}
+	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
+	if err != nil {
+		return nil, promptInputWriteError("user-context.md", err)
+	}
+	return map[string]interface{}{
+		"ProjectName":           req.ProjectName,
+		"RootPath":              req.RootPath,
+		"Language":              req.Language,
+		"CandidatePatternsPath": candidatesPath,
+		"CandidatePatternCount": len(req.Candidates),
+		"RelatedPatternsPath":   relatedPath,
+		"RelatedPatternCount":   len(req.RelatedPatterns),
+		"UserContextPath":       userContextPath,
+		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
+	}, nil
+}
+
+func writeNormalizePatternsInput(session *PromptInputSession, name string, patterns []domain.Pattern) (string, error) {
+	data, err := json.MarshalIndent(compactNormalizePatterns(patterns), "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return session.Write(name, string(data))
+}
+
+func compactNormalizePatterns(patterns []domain.Pattern) []normalizePatternInput {
+	out := make([]normalizePatternInput, 0, len(patterns))
+	for _, pattern := range patterns {
+		item := normalizePatternInput{
+			ID:            strings.TrimSpace(pattern.ID),
+			Name:          strings.TrimSpace(pattern.Name),
+			Category:      string(domain.NormalizePatternCategory(pattern.Category)),
+			Description:   strings.TrimSpace(pattern.Description),
+			Rule:          strings.TrimSpace(pattern.Rule),
+			EvidencePaths: compactEvidencePaths(pattern.EvidenceLocations),
+		}
+		if pattern.BusinessMethod != nil {
+			item.BusinessMethod = strings.TrimSpace(pattern.BusinessMethod.Name)
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func compactEvidencePaths(locations []domain.PatternEvidenceLocation) []string {
+	seen := make(map[string]struct{}, len(locations))
+	var paths []string
+	for _, location := range locations {
+		path := strings.TrimSpace(location.Path)
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 // AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
@@ -232,6 +296,7 @@ func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *Ana
 		"RootPath":              req.RootPath,
 		"Language":              req.Language,
 		"RuntimeLabel":          req.RuntimeLabel,
+		"SharedContextPath":     strings.TrimSpace(req.SharedContextPath),
 		"Focuses":               req.Focuses,
 		"StructurePath":         structurePath,
 		"StructuralContextPath": structuralContextPath,
@@ -262,6 +327,7 @@ func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *Analyz
 		"RootPath":              req.RootPath,
 		"Language":              req.Language,
 		"RuntimeLabel":          req.RuntimeLabel,
+		"SharedContextPath":     strings.TrimSpace(req.SharedContextPath),
 		"Focuses":               req.Focuses,
 		"StructurePath":         structurePath,
 		"StructuralContextPath": structuralContextPath,

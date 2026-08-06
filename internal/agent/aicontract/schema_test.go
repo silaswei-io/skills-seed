@@ -68,7 +68,7 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 
 	delta := decodeSchema(t, ContractAnalyzeCurrentDeltaBatch)
 	requireRequiredFields(t, delta, "knowledge_changes", "profile_refresh_recommended")
-	requireRequiredFields(t, mustFindSchemaContainer(t, delta, "focus_action"), "focus_action", "pattern_action", "anchors", "reason")
+	requireRequiredFields(t, mustFindSchemaContainer(t, delta, "focus_action"), "focus_action", "focus_id", "pattern_action", "anchors", "reason")
 	requireRequiredFields(t, mustFindSchemaContainer(t, delta, "change_kind"), "path", "change_kind", "description")
 
 	changeKind, _, ok := findSchemaPropertyWithContainer(delta, "change_kind")
@@ -77,6 +77,17 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	line, _, ok := findSchemaPropertyWithContainer(delta, "line")
 	require.True(t, ok)
 	require.Equal(t, float64(1), line["minimum"])
+
+	normalize := decodeSchema(t, ContractNormalizePatterns)
+	requireRequiredFields(t, normalize, "patterns", "dropped")
+	requireRequiredFields(t, mustFindSchemaContainer(t, normalize, "source_ids"), "id", "name", "category", "description", "rule", "confidence", "source_ids")
+	requireRequiredFields(t, mustFindSchemaContainer(t, normalize, "reason_code"), "id", "reason_code", "reason")
+	sourceIDs, _, ok := findSchemaPropertyWithContainer(normalize, "source_ids")
+	require.True(t, ok)
+	require.Equal(t, "array", sourceIDs["type"])
+	reasonCode, _, ok := findSchemaPropertyWithContainer(normalize, "reason_code")
+	require.True(t, ok)
+	require.Contains(t, schemaStringList(reasonCode["enum"]), "unsafe_guidance")
 }
 
 func TestPlanningAndSelectionSchemasRequireDecisionFields(t *testing.T) {
@@ -95,9 +106,6 @@ func TestPlanningAndSelectionSchemasRequireDecisionFields(t *testing.T) {
 	plan := decodeSchema(t, ContractPlanLearningAgenda)
 	requireRequiredFields(t, plan, "focuses")
 	requireRequiredFields(t, mustFindSchemaContainer(t, plan, "id"), "id", "name")
-
-	ack := decodeSchema(t, ContractLearningSessionAck)
-	requireRequiredFields(t, ack, "ready", "summary")
 }
 
 func TestWorkspaceContractsKeepIdentityOutOfAIOutput(t *testing.T) {

@@ -120,11 +120,6 @@ type ProfileRefreshRecommendationOutput struct {
 	Reason string `json:"reason,omitempty" jsonschema_description:"reason when refresh is needed"`
 }
 
-type LearningSessionAckOutput struct {
-	Ready   bool   `json:"ready" jsonschema_description:"true when the session has accepted the learning policy"`
-	Summary string `json:"summary" jsonschema_description:"brief summary of the bounded learning policy for later turns"`
-}
-
 type AnalyzeCurrentCodebaseBatchOutput struct {
 	Focuses []AnalyzeCurrentEvidenceFocusOutput `json:"focuses" jsonschema_description:"one result object for every evidenced input learning focus"`
 }
@@ -138,7 +133,7 @@ type AnalyzeCurrentEvidenceFocusOutput struct {
 
 type KnowledgeChangeOutput struct {
 	FocusAction   string             `json:"focus_action" jsonschema:"enum=existing,enum=extend,enum=new,enum=no_change" jsonschema_description:"how the diff relates to the listed learning focuses"`
-	FocusID       string             `json:"focus_id,omitempty" jsonschema_description:"matched or proposed learning focus id"`
+	FocusID       string             `json:"focus_id" jsonschema_description:"exact input learning focus id this decision belongs to"`
 	FocusName     string             `json:"focus_name,omitempty" jsonschema_description:"matched or proposed learning focus name"`
 	PatternAction string             `json:"pattern_action" jsonschema:"enum=add,enum=update,enum=reinforce,enum=retire,enum=no_change" jsonschema_description:"how the diff changes pattern knowledge"`
 	PatternID     string             `json:"pattern_id,omitempty" jsonschema_description:"existing pattern id for update, reinforce, retire, or proposed id for add"`
@@ -174,6 +169,27 @@ type EvidenceFocusOutput struct {
 
 type PlanLearningAgendaOutput struct {
 	Focuses []EvidenceFocusOutput `json:"focuses" jsonschema_description:"learning focuses for this run"`
+}
+
+type PatternNormalizationOutput struct {
+	ID          string   `json:"id" jsonschema_description:"stable kebab-case canonical pattern id; prefer an existing id when updating or replacing related existing knowledge"`
+	Name        string   `json:"name" jsonschema_description:"short canonical pattern name"`
+	Category    string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key"`
+	Description string   `json:"description" jsonschema_description:"compact source-backed applicability boundary shared by every source id"`
+	Rule        string   `json:"rule" jsonschema_description:"non-mandatory reuse guidance; do not convert observed unsafe behavior into a safety guarantee"`
+	Confidence  float64  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
+	SourceIDs   []string `json:"source_ids" jsonschema_description:"candidate and optional related existing pattern ids represented by this canonical pattern; every non-dropped candidate id must appear exactly once across output patterns"`
+}
+
+type PatternDropOutput struct {
+	ID         string `json:"id" jsonschema_description:"candidate pattern id that should not be stored"`
+	ReasonCode string `json:"reason_code" jsonschema:"enum=exact_duplicate,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overfiltered_source_backed" jsonschema_description:"structured drop reason"`
+	Reason     string `json:"reason" jsonschema_description:"brief reason"`
+}
+
+type NormalizePatternsOutput struct {
+	Patterns []PatternNormalizationOutput `json:"patterns" jsonschema_description:"canonical merged patterns"`
+	Dropped  []PatternDropOutput          `json:"dropped" jsonschema_description:"candidate patterns intentionally dropped"`
 }
 
 type WorkspaceProjectAnalysisOutput struct {

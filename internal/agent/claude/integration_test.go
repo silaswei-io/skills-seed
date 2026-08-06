@@ -107,7 +107,7 @@ func getMainFiles(t *testing.T) []string {
 
 // ========== E2E 测试：一个核心模板一个测试 ==========
 
-// TestE2E_ProjectAnalysis 测试会话式项目画像刷新：渲染 → Claude → 解析
+// TestE2E_ProjectAnalysis 测试项目画像刷新：渲染 → Claude → 解析
 // 模板绑定: ProjectName, RootPath, Structure, ReadmePath, MainFiles
 // 输出格式: {"project_name":"...", "language":"go", "frameworks":[...], ...}
 func TestE2E_ProjectAnalysis(t *testing.T) {
@@ -127,15 +127,7 @@ func TestE2E_ProjectAnalysis(t *testing.T) {
 		MainFiles:   mainFiles,
 	}
 
-	session, err := ag.StartLearningSession(ctx, agent.LearningSessionRequest{
-		ProjectName: "skills-seed",
-		RootPath:    testProjectPath,
-		Language:    "go",
-	})
-	require.NoError(t, err)
-	defer session.Close(ctx)
-
-	result, err := session.RefreshProjectProfile(ctx, req)
+	result, err := ag.RefreshProjectProfile(ctx, req)
 	require.NoError(t, err, "AnalyzeProject should succeed")
 	require.NotNil(t, result, "Result should not be nil")
 

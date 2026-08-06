@@ -15,7 +15,7 @@ import (
 
 const relatedDeltaPatternsPerFocus = 8
 
-func (r *learnCurrentProjectRun) analyzeDeltaBatch(ctx context.Context, batch learnCurrentBatch, batchFocuses []analyzer.AnalyzeCurrentEvidenceFocus, session agent.LearningSession) ([]learnCurrentFocusResult, error) {
+func (r *learnCurrentProjectRun) analyzeDeltaBatch(ctx context.Context, batch learnCurrentBatch, batchFocuses []analyzer.AnalyzeCurrentEvidenceFocus) ([]learnCurrentFocusResult, error) {
 	related, err := r.relatedPatternsByFocus(ctx, batchFocuses)
 	if err != nil {
 		return nil, err
@@ -31,12 +31,12 @@ func (r *learnCurrentProjectRun) analyzeDeltaBatch(ctx context.Context, batch le
 
 	batchLabel := r.analysisBatchRuntimeLabel(r.analysisState, batch)
 	result, err := r.cont.AnalyzerSvc.AnalyzeCurrentDeltaBatch(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCurrentDeltaBatchOptions{
-		RuntimeLabel:    batchLabel,
-		LearningMode:    r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-		ChangeProfile:   string(r.changeProfile),
-		RunContext:      r.codebaseRunContext,
-		LearningSession: session,
-		Focuses:         deltaFocuses,
+		RuntimeLabel:      batchLabel,
+		LearningMode:      r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		ChangeProfile:     string(r.changeProfile),
+		RunContext:        r.codebaseRunContext,
+		SharedContextPath: r.sharedLearningContextPath,
+		Focuses:           deltaFocuses,
 	})
 	if err != nil {
 		return nil, err

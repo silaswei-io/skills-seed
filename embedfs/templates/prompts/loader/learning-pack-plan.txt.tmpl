@@ -1,6 +1,6 @@
 # Plan Learning Packs
 
-This is the short planning conversation for current-code learning. Build a high-recall set of self-contained evidence packs for the files listed below. Prefer preserving source-backed knowledge boundaries over minimizing the number of packs.
+This is the planning runtime call for current-code learning. Build a high-recall set of self-contained evidence packs for the files listed below. Prefer preserving source-backed knowledge boundaries over minimizing the number of packs.
 
 Project:
 - name: {{.ProjectName}}
@@ -31,7 +31,9 @@ User context is available at `{{.UserContextPath}}`; use it only to interpret in
 
 Planning rules:
 - Each returned focus is an evidence pack, not a permanent project partition and not durable taxonomy.
-- Every evidence pack must be self-contained enough for a later isolated pack-analysis conversation: name the product/domain/interaction/technical route terms, entry paths, related paths, and a precise scope reason.
+- A focus must represent an abstract reusable knowledge boundary: a business loop, subsystem responsibility, cross-layer flow, stable architecture mechanism, external protocol, security/policy boundary, or generated-source family.
+- Do not create a separate focus for a low-density leaf such as a version endpoint, i18n file pair, simple constants/types bucket, or tiny config island unless it changes a distinct reusable decision. Attach it as related evidence to the nearest higher-level focus.
+- Every evidence pack must be self-contained enough for a later isolated pack-analysis runtime call: name the product/domain/interaction/technical route terms, entry paths, related paths, and a precise scope reason.
 - Do not plan a directory inventory. Group files that are likely to contain knowledge with future implementation, routing, validation, reuse, reusable capability-entry selection, debugging, or agent navigation value.
 - Preserve these knowledge lanes when present in the input: product/domain behavior, UI or command actions, interface/contract shape, error handling, validation/testing, state or storage behavior, configuration, framework/language/runtime integration, generated-source boundaries, security-sensitive handling, operational lifecycle, jobs/tasks, adapters, and reusable utilities.
 - Before grouping, scan for decision-bearing cues: actors, users, resources/entities, operations/capabilities, verified callable or declarative entries, states/phases, policies/rules, permissions, audit records, configuration gates, external systems, protocols/contracts, generated source inputs, framework/language/runtime usage conventions, jobs/tasks, operational lifecycle paths, exceptions, and compensation behavior.
@@ -39,6 +41,7 @@ Planning rules:
 - Plan horizontal packs when the input contains reusable cross-cutting repository behavior such as interface/request/response/message contracts, error taxonomy, validation commands, utility helpers, reusable entry families, generated-source files, configuration conventions, logging/audit conventions, state/storage construction, or rendering/interaction conventions. These packs are useful even when they are not a product subdomain.
 - Include only entry and related paths from the provided file list or structural context. Do not invent files and do not expand into unlisted directories.
 - Merge files into one pack only when a future request would naturally modify them together and the same source boundary explains the behavior.
+- Prefer fewer, more abstract high-density packs over leaf packs that only exist to cover files. Coverage can be represented by related paths; it does not require one focus per small endpoint, table, or support file.
 - Split packs when route terms, state/data boundaries, authorization/audit semantics, external dependency contracts, operational risk, or change triggers are materially different.
 - If the input is a small diff-oriented set, prefer compact packs anchored to the changed files instead of planning a broad project learning run.
 - Use deterministic ordering: business routeability first, then changed/source entry importance, then path vocabulary, then lexicographic path order.
@@ -47,6 +50,7 @@ Pre-output self-check:
 - Every provided file that should be learned is covered by at least one pack entry or related path.
 - No pack is only a vague directory, framework, or layer summary.
 - No pack exists only to inventory a language, framework, or module when no future decision value is visible.
+- No low-density support island is promoted to an independent focus when a nearby higher-level focus can carry it as related evidence.
 - No two packs are duplicates with different names.
 - Pack IDs and names are stable, routeable, and do not use sequence numbers as meaning.
 

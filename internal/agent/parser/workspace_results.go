@@ -35,6 +35,37 @@ func ParseSelectLearningCandidatesResult(output string) (*agent.SelectLearningCa
 	return result, nil
 }
 
+// ParseNormalizePatternsResult 解析当前学习模式合并优化结果。
+func ParseNormalizePatternsResult(output string) (*agent.NormalizePatternsResult, error) {
+	var payload aicontract.NormalizePatternsOutput
+	if err := parseJSONPayload(output, &payload); err != nil {
+		return nil, err
+	}
+	result := &agent.NormalizePatternsResult{
+		Patterns: make([]agent.PatternNormalization, 0, len(payload.Patterns)),
+		Dropped:  make([]agent.PatternDrop, 0, len(payload.Dropped)),
+	}
+	for _, pattern := range payload.Patterns {
+		result.Patterns = append(result.Patterns, agent.PatternNormalization{
+			ID:          pattern.ID,
+			Name:        pattern.Name,
+			Category:    pattern.Category,
+			Description: pattern.Description,
+			Rule:        pattern.Rule,
+			Confidence:  pattern.Confidence,
+			SourceIDs:   stringsOrEmpty(pattern.SourceIDs),
+		})
+	}
+	for _, dropped := range payload.Dropped {
+		result.Dropped = append(result.Dropped, agent.PatternDrop{
+			ID:         dropped.ID,
+			ReasonCode: dropped.ReasonCode,
+			Reason:     dropped.Reason,
+		})
+	}
+	return result, nil
+}
+
 // ParseWorkspaceProfile 解析工作区画像结果。
 func ParseWorkspaceProfile(output string) (*domain.WorkspaceProfile, error) {
 	var payload aicontract.WorkspaceProfileOutput

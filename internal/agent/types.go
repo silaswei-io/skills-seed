@@ -124,6 +124,7 @@ type AnalyzeCurrentCodebaseBatchRequest struct {
 	RootPath              string
 	Language              string
 	RuntimeLabel          string
+	SharedContextPath     string
 	Focuses               []AnalyzeCurrentEvidenceFocus
 	Structure             string
 	StructurePath         string
@@ -169,6 +170,7 @@ type AnalyzeCurrentDeltaBatchRequest struct {
 	RootPath              string
 	Language              string
 	RuntimeLabel          string
+	SharedContextPath     string
 	Focuses               []AnalyzeCurrentDeltaFocus
 	Structure             string
 	StructurePath         string
@@ -236,6 +238,41 @@ type PlanLearningAgendaResult struct {
 	Focuses []domain.EvidenceFocus `json:"focuses"`
 }
 
+// NormalizePatternsRequest 请求把当前学习得到的候选模式合并为稳定的入库决策。
+type NormalizePatternsRequest struct {
+	ProjectName     string
+	RootPath        string
+	Language        string
+	Candidates      []domain.Pattern
+	RelatedPatterns []domain.Pattern
+	UserContext     string
+	UserContextPath string
+}
+
+// PatternNormalization 描述一个规范化后的模式及其来源归属。
+type PatternNormalization struct {
+	ID          string
+	Name        string
+	Category    string
+	Description string
+	Rule        string
+	Confidence  float64
+	SourceIDs   []string
+}
+
+// PatternDrop 描述一个不应入库的候选模式。
+type PatternDrop struct {
+	ID         string
+	ReasonCode string
+	Reason     string
+}
+
+// NormalizePatternsResult 是 AI 合并候选模式后的所有权决策。
+type NormalizePatternsResult struct {
+	Patterns []PatternNormalization
+	Dropped  []PatternDrop
+}
+
 // ProfileRefreshRecommendation 描述是否需要额外刷新完整项目画像。
 type ProfileRefreshRecommendation struct {
 	Needed bool   `json:"needed"`
@@ -285,8 +322,19 @@ type UserPatternDefiner interface {
 
 // ProjectAnalyzer 项目分析接口
 type ProjectAnalyzer interface {
+	RefreshProjectProfile(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
+	SelectLearningCandidates(ctx context.Context, req *SelectLearningCandidatesRequest) (*SelectLearningCandidatesResult, error)
+	PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) (*PlanLearningAgendaResult, error)
+	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)
+	AnalyzeCurrentDeltaBatch(ctx context.Context, req *AnalyzeCurrentDeltaBatchRequest) (*AnalyzeCurrentDeltaBatchResult, error)
+	NormalizePatterns(ctx context.Context, req *NormalizePatternsRequest) (*NormalizePatternsResult, error)
 	AnalyzeWorkspaceProfile(ctx context.Context, req *AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpec(ctx context.Context, req *AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
+}
+
+// PatternNormalizer 优化当前学习候选模式归并。
+type PatternNormalizer interface {
+	NormalizePatterns(ctx context.Context, req *NormalizePatternsRequest) (*NormalizePatternsResult, error)
 }
 
 // WorkflowOptimizer 工作流优化接口。
@@ -298,7 +346,6 @@ type WorkflowOptimizer interface {
 type Agent interface {
 	Name() string
 	IsAvailable() bool
-	LearningSessionProvider
 	UserPatternDefiner
 	ProjectAnalyzer
 	WorkflowOptimizer

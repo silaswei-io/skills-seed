@@ -39,7 +39,8 @@ func TestGetProjectStructureUsesConfiguredExclude(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "internal", "generated", "wire.go"), []byte("package generated"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main"), 0644))
 
-	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go", RootPath: tmpDir},
 		Exclude:    []string{"internal/generated/**"},
 	})
@@ -83,11 +84,11 @@ func TestAnalyzeProjectProfile(t *testing.T) {
 			}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName:     "test",
-		RootPath:        tmpDir,
-		LearningSession: session,
+		ProjectName: "test",
+		RootPath:    tmpDir,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "go", result.Language)
@@ -100,7 +101,7 @@ func TestAnalyzeProjectProfile(t *testing.T) {
 	assert.Equal(t, "task verify", result.ValidationCommands[0].Command)
 }
 
-func TestAnalyzeProjectProfileUsesLearningSession(t *testing.T) {
+func TestAnalyzeProjectProfileUsesAgent(t *testing.T) {
 	tmpDir := t.TempDir()
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
@@ -111,12 +112,12 @@ func TestAnalyzeProjectProfileUsesLearningSession(t *testing.T) {
 			Summary:  "session profile",
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 
 	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName:     "test",
-		RootPath:        tmpDir,
-		LearningSession: session,
+		ProjectName: "test",
+		RootPath:    tmpDir,
 	})
 
 	require.NoError(t, err)
@@ -150,6 +151,7 @@ func TestAnalyzeProjectProfileAddsStructuralContext(t *testing.T) {
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		LearningCfg: config.LearningConfig{
 			Current: config.CurrentLearningConfig{
@@ -164,11 +166,10 @@ func TestAnalyzeProjectProfileAddsStructuralContext(t *testing.T) {
 	}
 
 	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName:     "test",
-		RootPath:        tmpDir,
-		Language:        "go",
-		MainFiles:       []string{"main.go"},
-		LearningSession: session,
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
+		MainFiles:   []string{"main.go"},
 	})
 
 	require.NoError(t, err)
@@ -198,13 +199,13 @@ func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testin
 			}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 
 	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName:     "test",
-		RootPath:        tmpDir,
-		FocusPaths:      []string{"internal/service"},
-		LearningSession: session,
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		FocusPaths:  []string{"internal/service"},
 	})
 
 	require.NoError(t, err)
@@ -225,6 +226,7 @@ func TestAnalyzeProjectProfileSkipsStructuralContextWithoutSeeds(t *testing.T) {
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		LearningCfg: config.LearningConfig{
 			Current: config.CurrentLearningConfig{
@@ -239,10 +241,9 @@ func TestAnalyzeProjectProfileSkipsStructuralContextWithoutSeeds(t *testing.T) {
 	}
 
 	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName:     "test",
-		RootPath:        tmpDir,
-		Language:        "go",
-		LearningSession: session,
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
 	})
 
 	require.NoError(t, err)
@@ -261,6 +262,7 @@ func TestAnalyzeProjectProfileSkipsUnavailableOptionalStructuralContext(t *testi
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		LearningCfg: config.LearningConfig{
 			Current: config.CurrentLearningConfig{
@@ -275,11 +277,10 @@ func TestAnalyzeProjectProfileSkipsUnavailableOptionalStructuralContext(t *testi
 	}
 
 	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName:     "test",
-		RootPath:        tmpDir,
-		Language:        "go",
-		MainFiles:       []string{"main.go"},
-		LearningSession: session,
+		ProjectName: "test",
+		RootPath:    tmpDir,
+		Language:    "go",
+		MainFiles:   []string{"main.go"},
 	})
 
 	require.NoError(t, err)
@@ -300,7 +301,9 @@ func TestSelectLearningCandidatesUsesStructuralSeedPaths(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
+	mockAgent.SelectLearningCandidatesFn = session.SelectLearningCandidates
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		LearningCfg: config.LearningConfig{
 			Current: config.CurrentLearningConfig{
 				Structural: config.StructuralConfig{Enabled: true},
@@ -321,7 +324,6 @@ func TestSelectLearningCandidatesUsesStructuralSeedPaths(t *testing.T) {
 		Progress: func(stage SelectLearningCandidatesStage) {
 			stages = append(stages, stage)
 		},
-		LearningSession: session,
 	})
 
 	require.NoError(t, err)
@@ -349,7 +351,9 @@ func TestSelectLearningCandidatesSkipsStructuralContextWithoutSeeds(t *testing.T
 			}, nil
 		},
 	}
-	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, &mocks.MockConfigReader{
+	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
+	mockAgent.SelectLearningCandidatesFn = session.SelectLearningCandidates
+	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
 		LearningCfg: config.LearningConfig{
 			Current: config.CurrentLearningConfig{
 				Structural: config.StructuralConfig{Enabled: true},
@@ -362,11 +366,10 @@ func TestSelectLearningCandidatesSkipsStructuralContextWithoutSeeds(t *testing.T
 	}
 
 	result, err := svc.SelectLearningCandidates(context.Background(), &SelectLearningCandidatesRequest{
-		ProjectName:     "test",
-		RootPath:        tmpDir,
-		Language:        "go",
-		CandidatePaths:  []string{"a.go", "b.go"},
-		LearningSession: session,
+		ProjectName:    "test",
+		RootPath:       tmpDir,
+		Language:       "go",
+		CandidatePaths: []string{"a.go", "b.go"},
 	})
 
 	require.NoError(t, err)
@@ -384,8 +387,9 @@ func TestAnalyzeProjectProfile_AIError(t *testing.T) {
 			return nil, errors.New("AI error")
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
-	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{LearningSession: session})
+	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{})
 	assert.Error(t, err)
 }
 
@@ -519,13 +523,12 @@ func TestRefreshProjectProfile_WithMock(t *testing.T) {
 			}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	profile, err := svc.RefreshProjectProfile(ctx, tmpDir, "test-project", "", AnalyzeProjectOptions{
-		LearningSession: session,
-	})
+	profile, err := svc.RefreshProjectProfile(ctx, tmpDir, "test-project", "", AnalyzeProjectOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "go", profile.Language)
 	assert.Contains(t, profile.Frameworks, "gin")
@@ -548,11 +551,10 @@ func TestRefreshProjectProfile_PassesReadmePathWithoutContent(t *testing.T) {
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 
-	_, err := svc.RefreshProjectProfile(context.Background(), tmpDir, "test-project", "", AnalyzeProjectOptions{
-		LearningSession: session,
-	})
+	_, err := svc.RefreshProjectProfile(context.Background(), tmpDir, "test-project", "", AnalyzeProjectOptions{})
 
 	require.NoError(t, err)
 	assert.Equal(t, "README.md", received.ReadmePath)
@@ -575,6 +577,7 @@ func TestBuildProjectProfileResult_PassesIncrementalProfileContext(t *testing.T)
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 	existingProfile := &domain.ProjectProfile{
 		ProjectName:  "test-project",
@@ -586,7 +589,6 @@ func TestBuildProjectProfileResult_PassesIncrementalProfileContext(t *testing.T)
 	_, err := svc.buildProjectProfileResult(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
 		ExistingProfile: existingProfile,
 		FocusPaths:      []string{filepath.Join(tmpDir, "internal", "service")},
-		LearningSession: session,
 	})
 
 	require.NoError(t, err)
@@ -613,11 +615,11 @@ func TestBuildProjectProfileResult_FocusedStructureOmitsUnfocusedTree(t *testing
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 
 	_, err := svc.buildProjectProfileResult(context.Background(), tmpDir, "test-project", "go", AnalyzeProjectOptions{
-		FocusPaths:      []string{filepath.Join(tmpDir, "internal", "service")},
-		LearningSession: session,
+		FocusPaths: []string{filepath.Join(tmpDir, "internal", "service")},
 	})
 
 	require.NoError(t, err)
@@ -640,12 +642,11 @@ func TestBuildProjectProfileResult_PassesRuntimeUserContext(t *testing.T) {
 			return &agent.AnalyzeProjectResult{Language: "go"}, nil
 		},
 	}
+	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
 	svc := NewAnalyzerService(mockAgent, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), "私有化 HSM 工作区，交付物是离线安装包。")
 
-	_, err := svc.buildProjectProfileResult(ctx, tmpDir, "test-project", "go", AnalyzeProjectOptions{
-		LearningSession: session,
-	})
+	_, err := svc.buildProjectProfileResult(ctx, tmpDir, "test-project", "go", AnalyzeProjectOptions{})
 
 	require.NoError(t, err)
 	assert.Equal(t, "私有化 HSM 工作区，交付物是离线安装包。", received.UserContext)
@@ -669,27 +670,11 @@ type profileRefreshTestSession struct {
 	selectFn func(context.Context, *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error)
 }
 
-func (s *profileRefreshTestSession) SessionID() string {
-	return "profile-refresh-test"
-}
-
 func (s *profileRefreshTestSession) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
 	if s.selectFn != nil {
 		return s.selectFn(ctx, req)
 	}
 	return &agent.SelectLearningCandidatesResult{}, nil
-}
-
-func (s *profileRefreshTestSession) PlanLearningAgenda(context.Context, *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	return &agent.PlanLearningAgendaResult{}, nil
-}
-
-func (s *profileRefreshTestSession) AnalyzeCurrentCodebaseBatch(context.Context, *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-	return &agent.AnalyzeCurrentCodebaseBatchResult{}, nil
-}
-
-func (s *profileRefreshTestSession) AnalyzeCurrentDeltaBatch(context.Context, *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
-	return &agent.AnalyzeCurrentDeltaBatchResult{}, nil
 }
 
 func (s *profileRefreshTestSession) RefreshProjectProfile(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
@@ -698,10 +683,6 @@ func (s *profileRefreshTestSession) RefreshProjectProfile(ctx context.Context, r
 		return s.fn(ctx, req)
 	}
 	return s.result, nil
-}
-
-func (s *profileRefreshTestSession) Close(context.Context) error {
-	return nil
 }
 
 func (f fakeStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {

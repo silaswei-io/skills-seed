@@ -1183,6 +1183,32 @@ func TestBuildDeltaFocusResultsMapsNewFocusByAnchor(t *testing.T) {
 	require.Equal(t, "支付流程", results[0].focus.Name)
 }
 
+func TestBuildDeltaFocusResultsAcceptsNoChangeDecisionWithoutAnchor(t *testing.T) {
+	run := &learnCurrentProjectRun{projectRoot: "/repo"}
+	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{
+		{index: 0, focus: domain.EvidenceFocus{ID: "app-config", Name: "应用配置"}},
+	}}
+	batchFocuses := []analyzer.AnalyzeCurrentEvidenceFocus{{
+		EvidenceFocus: batch.focuses[0].focus,
+		FocusAbsPaths: []string{"/repo/src/common/init.ts"},
+	}}
+
+	results, err := run.buildDeltaFocusResults(batch, batchFocuses, &analyzer.AnalyzeCurrentDeltaBatchResult{
+		Changes: []domain.KnowledgeChange{{
+			FocusAction:   domain.KnowledgeFocusNoChange,
+			FocusID:       "app-config",
+			FocusName:     "应用配置",
+			PatternAction: domain.KnowledgePatternNoChange,
+			Reason:        "diff does not reveal reusable knowledge",
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.True(t, results[0].completed)
+	require.Empty(t, results[0].patterns)
+}
+
 func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)

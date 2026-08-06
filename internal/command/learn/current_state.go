@@ -12,9 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
@@ -376,7 +374,6 @@ func loadOrCreateCurrentState(
 	ctx context.Context,
 	repo *commandstate.Repository,
 	analyzerSvc *analyzer.AnalyzerService,
-	learningSession agent.LearningSession,
 	projectName string,
 	projectRoot string,
 	language string,
@@ -400,14 +397,13 @@ func loadOrCreateCurrentState(
 	var focuses []domain.EvidenceFocus
 	if len(focusRelPaths) > 0 {
 		focuses, err = analyzerSvc.PlanLearningAgenda(ctx, &analyzer.PlanLearningAgendaRequest{
-			ProjectName:     projectName,
-			RootPath:        projectRoot,
-			Language:        language,
-			LearningMode:    config.NormalizeLearningMode(mode),
-			LearningScope:   config.NormalizeLearningScope(scope),
-			FocusPaths:      focusRelPaths,
-			UserContext:     userContext,
-			LearningSession: learningSession,
+			ProjectName:   projectName,
+			RootPath:      projectRoot,
+			Language:      language,
+			LearningMode:  config.NormalizeLearningMode(mode),
+			LearningScope: config.NormalizeLearningScope(scope),
+			FocusPaths:    focusRelPaths,
+			UserContext:   userContext,
 		})
 		if err != nil {
 			return nil, err
@@ -453,89 +449,6 @@ func evidenceFocusIncluded(focuses []domain.EvidenceFocus, target domain.Evidenc
 		}
 	}
 	return false
-}
-
-func fallbackEvidenceFocus(paths []string) domain.EvidenceFocus {
-	return domain.EvidenceFocus{
-		ID:           "current-codebase",
-		Name:         i18n.Get("LearnCurrentFallbackFocusName"),
-		RouteTerms:   []string{i18n.Get("LearnCurrentFallbackFocusRouteChange"), i18n.Get("LearnCurrentFallbackFocusRouteLearning")},
-		EntryPaths:   normalizeStatePaths(paths),
-		RelatedPaths: nil,
-		ScopeReason:  i18n.Get("LearnCurrentFallbackFocusReason"),
-	}
-}
-
-// reconcileEvidenceFocuses 把 AI 计划收敛为仅包含候选文件且完整覆盖候选集合的执行计划。
-func reconcileEvidenceFocuses(focuses []domain.EvidenceFocus, allowedPaths []string) []domain.EvidenceFocus {
-	allowedPaths = normalizeStatePaths(allowedPaths)
-	allowed := pathSet(allowedPaths)
-	normalized := make([]domain.EvidenceFocus, 0, len(focuses)+1)
-	for _, focus := range focuses {
-		focus.EntryPaths = filterEvidenceFocusPaths(focus.EntryPaths, allowed, nil)
-		entryPaths := pathSet(focus.EntryPaths)
-		focus.RelatedPaths = filterEvidenceFocusPaths(focus.RelatedPaths, allowed, entryPaths)
-		if len(focus.EntryPaths)+len(focus.RelatedPaths) == 0 {
-			continue
-		}
-		normalized = append(normalized, focus)
-	}
-
-	uncovered := uncoveredAnalysisPaths(normalized, allowedPaths)
-	if len(uncovered) == 0 {
-		return normalized
-	}
-	fallback := fallbackEvidenceFocus(uncovered)
-	fallback.ID = uniqueEvidenceFocusID(fallback.ID, normalized)
-	return append(normalized, fallback)
-}
-
-func filterEvidenceFocusPaths(paths []string, allowed, excluded map[string]bool) []string {
-	filtered := make([]string, 0, len(paths))
-	seen := make(map[string]bool, len(paths))
-	for _, path := range paths {
-		path = normalizeStatePath(path)
-		if path == "" || !allowed[path] || excluded[path] || seen[path] {
-			continue
-		}
-		seen[path] = true
-		filtered = append(filtered, path)
-	}
-	sort.Strings(filtered)
-	return filtered
-}
-
-func uniqueEvidenceFocusID(id string, focuses []domain.EvidenceFocus) string {
-	used := make(map[string]bool, len(focuses))
-	for _, focus := range focuses {
-		used[focus.ID] = true
-	}
-	if !used[id] {
-		return id
-	}
-	for suffix := 2; ; suffix++ {
-		candidate := id + "-" + strconv.Itoa(suffix)
-		if !used[candidate] {
-			return candidate
-		}
-	}
-}
-
-func uncoveredAnalysisPaths(focuses []domain.EvidenceFocus, paths []string) []string {
-	covered := make(map[string]bool)
-	for _, focus := range focuses {
-		for _, path := range append(append([]string{}, focus.EntryPaths...), focus.RelatedPaths...) {
-			covered[normalizeStatePath(path)] = true
-		}
-	}
-	paths = normalizeStatePaths(paths)
-	uncovered := make([]string, 0)
-	for _, path := range paths {
-		if !covered[path] {
-			uncovered = append(uncovered, path)
-		}
-	}
-	return uncovered
 }
 
 func subtractStatePaths(all, selected []string) []string {

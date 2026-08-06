@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
@@ -41,15 +40,16 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 
 	focusPaths := batchDeltaFocusPaths(focuses)
 	agentReq := &agent.AnalyzeCurrentDeltaBatchRequest{
-		ProjectName:   projectName,
-		RootPath:      projectRoot,
-		Language:      language,
-		LearningMode:  opts.LearningMode,
-		RuntimeLabel:  opts.RuntimeLabel,
-		Focuses:       focuses,
-		Structure:     focusedStructure(focusPaths),
-		UserContext:   runtimecontext.UserContext(ctx),
-		ChangeProfile: opts.ChangeProfile,
+		ProjectName:       projectName,
+		RootPath:          projectRoot,
+		Language:          language,
+		LearningMode:      opts.LearningMode,
+		RuntimeLabel:      opts.RuntimeLabel,
+		SharedContextPath: opts.SharedContextPath,
+		Focuses:           focuses,
+		Structure:         focusedStructure(focusPaths),
+		UserContext:       runtimecontext.UserContext(ctx),
+		ChangeProfile:     opts.ChangeProfile,
 	}
 
 	structuralContext, err := s.collectStructuralContext(ctx, projectRoot, structuralContextRequest{
@@ -64,10 +64,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	}
 	agentReq.StructuralContext = structuralContext
 
-	if opts.LearningSession == nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequiredForDelta")))
-	}
-	result, err := opts.LearningSession.AnalyzeCurrentDeltaBatch(ctx, agentReq)
+	result, err := s.agent.AnalyzeCurrentDeltaBatch(ctx, agentReq)
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_current_delta_batch",
@@ -104,22 +101,26 @@ func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot 
 		}
 		proposals = append(proposals, *change.Proposal)
 	}
-	validator, err := newCurrentPatternValidator(ctx, projectRoot, proposals, s.symbolResolver)
-	if err != nil {
-		return nil, err
-	}
 	validByID := make(map[string]domain.Pattern, len(proposals))
-	for _, pattern := range validator.validatePatterns(proposals) {
-		validByID[pattern.ID] = pattern
+	if len(proposals) > 0 {
+		validator, err := newCurrentPatternValidator(ctx, projectRoot, proposals, s.symbolResolver)
+		if err != nil {
+			return nil, err
+		}
+		for _, pattern := range validator.validatePatterns(proposals) {
+			validByID[pattern.ID] = pattern
+		}
 	}
 
 	validated := make([]domain.KnowledgeChange, 0, len(changes))
 	for _, change := range changes {
-		if !deltaChangeAnchored(change, focusByID) {
+		if !change.CarriesPattern() {
+			if deltaChangeScoped(change, focusByID) {
+				validated = append(validated, change)
+			}
 			continue
 		}
-		if !change.CarriesPattern() {
-			validated = append(validated, change)
+		if !deltaChangeAnchored(change, focusByID) {
 			continue
 		}
 		pattern, ok := validByID[change.Proposal.ID]
@@ -131,6 +132,13 @@ func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot 
 		validated = append(validated, change)
 	}
 	return validated, nil
+}
+
+func deltaChangeScoped(change domain.KnowledgeChange, focusByID map[string]map[string]bool) bool {
+	if _, ok := focusByID[change.FocusID]; ok {
+		return true
+	}
+	return deltaChangeAnchored(change, focusByID)
 }
 
 func deltaChangeAnchored(change domain.KnowledgeChange, focusByID map[string]map[string]bool) bool {

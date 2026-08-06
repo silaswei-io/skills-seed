@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.15.4]
+
+### Changes
+
+- Reworked current-code focus analysis into independent runtime calls with shared runtime context from agenda planning, avoiding context growth from reusing one analysis conversation across serial batches.
+- Added AI optimization for current-learning pattern merging: AI only returns source ownership and canonicalization proposals, while the local normalization service still hydrates fields, recovers coverage, validates strictly, checkpoints, and stores patterns. Invalid or failed AI output falls back to deterministic local normalization.
+- Tightened generated Skill templates and learning prompts so business/category references route by topic instead of printing long pattern summaries, and source-learned observations are not presented as authoritative hard rules or security guarantees.
+
+### Fixes
+
+- Fixed slow and repetitive current-learning focus analysis caused by unclear new-session versus reused-session behavior across batches.
+- Fixed source observations such as `html.UnescapeString` being learnable/renderable as an XSS mitigation claim.
+
 ## [v0.15.3]
 
 ### Changes
@@ -47,7 +60,7 @@
 
 ### Changes
 
-- Rebuilt current-code learning as a segmented conversation workflow: candidate narrowing, learning agenda planning, evidence-focus analysis, incremental diff analysis, project-profile sync, and global pattern curation now run in short conversations to avoid oversized long-context runs while preserving multi-turn refinement inside each evidence pack.
+- Rebuilt current-code learning as independent runtime calls: candidate narrowing, learning agenda planning, evidence-focus analysis, incremental diff analysis, and project-profile sync now run as single structured calls, with cross-stage context passed explicitly through runtime files to avoid oversized conversation state.
 - Reworked the learning prompt architecture with consistent `learning-*` and `core-*` names, stronger requirements for source evidence, business patterns, code patterns, boundary statements, recall-first discovery, and anti-generalization. Removed obsolete stateless learning, legacy analysis-unit prompts, and non-core fix/check/review/history paths.
 - Added a shared JSON parsing utility for Agent structured output. Agent responses now extract and repair JSON from text before strict schema parsing, tolerating Claude/Codex responses wrapped in Markdown code fences, prefixed explanations, or minor JSON formatting issues.
 - Consolidated internal package boundaries: removed ambiguous `internal/pkg`, moved terminal logging/progress to `internal/terminal`, moved project path handling to `internal/projectpath`, moved source classification to `internal/sourcecode`, and merged learned-knowledge presentation subpackages into `internal/knowledge`.
@@ -57,7 +70,7 @@
 
 - Fixed learning failures when an Agent succeeded but returned structured JSON inside normal text or Markdown JSON code fences.
 - Fixed delayed terminal stage reporting, long silent AI candidate-narrowing periods, and indirect failure diagnostics.
-- Fixed incremental and workspace learning issues around session cache state, focus numbering, duplicate focuses, project-profile refresh, and unclear global curation boundaries that could cause repeated analysis or coverage regressions.
+- Fixed incremental and workspace learning issues around focus numbering, duplicate focuses, project-profile refresh, and unclear global curation boundaries that could cause repeated analysis or coverage regressions.
 - Fixed generated Skills using non-i18n coverage warnings, overstating learned results as authoritative hard rules, and drifting between template documentation and code structure.
 - Removed inaccurate token cost/usage calculation and related redundant state to simplify terminal output and runtime architecture.
 

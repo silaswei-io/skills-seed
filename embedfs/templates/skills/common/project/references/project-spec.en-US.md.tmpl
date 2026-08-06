@@ -16,21 +16,21 @@
 
 ## Table Of Contents
 
-- [Authoritative Rules](#authoritative-rules)
+- [Authoritative Rules (User/Built-In)](#authoritative-rules-userbuilt-in)
 {{if .PatternGuidance}}- [Source-Backed Change Boundaries](#source-backed-change-boundaries)
 {{end}}{{if .FrameworkPatterns}}- [Framework Conventions](#framework-conventions)
 {{end}}{{if .ConfigPatterns}}- [Configuration Conventions](#configuration-conventions)
 {{end}}- [Change Touchpoints](#change-touchpoints)
 
-## Authoritative Rules
+## Authoritative Rules (User/Built-In)
 
 {{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**: {{.Rule}} (source: `{{.Source}}`{{if .Evidence}}; evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}})
 {{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
-{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*No authoritative rules have been extracted. Continue with the guidance below and category references for reusable implementations.*
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*No user-maintained or built-in authoritative rules have been extracted. Source-learned patterns live in the change boundaries below and category references.*
 {{end}}{{end}}
 {{if .PatternGuidance}}## Source-Backed Change Boundaries
 
-These entries come from source evidence and help locate reuse entries, generated/config boundaries, migration or operational risks, and cross-module conventions. They are not authoritative hard rules. Read the current source evidence before changing behavior.
+These entries come from source evidence and help locate reuse entries, generated/config boundaries, migration or operational risks, and cross-module conventions. They are not authoritative hard rules or security guarantees. Read the current source evidence before changing behavior.
 
 {{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{.Description}}{{if .Evidence}}
   - Evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}}

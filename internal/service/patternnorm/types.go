@@ -39,8 +39,12 @@ const (
 // NormalizeRequest 表示候选模式规范化入库请求。
 type NormalizeRequest struct {
 	Operation          Operation
+	ProjectName        string
+	RootPath           string
+	Language           string
 	Candidates         []domain.Pattern
 	DecisionCheckpoint DecisionCheckpoint
+	UserContext        string
 }
 
 // DecisionCheckpoint 保存已完成的规范化决策，使本地校验或入库失败后可以直接重放。

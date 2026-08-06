@@ -269,7 +269,8 @@ func TestLoader_RenderReference(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, content)
 	assert.Contains(t, content, "api")
-	assert.Contains(t, content, "API 相关的编码模式")
+	assert.NotContains(t, content, "API 相关的编码模式")
+	assert.Contains(t, content, "本页用于定位 api 分类下的 2 个源码证据模式")
 	assert.Contains(t, content, "API 路由命名规范")
 }
 

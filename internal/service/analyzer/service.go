@@ -3,7 +3,7 @@
 // 本包实现项目结构分析和当前代码学习上下文分析功能
 //   - AnalyzeProject: 分析项目结构和特点
 //   - PlanLearningAgenda: 为当前代码学习规划证据焦点
-//   - AnalyzeCurrentCodebaseBatch: 在当前学习阶段会话中提取模式
+//   - AnalyzeCurrentCodebaseBatch: 用独立 runtime 调用提取模式
 //   - AnalyzeCurrentDeltaBatch: 基于 diff 判断知识变化
 //
 // 服务职责
@@ -131,7 +131,6 @@ type AnalyzeProjectRequest struct {
 	ExistingProfileJSON  string
 	FocusPaths           []string
 	UserContext          string
-	LearningSession      agent.LearningSession
 }
 
 // AnalyzeProjectResult 项目分析结果
@@ -154,7 +153,7 @@ type AnalyzeProjectResult struct {
 	Summary            string
 }
 
-// analyzeProjectProfile 在当前学习阶段会话中分析项目结构和特点。
+// analyzeProjectProfile 用独立 Agent 调用分析项目结构和特点。
 func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error) {
 	startedAt := time.Now()
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationStart"),
@@ -205,10 +204,7 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 		UserContext:          req.UserContext,
 	}
 
-	if req.LearningSession == nil {
-		return nil, fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequired"))
-	}
-	result, err := req.LearningSession.RefreshProjectProfile(ctx, agentReq)
+	result, err := s.agent.RefreshProjectProfile(ctx, agentReq)
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_project",
@@ -276,12 +272,12 @@ type AnalyzeCurrentEvidenceFocus struct {
 }
 
 type AnalyzeCurrentCodebaseBatchOptions struct {
-	RuntimeLabel    string
-	LearningMode    config.LearningMode
-	ChangeProfile   string
-	RunContext      *CodebaseRunContext
-	LearningSession agent.LearningSession
-	Focuses         []AnalyzeCurrentEvidenceFocus
+	RuntimeLabel      string
+	SharedContextPath string
+	LearningMode      config.LearningMode
+	ChangeProfile     string
+	RunContext        *CodebaseRunContext
+	Focuses           []AnalyzeCurrentEvidenceFocus
 }
 
 type AnalyzeCurrentEvidenceResult struct {
@@ -301,12 +297,12 @@ type AnalyzeCurrentDeltaFocus struct {
 }
 
 type AnalyzeCurrentDeltaBatchOptions struct {
-	RuntimeLabel    string
-	LearningMode    config.LearningMode
-	ChangeProfile   string
-	RunContext      *CodebaseRunContext
-	LearningSession agent.LearningSession
-	Focuses         []AnalyzeCurrentDeltaFocus
+	RuntimeLabel      string
+	SharedContextPath string
+	LearningMode      config.LearningMode
+	ChangeProfile     string
+	RunContext        *CodebaseRunContext
+	Focuses           []AnalyzeCurrentDeltaFocus
 }
 
 type AnalyzeCurrentDeltaBatchResult struct {
@@ -324,7 +320,6 @@ type PlanLearningAgendaRequest struct {
 	FocusPaths        []string
 	StructuralContext string
 	UserContext       string
-	LearningSession   agent.LearningSession
 }
 
 // SelectLearningCandidatesRequest 请求 AI 从本地候选文件中收敛学习入口。
@@ -339,7 +334,6 @@ type SelectLearningCandidatesRequest struct {
 	StructuralSeedPaths []string
 	UserContext         string
 	Progress            func(SelectLearningCandidatesStage)
-	LearningSession     agent.LearningSession
 }
 
 type SelectLearningCandidatesStage string
@@ -397,10 +391,7 @@ func (s *AnalyzerService) SelectLearningCandidates(ctx context.Context, req *Sel
 		StructuralContext: structuralContext,
 		UserContext:       req.UserContext,
 	}
-	if req.LearningSession == nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequiredForAgenda")))
-	}
-	result, err := req.LearningSession.SelectLearningCandidates(ctx, agentReq)
+	result, err := s.agent.SelectLearningCandidates(ctx, agentReq)
 	if err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
@@ -433,10 +424,7 @@ func (s *AnalyzerService) PlanLearningAgenda(ctx context.Context, req *PlanLearn
 		StructuralContext: structuralContext,
 		UserContext:       req.UserContext,
 	}
-	if req.LearningSession == nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequiredForAgenda")))
-	}
-	result, err := req.LearningSession.PlanLearningAgenda(ctx, agentReq)
+	result, err := s.agent.PlanLearningAgenda(ctx, agentReq)
 	if err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
@@ -478,6 +466,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		Language:          language,
 		LearningMode:      opts.LearningMode,
 		RuntimeLabel:      opts.RuntimeLabel,
+		SharedContextPath: opts.SharedContextPath,
 		Focuses:           focuses,
 		Structure:         runContext.ProjectStructure,
 		MainFiles:         append([]string(nil), runContext.MainFiles...),
@@ -498,10 +487,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 	}
 	agentReq.StructuralContext = structuralContext
 
-	if opts.LearningSession == nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), fmt.Errorf("%s", i18n.Get("AnalyzerLearningSessionRequiredForBatch")))
-	}
-	result, err := opts.LearningSession.AnalyzeCurrentCodebaseBatch(ctx, agentReq)
+	result, err := s.agent.AnalyzeCurrentCodebaseBatch(ctx, agentReq)
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_current_codebase_batch",
@@ -705,7 +691,6 @@ func (s *AnalyzerService) FindReadmePath(projectRoot string) string {
 type AnalyzeProjectOptions struct {
 	ExistingProfile *domain.ProjectProfile
 	FocusPaths      []string
-	LearningSession agent.LearningSession
 }
 
 // buildProjectProfileResult 完整分析项目画像，支持基于已有画像和指定路径做增量刷新。
@@ -751,7 +736,6 @@ func (s *AnalyzerService) buildProjectProfileResult(ctx context.Context, project
 		ExistingProfileJSON: existingProfileJSON,
 		FocusPaths:          focusPaths,
 		UserContext:         runtimecontext.UserContext(ctx),
-		LearningSession:     opts.LearningSession,
 	}
 
 	result, err := s.analyzeProjectProfile(ctx, req)

@@ -206,13 +206,13 @@ exclude:
 
 候选准备决定进入议程规划的文件范围；AI 候选收敛、学习焦点规划和当前代码学习 prompt 都使用明确的稳定决策规则。当证据等价时，优先结构证据、可路由性和源码词汇，最后用路径、ID 或符号的字典序作为 tie-breaker。
 
-初始化交互中的“Agent 总并发数”会写入 `agent.parallelism`。workspace 根配置用它控制子项目并发；普通 project 配置用它控制当前代码学习的证据焦点批次并发。`learn current` 仍使用分段短会话：候选准备后由 planning 会话生成证据包，每个证据焦点批次分析使用独立会话，模式入库前由本地规范化服务完成候选合并、校验和写入。
+初始化交互中的“Agent 总并发数”会写入 `agent.parallelism`。workspace 根配置用它控制子项目并发；普通 project 配置用它控制当前代码学习的证据焦点批次并发。`learn current` 使用独立 runtime 调用：候选准备后由 planning 调用生成证据包，每个证据焦点批次分析使用独立调用，模式入库前先用 AI 做轻量合并优化，再由本地规范化服务完成字段补齐、覆盖恢复、校验和写入。
 
 0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。0.10.3 起，最终内容如果是合法 JSON，会在 `.md` 归档中格式化为可读的 `json` 代码块。
 
 0.9.6 起，`.skills-seed/runtime` 下的调试记录使用 `YYYYMMDD-HHMMSS[-NNN]-<kind>-<name>` 文件名前缀；同一秒内生成多个 runtime ID 时追加递增序号避免覆盖。`rendered-prompts/` 与对应的 `agent-outputs/` 共享同一个日期时间 ID 和语义名，Agent 输出文件只额外包含 Agent 名称，方便把同一次调用中的 prompt 和输出一一对应。0.10.3 起，合法 JSON 输出会在 `.md` 归档中格式化为可读的 `json` 代码块。
 
-0.9.0 起，模式库入库前会执行候选规范化。当前 `learn current` 的候选模式来自证据包分析结果；本地规范化服务负责重复候选合并、来源归属校验、召回保护和一次性写入。`generate skills` 只读取已保存数据，不执行模式合并或 Agent 调用。
+0.9.0 起，模式库入库前会执行候选规范化。当前 `learn current` 的候选模式来自证据包分析结果；AI 合并优化只负责候选来源归属和规范化建议，本地规范化服务负责字段补齐、来源归属校验、召回保护、降级恢复和一次性写入。`generate skills` 只读取已保存数据，不执行模式合并或 Agent 调用。
 
 当前版本不再维护 skills dirty state。`sync` 完成学习后仅在本轮有学习变化时生成 skills。显式执行 `skills-seed generate skills` 会删除旧的 skills-seed 生成目录并完整重建；手动添加用户模式后应显式运行该命令刷新产物。
 
@@ -238,7 +238,7 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 
 #### `parallelism` 说明
 
-1. `project` 模式下，`agent.parallelism > 1` 时，`learn current` 会并发分析独立证据焦点批次；每个批次使用独立短会话，结果回到主流程后按议程顺序合并和 checkpoint。
+1. `project` 模式下，`agent.parallelism > 1` 时，`learn current` 会并发分析独立证据焦点批次；每个批次使用独立 runtime 调用，结果回到主流程后按议程顺序合并和 checkpoint。
 2. `workspace` 模式下，自动值为子项目数，上限 `6`。
 3. 设置为大于 `0` 的数字时，使用该数字作为并发上限。
 4. workspace 子项目任务会通过 goroutine worker 池并行执行；每个子项目内部是否并发分析证据焦点，由该子项目配置的 `agent.parallelism` 决定。

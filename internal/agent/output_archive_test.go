@@ -188,28 +188,6 @@ func TestSaveAgentOutputForContextKeepsNonJSONContentAsMarkdown(t *testing.T) {
 	require.Equal(t, "plain text\n", string(content))
 }
 
-func TestSaveAgentOutputForContextSkipsLearningConversationStartArchive(t *testing.T) {
-	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
-	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
-
-	archive := SaveAgentOutputForContext(ctx, AgentOutputArchiveOptions{
-		Agent:     "claude",
-		Operation: OperationLearningConversationStart,
-		RuntimeID: "20260729-111645",
-		Slug:      RuntimeSlug("learning-conversation-start", "pack-analysis"),
-		Attempt:   1,
-		Content:   `{"ready":true}`,
-		RawOutput: "raw output",
-		Stderr:    "stderr",
-		ExitError: true,
-	})
-
-	require.Empty(t, archive.ContentPath)
-	require.Empty(t, archive.RawPath)
-	require.Empty(t, archive.StderrPath)
-	require.NoDirExists(t, filepath.Join(seedPath, "runtime", "agent-outputs"))
-}
-
 func TestSaveAgentOutputForContextSkipsWhenSeedPathMissing(t *testing.T) {
 	archive := SaveAgentOutputForContext(context.Background(), AgentOutputArchiveOptions{
 		Agent:     "claude",

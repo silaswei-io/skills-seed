@@ -42,6 +42,7 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 
 		pattern.MergedFrom = expandHydratedSources(pattern.MergedFrom, sources)
 		sources = prioritizeCurrentSources(pattern.ID, sources)
+		hydrateCurrentPatternFields(pattern, sources)
 		sourceEvidence := evidenceFromSources(sources)
 		pattern.GoodExample, pattern.BadExample = currentExamples(sources)
 		pattern.BusinessMethod = firstCurrentBusinessMethod(sources)
@@ -78,6 +79,30 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 		}
 	}
 	return nil
+}
+
+func hydrateCurrentPatternFields(pattern *domain.Pattern, sources []domain.Pattern) {
+	if strings.TrimSpace(pattern.Name) == "" {
+		pattern.Name = firstSourceValue(sources, func(source domain.Pattern) string { return source.Name })
+	}
+	if pattern.Category == "" {
+		pattern.Category = domain.Category(firstSourceValue(sources, func(source domain.Pattern) string { return string(source.Category) }))
+	}
+	if strings.TrimSpace(pattern.Description) == "" {
+		pattern.Description = firstSourceValue(sources, func(source domain.Pattern) string { return source.Description })
+	}
+	if strings.TrimSpace(pattern.Rule) == "" {
+		pattern.Rule = firstSourceValue(sources, func(source domain.Pattern) string { return source.Rule })
+	}
+}
+
+func firstSourceValue(sources []domain.Pattern, value func(domain.Pattern) string) string {
+	for _, source := range sources {
+		if text := strings.TrimSpace(value(source)); text != "" {
+			return text
+		}
+	}
+	return ""
 }
 
 func expandHydratedSources(sourceIDs []string, sources []domain.Pattern) []string {

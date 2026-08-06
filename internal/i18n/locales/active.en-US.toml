@@ -287,20 +287,8 @@ other = "Failed to render project or workspace analysis prompt"
 [AgentRenderInitSkillsPromptFailed]
 other = "Failed to render current learning stage prompt"
 
-[AgentClaudeLearningSessionIDFailed]
-other = "Failed to generate Claude learning session ID"
-
-[AgentCodexLearningSessionIDMissing]
-other = "Codex learning session did not return a resumable session ID"
-
-[AgentCodexLearningSessionIDLost]
-other = "Codex learning session lost resumable session ID during {{.Operation}}"
-
 [AgentPromptInputWriteFailed]
 other = "Failed to write prompt input file {{.Name}}"
-
-[AgentLearningSessionNotReady]
-other = "Learning session is not ready: {{.Summary}}"
 
 [AgentCodexProjectAnalysisFailed]
 other = "Codex project analysis failed"
@@ -407,9 +395,6 @@ other = "AI analysis failed"
 [AnalyzerAnalyzeProjectFailed]
 other = "Project analysis failed"
 
-[AnalyzerLearningSessionRequired]
-other = "A learning session is required to refresh the project profile"
-
 [AnalyzerAnalyzeCodebaseFailed]
 other = "Codebase analysis failed"
 
@@ -424,15 +409,6 @@ other = "Dropped invalid engineering rule"
 
 [AnalyzerMarshalProjectProfileFailed]
 other = "Failed to marshal project profile"
-
-[AnalyzerLearningSessionRequiredForAgenda]
-other = "A learning session is required for current learning agenda planning"
-
-[AnalyzerLearningSessionRequiredForBatch]
-other = "A learning session is required for current code batch analysis"
-
-[AnalyzerLearningSessionRequiredForDelta]
-other = "A learning session is required for current code delta analysis"
 
 [AnalyzerAnalyzeBatchNoFocusResults]
 other = "Current code batch returned no evidence focus results"
@@ -648,7 +624,7 @@ other = "skills-seed not initialized"
 other = "Please run 'skills-seed init' first"
 
 [LearnLongDesc]
-other = "Learn coding patterns from the current codebase.\n\nThis command will:\n  • Use segmented AI learning conversations for planning and analysis\n  • Analyze current code or diff-anchored changes\n  • Extract source-backed coding patterns\n  • Normalize learned patterns into the database\n  • Prepare compactable project knowledge for generated skills"
+other = "Learn coding patterns from the current codebase.\n\nThis command will:\n  • Use independent AI runtime calls for planning and analysis\n  • Analyze current code or diff-anchored changes\n  • Extract source-backed coding patterns\n  • Normalize learned patterns into the database\n  • Prepare compactable project knowledge for generated skills"
 
 [LearnExample]
 other = "  # Incrementally learn from current code\n  skills-seed learn current\n\n  # Learn only from a focused directory\n  skills-seed learn current --focus internal/service --profile skip"
@@ -872,6 +848,9 @@ other = "Writing pattern store"
 
 [ProgressNormalizePatternsLocal]
 other = "Local deterministic normalization"
+
+[ProgressNormalizePatternsAI]
+other = "AI pattern merge optimization"
 
 [ProgressLearnCurrentSaveProfile]
 other = "Synchronizing project profile"
@@ -1691,6 +1670,9 @@ other = "Pattern normalization appears over-filtered; recovered source-backed ca
 [LoggerPatternNormSanitized]
 other = "Pattern normalization result contains invalid or duplicate decisions; cleaned them and continued"
 
+[LoggerPatternNormAIFallback]
+other = "AI pattern merge optimization failed; falling back to local deterministic normalization"
+
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
 
@@ -1793,6 +1775,9 @@ other = "Focused scan paths: {{.Focus}}\nProject profile strategy: {{.ProfileMod
 [LearnCurrentFallbackFocusName]
 other = "Current code changes"
 
+[LearnCurrentFallbackFocusNameWithGroup]
+other = "Current code changes: {{.Group}}"
+
 [LearnCurrentFallbackFocusRouteChange]
 other = "current changes"
 
@@ -1802,14 +1787,8 @@ other = "code learning"
 [LearnCurrentFallbackFocusReason]
 other = "The agent did not return a valid evidence focus, so skills-seed uses the current learnable files as the fallback analysis scope"
 
-[LearnCurrentLoadLearningSessionCacheFailed]
-other = "Failed to load learning session cache"
-
-[LearnCurrentStartLearningSessionFailed]
-other = "Failed to start learning session"
-
-[LearnCurrentLearningSessionMissing]
-other = "Failed to start learning session: agent {{.Agent}} did not return a session"
+[LearnCurrentFallbackFocusReasonWithGroup]
+other = "The agent did not assign {{.Group}} to an existing high-density evidence focus, so skills-seed uses this semantic path group as the fallback analysis scope"
 
 [LearnCurrentDecisionCandidateChanged]
 other = "Normalization candidate set changed"
@@ -1855,6 +1834,54 @@ other = "AI candidate narrowing failed; falling back to all candidates: {{.Error
 
 [LearnCurrentFileSelectionSkipped]
 other = "skipped ({{.Reason}})"
+
+[LearnCurrentSharedContextTitle]
+other = "Learn Current Shared Context"
+
+[LearnCurrentSharedContextDescription]
+other = "Generated once after candidate selection and agenda planning. Use this as baseline context for independent batch runtime calls; it is not source evidence."
+
+[LearnCurrentSharedContextProject]
+other = "Project"
+
+[LearnCurrentSharedContextProjectName]
+other = "name"
+
+[LearnCurrentSharedContextProjectPath]
+other = "path"
+
+[LearnCurrentSharedContextProjectLanguage]
+other = "language"
+
+[LearnCurrentSharedContextLearningMode]
+other = "learning mode"
+
+[LearnCurrentSharedContextLearningScope]
+other = "learning scope"
+
+[LearnCurrentSharedContextChangeProfile]
+other = "change profile"
+
+[LearnCurrentSharedContextCandidateSelection]
+other = "Candidate selection"
+
+[LearnCurrentSharedContextCandidateCount]
+other = "candidates"
+
+[LearnCurrentSharedContextSelectedCount]
+other = "selected"
+
+[LearnCurrentSharedContextSelectionStatus]
+other = "status"
+
+[LearnCurrentSharedContextAgenda]
+other = "Agenda"
+
+[LearnCurrentSharedContextEntryPaths]
+other = "entry paths"
+
+[LearnCurrentSharedContextRelatedPaths]
+other = "related paths"
 
 [LearnCurrentFocusOutsideRoot]
 other = "Focus path {{.Path}} is outside the project root"

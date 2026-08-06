@@ -5,38 +5,80 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/knowledge/patternview"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
-func (s *Service) normalizeCurrent(ctx context.Context, candidates []domain.Pattern, retrieved retrievalResult, checkpoint DecisionCheckpoint, hooks ProgressHooks) (*proposal, error) {
+func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, hooks ProgressHooks) (*proposal, error) {
 	decisionKey, err := normalizationDecisionKey(candidates)
 	if err != nil {
 		return nil, err
 	}
-	if result, found, err := loadNormalizationDecision(ctx, checkpoint, decisionKey, hooks); err != nil || found {
+	if result, found, err := loadNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, hooks); err != nil || found {
 		if err != nil {
 			return nil, err
 		}
 		return finalizeCurrentNormalization(proposalFromDecision(result), candidates, retrieved.related)
 	}
 
-	label := i18n.Get("ProgressNormalizePatternsLocal")
-	notifyProgress(hooks.OnStepStart, label)
-	result := keepCurrentCandidates(candidates)
-	result, err = finalizeCurrentNormalization(result, candidates, retrieved.related)
-	if hooks.OnStepComplete != nil {
-		hooks.OnStepComplete(label)
+	result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, hooks)
+	if result != nil {
+		result, err = finalizeCurrentNormalization(result, candidates, retrieved.related)
+		if err == nil {
+			err = validateNormalizeResultForOperation(OperationLearnCurrent, result, candidates, retrieved.related)
+		}
+		if err == nil {
+			if err := saveNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, decisionFromProposal(result)); err != nil {
+				return nil, err
+			}
+			return result, nil
+		}
+		logger.Warn(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
 	}
+	result = normalizeCurrentLocally(candidates, hooks)
+	result, err = finalizeCurrentNormalization(result, candidates, retrieved.related)
 	if err != nil {
 		return nil, err
 	}
-	if err := saveNormalizationDecision(ctx, checkpoint, decisionKey, decisionFromProposal(result)); err != nil {
+	if err := saveNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, decisionFromProposal(result)); err != nil {
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, hooks ProgressHooks) *proposal {
+	if s.normalizer == nil {
+		return nil
+	}
+	label := i18n.Get("ProgressNormalizePatternsAI")
+	notifyProgress(hooks.OnStepStart, label)
+	result, err := s.normalizer.NormalizePatterns(ctx, &agent.NormalizePatternsRequest{
+		ProjectName:     req.ProjectName,
+		RootPath:        req.RootPath,
+		Language:        req.Language,
+		Candidates:      candidates,
+		RelatedPatterns: retrieved.related,
+		UserContext:     req.UserContext,
+	})
+	if err != nil {
+		logger.Warn(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
+		return nil
+	}
+	notifyProgress(hooks.OnStepComplete, label)
+	return proposalFromNormalizePatternsResult(result)
+}
+
+func normalizeCurrentLocally(candidates []domain.Pattern, hooks ProgressHooks) *proposal {
+	label := i18n.Get("ProgressNormalizePatternsLocal")
+	notifyProgress(hooks.OnStepStart, label)
+	result := keepCurrentCandidates(candidates)
+	if hooks.OnStepComplete != nil {
+		hooks.OnStepComplete(label)
+	}
+	return result
 }
 
 func keepCurrentCandidates(candidates []domain.Pattern) *proposal {
@@ -48,6 +90,36 @@ func keepCurrentCandidates(candidates []domain.Pattern) *proposal {
 		result.Patterns = append(result.Patterns, patternview.WithSources(candidate, patternview.SourceIDs(candidate)))
 	}
 	return result
+}
+
+func proposalFromNormalizePatternsResult(result *agent.NormalizePatternsResult) *proposal {
+	if result == nil {
+		return nil
+	}
+	out := &proposal{
+		Patterns: make([]domain.Pattern, 0, len(result.Patterns)),
+		Dropped:  make([]Drop, 0, len(result.Dropped)),
+	}
+	for _, item := range result.Patterns {
+		out.Patterns = append(out.Patterns, domain.Pattern{
+			ID:          item.ID,
+			Name:        item.Name,
+			Category:    domain.Category(item.Category),
+			Description: item.Description,
+			Rule:        item.Rule,
+			Confidence:  item.Confidence,
+			Merged:      len(item.SourceIDs) > 1,
+			MergedFrom:  append([]string(nil), item.SourceIDs...),
+		})
+	}
+	for _, item := range result.Dropped {
+		out.Dropped = append(out.Dropped, Drop{
+			ID:         item.ID,
+			ReasonCode: DropReasonCode(item.ReasonCode),
+			Reason:     item.Reason,
+		})
+	}
+	return out
 }
 
 func finalizeCurrentNormalization(result *proposal, candidates, existing []domain.Pattern) (*proposal, error) {

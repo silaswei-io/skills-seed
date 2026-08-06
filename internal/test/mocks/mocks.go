@@ -16,10 +16,10 @@ type MockAgent struct {
 	RefreshProjectProfileFn    func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	SelectLearningCandidatesFn func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error)
 	PlanLearningAgendaFn       func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error)
+	NormalizePatternsFn        func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error)
 	AnalyzeCurrentCodebaseFn   func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
 	AnalyzeCurrentBatchFn      func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeCurrentDeltaFn      func(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error)
-	StartLearningSessionFn     func(ctx context.Context, req agent.LearningSessionRequest) (agent.LearningSession, error)
 	AnalyzeWorkspaceProfileFn  func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
 	AnalyzeWorkspaceSpecFn     func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 	OptimizeWorkflowFn         func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error)
@@ -30,14 +30,6 @@ func (m *MockAgent) Name() string { return m.NameVal }
 
 // IsAvailable 返回模拟 Agent 是否可用
 func (m *MockAgent) IsAvailable() bool { return m.AvailableVal }
-
-// StartLearningSession 模拟当前代码学习会话。
-func (m *MockAgent) StartLearningSession(ctx context.Context, req agent.LearningSessionRequest) (agent.LearningSession, error) {
-	if m.StartLearningSessionFn != nil {
-		return m.StartLearningSessionFn(ctx, req)
-	}
-	return mockLearningSession{agent: m}, nil
-}
 
 // UserDefinePattern 模拟用户自定义模式
 func (m *MockAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error) {
@@ -69,6 +61,29 @@ func (m *MockAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearn
 		return m.PlanLearningAgendaFn(ctx, req)
 	}
 	return &agent.PlanLearningAgendaResult{}, nil
+}
+
+// NormalizePatterns 模拟当前学习模式合并优化。
+func (m *MockAgent) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+	if m.NormalizePatternsFn != nil {
+		return m.NormalizePatternsFn(ctx, req)
+	}
+	result := &agent.NormalizePatternsResult{
+		Patterns: make([]agent.PatternNormalization, 0, len(req.Candidates)),
+		Dropped:  []agent.PatternDrop{},
+	}
+	for _, pattern := range req.Candidates {
+		result.Patterns = append(result.Patterns, agent.PatternNormalization{
+			ID:          pattern.ID,
+			Name:        pattern.Name,
+			Category:    string(pattern.Category),
+			Description: pattern.Description,
+			Rule:        pattern.Rule,
+			Confidence:  pattern.Confidence,
+			SourceIDs:   []string{pattern.ID},
+		})
+	}
+	return result, nil
 }
 
 // AnalyzeCurrentCodebase 模拟当前代码库分析
@@ -279,38 +294,6 @@ func mockNoChange(unit agent.AnalyzeCurrentDeltaFocus) domain.KnowledgeChange {
 		Anchors:       []domain.PatternDiffAnchor{{Path: anchorPath, ChangeKind: "modified", Description: "mock delta no change"}},
 		Reason:        "mock delta analysis",
 	}
-}
-
-type mockLearningSession struct {
-	agent *MockAgent
-}
-
-func (s mockLearningSession) SessionID() string {
-	return "mock-learning-session"
-}
-
-func (s mockLearningSession) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-	return s.agent.SelectLearningCandidates(ctx, req)
-}
-
-func (s mockLearningSession) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	return s.agent.PlanLearningAgenda(ctx, req)
-}
-
-func (s mockLearningSession) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-	return s.agent.AnalyzeCurrentCodebaseBatch(ctx, req)
-}
-
-func (s mockLearningSession) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
-	return s.agent.AnalyzeCurrentDeltaBatch(ctx, req)
-}
-
-func (s mockLearningSession) RefreshProjectProfile(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-	return s.agent.RefreshProjectProfile(ctx, req)
-}
-
-func (s mockLearningSession) Close(context.Context) error {
-	return nil
 }
 
 // AnalyzeWorkspaceProfile 模拟工作区画像分析

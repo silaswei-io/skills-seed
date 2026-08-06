@@ -8,7 +8,7 @@
 
 ## Overview
 
-{{.Summary}}
+Use this page to route {{.PatternCount}} source-backed utility patterns in the {{.Category}} category. Match by headings, then confirm the full boundary in current source; source-learned results are not security or behavior guarantees.
 
 {{if .RelatedReferences}}
 ## Related References
@@ -29,6 +29,8 @@ This page only covers {{.Category}} category conventions. If the task crosses on
 {{end}}
 
 ## Reusable Solutions
+
+For authentication, authorization, input/output encoding, cryptography, permissions, destructive state changes, or external side effects, inspect the source before relying on the observation; observed handling is not a security guarantee.
 
 {{range .PatternObjects}}
 ### {{.Name}}

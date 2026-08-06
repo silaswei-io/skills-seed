@@ -347,6 +347,24 @@ func TestParseAnalyzeCurrentDeltaBatchResultRejectsMissingProfileRefreshRecommen
 	require.ErrorContains(t, err, "profile_refresh_recommended")
 }
 
+func TestParseAnalyzeCurrentDeltaBatchResultRejectsMissingFocusID(t *testing.T) {
+	result, err := ParseAnalyzeCurrentDeltaBatchResult(`{
+  "knowledge_changes": [
+    {
+      "focus_action": "no_change",
+      "pattern_action": "no_change",
+      "anchors": [],
+      "reason": "no reusable knowledge change"
+    }
+  ],
+  "profile_refresh_recommended": {"needed": false}
+}`)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "knowledge_changes[].focus_id")
+}
+
 func currentBatchOutput(patterns string) string {
 	return `{
   "focuses": [

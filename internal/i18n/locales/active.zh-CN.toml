@@ -287,20 +287,8 @@ other = "渲染项目或工作区分析 prompt 失败"
 [AgentRenderInitSkillsPromptFailed]
 other = "渲染当前学习阶段 prompt 失败"
 
-[AgentClaudeLearningSessionIDFailed]
-other = "生成 Claude 学习会话 ID 失败"
-
-[AgentCodexLearningSessionIDMissing]
-other = "Codex 学习会话未返回可恢复的会话 ID"
-
-[AgentCodexLearningSessionIDLost]
-other = "Codex 学习会话在 {{.Operation}} 期间丢失可恢复的会话 ID"
-
 [AgentPromptInputWriteFailed]
 other = "写入 prompt 输入文件 {{.Name}} 失败"
-
-[AgentLearningSessionNotReady]
-other = "学习会话未就绪: {{.Summary}}"
 
 [AgentCodexProjectAnalysisFailed]
 other = "Codex 项目分析失败"
@@ -407,9 +395,6 @@ other = "AI 分析失败"
 [AnalyzerAnalyzeProjectFailed]
 other = "项目分析失败"
 
-[AnalyzerLearningSessionRequired]
-other = "项目画像同步需要学习会话"
-
 [AnalyzerAnalyzeCodebaseFailed]
 other = "代码库分析失败"
 
@@ -424,15 +409,6 @@ other = "已丢弃无效工程规则"
 
 [AnalyzerMarshalProjectProfileFailed]
 other = "序列化项目画像失败"
-
-[AnalyzerLearningSessionRequiredForAgenda]
-other = "当前学习议程规划需要学习会话"
-
-[AnalyzerLearningSessionRequiredForBatch]
-other = "当前代码批次分析需要学习会话"
-
-[AnalyzerLearningSessionRequiredForDelta]
-other = "当前代码增量分析需要学习会话"
 
 [AnalyzerAnalyzeBatchNoFocusResults]
 other = "当前代码批次未返回证据焦点结果"
@@ -648,7 +624,7 @@ other = "skills-seed 未初始化"
 other = "请先运行 'skills-seed init' 初始化项目"
 
 [LearnLongDesc]
-other = "从当前代码库学习编码模式。\n\n此命令将：\n  • 使用分段 AI 学习会话规划和分析\n  • 分析当前代码或 diff 锚定变更\n  • 提取有源码证据的编码模式\n  • 规范化保存学到的 patterns 到数据库\n  • 为生成 skills 准备可收敛的项目知识"
+other = "从当前代码库学习编码模式。\n\n此命令将：\n  • 使用独立 AI runtime 调用规划和分析\n  • 分析当前代码或 diff 锚定变更\n  • 提取有源码证据的编码模式\n  • 规范化保存学到的 patterns 到数据库\n  • 为生成 skills 准备可收敛的项目知识"
 
 [LearnExample]
 other = "  # 从当前代码增量学习\n  skills-seed learn current\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service --profile skip"
@@ -872,6 +848,9 @@ other = "写入模式库"
 
 [ProgressNormalizePatternsLocal]
 other = "本地确定性规范化"
+
+[ProgressNormalizePatternsAI]
+other = "AI 合并优化模式"
 
 [ProgressLearnCurrentSaveProfile]
 other = "同步项目画像"
@@ -1691,6 +1670,9 @@ other = "模式规范化疑似过度过滤，已恢复有源码证据的候选"
 [LoggerPatternNormSanitized]
 other = "模式规范化结果包含无效或重复决策，已整理后继续"
 
+[LoggerPatternNormAIFallback]
+other = "AI 模式合并优化失败，已降级为本地确定性规范化"
+
 [LoggerAgentProjectPromptRenderFailed]
 other = "项目分析提示词模板渲染失败"
 
@@ -1793,6 +1775,9 @@ other = "指定扫描范围: {{.Focus}}\n项目画像策略: {{.ProfileMode}}"
 [LearnCurrentFallbackFocusName]
 other = "当前代码变更"
 
+[LearnCurrentFallbackFocusNameWithGroup]
+other = "当前代码变更: {{.Group}}"
+
 [LearnCurrentFallbackFocusRouteChange]
 other = "当前变更"
 
@@ -1802,14 +1787,8 @@ other = "代码学习"
 [LearnCurrentFallbackFocusReason]
 other = "AI 未返回有效证据焦点时，使用当前待学习文件作为兜底分析范围"
 
-[LearnCurrentLoadLearningSessionCacheFailed]
-other = "加载学习会话缓存失败"
-
-[LearnCurrentStartLearningSessionFailed]
-other = "启动学习会话失败"
-
-[LearnCurrentLearningSessionMissing]
-other = "启动学习会话失败: Agent {{.Agent}} 未返回会话"
+[LearnCurrentFallbackFocusReasonWithGroup]
+other = "AI 未将 {{.Group}} 归入已有高密度证据焦点时，按该语义路径簇作为兜底分析范围"
 
 [LearnCurrentDecisionCandidateChanged]
 other = "规范化候选集已变化"
@@ -1855,6 +1834,54 @@ other = "AI 候选收敛失败，降级为使用全部候选：{{.Error}}"
 
 [LearnCurrentFileSelectionSkipped]
 other = "已跳过（{{.Reason}}）"
+
+[LearnCurrentSharedContextTitle]
+other = "当前学习共享上下文"
+
+[LearnCurrentSharedContextDescription]
+other = "在候选准备和议程规划后生成一次。将它作为独立 batch 调用的基准上下文；它不是源码证据。"
+
+[LearnCurrentSharedContextProject]
+other = "项目"
+
+[LearnCurrentSharedContextProjectName]
+other = "名称"
+
+[LearnCurrentSharedContextProjectPath]
+other = "路径"
+
+[LearnCurrentSharedContextProjectLanguage]
+other = "语言"
+
+[LearnCurrentSharedContextLearningMode]
+other = "学习模式"
+
+[LearnCurrentSharedContextLearningScope]
+other = "学习范围"
+
+[LearnCurrentSharedContextChangeProfile]
+other = "变更画像"
+
+[LearnCurrentSharedContextCandidateSelection]
+other = "候选准备"
+
+[LearnCurrentSharedContextCandidateCount]
+other = "候选数"
+
+[LearnCurrentSharedContextSelectedCount]
+other = "选中数"
+
+[LearnCurrentSharedContextSelectionStatus]
+other = "状态"
+
+[LearnCurrentSharedContextAgenda]
+other = "分析议程"
+
+[LearnCurrentSharedContextEntryPaths]
+other = "入口路径"
+
+[LearnCurrentSharedContextRelatedPaths]
+other = "相关路径"
 
 [LearnCurrentFocusOutsideRoot]
 other = "focus 路径 {{.Path}} 位于项目根目录之外"

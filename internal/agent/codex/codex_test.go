@@ -67,26 +67,6 @@ enabled = true
 	require.NotContains(t, args, `plugins."superpowers@openai-curated".enabled=false`)
 }
 
-func TestCodexSessionArgsStayReadOnly(t *testing.T) {
-	t.Setenv("CODEX_HOME", t.TempDir())
-
-	startArgs := codexSessionStartArgs(false, "/tmp/output-schema.json", config.AgentRuntimeOptions{})
-	resumeArgs := codexSessionResumeArgs(false, "/tmp/output-schema.json", "thread-123", config.AgentRuntimeOptions{})
-
-	for _, args := range [][]string{startArgs, resumeArgs} {
-		require.Contains(t, args, "--ask-for-approval")
-		require.Equal(t, "never", requireArgValue(t, args, "--ask-for-approval"))
-		require.Contains(t, args, "--sandbox")
-		require.Equal(t, "read-only", requireArgValue(t, args, "--sandbox"))
-		require.Contains(t, args, "--json")
-		require.Contains(t, args, "--output-schema")
-	}
-	require.Contains(t, resumeArgs, "resume")
-	require.Contains(t, resumeArgs, "thread-123")
-	require.NotContains(t, startArgs, "--ephemeral")
-	require.NotContains(t, resumeArgs, "--ephemeral")
-}
-
 func TestExtractFinalContent_NoFinalMessage(t *testing.T) {
 	_, err := extractFinalContent(`{"msg_type":"task_started"}`)
 	require.Error(t, err)

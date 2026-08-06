@@ -60,7 +60,7 @@ func (r *learnCurrentProjectRun) planLearningAgenda() error {
 		}
 		if state == nil {
 			var err error
-			state, err = loadOrCreateCurrentState(r.ctx, r.stateRepo, r.cont.AnalyzerSvc, r.activeLearningSession, r.projectName, r.projectRoot, r.currentLanguage, r.learningMode, r.learningScope, focusRelPaths, r.incrementalChanges, currentStateInputSummary(r.incrementalChanges, r.selectionPlan, r.selectionSummary), r.changeProfile, r.opts.userContext, r.currentStateInvocationHash())
+			state, err = loadOrCreateCurrentState(r.ctx, r.stateRepo, r.cont.AnalyzerSvc, r.projectName, r.projectRoot, r.currentLanguage, r.learningMode, r.learningScope, focusRelPaths, r.incrementalChanges, currentStateInputSummary(r.incrementalChanges, r.selectionPlan, r.selectionSummary), r.changeProfile, r.opts.userContext, r.currentStateInvocationHash())
 			if err != nil {
 				return err
 			}
@@ -106,6 +106,9 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 			return err
 		}
 		r.codebaseRunContext = runContext
+		if err := r.ensureSharedLearningContext(); err != nil {
+			return err
+		}
 		_, err = r.analyzePlannedFocuses(analyzeLabel, r.analysisState, r.plannedFocuses)
 		if err != nil {
 			return err
@@ -246,7 +249,7 @@ func (r *learnCurrentProjectRun) analyzePlannedBatchesParallel(analyzeLabel stri
 			defer wg.Done()
 			for batch := range jobs {
 				progress.start(batch)
-				batchResults, err := r.analyzeBatchInDetachedSession(ctx, analyzeLabel, state, batch)
+				batchResults, err := r.analyzeBatch(ctx, analyzeLabel, state, batch, false)
 				if err != nil {
 					progress.stop(batch)
 					results <- learnCurrentBatchAnalysisResult{batchIndex: batch.index, err: err}
@@ -394,28 +397,6 @@ func (p *learnCurrentParallelAnalysisProgress) activeText() string {
 	return strings.Join(labels, "; ")
 }
 
-func (r *learnCurrentProjectRun) analyzeBatchInDetachedSession(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch) ([]learnCurrentFocusResult, error) {
-	stage := learningStagePackAnalysis
-	if r.useDeltaAnalysis() {
-		stage = learningStageDeltaAnalysis
-	}
-	session, err := r.newLearningSession(ctx, stage, "")
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := session.Close(context.Background()); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
-				"operation", "command.learn_current.close_parallel_learning_session",
-				"stage", stage,
-				"runtime_label", r.analysisBatchRuntimeLabel(state, batch),
-				"error", err,
-			)
-		}
-	}()
-	return r.analyzeBatchWithSession(ctx, analyzeLabel, state, batch, false, session)
-}
-
 func (r *learnCurrentProjectRun) focusProgressParams(state *commandstate.State, focus domain.EvidenceFocus, current, total int) map[string]interface{} {
 	currentFocus, allFocuses := learnCurrentFocusProgress(state, current, total, focus)
 	return map[string]interface{}{
@@ -426,20 +407,6 @@ func (r *learnCurrentProjectRun) focusProgressParams(state *commandstate.State, 
 }
 
 func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool) ([]learnCurrentFocusResult, error) {
-	var results []learnCurrentFocusResult
-	stage := learningStagePackAnalysis
-	if r.useDeltaAnalysis() {
-		stage = learningStageDeltaAnalysis
-	}
-	err := r.withLearningSession(stage, func(session agent.LearningSession) error {
-		var err error
-		results, err = r.analyzeBatchWithSession(ctx, analyzeLabel, state, batch, showDetails, session)
-		return err
-	})
-	return results, err
-}
-
-func (r *learnCurrentProjectRun) analyzeBatchWithSession(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool, session agent.LearningSession) ([]learnCurrentFocusResult, error) {
 	var batchFocuses []analyzer.AnalyzeCurrentEvidenceFocus
 	results := make([]learnCurrentFocusResult, 0, len(batch.focuses))
 	pendingByID := make(map[string]indexedEvidenceFocus, len(batch.focuses))
@@ -472,7 +439,7 @@ func (r *learnCurrentProjectRun) analyzeBatchWithSession(ctx context.Context, an
 	var analyzeResult *analyzer.AnalyzeCurrentCodebaseBatchResult
 	err := func() error {
 		if r.useDeltaAnalysis() {
-			deltaResults, err := r.analyzeDeltaBatch(ctx, batch, batchFocuses, session)
+			deltaResults, err := r.analyzeDeltaBatch(ctx, batch, batchFocuses)
 			if err != nil {
 				return err
 			}
@@ -481,12 +448,12 @@ func (r *learnCurrentProjectRun) analyzeBatchWithSession(ctx context.Context, an
 		}
 		var err error
 		analyzeResult, err = r.cont.AnalyzerSvc.AnalyzeCurrentCodebaseBatch(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCurrentCodebaseBatchOptions{
-			RuntimeLabel:    batchLabel,
-			LearningMode:    r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-			ChangeProfile:   string(r.changeProfile),
-			RunContext:      r.codebaseRunContext,
-			LearningSession: session,
-			Focuses:         batchFocuses,
+			RuntimeLabel:      batchLabel,
+			LearningMode:      r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+			ChangeProfile:     string(r.changeProfile),
+			RunContext:        r.codebaseRunContext,
+			SharedContextPath: r.sharedLearningContextPath,
+			Focuses:           batchFocuses,
 		})
 		return err
 	}()
@@ -655,8 +622,12 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 			checkpoint := newCurrentDecisionCheckpoint(r.stateRepo, r.analysisState)
 			result, err := r.cont.PatternNormSvc.NormalizeAndStoreWithHooks(r.ctx, patternnorm.NormalizeRequest{
 				Operation:          patternnorm.OperationLearnCurrent,
+				ProjectName:        r.projectName,
+				RootPath:           r.projectRoot,
+				Language:           r.currentLanguage,
 				Candidates:         r.patterns,
 				DecisionCheckpoint: checkpoint,
+				UserContext:        r.opts.userContext,
 			}, hooks)
 			if err != nil {
 				return err
@@ -763,7 +734,7 @@ func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	if r.refreshProfile && !r.profileCommitted() {
 		label := i18n.Get("ProgressLearnCurrentSaveProfile")
 		if err := r.steps.Run(label, func() error {
-			profile, err := r.refreshProjectProfileWithSession()
+			profile, err := r.refreshProjectProfile()
 			if err != nil {
 				return err
 			}
@@ -810,22 +781,10 @@ func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 }
 
 func (r *learnCurrentProjectRun) refreshProjectProfile() (*domain.ProjectProfile, error) {
-	options := analyzer.AnalyzeProjectOptions{
-		LearningSession: r.activeLearningSession,
-	}
+	options := analyzer.AnalyzeProjectOptions{}
 	if r.existingProfile != nil && len(r.effectiveFocusPaths) > 0 {
 		options.ExistingProfile = r.existingProfile
 		options.FocusPaths = r.effectiveFocusPaths
 	}
 	return r.cont.AnalyzerSvc.RefreshProjectProfile(r.ctx, r.projectRoot, r.projectName, r.currentLanguage, options)
-}
-
-func (r *learnCurrentProjectRun) refreshProjectProfileWithSession() (*domain.ProjectProfile, error) {
-	var profile *domain.ProjectProfile
-	err := r.withLearningSession(learningStageProfileRefresh, func(agent.LearningSession) error {
-		var err error
-		profile, err = r.refreshProjectProfile()
-		return err
-	})
-	return profile, err
 }

@@ -8,7 +8,7 @@
 
 ## Overview
 
-{{.Summary}}
+Use this page to route {{.PatternCount}} source-backed patterns in the {{.Category}} category. Match by the table of contents and headings, then confirm the full boundary in current source; source-learned results are not security or behavior guarantees.
 
 {{if .RelatedReferences}}
 ## Related References
@@ -32,7 +32,7 @@ This page only covers {{.Category}} category conventions. If the task crosses on
 {{if .ClaimGroups}}
 ## User Rules And Reusable Solutions
 
-Reuse by evidence; authoritative rules live in Project Spec.
+Reuse by evidence; authoritative rules live in Project Spec. For authentication, authorization, input/output encoding, cryptography, permissions, destructive state changes, or external side effects, inspect the source before relying on the observation; observed handling is not a security guarantee.
 
 {{range .ClaimGroups}}
 ### {{.Title}}
@@ -50,7 +50,7 @@ Reuse by evidence; authoritative rules live in Project Spec.
 {{else}}
 ## Reusable Solutions
 
-Use these patterns to locate and prefer existing implementations.
+Use these patterns to locate and prefer existing implementations. For authentication, authorization, input/output encoding, cryptography, permissions, destructive state changes, or external side effects, inspect the source before relying on the observation; observed handling is not a security guarantee.
 
 {{range .PatternObjects}}
 ### {{.Name}}

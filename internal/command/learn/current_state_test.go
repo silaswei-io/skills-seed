@@ -96,6 +96,68 @@ func TestReconcileEvidenceFocusesUsesUniqueFallbackID(t *testing.T) {
 	require.Equal(t, []string{"other.go"}, got[1].EntryPaths)
 }
 
+func TestReconcileEvidenceFocusesMergesLowDensitySupportFocus(t *testing.T) {
+	focuses := []domain.EvidenceFocus{
+		{
+			ID:           "application-entry-startup-framework",
+			Name:         "应用启动入口与框架集成",
+			EntryPaths:   []string{"cmd/server.go", "internal/handler/routes.go"},
+			RelatedPaths: []string{"etc/etc.yaml"},
+		},
+		{
+			ID:         "version-api",
+			Name:       "版本API",
+			RouteTerms: []string{"版本"},
+			EntryPaths: []string{"desc/api/version.api", "internal/handler/version.go", "internal/logic/version.go"},
+		},
+	}
+
+	got := reconcileEvidenceFocuses(focuses, []string{
+		"cmd/server.go",
+		"internal/handler/routes.go",
+		"etc/etc.yaml",
+		"desc/api/version.api",
+		"internal/handler/version.go",
+		"internal/logic/version.go",
+	})
+
+	require.Len(t, got, 1)
+	require.Equal(t, "application-entry-startup-framework", got[0].ID)
+	require.Contains(t, got[0].RelatedPaths, "desc/api/version.api")
+	require.Contains(t, got[0].RelatedPaths, "internal/handler/version.go")
+	require.Contains(t, got[0].RelatedPaths, "internal/logic/version.go")
+}
+
+func TestReconcileEvidenceFocusesGroupsMultipleFallbacksBySemanticPath(t *testing.T) {
+	got := reconcileEvidenceFocuses(nil, []string{
+		"internal/logic/system/admin/login.go",
+		"internal/logic/system/admin/logout.go",
+		"internal/logic/user/group/create.go",
+		"plugins/ca_manage/internal/logic/ca/addcacert.go",
+		"plugins/ca_manage/internal/logic/ca/deletecacert.go",
+	})
+
+	require.Len(t, got, 3)
+	require.Equal(t, "current-codebase-internal-logic-system", got[0].ID)
+	require.Equal(t, []string{"internal/logic/system/admin/login.go", "internal/logic/system/admin/logout.go"}, got[0].EntryPaths)
+	require.Equal(t, "current-codebase-internal-logic-user", got[1].ID)
+	require.Equal(t, []string{"internal/logic/user/group/create.go"}, got[1].EntryPaths)
+	require.Equal(t, "current-codebase-plugins-ca-manage-internal-logic-ca", got[2].ID)
+	require.Equal(t, []string{"plugins/ca_manage/internal/logic/ca/addcacert.go", "plugins/ca_manage/internal/logic/ca/deletecacert.go"}, got[2].EntryPaths)
+}
+
+func TestReconcileEvidenceFocusesKeepsShallowFallbackTogether(t *testing.T) {
+	got := reconcileEvidenceFocuses(nil, []string{
+		"main.go",
+		"internal/logic/create.go",
+		"internal/types/types.go",
+	})
+
+	require.Len(t, got, 1)
+	require.Equal(t, "current-codebase", got[0].ID)
+	require.Equal(t, []string{"internal/logic/create.go", "internal/types/types.go", "main.go"}, got[0].EntryPaths)
+}
+
 func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}}, nil, []domain.EvidenceFocus{{ID: "all", EntryPaths: []string{"main.go"}}})
 	state.ArtifactsCommitted = true

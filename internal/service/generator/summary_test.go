@@ -148,7 +148,8 @@ func TestGenerateSkillsUsesDeterministicSummary(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(ctx, tmpDir))
 
 	business := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	assert.Contains(t, business, "business 分类包含 1 个项目特定模式")
+	assert.NotContains(t, business, "business 分类包含 1 个项目特定模式")
+	assert.Contains(t, business, "本页是业务模式路由")
 	assert.Contains(t, business, "HSM Delivery Boundary")
 	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "hsm-delivery-boundary.md"))
 }
@@ -174,7 +175,8 @@ func TestGenerateSkillsDoesNotCallAgentSummary(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	business := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	assert.Contains(t, business, "business 分类包含 1 个项目特定模式")
+	assert.NotContains(t, business, "business 分类包含 1 个项目特定模式")
+	assert.Contains(t, business, "本页是业务模式路由")
 	assert.Contains(t, business, "AI Rule")
 	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "ai-rule.md"))
 }

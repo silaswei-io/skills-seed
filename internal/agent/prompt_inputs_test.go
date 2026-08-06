@@ -2,10 +2,12 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,24 @@ func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, config.LearningModeDeep, currentData["LearningMode"])
+}
+
+func TestCurrentBatchPromptDataKeepsSharedContextPath(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	sharedPath := filepath.Join(t.TempDir(), "shared-context.md")
+
+	currentData, err := AnalyzeCurrentCodebaseBatchPromptData(session, &AnalyzeCurrentCodebaseBatchRequest{
+		SharedContextPath: sharedPath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, sharedPath, currentData["SharedContextPath"])
+
+	deltaData, err := AnalyzeCurrentDeltaBatchPromptData(session, &AnalyzeCurrentDeltaBatchRequest{
+		SharedContextPath: sharedPath,
+	})
+	require.NoError(t, err)
+	require.Equal(t, sharedPath, deltaData["SharedContextPath"])
+	require.NoFileExists(t, filepath.Join(session.dir, "shared-context.md"))
 }
 
 func TestPlanLearningAgendaPromptDataWritesFocusedPathList(t *testing.T) {
@@ -68,6 +88,38 @@ func TestSelectLearningCandidatesPromptDataWritesCandidateAndRequiredPathLists(t
 	require.NoError(t, err)
 	require.Equal(t, "internal/auth/login.go\ninternal/key/create.go\n", string(content))
 	require.NotContains(t, data, "CandidatePaths")
+}
+
+func TestNormalizePatternsPromptDataWritesCompactPatternInputs(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	pattern := domain.NewPattern("p1", "Decode Boundary", domain.CategoryAPI)
+	pattern.SetDescription("HTML values are decoded before storage.")
+	pattern.SetRule("Inspect the decoded value handling before changing API persistence.")
+	pattern.GoodExample = "long example should not enter compact merge input"
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
+		{Path: "internal/a.go", Line: 10, Symbol: "A"},
+		{Path: "internal/a.go", Line: 20, Symbol: "B"},
+	}
+
+	data, err := NormalizePatternsPromptData(session, &NormalizePatternsRequest{
+		ProjectName: "demo",
+		Candidates:  []domain.Pattern{*pattern},
+	})
+	require.NoError(t, err)
+
+	path, ok := data["CandidatePatternsPath"].(string)
+	require.True(t, ok)
+	require.Equal(t, 1, data["CandidatePatternCount"])
+
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), "long example")
+	require.NotContains(t, string(raw), `"line"`)
+
+	var items []normalizePatternInput
+	require.NoError(t, json.Unmarshal(raw, &items))
+	require.Len(t, items, 1)
+	require.Equal(t, []string{"internal/a.go"}, items[0].EvidencePaths)
 }
 
 func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {

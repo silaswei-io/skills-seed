@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
@@ -15,12 +16,21 @@ import (
 // Service 是模式库唯一的规范入库边界。
 type Service struct {
 	patternRepo patternStore
+	normalizer  agent.PatternNormalizer
 }
 
 // NewService 创建模式规范化入库服务。
 func NewService(repo patternStore) *Service {
 	return &Service{
 		patternRepo: repo,
+	}
+}
+
+// NewServiceWithNormalizer 创建带 AI 合并优化的模式规范化服务。
+func NewServiceWithNormalizer(repo patternStore, normalizer agent.PatternNormalizer) *Service {
+	return &Service{
+		patternRepo: repo,
+		normalizer:  normalizer,
 	}
 }
 
@@ -54,7 +64,7 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
 	var normalized *proposal
 	if req.Operation == OperationLearnCurrent {
-		normalized, err = s.normalizeCurrent(ctx, candidates, retrieved, req.DecisionCheckpoint, hooks)
+		normalized, err = s.normalizeCurrent(ctx, req, candidates, retrieved, hooks)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", i18n.Get("PatternNormLearnCurrentFailed"), err)
 		}

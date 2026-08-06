@@ -1,6 +1,6 @@
 # Analyze Learning Pack
 
-This is an isolated pack-analysis conversation. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return the final source-backed repository knowledge for these packs. Favor recall for useful source-backed knowledge; later normalization and deterministic consolidation will merge true equivalents.
+This is an isolated pack-analysis runtime call. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return the final source-backed repository knowledge for these packs. Favor recall for useful source-backed knowledge; later normalization and deterministic consolidation will merge true equivalents.
 
 Project:
 - name: {{.ProjectName}}
@@ -19,6 +19,9 @@ Learning strategy guidance:
 {{- if .StructurePath}}
 
 Project structure is available at `{{.StructurePath}}`; use it only for boundaries and ownership.
+{{- end}}
+{{- if .SharedContextPath}}
+Shared planning context is available at `{{.SharedContextPath}}`; read it as the run baseline before inspecting pack evidence.
 {{- end}}
 {{- if .StructuralContextPath}}
 Structural context is available at `{{.StructuralContextPath}}`; use it only to choose direct source evidence inside the listed packs.
@@ -70,7 +73,7 @@ Evidence packs:
 {{end}}
 
 Pack boundary:
-- Do not rely on hidden context from planning, other packs, profile sync, or later normalization.
+- Do not rely on hidden context from planning, other packs, profile sync, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
 - Treat the explicit pack fields, runtime files, structural context, and listed source/diff files as the complete input.
 - Do not scan outside listed pack files and directly referenced context. If evidence is insufficient, return that pack with `patterns: []`.
 - Pack IDs are execution provenance for this response only; do not copy pack IDs or pack names into pattern fields.
@@ -94,6 +97,7 @@ Pack-local refinement:
 - Keep source-backed repository knowledge when routeable and useful for future work, even if it is domain-specific, technology-specific, single-file, locally scoped, configuration-only, interface/contract-only, error-handling-only, or utility-focused. Calibrate confidence and scope instead of dropping it for being local or simple.
 - If source evidence shows destructive schema/data behavior, bootstrap-only setup, or historical compatibility code, describe it as a bounded implementation observation. Do not phrase it as a recommended migration or production change pattern unless authoritative project guidance explicitly says to repeat it.
 - If source evidence shows destructive commands, privileged administration, external side effects, or irreversible operational behavior, return a scoped safety or operational-boundary pattern even when it lives in one command file.
+- If source evidence shows security-sensitive handling, describe only the observed boundary and required source inspection. Do not claim a mitigation unless the evidence proves it; decoding or unescaping input is not automatically XSS, injection, or authorization protection.
 - Avoid exact counts such as number of paths, cases, enum members, key types, statuses, exclusions, routes, or business variants unless you verified the full closed set from direct source evidence in this turn and the number changes a future implementation decision. Prefer "multiple", "a set of", or representative values.
 
 Pre-output validation:

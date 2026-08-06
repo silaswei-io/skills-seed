@@ -1,6 +1,6 @@
 # Analyze Diff Learning Pack
 
-This is an isolated diff-pack analysis conversation. Classify reusable knowledge changes caused by the listed diffs only, refine the pack-local decision internally, and return final knowledge-change decisions.
+This is an isolated diff-pack analysis runtime call. Classify reusable knowledge changes caused by the listed diffs only, refine the pack-local decision internally, and return final knowledge-change decisions.
 
 Project:
 - name: {{.ProjectName}}
@@ -19,6 +19,9 @@ Learning strategy guidance:
 {{- if .StructurePath}}
 
 Focused structure is available at `{{.StructurePath}}`; use it only around changed paths.
+{{- end}}
+{{- if .SharedContextPath}}
+Shared planning context is available at `{{.SharedContextPath}}`; read it as the run baseline before inspecting diff evidence.
 {{- end}}
 {{- if .StructuralContextPath}}
 Structural context is available at `{{.StructuralContextPath}}`; use only direct symbols, callers, callees, imports, and ownership clues connected to changed files.
@@ -57,7 +60,7 @@ Diff evidence packs:
 {{end}}
 
 Diff boundary:
-- Do not rely on hidden context from planning, previous full learning, other packs, profile sync, or later normalization.
+- Do not rely on hidden context from planning, previous full learning, other packs, profile sync, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
 - Every decision must be triggered by a listed diff or changed focus path.
 - Changed hunks are the source anchor. Unchanged context files can explain meaning but cannot independently create a new pattern.
 - `focus_action: "new"` means the diff revealed a new reusable boundary inside a listed pack; it does not authorize scanning beyond listed diffs and direct context.
@@ -75,10 +78,12 @@ Pack-local decision quality:
 - Do not generalize behavior from one lifecycle action to sibling actions unless the changed hunk proves the same invariant.
 - Treat destructive setup or migration changes conservatively: unless the diff and authoritative project evidence say the behavior is a production rule, record it only as a bounded observation or `no_change`.
 - Do not turn dangerous behavior into a recommendation to perform it. If kept, wording must require inspecting the verified entry and preserving safeguards, prompts, environment checks, rollback expectations, or documented boundaries shown by the diff.
+- If the diff touches security-sensitive handling, describe only the observed boundary and required source inspection. Do not claim a mitigation unless the diff proves it; decoding or unescaping input is not automatically XSS, injection, or authorization protection.
 - Do not introduce exact counts, totals, exclusions, enum cardinalities, or supported variant numbers from a partial diff unless the changed hunk contains the complete closed list and the number changes a future implementation decision.
 
 Pre-output validation:
 - Every diff pack receives a decision.
+- Every decision must set `focus_id` to the exact input focus ID printed in that diff pack header, including `no_change` decisions.
 - Every proposal has at least one changed-hunk anchor.
 - No decision references files outside the listed changed paths or context files.
 - No proposal duplicates a related existing pattern under a new ID.

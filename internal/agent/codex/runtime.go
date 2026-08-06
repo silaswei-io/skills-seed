@@ -19,7 +19,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
-	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, error) {
@@ -54,45 +53,6 @@ func (c *CodexAgent) callCodexWithOptions(ctx context.Context, operation, prompt
 			return output, output, duration, retryable, err
 		},
 	})
-}
-
-type codexSessionCallResult struct {
-	output    string
-	sessionID string
-}
-
-func (c *CodexAgent) callCodexSession(ctx context.Context, operation, prompt, outputContract, sessionID string, task agent.RuntimeTask) (string, string, error) {
-	outputSchema, err := aicontract.StructuredOutputSchema(outputContract)
-	if err != nil {
-		return "", sessionID, err
-	}
-	schemaFile, err := os.CreateTemp("", "skills-seed-output-schema-*.json")
-	if err != nil {
-		return "", sessionID, err
-	}
-	schemaPath := schemaFile.Name()
-	defer os.Remove(schemaPath)
-	if _, err := schemaFile.WriteString(outputSchema); err != nil {
-		_ = schemaFile.Close()
-		return "", sessionID, err
-	}
-	if err := schemaFile.Close(); err != nil {
-		return "", sessionID, err
-	}
-
-	result, err := agent.RunRetryingCall(ctx, agent.RetryingCallOptions[codexSessionCallResult]{
-		AgentName: c.Name(),
-		Operation: operation,
-		Policy:    c.retryCfg,
-		Call: func(attempt int) (codexSessionCallResult, string, time.Duration, bool, error) {
-			output, nextSessionID, duration, retryable, err := c.doCallCodexSession(ctx, operation, prompt, schemaPath, sessionID, attempt, task)
-			return codexSessionCallResult{output: output, sessionID: nextSessionID}, output, duration, retryable, err
-		},
-	})
-	if result.sessionID == "" {
-		result.sessionID = sessionID
-	}
-	return result.output, result.sessionID, err
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
@@ -235,115 +195,6 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 	return content, duration, false, nil
 }
 
-func (c *CodexAgent) doCallCodexSession(ctx context.Context, operation, prompt, outputSchemaPath, sessionID string, attempt int, task agent.RuntimeTask) (string, string, time.Duration, bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
-
-	workDir, err := agent.WorkDirForContext(ctx)
-	if err != nil {
-		return "", sessionID, 0, false, err
-	}
-	args := codexSessionStartArgs(c.allowUserPlugins, outputSchemaPath, c.runtime)
-	if strings.TrimSpace(sessionID) != "" {
-		args = codexSessionResumeArgs(c.allowUserPlugins, outputSchemaPath, sessionID, c.runtime)
-	}
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
-		"agent", c.Name(),
-		"operation", operation,
-		"command", c.commandPath,
-		"args", args,
-		"timeout", c.timeout,
-		"work_dir", workDir,
-		"prompt_length", len(prompt),
-		"session_id", sessionID,
-		"attempt", attempt,
-	)
-
-	cmd := exec.CommandContext(ctx, c.commandPath, args...)
-	cmd.Dir = workDir
-	cmd.Stdin = strings.NewReader(prompt)
-	configureCommandProcessGroup(cmd)
-	stopProcessGroupKill := context.AfterFunc(ctx, func() {
-		terminateCommandProcessGroup(cmd)
-	})
-	defer stopProcessGroupKill()
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	startedAt := time.Now()
-	if err := cmd.Run(); err != nil {
-		duration := time.Since(startedAt)
-		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
-		stdoutStr := stdout.String()
-		stderrStr := stderr.String()
-		retryable := isCodexRetryableError(stdoutStr, stderrStr)
-		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:     c.Name(),
-			Operation: operation,
-			RuntimeID: task.ID,
-			Slug:      task.Slug,
-			Attempt:   attempt,
-			RawOutput: stdoutStr,
-			Stderr:    stderrStr,
-			ExitError: true,
-		})
-
-		if retryable {
-			return stdoutStr + stderrStr, sessionID, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
-		}
-		return "", sessionID, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
-	}
-	duration := time.Since(startedAt)
-
-	rawOutput := stdout.String()
-	nextSessionID := stringx.FirstNonBlank(extractCodexSessionID(rawOutput), sessionID)
-	callCompleteFields := []any{
-		"agent", c.Name(),
-		"operation", operation,
-		"duration", duration,
-		"output_length", stdout.Len(),
-		"stderr_length", stderr.Len(),
-		"attempt", attempt,
-		"session_id", nextSessionID,
-	}
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
-
-	content, err := extractFinalContent(rawOutput)
-	if err != nil {
-		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-			Agent:     c.Name(),
-			Operation: operation,
-			RuntimeID: task.ID,
-			Slug:      task.Slug,
-			Attempt:   attempt,
-			RawOutput: rawOutput,
-			Stderr:    stderr.String(),
-		})
-		return "", nextSessionID, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, err, rawOutput, archive))
-	}
-	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
-		Agent:     c.Name(),
-		Operation: operation,
-		RuntimeID: task.ID,
-		Slug:      task.Slug,
-		Attempt:   attempt,
-		Content:   content,
-		RawOutput: rawOutput,
-		Stderr:    stderr.String(),
-	})
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
-		"agent", c.Name(),
-		"operation", operation,
-		"content_length", len(content),
-		"output_path", archive.ContentPath,
-		"raw_output_path", archive.RawPath,
-		"stderr_path", archive.StderrPath,
-	)
-	return content, nextSessionID, duration, false, nil
-}
-
 func codexExecArgs(allowUserPlugins bool, outputSchemaPath string, runtime config.AgentRuntimeOptions) []string {
 	// 已经把需要分析的结构和样例代码放进提示词。这里让模型以一次性、
 	// 只读、非交互模式在当前目录运行，避免写入文件或等待工具审批
@@ -360,49 +211,6 @@ func codexExecArgs(allowUserPlugins bool, outputSchemaPath string, runtime confi
 		"--output-schema", outputSchemaPath,
 		"-",
 	)
-	if !allowUserPlugins {
-		args = append(codexDisableUserPluginArgs(), args...)
-	}
-	return args
-}
-
-func codexSessionStartArgs(allowUserPlugins bool, outputSchemaPath string, runtime config.AgentRuntimeOptions) []string {
-	args := codexRuntimeArgs(runtime)
-	args = append(args,
-		"--ask-for-approval", "never",
-		"exec",
-		"--skip-git-repo-check",
-		"--ignore-rules",
-		"--sandbox", "read-only",
-		"--color", "never",
-		"--json",
-		"--output-schema", outputSchemaPath,
-		"-",
-	)
-	if !allowUserPlugins {
-		args = append(codexDisableUserPluginArgs(), args...)
-	}
-	return args
-}
-
-func codexSessionResumeArgs(allowUserPlugins bool, outputSchemaPath, sessionID string, runtime config.AgentRuntimeOptions) []string {
-	args := codexRuntimeArgs(runtime)
-	args = append(args,
-		"--ask-for-approval", "never",
-		"exec",
-		"resume",
-		"--skip-git-repo-check",
-		"--ignore-rules",
-		"--sandbox", "read-only",
-		"--color", "never",
-		"--json",
-		"--output-schema", outputSchemaPath,
-	)
-	if strings.TrimSpace(sessionID) == "" {
-		args = append(args, "--last", "-")
-	} else {
-		args = append(args, sessionID, "-")
-	}
 	if !allowUserPlugins {
 		args = append(codexDisableUserPluginArgs(), args...)
 	}
@@ -522,27 +330,6 @@ func hasEarlierJSONContent(parts []string) bool {
 		}
 	}
 	return false
-}
-
-func extractCodexSessionID(output string) string {
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		var evt map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &evt); err != nil {
-			continue
-		}
-		for _, key := range []string{"thread_id", "session_id", "conversation_id"} {
-			if id := strings.TrimSpace(stringField(evt, key)); id != "" {
-				return id
-			}
-		}
-	}
-	return ""
 }
 
 func extractCodexEventContent(evt map[string]interface{}) string {

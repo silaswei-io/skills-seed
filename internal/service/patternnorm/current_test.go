@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
@@ -62,6 +63,65 @@ func TestNormalizeAndStoreKeepsEquivalentCurrentCandidatesForRecall(t *testing.T
 	require.Equal(t, []string{second.ID}, result.Written[1].MergedFrom)
 	require.Equal(t, first.EvidenceLocations, result.Written[0].EvidenceLocations)
 	require.Equal(t, second.EvidenceLocations, result.Written[1].EvidenceLocations)
+}
+
+func TestNormalizeAndStoreUsesAIMergeForCurrentCandidates(t *testing.T) {
+	first := newPatternNormTestPattern("first", "Shared Error Rule", domain.CategoryError)
+	first.Rule = "Wrap repository errors with operation context."
+	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "first.go", Line: 10, Symbol: "First", Kind: "func"}}
+	second := newPatternNormTestPattern("second", "Shared Error Rule", domain.CategoryError)
+	second.Rule = "Wrap repository errors with operation context."
+	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "second.go", Line: 20, Symbol: "Second", Kind: "func"}}
+
+	normalizer := normalizePatternsFunc(func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{{
+			ID:          "shared-error-rule",
+			Name:        "Shared Error Rule",
+			Category:    string(domain.CategoryError),
+			Description: "Repository errors are wrapped with operation context.",
+			Rule:        "Keep operation context when returning repository errors.",
+			Confidence:  0.8,
+			SourceIDs:   []string{"first", "second"},
+		}}}, nil
+	})
+
+	result, err := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}, normalizer).NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*first, *second},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, "shared-error-rule", result.Written[0].ID)
+	require.ElementsMatch(t, []string{"first", "second"}, result.Written[0].MergedFrom)
+	require.ElementsMatch(t, append(first.EvidenceLocations, second.EvidenceLocations...), result.Written[0].EvidenceLocations)
+	require.Equal(t, 1, result.Summary.MergeCount)
+}
+
+func TestNormalizeAndStoreFallsBackWhenAIMergeOmitsCandidate(t *testing.T) {
+	first := newPatternNormTestPattern("first", "First", domain.CategoryBusiness)
+	second := newPatternNormTestPattern("second", "Second", domain.CategoryBusiness)
+	normalizer := normalizePatternsFunc(func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{{
+			ID:        "first",
+			Name:      "First",
+			Category:  string(domain.CategoryBusiness),
+			SourceIDs: []string{"first"},
+		}}}, nil
+	})
+
+	result, err := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}, normalizer).NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{*first, *second},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 2)
+	require.ElementsMatch(t, []string{"first", "second"}, patternIDs(result.Written))
 }
 
 func TestNormalizeAndStoreReplaysSavedCurrentNormalizationDecision(t *testing.T) {
@@ -239,4 +299,18 @@ func (c *memoryDecisionCheckpoint) Save(_ context.Context, key string, result *D
 	c.decision = result
 	c.saves++
 	return nil
+}
+
+type normalizePatternsFunc func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error)
+
+func (f normalizePatternsFunc) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+	return f(ctx, req)
+}
+
+func patternIDs(patterns []domain.Pattern) []string {
+	ids := make([]string, 0, len(patterns))
+	for _, pattern := range patterns {
+		ids = append(ids, pattern.ID)
+	}
+	return ids
 }

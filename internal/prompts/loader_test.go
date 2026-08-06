@@ -112,20 +112,12 @@ func TestLoaderMergesContextFragments(t *testing.T) {
 	require.Contains(t, prompt, "Use i18n for user-visible text.")
 }
 
-func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
+func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	loader := New("codex", "en-US", "")
-
-	start, err := loader.Render("learning-conversation-start", sampleLearningSessionData())
-	require.NoError(t, err)
-	require.Contains(t, start, "short stage conversation")
-	require.Contains(t, start, "explicit prompt inputs as the complete cross-stage memory")
-	require.Contains(t, start, "Learning strategy guidance")
-	require.Contains(t, start, "Treat learning mode as recall/precision priority")
-	require.Contains(t, start, "Do not assume or inventory any language, framework, architecture, domain, or fixed output count")
-	require.Contains(t, start, "project-specific product/domain patterns and project-specific code patterns")
 
 	plan, err := loader.Render("learning-pack-plan", samplePlanData(t))
 	require.NoError(t, err)
+	require.Contains(t, plan, "planning runtime call")
 	require.Contains(t, plan, "self-contained evidence packs")
 	require.Contains(t, plan, "Do not plan a directory inventory")
 	require.Contains(t, plan, "Preserve these knowledge lanes")
@@ -144,7 +136,7 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 
 	batch, err := loader.Render("learning-pack-analyze", sampleCurrentBatchData())
 	require.NoError(t, err)
-	require.Contains(t, batch, "isolated pack-analysis conversation")
+	require.Contains(t, batch, "isolated pack-analysis runtime call")
 	require.Contains(t, batch, "Run a decision-value discovery pass")
 	require.Contains(t, batch, "Pack-local refinement")
 	require.Contains(t, batch, "product/domain patterns and code patterns")
@@ -155,7 +147,7 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 
 	delta, err := loader.Render("learning-delta-pack-analyze", sampleCurrentDeltaData())
 	require.NoError(t, err)
-	require.Contains(t, delta, "isolated diff-pack analysis conversation")
+	require.Contains(t, delta, "isolated diff-pack analysis runtime call")
 	require.Contains(t, delta, "Changed hunks are the source anchor")
 	require.Contains(t, delta, "proposal.business_method")
 	require.Contains(t, delta, "Do not infer a new language, framework, architecture, or domain inventory")
@@ -163,7 +155,7 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 
 	profile, err := loader.Render("learning-profile-refresh", sampleProjectProfileData(t))
 	require.NoError(t, err)
-	require.Contains(t, profile, "bounded profile-sync conversation")
+	require.Contains(t, profile, "bounded profile-sync runtime call")
 	require.Contains(t, profile, "Do not inventory the project for completeness")
 	require.Contains(t, profile, "Avoid exact capability counts")
 
@@ -171,7 +163,6 @@ func TestLearningPromptsUseSegmentedConversationBoundary(t *testing.T) {
 
 func currentPromptData(t *testing.T) map[string]interface{} {
 	return map[string]interface{}{
-		"learning-conversation-start": sampleLearningSessionData(),
 		"learning-candidate-select":   sampleCandidateSelectionData(t),
 		"learning-pack-plan":          samplePlanData(t),
 		"learning-pack-analyze":       sampleCurrentBatchData(),
@@ -181,20 +172,6 @@ func currentPromptData(t *testing.T) map[string]interface{} {
 		"core-workflow-optimize":      sampleWorkflowData(),
 		"core-workspace-profile":      sampleWorkspaceData(),
 		"core-workspace-spec":         sampleWorkspaceData(),
-	}
-}
-
-func sampleLearningSessionData() map[string]interface{} {
-	return map[string]interface{}{
-		"ProjectName":       "demo",
-		"RootPath":          "/repo",
-		"Language":          "go",
-		"Stage":             "planning",
-		"LearningMode":      config.LearningModeNormal,
-		"LearningScope":     config.LearningScopeFlow,
-		"ChangeProfile":     "normal",
-		"UserContextPath":   "",
-		"AllowedCategories": domain.AllowedPatternCategoriesText(),
 	}
 }
 
@@ -235,6 +212,7 @@ func sampleCurrentBatchData() map[string]interface{} {
 		"RootPath":              "/repo",
 		"Language":              "go",
 		"RuntimeLabel":          "current",
+		"SharedContextPath":     "/tmp/shared-context.md",
 		"Focuses":               []agent.AnalyzeCurrentEvidenceFocus{sampleEvidenceFocus()},
 		"StructurePath":         "/tmp/project-structure.txt",
 		"StructuralContextPath": "/tmp/structural-context.md",
@@ -252,6 +230,7 @@ func sampleCurrentDeltaData() map[string]interface{} {
 		"RootPath":              "/repo",
 		"Language":              "go",
 		"RuntimeLabel":          "delta",
+		"SharedContextPath":     "/tmp/shared-context.md",
 		"Focuses":               []agent.AnalyzeCurrentDeltaFocus{sampleDeltaFocus()},
 		"StructurePath":         "/tmp/focused-structure.txt",
 		"StructuralContextPath": "/tmp/structural-context.md",

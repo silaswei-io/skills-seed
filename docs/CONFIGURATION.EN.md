@@ -206,13 +206,13 @@ Starting in 0.11.2, `learning.current.max_focuses_per_call` controls how many li
 
 Candidate preparation decides which files enter agenda planning. AI candidate narrowing, evidence-focus planning, and current-code learning prompts use explicit stable-decision rules; when evidence is equivalent, they prefer structural evidence, routeability, and source vocabulary, then use lexicographic path, ID, or symbol order as the final tie-breaker.
 
-The interactive init prompt writes total Agent parallelism into `agent.parallelism`. Workspace root configs use it for child-project concurrency; ordinary project configs use it for current-code evidence-focus batch concurrency. `learn current` still uses segmented short conversations: after candidate preparation, planning creates evidence packs, each evidence-focus batch is analyzed in its own conversation, and the local normalization service merges, validates, and stores candidate patterns.
+The interactive init prompt writes total Agent parallelism into `agent.parallelism`. Workspace root configs use it for child-project concurrency; ordinary project configs use it for current-code evidence-focus batch concurrency. `learn current` uses independent runtime calls: after candidate preparation, planning creates evidence packs, each evidence-focus batch is analyzed in its own call, AI performs lightweight merge optimization, and the local normalization service hydrates fields, recovers coverage, validates, and stores candidate patterns.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Starting in 0.10.3, valid JSON final content is formatted as a readable fenced `json` block inside the `.md` archive.
 
 Starting in 0.9.6, debug records under `.skills-seed/runtime` use the `YYYYMMDD-HHMMSS[-NNN]-<kind>-<name>` filename prefix; when multiple runtime IDs are generated in the same second, an incrementing sequence is appended to avoid overwrites. `rendered-prompts/` and their matching `agent-outputs/` share the same date-time ID and semantic name; Agent output files only add the Agent name, making each prompt/output pair easy to correlate. Starting in 0.10.3, valid JSON output is formatted as a readable fenced `json` block inside the `.md` archive.
 
-Starting in 0.9.0, candidates are normalized before entering the pattern store. Current `learn current` receives candidate patterns from evidence-pack analysis; the local normalization service owns duplicate merging, source ownership validation, recall protection, and one-shot storage. `generate skills` only reads stored data and performs neither pattern merging nor Agent calls.
+Starting in 0.9.0, candidates are normalized before entering the pattern store. Current `learn current` receives candidate patterns from evidence-pack analysis; AI merge optimization only proposes source ownership and canonical patterns, while the local normalization service owns field hydration, source ownership validation, recall protection, fallback recovery, and one-shot storage. `generate skills` only reads stored data and performs neither pattern merging nor Agent calls.
 
 The current version no longer maintains skills dirty state. `sync` generates skills only when the learning run changes learned output. Explicit `skills-seed generate skills` deletes the old skills-seed generated output directory and fully rebuilds it; after manually adding a user pattern, run this command to refresh generated artifacts.
 
@@ -238,7 +238,7 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 
 #### `parallelism` Notes
 
-1. In `project` mode, `agent.parallelism > 1` lets `learn current` analyze independent evidence-focus batches concurrently. Each batch uses its own short conversation, then results are merged and checkpointed in agenda order.
+1. In `project` mode, `agent.parallelism > 1` lets `learn current` analyze independent evidence-focus batches concurrently. Each batch uses its own runtime call, then results are merged and checkpointed in agenda order.
 2. In `workspace` mode, automatic parallelism is the child project count, capped at `6`.
 3. A positive value is used as the explicit concurrency limit.
 4. Workspace child project tasks run through a goroutine worker pool. Evidence-focus concurrency inside each child project is controlled by that child project's `agent.parallelism`.

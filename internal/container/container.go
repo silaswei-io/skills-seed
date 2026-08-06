@@ -157,7 +157,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 	// 7. 创建服务
 	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo)
-	patternNormSvc := patternnorm.NewService(patternRepo)
+	patternNormSvc := patternnorm.NewServiceWithNormalizer(patternRepo, agentImpl)
 
 	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, cfg.Project.Language)
 	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo)

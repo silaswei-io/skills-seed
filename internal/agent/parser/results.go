@@ -11,18 +11,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
-// ParseLearningSessionAck 验证当前代码学习会话初始化结果。
-func ParseLearningSessionAck(output string) error {
-	var result aicontract.LearningSessionAckOutput
-	if err := parseJSONPayload(output, &result); err != nil {
-		return err
-	}
-	if !result.Ready {
-		return errors.New(i18n.GetWithParams("AgentLearningSessionNotReady", map[string]interface{}{"Summary": strings.TrimSpace(result.Summary)}))
-	}
-	return nil
-}
-
 // ParseUserDefinePatternResult 解析用户自定义模式结果。
 func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult, error) {
 	var payload aicontract.PatternOutput
@@ -75,6 +63,11 @@ func ParseAnalyzeCurrentDeltaBatchResult(output string) (*agent.AnalyzeCurrentDe
 	}
 	if payload.ProfileRefreshRecommended == nil {
 		return nil, missingRequiredOutputField("profile_refresh_recommended")
+	}
+	for _, change := range payload.KnowledgeChanges {
+		if strings.TrimSpace(change.FocusID) == "" {
+			return nil, missingRequiredOutputField("knowledge_changes[].focus_id")
+		}
 	}
 
 	now := time.Now()

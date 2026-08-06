@@ -1,12 +1,12 @@
 package domain
 
-// LearningAgenda 是一次学习会话的临时议程。
-// 它只用于组织本轮对话要查看的证据，不属于最终模式库分类。
+// LearningAgenda 是本轮学习的临时议程。
+// 它只用于组织独立批次调用要查看的证据，不属于最终模式库分类。
 type LearningAgenda struct {
 	Focuses []EvidenceFocus `json:"focuses,omitempty"`
 }
 
-// EvidenceFocus 表示一次学习会话中需要共同查看的一组证据。
+// EvidenceFocus 表示一次独立批次调用中需要共同查看的一组证据。
 type EvidenceFocus struct {
 	ID           string   `json:"id"`
 	Name         string   `json:"name"`
