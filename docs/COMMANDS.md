@@ -555,7 +555,7 @@ skills-seed learn current --profile refresh
 
 #### 命令概述
 
-管理可复用的任务工作流。根命令调用 Agent 把用户说明整理成标准工作流；`show` 子命令只读查询已有工作流，不调用 Agent、不修改文件。
+管理可复用的任务工作流。根命令调用 Agent 把用户说明整理成适合该任务的 Markdown 工作流；`show` 子命令只读查询已有工作流，不调用 Agent、不修改文件。
 
 #### 命令形式
 
@@ -580,8 +580,9 @@ skills-seed learn current --profile refresh
 #### 注意事项
 
 1. 更新已有工作流前，可先执行 `workflow show --format json`，再按需读取匹配详情。
-2. 已有内容等价时不重复写入；存在冲突时由用户选择合并或覆盖。
-3. 写入完成后运行 `skills-seed generate skills`。
+2. 工作流正文不强制固定章节；校验、回滚等部分只在任务需要时保留。
+3. 已有内容等价时不重复写入；存在冲突时由用户选择合并或覆盖。
+4. 写入完成后运行 `skills-seed generate skills`。
 
 ### `skills-seed sync`
 

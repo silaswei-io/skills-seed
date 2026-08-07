@@ -243,10 +243,10 @@ other = "Initialize workspace child projects"
 other = "Internal workspace child initialization flow. Each child project must be an independent Git repository. Already initialized child projects are reported and skipped, including whether their agent.engine matches the root."
 
 [InitChildrenExample]
-other = "  skills-seed init --workspace\n  skills-seed add backend"
+other = "  skills-seed init --workspace\n  skills-seed workspace add backend"
 
 [InitChildrenRequireWorkspaceMode]
-other = "add can only run in a workspace-mode root repository"
+other = "workspace add can only run in a workspace-mode root repository"
 
 [InitChildrenProjectInitializing]
 other = "Initializing child project {{.ProjectName}}: {{.Path}}"
@@ -947,7 +947,7 @@ other = "Generating skills for child project {{.ProjectName}}"
 other = "Generated skills for child project {{.ProjectName}}"
 
 [GenerateWorkspaceChildNotInitialized]
-other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed add {{.ProjectName}}"
+other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed workspace add {{.ProjectName}}"
 
 [GenerateWorkspaceChildNotGitRepo]
 other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
@@ -1941,7 +1941,7 @@ other = "completed, patterns {{.Patterns}}, written {{.Saved}}"
 other = "failed"
 
 [LearnWorkspaceChildNotInitialized]
-other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed add {{.ProjectName}}"
+other = "Child project {{.ProjectName}} is not initialized. Run from the workspace root: skills-seed workspace add {{.ProjectName}}"
 
 [LearnWorkspaceChildNotGitRepo]
 other = "Child project {{.ProjectName}} is not an independent Git repository: {{.Path}}"
@@ -2023,10 +2023,10 @@ other = "Add child projects to a workspace"
 other = "Detect child projects under the workspace root, write selected projects to workspace.projects, and initialize their .skills-seed directories in project mode.\n\nUse . to add every currently detected child project. With arguments, each value may be a child project id or path. This command only works from a workspace-mode root repository."
 
 [AddExample]
-other = "  # Add and initialize every currently detected child project\n  skills-seed add .\n\n  # Add only specific child projects\n  skills-seed add backend frontend"
+other = "  # Add and initialize every currently detected child project\n  skills-seed workspace add .\n\n  # Add only specific child projects\n  skills-seed workspace add backend frontend"
 
 [AddRequireWorkspaceMode]
-other = "add can only run in a workspace-mode root repository"
+other = "workspace add can only run in a workspace-mode root repository"
 
 [AddProjectsMissing]
 other = "No child projects were detected"

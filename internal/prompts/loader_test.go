@@ -161,6 +161,18 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 
 }
 
+func TestWorkflowPromptAllowsTaskSpecificStructure(t *testing.T) {
+	loader := New("codex", "en-US", "")
+
+	prompt, err := loader.Render("core-workflow-optimize", sampleWorkflowData())
+	require.NoError(t, err)
+
+	require.Contains(t, prompt, "Use a structure that fits the workflow")
+	require.Contains(t, prompt, "Do not force validation or rollback sections")
+	require.Contains(t, prompt, "Treat structural differences such as section names, optional sections, and flexible document content formats as mergeable")
+	require.NotContains(t, prompt, "Use only these sections")
+}
+
 func currentPromptData(t *testing.T) map[string]interface{} {
 	return map[string]interface{}{
 		"learning-candidate-select":   sampleCandidateSelectionData(t),

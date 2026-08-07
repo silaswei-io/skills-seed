@@ -203,6 +203,19 @@ func TestUpsertWorkflowGeneratesNameWhenMissing(t *testing.T) {
 	require.FileExists(t, filepath.Join(seedPath, "workflows", workflow.ID, "WORKFLOW.md"))
 }
 
+func TestUpsertWorkflowFallsBackToContextIDWhenGeneratedTitleIsNotSafe(t *testing.T) {
+	seedPath := t.TempDir()
+	repo := workflowstore.NewRepository(seedPath)
+	svc := NewService(repo, fixedTitleOptimizer{title: "需求分析与方案生成工作流"}, "go")
+
+	workflow, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{Context: "整理开发需求文档，帮助 AI 理解实现边界"})
+
+	require.NoError(t, err)
+	require.Equal(t, "需求分析与方案生成工作流", workflow.Name)
+	require.Regexp(t, `^workflow-[0-9a-f]{12}$`, workflow.ID)
+	require.FileExists(t, filepath.Join(seedPath, "workflows", workflow.ID, "WORKFLOW.md"))
+}
+
 func TestUpsertWorkflowWithoutNameDoesNotUpdateExistingTitleID(t *testing.T) {
 	seedPath := t.TempDir()
 	repo := workflowstore.NewRepository(seedPath)

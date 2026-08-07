@@ -555,7 +555,7 @@ skills-seed learn current --profile refresh
 
 #### Command Overview
 
-Manage reusable task workflows. The root command asks the Agent to organize user guidance into a standard workflow. The `show` subcommand only reads existing workflows, does not call an Agent, and does not modify files.
+Manage reusable task workflows. The root command asks the Agent to organize user guidance into task-appropriate Markdown workflow content. The `show` subcommand only reads existing workflows, does not call an Agent, and does not modify files.
 
 #### Command Forms
 
@@ -580,8 +580,9 @@ Manage reusable task workflows. The root command asks the Agent to organize user
 #### Notes
 
 1. Before updating an existing workflow, use `workflow show --format json` and read matching details as needed.
-2. Do not rewrite equivalent content; conflicts require choosing merge or overwrite.
-3. After a write, run `skills-seed generate skills`.
+2. Workflow bodies do not require fixed sections; validation and rollback sections are kept only when the task needs them.
+3. Do not rewrite equivalent content; conflicts require choosing merge or overwrite.
+4. After a write, run `skills-seed generate skills`.
 
 ### `skills-seed sync`
 

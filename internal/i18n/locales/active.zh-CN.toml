@@ -243,10 +243,10 @@ other = "初始化 workspace 子项目"
 other = "初始化 workspace 子项目的内部流程。每个子项目必须是独立 Git 仓库。已初始化的子项目会按 agent.engine 是否一致给出提示并跳过。"
 
 [InitChildrenExample]
-other = "  skills-seed init --workspace\n  skills-seed add backend"
+other = "  skills-seed init --workspace\n  skills-seed workspace add backend"
 
 [InitChildrenRequireWorkspaceMode]
-other = "只能在 workspace 模式根仓中添加子项目"
+other = "workspace add 只能在 workspace 模式根仓中运行"
 
 [InitChildrenProjectInitializing]
 other = "正在初始化子项目 {{.ProjectName}}: {{.Path}}"
@@ -947,7 +947,7 @@ other = "子项目 {{.ProjectName}} 开始生成 skills"
 other = "子项目 {{.ProjectName}} skills 生成完成"
 
 [GenerateWorkspaceChildNotInitialized]
-other = "子项目 {{.ProjectName}} 未初始化，请在 workspace 根仓执行: skills-seed add {{.ProjectName}}"
+other = "子项目 {{.ProjectName}} 未初始化，请在 workspace 根仓执行: skills-seed workspace add {{.ProjectName}}"
 
 [GenerateWorkspaceChildNotGitRepo]
 other = "子项目 {{.ProjectName}} 不是独立 Git 仓库: {{.Path}}"
@@ -1941,7 +1941,7 @@ other = "完成，模式 {{.Patterns}}，写入 {{.Saved}}"
 other = "失败"
 
 [LearnWorkspaceChildNotInitialized]
-other = "子项目 {{.ProjectName}} 未初始化，请在 workspace 根仓执行: skills-seed add {{.ProjectName}}"
+other = "子项目 {{.ProjectName}} 未初始化，请在 workspace 根仓执行: skills-seed workspace add {{.ProjectName}}"
 
 [LearnWorkspaceChildNotGitRepo]
 other = "子项目 {{.ProjectName}} 不是独立 Git 仓库: {{.Path}}"
@@ -2023,10 +2023,10 @@ other = "向 workspace 添加子项目"
 other = "检测 workspace 根目录下的子项目，将指定子项目写入 workspace.projects，并以 project 模式初始化它们的 .skills-seed。\n\n使用 . 表示添加当前检测到的所有子项目；指定参数时可使用子项目 id 或 path。此命令只适用于 workspace 模式根仓。"
 
 [AddExample]
-other = "  # 添加并初始化当前检测到的所有子项目\n  skills-seed add .\n\n  # 只添加指定子项目\n  skills-seed add backend frontend"
+other = "  # 添加并初始化当前检测到的所有子项目\n  skills-seed workspace add .\n\n  # 只添加指定子项目\n  skills-seed workspace add backend frontend"
 
 [AddRequireWorkspaceMode]
-other = "add 只能在 workspace 模式根仓中运行"
+other = "workspace add 只能在 workspace 模式根仓中运行"
 
 [AddProjectsMissing]
 other = "未检测到可添加的子项目"

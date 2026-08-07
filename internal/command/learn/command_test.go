@@ -2152,7 +2152,7 @@ func TestRunLearnWorkspaceCurrentRequiresInitializedChildProject(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backend")
-	require.Contains(t, err.Error(), "skills-seed add")
+	require.Contains(t, err.Error(), "skills-seed workspace add")
 }
 
 func TestRunLearnWorkspaceCurrentRequiresChildGitRepository(t *testing.T) {

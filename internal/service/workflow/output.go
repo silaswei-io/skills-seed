@@ -248,7 +248,15 @@ func normalizedContentLine(line string) string {
 	line = strings.TrimSpace(strings.TrimPrefix(line, "-"))
 	line = strings.TrimSpace(strings.TrimPrefix(line, "*"))
 	line = strings.TrimSpace(strings.TrimPrefix(line, ">"))
+	if isWorkflowLabelLine(line) {
+		return ""
+	}
 	return strings.TrimSpace(line)
+}
+
+func isWorkflowLabelLine(line string) bool {
+	line = strings.TrimSpace(line)
+	return len([]rune(line)) <= 40 && (strings.HasSuffix(line, ":") || strings.HasSuffix(line, "："))
 }
 
 func truncateDescription(content string, limit int) string {

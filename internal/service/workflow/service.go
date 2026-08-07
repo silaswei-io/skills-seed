@@ -2,6 +2,8 @@ package workflow
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -76,7 +78,7 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 		return nil, err
 	}
 	if id == "" {
-		id, err = s.newGeneratedWorkflowID(title)
+		id, err = s.newGeneratedWorkflowID(title, context)
 		if err != nil {
 			return nil, err
 		}
@@ -166,8 +168,8 @@ func buildWorkflow(id, title, context, content string, now time.Time, existing *
 	return workflow
 }
 
-func (s *Service) newGeneratedWorkflowID(title string) (string, error) {
-	baseID := workflowIDFromGeneratedTitle(title)
+func (s *Service) newGeneratedWorkflowID(title, context string) (string, error) {
+	baseID := workflowIDFromGeneratedTitle(title, context)
 	if baseID == "" {
 		return "", nil
 	}
@@ -215,8 +217,20 @@ func normalizeConflicts(values []string) []string {
 	return conflicts
 }
 
-func workflowIDFromGeneratedTitle(title string) string {
-	return runtimefiles.SafePart(title, "")
+func workflowIDFromGeneratedTitle(title, context string) string {
+	if id := runtimefiles.SafePart(title, ""); id != "" {
+		return id
+	}
+	return workflowIDFromGeneratedContext(context)
+}
+
+func workflowIDFromGeneratedContext(context string) string {
+	context = strings.TrimSpace(context)
+	if context == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(context))
+	return "workflow-" + hex.EncodeToString(sum[:])[:12]
 }
 
 func existingWorkflowContent(workflow *domain.Workflow, overwrite bool) string {

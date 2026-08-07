@@ -20,6 +20,16 @@ func TestWorkflowDescriptionUsesOptimizedContentSummary(t *testing.T) {
 	require.Equal(t, "发布流程覆盖上线前环境与产物核验，以及上线后的冒烟验证。", Summary(workflow, "zh-CN"))
 }
 
+func TestWorkflowDescriptionSkipsApplicabilityLabelLine(t *testing.T) {
+	workflow := domain.Workflow{
+		ID:      "requirement-analysis-workflow",
+		Name:    "需求分析与方案生成工作流",
+		Content: "# 需求分析与方案生成工作流\n\n## Applicability\n\n适用于以下场景：\n- 接收到新的功能需求清单\n- 收到重大变更或重构需求\n",
+	}
+
+	require.Equal(t, "接收到新的功能需求清单", Summary(workflow, "zh-CN"))
+}
+
 func TestWorkflowDescriptionIgnoresOriginalContextWithoutOptimizedContent(t *testing.T) {
 	workflow := domain.Workflow{
 		ID: "deploy",

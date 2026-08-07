@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.15.5]
+
+### Changes
+
+- Relaxed the user workflow optimization template so workflow bodies use task-appropriate Markdown structure instead of forcing fixed sections or requiring every workflow to include Validation / rollback content.
+- Updated workflow command documentation, configuration documentation, prompt documentation, and the CLI Skill reference to clarify that workflow body structure can vary by task and validation steps are kept only when relevant.
+
+### Fixes
+
+- Fixed same-name workflow merging treating section names, optional sections, or flexible document content formats as conflicts. When new input relaxes or narrows formatting requirements, the workflow body is updated instead.
+- Fixed missing `--name` workflows failing with an unsafe-title error when the AI generated a non-ASCII title. The title remains the display name, while the safe ID falls back to a stable hash from the user input.
+- Fixed workspace-mode prompts that still referenced the old `skills-seed add` command, standardizing them on `skills-seed workspace add`.
+- Fixed workflow summary extraction using short label lines such as "Applicable scenarios:" as the summary.
+
 ## [v0.15.4]
 
 ### Changes

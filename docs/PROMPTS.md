@@ -17,7 +17,7 @@ Files under `embedfs/templates/prompts/append/` are reusable fragments selected 
 | `core-workspace-profile` | `CodexAgent.AnalyzeWorkspaceProfile`, `ClaudeAgent.AnalyzeWorkspaceProfile` | Learn workspace-level project relationships and routing facts. |
 | `core-workspace-spec` | `CodexAgent.AnalyzeWorkspaceSpec`, `ClaudeAgent.AnalyzeWorkspaceSpec` | Generate workspace-level executable development constraints. |
 | `core-user-pattern` | `CodexAgent.UserDefinePattern`, `ClaudeAgent.UserDefinePattern` | Convert user-provided pattern descriptions into structured pattern output. |
-| `core-workflow-optimize` | `CodexAgent.OptimizeWorkflow`, `ClaudeAgent.OptimizeWorkflow` | Normalize a user workflow description into structured workflow steps. |
+| `core-workflow-optimize` | `CodexAgent.OptimizeWorkflow`, `ClaudeAgent.OptimizeWorkflow` | Normalize a user workflow description into maintainable Markdown while preserving task-specific structure. |
 
 Planning and learning stages retain read-only repository tools because their prompts intentionally reference runtime candidate lists, structural context, diffs, and repository paths. Cross-stage memory is explicit runtime data, not command-wide hidden conversation state.
 
