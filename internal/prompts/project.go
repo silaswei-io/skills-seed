@@ -17,7 +17,6 @@ import (
 var contextFileNames = []string{
 	"README",
 	"background",
-	"constraints",
 	"terminology",
 }
 
@@ -169,7 +168,7 @@ func removeDeprecatedPromptsDir(seedPath string) error {
 }
 
 func removeDeprecatedContextFiles(contextDir string) error {
-	for _, name := range []string{"project.md", "rules.md", "glossary.md"} {
+	for _, name := range []string{"project.md", "rules.md", "glossary.md", "constraints.md"} {
 		if err := os.Remove(filepath.Join(contextDir, name)); err != nil && !os.IsNotExist(err) {
 			return err
 		}

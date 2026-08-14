@@ -32,16 +32,10 @@ type Repository struct {
 }
 
 type workflowMetadata struct {
-	ID        string                    `yaml:"id"`
-	Name      string                    `yaml:"name"`
-	CreatedAt string                    `yaml:"created_at,omitempty"`
-	UpdatedAt string                    `yaml:"updated_at,omitempty"`
-	Contexts  []workflowContextMetadata `yaml:"contexts,omitempty"`
-}
-
-type workflowContextMetadata struct {
-	Content   string `yaml:"content"`
+	ID        string `yaml:"id"`
+	Name      string `yaml:"name"`
 	CreatedAt string `yaml:"created_at,omitempty"`
+	UpdatedAt string `yaml:"updated_at,omitempty"`
 }
 
 // NewRepository 创建工作流仓储。
@@ -248,42 +242,18 @@ func renderWorkflowMetadata(workflow domain.Workflow) []byte {
 }
 
 func workflowToMetadata(workflow domain.Workflow) workflowMetadata {
-	contexts := make([]workflowContextMetadata, 0, len(workflow.Contexts))
-	for _, item := range workflow.Contexts {
-		content := strings.TrimSpace(item.Content)
-		if content == "" {
-			continue
-		}
-		contexts = append(contexts, workflowContextMetadata{
-			Content:   content,
-			CreatedAt: formatWorkflowTime(item.CreatedAt),
-		})
-	}
 	return workflowMetadata{
 		ID:        workflow.ID,
 		Name:      strings.TrimSpace(workflow.Name),
 		CreatedAt: formatWorkflowTime(workflow.CreatedAt),
 		UpdatedAt: formatWorkflowTime(workflow.UpdatedAt),
-		Contexts:  contexts,
 	}
 }
 
 func metadataToWorkflow(meta workflowMetadata) domain.Workflow {
-	contexts := make([]domain.WorkflowContext, 0, len(meta.Contexts))
-	for _, item := range meta.Contexts {
-		content := strings.TrimSpace(item.Content)
-		if content == "" {
-			continue
-		}
-		contexts = append(contexts, domain.WorkflowContext{
-			Content:   content,
-			CreatedAt: parseWorkflowTime(item.CreatedAt),
-		})
-	}
 	return domain.Workflow{
 		ID:        workflowID(meta.ID),
 		Name:      strings.TrimSpace(meta.Name),
-		Contexts:  contexts,
 		CreatedAt: parseWorkflowTime(meta.CreatedAt),
 		UpdatedAt: parseWorkflowTime(meta.UpdatedAt),
 	}

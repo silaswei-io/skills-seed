@@ -48,8 +48,9 @@ agent:
 learning:
   current:
     mode: "normal"
-    scope: "flow"
-    max_focuses_per_call: 1
+    pattern_admission:
+      min_confidence: 0.75
+      min_single_evidence_confidence: 0.85
     structural:
       enabled: true
       provider: "auto"
@@ -160,11 +161,7 @@ exclude:
 
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
-| `mode` | `normal` | 学习策略：`normal` 平衡质量和速度；`fast` 保留紧凑但直接有证据的模式；`deep` 更愿意保留有证据的局部业务/代码模式 |
-| `scope` | `flow` | 焦点规划取向：`flow` 默认且最稳定，优先关注业务流程/资源动作；`domain` 更偏长期业务职责；`module` 更偏模块/插件/契约边界。它是学习视角，不是固定分类或数量边界 |
-| `max_focuses_per_call` | `1` | 单次 AI 调用最多分析的焦点数；`1` 表示不合批，降低单次输出过大、解析失败和跨焦点结论串扰风险 |
-| `select_relevant_files` | `true` | 大候选集是否在议程规划前启用 AI 候选收敛；关闭后使用本地保守候选准备 |
-| `select_relevant_files_min_candidates` | `200` | 候选文件数达到该阈值时才调用 AI 候选收敛；小范围变更直接保留本地候选 |
+| `mode` | `normal` | 学习策略均以高精准率准入：`fast` 缩小证据探索范围；`normal` 为默认；`deep` 扩大证据探索范围，但不降低模式准入标准 |
 | `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
 | `structural.provider` | `auto` | 结构化上下文与符号校验来源：`auto` 优先 CodeGraph 并在不可用时回退 tree-sitter；`codegraph` 强制使用 CodeGraph；`treesitter` 显式选择内嵌 parser |
 | `structural.max_symbols` | `30` | 输出到结构化上下文的最大符号数 |
@@ -178,17 +175,16 @@ exclude:
 
 0.9.0 起，项目结构摘要、样例文件收集和结构化预扫描都统一使用同一套配置化文件过滤策略。除 `.git`、`.skills-seed` 和已配置的 skills 输出目录等内置安全边界外，不再在 analyzer 内额外维护目录名关键字；需要排除依赖、构建产物或项目自定义目录时，应写入 `exclude`。
 
-当前版本中，`learn current` 在本地文件过滤后会执行候选准备：小范围变更直接保留候选，不再用路径词表删减源码文件；路径信号只用于挑选结构化上下文入口。候选数达到 `select_relevant_files_min_candidates` 且 `select_relevant_files` 开启时，会先调用 `learning-candidate-select` 让 AI 基于候选清单、必选路径和结构化上下文收敛大候选集；AI 不可用时回退为使用全部候选。候选路径、diff、焦点文件和结构化上下文等大块输入会写入 runtime 输入文件，prompt 通过路径引用它们。
+当前版本中，`learn current` 在本地文件过滤后会保留全部范围内候选，不再用路径词表或模型猜测删减源码文件。候选路径、diff、焦点文件和结构化上下文等大块输入会写入 runtime 输入文件，prompt 通过路径引用它们。
 
 0.9.11 起，文件过滤策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。0.9.13 起，快照仍保存完整当前状态，但发送给 AI 的 diff 会按 `exclude.paths` 和 `exclude.gitignore` 过滤，避免被忽略文件作为删除 diff 进入分析。
 
 #### 建议
 
 1. 大多数项目保持默认值即可；没有边界输入时不会运行结构化上下文。
-2. 大型仓库候选特别多但希望减少规划成本时，保持 `select_relevant_files: true` 并按项目规模调整 `select_relevant_files_min_candidates`。
-3. 明确不需要结构化上下文时，把 `structural.enabled` 设为 `false`。
-4. 大型仓库显式使用 tree-sitter 时可降低 `structural.max_file_size`，避免解析生成文件、bundle 或异常大文件。
-5. 结构化上下文只消费已有边界输入，不在没有 seed 时全仓扫描。
+2. 明确不需要结构化上下文时，把 `structural.enabled` 设为 `false`。
+3. 大型仓库显式使用 tree-sitter 时可降低 `structural.max_file_size`，避免解析生成文件、bundle 或异常大文件。
+4. 结构化上下文只消费已有边界输入，不在没有 seed 时全仓扫描。
 
 ### Prompt 运行时调试
 
@@ -198,21 +194,21 @@ exclude:
 
 0.10.5 起，`learn current` 焦点分析不会再把已有模式库写入每个焦点 prompt；如果需要查看已有模式，请读取本地模式库或使用 `patterns show` / `patterns stats`。Claude 和 Codex 调用统一使用 DTO 生成的 Schema 约束原生结构化输出；解析层使用 `jsonrepair-go` 修复 JSON 语法，修复结果仍必须通过严格 DTO 解码，不会放行未知字段或错误结构。
 
-0.11.0 起，`learning.current.mode` 可设置为 `fast`、`normal` 或 `deep`，用于在学习速度和模式覆盖质量之间选择策略；该配置会进入续跑状态指纹。生成 skills 时会输出相关参考路由、重要性分层和分组入口索引，并在渲染前校验证据路径是否存在。验证命令集中写入 `references/validation.md`；Go 项目根据真实 `go.mod` 和 `_test.go` 额外生成 `references/testing.md`，测试文件归属到最近的上级 module。
+0.11.0 起，`learning.current.mode` 可设置为 `fast`、`normal` 或 `deep`，用于在学习速度和模式覆盖质量之间选择策略；该配置会进入续跑状态指纹。生成 skills 时会输出相关参考路由、重要性分层和分组入口索引，并在渲染前校验证据路径是否存在。测试、部署和验收流程不从源码学习，其步骤、命令和顺序由用户维护的 Workflow 提供，并随最终 Skills 一起生成。
 
-0.11.1 起，`learning.current.scope` 可设置为 `domain`、`flow` 或 `module`，用于引导学习焦点按业务域、业务流程或模块/插件粒度切分，并与 `mode` 一起进入续跑状态指纹。模型输出解析会额外修复证据行号范围表达式，将 `"line": 29-43` 这类非法 JSON 归一为单个行号。
+学习焦点没有可配置分类。规划阶段根据源码责任、能力、资源动作、状态转换、契约、集成和横切机制，自动形成验证未来开发决策所需的最小证据集。焦点只服务于本次取证，不会成为 Workflow、工作步骤或生成 Skill 的固定分类。模型输出解析会额外修复证据行号范围表达式，将 `"line": 29-43` 这类非法 JSON 归一为单个行号。
 
-0.11.2 起，`learning.current.max_focuses_per_call` 可控制一次 AI 调用最多分析的焦点数，默认 `1` 表示不合批；调高后会把多个焦点放入同一次调用并要求响应按顶层 `focuses` 返回。生成 skills 时，低频或局部证据不会进入强约束层，避免把偶发现象误写成必须遵守的项目标准。
+当前版本中，每个证据焦点都使用独立的分析调用，避免跨焦点结论串扰；分析并发只由 `agent.parallelism` 控制。独立知识审查继续以完整证据焦点为单元，按议程串行执行，每个焦点完成后立即保存 checkpoint；全部焦点审查完成后，候选才进入一次跨焦点全局规范化。生成 skills 时，低频或局部证据不会进入强约束层，避免把偶发现象误写成必须遵守的项目标准。
 
-候选准备决定进入议程规划的文件范围；AI 候选收敛、学习焦点规划和当前代码学习 prompt 都使用明确的稳定决策规则。当证据等价时，优先结构证据、可路由性和源码词汇，最后用路径、ID 或符号的字典序作为 tie-breaker。
+候选准备只做范围、排除规则和路径规范化，不根据文件名、目录名、语言或框架词汇判断知识价值。所有范围内候选都进入议程规划，规划结果必须用焦点或带理由的跳过回执完整覆盖输入路径。后续源码分析与独立知识审查负责语义判断；本地代码只校验证据、范围、结构化契约和覆盖完整性。
 
-初始化交互中的“Agent 总并发数”会写入 `agent.parallelism`。workspace 根配置用它控制子项目并发；普通 project 配置用它控制当前代码学习的证据焦点批次并发。`learn current` 使用独立 runtime 调用：候选准备后由 planning 调用生成证据包，每个证据焦点批次分析使用独立调用，模式入库前先用 AI 做轻量合并优化，再由本地规范化服务完成字段补齐、覆盖恢复、校验和写入。
+初始化交互中的“Agent 总并发数”会写入 `agent.parallelism`。workspace 根配置用它控制子项目并发；普通 project 配置用它控制当前代码学习的证据焦点并发。`learn current` 使用独立 runtime 调用：候选准备后由 planning 调用生成证据包，每个证据焦点使用独立调用。`learning.current.pattern_admission` 控制候选进入合并与入库链路所需的置信度。
 
 0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。0.10.3 起，最终内容如果是合法 JSON，会在 `.md` 归档中格式化为可读的 `json` 代码块。
 
 0.9.6 起，`.skills-seed/runtime` 下的调试记录使用 `YYYYMMDD-HHMMSS[-NNN]-<kind>-<name>` 文件名前缀；同一秒内生成多个 runtime ID 时追加递增序号避免覆盖。`rendered-prompts/` 与对应的 `agent-outputs/` 共享同一个日期时间 ID 和语义名，Agent 输出文件只额外包含 Agent 名称，方便把同一次调用中的 prompt 和输出一一对应。0.10.3 起，合法 JSON 输出会在 `.md` 归档中格式化为可读的 `json` 代码块。
 
-0.9.0 起，模式库入库前会执行候选规范化。当前 `learn current` 的候选模式来自证据包分析结果；AI 合并优化只负责候选来源归属和规范化建议，本地规范化服务负责字段补齐、来源归属校验、召回保护、降级恢复和一次性写入。`generate skills` 只读取已保存数据，不执行模式合并或 Agent 调用。
+模式库入库前会执行候选规范化。当前 `learn current` 的候选模式来自证据包分析结果，并先经过独立知识审查；本地服务再按配置的证据与置信度门槛准入，AI 只对新旧模式提出语义合并建议。本地服务负责校验来源 ID、从来源传播受控知识标志、确定性处理重复归属、补回遗漏的合格候选并一次性写入。`generate skills` 只读取已保存数据，不执行模式合并或 Agent 调用。
 
 当前版本不再维护 skills dirty state。`sync` 完成学习后仅在本轮有学习变化时生成 skills。显式执行 `skills-seed generate skills` 会删除旧的 skills-seed 生成目录并完整重建；手动添加用户模式后应显式运行该命令刷新产物。
 
@@ -278,13 +274,13 @@ skills-seed init --workspace --agent codex
 
 ### 工作流资源
 
-用户工作流不写入 `config.yaml`，也不属于 `profile.mode`。使用命令把用户显式传入的目标、约束、背景或路径交给当前 Agent 推导为适合该任务的 Markdown 工作流，推导后的正文保存到 `.skills-seed/workflows/<id>/WORKFLOW.md`，原始输入记录和元数据保存到同目录 `metadata.yaml`：
+用户工作流不写入 `config.yaml`，也不属于 `profile.mode`。用户直接提供完整 Markdown 内容，正文保存到 `.skills-seed/workflows/<id>/WORKFLOW.md`，其中 `<id>` 由 `--name` 生成：
 
 ```bash
-skills-seed workflow --context "发布前检查环境变量和构建产物，发布后执行 smoke test"
+skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检查环境变量和构建产物"
 ```
 
-未提供 `--name` 时，Agent 会根据 `--context` 生成英文工作流标题，并用标题 slug 作为 `<id>`；标题重复时自动追加序号。`--context` 可以是目标、约束、背景、路径或零散说明，Agent 会从这些显式输入推导工作流正文；正文不强制固定章节，校验、回滚等部分只在任务需要时保留。同名工作流默认会与已有内容合并去重；需要完全替换时使用 `--overwrite`。
+`--name` 与 `--content` 均为必填。工作流正文不强制固定章节，用户可按任务需要维护步骤、检查项和执行约束。同名工作流不会自动合并；需要更新时使用 `--overwrite` 完全替换。
 
 生成 skills 时，工作流会写入输出目录的 `workflows/`，对应脚本目录会复制到 `scripts/workflows/<id>/`。
 
@@ -304,20 +300,19 @@ skills-seed workflow --context "发布前检查环境变量和构建产物，发
 
 ### `.skills-seed/context/`
 
-`.skills-seed/context/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑上下文目录。它用于长期生效的项目背景、团队约束、术语和 workspace 约束。
+`.skills-seed/context/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑上下文目录。它用于项目背景、术语和 workspace 背景；必须遵守的长期规则由 `.skills-seed/rules/` 独立维护。
 
 常见路径：
 
 | 路径 | 作用 |
 |---|---|
 | `.skills-seed/context/background.md` | 代码看不到的业务背景、外部系统和线上事实 |
-| `.skills-seed/context/constraints.md` | 长期团队规则、兼容性、安全边界和禁止事项 |
 | `.skills-seed/context/terminology.md` | 术语、别名、状态名和业务词到代码词的对应关系 |
 | `.skills-seed/context/workspace.md` | workspace 级上下文，仅 workspace 模式生成 |
 
 这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户上下文破坏解析。
 
-`--context` 和 `--context-path` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/context/`，也不会传给 `generate skills`。长期规则写入 `context/constraints.md`；临时说明使用 `learn current --context` 或 `learn current --context-path`。
+`--context` 和 `--context-path` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/context/`，也不会传给 `generate skills`。长期规则使用 `skills-seed rule` 维护；临时说明使用 `learn current --context` 或 `learn current --context-path`。
 
 ### `skills`
 

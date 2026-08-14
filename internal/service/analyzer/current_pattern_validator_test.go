@@ -31,7 +31,7 @@ func TestCurrentPatternValidatorUsesVerifiedSourceEvidence(t *testing.T) {
 
 	require.Len(t, patterns, 1)
 	require.Equal(t, domain.SourceLearnedCurrent, patterns[0].Source)
-	require.Equal(t, "service.go", patterns[0].ScopePath)
+	require.Empty(t, patterns[0].ScopePath)
 	require.Equal(t, 3, patterns[0].EvidenceLocations[0].Line)
 	require.Equal(t, "function", patterns[0].EvidenceLocations[0].Kind)
 	require.Equal(t, 1, patterns[0].Frequency)
@@ -104,7 +104,23 @@ func TestCurrentPatternValidatorCleansEvidencePathWithLineSuffix(t *testing.T) {
 
 	require.Len(t, patterns, 1)
 	require.Equal(t, "service.go", patterns[0].EvidenceLocations[0].Path)
-	require.Equal(t, "service.go", patterns[0].ScopePath)
+	require.Empty(t, patterns[0].ScopePath)
+}
+
+func TestCurrentPatternValidatorPreservesExplicitScopePath(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "components", "identity"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "components", "identity", "service.go"), []byte("package identity\nfunc LoadUser() {}\n"), 0o644))
+
+	pattern := domain.NewPattern("load-user", "Load User", domain.CategoryBusiness)
+	pattern.Rule = "When loading a user, use LoadUser."
+	pattern.ScopePath = "components/identity"
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "components/identity/service.go", Symbol: "LoadUser", Kind: "function"}}
+
+	patterns := validateCurrentPatternsForTest(t, root, []domain.Pattern{*pattern})
+
+	require.Len(t, patterns, 1)
+	require.Equal(t, "components/identity", patterns[0].ScopePath)
 }
 
 func TestCurrentPatternValidatorHasNoQuantityLimit(t *testing.T) {

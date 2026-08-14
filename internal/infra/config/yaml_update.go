@@ -29,11 +29,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
 
 	setYAMLString(doc, []string{"learning", "current", "mode"}, string(cfg.Learning.Current.Mode))
-	setYAMLString(doc, []string{"learning", "current", "scope"}, string(cfg.Learning.Current.Scope))
-	setYAMLInt(doc, []string{"learning", "current", "max_focuses_per_call"}, cfg.Learning.Current.MaxFocusesPerCall)
-	setYAMLBool(doc, []string{"learning", "current", "select_relevant_files"}, cfg.Learning.Current.SelectRelevantFiles)
-	setYAMLInt(doc, []string{"learning", "current", "select_relevant_files_min_candidates"}, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
-	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "budget")
+	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "scope", "budget", "max_focuses_per_call", "select_relevant_files", "select_relevant_files_min_candidates")
 	setYAMLBool(doc, []string{"learning", "current", "structural", "enabled"}, cfg.Learning.Current.Structural.Enabled)
 	setYAMLString(doc, []string{"learning", "current", "structural", "provider"}, string(cfg.Learning.Current.Structural.Provider))
 	setYAMLInt(doc, []string{"learning", "current", "structural", "max_symbols"}, cfg.Learning.Current.Structural.MaxSymbols)

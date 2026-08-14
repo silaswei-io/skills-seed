@@ -100,19 +100,28 @@ func (c *ClaudeAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefi
 	return result, nil
 }
 
-// OptimizeWorkflow 将用户工作流说明整理为标准工作流。
-func (c *ClaudeAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
-	prompt, err := c.promptLoader.Render("core-workflow-optimize", req)
+// OptimizeWorkflow 整理用户提供的工作流内容。
+func (c *ClaudeAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeContentResult, error) {
+	return c.optimizeContent(ctx, "OptimizeWorkflow", "core-workflow-optimize", req, aicontract.ContractOptimizeWorkflow,
+		"AgentRenderOptimizeWorkflowPromptFailed", "AgentOptimizeWorkflowFailed")
+}
+
+// OptimizeRule 在当前项目边界内润色用户权威规则。
+func (c *ClaudeAgent) OptimizeRule(ctx context.Context, req *agent.OptimizeRuleRequest) (*agent.OptimizeContentResult, error) {
+	return c.optimizeContent(ctx, "OptimizeRule", "core-rule-optimize", req, aicontract.ContractOptimizeRule,
+		"AgentRenderOptimizeRulePromptFailed", "AgentOptimizeRuleFailed")
+}
+
+func (c *ClaudeAgent) optimizeContent(ctx context.Context, operation, promptName string, data interface{}, contract, renderError, callError string) (*agent.OptimizeContentResult, error) {
+	prompt, err := c.promptLoader.Render(promptName, data)
 	if err != nil || prompt == "" {
-		return nil, errors.New(i18n.Get("AgentRenderOptimizeWorkflowPromptFailed"))
+		return nil, errors.New(i18n.Get(renderError))
 	}
-
-	output, err := c.callClaude(ctx, "OptimizeWorkflow", prompt, aicontract.ContractOptimizeWorkflow)
+	output, err := c.callClaude(ctx, operation, prompt, contract)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentOptimizeWorkflowFailed"), err)
+		return nil, fmt.Errorf("%s: %w", i18n.Get(callError), err)
 	}
-
-	result, err := parser.ParseOptimizeWorkflowResult(output)
+	result, err := parser.ParseOptimizeContentResult(output)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
 	}

@@ -64,8 +64,8 @@ func CleanProjectProfile(profile *ProjectProfile) *ProjectProfile {
 		}
 	}
 
-	cleaned.ValidationCommands = CleanValidationCommands(profile.ValidationCommands)
 	cleaned.EngineeringRules = cleanEngineeringRules(profile.EngineeringRules)
+	cleaned.AuthorityCoverage = cleanAuthorityCoverage(profile.AuthorityCoverage)
 
 	return &cleaned
 }
@@ -77,6 +77,9 @@ func cleanEngineeringRules(rules []EngineeringRule) []EngineeringRule {
 		rule.Title = strings.TrimSpace(rule.Title)
 		rule.Rule = strings.TrimSpace(rule.Rule)
 		rule.Source = normalizeProfileEvidencePath(rule.Source)
+		rule.Section = strings.TrimSpace(rule.Section)
+		rule.AppliesTo = cleanProfilePatternList(rule.AppliesTo, 0)
+		rule.CommandPolicy = normalizeCommandPolicy(rule.CommandPolicy)
 		rule.Evidence = cleanProfileEvidenceLocations(rule.Evidence)
 		key := rule.Source + "\x00" + strings.ToLower(rule.Title) + "\x00" + rule.Rule
 		if rule.Title == "" || rule.Rule == "" || rule.Source == "" || seen[key] {
@@ -88,48 +91,29 @@ func cleanEngineeringRules(rules []EngineeringRule) []EngineeringRule {
 	return cleaned
 }
 
-// CleanValidationCommands 清洗从项目证据中学习到的验证命令。
-func CleanValidationCommands(commands []ValidationCommand) []ValidationCommand {
-	cleaned := make([]ValidationCommand, 0, len(commands))
-	seen := make(map[string]bool, len(commands))
-	for _, command := range commands {
-		command.Command = strings.TrimSpace(command.Command)
-		command.When = strings.TrimSpace(command.When)
-		command.Source = strings.TrimSpace(command.Source)
-		command.Workdir = normalizeProfileEvidencePath(command.Workdir)
-		command.ScopePaths = cleanProfilePaths(command.ScopePaths)
-		command.Evidence = cleanProfileEvidenceLocations(command.Evidence)
-		command.Type = strings.TrimSpace(command.Type)
-		if isInvalidValidationCommand(command.Command) {
+func cleanAuthorityCoverage(coverage []AuthorityCoverage) []AuthorityCoverage {
+	cleaned := make([]AuthorityCoverage, 0, len(coverage))
+	seen := make(map[string]bool, len(coverage))
+	for _, item := range coverage {
+		item.Source = normalizeProfileEvidencePath(item.Source)
+		item.Sections = cleanProfilePatternList(item.Sections, 0)
+		if item.Source == "" || seen[item.Source] {
 			continue
 		}
-		kind := ClassifyValidationCommand(command)
-		if kind == ValidationCommandOther {
-			continue
-		}
-		command.Type = CanonicalValidationCommandType(kind, command.Type)
-		key := strings.ToLower(command.Command + "\x00" + command.Workdir + "\x00" + strings.Join(command.ScopePaths, "\x00") + "\x00" + command.When)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		cleaned = append(cleaned, command)
+		seen[item.Source] = true
+		cleaned = append(cleaned, item)
 	}
 	return cleaned
 }
 
-func cleanProfilePaths(paths []string) []string {
-	cleaned := make([]string, 0, len(paths))
-	seen := make(map[string]bool, len(paths))
-	for _, path := range paths {
-		path = normalizeProfileEvidencePath(path)
-		if path == "" || seen[path] {
-			continue
-		}
-		seen[path] = true
-		cleaned = append(cleaned, path)
+func normalizeCommandPolicy(policy string) string {
+	policy = strings.ToLower(strings.TrimSpace(policy))
+	switch policy {
+	case CommandPolicyForbidden, CommandPolicyDescribeOnly, CommandPolicyRequiresAuthorization, CommandPolicyAllowed:
+		return policy
+	default:
+		return ""
 	}
-	return cleaned
 }
 
 func cleanProfileEvidenceLocations(paths []string) []string {
@@ -164,14 +148,6 @@ func normalizeProfileEvidenceLocation(path string) string {
 		return ""
 	}
 	return path
-}
-
-func isInvalidValidationCommand(command string) bool {
-	if command == "" {
-		return true
-	}
-	upper := strings.ToUpper(command)
-	return strings.Contains(upper, "TODO") || strings.Contains(command, "待确认")
 }
 
 func cleanProfilePatternList(values []string, limit int) []string {

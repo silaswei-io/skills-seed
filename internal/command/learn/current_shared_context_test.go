@@ -19,7 +19,6 @@ func TestEnsureSharedLearningContextWritesRuntimeFile(t *testing.T) {
 		projectRoot:     "/repo",
 		currentLanguage: "go",
 		learningMode:    "normal",
-		learningScope:   "flow",
 		analysisState: &commandstate.State{
 			Agenda: domain.LearningAgenda{Focuses: []domain.EvidenceFocus{{
 				ID:         "auth",

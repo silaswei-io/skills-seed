@@ -16,6 +16,7 @@ type LearnCurrentSummary struct {
 	SkippedFiles     int
 	PatternsFound    int
 	PatternsSaved    int
+	PatternsRetired  int
 	Projects         int
 	ChangedProjects  int
 	WorkspaceChanged bool

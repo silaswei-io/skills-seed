@@ -54,57 +54,6 @@ func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) 
 	require.FileExists(t, missingPath)
 }
 
-func TestGenerateSkillsWithHooksSkipsReferencesAndReferenceLinks(t *testing.T) {
-	pattern := domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)
-	pattern.Confidence = 0.9
-	pattern.SetDescription("Use existing business rule")
-	pattern.SetRule("Reuse the documented flow")
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*pattern}, nil
-		},
-	}
-	mockProfile := &mocks.MockProjectProfileRepository{
-		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
-			return &domain.ProjectProfile{
-				ProjectName: "test",
-				Language:    "go",
-				Summary:     "Profile-backed project overview",
-				GeneratedAt: "2026-05-19 12:00:00",
-				KeyModules: []domain.ModuleInfo{{
-					Name:        "vocab",
-					Path:        "internal/application/vocab",
-					Description: "vocabulary business service",
-				}},
-				BusinessMethods: []domain.BusinessMethod{{
-					Name:         "ActivatePlan",
-					CodeLocation: domain.CodeLocation{CurrentLocation: "internal/application/vocab/service.go:1"},
-					Description:  "activates a plan",
-					Function:     "func ActivatePlan()",
-					Usage:        "plan activation",
-					Type:         "domain",
-				}},
-			}, nil
-		},
-	}
-	loader := skills.NewLoader("zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
-	}
-	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
-	tmpDir := t.TempDir()
-
-	err := svc.GenerateSkillsWithHooks(context.Background(), tmpDir, GenerateProgressHooks{}, GenerateOptions{SkipReferences: true})
-	require.NoError(t, err)
-
-	require.FileExists(t, filepath.Join(tmpDir, "SKILL.md"))
-	require.NoDirExists(t, filepath.Join(tmpDir, "references"))
-	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
-	assert.Contains(t, skill, "本次生成未写入 references")
-	assert.NotContains(t, skill, "./references/")
-	assertNoBrokenMarkdownLinks(t, tmpDir)
-}
-
 func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
@@ -197,7 +146,7 @@ func TestGenerateSkills_MainSkillReferencesOnlyGeneratedCategories(t *testing.T)
 	assert.Contains(t, skill, "./references/patterns/database.md")
 	assert.NotContains(t, skill, "./references/examples/")
 
-	for _, missingCategory := range []string{"naming", "error", "utils", "testing", "api", "middleware", "config", "structure", "concurrency"} {
+	for _, missingCategory := range []string{"naming", "error", "utils", "api", "middleware", "config", "structure", "concurrency"} {
 		assert.NotContains(t, skill, "./references/patterns/"+missingCategory+".md")
 	}
 }
@@ -358,7 +307,7 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	overviewText := string(overview)
 	assert.Contains(t, overviewText, "./business-methods.md")
 	assert.Contains(t, overviewText, "./modules.md")
-	assert.Contains(t, overviewText, "./common-utils.md")
+	assert.NotContains(t, overviewText, "./common-utils.md")
 	assert.NotContains(t, overviewText, "func (s *Service) IssueCertificate(ctx context.Context, req *IssueRequest) error")
 
 	businessMethods, err := os.ReadFile(filepath.Join(tmpDir, "references", "business-methods.md"))
@@ -373,17 +322,13 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	assert.Contains(t, string(modules), "certificate-service")
 	assert.Contains(t, string(modules), "internal/service/certificate")
 
-	commonUtils, err := os.ReadFile(filepath.Join(tmpDir, "references", "common-utils.md"))
-	require.NoError(t, err)
-	assert.Contains(t, string(commonUtils), "NormalizeSerial")
-	assert.Contains(t, string(commonUtils), "func NormalizeSerial(serial string) string")
-	assert.NotContains(t, string(commonUtils), "./patterns/utils.md")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "common-utils.md"))
 
 	skill, err := os.ReadFile(filepath.Join(tmpDir, "SKILL.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(skill), "./references/business-methods.md")
 	assert.Contains(t, string(skill), "./references/modules.md")
-	assert.Contains(t, string(skill), "./references/common-utils.md")
+	assert.NotContains(t, string(skill), "./references/common-utils.md")
 
 	_, err = os.Stat(filepath.Join(tmpDir, "references", "examples"))
 	assert.ErrorIs(t, err, os.ErrNotExist)
@@ -417,12 +362,14 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 				},
 				BusinessMethods: []domain.BusinessMethod{
 					{
-						Name:         "DuplicatedMethod",
-						CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/demo.go:10"},
-						Description:  "method documented once in the split reference",
-						Usage:        "business flow reuse",
-						Type:         "domain",
-						Function:     "func DuplicatedMethod() error",
+						Name:          "DuplicatedMethod",
+						CodeLocation:  domain.CodeLocation{CurrentLocation: "internal/service/demo.go:10"},
+						Description:   "method documented once in the split reference",
+						Usage:         "business flow reuse",
+						Type:          "domain",
+						Function:      "func DuplicatedMethod() error",
+						Prerequisites: "initialized demo service",
+						Returns:       "an error when the operation fails",
 					},
 				},
 			}, nil
@@ -550,9 +497,6 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 					Usage:        "plan activation",
 					Type:         "domain",
 				}},
-				ValidationCommands: []domain.ValidationCommand{
-					{Command: "task verify", When: "业务逻辑变更后运行", Source: "Taskfile.yml"},
-				},
 			}, nil
 		},
 	}
@@ -570,29 +514,20 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 	assert.NotContains(t, skill, "新增或调整 API")
 	assert.NotContains(t, skill, "修改业务流程")
 	assert.NotContains(t, skill, "接入或调整外部依赖")
-	assert.Contains(t, skill, "[验证策略](./references/validation.md)")
-	assert.NotContains(t, skill, "## 验证命令")
+	assert.NotContains(t, skill, "验证策略")
 	assert.NotContains(t, skill, "`jzero gen`")
 	assert.NotContains(t, skill, "`go test ./...`")
 	assert.NotContains(t, skill, "`go test ./internal/application/vocab`")
 	assert.Contains(t, skill, "约束来源由 [项目规范](./references/project-spec.md) 区分")
 	assert.Contains(t, skill, "## 参考入口")
-	validation := readGeneratedFile(t, tmpDir, "references", "validation.md")
-	assert.NotContains(t, validation, "## 范围矩阵")
-	assert.Contains(t, validation, "`task verify` - 业务逻辑变更后运行（来源：`Taskfile.yml`）")
-
 	spec := readGeneratedFile(t, tmpDir, "references", "project-spec.md")
 	assert.NotContains(t, spec, "## 修改来源")
 	assert.NotContains(t, spec, "## 参考观察")
-	assert.Contains(t, spec, "[验证策略](./validation.md)")
-	assert.NotContains(t, spec, "## 验证命令")
-	assert.Contains(t, spec, "jzero gen generates handlers, types, routes, and swagger from desc/api .api files")
+	assert.NotContains(t, spec, "验证策略")
+	assert.NotContains(t, spec, "jzero gen generates handlers, types, routes, and swagger from desc/api .api files")
 	assert.NotContains(t, spec, "Only one plan can be active")
 	assert.NotContains(t, spec, "Do not hand-edit generated handlers or types")
 	assert.NotContains(t, spec, "Deactivate existing active plans before creating or activating a plan")
-
-	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
-	assert.NotContains(t, overview, "## 验证命令")
 
 	api := readGeneratedFile(t, tmpDir, "references", "patterns", "api.md")
 	assert.Contains(t, api, "## 用户规则与可复用解决方案")
@@ -710,121 +645,4 @@ func TestGenerateSkills_FiltersMissingEvidencePaths(t *testing.T) {
 
 	spec := readGeneratedFile(t, tmpDir, "references", "project-spec.md")
 	require.NotContains(t, spec, missingPath)
-}
-
-func TestGenerateSkills_OmitsValidationCommandsWhenNotLearned(t *testing.T) {
-	mockPattern := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return []domain.Pattern{*domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)}, nil
-		},
-	}
-	mockProfile := &mocks.MockProjectProfileRepository{
-		GetFn: func(ctx context.Context) (*domain.ProjectProfile, error) {
-			return &domain.ProjectProfile{
-				ProjectName: "backend",
-				Language:    "unknown",
-				Summary:     "Profile-backed project overview",
-			}, nil
-		},
-	}
-	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "backend"},
-	})
-	tmpDir := t.TempDir()
-
-	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
-
-	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
-	assert.NotContains(t, skill, "## 验证命令")
-	assert.Contains(t, skill, "[验证策略](./references/validation.md)")
-	validation := readGeneratedFile(t, tmpDir, "references", "validation.md")
-	assert.Contains(t, validation, "未学习到有仓库证据的验证命令")
-	overview := readGeneratedFile(t, tmpDir, "references", "project-overview.md")
-	assert.NotContains(t, overview, "## 验证命令")
-	assert.NotContains(t, overview, "## 通用工具")
-	assert.NotContains(t, overview, "通用工具信息尚未提取")
-}
-
-func TestGenerateSkillsUsesRepositoryValidationEvidence(t *testing.T) {
-	projectRoot := t.TempDir()
-	for path, content := range map[string]string{
-		"go.mod":          "module example/backend\n",
-		"service_test.go": "package backend\n",
-		".jzero.yaml":     "gen:\n  hooks:\n    after:\n      - jzero format\n",
-		"Dockerfile":      "RUN --mount=type=cache,target=/go/pkg CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -ldflags=\"$LDFLAGS\" -o /dist/app main.go \\\n    && jzero gen swagger\n",
-	} {
-		fullPath := filepath.Join(projectRoot, filepath.FromSlash(path))
-		require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0755))
-		require.NoError(t, os.WriteFile(fullPath, []byte(content), 0644))
-	}
-	mockPattern := &mocks.MockPatternRepository{GetAllFn: func(context.Context) ([]domain.Pattern, error) {
-		return []domain.Pattern{*domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)}, nil
-	}}
-	mockProfile := &mocks.MockProjectProfileRepository{GetFn: func(context.Context) (*domain.ProjectProfile, error) {
-		return &domain.ProjectProfile{
-			ProjectName: "backend",
-			Language:    "go",
-			ValidationCommands: []domain.ValidationCommand{{
-				Command: "go test -race ./...",
-				Source:  "用户上下文(golang测试规则)",
-				Type:    "test",
-			}},
-		}, nil
-	}}
-	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go", RootPath: projectRoot},
-	})
-	outputPath := filepath.Join(projectRoot, ".agents", "skills", "backend-dev")
-
-	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
-
-	validation := readGeneratedFile(t, outputPath, "references", "validation.md")
-	require.Contains(t, validation, "`go test ./...`")
-	require.Contains(t, validation, "来源：`go.mod`")
-	require.Contains(t, validation, "`jzero format`")
-	require.Contains(t, validation, "来源：`.jzero.yaml`")
-	require.Contains(t, validation, "`CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -ldflags=\"$LDFLAGS\" -o /dist/app main.go`")
-	require.Contains(t, validation, "来源：`Dockerfile`")
-	require.NotContains(t, validation, "go test -race")
-	require.NotContains(t, validation, "用户上下文")
-}
-
-func TestGenerateSkills_RendersLocalMultiModuleTestMatrix(t *testing.T) {
-	projectRoot := t.TempDir()
-	for path, content := range map[string]string{
-		"go.mod":                    "module example/root\n",
-		"root_test.go":              "package root\n",
-		"plugins/a/go.mod":          "module example/a\n",
-		"plugins/a/a_test.go":       "package a\n",
-		"plugins/without/go.mod":    "module example/without\n",
-		"plugins/a/child/b_test.go": "package child\n",
-	} {
-		fullPath := filepath.Join(projectRoot, filepath.FromSlash(path))
-		require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0755))
-		require.NoError(t, os.WriteFile(fullPath, []byte(content), 0644))
-	}
-	mockPattern := &mocks.MockPatternRepository{GetAllFn: func(context.Context) ([]domain.Pattern, error) {
-		return []domain.Pattern{*domain.NewPattern("p1", "Business Rule", domain.CategoryBusiness)}, nil
-	}}
-	mockProfile := &mocks.MockProjectProfileRepository{GetFn: func(context.Context) (*domain.ProjectProfile, error) {
-		return &domain.ProjectProfile{ProjectName: "backend", Language: "go"}, nil
-	}}
-	svc := newGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "backend", Language: "go", RootPath: projectRoot},
-	})
-	outputPath := filepath.Join(projectRoot, ".agents", "skills", "backend-dev")
-
-	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
-
-	skill := readGeneratedFile(t, outputPath, "SKILL.md")
-	require.Contains(t, skill, "[测试矩阵](./references/testing.md)")
-	require.NotContains(t, skill, "plugins/a/a_test.go")
-	testingReference := readGeneratedFile(t, outputPath, "references", "testing.md")
-	require.Contains(t, testingReference, "| `.` | `go test ./...` | 1 | `go.mod` |")
-	require.Contains(t, testingReference, "| `plugins/a` | `go test ./...` | 2 | `plugins/a/go.mod` |")
-	require.Contains(t, testingReference, "`plugins/a/child/b_test.go`")
-	require.Contains(t, testingReference, "模块 `plugins/without`")
-	require.Contains(t, testingReference, "| `plugins/without` | `go test ./...` | 0 | `plugins/without/go.mod` |")
-	require.NotContains(t, testingReference, "未发现可由当前源码确定的覆盖缺口")
-	assertNoBrokenMarkdownLinks(t, outputPath)
 }

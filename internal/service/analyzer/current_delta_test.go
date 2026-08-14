@@ -2,6 +2,8 @@ package analyzer
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -48,7 +50,7 @@ func TestValidateDeltaChangesKeepsScopedNoChangeDecisionWithoutAnchor(t *testing
 		Reason:        "changed files do not reveal reusable knowledge",
 	}}
 
-	validated, err := svc.validateDeltaChanges(context.Background(), "/repo", changes, focusByID)
+	validated, err := svc.validateDeltaChanges(context.Background(), "/repo", changes, focusByID, nil)
 
 	require.NoError(t, err)
 	require.Len(t, validated, 1)
@@ -66,7 +68,77 @@ func TestValidateDeltaChangesDropsUnscopedNoChangeDecisionWithoutAnchor(t *testi
 		Reason:        "missing focus id",
 	}}
 
-	validated, err := svc.validateDeltaChanges(context.Background(), "/repo", changes, focusByID)
+	validated, err := svc.validateDeltaChanges(context.Background(), "/repo", changes, focusByID, nil)
+
+	require.NoError(t, err)
+	require.Empty(t, validated)
+}
+
+func TestValidateDeltaChangesRetiresOnlyEvidenceThatNoLongerExists(t *testing.T) {
+	root := t.TempDir()
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, nil)
+	focusByID := map[string]map[string]bool{
+		"auth": {"internal/auth/login.go": true},
+	}
+	changes := []domain.KnowledgeChange{
+		{
+			FocusID:       "auth",
+			PatternAction: domain.KnowledgePatternRetire,
+			PatternID:     "legacy-auth-flow",
+			Anchors:       []domain.PatternDiffAnchor{{Path: "internal/auth/login.go"}},
+		},
+		{
+			FocusID:       "auth",
+			PatternAction: domain.KnowledgePatternRetire,
+			PatternID:     "missing-anchor",
+		},
+		{
+			FocusID:       "auth",
+			PatternAction: domain.KnowledgePatternRetire,
+			Anchors:       []domain.PatternDiffAnchor{{Path: "internal/auth/login.go"}},
+		},
+	}
+
+	legacy := domain.NewPattern("legacy-auth-flow", "Legacy Auth Flow", domain.CategoryBusiness)
+	legacy.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path:   "internal/auth/login.go",
+		Symbol: "Login",
+		Kind:   "function",
+	}}
+	validated, err := svc.validateDeltaChanges(context.Background(), root, changes, focusByID, map[string]map[string]domain.Pattern{
+		"auth": {legacy.ID: *legacy},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, validated, 1)
+	require.Equal(t, "legacy-auth-flow", validated[0].PatternID)
+}
+
+func TestValidateDeltaChangesKeepsPatternWhenItsEvidenceStillExists(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "internal", "auth", "login.go")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte("package auth\n\nfunc Login() error { return nil }\n"), 0o644))
+
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, nil)
+	change := domain.KnowledgeChange{
+		FocusID:       "auth",
+		PatternAction: domain.KnowledgePatternRetire,
+		PatternID:     "legacy-auth-flow",
+		Anchors:       []domain.PatternDiffAnchor{{Path: "internal/auth/login.go"}},
+	}
+	legacy := domain.NewPattern("legacy-auth-flow", "Legacy Auth Flow", domain.CategoryBusiness)
+	legacy.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path:   "internal/auth/login.go",
+		Symbol: "Login",
+		Kind:   "function",
+	}}
+
+	validated, err := svc.validateDeltaChanges(context.Background(), root, []domain.KnowledgeChange{change}, map[string]map[string]bool{
+		"auth": {"internal/auth/login.go": true},
+	}, map[string]map[string]domain.Pattern{
+		"auth": {legacy.ID: *legacy},
+	})
 
 	require.NoError(t, err)
 	require.Empty(t, validated)

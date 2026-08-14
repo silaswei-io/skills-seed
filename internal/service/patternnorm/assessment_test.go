@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAssessNormalizationDoesNotMutateAgentResult(t *testing.T) {
-	result := &Decision{
-		Patterns: []DecisionPattern{{
-			ID:        "normalized",
-			SourceIDs: []string{"candidate", "invented-source"},
+func TestAssessNormalizationDoesNotMutateProposal(t *testing.T) {
+	result := &proposal{
+		Patterns: []domain.Pattern{{
+			ID:         "normalized",
+			MergedFrom: []string{"candidate", "invented-source"},
 		}},
 		Dropped: []Drop{
 			{ID: "candidate", ReasonCode: DropExactDuplicate, Reason: "duplicate"},
@@ -20,9 +20,9 @@ func TestAssessNormalizationDoesNotMutateAgentResult(t *testing.T) {
 	}
 	candidates := []domain.Pattern{{ID: "candidate"}}
 
-	assessment := assessNormalization(proposalFromDecision(result), candidates, nil)
+	assessment := assessNormalization(result, candidates, nil)
 
-	require.Equal(t, []string{"candidate", "invented-source"}, result.Patterns[0].SourceIDs)
+	require.Equal(t, []string{"candidate", "invented-source"}, result.Patterns[0].MergedFrom)
 	require.Len(t, result.Dropped, 2)
 	require.Equal(t, []string{"candidate"}, assessment.Result.Patterns[0].MergedFrom)
 	require.Equal(t, []Drop{{ID: "candidate", ReasonCode: DropExactDuplicate, Reason: "duplicate"}}, assessment.Result.Dropped)

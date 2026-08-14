@@ -28,16 +28,13 @@ Thumbs.db
 # Project specific
 *.db
 *.log
-.test/
 AGENTS.md
-.skills-seed/
-.claude/skills/
-.agents/skills/
-
-# Go modules cache
-pkg/mod/
-
-# Ai output
-.cursor
-
-.codegraph
+!/.test/
+.test/*
+!.test/quality/
+!.test/quality/**
+.test/quality/.test/
+.test/quality/bin/
+.test/quality/cache/
+.test/quality/reports/
+.test/quality/runtime/

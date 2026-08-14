@@ -1,92 +1,80 @@
 package domain
 
+import "strings"
+
 // ProjectProfile 是学习阶段沉淀的持久化项目级知识。
 // 生成的参考文档会基于该画像渲染。
 type ProjectProfile struct {
-	ProjectName        string              `json:"project_name"`
-	Language           string              `json:"language"`
-	Frameworks         []string            `json:"frameworks"`
-	Architecture       string              `json:"architecture"`
-	Structure          string              `json:"structure"`
-	CommonUtils        []UtilityFunction   `json:"common_utils"`
-	KeyModules         []ModuleInfo        `json:"key_modules"`
-	ConfigPatterns     []string            `json:"config_patterns"`
-	Dependencies       []string            `json:"dependencies"`
-	Layers             []ArchitectureLayer `json:"layers"`
-	DependencyGraph    string              `json:"dependency_graph"`
-	DataFlow           string              `json:"data_flow"`
-	FrameworkPatterns  []string            `json:"framework_patterns"`
-	BusinessMethods    []BusinessMethod    `json:"business_methods"`
-	EngineeringRules   []EngineeringRule   `json:"engineering_rules,omitempty"`
-	ValidationCommands []ValidationCommand `json:"validation_commands,omitempty"`
-	Summary            string              `json:"summary"`
-	GeneratedAt        string              `json:"generated_at"`
+	ProjectName       string              `json:"project_name"`
+	Language          string              `json:"language"`
+	Frameworks        []string            `json:"frameworks"`
+	Architecture      string              `json:"architecture"`
+	Structure         string              `json:"structure"`
+	CommonUtils       []UtilityFunction   `json:"common_utils"`
+	KeyModules        []ModuleInfo        `json:"key_modules"`
+	ConfigPatterns    []string            `json:"config_patterns"`
+	Dependencies      []string            `json:"dependencies"`
+	Layers            []ArchitectureLayer `json:"layers"`
+	DependencyGraph   string              `json:"dependency_graph"`
+	DataFlow          string              `json:"data_flow"`
+	FrameworkPatterns []string            `json:"framework_patterns"`
+	BusinessMethods   []BusinessMethod    `json:"business_methods"`
+	EngineeringRules  []EngineeringRule   `json:"engineering_rules,omitempty"`
+	AuthorityCoverage []AuthorityCoverage `json:"authority_coverage,omitempty"`
+	AuthorityRevision string              `json:"authority_revision,omitempty"`
+	Summary           string              `json:"summary"`
+	GeneratedAt       string              `json:"generated_at"`
 }
 
 // EngineeringRule 描述来自权威工程知识文件或用户上下文的显式约束。
 type EngineeringRule struct {
-	Title    string   `json:"title"`
-	Rule     string   `json:"rule"`
-	Source   string   `json:"source"`
-	Evidence []string `json:"evidence,omitempty"`
+	Title         string   `json:"title"`
+	Rule          string   `json:"rule"`
+	Source        string   `json:"source"`
+	Section       string   `json:"section,omitempty"`
+	AppliesTo     []string `json:"applies_to,omitempty"`
+	CommandPolicy string   `json:"command_policy,omitempty"`
+	Evidence      []string `json:"evidence,omitempty"`
 }
 
-// ValidationCommand 描述从项目证据中学习到的验证命令。
-type ValidationCommand struct {
-	Command    string   `json:"command"`
-	When       string   `json:"when,omitempty"`
-	Source     string   `json:"source,omitempty"`
-	Workdir    string   `json:"workdir,omitempty"`
-	ScopePaths []string `json:"scope_paths,omitempty"`
-	Evidence   []string `json:"evidence,omitempty"`
-	Type       string   `json:"type,omitempty"`
+const (
+	// CommandPolicyForbidden 表示权威规则禁止执行匹配命令。
+	CommandPolicyForbidden = "forbidden"
+	// CommandPolicyDescribeOnly 表示只能说明命令，不得执行。
+	CommandPolicyDescribeOnly = "describe_only"
+	// CommandPolicyRequiresAuthorization 表示必须取得用户当轮明确授权后才能执行。
+	CommandPolicyRequiresAuthorization = "requires_authorization"
+	// CommandPolicyAllowed 表示权威规则明确允许执行；仍受当前用户指令和运行环境约束。
+	CommandPolicyAllowed = "allowed"
+)
+
+// AuthorityCoverage 记录一次画像同步纳入的权威输入文件及 Markdown 章节。
+type AuthorityCoverage struct {
+	Source   string   `json:"source"`
+	Sections []string `json:"sections,omitempty"`
+}
+
+// IsRouteableBusinessMethod 判断能力入口是否具备未来 Agent 自主复用所需的完整契约。
+func IsRouteableBusinessMethod(method BusinessMethod) bool {
+	return strings.TrimSpace(method.Name) != "" &&
+		strings.TrimSpace(method.DisplayLocation()) != "" &&
+		strings.TrimSpace(method.Function) != "" &&
+		strings.TrimSpace(method.Description) != "" &&
+		strings.TrimSpace(method.Usage) != "" &&
+		strings.TrimSpace(method.Prerequisites) != "" &&
+		strings.TrimSpace(method.Returns) != ""
 }
 
 // ProjectSpec 是由项目画像和已学习模式生成的项目级开发规范
 type ProjectSpec struct {
-	ProjectID          string                   `json:"project_id,omitempty"`
-	ProjectName        string                   `json:"project_name"`
-	ScopePath          string                   `json:"scope_path,omitempty"`
-	WorkspaceRole      string                   `json:"workspace_role,omitempty"`
-	Language           string                   `json:"language"`
-	Summary            string                   `json:"summary,omitempty"`
-	Boundaries         []ProjectSpecBoundary    `json:"boundaries,omitempty"`
-	PatternRules       []ProjectSpecPatternRule `json:"pattern_rules,omitempty"`
-	PatternGuidance    []ProjectSpecPatternRule `json:"pattern_guidance,omitempty"`
-	EngineeringRules   []EngineeringRule        `json:"engineering_rules,omitempty"`
-	ConfigPatterns     []string                 `json:"config_patterns,omitempty"`
-	FrameworkPatterns  []string                 `json:"framework_patterns,omitempty"`
-	ValidationCommands []ValidationCommand      `json:"validation_commands,omitempty"`
-	Touchpoints        []ProjectSpecTouchpoint  `json:"touchpoints,omitempty"`
-	GeneratedAt        string                   `json:"generated_at"`
-}
-
-// ProjectSpecBoundary 描述项目内需要保护的层次、模块或职责边界
-type ProjectSpecBoundary struct {
-	Type             string   `json:"type"`
-	Name             string   `json:"name"`
-	Description      string   `json:"description,omitempty"`
-	Responsibilities []string `json:"responsibilities,omitempty"`
-	Paths            []string `json:"paths,omitempty"`
-}
-
-// ProjectSpecPatternRule 描述从 patterns 中提炼出的可执行规则
-type ProjectSpecPatternRule struct {
-	Name        string   `json:"name"`
-	Category    string   `json:"category"`
-	Description string   `json:"description,omitempty"`
-	Rule        string   `json:"rule,omitempty"`
-	Confidence  float64  `json:"confidence"`
-	Frequency   int      `json:"frequency"`
-	Evidence    []string `json:"evidence,omitempty"`
-}
-
-// ProjectSpecTouchpoint 描述改动时应优先检查的能力入口、工具或模块入口。
-type ProjectSpecTouchpoint struct {
-	Kind        string `json:"kind"`
-	Name        string `json:"name"`
-	Path        string `json:"path,omitempty"`
-	Description string `json:"description,omitempty"`
+	ProjectID         string              `json:"project_id,omitempty"`
+	ProjectName       string              `json:"project_name"`
+	ScopePath         string              `json:"scope_path,omitempty"`
+	WorkspaceRole     string              `json:"workspace_role,omitempty"`
+	Language          string              `json:"language"`
+	EngineeringRules  []EngineeringRule   `json:"engineering_rules,omitempty"`
+	AuthorityCoverage []AuthorityCoverage `json:"authority_coverage,omitempty"`
+	GeneratedAt       string              `json:"generated_at"`
 }
 
 // ArchitectureLayer 描述项目中的一个逻辑分层

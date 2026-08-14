@@ -2,6 +2,29 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.0]
+
+### Changes
+
+- Rebuilt the knowledge-production pipeline around `docs/ULTIMATE_GOAL.md`, separating authority extraction, project-map refresh, source-evidence learning, independent review, global normalization, and final Skill projection. Production logic and prompts contain no project-, language-, framework-, or quality-fixture-specific decisions.
+- Upgraded learning agendas to evidence focuses: every locally eligible candidate reaches planning, the Agent groups evidence by source responsibility and decision boundary, and explicit skip receipts account for omitted inputs. Current analysis and diff learning now share structured context, evidence ownership, and strict output contracts.
+- Reworked independent knowledge review into a serial focus-level pipeline. Candidates from one focus stay in one Agent call, every completed focus is checkpointed immediately, and one global cross-focus normalization pass runs only after all focuses succeed. Fixed-size candidate batching was removed.
+- Added complete project Rule maintenance and generation. Rules and Workflows now use `.skills-seed` as their single source of truth and consistently accept `--content`; same-name input is incrementally optimized against existing content by a dedicated prompt, while `--overwrite` remains the only full replacement path.
+- Reworked generated Skill knowledge boundaries and progressive loading so authority constraints, source knowledge, capability entries, user Rules, and Workflows are projected separately. Removed source-inferred test/deployment procedures, redundant validation matrices, and repeated aggregate content, and added delivery-readiness checks plus a generation manifest.
+- Expanded `.test/quality` into a stable 100-point quality evaluation with a generic multi-domain fixture and gates for authority coverage, capability entries, architecture relations, evidence links, progressive loading, output stability, and production-prompt independence. All evaluation resources remain under `.test/quality`.
+- Unified Claude/Codex structured-task execution, DTO schemas, prompt input files, and output archives. Authority sections, learning focuses, knowledge review, and normalization now use validated one-to-one receipts while local code retains deterministic ownership and evidence checks.
+- Updated the eight-stage terminal pipeline and bilingual i18n to show candidate preparation, agenda focuses, isolated analysis, focus-level review, knowledge storage, authority extraction, project mapping, and Skill readiness. CLI runtime errors now print one locale-specific prefix.
+
+### Fixes
+
+- Fixed sync failures caused by learning skip receipts referencing unknown paths and authority rules referencing empty or unknown source sections by validating deterministic input collection and structured ownership at their source boundary.
+- Fixed independent review accepting irrelevant revisions, relying on an implicit business-method `keep`, retaining incomplete capability receipts, or preserving unsupported security, atomicity, ordering, and consistency guarantees.
+- Fixed key API and project constraints being buried in profile summaries, mechanically clustered business routing, self-referential or invalid module dependency paths, misleading capability indexes, and repeated reference loading.
+- Fixed workspace-root Rules requiring artificial multi-project impact, same-name Rules/Workflows rejecting incremental updates, and Agent-inferred scope expansion.
+- Fixed command permissions conflicting with Workflow safety boundaries, source behavior being rendered as a user procedure, and generated directories feeding back into authority learning.
+- Fixed incompatible command-state schemas deleting recovery data automatically. The checkpoint is now preserved and reported explicitly so the user can decide whether to run `sync --restart`.
+- Fixed Cobra's hard-coded English `Error:` being printed alongside the application-localized error; Chinese now prints only `错误:` and English only `Error:`.
+
 ## [v0.15.5]
 
 ### Changes

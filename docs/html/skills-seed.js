@@ -77,7 +77,7 @@
       valueTitle: "Turn real project practice into agent context",
       valueLead: "Skills Seed is built for existing repositories. Repository facts, team additions, and learned patterns become refreshable context for AI agents.",
       featureLearnTitle: "Project learning",
-      featureLearnText: "Extract patterns, business methods, utilities, validation strategy, and project profile from current code and diffs.",
+      featureLearnText: "Extract project boundaries, reusable capability entries, contracts, and source-backed patterns from current code and diffs.",
       featureOutputTitle: "Agent-loadable output",
       featureOutputText: "Generate <code>SKILL.md</code> and references so Claude Code or Codex can read only the context needed for the current task.",
       featureWorkspaceTitle: "Workspace routing",

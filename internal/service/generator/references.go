@@ -5,11 +5,9 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/knowledge"
 	"github.com/silaswei-io/skills-seed/internal/knowledge/patternview"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
-	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 func (s *GeneratorService) ensureCategorySummaries(
@@ -59,25 +57,7 @@ func categoryNamesWithPatterns(patterns []domain.Pattern) []string {
 }
 
 func patternsForSkillTemplates(patterns []domain.Pattern) []domain.Pattern {
-	out := make([]domain.Pattern, 0, len(patterns))
-	for _, pattern := range patterns {
-		if !patternShouldRender(pattern) {
-			continue
-		}
-		out = append(out, pattern)
-	}
-	return patternview.Render(out)
-}
-
-func patternShouldRender(pattern domain.Pattern) bool {
-	switch pattern.Category {
-	case domain.CategoryNaming:
-		return domain.IsRenderableNamingPattern(pattern)
-	case domain.CategoryUtils:
-		return domain.IsRenderableUtilityPattern(pattern)
-	default:
-		return true
-	}
+	return patternview.Render(patterns)
 }
 
 func referenceAvailability(profile *domain.ProjectProfile, patterns []domain.Pattern, enabled bool) ReferenceAvailability {
@@ -202,11 +182,6 @@ func categoryReferenceMetadata(category, locale string) categoryReferenceMeta {
 			Title:       generatorText(locale, "GeneratorCategoryConcurrencyTitle"),
 			Description: generatorText(locale, "GeneratorCategoryConcurrencyDescription"),
 		},
-		string(domain.CategoryTesting): {
-			Group:       groupAdvanced,
-			Title:       generatorText(locale, "GeneratorCategoryTestingTitle"),
-			Description: generatorText(locale, "GeneratorCategoryTestingDescription"),
-		},
 	}
 
 	if meta, ok := metadataByCategory[category]; ok {
@@ -277,7 +252,7 @@ func patternsForTemplate(patterns []domain.Pattern) []patternRenderModel {
 		result = append(result, patternRenderModel{
 			Pattern:             pattern,
 			HardConstraint:      hardConstraint,
-			HighRiskOperational: domain.IsHighRiskOperationalPattern(pattern),
+			HighRiskOperational: pattern.HighRiskOperational(),
 		})
 	}
 	return result
@@ -287,76 +262,24 @@ func cleanProjectProfile(profile *domain.ProjectProfile) *domain.ProjectProfile 
 	return domain.CleanProjectProfile(profile)
 }
 
-func profileForSkillTemplates(profile *domain.ProjectProfile, patterns []domain.Pattern) *domain.ProjectProfile {
+func profileForSkillTemplates(profile *domain.ProjectProfile, _ []domain.Pattern) *domain.ProjectProfile {
 	if profile == nil {
 		return nil
 	}
 	filtered := *profile
-	filtered.CommonUtils = filterCommonUtilsForSkillTemplates(profile.CommonUtils, patterns)
+	filtered.BusinessMethods = routeableBusinessMethods(profile.BusinessMethods)
+	filtered.CommonUtils = nil
 	return &filtered
 }
 
-func filterCommonUtilsForSkillTemplates(utils []domain.UtilityFunction, patterns []domain.Pattern) []domain.UtilityFunction {
-	utils = filterRouteableCommonUtils(utils)
-	return filterCommonUtilsCoveredByBusinessPatterns(utils, patterns)
-}
-
-func filterRouteableCommonUtils(utils []domain.UtilityFunction) []domain.UtilityFunction {
-	out := make([]domain.UtilityFunction, 0, len(utils))
-	for _, utility := range utils {
-		if domain.IsRouteableUtilityFunction(utility) {
-			out = append(out, utility)
+func routeableBusinessMethods(methods []domain.BusinessMethod) []domain.BusinessMethod {
+	out := make([]domain.BusinessMethod, 0, len(methods))
+	for _, method := range methods {
+		if domain.IsRouteableBusinessMethod(method) {
+			out = append(out, method)
 		}
 	}
 	return out
-}
-
-func filterCommonUtilsCoveredByBusinessPatterns(utils []domain.UtilityFunction, patterns []domain.Pattern) []domain.UtilityFunction {
-	if len(utils) == 0 || len(patterns) == 0 {
-		return utils
-	}
-	covered := businessPatternEvidenceIndex(patterns)
-	if len(covered) == 0 {
-		return utils
-	}
-	out := make([]domain.UtilityFunction, 0, len(utils))
-	for _, utility := range utils {
-		if covered[normalizeReferencePath(utility.File)] {
-			continue
-		}
-		if covered[normalizeReferencePath(utility.Signature)] {
-			continue
-		}
-		out = append(out, utility)
-	}
-	return out
-}
-
-func businessPatternEvidenceIndex(patterns []domain.Pattern) map[string]bool {
-	covered := map[string]bool{}
-	for _, pattern := range patterns {
-		if pattern.Category != domain.CategoryBusiness {
-			continue
-		}
-		for _, location := range pattern.EvidenceLocations {
-			if key := normalizeReferencePath(location.Path); key != "" {
-				covered[key] = true
-			}
-		}
-		if pattern.BusinessMethod != nil {
-			if key := normalizeReferencePath(pattern.BusinessMethod.Function); key != "" {
-				covered[key] = true
-			}
-			if key := normalizeReferencePath(pattern.BusinessMethod.DisplayLocation()); key != "" {
-				covered[key] = true
-			}
-		}
-	}
-	return covered
-}
-
-func normalizeReferencePath(value string) string {
-	return pathx.CleanEvidenceLocationPath(value)
 }
 
 func generatorText(locale, key string) string {
@@ -369,15 +292,6 @@ func generatorTextWithParams(locale, key string, params map[string]interface{}) 
 
 func generatorListJoin(locale string, values []string) string {
 	return strings.Join(values, generatorText(locale, "GeneratorListSeparator"))
-}
-
-func (s *GeneratorService) projectSpecFromProfileAndPatterns(profile *domain.ProjectProfile, patterns []domain.Pattern, project config.WorkspaceProjectConfig) *domain.ProjectSpec {
-	return domain.NewProjectSpecFromProfile(profile, patterns, domain.WorkspaceProjectOverride{
-		ID:       project.ID,
-		Path:     project.Path,
-		Type:     project.Type,
-		Language: project.Language,
-	})
 }
 
 func templateCategoryName(category string) string {

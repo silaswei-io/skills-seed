@@ -18,6 +18,7 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -111,27 +112,6 @@ func TestRunGenerateWorkspaceUsesOutputFlagForRootSkill(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md"))
 }
 
-func TestRunGenerateWorkspaceNoReferencesSkipsRootAndChildReferences(t *testing.T) {
-	provider := registerGenerateWorkspaceMockAgentFactory(t)
-	workspaceRoot := t.TempDir()
-	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
-	childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
-	seedGenerateChildMemory(t, childRoot, "Backend Rule")
-	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, []config.WorkspaceProjectConfig{project})
-	defer cont.Close()
-
-	cmd := Cmd(cont)
-	cmd.SetArgs([]string{"skills", "--no-references"})
-	require.NoError(t, cmd.Execute())
-
-	rootOutputPath := filepath.Join(workspaceRoot, ".agents", "skills", "demo-workspace-dev")
-	childOutputPath := filepath.Join(childRoot, ".agents", "skills", "backend-dev")
-	require.FileExists(t, filepath.Join(rootOutputPath, "SKILL.md"))
-	require.NoDirExists(t, filepath.Join(rootOutputPath, "references"))
-	require.FileExists(t, filepath.Join(childOutputPath, "SKILL.md"))
-	require.NoDirExists(t, filepath.Join(childOutputPath, "references"))
-}
-
 func TestRunGenerateWorkspaceGeneratesChildrenBeforeRootSkill(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	workspaceRoot := t.TempDir()
@@ -181,6 +161,74 @@ func TestRunGenerateUsesConfiguredOutputPathWithoutCobraCommand(t *testing.T) {
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 
+func TestRunGenerateQuietWithProgressReportsGenerationStages(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
+
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "backend"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Language = "go"
+	cfg.Project.RootPath = projectRoot
+	cfg.Agent.Engine = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "backend-dev")}
+	require.NoError(t, configRepo.Update(cfg))
+
+	seedGenerateChildMemory(t, projectRoot, "Backend Rule")
+	cont, err := container.NewContainer(context.Background(), seedPath)
+	require.NoError(t, err)
+	defer cont.Close()
+
+	var started []string
+	var completed []string
+	err = RunGenerateQuietWithProgress(cont, generator.GenerateProgressHooks{
+		OnStepStart:    func(label string) { started = append(started, label) },
+		OnStepComplete: func(label string) { completed = append(completed, label) },
+	})
+
+	require.NoError(t, err)
+	require.Len(t, started, generator.GenerateProjectStepTotal)
+	require.Equal(t, started, completed)
+	require.Equal(t, i18n.Get("ProgressGenerateResolveOutput"), started[0])
+	require.Equal(t, i18n.Get("ProgressGenerateWriteSkills"), started[len(started)-1])
+}
+
+func TestRunGenerateDisplaysOnlyRealPipelineStages(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := configRepo.Get()
+	cfg.Project.Name = "backend"
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Language = "go"
+	cfg.Project.RootPath = projectRoot
+	cfg.Agent.Engine = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Skills.Target = "codex"
+	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "backend-dev")}
+	require.NoError(t, configRepo.Update(cfg))
+	seedGenerateChildMemory(t, projectRoot, "Backend Rule")
+	cont, err := container.NewContainer(context.Background(), seedPath)
+	require.NoError(t, err)
+	defer cont.Close()
+
+	output := captureGenerateStdout(t, func() {
+		require.NoError(t, RunGenerate(cont))
+	})
+
+	require.Contains(t, output, "5/5")
+	require.NotContains(t, output, i18n.Get("ProgressGenerateCountPatterns"))
+}
+
 func TestRunGenerateDoesNotRequireAvailableAgent(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	projectRoot := t.TempDir()
@@ -211,7 +259,7 @@ func TestRunGenerateDoesNotRequireAvailableAgent(t *testing.T) {
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
 }
 
-func TestRunGenerateAllowsWorkflowOnlyProject(t *testing.T) {
+func TestRunGenerateAllowsResourceOnlyProject(t *testing.T) {
 	provider := registerGenerateWorkspaceMockAgentFactory(t)
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".git"), 0755))
@@ -323,7 +371,7 @@ func TestRunGenerateWorkspacePrintsConcurrentChildProjectProgress(t *testing.T) 
 	require.Contains(t, output, "frontend")
 	require.Contains(t, output, "写入技能文件")
 	require.Contains(t, output, "整理生成数据")
-	require.Contains(t, output, "读取项目画像")
+	require.Contains(t, output, i18n.Get("ProgressGenerateLoadProfile"))
 	require.Contains(t, output, "backend      5/5")
 	require.Contains(t, output, "frontend     5/5")
 	require.Contains(t, output, "2/2 生成工作区子项目 skills")
@@ -372,6 +420,36 @@ func TestGenerateWorkspaceChildSkillsDoesNotCallSummary(t *testing.T) {
 	ctx := runtimecontext.WithUserContext(context.Background(), "workspace 根说明不能透传给子项目")
 	require.NoError(t, generateWorkspaceChildSkillsWithOptions(ctx, cont, generateOptions{}))
 	require.FileExists(t, filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"))
+}
+
+func TestGenerateWorkspaceProjectsOnlyExplicitRulesToMatchingChildren(t *testing.T) {
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	workspaceRoot := t.TempDir()
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+		{ID: "console", Path: "console", Type: "frontend", Language: "typescript"},
+	}
+	for _, project := range projects {
+		childRoot := initGenerateWorkspaceChildProject(t, workspaceRoot, project, provider)
+		setGenerateChildOutputPath(t, childRoot, provider, filepath.Join(".agents", "skills", project.ID+"-dev"))
+		seedGenerateChildMemory(t, childRoot, project.ID+" Rule")
+	}
+	cont := initGenerateWorkspaceRootContainer(t, workspaceRoot, provider, projects)
+	defer cont.Close()
+	require.NoError(t, cont.RuleRepo.Save(domain.Rule{
+		ID:               "backend-protection",
+		Name:             "Backend Protection",
+		Content:          "# Backend Protection\n\nDo not change the backend foundation without authorization.",
+		AffectedProjects: []string{"backend", "frontend"},
+	}))
+
+	require.NoError(t, generateWorkspaceChildSkillsWithOptions(context.Background(), cont, generateOptions{}))
+
+	require.FileExists(t, filepath.Join(workspaceRoot, "backend", ".agents", "skills", "backend-dev", "references", "rules", "backend-protection.md"))
+	require.FileExists(t, filepath.Join(workspaceRoot, "frontend", ".agents", "skills", "frontend-dev", "references", "rules", "backend-protection.md"))
+	require.NoFileExists(t, filepath.Join(workspaceRoot, "console", ".agents", "skills", "console-dev", "references", "rules", "backend-protection.md"))
+	require.FileExists(t, filepath.Join(cont.SeedPath, "rules", "backend-protection", "RULE.md"))
 }
 
 func TestRunGenerateWorkspacePrintsWorkspaceProgressBeforeChildDetails(t *testing.T) {
@@ -506,12 +584,13 @@ func seedGenerateChildMemory(t *testing.T, childRoot, patternName string) {
 	require.NoError(t, patternRepo.Save(ctx, pattern))
 
 	profileRepo := profilestore.NewRepository(seedPath)
-	require.NoError(t, profileRepo.Save(ctx, &domain.ProjectProfile{
+	profile := &domain.ProjectProfile{
 		ProjectName: "backend",
 		Language:    "go",
 		Summary:     "backend service profile",
 		GeneratedAt: "2026-05-27 00:00:00",
-	}))
+	}
+	require.NoError(t, profileRepo.Save(ctx, profile))
 }
 
 func readGenerateFile(t *testing.T, root string, parts ...string) string {

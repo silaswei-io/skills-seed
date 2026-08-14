@@ -10,13 +10,13 @@ This directory stores long-lived information that is not visible in code but sho
 ## Files
 
 - `background.md`: project background, external systems, production facts, rollout or compatibility targets, and manual processes.
-- `constraints.md`: long-lived team constraints, forbidden changes, and security, data, release, or operations boundaries.
 - `terminology.md`: business terms, aliases, state names, external system names, and code identifier mappings.
-- `workspace.md`: cross-project background and coordination constraints in workspace mode.
+- `workspace.md`: cross-project background, responsibilities, and shared facts in workspace mode.
 
 ## Writing Rules
 
 - Put information here only when it should apply to future runs.
+- Maintain mandatory long-lived rules under `.skills-seed/rules/` with `skills-seed rule`, not in context.
 - Use `--context` or `--context-path` for one-time learning or sync guidance.
 - Do not paste code, long README excerpts, or temporary debugging notes here.
 - Empty sections are fine; default placeholder text is filtered out before Agent input.

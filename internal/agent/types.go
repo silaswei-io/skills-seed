@@ -43,7 +43,6 @@ type AnalyzeProjectRequest struct {
 	StructuralContextPath string   // 结构化分析上下文文件路径
 	ReadmePath            string   // README 文件路径（如果存在）
 	MainFiles             []string // 主要入口文件路径
-	EngineeringKnowledge  []string // 权威工程知识文件路径，不参与业务源码筛选
 	ExistingProfileJSON   string   // 已有项目画像 JSON
 	ExistingProfilePath   string   // 已有项目画像 JSON 文件路径
 	FocusPaths            []string // 指定增量分析范围
@@ -53,23 +52,48 @@ type AnalyzeProjectRequest struct {
 
 // AnalyzeProjectResult 项目分析结果
 type AnalyzeProjectResult struct {
-	ProjectName        string                   // 项目名称
-	Language           string                   // 主要编程语言
-	Frameworks         []string                 // 使用的框架
-	Architecture       string                   // 架构描述
-	Structure          string                   // 目录结构说明
-	CommonUtils        []domain.UtilityFunction // 公共工具方法
-	KeyModules         []domain.ModuleInfo      // 关键模块
-	ConfigPatterns     []string                 // 配置模式
-	Dependencies       []string                 // 主要依赖
-	Layers             []domain.ArchitectureLayer
-	DependencyGraph    string
-	DataFlow           string
-	FrameworkPatterns  []string
-	BusinessMethods    []domain.BusinessMethod
-	EngineeringRules   []domain.EngineeringRule
-	ValidationCommands []domain.ValidationCommand
-	Summary            string // 项目总结
+	ProjectName       string              // 项目名称
+	Language          string              // 主要编程语言
+	Frameworks        []string            // 使用的框架
+	Architecture      string              // 架构描述
+	Structure         string              // 目录结构说明
+	KeyModules        []domain.ModuleInfo // 关键模块
+	ConfigPatterns    []string            // 配置模式
+	Dependencies      []string            // 主要依赖
+	Layers            []domain.ArchitectureLayer
+	DependencyGraph   string
+	DataFlow          string
+	FrameworkPatterns []string
+	Summary           string // 项目总结
+}
+
+// ExtractAuthorityRequest 描述一次独立的权威知识提取输入。
+type ExtractAuthorityRequest struct {
+	ProjectName          string
+	RootPath             string
+	EngineeringKnowledge []string
+	AuthoritySections    []AuthoritySection
+	UserContext          string
+	UserContextPath      string
+}
+
+// ExtractAuthorityResult 描述逐章节提取的权威知识结果。
+type ExtractAuthorityResult struct {
+	AuthoritySections []AuthoritySectionResult
+}
+
+// AuthoritySection 是由程序确定性生成的权威章节目录项。
+type AuthoritySection struct {
+	ID      string `json:"section_id"`
+	Source  string `json:"source"`
+	Section string `json:"section,omitempty"`
+}
+
+// AuthoritySectionResult 是 Agent 在指定权威章节下提取的规则，不携带归属字段。
+type AuthoritySectionResult struct {
+	SectionID    string
+	Rules        []domain.EngineeringRule
+	NoRuleReason string
 }
 
 // SampleFile 示例文件路径
@@ -193,49 +217,47 @@ type AnalyzeCurrentDeltaBatchResult struct {
 	ProfileRefreshRecommended ProfileRefreshRecommendation
 }
 
-// SelectLearningCandidatesRequest 请求从本地候选文件中收敛值得进入议程规划的文件。
-type SelectLearningCandidatesRequest struct {
-	ProjectName           string
-	RootPath              string
-	Language              string
-	CandidatePaths        []string
-	RequiredPaths         []string
-	StructuralContext     string
-	StructuralContextPath string
-	UserContext           string
-	UserContextPath       string
-	LearningMode          config.LearningMode
-	LearningScope         config.LearningScope
-}
-
-type LearningCandidateSkip struct {
+// LearningPathSkip 记录规划阶段明确跳过的输入路径及原因。
+type LearningPathSkip struct {
 	Path   string
 	Reason string
 }
 
-// SelectLearningCandidatesResult 是 AI 候选收敛结果。
-type SelectLearningCandidatesResult struct {
-	SelectedPaths []string
-	SkippedPaths  []LearningCandidateSkip
-	Reason        string
+// PlanningSourceFact 是规划 Agent 用于确认文件密度和声明边界的轻量事实。
+type PlanningSourceFact struct {
+	Path          string               `json:"path"`
+	SizeBytes     int64                `json:"size_bytes"`
+	LineCount     int                  `json:"line_count"`
+	NonBlankLines int                  `json:"non_blank_lines"`
+	SymbolCount   int                  `json:"symbol_count"`
+	Symbols       []PlanningSymbolFact `json:"symbols,omitempty"`
 }
 
-// PlanLearningAgendaRequest 请求按业务能力拆分当前待学习文件。
+// PlanningSymbolFact 是源码事实清单中的声明摘要。
+type PlanningSymbolFact struct {
+	Name string `json:"name"`
+	Kind string `json:"kind"`
+	Line int    `json:"line"`
+}
+
+// PlanLearningAgendaRequest 请求按源码证据边界拆分当前待学习文件。
 type PlanLearningAgendaRequest struct {
 	ProjectName           string
 	RootPath              string
 	Language              string
 	FocusPaths            []string
+	SourceFacts           []PlanningSourceFact
 	StructuralContext     string // 结构化分析上下文
 	StructuralContextPath string // 结构化分析上下文文件路径
 	UserContext           string
 	LearningMode          config.LearningMode
-	LearningScope         config.LearningScope
 }
 
 // PlanLearningAgendaResult 是 AI 生成的业务证据焦点计划。
 type PlanLearningAgendaResult struct {
-	Focuses []domain.EvidenceFocus `json:"focuses"`
+	Focuses      []domain.EvidenceFocus
+	SkippedPaths []LearningPathSkip
+	Reason       string
 }
 
 // NormalizePatternsRequest 请求把当前学习得到的候选模式合并为稳定的入库决策。
@@ -247,6 +269,43 @@ type NormalizePatternsRequest struct {
 	RelatedPatterns []domain.Pattern
 	UserContext     string
 	UserContextPath string
+}
+
+// ReviewKnowledgeRequest 请求独立复核当前源码学习候选。
+type ReviewKnowledgeRequest struct {
+	ProjectName     string
+	RootPath        string
+	Language        string
+	EvidenceFocus   domain.EvidenceFocus
+	Candidates      []domain.Pattern
+	UserContext     string
+	UserContextPath string
+}
+
+// KnowledgeRevision 只允许修订知识表述，不改变程序持有的证据和归属。
+type KnowledgeRevision struct {
+	Name           string
+	Category       string
+	Description    string
+	Rule           string
+	Confidence     float64
+	KnowledgeFlags []string
+}
+
+// KnowledgeReviewDecision 是单个候选的独立审查结论。
+type KnowledgeReviewDecision struct {
+	CandidateID           string
+	Verdict               string
+	ReasonCode            string
+	Reason                string
+	BusinessMethodVerdict string
+	BusinessMethod        *domain.BusinessMethod
+	Revision              *KnowledgeRevision
+}
+
+// ReviewKnowledgeResult 包含每个输入候选的一对一审查回执。
+type ReviewKnowledgeResult struct {
+	Decisions []KnowledgeReviewDecision
 }
 
 // PatternNormalization 描述一个规范化后的模式及其来源归属。
@@ -298,21 +357,37 @@ type AnalyzeWorkspaceSpecRequest struct {
 	ProjectIDs           []string // 配置声明的唯一合法子项目 ID
 }
 
-// OptimizeWorkflowRequest 请求把用户口语化说明整理为标准工作流。
-type OptimizeWorkflowRequest struct {
-	ID              string // 工作流 ID
-	Name            string // 工作流名称
-	Context         string // 本次用户输入
-	ExistingContent string // 已有工作流正文；默认合并时用于去重整合
-	Overwrite       bool   // 是否重写同名工作流
-	Language        string // 项目主要语言
+// ProjectContext 描述资源优化时可读取的当前项目边界。
+type ProjectContext struct {
+	Name     string
+	RootPath string
+	Language string
+	Mode     string
 }
 
-// OptimizeWorkflowResult 是 AI 优化后的标准工作流。
-type OptimizeWorkflowResult struct {
-	Title     string
-	Content   string
-	Conflicts []string
+// OptimizeWorkflowRequest 请求把用户提供的内容整理为可执行工作流。
+type OptimizeWorkflowRequest struct {
+	Project         ProjectContext
+	Name            string
+	ExistingContent string
+	Content         string
+	Overwrite       bool
+}
+
+// OptimizeRuleRequest 请求在项目边界内润色用户提供的权威规则。
+type OptimizeRuleRequest struct {
+	Project          ProjectContext
+	Name             string
+	ExistingContent  string
+	Content          string
+	AffectedProjects []string
+	Paths            []string
+	Overwrite        bool
+}
+
+// OptimizeContentResult 是资源优化后的完整 Markdown 内容。
+type OptimizeContentResult struct {
+	Content string
 }
 
 // UserPatternDefiner 用户自定义模式接口
@@ -323,7 +398,7 @@ type UserPatternDefiner interface {
 // ProjectAnalyzer 项目分析接口
 type ProjectAnalyzer interface {
 	RefreshProjectProfile(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
-	SelectLearningCandidates(ctx context.Context, req *SelectLearningCandidatesRequest) (*SelectLearningCandidatesResult, error)
+	ExtractAuthority(ctx context.Context, req *ExtractAuthorityRequest) (*ExtractAuthorityResult, error)
 	PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) (*PlanLearningAgendaResult, error)
 	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeCurrentDeltaBatch(ctx context.Context, req *AnalyzeCurrentDeltaBatchRequest) (*AnalyzeCurrentDeltaBatchResult, error)
@@ -337,9 +412,15 @@ type PatternNormalizer interface {
 	NormalizePatterns(ctx context.Context, req *NormalizePatternsRequest) (*NormalizePatternsResult, error)
 }
 
-// WorkflowOptimizer 工作流优化接口。
-type WorkflowOptimizer interface {
-	OptimizeWorkflow(ctx context.Context, req *OptimizeWorkflowRequest) (*OptimizeWorkflowResult, error)
+// KnowledgeReviewer 独立复核源码学习候选的证据和表述边界。
+type KnowledgeReviewer interface {
+	ReviewKnowledge(ctx context.Context, req *ReviewKnowledgeRequest) (*ReviewKnowledgeResult, error)
+}
+
+// ResourceOptimizer 整理用户维护的工作流和权威规则。
+type ResourceOptimizer interface {
+	OptimizeWorkflow(ctx context.Context, req *OptimizeWorkflowRequest) (*OptimizeContentResult, error)
+	OptimizeRule(ctx context.Context, req *OptimizeRuleRequest) (*OptimizeContentResult, error)
 }
 
 // Agent AI Agent 接口（组合所有子接口）
@@ -348,5 +429,6 @@ type Agent interface {
 	IsAvailable() bool
 	UserPatternDefiner
 	ProjectAnalyzer
-	WorkflowOptimizer
+	KnowledgeReviewer
+	ResourceOptimizer
 }

@@ -9,6 +9,8 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
+	"github.com/silaswei-io/skills-seed/internal/service/repositoryscopeconfig"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +46,7 @@ func TestSanitizeGenerationInputsDropsUnverifiableExternalUtilityLocations(t *te
 	assert.Empty(t, sanitized.CommonUtils)
 }
 
-func TestSanitizeGenerationInputsKeepsSourceVerifiedUtility(t *testing.T) {
+func TestSanitizeGenerationInputsDropsLegacyProfileUtility(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "helper"), 0o755))
 	require.NoError(t, os.WriteFile(
@@ -60,8 +62,7 @@ func TestSanitizeGenerationInputsKeepsSourceVerifiedUtility(t *testing.T) {
 
 	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
 
-	require.Len(t, sanitized.CommonUtils, 1)
-	assert.Equal(t, "internal/helper/response.go:3", sanitized.CommonUtils[0].File)
+	require.Empty(t, sanitized.CommonUtils)
 }
 
 func TestSanitizeGenerationInputsDropsMissingProjectUtilityLocations(t *testing.T) {
@@ -181,7 +182,7 @@ func TestSanitizeGenerationInputsKeepsExplicitFileEvidence(t *testing.T) {
 	require.Equal(t, []domain.PatternEvidenceLocation{{Path: "policy.txt", Kind: "file"}}, patterns[0].EvidenceLocations)
 }
 
-func TestSanitizeGenerationInputsKeepsExistingScopeWithoutEvidence(t *testing.T) {
+func TestSanitizeGenerationInputsDropsScopeWithoutVerifiedEvidence(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "policy"), 0o755))
 	pattern := domain.NewPattern("policy", "Policy", domain.CategoryBusiness)
@@ -189,8 +190,70 @@ func TestSanitizeGenerationInputsKeepsExistingScopeWithoutEvidence(t *testing.T)
 
 	_, patterns := sanitizeGenerationInputsForTest(t, &domain.ProjectProfile{}, []domain.Pattern{*pattern}, root)
 
+	require.Empty(t, patterns)
+}
+
+func TestSanitizeGenerationInputsDropsCacheEvidenceAndProfileEntries(t *testing.T) {
+	root := t.TempDir()
+	cacheFile := filepath.Join(root, ".test", "quality", "cache", "go-mod", "dependency", "service.go")
+	require.NoError(t, os.MkdirAll(filepath.Dir(cacheFile), 0o755))
+	require.NoError(t, os.WriteFile(cacheFile, []byte("package dependency\n\nfunc Execute() error { return nil }\n"), 0o644))
+
+	profile := &domain.ProjectProfile{
+		KeyModules: []domain.ModuleInfo{{
+			Name: "cached",
+			Path: ".test/quality/cache/go-mod/dependency",
+		}},
+		CommonUtils: []domain.UtilityFunction{{
+			Name:      "Execute",
+			File:      ".test/quality/cache/go-mod/dependency/service.go:3",
+			Signature: "func Execute() error",
+		}},
+	}
+	pattern := domain.NewPattern("cached-operation", "Cached Operation", domain.CategoryBusiness)
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path:   ".test/quality/cache/go-mod/dependency/service.go",
+		Line:   3,
+		Symbol: "Execute",
+		Kind:   "function",
+	}}
+
+	sanitized, patterns := sanitizeGenerationInputsForTest(t, profile, []domain.Pattern{*pattern}, root)
+
+	require.Empty(t, sanitized.KeyModules)
+	require.Empty(t, sanitized.CommonUtils)
+	require.Empty(t, patterns)
+}
+
+func TestSanitizeGenerationInputsDropsProcedureBackedKnowledge(t *testing.T) {
+	root := t.TempDir()
+	writeKnowledgeSource(t, root, "internal/service/account.go", "package service\n\nfunc CreateAccount() error { return nil }\n")
+	writeKnowledgeSource(t, root, "tests/account_test.go", "package tests\n\nfunc CreateFixture() error { return nil }\n")
+	writeKnowledgeSource(t, root, "deploy/release.go", "package deploy\n\nfunc PublishRelease() error { return nil }\n")
+
+	profile := &domain.ProjectProfile{
+		BusinessMethods: []domain.BusinessMethod{
+			{Name: "CreateAccount", Function: "func CreateAccount() error", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/service/account.go:3"}},
+			{Name: "CreateFixture", Function: "func CreateFixture() error", CodeLocation: domain.CodeLocation{CurrentLocation: "tests/account_test.go:3"}},
+		},
+		CommonUtils: []domain.UtilityFunction{
+			{Name: "CreateAccount", File: "internal/service/account.go:3", Signature: "func CreateAccount() error"},
+			{Name: "PublishRelease", File: "deploy/release.go:3", Signature: "func PublishRelease() error"},
+		},
+	}
+	business := domain.NewPattern("account-create", "Account Create", domain.CategoryBusiness)
+	business.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/service/account.go", Line: 3, Symbol: "CreateAccount", Kind: "function"}}
+	testingPattern := domain.NewPattern("fixture-create", "Fixture Create", domain.CategoryUtils)
+	testingPattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "tests/account_test.go", Line: 3, Symbol: "CreateFixture", Kind: "function"}}
+	releasePattern := domain.NewPattern("release-publish", "Release Publish", domain.CategoryBusiness)
+	releasePattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "deploy/release.go", Line: 3, Symbol: "PublishRelease", Kind: "function"}}
+
+	sanitized, patterns := sanitizeGenerationInputsForTest(t, profile, []domain.Pattern{*business, *testingPattern, *releasePattern}, root)
+
+	require.Empty(t, sanitized.BusinessMethods)
+	require.Empty(t, sanitized.CommonUtils)
 	require.Len(t, patterns, 1)
-	require.Equal(t, "internal/policy", patterns[0].ScopePath)
+	assert.Equal(t, "account-create", patterns[0].ID)
 }
 
 func TestSanitizeGenerationInputsBuildsModuleEntriesFromVerifiedSource(t *testing.T) {
@@ -232,24 +295,46 @@ func (c *Custom) Publish() error { return nil }
 
 	sanitized, patterns := sanitizeGenerationInputsForTest(t, profile, []domain.Pattern{*pattern}, root)
 
-	require.Len(t, sanitized.BusinessMethods, 2)
-	assert.ElementsMatch(t, []string{"Start", "Publish"}, []string{
-		sanitized.BusinessMethods[0].Name,
-		sanitized.BusinessMethods[1].Name,
-	})
+	require.Len(t, sanitized.BusinessMethods, 1)
+	assert.Equal(t, "Publish", sanitized.BusinessMethods[0].Name)
 	require.Len(t, sanitized.KeyModules, 1)
-	assert.Equal(t, []string{"profile-dependency"}, sanitized.KeyModules[0].Dependencies)
-	assert.Equal(t, []string{"profile-dependent"}, sanitized.KeyModules[0].Dependents)
-	assert.ElementsMatch(t, []string{"Start", "Publish"}, sanitized.KeyModules[0].KeyMethods)
+	assert.Empty(t, sanitized.KeyModules[0].Dependencies)
+	assert.Empty(t, sanitized.KeyModules[0].Dependents)
+	assert.Equal(t, []string{"Publish"}, sanitized.KeyModules[0].KeyMethods)
 	require.Len(t, patterns, 1)
 	require.NotNil(t, patterns[0].BusinessMethod)
 	assert.Equal(t, "Publish", patterns[0].BusinessMethod.Name)
 }
 
+func TestSanitizeGenerationInputsKeepsOnlyKnownNonSelfModuleRelations(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "service"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "internal", "repository"), 0o755))
+	profile := &domain.ProjectProfile{KeyModules: []domain.ModuleInfo{
+		{Name: "service layer", Path: "internal/service", Dependencies: []string{"service layer", "internal/repository", "internal/missing"}},
+		{Name: "repository", Path: "internal/repository", Dependents: []string{"internal/service", "repository"}},
+	}}
+
+	sanitized, _ := sanitizeGenerationInputsForTest(t, profile, nil, root)
+
+	require.Len(t, sanitized.KeyModules, 2)
+	require.Equal(t, []string{"internal/repository"}, sanitized.KeyModules[0].Dependencies)
+	require.Empty(t, sanitized.KeyModules[0].Dependents)
+	require.Empty(t, sanitized.KeyModules[1].Dependencies)
+	require.Equal(t, []string{"internal/service"}, sanitized.KeyModules[1].Dependents)
+}
+
 func sanitizeGenerationInputsForTest(t *testing.T, profile *domain.ProjectProfile, patterns []domain.Pattern, root string) (*domain.ProjectProfile, []domain.Pattern) {
 	t.Helper()
 	resolver := sourcecode.NewResolver(config.StructuralConfig{Provider: config.StructuralProviderTreeSitter})
-	sanitized, validated, err := sanitizeGenerationInputs(context.Background(), profile, patterns, root, resolver)
+	sanitized, validated, err := knowledge.VerifyProjectKnowledge(context.Background(), profile, patterns, root, resolver, repositoryscopeconfig.DefaultKnowledgeScope())
 	require.NoError(t, err)
 	return sanitized, validated
+}
+
+func writeKnowledgeSource(t *testing.T, root, path, content string) {
+	t.Helper()
+	fullPath := filepath.Join(root, filepath.FromSlash(path))
+	require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0o755))
+	require.NoError(t, os.WriteFile(fullPath, []byte(content), 0o644))
 }

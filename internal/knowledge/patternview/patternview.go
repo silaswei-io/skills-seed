@@ -57,7 +57,7 @@ func Similarity(left, right domain.Pattern) float64 {
 	if !compatibleScope(left, right) {
 		return 0
 	}
-	if domain.IsHighRiskOperationalPattern(left) != domain.IsHighRiskOperationalPattern(right) {
+	if left.HighRiskOperational() != right.HighRiskOperational() {
 		return 0
 	}
 
@@ -146,6 +146,7 @@ func WithSources(pattern domain.Pattern, mergedFrom []string) domain.Pattern {
 	pattern = Normalize(pattern)
 	pattern.MergedFrom = stringx.UniqueNonEmpty(mergedFrom)
 	pattern.Merged = len(pattern.MergedFrom) > 1
+	pattern.KnowledgeFlags = append([]string(nil), pattern.KnowledgeFlags...)
 	pattern.BusinessMethod = cloneBusinessMethod(pattern.BusinessMethod)
 	pattern.EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...)
 	return pattern
@@ -173,6 +174,7 @@ func Normalize(pattern domain.Pattern) domain.Pattern {
 	pattern.ProjectID = strings.TrimSpace(pattern.ProjectID)
 	pattern.ScopePath = strings.TrimSpace(pattern.ScopePath)
 	pattern.WorkspaceRole = strings.TrimSpace(pattern.WorkspaceRole)
+	pattern.KnowledgeFlags = domain.CanonicalKnowledgeFlags(pattern.KnowledgeFlags)
 	pattern.Category = domain.NormalizePatternCategory(pattern.Category)
 	if pattern.Source == "" {
 		pattern.Source = domain.SourceLearned

@@ -33,7 +33,6 @@ const (
 	CategoryError       Category = "error"       // 错误处理
 	CategoryStructure   Category = "structure"   // 代码结构
 	CategoryConcurrency Category = "concurrency" // 并发模式
-	CategoryTesting     Category = "testing"     // 测试模式
 	CategoryBusiness    Category = "business"    // 产品/领域行为模式
 	CategoryAPI         Category = "api"         // 接口/合约模式
 	CategoryDatabase    Category = "database"    // 状态/存储模式
@@ -48,19 +47,12 @@ var allowedPatternCategories = []Category{
 	CategoryError,
 	CategoryStructure,
 	CategoryConcurrency,
-	CategoryTesting,
 	CategoryBusiness,
 	CategoryAPI,
 	CategoryDatabase,
 	CategoryUtils,
 	CategoryMiddleware,
 	CategoryConfig,
-}
-
-// patternCategoryAliases 记录历史或模型常见输出到规范分类的兼容映射。
-var patternCategoryAliases = map[Category]Category{
-	Category("security"):           CategoryUtils,
-	Category("security-hardening"): CategoryUtils,
 }
 
 // AllowedPatternCategoryNames 返回稳定顺序的合法模式分类名。
@@ -91,8 +83,6 @@ func patternCategoryPromptDescription(category Category) string {
 		return "structure (ownership, module, component, generated-source, or extension boundaries)"
 	case CategoryConcurrency:
 		return "concurrency (parallelism, lifecycle synchronization, consistency windows)"
-	case CategoryTesting:
-		return "testing (validation strategy, fixtures, assertions, quality gates)"
 	case CategoryBusiness:
 		return "business (product/domain behavior, user or system actions, policies, state transitions)"
 	case CategoryAPI:
@@ -110,13 +100,9 @@ func patternCategoryPromptDescription(category Category) string {
 	}
 }
 
-// NormalizePatternCategory 把兼容别名归一化为内部规范分类。
+// NormalizePatternCategory 规范化分类键的大小写和空白。
 func NormalizePatternCategory(category Category) Category {
-	normalized := canonicalPatternCategory(category)
-	if alias, ok := patternCategoryAliases[normalized]; ok {
-		return alias
-	}
-	return normalized
+	return canonicalPatternCategory(category)
 }
 
 // IsValidPatternCategory 判断分类是否属于内部规范分类集合。
@@ -305,6 +291,7 @@ type Pattern struct {
 	MergedFrom     []string        // 从哪些模式ID汇总而来
 	Generated      bool            // 是否已生成到 skills
 	BusinessMethod *BusinessMethod // 能力入口信息（可选，用于可复用入口定位）
+	KnowledgeFlags []string        `json:"knowledge_flags,omitempty"` // 经证据审查的受控知识标志
 	// EvidenceLocations 是模式对应的通用源码证据位置，不等同于 BusinessMethod 的可调用位置。
 	EvidenceLocations []PatternEvidenceLocation `json:"evidence_locations,omitempty"`
 	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
@@ -348,6 +335,7 @@ func (p *Pattern) SetBusinessMethod(method *BusinessMethod) {
 
 // NormalizeForSave 补齐持久化时需要稳定保存的字段。
 func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
+	p.KnowledgeFlags = CanonicalKnowledgeFlags(p.KnowledgeFlags)
 	p.Status = NormalizePatternStatus(p.Status)
 	if previous != nil && !previous.CreatedAt.IsZero() {
 		p.CreatedAt = previous.CreatedAt
@@ -373,6 +361,7 @@ func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 
 // NormalizeAfterLoad 补齐旧 DB 记录缺失的派生字段，不改变更新时间。
 func (p *Pattern) NormalizeAfterLoad() {
+	p.KnowledgeFlags = CanonicalKnowledgeFlags(p.KnowledgeFlags)
 	p.Status = NormalizePatternStatus(p.Status)
 	if p.LastSeenAt.IsZero() {
 		p.LastSeenAt = p.UpdatedAt
@@ -388,6 +377,17 @@ func (p *Pattern) NormalizeAfterLoad() {
 // IsActive 判断模式是否应参与 check 和 generate 等默认消费流程。
 func (p Pattern) IsActive() bool {
 	return NormalizePatternStatus(p.Status) == PatternStatusActive
+}
+
+// CanBeRetiredFromCurrentLearning 判断模式是否允许由当前代码增量学习自动删除。
+// 用户定义和默认模式属于显式约束，不能由模型根据局部 diff 自动撤销。
+func (p Pattern) CanBeRetiredFromCurrentLearning() bool {
+	switch p.Source {
+	case SourceLearned, SourceLearnedCurrent, SourceInit:
+		return true
+	default:
+		return false
+	}
 }
 
 // NormalizeCodeLocation 规范化能力入口的结构化代码位置。
@@ -472,6 +472,7 @@ func (p *Pattern) IsValid() bool {
 		strings.TrimSpace(p.Name) != "" &&
 		strings.TrimSpace(p.Rule) != "" &&
 		IsValidPatternCategory(p.Category) &&
+		ValidKnowledgeFlags(p.KnowledgeFlags) &&
 		p.Confidence >= 0.0 &&
 		p.Confidence <= 1.0
 }
@@ -502,6 +503,7 @@ func (p *Pattern) SetRule(rule string) {
 // Merge 合并另一个模式到当前模式
 // 会合并示例、更新置信度和频率
 func (p *Pattern) Merge(other *Pattern) {
+	p.KnowledgeFlags = MergeKnowledgeFlags(p.KnowledgeFlags, other.KnowledgeFlags)
 	// 如果当前模式没有示例，使用另一个模式的示例
 	if p.GoodExample == "" && other.GoodExample != "" {
 		p.GoodExample = other.GoodExample
@@ -525,17 +527,19 @@ func (p *Pattern) Merge(other *Pattern) {
 	p.RefreshMetrics()
 }
 
-// RefreshMetrics 使用确定性启发式刷新模式质量指标。
+// RefreshMetrics 只依据可确定验证的证据量和置信度刷新质量指标。
 func (p *Pattern) RefreshMetrics() {
 	evidence := p.evidenceCount()
-	genericPenalty := p.genericPenalty()
-	specificity := clamp01(float64(evidence)/6.0 + categorySpecificityBonus(p) - genericPenalty*0.35)
-	effective := clamp01(specificity*0.6 + p.Confidence*0.3 - genericPenalty*0.1)
+	specificity := 0.0
+	if evidence > 0 {
+		specificity = float64(evidence) / float64(evidence+1)
+	}
+	effective := clamp01((specificity + clamp01(p.Confidence)) / 2)
 
 	p.Metrics = PatternMetrics{
 		SpecificityScore: roundScore(specificity),
 		EvidenceCount:    evidence,
-		GenericPenalty:   roundScore(genericPenalty),
+		GenericPenalty:   0,
 		EffectiveScore:   roundScore(effective),
 	}
 	p.UpdatedAt = time.Now()
@@ -543,44 +547,6 @@ func (p *Pattern) RefreshMetrics() {
 
 func (p *Pattern) evidenceCount() int {
 	return PatternEvidenceFileCount(p.EvidenceLocations)
-}
-
-func (p *Pattern) genericPenalty() float64 {
-	text := strings.ToLower(strings.Join([]string{p.Name, p.Description, p.Rule}, " "))
-	terms := []string{
-		"best practice", "clean architecture", "layered architecture", "repository pattern",
-		"最佳实践", "分层架构", "注意错误处理", "代码规范", "保持一致", "遵守规范", "合理命名",
-	}
-	hits := 0
-	for _, term := range terms {
-		if strings.Contains(text, strings.ToLower(term)) {
-			hits++
-		}
-	}
-	if len([]rune(strings.TrimSpace(p.Description))) < 24 {
-		hits++
-	}
-	if len([]rune(strings.TrimSpace(p.Rule))) < 16 {
-		hits++
-	}
-	return clamp01(float64(hits) * 0.18)
-}
-
-func categorySpecificityBonus(p *Pattern) float64 {
-	switch p.Category {
-	case CategoryBusiness:
-		if p.BusinessMethod != nil {
-			return 0.18
-		}
-		return 0.08
-	case CategoryUtils:
-		if p.BusinessMethod != nil {
-			return 0.12
-		}
-	case CategoryAPI, CategoryDatabase:
-		return 0.05
-	}
-	return 0
 }
 
 func clamp01(v float64) float64 {
@@ -739,11 +705,6 @@ func NewFileInfo(path, content string) FileInfo {
 // IsGoFile 是否是 Go 文件
 func (f FileInfo) IsGoFile() bool {
 	return f.Language == "go"
-}
-
-// IsTestFile 是否是测试文件
-func (f FileInfo) IsTestFile() bool {
-	return len(f.Path) > 8 && f.Path[len(f.Path)-8:] == "_test.go"
 }
 
 // IsEmpty 是否为空

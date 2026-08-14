@@ -13,7 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
-	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
+	"github.com/silaswei-io/skills-seed/internal/service/repositoryscopeconfig"
 )
 
 type FileChanges struct {
@@ -73,7 +73,7 @@ func PrepareCurrentChangesWithOptions(ctx context.Context, tracker domain.FileAn
 		ScannedFileCount:           len(selection.Files) + len(selection.Skipped),
 		SourceFileCount:            len(selection.Files),
 		PreviousAnalyzedCount:      len(previous),
-		ExcludedGeneratedSkillDirs: GeneratedSkillExcludeDirs(configRepo, scanRoot),
+		ExcludedGeneratedSkillDirs: repositoryscopeconfig.GeneratedSkillDirs(configRepo, scanRoot),
 		SkippedFiles:               append([]SkippedFile{}, selection.Skipped...),
 	}
 	for _, skipped := range selection.Skipped {
@@ -126,10 +126,15 @@ func CommitCurrentChanges(ctx context.Context, tracker domain.FileAnalysisTracke
 	if changes == nil {
 		return nil
 	}
-	if err := tracker.SaveAnalyzedFiles(ctx, changes.Records); err != nil {
-		return err
+	if len(changes.Records) > 0 {
+		if err := tracker.SaveAnalyzedFiles(ctx, changes.Records); err != nil {
+			return err
+		}
 	}
-	return tracker.DeleteAnalyzedFiles(ctx, changes.Scope, changes.Deleted)
+	if len(changes.Deleted) > 0 {
+		return tracker.DeleteAnalyzedFiles(ctx, changes.Scope, changes.Deleted)
+	}
+	return nil
 }
 
 func (c FileChanges) HasChanges() bool {
@@ -213,40 +218,9 @@ func fingerprintLearnFile(projectRoot string, scope domain.FileAnalysisScope, re
 }
 
 func ConfiguredLearnExcludes(configRepo config.Reader, projectRoot string) []string {
-	configExcludes := []string{}
-	if configRepo != nil {
-		configExcludes = configRepo.GetExclude()
-	}
-	return config.LearnExcludePatterns(configExcludes, GeneratedSkillExcludeDirs(configRepo, projectRoot))
+	return repositoryscopeconfig.KnowledgeExcludes(configRepo, projectRoot)
 }
 
 func GeneratedSkillExcludeDirs(configRepo config.Reader, projectRoot string) []string {
-	dirs := make([]string, 0)
-	readers := []config.Reader{}
-	if configRepo != nil {
-		readers = append(readers, configRepo)
-	}
-	childSeedPath := filepath.Join(projectRoot, ".skills-seed")
-	if _, err := os.Stat(filepath.Join(childSeedPath, "config.yaml")); err == nil {
-		if childRepo, err := config.NewRepository(childSeedPath, ""); err == nil {
-			readers = append(readers, childRepo)
-		}
-	}
-	for _, reader := range readers {
-		for _, outputPath := range reader.GetSkillsConfig().Paths {
-			if outputPath == "" {
-				continue
-			}
-			resolved, err := projectpath.Resolve(projectRoot, outputPath)
-			if err != nil {
-				continue
-			}
-			rel, err := filepath.Rel(projectRoot, resolved)
-			if err == nil {
-				dirs = append(dirs, filepath.ToSlash(rel))
-			}
-		}
-	}
-	sort.Strings(dirs)
-	return stringx.UniqueNonEmpty(dirs)
+	return repositoryscopeconfig.GeneratedSkillDirs(configRepo, projectRoot)
 }

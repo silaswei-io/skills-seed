@@ -150,9 +150,48 @@ func TestAssembleProfileResolvesProjectPathDependency(t *testing.T) {
 	require.Equal(t, "ra-admin", profile.Projects[1].ID)
 	require.Empty(t, profile.Shared)
 	require.Empty(t, profile.Infra)
-	require.Len(t, profile.ImpactRoutes, 1)
-	require.Equal(t, ".github/**", profile.ImpactRoutes[0].PathPattern)
-	require.Equal(t, []string{"ra-admin"}, profile.ImpactRoutes[0].ProjectIDs)
+	require.Empty(t, profile.ImpactRoutes)
+}
+
+func TestAssembleProfileDropsProcedurePathsAndKeepsRuntimeConfig(t *testing.T) {
+	root := t.TempDir()
+	for _, path := range []string{
+		"app",
+		"worker",
+		".github/workflows",
+		"deploy",
+		"runtime/config",
+	} {
+		require.NoError(t, os.MkdirAll(filepath.Join(root, filepath.FromSlash(path)), 0o755))
+	}
+	base := &domain.WorkspaceProfile{
+		Name:     "demo",
+		RootPath: root,
+		Projects: []domain.WorkspaceProject{
+			{ID: "app", Path: "app", Type: "service", Language: "go"},
+			{ID: "worker", Path: "worker", Type: "service", Language: "go"},
+		},
+	}
+	analysis := &domain.WorkspaceProfile{
+		Projects: []domain.WorkspaceProject{{ID: "app"}, {ID: "worker"}},
+		Infra: []domain.WorkspacePath{
+			{Path: ".github/workflows", AffectedProjects: []string{"app", "worker"}},
+			{Path: "deploy", AffectedProjects: []string{"app", "worker"}},
+			{Path: "runtime/config", AffectedProjects: []string{"app", "worker"}},
+		},
+		ImpactRoutes: []domain.WorkspaceRoute{
+			{PathPattern: ".github/**", ProjectIDs: []string{"app", "worker"}, Reason: "CI"},
+			{PathPattern: "deploy/**", ProjectIDs: []string{"app", "worker"}, Reason: "deployment"},
+			{PathPattern: "runtime/config/**", ProjectIDs: []string{"app", "worker"}, Reason: "runtime consumers"},
+		},
+	}
+
+	profile, err := AssembleProfile(base, analysis)
+
+	require.NoError(t, err)
+	require.Len(t, profile.Infra, 1)
+	require.Equal(t, "runtime/config", profile.Infra[0].Path)
+	require.Empty(t, profile.ImpactRoutes)
 }
 
 func TestAssembleProfileNormalizesWorkspacePathsAtSource(t *testing.T) {
@@ -221,7 +260,7 @@ func TestSpecFromProfileMergesDefaultAndImpactRoutes(t *testing.T) {
 	require.Equal(t, []string{"worker"}, spec.Routing[1].ProjectIDs)
 }
 
-func TestAssembleSpecValidatesTypedReferencesAndDotRoutes(t *testing.T) {
+func TestAssembleSpecDropsProcedureAndExternalRoutes(t *testing.T) {
 	root := t.TempDir()
 	for _, path := range []string{"backend_service", ".github"} {
 		require.NoError(t, os.MkdirAll(filepath.Join(root, path), 0755))
@@ -264,13 +303,11 @@ func TestAssembleSpecValidatesTypedReferencesAndDotRoutes(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, domain.WorkspaceRuleAuthorityInferred, spec.Rules[0].Authority)
-	require.Equal(t, ".github/**", spec.Routing[0].PathPattern)
-	require.Equal(t, []string{"backend"}, spec.Routing[0].ProjectIDs)
 	require.Equal(t, domain.WorkspaceReferenceProject, spec.Rules[0].AppliesTo[0].Kind)
 	require.Equal(t, "backend", spec.Rules[0].AppliesTo[0].Value)
-	require.Len(t, spec.Routing, 1)
+	require.Empty(t, spec.Routing)
 	require.Len(t, spec.Rules[0].AppliesTo, 1)
-	require.Len(t, spec.ParallelAgentGuidance, 1)
+	require.Empty(t, spec.ParallelAgentGuidance)
 }
 
 func TestAssembleSpecPreservesBaseRoutesAndSystemRules(t *testing.T) {
@@ -296,9 +333,8 @@ func TestAssembleSpecPreservesBaseRoutesAndSystemRules(t *testing.T) {
 	spec, err := AssembleSpec(base, analysis, profile, ValidationOptions{RootPath: root})
 
 	require.NoError(t, err)
-	require.Len(t, spec.Routing, 2)
+	require.Len(t, spec.Routing, 1)
 	require.Equal(t, "backend/**", spec.Routing[0].PathPattern)
-	require.Equal(t, ".github/**", spec.Routing[1].PathPattern)
 	require.Len(t, spec.Rules, 2)
 	require.Equal(t, domain.WorkspaceRuleAuthoritySystem, spec.Rules[0].Authority)
 	require.Equal(t, domain.WorkspaceRuleAuthorityInferred, spec.Rules[1].Authority)

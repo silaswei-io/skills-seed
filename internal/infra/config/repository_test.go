@@ -87,11 +87,10 @@ func TestNewRepository(t *testing.T) {
 		require.NotContains(t, text, `shared:`)
 		require.NotContains(t, text, `contracts:`)
 		require.NotContains(t, text, `infra:`)
-		require.Contains(t, text, "# 学习策略：normal 平衡质量和速度；fast 保留紧凑但直接有证据的模式；deep 更愿意保留有证据的局部业务/代码模式\n    mode: \"normal\"")
-		require.Contains(t, text, "# 学习焦点规划取向：flow 默认且最稳定，优先关注业务流程/资源动作；domain 更偏长期业务职责；module 更偏模块/插件/契约边界\n    scope: \"flow\"")
-		require.Contains(t, text, "# 单次 AI 调用最多分析的焦点数；1 表示不合批，降低单次输出过大和跨焦点串扰风险\n    max_focuses_per_call: 1")
-		require.Contains(t, text, "select_relevant_files: true")
-		require.Contains(t, text, "select_relevant_files_min_candidates: 200")
+		require.Contains(t, text, "# 学习策略均以高精准率准入：fast 缩小探索范围；normal 为默认；deep 扩大证据探索范围但不降低准入标准\n    mode: \"normal\"")
+		require.NotContains(t, text, "scope:")
+		require.NotContains(t, text, "max_focuses_per_call")
+		require.NotContains(t, text, "select_relevant_files")
 		require.Contains(t, text, "# 启用有边界的结构化上下文；无边界输入时不会运行\n      enabled: true")
 		require.Contains(t, text, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界\n########################################################################\nexclude:")
 		require.Contains(t, text, "# 是否排除 Git ignore 命中的文件\n  gitignore: true")
@@ -130,9 +129,6 @@ func TestRepository_Get(t *testing.T) {
 	assert.Equal(t, 1800, cfg.Agent.Timeout)
 	assert.False(t, cfg.Agent.AllowUserPlugins)
 	assert.Empty(t, cfg.Agent.Model)
-	assert.Equal(t, 1, cfg.Learning.Current.MaxFocusesPerCall)
-	assert.True(t, cfg.Learning.Current.SelectRelevantFiles)
-	assert.Equal(t, 200, cfg.Learning.Current.SelectRelevantFilesMinCandidates)
 	assert.True(t, cfg.Learning.Current.Structural.Enabled)
 	assert.Equal(t, 30, cfg.Learning.Current.Structural.MaxSymbols)
 	assert.Equal(t, 512, cfg.Learning.Current.Structural.MaxFileSize)
@@ -301,8 +297,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.Contains(t, content, `- "*.log"`)
 	require.NotContains(t, content, `analysis:`)
 	require.NotContains(t, content, `ai_file_selector:`)
-	require.Contains(t, content, "select_relevant_files: true")
-	require.Contains(t, content, "select_relevant_files_min_candidates: 200")
+	require.NotContains(t, content, "select_relevant_files")
 	require.Contains(t, content, `enabled: true`)
 	require.Contains(t, content, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界")
 	require.Contains(t, content, "# 是否排除 Git ignore 命中的文件\n  gitignore: true")
@@ -437,9 +432,6 @@ exclude:
 		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
 	}
 	cfg.Learning.Current.Structural.Enabled = false
-	cfg.Learning.Current.MaxFocusesPerCall = 3
-	cfg.Learning.Current.SelectRelevantFiles = false
-	cfg.Learning.Current.SelectRelevantFilesMinCandidates = 25
 	cfg.Exclude.GitIgnore = false
 	cfg.Exclude.Paths = []string{".*", "dist/**"}
 	require.NoError(t, repo.Update(cfg))
@@ -452,9 +444,8 @@ exclude:
 	require.Contains(t, text, "# 自定义工作区注释")
 	require.Contains(t, text, "# 自定义子项目注释\n  projects:")
 	require.Contains(t, text, "# 自定义结构化上下文注释\n      enabled: false")
-	require.Contains(t, text, "max_focuses_per_call: 3")
-	require.Contains(t, text, "select_relevant_files: false")
-	require.Contains(t, text, "select_relevant_files_min_candidates: 25")
+	require.NotContains(t, text, "max_focuses_per_call")
+	require.NotContains(t, text, "select_relevant_files")
 	require.Contains(t, text, "exclude:\n  gitignore: false")
 	require.Contains(t, text, "# 保留点号文件注释\n    - \".*\"")
 	require.NotContains(t, text, "\nfile_filter:")
@@ -473,7 +464,6 @@ exclude:
 	require.Equal(t, "workspace", reloaded.GetProjectConfig().Mode)
 	require.False(t, reloaded.GetCurrentLearningConfig().Structural.Enabled)
 	require.Equal(t, LearningModeNormal, reloaded.GetCurrentLearningConfig().Mode)
-	require.Equal(t, 3, reloaded.GetCurrentLearningConfig().MaxFocusesPerCall)
 	require.False(t, reloaded.GetExcludeConfig().GitIgnore)
 	require.Len(t, reloaded.GetWorkspaceConfig().Projects, 1)
 	require.Equal(t, []string{".*", "dist/**"}, reloaded.GetExclude())
@@ -619,9 +609,39 @@ exclude:
 
 	cfg := repo.GetCurrentLearningConfig().Structural
 	require.Equal(t, LearningModeNormal, repo.GetCurrentLearningConfig().Mode)
+	require.Equal(t, 0.75, repo.GetCurrentLearningConfig().PatternAdmission.MinConfidence)
+	require.Equal(t, 0.85, repo.GetCurrentLearningConfig().PatternAdmission.MinSingleEvidenceConfidence)
 	require.True(t, cfg.Enabled)
 	require.Equal(t, 30, cfg.MaxSymbols)
 	require.Equal(t, 512, cfg.MaxFileSize)
+}
+
+func TestRepository_PreservesPatternAdmissionThresholds(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "config.yaml"), []byte(`
+profile:
+  language: "go"
+  locale: "zh-CN"
+agent:
+  engine: "claude"
+learning:
+  current:
+    pattern_admission:
+      min_confidence: 0.62
+      min_single_evidence_confidence: 0.79
+skills:
+  paths: {}
+logging:
+  level: "DEBUG"
+exclude:
+  paths: []
+`), 0644))
+
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	admission := repo.GetCurrentLearningConfig().PatternAdmission
+	require.Equal(t, 0.62, admission.MinConfidence)
+	require.Equal(t, 0.79, admission.MinSingleEvidenceConfidence)
 }
 
 func TestRepository_PreservesExplicitStructuralDisabled(t *testing.T) {

@@ -13,10 +13,11 @@ This is the complete command reference. Every command supports `--help`. Command
 | Workspace | [`skills-seed workspace`](#skills-seed-workspace) | Add or manage workspace child projects | `skills-seed workspace add .` |
 | Reset | [`skills-seed reset`](#skills-seed-reset) | Back up and recreate `.skills-seed` | `skills-seed reset --mode workspace` |
 | Learning | [`skills-seed learn`](#skills-seed-learn) | Learn patterns from current code | `skills-seed learn current` |
-| Generation | [`skills-seed generate`](#skills-seed-generate) | Generate skills from profiles and patterns | `skills-seed generate skills` |
+| Generation | [`skills-seed generate`](#skills-seed-generate) | Generate skills from verified knowledge and user resources | `skills-seed generate skills` |
 | Preview | [`skills-seed preview`](#skills-seed-preview) | Preview files selected for full or incremental analysis | `skills-seed preview files` |
 | Pattern Management | [`skills-seed patterns`](#skills-seed-patterns) | Add, delete, compact, and inspect patterns | `skills-seed patterns show` |
-| Workflow | [`skills-seed workflow`](#skills-seed-workflow) | Add or update user task workflows | `skills-seed workflow --context "..."` |
+| Workflow | [`skills-seed workflow`](#skills-seed-workflow) | Add or update user task workflows | `skills-seed workflow --name <name> --content "<Markdown>"` |
+| Rule | [`skills-seed rule`](#skills-seed-rule) | Add or update authoritative user rules | `skills-seed rule --name <name> --content "<Markdown>"` |
 | Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show the project profile | `skills-seed profile show` |
 | One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
 | Change History | [`skills-seed log`](#skills-seed-log) | Show learned change history | `skills-seed log` |
@@ -32,7 +33,8 @@ This is the complete command reference. Every command supports `--help`. Command
 | Daily incremental update | `skills-seed sync` | Learns current changes and generates skills only when learning changed output |
 | Add one missed rule | `skills-seed patterns add --context "<description>"` → `skills-seed generate skills` | Adds a natural-language pattern, then regenerates |
 | Inspect task workflows | `skills-seed workflow show --format json` | Returns lightweight summaries; read details with `workflow show <id> --format json` as needed |
-| Update task workflow | `skills-seed workflow --context "<notes>"` → `skills-seed generate skills` | `--context` is inferred by the Agent from goals, constraints, background, or paths; omit `--name` to generate one, same-name workflows merge by default, and `--overwrite` replaces one completely |
+| Update task workflow | `skills-seed workflow --name <name> --content "<Markdown>"` → `skills-seed generate skills` | Same-name content is merged and optimized by default; use `--overwrite` only for complete replacement |
+| Update a long-lived rule | `skills-seed rule --name <name> --content "<Markdown>"` → `skills-seed generate skills` | Existing authority is preserved and optimized with same-name additions by default; use `--overwrite` only to replace content and scope completely |
 | Pre-commit updates | `skills-seed hook install` | Install the pre-commit hook and choose sync, learn only, or skip before commit |
 | Inspect learned changes | `skills-seed log` | Show recent learned and generated changes in a git-log-like format |
 | Inspect learned output | `skills-seed patterns show` → `skills-seed profile show` | Verify learned patterns and the current project profile |
@@ -44,12 +46,12 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `rule`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed cli-skills` | Manage global skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | Install/update global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | Uninstall global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed generate` | Generate AI Agent outputs | `skills` | `--help, -h` = `false` |
-| `skills-seed generate skills` | Generate AI Agent skills | - | `--help, -h` = `false`<br>`--no-references` = `false`<br>`--output, -o` = `` |
+| `skills-seed generate skills` | Generate AI Agent skills | - | `--help, -h` = `false`<br>`--output, -o` = `` |
 | `skills-seed hook` | Manage Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed hook install` | Install Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
@@ -70,8 +72,10 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed profile` | Show the project profile | `show` | `--help, -h` = `false` |
 | `skills-seed profile show` | Show the current project profile summary | - | `--help, -h` = `false` |
 | `skills-seed reset` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
+| `skills-seed rule` | Manage authoritative user rules | `show [rule-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false`<br>`--path` = `[]`<br>`--project` = `[]` |
+| `skills-seed rule show [rule-id]` | Show existing rule scopes or full text | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
-| `skills-seed workflow` | Manage user workflows | `show [workflow-id]` | `--child` = ``<br>`--context` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
+| `skills-seed workflow` | Manage user workflows | `show [workflow-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workflow show [workflow-id]` | Show existing workflow summaries or full details | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
 | `skills-seed workspace add .\|project-id-or-path...` | Add sub-projects to workspace | - | `--help, -h` = `false` |
@@ -274,7 +278,7 @@ Learn coding patterns, capability entries, and best practices from the current c
 |---|---:|---|
 | `--language`, `-l` | config or auto-detect | Primary project language |
 | `--focus`, `-f` | empty | Learn only a directory or file; may be repeated, and paths must stay under the project root |
-| `--profile` | `auto` | Project profile sync strategy: `auto`, `skip`, or `refresh` |
+| `--profile` | `auto` | Authority-rule and project-map refresh strategy: `auto`, `skip`, or `refresh` |
 | `--context` | empty | One-time guidance for this learn run, passed to the AI agent and not written to `.skills-seed/context/` |
 | `--context-path` | empty | Read one-time guidance for this learn run from files or directories; may be repeated and is not written to `.skills-seed/context/` |
 | `--help`, `-h` | `false` | Show `learn current` help |
@@ -283,9 +287,9 @@ Learn coding patterns, capability entries, and best practices from the current c
 
 | Value | Description |
 |---|---|
-| `auto` | Creates the project profile when missing; syncs it when this run writes new or updated patterns; otherwise skips |
-| `skip` | Learn patterns only |
-| `refresh` | Force project-profile re-analysis and sync from the current input |
+| `auto` | Refreshes when the project map is missing or authoritative input content changes; otherwise reuses the existing map |
+| `skip` | Learn source knowledge without refreshing authority rules or the project map |
+| `refresh` | Force authority extraction and project-map refresh from the current input |
 
 #### Common Examples
 
@@ -300,7 +304,7 @@ skills-seed learn current --context-path .skills-seed/context.md
 
 #### Notes
 
-1. After the first successful run, Skills Seed records md5 fingerprints for analyzed files. If no learnable files changed, pattern learning and project-profile sync are skipped.
+1. After the first successful run, Skills Seed records md5 fingerprints for analyzed files. If no learnable files changed, source analysis, review, and admission are skipped. `auto` still compares authoritative input content and refreshes authority rules and the project map when those files changed.
 2. Generated skill directories are excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
 3. The workspace root coordinates learning and does not store child patterns in root storage.
 4. In project mode, `agent.parallelism > 1` analyzes independent evidence-focus batches concurrently; results are still merged and checkpointed in agenda order.
@@ -309,7 +313,7 @@ skills-seed learn current --context-path .skills-seed/context.md
 7. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
 8. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
 9. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
-10. When bounded inputs such as focus paths, diffs, samples, or entry files exist, learning and project-profile analysis use structural context configured by `learning.current.structural`; the default `provider: auto` prefers CodeGraph and falls back to embedded tree-sitter when the CodeGraph command or index is unavailable. Explicit `provider: codegraph` requires CodeGraph. Without bounded inputs, it does not scan the whole repository.
+10. When bounded inputs such as focus paths, diffs, samples, or entry files exist, source-evidence analysis and project-map refresh use structural context configured by `learning.current.structural`; the default `provider: auto` prefers CodeGraph and falls back to embedded tree-sitter when the CodeGraph command or index is unavailable. Explicit `provider: codegraph` requires CodeGraph. Without bounded inputs, it does not scan the whole repository.
 11. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, the terminal also prints a stable notice with the wait duration and API reason, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
@@ -322,7 +326,7 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed generate skills` | Generate skills from patterns and project profile | `skills-seed generate skills --output .agents/skills/my-project` | Defaults to `skills.paths` for the current `skills.target` |
+| `skills-seed generate skills` | Generate skills from reviewed patterns, authority rules, and the project map | `skills-seed generate skills --output .agents/skills/my-project` | Defaults to `skills.paths` for the current `skills.target` |
 
 #### `generate` Flags
 
@@ -335,7 +339,6 @@ Generate AI Agent related outputs. Currently supports the `skills` subcommand.
 | Flag | Default | Description |
 |---|---:|---|
 | `--output`, `-o` | current `skills.target`'s `skills.paths` | Temporarily override the skills output directory |
-| `--no-references` | `false` | Generate only the entry `SKILL.md` and skip detailed `references/` files |
 | `--help`, `-h` | `false` | Show `generate skills` help |
 
 #### Common Examples
@@ -345,18 +348,17 @@ skills-seed generate skills
 skills-seed generate skills --output .agents/skills/my-project
 ```
 
-One-shot guidance is only accepted during learning, for example `skills-seed learn current --context-path .skills-seed/run-context.md`. `generate skills` only consumes learned project profiles, workspace profile/spec, patterns, and long-lived context under `.skills-seed/context/`.
+One-shot guidance is only accepted during learning, for example `skills-seed learn current --context-path .skills-seed/run-context.md`. `generate skills` consumes the learned project map and reviewed patterns, extracted authoritative rules, user Rules/Workflows, and long-lived background under `.skills-seed/context/`. The generated project spec is a deterministic projection, not a persisted input fact store.
 
 #### Project Context Notes
 
 Files under `.skills-seed/context/` are merged with built-in prompts; they do not replace built-in prompts. Common persistent guidance locations:
 
 - `.skills-seed/context/background.md`: business background, external systems, and production facts not visible in code.
-- `.skills-seed/context/constraints.md`: long-lived team constraints, compatibility requirements, security boundaries, and forbidden changes.
 - `.skills-seed/context/terminology.md`: terms, aliases, state names, and mappings from business language to code terms.
 - `.skills-seed/context/workspace.md`: workspace-level context, generated only in workspace mode.
 
-The merge order is built-in prompt, `context/background.md`, `context/constraints.md`, `context/terminology.md`, `context/workspace.md`, then a built-in final output contract. User files cannot override the final output contract; it protects the JSON / Markdown output format expected by parsers.
+The merge order is built-in prompt, `context/background.md`, `context/terminology.md`, `context/workspace.md`, then a built-in final output contract. Maintain authoritative long-lived rules with `skills-seed rule` under `.skills-seed/rules/`; generation projects them into the Skill.
 
 #### Generated Content
 
@@ -524,7 +526,7 @@ skills-seed patterns show business-create-order --format json
 
 #### Command Overview
 
-Show the project profile. The profile is stored at `.skills-seed/store/documents/project-profile.json` and is used to generate `references/project-overview.md`. Profile sync is part of `learn current`; incremental learning decides whether to update it from detected changes and AI recommendations, and `learn current --profile refresh` can still force it.
+Show the compatibility profile file that stores the project map. It lives at `.skills-seed/store/documents/project-profile.json` and generates `references/project-overview.md`. `learn current --profile auto` refreshes authority rules and the project map when the map is missing or authoritative input content changes; `--profile refresh` forces a refresh.
 
 #### Command Forms
 
@@ -549,19 +551,31 @@ skills-seed learn current --profile refresh
 #### Notes
 
 1. `profile show` is useful for quickly checking the current profile.
-2. Project profile sync belongs to current learning; incremental learning decides whether the complete profile should be updated from the change set and AI recommendation.
+2. Authority-rule and project-map refresh belongs to current learning. In `auto` mode, the decision uses project-map presence and authoritative input content versions rather than agent-reported input boundaries.
+
+### `skills-seed rule`
+
+Rules are authoritative user-maintained constraints. The current Agent uses target-project context to organize `--content` without changing its authority or scope, stores it at `.skills-seed/rules/<id>/RULE.md`, and `generate skills` projects it to `references/rules/<id>.md`. Without scope flags, a rule belongs only to the current project or workspace root. Use `--child`, `--project`, or `--path` for other explicit scopes. The Agent does not infer ownership or paths from rule prose.
+
+```bash
+skills-seed rule --name foundation-code --content "Do not modify foundation code without explicit authorization." --path "internal/platform/**"
+skills-seed rule --name shared-contract --content "Confirm consumers before changing the shared contract." --project backend,frontend
+skills-seed rule show foundation-code --format json
+```
+
+A rule with the same name sends both the existing text and the new content to the Agent for merging, deduplication, and optimization. Existing scope is preserved, while explicitly supplied `--project` and `--path` values are added uniquely. Use `--overwrite` to replace both the full text and explicit scope.
 
 ### `skills-seed workflow`
 
 #### Command Overview
 
-Manage reusable task workflows. The root command asks the Agent to organize user guidance into task-appropriate Markdown workflow content. The `show` subcommand only reads existing workflows, does not call an Agent, and does not modify files.
+Manage reusable task workflows. The root command uses the current Agent and target-project context to organize `--content`, then saves the complete Markdown body. The `show` subcommand only reads existing workflows and does not modify files.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed workflow --context <notes>` | Create a workflow or merge into an explicitly named workflow | `skills-seed workflow --name release --context "Run smoke tests after release"` | Without `--name`, an Agent-generated name always creates a new workflow |
+| `skills-seed workflow --name <name> --content <Markdown>` | Create a workflow or merge new content into a named workflow | `skills-seed workflow --name release --content "Add a post-release smoke test"` | The Agent preserves valid existing steps while organizing the addition and must not invent steps; both name and content are required |
 | `skills-seed workflow show` | List lightweight summaries in the current scope | `skills-seed workflow show --format json` | The list omits full content |
 | `skills-seed workflow show <id>` | Show the complete workflow | `skills-seed workflow show release --format json` | Returns full details for the specified workflow |
 | `skills-seed workflow show --child <id>` | Inspect workflows in a workspace child | `skills-seed workflow show --child backend --format json` | `--child` is valid only from a workspace root |
@@ -571,7 +585,7 @@ Manage reusable task workflows. The root command asks the Agent to organize user
 | Command | Flag | Default | Description |
 |---|---|---:|---|
 | `workflow` | `--name` | empty | Workflow name; provide it explicitly when updating an existing workflow |
-| `workflow` | `--context` | empty | Goals, constraints, background, or rough notes for the Agent to organize |
+| `workflow` | `--content` | empty | Workflow text or draft; the Agent organizes it as executable Markdown |
 | `workflow` | `--overwrite` | `false` | Replace a same-name workflow completely; never enable without user confirmation |
 | `workflow` | `--child` | empty | Write the workflow to a workspace child |
 | `workflow show` | `--format` | `table` | Output `table` or `json` |
@@ -581,7 +595,7 @@ Manage reusable task workflows. The root command asks the Agent to organize user
 
 1. Before updating an existing workflow, use `workflow show --format json` and read matching details as needed.
 2. Workflow bodies do not require fixed sections; validation and rollback sections are kept only when the task needs them.
-3. Do not rewrite equivalent content; conflicts require choosing merge or overwrite.
+3. Default merging preserves conflicting requirements and marks them `To confirm`; only `--overwrite` ignores the old body.
 4. After a write, run `skills-seed generate skills`.
 
 ### `skills-seed sync`

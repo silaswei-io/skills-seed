@@ -28,23 +28,167 @@ other = "version for skills-seed"
 [RuntimeContextPathNotRegularFile]
 other = "context path is not a regular file: {{.Path}}"
 
+[ResourceTargetWorkspace]
+other = "workspace"
+
+[ResourceTargetProject]
+other = "project"
+
+[RuleShort]
+other = "Manage authoritative user rules"
+
+[RuleLongDesc]
+other = "Use the current Agent and project context to organize an authoritative user rule, then save its complete text. A rule with the same name is merged with the existing content by default; use --overwrite only to replace its content and scope completely. Without scope flags, the rule belongs only to the current project or workspace root; use --project, --path, or --child for other explicit scopes."
+
+[RuleExample]
+other = "  skills-seed rule --name foundation-code --content \"Do not modify foundation code without explicit authorization.\" --path \"internal/platform/**\"\n  skills-seed rule --name shared-contract --content \"Confirm both consumers before changing the shared contract.\" --project backend,frontend\n  skills-seed rule --name backend-boundary --content \"Do not depend directly on storage implementations.\" --child backend"
+
+[RuleFlagName]
+other = "Rule name"
+
+[RuleFlagContent]
+other = "Rule text or draft; the Agent organizes it as Markdown without changing its authority"
+
+[RuleFlagOverwrite]
+other = "Completely replace the rule and its scope"
+
+[RuleFlagChild]
+other = "In workspace mode, save the rule to a child project"
+
+[RuleFlagProject]
+other = "Child project IDs explicitly affected by a workspace-root rule; repeat or comma-separate"
+
+[RuleFlagPath]
+other = "Project- or workspace-relative paths explicitly governed by the rule; repeat or comma-separate"
+
+[RuleShowShort]
+other = "Show existing rule scopes or full text"
+
+[RuleShowLongDesc]
+other = "Without an argument, list rules and their explicit scopes for the current target. With a rule ID, show the complete rule text."
+
+[RuleShowExample]
+other = "  skills-seed rule show\n  skills-seed rule show foundation-code --format json\n  skills-seed rule show --child backend"
+
+[RuleShowFlagFormat]
+other = "Output format: table or json"
+
+[RuleShowFlagChild]
+other = "In workspace mode, inspect a child project"
+
+[RuleShowUnsupportedFormat]
+other = "Unsupported rule output format: {{.Format}}"
+
+[RuleShowNotFound]
+other = "Rule not found: {{.ID}}"
+
+[RuleShowHeaderID]
+other = "ID"
+
+[RuleShowHeaderName]
+other = "Name"
+
+[RuleShowHeaderTarget]
+other = "Owner"
+
+[RuleShowHeaderScope]
+other = "Scope"
+
+[RuleShowHeaderUpdatedAt]
+other = "Updated At"
+
+[RuleShowFieldID]
+other = "ID"
+
+[RuleShowFieldName]
+other = "Name"
+
+[RuleShowFieldTarget]
+other = "Owner"
+
+[RuleShowFieldProjects]
+other = "Affected Projects"
+
+[RuleShowFieldPaths]
+other = "Affected Paths"
+
+[RuleShowFieldCreatedAt]
+other = "Created At"
+
+[RuleShowFieldUpdatedAt]
+other = "Updated At"
+
+[RuleShowContentHeading]
+other = "Rule Text"
+
+[RuleSaved]
+other = "Rule saved: {{.Name}} ({{.ID}}) -> {{.Target}}"
+
+[RuleRepositoryMissing]
+other = "rule repository is not configured"
+
+[RuleNameRequired]
+other = "rule name is required"
+
+[RuleContentRequired]
+other = "rule content is required"
+
+[RuleChildRequiresWorkspace]
+other = "--child can only be used in workspace mode"
+
+[RuleChildNotFound]
+other = "Workspace child project not found: {{.Child}}"
+
+[RuleChildNotInitialized]
+other = "Child project {{.ProjectName}} has not initialized skills-seed: {{.Path}}"
+
+[RuleChildNotGitRepo]
+other = "Child project {{.ProjectName}} is not a Git repository: {{.Path}}"
+
+[RuleChildModeInvalid]
+other = "Child project {{.ProjectName}} must use project mode, current mode is {{.Mode}}"
+
+[RuleChildProjectConflict]
+other = "--child and --project cannot be used together"
+
+[RuleProjectRequiresWorkspace]
+other = "--project can only be used for a workspace-root rule"
+
+[RuleProjectNotFound]
+other = "Workspace child project not found: {{.Project}}"
+
+[RulePathInvalid]
+other = "A rule path must be relative to the current project or workspace: {{.Path}}"
+
+[ProgressOptimizeRuleAI]
+other = "Optimizing and saving user rule"
+
+[RuleOptimizerMissing]
+other = "Rule optimizer is not configured"
+
+[RuleOptimizerEmptyContent]
+other = "Rule optimizer returned empty content"
+
+[GenerateRuleIDConflict]
+other = "The current project rule and projected workspace rule use the same ID: {{.ID}}"
+
 [WorkflowShort]
 other = "Manage user workflows"
 
 [WorkflowLongDesc]
-other = "Ask the current Agent to infer and organize a standard workflow from user-provided goals, constraints, background, or paths, then save it as an independent resource. Same-name workflows are merged and deduplicated by default; use --overwrite to replace them completely. Use the show subcommand to inspect existing workflows without writing. Workflows are not profile.mode and do not affect the project/workspace mode lock."
+other = "Use the current Agent and project context to organize a user workflow, then save its complete text. A workflow with the same name is merged with the existing content by default; use --overwrite only for a complete replacement. Use the show subcommand to inspect existing workflows without writing. Workflows are not profile.mode and do not affect the project/workspace mode lock."
 
 [WorkflowExample]
-other = "  skills-seed workflow --context \"Check environment variables and build artifacts before release, then run smoke tests after deployment\"\n  skills-seed workflow --name deploy --context \"Also check database migrations and rollback scripts before release\"\n  skills-seed workflow --name deploy --context \"Replace the release workflow with only this new process\" --overwrite"
+other = "  skills-seed workflow --name deploy --content \"# Deploy\\n\\n## Steps\\n- Check environment variables\"\n  skills-seed workflow --name deploy --content \"Add database migration checks\""
 
 [WorkflowFlagName]
-other = "Workflow name; generated by the Agent from context when omitted"
+other = "Workflow name"
 
-[WorkflowFlagContext]
-other = "User-provided goals, constraints, background, paths, or rough notes; the Agent infers a standard workflow and merges same-name workflows by default"
+[WorkflowFlagContent]
+other = "Workflow text or draft; the Agent organizes it as executable Markdown"
 
 [WorkflowFlagOverwrite]
-other = "Completely replace the same-name workflow instead of merging with existing content"
+other = "Completely replace a workflow with the same name"
 
 [WorkflowFlagChild]
 other = "In workspace mode, save the workflow to a child project, for example --child backend"
@@ -82,9 +226,6 @@ other = "Target"
 [WorkflowShowHeaderSummary]
 other = "Summary"
 
-[WorkflowShowHeaderContexts]
-other = "Contexts"
-
 [WorkflowShowHeaderScripts]
 other = "Scripts"
 
@@ -102,9 +243,6 @@ other = "Target"
 
 [WorkflowShowFieldSummary]
 other = "Summary"
-
-[WorkflowShowFieldContexts]
-other = "Contexts"
 
 [WorkflowShowFieldScripts]
 other = "Scripts"
@@ -140,7 +278,7 @@ other = "Child project {{.ProjectName}} must use project mode, current mode is {
 other = "workflow skills template loader is not configured"
 
 [ProgressOptimizeWorkflowAI]
-other = "Optimizing user workflow"
+other = "Optimizing and saving user workflow"
 
 [WorkflowOutputSummaryHeadingCandidates]
 other = "Applies When|When to use|Goal|Summary|Description"
@@ -276,10 +414,16 @@ other = "Unsupported agent engine: {{.Provider}}"
 other = "Agent {{.Agent}} is not available; check agent command configuration"
 
 [AgentRenderOptimizeWorkflowPromptFailed]
-other = "Failed to render core-workflow-optimize prompt"
+other = "Failed to render workflow optimization prompt"
 
 [AgentOptimizeWorkflowFailed]
 other = "Failed to optimize workflow"
+
+[AgentRenderOptimizeRulePromptFailed]
+other = "Failed to render rule optimization prompt"
+
+[AgentOptimizeRuleFailed]
+other = "Failed to optimize rule"
 
 [AgentRenderProjectAnalysisPromptFailed]
 other = "Failed to render project or workspace analysis prompt"
@@ -777,27 +921,6 @@ other = "{{.Label}}: scanning file fingerprints"
 [ProgressLearnCurrentLocalFileSelection]
 other = "Local candidate preparation"
 
-[ProgressLearnCurrentAIFileSelection]
-other = "AI candidate narrowing"
-
-[ProgressLearnCurrentCandidateSelectionStructuralContext]
-other = "{{.Label}} · preparing structural context (seeds {{.SeedPaths}})"
-
-[ProgressLearnCurrentCandidateSelectionCodeGraphIndex]
-other = "{{.Label}} · CodeGraph checking index (seeds {{.SeedPaths}})"
-
-[ProgressLearnCurrentCandidateSelectionCodeGraphContext]
-other = "{{.Label}} · CodeGraph extracting candidate cues (seeds {{.SeedPaths}})"
-
-[ProgressLearnCurrentCandidateSelectionCodeGraphRepair]
-other = "{{.Label}} · CodeGraph repairing index (seeds {{.SeedPaths}})"
-
-[ProgressLearnCurrentCandidateSelectionTreeSitterContext]
-other = "{{.Label}} · parsing structural seeds (seeds {{.SeedPaths}})"
-
-[ProgressLearnCurrentCandidateSelectionAgent]
-other = "{{.Label}} · calling Agent to narrow candidates (candidates {{.CandidatePaths}})"
-
 [ProgressLearnCurrentFileSelectionSkipRestored]
 other = "learning agenda restored"
 
@@ -805,7 +928,7 @@ other = "learning agenda restored"
 other = "no candidate files"
 
 [ProgressLearnCurrentAnalyzeCodebase]
-other = "Analyzing current codebase"
+other = "Isolated source evidence analysis"
 
 [ProgressLearnCurrentPlanFocuses]
 other = "Learning agenda planning"
@@ -835,7 +958,19 @@ other = "{{.Batch}} focuses {{.Start}}-{{.End}}/{{.Total}} {{.Name}}"
 other = "{{.Label}} · committing {{.Count}} file states"
 
 [ProgressLearnCurrentNormalizeAndSavePatterns]
-other = "Normalizing and saving pattern store"
+other = "Knowledge admission and pattern storage"
+
+[ProgressLearnCurrentReviewKnowledge]
+other = "Independent knowledge review"
+
+[ProgressLearnCurrentReviewKnowledgeSkipped]
+other = "Skipping independent knowledge review (no candidates or reused)"
+
+[ProgressLearnCurrentReviewFocus]
+other = "{{.Label}} · completed {{.Completed}}/{{.Total}} · focus {{.Current}}/{{.AgendaTotal}} {{.Name}} · candidates {{.Candidates}}"
+
+[ProgressLearnCurrentReviewComplete]
+other = "{{.Label}} · completed {{.Completed}}/{{.Total}} focuses"
 
 [ProgressLearnCurrentPatternStageDetail]
 other = "{{.Label}} · {{.Detail}}"
@@ -846,23 +981,26 @@ other = "Validating normalized patterns"
 [ProgressNormalizePatternsStore]
 other = "Writing pattern store"
 
-[ProgressNormalizePatternsLocal]
-other = "Local deterministic normalization"
-
 [ProgressNormalizePatternsAI]
 other = "AI pattern merge optimization"
 
+[ProgressNormalizePatternsReplay]
+other = "Replay saved normalization decision"
+
 [ProgressLearnCurrentSaveProfile]
-other = "Synchronizing project profile"
+other = "Refreshing authority rules and project map"
 
 [ProgressLearnCurrentSkipProfile]
-other = "Skipping project profile sync"
+other = "Skipping authority rules and project map refresh"
+
+[ProgressLearnCurrentExtractAuthority]
+other = "Extracting authority rules"
+
+[ProgressLearnCurrentRefreshProjectMap]
+other = "Refreshing project map"
 
 [ProgressLearnWorkspaceProjects]
 other = "Learning workspace child projects"
-
-[ProgressNormalizePatternsReplay]
-other = "Replay saved normalization decision"
 
 [ProgressUserDefinePatternAI]
 other = "Generate user-defined pattern"
@@ -884,7 +1022,7 @@ other = "Generating AI Agent skills..."
 other = "Failed to count patterns: {{.Error}}"
 
 [GenerateNoPatterns]
-other = "No learned patterns or saved workflows yet. Run 'skills-seed learn current' or 'skills-seed workflow --context \"...\"' first."
+other = "No learned patterns or saved workflows yet. Run 'skills-seed learn current' or 'skills-seed workflow --name <name> --content \"<Markdown>\"' first."
 
 [GenerateFoundPatterns]
 other = "Found {{.Count}} patterns"
@@ -902,10 +1040,13 @@ other = "Loading learned patterns"
 other = "Preparing generation data"
 
 [ProgressGenerateLoadProfile]
-other = "Loading project profile"
+other = "Loading authority rules and project map"
 
 [ProgressGenerateWriteSkills]
 other = "Writing skill files"
+
+[ProgressGenerateAuditReadiness]
+other = "Write Skill files · audit delivery readiness"
 
 [ProgressGenerateWriteRootSkills]
 other = "Writing workspace root skills"
@@ -957,9 +1098,6 @@ other = "Child project {{.ProjectName}} must use project mode, current mode is {
 
 [GenerateFlagOutput]
 other = "Skills output directory (defaults to skills.paths for the current skills.target, such as .claude/skills/... or .agents/skills/...)"
-
-[GenerateFlagNoReferences]
-other = "Skip generating reference documents (references/ directory)"
 
 [GenerateFlagContext]
 other = "Additional guidance for this generate run, passed to the AI agent as extra constraints"
@@ -1395,7 +1533,7 @@ other = "  # Auto-detect and add all sub-projects\n  skills-seed workspace add .
 other = "Generate AI Agent skills"
 
 [GenerateSkillsLongDesc]
-other = "Generate AI Agent skills from learned patterns and the project profile.\n\nThis command will:\n  • Read learned patterns from the database\n  • Read the project profile\n  • Select templates based on skills.target\n  • Deterministically generate SKILL.md and references/\n\nGeneration does not invoke an Agent."
+other = "Generate AI Agent skills from verified patterns, authority rules, and the project map.\n\nThis command will:\n  • Read learned patterns from the database\n  • Read authority rules and the project map\n  • Select templates based on skills.target\n  • Deterministically generate SKILL.md and references/\n\nGeneration does not invoke an Agent."
 
 [GenerateSkillsExample]
 other = "  # Generate to default skills.paths\n  skills-seed generate skills\n\n  # Specify output directory\n  skills-seed generate skills --output .agents/skills/my-project"
@@ -1661,17 +1799,8 @@ other = "Failed to parse result, returning empty result"
 [LoggerAgentParseResultFailedNonFallback]
 other = "Failed to parse result"
 
-[LoggerPatternNormCoverageRecovered]
-other = "Pattern normalization coverage is incomplete; recovering only unclassified candidates locally"
-
-[LoggerPatternNormRecallRecovered]
-other = "Pattern normalization appears over-filtered; recovered source-backed candidates"
-
 [LoggerPatternNormSanitized]
 other = "Pattern normalization result contains invalid or duplicate decisions; cleaned them and continued"
-
-[LoggerPatternNormAIFallback]
-other = "AI pattern merge optimization failed; falling back to local deterministic normalization"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
@@ -1739,10 +1868,10 @@ other = "Event statistics updated"
 other = "Learn from current codebase"
 
 [LearnCurrentLongDesc]
-other = "Analyze current codebase and extract coding patterns, capability entries, reusable project knowledge, and the project profile.\n\nThis command will:\n  • Analyze project structure and code\n  • Use configured AI agent to extract coding patterns\n  • Save learned patterns to database\n  • Save the project profile to .skills-seed/store/documents/project-profile.json according to the selected strategy\n  • Prepare complete project-overview input for generate skills"
+other = "Produce reusable project knowledge, authority rules, and a project map from the current codebase.\n\nThis command will:\n  • Prepare candidates and plan a learning agenda\n  • Analyze isolated source evidence and independently review knowledge\n  • Normalize and store admitted patterns\n  • Extract authority rules and refresh .skills-seed/store/documents/project-profile.json according to policy\n  • Prepare verified knowledge input for generate skills"
 
 [LearnCurrentExample]
-other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip project profile sync\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance from multiple files or directories\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
+other = "  # Incrementally learn from the current codebase\n  skills-seed learn current\n\n  # Learn only a directory and skip authority-rule and project-map refresh\n  skills-seed learn current --focus internal/service --profile skip\n\n  # Pass multiple focus paths\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # Read guidance from multiple files or directories\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
 [LearnFlagLanguage]
 other = "Primary programming language of the project; empty uses config or auto-detection"
@@ -1751,7 +1880,7 @@ other = "Primary programming language of the project; empty uses config or auto-
 other = "Directory or file to scan for learning; may be repeated; paths must stay under the project root"
 
 [LearnFlagProfile]
-other = "Project profile sync strategy: auto syncs when missing or when this run writes patterns, skip omits it, refresh re-analyzes the current input and syncs"
+other = "Authority-rule and project-map refresh strategy: auto refreshes when the map is missing or authority inputs change, skip omits it, refresh forces it"
 
 [LearnFlagContext]
 other = "Additional guidance for this learn run, passed to the AI agent as extra constraints"
@@ -1790,18 +1919,6 @@ other = "The agent did not return a valid evidence focus, so skills-seed uses th
 [LearnCurrentFallbackFocusReasonWithGroup]
 other = "The agent did not assign {{.Group}} to an existing high-density evidence focus, so skills-seed uses this semantic path group as the fallback analysis scope"
 
-[LearnCurrentDecisionCandidateChanged]
-other = "Normalization candidate set changed"
-
-[LearnCurrentDecodeDecisionFailed]
-other = "Failed to decode normalization decision"
-
-[LearnCurrentDecisionCheckpointMissing]
-other = "Normalization checkpoint is not initialized"
-
-[LearnCurrentEncodeDecisionFailed]
-other = "Failed to encode normalization decision"
-
 [LearnCurrentArtifactsCommittedWithPendingFocuses]
 other = "Analysis artifacts are committed with {{.Count}} pending evidence focuses"
 
@@ -1826,12 +1943,6 @@ other = "Candidate preparation applied"
 [LearnCurrentFileSelectionLocalReason]
 other = "local conservative candidate preparation"
 
-[LearnCurrentFileSelectionAIReason]
-other = "AI candidate narrowing applied{{if .Reason}}: {{.Reason}}{{end}}"
-
-[LearnCurrentFileSelectionAIFailed]
-other = "AI candidate narrowing failed; falling back to all candidates: {{.Error}}"
-
 [LearnCurrentFileSelectionSkipped]
 other = "skipped ({{.Reason}})"
 
@@ -1855,9 +1966,6 @@ other = "language"
 
 [LearnCurrentSharedContextLearningMode]
 other = "learning mode"
-
-[LearnCurrentSharedContextLearningScope]
-other = "learning scope"
 
 [LearnCurrentSharedContextChangeProfile]
 other = "change profile"
@@ -1893,7 +2001,7 @@ other = "Focus path {{.Path}} is not accessible"
 other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or refresh"
 
 [LearnCurrentResult]
-other = "Analysis result:\n  • new patterns: {{.PatternsCount}}"
+other = "Analysis result:\n  • new or updated patterns: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeFocusesSummary]
 other = "Evidence focuses completed: {{.Completed}}/{{.Total}}, batches {{.Batches}}, in-project parallelism {{.Parallelism}}"
@@ -1902,13 +2010,13 @@ other = "Evidence focuses completed: {{.Completed}}/{{.Total}}, batches {{.Batch
 other = "Failed to save pattern [{{.ID}}]: {{.Error}}"
 
 [LearnCurrentPatternsSaved]
-other = "Pattern store write completed: {{.Count}} patterns"
+other = "Pattern store update completed: wrote {{.Saved}} patterns, removed {{.Retired}} outdated patterns"
 
 [LearnCurrentProfileSaved]
-other = "Project profile synchronized"
+other = "Authority rules and project map refreshed"
 
 [LearnCurrentProfileSkipped]
-other = "Project profile sync skipped"
+other = "Authority rules and project map refresh skipped"
 
 [LearnCurrentProfileFailed]
 other = "Failed to sync project profile: {{.Error}}"
@@ -1923,7 +2031,7 @@ other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguag
 other = "Child project {{.ProjectName}} incremental learning started; log directory: {{.LogPath}}"
 
 [LearnWorkspaceProjectSummary]
-other = "Child project {{.ProjectName}} completed: changed {{.Changed}}, deleted {{.Deleted}}, locally excluded {{.Skipped}}, produced patterns {{.Patterns}}, written {{.Saved}}, duration {{.Duration}}"
+other = "Child project {{.ProjectName}} completed: changed {{.Changed}}, deleted {{.Deleted}}, locally excluded {{.Skipped}}, produced patterns {{.Patterns}}, written {{.Saved}}, retired {{.Retired}}, duration {{.Duration}}"
 
 [LearnWorkspaceProjectNoFileChanges]
 other = "Child project {{.ProjectName}} has no learnable file changes; skipped, duration {{.Duration}}"
@@ -1935,7 +2043,7 @@ other = "Child project {{.ProjectName}} completed independent execution; log fil
 other = "Workspace relationship input is unchanged; skipped workspace profile and rules analysis"
 
 [LearnWorkspaceProjectProgressComplete]
-other = "completed, patterns {{.Patterns}}, written {{.Saved}}"
+other = "completed, patterns {{.Patterns}}, written {{.Saved}}, retired {{.Retired}}"
 
 [LearnWorkspaceProjectProgressFailed]
 other = "failed"
@@ -2080,7 +2188,7 @@ other = "Learned current code"
 other = "Generated skills"
 
 [ChangeLogLearnProjectSummary]
-other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}; found {{.Patterns}} patterns, saved {{.Saved}}"
+other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}; found {{.Patterns}} patterns, saved {{.Saved}}, retired {{.Retired}}"
 
 [ChangeLogLearnWorkspaceSummary]
 other = "processed {{.Projects}} projects; {{.ChangedProjects}} changed patterns"
@@ -2451,15 +2559,6 @@ other = "code"
 [GeneratorSkillDescriptionDefault]
 other = "Use when modifying, debugging, testing, reviewing, or extending {{.Project}} {{.Language}} code, including interfaces and contracts, plugins and integrations, state/persistence, configuration and runtime behavior, or architecture analysis"
 
-[GeneratorValidationGapTest]
-other = "No repository-evidenced test command has been learned"
-
-[GeneratorValidationGapStaticCheck]
-other = "No repository-evidenced static-check command has been learned"
-
-[GeneratorValidationGapScopedMatrix]
-other = "No validation matrix can currently be mapped to change scopes"
-
 [GeneratorCategorySummary]
 other = "{{.Category}} category contains {{.Count}} project-specific patterns: {{.Patterns}}."
 
@@ -2538,12 +2637,6 @@ other = "Concurrency / Lifecycle Patterns"
 [GeneratorCategoryConcurrencyDescription]
 other = "Parallel execution, synchronization, consistency windows, and lifecycle coordination"
 
-[GeneratorCategoryTestingTitle]
-other = "Testing Patterns"
-
-[GeneratorCategoryTestingDescription]
-other = "Testing conventions"
-
 [GeneratorCategoryDefaultDescription]
 other = "Project-specific patterns"
 
@@ -2583,11 +2676,8 @@ other = "Covered pattern categories: {{.Categories}}"
 [GeneratorOverviewArchitectureSummary]
 other = "The current codebase has {{.Count}} learned architecture layers. This section is a navigation summary; use the Architecture Layers and Key Modules sections for concrete responsibilities."
 
-[GeneratorOverviewCoveragePreview]
-other = "The learned project profile currently covers {{.Total}} modules or responsibility domains; this preview lists the first {{.Preview}} for navigation: {{.Domains}}. Use Key Modules, capability entries, and category patterns for the full reference set; confirm concrete product rules, architecture boundaries, and implementation details against current code instead of promoting one local summary to whole-project fact."
-
-[GeneratorOverviewCoverageFull]
-other = "The learned project profile currently covers {{.Total}} modules or responsibility domains: {{.Domains}}. Use this section to quickly locate project scope and reference entry points; confirm concrete product rules, architecture boundaries, and implementation details against current code, Project Spec, and category patterns instead of promoting one domain summary to whole-project fact."
+[GeneratorOverviewCoverageTotal]
+other = "The learned project profile currently covers {{.Total}} modules or responsibility domains. Use Key Modules, capability entries, and category patterns for complete navigation; confirm concrete product rules, architecture boundaries, and implementation details against current code instead of promoting local summaries to whole-project fact."
 
 [GeneratorOverviewCoverageMissing]
 other = "A stable whole-project overview summary has not been extracted yet; confirm global conclusions against current code, Project Spec, and category patterns."
@@ -2655,26 +2745,11 @@ other = "Read when utility functions carry domain rules, audit data, or business
 [GeneratorReferenceLinkUtilsAPI]
 other = "Read when utility functions are used for interface, message, event, model conversion, or external contracts."
 
-[GeneratorReferenceLinkUtilsTesting]
-other = "Read when utility changes need project testing conventions, fixtures, or assertion patterns."
-
 [GeneratorReferenceLinkConcurrencyDatabase]
 other = "Read when concurrency control affects state consistency, transaction boundaries, caches, or persistence order."
 
 [GeneratorReferenceLinkConcurrencyBusiness]
 other = "Read when locks, queues, or async flows carry business state transitions."
-
-[GeneratorReferenceLinkConcurrencyTesting]
-other = "Read when concurrent behavior needs race, timing, or retry-oriented test conventions."
-
-[GeneratorReferenceLinkTestingBusiness]
-other = "Read when tests assert business rules, state transitions, or cross-entity behavior."
-
-[GeneratorReferenceLinkTestingAPI]
-other = "Read when tests cover interfaces, messages, events, contracts, generated code, or adapters."
-
-[GeneratorReferenceLinkTestingDatabase]
-other = "Read when tests depend on state fixtures, transaction isolation, caches, or persistence assertions."
 
 [GeneratorReferenceLinkStructureBusiness]
 other = "Read when structural changes affect domain boundaries, entry orchestration, or cross-module business flows."
@@ -2721,26 +2796,20 @@ other = "Enter a valid integer"
 [InteractiveMinimumInteger]
 other = "Value must be at least {{.Minimum}}"
 
-[WorkflowConflictRequirements]
-other = "Workflow contains conflicting requirements: {{.Conflicts}}"
-
 [WorkflowRepositoryMissing]
 other = "Workflow repository is not configured"
 
 [WorkflowOptimizerMissing]
 other = "Workflow optimizer is not configured"
 
-[WorkflowContextRequired]
-other = "workflow --context is required"
-
 [WorkflowOptimizerEmptyContent]
 other = "Workflow optimizer returned empty content"
 
-[WorkflowOptimizerEmptyTitle]
-other = "Workflow optimizer returned empty title"
+[WorkflowNameRequired]
+other = "workflow name is required"
 
-[WorkflowOptimizerUnsafeTitle]
-other = "Workflow optimizer returned an unsafe title"
+[WorkflowContentRequired]
+other = "workflow content is required through --content"
 
 [PatternsNotWritten]
 other = "Pattern was not written"
@@ -2844,14 +2913,29 @@ other = "Unsupported pattern storage operation: {{.Operation}}"
 [PatternNormLoadExistingPatternsFailed]
 other = "Failed to load existing patterns"
 
+[PatternNormValidateDeterministicFailed]
+other = "Failed to validate deterministic normalization"
+
 [PatternNormLearnCurrentFailed]
 other = "Failed to normalize current-code patterns"
 
 [PatternNormValidateCurrentFailed]
 other = "Failed to validate current-code normalization"
 
-[PatternNormValidateDeterministicFailed]
-other = "Failed to validate deterministic normalization"
+[LoggerPatternNormAIFallback]
+other = "AI pattern merge optimization failed; falling back to local deterministic normalization"
+
+[LearnCurrentDecisionCandidateChanged]
+other = "Normalization candidate set changed"
+
+[LearnCurrentDecodeDecisionFailed]
+other = "Failed to decode normalization decision"
+
+[LearnCurrentDecisionCheckpointMissing]
+other = "Normalization checkpoint is not initialized"
+
+[LearnCurrentEncodeDecisionFailed]
+other = "Failed to encode normalization decision"
 
 [PatternNormApplyPatternsFailed]
 other = "Failed to apply normalized patterns"

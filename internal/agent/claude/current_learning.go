@@ -2,24 +2,12 @@ package claude
 
 import (
 	"context"
-	"errors"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
-	"github.com/silaswei-io/skills-seed/internal/i18n"
-	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
+	"github.com/silaswei-io/skills-seed/internal/agent/structuredtask"
 )
-
-func (c *ClaudeAgent) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-	output, err := c.callCurrentLearning(ctx, "LearningCandidateSelect", "learning-candidate-select", "skills-seed-learning-candidate-select", aicontract.ContractSelectLearningCandidates, agent.NewRuntimeTask(agent.RuntimeSlug("learning-candidate-select", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
-		return agent.SelectLearningCandidatesPromptData(inputs, req)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return parser.ParseSelectLearningCandidatesResult(output)
-}
 
 func (c *ClaudeAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
 	output, err := c.callCurrentLearning(ctx, "LearningPackPlan", "learning-pack-plan", "skills-seed-learning-pack-plan", aicontract.ContractPlanLearningAgenda, agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-plan", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
@@ -39,6 +27,20 @@ func (c *ClaudeAgent) NormalizePatterns(ctx context.Context, req *agent.Normaliz
 		return nil, err
 	}
 	return parser.ParseNormalizePatternsResult(output)
+}
+
+func (c *ClaudeAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+	output, err := c.callCurrentLearning(ctx, "LearningKnowledgeReview", "learning-knowledge-review", "skills-seed-learning-knowledge-review", aicontract.ContractReviewKnowledge, agent.NewRuntimeTask(agent.RuntimeSlug("learning-knowledge-review", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+		return agent.ReviewKnowledgePromptData(inputs, req)
+	})
+	if err != nil {
+		return nil, err
+	}
+	result, err := parser.ParseReviewKnowledgeResult(output)
+	if err != nil {
+		return nil, err
+	}
+	return result, agent.RequireResult(result, "ReviewKnowledge")
 }
 
 func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
@@ -85,24 +87,30 @@ func (c *ClaudeAgent) RefreshProjectProfile(ctx context.Context, req *agent.Anal
 	return result, agent.RequireResult(result, "AnalyzeProject")
 }
 
-func (c *ClaudeAgent) callCurrentLearning(ctx context.Context, operation, templateName, inputPrefix, outputContract string, task agent.RuntimeTask, build func(*agent.PromptInputSession) (map[string]interface{}, error)) (string, error) {
-	inputs, err := agent.NewPromptInputSessionForContext(ctx, inputPrefix)
+func (c *ClaudeAgent) ExtractAuthority(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+	output, err := c.callCurrentLearning(ctx, "LearningAuthorityExtract", "learning-authority-extract", "skills-seed-learning-authority-extract", aicontract.ContractAuthorityExtraction, agent.NewRuntimeTask(agent.RuntimeSlug("learning-authority-extract", "")), func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+		return agent.ExtractAuthorityPromptData(inputs, req)
+	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer inputs.Cleanup()
-
-	data, err := build(inputs)
+	result, err := parser.ParseExtractAuthorityResult(output)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	prompt, err := c.promptLoader.RenderForRuntimeTask(templateName, data, promptRuntimeTask(task))
-	if err != nil || prompt == "" {
-		return "", errors.New(i18n.Get("AgentRenderInitSkillsPromptFailed"))
-	}
-	return c.callClaude(ctx, operation, prompt, outputContract, task)
+	return result, agent.RequireResult(result, "ExtractAuthority")
 }
 
-func promptRuntimeTask(task agent.RuntimeTask) promptloader.RuntimeTask {
-	return promptloader.RuntimeTask{ID: task.ID, Slug: task.Slug}
+func (c *ClaudeAgent) callCurrentLearning(ctx context.Context, operation, templateName, inputPrefix, outputContract string, task agent.RuntimeTask, build func(*agent.PromptInputSession) (map[string]interface{}, error)) (string, error) {
+	runner := structuredtask.New(c.promptLoader, func(ctx context.Context, operation, prompt, contract string, runtime agent.RuntimeTask) (string, error) {
+		return c.callClaude(ctx, operation, prompt, contract, runtime)
+	})
+	return runner.Run(ctx, structuredtask.Task{
+		Operation:      operation,
+		Template:       templateName,
+		InputPrefix:    inputPrefix,
+		OutputContract: outputContract,
+		Runtime:        task,
+		Build:          build,
+	})
 }

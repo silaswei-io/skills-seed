@@ -19,8 +19,116 @@ func promptLearningMode(mode config.LearningMode) config.LearningMode {
 	return config.NormalizeLearningMode(string(mode))
 }
 
-func promptLearningScope(scope config.LearningScope) config.LearningScope {
-	return config.NormalizeLearningScope(string(scope))
+type normalizePatternInput struct {
+	ID              string                         `json:"id"`
+	Name            string                         `json:"name"`
+	Category        string                         `json:"category"`
+	Description     string                         `json:"description,omitempty"`
+	Rule            string                         `json:"rule,omitempty"`
+	EvidencePaths   []string                       `json:"evidence_paths,omitempty"`
+	CapabilityEntry *normalizeCapabilityEntryInput `json:"capability_entry,omitempty"`
+	KnowledgeFlags  []string                       `json:"knowledge_flags,omitempty"`
+}
+
+type normalizeCapabilityEntryInput struct {
+	Name               string `json:"name"`
+	CurrentLocation    string `json:"current_location,omitempty"`
+	HistoricalLocation string `json:"historical_location,omitempty"`
+}
+
+// NormalizePatternsPromptData 返回当前模式合并优化所需的提示词数据。
+func NormalizePatternsPromptData(session *PromptInputSession, req *NormalizePatternsRequest) (map[string]interface{}, error) {
+	candidatesPath, err := writeNormalizePatternsInput(session, "candidate-patterns.json", req.Candidates)
+	if err != nil {
+		return nil, promptInputWriteError("candidate-patterns.json", err)
+	}
+	relatedPath, err := writeNormalizePatternsInput(session, "related-patterns.json", req.RelatedPatterns)
+	if err != nil {
+		return nil, promptInputWriteError("related-patterns.json", err)
+	}
+	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
+	if err != nil {
+		return nil, promptInputWriteError("user-context.md", err)
+	}
+	return map[string]interface{}{
+		"ProjectName":           req.ProjectName,
+		"RootPath":              req.RootPath,
+		"Language":              req.Language,
+		"CandidatePatternsPath": candidatesPath,
+		"CandidatePatternCount": len(req.Candidates),
+		"RelatedPatternsPath":   relatedPath,
+		"RelatedPatternCount":   len(req.RelatedPatterns),
+		"UserContextPath":       userContextPath,
+		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
+	}, nil
+}
+
+// ReviewKnowledgePromptData 返回独立知识审查所需的提示词数据。
+func ReviewKnowledgePromptData(session *PromptInputSession, req *ReviewKnowledgeRequest) (map[string]interface{}, error) {
+	focusPath, err := writeJSONInput(session, "evidence-focus.json", req.EvidenceFocus)
+	if err != nil {
+		return nil, promptInputWriteError("evidence-focus.json", err)
+	}
+	candidatesPath, err := writeJSONInput(session, "knowledge-candidates.json", req.Candidates)
+	if err != nil {
+		return nil, promptInputWriteError("knowledge-candidates.json", err)
+	}
+	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
+	if err != nil {
+		return nil, promptInputWriteError("user-context.md", err)
+	}
+	return map[string]interface{}{
+		"ProjectName":       req.ProjectName,
+		"RootPath":          req.RootPath,
+		"Language":          req.Language,
+		"EvidenceFocusPath": focusPath,
+		"CandidatesPath":    candidatesPath,
+		"CandidateCount":    len(req.Candidates),
+		"UserContextPath":   userContextPath,
+		"AllowedCategories": domain.AllowedPatternCategoriesText(),
+	}, nil
+}
+
+func writeNormalizePatternsInput(session *PromptInputSession, name string, patterns []domain.Pattern) (string, error) {
+	data, err := json.MarshalIndent(compactNormalizePatterns(patterns), "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return session.Write(name, string(data))
+}
+
+func compactNormalizePatterns(patterns []domain.Pattern) []normalizePatternInput {
+	out := make([]normalizePatternInput, 0, len(patterns))
+	for _, pattern := range patterns {
+		item := normalizePatternInput{ID: strings.TrimSpace(pattern.ID), Name: strings.TrimSpace(pattern.Name), Category: string(domain.NormalizePatternCategory(pattern.Category)), Description: strings.TrimSpace(pattern.Description), Rule: strings.TrimSpace(pattern.Rule), EvidencePaths: compactEvidencePaths(pattern.EvidenceLocations), KnowledgeFlags: domain.CanonicalKnowledgeFlags(pattern.KnowledgeFlags)}
+		if pattern.BusinessMethod != nil {
+			item.CapabilityEntry = &normalizeCapabilityEntryInput{
+				Name:               strings.TrimSpace(pattern.BusinessMethod.Name),
+				CurrentLocation:    strings.TrimSpace(pattern.BusinessMethod.CodeLocation.CurrentLocation),
+				HistoricalLocation: strings.TrimSpace(pattern.BusinessMethod.CodeLocation.HistoricalLocation),
+			}
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func compactEvidencePaths(locations []domain.PatternEvidenceLocation) []string {
+	seen := make(map[string]struct{}, len(locations))
+	paths := make([]string, 0, len(locations))
+	for _, location := range locations {
+		path := strings.TrimSpace(location.Path)
+		if path == "" {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 // WorkspacePromptDataRequest 描述工作区画像和规范提示词共享的输入参数。
@@ -92,11 +200,23 @@ func writePathListInput(session *PromptInputSession, name string, paths []string
 	return path, len(normalized), nil
 }
 
-// PlanLearningAgendaPromptData 返回业务学习议程规划所需的提示词数据。
+func writeJSONInput(session *PromptInputSession, name string, value any) (string, error) {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return session.Write(name, string(data))
+}
+
+// PlanLearningAgendaPromptData 返回源码证据学习议程规划所需的提示词数据。
 func PlanLearningAgendaPromptData(session *PromptInputSession, req *PlanLearningAgendaRequest) (map[string]interface{}, error) {
 	focusPathsPath, focusPathCount, err := writePathListInput(session, "analysis-files.txt", req.FocusPaths)
 	if err != nil {
 		return nil, promptInputWriteError("analysis-files.txt", err)
+	}
+	sourceFactsPath, err := writeJSONInput(session, "planning-source-facts.json", req.SourceFacts)
+	if err != nil {
+		return nil, promptInputWriteError("planning-source-facts.json", err)
 	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
@@ -112,126 +232,12 @@ func PlanLearningAgendaPromptData(session *PromptInputSession, req *PlanLearning
 		"Language":              req.Language,
 		"FocusPathsPath":        focusPathsPath,
 		"FocusPathCount":        focusPathCount,
+		"SourceFactsPath":       sourceFactsPath,
+		"SourceFactCount":       len(req.SourceFacts),
 		"StructuralContextPath": structuralContextPath,
 		"UserContextPath":       userContextPath,
 		"LearningMode":          promptLearningMode(req.LearningMode),
-		"LearningScope":         promptLearningScope(req.LearningScope),
 	}, nil
-}
-
-// SelectLearningCandidatesPromptData 返回当前代码学习候选文件 AI 收敛所需的提示词数据。
-func SelectLearningCandidatesPromptData(session *PromptInputSession, req *SelectLearningCandidatesRequest) (map[string]interface{}, error) {
-	candidatesPath, candidateCount, err := writePathListInput(session, "candidate-files.txt", req.CandidatePaths)
-	if err != nil {
-		return nil, promptInputWriteError("candidate-files.txt", err)
-	}
-	requiredPath, requiredCount, err := writePathListInput(session, "required-files.txt", req.RequiredPaths)
-	if err != nil {
-		return nil, promptInputWriteError("required-files.txt", err)
-	}
-	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
-	if err != nil {
-		return nil, promptInputWriteError("structural-context.md", err)
-	}
-	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
-	if err != nil {
-		return nil, promptInputWriteError("user-context.md", err)
-	}
-	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"CandidatePathsPath":    candidatesPath,
-		"CandidatePathCount":    candidateCount,
-		"RequiredPathsPath":     requiredPath,
-		"RequiredPathCount":     requiredCount,
-		"StructuralContextPath": structuralContextPath,
-		"UserContextPath":       userContextPath,
-		"LearningMode":          promptLearningMode(req.LearningMode),
-		"LearningScope":         promptLearningScope(req.LearningScope),
-	}, nil
-}
-
-type normalizePatternInput struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Category       string   `json:"category"`
-	Description    string   `json:"description,omitempty"`
-	Rule           string   `json:"rule,omitempty"`
-	EvidencePaths  []string `json:"evidence_paths,omitempty"`
-	BusinessMethod string   `json:"business_method,omitempty"`
-}
-
-// NormalizePatternsPromptData 返回当前模式合并优化所需的提示词数据。
-func NormalizePatternsPromptData(session *PromptInputSession, req *NormalizePatternsRequest) (map[string]interface{}, error) {
-	candidatesPath, err := writeNormalizePatternsInput(session, "candidate-patterns.json", req.Candidates)
-	if err != nil {
-		return nil, promptInputWriteError("candidate-patterns.json", err)
-	}
-	relatedPath, err := writeNormalizePatternsInput(session, "related-patterns.json", req.RelatedPatterns)
-	if err != nil {
-		return nil, promptInputWriteError("related-patterns.json", err)
-	}
-	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
-	if err != nil {
-		return nil, promptInputWriteError("user-context.md", err)
-	}
-	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"CandidatePatternsPath": candidatesPath,
-		"CandidatePatternCount": len(req.Candidates),
-		"RelatedPatternsPath":   relatedPath,
-		"RelatedPatternCount":   len(req.RelatedPatterns),
-		"UserContextPath":       userContextPath,
-		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
-	}, nil
-}
-
-func writeNormalizePatternsInput(session *PromptInputSession, name string, patterns []domain.Pattern) (string, error) {
-	data, err := json.MarshalIndent(compactNormalizePatterns(patterns), "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return session.Write(name, string(data))
-}
-
-func compactNormalizePatterns(patterns []domain.Pattern) []normalizePatternInput {
-	out := make([]normalizePatternInput, 0, len(patterns))
-	for _, pattern := range patterns {
-		item := normalizePatternInput{
-			ID:            strings.TrimSpace(pattern.ID),
-			Name:          strings.TrimSpace(pattern.Name),
-			Category:      string(domain.NormalizePatternCategory(pattern.Category)),
-			Description:   strings.TrimSpace(pattern.Description),
-			Rule:          strings.TrimSpace(pattern.Rule),
-			EvidencePaths: compactEvidencePaths(pattern.EvidenceLocations),
-		}
-		if pattern.BusinessMethod != nil {
-			item.BusinessMethod = strings.TrimSpace(pattern.BusinessMethod.Name)
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func compactEvidencePaths(locations []domain.PatternEvidenceLocation) []string {
-	seen := make(map[string]struct{}, len(locations))
-	var paths []string
-	for _, location := range locations {
-		path := strings.TrimSpace(location.Path)
-		if path == "" {
-			continue
-		}
-		if _, ok := seen[path]; ok {
-			continue
-		}
-		seen[path] = struct{}{}
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	return paths
 }
 
 // AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
@@ -243,10 +249,6 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 	focusPathsPath, focusPathCount, err := writePathListInput(session, "focused-paths.txt", req.FocusPaths)
 	if err != nil {
 		return nil, promptInputWriteError("focused-paths.txt", err)
-	}
-	engineeringKnowledgePath, engineeringKnowledgeCount, err := writePathListInput(session, "engineering-knowledge-paths.txt", req.EngineeringKnowledge)
-	if err != nil {
-		return nil, promptInputWriteError("engineering-knowledge-paths.txt", err)
 	}
 	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
 	if err != nil {
@@ -261,18 +263,41 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 		return nil, promptInputWriteError("user-context.md", err)
 	}
 	return map[string]interface{}{
+		"ProjectName":           req.ProjectName,
+		"RootPath":              req.RootPath,
+		"Language":              req.Language,
+		"StructurePath":         structurePath,
+		"StructuralContextPath": structuralContextPath,
+		"ReadmePath":            req.ReadmePath,
+		"MainFiles":             req.MainFiles,
+		"ExistingProfilePath":   existingProfilePath,
+		"FocusPathsPath":        focusPathsPath,
+		"FocusPathCount":        focusPathCount,
+		"UserContextPath":       userContextPath,
+	}, nil
+}
+
+// ExtractAuthorityPromptData 返回独立权威知识提取所需的提示词数据。
+func ExtractAuthorityPromptData(session *PromptInputSession, req *ExtractAuthorityRequest) (map[string]interface{}, error) {
+	knowledgePath, knowledgeCount, err := writePathListInput(session, "engineering-knowledge-paths.txt", req.EngineeringKnowledge)
+	if err != nil {
+		return nil, promptInputWriteError("engineering-knowledge-paths.txt", err)
+	}
+	sectionsPath, err := writeJSONInput(session, "authority-sections.json", req.AuthoritySections)
+	if err != nil {
+		return nil, promptInputWriteError("authority-sections.json", err)
+	}
+	userContextPath, err := session.UsePathOrWrite(req.UserContextPath, "user-context.md", req.UserContext)
+	if err != nil {
+		return nil, promptInputWriteError("user-context.md", err)
+	}
+	return map[string]interface{}{
 		"ProjectName":               req.ProjectName,
 		"RootPath":                  req.RootPath,
-		"Language":                  req.Language,
-		"StructurePath":             structurePath,
-		"StructuralContextPath":     structuralContextPath,
-		"ReadmePath":                req.ReadmePath,
-		"MainFiles":                 req.MainFiles,
-		"EngineeringKnowledgePath":  engineeringKnowledgePath,
-		"EngineeringKnowledgeCount": engineeringKnowledgeCount,
-		"ExistingProfilePath":       existingProfilePath,
-		"FocusPathsPath":            focusPathsPath,
-		"FocusPathCount":            focusPathCount,
+		"EngineeringKnowledgePath":  knowledgePath,
+		"EngineeringKnowledgeCount": knowledgeCount,
+		"AuthoritySectionsPath":     sectionsPath,
+		"AuthoritySectionCount":     len(req.AuthoritySections),
 		"UserContextPath":           userContextPath,
 	}, nil
 }

@@ -48,8 +48,9 @@ agent:
 learning:
   current:
     mode: "normal"
-    scope: "flow"
-    max_focuses_per_call: 1
+    pattern_admission:
+      min_confidence: 0.75
+      min_single_evidence_confidence: 0.85
     structural:
       enabled: true
       provider: "auto"
@@ -160,11 +161,7 @@ exclude:
 
 | Field | Default | Description |
 |---|---:|---|
-| `mode` | `normal` | Learning strategy: `normal` balances quality and speed; `fast` keeps compact directly evidenced patterns; `deep` keeps more source-backed local business/code patterns |
-| `scope` | `flow` | Focus planning lens: `flow` is the default stable choice for workflows/resource actions; `domain` favors long-lived business responsibilities; `module` favors module/plugin/contract boundaries. It guides learning perspective, not a fixed taxonomy or count boundary |
-| `max_focuses_per_call` | `1` | Maximum evidence focuses per AI call; `1` disables batching to reduce oversized outputs, parse failures, and cross-focus conclusion bleed |
-| `select_relevant_files` | `true` | Enable AI candidate narrowing for large candidate sets before agenda planning; when disabled, conservative local preparation is used |
-| `select_relevant_files_min_candidates` | `200` | Minimum candidate file count before AI candidate narrowing is called; smaller changes keep local candidates |
+| `mode` | `normal` | All learning strategies use high-precision admission: `fast` narrows evidence exploration; `normal` is the default; `deep` broadens evidence exploration without lowering the pattern admission standard |
 | `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
 | `structural.provider` | `auto` | Structural context and symbol-verification source: `auto` prefers CodeGraph and falls back to tree-sitter when unavailable; `codegraph` requires CodeGraph; `treesitter` explicitly selects the embedded parser |
 | `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |
@@ -178,17 +175,16 @@ Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the
 
 Starting in 0.9.0, project-structure summaries, sample-file collection, and structural pre-scan all use the same configured file-filtering policy. Except for built-in safety boundaries such as `.git`, `.skills-seed`, and configured generated-skills output directories, analyzer no longer keeps extra directory-name keywords. Put dependency, build-output, or project-specific directories in `exclude` when they should be skipped.
 
-The current version applies candidate preparation after local file filtering: smaller changes keep their candidates and no longer drop source files by path vocabulary; path signals are used only to choose structural-context seeds. When candidate count reaches `select_relevant_files_min_candidates` and `select_relevant_files` is enabled, `learning-candidate-select` asks AI to narrow the large candidate set from the candidate list, required paths, and structural context. AI failures fall back to all candidates. Large inputs such as candidate paths, diffs, focused files, and structural context are written into runtime input files and referenced by prompts.
+The current version keeps every in-scope candidate after local file filtering; no path vocabulary or model guess narrows source candidates before planning. Large inputs such as candidate paths, diffs, focused files, and structural context are written into runtime input files and referenced by prompts.
 
 Starting in 0.9.11, file filtering also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed. Starting in 0.9.13, snapshots still preserve the full current state, but diffs sent to AI are filtered by `exclude.paths` and `exclude.gitignore`, preventing ignored files from entering analysis as deleted diffs.
 
 #### Recommendations
 
 1. Most projects should keep the defaults; structural context still does not run without bounded inputs.
-2. For large repositories with many candidates, keep `select_relevant_files: true` and tune `select_relevant_files_min_candidates` to control planning cost.
-3. Set `structural.enabled` to `false` when structural context is not needed.
-4. Lower `structural.max_file_size` for large repositories when explicitly using tree-sitter to avoid generated files, bundles, or unusually large files.
-5. Structural context only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
+2. Set `structural.enabled` to `false` when structural context is not needed.
+3. Lower `structural.max_file_size` for large repositories when explicitly using tree-sitter to avoid generated files, bundles, or unusually large files.
+4. Structural context only consumes bounded seed inputs and does not scan the whole repository when no seed exists.
 
 ### Prompt Runtime Debugging
 
@@ -198,21 +194,21 @@ Rendered prompts are saved by default under `.skills-seed/runtime/rendered-promp
 
 Starting in 0.10.5, `learn current` no longer writes the existing pattern store into every evidence prompt. To inspect stored patterns, read the local pattern store or use `patterns show` / `patterns stats`. Claude and Codex calls now enforce the same DTO-generated schema through native structured-output flags. The parser uses `jsonrepair-go` for JSON syntax repair, and repaired output must still pass strict DTO decoding; unknown fields and invalid shapes are not accepted.
 
-Starting in 0.11.0, `learning.current.mode` can be set to `fast`, `normal`, or `deep` to choose between learning speed and pattern coverage quality; the mode is included in resume-state fingerprints. Generated skills render related-reference routing, importance layers, grouped entry indexes, and path-validated source evidence. Validation commands live only in `references/validation.md`; Go projects additionally derive `references/testing.md` from real `go.mod` and `_test.go` files, assigning each test to its nearest ancestor module.
+Starting in 0.11.0, `learning.current.mode` can be set to `fast`, `normal`, or `deep` to choose between learning speed and pattern coverage quality; the mode is included in resume-state fingerprints. Generated skills render related-reference routing, importance layers, grouped entry indexes, and path-validated source evidence. Testing, deployment, and acceptance procedures are not learned from source; user-maintained Workflows provide their steps, commands, and ordering and are generated as part of the final Skills.
 
-Starting in 0.11.1, `learning.current.scope` can be set to `domain`, `flow`, or `module` to guide evidence-focus splitting by business domain, workflow, or module/plugin granularity, and it participates in resume-state fingerprints together with `mode`. Model-output parsing also repairs evidence line range expressions, normalizing invalid JSON such as `"line": 29-43` to a single line number.
+Evidence focuses have no configurable classification. Planning derives the minimum evidence set needed to validate a future development decision from source responsibilities, capabilities, resource actions, state transitions, contracts, integrations, and cross-cutting mechanisms. A focus exists only for the current evidence pass; it is not a Workflow, work procedure, or fixed generated-Skill taxonomy. Model-output parsing also repairs evidence line range expressions, normalizing invalid JSON such as `"line": 29-43` to a single line number.
 
-Starting in 0.11.2, `learning.current.max_focuses_per_call` controls how many lightweight learning focuses one AI call may process, with the default `1` disabling batching. Raising it groups multiple focuses into one call and requires the response to return top-level `focuses`. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer, so incidental examples are not rendered as mandatory project standards.
+In the current version, every evidence focus uses an independent analysis call to avoid cross-focus conclusion bleed; analysis concurrency is controlled only by `agent.parallelism`. Independent knowledge review keeps each complete evidence focus together and processes agenda focuses serially, checkpointing immediately after each focus. Only after every focus is reviewed do candidates enter one global cross-focus normalization pass. Generated skills also keep low-frequency or local evidence out of the strong-constraint layer, so incidental examples are not rendered as mandatory project standards.
 
-Candidate preparation decides which files enter agenda planning. AI candidate narrowing, evidence-focus planning, and current-code learning prompts use explicit stable-decision rules; when evidence is equivalent, they prefer structural evidence, routeability, and source vocabulary, then use lexicographic path, ID, or symbol order as the final tie-breaker.
+Candidate preparation only applies scope, exclusion rules, and path normalization. It does not infer knowledge value from filenames, directories, languages, or framework vocabulary. Every in-scope candidate enters agenda planning, whose focuses and reasoned skip receipts must cover every input path. Source analysis and independent knowledge review own semantic judgment; local code validates evidence, scope, structured contracts, and complete coverage.
 
-The interactive init prompt writes total Agent parallelism into `agent.parallelism`. Workspace root configs use it for child-project concurrency; ordinary project configs use it for current-code evidence-focus batch concurrency. `learn current` uses independent runtime calls: after candidate preparation, planning creates evidence packs, each evidence-focus batch is analyzed in its own call, AI performs lightweight merge optimization, and the local normalization service hydrates fields, recovers coverage, validates, and stores candidate patterns.
+The interactive init prompt writes total Agent parallelism into `agent.parallelism`. Workspace root configs use it for child-project concurrency; ordinary project configs use it for current-code evidence-focus concurrency. `learn current` uses independent runtime calls: after candidate preparation, planning creates evidence packs and each evidence focus is analyzed in its own call. `learning.current.pattern_admission` controls the confidence required for a candidate to enter the merge and storage flow.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Starting in 0.10.3, valid JSON final content is formatted as a readable fenced `json` block inside the `.md` archive.
 
 Starting in 0.9.6, debug records under `.skills-seed/runtime` use the `YYYYMMDD-HHMMSS[-NNN]-<kind>-<name>` filename prefix; when multiple runtime IDs are generated in the same second, an incrementing sequence is appended to avoid overwrites. `rendered-prompts/` and their matching `agent-outputs/` share the same date-time ID and semantic name; Agent output files only add the Agent name, making each prompt/output pair easy to correlate. Starting in 0.10.3, valid JSON output is formatted as a readable fenced `json` block inside the `.md` archive.
 
-Starting in 0.9.0, candidates are normalized before entering the pattern store. Current `learn current` receives candidate patterns from evidence-pack analysis; AI merge optimization only proposes source ownership and canonical patterns, while the local normalization service owns field hydration, source ownership validation, recall protection, fallback recovery, and one-shot storage. `generate skills` only reads stored data and performs neither pattern merging nor Agent calls.
+Candidates are normalized before entering the pattern store. Current `learn current` sends source-analysis candidates through an independent knowledge review, applies the configured evidence and confidence thresholds, and then asks AI only for semantic merge proposals against related stored patterns. The local normalization service validates source IDs, propagates controlled knowledge flags from their sources, resolves duplicate ownership deterministically, restores omitted eligible candidates, and writes once. `generate skills` only reads stored data and performs no pattern merging or Agent calls.
 
 The current version no longer maintains skills dirty state. `sync` generates skills only when the learning run changes learned output. Explicit `skills-seed generate skills` deletes the old skills-seed generated output directory and fully rebuilds it; after manually adding a user pattern, run this command to refresh generated artifacts.
 
@@ -278,13 +274,13 @@ skills-seed init --workspace --agent codex
 
 ### Workflow Resources
 
-User workflows are not stored in `config.yaml` and are not part of `profile.mode`. The command sends explicitly provided goals, constraints, background, or paths to the current Agent, infers task-appropriate Markdown workflow content from them, saves the inferred body to `.skills-seed/workflows/<id>/WORKFLOW.md`, and stores original notes plus metadata in `metadata.yaml` in the same directory:
+User workflows are not stored in `config.yaml` and are not part of `profile.mode`. Users provide complete Markdown content directly; it is saved to `.skills-seed/workflows/<id>/WORKFLOW.md`, where `<id>` is derived from `--name`:
 
 ```bash
-skills-seed workflow --context "Check environment variables and build artifacts before release, then run smoke tests after deployment"
+skills-seed workflow --name release --content "# Release\n\n- Check environment variables and build artifacts"
 ```
 
-When `--name` is omitted, the Agent generates an English workflow title from `--context` and uses its slug as `<id>`; repeated titles receive a numbered suffix. `--context` can be a goal, constraint, background note, path, or rough description; the Agent infers workflow content from that explicit input. The body does not require fixed sections; validation and rollback sections are kept only when the task needs them. Existing same-name workflows are merged and deduplicated by default; use `--overwrite` to replace one completely.
+Both `--name` and `--content` are required. The body does not require fixed sections, so users can maintain task-specific steps, checks, and constraints. Same-name workflows never merge automatically; use `--overwrite` to replace one completely.
 
 When skills are generated, workflows are written to output `workflows/`, and matching script directories are copied to `scripts/workflows/<id>/`.
 
@@ -304,20 +300,19 @@ When skills are generated, workflows are written to output `workflows/`, and mat
 
 ### `.skills-seed/context/`
 
-`.skills-seed/context/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable project context. Use it for persistent project background, team constraints, terminology, and workspace constraints.
+`.skills-seed/context/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable project context. Use it for project background, terminology, and workspace background. Mandatory long-lived rules are maintained separately under `.skills-seed/rules/`.
 
 Common paths:
 
 | Path | Purpose |
 |---|---|
 | `.skills-seed/context/background.md` | Business background, external systems, and production facts not visible in code |
-| `.skills-seed/context/constraints.md` | Long-lived team constraints, compatibility requirements, security boundaries, and forbidden changes |
 | `.skills-seed/context/terminology.md` | Domain terms, aliases, state names, and mappings from business language to code terms |
 | `.skills-seed/context/workspace.md` | Workspace-level context, generated only in workspace mode |
 
 These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
 
-`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/context/`, and are not passed to `generate skills`. Put long-lived rules in `context/constraints.md`; use `learn current --context` or `learn current --context-path` for temporary guidance.
+`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/context/`, and are not passed to `generate skills`. Maintain long-lived rules with `skills-seed rule`; use `learn current --context` or `learn current --context-path` for temporary guidance.
 
 ### `skills`
 

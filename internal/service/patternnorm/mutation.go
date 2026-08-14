@@ -21,8 +21,9 @@ type mutationPlan struct {
 	Mutation domain.PatternMutation
 }
 
-func applyNormalizedPatterns(ctx context.Context, repo patternStore, normalized []domain.Pattern, dropped []Drop, existing []domain.Pattern, intent mutationIntent) ([]domain.Pattern, error) {
+func applyNormalizedPatterns(ctx context.Context, repo patternStore, normalized []domain.Pattern, dropped []Drop, existing []domain.Pattern, retiredIDs []string, intent mutationIntent) ([]domain.Pattern, error) {
 	plan := buildMutationPlan(normalized, dropped, existing, intent)
+	plan.Mutation.DeleteIDs = stringx.UniqueNonEmpty(append(plan.Mutation.DeleteIDs, retiredIDs...))
 	if err := repo.ApplyPatternMutation(ctx, plan.Mutation); err != nil {
 		return nil, err
 	}
@@ -74,6 +75,7 @@ func patternForSave(pattern domain.Pattern) domain.Pattern {
 	now := time.Now()
 	pattern.Merged = len(pattern.MergedFrom) > 1
 	pattern.MergedFrom = append([]string(nil), pattern.MergedFrom...)
+	pattern.KnowledgeFlags = append([]string(nil), pattern.KnowledgeFlags...)
 	pattern.BusinessMethod = cloneBusinessMethod(pattern.BusinessMethod)
 	pattern.EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...)
 	pattern.CreatedAt = now

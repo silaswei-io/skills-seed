@@ -7,7 +7,9 @@ Templates are organized by two different dimensions.
 `templates/prompts` stores prompt templates used to ask the AI agent for analysis or generated data.
 
 - `loader/` stores English runtime agent prompts rendered by `internal/prompts`.
-- `append/` stores mandatory English fragments appended after runtime prompts, such as final output contracts and output-language rules.
+- `append/` stores mandatory English prompt fragments selected by the loader. The knowledge goal is prepended to knowledge-producing prompts; final output contracts and output-language rules are appended after runtime prompts.
+
+Runtime-wide goal contracts must live in `append/`, not `docs/`. Documentation may explain their purpose and loading behavior but must not become a second runtime prompt source.
 
 Runtime prompt IDs use kebab-case prefixes:
 

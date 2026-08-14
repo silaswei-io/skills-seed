@@ -15,6 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
+	ruleoutput "github.com/silaswei-io/skills-seed/internal/service/rule"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
@@ -27,8 +28,8 @@ var sleepAfterGenerateChildStep = time.Sleep
 type generateOptions struct {
 	outputPath    string
 	outputChanged bool
-	noReferences  bool
 	quiet         bool
+	progress      generator.GenerateProgressHooks
 }
 
 // Cmd 返回 generate 命令
@@ -75,8 +76,6 @@ func skillsCmd(cont *container.Container) *cobra.Command {
 	}
 	opts.outputPath = defaultOutputPath
 	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", defaultOutputPath, i18n.Get("GenerateFlagOutput"))
-	cmd.Flags().BoolVar(&opts.noReferences, "no-references", false, i18n.Get("GenerateFlagNoReferences"))
-
 	return cmd
 }
 
@@ -88,6 +87,11 @@ func RunGenerate(cont *container.Container) error {
 // RunGenerateQuiet 生成 skills，但不直接输出项目级进度和提示。
 func RunGenerateQuiet(cont *container.Container) error {
 	return runGenerate(cont, generateOptions{quiet: true})
+}
+
+// RunGenerateQuietWithProgress 生成 skills，并把实际生成子阶段回传给上层流程。
+func RunGenerateQuietWithProgress(cont *container.Container, hooks generator.GenerateProgressHooks) error {
+	return runGenerate(cont, generateOptions{quiet: true, progress: hooks})
 }
 
 // RunGenerateWorkspaceRoot 只生成工作区根 skill。
@@ -115,25 +119,17 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		return err
 	}
 
-	// 获取模式数量
+	// 模式数量只用于提前判断是否有可生成资源，不属于生成流水线阶段。
 	var count int
 	isWorkspaceMode := cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace
 	var tracker *progress.Tracker
 	if !isWorkspaceMode {
-		tracker = progress.New(2)
-		runStep := tracker.RunStep
-		if opts.quiet {
-			runStep = func(_ string, fn func() error) error {
-				return fn()
-			}
-		}
-		if err := runStep(i18n.Get("ProgressGenerateCountPatterns"), func() error {
-			var countErr error
-			count, countErr = cont.PatternRepo.Count(ctx)
+		tracker = progress.New(generator.GenerateProjectStepTotal)
+		var countErr error
+		count, countErr = cont.PatternRepo.Count(ctx)
+		if countErr != nil {
+			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": countErr.Error()}))
 			return countErr
-		}); err != nil {
-			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
-			return err
 		}
 	} else {
 		var countErr error
@@ -150,7 +146,11 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
 			return err
 		}
-		if workflowCount == 0 {
+		ruleCount, ruleErr := countRules(cont)
+		if ruleErr != nil {
+			return ruleErr
+		}
+		if workflowCount == 0 && ruleCount == 0 {
 			if !opts.quiet {
 				logger.Warn(i18n.Get("GenerateNoPatterns"))
 			}
@@ -175,25 +175,13 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		}
 		generatedOutputPath = rootOutputPath
 	} else {
-		generateLabel := i18n.Get("ProgressGenerateWriteSkills")
-		updateStep := tracker.UpdateStep
-		if opts.quiet {
-			updateStep = func(string) {}
-		}
-		retryProgress := agent.NewRetryProgressBinder(updateStep)
-		generateCtx := retryProgress.WithContext(ctx)
-		runStep := tracker.RunStep
-		if opts.quiet {
-			runStep = func(_ string, fn func() error) error {
-				return fn()
-			}
-		}
-		if err := runStep(generateLabel, func() error {
-			retryProgress.StartStep(generateLabel)
-			callErr := cont.GeneratorSvc.GenerateSkillsWithHooks(generateCtx, effectiveOutputPath, generator.GenerateProgressHooks{}, generator.GenerateOptions{SkipReferences: opts.noReferences})
-			retryProgress.FinishStep(generateLabel, callErr == nil)
-			return callErr
+		lastStage := i18n.Get("ProgressGenerateWriteSkills")
+		if err := cont.GeneratorSvc.GenerateSkillsWithOptions(ctx, effectiveOutputPath, generator.GenerateOptions{
+			Progress: generateProjectProgressHooks(tracker, opts, &lastStage),
 		}); err != nil {
+			if !opts.quiet {
+				tracker.FailStep(lastStage)
+			}
 			logger.Error(i18n.GetWithParams("GenerateFailed", map[string]interface{}{"Error": err.Error()}))
 			return err
 		}
@@ -208,6 +196,31 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	}
 
 	return nil
+}
+
+func generateProjectProgressHooks(tracker *progress.Tracker, opts generateOptions, lastStage *string) generator.GenerateProgressHooks {
+	if opts.quiet {
+		return opts.progress
+	}
+	return generator.GenerateProgressHooks{
+		OnStepStart: func(label string) {
+			*lastStage = label
+			tracker.StartStep(label)
+		},
+		OnStepUpdate: func(label string) {
+			*lastStage = label
+			tracker.UpdateStep(label)
+		},
+		OnStepComplete: tracker.CompleteStep,
+	}
+}
+
+func countRules(cont *container.Container) (int, error) {
+	if cont == nil || cont.RuleRepo == nil {
+		return 0, nil
+	}
+	rules, err := cont.RuleRepo.List()
+	return len(rules), err
 }
 
 func countWorkflows(cont *container.Container) (int, error) {
@@ -253,7 +266,7 @@ func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts g
 }
 
 func workspaceGenerateOptions(opts generateOptions) ws.WorkspaceGenerateOptions {
-	workspaceOpts := ws.WorkspaceGenerateOptions{SkipReferences: opts.noReferences}
+	workspaceOpts := ws.WorkspaceGenerateOptions{}
 	if opts.outputChanged {
 		workspaceOpts.RootOutputPath = opts.outputPath
 	}
@@ -267,6 +280,14 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
 	}
 	projects := workspaceConfig.Projects
+	var workspaceRules []domain.Rule
+	if cont.RuleRepo != nil {
+		var err error
+		workspaceRules, err = cont.RuleRepo.List()
+		if err != nil {
+			return err
+		}
+	}
 
 	projectRoot := projectConfig.RootPath
 	if projectRoot == "" {
@@ -330,11 +351,14 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 		childCtx := runtimecontext.WithoutUserContext(ctx)
 		childCtx = runtimecontext.WithSeedPath(childCtx, childCont.SeedPath)
 		childOutputPath := outputPathForCurrentTarget(childCont)
-		if err := childCont.GeneratorSvc.GenerateSkillsWithHooks(childCtx, childOutputPath, generator.GenerateProgressHooks{
-			OnStepStart:    startStep,
-			OnStepUpdate:   updateStep,
-			OnStepComplete: completeStep,
-		}, generator.GenerateOptions{SkipReferences: opts.noReferences}); err != nil {
+		if err := childCont.GeneratorSvc.GenerateSkillsWithOptions(childCtx, childOutputPath, generator.GenerateOptions{
+			Progress: generator.GenerateProgressHooks{
+				OnStepStart:    startStep,
+				OnStepUpdate:   updateStep,
+				OnStepComplete: completeStep,
+			},
+			ProjectedRules: ruleoutput.ApplicableToProject(workspaceRules, project.ID, project.Path),
+		}); err != nil {
 			return err
 		}
 		logger.Info(i18n.GetWithParams("GenerateWorkspaceChildGenerated", map[string]interface{}{"ProjectName": project.ID}))

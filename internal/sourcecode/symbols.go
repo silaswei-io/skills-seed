@@ -70,16 +70,21 @@ func FindSymbol(symbols []Symbol, name, kind string, line int) (Symbol, bool) {
 
 func simpleSymbolName(value string) string {
 	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	dot := strings.LastIndex(value, ".")
+	separator := strings.LastIndex(value, "::")
+	if separator > dot {
+		value = value[separator+2:]
+	} else if dot >= 0 {
+		value = value[dot+1:]
+	}
+	value = strings.TrimSpace(value)
 	if value == "" || strings.ContainsAny(value, "() \t\r\n") {
 		return ""
 	}
-	if index := strings.LastIndex(value, "."); index >= 0 {
-		value = value[index+1:]
-	}
-	if index := strings.LastIndex(value, "::"); index >= 0 {
-		value = value[index+2:]
-	}
-	return strings.TrimSpace(value)
+	return value
 }
 
 func compatibleKind(requested, actual string) bool {

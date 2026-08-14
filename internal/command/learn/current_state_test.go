@@ -53,13 +53,16 @@ func TestChangesFromCurrentStateRestoresCompleteRecords(t *testing.T) {
 	require.Equal(t, []string{"internal/removed.go"}, changes.Deleted)
 }
 
-func TestReconcileEvidenceFocusesFiltersInvalidPathsAndCoversEveryCandidate(t *testing.T) {
+func TestReconcileEvidenceFocusesFiltersInvalidPathsAndNormalizesPolicy(t *testing.T) {
 	focuses := []domain.EvidenceFocus{
 		{
-			ID:           "auth",
-			Name:         "Auth",
-			EntryPaths:   []string{"internal/auth/login.go", "internal/auth", "outside.go", "../escape.go"},
-			RelatedPaths: []string{"internal/auth/login.go", "internal/auth/types.go", "/tmp/escape.go"},
+			ID:            "auth",
+			Name:          "Auth",
+			Attributes:    []string{" Stable ", "stable", "Critical"},
+			RiskSignals:   []string{" Review ", "review"},
+			AnalysisDepth: "unsupported",
+			EntryPaths:    []string{"internal/auth/login.go", "internal/auth", "outside.go", "../escape.go"},
+			RelatedPaths:  []string{"internal/auth/login.go", "internal/auth/types.go", "/tmp/escape.go"},
 		},
 	}
 	allowed := []string{
@@ -72,101 +75,77 @@ func TestReconcileEvidenceFocusesFiltersInvalidPathsAndCoversEveryCandidate(t *t
 
 	require.Equal(t, []domain.EvidenceFocus{
 		{
-			ID:           "auth",
-			Name:         "Auth",
-			EntryPaths:   []string{"internal/auth/login.go"},
-			RelatedPaths: []string{"internal/auth/types.go"},
+			ID:            "auth",
+			Name:          "Auth",
+			Attributes:    []string{"critical", "stable"},
+			RiskSignals:   []string{"review"},
+			AnalysisDepth: domain.EvidenceFocusDepthStandard,
+			EntryPaths:    []string{"internal/auth/login.go"},
+			RelatedPaths:  []string{"internal/auth/types.go"},
 		},
-		fallbackEvidenceFocus([]string{"internal/key/create.go"}),
 	}, got)
-	require.Empty(t, uncoveredAnalysisPaths(got, allowed))
+	require.Equal(t, []string{"internal/key/create.go"}, uncoveredAnalysisPaths(got, allowed))
 }
 
-func TestReconcileEvidenceFocusesUsesUniqueFallbackID(t *testing.T) {
-	focuses := []domain.EvidenceFocus{{
-		ID:         "current-codebase",
-		Name:       "Existing",
-		EntryPaths: []string{"main.go"},
-	}}
-
-	got := reconcileEvidenceFocuses(focuses, []string{"main.go", "other.go"})
-
-	require.Len(t, got, 2)
-	require.Equal(t, "current-codebase-2", got[1].ID)
-	require.Equal(t, []string{"other.go"}, got[1].EntryPaths)
-}
-
-func TestReconcileEvidenceFocusesMergesLowDensitySupportFocus(t *testing.T) {
+func TestReconcileEvidenceFocusesPreservesDistinctAgentFocuses(t *testing.T) {
 	focuses := []domain.EvidenceFocus{
 		{
-			ID:           "application-entry-startup-framework",
-			Name:         "应用启动入口与框架集成",
-			EntryPaths:   []string{"cmd/server.go", "internal/handler/routes.go"},
-			RelatedPaths: []string{"etc/etc.yaml"},
+			ID:         "primary-workflow",
+			Name:       "Primary workflow",
+			EntryPaths: []string{"area/entry", "area/shared"},
 		},
 		{
-			ID:         "version-api",
-			Name:       "版本API",
-			RouteTerms: []string{"版本"},
-			EntryPaths: []string{"desc/api/version.api", "internal/handler/version.go", "internal/logic/version.go"},
+			ID:           "supporting-policy",
+			Name:         "Supporting policy",
+			RouteTerms:   []string{"policy"},
+			EntryPaths:   []string{"area/policy"},
+			RelatedPaths: []string{"area/shared"},
 		},
 	}
 
 	got := reconcileEvidenceFocuses(focuses, []string{
-		"cmd/server.go",
-		"internal/handler/routes.go",
-		"etc/etc.yaml",
-		"desc/api/version.api",
-		"internal/handler/version.go",
-		"internal/logic/version.go",
+		"area/entry",
+		"area/policy",
+		"area/shared",
 	})
 
-	require.Len(t, got, 1)
-	require.Equal(t, "application-entry-startup-framework", got[0].ID)
-	require.Contains(t, got[0].RelatedPaths, "desc/api/version.api")
-	require.Contains(t, got[0].RelatedPaths, "internal/handler/version.go")
-	require.Contains(t, got[0].RelatedPaths, "internal/logic/version.go")
+	require.Len(t, got, 2)
+	require.Equal(t, "primary-workflow", got[0].ID)
+	require.Equal(t, "supporting-policy", got[1].ID)
+	require.Equal(t, []string{"area/policy"}, got[1].EntryPaths)
+	require.Equal(t, []string{"area/shared"}, got[1].RelatedPaths)
 }
 
-func TestReconcileEvidenceFocusesGroupsMultipleFallbacksBySemanticPath(t *testing.T) {
-	got := reconcileEvidenceFocuses(nil, []string{
-		"internal/logic/system/admin/login.go",
-		"internal/logic/system/admin/logout.go",
-		"internal/logic/user/group/create.go",
-		"plugins/ca_manage/internal/logic/ca/addcacert.go",
-		"plugins/ca_manage/internal/logic/ca/deletecacert.go",
-	})
+func TestReconcileEvidenceFocusesDropsEmptyFocusWithoutInventingFallback(t *testing.T) {
+	focuses := []domain.EvidenceFocus{
+		{
+			ID:         "invalid",
+			Name:       "Invalid",
+			EntryPaths: []string{"outside"},
+		},
+		{
+			ID:         "valid",
+			Name:       "Valid",
+			EntryPaths: []string{"scope/entry"},
+		},
+	}
 
-	require.Len(t, got, 3)
-	require.Equal(t, "current-codebase-internal-logic-system", got[0].ID)
-	require.Equal(t, []string{"internal/logic/system/admin/login.go", "internal/logic/system/admin/logout.go"}, got[0].EntryPaths)
-	require.Equal(t, "current-codebase-internal-logic-user", got[1].ID)
-	require.Equal(t, []string{"internal/logic/user/group/create.go"}, got[1].EntryPaths)
-	require.Equal(t, "current-codebase-plugins-ca-manage-internal-logic-ca", got[2].ID)
-	require.Equal(t, []string{"plugins/ca_manage/internal/logic/ca/addcacert.go", "plugins/ca_manage/internal/logic/ca/deletecacert.go"}, got[2].EntryPaths)
-}
-
-func TestReconcileEvidenceFocusesKeepsShallowFallbackTogether(t *testing.T) {
-	got := reconcileEvidenceFocuses(nil, []string{
-		"main.go",
-		"internal/logic/create.go",
-		"internal/types/types.go",
-	})
+	got := reconcileEvidenceFocuses(focuses, []string{"scope/entry", "scope/unassigned"})
 
 	require.Len(t, got, 1)
-	require.Equal(t, "current-codebase", got[0].ID)
-	require.Equal(t, []string{"internal/logic/create.go", "internal/types/types.go", "main.go"}, got[0].EntryPaths)
+	require.Equal(t, "valid", got[0].ID)
+	require.Equal(t, []string{"scope/unassigned"}, uncoveredAnalysisPaths(got, []string{"scope/entry", "scope/unassigned"}))
 }
 
 func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}}, nil, []domain.EvidenceFocus{{ID: "all", EntryPaths: []string{"main.go"}}})
-	state.ArtifactsCommitted = true
+	state.MarkPatternsCommitted()
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	require.NoError(t, repo.Save(context.Background(), state))
 
 	loaded, err := repo.Load(context.Background())
 	require.NoError(t, err)
-	require.True(t, loaded.ArtifactsCommitted)
+	require.True(t, loaded.PatternsCommitComplete())
 }
 
 func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
@@ -174,12 +153,16 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 	unit := domain.EvidenceFocus{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}}
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "internal/auth.go", Hash: "hash"}}, nil, []domain.EvidenceFocus{unit})
 	state.Analysis = &commandstate.AnalysisCheckpoint{
-		Patterns:             []domain.Pattern{*pattern},
-		CompletedFocuses:     []domain.EvidenceFocus{unit},
+		FocusKnowledge: []commandstate.FocusKnowledgeCheckpoint{{
+			Focus:             unit,
+			Patterns:          []domain.Pattern{*pattern},
+			RetiredPatternIDs: []string{"legacy-pattern"},
+			Reviewed:          true,
+		}},
 		ProfileRefreshNeeded: true,
 		ProfileRefreshReason: "module boundary changed",
 	}
-	state.ProfileCommitted = true
+	state.MarkProjectionsCommitted()
 	state.Decision = &commandstate.DecisionCheckpoint{
 		CandidateHash: "candidate-hash",
 		Decision:      json.RawMessage(`{"patterns":[],"dropped":[]}`),
@@ -191,23 +174,25 @@ func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, loaded.Analysis)
-	require.Len(t, loaded.Analysis.Patterns, 1)
-	require.Equal(t, "checkpoint", loaded.Analysis.Patterns[0].ID)
-	require.Equal(t, []domain.EvidenceFocus{unit}, loaded.Analysis.CompletedFocuses)
+	require.Len(t, loaded.Analysis.FocusKnowledge, 1)
+	require.Equal(t, unit, loaded.Analysis.FocusKnowledge[0].Focus)
+	require.Equal(t, "checkpoint", loaded.Analysis.FocusKnowledge[0].Patterns[0].ID)
+	require.Equal(t, []string{"legacy-pattern"}, loaded.Analysis.FocusKnowledge[0].RetiredPatternIDs)
+	require.True(t, loaded.Analysis.FocusKnowledge[0].Reviewed)
 	require.True(t, loaded.Analysis.ProfileRefreshNeeded)
 	require.Equal(t, "module boundary changed", loaded.Analysis.ProfileRefreshReason)
-	require.True(t, loaded.ProfileCommitted)
+	require.True(t, loaded.ProjectionsCommitComplete())
 	require.Equal(t, state.Decision.CandidateHash, loaded.Decision.CandidateHash)
 	require.JSONEq(t, string(state.Decision.Decision), string(loaded.Decision.Decision))
 }
 
-func TestPendingEvidenceFocusesDerivesCompletionFromCompletedFocuses(t *testing.T) {
+func TestPendingEvidenceFocusesDerivesCompletionFromFocusKnowledge(t *testing.T) {
 	focuses := []domain.EvidenceFocus{
 		{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/auth.go"}},
 		{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}},
 	}
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses)
-	state.Analysis = &commandstate.AnalysisCheckpoint{CompletedFocuses: focuses[:1]}
+	state.Analysis = &commandstate.AnalysisCheckpoint{FocusKnowledge: []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0]}}}
 	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{
 		{Path: "internal/auth.go"},
 		{Path: "internal/key.go"},
@@ -224,9 +209,9 @@ func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {
 		{ID: "key", Name: "Key", EntryPaths: []string{"internal/shared.go"}},
 	}
 	run := &learnCurrentProjectRun{
-		analysisState:            commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses),
-		incrementalChanges:       &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
-		completedEvidenceFocuses: focuses[:1],
+		analysisState:      commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses),
+		incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
+		focusKnowledge:     []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0]}},
 	}
 
 	err := run.validateCompletedAnalysis()
@@ -285,7 +270,7 @@ func TestCurrentChangesCoveredByStateRejectsUnplannedInput(t *testing.T) {
 
 func TestCanReuseCurrentStateRequiresExactInputSet(t *testing.T) {
 	const invocationHash = "invocation"
-	mode := learnCurrentStateMode(string(config.LearningModeNormal), string(config.LearningScopeFlow))
+	mode := string(config.LearningModeNormal)
 	state := commandstate.NewStateWithMode(commandStateLearnCurrent, "demo", "go", mode, "", []domain.FileAnalysisRecord{
 		{Path: "main.go", Hash: "main-hash"},
 	}, []string{"removed.go"}, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}}).WithInvocationHash(invocationHash)
@@ -294,13 +279,13 @@ func TestCanReuseCurrentStateRequiresExactInputSet(t *testing.T) {
 	require.False(t, canReuseCurrentState(state, changes, "demo", "go", mode, "", invocationHash))
 }
 
-func TestRestoreCurrentStateClearsIncompatibleCheckpoint(t *testing.T) {
+func TestRestoreCurrentStateClearsIncompatibleInvocation(t *testing.T) {
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	state := commandstate.NewStateWithMode(
 		commandStateLearnCurrent,
 		"demo",
 		"go",
-		"normal|scope=flow",
+		"normal",
 		"",
 		[]domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}},
 		nil,
@@ -314,15 +299,26 @@ func TestRestoreCurrentStateClearsIncompatibleCheckpoint(t *testing.T) {
 		nil,
 		"demo",
 		"go",
-		"normal|scope=flow",
+		"normal",
 		"",
 		"new-invocation",
 	)
 
 	require.NoError(t, err)
 	require.Nil(t, session)
-	_, err = repo.Load(context.Background())
-	require.ErrorIs(t, err, commandstate.ErrStateNotFound)
+	require.NoFileExists(t, repo.Path())
+}
+
+func TestRestoreCurrentStateReportsUnsupportedSchemaWithoutDeletingIt(t *testing.T) {
+	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
+	require.NoError(t, os.MkdirAll(filepath.Dir(repo.Path()), 0o755))
+	require.NoError(t, os.WriteFile(repo.Path(), []byte(`{"schema_version":3,"command":"learn-current"}`), 0o600))
+
+	session, err := restoreCurrentState(context.Background(), repo, nil, "demo", "go", "normal", "", "invocation")
+
+	require.ErrorIs(t, err, commandstate.ErrUnsupportedSchemaVersion)
+	require.Nil(t, session)
+	require.FileExists(t, repo.Path())
 }
 
 func TestLearnCurrentInvocationHashIncludesExecutionOptions(t *testing.T) {

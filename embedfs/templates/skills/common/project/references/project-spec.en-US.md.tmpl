@@ -8,43 +8,31 @@
 
 ## Usage
 
-- This spec keeps executable constraints, generated/config conventions, source-backed change boundaries, and change touchpoints.
-- For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for capability entries read [Capability Entry Index](./business-methods.md){{end}}; for verification read [Validation Strategy](./validation.md){{if .References.Testing}} and [Test Matrix](./testing.md){{end}}.
+- This spec keeps authoritative constraints and their synchronization coverage. Source-learned findings are expanded only in category pattern references.
+- For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for capability entries read [Capability Entry Index](./business-methods.md){{end}}.
 - Authoritative rules only come from user-maintained or built-in constraints. Source-learned results are reuse and safety inspection entries only.
-- Framework and configuration items are navigation aids from the learned profile. Confirm them against current code, manifests, and configuration files.
 - Trust current code when it conflicts with this spec.
 
 ## Table Of Contents
 
 - [Authoritative Rules (User/Built-In)](#authoritative-rules-userbuilt-in)
-{{if .PatternGuidance}}- [Source-Backed Change Boundaries](#source-backed-change-boundaries)
-{{end}}{{if .FrameworkPatterns}}- [Framework Conventions](#framework-conventions)
-{{end}}{{if .ConfigPatterns}}- [Configuration Conventions](#configuration-conventions)
-{{end}}- [Change Touchpoints](#change-touchpoints)
+{{if .AuthorityCoverage}}- [Authority Sync Coverage](#authority-sync-coverage)
+{{end}}
 
 ## Authoritative Rules (User/Built-In)
 
+{{if .RuleReferences}}Complete user-maintained rule text:
+
+{{range .RuleReferences}}- [{{.Name}}]({{.Path}}){{if .Paths}}; paths: {{range $i, $path := .Paths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{else}}; applies to the whole project{{end}}
+{{end}}
+{{end}}
 {{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**: {{.Rule}} (source: `{{.Source}}`{{if .Evidence}}; evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}})
-{{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
-{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*No user-maintained or built-in authoritative rules have been extracted. Source-learned patterns live in the change boundaries below and category references.*
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .RuleReferences}}*No user-maintained or built-in authoritative rules have been extracted. Source-learned patterns live in category pattern references.*
 {{end}}{{end}}
-{{if .PatternGuidance}}## Source-Backed Change Boundaries
+{{if .AuthorityCoverage}}## Authority Sync Coverage
 
-These entries come from source evidence and help locate reuse entries, generated/config boundaries, migration or operational risks, and cross-module conventions. They are not authoritative hard rules or security guarantees. Read the current source evidence before changing behavior.
+This list makes the input boundary included in authority sync auditable. An included section does not necessarily produce a retained rule.
 
-{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{.Description}}{{if .Evidence}}
-  - Evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}}
+{{range .AuthorityCoverage}}- `{{.Source}}`{{if .Sections}}: {{range $i, $section := .Sections}}{{if $i}}, {{end}}{{$section}}{{end}}{{else}} (file-level coverage){{end}}
 {{end}}
-{{end}}{{if .FrameworkPatterns}}## Framework Conventions
-
-{{range .FrameworkPatterns}}- {{.}}
-{{end}}
-{{end}}{{if .ConfigPatterns}}## Configuration Conventions
-
-{{range .ConfigPatterns}}- {{.}}
-{{end}}
-{{end}}## Change Touchpoints
-
-{{if .Touchpoints}}{{range .Touchpoints}}- **{{.Kind}}** `{{.Name}}`{{if .Path}} - `{{.Path}}`{{end}}{{if .Description}}: {{.Description}}{{end}}
-{{end}}{{else}}*No key touchpoints extracted yet.*
 {{end}}

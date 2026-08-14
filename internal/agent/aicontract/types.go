@@ -41,32 +41,35 @@ type BusinessMethodOutput struct {
 type PatternOutput struct {
 	ID                string                   `json:"id" jsonschema_description:"kebab-case-id"`
 	Name              string                   `json:"name" jsonschema_description:"pattern name"`
-	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key; business means product/domain behavior, api means interface/contract/message/event/adapter, database means state/storage/persistence/cache, middleware means interception/pipeline/filter/hook processing"`
+	Category          string                   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key; business means product/domain behavior, api means interface/contract/message/event/adapter, database means state/storage/persistence/cache, middleware means interception/pipeline/filter/hook processing"`
 	Description       string                   `json:"description" jsonschema_description:"source-backed problem or capability, matching triggers, observed behavior, and applicability boundary; for multiple evidence locations include only behavior every location proves"`
 	GoodExample       string                   `json:"good_example" jsonschema_description:"source-backed code evidence as an escaped JSON string"`
 	BadExample        string                   `json:"bad_example" jsonschema_description:"common mistake to avoid or empty string"`
 	Rule              string                   `json:"rule" jsonschema_description:"non-mandatory reuse guidance naming verified existing entries or boundaries to prefer and when extension is appropriate; never generalize beyond source evidence"`
 	Confidence        float64                  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 	Frequency         int                      `json:"frequency" jsonschema:"minimum=1" jsonschema_description:"positive integer occurrence count"`
+	ScopePath         string                   `json:"scope_path,omitempty" jsonschema_description:"stable repository-relative ownership scope for routing; omit when evidence does not establish one"`
+	KnowledgeFlags    []string                 `json:"knowledge_flags" jsonschema:"enum=operational_risk" jsonschema_description:"reviewable evidence-based flags; use operational_risk only for irreversible, privileged, state/resource-changing, or externally visible behavior; otherwise return an empty array"`
 	EvidenceLocations []EvidenceLocationOutput `json:"evidence_locations,omitempty" jsonschema_description:"minimum source-backed implementation chain needed for correct reuse"`
 	BusinessMethod    *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"legacy field name for a canonical reusable capability entry with verified name, repository-relative location, complete signature or concrete declaration, prerequisites, return/error/result semantics, and source-backed usage; include for product/domain behavior, UI/CLI/system actions, orchestration, adapters, jobs/tasks, resolvers, declarative entries, or common utilities when directly verified, otherwise null"`
 }
 
-type ValidationCommandOutput struct {
-	Command    string   `json:"command" jsonschema_description:"exact full validation command shown by evidence"`
-	When       string   `json:"when,omitempty" jsonschema_description:"when to run this command"`
-	Source     string   `json:"source,omitempty" jsonschema_description:"repository-relative evidence path or user_context"`
-	Workdir    string   `json:"workdir,omitempty" jsonschema_description:"repository-relative workdir, empty for project root"`
-	ScopePaths []string `json:"scope_paths,omitempty" jsonschema_description:"relative paths or directories explicitly covered by this command; leave empty for broad or unclear commands"`
-	Evidence   []string `json:"evidence,omitempty" jsonschema_description:"relative repository paths proving this command and its scope; do not use unconfirmed placeholders"`
-	Type       string   `json:"type,omitempty" jsonschema:"enum=test,enum=build,enum=lint,enum=generate,enum=contract,enum=check" jsonschema_description:"test|build|lint|generate|contract|check"`
+type AuthorityRuleOutput struct {
+	Title         string   `json:"title" jsonschema_description:"concise authoritative rule title"`
+	Rule          string   `json:"rule" jsonschema_description:"exact actionable constraint supported by the authoritative source"`
+	AppliesTo     []string `json:"applies_to,omitempty" jsonschema_description:"concrete task, path, command family, module, or operation scopes governed by this rule"`
+	CommandPolicy string   `json:"command_policy,omitempty" jsonschema:"enum=forbidden,enum=describe_only,enum=requires_authorization,enum=allowed" jsonschema_description:"set only when the source explicitly governs whether matching commands may be executed"`
 }
 
-type EngineeringRuleOutput struct {
-	Title    string   `json:"title" jsonschema_description:"concise authoritative rule title"`
-	Rule     string   `json:"rule" jsonschema_description:"exact actionable constraint supported by the authoritative source"`
-	Source   string   `json:"source" jsonschema_description:"repository-relative authoritative engineering knowledge path or user_context"`
-	Evidence []string `json:"evidence,omitempty" jsonschema_description:"repository-relative files supporting the constraint"`
+type AuthoritySectionOutput struct {
+	SectionID    string                `json:"section_id" jsonschema_description:"exact immutable section_id from the authority section catalog"`
+	Rules        []AuthorityRuleOutput `json:"rules" jsonschema_description:"all explicit constraints owned by this catalog section; empty only when no_rule_reason explains why the section has no constraint"`
+	NoRuleReason string                `json:"no_rule_reason,omitempty" jsonschema_description:"concrete reason only when rules is empty; omit when rules is non-empty; never use N/A, none, or another placeholder"`
+}
+
+// AuthorityExtractionOutput 是独立权威知识提取阶段的输出契约。
+type AuthorityExtractionOutput struct {
+	AuthoritySections []AuthoritySectionOutput `json:"authority_sections" jsonschema_description:"exactly one result for every immutable section_id in the authority section catalog"`
 }
 
 type ArchitectureLayerOutput struct {
@@ -74,14 +77,6 @@ type ArchitectureLayerOutput struct {
 	Description      string   `json:"description" jsonschema_description:"layer responsibility"`
 	Responsibilities []string `json:"responsibilities" jsonschema_description:"specific responsibilities"`
 	Files            []string `json:"files" jsonschema_description:"relative files owned by this layer"`
-}
-
-type UtilityFunctionOutput struct {
-	Name        string `json:"name" jsonschema_description:"utility name"`
-	File        string `json:"file" jsonschema_description:"real repository-relative file path or external package path; omit the utility if the location is unconfirmed"`
-	Signature   string `json:"signature" jsonschema_description:"real function or method signature"`
-	Description string `json:"description" jsonschema_description:"domain-neutral utility responsibility; external dependency interaction entries that carry product-domain behavior should prefer business_methods"`
-	Usage       string `json:"usage" jsonschema_description:"when to use it"`
 }
 
 type ModuleOutput struct {
@@ -96,23 +91,19 @@ type ModuleOutput struct {
 
 // ProjectProfileOutput 是完整项目画像的 AI 输出契约。
 type ProjectProfileOutput struct {
-	ProjectName        string                    `json:"project_name" jsonschema_description:"project name"`
-	Language           string                    `json:"language" jsonschema_description:"primary language"`
-	Frameworks         []string                  `json:"frameworks" jsonschema_description:"framework or runtime names supported by evidence"`
-	Architecture       string                    `json:"architecture" jsonschema_description:"concrete architecture description"`
-	Layers             []ArchitectureLayerOutput `json:"layers" jsonschema_description:"architecture layers"`
-	DependencyGraph    string                    `json:"dependency_graph" jsonschema_description:"dependency direction using real module names"`
-	DataFlow           string                    `json:"data_flow" jsonschema_description:"data flow using real processing stages"`
-	FrameworkPatterns  []string                  `json:"framework_patterns" jsonschema_description:"concrete framework usage patterns"`
-	Structure          string                    `json:"structure" jsonschema_description:"concrete project structure summary"`
-	KeyModules         []ModuleOutput            `json:"key_modules" jsonschema_description:"key modules"`
-	BusinessMethods    []BusinessMethodOutput    `json:"business_methods" jsonschema_description:"project-level reusable capability entries"`
-	CommonUtils        []UtilityFunctionOutput   `json:"common_utils" jsonschema_description:"domain-neutral utility functions"`
-	ConfigPatterns     []string                  `json:"config_patterns" jsonschema_description:"configuration conventions"`
-	Dependencies       []string                  `json:"dependencies" jsonschema_description:"important dependencies"`
-	ValidationCommands []ValidationCommandOutput `json:"validation_commands" jsonschema_description:"repository-evidenced validation commands"`
-	EngineeringRules   []EngineeringRuleOutput   `json:"engineering_rules" jsonschema_description:"explicit constraints from authoritative engineering knowledge or user context"`
-	Summary            string                    `json:"summary" jsonschema_description:"specific project overview"`
+	ProjectName       string                    `json:"project_name" jsonschema_description:"project name"`
+	Language          string                    `json:"language" jsonschema_description:"primary language"`
+	Frameworks        []string                  `json:"frameworks" jsonschema_description:"framework or runtime names supported by evidence"`
+	Architecture      string                    `json:"architecture" jsonschema_description:"concrete architecture description"`
+	Layers            []ArchitectureLayerOutput `json:"layers" jsonschema_description:"architecture layers"`
+	DependencyGraph   string                    `json:"dependency_graph" jsonschema_description:"dependency direction using real module names"`
+	DataFlow          string                    `json:"data_flow" jsonschema_description:"data flow using real processing stages"`
+	FrameworkPatterns []string                  `json:"framework_patterns" jsonschema_description:"concrete framework usage patterns"`
+	Structure         string                    `json:"structure" jsonschema_description:"concrete project structure summary"`
+	KeyModules        []ModuleOutput            `json:"key_modules" jsonschema_description:"key modules"`
+	ConfigPatterns    []string                  `json:"config_patterns" jsonschema_description:"configuration conventions"`
+	Dependencies      []string                  `json:"dependencies" jsonschema_description:"important dependencies"`
+	Summary           string                    `json:"summary" jsonschema_description:"specific project overview"`
 }
 
 type ProfileRefreshRecommendationOutput struct {
@@ -147,38 +138,60 @@ type AnalyzeCurrentDeltaBatchOutput struct {
 	ProfileRefreshRecommended *ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"true only when broad structure or technology changes require full refresh"`
 }
 
-type LearningCandidateSkipOutput struct {
+type LearningPathSkipOutput struct {
 	Path   string `json:"path" jsonschema_description:"repository-relative path from the exact candidate file list; never output an absolute path, directory, glob, invented path, or path containing .."`
 	Reason string `json:"reason" jsonschema_description:"brief reason this file has low learning value for this run"`
 }
 
-type SelectLearningCandidatesOutput struct {
-	SelectedPaths []string                      `json:"selected_paths" jsonschema_description:"complete lexicographically sorted repository-relative file list worth sending into evidence-pack planning; every path must come from the exact candidate file list, required paths must be included when present there, and absolute paths, directories, globs, invented paths, or paths containing .. are forbidden"`
-	SkippedPaths  []LearningCandidateSkipOutput `json:"skipped_paths" jsonschema_description:"lexicographically sorted candidate files intentionally skipped as low learning value; each item must come from the exact candidate file list and must not duplicate selected_paths"`
-	Reason        string                        `json:"reason" jsonschema_description:"one short sentence summarizing the selection strategy; do not repeat the full file list"`
-}
-
 type EvidenceFocusOutput struct {
-	ID           string   `json:"id" jsonschema_description:"kebab-case-id"`
-	Name         string   `json:"name" jsonschema_description:"learning focus name"`
-	RouteTerms   []string `json:"route_terms,omitempty" jsonschema_description:"requirement, state, action, resource, or external system terms"`
-	EntryPaths   []string `json:"entry_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
-	RelatedPaths []string `json:"related_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
-	ScopeReason  string   `json:"scope_reason,omitempty" jsonschema_description:"why these files belong together"`
+	ID            string   `json:"id" jsonschema_description:"kebab-case-id"`
+	Name          string   `json:"name" jsonschema_description:"specific source responsibility or behavior boundary name; never a work procedure, developer instruction, or generic workflow/process label"`
+	RouteTerms    []string `json:"route_terms,omitempty" jsonschema_description:"requirement, state, action, resource, or external system terms"`
+	Attributes    []string `json:"attributes,omitempty" jsonschema_description:"applicable focus attributes chosen from product_behavior, stateful, contract, cross_module, generated_boundary, security_sensitive, operational, external_effect"`
+	RiskSignals   []string `json:"risk_signals,omitempty" jsonschema_description:"concrete evidence cues that justify careful or critical analysis; empty for standard focus"`
+	AnalysisDepth string   `json:"analysis_depth" jsonschema:"enum=standard,enum=careful,enum=critical" jsonschema_description:"standard for a direct bounded chain; careful for state, contract, generated, or cross-module boundaries; critical for security-sensitive, privileged, destructive, or externally visible behavior"`
+	EntryPaths    []string `json:"entry_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
+	RelatedPaths  []string `json:"related_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
+	ScopeReason   string   `json:"scope_reason,omitempty" jsonschema_description:"why these files belong together"`
 }
 
 type PlanLearningAgendaOutput struct {
-	Focuses []EvidenceFocusOutput `json:"focuses" jsonschema_description:"learning focuses for this run"`
+	Focuses      []EvidenceFocusOutput    `json:"focuses" jsonschema_description:"learning focuses for this run; paths assigned here and skipped_paths together must cover every input path"`
+	SkippedPaths []LearningPathSkipOutput `json:"skipped_paths" jsonschema_description:"every input path intentionally excluded from learning, with a concrete evidence-value reason; must not overlap any focus path"`
+	Reason       string                   `json:"reason" jsonschema_description:"one short sentence summarizing the planning boundary"`
+}
+
+type KnowledgeRevisionOutput struct {
+	Name           string   `json:"name" jsonschema_description:"revised concise knowledge name"`
+	Category       string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key"`
+	Description    string   `json:"description" jsonschema_description:"revised source-backed behavior and applicability boundary"`
+	Rule           string   `json:"rule" jsonschema_description:"revised non-mandatory reuse guidance that does not exceed the evidence"`
+	Confidence     float64  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"reviewed confidence from 0.0 to 1.0"`
+	KnowledgeFlags []string `json:"knowledge_flags" jsonschema:"enum=operational_risk" jsonschema_description:"complete reviewed flag set; operational_risk is the only allowed value; return an empty array when the evidence does not establish it"`
+}
+
+type KnowledgeReviewDecisionOutput struct {
+	CandidateID           string                   `json:"candidate_id" jsonschema_description:"exact id from one input candidate"`
+	Verdict               string                   `json:"verdict" jsonschema:"enum=accept,enum=revise,enum=reject" jsonschema_description:"accept|revise|reject"`
+	ReasonCode            string                   `json:"reason_code" jsonschema:"enum=accepted,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overclaimed,enum=incorrect_boundary" jsonschema_description:"structured reason for the verdict"`
+	Reason                string                   `json:"reason" jsonschema_description:"concise evidence-based review reason"`
+	BusinessMethodVerdict string                   `json:"business_method_verdict" jsonschema:"enum=remove,enum=set" jsonschema_description:"remove an absent or unsuitable entry, or set a complete source-backed entry"`
+	BusinessMethod        *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"complete reviewed capability entry required only when business_method_verdict is set; omit for remove"`
+	Revision              *KnowledgeRevisionOutput `json:"revision,omitempty" jsonschema_description:"required only for revise; omit for accept and reject"`
+}
+
+type ReviewKnowledgeOutput struct {
+	Decisions []KnowledgeReviewDecisionOutput `json:"decisions" jsonschema_description:"exactly one review decision for every input candidate id"`
 }
 
 type PatternNormalizationOutput struct {
 	ID          string   `json:"id" jsonschema_description:"stable kebab-case canonical pattern id; prefer an existing id when updating or replacing related existing knowledge"`
 	Name        string   `json:"name" jsonschema_description:"short canonical pattern name"`
-	Category    string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=testing,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key"`
+	Category    string   `json:"category" jsonschema:"enum=naming,enum=error,enum=structure,enum=concurrency,enum=business,enum=api,enum=database,enum=utils,enum=middleware,enum=config" jsonschema_description:"one allowed category key"`
 	Description string   `json:"description" jsonschema_description:"compact source-backed applicability boundary shared by every source id"`
-	Rule        string   `json:"rule" jsonschema_description:"non-mandatory reuse guidance; do not convert observed unsafe behavior into a safety guarantee"`
+	Rule        string   `json:"rule" jsonschema_description:"non-mandatory reuse guidance"`
 	Confidence  float64  `json:"confidence" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
-	SourceIDs   []string `json:"source_ids" jsonschema_description:"candidate and optional related existing pattern ids represented by this canonical pattern; every non-dropped candidate id must appear exactly once across output patterns"`
+	SourceIDs   []string `json:"source_ids" jsonschema_description:"unique candidate or related existing pattern ids represented by this canonical pattern; use only ids from the supplied inputs"`
 }
 
 type PatternDropOutput struct {
@@ -261,8 +274,7 @@ type WorkspaceSpecOutput struct {
 	LoadMultipleSkillsWhen []WorkspaceLoadMultipleSkillOutput `json:"load_multiple_skills_when,omitempty" jsonschema_description:"when to load multiple child skills"`
 }
 
-type OptimizeWorkflowOutput struct {
-	Title     string   `json:"title" jsonschema_description:"short title"`
-	Content   string   `json:"content" jsonschema_description:"complete Markdown workflow body"`
-	Conflicts []string `json:"conflicts" jsonschema_description:"incompatible existing and new requirements; empty when the workflow can be saved"`
+// OptimizedContentOutput 是用户维护资源经 Agent 整理后的最小输出契约。
+type OptimizedContentOutput struct {
+	Content string `json:"content" jsonschema_description:"complete Markdown content preserving the user's intent and authority"`
 }

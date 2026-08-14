@@ -40,6 +40,7 @@ Before returning JSON, validate the result internally:
 5. `evidence_locations` contains pattern-level source evidence locations. Return an empty array when there is no real evidence. Include a 1-based line number only when known; otherwise provide only the real path.
 6. Fill `business_method` only when real source evidence supports a reusable capability entry, and include a real signature or declaration plus location. Otherwise use `null`.
 7. Lower `confidence` when evidence is weak or the user description is broad. Do not invent facts, evidence paths, or line numbers.
+8. Return the complete `knowledge_flags` array. Use `["operational_risk"]` only when the user's explicit requirement or real source evidence establishes irreversible, privileged, state/resource-changing, or externally visible behavior; otherwise use `[]`. Never invent another flag.
 
 
 # Output Format

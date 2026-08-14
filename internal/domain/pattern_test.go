@@ -18,6 +18,16 @@ func TestPatternAllowsHardConstraintOnlyForMaintainedSources(t *testing.T) {
 	}
 }
 
+func TestActivePatternsExcludesRetiredPatterns(t *testing.T) {
+	active := Pattern{ID: "active", Category: CategoryError, Status: PatternStatusActive}
+	stale := Pattern{ID: "stale", Status: PatternStatusStale}
+	superseded := Pattern{ID: "superseded", Status: PatternStatusSuperseded}
+
+	patterns := ActivePatterns([]Pattern{active, stale, superseded})
+
+	require.Equal(t, []Pattern{active}, patterns)
+}
+
 func TestPatternEvidenceFileCountCountsFilesInsteadOfSymbols(t *testing.T) {
 	count := PatternEvidenceFileCount([]PatternEvidenceLocation{
 		{Path: "internal/health.go", Line: 10, Symbol: "Check"},

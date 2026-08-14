@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -10,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/service/repositoryscopeconfig"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
@@ -26,6 +28,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 
 	focuses := make([]agent.AnalyzeCurrentDeltaFocus, 0, len(opts.Focuses))
 	focusByID := make(map[string]map[string]bool, len(opts.Focuses))
+	relatedByFocus := make(map[string]map[string]domain.Pattern, len(opts.Focuses))
 	for _, focus := range opts.Focuses {
 		focusPaths := projectpath.Relative(projectRoot, focus.FocusAbsPaths)
 		focuses = append(focuses, agent.AnalyzeCurrentDeltaFocus{
@@ -36,6 +39,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 			RelatedPatterns: append([]domain.Pattern(nil), focus.RelatedPatterns...),
 		})
 		focusByID[focus.EvidenceFocus.ID] = relPathSet(focusPaths)
+		relatedByFocus[focus.EvidenceFocus.ID] = relatedPatternIndex(focus.RelatedPatterns)
 	}
 
 	focusPaths := batchDeltaFocusPaths(focuses)
@@ -77,7 +81,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
 
-	changes, err := s.validateDeltaChanges(ctx, projectRoot, result.Changes, focusByID)
+	changes, err := s.validateDeltaChanges(ctx, projectRoot, result.Changes, focusByID, relatedByFocus)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +97,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	}, nil
 }
 
-func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot string, changes []domain.KnowledgeChange, focusByID map[string]map[string]bool) ([]domain.KnowledgeChange, error) {
+func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot string, changes []domain.KnowledgeChange, focusByID map[string]map[string]bool, relatedByFocus map[string]map[string]domain.Pattern) ([]domain.KnowledgeChange, error) {
 	proposals := make([]domain.Pattern, 0)
 	for _, change := range changes {
 		if !change.CarriesPattern() || !deltaChangeAnchored(change, focusByID) {
@@ -112,8 +116,32 @@ func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot 
 		}
 	}
 
+	retirementTargets := retirementTargets(changes, relatedByFocus)
+	var retirementValidator *currentPatternValidator
+	if len(retirementTargets) > 0 {
+		var err error
+		retirementValidator, err = newCurrentPatternValidator(ctx, projectRoot, retirementTargets, s.symbolResolver)
+		if err != nil {
+			return nil, err
+		}
+	}
+	scope := repositoryscopeconfig.KnowledgeScope(s.configRepo, projectRoot)
+
 	validated := make([]domain.KnowledgeChange, 0, len(changes))
 	for _, change := range changes {
+		if change.PatternAction == domain.KnowledgePatternRetire {
+			pattern, ok := relatedByFocus[change.FocusID][strings.TrimSpace(change.PatternID)]
+			if !ok ||
+				!pattern.CanBeRetiredFromCurrentLearning() ||
+				!deltaChangeAnchored(change, focusByID) ||
+				!anchorsTouchPatternEvidence(change.Anchors, pattern.EvidenceLocations) ||
+				retirementValidator == nil ||
+				retirementValidator.hasLiveEvidence(pattern.EvidenceLocations, scope) {
+				continue
+			}
+			validated = append(validated, change)
+			continue
+		}
 		if !change.CarriesPattern() {
 			if deltaChangeScoped(change, focusByID) {
 				validated = append(validated, change)
@@ -132,6 +160,49 @@ func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot 
 		validated = append(validated, change)
 	}
 	return validated, nil
+}
+
+func relatedPatternIndex(patterns []domain.Pattern) map[string]domain.Pattern {
+	index := make(map[string]domain.Pattern, len(patterns))
+	for _, pattern := range patterns {
+		if strings.TrimSpace(pattern.ID) != "" {
+			index[pattern.ID] = pattern
+		}
+	}
+	return index
+}
+
+func retirementTargets(changes []domain.KnowledgeChange, relatedByFocus map[string]map[string]domain.Pattern) []domain.Pattern {
+	seen := make(map[string]bool)
+	targets := make([]domain.Pattern, 0)
+	for _, change := range changes {
+		if change.PatternAction != domain.KnowledgePatternRetire {
+			continue
+		}
+		pattern, ok := relatedByFocus[change.FocusID][strings.TrimSpace(change.PatternID)]
+		if !ok || !pattern.CanBeRetiredFromCurrentLearning() || seen[pattern.ID] {
+			continue
+		}
+		seen[pattern.ID] = true
+		targets = append(targets, pattern)
+	}
+	return targets
+}
+
+func anchorsTouchPatternEvidence(anchors []domain.PatternDiffAnchor, locations []domain.PatternEvidenceLocation) bool {
+	paths := make(map[string]bool, len(locations))
+	for _, location := range locations {
+		path := normalizeRelPath(location.Path)
+		if path != "" {
+			paths[path] = true
+		}
+	}
+	for _, anchor := range anchors {
+		if paths[normalizeRelPath(anchor.Path)] {
+			return true
+		}
+	}
+	return false
 }
 
 func deltaChangeScoped(change domain.KnowledgeChange, focusByID map[string]map[string]bool) bool {

@@ -40,6 +40,7 @@ func logLearnWorkspaceProjectSummary(projectName string, result *learnCurrentPro
 		"Skipped":     result.skippedCount,
 		"Patterns":    result.patternsCount,
 		"Saved":       result.savedCount,
+		"Retired":     result.retiredCount,
 		"Duration":    result.duration.Truncate(time.Second).String(),
 	}))
 }
@@ -256,7 +257,7 @@ func (r *learnWorkspaceCurrentRun) logProjectStarted(project config.WorkspacePro
 
 func (r *learnWorkspaceCurrentRun) recordProjectResult(project config.WorkspaceProjectConfig, scope, logPath string, result *learnCurrentProjectResult) {
 	r.resultMu.Lock()
-	if result.savedCount > 0 {
+	if result.savedCount > 0 || result.retiredCount > 0 {
 		r.changedProjects = append(r.changedProjects, scope)
 	}
 	r.resultMu.Unlock()
@@ -300,6 +301,7 @@ func (p *workspaceProjectProgress) finish(result *learnCurrentProjectResult) {
 		p.tracker.Complete(p.name, i18n.GetWithParams("LearnWorkspaceProjectProgressComplete", map[string]interface{}{
 			"Patterns": result.patternsCount,
 			"Saved":    result.savedCount,
+			"Retired":  result.retiredCount,
 		}))
 	}
 }

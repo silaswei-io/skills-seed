@@ -177,15 +177,17 @@ func TestDeterministicNormalizeDoesNotMergeHighRiskBoundaryIntoNormalCapability(
 	candidate.SetDescription("Destroy command deletes resource state and has external environment side effects.")
 	candidate.SetRule("When changing destroy behavior, inspect the command safeguards before modifying it.")
 	candidate.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "tools/commands/destroy.ts", Symbol: "destroyResource"}}
+	candidate.KnowledgeFlags = []string{domain.KnowledgeFlagOperationalRisk}
 
 	result := deterministicNormalize([]domain.Pattern{*candidate}, []domain.Pattern{*existing})
 
 	require.Len(t, result.Patterns, 1)
 	require.Equal(t, "resource-destroy", result.Patterns[0].ID)
 	require.Equal(t, []string{"resource-destroy"}, result.Patterns[0].MergedFrom)
+	require.Equal(t, []string{domain.KnowledgeFlagOperationalRisk}, result.Patterns[0].KnowledgeFlags)
 }
 
-func TestNormalizeAndStoreDoesNotUseAIDroppedCandidates(t *testing.T) {
+func TestNormalizeAndStoreKeepsEligibleCurrentCandidate(t *testing.T) {
 	candidate := newPatternNormTestPattern("candidate", "Error Handling", domain.CategoryError)
 	candidate.Confidence = 0.9
 	candidate.SetRule("wrap errors with context")
@@ -213,36 +215,4 @@ func TestNormalizeAndStoreDoesNotUseAIDroppedCandidates(t *testing.T) {
 	require.Equal(t, "candidate", saved[0].ID)
 	require.Empty(t, result.Dropped)
 	require.Equal(t, 0, result.Summary.TotalDropped)
-}
-
-func TestNormalizeAndStoreNormalizesCategoryAliasesBeforeValidationAndSave(t *testing.T) {
-	candidate := newPatternNormTestPattern("path-traversal-protection", "Path Traversal Protection", domain.Category("security"))
-	candidate.Confidence = 0.9
-	candidate.SetDescription("Validate archive paths before extracting files")
-	candidate.SetRule("When extracting archive entries, reject paths outside the target directory")
-	candidate.SetExamples("cleanedTarget := filepath.Clean(targetDir)\ncleanedFile := filepath.Clean(filePath)\nif !strings.HasPrefix(cleanedFile, cleanedTarget+string(os.PathSeparator)) {\n\treturn fmt.Errorf(\"invalid path\")\n}", "")
-
-	var saved []*domain.Pattern
-	repo := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
-			return nil, nil
-		},
-		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
-			saved = append(saved, p)
-			return nil
-		},
-	}
-	svc := NewService(repo)
-
-	result, err := svc.NormalizeAndStore(context.Background(), NormalizeRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
-	})
-
-	require.NoError(t, err)
-	require.Len(t, result.Written, 1)
-	require.Len(t, saved, 1)
-	require.Equal(t, domain.CategoryUtils, result.Written[0].Category)
-	require.Equal(t, domain.CategoryUtils, saved[0].Category)
-	require.Equal(t, "path-traversal-protection", saved[0].ID)
 }

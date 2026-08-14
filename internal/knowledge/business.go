@@ -92,120 +92,19 @@ type businessGroupKey struct {
 }
 
 func businessPatternGroupKey(pattern domain.Pattern) businessGroupKey {
-	if key := businessGroupKeyFromPath(pattern); key.ID != "" {
-		return key
-	}
-	if key := businessGroupKeyFromEvidence(pattern); key.ID != "" {
-		return key
-	}
 	if pattern.ScopePath != "" {
 		return businessGroupKeyFromPathText(pattern.ScopePath)
 	}
-	if key := businessGroupKeyFromPatternText(pattern); key.ID != "" {
-		return key
-	}
 	return businessGroupKey{}
-}
-
-func businessGroupKeyFromPath(pattern domain.Pattern) businessGroupKey {
-	if pattern.BusinessMethod == nil {
-		return businessGroupKey{}
-	}
-	return businessGroupKeyFromPathText(pattern.BusinessMethod.DisplayLocation())
-}
-
-func businessGroupKeyFromEvidence(pattern domain.Pattern) businessGroupKey {
-	for _, location := range pattern.EvidenceLocations {
-		if key := businessGroupKeyFromPathText(location.DisplayLocation()); key.ID != "" {
-			return key
-		}
-	}
-	return businessGroupKey{}
-}
-
-func businessGroupKeyFromPatternText(pattern domain.Pattern) businessGroupKey {
-	text := stringx.FirstNonBlank(pattern.Name, pattern.ID, pattern.Rule, pattern.Description)
-	return businessGroupKeyFromName(text)
 }
 
 func businessGroupKeyFromPathText(location string) businessGroupKey {
-	location = strings.TrimSpace(location)
-	if location == "" {
+	path := filepath.ToSlash(strings.TrimSpace(location))
+	path = strings.Trim(path, "/")
+	if path == "" {
 		return businessGroupKey{}
 	}
-	if idx := strings.Index(location, ":"); idx >= 0 {
-		location = location[:idx]
-	}
-
-	parts := strings.FieldsFunc(filepath.ToSlash(location), func(r rune) bool {
-		return r == '/'
-	})
-	fileStem := ""
-	if len(parts) > 0 && filepath.Ext(parts[len(parts)-1]) != "" {
-		fileStem = strings.TrimSuffix(parts[len(parts)-1], filepath.Ext(parts[len(parts)-1]))
-		parts = parts[:len(parts)-1]
-	}
-	for i := len(parts) - 1; i >= 0; i-- {
-		part := strings.TrimSpace(parts[i])
-		if part == "" || isGenericBusinessDirectory(part) {
-			continue
-		}
-		part = strings.TrimSuffix(part, filepath.Ext(part))
-		if key := businessGroupKeyFromName(part); key.ID != "" {
-			return key
-		}
-	}
-	return businessGroupKeyFromName(normalizeBusinessFileStem(fileStem))
-}
-
-func isGenericBusinessDirectory(value string) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "app", "application", "biz", "business", "cmd", "command", "commands", "component", "components",
-		"controller", "domain", "endpoint", "endpoints", "feature", "features", "flow", "flows",
-		"handler", "handlers", "hook", "hooks", "internal", "job", "jobs", "layout", "layouts",
-		"logic", "model", "models", "mutation", "mutations", "page", "pages", "pkg", "query",
-		"queries", "repository", "resolver", "resolvers", "route", "routes", "screen", "screens",
-		"service", "services", "src", "store", "stores", "svc", "task", "tasks", "template",
-		"templates", "usecase", "usecases", "view", "views", "widget", "widgets", "worker",
-		"workers", "workflow", "workflows":
-		return true
-	default:
-		return false
-	}
-}
-
-func normalizeBusinessFileStem(value string) string {
-	words := splitBusinessGroupWords(value)
-	if len(words) >= 2 && words[len(words)-2] == "tp" && isDigits(words[len(words)-1]) {
-		words = words[:len(words)-1]
-	}
-	if len(words) > 1 && isBusinessRoleSuffix(words[len(words)-1]) {
-		words = words[:len(words)-1]
-	}
-	return strings.Join(words, "-")
-}
-
-func isBusinessRoleSuffix(value string) bool {
-	switch value {
-	case "adapter", "client", "command", "component", "controller", "handler", "hook", "job", "logic",
-		"manager", "mutation", "page", "query", "reloader", "repository", "resolver", "screen",
-		"service", "task", "view", "widget", "worker":
-		return true
-	default:
-		return false
-	}
-}
-
-func isDigits(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, r := range value {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return true
+	return businessGroupKeyFromName(filepath.Base(path))
 }
 
 func businessGroupKeyFromName(name string) businessGroupKey {
@@ -300,9 +199,6 @@ func businessGroupKeywords(group BusinessGroup) []string {
 	keywords := SplitBusinessGroupWords(group.Title)
 	if len(keywords) == 0 {
 		keywords = SplitBusinessGroupWords(group.ID)
-	}
-	for _, signal := range group.Signals {
-		keywords = append(keywords, SplitBusinessGroupWords(signal)...)
 	}
 	return limitStrings(stringx.UniqueNonBlank(keywords), maxBusinessGroupSignals)
 }

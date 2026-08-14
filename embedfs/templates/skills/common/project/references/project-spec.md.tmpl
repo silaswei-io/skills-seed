@@ -8,43 +8,31 @@
 
 ## 使用方式
 
-- 本规范只保留当前项目的可执行约束、生成/配置约定、源码证据支持的改动边界和改动触点。
-- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，能力入口读 [能力入口索引](./business-methods.md){{end}}；验证方式读 [验证策略](./validation.md){{if .References.Testing}} 和 [测试矩阵](./testing.md){{end}}。
+- 本规范只保留当前项目的权威约束及同步覆盖；源码学习结论只在分类 patterns reference 中展开。
+- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，能力入口读 [能力入口索引](./business-methods.md){{end}}。
 - 权威规则只来自用户维护或内置约束；源码学习结果只作为复用和安全检查入口。
-- 框架和配置条目来自已学习项目画像，只用于定位；修改前仍需按当前代码、依赖清单和配置文件确认。
 - 当本规范和实际代码不一致时，以当前代码为准。
 
 ## 目录
 
 - [权威规则（用户/内置）](#权威规则用户内置)
-{{if .PatternGuidance}}- [源码改动边界](#源码改动边界)
-{{end}}{{if .FrameworkPatterns}}- [框架使用约定](#框架使用约定)
-{{end}}{{if .ConfigPatterns}}- [配置约定](#配置约定)
-{{end}}- [改动触点](#改动触点)
+{{if .AuthorityCoverage}}- [权威同步覆盖](#权威同步覆盖)
+{{end}}
 
 ## 权威规则（用户/内置）
 
+{{if .RuleReferences}}用户维护的完整规则原文：
+
+{{range .RuleReferences}}- [{{.Name}}]({{.Path}}){{if .Paths}}；路径：{{range $i, $path := .Paths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{else}}；适用于整个项目{{end}}
+{{end}}
+{{end}}
 {{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**：{{.Rule}}（来源：`{{.Source}}`{{if .Evidence}}；证据：{{range $i, $path := .Evidence}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}）
-{{end}}{{end}}{{if .PatternRules}}{{range .PatternRules}}- **{{.Name}}** ({{.Category}}): {{if .Rule}}{{.Rule}}{{else}}{{.Description}}{{end}}
-{{end}}{{end}}{{if not .EngineeringRules}}{{if not .PatternRules}}*尚未提取用户或内置权威规则；源码学习模式见下方改动边界和分类 references。*
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .RuleReferences}}*尚未提取用户或内置权威规则；源码学习模式见分类 patterns references。*
 {{end}}{{end}}
-{{if .PatternGuidance}}## 源码改动边界
+{{if .AuthorityCoverage}}## 权威同步覆盖
 
-以下条目来自源码证据，用于定位复用入口、生成/配置边界、迁移/操作风险或跨模块约定；它们不是自动生效的权威硬规则，也不是安全保证。修改前先按证据位置读取当前源码。
+以下清单用于审阅本次权威同步纳入的输入边界；被纳入不代表每个章节都会产生规则。
 
-{{range .PatternGuidance}}- **{{.Name}}** ({{.Category}}): {{.Description}}{{if .Evidence}}
-  - 证据：{{range $i, $path := .Evidence}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}
+{{range .AuthorityCoverage}}- `{{.Source}}`{{if .Sections}}：{{range $i, $section := .Sections}}{{if $i}}、{{end}}{{$section}}{{end}}{{else}}（文件级覆盖）{{end}}
 {{end}}
-{{end}}{{if .FrameworkPatterns}}## 框架使用约定
-
-{{range .FrameworkPatterns}}- {{.}}
-{{end}}
-{{end}}{{if .ConfigPatterns}}## 配置约定
-
-{{range .ConfigPatterns}}- {{.}}
-{{end}}
-{{end}}## 改动触点
-
-{{if .Touchpoints}}{{range .Touchpoints}}- **{{.Kind}}** `{{.Name}}`{{if .Path}} - `{{.Path}}`{{end}}{{if .Description}}: {{.Description}}{{end}}
-{{end}}{{else}}*尚未提取关键触点。*
 {{end}}

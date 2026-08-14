@@ -13,12 +13,9 @@ func proposalFromDecision(result *Decision) *proposal {
 	if result == nil {
 		return nil
 	}
-	out := &proposal{
-		Patterns: make([]domain.Pattern, 0, len(result.Patterns)),
-		Dropped:  make([]Drop, 0, len(result.Dropped)),
-	}
+	out := &proposal{Patterns: make([]domain.Pattern, 0, len(result.Patterns)), Dropped: append([]Drop(nil), result.Dropped...)}
 	for _, item := range result.Patterns {
-		pattern := domain.Pattern{
+		out.Patterns = append(out.Patterns, domain.Pattern{
 			ID:          item.ID,
 			Name:        item.Name,
 			Category:    domain.Category(item.Category),
@@ -27,10 +24,8 @@ func proposalFromDecision(result *Decision) *proposal {
 			Confidence:  item.Confidence,
 			Merged:      len(item.SourceIDs) > 1,
 			MergedFrom:  append([]string(nil), item.SourceIDs...),
-		}
-		out.Patterns = append(out.Patterns, pattern)
+		})
 	}
-	out.Dropped = append(out.Dropped, result.Dropped...)
 	return out
 }
 
@@ -38,10 +33,7 @@ func decisionFromProposal(result *proposal) *Decision {
 	if result == nil {
 		return nil
 	}
-	out := &Decision{
-		Patterns: make([]DecisionPattern, 0, len(result.Patterns)),
-		Dropped:  make([]Drop, 0, len(result.Dropped)),
-	}
+	out := &Decision{Patterns: make([]DecisionPattern, 0, len(result.Patterns)), Dropped: append([]Drop(nil), result.Dropped...)}
 	for _, pattern := range result.Patterns {
 		out.Patterns = append(out.Patterns, DecisionPattern{
 			ID:          pattern.ID,
@@ -53,7 +45,6 @@ func decisionFromProposal(result *proposal) *Decision {
 			SourceIDs:   append([]string(nil), pattern.MergedFrom...),
 		})
 	}
-	out.Dropped = append(out.Dropped, result.Dropped...)
 	return out
 }
 
@@ -75,6 +66,7 @@ func cloneProposal(value *proposal) *proposal {
 	for i := range value.Patterns {
 		cloned.Patterns[i] = value.Patterns[i]
 		cloned.Patterns[i].MergedFrom = append([]string(nil), value.Patterns[i].MergedFrom...)
+		cloned.Patterns[i].KnowledgeFlags = append([]string(nil), value.Patterns[i].KnowledgeFlags...)
 		cloned.Patterns[i].EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), value.Patterns[i].EvidenceLocations...)
 		cloned.Patterns[i].BusinessMethod = cloneBusinessMethod(value.Patterns[i].BusinessMethod)
 	}

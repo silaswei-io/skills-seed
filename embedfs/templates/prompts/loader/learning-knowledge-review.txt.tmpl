@@ -1,0 +1,35 @@
+# Review Learned Knowledge
+
+This is an independent knowledge-review runtime call. Review every source-learning candidate as a skeptical maintainer before it can be normalized or published. Do not merge candidates, compare them with the existing knowledge store, build a project map, or extract authoritative rules.
+
+Project:
+- name: {{.ProjectName}}
+- root: {{.RootPath}}
+- language: {{.Language}}
+
+The evidence focus for this review is available at `{{.EvidenceFocusPath}}`. Candidate knowledge from that focus is available at `{{.CandidatesPath}}` ({{.CandidateCount}} items). Keep this focus together, and read each candidate and its referenced repository evidence. User context is available at `{{.UserContextPath}}`.
+
+Allowed categories: {{.AllowedCategories}}
+
+Review contract:
+- Return exactly one decision for every candidate ID. Never invent, omit, duplicate, merge, or rewrite an ID.
+- Judge semantic accuracy from the referenced evidence chain, not from the candidate's confidence, wording, filename, framework conventions, or common engineering expectations.
+- Distinguish current implementation, design intent, proven guarantee, and known risk. Reject or revise claims of atomicity, security, validation, consistency, reliability, compatibility, ordering, completeness, or prevention unless the evidence covers the relevant boundary and failure modes.
+- Confirm the applicability boundary. A local example cannot become a repository-wide practice; one branch cannot prove every variant; presentation or client behavior cannot prove enforcement by another boundary.
+- Keep source-backed knowledge that changes a future implementation, routing, reuse, safety, debugging, or maintenance decision. Reject generic summaries, inventories, thin forwarding, generated wrappers without source-of-truth value, and observations with no routeable decision value.
+- Learned knowledge is not authority. Its `rule` is non-mandatory reuse guidance and must not be rewritten as a command permission, prohibition, workflow, or team mandate.
+- Review the capability entry independently. Use `set` whenever the evidence establishes a canonical routing or reuse entry, including when the candidate already contains one, and return the complete verified `business_method`. Use `remove` when no canonical entry is supported, and omit `business_method`. Never preserve an entry by reference to the candidate: every retained entry must be self-contained in this review result. Routeable task submission, lifecycle, dispatch, adapter, resolver, interaction, state transition, and boundary operations can be canonical entries even when they are not product-facing orchestration methods. Removing the capability entry does not require rejecting valid surrounding knowledge.
+- A candidate whose name, description, or rule tells a future Agent to call, use, prefer, extend, replace, or preserve a named entry must use `set` when the cited evidence establishes that entry's complete contract. Do not accept routeable guidance while silently deleting or omitting its verified capability entry.
+- When limits, eligibility, time windows, state transitions, retries, partial results, or external effects depend on a calculation or ordering rule, verify that the candidate preserves its decision-bearing operands, comparison or precedence, fallback/base selection, and boundary condition. Revise a generic outcome summary when omitting that formula would make a future change unsafe or ambiguous.
+- When a candidate is anchored to one canonical entry, verify its complete change boundary rather than one convenient branch: guards, idempotent reuse or conflict checks, selected/calculated result, external effect identity, persistence ordering, partial result, and post-effect failure uncertainty wherever the cited source proves them. Revise an incomplete summary from that same evidence instead of treating each branch as unrelated knowledge.
+- If earlier progress or effects remain after failure and the cited source has no compensation or rollback path, require the candidate to say so explicitly. Reject any atomicity claim and revise wording that mentions a partial result while hiding the proven no-compensation boundary.
+- Review `knowledge_flags` independently from wording and analysis depth. `operational_risk` is valid only when evidence proves the candidate itself involves irreversible, privileged, state/resource-changing, or externally visible behavior. Sensitive vocabulary, filenames, planning risk signals, or a critical focus are insufficient. Remove an unsupported flag and add a missing proven flag through `revise`; never output another flag.
+- Use `accept` only when the current text and flag set are already bounded and accurate. Use `revise` when accurate knowledge can be preserved by narrowing or correcting its name, category, description, guidance, confidence, or flag set. Use `reject` when the evidence does not support a useful candidate.
+- For `revise`, return a complete revision. For `accept` and `reject`, omit `revision`. A rejected candidate must use `business_method_verdict: "remove"` and omit `business_method`.
+- Never propose changes to evidence locations, source ownership, project scope, workspace ownership, timestamps, metrics, or candidate IDs; the runtime owns those fields.
+
+Before returning, audit one-to-one candidate coverage and verify that every accepted or revised claim and every `operational_risk` flag can be pointed back to its evidence without relying on hidden context.
+
+Return JSON only.
+
+{{ jsonContract "ReviewKnowledgeOutput" }}

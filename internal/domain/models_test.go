@@ -382,7 +382,8 @@ func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *
 
 	assert.Greater(t, specific.Metrics.SpecificityScore, generic.Metrics.SpecificityScore)
 	assert.Greater(t, specific.Metrics.EvidenceCount, generic.Metrics.EvidenceCount)
-	assert.Greater(t, generic.Metrics.GenericPenalty, specific.Metrics.GenericPenalty)
+	assert.Zero(t, generic.Metrics.GenericPenalty)
+	assert.Zero(t, specific.Metrics.GenericPenalty)
 	assert.Greater(t, specific.Metrics.EffectiveScore, generic.Metrics.EffectiveScore)
 }
 
@@ -620,42 +621,6 @@ func TestFileInfo_IsGoFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.goFile, tt.fileInfo.IsGoFile())
-		})
-	}
-}
-
-func TestFileInfo_IsTestFile(t *testing.T) {
-	tests := []struct {
-		name     string
-		path     string
-		testFile bool
-	}{
-		{
-			name:     "test file with _test.go",
-			path:     "service_test.go",
-			testFile: true,
-		},
-		{
-			name:     "regular go file",
-			path:     "service.go",
-			testFile: false,
-		},
-		{
-			name:     "test file with path prefix",
-			path:     "internal/domain/models_test.go",
-			testFile: true,
-		},
-		{
-			name:     "short filename",
-			path:     "x.go",
-			testFile: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fi := FileInfo{Path: tt.path}
-			assert.Equal(t, tt.testFile, fi.IsTestFile())
 		})
 	}
 }
@@ -946,37 +911,6 @@ func TestFileInfo_LineCount_MultipleEmptyLines(t *testing.T) {
 	assert.Equal(t, 4, fi.LineCount(), "Three newlines should give 4 lines")
 }
 
-func TestFileInfo_IsTestFile_EdgeCases(t *testing.T) {
-	tests := []struct {
-		name     string
-		path     string
-		expected bool
-	}{
-		{
-			name:     "exactly 8 chars ending in _test.go",
-			path:     "a_test.go",
-			expected: true,
-		},
-		{
-			name:     "7 chars cannot be test file",
-			path:     "test.go",
-			expected: false,
-		},
-		{
-			name:     "empty path",
-			path:     "",
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fi := FileInfo{Path: tt.path}
-			assert.Equal(t, tt.expected, fi.IsTestFile())
-		})
-	}
-}
-
 func TestPattern_UpdateConfidence_MultipleUpdates(t *testing.T) {
 	p := &Pattern{Confidence: 0.0, Frequency: 0}
 
@@ -996,7 +930,7 @@ func TestPattern_UpdateConfidence_MultipleUpdates(t *testing.T) {
 func TestNewPattern_AllCategories(t *testing.T) {
 	categories := []Category{
 		CategoryNaming, CategoryError, CategoryStructure,
-		CategoryConcurrency, CategoryTesting, CategoryBusiness,
+		CategoryConcurrency, CategoryBusiness,
 		CategoryAPI, CategoryDatabase, CategoryUtils, CategoryMiddleware,
 		CategoryConfig,
 	}
@@ -1019,7 +953,6 @@ func TestAllowedPatternCategoryNames(t *testing.T) {
 		"error",
 		"structure",
 		"concurrency",
-		"testing",
 		"business",
 		"api",
 		"database",
@@ -1030,7 +963,7 @@ func TestAllowedPatternCategoryNames(t *testing.T) {
 	assert.NotContains(t, names, "security")
 }
 
-func TestNormalizePatternCategoryAliases(t *testing.T) {
+func TestNormalizePatternCategory(t *testing.T) {
 	tests := []struct {
 		name string
 		in   Category
@@ -1038,8 +971,6 @@ func TestNormalizePatternCategoryAliases(t *testing.T) {
 	}{
 		{name: "known category", in: CategoryAPI, want: CategoryAPI},
 		{name: "trim and lower", in: Category(" Error "), want: CategoryError},
-		{name: "security alias", in: Category("security"), want: CategoryUtils},
-		{name: "security dashed alias", in: Category("security-hardening"), want: CategoryUtils},
 		{name: "unknown category", in: Category("performance"), want: Category("performance")},
 	}
 
@@ -1056,7 +987,6 @@ func TestIsValidPatternCategory(t *testing.T) {
 	}
 
 	assert.False(t, IsValidPatternCategory(Category("security")))
-	assert.True(t, IsValidPatternCategory(NormalizePatternCategory(Category("security"))))
 }
 
 func TestCommitInfo_Summary_WithMultipleNewlines(t *testing.T) {

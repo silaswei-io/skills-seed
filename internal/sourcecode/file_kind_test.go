@@ -32,6 +32,46 @@ func TestIsAnalyzableKeepsDependencyFiles(t *testing.T) {
 	require.False(t, IsAnalyzable("LICENSE"))
 }
 
+func TestIsProcedureSource(t *testing.T) {
+	for _, path := range []string{
+		"internal/service/service_test.go",
+		"src/auth/login.spec.ts",
+		"tests/auth_test.py",
+		"release/publish.sh",
+		"deploy",
+		"deploy/**",
+		"deploy/release.go",
+		"acceptance/cases.json",
+		".github/workflows/verify.yml",
+		"scripts/deploy.sh",
+	} {
+		require.True(t, IsProcedureSource(path), path)
+	}
+	for _, path := range []string{
+		"internal/service/service.go",
+		"internal/release/model.go",
+		"internal/deployment_state/store.go",
+		"internal/spec/model.go",
+		"config/application.yaml",
+		"deploy/chart/values.yaml",
+		"deployment/service/config.toml",
+		"release/image-metadata.json",
+		"helm/service/values.yaml",
+		"k8s/service/deployment.yaml",
+		"Dockerfile",
+		"docker-compose.yaml",
+	} {
+		require.False(t, IsProcedureSource(path), path)
+	}
+}
+
+func TestIsUserRuleAuthorityRequiresExactSeedShape(t *testing.T) {
+	require.True(t, IsUserRuleAuthority(".skills-seed/rules/foundation/RULE.md"))
+	require.False(t, IsUserRuleAuthority(".skills-seed/rules/RULE.md"))
+	require.False(t, IsUserRuleAuthority("nested/.skills-seed/rules/foundation/RULE.md"))
+	require.False(t, IsUserRuleAuthority(".skills-seed/rules/foundation/metadata.yaml"))
+}
+
 func TestIsEngineeringKnowledge(t *testing.T) {
 	tests := map[string]bool{
 		"AGENTS.md":                           true,
@@ -39,7 +79,9 @@ func TestIsEngineeringKnowledge(t *testing.T) {
 		"Taskfile.yml":                        true,
 		"Makefile":                            true,
 		".github/workflows/verify.yaml":       true,
-		".skills-seed/context/release.md":     true,
+		".skills-seed/rules/release/RULE.md":  true,
+		".skills-seed/context/release.md":     false,
+		".skills-seed/rules/metadata.yaml":    false,
 		"internal/service/service.go":         false,
 		".github/workflows/notes.md":          false,
 		"docs/build-and-test-instructions.md": false,

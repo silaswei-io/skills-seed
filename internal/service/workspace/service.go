@@ -17,6 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
+	ruleoutput "github.com/silaswei-io/skills-seed/internal/service/rule"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
@@ -31,6 +32,7 @@ type WorkspaceGenerator struct {
 	workspaceProfileRepo domain.WorkspaceProfileRepository
 	workspaceSpecRepo    domain.WorkspaceSpecRepository
 	workflowRepo         domain.WorkflowRepository
+	ruleRepo             domain.RuleRepository
 }
 
 func NewWorkspaceGenerator(
@@ -39,6 +41,7 @@ func NewWorkspaceGenerator(
 	workspaceProfileRepo domain.WorkspaceProfileRepository,
 	workspaceSpecRepo domain.WorkspaceSpecRepository,
 	workflowRepo domain.WorkflowRepository,
+	ruleRepo domain.RuleRepository,
 ) *WorkspaceGenerator {
 	return &WorkspaceGenerator{
 		skillsLoader:         skillsLoader,
@@ -47,6 +50,7 @@ func NewWorkspaceGenerator(
 		workspaceProfileRepo: workspaceProfileRepo,
 		workspaceSpecRepo:    workspaceSpecRepo,
 		workflowRepo:         workflowRepo,
+		ruleRepo:             ruleRepo,
 	}
 }
 
@@ -88,17 +92,6 @@ func (g *WorkspaceGenerator) generateWorkspaceSkills(ctx context.Context, opts W
 	}
 	if err := g.writeWorkspaceRootSkill(ctx, rootOutputPath, projectConfig, workspaceConfig, profile, spec, opts); err != nil {
 		return err
-	}
-	if strings.TrimSpace(opts.RootOutputPath) == "" {
-		legacyOutputPath, err := g.targetSkillOutputPath(projectRoot, legacyWorkspaceSkillName(projectConfig.Name))
-		if err != nil {
-			return err
-		}
-		if legacyOutputPath != rootOutputPath {
-			if err := skilloutput.Remove(legacyOutputPath); err != nil {
-				return err
-			}
-		}
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
@@ -198,18 +191,30 @@ func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, output
 		return err
 	}
 	return skilloutput.ReplaceWithinRoot(projectConfig.RootPath, outputPath, func(staging string) error {
+		rules, err := g.loadRules()
+		if err != nil {
+			return err
+		}
+		if err := ruleoutput.Write(rules, staging); err != nil {
+			return err
+		}
 		if err := generator.WriteWorkflowOutputs(g.workflowRepo, staging, g.skillsLoader.GetLocale()); err != nil {
 			return err
 		}
 		p := skillgen.NewPlan(staging)
 		p.AddFile("SKILL.md", skillgen.CatalogTemplate, "workspace-skill", data)
 		p.AgentMetadataData = data
-		if !opts.SkipReferences {
-			p.AddDir("references")
-			p.AddFile("references/workspace-overview.md", skillgen.CatalogTemplate, "workspace-reference-overview", data)
-			p.AddFile("references/cross-project-rules.md", skillgen.CatalogTemplate, "workspace-reference-cross-project-rules", data)
+		p.AddDir("references")
+		p.AddFile("references/workspace-overview.md", skillgen.CatalogTemplate, "workspace-reference-overview", data)
+		p.AddFile("references/cross-project-rules.md", skillgen.CatalogTemplate, "workspace-reference-cross-project-rules", data)
+		if err := g.renderer.Render(ctx, p); err != nil {
+			return err
 		}
-		return g.renderer.Render(ctx, p)
+		requirements := skilloutput.ReadinessRequirements{}
+		for _, file := range p.Files {
+			requirements.ExpectedFiles = append(requirements.ExpectedFiles, file.Path)
+		}
+		return skilloutput.AuditReadiness(staging, requirements)
 	})
 }
 
@@ -252,7 +257,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		impactRoutes = profile.ImpactRoutes
 	}
 	var routing []domain.WorkspaceRoute
-	var rules []domain.WorkspaceRule
+	var specRules []domain.WorkspaceRule
 	var guidance []domain.WorkspaceRule
 	var changeOrder []string
 	var parallelGuidance []domain.WorkspaceParallelGuidance
@@ -264,7 +269,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 				guidance = append(guidance, rule)
 				continue
 			}
-			rules = append(rules, rule)
+			specRules = append(specRules, rule)
 		}
 		changeOrder = spec.ChangeOrder
 		parallelGuidance = spec.ParallelAgentGuidance
@@ -274,6 +279,11 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 	if err != nil {
 		return workspaceSkillTemplateData{}, err
 	}
+	userRules, err := g.loadRules()
+	if err != nil {
+		return workspaceSkillTemplateData{}, err
+	}
+	ruleReferences := generator.RuleReferences(userRules)
 	summary := ""
 	if profile != nil {
 		summary = profile.Summary
@@ -293,13 +303,13 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		Dependencies:        dependencies,
 		ImpactRoutes:        impactRoutes,
 		Routing:             routing,
-		Rules:               rules,
+		Rules:               specRules,
 		Guidance:            guidance,
 		ChangeOrder:         changeOrder,
 		ParallelGuidance:    parallelGuidance,
 		LoadMultipleWhen:    loadMultipleWhen,
 		WorkflowReferences:  workflowReferences,
-		SkipReferences:      opts.SkipReferences,
+		RuleReferences:      ruleReferences,
 		HasWorkspaceFacts:   summary != "",
 		HasShared:           len(shared) > 0,
 		HasContracts:        len(contracts) > 0,
@@ -307,13 +317,21 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		HasDependencies:     len(dependencies) > 0,
 		HasImpactRoutes:     len(impactRoutes) > 0,
 		HasRouting:          len(routing) > 0,
-		HasRules:            len(rules) > 0,
+		HasRules:            len(specRules) > 0,
 		HasGuidance:         len(guidance) > 0,
 		HasChangeOrder:      len(changeOrder) > 0,
 		HasParallelGuidance: len(parallelGuidance) > 0,
 		HasLoadMultipleWhen: len(loadMultipleWhen) > 0,
 		HasWorkflowRefs:     len(workflowReferences) > 0,
+		HasRuleRefs:         len(ruleReferences) > 0,
 	}, nil
+}
+
+func (g *WorkspaceGenerator) loadRules() ([]domain.Rule, error) {
+	if g.ruleRepo == nil {
+		return nil, nil
+	}
+	return g.ruleRepo.List()
 }
 
 func workspaceProjectByID(profile *domain.WorkspaceProfile, id string) domain.WorkspaceProject {

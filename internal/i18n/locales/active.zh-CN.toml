@@ -28,23 +28,167 @@ other = "查看版本信息"
 [RuntimeContextPathNotRegularFile]
 other = "context 路径不是普通文件: {{.Path}}"
 
+[ResourceTargetWorkspace]
+other = "工作区"
+
+[ResourceTargetProject]
+other = "项目"
+
+[RuleShort]
+other = "管理用户权威规则"
+
+[RuleLongDesc]
+other = "由当前 Agent 结合项目上下文整理用户提供的权威规则，再保存完整正文。同名规则默认与已有内容合并优化；仅在需要完整替换正文和作用范围时使用 --overwrite。无范围参数时规则只归属当前项目或工作区根；使用 --project、--path 或 --child 可明确其他作用范围。"
+
+[RuleExample]
+other = "  skills-seed rule --name foundation-code --content \"底座代码未经明确授权不得修改。\" --path \"internal/platform/**\"\n  skills-seed rule --name shared-contract --content \"修改公共契约前必须确认两个消费者。\" --project backend,frontend\n  skills-seed rule --name backend-boundary --content \"不得直接依赖存储实现。\" --child backend"
+
+[RuleFlagName]
+other = "规则名称"
+
+[RuleFlagContent]
+other = "规则原文或草稿；Agent 会在保持权威语义不变的前提下整理为 Markdown"
+
+[RuleFlagOverwrite]
+other = "完全覆盖同名规则及其作用范围"
+
+[RuleFlagChild]
+other = "工作区模式下把规则保存到指定子项目"
+
+[RuleFlagProject]
+other = "工作区根规则明确影响的子项目 ID，可重复或逗号分隔"
+
+[RuleFlagPath]
+other = "规则明确约束的项目相对路径或工作区相对路径，可重复或逗号分隔"
+
+[RuleShowShort]
+other = "查看已有规则的范围或完整原文"
+
+[RuleShowLongDesc]
+other = "无参数时列出当前目标已有规则及其显式范围；提供 rule-id 时显示完整原文。"
+
+[RuleShowExample]
+other = "  skills-seed rule show\n  skills-seed rule show foundation-code --format json\n  skills-seed rule show --child backend"
+
+[RuleShowFlagFormat]
+other = "输出格式：table 或 json"
+
+[RuleShowFlagChild]
+other = "工作区模式下查询指定子项目"
+
+[RuleShowUnsupportedFormat]
+other = "不支持的规则输出格式: {{.Format}}"
+
+[RuleShowNotFound]
+other = "未找到规则: {{.ID}}"
+
+[RuleShowHeaderID]
+other = "ID"
+
+[RuleShowHeaderName]
+other = "名称"
+
+[RuleShowHeaderTarget]
+other = "归属"
+
+[RuleShowHeaderScope]
+other = "作用范围"
+
+[RuleShowHeaderUpdatedAt]
+other = "更新时间"
+
+[RuleShowFieldID]
+other = "ID"
+
+[RuleShowFieldName]
+other = "名称"
+
+[RuleShowFieldTarget]
+other = "归属"
+
+[RuleShowFieldProjects]
+other = "影响项目"
+
+[RuleShowFieldPaths]
+other = "影响路径"
+
+[RuleShowFieldCreatedAt]
+other = "创建时间"
+
+[RuleShowFieldUpdatedAt]
+other = "更新时间"
+
+[RuleShowContentHeading]
+other = "规则原文"
+
+[RuleSaved]
+other = "规则已保存: {{.Name}} ({{.ID}}) -> {{.Target}}"
+
+[RuleRepositoryMissing]
+other = "规则仓储未配置"
+
+[RuleNameRequired]
+other = "规则名称不能为空"
+
+[RuleContentRequired]
+other = "规则原文不能为空"
+
+[RuleChildRequiresWorkspace]
+other = "--child 只能在工作区模式下使用"
+
+[RuleChildNotFound]
+other = "未找到工作区子项目: {{.Child}}"
+
+[RuleChildNotInitialized]
+other = "子项目 {{.ProjectName}} 尚未初始化 skills-seed: {{.Path}}"
+
+[RuleChildNotGitRepo]
+other = "子项目 {{.ProjectName}} 不是 Git 仓库: {{.Path}}"
+
+[RuleChildModeInvalid]
+other = "子项目 {{.ProjectName}} 必须是 project 模式，当前为 {{.Mode}}"
+
+[RuleChildProjectConflict]
+other = "--child 与 --project 不能同时使用"
+
+[RuleProjectRequiresWorkspace]
+other = "--project 只能用于工作区根规则"
+
+[RuleProjectNotFound]
+other = "未找到工作区子项目: {{.Project}}"
+
+[RulePathInvalid]
+other = "规则路径必须是当前项目或工作区内的相对路径: {{.Path}}"
+
+[ProgressOptimizeRuleAI]
+other = "优化并保存用户规则"
+
+[RuleOptimizerMissing]
+other = "规则优化器未配置"
+
+[RuleOptimizerEmptyContent]
+other = "规则优化器返回了空内容"
+
+[GenerateRuleIDConflict]
+other = "当前项目规则与工作区投影规则使用了相同 ID：{{.ID}}"
+
 [WorkflowShort]
 other = "管理用户工作流"
 
 [WorkflowLongDesc]
-other = "把用户传入的目标、约束、背景或路径交给当前 Agent 推导并整理成标准工作流，保存为独立资源。同名工作流默认会与已有内容合并去重；需要完全重写时使用 --overwrite。使用 show 子命令可只读查询已有工作流。工作流不属于 profile.mode，也不会影响 project/workspace 模式锁定。"
+other = "由当前 Agent 结合项目上下文整理用户提供的工作流，再保存完整正文。同名工作流默认与已有内容合并优化；仅在需要完整替换时使用 --overwrite。使用 show 子命令可只读查询已有工作流。工作流不属于 profile.mode，也不会影响 project/workspace 模式锁定。"
 
 [WorkflowExample]
-other = "  skills-seed workflow --context \"发布前检查环境变量和构建产物，发布后执行 smoke test\"\n  skills-seed workflow --name deploy --context \"补充：发布前检查数据库迁移和回滚脚本\"\n  skills-seed workflow --name deploy --context \"改为只按本次说明生成发布流程\" --overwrite"
+other = "  skills-seed workflow --name deploy --content \"# 部署流程\\n\\n## 步骤\\n- 检查环境变量\"\n  skills-seed workflow --name deploy --content \"增加数据库迁移检查\""
 
 [WorkflowFlagName]
-other = "工作流名称；不提供时由 Agent 根据 context 生成"
+other = "工作流名称"
 
-[WorkflowFlagContext]
-other = "用户传入的目标、约束、背景、路径或零散说明；Agent 会据此推导标准工作流，默认合并同名工作流"
+[WorkflowFlagContent]
+other = "工作流原文或草稿；Agent 会整理为可执行的 Markdown"
 
 [WorkflowFlagOverwrite]
-other = "完全重写同名工作流，而不是与已有内容合并"
+other = "完全覆盖同名工作流"
 
 [WorkflowFlagChild]
 other = "工作区模式下把工作流保存到指定子项目，例如 --child backend"
@@ -82,9 +226,6 @@ other = "目标"
 [WorkflowShowHeaderSummary]
 other = "摘要"
 
-[WorkflowShowHeaderContexts]
-other = "上下文数"
-
 [WorkflowShowHeaderScripts]
 other = "脚本数"
 
@@ -102,9 +243,6 @@ other = "目标"
 
 [WorkflowShowFieldSummary]
 other = "摘要"
-
-[WorkflowShowFieldContexts]
-other = "上下文数"
 
 [WorkflowShowFieldScripts]
 other = "脚本数"
@@ -140,7 +278,7 @@ other = "子项目 {{.ProjectName}} 必须是 project 模式，当前为 {{.Mode
 other = "工作流模板加载器未配置"
 
 [ProgressOptimizeWorkflowAI]
-other = "优化用户工作流"
+other = "优化并保存用户工作流"
 
 [WorkflowOutputSummaryHeadingCandidates]
 other = "适用场景|使用场景|目标|说明|简介"
@@ -276,10 +414,16 @@ other = "不支持的 Agent engine: {{.Provider}}"
 other = "Agent {{.Agent}} 不可用，请检查 agent 命令配置"
 
 [AgentRenderOptimizeWorkflowPromptFailed]
-other = "渲染 core-workflow-optimize prompt 失败"
+other = "渲染工作流优化 prompt 失败"
 
 [AgentOptimizeWorkflowFailed]
 other = "优化工作流失败"
+
+[AgentRenderOptimizeRulePromptFailed]
+other = "渲染规则优化 prompt 失败"
+
+[AgentOptimizeRuleFailed]
+other = "优化规则失败"
 
 [AgentRenderProjectAnalysisPromptFailed]
 other = "渲染项目或工作区分析 prompt 失败"
@@ -777,27 +921,6 @@ other = "{{.Label}}：扫描文件指纹"
 [ProgressLearnCurrentLocalFileSelection]
 other = "本地候选准备"
 
-[ProgressLearnCurrentAIFileSelection]
-other = "AI 候选收敛"
-
-[ProgressLearnCurrentCandidateSelectionStructuralContext]
-other = "{{.Label}} · 准备结构化上下文（入口 {{.SeedPaths}}）"
-
-[ProgressLearnCurrentCandidateSelectionCodeGraphIndex]
-other = "{{.Label}} · CodeGraph 检查索引（入口 {{.SeedPaths}}）"
-
-[ProgressLearnCurrentCandidateSelectionCodeGraphContext]
-other = "{{.Label}} · CodeGraph 提取候选线索（入口 {{.SeedPaths}}）"
-
-[ProgressLearnCurrentCandidateSelectionCodeGraphRepair]
-other = "{{.Label}} · CodeGraph 修复索引（入口 {{.SeedPaths}}）"
-
-[ProgressLearnCurrentCandidateSelectionTreeSitterContext]
-other = "{{.Label}} · 解析结构化入口（入口 {{.SeedPaths}}）"
-
-[ProgressLearnCurrentCandidateSelectionAgent]
-other = "{{.Label}} · 调用 Agent 收敛候选（候选 {{.CandidatePaths}}）"
-
 [ProgressLearnCurrentFileSelectionSkipRestored]
 other = "已恢复分析计划"
 
@@ -805,7 +928,7 @@ other = "已恢复分析计划"
 other = "无候选文件"
 
 [ProgressLearnCurrentAnalyzeCodebase]
-other = "分析当前代码库"
+other = "隔离源码证据分析"
 
 [ProgressLearnCurrentPlanFocuses]
 other = "学习议程规划"
@@ -835,7 +958,19 @@ other = "{{.Batch}} 焦点 {{.Start}}-{{.End}}/{{.Total}} {{.Name}}"
 other = "{{.Label}} · 提交 {{.Count}} 个文件状态"
 
 [ProgressLearnCurrentNormalizeAndSavePatterns]
-other = "规范化并保存模式库"
+other = "知识准入与模式入库"
+
+[ProgressLearnCurrentReviewKnowledge]
+other = "独立知识审查"
+
+[ProgressLearnCurrentReviewKnowledgeSkipped]
+other = "跳过独立知识审查（无候选或已复用）"
+
+[ProgressLearnCurrentReviewFocus]
+other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} · 焦点 {{.Current}}/{{.AgendaTotal}} {{.Name}} · 候选 {{.Candidates}}"
+
+[ProgressLearnCurrentReviewComplete]
+other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} 个焦点"
 
 [ProgressLearnCurrentPatternStageDetail]
 other = "{{.Label}} · {{.Detail}}"
@@ -846,23 +981,26 @@ other = "校验规范化结果"
 [ProgressNormalizePatternsStore]
 other = "写入模式库"
 
-[ProgressNormalizePatternsLocal]
-other = "本地确定性规范化"
-
 [ProgressNormalizePatternsAI]
 other = "AI 合并优化模式"
 
+[ProgressNormalizePatternsReplay]
+other = "重放已保存的规范化决策"
+
 [ProgressLearnCurrentSaveProfile]
-other = "同步项目画像"
+other = "权威规则与项目地图刷新"
 
 [ProgressLearnCurrentSkipProfile]
-other = "跳过项目画像同步"
+other = "跳过权威规则与项目地图刷新"
+
+[ProgressLearnCurrentExtractAuthority]
+other = "提取权威规则"
+
+[ProgressLearnCurrentRefreshProjectMap]
+other = "刷新项目地图"
 
 [ProgressLearnWorkspaceProjects]
 other = "学习工作区子项目"
-
-[ProgressNormalizePatternsReplay]
-other = "重放已保存的规范化决策"
 
 [ProgressUserDefinePatternAI]
 other = "生成用户定义模式"
@@ -884,7 +1022,7 @@ other = "生成 AI Agent skills..."
 other = "统计模式失败: {{.Error}}"
 
 [GenerateNoPatterns]
-other = "还没有学习任何模式，也没有保存工作流。请先运行 'skills-seed learn current' 或 'skills-seed workflow --context \"...\"'。"
+other = "还没有学习任何模式，也没有保存工作流。请先运行 'skills-seed learn current' 或 'skills-seed workflow --name <名称> --content \"<Markdown>\"'。"
 
 [GenerateFoundPatterns]
 other = "找到 {{.Count}} 个模式"
@@ -902,10 +1040,13 @@ other = "加载已学习模式"
 other = "整理生成数据"
 
 [ProgressGenerateLoadProfile]
-other = "读取项目画像"
+other = "读取权威规则与项目地图"
 
 [ProgressGenerateWriteSkills]
 other = "写入技能文件"
+
+[ProgressGenerateAuditReadiness]
+other = "写入技能文件 · 校验交付就绪状态"
 
 [ProgressGenerateWriteRootSkills]
 other = "写入工作区根 skills"
@@ -957,9 +1098,6 @@ other = "子项目 {{.ProjectName}} 必须使用 project 模式，当前为 {{.M
 
 [GenerateFlagOutput]
 other = "skills 输出目录（默认使用当前 skills.target 的 skills.paths，例如 .claude/skills/... 或 .agents/skills/...）"
-
-[GenerateFlagNoReferences]
-other = "跳过参考文档生成（不生成 references/ 目录）"
 
 [GenerateFlagContext]
 other = "本次生成的补充说明，会传给 AI Agent 作为额外约束"
@@ -1395,7 +1533,7 @@ other = "  # 自动检测并添加所有子仓\n  skills-seed workspace add .\n\
 other = "生成 AI Agent skills"
 
 [GenerateSkillsLongDesc]
-other = "从已学习的 patterns 和项目画像生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取已学习的 patterns\n  • 读取项目画像\n  • 根据 skills.target 选择目标 skills 模板\n  • 确定性生成 SKILL.md 与 references/ 文档\n\n生成过程不调用 Agent。"
+other = "从已核验的 patterns、权威规则和项目地图生成 AI Agent skills。\n\n此命令将：\n  • 从数据库读取已学习的 patterns\n  • 读取权威规则与项目地图\n  • 根据 skills.target 选择目标 skills 模板\n  • 确定性生成 SKILL.md 与 references/ 文档\n\n生成过程不调用 Agent。"
 
 [GenerateSkillsExample]
 other = "  # 生成到默认 skills.paths\n  skills-seed generate skills\n\n  # 临时指定输出目录\n  skills-seed generate skills --output .agents/skills/my-project"
@@ -1661,17 +1799,8 @@ other = "解析结果失败，返回空结果"
 [LoggerAgentParseResultFailedNonFallback]
 other = "解析结果失败"
 
-[LoggerPatternNormCoverageRecovered]
-other = "模式规范化候选覆盖率异常，仅对未分类候选执行本地确定性恢复"
-
-[LoggerPatternNormRecallRecovered]
-other = "模式规范化疑似过度过滤，已恢复有源码证据的候选"
-
 [LoggerPatternNormSanitized]
 other = "模式规范化结果包含无效或重复决策，已整理后继续"
-
-[LoggerPatternNormAIFallback]
-other = "AI 模式合并优化失败，已降级为本地确定性规范化"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "项目分析提示词模板渲染失败"
@@ -1739,10 +1868,10 @@ other = "事件统计"
 other = "从当前代码学习"
 
 [LearnCurrentLongDesc]
-other = "分析当前代码库，提取编码模式、能力入口、可复用项目知识与项目画像。\n\n此命令将：\n  • 分析项目结构和代码\n  • 使用配置的 AI Agent 提取编码模式\n  • 保存学到的 patterns 到数据库\n  • 按策略保存项目画像到 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备完整 project-overview 输入"
+other = "从当前代码库生产可复用项目知识、权威规则和项目地图。\n\n此命令将：\n  • 准备候选并规划学习议程\n  • 隔离分析源码证据并独立审查知识\n  • 规范化后写入 patterns 数据库\n  • 按策略提取权威规则并刷新 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备已核验知识输入"
 
 [LearnCurrentExample]
-other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不同步项目画像\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
+other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不刷新权威规则与项目地图\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
 [LearnFlagLanguage]
 other = "项目主要编程语言；留空时使用配置或自动识别"
@@ -1751,7 +1880,7 @@ other = "项目主要编程语言；留空时使用配置或自动识别"
 other = "指定要扫描学习的目录或文件，可重复使用；路径必须在项目根目录内"
 
 [LearnFlagProfile]
-other = "项目画像同步策略：auto 在缺失或本次写入模式时同步，skip 跳过，refresh 强制重新分析当前输入并同步"
+other = "权威规则与项目地图刷新策略：auto 在地图缺失或权威输入变化时刷新，skip 跳过，refresh 强制刷新"
 
 [LearnFlagContext]
 other = "本次学习的补充说明，会传给 AI Agent 作为额外约束"
@@ -1790,18 +1919,6 @@ other = "AI 未返回有效证据焦点时，使用当前待学习文件作为�
 [LearnCurrentFallbackFocusReasonWithGroup]
 other = "AI 未将 {{.Group}} 归入已有高密度证据焦点时，按该语义路径簇作为兜底分析范围"
 
-[LearnCurrentDecisionCandidateChanged]
-other = "规范化候选集已变化"
-
-[LearnCurrentDecodeDecisionFailed]
-other = "解码规范化决策失败"
-
-[LearnCurrentDecisionCheckpointMissing]
-other = "规范化检查点未初始化"
-
-[LearnCurrentEncodeDecisionFailed]
-other = "编码规范化决策失败"
-
 [LearnCurrentArtifactsCommittedWithPendingFocuses]
 other = "分析产物已提交，但仍有 {{.Count}} 个证据焦点待处理"
 
@@ -1826,12 +1943,6 @@ other = "候选准备已生效"
 [LearnCurrentFileSelectionLocalReason]
 other = "本地保守候选准备"
 
-[LearnCurrentFileSelectionAIReason]
-other = "AI 候选收敛已生效{{if .Reason}}：{{.Reason}}{{end}}"
-
-[LearnCurrentFileSelectionAIFailed]
-other = "AI 候选收敛失败，降级为使用全部候选：{{.Error}}"
-
 [LearnCurrentFileSelectionSkipped]
 other = "已跳过（{{.Reason}}）"
 
@@ -1855,9 +1966,6 @@ other = "语言"
 
 [LearnCurrentSharedContextLearningMode]
 other = "学习模式"
-
-[LearnCurrentSharedContextLearningScope]
-other = "学习范围"
 
 [LearnCurrentSharedContextChangeProfile]
 other = "变更画像"
@@ -1893,7 +2001,7 @@ other = "focus 路径 {{.Path}} 不可访问"
 other = "无效的项目画像策略 {{.Mode}}，可选值为 auto、skip 或 refresh"
 
 [LearnCurrentResult]
-other = "分析结果:\n  • 新增模式数: {{.PatternsCount}}"
+other = "分析结果:\n  • 新增或更新模式数: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeFocusesSummary]
 other = "证据焦点完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}} 个，项目内并发 {{.Parallelism}}"
@@ -1902,16 +2010,16 @@ other = "证据焦点完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}
 other = "保存模式失败 [{{.ID}}]: {{.Error}}"
 
 [LearnCurrentPatternsSaved]
-other = "模式库写入完成: {{.Count}} 个模式"
+other = "模式库变更完成: 写入 {{.Saved}} 个模式，移除 {{.Retired}} 个过期模式"
 
 [LearnCurrentProfileSaved]
-other = "项目画像同步完成"
+other = "权威规则与项目地图刷新完成"
 
 [LearnCurrentProfileSkipped]
-other = "项目画像同步已跳过"
+other = "权威规则与项目地图刷新已跳过"
 
 [LearnCurrentProfileFailed]
-other = "项目画像同步失败: {{.Error}}"
+other = "权威规则与项目地图刷新失败: {{.Error}}"
 
 [LearnWorkspaceStart]
 other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并发 {{.Parallelism}}；子项目内证据焦点并发由子项目配置控制"
@@ -1923,7 +2031,7 @@ other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语�
 other = "子项目 {{.ProjectName}} 开始增量学习，日志目录: {{.LogPath}}"
 
 [LearnWorkspaceProjectSummary]
-other = "子项目 {{.ProjectName}} 处理完成: 新增或修改 {{.Changed}}，删除 {{.Deleted}}，本地排除 {{.Skipped}}，产出模式 {{.Patterns}}，写入 {{.Saved}}，耗时 {{.Duration}}"
+other = "子项目 {{.ProjectName}} 处理完成: 新增或修改 {{.Changed}}，删除 {{.Deleted}}，本地排除 {{.Skipped}}，产出模式 {{.Patterns}}，写入 {{.Saved}}，移除过期模式 {{.Retired}}，耗时 {{.Duration}}"
 
 [LearnWorkspaceProjectNoFileChanges]
 other = "子项目 {{.ProjectName}} 未检测到可学习文件变化，已跳过，耗时 {{.Duration}}"
@@ -1935,7 +2043,7 @@ other = "子项目 {{.ProjectName}} 独立执行完成，日志文件: {{.LogPat
 other = "工作区关系输入未变化，已跳过工作区画像和规范分析"
 
 [LearnWorkspaceProjectProgressComplete]
-other = "完成，模式 {{.Patterns}}，写入 {{.Saved}}"
+other = "完成，模式 {{.Patterns}}，写入 {{.Saved}}，移除 {{.Retired}}"
 
 [LearnWorkspaceProjectProgressFailed]
 other = "失败"
@@ -2080,7 +2188,7 @@ other = "学习当前代码"
 other = "生成 skills"
 
 [ChangeLogLearnProjectSummary]
-other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}；发现 {{.Patterns}} 个 patterns，保存 {{.Saved}} 个"
+other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}；发现 {{.Patterns}} 个 patterns，保存 {{.Saved}} 个，移除过期 {{.Retired}} 个"
 
 [ChangeLogLearnWorkspaceSummary]
 other = "处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有模式变化"
@@ -2451,15 +2559,6 @@ other = "code"
 [GeneratorSkillDescriptionDefault]
 other = "修改、调试、测试、审查或扩展 {{.Project}} {{.Language}} 代码时使用，包括接口与契约、插件与集成、状态/持久化、配置与运行期以及架构分析"
 
-[GeneratorValidationGapTest]
-other = "未学习到有仓库证据的测试命令"
-
-[GeneratorValidationGapStaticCheck]
-other = "未学习到有仓库证据的静态检查命令"
-
-[GeneratorValidationGapScopedMatrix]
-other = "尚无可按改动范围映射的验证矩阵"
-
 [GeneratorCategorySummary]
 other = "{{.Category}} 分类包含 {{.Count}} 个项目特定模式：{{.Patterns}}。"
 
@@ -2538,12 +2637,6 @@ other = "并发 / 生命周期模式"
 [GeneratorCategoryConcurrencyDescription]
 other = "并行执行、同步、一致性窗口与生命周期协调"
 
-[GeneratorCategoryTestingTitle]
-other = "测试模式"
-
-[GeneratorCategoryTestingDescription]
-other = "测试约定"
-
 [GeneratorCategoryDefaultDescription]
 other = "项目特定模式"
 
@@ -2583,11 +2676,8 @@ other = "已覆盖模式分类：{{.Categories}}"
 [GeneratorOverviewArchitectureSummary]
 other = "已从当前代码学习到 {{.Count}} 个架构层次；本节用于导航已沉淀的结构事实，具体职责以“架构层次”和“关键模块”章节为准。"
 
-[GeneratorOverviewCoveragePreview]
-other = "当前项目画像已覆盖 {{.Total}} 个模块/责任域；此处仅列出前 {{.Preview}} 个用于导航：{{.Domains}}。完整列表见关键模块、能力入口和分类模式；具体产品规则、架构边界和实现细节需结合当前代码确认，不能把局部摘要当作完整项目事实。"
-
-[GeneratorOverviewCoverageFull]
-other = "当前项目画像已覆盖 {{.Total}} 个模块/责任域：{{.Domains}}。本节用于快速定位项目范围和参考入口；具体产品规则、架构边界和实现细节需结合当前代码、项目规范和分类模式确认，不能把单个责任域摘要当作完整项目事实。"
+[GeneratorOverviewCoverageTotal]
+other = "当前项目画像已覆盖 {{.Total}} 个模块/责任域。完整导航见关键模块、能力入口和分类模式；具体产品规则、架构边界和实现细节需结合当前代码确认，不能把局部摘要当作完整项目事实。"
 
 [GeneratorOverviewCoverageMissing]
 other = "项目概览摘要尚未从完整项目画像中稳定提取；请结合当前代码、项目规范和分类模式确认全局结论。"
@@ -2655,26 +2745,11 @@ other = "工具函数承载领域规则、审计数据或业务字段格式时�
 [GeneratorReferenceLinkUtilsAPI]
 other = "工具函数用于接口、消息、事件、模型转换或外部契约时继续阅读。"
 
-[GeneratorReferenceLinkUtilsTesting]
-other = "工具函数改动需要复用项目测试约定、fixture 或断言模式时继续阅读。"
-
 [GeneratorReferenceLinkConcurrencyDatabase]
 other = "并发控制影响状态一致性、事务边界、缓存或持久化顺序时继续阅读。"
 
 [GeneratorReferenceLinkConcurrencyBusiness]
 other = "锁、队列或异步流程承载业务状态变化时继续阅读。"
-
-[GeneratorReferenceLinkConcurrencyTesting]
-other = "并发行为需要 race、时序或重试类测试约定时继续阅读。"
-
-[GeneratorReferenceLinkTestingBusiness]
-other = "测试断言业务规则、状态流转或跨实体行为时继续阅读。"
-
-[GeneratorReferenceLinkTestingAPI]
-other = "测试覆盖接口、消息、事件、契约、生成代码或适配层时继续阅读。"
-
-[GeneratorReferenceLinkTestingDatabase]
-other = "测试依赖状态 fixture、事务隔离、缓存或持久化断言时继续阅读。"
 
 [GeneratorReferenceLinkStructureBusiness]
 other = "结构调整影响领域边界、入口编排或跨模块业务流时继续阅读。"
@@ -2721,26 +2796,20 @@ other = "请输入有效整数"
 [InteractiveMinimumInteger]
 other = "数值不能小于 {{.Minimum}}"
 
-[WorkflowConflictRequirements]
-other = "工作流包含冲突要求: {{.Conflicts}}"
-
 [WorkflowRepositoryMissing]
 other = "工作流仓储未配置"
 
 [WorkflowOptimizerMissing]
 other = "工作流优化器未配置"
 
-[WorkflowContextRequired]
-other = "必须提供 workflow --context"
-
 [WorkflowOptimizerEmptyContent]
 other = "工作流优化器返回了空内容"
 
-[WorkflowOptimizerEmptyTitle]
-other = "工作流优化器返回了空标题"
+[WorkflowNameRequired]
+other = "必须提供工作流名称"
 
-[WorkflowOptimizerUnsafeTitle]
-other = "工作流优化器返回了不安全的标题"
+[WorkflowContentRequired]
+other = "必须通过 --content 提供工作流内容"
 
 [PatternsNotWritten]
 other = "模式未写入"
@@ -2844,14 +2913,29 @@ other = "不支持的模式入库操作: {{.Operation}}"
 [PatternNormLoadExistingPatternsFailed]
 other = "加载已有模式失败"
 
+[PatternNormValidateDeterministicFailed]
+other = "校验确定性规范化结果失败"
+
 [PatternNormLearnCurrentFailed]
 other = "当前代码模式规范化失败"
 
 [PatternNormValidateCurrentFailed]
 other = "校验当前代码规范化结果失败"
 
-[PatternNormValidateDeterministicFailed]
-other = "校验确定性规范化结果失败"
+[LoggerPatternNormAIFallback]
+other = "AI 模式合并优化失败，已降级为本地确定性规范化"
+
+[LearnCurrentDecisionCandidateChanged]
+other = "规范化候选集已变化"
+
+[LearnCurrentDecodeDecisionFailed]
+other = "解码规范化决策失败"
+
+[LearnCurrentDecisionCheckpointMissing]
+other = "规范化检查点未初始化"
+
+[LearnCurrentEncodeDecisionFailed]
+other = "编码规范化决策失败"
 
 [PatternNormApplyPatternsFailed]
 other = "写入规范模式失败"

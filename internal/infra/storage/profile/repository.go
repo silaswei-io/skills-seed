@@ -14,10 +14,7 @@ import (
 // ErrProfileNotFound 表示项目画像不存在
 var ErrProfileNotFound = errors.New("project profile not found")
 
-// ErrSpecNotFound 表示项目开发规范不存在
-var ErrSpecNotFound = errors.New("project spec not found")
-
-// Repository 将项目画像和项目规范保存为持久化 JSON 文档。
+// Repository 保存项目画像 JSON 文档。
 type Repository struct {
 	layout layout.Layout
 }
@@ -60,38 +57,6 @@ func (r *Repository) projectPath(projectID string) string {
 	return r.layout.ProjectDocument(projectID, "project-profile.json")
 }
 
-// GetSpec 读取单项目开发规范
-func (r *Repository) GetSpec(ctx context.Context) (*domain.ProjectSpec, error) {
-	return r.readSpec(ctx, r.layout.ProjectSpec())
-}
-
-// SaveSpec 保存单项目开发规范
-func (r *Repository) SaveSpec(ctx context.Context, spec *domain.ProjectSpec) error {
-	return r.writeSpec(ctx, r.layout.ProjectSpec(), spec)
-}
-
-// GetSpecForProject 读取工作区子项目开发规范
-func (r *Repository) GetSpecForProject(ctx context.Context, projectID string) (*domain.ProjectSpec, error) {
-	return r.readSpec(ctx, r.projectSpecPath(projectID))
-}
-
-// SaveSpecForProject 保存工作区子项目开发规范
-func (r *Repository) SaveSpecForProject(ctx context.Context, projectID string, spec *domain.ProjectSpec) error {
-	return r.writeSpec(ctx, r.projectSpecPath(projectID), spec)
-}
-
-func (r *Repository) readSpec(ctx context.Context, path string) (*domain.ProjectSpec, error) {
-	return specStore(path).Get(ctx)
-}
-
-func (r *Repository) writeSpec(ctx context.Context, path string, spec *domain.ProjectSpec) error {
-	return specStore(path).Save(ctx, spec)
-}
-
-func (r *Repository) projectSpecPath(projectID string) string {
-	return r.layout.ProjectDocument(projectID, "project-spec.json")
-}
-
 func profileStore(path string) jsonfile.Store[domain.ProjectProfile] {
 	return jsonfile.Store[domain.ProjectProfile]{
 		Path:     path,
@@ -103,21 +68,6 @@ func profileStore(path string) jsonfile.Store[domain.ProjectProfile] {
 			CreateDir: i18n.Get("ProjectProfileCreateDirFailed"),
 			Marshal:   i18n.Get("ProjectProfileMarshalFailed"),
 			Write:     i18n.Get("ProjectProfileWriteFailed"),
-		},
-	}
-}
-
-func specStore(path string) jsonfile.Store[domain.ProjectSpec] {
-	return jsonfile.Store[domain.ProjectSpec]{
-		Path:     path,
-		NotFound: ErrSpecNotFound,
-		NilValue: fmt.Errorf("%s", i18n.Get("ProjectSpecNil")),
-		Labels: jsonfile.Labels{
-			Read:      i18n.Get("ProjectSpecReadFailed"),
-			Parse:     i18n.Get("ProjectSpecParseFailed"),
-			CreateDir: i18n.Get("ProjectSpecCreateDirFailed"),
-			Marshal:   i18n.Get("ProjectSpecMarshalFailed"),
-			Write:     i18n.Get("ProjectSpecWriteFailed"),
 		},
 	}
 }

@@ -92,11 +92,12 @@ func (v *Verifier) VerifyBusinessMethods(values []domain.BusinessMethod) []domai
 		location := displayLocation(file.path, symbol.Line)
 		value.Name = symbol.Name
 		value.Function = symbol.Signature
-		value.Description = ""
-		value.Usage = ""
-		value.Prerequisites = ""
-		value.Returns = ""
-		value.Type = ""
+		// 签名和位置由 AST 事实覆盖；语义契约来自同一次源码分析，保留给生成阶段做完整性准入。
+		value.Description = strings.TrimSpace(value.Description)
+		value.Usage = strings.TrimSpace(value.Usage)
+		value.Prerequisites = strings.TrimSpace(value.Prerequisites)
+		value.Returns = strings.TrimSpace(value.Returns)
+		value.Type = strings.TrimSpace(value.Type)
 		value.CodeLocation = domain.CodeLocation{
 			HistoricalLocation: location,
 			CurrentLocation:    location,

@@ -2,6 +2,10 @@ package generator
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -11,9 +15,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 func TestGenerateSkillsDoesNotSkipWhenWorkflowScriptChanges(t *testing.T) {
@@ -30,14 +31,11 @@ func TestGenerateSkillsDoesNotSkipWhenWorkflowScriptChanges(t *testing.T) {
 	defer patternRepo.Close()
 	require.NoError(t, patternRepo.Save(ctx, pattern))
 
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-	}
 	workflowRepo := workflowstore.NewRepository(seedPath)
-	workflowSvc := workflowsvc.NewService(workflowRepo, mockAgent, "go")
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{}, agent.ProjectContext{})
 	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{
 		Name:    "deploy",
-		Context: "发布前检查环境变量",
+		Content: "# Deploy\n\n发布前检查环境变量",
 	})
 	require.NoError(t, err)
 	scriptPath := filepath.Join(seedPath, "workflows", "deploy", "scripts", "smoke-test.sh")
@@ -54,7 +52,7 @@ func TestGenerateSkillsDoesNotSkipWhenWorkflowScriptChanges(t *testing.T) {
 	}
 	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
-	}, workflowRepo)
+	}, workflowRepo, nil)
 	outputPath := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
@@ -79,10 +77,10 @@ func TestGenerateSkillsRemovesDeletedWorkflowOutputs(t *testing.T) {
 	defer patternRepo.Close()
 	require.NoError(t, patternRepo.Save(ctx, pattern))
 	workflowRepo := workflowstore.NewRepository(seedPath)
-	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{NameVal: "test", AvailableVal: true}, "go")
-	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{Name: "deploy", Context: "发布前检查环境变量"})
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{}, agent.ProjectContext{})
+	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{Name: "deploy", Content: "# Deploy\n\n发布前检查环境变量"})
 	require.NoError(t, err)
-	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{Name: "test", Context: "发布后执行 smoke test"})
+	_, err = workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{Name: "test", Content: "# Test\n\n发布后执行 smoke test"})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "workflows", "test", "scripts", "smoke-test.sh"), []byte("#!/bin/sh\necho ok\n"), 0755))
 
@@ -93,7 +91,7 @@ func TestGenerateSkillsRemovesDeletedWorkflowOutputs(t *testing.T) {
 	}
 	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
-	}, workflowRepo)
+	}, workflowRepo, nil)
 	outputPath := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(ctx, outputPath))
@@ -129,18 +127,10 @@ func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
 	}
 	seedPath := t.TempDir()
 	workflowRepo := workflowstore.NewRepository(seedPath)
-	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-		OptimizeWorkflowFn: func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
-			return &agent.OptimizeWorkflowResult{
-				Title:   req.Name,
-				Content: "# " + req.Name + "\n\n## 适用场景\n发布流程覆盖上线前环境与产物核验，以及上线后的冒烟验证。\n",
-			}, nil
-		},
-	}, "go")
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{}, agent.ProjectContext{})
 	_, err := workflowSvc.UpsertWorkflow(context.Background(), workflowsvc.UpsertRequest{
 		Name:    "deploy",
-		Context: "发布前检查环境变量和构建产物，发布后执行 smoke test",
+		Content: "# deploy\n\n## 适用场景\n发布流程覆盖上线前环境与产物核验，以及上线后的冒烟验证。\n",
 	})
 	require.NoError(t, err)
 	scriptPath := filepath.Join(seedPath, "workflows", "deploy", "scripts", "smoke-test.sh")
@@ -148,7 +138,7 @@ func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
 
 	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
-	}, workflowRepo)
+	}, workflowRepo, nil)
 	outputPath := t.TempDir()
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
@@ -157,7 +147,6 @@ func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
 	require.Contains(t, skill, "## 用户工作流")
 	require.Contains(t, skill, "./workflows/deploy.md")
 	require.Contains(t, skill, "发布流程覆盖上线前环境与产物核验，以及上线后的冒烟验证。")
-	require.NotContains(t, skill, "发布前检查环境变量和构建产物，发布后执行 smoke test")
 	workflowContent := readGeneratedFile(t, outputPath, "workflows", "deploy.md")
 	require.Contains(t, workflowContent, "## 适用场景")
 	require.Contains(t, workflowContent, "发布流程覆盖上线前环境与产物核验")

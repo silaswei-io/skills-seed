@@ -58,14 +58,9 @@ func TestLoader_Render(t *testing.T) {
 		"WorkflowReferences": []map[string]string{
 			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查"},
 		},
-		"ValidationCommands": []map[string]interface{}{
-			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
-		},
-		"ValidationMatrix": []map[string]interface{}{
-			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
-		},
-		"ValidationGaps": []string{},
+		"RuleReferences": []map[string]string{},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
+		"CommandRules":   []domain.EngineeringRule{},
 		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
 			{
@@ -95,7 +90,7 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "业务模式地图")
 	assert.NotContains(t, content, "常用工作流")
 	assert.Contains(t, content, "部署工作流")
-	assert.Contains(t, content, "验证策略")
+	assert.NotContains(t, content, "验证策略")
 	assert.NotContains(t, content, "task verify")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")
 	assert.NotContains(t, content, "为外部调用补充超时测试")
@@ -129,16 +124,11 @@ func TestLoader_Render_English(t *testing.T) {
 		},
 		"OverviewReferences": []ReferenceItem{},
 		"WorkflowReferences": []map[string]string{},
-		"ValidationCommands": []map[string]interface{}{
-			{"Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
-		},
-		"ValidationMatrix": []map[string]interface{}{
-			{"Area": "Business Flow / State / Orchestration", "Command": "task verify", "When": "project code changes", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
-		},
-		"ValidationGaps":  []string{},
-		"StateSummaries":  []string{"Task: preserve task state transitions."},
-		"References":      fullReferenceAvailability(),
-		"ReferenceGroups": []ReferenceGroup{},
+		"RuleReferences":     []map[string]string{},
+		"StateSummaries":     []string{"Task: preserve task state transitions."},
+		"CommandRules":       []domain.EngineeringRule{},
+		"References":         fullReferenceAvailability(),
+		"ReferenceGroups":    []ReferenceGroup{},
 	}
 
 	content, err := loader.Render("project-skill", data)
@@ -149,7 +139,7 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "project entry skill")
 	assert.NotContains(t, content, "Common Workflows")
-	assert.Contains(t, content, "Validation Strategy")
+	assert.NotContains(t, content, "Validation Strategy")
 	assert.NotContains(t, content, "task verify")
 	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
 	assert.NotContains(t, content, "Add timeout tests for external calls")
@@ -208,7 +198,7 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 		"HasContracts":       true,
 		"HasInfra":           false,
 		"WorkflowReferences": []map[string]string{},
-		"SkipReferences":     false,
+		"RuleReferences":     []map[string]string{},
 	}
 
 	content, err := loader.Render("workspace-skill", data)
@@ -498,7 +488,6 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 		"middleware",
 		"naming",
 		"structure",
-		"testing",
 		"utils",
 	}
 
@@ -515,19 +504,6 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 					require.NotContains(t, mainContent, "skills-seed generate skills")
 					require.NotContains(t, mainContent, "skills-seed generate-skills")
 					require.NotContains(t, mainContent, "task verify")
-					validationContent, err := loader.Render("project-reference-validation", map[string]interface{}{
-						"Commands": []domain.ValidationCommand{{Command: "task verify", When: "code changes", Source: "Taskfile.yml"}},
-						"Matrix":   []map[string]interface{}{},
-						"Gaps":     []string{},
-					})
-					require.NoError(t, err)
-					require.Contains(t, validationContent, "task verify")
-					if locale == "zh-CN" {
-						require.Contains(t, validationContent, "## 最低验证策略")
-					} else {
-						require.Contains(t, validationContent, "## Minimum Validation Strategy")
-					}
-
 					overview, err := loader.Render("project-reference-overview", projectOverviewData())
 					require.NoError(t, err)
 					require.NotEmpty(t, overview)
@@ -575,6 +551,10 @@ func TestSkillTemplates_DoNotKeepDuplicateOrRetiredReferenceTemplates(t *testing
 	for _, path := range []string{
 		"../../../embedfs/templates/skills/common/references/examples",
 		"../../../embedfs/templates/skills/common/workflow",
+		"../../../embedfs/templates/skills/common/project/references/validation.md.tmpl",
+		"../../../embedfs/templates/skills/common/project/references/validation.en-US.md.tmpl",
+		"../../../embedfs/templates/skills/common/project/references/testing.md.tmpl",
+		"../../../embedfs/templates/skills/common/project/references/testing.en-US.md.tmpl",
 		"../../../embedfs/templates/skills/claude/references/project-overview.md.tmpl",
 		"../../../embedfs/templates/skills/claude/references/project-overview.md.tmpl",
 		"../../../embedfs/templates/skills/claude/references/patterns",
@@ -716,15 +696,10 @@ func fullSkillData() map[string]interface{} {
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "完整业务方法清单"},
 		},
 		"WorkflowReferences": []map[string]string{},
-		"ValidationCommands": []map[string]interface{}{
-			{"Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Workdir": ".", "ScopePaths": []string{"internal/service"}, "Evidence": []string{"Taskfile.yml"}, "Type": "test"},
-		},
-		"ValidationMatrix": []map[string]interface{}{
-			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
-		},
-		"ValidationGaps": []string{},
-		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
-		"References":     fullReferenceAvailability(),
+		"RuleReferences":     []map[string]string{},
+		"StateSummaries":     []string{"Task: 保持任务状态迁移。"},
+		"CommandRules":       []domain.EngineeringRule{},
+		"References":         fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
 			{
 				Title: "业务与领域",
@@ -798,39 +773,22 @@ func projectOverviewData() map[string]interface{} {
 			{Title: "关键模块", Path: "./modules.md", Description: "完整模块清单"},
 			{Title: "通用工具", Path: "./common-utils.md", Description: "工具方法清单"},
 		},
-		"References":      fullReferenceAvailability(),
-		"KeyModules":      []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Dependencies: []string{"domain"}, Dependents: []string{"command"}, KeyMethods: []string{"Run()"}}},
-		"BusinessMethods": []domain.BusinessMethod{{Name: "Demo", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/demo.go:10"}, Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
-		"CommonUtils":     []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
-		"ConfigPatterns":  []string{"yaml config"},
-		"ValidationCommands": []domain.ValidationCommand{
-			{Command: "task verify", When: "项目代码变化后", Source: "Taskfile.yml"},
-		},
-		"ValidationMatrix": []map[string]interface{}{
-			{"Area": "业务流程 / 状态 / 编排", "Command": "task verify", "When": "项目代码变化后", "Source": "Taskfile.yml", "Evidence": []string{"internal/service"}},
-		},
-		"ValidationGaps":      []string{},
+		"References":          fullReferenceAvailability(),
+		"KeyModules":          []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Dependencies: []string{"domain"}, Dependents: []string{"command"}, KeyMethods: []string{"Run()"}}},
+		"BusinessMethods":     []domain.BusinessMethod{{Name: "Demo", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/demo.go:10"}, Description: "demo", Function: "func Demo()", Usage: "demo", Type: "domain"}},
+		"CommonUtils":         []domain.UtilityFunction{{Name: "DemoUtil", File: "internal/utils/demo.go", Signature: "func DemoUtil()", Description: "demo util", Usage: "demo"}},
+		"ConfigPatterns":      []string{"yaml config"},
 		"CodeFenceLanguage":   "go",
 		"ProjectID":           "demo",
 		"ScopePath":           "demo",
 		"WorkspaceRole":       "backend",
 		"HasBusinessPatterns": true,
 		"HasUtilityPatterns":  true,
-		"Boundaries": []domain.ProjectSpecBoundary{
-			{Type: "module", Name: "service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Paths: []string{"internal/service"}},
-		},
-		"PatternRules": []domain.ProjectSpecPatternRule{
-			{Name: "Error Wrapping", Category: "error", Description: "wrap errors", Rule: "use %w", Confidence: 0.9, Frequency: 2},
-		},
 		"EngineeringRules": []domain.EngineeringRule{
 			{Title: "Validation", Rule: "Run task verify", Source: "AGENTS.md", Evidence: []string{"AGENTS.md"}},
 		},
-		"PatternGuidance": []domain.ProjectSpecPatternRule{
-			{Name: "Naming Observation", Category: "naming", Description: "names align", Rule: "prefer local names", Confidence: 0.7, Frequency: 1},
-		},
-		"Touchpoints": []domain.ProjectSpecTouchpoint{
-			{Kind: "business_method", Name: "Demo", Path: "internal/demo.go:10", Description: "demo"},
-		},
+		"AuthorityCoverage": []domain.AuthorityCoverage{},
+		"RuleReferences":    []map[string]string{},
 		"BusinessMethodIndex": map[string]interface{}{
 			"Total": 1,
 			"Sections": []map[string]interface{}{
@@ -901,7 +859,5 @@ func fullReferenceAvailability() map[string]bool {
 		"KeyModules":       true,
 		"CommonUtils":      true,
 		"BusinessPatterns": true,
-		"Validation":       true,
-		"Testing":          true,
 	}
 }

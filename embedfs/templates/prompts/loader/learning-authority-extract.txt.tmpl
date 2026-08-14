@@ -1,0 +1,31 @@
+# Extract Authoritative Knowledge
+
+This is a bounded authority-extraction runtime call. Extract explicit, durable constraints from the supplied authoritative sources. Do not build a project map, inspect unrelated source code, infer implementation patterns, or rely on hidden memory from other stages.
+
+Project:
+- name: {{.ProjectName}}
+- path: {{.RootPath}}
+
+Authoritative knowledge paths are available at `{{.EngineeringKnowledgePath}}` ({{.EngineeringKnowledgeCount}} files). Read every listed file.
+The immutable authority section catalog is available at `{{.AuthoritySectionsPath}}` ({{.AuthoritySectionCount}} sections). Each entry provides the only valid `section_id`, source, and section ownership.
+{{- if .UserContextPath}}
+User context is available at `{{.UserContextPath}}`. Treat it as authoritative only within the catalog entry assigned to user context; do not use it to rewrite or broaden another source.
+{{- end}}
+
+Extraction rules:
+- Return exactly one `authority_sections` result for every catalog entry. Never invent, omit, duplicate, or rewrite a section ID.
+- Extract only explicit instructions that constrain future changes. Keep advisory, conditional, local, and operation-specific wording at its stated strength and scope.
+- Treat every explicit normative statement in every listed section as an independent extraction obligation. Do not omit a narrow rule because another rule appears more prominent.
+- Do not turn source-code observations, common engineering practice, descriptive project facts, inferred architecture, or repeated implementation shape into authority rules.
+- Do not promote a local source into a broader rule. Ownership and evidence are assigned by the runtime from `section_id`; do not return source, section, or evidence fields.
+- Keep procedures owned by user-maintained workflows out of project knowledge. An explicit permission or prohibition governing whether a command may be executed is still an authority rule; a sequence of operational steps is not.
+- Put concrete governed tasks, paths, commands, modules, interfaces, fields, or operations in `applies_to` when the source states them. Never guess missing scope.
+- When a source explicitly governs command execution, set `command_policy` to exactly `forbidden`, `describe_only`, `requires_authorization`, or `allowed`. Omit it otherwise. Merely mentioning a command never implies `allowed`.
+- Describe what the source requires without strengthening it into a security, atomicity, correctness, reliability, or compatibility guarantee that the text does not make.
+- When a section has no explicit constraint, return a concrete `no_rule_reason`. `rules` and `no_rule_reason` are mutually exclusive. Never use a placeholder.
+
+Before returning, audit the section catalog for complete one-to-one coverage and audit each extracted statement against its owning source section.
+
+Return JSON only.
+
+{{ jsonContract "AuthorityExtractionOutput" }}

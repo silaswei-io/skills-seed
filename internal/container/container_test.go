@@ -67,10 +67,12 @@ func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
 	defer cont.Close()
 
 	require.Same(t, cont.PromptLoader, capturedLoader)
-	prompt, err := cont.PromptLoader.Render("core-workflow-optimize", agent.OptimizeWorkflowRequest{
-		ID:       "release",
-		Context:  "整理发版流程",
-		Language: "go",
+	prompt, err := cont.PromptLoader.Render("core-user-pattern", map[string]interface{}{
+		"Description":       "Wrap errors with operation context.",
+		"Category":          "error",
+		"UserContext":       "",
+		"Language":          "go",
+		"AllowedCategories": domain.AllowedPatternCategoriesText(),
 	})
 	require.NoError(t, err)
 	require.Contains(t, prompt, "All user-facing natural-language fields must be written in English (en-US)")

@@ -59,11 +59,11 @@ func Check(uuid string) error { return nil }
 	require.Equal(t, "component.go:3", methods[0].DisplayLocation())
 	require.Equal(t, domain.CodeLocationStatusValid, methods[0].CodeLocation.Status)
 	require.Equal(t, "func Check(uuid string) error", methods[0].Function)
-	require.Empty(t, methods[0].Description)
-	require.Empty(t, methods[0].Usage)
-	require.Empty(t, methods[0].Prerequisites)
-	require.Empty(t, methods[0].Returns)
-	require.Empty(t, methods[0].Type)
+	require.Equal(t, "unverified behavior", methods[0].Description)
+	require.Equal(t, "unverified usage", methods[0].Usage)
+	require.Equal(t, "unverified prerequisite", methods[0].Prerequisites)
+	require.Equal(t, "unverified result", methods[0].Returns)
+	require.Equal(t, "domain", methods[0].Type)
 }
 
 func TestVerifierReplacesCandidateSignatureWithSourceSignature(t *testing.T) {
@@ -78,13 +78,14 @@ func (s *Service) Publish(ctx string) (bool, error) { return true, nil }
 
 	methods := verifier.VerifyBusinessMethods([]domain.BusinessMethod{
 		{
-			Name:         "Service.Publish",
+			Name:         "(*service.Service).Publish",
 			Function:     "Publish(ctx int) (bool, error)",
 			CodeLocation: domain.CodeLocation{CurrentLocation: "service.go:5"},
 		},
 	})
 
 	require.Len(t, methods, 1)
+	require.Equal(t, "Publish", methods[0].Name)
 	require.Equal(t, "func (s *Service) Publish(ctx string) (bool, error)", methods[0].Function)
 	require.Equal(t, methods[0].Function, methods[0].CodeLocation.Snapshot.Signature)
 }

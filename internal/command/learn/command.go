@@ -25,7 +25,7 @@ const (
 	learnCurrentProgressSubjectMaxRunes = 36
 	learnCurrentRunningSubjectMaxRunes  = 18
 	// learnCurrentProjectStepTotal 是项目级 learn current 在控制台展示的顶层阶段数。
-	learnCurrentProjectStepTotal = 7
+	learnCurrentProjectStepTotal = 8
 )
 
 type learnCurrentOptions struct {
@@ -160,12 +160,13 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 		return domain.LearnCurrentResult{}, err
 	}
 	summary := domain.LearnCurrentSummary{
-		ChangedFiles:  result.changedCount,
-		DeletedFiles:  result.deletedCount,
-		SkippedFiles:  result.skippedCount,
-		PatternsFound: result.patternsCount,
-		PatternsSaved: result.savedCount,
-		NoFileChanges: result.skipped,
+		ChangedFiles:    result.changedCount,
+		DeletedFiles:    result.deletedCount,
+		SkippedFiles:    result.skippedCount,
+		PatternsFound:   result.patternsCount,
+		PatternsSaved:   result.savedCount,
+		PatternsRetired: result.retiredCount,
+		NoFileChanges:   result.skipped,
 	}
 	return domain.LearnCurrentResult{Summary: summary}, nil
 }
@@ -191,6 +192,7 @@ type learnCurrentProjectResult struct {
 	skippedCount  int
 	patternsCount int
 	savedCount    int
+	retiredCount  int
 	skipped       bool
 	duration      time.Duration
 }

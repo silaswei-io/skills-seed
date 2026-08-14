@@ -12,153 +12,79 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalizeAndStoreUsesLocalNormalizationForLearnCurrent(t *testing.T) {
-	first := newPatternNormTestPattern("api-contract", "API Contract", domain.CategoryAPI)
-	first.Rule = "Preserve the repository-specific API response contract."
-	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/api/user.go", Line: 10, Symbol: "User", Kind: "handler"}}
-	second := newPatternNormTestPattern("order-flow", "Order Flow", domain.CategoryBusiness)
-	second.Rule = "Preserve the repository-specific order state transition."
-	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/service/order.go", Line: 20, Symbol: "CreateOrder", Kind: "function"}}
+func TestNormalizeAndStoreKeepsCurrentCandidates(t *testing.T) {
+	first := currentPattern("api-contract", 0.9, "internal/api/user.go")
+	second := currentPattern("order-flow", 0.9, "internal/service/order.go")
 
-	var saved []*domain.Pattern
-	repo := &mocks.MockPatternRepository{
+	result, err := NewService(&mocks.MockPatternRepository{
 		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
-		SaveFn: func(ctx context.Context, pattern *domain.Pattern) error {
-			saved = append(saved, pattern)
-			return nil
-		},
-	}
-
-	result, err := NewService(repo).NormalizeAndStore(context.Background(), NormalizeRequest{
+	}).NormalizeAndStore(context.Background(), NormalizeRequest{
 		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*first, *second},
+		Candidates: []domain.Pattern{first, second},
 	})
 
 	require.NoError(t, err)
 	require.Len(t, result.Written, 2)
 	require.Empty(t, result.Dropped)
-	require.Len(t, saved, 2)
-}
-
-func TestNormalizeAndStoreKeepsEquivalentCurrentCandidatesForRecall(t *testing.T) {
-	first := newPatternNormTestPattern("first", "Shared Error Rule", domain.CategoryError)
-	first.Rule = "Wrap repository errors with operation context."
-	first.Confidence = 0.70
-	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "first.go", Line: 10, Symbol: "First", Kind: "func"}}
-	second := newPatternNormTestPattern("second", "Shared Error Rule", domain.CategoryError)
-	second.Rule = "Wrap repository errors with operation context."
-	second.Confidence = 0.90
-	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "second.go", Line: 20, Symbol: "Second", Kind: "func"}}
-
-	result, err := NewService(&mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
-	}).NormalizeAndStore(context.Background(), NormalizeRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*first, *second},
-	})
-
-	require.NoError(t, err)
-	require.Len(t, result.Written, 2)
 	require.Equal(t, []string{first.ID}, result.Written[0].MergedFrom)
 	require.Equal(t, []string{second.ID}, result.Written[1].MergedFrom)
-	require.Equal(t, first.EvidenceLocations, result.Written[0].EvidenceLocations)
-	require.Equal(t, second.EvidenceLocations, result.Written[1].EvidenceLocations)
 }
 
-func TestNormalizeAndStoreUsesAIMergeForCurrentCandidates(t *testing.T) {
-	first := newPatternNormTestPattern("first", "Shared Error Rule", domain.CategoryError)
-	first.Rule = "Wrap repository errors with operation context."
-	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "first.go", Line: 10, Symbol: "First", Kind: "func"}}
-	second := newPatternNormTestPattern("second", "Shared Error Rule", domain.CategoryError)
-	second.Rule = "Wrap repository errors with operation context."
-	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "second.go", Line: 20, Symbol: "Second", Kind: "func"}}
+func TestNormalizeAndStoreFiltersCurrentCandidatesByEvidenceAndConfidence(t *testing.T) {
+	tests := []struct {
+		name       string
+		confidence float64
+		paths      []string
+		kept       bool
+	}{
+		{name: "multiple evidence below threshold", confidence: 0.74, paths: []string{"a.go", "b.go"}},
+		{name: "multiple evidence at threshold", confidence: 0.75, paths: []string{"a.go", "b.go"}, kept: true},
+		{name: "single evidence below threshold", confidence: 0.84, paths: []string{"a.go"}},
+		{name: "single evidence at threshold", confidence: 0.85, paths: []string{"a.go"}, kept: true},
+	}
 
-	normalizer := normalizePatternsFunc(func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
-		return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{{
-			ID:          "shared-error-rule",
-			Name:        "Shared Error Rule",
-			Category:    string(domain.CategoryError),
-			Description: "Repository errors are wrapped with operation context.",
-			Rule:        "Keep operation context when returning repository errors.",
-			Confidence:  0.8,
-			SourceIDs:   []string{"first", "second"},
-		}}}, nil
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidate := currentPattern("candidate", tt.confidence, tt.paths...)
+			result, err := NewService(&mocks.MockPatternRepository{
+				GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+			}).NormalizeAndStore(context.Background(), NormalizeRequest{
+				Operation:  OperationLearnCurrent,
+				Candidates: []domain.Pattern{candidate},
+			})
 
-	result, err := NewServiceWithNormalizer(&mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
-	}, normalizer).NormalizeAndStore(context.Background(), NormalizeRequest{
+			require.NoError(t, err)
+			if tt.kept {
+				require.Len(t, result.Written, 1)
+				return
+			}
+			require.Empty(t, result.Written)
+		})
+	}
+}
+
+func TestNormalizeAndStoreUsesConfiguredAdmissionPolicy(t *testing.T) {
+	candidate := currentPattern("candidate", 0.7, "candidate.go")
+	result, err := NewService(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}, AdmissionPolicy{MinConfidence: 0.65, MinSingleEvidenceConfidence: 0.7}).NormalizeAndStore(context.Background(), NormalizeRequest{
 		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*first, *second},
+		Candidates: []domain.Pattern{candidate},
 	})
 
 	require.NoError(t, err)
 	require.Len(t, result.Written, 1)
-	require.Equal(t, "shared-error-rule", result.Written[0].ID)
-	require.ElementsMatch(t, []string{"first", "second"}, result.Written[0].MergedFrom)
-	require.ElementsMatch(t, append(first.EvidenceLocations, second.EvidenceLocations...), result.Written[0].EvidenceLocations)
-	require.Equal(t, 1, result.Summary.MergeCount)
 }
 
-func TestNormalizeAndStoreFallsBackWhenAIMergeOmitsCandidate(t *testing.T) {
-	first := newPatternNormTestPattern("first", "First", domain.CategoryBusiness)
-	second := newPatternNormTestPattern("second", "Second", domain.CategoryBusiness)
-	normalizer := normalizePatternsFunc(func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
-		return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{{
-			ID:        "first",
-			Name:      "First",
-			Category:  string(domain.CategoryBusiness),
-			SourceIDs: []string{"first"},
-		}}}, nil
-	})
-
-	result, err := NewServiceWithNormalizer(&mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
-	}, normalizer).NormalizeAndStore(context.Background(), NormalizeRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*first, *second},
-	})
-
-	require.NoError(t, err)
-	require.Len(t, result.Written, 2)
-	require.ElementsMatch(t, []string{"first", "second"}, patternIDs(result.Written))
-}
-
-func TestNormalizeAndStoreReplaysSavedCurrentNormalizationDecision(t *testing.T) {
-	candidate := newPatternNormTestPattern("candidate", "Candidate", domain.CategoryBusiness)
-	checkpoint := &memoryDecisionCheckpoint{}
-	request := NormalizeRequest{
-		Operation:          OperationLearnCurrent,
-		Candidates:         []domain.Pattern{*candidate},
-		DecisionCheckpoint: checkpoint,
-	}
-
-	first, err := NewService(&mocks.MockPatternRepository{
-		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
-	}).NormalizeAndStore(context.Background(), request)
-	require.NoError(t, err)
-	require.Len(t, first.Written, 1)
-	require.Equal(t, 1, checkpoint.saves)
-
-	second, err := NewService(&mocks.MockPatternRepository{
-		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
-	}).NormalizeAndStore(context.Background(), request)
-	require.NoError(t, err)
-	require.Len(t, second.Written, 1)
-	require.Equal(t, 1, checkpoint.saves)
-}
-
-func TestNormalizeAndStoreCompactsDuplicateCurrentCandidatesBeforeLocalNormalization(t *testing.T) {
-	first := newPatternNormTestPattern("shared-rule", "Shared Rule", domain.CategoryBusiness)
-	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "a.go", Line: 10, Symbol: "A", Kind: "func"}}
-	second := newPatternNormTestPattern("shared-rule", "Shared Rule", domain.CategoryBusiness)
-	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "b.go", Line: 20, Symbol: "B", Kind: "func"}}
+func TestNormalizeAndStoreCoalescesCurrentCandidatesByID(t *testing.T) {
+	first := currentPattern("shared-rule", 0.9, "a.go")
+	second := currentPattern("shared-rule", 0.9, "b.go")
 
 	result, err := NewService(&mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
 	}).NormalizeAndStore(context.Background(), NormalizeRequest{
 		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*first, *second},
+		Candidates: []domain.Pattern{first, second},
 	})
 
 	require.NoError(t, err)
@@ -166,145 +92,211 @@ func TestNormalizeAndStoreCompactsDuplicateCurrentCandidatesBeforeLocalNormaliza
 	require.ElementsMatch(t, append(first.EvidenceLocations, second.EvidenceLocations...), result.Written[0].EvidenceLocations)
 }
 
-func TestHydrateCurrentNormalizeResultReplacesEvidenceFromUndeclaredSource(t *testing.T) {
-	first := newPatternNormTestPattern("first", "First", domain.CategoryBusiness)
-	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "first.go", Line: 10, Symbol: "First", Kind: "func"}}
-	second := newPatternNormTestPattern("second", "Second", domain.CategoryBusiness)
-	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "second.go", Line: 20, Symbol: "Second", Kind: "func"}}
-	result := &Decision{Patterns: []DecisionPattern{{
-		ID:        first.ID,
-		SourceIDs: []string{first.ID},
-	}}}
-	normalized := proposalFromDecision(result)
+func TestNormalizeAndStoreUsesAIToMergeCandidateWithRelatedPattern(t *testing.T) {
+	existing := currentPattern("existing-error-wrap", 0.9, "error.go")
+	existing.Source = domain.SourceLearnedCurrent
+	candidate := currentPattern("candidate-error-wrap", 0.9, "error.go")
 
-	require.NoError(t, hydrateNormalizeResult(normalized, []domain.Pattern{*first, *second}, nil))
-	require.Equal(t, first.EvidenceLocations, normalized.Patterns[0].EvidenceLocations)
-}
+	service := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return []domain.Pattern{existing}, nil },
+	}, normalizePatternsFunc(func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{{
+			ID:          existing.ID,
+			Name:        existing.Name,
+			Category:    string(existing.Category),
+			Description: existing.Description,
+			Rule:        existing.Rule,
+			Confidence:  0.9,
+			SourceIDs:   []string{existing.ID, candidate.ID},
+		}}}, nil
+	}))
 
-func TestCoalesceCurrentCandidatesCombinesEvidenceAcrossFocuses(t *testing.T) {
-	first := newPatternNormTestPattern("shared-rule", "Shared Rule", domain.CategoryBusiness)
-	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "a.go", Line: 10, Symbol: "A", Kind: "func"}}
-	second := newPatternNormTestPattern("shared-rule", "Shared Rule", domain.CategoryBusiness)
-	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "b.go", Line: 20, Symbol: "B", Kind: "func"}}
-
-	coalesced := coalesceCurrentCandidates([]domain.Pattern{*first, *second})
-
-	require.Len(t, coalesced, 1)
-	require.ElementsMatch(t, append(first.EvidenceLocations, second.EvidenceLocations...), coalesced[0].EvidenceLocations)
-}
-
-func TestNormalizeAndStoreKeepsDistinctCurrentCandidatesForRecall(t *testing.T) {
-	first := newPatternNormTestPattern("auth-error-wrap", "Error Wrapping", domain.CategoryError)
-	first.SetDescription("Repository errors in auth flow are wrapped with operation context before returning.")
-	first.SetRule("When auth repository calls fail, keep the auth operation context in the returned error.")
-	first.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/auth/repo.go", Line: 10, Symbol: "LoadAuth", Kind: "func"}}
-	second := newPatternNormTestPattern("order-error-wrap", "Error Wrapping", domain.CategoryError)
-	second.SetDescription("Repository errors in order flow are wrapped with operation context before returning.")
-	second.SetRule("When order repository calls fail, keep the order operation context in the returned error.")
-	second.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/order/repo.go", Line: 20, Symbol: "LoadOrder", Kind: "func"}}
-
-	repo := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
-		SaveFn:   func(context.Context, *domain.Pattern) error { return nil },
-	}
-
-	result, err := NewService(repo).NormalizeAndStore(context.Background(), NormalizeRequest{
+	result, err := service.NormalizeAndStore(context.Background(), NormalizeRequest{
 		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*first, *second},
-	})
-
-	require.NoError(t, err)
-	require.Len(t, result.Written, 2)
-	require.Equal(t, []string{"auth-error-wrap"}, result.Written[0].MergedFrom)
-	require.Equal(t, []string{"order-error-wrap"}, result.Written[1].MergedFrom)
-}
-
-func TestNormalizeAndStoreHydratesSourceOwnedFieldsFromCurrentCandidate(t *testing.T) {
-	candidate := newPatternNormTestPattern("candidate", "Error Wrapping", domain.CategoryError)
-	candidate.Confidence = 0.9
-	candidate.SetRule("When repository errors occur, wrap them with operation context")
-	candidate.BadExample = "Return the repository error without operation context."
-	candidate.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "repository.go", Line: 10, Symbol: "Load", Kind: "func"}}
-	candidate.Source = domain.SourceLearnedCurrent
-	candidate.ProjectID = "ca-admin"
-	candidate.ScopePath = "services/ca-admin"
-	candidate.WorkspaceRole = "service"
-
-	var saved []*domain.Pattern
-	repo := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
-		SaveFn: func(ctx context.Context, p *domain.Pattern) error {
-			saved = append(saved, p)
-			return nil
-		},
-	}
-
-	result, err := NewService(repo).NormalizeAndStore(context.Background(), NormalizeRequest{
-		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Candidates: []domain.Pattern{candidate},
 	})
 
 	require.NoError(t, err)
 	require.Len(t, result.Written, 1)
-	require.Len(t, saved, 1)
-	require.Equal(t, "candidate", saved[0].ID)
-	require.Empty(t, saved[0].GoodExample)
-	require.Equal(t, candidate.BadExample, saved[0].BadExample)
-	require.Equal(t, candidate.EvidenceLocations, saved[0].EvidenceLocations)
-	require.Equal(t, candidate.Source, saved[0].Source)
-	require.Equal(t, candidate.ProjectID, saved[0].ProjectID)
-	require.Equal(t, candidate.ScopePath, saved[0].ScopePath)
-	require.Equal(t, candidate.WorkspaceRole, saved[0].WorkspaceRole)
-	require.Equal(t, 1, result.Summary.TotalCandidates)
-	require.Equal(t, 1, result.Summary.TotalWritten)
-	require.Zero(t, result.Summary.TotalDropped)
+	require.Equal(t, existing.ID, result.Written[0].ID)
+	require.ElementsMatch(t, []string{existing.ID, candidate.ID}, result.Written[0].MergedFrom)
 }
 
-func TestNormalizeAndStoreDoesNotPersistCurrentCandidatesWhenStoreFails(t *testing.T) {
-	candidate := newPatternNormTestPattern("candidate", "Error Wrapping", domain.CategoryError)
-	var saved bool
-	repo := &mocks.MockPatternRepository{
-		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
-		SaveFn: func(ctx context.Context, pattern *domain.Pattern) error {
-			saved = true
-			return errors.New("db closed")
-		},
+func TestNormalizeAndStoreRejectsMergeAcrossDistinctCapabilityEntries(t *testing.T) {
+	submit := currentPattern("dispatcher-submit", 0.9, "internal/job/dispatcher.go")
+	submit.BusinessMethod = &domain.BusinessMethod{
+		Name:         "Submit",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/job/dispatcher.go:41"},
 	}
+	closeDispatcher := currentPattern("dispatcher-close", 0.9, "internal/job/dispatcher.go")
+	closeDispatcher.BusinessMethod = &domain.BusinessMethod{
+		Name:         "Close",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/job/dispatcher.go:88"},
+	}
+	service := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}, normalizePatternsFunc(func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return mergedNormalization("dispatcher-lifecycle", submit, closeDispatcher), nil
+	}))
 
-	result, err := NewService(repo).NormalizeAndStore(context.Background(), NormalizeRequest{
+	result, err := service.NormalizeAndStore(context.Background(), NormalizeRequest{
 		Operation:  OperationLearnCurrent,
-		Candidates: []domain.Pattern{*candidate},
+		Candidates: []domain.Pattern{submit, closeDispatcher},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 2)
+	require.ElementsMatch(t, []string{submit.ID, closeDispatcher.ID}, patternIDs(result.Written))
+}
+
+func TestNormalizeAndStoreAllowsMergeForSameCapabilityEntry(t *testing.T) {
+	first := currentPattern("submit-behavior", 0.9, "internal/job/dispatcher.go")
+	first.BusinessMethod = &domain.BusinessMethod{
+		Name:         "Submit",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/job/dispatcher.go:41"},
+	}
+	second := currentPattern("submit-contract", 0.9, "internal/job/dispatcher.go")
+	second.BusinessMethod = &domain.BusinessMethod{
+		Name:         "Submit",
+		CodeLocation: domain.CodeLocation{HistoricalLocation: "internal/job/dispatcher.go:41"},
+	}
+	service := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}, normalizePatternsFunc(func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return mergedNormalization(first.ID, first, second), nil
+	}))
+
+	result, err := service.NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{first, second},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, "Submit", result.Written[0].BusinessMethod.Name)
+	require.ElementsMatch(t, []string{first.ID, second.ID}, result.Written[0].MergedFrom)
+}
+
+func TestNormalizeAndStoreAllowsMergeWithoutCapabilityEntries(t *testing.T) {
+	first := currentPattern("retry-observation", 0.9, "internal/worker/retry.go")
+	second := currentPattern("retry-boundary", 0.9, "internal/worker/retry.go")
+	service := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}, normalizePatternsFunc(func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return mergedNormalization(first.ID, first, second), nil
+	}))
+
+	result, err := service.NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{first, second},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Nil(t, result.Written[0].BusinessMethod)
+	require.ElementsMatch(t, []string{first.ID, second.ID}, result.Written[0].MergedFrom)
+}
+
+func TestNormalizeAndStoreRepairsInvalidAIOwnershipLocally(t *testing.T) {
+	first := currentPattern("first", 0.9, "first.go")
+	second := currentPattern("second", 0.9, "second.go")
+	service := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	}, normalizePatternsFunc(func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{{
+			ID:          first.ID,
+			Name:        first.Name,
+			Category:    string(first.Category),
+			Description: first.Description,
+			Rule:        first.Rule,
+			Confidence:  first.Confidence,
+			SourceIDs:   []string{first.ID, "invented", first.ID},
+		}}}, nil
+	}))
+
+	result, err := service.NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{first, second},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 2)
+	require.ElementsMatch(t, []string{first.ID, second.ID}, patternIDs(result.Written))
+}
+
+func TestNormalizeAndStoreDeletesEligibleRetiredCurrentPattern(t *testing.T) {
+	learned := currentPattern("legacy-flow", 0.9, "legacy.go")
+	learned.Source = domain.SourceLearnedCurrent
+	userDefined := currentPattern("explicit-policy", 0.9, "policy.go")
+	userDefined.Source = domain.SourceUserDefined
+	var mutation domain.PatternMutation
+
+	result, err := NewService(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return []domain.Pattern{learned, userDefined}, nil },
+		ApplyPatternMutationFn: func(_ context.Context, input domain.PatternMutation) error {
+			mutation = input
+			return nil
+		},
+	}).NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:         OperationLearnCurrent,
+		RetiredPatternIDs: []string{"legacy-flow", "explicit-policy", "legacy-flow", "unknown"},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"legacy-flow"}, result.RetiredPatternIDs)
+	require.Equal(t, []string{"legacy-flow"}, mutation.DeleteIDs)
+}
+
+func TestNormalizeAndStoreReportsStoreFailure(t *testing.T) {
+	candidate := currentPattern("candidate", 0.9, "repository.go")
+	result, err := NewService(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+		SaveFn:   func(context.Context, *domain.Pattern) error { return errors.New("db closed") },
+	}).NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{candidate},
 	})
 
 	require.ErrorContains(t, err, i18n.Get("PatternNormApplyPatternsFailed"))
 	require.Nil(t, result)
-	require.True(t, saved)
 }
 
-type memoryDecisionCheckpoint struct {
-	key      string
-	decision *Decision
-	saves    int
-}
-
-func (c *memoryDecisionCheckpoint) Load(_ context.Context, key string) (*Decision, bool, error) {
-	if c.key != key || c.decision == nil {
-		return nil, false, nil
+func currentPattern(id string, confidence float64, paths ...string) domain.Pattern {
+	pattern := newPatternNormTestPattern(id, "Current Pattern", domain.CategoryBusiness)
+	pattern.Confidence = confidence
+	pattern.EvidenceLocations = make([]domain.PatternEvidenceLocation, 0, len(paths))
+	for index, path := range paths {
+		pattern.EvidenceLocations = append(pattern.EvidenceLocations, domain.PatternEvidenceLocation{
+			Path:   path,
+			Line:   index + 1,
+			Symbol: "Current",
+			Kind:   "function",
+		})
 	}
-	return c.decision, true, nil
-}
-
-func (c *memoryDecisionCheckpoint) Save(_ context.Context, key string, result *Decision) error {
-	c.key = key
-	c.decision = result
-	c.saves++
-	return nil
+	return *pattern
 }
 
 type normalizePatternsFunc func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error)
 
 func (f normalizePatternsFunc) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
 	return f(ctx, req)
+}
+
+func mergedNormalization(id string, sources ...domain.Pattern) *agent.NormalizePatternsResult {
+	first := sources[0]
+	sourceIDs := make([]string, 0, len(sources))
+	for _, source := range sources {
+		sourceIDs = append(sourceIDs, source.ID)
+	}
+	return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{{
+		ID:          id,
+		Name:        first.Name,
+		Category:    string(first.Category),
+		Description: first.Description,
+		Rule:        first.Rule,
+		Confidence:  first.Confidence,
+		SourceIDs:   sourceIDs,
+	}}}
 }
 
 func patternIDs(patterns []domain.Pattern) []string {

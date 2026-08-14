@@ -78,7 +78,7 @@ func TestCompactNormalizesRequestedCategory(t *testing.T) {
 	}
 	svc := NewService(repo)
 
-	result, err := svc.Compact(context.Background(), CompactRequest{Category: " Security ", DryRun: true})
+	result, err := svc.Compact(context.Background(), CompactRequest{Category: " Utils ", DryRun: true})
 
 	require.NoError(t, err)
 	require.Equal(t, domain.CategoryUtils, requested)

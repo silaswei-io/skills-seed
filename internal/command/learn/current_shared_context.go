@@ -35,7 +35,6 @@ func (r *learnCurrentProjectRun) sharedLearningContextText() string {
 	fmt.Fprintf(&b, "- %s: %s\n", i18n.Get("LearnCurrentSharedContextProjectPath"), r.projectRoot)
 	fmt.Fprintf(&b, "- %s: %s\n", i18n.Get("LearnCurrentSharedContextProjectLanguage"), r.currentLanguage)
 	fmt.Fprintf(&b, "- %s: %s\n", i18n.Get("LearnCurrentSharedContextLearningMode"), r.learningMode)
-	fmt.Fprintf(&b, "- %s: %s\n", i18n.Get("LearnCurrentSharedContextLearningScope"), r.learningScope)
 	fmt.Fprintf(&b, "- %s: %s\n\n", i18n.Get("LearnCurrentSharedContextChangeProfile"), r.changeProfile)
 
 	fmt.Fprintf(&b, "%s:\n", i18n.Get("LearnCurrentSharedContextCandidateSelection"))

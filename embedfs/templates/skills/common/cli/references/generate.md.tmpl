@@ -16,13 +16,11 @@ Generation does not analyze source files by itself.
 ## Flags
 
 - `--output, -o`: override configured output path for this run.
-- `--no-references`: write only the main Skill file and skip detailed reference files.
 
 ## Use Cases
 
 - Generate configured target: `skills-seed generate skills`
 - Write elsewhere once: `skills-seed generate skills --output .agents/skills/my-project`
-- Inspect only the root Skill quickly: `skills-seed generate skills --no-references`
 
 ## Project Mode
 
@@ -31,7 +29,6 @@ Project mode writes one project Skill tree. It consumes:
 - Project profile/spec.
 - Learned patterns.
 - Workflow entries.
-- Validation command evidence.
 
 If no patterns exist in project mode, generation may do nothing useful; run `sync` or `learn current` first.
 

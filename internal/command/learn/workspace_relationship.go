@@ -37,7 +37,6 @@ type workspaceLearnInputProject struct {
 	Language           string   `json:"language"`
 	SkillPath          string   `json:"skill_path,omitempty"`
 	ProjectProfilePath string   `json:"project_profile_path,omitempty"`
-	ProjectSpecPath    string   `json:"project_spec_path,omitempty"`
 	Summary            string   `json:"summary,omitempty"`
 	Frameworks         []string `json:"frameworks,omitempty"`
 	KeyModules         []string `json:"key_modules,omitempty"`
@@ -309,7 +308,6 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 		childSeedPath := filepath.Join(projectRootPath, ".skills-seed")
 		childLayout := layout.New(childSeedPath)
 		projectProfilePath := childLayout.ProjectProfile()
-		projectSpecPath := childLayout.ProjectSpec()
 		target, err := workspacediscovery.ResolveChildSkillTarget(projectRoot, project, cont.ConfigRepo)
 		if err != nil {
 			return workspaceLearnInputData{}, err
@@ -327,7 +325,6 @@ func workspaceLearnInput(ctx context.Context, cont *container.Container, workspa
 			Language:           project.Language,
 			SkillPath:          filepath.ToSlash(filepath.Join(project.Path, skillPath, "SKILL.md")),
 			ProjectProfilePath: filepath.ToSlash(projectProfilePath),
-			ProjectSpecPath:    filepath.ToSlash(projectSpecPath),
 		}
 		if profile, err := readChildProjectProfile(ctx, cont, project.ID, projectProfilePath); err == nil && profile != nil {
 			child.Summary = profile.Summary

@@ -22,6 +22,15 @@ func ParseUserDefinePatternResult(output string) (*agent.UserDefinePatternResult
 	return &agent.UserDefinePatternResult{Pattern: &pattern}, nil
 }
 
+// ParseOptimizeContentResult 解析用户维护资源的优化结果。
+func ParseOptimizeContentResult(output string) (*agent.OptimizeContentResult, error) {
+	var result aicontract.OptimizedContentOutput
+	if err := parseJSONPayload(output, &result); err != nil {
+		return nil, err
+	}
+	return &agent.OptimizeContentResult{Content: strings.TrimSpace(result.Content)}, nil
+}
+
 // ParseAnalyzeProjectResult 解析项目分析结果。
 func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, error) {
 	var result aicontract.ProjectProfileOutput
@@ -29,7 +38,48 @@ func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, erro
 		return nil, err
 	}
 
-	return projectProfileToAnalyzeProjectResult(result, time.Now()), nil
+	return projectProfileToAnalyzeProjectResult(result), nil
+}
+
+// ParseExtractAuthorityResult 解析独立权威知识提取结果。
+func ParseExtractAuthorityResult(output string) (*agent.ExtractAuthorityResult, error) {
+	var result aicontract.AuthorityExtractionOutput
+	if err := parseJSONPayload(output, &result); err != nil {
+		return nil, err
+	}
+	return authorityExtractionToResult(result), nil
+}
+
+// ParseReviewKnowledgeResult 解析独立知识审查结果。
+func ParseReviewKnowledgeResult(output string) (*agent.ReviewKnowledgeResult, error) {
+	var payload aicontract.ReviewKnowledgeOutput
+	if err := parseJSONPayload(output, &payload); err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	result := &agent.ReviewKnowledgeResult{Decisions: make([]agent.KnowledgeReviewDecision, 0, len(payload.Decisions))}
+	for _, item := range payload.Decisions {
+		decision := agent.KnowledgeReviewDecision{
+			CandidateID:           item.CandidateID,
+			Verdict:               item.Verdict,
+			ReasonCode:            item.ReasonCode,
+			Reason:                item.Reason,
+			BusinessMethodVerdict: item.BusinessMethodVerdict,
+		}
+		// 可选字段由各自 verdict 激活，忽略 Agent 在其他分支返回的冗余对象。
+		if item.BusinessMethodVerdict == "set" {
+			decision.BusinessMethod = businessMethodToDomain(item.BusinessMethod, now)
+		}
+		if item.Verdict == "revise" && item.Revision != nil {
+			decision.Revision = &agent.KnowledgeRevision{
+				Name: item.Revision.Name, Category: item.Revision.Category,
+				Description: item.Revision.Description, Rule: item.Revision.Rule,
+				Confidence: item.Revision.Confidence, KnowledgeFlags: append([]string(nil), item.Revision.KnowledgeFlags...),
+			}
+		}
+		result.Decisions = append(result.Decisions, decision)
+	}
+	return result, nil
 }
 
 // ParseAnalyzeCurrentCodebaseBatchResult 解析当前代码库批量分析结果。
@@ -86,17 +136,4 @@ func profileRefreshRecommendationToAgent(in aicontract.ProfileRefreshRecommendat
 
 func missingRequiredOutputField(field string) error {
 	return errors.New(i18n.GetWithParams("AgentRequiredOutputFieldMissing", map[string]interface{}{"Field": field}))
-}
-
-// ParseOptimizeWorkflowResult 解析工作流优化结果。
-func ParseOptimizeWorkflowResult(output string) (*agent.OptimizeWorkflowResult, error) {
-	var result aicontract.OptimizeWorkflowOutput
-	if err := parseJSONPayload(output, &result); err != nil {
-		return nil, err
-	}
-	return &agent.OptimizeWorkflowResult{
-		Title:     strings.TrimSpace(result.Title),
-		Content:   strings.TrimSpace(result.Content),
-		Conflicts: result.Conflicts,
-	}, nil
 }

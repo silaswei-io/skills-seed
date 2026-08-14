@@ -3,7 +3,6 @@ package generator
 import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/knowledge"
-	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 )
 
@@ -15,9 +14,10 @@ type GenerateProgressHooks struct {
 	OnStepComplete func(label string)
 }
 
-// GenerateOptions 控制生成行为的可选参数
+// GenerateOptions 描述单次 Skill 生成的显式输入。
 type GenerateOptions struct {
-	SkipReferences bool
+	Progress       GenerateProgressHooks
+	ProjectedRules []domain.Rule
 }
 
 type generationSummary struct {
@@ -48,7 +48,9 @@ type skillTemplateData struct {
 	OverviewReferences  []skills.ReferenceItem
 	ReferenceGroups     []skills.ReferenceGroup
 	WorkflowReferences  []WorkflowReference
+	RuleReferences      []RuleReference
 	StateSummaries      []string
+	CommandRules        []domain.EngineeringRule
 }
 
 type categoryPatternTemplateData struct {
@@ -105,18 +107,8 @@ type moduleReferenceTemplateData struct {
 
 type projectSpecTemplateData struct {
 	domain.ProjectSpec
-	References ReferenceAvailability
-}
-
-type validationReferenceTemplateData struct {
-	Commands []validationCommand
-	Matrix   []ValidationMatrixItem
-	Gaps     []string
-}
-
-type testingReferenceTemplateData struct {
-	Inventory sourcecode.GoTestInventory
-	Gaps      []string
+	References     ReferenceAvailability
+	RuleReferences []RuleReference
 }
 
 type categoryReferenceMeta struct {
@@ -146,14 +138,6 @@ type patternGroup struct {
 	Patterns []patternRenderModel
 }
 
-type ValidationMatrixItem struct {
-	Area     string
-	Command  string
-	When     string
-	Source   string
-	Evidence []string
-}
-
 type ReferenceAvailability struct {
 	Enabled          bool
 	ProjectSpec      bool
@@ -162,8 +146,6 @@ type ReferenceAvailability struct {
 	KeyModules       bool
 	CommonUtils      bool
 	BusinessPatterns bool
-	Validation       bool
-	Testing          bool
 }
 
 type WorkflowReference struct {
@@ -171,4 +153,13 @@ type WorkflowReference struct {
 	Name        string
 	Path        string
 	Description string
+}
+
+// RuleReference 描述 Skill 入口可路由的用户规则。
+type RuleReference struct {
+	ID               string
+	Name             string
+	Path             string
+	AffectedProjects []string
+	Paths            []string
 }

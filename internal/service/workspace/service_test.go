@@ -35,7 +35,7 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -43,28 +43,6 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev", "references", "workspace-overview.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
-}
-
-func TestGenerateWorkspaceSkillsRemovesLegacyRoot(t *testing.T) {
-	projectRoot := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
-	legacyPath := filepath.Join(projectRoot, ".agents", "skills", "demo-workspace")
-	require.NoError(t, os.MkdirAll(legacyPath, 0755))
-	existingContent := []byte("# Existing workspace skill\n")
-	require.NoError(t, os.WriteFile(filepath.Join(legacyPath, "SKILL.md"), existingContent, 0644))
-
-	loader := skills.NewLoaderForAgent("codex", "zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
-		WorkspaceCfg: config.WorkspaceConfig{
-			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
-		},
-		AgentCfg: config.AgentConfig{Engine: "codex"},
-	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
-
-	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
-	require.NoDirExists(t, legacyPath)
 }
 
 func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) {
@@ -79,7 +57,7 @@ func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkillsWithOptions(context.Background(), WorkspaceGenerateOptions{
 		RootOutputPath: "custom/root-skill",
@@ -87,30 +65,6 @@ func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) 
 
 	require.FileExists(t, filepath.Join(projectRoot, "custom", "root-skill", "SKILL.md"))
 	require.NoFileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md"))
-}
-
-func TestGenerateWorkspaceSkillsWithOptionsSkipsReferences(t *testing.T) {
-	projectRoot := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))
-
-	loader := skills.NewLoaderForAgent("codex", "zh-CN")
-	cfg := &mocks.MockConfigReader{
-		ProjectCfg: config.ProjectConfig{Name: "demo", Mode: domain.ModeWorkspace, RootPath: projectRoot, Language: "go"},
-		WorkspaceCfg: config.WorkspaceConfig{
-			Projects: []config.WorkspaceProjectConfig{{ID: "backend", Path: "backend", Type: "backend", Language: "go"}},
-		},
-		AgentCfg: config.AgentConfig{Engine: "codex"},
-	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
-
-	require.NoError(t, svc.GenerateWorkspaceSkillsWithOptions(context.Background(), WorkspaceGenerateOptions{SkipReferences: true}))
-
-	outputPath := filepath.Join(projectRoot, ".agents", "skills", "demo-workspace-dev")
-	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
-	require.NoDirExists(t, filepath.Join(outputPath, "references"))
-	rootSkill := readGeneratedFile(t, projectRoot, ".agents", "skills", "demo-workspace-dev", "SKILL.md")
-	require.Contains(t, rootSkill, "本次生成未写入 references")
-	require.NotContains(t, rootSkill, "./references/workspace-overview.md")
 }
 
 func TestGenerateWorkspaceSkillsRebuildsGeneratedOutput(t *testing.T) {
@@ -131,7 +85,7 @@ func TestGenerateWorkspaceSkillsRebuildsGeneratedOutput(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -165,7 +119,7 @@ func TestGenerateWorkspaceSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *te
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -204,14 +158,14 @@ func TestGenerateWorkspaceSkillsDoesNotUseRootPatternsAsWorkspaceRules(t *testin
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
 	rules := readGeneratedFile(t, projectRoot, ".claude", "skills", "hsm-workspace-dev", "references", "cross-project-rules.md")
 	require.NotContains(t, rules, "插件源码修改规范")
 	require.NotContains(t, rules, "改代码时应该改源插件代码")
-	require.Contains(t, rules, "跨项目改动先定边界")
+	require.Contains(t, rules, "本文件只提供工作区路由和有证据的跨项目影响边界")
 }
 
 func TestGenerateWorkspaceSkillsWritesWorkspaceWorkflows(t *testing.T) {
@@ -221,10 +175,10 @@ func TestGenerateWorkspaceSkillsWritesWorkspaceWorkflows(t *testing.T) {
 
 	seedPath := filepath.Join(projectRoot, ".skills-seed")
 	workflowRepo := workflowstore.NewRepository(seedPath)
-	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{NameVal: "claude", AvailableVal: true}, "go")
+	workflowSvc := workflowsvc.NewService(workflowRepo, &mocks.MockAgent{}, agent.ProjectContext{})
 	_, err := workflowSvc.UpsertWorkflow(ctx, workflowsvc.UpsertRequest{
 		Name:    "release",
-		Context: "发布前确认 backend 和部署脚本的兼容性",
+		Content: "# Release\n\n发布前确认 backend 和部署脚本的兼容性",
 	})
 	require.NoError(t, err)
 
@@ -236,7 +190,7 @@ func TestGenerateWorkspaceSkillsWritesWorkspaceWorkflows(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, workflowRepo)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, workflowRepo, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
 
@@ -302,7 +256,7 @@ func TestGenerateWorkspaceSkillsUsesPersistedWorkspaceArtifacts(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, profileRepo, specRepo, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, profileRepo, specRepo, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -364,7 +318,7 @@ func TestGenerateWorkspaceSkillsRejectsUnknownWorkspaceProjects(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, profileRepo, specRepo, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, profileRepo, specRepo, nil, nil)
 
 	err := svc.GenerateWorkspaceSkills(context.Background())
 	require.Error(t, err)
@@ -399,7 +353,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "codex"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	err := svc.GenerateWorkspaceSkills(context.Background())
 
@@ -427,7 +381,7 @@ func TestGenerateWorkspaceSkillsDoesNotPersistRuntimeContextInWorkspaceReference
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), strings.TrimSpace(`
 HSM 工作区用于管理密码设备、密钥服务、KMIP 接入和日志/网络组件。
 hsmwebapi 是管理 API 入口，core-engine 是核心能力库。
@@ -475,7 +429,7 @@ func TestGenerateWorkspaceSkills_DoesNotCallWorkspaceAIInGenerate(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), "hsmwebapi 为主后端，它调用 kmip-go 实现 KMIP 的能力。")
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
@@ -494,8 +448,8 @@ func TestGenerateWorkspaceSkills_DoesNotCallWorkspaceAIInGenerate(t *testing.T) 
 	require.Contains(t, rules, "kmip-go/**")
 	require.NotContains(t, rules, "KMIP 能力同步")
 	require.NotContains(t, rules, "先确认 KMIP 契约和核心能力边界")
-	require.Contains(t, rules, "跨项目改动先定边界")
-	require.Contains(t, rules, "子项目路径只路由到该子项目的独立 skill")
+	require.Contains(t, rules, "本文件只提供工作区路由和有证据的跨项目影响边界")
+	require.Contains(t, rules, "任务只命中一个子项目时")
 }
 
 func TestGenerateWorkspaceSkills_RootSkillStaysConciseAndRoutesViaOverview(t *testing.T) {
@@ -527,7 +481,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -562,7 +516,7 @@ func TestGenerateWorkspaceSkills_RoutingTableHasNoBlankLines(t *testing.T) {
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -582,7 +536,7 @@ func TestGenerateWorkspaceSkills_DoesNotPersistRuntimeUserContext(t *testing.T) 
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	ctx := runtimecontext.WithUserContext(context.Background(), "本次运行的一次性原文不能进入 workspace skill")
 	require.NoError(t, svc.GenerateWorkspaceSkills(ctx))
@@ -607,7 +561,7 @@ func TestGenerateWorkspaceSkills_UsesConfiguredTargetOnly(t *testing.T) {
 			"codex":  ".agents/skills/skills-seed-skills",
 		}},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md"))
@@ -637,7 +591,7 @@ func TestGenerateWorkspaceSkills_NormalizesLegacyChildSkillPath(t *testing.T) {
 			"codex": ".agents/skills/skills-seed-skills",
 		}},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 
@@ -675,7 +629,7 @@ skills:
 		},
 		AgentCfg: config.AgentConfig{Engine: "claude"},
 	}
-	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil)
+	svc := NewWorkspaceGenerator(loader, cfg, nil, nil, nil, nil)
 
 	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
 	require.FileExists(t, filepath.Join(projectRoot, ".claude", "skills", "demo-workspace-dev", "SKILL.md"))

@@ -10,7 +10,7 @@ This file is the workspace map and AI handoff guide. It describes entry points, 
 
 ## Gaps To Confirm
 
-- If this file and the child skills do not confirm product boundaries, project responsibility, delivery model, validation commands, or cross-project dependencies, ask the user before continuing.
+- If this file and the child skills do not confirm product boundaries, project responsibility, or cross-project dependencies, ask the user before continuing.
 - Do not invent workspace facts from path names alone; use repository evidence.
 
 ## Child Projects
@@ -77,7 +77,7 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
   {{if .Producers}}- Producers: {{range $i, $id := .Producers}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
   {{if .Consumers}}- Consumers: {{range $i, $id := .Consumers}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
-  - After changes, check producers, consumers, derived artifacts, adapters, and tests.
+  - When changing it, check producers, consumers, derived artifacts, and adapters together.
 {{end}}
 {{else}}
 - No explicit contract paths were analyzed.
@@ -105,12 +105,11 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 {{range .Infra}}
 - `{{.Path}}`{{if .Description}} - {{.Description}}{{end}}
   {{if .AffectedProjects}}- Affected projects: {{range $i, $id := .AffectedProjects}}{{if $i}}, {{end}}`{{$id}}`{{end}}{{end}}
-  - After changes, check child projects affected by deployment targets, environment variables, routing rules, or middleware config.
+  - When changing it, check child projects affected by environment variables, routing rules, or middleware config.
 {{end}}
 {{else}}
 - No explicit infrastructure paths were analyzed.
-- When touching deployment, container, orchestration, routing, environment, or runtime config paths, evaluate runtime impact first.
-- Infrastructure changes should check startup commands, ports, environment variables, health checks, routing rules, and automation together.
+- When touching environment, routing, middleware, or runtime config paths, identify the affected child projects first.
 {{end}}
 
 ## Decision Rules
@@ -118,5 +117,5 @@ No child projects are configured. Check `.skills-seed/config.yaml` `workspace.pr
 - Path matches one child project only: read that child skill and keep writes inside that child project path.
 - Path matches special paths or root scripts: identify covered child projects, then read every affected child skill.
 - Filename or content represents interfaces, types, error codes, events, messages, or generation inputs: treat as a contract change.
-- Filename or content represents deployment, runtime config, routing, or middleware: treat as an infrastructure change.
+- Filename or content represents runtime config, routing, or middleware: inspect its cross-project impact.
 - If ownership is unclear, stop and inspect the workspace overview, child skills, or ask the user before assigning responsibility.

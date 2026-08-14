@@ -10,13 +10,13 @@
 ## 文件说明
 
 - `background.md`: 项目背景、外部系统、线上事实、灰度/兼容对象、人工流程。
-- `constraints.md`: 长期团队约束、禁止事项、安全/数据/发布/运维边界。
 - `terminology.md`: 业务术语、别名、状态名、外部系统名与代码标识符映射。
-- `workspace.md`: workspace 模式下的跨项目背景和协作约束。
+- `workspace.md`: workspace 模式下的跨项目背景、职责和共享事实。
 
 ## 写入原则
 
 - 长期有效、后续任务都应知道的信息写在这里。
+- 必须遵守的长期规则使用 `skills-seed rule` 维护在 `.skills-seed/rules/`，不要写入 context。
 - 只解释本次学习或同步的临时信息，使用 `--context` 或 `--context-path`。
 - 不要复制代码、README 大段内容或一次性调试记录。
 - 没有内容的段落可以留空；默认占位文本不会进入 Agent 输入。

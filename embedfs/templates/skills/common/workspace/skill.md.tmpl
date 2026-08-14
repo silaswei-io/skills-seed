@@ -12,31 +12,15 @@ description: 修改、审查或扩展 {{.WorkspaceName}} 工作区代码时使�
 
 ## 使用方式
 
-{{if not .SkipReferences}}
 1. 先读取 [工作区概览](./references/workspace-overview.md)，用路由表确认路径归属、子项目 skill 位置和默认写入边界。
 2. 单子项目任务只进入该子项目的 `SKILL.md` 和 `references/project-spec.md`，不要顺手读取或修改其他子项目。
 3. 契约、共享代码、基础设施、根目录脚本或多子项目任务，先读取 [跨项目规则](./references/cross-project-rules.md)，再决定执行顺序。
 {{if .WorkflowReferences}}4. 命中已沉淀的工作区工作流时，先读取对应工作流，再结合概览和跨项目规则执行。
-5. 如果概览、子项目 skill、工作流或配置无法确认产品边界、项目职责、交付模型、验证命令或跨项目依赖，先询问用户，不要编造。
-{{else}}4. 如果概览、子项目 skill 或配置无法确认产品边界、项目职责、交付模型、验证命令或跨项目依赖，先询问用户，不要编造。
-{{end}}
-{{else}}
-1. 本次生成未写入 references；先用下方子项目清单和当前工作区配置判断路径归属。
-2. 单子项目任务只进入该子项目的 `SKILL.md`，再按该 skill 的说明读取代码或参考。
-3. 契约、共享代码、基础设施、根目录脚本或多子项目任务，先从当前代码和配置确认边界，再决定执行顺序。
-{{if .WorkflowReferences}}4. 命中已沉淀的工作区工作流时，先读取对应工作流，再结合当前代码和配置执行。
-5. 如果子项目 skill、工作流或配置无法确认产品边界、项目职责、交付模型、验证命令或跨项目依赖，先询问用户，不要编造。
-{{else}}4. 如果子项目 skill 或配置无法确认产品边界、项目职责、交付模型、验证命令或跨项目依赖，先询问用户，不要编造。
-{{end}}
+5. 如果概览、子项目 skill、工作流或配置无法确认产品边界、项目职责或跨项目依赖，先询问用户，不要编造。
+{{else}}4. 如果概览、子项目 skill 或配置无法确认产品边界、项目职责或跨项目依赖，先询问用户，不要编造。
 {{end}}
 
-{{if .SkipReferences}}
-## 子项目
-
-{{range .Projects}}
-- `{{.ID}}`：`{{.Path}}`，skill `{{.SkillPath}}`
-{{end}}
-
+{{if .RuleReferences}}执行上述路由前先检查下方“工作区规则”：任务命中明确列出的项目或路径时读取完整规则；未列出的子项目不自动继承该规则。
 {{end}}
 
 {{if .WorkflowReferences}}
@@ -48,11 +32,15 @@ description: 修改、审查或扩展 {{.WorkspaceName}} 工作区代码时使�
 
 {{end}}
 
+{{if .RuleReferences}}
+## 工作区规则
+
+{{range .RuleReferences}}- [{{.Name}}]({{.Path}}){{if .AffectedProjects}}；项目：{{range $i, $project := .AffectedProjects}}{{if $i}}、{{end}}`{{$project}}`{{end}}{{end}}{{if .Paths}}；路径：{{range $i, $path := .Paths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}
+{{end}}
+
+{{end}}
+
 ## 参考
 
-{{if not .SkipReferences}}
 - [工作区概览](./references/workspace-overview.md)：子项目、路由表、仓库证据支持的依赖和影响范围。
-- [跨项目规则](./references/cross-project-rules.md)：多项目改动、契约/共享/基础设施变更、并发边界和验证顺序。
-{{else}}
-*本次生成未写入 references。*
-{{end}}
+- [跨项目规则](./references/cross-project-rules.md)：多项目改动、契约/共享/运行时配置变更、依赖顺序和并发边界。

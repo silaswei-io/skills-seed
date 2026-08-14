@@ -43,6 +43,7 @@ func TestNormalizeAndStoreAddsNewCandidate(t *testing.T) {
 
 func newPatternNormTestPattern(id, name string, category domain.Category) *domain.Pattern {
 	pattern := domain.NewPattern(id, name, category)
+	pattern.Confidence = 0.9
 	pattern.Rule = "Preserve the project-specific " + name + " rule."
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: id + ".go", Line: 1, Kind: "file"}}
 	return pattern

@@ -61,12 +61,22 @@ type contextPromptFile struct {
 
 var contextPromptFiles = []contextPromptFile{
 	{partName: "context-background", fileName: "background.md"},
-	{partName: "context-constraints", fileName: "constraints.md"},
 	{partName: "context-terminology", fileName: "terminology.md"},
 	{partName: "context-workspace", fileName: "workspace.md"},
 }
 
-var promptAppendFragments = map[string][]string{}
+var knowledgePromptNames = map[string]bool{
+	"core-user-pattern":           true,
+	"core-workspace-profile":      true,
+	"core-workspace-spec":         true,
+	"learning-delta-pack-analyze": true,
+	"learning-pack-analyze":       true,
+	"learning-pack-plan":          true,
+	"learning-pattern-normalize":  true,
+	"learning-profile-refresh":    true,
+	"learning-authority-extract":  true,
+	"learning-knowledge-review":   true,
+}
 
 // RuntimeTask 标识一次 agent 调用共用的 runtime 文件名前缀。
 type RuntimeTask struct {
@@ -170,17 +180,15 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		return "", err
 	}
 
-	base := buf.String()
-	appendFragments := l.appendFragments(locale, name)
+	base := l.prependKnowledgeGoal(locale, name, buf.String())
 	contractGuard := l.outputContractGuard(locale, name)
 	if l.seedPath == "" {
-		rendered := l.appendOutputContractGuard(l.appendRenderedFragments(base, appendFragments), contractGuard)
+		rendered := l.appendOutputContractGuard(base, contractGuard)
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticPromptRendered"),
 			"template", name,
 			"agent", l.agentName,
 			"locale", locale,
 			"base_length", len(base),
-			"append_fragments_count", len(appendFragments),
 			"output_contract_guard_length", len(contractGuard),
 			"final_length", len(rendered),
 			"has_seed_path", false,
@@ -221,9 +229,6 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		addPart(file.partName, raw, cleaned)
 		contextLengths[file.partName] = len(cleaned)
 	}
-	for _, fragment := range appendFragments {
-		addPart(fragment.Name, fragment.Content, fragment.Content)
-	}
 	if contractGuard != "" {
 		addPart("output-contract-guard", contractGuard, contractGuard)
 	}
@@ -235,10 +240,8 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 		"locale", locale,
 		"base_length", len(base),
 		"context_background_length", contextLengths["context-background"],
-		"context_constraints_length", contextLengths["context-constraints"],
 		"context_terminology_length", contextLengths["context-terminology"],
 		"context_workspace_length", contextLengths["context-workspace"],
-		"append_fragments_count", len(appendFragments),
 		"output_contract_guard_length", len(contractGuard),
 		"final_length", len(rendered),
 		"has_seed_path", true,
@@ -300,28 +303,11 @@ func (l *Loader) outputContractGuard(locale, promptName string) string {
 	return strings.TrimSpace(buf.String())
 }
 
-type renderedAppendFragment struct {
-	Name    string
-	Content string
-}
-
-func (l *Loader) appendFragments(locale, promptName string) []renderedAppendFragment {
-	names := promptAppendFragments[promptName]
-	if len(names) == 0 {
-		return nil
+func (l *Loader) prependKnowledgeGoal(locale, promptName, base string) string {
+	if !knowledgePromptNames[promptName] {
+		return base
 	}
-	fragments := make([]renderedAppendFragment, 0, len(names))
-	for _, name := range names {
-		content := l.renderAppendTemplate(locale, name)
-		if content == "" {
-			continue
-		}
-		fragments = append(fragments, renderedAppendFragment{
-			Name:    name,
-			Content: content,
-		})
-	}
-	return fragments
+	return prependPromptSection(base, l.renderAppendTemplate(locale, "knowledge-goal-contract"))
 }
 
 func (l *Loader) renderAppendTemplate(locale, name string) string {
@@ -350,13 +336,6 @@ func readAppendTemplate(name string) ([]byte, error) {
 	return nil, os.ErrNotExist
 }
 
-func (l *Loader) appendRenderedFragments(base string, fragments []renderedAppendFragment) string {
-	for _, fragment := range fragments {
-		base = appendPromptSection(base, fragment.Content)
-	}
-	return base
-}
-
 func (l *Loader) appendOutputContractGuard(base, contractGuard string) string {
 	return appendPromptSection(base, contractGuard)
 }
@@ -371,6 +350,10 @@ func appendPromptSection(base, section string) string {
 		return section
 	}
 	return strings.TrimSpace(base + "\n\n" + section)
+}
+
+func prependPromptSection(base, section string) string {
+	return appendPromptSection(section, base)
 }
 
 func templateCacheKey(locale, name string) string {

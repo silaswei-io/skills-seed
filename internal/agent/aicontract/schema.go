@@ -14,27 +14,31 @@ import (
 const (
 	ContractUserDefinePattern           = "UserDefinePatternOutput"
 	ContractProjectProfile              = "ProjectProfileOutput"
+	ContractAuthorityExtraction         = "AuthorityExtractionOutput"
 	ContractAnalyzeCurrentCodebaseBatch = "AnalyzeCurrentCodebaseBatchOutput"
 	ContractAnalyzeCurrentDeltaBatch    = "AnalyzeCurrentDeltaBatchOutput"
-	ContractSelectLearningCandidates    = "SelectLearningCandidatesOutput"
 	ContractPlanLearningAgenda          = "PlanLearningAgendaOutput"
+	ContractReviewKnowledge             = "ReviewKnowledgeOutput"
 	ContractNormalizePatterns           = "NormalizePatternsOutput"
 	ContractWorkspaceProfile            = "WorkspaceProfileOutput"
 	ContractWorkspaceSpec               = "WorkspaceSpecOutput"
 	ContractOptimizeWorkflow            = "OptimizeWorkflowOutput"
+	ContractOptimizeRule                = "OptimizeRuleOutput"
 )
 
 var outputTypes = map[string]reflect.Type{
 	ContractUserDefinePattern:           reflect.TypeOf(PatternOutput{}),
 	ContractProjectProfile:              reflect.TypeOf(ProjectProfileOutput{}),
+	ContractAuthorityExtraction:         reflect.TypeOf(AuthorityExtractionOutput{}),
 	ContractAnalyzeCurrentCodebaseBatch: reflect.TypeOf(AnalyzeCurrentCodebaseBatchOutput{}),
 	ContractAnalyzeCurrentDeltaBatch:    reflect.TypeOf(AnalyzeCurrentDeltaBatchOutput{}),
-	ContractSelectLearningCandidates:    reflect.TypeOf(SelectLearningCandidatesOutput{}),
 	ContractPlanLearningAgenda:          reflect.TypeOf(PlanLearningAgendaOutput{}),
+	ContractReviewKnowledge:             reflect.TypeOf(ReviewKnowledgeOutput{}),
 	ContractNormalizePatterns:           reflect.TypeOf(NormalizePatternsOutput{}),
 	ContractWorkspaceProfile:            reflect.TypeOf(WorkspaceProfileOutput{}),
 	ContractWorkspaceSpec:               reflect.TypeOf(WorkspaceSpecOutput{}),
-	ContractOptimizeWorkflow:            reflect.TypeOf(OptimizeWorkflowOutput{}),
+	ContractOptimizeWorkflow:            reflect.TypeOf(OptimizedContentOutput{}),
+	ContractOptimizeRule:                reflect.TypeOf(OptimizedContentOutput{}),
 }
 
 // StructuredOutputOptions 表示一次 Agent 调用可动态收窄的输出契约。

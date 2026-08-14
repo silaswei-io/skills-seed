@@ -35,7 +35,7 @@ func (s *Service) CompactWithHooks(ctx context.Context, req CompactRequest, hook
 		}, nil
 	}
 
-	written, err := applyNormalizedPatterns(ctx, s.patternRepo, normalized.Patterns, normalized.Dropped, patterns, compactLibrary)
+	written, err := applyNormalizedPatterns(ctx, s.patternRepo, normalized.Patterns, normalized.Dropped, patterns, nil, compactLibrary)
 	if err != nil {
 		return nil, fmt.Errorf("apply compacted patterns: %w", err)
 	}

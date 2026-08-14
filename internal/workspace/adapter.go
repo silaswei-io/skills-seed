@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
 type workspacePathKind int
@@ -84,7 +85,7 @@ func (s workspaceCandidateSanitizer) sanitizePathGroup(paths []domain.WorkspaceP
 	out := make([]domain.WorkspacePath, 0, len(paths))
 	for _, item := range paths {
 		switch {
-		case isWorkspaceExternalLocation(item.Path):
+		case isWorkspaceExternalLocation(item.Path), s.isProcedurePath(item.Path):
 			continue
 		case isWorkspacePathPattern(item.Path):
 			if s.rootPatternExists(item.Path) {
@@ -146,7 +147,7 @@ func (s workspaceCandidateSanitizer) appendRoute(routes *[]domain.WorkspaceRoute
 func (s workspaceCandidateSanitizer) validRoutes(items []domain.WorkspaceRoute) []domain.WorkspaceRoute {
 	routes := make([]domain.WorkspaceRoute, 0, len(items))
 	for _, route := range items {
-		if isWorkspaceExternalLocation(route.PathPattern) || !s.routePrefixExists(route.PathPattern) {
+		if isWorkspaceExternalLocation(route.PathPattern) || s.isProcedurePath(routeStaticPrefix(route.PathPattern)) || !s.routePrefixExists(route.PathPattern) {
 			continue
 		}
 		route.ProjectIDs = s.refs.projectIDs(route.ProjectIDs)
@@ -228,6 +229,9 @@ func (s workspaceCandidateSanitizer) validPathReference(path string, allowPatter
 	if isWorkspaceExternalLocation(path) {
 		return false
 	}
+	if s.isProcedurePath(routeStaticPrefix(path)) {
+		return false
+	}
 	if isWorkspacePathPattern(path) {
 		return allowPattern && s.rootPatternExists(path)
 	}
@@ -285,6 +289,23 @@ func (s workspaceCandidateSanitizer) childPathOwner(path string) string {
 		}
 	}
 	return owner
+}
+
+func (s workspaceCandidateSanitizer) isProcedurePath(path string) bool {
+	path = cleanRelativePath(path)
+	if path == ".github" || sourcecode.IsProcedureSource(path) {
+		return true
+	}
+	for _, project := range s.refs.projects {
+		projectPath := cleanRelativePath(project.Path)
+		if projectPath == "" || projectPath == "." || !strings.HasPrefix(path, projectPath+"/") {
+			continue
+		}
+		if sourcecode.IsProcedureSource(strings.TrimPrefix(path, projectPath+"/")) {
+			return true
+		}
+	}
+	return false
 }
 
 type workspaceReferenceCatalog struct {

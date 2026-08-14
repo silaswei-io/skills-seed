@@ -2,249 +2,93 @@ package workflow
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
-// Optimizer 将用户口语化输入整理为标准工作流。
+// Optimizer 整理用户提供的工作流正文。
 type Optimizer interface {
-	OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error)
+	OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeContentResult, error)
 }
 
-// Service 管理用户工作流资源。
+// Service 管理用户维护的工作流资源。
 type Service struct {
 	repo      domain.WorkflowRepository
 	optimizer Optimizer
-	language  string
+	project   agent.ProjectContext
 }
 
 // NewService 创建工作流服务。
-func NewService(repo domain.WorkflowRepository, optimizer Optimizer, language string) *Service {
-	return &Service{repo: repo, optimizer: optimizer, language: language}
+func NewService(repo domain.WorkflowRepository, optimizer Optimizer, project agent.ProjectContext) *Service {
+	return &Service{repo: repo, optimizer: optimizer, project: project}
 }
 
-// UpsertRequest 描述新增或更新工作流的请求。
+// UpsertRequest 描述新增、合并或覆盖工作流的请求。
 type UpsertRequest struct {
 	Name      string
-	Context   string
+	Content   string
 	Overwrite bool
 }
 
-// ConflictError 表示已有工作流与新增说明不能安全自动合并。
-type ConflictError struct {
-	Conflicts []string
-}
-
-func (e *ConflictError) Error() string {
-	return i18n.GetWithParams("WorkflowConflictRequirements", map[string]interface{}{"Conflicts": strings.Join(e.Conflicts, "; ")})
-}
-
-// UpsertWorkflow 创建或更新用户工作流。
+// UpsertWorkflow 优化并保存用户工作流。
 func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domain.Workflow, error) {
-	context, err := s.validateUpsertRequest(req)
-	if err != nil {
-		return nil, err
+	if s == nil || s.repo == nil {
+		return nil, errors.New(i18n.Get("WorkflowRepositoryMissing"))
+	}
+	if s.optimizer == nil {
+		return nil, errors.New(i18n.Get("WorkflowOptimizerMissing"))
 	}
 	name := strings.TrimSpace(req.Name)
+	content := strings.TrimSpace(req.Content)
 	id := runtimefiles.SafePart(name, "")
-	now := time.Now()
-	existing, err := s.existingWorkflow(id)
-	if err != nil {
+	if name == "" || id == "" {
+		return nil, errors.New(i18n.Get("WorkflowNameRequired"))
+	}
+	if content == "" {
+		return nil, errors.New(i18n.Get("WorkflowContentRequired"))
+	}
+
+	existing, err := s.repo.Get(id)
+	if err != nil && !errors.Is(err, workflow.ErrNotFound) {
 		return nil, err
 	}
+	existingContent := ""
+	if existing != nil && !req.Overwrite {
+		existingContent = strings.TrimSpace(existing.Content)
+	}
 	optimized, err := s.optimizer.OptimizeWorkflow(ctx, &agent.OptimizeWorkflowRequest{
-		ID:              id,
+		Project:         s.project,
 		Name:            name,
-		Context:         context,
-		ExistingContent: existingWorkflowContent(existing, req.Overwrite),
+		ExistingContent: existingContent,
+		Content:         content,
 		Overwrite:       req.Overwrite,
-		Language:        s.language,
 	})
 	if err != nil {
 		return nil, err
 	}
-	optimizedContent, title, err := validateOptimizedWorkflow(optimized, name)
-	if err != nil {
+	if err := agent.RequireResult(optimized, "OptimizeWorkflow"); err != nil {
 		return nil, err
 	}
-	if id == "" {
-		id, err = s.newGeneratedWorkflowID(title, context)
-		if err != nil {
-			return nil, err
-		}
-		if id == "" {
-			return nil, fmt.Errorf("%s", i18n.Get("WorkflowOptimizerUnsafeTitle"))
-		}
+	content = strings.TrimSpace(optimized.Content)
+	if content == "" {
+		return nil, errors.New(i18n.Get("WorkflowOptimizerEmptyContent"))
 	}
-	workflow := buildWorkflow(id, title, context, optimizedContent, now, existing, req.Overwrite)
+
+	now := time.Now()
+	workflow := domain.Workflow{ID: id, Name: name, Content: content, CreatedAt: now, UpdatedAt: now}
+	if existing != nil {
+		workflow.CreatedAt = existing.CreatedAt
+		workflow.Scripts = existing.Scripts
+	}
 	if err := s.repo.Save(workflow); err != nil {
 		return nil, err
 	}
 	return s.repo.Get(id)
-}
-
-func (s *Service) validateUpsertRequest(req UpsertRequest) (string, error) {
-	if s == nil || s.repo == nil {
-		return "", fmt.Errorf("%s", i18n.Get("WorkflowRepositoryMissing"))
-	}
-	if s.optimizer == nil {
-		return "", fmt.Errorf("%s", i18n.Get("WorkflowOptimizerMissing"))
-	}
-	context := strings.TrimSpace(req.Context)
-	if context == "" {
-		return "", fmt.Errorf("%s", i18n.Get("WorkflowContextRequired"))
-	}
-	return context, nil
-}
-
-func (s *Service) existingWorkflow(id string) (*domain.Workflow, error) {
-	if id == "" {
-		return nil, nil
-	}
-	existing, err := s.repo.Get(id)
-	if err != nil && !errors.Is(err, workflowstore.ErrNotFound) {
-		return nil, err
-	}
-	return existing, nil
-}
-
-func validateOptimizedWorkflow(optimized *agent.OptimizeWorkflowResult, fallbackTitle string) (string, string, error) {
-	if err := agent.RequireResult(optimized, "OptimizeWorkflow"); err != nil {
-		return "", "", err
-	}
-	conflicts := normalizeConflicts(optimized.Conflicts)
-	if len(conflicts) > 0 {
-		return "", "", &ConflictError{Conflicts: conflicts}
-	}
-	content := strings.TrimSpace(optimized.Content)
-	if content == "" {
-		return "", "", fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyContent"))
-	}
-	title := strings.TrimSpace(optimized.Title)
-	if title == "" {
-		title = fallbackTitle
-	}
-	if title == "" {
-		return "", "", fmt.Errorf("%s", i18n.Get("WorkflowOptimizerEmptyTitle"))
-	}
-	return content, title, nil
-}
-
-func buildWorkflow(id, title, context, content string, now time.Time, existing *domain.Workflow, overwrite bool) domain.Workflow {
-	workflow := domain.Workflow{
-		ID:        id,
-		Name:      title,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if existing != nil {
-		workflow = *existing
-		if strings.TrimSpace(workflow.Name) == "" {
-			workflow.Name = title
-		}
-		workflow.UpdatedAt = now
-	}
-	nextContext := domain.WorkflowContext{
-		Content:   context,
-		CreatedAt: now,
-	}
-	if overwrite {
-		workflow.Contexts = []domain.WorkflowContext{nextContext}
-	} else {
-		workflow.Contexts = append(workflow.Contexts, nextContext)
-	}
-	workflow.Content = content
-	workflow.Name = title
-	return workflow
-}
-
-func (s *Service) newGeneratedWorkflowID(title, context string) (string, error) {
-	baseID := workflowIDFromGeneratedTitle(title, context)
-	if baseID == "" {
-		return "", nil
-	}
-	if _, err := s.repo.Get(baseID); errors.Is(err, workflowstore.ErrNotFound) {
-		return baseID, nil
-	} else if err != nil {
-		return "", err
-	}
-
-	workflows, err := s.repo.List()
-	if err != nil {
-		return "", err
-	}
-	used := make(map[string]struct{}, len(workflows))
-	for _, workflow := range workflows {
-		used[workflow.ID] = struct{}{}
-	}
-	for i := 2; ; i++ {
-		id := fmt.Sprintf("%s-%d", baseID, i)
-		if _, ok := used[id]; ok {
-			continue
-		}
-		if _, err := s.repo.Get(id); errors.Is(err, workflowstore.ErrNotFound) {
-			return id, nil
-		} else if err != nil {
-			return "", err
-		}
-	}
-}
-
-func normalizeConflicts(values []string) []string {
-	conflicts := make([]string, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		conflicts = append(conflicts, value)
-	}
-	return conflicts
-}
-
-func workflowIDFromGeneratedTitle(title, context string) string {
-	if id := runtimefiles.SafePart(title, ""); id != "" {
-		return id
-	}
-	return workflowIDFromGeneratedContext(context)
-}
-
-func workflowIDFromGeneratedContext(context string) string {
-	context = strings.TrimSpace(context)
-	if context == "" {
-		return ""
-	}
-	sum := sha256.Sum256([]byte(context))
-	return "workflow-" + hex.EncodeToString(sum[:])[:12]
-}
-
-func existingWorkflowContent(workflow *domain.Workflow, overwrite bool) string {
-	if workflow == nil || overwrite {
-		return ""
-	}
-	if strings.TrimSpace(workflow.Content) != "" {
-		return strings.TrimSpace(workflow.Content)
-	}
-	parts := make([]string, 0, len(workflow.Contexts))
-	for _, item := range workflow.Contexts {
-		if content := strings.TrimSpace(item.Content); content != "" {
-			parts = append(parts, content)
-		}
-	}
-	return strings.Join(parts, "\n\n")
 }

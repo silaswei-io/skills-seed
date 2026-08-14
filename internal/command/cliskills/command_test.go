@@ -27,6 +27,7 @@ func TestInstallGlobalAtHomeWritesClaudeAndCodexSkillTrees(t *testing.T) {
 	require.FileExists(t, filepath.Join(codexRoot, "references", "learn.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "generate.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "patterns.md"))
+	require.FileExists(t, filepath.Join(codexRoot, "references", "rule.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "workflow.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "preview.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "hook.md"))
@@ -126,6 +127,7 @@ func TestRenderSkillDocumentsPublicCommands(t *testing.T) {
 		"./references/learn.md",
 		"./references/generate.md",
 		"./references/patterns.md",
+		"./references/rule.md",
 		"./references/workflow.md",
 		"./references/preview.md",
 		"./references/hook.md",
@@ -158,6 +160,7 @@ func TestRenderSkillTreeIncludesPerCommandReferences(t *testing.T) {
 		"references/learn.md",
 		"references/generate.md",
 		"references/patterns.md",
+		"references/rule.md",
 		"references/workflow.md",
 		"references/preview.md",
 		"references/hook.md",
@@ -168,8 +171,8 @@ func TestRenderSkillTreeIncludesPerCommandReferences(t *testing.T) {
 		require.Contains(t, paths, path)
 	}
 	require.Contains(t, paths["references/operation-model.md"], "Command Groups")
-	require.Contains(t, paths["references/workflow.md"], "Merge Versus Overwrite")
 	require.Contains(t, paths["references/workflow.md"], "Use the detail form when complete workflow content is needed")
+	require.Contains(t, paths["references/rule.md"], ".skills-seed/rules/<id>/RULE.md")
 }
 
 func TestWriteTreeIfNeededKeepsSameContent(t *testing.T) {

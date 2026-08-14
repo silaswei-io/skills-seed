@@ -44,10 +44,34 @@ func TestStructuredOutputSchemaOmitsUnsupportedMetaSchema(t *testing.T) {
 }
 
 func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
+	profile := decodeSchema(t, ContractProjectProfile)
+	profileProperties := profile["properties"].(map[string]any)
+	require.NotContains(t, profileProperties, "authority_coverage")
+	require.NotContains(t, profileProperties, "engineering_rules")
+	require.NotContains(t, profileProperties, "authority_reviews")
+	require.NotContains(t, profileProperties, "authority_sections")
+	authority := decodeSchema(t, ContractAuthorityExtraction)
+	requireRequiredFields(t, authority, "authority_sections")
+	authorityContainer := mustFindSchemaContainer(t, authority, "section_id")
+	requireRequiredFields(t, authorityContainer, "section_id", "rules")
+	require.NotContains(t, schemaStringList(authorityContainer["required"]), "no_rule_reason")
+	authorityRuleContainer := mustFindSchemaContainer(t, authority, "command_policy")
+	requireRequiredFields(t, authorityRuleContainer, "title", "rule")
+	require.NotContains(t, schemaStringList(authorityRuleContainer["required"]), "applies_to")
+	require.NotContains(t, schemaStringList(authorityRuleContainer["required"]), "command_policy")
+	authorityRuleProperties := authorityRuleContainer["properties"].(map[string]any)
+	require.NotContains(t, authorityRuleProperties, "source")
+	require.NotContains(t, authorityRuleProperties, "section")
+	require.NotContains(t, authorityRuleProperties, "evidence")
+
 	batch := decodeSchema(t, ContractAnalyzeCurrentCodebaseBatch)
 	requireRequiredFields(t, batch, "focuses")
 	requireRequiredFields(t, mustFindSchemaContainer(t, batch, "focus_id"), "focus_id", "focus_name", "patterns", "profile_refresh_recommended")
-	requireRequiredFields(t, mustFindSchemaContainer(t, batch, "category"), "id", "name", "category", "description", "good_example", "bad_example", "rule", "confidence", "frequency")
+	requireRequiredFields(t, mustFindSchemaContainer(t, batch, "category"), "id", "name", "category", "description", "good_example", "bad_example", "rule", "confidence", "frequency", "knowledge_flags")
+	flags, _, ok := findSchemaPropertyWithContainer(batch, "knowledge_flags")
+	require.True(t, ok)
+	require.Equal(t, "array", flags["type"])
+	require.ElementsMatch(t, []string{"operational_risk"}, schemaStringList(flags["items"].(map[string]any)["enum"]))
 
 	currentLocation, container, ok := findSchemaPropertyWithContainer(batch, "current_location")
 	require.True(t, ok)
@@ -58,7 +82,7 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	category, _, ok := findSchemaPropertyWithContainer(learning, "category")
 	require.True(t, ok)
 	require.ElementsMatch(t, []string{
-		"naming", "error", "structure", "concurrency", "testing", "business",
+		"naming", "error", "structure", "concurrency", "business",
 		"api", "database", "utils", "middleware", "config",
 	}, schemaStringList(category["enum"]))
 	confidence, _, ok := findSchemaPropertyWithContainer(learning, "confidence")
@@ -87,25 +111,28 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	require.Equal(t, "array", sourceIDs["type"])
 	reasonCode, _, ok := findSchemaPropertyWithContainer(normalize, "reason_code")
 	require.True(t, ok)
-	require.Contains(t, schemaStringList(reasonCode["enum"]), "unsafe_guidance")
+	require.Contains(t, schemaStringList(reasonCode["enum"]), "overfiltered_source_backed")
 }
 
-func TestPlanningAndSelectionSchemasRequireDecisionFields(t *testing.T) {
-	selection := decodeSchema(t, ContractSelectLearningCandidates)
-	requireRequiredFields(t, selection, "selected_paths", "skipped_paths", "reason")
-	requireRequiredFields(t, mustFindSchemaContainer(t, selection, "path"), "path", "reason")
-	selectedPaths, _, ok := findSchemaPropertyWithContainer(selection, "selected_paths")
-	require.True(t, ok)
-	require.Contains(t, selectedPaths["description"], "exact candidate file list")
-	require.Contains(t, selectedPaths["description"], "required paths must be included")
-	require.Contains(t, selectedPaths["description"], "absolute paths")
-	skippedPaths, _, ok := findSchemaPropertyWithContainer(selection, "skipped_paths")
-	require.True(t, ok)
-	require.Contains(t, skippedPaths["description"], "must not duplicate selected_paths")
-
+func TestPlanningSchemaRequiresCoverageDecisionFields(t *testing.T) {
 	plan := decodeSchema(t, ContractPlanLearningAgenda)
-	requireRequiredFields(t, plan, "focuses")
+	requireRequiredFields(t, plan, "focuses", "skipped_paths", "reason")
 	requireRequiredFields(t, mustFindSchemaContainer(t, plan, "id"), "id", "name")
+}
+
+func TestKnowledgeReviewSchemaRequiresOneDecisionShape(t *testing.T) {
+	review := decodeSchema(t, ContractReviewKnowledge)
+	requireRequiredFields(t, review, "decisions")
+	decision := mustFindSchemaContainer(t, review, "candidate_id")
+	requireRequiredFields(t, decision, "candidate_id", "verdict", "reason_code", "reason", "business_method_verdict")
+	verdict, _, ok := findSchemaPropertyWithContainer(review, "verdict")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"accept", "revise", "reject"}, schemaStringList(verdict["enum"]))
+	methodVerdict, _, ok := findSchemaPropertyWithContainer(review, "business_method_verdict")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"remove", "set"}, schemaStringList(methodVerdict["enum"]))
+	revision := mustFindSchemaContainer(t, review, "knowledge_flags")
+	requireRequiredFields(t, revision, "name", "category", "description", "rule", "confidence", "knowledge_flags")
 }
 
 func TestWorkspaceContractsKeepIdentityOutOfAIOutput(t *testing.T) {
@@ -149,6 +176,16 @@ func TestWorkspaceStructuredOutputSchemaConstrainsProjectIDs(t *testing.T) {
 		require.ElementsMatch(t, []string{"agent", "network"}, schemaStringList(items["enum"]), name)
 	}
 	require.NotContains(t, data, "ntls-workspace")
+}
+
+func TestResourceOptimizationSchemasExposeOnlyContent(t *testing.T) {
+	for _, contract := range []string{ContractOptimizeWorkflow, ContractOptimizeRule} {
+		schema := decodeSchema(t, contract)
+		properties := schema["properties"].(map[string]any)
+		require.Len(t, properties, 1)
+		require.Contains(t, properties, "content")
+		require.Equal(t, []string{"content"}, schemaStringList(schema["required"]))
+	}
 }
 
 func TestJSONSchemaRejectsUnknownContract(t *testing.T) {

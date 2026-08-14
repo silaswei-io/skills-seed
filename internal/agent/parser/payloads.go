@@ -22,6 +22,8 @@ func patternToDomain(p aicontract.PatternOutput, source domain.Source, now time.
 		Rule:              p.Rule,
 		Confidence:        p.Confidence,
 		Frequency:         p.Frequency,
+		ScopePath:         p.ScopePath,
+		KnowledgeFlags:    append([]string(nil), p.KnowledgeFlags...),
 		Source:            source,
 		CreatedAt:         now,
 		EvidenceLocations: evidenceLocationsToDomain(p.EvidenceLocations),
@@ -55,14 +57,6 @@ func businessMethodToDomain(p *aicontract.BusinessMethodOutput, now time.Time) *
 
 func stringsOrEmpty(values []string) []string {
 	return stringx.EmptyIfNil(values)
-}
-
-func businessMethodsToDomain(methods []aicontract.BusinessMethodOutput, now time.Time) []domain.BusinessMethod {
-	out := make([]domain.BusinessMethod, len(methods))
-	for i, method := range methods {
-		out[i] = *businessMethodToDomain(&method, now)
-	}
-	return out
 }
 
 func evidenceLocationsToDomain(locations []aicontract.EvidenceLocationOutput) []domain.PatternEvidenceLocation {

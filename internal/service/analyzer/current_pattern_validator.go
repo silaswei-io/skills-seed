@@ -10,6 +10,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
+	"github.com/silaswei-io/skills-seed/internal/repositoryscope"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
@@ -56,7 +57,7 @@ func (v *currentPatternValidator) validatePatterns(patterns []domain.Pattern) []
 }
 
 func (v *currentPatternValidator) validate(pattern domain.Pattern) (domain.Pattern, bool) {
-	if strings.TrimSpace(pattern.ID) == "" || strings.TrimSpace(pattern.Name) == "" || strings.TrimSpace(pattern.Rule) == "" {
+	if strings.TrimSpace(pattern.ID) == "" || strings.TrimSpace(pattern.Name) == "" || strings.TrimSpace(pattern.Rule) == "" || !domain.ValidKnowledgeFlags(pattern.KnowledgeFlags) {
 		return domain.Pattern{}, false
 	}
 
@@ -79,20 +80,34 @@ func (v *currentPatternValidator) validate(pattern domain.Pattern) (domain.Patte
 	}
 
 	pattern.EvidenceLocations = locations
+	pattern.KnowledgeFlags = domain.CanonicalKnowledgeFlags(pattern.KnowledgeFlags)
 	pattern.Source = domain.SourceLearnedCurrent
 	pattern.Status = domain.PatternStatusActive
 	pattern.Frequency = domain.PatternEvidenceFileCount(locations)
 	if strings.TrimSpace(pattern.GoodExample) != "" && !v.exampleExists(pattern.GoodExample, locations) {
 		pattern.GoodExample = ""
 	}
-	if pattern.ScopePath == "" {
-		pattern.ScopePath = singleEvidencePath(locations)
-	}
 	pattern.RefreshMetrics()
 	return pattern, true
 }
 
+// hasLiveEvidence 报告模式是否仍有范围内可验证的源码证据。
+func (v *currentPatternValidator) hasLiveEvidence(locations []domain.PatternEvidenceLocation, scope repositoryscope.Scope) bool {
+	for _, location := range locations {
+		if !scope.AllowsKnowledge(location.Path) {
+			continue
+		}
+		if _, ok := v.validateLocation(location); ok {
+			return true
+		}
+	}
+	return false
+}
+
 func (v *currentPatternValidator) validateLocation(location domain.PatternEvidenceLocation) (domain.PatternEvidenceLocation, bool) {
+	if sourcecode.IsProcedureSource(location.Path) {
+		return domain.PatternEvidenceLocation{}, false
+	}
 	path, source, ok := v.source(location.Path)
 	if !ok {
 		return domain.PatternEvidenceLocation{}, false
@@ -155,20 +170,6 @@ func (v *currentPatternValidator) exampleExists(example string, locations []doma
 		}
 	}
 	return false
-}
-
-func singleEvidencePath(locations []domain.PatternEvidenceLocation) string {
-	path := ""
-	for _, location := range locations {
-		if path == "" {
-			path = location.Path
-			continue
-		}
-		if path != location.Path {
-			return ""
-		}
-	}
-	return path
 }
 
 func evidenceKey(location domain.PatternEvidenceLocation) string {

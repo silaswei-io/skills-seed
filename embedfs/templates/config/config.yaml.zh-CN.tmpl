@@ -56,20 +56,18 @@ agent:
 
 ########################################################################
 # 学习
-# 控制 learn current 的默认学习范围
+# 控制 learn current 的学习策略和结构化上下文
 ########################################################################
 learning:
   current:
-    # 学习策略：normal 平衡质量和速度；fast 保留紧凑但直接有证据的模式；deep 更愿意保留有证据的局部业务/代码模式
+    # 学习策略均以高精准率准入：fast 缩小探索范围；normal 为默认；deep 扩大证据探索范围但不降低准入标准
     mode: "normal"
-    # 学习焦点规划取向：flow 默认且最稳定，优先关注业务流程/资源动作；domain 更偏长期业务职责；module 更偏模块/插件/契约边界
-    scope: "flow"
-    # 单次 AI 调用最多分析的焦点数；1 表示不合批，降低单次输出过大和跨焦点串扰风险
-    max_focuses_per_call: 1
-    # 大候选集启用 AI 候选收敛，在进入议程规划前先筛掉低学习价值文件
-    select_relevant_files: true
-    # 候选文件数达到该阈值时才调用 AI 候选收敛；小范围变更使用本地保守候选准备
-    select_relevant_files_min_candidates: 200
+    # 模式候选入库阈值，取值 (0, 1]
+    pattern_admission:
+      # 多文件证据候选的最低置信度
+      min_confidence: 0.75
+      # 单文件证据候选的最低置信度
+      min_single_evidence_confidence: 0.85
     structural:
       # 启用有边界的结构化上下文；无边界输入时不会运行
       enabled: true

@@ -6,11 +6,15 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/knowledge/patternview"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 func validateCandidates(candidates []domain.Pattern) []domain.Pattern {
 	valid := make([]domain.Pattern, 0, len(candidates))
 	for _, candidate := range candidates {
+		if !domain.ValidKnowledgeFlags(candidate.KnowledgeFlags) {
+			continue
+		}
 		pattern := patternview.Normalize(candidate)
 		if pattern.IsValid() && !hasPlaceholderExample(pattern.GoodExample) {
 			valid = append(valid, pattern)
@@ -19,12 +23,17 @@ func validateCandidates(candidates []domain.Pattern) []domain.Pattern {
 	return valid
 }
 
-func validateCurrentCandidates(candidates []domain.Pattern) []domain.Pattern {
+func (s *Service) validateCurrentCandidates(candidates []domain.Pattern) []domain.Pattern {
 	valid := make([]domain.Pattern, 0, len(candidates))
 	for _, candidate := range candidates {
-		if len(candidate.EvidenceLocations) > 0 {
-			valid = append(valid, candidate)
+		evidenceCount := domain.PatternEvidenceFileCount(candidate.EvidenceLocations)
+		if evidenceCount == 0 || candidate.Confidence < s.admission.MinConfidence {
+			continue
 		}
+		if evidenceCount == 1 && candidate.Confidence < s.admission.MinSingleEvidenceConfidence {
+			continue
+		}
+		valid = append(valid, candidate)
 	}
 	return valid
 }
@@ -60,11 +69,80 @@ func commonPairValue(left, right string) string {
 
 func validateNormalizeResultForOperation(operation Operation, result *proposal, candidates, existing []domain.Pattern) error {
 	if operation == OperationLearnCurrent {
+		if err := validateCapabilityEntryMerges(result, candidates, existing); err != nil {
+			return err
+		}
 		if err := hydrateNormalizeResult(result, candidates, existing); err != nil {
 			return err
 		}
 	}
 	return validateNormalizeResult(result, candidates, existing)
+}
+
+func validateCapabilityEntryMerges(result *proposal, candidates, existing []domain.Pattern) error {
+	if result == nil {
+		return fmt.Errorf("normalization result is nil")
+	}
+
+	inputs := make(map[string][]domain.Pattern, len(candidates)+len(existing))
+	for _, pattern := range append(append([]domain.Pattern(nil), candidates...), existing...) {
+		inputs[pattern.ID] = append(inputs[pattern.ID], pattern)
+	}
+	for _, pattern := range result.Patterns {
+		var entries []capabilityEntryIdentity
+		for _, sourceID := range pattern.MergedFrom {
+			for _, source := range inputs[sourceID] {
+				if entry, ok := newCapabilityEntryIdentity(source.BusinessMethod); ok {
+					entries = append(entries, entry)
+				}
+			}
+		}
+		for left := 0; left < len(entries); left++ {
+			for right := left + 1; right < len(entries); right++ {
+				if entries[left].distinctFrom(entries[right]) {
+					return fmt.Errorf("normalized pattern %q merges distinct capability entries %q and %q", pattern.ID, entries[left].name, entries[right].name)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+type capabilityEntryIdentity struct {
+	name      string
+	locations map[string]struct{}
+}
+
+func newCapabilityEntryIdentity(method *domain.BusinessMethod) (capabilityEntryIdentity, bool) {
+	if method == nil {
+		return capabilityEntryIdentity{}, false
+	}
+	name := strings.ToLower(strings.TrimSpace(method.Name))
+	if name == "" {
+		return capabilityEntryIdentity{}, false
+	}
+	locations := make(map[string]struct{}, 2)
+	for _, value := range []string{method.CodeLocation.CurrentLocation, method.CodeLocation.HistoricalLocation} {
+		if location := strings.ToLower(pathx.CleanEvidenceLocationPath(value)); location != "" {
+			locations[location] = struct{}{}
+		}
+	}
+	return capabilityEntryIdentity{name: name, locations: locations}, true
+}
+
+func (left capabilityEntryIdentity) distinctFrom(right capabilityEntryIdentity) bool {
+	if left.name != right.name {
+		return true
+	}
+	if len(left.locations) == 0 || len(right.locations) == 0 {
+		return false
+	}
+	for location := range left.locations {
+		if _, ok := right.locations[location]; ok {
+			return false
+		}
+	}
+	return true
 }
 
 func validateNormalizeResult(result *proposal, candidates, existing []domain.Pattern) error {
@@ -138,6 +216,9 @@ func (s normalizeValidationState) validatePattern(pattern *domain.Pattern) error
 	s.outputIDs[pattern.ID] = struct{}{}
 	if !domain.IsValidPatternCategory(pattern.Category) {
 		return fmt.Errorf("normalized pattern %q has invalid category %q", pattern.ID, pattern.Category)
+	}
+	if !domain.ValidKnowledgeFlags(pattern.KnowledgeFlags) {
+		return fmt.Errorf("normalized pattern %q has invalid knowledge flags", pattern.ID)
 	}
 	if strings.TrimSpace(pattern.Name) == "" {
 		return fmt.Errorf("normalized pattern %q has empty name", pattern.ID)

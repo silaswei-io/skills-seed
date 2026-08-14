@@ -18,50 +18,45 @@ func TestBusinessPatternGroupsUseScopePathWhenSourcePathIsUnavailable(t *testing
 	require.Equal(t, "Capability Lifecycle", groups[0].Title)
 }
 
-func TestBusinessPatternGroupsFallBackToPatternTextWhenPathIsUnavailable(t *testing.T) {
+func TestBusinessPatternGroupsDoNotInventDomainFromPatternText(t *testing.T) {
 	pattern := domain.NewPattern("existing-capability", "Existing Capability", domain.CategoryBusiness)
-	pattern.SetDescription("HSM 与 CA 管理需要复用既有生命周期流程")
+	pattern.SetDescription("audit log before after")
 
 	groups := BusinessPatternGroups("zh-CN", []domain.Pattern{*pattern})
 
 	require.Len(t, groups, 1)
-	require.NotEmpty(t, groups[0].ID)
+	require.Equal(t, businessFallbackGroupID, groups[0].ID)
 }
 
-func TestBusinessPatternGroupsFallBackToSourcePath(t *testing.T) {
+func TestBusinessPatternGroupsDoNotInferScopeFromEvidencePath(t *testing.T) {
 	pattern := domain.NewPattern("existing-capability", "Existing Capability", domain.CategoryBusiness)
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "src/capability/entry.ext", Symbol: "ExistingEntry"}}
 
 	groups := BusinessPatternGroups("en-US", []domain.Pattern{*pattern})
 
 	require.Len(t, groups, 1)
-	require.Equal(t, "capability", groups[0].ID)
+	require.Equal(t, businessFallbackGroupID, groups[0].ID)
 }
 
-func TestBusinessPatternGroupsPreferStableSourcePathOverScopePath(t *testing.T) {
-	tests := []struct {
-		path string
-		want string
-	}{
-		{path: "internal/service/handle_data_report.go", want: "handle-data-report"},
-		{path: "internal/service/handle_data_report_tp_1.go", want: "handle-data-report-tp"},
-		{path: "internal/svc/hsm_reloader.go", want: "hsm"},
-		{path: "internal/async/task_manager.go", want: "async"},
-		{path: "internal/logic/node/config.go", want: "node"},
-	}
+func TestBusinessGroupKeywordsDoNotExpandFromBroadPatternSignals(t *testing.T) {
+	pattern := domain.NewPattern("domain-action-state", "Domain Action State", domain.CategoryBusiness)
+	pattern.ScopePath = "components/billing"
 
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			pattern := domain.NewPattern("pattern", "Pattern", domain.CategoryBusiness)
-			pattern.ScopePath = "unstable/ai/title"
-			pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: tt.path}}
+	groups := BusinessPatternGroups("en-US", []domain.Pattern{*pattern})
 
-			groups := BusinessPatternGroups("en-US", []domain.Pattern{*pattern})
+	require.Len(t, groups, 1)
+	require.Equal(t, []string{"billing"}, groups[0].Summary.Keywords)
+}
 
-			require.Len(t, groups, 1)
-			require.Equal(t, tt.want, groups[0].ID)
-		})
-	}
+func TestBusinessPatternGroupsUseExplicitScopeOverEvidencePath(t *testing.T) {
+	pattern := domain.NewPattern("pattern", "Pattern", domain.CategoryBusiness)
+	pattern.ScopePath = "components/identity"
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "src/adapter/entry.ext"}}
+
+	groups := BusinessPatternGroups("en-US", []domain.Pattern{*pattern})
+
+	require.Len(t, groups, 1)
+	require.Equal(t, "identity", groups[0].ID)
 }
 
 func TestTitleFromWordsPreservesUnicode(t *testing.T) {

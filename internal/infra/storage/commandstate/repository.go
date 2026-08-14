@@ -18,7 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
-const schemaVersion = 2
+const schemaVersion = 4
 
 var (
 	ErrStateNotFound            = errors.New("command state not found")
@@ -34,18 +34,35 @@ type InputSummary struct {
 	SkippedFiles        int `json:"skipped_files,omitempty"`
 }
 
-// AnalysisCheckpoint 保存高成本分析的阶段结果，供失败后从未完成证据焦点继续。
+// FocusKnowledgeCheckpoint 保存单个证据焦点的分析和审查结果。
+// 焦点是独立审查与恢复的最小单元，不写入最终 Pattern 事实。
+type FocusKnowledgeCheckpoint struct {
+	Focus             domain.EvidenceFocus `json:"focus"`
+	Patterns          []domain.Pattern     `json:"patterns,omitempty"`
+	RetiredPatternIDs []string             `json:"retired_pattern_ids,omitempty"`
+	Reviewed          bool                 `json:"reviewed,omitempty"`
+}
+
+// AnalysisCheckpoint 保存高成本分析的焦点结果，供失败后从未完成焦点继续。
 type AnalysisCheckpoint struct {
-	Patterns             []domain.Pattern       `json:"patterns,omitempty"`
-	CompletedFocuses     []domain.EvidenceFocus `json:"completed_focuses,omitempty"`
-	ProfileRefreshNeeded bool                   `json:"profile_refresh_needed,omitempty"`
-	ProfileRefreshReason string                 `json:"profile_refresh_reason,omitempty"`
+	FocusKnowledge       []FocusKnowledgeCheckpoint `json:"focus_knowledge,omitempty"`
+	ProfileRefreshNeeded bool                       `json:"profile_refresh_needed,omitempty"`
+	ProfileRefreshReason string                     `json:"profile_refresh_reason,omitempty"`
 }
 
 // DecisionCheckpoint 保存一次已完成的规范化决策，等待本地校验和原子提交。
 type DecisionCheckpoint struct {
 	CandidateHash string          `json:"candidate_hash"`
 	Decision      json.RawMessage `json:"decision"`
+}
+
+// KnowledgeCommitCheckpoint 记录知识事实的分阶段提交结果。
+// ID 与本次恢复状态的输入绑定，用于审计和避免将不同调用的提交结果混用。
+type KnowledgeCommitCheckpoint struct {
+	ID                      string `json:"id"`
+	PatternsCommitted       bool   `json:"patterns_committed,omitempty"`
+	SourceBaselineCommitted bool   `json:"source_baseline_committed,omitempty"`
+	ProjectionsCommitted    bool   `json:"projections_committed,omitempty"`
 }
 
 // State 是命令未完成执行的可恢复状态。
@@ -68,10 +85,8 @@ type State struct {
 	Analysis *AnalysisCheckpoint `json:"analysis,omitempty"`
 	// Decision 保存与当前候选集合绑定的规范化决策。
 	Decision *DecisionCheckpoint `json:"decision,omitempty"`
-	// ProfileCommitted 表示本轮需要刷新的项目画像已经持久化。
-	ProfileCommitted bool `json:"profile_committed,omitempty"`
-	// ArtifactsCommitted 表示本轮 patterns 已成功持久化，恢复时只需提交快照与指纹。
-	ArtifactsCommitted bool `json:"artifacts_committed,omitempty"`
+	// KnowledgeCommit 保存可恢复知识提交的细粒度检查点。
+	KnowledgeCommit KnowledgeCommitCheckpoint `json:"knowledge_commit"`
 }
 
 // Repository 读写某个命令的恢复状态。
@@ -108,6 +123,7 @@ func (r *Repository) Load(ctx context.Context) (*State, error) {
 	if state.SchemaVersion != schemaVersion {
 		return nil, fmt.Errorf("%w: got %d, want %d", ErrUnsupportedSchemaVersion, state.SchemaVersion, schemaVersion)
 	}
+	state.ensureKnowledgeCommitID()
 	return state, nil
 }
 
@@ -128,6 +144,7 @@ func (r *Repository) Save(ctx context.Context, state *State) error {
 	if strings.TrimSpace(state.CreatedAt) == "" {
 		state.CreatedAt = time.Now().Format(time.RFC3339)
 	}
+	state.ensureKnowledgeCommitID()
 	return stateStore(r.path).Save(ctx, state)
 }
 
@@ -185,6 +202,92 @@ func (s *State) WithChangeProfile(profile string) *State {
 	}
 	s.ChangeProfile = strings.TrimSpace(profile)
 	return s
+}
+
+// KnowledgeCommitCheckpoint 返回状态关联的知识提交检查点。
+func (s *State) KnowledgeCommitCheckpoint() *KnowledgeCommitCheckpoint {
+	if s == nil {
+		return nil
+	}
+	s.ensureKnowledgeCommitID()
+	return &s.KnowledgeCommit
+}
+
+// PatternsCommitComplete 报告 Pattern mutation 是否已提交。
+func (s *State) PatternsCommitComplete() bool {
+	checkpoint := s.KnowledgeCommitCheckpoint()
+	return checkpoint != nil && checkpoint.PatternsCommitted
+}
+
+// SourceBaselineCommitComplete 报告源码快照与文件指纹是否均已提交。
+func (s *State) SourceBaselineCommitComplete() bool {
+	checkpoint := s.KnowledgeCommitCheckpoint()
+	return checkpoint != nil && checkpoint.SourceBaselineCommitted
+}
+
+// ProjectionsCommitComplete 报告画像、规范与源码事实投影是否均已提交。
+func (s *State) ProjectionsCommitComplete() bool {
+	checkpoint := s.KnowledgeCommitCheckpoint()
+	return checkpoint != nil && checkpoint.ProjectionsCommitted
+}
+
+// MarkPatternsCommitted 标记 Pattern mutation 已完成。
+func (s *State) MarkPatternsCommitted() {
+	if checkpoint := s.KnowledgeCommitCheckpoint(); checkpoint != nil {
+		checkpoint.PatternsCommitted = true
+	}
+}
+
+// MarkSourceBaselineCommitted 标记源码快照与文件指纹均已完成。
+func (s *State) MarkSourceBaselineCommitted() {
+	if checkpoint := s.KnowledgeCommitCheckpoint(); checkpoint != nil {
+		checkpoint.SourceBaselineCommitted = true
+	}
+}
+
+// MarkProjectionsCommitted 标记项目画像和规范投影均已完成。
+func (s *State) MarkProjectionsCommitted() {
+	if checkpoint := s.KnowledgeCommitCheckpoint(); checkpoint != nil {
+		checkpoint.ProjectionsCommitted = true
+	}
+}
+
+func (s *State) ensureKnowledgeCommitID() {
+	if s == nil {
+		return
+	}
+	if strings.TrimSpace(s.KnowledgeCommit.ID) == "" {
+		s.KnowledgeCommit.ID = s.knowledgeCommitID()
+	}
+}
+
+func (s *State) knowledgeCommitID() string {
+	if s == nil {
+		return ""
+	}
+	type identity struct {
+		Command        string                      `json:"command"`
+		ProjectName    string                      `json:"project_name"`
+		Language       string                      `json:"language"`
+		Mode           string                      `json:"mode"`
+		UserContext    string                      `json:"user_context_hash"`
+		InvocationHash string                      `json:"invocation_hash"`
+		Files          []domain.FileAnalysisRecord `json:"files"`
+		Deleted        []string                    `json:"deleted"`
+		Agenda         domain.LearningAgenda       `json:"agenda"`
+	}
+	data, _ := json.Marshal(identity{
+		Command:        s.Command,
+		ProjectName:    s.ProjectName,
+		Language:       s.Language,
+		Mode:           s.Mode,
+		UserContext:    s.UserContext,
+		InvocationHash: s.InvocationHash,
+		Files:          s.Files,
+		Deleted:        s.Deleted,
+		Agenda:         s.Agenda,
+	})
+	return HashText(string(data))
 }
 
 // HashText 返回文本的稳定 SHA-256 摘要。
@@ -259,6 +362,11 @@ func normalizeFocuses(focuses []domain.EvidenceFocus) []domain.EvidenceFocus {
 		focus.EntryPaths = normalizePaths(focus.EntryPaths)
 		focus.RelatedPaths = normalizePaths(focus.RelatedPaths)
 		focus.RouteTerms = normalizeStrings(focus.RouteTerms)
+		focus.Attributes = normalizeStrings(focus.Attributes)
+		focus.RiskSignals = normalizeStrings(focus.RiskSignals)
+		if focus.AnalysisDepth != "" {
+			focus.AnalysisDepth = focus.EffectiveAnalysisDepth()
+		}
 		if focus.ID == "" || len(focusPaths(focus)) == 0 {
 			continue
 		}

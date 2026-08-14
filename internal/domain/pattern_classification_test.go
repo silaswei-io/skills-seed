@@ -6,62 +6,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPatternClassificationDetectsHighRiskOperationalBoundary(t *testing.T) {
-	pattern := NewPattern("destroy-resource", "Destroy Workspace Resource", CategoryBusiness)
-	pattern.SetDescription("Destroy command deletes external resources and updates environment state.")
-	pattern.EvidenceLocations = []PatternEvidenceLocation{{Path: "tools/commands/destroy.ts", Symbol: "destroyResource"}}
+func TestKnowledgeFlagsAreControlledAndCanonical(t *testing.T) {
+	flags := MergeKnowledgeFlags(
+		[]string{KnowledgeFlagOperationalRisk, KnowledgeFlagOperationalRisk},
+		nil,
+	)
 
-	require.True(t, IsHighRiskOperationalPattern(*pattern))
+	require.Equal(t, []string{KnowledgeFlagOperationalRisk}, flags)
+	require.True(t, ValidKnowledgeFlags(flags))
+	require.False(t, ValidKnowledgeFlags([]string{"invented"}))
 }
 
-func TestPatternClassificationDoesNotMatchEnglishTermSubstrings(t *testing.T) {
-	highRisk := NewPattern("statement-builder", "Statement Builder", CategoryDatabase)
-	highRisk.SetDescription("The statement builder removes empty clauses before compiling queries.")
-	highRisk.EvidenceLocations = []PatternEvidenceLocation{{Path: "internal/query/builder.go", Symbol: "BuildStatement"}}
+func TestHighRiskOperationalUsesReviewedFlagOnly(t *testing.T) {
+	pattern := NewPattern("resource-boundary", "Resource boundary", CategoryBusiness)
+	pattern.SetDescription("Text and paths do not classify the pattern in runtime code.")
 
-	naming := NewPattern("username-validator", "Username Validator", CategoryNaming)
-	naming.SetDescription("Username validation appears across account DTOs.")
-	naming.Frequency = 2
-	naming.EvidenceLocations = []PatternEvidenceLocation{
-		{Path: "src/auth/user.ts", Symbol: "ValidateUsername"},
-		{Path: "src/admin/user.ts", Symbol: "ValidateUsername"},
-	}
+	require.False(t, pattern.HighRiskOperational())
 
-	require.False(t, IsHighRiskOperationalPattern(*highRisk))
-	require.False(t, IsRenderableNamingPattern(*naming))
-}
-
-func TestRenderableNamingPatternRequiresNamingEvidence(t *testing.T) {
-	weak := NewPattern("login-model", "LoginWithPassword Model", CategoryNaming)
-	weak.SetDescription("LoginWithPassword appears near model code.")
-	weak.EvidenceLocations = []PatternEvidenceLocation{{Path: "src/auth/login.ts", Symbol: "LoginWithPassword"}}
-
-	stable := NewPattern("component-suffix", "Component Suffix Naming", CategoryNaming)
-	stable.SetDescription("Interactive components use a component suffix for routeable UI entries.")
-	stable.Frequency = 2
-	stable.EvidenceLocations = []PatternEvidenceLocation{
-		{Path: "src/user/ProfileComponent.tsx", Symbol: "ProfileComponent"},
-		{Path: "src/order/OrderComponent.tsx", Symbol: "OrderComponent"},
-	}
-
-	require.False(t, IsRenderableNamingPattern(*weak))
-	require.True(t, IsRenderableNamingPattern(*stable))
-}
-
-func TestRouteableUtilityFunctionDropsTrivialCacheKeys(t *testing.T) {
-	cacheKey := UtilityFunction{
-		Name:        "BuildCacheKey",
-		File:        "src/cache/key.ts",
-		Signature:   "function BuildCacheKey(id: string): string",
-		Description: "builds a cache key",
-	}
-	normalizer := UtilityFunction{
-		Name:        "NormalizeResourceID",
-		File:        "src/resource/id.ts",
-		Signature:   "function NormalizeResourceID(id: string): string",
-		Description: "normalizes resource identifiers before protocol calls",
-	}
-
-	require.False(t, IsRouteableUtilityFunction(cacheKey))
-	require.True(t, IsRouteableUtilityFunction(normalizer))
+	pattern.KnowledgeFlags = []string{KnowledgeFlagOperationalRisk}
+	require.True(t, pattern.HighRiskOperational())
 }

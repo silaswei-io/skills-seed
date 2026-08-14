@@ -1,13 +1,74 @@
 package analyzer
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
+
+// EngineeringKnowledgeRevision 返回项目级权威工程知识的内容版本。
+// 空项目不产生版本，避免没有权威来源的已有画像发生无意义刷新。
+func EngineeringKnowledgeRevision(projectRoot string) (string, error) {
+	paths, err := engineeringKnowledgePaths(projectRoot)
+	if err != nil {
+		return "", err
+	}
+	return engineeringKnowledgeRevisionForPaths(projectRoot, paths)
+}
+
+// engineeringKnowledgeRevisionForPaths 对本次实际送入画像同步的权威文件求内容版本。
+func engineeringKnowledgeRevisionForPaths(projectRoot string, paths []string) (string, error) {
+	paths, err := cleanEngineeringKnowledgePaths(paths)
+	if err != nil {
+		return "", err
+	}
+	if len(paths) == 0 {
+		return "", nil
+	}
+
+	hash := sha256.New()
+	for _, path := range paths {
+		resolved, err := projectpath.CanonicalWithinRoot(projectRoot, filepath.Join(projectRoot, filepath.FromSlash(path)))
+		if err != nil {
+			return "", err
+		}
+		data, err := os.ReadFile(resolved)
+		if err != nil {
+			return "", err
+		}
+		hash.Write([]byte(path))
+		hash.Write([]byte{0})
+		hash.Write(data)
+		hash.Write([]byte{0})
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func cleanEngineeringKnowledgePaths(paths []string) ([]string, error) {
+	out := make([]string, 0, len(paths))
+	seen := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		path, ok := projectRelativePath(path)
+		if !ok {
+			return nil, fmt.Errorf("invalid authority path %q", path)
+		}
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		out = append(out, path)
+	}
+	sort.Strings(out)
+	return out, nil
+}
 
 func engineeringKnowledgePaths(projectRoot string) ([]string, error) {
 	var paths []string
@@ -43,7 +104,7 @@ func isProjectEngineeringAuthority(path string) bool {
 	if path == "" || !sourcecode.IsEngineeringKnowledge(path) {
 		return false
 	}
-	if strings.HasPrefix(path, ".github/workflows/") || strings.HasPrefix(path, ".skills-seed/context/") {
+	if strings.HasPrefix(path, ".github/workflows/") || sourcecode.IsUserRuleAuthority(path) {
 		return true
 	}
 	return !strings.Contains(path, "/")
@@ -57,7 +118,7 @@ func skipEngineeringKnowledgeDir(path string) bool {
 		case ".git", "vendor", "node_modules", ".agents", ".claude":
 			return true
 		case ".skills-seed":
-			if index != 0 || (len(parts) > 1 && parts[1] != "context") {
+			if index != 0 || (len(parts) > 1 && parts[1] != "rules") {
 				return true
 			}
 		}

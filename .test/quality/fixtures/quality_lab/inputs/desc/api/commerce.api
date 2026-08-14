@@ -1,0 +1,43 @@
+syntax = "v1"
+
+info (
+	go_package:  "commerce"
+	WrapCodeMsg: true
+)
+
+type CatalogRequest {
+	TenantId string `path:"tenantId"`
+}
+
+type CatalogItem {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Stock int64  `json:"stock"`
+}
+
+type CatalogResponse {
+	Items []CatalogItem `json:"items"`
+}
+
+type PlaceOrderRequest {
+	TenantId string `path:"tenantId"`
+	ItemId   string `json:"itemId"`
+	Quantity int64  `json:"quantity"`
+}
+
+type PlaceOrderResponse {
+	OrderId string `json:"orderId"`
+	Status  string `json:"status"`
+}
+
+@server (
+	group: commerce
+)
+service qualityLab {
+	@handler Catalog
+	get /api/tenants/:tenantId/catalog (CatalogRequest) returns (CatalogResponse)
+
+	@handler PlaceOrder
+	post /api/tenants/:tenantId/orders (PlaceOrderRequest) returns (PlaceOrderResponse)
+}
+

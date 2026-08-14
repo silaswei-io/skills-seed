@@ -283,7 +283,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		Agent:          mockAgent,
 		AnalyzerSvc:    analyzer.NewAnalyzerService(mockAgent, configRepo),
 		PatternNormSvc: patternNormSvc,
-		GeneratorSvc:   generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil),
+		GeneratorSvc:   generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil, nil),
 	}
 
 	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())
@@ -304,8 +304,10 @@ func commandDependenciesForTest() Dependencies {
 				OnStepComplete: opts.OnStepComplete,
 			})
 		},
-		Generate:                    gencmd.RunGenerate,
-		GenerateChild:               gencmd.RunGenerateQuiet,
+		Generate: gencmd.RunGenerate,
+		GenerateChild: func(cont *container.Container, _ GenerateChildOptions) error {
+			return gencmd.RunGenerateQuiet(cont)
+		},
 		LearnWorkspaceRelationships: learncmd.RunWorkspaceRelationships,
 		GenerateWorkspaceRoot:       gencmd.RunGenerateWorkspaceRoot,
 	}
@@ -338,8 +340,14 @@ func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
 			calls = append(calls, "generate-default:"+cont.ConfigRepo.GetProjectConfig().Name)
 			return nil
 		},
-		GenerateChild: func(cont *container.Container) error {
+		GenerateChild: func(cont *container.Container, opts GenerateChildOptions) error {
+			require.NotNil(t, opts.OnStepStart)
+			require.NotNil(t, opts.OnStepUpdate)
+			require.NotNil(t, opts.OnStepComplete)
 			calls = append(calls, "generate:"+cont.ConfigRepo.GetProjectConfig().Name)
+			opts.OnStepStart("load")
+			opts.OnStepUpdate("audit")
+			opts.OnStepComplete("load")
 			return nil
 		},
 		LearnWorkspaceRelationships: func(cont *container.Container, userContext string) (bool, error) {
@@ -413,6 +421,19 @@ func TestHasSyncCommandState(t *testing.T) {
 	hasState, err = hasSyncCommandState(context.Background(), seedPath, "sync")
 	require.NoError(t, err)
 	require.True(t, hasState)
+}
+
+func TestHasSyncCommandStateReportsUnsupportedSchemaWithoutDeletingIt(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	repo := commandstate.NewRepository(seedPath, "sync")
+	require.NoError(t, os.MkdirAll(filepath.Dir(repo.Path()), 0o755))
+	require.NoError(t, os.WriteFile(repo.Path(), []byte(`{"schema_version":3,"command":"sync"}`), 0o600))
+
+	hasState, err := hasSyncCommandState(context.Background(), seedPath, "sync")
+
+	require.False(t, hasState)
+	require.ErrorIs(t, err, commandstate.ErrUnsupportedSchemaVersion)
+	require.FileExists(t, repo.Path())
 }
 
 func TestHasResumableSyncCommandStateRequiresInputsAndFocuses(t *testing.T) {

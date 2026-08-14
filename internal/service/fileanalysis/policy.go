@@ -1,10 +1,9 @@
 package fileanalysis
 
 import (
-	"context"
-
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/infra/gitignore"
+	"github.com/silaswei-io/skills-seed/internal/repositoryscope"
+	"github.com/silaswei-io/skills-seed/internal/service/repositoryscopeconfig"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 )
 
@@ -15,20 +14,20 @@ const (
 	SkipReasonExcluded   SkipReason = "excluded"
 	SkipReasonDocument   SkipReason = "document"
 	SkipReasonNonSource  SkipReason = "non-source"
+	SkipReasonProcedure  SkipReason = "procedure"
 	SkipReasonOutOfFocus SkipReason = "out-of-focus"
 	SkipReasonUnreadable SkipReason = "unreadable"
 )
 
 type SelectionPolicy struct {
-	ExcludePatterns []string
-	GitIgnore       *gitignore.Matcher
-	SourceOnly      bool
+	Scope      repositoryscope.Scope
+	SourceOnly bool
 }
 
 func NewSelectionPolicy(excludePatterns []string) SelectionPolicy {
 	return SelectionPolicy{
-		ExcludePatterns: excludePatterns,
-		SourceOnly:      config.DefaultAnalyzeSourceFilesOnly,
+		Scope:      repositoryscope.New(excludePatterns),
+		SourceOnly: config.DefaultAnalyzeSourceFilesOnly,
 	}
 }
 
@@ -39,15 +38,10 @@ type Decision struct {
 }
 
 func NewConfiguredSelectionPolicy(configRepo config.Reader, projectRoot string) SelectionPolicy {
-	policy := NewSelectionPolicy(ConfiguredLearnExcludes(configRepo, projectRoot))
-	if configRepo == nil || !configRepo.GetExcludeConfig().GitIgnore {
-		return policy
+	return SelectionPolicy{
+		Scope:      repositoryscopeconfig.KnowledgeScope(configRepo, projectRoot),
+		SourceOnly: config.DefaultAnalyzeSourceFilesOnly,
 	}
-	matcher, err := gitignore.NewMatcher(context.Background(), projectRoot)
-	if err == nil {
-		policy.GitIgnore = matcher
-	}
-	return policy
 }
 
 func (p SelectionPolicy) Decide(path string) Decision {
@@ -56,6 +50,9 @@ func (p SelectionPolicy) Decide(path string) Decision {
 	}
 	if !p.SourceOnly {
 		return Decision{Path: path, Include: true, Reason: SkipReasonNone}
+	}
+	if sourcecode.IsProcedureSource(path) {
+		return Decision{Path: path, Include: false, Reason: SkipReasonProcedure}
 	}
 	if sourcecode.IsAnalyzable(path) {
 		return Decision{Path: path, Include: true, Reason: SkipReasonNone}
@@ -67,5 +64,5 @@ func (p SelectionPolicy) Decide(path string) Decision {
 }
 
 func (p SelectionPolicy) IsExcluded(path string) bool {
-	return matchExcluded(path, p.ExcludePatterns) || p.GitIgnore.Match(path)
+	return !p.Scope.AllowsKnowledge(path)
 }

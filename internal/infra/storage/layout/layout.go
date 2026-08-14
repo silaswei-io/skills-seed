@@ -43,11 +43,6 @@ func (l Layout) ProjectProfile() string {
 	return l.StoreDocuments("project-profile.json")
 }
 
-// ProjectSpec returns the project spec document path.
-func (l Layout) ProjectSpec() string {
-	return l.StoreDocuments("project-spec.json")
-}
-
 // ProjectDocument returns a workspace child project document path.
 func (l Layout) ProjectDocument(projectID, name string) string {
 	return l.StoreDocuments("projects", projectID, name)

@@ -3,7 +3,7 @@
 **Language**: {{.Language}}
 **Generated At**: {{.GeneratedAt}}
 
-Use this page for architecture navigation. File paths and capability entries are checked against current source during generation; confirm other descriptions against current code and configuration before changing behavior.
+Use this page for architecture navigation. File paths and capability entries are checked against current source during generation. Other profile descriptions are generation-time navigation snapshots; confirm them against current code and configuration before changing behavior.
 
 ---
 
@@ -18,7 +18,7 @@ Use this page for architecture navigation. File paths and capability entries are
 - [Capability Entries](#capability-entries)
 {{if .CommonUtils}}- [Common Utilities](#common-utilities)
 {{end}}
-- [Configuration Patterns](#configuration-patterns)
+- [Configuration Navigation Hints (Profile Snapshot)](#configuration-navigation-hints-profile-snapshot)
 
 ## Project Overview Summary
 
@@ -93,7 +93,7 @@ Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 {{end}}
 
 {{if .FrameworkPatterns}}
-### Framework Usage Patterns
+### Framework Navigation Hints (Profile Snapshot)
 
 {{range .FrameworkPatterns}}
 - {{.}}
@@ -121,7 +121,7 @@ Main files: {{range $i, $file := .Files}}{{if $i}}, {{end}}`{{$file}}`{{end}}
 {{len .CommonUtils}} common utility functions were extracted. See [Common Utilities](./common-utils.md) for signatures and usage scenarios
 {{end}}
 
-## Configuration Patterns
+## Configuration Navigation Hints (Profile Snapshot)
 
 {{if .ConfigPatterns}}
 {{range .ConfigPatterns}}

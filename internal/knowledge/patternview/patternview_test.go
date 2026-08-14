@@ -112,6 +112,7 @@ func TestRenderKeepsHighRiskBoundarySeparate(t *testing.T) {
 	destroy.SetDescription("Destroy command deletes resource state and has external environment side effects.")
 	destroy.SetRule("When changing destroy behavior, inspect the command safeguards before modifying it.")
 	destroy.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "tools/commands/destroy.ts", Symbol: "destroyResource"}}
+	destroy.KnowledgeFlags = []string{domain.KnowledgeFlagOperationalRisk}
 
 	view := Render([]domain.Pattern{*update, *destroy})
 

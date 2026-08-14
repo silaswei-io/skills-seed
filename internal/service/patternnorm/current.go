@@ -24,8 +24,7 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 		return finalizeCurrentNormalization(proposalFromDecision(result), candidates, retrieved.related)
 	}
 
-	result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, hooks)
-	if result != nil {
+	if result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, hooks); result != nil {
 		result, err = finalizeCurrentNormalization(result, candidates, retrieved.related)
 		if err == nil {
 			err = validateNormalizeResultForOperation(OperationLearnCurrent, result, candidates, retrieved.related)
@@ -36,13 +35,10 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 			}
 			return result, nil
 		}
-		logger.Warn(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
+		logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
 	}
-	result = normalizeCurrentLocally(candidates, hooks)
-	result, err = finalizeCurrentNormalization(result, candidates, retrieved.related)
-	if err != nil {
-		return nil, err
-	}
+
+	result := keepCurrentCandidates(candidates)
 	if err := saveNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, decisionFromProposal(result)); err != nil {
 		return nil, err
 	}
@@ -64,21 +60,11 @@ func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeReque
 		UserContext:     req.UserContext,
 	})
 	if err != nil {
-		logger.Warn(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
+		logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
 		return nil
 	}
 	notifyProgress(hooks.OnStepComplete, label)
 	return proposalFromNormalizePatternsResult(result)
-}
-
-func normalizeCurrentLocally(candidates []domain.Pattern, hooks ProgressHooks) *proposal {
-	label := i18n.Get("ProgressNormalizePatternsLocal")
-	notifyProgress(hooks.OnStepStart, label)
-	result := keepCurrentCandidates(candidates)
-	if hooks.OnStepComplete != nil {
-		hooks.OnStepComplete(label)
-	}
-	return result
 }
 
 func keepCurrentCandidates(candidates []domain.Pattern) *proposal {
@@ -113,43 +99,24 @@ func proposalFromNormalizePatternsResult(result *agent.NormalizePatternsResult) 
 		})
 	}
 	for _, item := range result.Dropped {
-		out.Dropped = append(out.Dropped, Drop{
-			ID:         item.ID,
-			ReasonCode: DropReasonCode(item.ReasonCode),
-			Reason:     item.Reason,
-		})
+		out.Dropped = append(out.Dropped, Drop{ID: item.ID, ReasonCode: DropReasonCode(item.ReasonCode), Reason: item.Reason})
 	}
 	return out
 }
 
 func finalizeCurrentNormalization(result *proposal, candidates, existing []domain.Pattern) (*proposal, error) {
-	var conflictingDroppedIDs []string
-	result, conflictingDroppedIDs = preferCurrentPatternsOverConflictingDrops(result, candidates)
+	result, conflictingDroppedIDs := preferCurrentPatternsOverConflictingDrops(result, candidates)
 	assessment := assessNormalization(result, candidates, existing)
 	assessment.IgnoredConflictingDroppedIDs = conflictingDroppedIDs
-	var recallRecoveredIDs []string
-	result, recallRecoveredIDs = recoverRecallProtectedDrops(assessment.Result, candidates)
-	if len(recallRecoveredIDs) > 0 {
-		logger.Diagnostic(i18n.Get("LoggerPatternNormRecallRecovered"),
-			"operation", OperationLearnCurrent,
-			"recovered_ids", recallRecoveredIDs,
-			"candidate_count", len(candidates),
-		)
+	result, recoveredIDs := recoverRecallProtectedDrops(assessment.Result, candidates)
+	if len(recoveredIDs) > 0 {
 		assessment = assessNormalization(result, candidates, existing)
 		assessment.IgnoredConflictingDroppedIDs = conflictingDroppedIDs
 	}
-	logNormalizationAssessment(OperationLearnCurrent, assessment)
-	if assessment.Coverage.MissingCount() == 0 {
-		return assessment.Result, nil
+	if assessment.Coverage.MissingCount() > 0 {
+		assessment = assessNormalization(recoverCurrentNormalization(assessment, candidates), candidates, existing)
+		assessment.IgnoredConflictingDroppedIDs = conflictingDroppedIDs
 	}
-	logger.Warn(i18n.Get("LoggerPatternNormCoverageRecovered"),
-		"operation", OperationLearnCurrent,
-		"missing_count", assessment.Coverage.MissingCount(),
-		"candidate_count", assessment.Coverage.CandidateCount,
-		"missing_ratio", assessment.Coverage.MissingRatio(),
-	)
-	result = recoverCurrentNormalization(assessment, candidates)
-	assessment = assessNormalization(result, candidates, existing)
 	logNormalizationAssessment(OperationLearnCurrent, assessment)
 	if assessment.Coverage.MissingCount() > 0 {
 		return nil, fmt.Errorf("recover normalization coverage: %d of %d candidates remain unclassified", assessment.Coverage.MissingCount(), assessment.Coverage.CandidateCount)
@@ -178,7 +145,7 @@ func preferCurrentPatternsOverConflictingDrops(result *proposal, candidates []do
 	}
 
 	dropped := result.Dropped[:0]
-	var ignored []string
+	ignored := make([]string, 0)
 	for _, item := range result.Dropped {
 		if _, conflict := represented[item.ID]; conflict {
 			ignored = append(ignored, item.ID)

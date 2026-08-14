@@ -12,9 +12,20 @@ description: {{.SkillDescription}}
 **最后更新**: {{.LastUpdated}}
 **已学习模式**: {{.PatternCount}}
 
-{{if .HasKnowledge}}这是项目入口 skill，只负责按任务路由到最小必要参考。产品/领域规则、架构细节、代码证据、测试事实和验证命令进入对应 reference 后再决策。{{else}}这是项目工作流入口 skill，只负责把匹配任务路由到用户维护的工作流文档。{{end}}
+{{if .HasKnowledge}}这是项目入口 skill，只负责按任务路由到最小必要参考。用户规则、产品/领域规则、架构细节和代码证据进入对应 reference 后再决策。{{else}}这是项目资源入口 skill，只负责把匹配任务路由到用户维护的规则或工作流文档。{{end}}
+
+{{if .CommandRules}}## 命令执行边界
+
+以下规则来自项目权威文件；涉及命令时必须遵守：
+
+{{range .CommandRules}}- **{{.Title}}** (`{{.CommandPolicy}}`)：{{.Rule}}{{if .AppliesTo}}；适用：{{range $i, $scope := .AppliesTo}}{{if $i}}、{{end}}`{{$scope}}`{{end}}{{end}}（来源：`{{.Source}}`{{if .Section}} / {{.Section}}{{end}}）
+{{end}}
+{{end}}
 
 ## 任务路由
+
+{{if .RuleReferences}}路由前先检查下方“用户规则”：任务命中其项目或路径范围时，读取完整规则并遵守；不要根据标题猜测未声明的范围。
+{{end}}
 
 {{if .HasKnowledge}}
 1. 先按任务类型读取最小必要参考，不要一次性读取所有 references。进入任何分类模式后，先检查其中的“相关参考”；任务命中跨边界提示时继续读取对应 reference。
@@ -22,10 +33,12 @@ description: {{.SkillDescription}}
 {{else}}2. 产品/领域规则、状态流转、用户动作或跨资源流程：检查当前代码并复用附近实现。
 {{end}}{{if .References.BusinessMethods}}3. 可复用能力入口、模块级扩展点、跨边界编排、界面/命令动作或工具入口：读 [能力入口索引](./references/business-methods.md)。
 {{else}}3. 项目级能力入口：从当前代码和模块入口确认。
-{{end}}4. 接口、消息、事件、合约、适配层、派生产物或配置约定：读 [项目规范](./references/project-spec.md) 和相关分类模式。
+{{end}}4. 接口、消息、事件、合约、适配层、派生产物或配置约定：读相关分类模式并回到其证据源码；命中明确约束时再读 [项目规范](./references/project-spec.md)。
 {{if .References.KeyModules}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md) 和 [关键模块](./references/modules.md)。
 {{else}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md)。
-{{end}}6. 验证改动：读 [验证策略](./references/validation.md){{if .References.Testing}}；涉及已识别测试生态时再读 [测试矩阵](./references/testing.md){{end}}。
+{{end}}{{if .WorkflowReferences}}6. 测试、部署、发布和验收：从下方“用户工作流”选择匹配流程并读取完整文档。
+{{else}}6. 当前没有用户维护的测试、部署、发布或验收 Workflow；references 不定义这些操作流程，需以用户当次指令为准。
+{{end}}
 {{else}}2. 本次生成未写入 references；直接读取当前代码，并优先沿用附近已有实现。
 {{end}}
 
@@ -36,7 +49,14 @@ description: {{.SkillDescription}}
 {{else}}1. 当前没有可用工作流；先读取用户指令和当前项目上下文。
 {{end}}
 
-工作流是用户维护的任务流程，可作为执行步骤来源；缺少代码模式和项目画像时，不要补造项目规则。
+规则是用户维护的明确约束，工作流是用户维护的任务流程；缺少代码模式和项目画像时，不要补造项目事实。
+{{end}}
+
+{{if .RuleReferences}}
+## 用户规则
+
+{{range .RuleReferences}}- **[{{.Name}}]({{.Path}})**{{if .Paths}} - 路径：{{range $i, $path := .Paths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{else}} - 适用于整个项目{{end}}
+{{end}}
 {{end}}
 
 {{if .WorkflowReferences}}
@@ -53,11 +73,9 @@ description: {{.SkillDescription}}
 {{if .HasKnowledge}}
 ## 参考入口
 
-{{if .References.Enabled}}- **[项目规范](./references/project-spec.md)** - 边界、规则、配置和改动触点
+{{if .References.Enabled}}- **[项目规范](./references/project-spec.md)** - 明确权威规则及其同步覆盖
 - **[项目概览](./references/project-overview.md)** - 架构、技术栈和关键模块
-- **[验证策略](./references/validation.md)** - 已学习命令、适用范围和验证缺口
-{{if .References.Testing}}- **[测试矩阵](./references/testing.md)** - 测试范围、命令和测试文件证据
-{{end}}{{else}}*本次生成未写入 references。*
+{{else}}*本次生成未写入 references。*
 {{end}}{{if .OverviewReferences}}
 
 ### 项目详情
@@ -76,7 +94,7 @@ description: {{.SkillDescription}}
 
 - 引入新模式或抽象前，先检查附近已有代码。
 - 如果参考中已有项目特定入口或工具方法，优先复用。
-{{if .References.ProjectSpec}}- 派生产物、接口/消息模型、适配层和配置约定以 [项目规范](./references/project-spec.md) 为准。{{else}}- 派生产物、接口/消息模型、适配层和配置约定以当前代码和项目配置为准。{{end}}
+- 派生产物、接口/消息模型、适配层和配置约定以相关模式的证据源码及当前项目配置为准；[项目规范](./references/project-spec.md) 只补充明确权威约束。
 - references 与实际代码不一致时，以当前代码为准。
 
 {{if .KeyInsights}}### 关键洞察

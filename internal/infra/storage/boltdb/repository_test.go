@@ -2,7 +2,6 @@ package boltdb
 
 import (
 	"context"
-	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	bolt "go.etcd.io/bbolt"
 )
 
 // setupTestDB 创建测试用的全新 PatternRepository。
@@ -119,44 +117,6 @@ func TestPatternRepository_ApplyPatternMutationValidatesBeforeDeleting(t *testin
 	require.Equal(t, existing.ID, got.ID)
 }
 
-func TestPatternRepository_SaveRemovesLegacyCategoryCopies(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	legacy := newTestPattern("p-001", "legacy security copy", domain.Category("security"), 0.8)
-	require.NoError(t, repo.db.Update(func(tx *bolt.Tx) error {
-		mainBucket := tx.Bucket(bucketPatterns)
-		categoryBucket, err := mainBucket.CreateBucketIfNotExists([]byte("security"))
-		if err != nil {
-			return err
-		}
-		data, err := json.Marshal(legacy)
-		if err != nil {
-			return err
-		}
-		return categoryBucket.Put([]byte(legacy.ID), data)
-	}))
-
-	updated := newTestPattern("p-001", "canonical utils copy", domain.Category(" Security "), 0.9)
-	require.NoError(t, repo.Save(ctx, updated))
-
-	all, err := repo.GetAll(ctx)
-	require.NoError(t, err)
-	require.Len(t, all, 1)
-	require.Equal(t, domain.CategoryUtils, all[0].Category)
-
-	utilsPatterns, err := repo.GetByCategory(ctx, domain.CategoryUtils)
-	require.NoError(t, err)
-	require.Len(t, utilsPatterns, 1)
-
-	require.NoError(t, repo.db.View(func(tx *bolt.Tx) error {
-		legacyBucket := tx.Bucket(bucketPatterns).Bucket([]byte("security"))
-		require.NotNil(t, legacyBucket)
-		require.Nil(t, legacyBucket.Get([]byte("p-001")))
-		return nil
-	}))
-}
-
 func TestPatternRepository_PreservesPatternCreatedAtOnUpdate(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -219,7 +179,7 @@ func TestPatternRepository_GetPatternStats(t *testing.T) {
 
 	p1 := newTestPattern("p-001", "specific pattern", domain.CategoryError, 0.9)
 	p1.Metrics.EffectiveScore = 0.8
-	p2 := newTestPattern("p-002", "lower pattern", domain.CategoryTesting, 0.7)
+	p2 := newTestPattern("p-002", "lower pattern", domain.CategoryBusiness, 0.7)
 	p2.Metrics.EffectiveScore = 0.5
 	require.NoError(t, repo.Save(ctx, p1))
 	require.NoError(t, repo.Save(ctx, p2))
@@ -247,7 +207,7 @@ func TestPatternRepository_GetAll(t *testing.T) {
 
 	p1 := newTestPattern("p-001", "pattern-1", domain.CategoryNaming, 0.9)
 	p2 := newTestPattern("p-002", "pattern-2", domain.CategoryError, 0.8)
-	p3 := newTestPattern("p-003", "pattern-3", domain.CategoryTesting, 0.7)
+	p3 := newTestPattern("p-003", "pattern-3", domain.CategoryBusiness, 0.7)
 
 	require.NoError(t, repo.Save(ctx, p1))
 	require.NoError(t, repo.Save(ctx, p2))
@@ -307,7 +267,7 @@ func TestPatternRepository_GetHighConfidence(t *testing.T) {
 
 	p1 := newTestPattern("p-001", "high-1", domain.CategoryNaming, 0.95)
 	p2 := newTestPattern("p-002", "high-2", domain.CategoryError, 0.85)
-	p3 := newTestPattern("p-003", "low-1", domain.CategoryTesting, 0.5)
+	p3 := newTestPattern("p-003", "low-1", domain.CategoryBusiness, 0.5)
 	p4 := newTestPattern("p-004", "borderline", domain.CategoryStructure, 0.8)
 
 	require.NoError(t, repo.Save(ctx, p1))
@@ -348,18 +308,18 @@ func TestPatternRepository_FindSimilarNormalizesCategory(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
 
-	original := newTestPattern("p-001", "path guard", domain.CategoryUtils, 0.9)
+	original := newTestPattern("p-001", "path guard", domain.CategoryError, 0.9)
 	require.NoError(t, repo.Save(ctx, original))
 
 	search := &domain.Pattern{
 		Name:     "path guard",
-		Category: domain.Category(" Security "),
+		Category: domain.Category(" Error "),
 	}
 	found, err := repo.FindSimilar(ctx, search)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	require.Equal(t, "p-001", found.ID)
-	require.Equal(t, domain.Category(" Security "), search.Category)
+	require.Equal(t, domain.Category(" Error "), search.Category)
 }
 
 func TestPatternRepository_FindSimilar_NotFound(t *testing.T) {
@@ -402,34 +362,6 @@ func TestPatternRepository_Delete(t *testing.T) {
 	assert.Contains(t, err.Error(), "pattern not found")
 }
 
-func TestPatternRepository_DeleteRemovesAllCategoryCopies(t *testing.T) {
-	repo := setupTestDB(t)
-	ctx := context.Background()
-
-	p := newTestPattern("p-001", "duplicated", domain.CategoryUtils, 0.9)
-	require.NoError(t, repo.Save(ctx, p))
-	legacy := newTestPattern("p-001", "duplicated legacy", domain.Category("security"), 0.8)
-	require.NoError(t, repo.db.Update(func(tx *bolt.Tx) error {
-		categoryBucket, err := tx.Bucket(bucketPatterns).CreateBucketIfNotExists([]byte("security"))
-		if err != nil {
-			return err
-		}
-		data, err := json.Marshal(legacy)
-		if err != nil {
-			return err
-		}
-		return categoryBucket.Put([]byte(legacy.ID), data)
-	}))
-
-	require.NoError(t, repo.Delete(ctx, "p-001"))
-
-	all, err := repo.GetAll(ctx)
-	require.NoError(t, err)
-	require.Empty(t, all)
-	_, err = repo.Get(ctx, "p-001")
-	require.Error(t, err)
-}
-
 func TestPatternRepository_Count(t *testing.T) {
 	repo := setupTestDB(t)
 	ctx := context.Background()
@@ -441,7 +373,7 @@ func TestPatternRepository_Count(t *testing.T) {
 
 	p1 := newTestPattern("p-001", "pattern-1", domain.CategoryNaming, 0.9)
 	p2 := newTestPattern("p-002", "pattern-2", domain.CategoryError, 0.8)
-	p3 := newTestPattern("p-003", "pattern-3", domain.CategoryTesting, 0.7)
+	p3 := newTestPattern("p-003", "pattern-3", domain.CategoryBusiness, 0.7)
 
 	require.NoError(t, repo.Save(ctx, p1))
 	require.NoError(t, repo.Save(ctx, p2))

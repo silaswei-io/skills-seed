@@ -36,7 +36,7 @@ const (
 type Dependencies struct {
 	LearnCurrent                func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error)
 	Generate                    func(cont *container.Container) error
-	GenerateChild               func(cont *container.Container) error
+	GenerateChild               func(cont *container.Container, opts GenerateChildOptions) error
 	LearnWorkspaceRelationships func(cont *container.Container, userContext string) (bool, error)
 	GenerateWorkspaceRoot       func(cont *container.Container) error
 }
@@ -49,7 +49,14 @@ type LearnCurrentOptions struct {
 	OnStepComplete func(label string)
 }
 
-const syncWorkspaceChildStepTotal = 8 // 子项目 learn current 7 步 + 子项目 skill 生成 1 步。
+// GenerateChildOptions 描述工作区同步时子项目生成阶段的进度回调。
+type GenerateChildOptions struct {
+	OnStepStart    func(label string)
+	OnStepUpdate   func(label string)
+	OnStepComplete func(label string)
+}
+
+const syncWorkspaceChildStepTotal = 13 // 子项目 learn current 8 步 + 子项目 skill 生成 5 步。
 
 // Cmd 返回 sync 命令
 func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
@@ -298,13 +305,20 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 		}
 		shouldGenerate := syncflow.ShouldGenerateAfterLearn(result) || syncGeneratedSkillMissing(childCont)
 		if shouldGenerate {
-			generateLabel := i18n.Get("ProgressGenerateWriteSkills")
-			childProgress.Start(progressName, generateLabel)
-			if err := dependencies.GenerateChild(childCont); err != nil {
+			if err := dependencies.GenerateChild(childCont, GenerateChildOptions{
+				OnStepStart: func(label string) {
+					childProgress.Start(progressName, label)
+				},
+				OnStepUpdate: func(label string) {
+					childProgress.Update(progressName, label)
+				},
+				OnStepComplete: func(label string) {
+					childProgress.CompleteStep(progressName, label)
+				},
+			}); err != nil {
 				childProgress.Fail(progressName, i18n.Get("GenerateWorkspaceProjectProgressFailed"))
 				return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 			}
-			childProgress.CompleteStep(progressName, generateLabel)
 			childProgress.Complete(progressName, i18n.Get("GenerateWorkspaceProjectProgressComplete"))
 		} else {
 			childProgress.Complete(progressName, i18n.Get("SyncGenerateSkippedNoChanges"))

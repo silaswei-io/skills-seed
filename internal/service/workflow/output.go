@@ -94,11 +94,10 @@ func Write(repo domain.WorkflowRepository, outputPath, locale string) error {
 }
 
 type workflowOutputTemplateData struct {
-	Title    string
-	Summary  string
-	Content  string
-	Contexts []string
-	Scripts  []string
+	Title   string
+	Summary string
+	Content string
+	Scripts []string
 }
 
 func renderWorkflowOutput(workflow domain.Workflow, locale string) (string, error) {
@@ -106,11 +105,6 @@ func renderWorkflowOutput(workflow domain.Workflow, locale string) (string, erro
 		Title:   workflowDisplayName(workflow),
 		Summary: Summary(workflow, locale),
 		Content: strings.TrimSpace(workflow.Content),
-	}
-	for _, item := range workflow.Contexts {
-		if content := strings.TrimSpace(item.Content); content != "" {
-			data.Contexts = append(data.Contexts, content)
-		}
 	}
 	for _, script := range workflow.Scripts {
 		if strings.TrimSpace(script.Path) == "" {

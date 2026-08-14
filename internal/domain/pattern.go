@@ -11,6 +11,17 @@ func (p Pattern) AllowsHardConstraint() bool {
 	return p.Source == SourceUserDefined || p.Source == SourceDefault
 }
 
+// ActivePatterns 返回参与默认知识投影的有效模式，并保留原有顺序。
+func ActivePatterns(patterns []Pattern) []Pattern {
+	active := make([]Pattern, 0, len(patterns))
+	for _, pattern := range patterns {
+		if pattern.IsActive() && IsValidPatternCategory(pattern.Category) {
+			active = append(active, pattern)
+		}
+	}
+	return active
+}
+
 // PatternEvidenceFileCount 统计模式覆盖的不同源码文件。
 // 同一文件中的多个符号通常属于同一实现，不能重复计算覆盖度。
 func PatternEvidenceFileCount(locations []PatternEvidenceLocation) int {

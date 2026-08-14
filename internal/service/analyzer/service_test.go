@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,9 +64,8 @@ func TestFindMainFiles(t *testing.T) {
 	assert.Contains(t, mainFiles, "main.go")
 }
 
-func TestAnalyzeProjectProfile(t *testing.T) {
+func TestAnalyzeProjectProfileKeepsProjectMapSeparateFromCapabilities(t *testing.T) {
 	tmpDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "helper.go"), []byte("package helper\n\nfunc BuildResponse(value any) error { return nil }\n"), 0o644))
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 	}
@@ -75,12 +75,7 @@ func TestAnalyzeProjectProfile(t *testing.T) {
 				Language:     "go",
 				Frameworks:   []string{"gin"},
 				Architecture: "DDD",
-				CommonUtils: []domain.UtilityFunction{
-					{Name: "BuildResponse", File: "helper.go:99", Signature: "func BuildResponse(value any) error", Description: "AI summary"},
-					{Name: "SuccessResp", File: "helper.go:3", Signature: "func SuccessResp()"},
-				},
-				ValidationCommands: []domain.ValidationCommand{{Command: "task verify", When: "after changes", Source: "Taskfile.yml"}},
-				Summary:            "Test project summary",
+				Summary:      "Test project summary",
 			}, nil
 		},
 	}
@@ -93,12 +88,6 @@ func TestAnalyzeProjectProfile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "go", result.Language)
 	assert.Contains(t, result.Frameworks, "gin")
-	require.Len(t, result.CommonUtils, 1)
-	assert.Equal(t, "BuildResponse", result.CommonUtils[0].Name)
-	assert.Equal(t, "helper.go:3", result.CommonUtils[0].File)
-	assert.Empty(t, result.CommonUtils[0].Description)
-	require.Len(t, result.ValidationCommands, 1)
-	assert.Equal(t, "task verify", result.ValidationCommands[0].Command)
 }
 
 func TestAnalyzeProjectProfileUsesAgent(t *testing.T) {
@@ -124,19 +113,6 @@ func TestAnalyzeProjectProfileUsesAgent(t *testing.T) {
 	require.True(t, session.called)
 	assert.Equal(t, "go", result.Language)
 	assert.Equal(t, "session profile", result.Summary)
-}
-
-func TestNewProjectProfilePreservesValidationCommands(t *testing.T) {
-	profile := NewProjectProfile(&AnalyzeProjectResult{
-		Language:           "unknown",
-		ValidationCommands: []domain.ValidationCommand{{Command: "task verify", When: "after changes", Source: "Taskfile.yml"}},
-		Summary:            "profile",
-	}, "demo", "")
-
-	require.NotNil(t, profile)
-	require.Len(t, profile.ValidationCommands, 1)
-	assert.Equal(t, "task verify", profile.ValidationCommands[0].Command)
-	assert.Equal(t, "Taskfile.yml", profile.ValidationCommands[0].Source)
 }
 
 func TestAnalyzeProjectProfileAddsStructuralContext(t *testing.T) {
@@ -181,25 +157,31 @@ func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testin
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "AGENTS.md"), []byte("go test ./..."), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "Taskfile.yml"), []byte("version: '3'"), 0o644))
 
-	var received agent.AnalyzeProjectRequest
+	var received agent.ExtractAuthorityRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 	}
 	session := &profileRefreshTestSession{
-		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		result: &agent.AnalyzeProjectResult{Language: "go"},
+		authorityFn: func(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
 			received = *req
-			return &agent.AnalyzeProjectResult{
-				Language: "go",
-				EngineeringRules: []domain.EngineeringRule{{
-					Title:    "Validation",
-					Rule:     "Run go test ./...",
-					Source:   "AGENTS.md",
-					Evidence: []string{"AGENTS.md"},
-				}},
+			require.Len(t, req.AuthoritySections, 2)
+			return &agent.ExtractAuthorityResult{
+				AuthoritySections: []agent.AuthoritySectionResult{
+					{
+						SectionID: req.AuthoritySections[0].ID,
+						Rules: []domain.EngineeringRule{{
+							Title: "Validation",
+							Rule:  "Run the project validation suite.",
+						}},
+					},
+					{SectionID: req.AuthoritySections[1].ID, NoRuleReason: "No project constraint was identified in this source."},
+				},
 			}, nil
 		},
 	}
 	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
+	mockAgent.ExtractAuthorityFn = session.ExtractAuthority
 	svc := NewAnalyzerService(mockAgent, nil)
 
 	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
@@ -210,8 +192,15 @@ func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testin
 
 	require.NoError(t, err)
 	require.Equal(t, []string{"AGENTS.md", "Taskfile.yml"}, received.EngineeringKnowledge)
+	require.Equal(t, "AGENTS.md", received.AuthoritySections[0].Source)
+	require.Equal(t, "Taskfile.yml", received.AuthoritySections[1].Source)
 	require.Len(t, result.EngineeringRules, 1)
 	require.Equal(t, "AGENTS.md", result.EngineeringRules[0].Source)
+	require.Equal(t, []domain.AuthorityCoverage{
+		{Source: "AGENTS.md"},
+		{Source: "Taskfile.yml"},
+	}, result.AuthorityCoverage)
+	require.NotEmpty(t, result.AuthorityRevision)
 }
 
 func TestAnalyzeProjectProfileSkipsStructuralContextWithoutSeeds(t *testing.T) {
@@ -287,97 +276,6 @@ func TestAnalyzeProjectProfileSkipsUnavailableOptionalStructuralContext(t *testi
 	require.Empty(t, received.StructuralContext)
 }
 
-func TestSelectLearningCandidatesUsesStructuralSeedPaths(t *testing.T) {
-	tmpDir := t.TempDir()
-	var agentReq agent.SelectLearningCandidatesRequest
-	var structuralReqs []structuralContextRequest
-	var stages []SelectLearningCandidatesStage
-	session := &profileRefreshTestSession{
-		selectFn: func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-			agentReq = *req
-			return &agent.SelectLearningCandidatesResult{
-				SelectedPaths: []string{"internal/auth/service.go"},
-				Reason:        "service entry is enough",
-			}, nil
-		},
-	}
-	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-	mockAgent.SelectLearningCandidatesFn = session.SelectLearningCandidates
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		LearningCfg: config.LearningConfig{
-			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{Enabled: true},
-			},
-		},
-	})
-	svc.structuralCollector = recordingStructuralCollector{
-		context:  "## Structural Context\n- service routes auth",
-		requests: &structuralReqs,
-	}
-
-	result, err := svc.SelectLearningCandidates(context.Background(), &SelectLearningCandidatesRequest{
-		ProjectName:         "test",
-		RootPath:            tmpDir,
-		Language:            "go",
-		CandidatePaths:      []string{"internal/auth/service.go", "internal/auth/types.go"},
-		StructuralSeedPaths: []string{"internal/auth/service.go"},
-		Progress: func(stage SelectLearningCandidatesStage) {
-			stages = append(stages, stage)
-		},
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, []string{"internal/auth/service.go"}, result.SelectedPaths)
-	require.Len(t, structuralReqs, 1)
-	require.Equal(t, []string{"internal/auth/service.go"}, structuralReqs[0].SeedPaths)
-	require.Equal(t, []string{"internal/auth/service.go"}, structuralReqs[0].FocusPaths)
-	require.Contains(t, agentReq.StructuralContext, "service routes auth")
-	require.Equal(t, []SelectLearningCandidatesStage{
-		SelectLearningCandidatesStageStructuralContext,
-		SelectLearningCandidatesStageAgent,
-	}, stages)
-}
-
-func TestSelectLearningCandidatesSkipsStructuralContextWithoutSeeds(t *testing.T) {
-	tmpDir := t.TempDir()
-	var agentReq agent.SelectLearningCandidatesRequest
-	var structuralReqs []structuralContextRequest
-	session := &profileRefreshTestSession{
-		selectFn: func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-			agentReq = *req
-			return &agent.SelectLearningCandidatesResult{
-				SelectedPaths: req.CandidatePaths,
-				Reason:        "no structural seed needed",
-			}, nil
-		},
-	}
-	mockAgent := &mocks.MockAgent{NameVal: "test", AvailableVal: true}
-	mockAgent.SelectLearningCandidatesFn = session.SelectLearningCandidates
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		LearningCfg: config.LearningConfig{
-			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{Enabled: true},
-			},
-		},
-	})
-	svc.structuralCollector = recordingStructuralCollector{
-		context:  "## Structural Context\n- should not be collected",
-		requests: &structuralReqs,
-	}
-
-	result, err := svc.SelectLearningCandidates(context.Background(), &SelectLearningCandidatesRequest{
-		ProjectName:    "test",
-		RootPath:       tmpDir,
-		Language:       "go",
-		CandidatePaths: []string{"a.go", "b.go"},
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, []string{"a.go", "b.go"}, result.SelectedPaths)
-	require.Empty(t, structuralReqs)
-	require.Empty(t, agentReq.StructuralContext)
-}
-
 func TestAnalyzeProjectProfile_AIError(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
@@ -391,6 +289,124 @@ func TestAnalyzeProjectProfile_AIError(t *testing.T) {
 	svc := NewAnalyzerService(mockAgent, nil)
 	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{})
 	assert.Error(t, err)
+}
+
+func TestValidateLearningAgendaCoverageAcceptsFocusAndSkipReceipt(t *testing.T) {
+	err := validateLearningAgendaCoverage(
+		[]string{"src/entry.ext", "src/support.ext"},
+		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
+		[]agent.LearningPathSkip{{Path: "src/support.ext", Reason: "No durable decision value."}},
+	)
+
+	require.NoError(t, err)
+}
+
+func TestPlanningSourceFactsExposeDensityAndBoundSymbolPreview(t *testing.T) {
+	root := t.TempDir()
+	maxSymbols := 4
+	var source strings.Builder
+	source.WriteString("package sample\n\n")
+	for index := 0; index < maxSymbols+3; index++ {
+		fmt.Fprintf(&source, "func Operation%d() {}\n", index)
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte(source.String()), 0o644))
+
+	facts := planningSourceFacts(context.Background(), root, []string{"service.go"}, maxSymbols)
+
+	require.Len(t, facts, 1)
+	require.Equal(t, "service.go", facts[0].Path)
+	require.Equal(t, maxSymbols+3, facts[0].SymbolCount)
+	require.Len(t, facts[0].Symbols, maxSymbols)
+	require.Greater(t, facts[0].NonBlankLines, maxSymbols)
+}
+
+func TestPlanningSourceFactsSharesConfiguredSymbolBudgetAcrossFiles(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"first.go", "second.go"} {
+		source := "package sample\n\nfunc First() {}\nfunc Second() {}\nfunc Third() {}\n"
+		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(source), 0o644))
+	}
+
+	facts := planningSourceFacts(context.Background(), root, []string{"second.go", "first.go"}, 4)
+
+	require.Len(t, facts, 2)
+	require.Len(t, facts[0].Symbols, 2)
+	require.Len(t, facts[1].Symbols, 2)
+	require.Equal(t, 3, facts[0].SymbolCount)
+	require.Equal(t, 3, facts[1].SymbolCount)
+}
+
+func TestValidateLearningAgendaCoverageRejectsMissingDecision(t *testing.T) {
+	err := validateLearningAgendaCoverage(
+		[]string{"src/entry.ext", "src/missing.ext"},
+		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
+		nil,
+	)
+
+	require.ErrorContains(t, err, "src/missing.ext")
+}
+
+func TestDropFocusedSkipReceiptsPrefersFocusDecision(t *testing.T) {
+	skipped := dropFocusedSkipReceipts(
+		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
+		[]agent.LearningPathSkip{
+			{Path: "src/entry.ext", Reason: "Redundant receipt."},
+			{Path: "src/support.ext", Reason: "No durable decision value."},
+		},
+	)
+
+	require.Equal(t, []agent.LearningPathSkip{{Path: "src/support.ext", Reason: "No durable decision value."}}, skipped)
+	require.NoError(t, validateLearningAgendaCoverage(
+		[]string{"src/entry.ext", "src/support.ext"},
+		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
+		skipped,
+	))
+}
+
+func TestCompleteLearningAgendaCoverageAddsOnlyOmittedInputs(t *testing.T) {
+	focuses := completeLearningAgendaCoverage(
+		[]string{"src/entry.ext", "src/omitted-a.ext", "src/omitted-b.ext", "src/skipped.ext"},
+		[]domain.EvidenceFocus{{ID: "existing", EntryPaths: []string{"src/entry.ext"}}},
+		[]agent.LearningPathSkip{{Path: "src/skipped.ext", Reason: "No durable decision value."}},
+	)
+
+	require.Len(t, focuses, 2)
+	require.Equal(t, "unassigned-evidence", focuses[1].ID)
+	require.Equal(t, []string{"src/omitted-a.ext", "src/omitted-b.ext"}, focuses[1].EntryPaths)
+	require.Empty(t, focuses[1].RouteTerms)
+	require.Empty(t, focuses[1].Attributes)
+	require.Empty(t, focuses[1].RiskSignals)
+	require.NoError(t, validateLearningAgendaCoverage(
+		[]string{"src/entry.ext", "src/omitted-a.ext", "src/omitted-b.ext", "src/skipped.ext"}, focuses,
+		[]agent.LearningPathSkip{{Path: "src/skipped.ext", Reason: "No durable decision value."}},
+	))
+}
+
+func TestRestrictLearningAgendaFocusesDropsUnlistedPathsAndEmptyFocuses(t *testing.T) {
+	focuses := restrictLearningAgendaFocuses(
+		[]string{"src/entry.ext", "src/related.ext"},
+		[]domain.EvidenceFocus{
+			{ID: "kept", EntryPaths: []string{"src/entry.ext", "src"}, RelatedPaths: []string{"src/related.ext", "src/entry.ext"}},
+			{ID: "dropped", EntryPaths: []string{"outside.ext"}},
+		},
+	)
+
+	require.Len(t, focuses, 1)
+	require.Equal(t, "kept", focuses[0].ID)
+	require.Equal(t, []string{"src/entry.ext"}, focuses[0].EntryPaths)
+	require.Equal(t, []string{"src/related.ext", "src/entry.ext"}, focuses[0].RelatedPaths)
+}
+
+func TestRestrictLearningAgendaSkipReceiptsDropsUnlistedPaths(t *testing.T) {
+	skipped := restrictLearningAgendaSkipReceipts(
+		[]string{"src/entry.ext", "src/support.ext"},
+		[]agent.LearningPathSkip{
+			{Path: "src/support.ext", Reason: "No durable decision value."},
+			{Path: "src/context-only.ext", Reason: "Not an input file."},
+		},
+	)
+
+	require.Equal(t, []agent.LearningPathSkip{{Path: "src/support.ext", Reason: "No durable decision value."}}, skipped)
 }
 
 func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {
@@ -426,7 +442,10 @@ func TestCollectSampleFiles(t *testing.T) {
 	svc := &AnalyzerService{}
 	files := svc.collectSampleFilesFromRoots(tmpDir, nil, "go")
 	assert.NotEmpty(t, files)
-	assertSamplePathsContain(t, files, "main.go", "internal/service/user.go", "main_test.go")
+	assertSamplePathsContain(t, files, "main.go", "internal/service/user.go")
+	for _, file := range files {
+		assert.NotEqual(t, "main_test.go", file.Path)
+	}
 }
 
 func TestCollectSampleFiles_ReturnsPathsWithoutEmbeddingContent(t *testing.T) {
@@ -518,7 +537,6 @@ func TestRefreshProjectProfile_WithMock(t *testing.T) {
 				Dependencies:   []string{"github.com/gin-gonic/gin"},
 				Summary:        "A test project",
 				KeyModules:     []domain.ModuleInfo{{Name: "handler", Path: "internal/handler"}},
-				CommonUtils:    []domain.UtilityFunction{{Name: "Response", File: "pkg/response.go", Signature: "func Response(value any) error"}},
 				ConfigPatterns: []string{"YAML config"},
 			}, nil
 		},
@@ -534,7 +552,7 @@ func TestRefreshProjectProfile_WithMock(t *testing.T) {
 	assert.Contains(t, profile.Frameworks, "gin")
 	assert.Contains(t, profile.Frameworks, "gorm")
 	assert.NotEmpty(t, profile.KeyModules)
-	assert.NotEmpty(t, profile.CommonUtils)
+	assert.Empty(t, profile.CommonUtils)
 }
 
 func TestRefreshProjectProfile_PassesReadmePathWithoutContent(t *testing.T) {
@@ -632,17 +650,25 @@ func TestBuildProjectProfileResult_FocusedStructureOmitsUnfocusedTree(t *testing
 func TestBuildProjectProfileResult_PassesRuntimeUserContext(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	var received agent.AnalyzeProjectRequest
+	var received agent.ExtractAuthorityRequest
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
 	}
 	session := &profileRefreshTestSession{
-		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		result: &agent.AnalyzeProjectResult{Language: "go"},
+		authorityFn: func(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
 			received = *req
-			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+			require.Len(t, req.AuthoritySections, 1)
+			return &agent.ExtractAuthorityResult{
+				AuthoritySections: []agent.AuthoritySectionResult{{
+					SectionID:    req.AuthoritySections[0].ID,
+					NoRuleReason: "The runtime context describes the environment but contains no durable project constraint.",
+				}},
+			}, nil
 		},
 	}
 	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
+	mockAgent.ExtractAuthorityFn = session.ExtractAuthority
 	svc := NewAnalyzerService(mockAgent, nil)
 	ctx := runtimecontext.WithUserContext(context.Background(), "私有化 HSM 工作区，交付物是离线安装包。")
 
@@ -650,6 +676,7 @@ func TestBuildProjectProfileResult_PassesRuntimeUserContext(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "私有化 HSM 工作区，交付物是离线安装包。", received.UserContext)
+	assert.Equal(t, "user_context", received.AuthoritySections[0].Source)
 }
 
 type fakeStructuralCollector struct {
@@ -657,24 +684,11 @@ type fakeStructuralCollector struct {
 	err     error
 }
 
-type recordingStructuralCollector struct {
-	context  string
-	err      error
-	requests *[]structuralContextRequest
-}
-
 type profileRefreshTestSession struct {
-	called   bool
-	result   *agent.AnalyzeProjectResult
-	fn       func(context.Context, *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
-	selectFn func(context.Context, *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error)
-}
-
-func (s *profileRefreshTestSession) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-	if s.selectFn != nil {
-		return s.selectFn(ctx, req)
-	}
-	return &agent.SelectLearningCandidatesResult{}, nil
+	called      bool
+	result      *agent.AnalyzeProjectResult
+	fn          func(context.Context, *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
+	authorityFn func(context.Context, *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error)
 }
 
 func (s *profileRefreshTestSession) RefreshProjectProfile(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
@@ -685,13 +699,17 @@ func (s *profileRefreshTestSession) RefreshProjectProfile(ctx context.Context, r
 	return s.result, nil
 }
 
-func (f fakeStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
-	return f.context, f.err
+func (s *profileRefreshTestSession) ExtractAuthority(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+	if s.authorityFn != nil {
+		return s.authorityFn(ctx, req)
+	}
+	sections := make([]agent.AuthoritySectionResult, 0, len(req.AuthoritySections))
+	for _, section := range req.AuthoritySections {
+		sections = append(sections, agent.AuthoritySectionResult{SectionID: section.ID, NoRuleReason: "No explicit project constraint was found."})
+	}
+	return &agent.ExtractAuthorityResult{AuthoritySections: sections}, nil
 }
 
-func (f recordingStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
-	if f.requests != nil {
-		*f.requests = append(*f.requests, req)
-	}
+func (f fakeStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
 	return f.context, f.err
 }

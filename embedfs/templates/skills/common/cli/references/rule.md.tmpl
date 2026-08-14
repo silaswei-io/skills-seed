@@ -1,0 +1,29 @@
+# Rule
+
+Use `skills-seed rule` to maintain authoritative constraints in `.skills-seed/rules/<id>/RULE.md`. `generate skills` projects them into generated Skill references; generated files are not the maintenance source.
+
+The configured Agent may inspect the target project to clarify the supplied content, but it must preserve the user's authority and explicit scope. It cannot infer new rules, paths, ownership, or command permissions.
+
+## Create Or Replace
+
+- Project rule: `skills-seed rule --name <name> --content "<Markdown>"`
+- Path-scoped project rule: `skills-seed rule --name <name> --content "<Markdown>" --path "internal/platform/**"`
+- Replace an existing rule: add `--overwrite` to replace both its complete text and explicit scope.
+
+The command rejects a rule with the same name unless `--overwrite` is explicit.
+
+## Inspect
+
+- List rule scopes: `skills-seed rule show`
+- Inspect one rule: `skills-seed rule show <rule-id> --format json`
+- Inspect a child rule: `skills-seed rule show --child backend --format json`
+
+## Workspace Ownership
+
+- Use `--child <id>` when a rule affects only one child project. The rule is stored in that child's `.skills-seed/rules/`.
+- Without `--child`, `--project`, or `--path`, a workspace-root rule belongs only to the workspace root.
+- Use `--project` or `--path` only when the rule explicitly affects those child projects or paths.
+- Do not infer project ownership or governed paths from rule prose.
+- Workspace-root rules do not automatically apply to every child project.
+
+After changing rules, run `skills-seed generate skills` to update generated Skill references. Use `skills-seed sync` when the authoritative rule should also refresh the structured project profile.

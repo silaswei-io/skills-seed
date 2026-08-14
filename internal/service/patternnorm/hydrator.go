@@ -29,10 +29,9 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 				sources = append(sources, source)
 				for _, location := range source.EvidenceLocations {
 					key := evidenceKey(location)
-					if _, exists := allowedEvidence[key]; exists {
-						continue
+					if _, exists := allowedEvidence[key]; !exists {
+						allowedEvidence[key] = location
 					}
-					allowedEvidence[key] = location
 				}
 			}
 		}
@@ -43,6 +42,7 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 		pattern.MergedFrom = expandHydratedSources(pattern.MergedFrom, sources)
 		sources = prioritizeCurrentSources(pattern.ID, sources)
 		hydrateCurrentPatternFields(pattern, sources)
+		pattern.KnowledgeFlags = knowledgeFlagsFromSources(sources)
 		sourceEvidence := evidenceFromSources(sources)
 		pattern.GoodExample, pattern.BadExample = currentExamples(sources)
 		pattern.BusinessMethod = firstCurrentBusinessMethod(sources)
@@ -81,6 +81,14 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 	return nil
 }
 
+func knowledgeFlagsFromSources(sources []domain.Pattern) []string {
+	groups := make([][]string, 0, len(sources))
+	for _, source := range sources {
+		groups = append(groups, source.KnowledgeFlags)
+	}
+	return domain.MergeKnowledgeFlags(groups...)
+}
+
 func hydrateCurrentPatternFields(pattern *domain.Pattern, sources []domain.Pattern) {
 	if strings.TrimSpace(pattern.Name) == "" {
 		pattern.Name = firstSourceValue(sources, func(source domain.Pattern) string { return source.Name })
@@ -106,8 +114,7 @@ func firstSourceValue(sources []domain.Pattern, value func(domain.Pattern) strin
 }
 
 func expandHydratedSources(sourceIDs []string, sources []domain.Pattern) []string {
-	expanded := make([]string, 0, len(sourceIDs)+len(sources))
-	expanded = append(expanded, sourceIDs...)
+	expanded := append([]string(nil), sourceIDs...)
 	for _, source := range sources {
 		expanded = append(expanded, source.MergedFrom...)
 	}
@@ -146,17 +153,13 @@ func prioritizeCurrentSources(patternID string, sources []domain.Pattern) []doma
 }
 
 func currentExamples(sources []domain.Pattern) (string, string) {
-	var goodExample string
-	var badExample string
+	var goodExample, badExample string
 	for _, source := range sources {
 		if goodExample == "" {
 			goodExample = strings.TrimSpace(source.GoodExample)
 		}
 		if badExample == "" {
 			badExample = strings.TrimSpace(source.BadExample)
-		}
-		if goodExample != "" && badExample != "" {
-			break
 		}
 	}
 	return goodExample, badExample

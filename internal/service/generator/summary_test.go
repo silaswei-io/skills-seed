@@ -219,8 +219,7 @@ func TestGenerateSkills_ProjectOverviewDoesNotPromoteUnitSummaryToProjectFact(t 
 	text := string(content)
 	require.Contains(t, text, "## 项目概览摘要")
 	require.Contains(t, text, "当前项目画像已覆盖 2 个模块/责任域")
-	require.Contains(t, text, "home")
-	require.Contains(t, text, "key-manage")
+	require.Contains(t, text, "完整导航见关键模块、能力入口和分类模式")
 	require.NotContains(t, text, "## 项目概览摘要\n\nhome-info模块")
 	require.NotContains(t, text, "## 技术架构\n\nhome-info模块")
 }

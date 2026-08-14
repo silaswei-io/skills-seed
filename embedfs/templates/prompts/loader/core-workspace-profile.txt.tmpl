@@ -8,21 +8,20 @@ The workspace profile describes relationships between child projects. It does no
 
 Separate these facts carefully:
 
-1. **Workspace facts**: child project boundaries, project roles, dependency direction, shared paths, contract paths, infrastructure paths, and cross-project synchronization.
+1. **Workspace facts**: child project boundaries, project roles, dependency direction, shared paths, contract paths, runtime configuration paths, and cross-project impact.
 2. **Child project facts**: one project's internal layout, coding style, framework usage, and capability entries. Do not put these in the workspace profile unless they affect another project.
 
 # Required Findings
 
 1. Project index: ID, path, responsibility, role, primary language, and key framework/runtime.
-2. Workspace context: product/business context, repository model, and delivery or validation boundaries. Only write facts supported by repository evidence.
+2. Workspace context: product/business context and repository model. Only write facts supported by repository evidence.
 3. Shared paths: code, config, shared artifacts, generated artifacts, or tooling consumed by multiple projects.
 4. Contract paths: interface definitions, shared schemas, type definitions, event definitions, data structure definitions, or generated-code inputs.
-5. Infrastructure paths: container, orchestration, deployment, environment, routing, middleware, automation, or release config.
-6. Dependency direction: project to project, project to shared library, adapter to service, contract to derived output, deployment config to runtime service.
-7. Common tasks and validation: record only task entry points and commands confirmed by README files, scripts, CI, build files, or config.
-8. Impact radius: which paths affect multiple projects and which projects must be checked together.
-9. Routing hints: which child `.agents/.claude` skills must be read before editing each path family.
-10. Open questions: when product context, delivery model, common tasks, validation commands, or dependencies cannot be confirmed, briefly note in `summary` that the information must be confirmed during task execution instead of inventing details.
+5. Runtime configuration paths: environment, routing, middleware, service wiring, or other configuration consumed by multiple projects. Do not infer deployment, release, testing, or acceptance procedures from these paths.
+6. Dependency direction: project to project, project to shared library, adapter to service, contract to derived output, or runtime configuration to consumer.
+7. Impact radius: which paths affect multiple projects and which projects must be checked together.
+8. Routing hints: which child `.agents/.claude` skills must be read before editing each path family.
+9. Open questions: when product context or dependencies cannot be confirmed, briefly note in `summary` that the information must be confirmed during task execution instead of inventing details.
 
 # Input Files
 
@@ -35,25 +34,26 @@ Separate these facts carefully:
 Read these files by path. Do not expect their contents to be embedded in this prompt.
 {{- if .UserContextPath}}
 
-Use the context only to interpret workspace positioning, delivery boundaries, repository organization, and validation priorities; do not copy the file verbatim or persist long paraphrased passages into the workspace profile.
+Use the context only to interpret workspace positioning, repository organization, and cross-project background facts; do not treat it as an authoritative rule source, copy it verbatim, or persist long paraphrased passages into the workspace profile.
 {{- end}}
 
 # Rules
 
 - Do not describe the workspace as a single monolithic project.
 - Do not promote a local child-project convention to a workspace rule unless multiple projects depend on it.
-- Use a workspace-level abstraction only for facts that affect more than one child project: contracts, shared paths, dependency direction, change order, impact radius, or coordinated validation. Keep single-project internals out of the workspace profile.
+- Use a workspace-level abstraction only for facts that affect more than one child project: contracts, shared paths, dependency direction, code dependency order, or impact radius. Keep single-project internals out of the workspace profile.
+- Do not learn from tests, fixtures, mocks, CI definitions, deployment manifests, release scripts, or acceptance assets. Their commands, steps, and execution order belong to user-maintained Workflows.
 - If a relationship cannot be confirmed from repository structure, config, README, or build files, record the uncertainty in `summary` or use an empty array. Do not invent facts.
 - The AI call is non-interactive; do not ask the user in the response. Record which information must be confirmed during actual task execution.
-- Preserve paths, commands, config keys, environment variables, interface names, file names, project IDs, and code identifiers exactly when needed.
+- Preserve paths, config keys, environment variables, interface names, file names, project IDs, and code identifiers exactly when needed.
 - Project identity is owned by configuration. In `projects`, return only the exact configured `project_id` plus analysis-owned responsibility and framework fields. Never return or redefine project paths, types, languages, workspace name, or workspace root.
 - In `consumers`, `producers`, `affected_projects`, `from_project_id`, and `project_ids`, use only exact configured child project IDs from the workspace input. Never use the workspace name, workspace root directory name, service role, platform name, or external system name as a project ID.
 - Workspace input may include `project_ref` and `path_ref` to disambiguate projects from paths. When a dependency target is a configured child project, output `to.kind: "project"` and `to.value` as the exact project ID. Do not copy the `project:` or `path:` prefix into output JSON.
 - Use `to.kind: "path"` only for shared, contract, or infrastructure paths that are also declared in `shared`, `contracts`, or `infra`; never use `path` for a configured child project even when project ID and path are the same string.
-- `shared.path`, `contracts.path`, and `infra.path` must be concrete existing workspace-root files or directories, not glob patterns. A child-project-owned path is allowed only when repository evidence shows it is a cross-project shared asset, contract source, generated-code input, deployment boundary, or runtime integration boundary; otherwise keep child-project internals out of the workspace profile.
+- `shared.path`, `contracts.path`, and `infra.path` must be concrete existing workspace-root files or directories, not glob patterns. A child-project-owned path is allowed only when repository evidence shows it is a cross-project shared asset, contract source, generated-code input, or runtime configuration boundary; otherwise keep child-project internals out of the workspace profile.
 - For a child-project-owned shared, contract, or infra path, include the owning project plus every affected peer project. Do not emit a path that affects only its owning child project.
-- Put only root-level cross-project glob patterns such as `.github/**` in `impact_routes.path_pattern`; do not add child-project-local patterns such as `**/Taskfile.yml`, `**/etc/*.yaml`, or per-project build scripts to workspace output.
-- Do not put platform names, mirror registry names, URLs, Jenkins job addresses, deployment endpoints, or other non-repository locations in any path field. Mention them only in `summary` when repository evidence proves they matter.
+- Put only root-level cross-project code, contract, shared, or runtime-config glob patterns in `impact_routes.path_pattern`; do not add CI, testing, deployment, release, acceptance, or child-project-local build patterns.
+- Do not put platform names, mirror registry names, URLs, job addresses, deployment endpoints, or other non-repository locations in any path field. Mention them only in `summary` when repository evidence proves they matter.
 - For stable output, keep configured project IDs unchanged, sort repeated arrays by project ID then path, and do not rename responsibilities or relationships merely for wording variety.
 
 # Output Format

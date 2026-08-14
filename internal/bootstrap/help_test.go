@@ -212,7 +212,9 @@ func TestSubcommandHelpKeepsDetailedContent(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 
 	helpText := out.String()
-	require.Contains(t, helpText, "分析当前代码库，提取编码模式")
+	require.Contains(t, helpText, "准备候选并规划学习议程")
+	require.Contains(t, helpText, "隔离分析源码证据并独立审查知识")
+	require.Contains(t, helpText, "按策略提取权威规则并刷新")
 	require.Contains(t, helpText, "Examples:")
 	require.Contains(t, helpText, "skills-seed learn current --focus internal/service --profile skip")
 	require.Contains(t, helpText, "--context string")
@@ -233,6 +235,9 @@ func TestRuntimeErrorsDoNotPrintUsage(t *testing.T) {
 	output := out.String()
 	require.NotContains(t, output, "Usage:")
 	require.NotContains(t, output, "Flags:")
+	require.NotContains(t, output, "Error:")
+	require.NotContains(t, output, "错误:")
+	require.True(t, rootCmd.SilenceErrors)
 }
 
 func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {

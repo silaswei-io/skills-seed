@@ -154,6 +154,21 @@ func TestUpdateStepPrintsDetailWhenProgressDisabled(t *testing.T) {
 	require.Contains(t, output, "分析当前代码库 · 焦点 2/17 · registry-management")
 }
 
+func TestCompleteStepPrintsFinalSummaryWhenProgressDisabled(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := New(2)
+		tracker.enabled = false
+
+		tracker.StartStep("准备")
+		tracker.CompleteStep("准备")
+		tracker.StartStep("完成")
+		tracker.CompleteStep("完成")
+	})
+
+	require.Contains(t, output, "[############################] 2/2   完成")
+	require.NotContains(t, output, "1/2")
+}
+
 func TestPrintConsoleLineAfterProgressPrintsAfterCompletedStep(t *testing.T) {
 	output := captureStdout(t, func() {
 		tracker := New(1)

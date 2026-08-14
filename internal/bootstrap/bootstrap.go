@@ -17,6 +17,7 @@ import (
 	patternscmd "github.com/silaswei-io/skills-seed/internal/command/patterns"
 	previewcmd "github.com/silaswei-io/skills-seed/internal/command/preview"
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
+	rulecmd "github.com/silaswei-io/skills-seed/internal/command/rule"
 	synccmd "github.com/silaswei-io/skills-seed/internal/command/sync"
 	workflowcmd "github.com/silaswei-io/skills-seed/internal/command/workflow"
 	workspacecmd "github.com/silaswei-io/skills-seed/internal/command/workspace"
@@ -26,6 +27,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
+	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/spf13/cobra"
@@ -129,12 +131,13 @@ func createRootCmd() *cobra.Command {
 	skillsTemplatesHash := metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS))
 
 	cmd := &cobra.Command{
-		Use:          "skills-seed",
-		Short:        i18n.Get("RootShort"),
-		Long:         i18n.Get("RootLong"),
-		Example:      i18n.Get("RootExample"),
-		Version:      metadata.ProgramVersion,
-		SilenceUsage: true,
+		Use:           "skills-seed",
+		Short:         i18n.Get("RootShort"),
+		Long:          i18n.Get("RootLong"),
+		Example:       i18n.Get("RootExample"),
+		Version:       metadata.ProgramVersion,
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 	configureCobraDefaults(cmd)
 	cmd.SetVersionTemplate("{{.Name}} version {{.Version}}\nprompt-templates-sha256: " + promptTemplatesHash + "\nskills-templates-sha256: " + skillsTemplatesHash + "\n")
@@ -180,12 +183,19 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 				OnStepComplete: opts.OnStepComplete,
 			})
 		},
-		Generate:                    generate.RunGenerate,
-		GenerateChild:               generate.RunGenerateQuiet,
+		Generate: generate.RunGenerate,
+		GenerateChild: func(cont *container.Container, opts synccmd.GenerateChildOptions) error {
+			return generate.RunGenerateQuietWithProgress(cont, generator.GenerateProgressHooks{
+				OnStepStart:    opts.OnStepStart,
+				OnStepUpdate:   opts.OnStepUpdate,
+				OnStepComplete: opts.OnStepComplete,
+			})
+		},
 		LearnWorkspaceRelationships: learn.RunWorkspaceRelationships,
 		GenerateWorkspaceRoot:       generate.RunGenerateWorkspaceRoot,
 	}))
 	rootCmd.AddCommand(workflowcmd.Cmd(cont))
+	rootCmd.AddCommand(rulecmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
 	rootCmd.AddCommand(logcmd.Cmd())
@@ -239,6 +249,7 @@ var projectRuntimeCommands = map[string]struct{}{
 	"reset":    {},
 	"sync":     {},
 	"workflow": {},
+	"rule":     {},
 }
 
 var projectRuntimeSubcommands = map[string]map[string]struct{}{

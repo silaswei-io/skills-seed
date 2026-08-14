@@ -18,18 +18,12 @@ import (
 )
 
 type workflowSummaryView struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Target       string `json:"target"`
-	Summary      string `json:"summary,omitempty"`
-	ContextCount int    `json:"context_count"`
-	ScriptCount  int    `json:"script_count"`
-	UpdatedAt    string `json:"updated_at,omitempty"`
-}
-
-type workflowContextView struct {
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Target      string `json:"target"`
+	Summary     string `json:"summary,omitempty"`
+	ScriptCount int    `json:"script_count"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
 }
 
 type workflowScriptView struct {
@@ -39,15 +33,14 @@ type workflowScriptView struct {
 }
 
 type workflowDetailView struct {
-	ID        string                `json:"id"`
-	Name      string                `json:"name"`
-	Target    string                `json:"target"`
-	Summary   string                `json:"summary,omitempty"`
-	Content   string                `json:"content"`
-	Contexts  []workflowContextView `json:"contexts"`
-	Scripts   []workflowScriptView  `json:"scripts"`
-	CreatedAt string                `json:"created_at,omitempty"`
-	UpdatedAt string                `json:"updated_at,omitempty"`
+	ID        string               `json:"id"`
+	Name      string               `json:"name"`
+	Target    string               `json:"target"`
+	Summary   string               `json:"summary,omitempty"`
+	Content   string               `json:"content"`
+	Scripts   []workflowScriptView `json:"scripts"`
+	CreatedAt string               `json:"created_at,omitempty"`
+	UpdatedAt string               `json:"updated_at,omitempty"`
 }
 
 func showCmd(cont *container.Container) *cobra.Command {
@@ -121,24 +114,16 @@ func newWorkflowSummaryViews(workflows []domain.Workflow, target, locale string)
 
 func newWorkflowSummaryView(workflow domain.Workflow, target, locale string) workflowSummaryView {
 	return workflowSummaryView{
-		ID:           workflow.ID,
-		Name:         workflow.Name,
-		Target:       target,
-		Summary:      workflowoutput.Summary(workflow, locale),
-		ContextCount: len(workflow.Contexts),
-		ScriptCount:  len(workflow.Scripts),
-		UpdatedAt:    formatWorkflowTime(workflow.UpdatedAt),
+		ID:          workflow.ID,
+		Name:        workflow.Name,
+		Target:      target,
+		Summary:     workflowoutput.Summary(workflow, locale),
+		ScriptCount: len(workflow.Scripts),
+		UpdatedAt:   formatWorkflowTime(workflow.UpdatedAt),
 	}
 }
 
 func newWorkflowDetailView(workflow domain.Workflow, target, locale string) workflowDetailView {
-	contexts := make([]workflowContextView, 0, len(workflow.Contexts))
-	for _, item := range workflow.Contexts {
-		contexts = append(contexts, workflowContextView{
-			Content:   item.Content,
-			CreatedAt: formatWorkflowTime(item.CreatedAt),
-		})
-	}
 	scripts := make([]workflowScriptView, 0, len(workflow.Scripts))
 	for _, script := range workflow.Scripts {
 		scripts = append(scripts, workflowScriptView{
@@ -153,7 +138,6 @@ func newWorkflowDetailView(workflow domain.Workflow, target, locale string) work
 		Target:    target,
 		Summary:   workflowoutput.Summary(workflow, locale),
 		Content:   workflow.Content,
-		Contexts:  contexts,
 		Scripts:   scripts,
 		CreatedAt: formatWorkflowTime(workflow.CreatedAt),
 		UpdatedAt: formatWorkflowTime(workflow.UpdatedAt),
@@ -164,12 +148,11 @@ func writeWorkflowList(w io.Writer, workflows []workflowSummaryView) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	if _, err := fmt.Fprintf(
 		tw,
-		"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		"%s\t%s\t%s\t%s\t%s\t%s\n",
 		i18n.Get("WorkflowShowHeaderID"),
 		i18n.Get("WorkflowShowHeaderName"),
 		i18n.Get("WorkflowShowHeaderTarget"),
 		i18n.Get("WorkflowShowHeaderSummary"),
-		i18n.Get("WorkflowShowHeaderContexts"),
 		i18n.Get("WorkflowShowHeaderScripts"),
 		i18n.Get("WorkflowShowHeaderUpdatedAt"),
 	); err != nil {
@@ -178,12 +161,11 @@ func writeWorkflowList(w io.Writer, workflows []workflowSummaryView) error {
 	for _, workflow := range workflows {
 		if _, err := fmt.Fprintf(
 			tw,
-			"%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
+			"%s\t%s\t%s\t%s\t%d\t%s\n",
 			workflow.ID,
 			workflow.Name,
-			workflow.Target,
+			workflowTargetLabel(workflow.Target),
 			workflow.Summary,
-			workflow.ContextCount,
 			workflow.ScriptCount,
 			workflow.UpdatedAt,
 		); err != nil {
@@ -201,9 +183,8 @@ func writeWorkflowDetails(w io.Writer, workflow workflowDetailView) error {
 	}{
 		{i18n.Get("WorkflowShowFieldID"), workflow.ID},
 		{i18n.Get("WorkflowShowFieldName"), workflow.Name},
-		{i18n.Get("WorkflowShowFieldTarget"), workflow.Target},
+		{i18n.Get("WorkflowShowFieldTarget"), workflowTargetLabel(workflow.Target)},
 		{i18n.Get("WorkflowShowFieldSummary"), workflow.Summary},
-		{i18n.Get("WorkflowShowFieldContexts"), fmt.Sprintf("%d", len(workflow.Contexts))},
 		{i18n.Get("WorkflowShowFieldScripts"), fmt.Sprintf("%d", len(workflow.Scripts))},
 		{i18n.Get("WorkflowShowFieldCreatedAt"), workflow.CreatedAt},
 		{i18n.Get("WorkflowShowFieldUpdatedAt"), workflow.UpdatedAt},

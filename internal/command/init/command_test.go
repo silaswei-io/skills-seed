@@ -67,7 +67,6 @@ func TestInitializeProjectStoresConfiguredParallelism(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 4, configRepo.GetAgentConfig().Parallelism)
 	require.Equal(t, config.LearningModeNormal, configRepo.GetCurrentLearningConfig().Mode)
-	require.Equal(t, config.LearningScopeFlow, configRepo.GetCurrentLearningConfig().Scope)
 }
 
 func TestInitializeProjectStoresConfiguredAgentModel(t *testing.T) {
@@ -106,12 +105,10 @@ func TestInitializeWorkspaceAllocatesTotalParallelism(t *testing.T) {
 	rootConfig, err := config.NewRepository(filepath.Join(workspaceRoot, ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, 3, rootConfig.GetAgentConfig().Parallelism)
-	require.Equal(t, config.LearningScopeFlow, rootConfig.GetCurrentLearningConfig().Scope)
 
 	childConfig, err := config.NewRepository(filepath.Join(workspaceRoot, "api", ".skills-seed"), "zh-CN")
 	require.NoError(t, err)
 	require.Equal(t, 0, childConfig.GetAgentConfig().Parallelism)
-	require.Equal(t, config.LearningScopeFlow, childConfig.GetCurrentLearningConfig().Scope)
 }
 
 func TestAllocateWorkspaceParallelism(t *testing.T) {
@@ -324,10 +321,7 @@ func TestCmdDefaultsSkillsLocaleToEnglishButKeepsContextTemplatesInToolLocale(t 
 	require.Contains(t, string(profile), "# 背景与外部事实")
 	require.NotContains(t, string(profile), "# Background and External Facts")
 
-	instructions, err := os.ReadFile(filepath.Join(projectRoot, ".skills-seed", "context", "constraints.md"))
-	require.NoError(t, err)
-	require.Contains(t, string(instructions), "# 约束与边界")
-	require.NotContains(t, string(instructions), "# Constraints and Boundaries")
+	require.NoFileExists(t, filepath.Join(projectRoot, ".skills-seed", "context", "constraints.md"))
 }
 
 func TestInitializeProjectDetectsFrontendLanguage(t *testing.T) {

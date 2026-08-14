@@ -14,23 +14,27 @@ Inputs:
 
 Allowed categories: {{.AllowedCategories}}
 
-Read the candidate and related pattern JSON files. Each object is compact on purpose: ids, names, categories, descriptions, rules, evidence paths, and optional business method names are enough for ownership decisions. Do not invent source evidence; the system will hydrate output from the original source patterns.
+Read the candidate and related pattern JSON files. Each object is compact on purpose: ids, names, categories, descriptions, rules, evidence paths, reviewed knowledge flags, and an optional `capability_entry` identity are enough for semantic merge decisions. A capability entry includes its verified name and current or historical source location when known. Do not invent source evidence; the system validates source ownership and hydrates output, including the union of reviewed flags, from the original patterns.
 
 Merge rules:
-- Every candidate id must be represented exactly once: either in one output pattern's `source_ids` or in `dropped`.
-- You may include related existing pattern ids in `source_ids` when a candidate clearly updates or duplicates existing knowledge. Prefer the existing id for the output pattern in that case.
+- Include only source ids from the supplied candidate and related pattern inputs. Source ids must be unique within each output pattern.
+- Include related existing pattern ids when a candidate clearly updates or duplicates existing knowledge. Prefer the existing id for the output pattern in that case.
 - Merge only when applicability boundary, behavior, category, and evidence meaning are equivalent. Similar names, shared vocabulary, adjacent layers, sibling lifecycle actions, or reducing output count are not sufficient.
-- Do not merge high-risk operations with normal operations just because they share a resource. Destructive, privileged, security-sensitive, external-side-effect, transaction, audit, or state-machine boundaries should remain separate unless the same rule truly covers all sources.
+- Treat each nonempty `capability_entry` identity as an ownership boundary. Never merge sources that identify distinct capability entries. Sharing a resource, lifecycle, vocabulary, evidence path, or surrounding type does not make separate entries equivalent.
+- Do not merge a pattern carrying `operational_risk` with one that does not carry it. Also keep other materially different safety or correctness boundaries separate even when they share a resource.
 - Drop only unsupported evidence, exact duplicates already represented elsewhere, unsafe guidance, low-signal boilerplate, or content with no future routing value.
 - If a candidate is source-backed and has a distinct reusable boundary, keep it even if it is verbose.
-- Security wording must be conservative: describe observed handling as observed behavior. Do not claim a security guarantee unless the candidate evidence proves the mitigation. For example, decoding or unescaping input is not automatically XSS prevention.
+- Security wording must be conservative: describe observed handling as observed behavior. Do not claim a security guarantee unless the candidate evidence proves the mitigation.
+- Reliability and consistency wording must be equally conservative. Keep current implementation, design intent, proven guarantees, and known risks distinct. A local mechanism cannot be promoted to a system-wide guarantee without evidence covering the relevant failure and concurrency boundary; rewrite unsupported guarantees as bounded observations or drop them.
 
 Output fields:
 - `patterns`: canonical merged patterns with `id`, `name`, `category`, `description`, `rule`, `confidence`, and `source_ids`.
 - `dropped`: candidate ids intentionally excluded with `reason_code` and `reason`.
 
 Pre-output self-check:
-- No candidate id is missing.
+- No source id is invented or repeated within one output pattern.
 - No candidate id appears in more than one output pattern.
 - No output pattern has empty `source_ids`.
+- No output pattern combines distinct nonempty `capability_entry` identities.
 - No safety claim exceeds the source-backed behavior shared by all `source_ids`.
+- Source selection never adds, removes, or reinterprets `knowledge_flags`; the runtime derives them from the selected source IDs.

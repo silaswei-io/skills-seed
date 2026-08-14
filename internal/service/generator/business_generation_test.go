@@ -59,6 +59,7 @@ func TestGenerateSkillsMarksHighRiskBusinessPatternsAsCheckpoints(t *testing.T) 
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Destroy command deletes resource state and changes an external environment.")
 	pattern.SetRule("Inspect destroy safeguards before changing this operation.")
+	pattern.KnowledgeFlags = []string{domain.KnowledgeFlagOperationalRisk}
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
 		Path:   "tools/commands/destroy.ts",
 		Line:   12,
@@ -81,7 +82,7 @@ func TestGenerateSkillsMarksHighRiskBusinessPatternsAsCheckpoints(t *testing.T) 
 	require.Contains(t, index, "不要把危险动作当作普通复用建议")
 }
 
-func TestGenerateSkills_HidesCommonUtilsCoveredByBusinessPatterns(t *testing.T) {
+func TestGenerateSkillsDoesNotProjectLegacyProfileUtilities(t *testing.T) {
 	pattern := domain.NewPattern("sm4-gcm-encrypt-decrypt", "SM4-GCM加解密", domain.CategoryBusiness)
 	pattern.Confidence = 0.92
 	pattern.SetDescription("使用国密SM4算法的GCM模式进行对称加密和解密")
@@ -129,10 +130,9 @@ func TestGenerateSkills_HidesCommonUtilsCoveredByBusinessPatterns(t *testing.T) 
 	tmpDir := t.TempDir()
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
-	commonUtils, err := os.ReadFile(filepath.Join(tmpDir, "references", "common-utils.md"))
-	require.NoError(t, err)
-	assert.NotContains(t, string(commonUtils), "SM4Encrypt")
-	assert.Contains(t, string(commonUtils), "FormatFileSize")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "common-utils.md"))
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	assert.NotContains(t, skill, "./references/common-utils.md")
 	assertNoBrokenMarkdownLinks(t, tmpDir)
 }
 
@@ -183,18 +183,24 @@ func TestGenerateSkills_GroupsBusinessMethodsBySourceModule(t *testing.T) {
 				Summary:     "Profile-backed project overview",
 				BusinessMethods: []domain.BusinessMethod{
 					{
-						Name:         "Run",
-						CodeLocation: domain.CodeLocation{CurrentLocation: "cmd/server.go:20"},
-						Description:  "starts the server",
-						Function:     "func (s *Server) Run(ctx context.Context) error",
-						Type:         "domain",
+						Name:          "Run",
+						CodeLocation:  domain.CodeLocation{CurrentLocation: "cmd/server.go:20"},
+						Description:   "starts the server",
+						Usage:         "server startup",
+						Function:      "func (s *Server) Run(ctx context.Context) error",
+						Prerequisites: "initialized server dependencies",
+						Returns:       "an error when startup fails",
+						Type:          "domain",
 					},
 					{
-						Name:         "Run",
-						CodeLocation: domain.CodeLocation{CurrentLocation: "internal/plugin/vpn/run.go:12"},
-						Description:  "runs VPN plugin command",
-						Function:     "func (p *Plugin) Run(ctx context.Context) error",
-						Type:         "domain",
+						Name:          "Run",
+						CodeLocation:  domain.CodeLocation{CurrentLocation: "internal/plugin/vpn/run.go:12"},
+						Description:   "runs VPN plugin command",
+						Usage:         "VPN plugin execution",
+						Function:      "func (p *Plugin) Run(ctx context.Context) error",
+						Prerequisites: "initialized VPN plugin",
+						Returns:       "an error when plugin execution fails",
+						Type:          "domain",
 					},
 				},
 			}, nil
@@ -246,6 +252,9 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 		businessPatternWithLocation("billing-renewal", "Renewal Rule", "Renewal keeps billing state consistent", "Renew only after validating billing state", "func (s *Service) Renew(planID int64) error {\n\treturn nil\n}", "internal/application/billing/renewal.go:12"),
 		businessPatternWithLocation("notification-delivery", "Delivery Rule", "Delivery records notification attempts", "Record delivery attempts before retry", "func (s *Service) Deliver(id int64) error {\n\treturn nil\n}", "internal/application/notification/delivery.go:20"),
 	}
+	patterns[0].ScopePath = "internal/application/billing"
+	patterns[1].ScopePath = "internal/application/billing"
+	patterns[2].ScopePath = "internal/application/notification"
 
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {

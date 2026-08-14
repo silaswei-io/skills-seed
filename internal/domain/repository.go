@@ -73,18 +73,6 @@ type ScopedProjectProfileRepository interface {
 	SaveForProject(ctx context.Context, projectID string, profile *ProjectProfile) error
 }
 
-// ProjectSpecRepository 保存项目级开发规范
-type ProjectSpecRepository interface {
-	GetSpec(ctx context.Context) (*ProjectSpec, error)
-	SaveSpec(ctx context.Context, spec *ProjectSpec) error
-}
-
-// ScopedProjectSpecRepository 保存工作区子项目的开发规范
-type ScopedProjectSpecRepository interface {
-	GetSpecForProject(ctx context.Context, projectID string) (*ProjectSpec, error)
-	SaveSpecForProject(ctx context.Context, projectID string, spec *ProjectSpec) error
-}
-
 // RuntimeStateRepository 保存初始化后需要锁定的运行状态
 type RuntimeStateRepository interface {
 	Get(ctx context.Context) (*RuntimeState, error)

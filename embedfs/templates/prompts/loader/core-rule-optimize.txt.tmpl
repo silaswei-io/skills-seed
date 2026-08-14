@@ -1,0 +1,40 @@
+# Optimize Authoritative User Rule
+
+Polish the user-maintained rule below into concise, unambiguous Markdown for future Agents working in the current project.
+
+Project boundary:
+- name: {{.Project.Name}}
+- root: {{.Project.RootPath}}
+- language: {{.Project.Language}}
+- mode: {{.Project.Mode}}
+
+Rule name: {{.Name}}
+Mode: {{if .Overwrite}}overwrite{{else if .ExistingContent}}merge{{else}}create{{end}}
+Affected projects: {{if .AffectedProjects}}{{.AffectedProjects}}{{else}}none specified{{end}}
+Affected paths: {{if .Paths}}{{.Paths}}{{else}}none specified{{end}}
+Default ownership: when neither field is specified, the rule belongs only to the current target.
+
+{{if .ExistingContent}}Existing authoritative content:
+```markdown
+{{.ExistingContent}}
+```
+
+{{end}}New authoritative content:
+```markdown
+{{.Content}}
+```
+
+Requirements:
+- The existing and new content are authoritative inputs. Preserve every obligation, prohibition, permission, condition, exception, scope boundary, and command exactly in meaning and strength.
+- In merge mode, incorporate both inputs and deduplicate only equivalent wording. Do not silently discard either input or choose one side of a conflict.
+- In overwrite mode, use only the new content. Do not restore requirements from an earlier version.
+- You may inspect the repository read-only when the content names a path, symbol, command, or project concept that needs clarification. Stay within the project root and do not perform a broad survey.
+- Repository evidence is supporting context only. Never infer a new rule, weaken or strengthen the supplied rule, widen or narrow its scope, or replace it with a project convention.
+- Do not invent commands, paths, tools, guarantees, ownership, or execution permission. Do not convert descriptive facts into mandates.
+- Resolve wording and structure only when the evidence supports the same meaning. Keep already clear rules concise.
+- If inputs conflict or an ambiguity cannot be resolved without changing authority, preserve both positions and mark the point as `To confirm`.
+- Return the complete replacement Markdown body. Do not add commentary outside the result.
+
+Return JSON only.
+
+{{ jsonContract "OptimizeRuleOutput" }}

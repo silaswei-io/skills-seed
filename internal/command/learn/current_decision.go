@@ -20,20 +20,18 @@ func newCurrentDecisionCheckpoint(repo *commandstate.Repository, state *commands
 }
 
 func (c *currentDecisionCheckpoint) Load(ctx context.Context, candidateHash string) (*patternnorm.Decision, bool, error) {
-	if c == nil || c.state == nil {
+	if c == nil || c.state == nil || c.state.Decision == nil {
 		return nil, false, nil
 	}
-	if checkpoint := c.state.Decision; checkpoint != nil {
-		if checkpoint.CandidateHash != candidateHash {
-			return nil, false, fmt.Errorf("%s", i18n.Get("LearnCurrentDecisionCandidateChanged"))
-		}
-		var result patternnorm.Decision
-		if err := json.Unmarshal(checkpoint.Decision, &result); err != nil {
-			return nil, false, fmt.Errorf("%s: %w", i18n.Get("LearnCurrentDecodeDecisionFailed"), err)
-		}
-		return &result, true, nil
+	checkpoint := c.state.Decision
+	if checkpoint.CandidateHash != candidateHash {
+		return nil, false, fmt.Errorf("%s", i18n.Get("LearnCurrentDecisionCandidateChanged"))
 	}
-	return nil, false, nil
+	var decision patternnorm.Decision
+	if err := json.Unmarshal(checkpoint.Decision, &decision); err != nil {
+		return nil, false, fmt.Errorf("%s: %w", i18n.Get("LearnCurrentDecodeDecisionFailed"), err)
+	}
+	return &decision, true, nil
 }
 
 func (c *currentDecisionCheckpoint) Save(ctx context.Context, candidateHash string, result *patternnorm.Decision) error {
@@ -44,9 +42,6 @@ func (c *currentDecisionCheckpoint) Save(ctx context.Context, candidateHash stri
 	if err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentEncodeDecisionFailed"), err)
 	}
-	c.state.Decision = &commandstate.DecisionCheckpoint{
-		CandidateHash: candidateHash,
-		Decision:      data,
-	}
+	c.state.Decision = &commandstate.DecisionCheckpoint{CandidateHash: candidateHash, Decision: data}
 	return c.repo.Save(ctx, c.state)
 }

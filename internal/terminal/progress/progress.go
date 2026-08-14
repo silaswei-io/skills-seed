@@ -523,6 +523,9 @@ func (t *Tracker) CompleteStep(label string) {
 		t.done++
 	}
 	if !t.enabled {
+		if t.done == t.total {
+			PrintConsoleLine(formatProgressLine(t.done, t.done, t.total, t.width, " ", label, 0))
+		}
 		return
 	}
 	t.label = label
@@ -597,12 +600,6 @@ func (t *Tracker) stopActiveTicker() {
 }
 
 func (t *Tracker) renderLocked(newline bool) {
-	filled := int(float64(t.done) / float64(t.total) * float64(t.width))
-	if filled > t.width {
-		filled = t.width
-	}
-	bar := strings.Repeat("#", filled) + strings.Repeat("-", t.width-filled)
-
 	step := t.done
 	if t.active && step < t.total {
 		step++
@@ -620,10 +617,7 @@ func (t *Tracker) renderLocked(newline bool) {
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 
-	line := fmt.Sprintf("[%s] %d/%d %s %s", bar, step, t.total, frame, t.label)
-	if elapsed > 0 {
-		line += fmt.Sprintf(" (%s)", elapsed)
-	}
+	line := formatProgressLine(t.done, step, t.total, t.width, frame, t.label, elapsed)
 	fmt.Fprintf(os.Stdout, "\r\033[2K%s", clipToDisplayWidth(line, terminalWidth()))
 	if newline {
 		fmt.Fprintln(os.Stdout)
@@ -634,6 +628,19 @@ func (t *Tracker) renderLocked(newline bool) {
 	}
 	progressActive = true
 	progressLineOpen = true
+}
+
+func formatProgressLine(done, step, total, width int, frame, label string, elapsed time.Duration) string {
+	filled := int(float64(done) / float64(total) * float64(width))
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("#", filled) + strings.Repeat("-", width-filled)
+	line := fmt.Sprintf("[%s] %d/%d %s %s", bar, step, total, frame, label)
+	if elapsed > 0 {
+		line += fmt.Sprintf(" (%s)", elapsed)
+	}
+	return line
 }
 
 func clipLinesToTerminal(lines []string, width int) []string {

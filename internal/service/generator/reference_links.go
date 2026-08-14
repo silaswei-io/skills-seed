@@ -72,17 +72,10 @@ func relatedCategoryRules() map[string][]categoryLinkRule {
 		string(domain.CategoryUtils): {
 			linkRule(domain.CategoryBusiness, "GeneratorReferenceLinkUtilsBusiness"),
 			linkRule(domain.CategoryAPI, "GeneratorReferenceLinkUtilsAPI"),
-			linkRule(domain.CategoryTesting, "GeneratorReferenceLinkUtilsTesting"),
 		},
 		string(domain.CategoryConcurrency): {
 			linkRule(domain.CategoryDatabase, "GeneratorReferenceLinkConcurrencyDatabase"),
 			linkRule(domain.CategoryBusiness, "GeneratorReferenceLinkConcurrencyBusiness"),
-			linkRule(domain.CategoryTesting, "GeneratorReferenceLinkConcurrencyTesting"),
-		},
-		string(domain.CategoryTesting): {
-			linkRule(domain.CategoryBusiness, "GeneratorReferenceLinkTestingBusiness"),
-			linkRule(domain.CategoryAPI, "GeneratorReferenceLinkTestingAPI"),
-			linkRule(domain.CategoryDatabase, "GeneratorReferenceLinkTestingDatabase"),
 		},
 		string(domain.CategoryStructure): {
 			linkRule(domain.CategoryBusiness, "GeneratorReferenceLinkStructureBusiness"),

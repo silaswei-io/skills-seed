@@ -24,7 +24,7 @@ This is a CLI operation Skill, not a project coding Skill. It teaches how to ope
 - Use `sync` as the normal high-level workflow: it learns current changes and regenerates Skills when needed.
 - Use `learn current` when learning should happen without generation.
 - Use `generate skills` when learned data already exists and only files need to be rendered.
-- Store durable guidance with `.skills-seed/context/`, `patterns add`, `patterns update`, or `workflow`; use `--context` and `--context-path` only for one run.
+- Store authoritative constraints with `rule`, reusable code practices with `patterns add` or `patterns update`, task procedures with `workflow`, and background or terminology with `.skills-seed/context/`; use `--context` and `--context-path` only for one run.
 - In automation, pass `--no-interactive` where the command supports it.
 
 ## Reference Routing
@@ -36,7 +36,8 @@ This is a CLI operation Skill, not a project coding Skill. It teaches how to ope
 | Add a workspace child project | [Workspace](./references/workspace.md) |
 | Learn current code | [Learn](./references/learn.md) or [Sync](./references/sync.md) |
 | Regenerate project Skills | [Generate](./references/generate.md) |
-| Add durable rules | [Patterns](./references/patterns.md) |
+| Add authoritative rules | [Rule](./references/rule.md) |
+| Add reusable code practices | [Patterns](./references/patterns.md) |
 | Add durable workflows | [Workflow](./references/workflow.md) |
 | Manage pre-commit integration | [Hook](./references/hook.md) |
 | Understand why files were or were not analyzed | [Preview](./references/preview.md) |
@@ -49,7 +50,7 @@ This is a CLI operation Skill, not a project coding Skill. It teaches how to ope
 1. First project setup: `skills-seed init`, then `skills-seed sync`.
 2. First workspace setup: `skills-seed init --workspace`, then `skills-seed workspace add .`, then `skills-seed sync`.
 3. Daily update: `skills-seed sync`.
-4. Add a durable rule: `skills-seed patterns add --context "<rule>"`, then `skills-seed generate skills`.
-5. Add a durable task process: `skills-seed workflow --name <name> --context "<process>"`, then `skills-seed generate skills`.
+4. Add an authoritative rule: `skills-seed rule --name <name> --content "<Markdown>"`, then `skills-seed generate skills`.
+5. Add a durable task process: `skills-seed workflow --name <name> --content "<Markdown>"`, then `skills-seed generate skills`.
 6. Debug file selection: `skills-seed preview files --mode current` before learning.
 7. Pre-commit workflow: install the hook with `skills-seed hook install`.

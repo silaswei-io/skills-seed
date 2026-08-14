@@ -5,24 +5,77 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 )
 
 // MockAgent 模拟 AI Agent
 type MockAgent struct {
-	NameVal                    string
-	AvailableVal               bool
-	UserDefinePatternFn        func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
-	RefreshProjectProfileFn    func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
-	SelectLearningCandidatesFn func(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error)
-	PlanLearningAgendaFn       func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error)
-	NormalizePatternsFn        func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error)
-	AnalyzeCurrentCodebaseFn   func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
-	AnalyzeCurrentBatchFn      func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error)
-	AnalyzeCurrentDeltaFn      func(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error)
-	AnalyzeWorkspaceProfileFn  func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
-	AnalyzeWorkspaceSpecFn     func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
-	OptimizeWorkflowFn         func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error)
+	NameVal                   string
+	AvailableVal              bool
+	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
+	RefreshProjectProfileFn   func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
+	ExtractAuthorityFn        func(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error)
+	PlanLearningAgendaFn      func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error)
+	NormalizePatternsFn       func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error)
+	ReviewKnowledgeFn         func(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error)
+	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
+	AnalyzeCurrentBatchFn     func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error)
+	AnalyzeCurrentDeltaFn     func(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error)
+	AnalyzeWorkspaceProfileFn func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error)
+	AnalyzeWorkspaceSpecFn    func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
+	OptimizeWorkflowFn        func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeContentResult, error)
+	OptimizeRuleFn            func(ctx context.Context, req *agent.OptimizeRuleRequest) (*agent.OptimizeContentResult, error)
+}
+
+// OptimizeWorkflow 模拟工作流正文优化。
+func (m *MockAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeContentResult, error) {
+	if m.OptimizeWorkflowFn != nil {
+		return m.OptimizeWorkflowFn(ctx, req)
+	}
+	return &agent.OptimizeContentResult{Content: req.Content}, nil
+}
+
+// OptimizeRule 模拟权威规则正文优化。
+func (m *MockAgent) OptimizeRule(ctx context.Context, req *agent.OptimizeRuleRequest) (*agent.OptimizeContentResult, error) {
+	if m.OptimizeRuleFn != nil {
+		return m.OptimizeRuleFn(ctx, req)
+	}
+	return &agent.OptimizeContentResult{Content: req.Content}, nil
+}
+
+// NormalizePatterns 模拟当前学习模式合并优化。
+func (m *MockAgent) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+	if m.NormalizePatternsFn != nil {
+		return m.NormalizePatternsFn(ctx, req)
+	}
+	result := &agent.NormalizePatternsResult{Patterns: make([]agent.PatternNormalization, 0, len(req.Candidates))}
+	for _, pattern := range req.Candidates {
+		result.Patterns = append(result.Patterns, agent.PatternNormalization{ID: pattern.ID, Name: pattern.Name, Category: string(pattern.Category), Description: pattern.Description, Rule: pattern.Rule, Confidence: pattern.Confidence, SourceIDs: []string{pattern.ID}})
+	}
+	return result, nil
+}
+
+// ReviewKnowledge 模拟独立知识审查。
+func (m *MockAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+	if m.ReviewKnowledgeFn != nil {
+		return m.ReviewKnowledgeFn(ctx, req)
+	}
+	decisions := make([]agent.KnowledgeReviewDecision, 0, len(req.Candidates))
+	for _, candidate := range req.Candidates {
+		methodVerdict := "remove"
+		var method *domain.BusinessMethod
+		if candidate.BusinessMethod != nil && domain.IsRouteableBusinessMethod(*candidate.BusinessMethod) {
+			methodVerdict = "set"
+			copied := *candidate.BusinessMethod
+			method = &copied
+		}
+		decisions = append(decisions, agent.KnowledgeReviewDecision{
+			CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
+			Reason: "Mock accepts the source-backed candidate.", BusinessMethodVerdict: methodVerdict, BusinessMethod: method,
+		})
+	}
+	return &agent.ReviewKnowledgeResult{Decisions: decisions}, nil
 }
 
 // Name 返回模拟 Agent 名称
@@ -47,43 +100,39 @@ func (m *MockAgent) RefreshProjectProfile(ctx context.Context, req *agent.Analyz
 	return &agent.AnalyzeProjectResult{}, nil
 }
 
-// SelectLearningCandidates 模拟当前代码学习候选收敛。
-func (m *MockAgent) SelectLearningCandidates(ctx context.Context, req *agent.SelectLearningCandidatesRequest) (*agent.SelectLearningCandidatesResult, error) {
-	if m.SelectLearningCandidatesFn != nil {
-		return m.SelectLearningCandidatesFn(ctx, req)
+// ExtractAuthority 模拟权威知识提取。
+func (m *MockAgent) ExtractAuthority(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+	if m.ExtractAuthorityFn != nil {
+		return m.ExtractAuthorityFn(ctx, req)
 	}
-	return &agent.SelectLearningCandidatesResult{SelectedPaths: append([]string(nil), req.CandidatePaths...), Reason: "mock selects all candidates"}, nil
+	sections := make([]agent.AuthoritySectionResult, 0, len(req.AuthoritySections))
+	for _, section := range req.AuthoritySections {
+		sections = append(sections, agent.AuthoritySectionResult{
+			SectionID:    section.ID,
+			NoRuleReason: "The authoritative section contains no explicit project constraint.",
+		})
+	}
+	return &agent.ExtractAuthorityResult{AuthoritySections: sections}, nil
 }
 
-// PlanLearningAgenda 模拟业务学习议程规划。
+// PlanLearningAgenda 模拟源码证据学习议程规划。
 func (m *MockAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
 	if m.PlanLearningAgendaFn != nil {
 		return m.PlanLearningAgendaFn(ctx, req)
 	}
-	return &agent.PlanLearningAgendaResult{}, nil
-}
-
-// NormalizePatterns 模拟当前学习模式合并优化。
-func (m *MockAgent) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
-	if m.NormalizePatternsFn != nil {
-		return m.NormalizePatternsFn(ctx, req)
+	if len(req.FocusPaths) == 0 {
+		return &agent.PlanLearningAgendaResult{}, nil
 	}
-	result := &agent.NormalizePatternsResult{
-		Patterns: make([]agent.PatternNormalization, 0, len(req.Candidates)),
-		Dropped:  []agent.PatternDrop{},
-	}
-	for _, pattern := range req.Candidates {
-		result.Patterns = append(result.Patterns, agent.PatternNormalization{
-			ID:          pattern.ID,
-			Name:        pattern.Name,
-			Category:    string(pattern.Category),
-			Description: pattern.Description,
-			Rule:        pattern.Rule,
-			Confidence:  pattern.Confidence,
-			SourceIDs:   []string{pattern.ID},
-		})
-	}
-	return result, nil
+	return &agent.PlanLearningAgendaResult{
+		Focuses: []domain.EvidenceFocus{{
+			ID:            "mock-learning-focus",
+			Name:          i18n.Get("LearnCurrentFallbackFocusName"),
+			AnalysisDepth: domain.EvidenceFocusDepthStandard,
+			EntryPaths:    append([]string(nil), req.FocusPaths...),
+			ScopeReason:   i18n.Get("LearnCurrentFallbackFocusReason"),
+		}},
+		Reason: "Mock keeps all requested learning inputs.",
+	}, nil
 }
 
 // AnalyzeCurrentCodebase 模拟当前代码库分析
@@ -312,21 +361,6 @@ func (m *MockAgent) AnalyzeWorkspaceSpec(ctx context.Context, req *agent.Analyze
 	return &domain.WorkspaceSpec{}, nil
 }
 
-// OptimizeWorkflow 模拟工作流优化。
-func (m *MockAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
-	if m.OptimizeWorkflowFn != nil {
-		return m.OptimizeWorkflowFn(ctx, req)
-	}
-	title := req.Name
-	if title == "" {
-		title = "workflow"
-	}
-	return &agent.OptimizeWorkflowResult{
-		Title:   title,
-		Content: "# " + title + "\n\n## 适用场景\n" + req.Context + "\n",
-	}, nil
-}
-
 // MockGitRepository 模拟 Git 仓储
 type MockGitRepository struct {
 	CommitsFn       func(ctx context.Context, limit int, since string) ([]domain.CommitInfo, error)
@@ -521,14 +555,10 @@ func (m *MockPatternStatsRepository) GetPatternStats(ctx context.Context) ([]dom
 
 // MockProjectProfileRepository 模拟项目画像仓储
 type MockProjectProfileRepository struct {
-	GetFn                func(ctx context.Context) (*domain.ProjectProfile, error)
-	SaveFn               func(ctx context.Context, profile *domain.ProjectProfile) error
-	GetForProjectFn      func(ctx context.Context, projectID string) (*domain.ProjectProfile, error)
-	SaveForProjectFn     func(ctx context.Context, projectID string, profile *domain.ProjectProfile) error
-	GetSpecFn            func(ctx context.Context) (*domain.ProjectSpec, error)
-	SaveSpecFn           func(ctx context.Context, spec *domain.ProjectSpec) error
-	GetSpecForProjectFn  func(ctx context.Context, projectID string) (*domain.ProjectSpec, error)
-	SaveSpecForProjectFn func(ctx context.Context, projectID string, spec *domain.ProjectSpec) error
+	GetFn            func(ctx context.Context) (*domain.ProjectProfile, error)
+	SaveFn           func(ctx context.Context, profile *domain.ProjectProfile) error
+	GetForProjectFn  func(ctx context.Context, projectID string) (*domain.ProjectProfile, error)
+	SaveForProjectFn func(ctx context.Context, projectID string, profile *domain.ProjectProfile) error
 }
 
 // Get 模拟获取项目画像
@@ -566,38 +596,6 @@ func (m *MockProjectProfileRepository) SaveForProject(ctx context.Context, proje
 		return m.SaveForProjectFn(ctx, projectID, profile)
 	}
 	return m.Save(ctx, profile)
-}
-
-// GetSpec 模拟获取项目规范
-func (m *MockProjectProfileRepository) GetSpec(ctx context.Context) (*domain.ProjectSpec, error) {
-	if m.GetSpecFn != nil {
-		return m.GetSpecFn(ctx)
-	}
-	return nil, nil
-}
-
-// SaveSpec 模拟保存项目规范
-func (m *MockProjectProfileRepository) SaveSpec(ctx context.Context, spec *domain.ProjectSpec) error {
-	if m.SaveSpecFn != nil {
-		return m.SaveSpecFn(ctx, spec)
-	}
-	return nil
-}
-
-// GetSpecForProject 模拟获取工作区子项目规范
-func (m *MockProjectProfileRepository) GetSpecForProject(ctx context.Context, projectID string) (*domain.ProjectSpec, error) {
-	if m.GetSpecForProjectFn != nil {
-		return m.GetSpecForProjectFn(ctx, projectID)
-	}
-	return nil, nil
-}
-
-// SaveSpecForProject 模拟保存工作区子项目规范
-func (m *MockProjectProfileRepository) SaveSpecForProject(ctx context.Context, projectID string, spec *domain.ProjectSpec) error {
-	if m.SaveSpecForProjectFn != nil {
-		return m.SaveSpecForProjectFn(ctx, projectID, spec)
-	}
-	return nil
 }
 
 // MockFileAnalysisTracker 模拟文件分析追踪器

@@ -85,19 +85,28 @@ func (c *CodexAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefin
 	return result, nil
 }
 
-// OptimizeWorkflow 将用户工作流说明整理为标准工作流。
-func (c *CodexAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeWorkflowResult, error) {
-	prompt, err := c.promptLoader.Render("core-workflow-optimize", req)
+// OptimizeWorkflow 整理用户提供的工作流内容。
+func (c *CodexAgent) OptimizeWorkflow(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeContentResult, error) {
+	return c.optimizeContent(ctx, "OptimizeWorkflow", "core-workflow-optimize", req, aicontract.ContractOptimizeWorkflow,
+		"AgentRenderOptimizeWorkflowPromptFailed", "AgentOptimizeWorkflowFailed")
+}
+
+// OptimizeRule 在当前项目边界内润色用户权威规则。
+func (c *CodexAgent) OptimizeRule(ctx context.Context, req *agent.OptimizeRuleRequest) (*agent.OptimizeContentResult, error) {
+	return c.optimizeContent(ctx, "OptimizeRule", "core-rule-optimize", req, aicontract.ContractOptimizeRule,
+		"AgentRenderOptimizeRulePromptFailed", "AgentOptimizeRuleFailed")
+}
+
+func (c *CodexAgent) optimizeContent(ctx context.Context, operation, promptName string, data interface{}, contract, renderError, callError string) (*agent.OptimizeContentResult, error) {
+	prompt, err := c.promptLoader.Render(promptName, data)
 	if err != nil || prompt == "" {
-		return nil, fmt.Errorf("%s", i18n.Get("AgentRenderOptimizeWorkflowPromptFailed"))
+		return nil, fmt.Errorf("%s", i18n.Get(renderError))
 	}
-
-	output, err := c.callCodex(ctx, "OptimizeWorkflow", prompt, aicontract.ContractOptimizeWorkflow)
+	output, err := c.callCodex(ctx, operation, prompt, contract)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentOptimizeWorkflowFailed"), err)
+		return nil, fmt.Errorf("%s: %w", i18n.Get(callError), err)
 	}
-
-	result, err := parser.ParseOptimizeWorkflowResult(output)
+	result, err := parser.ParseOptimizeContentResult(output)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
 	}

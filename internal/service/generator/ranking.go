@@ -15,16 +15,6 @@ func (s *GeneratorService) patternGenerationInsights(_ context.Context, patterns
 }
 
 func rankPatternsForGeneration(patterns []domain.Pattern, insights map[string]domain.PatternInsight) []domain.Pattern {
-	patterns = activePatterns(patterns)
+	patterns = domain.ActivePatterns(patterns)
 	return domain.RankPatternsForGeneration(patterns, insights)
-}
-
-func activePatterns(patterns []domain.Pattern) []domain.Pattern {
-	out := make([]domain.Pattern, 0, len(patterns))
-	for _, pattern := range patterns {
-		if pattern.IsActive() {
-			out = append(out, pattern)
-		}
-	}
-	return out
 }

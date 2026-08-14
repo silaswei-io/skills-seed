@@ -6,31 +6,19 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-// ParsePlanLearningAgendaResult 解析业务学习议程规划结果。
+// ParsePlanLearningAgendaResult 解析源码证据学习议程规划结果。
 func ParsePlanLearningAgendaResult(output string) (*agent.PlanLearningAgendaResult, error) {
 	var payload aicontract.PlanLearningAgendaOutput
 	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
-	return &agent.PlanLearningAgendaResult{Focuses: evidenceFocusesToDomain(payload.Focuses)}, nil
-}
-
-// ParseSelectLearningCandidatesResult 解析当前代码学习候选文件收敛结果。
-func ParseSelectLearningCandidatesResult(output string) (*agent.SelectLearningCandidatesResult, error) {
-	var payload aicontract.SelectLearningCandidatesOutput
-	if err := parseJSONPayload(output, &payload); err != nil {
-		return nil, err
-	}
-	result := &agent.SelectLearningCandidatesResult{
-		SelectedPaths: stringsOrEmpty(payload.SelectedPaths),
-		SkippedPaths:  make([]agent.LearningCandidateSkip, 0, len(payload.SkippedPaths)),
-		Reason:        payload.Reason,
+	result := &agent.PlanLearningAgendaResult{
+		Focuses:      evidenceFocusesToDomain(payload.Focuses),
+		SkippedPaths: make([]agent.LearningPathSkip, 0, len(payload.SkippedPaths)),
+		Reason:       payload.Reason,
 	}
 	for _, skipped := range payload.SkippedPaths {
-		result.SkippedPaths = append(result.SkippedPaths, agent.LearningCandidateSkip{
-			Path:   skipped.Path,
-			Reason: skipped.Reason,
-		})
+		result.SkippedPaths = append(result.SkippedPaths, agent.LearningPathSkip{Path: skipped.Path, Reason: skipped.Reason})
 	}
 	return result, nil
 }
@@ -41,27 +29,12 @@ func ParseNormalizePatternsResult(output string) (*agent.NormalizePatternsResult
 	if err := parseJSONPayload(output, &payload); err != nil {
 		return nil, err
 	}
-	result := &agent.NormalizePatternsResult{
-		Patterns: make([]agent.PatternNormalization, 0, len(payload.Patterns)),
-		Dropped:  make([]agent.PatternDrop, 0, len(payload.Dropped)),
-	}
+	result := &agent.NormalizePatternsResult{Patterns: make([]agent.PatternNormalization, 0, len(payload.Patterns)), Dropped: make([]agent.PatternDrop, 0, len(payload.Dropped))}
 	for _, pattern := range payload.Patterns {
-		result.Patterns = append(result.Patterns, agent.PatternNormalization{
-			ID:          pattern.ID,
-			Name:        pattern.Name,
-			Category:    pattern.Category,
-			Description: pattern.Description,
-			Rule:        pattern.Rule,
-			Confidence:  pattern.Confidence,
-			SourceIDs:   stringsOrEmpty(pattern.SourceIDs),
-		})
+		result.Patterns = append(result.Patterns, agent.PatternNormalization{ID: pattern.ID, Name: pattern.Name, Category: pattern.Category, Description: pattern.Description, Rule: pattern.Rule, Confidence: pattern.Confidence, SourceIDs: stringsOrEmpty(pattern.SourceIDs)})
 	}
 	for _, dropped := range payload.Dropped {
-		result.Dropped = append(result.Dropped, agent.PatternDrop{
-			ID:         dropped.ID,
-			ReasonCode: dropped.ReasonCode,
-			Reason:     dropped.Reason,
-		})
+		result.Dropped = append(result.Dropped, agent.PatternDrop{ID: dropped.ID, ReasonCode: dropped.ReasonCode, Reason: dropped.Reason})
 	}
 	return result, nil
 }
@@ -123,12 +96,15 @@ func evidenceFocusesToDomain(focuses []aicontract.EvidenceFocusOutput) []domain.
 	out := make([]domain.EvidenceFocus, len(focuses))
 	for i, unit := range focuses {
 		out[i] = domain.EvidenceFocus{
-			ID:           unit.ID,
-			Name:         unit.Name,
-			RouteTerms:   stringsOrEmpty(unit.RouteTerms),
-			EntryPaths:   stringsOrEmpty(unit.EntryPaths),
-			RelatedPaths: stringsOrEmpty(unit.RelatedPaths),
-			ScopeReason:  unit.ScopeReason,
+			ID:            unit.ID,
+			Name:          unit.Name,
+			RouteTerms:    stringsOrEmpty(unit.RouteTerms),
+			Attributes:    stringsOrEmpty(unit.Attributes),
+			RiskSignals:   stringsOrEmpty(unit.RiskSignals),
+			AnalysisDepth: unit.AnalysisDepth,
+			EntryPaths:    stringsOrEmpty(unit.EntryPaths),
+			RelatedPaths:  stringsOrEmpty(unit.RelatedPaths),
+			ScopeReason:   unit.ScopeReason,
 		}
 	}
 	return out

@@ -41,9 +41,9 @@ Commands that need `.skills-seed` project state:
 The CLI works with these durable state categories:
 
 - `.skills-seed/config.yaml`: tool configuration, project/workspace mode, agent, Skills target, learning settings, and output paths.
-- `.skills-seed/context/`: user-owned durable context such as background, constraints, terminology, or workspace notes.
+- `.skills-seed/context/`: user-owned durable background, terminology, or workspace notes; authoritative rules live under `.skills-seed/rules/`.
 - Learned patterns: project-specific implementation rules and evidence.
-- Project profile/spec: architecture, modules, dependencies, validation commands, and rules used by generated Skills.
+- Project profile/spec: architecture, modules, dependencies, and rules used by generated Skills.
 - Workflows: user-defined or learned task procedures rendered into generated Skills.
 - Command state: resumable state for interrupted commands such as `sync`.
 

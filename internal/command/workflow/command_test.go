@@ -24,7 +24,7 @@ func TestWorkflowCommandInWorkspaceDefaultsToRootWorkflow(t *testing.T) {
 	defer cont.Close()
 
 	cmd := Cmd(cont)
-	cmd.SetArgs([]string{"--name", "release", "--context", "工作区发布前确认 backend 和部署脚本兼容"})
+	cmd.SetArgs([]string{"--name", "release", "--content", "# Release\n\n工作区发布前确认 backend 和部署脚本兼容"})
 
 	require.NoError(t, cmd.Execute())
 
@@ -32,21 +32,15 @@ func TestWorkflowCommandInWorkspaceDefaultsToRootWorkflow(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend", ".skills-seed", "workflows", "release", "WORKFLOW.md"))
 }
 
-func TestWorkflowCommandGeneratesNameWhenMissing(t *testing.T) {
+func TestWorkflowCommandRequiresName(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	cont := newWorkflowWorkspaceContainer(t)
 	defer cont.Close()
 
 	cmd := Cmd(cont)
-	cmd.SetArgs([]string{"--context", "工作区发布前确认 backend 和部署脚本兼容"})
+	cmd.SetArgs([]string{"--content", "# Release\n\n工作区发布前确认 backend 和部署脚本兼容"})
 
-	require.NoError(t, cmd.Execute())
-
-	entries, err := os.ReadDir(filepath.Join(cont.SeedPath, "workflows"))
-	require.NoError(t, err)
-	require.Len(t, entries, 1)
-	require.Equal(t, "workflow", entries[0].Name())
-	require.FileExists(t, filepath.Join(cont.SeedPath, "workflows", entries[0].Name(), "WORKFLOW.md"))
+	require.Error(t, cmd.Execute())
 }
 
 func TestWorkflowCommandInWorkspaceCanTargetChildProject(t *testing.T) {
@@ -55,7 +49,7 @@ func TestWorkflowCommandInWorkspaceCanTargetChildProject(t *testing.T) {
 	defer cont.Close()
 
 	cmd := Cmd(cont)
-	cmd.SetArgs([]string{"--name", "deploy", "--context", "backend 发布前运行数据库迁移检查", "--child", "backend"})
+	cmd.SetArgs([]string{"--name", "deploy", "--content", "# Deploy\n\nbackend 发布前运行数据库迁移检查", "--child", "backend"})
 
 	require.NoError(t, cmd.Execute())
 
@@ -64,18 +58,18 @@ func TestWorkflowCommandInWorkspaceCanTargetChildProject(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(cont.SeedPath, "workflows", "deploy", "WORKFLOW.md"))
 }
 
-func TestWorkflowCommandPrintsOptimizeProgress(t *testing.T) {
+func TestWorkflowCommandPrintsSaveProgress(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	cont := newWorkflowWorkspaceContainer(t)
 	defer cont.Close()
 
 	output := captureWorkflowStdout(t, func() {
 		cmd := Cmd(cont)
-		cmd.SetArgs([]string{"--name", "release", "--context", "工作区发布前确认 backend 和部署脚本兼容"})
+		cmd.SetArgs([]string{"--name", "release", "--content", "# Release\n\n工作区发布前确认 backend 和部署脚本兼容"})
 		require.NoError(t, cmd.Execute())
 	})
 
-	require.Contains(t, output, "优化用户工作流")
+	require.Contains(t, output, "优化并保存用户工作流")
 }
 
 func TestWorkflowCommandUsesOverwriteFlagOnly(t *testing.T) {
@@ -95,11 +89,8 @@ func TestWorkflowShowListsLightweightSummariesAsJSON(t *testing.T) {
 
 	now := time.Date(2026, 7, 13, 12, 30, 0, 0, time.UTC)
 	require.NoError(t, cont.WorkflowRepo.Save(domain.Workflow{
-		ID:   "release",
-		Name: "Release",
-		Contexts: []domain.WorkflowContext{
-			{Content: "发布前检查构建产物", CreatedAt: now},
-		},
+		ID:        "release",
+		Name:      "Release",
 		Content:   "# Release\n\n## 适用场景\n发布流程覆盖构建产物检查和上线后验证。\n\n## 步骤\n- 检查构建产物",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -115,9 +106,8 @@ func TestWorkflowShowListsLightweightSummariesAsJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 	require.Len(t, got, 1)
 	require.Equal(t, "release", got[0].ID)
-	require.Equal(t, "workspace", got[0].Target)
+	require.Equal(t, domain.ModeWorkspace, got[0].Target)
 	require.Equal(t, "发布流程覆盖构建产物检查和上线后验证。", got[0].Summary)
-	require.Equal(t, 1, got[0].ContextCount)
 	require.NotContains(t, out.String(), "\"content\"")
 }
 
@@ -128,11 +118,8 @@ func TestWorkflowShowReturnsFullDetailsAsJSON(t *testing.T) {
 
 	now := time.Date(2026, 7, 13, 12, 30, 0, 0, time.UTC)
 	require.NoError(t, cont.WorkflowRepo.Save(domain.Workflow{
-		ID:   "release",
-		Name: "Release",
-		Contexts: []domain.WorkflowContext{
-			{Content: "发布前检查构建产物", CreatedAt: now},
-		},
+		ID:        "release",
+		Name:      "Release",
 		Content:   "# Release\n\n## 适用场景\n发布流程覆盖构建产物检查和上线后验证。",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -148,9 +135,8 @@ func TestWorkflowShowReturnsFullDetailsAsJSON(t *testing.T) {
 	var got workflowDetailView
 	require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 	require.Equal(t, "release", got.ID)
-	require.Equal(t, "workspace", got.Target)
+	require.Equal(t, domain.ModeWorkspace, got.Target)
 	require.Contains(t, got.Content, "发布流程覆盖构建产物检查")
-	require.Len(t, got.Contexts, 1)
 	require.Len(t, got.Scripts, 1)
 	require.Equal(t, "smoke.sh", got.Scripts[0].Path)
 	require.NotEmpty(t, got.Scripts[0].SHA256)

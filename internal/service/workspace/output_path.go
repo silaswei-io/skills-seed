@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
@@ -10,11 +9,6 @@ import (
 
 func (g *WorkspaceGenerator) workspaceRootOutputPath(projectRoot, workspaceName string) (string, error) {
 	return g.targetSkillOutputPath(projectRoot, skillgen.GeneratedWorkspaceSkillName(workspaceName))
-}
-
-func legacyWorkspaceSkillName(workspaceName string) string {
-	name := skillgen.GeneratedSkillName(workspaceName)
-	return strings.TrimSuffix(name, "-dev") + "-workspace"
 }
 
 func (g *WorkspaceGenerator) targetSkillOutputPath(projectRoot, skillName string) (string, error) {

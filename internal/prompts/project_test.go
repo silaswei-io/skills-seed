@@ -38,9 +38,10 @@ func TestEnsureProjectContextCreatesContextFilesOnly(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	for _, name := range []string{"README.md", "background.md", "constraints.md", "terminology.md"} {
+	for _, name := range []string{"README.md", "background.md", "terminology.md"} {
 		require.FileExists(t, filepath.Join(seedPath, "context", name))
 	}
+	require.NoFileExists(t, filepath.Join(seedPath, "context", "constraints.md"))
 	_, err = os.Stat(filepath.Join(seedPath, "prompts"))
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
@@ -90,7 +91,7 @@ func TestEnsureProjectContextRemovesDeprecatedContextFiles(t *testing.T) {
 	seedPath := t.TempDir()
 	contextDir := filepath.Join(seedPath, "context")
 	require.NoError(t, os.MkdirAll(contextDir, 0755))
-	for _, name := range []string{"project.md", "rules.md", "glossary.md"} {
+	for _, name := range []string{"project.md", "rules.md", "glossary.md", "constraints.md"} {
 		require.NoError(t, os.WriteFile(filepath.Join(contextDir, name), []byte("deprecated"), 0644))
 	}
 
@@ -101,10 +102,10 @@ func TestEnsureProjectContextRemovesDeprecatedContextFiles(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	for _, name := range []string{"project.md", "rules.md", "glossary.md"} {
+	for _, name := range []string{"project.md", "rules.md", "glossary.md", "constraints.md"} {
 		require.NoFileExists(t, filepath.Join(contextDir, name))
 	}
-	for _, name := range []string{"background.md", "constraints.md", "terminology.md"} {
+	for _, name := range []string{"background.md", "terminology.md"} {
 		require.FileExists(t, filepath.Join(contextDir, name))
 	}
 }
@@ -124,10 +125,7 @@ func TestEnsureProjectContextUsesToolLocaleForContextFiles(t *testing.T) {
 	require.Contains(t, string(project), "# Background and External Facts")
 	require.NotContains(t, string(project), "# 背景与外部事实")
 
-	rules, err := os.ReadFile(filepath.Join(seedPath, "context", "constraints.md"))
-	require.NoError(t, err)
-	require.Contains(t, string(rules), "# Constraints and Boundaries")
-	require.NotContains(t, string(rules), "# 约束与边界")
+	require.NoFileExists(t, filepath.Join(seedPath, "context", "constraints.md"))
 }
 
 func TestEnsureProjectContextWritesContextWithoutAnalysisCommands(t *testing.T) {

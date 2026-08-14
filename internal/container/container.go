@@ -18,6 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	rulestore "github.com/silaswei-io/skills-seed/internal/infra/storage/rule"
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
@@ -25,6 +26,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
+	rulesvc "github.com/silaswei-io/skills-seed/internal/service/rule"
 	workflowsvc "github.com/silaswei-io/skills-seed/internal/service/workflow"
 	ws "github.com/silaswei-io/skills-seed/internal/service/workspace"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
@@ -46,11 +48,13 @@ type Container struct {
 	WorkspaceProfileRepo  *workspacestore.ProfileRepository
 	WorkspaceSpecRepo     *workspacestore.SpecRepository
 	WorkflowRepo          *workflowstore.Repository
+	RuleRepo              *rulestore.Repository
 	Agent                 agent.Agent
 	AnalyzerSvc           *analyzer.AnalyzerService
 	GeneratorSvc          *generator.GeneratorService
 	WorkspaceGeneratorSvc *ws.WorkspaceGenerator
 	WorkflowSvc           *workflowsvc.Service
+	RuleSvc               *rulesvc.Service
 	PatternNormSvc        *patternnorm.Service
 	PromptLoader          *promptloader.Loader
 	SkillsLoader          *skills.Loader
@@ -143,6 +147,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	workspaceProfileRepo := workspacestore.NewProfileRepository(seedPath)
 	workspaceSpecRepo := workspacestore.NewSpecRepository(seedPath)
 	workflowRepo := workflowstore.NewRepository(seedPath)
+	ruleRepo := rulestore.NewRepository(seedPath)
 
 	// 5. 创建加载器
 	promptLoader := promptloader.New(cfg.Agent.Engine, configRepo.GetSkillsLocale(), seedPath)
@@ -157,11 +162,21 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 	// 7. 创建服务
 	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo)
-	patternNormSvc := patternnorm.NewServiceWithNormalizer(patternRepo, agentImpl)
+	patternNormSvc := patternnorm.NewServiceWithNormalizer(patternRepo, agentImpl, patternnorm.AdmissionPolicy{
+		MinConfidence:               cfg.Learning.Current.PatternAdmission.MinConfidence,
+		MinSingleEvidenceConfidence: cfg.Learning.Current.PatternAdmission.MinSingleEvidenceConfidence,
+	})
 
-	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, cfg.Project.Language)
-	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo)
-	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo, workflowRepo)
+	projectContext := agent.ProjectContext{
+		Name:     cfg.Project.Name,
+		RootPath: cfg.Project.RootPath,
+		Language: cfg.Project.Language,
+		Mode:     cfg.Project.Mode,
+	}
+	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, projectContext)
+	ruleSvc := rulesvc.NewService(ruleRepo, agentImpl, projectContext)
+	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo, ruleRepo)
+	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo, workflowRepo, ruleRepo)
 
 	return &Container{
 		SeedPath:              seedPath,
@@ -177,11 +192,13 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 		WorkspaceProfileRepo:  workspaceProfileRepo,
 		WorkspaceSpecRepo:     workspaceSpecRepo,
 		WorkflowRepo:          workflowRepo,
+		RuleRepo:              ruleRepo,
 		Agent:                 agentImpl,
 		AnalyzerSvc:           analyzerSvc,
 		GeneratorSvc:          generatorSvc,
 		WorkspaceGeneratorSvc: workspaceGeneratorSvc,
 		WorkflowSvc:           workflowSvc,
+		RuleSvc:               ruleSvc,
 		PatternNormSvc:        patternNormSvc,
 		PromptLoader:          promptLoader,
 		SkillsLoader:          skillsLoader,

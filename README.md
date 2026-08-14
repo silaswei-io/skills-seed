@@ -15,7 +15,7 @@
 
 </div>
 
-Skills Seed 面向已有代码库。它从当前代码、Git 历史、目录结构和检查命中记录中提取团队真实实践，把目录边界、能力入口、错误处理、可复用工具、测试习惯和接口/契约约定沉淀成本地 Skills，供 Claude Code / Codex 直接加载。
+Skills Seed 面向已有代码库。它从当前代码、Git 历史、目录结构和检查命中记录中提取团队真实实践，把目录边界、能力入口、错误处理、可复用工具和接口/契约约定沉淀成本地 Skills，供 Claude Code / Codex 直接加载。
 
 适合你已经有一个老项目、业务系统或多仓 workspace，并希望 AI Agent 不再每次都从零理解项目规则。
 
@@ -32,7 +32,7 @@ Skills Seed 的核心不是生成一份静态项目说明，而是让 Agent 的�
 
 - **从代码中学习**：以当前代码、目录结构、显式项目上下文和源码证据为主要输入，不要求用户手写大段项目说明。
 - **增量学习**：`learn current` 默认只处理新增、修改和删除文件，未变化文件跳过；删除文件会清理文件指纹并作为删除 diff 进入学习流程。
-- **模式生命周期**：pattern 有 `active`、`stale`、`superseded`、`deprecated` 状态，默认只让 active 模式参与生成和统计；当前不自动物理删除过期模式，可用 `patterns delete` / `patterns compact` 治理。
+- **模式生命周期**：pattern 有 `active`、`stale`、`superseded`、`deprecated` 状态，默认只让 active 模式参与生成和统计；`learn current` 会在有 diff 锚定证据时物理删除已失效的代码学习模式，用户定义和默认模式仍需显式治理。
 
 ### Skills 实时刷新、按需加载
 
@@ -51,15 +51,15 @@ Skills Seed 的核心不是生成一份静态项目说明，而是让 Agent 的�
 生成结果不是泛泛的项目介绍，而是一套围绕当前仓库组织的 Agent 工作上下文：
 
 - 哪些目录负责什么能力，改动时应该先看哪里。
-- 哪些能力入口、可复用工具、错误处理和测试习惯已经被团队长期使用。
+- 哪些能力入口、可复用工具和错误处理已经被团队长期使用。
 - workspace 根仓中哪个子项目应该处理哪类需求，跨项目改动要按什么顺序看。
-- 哪些源码证据支持可复用知识，应进入最终 Skills 的路由、参考和验证建议。
+- 哪些源码证据支持可复用知识，应进入最终 Skills 的路由和参考。
 
 ## 真实项目案例
 
-以 [medusa-demo](https://github.com/silaswei-io/medusa-demo/tree/develop/.claude/skills/skills-seed-skills) 为例，直接使用默认 `sync` 后，Skills Seed 生成了面向 Medusa TypeScript monorepo 的项目级 Skill：入口 `SKILL.md` 只负责任务路由和约束来源，产品/领域规则、架构边界、能力入口、验证命令和代码证据拆到 `references/` 中按需加载。Go 项目还会从真实 `go.mod` 与 `_test.go` 确定性生成多模块测试矩阵，不依赖 AI 是否学到测试命令。
+以 [medusa-demo](https://github.com/silaswei-io/medusa-demo/tree/develop/.claude/skills/skills-seed-skills) 为例，直接使用默认 `sync` 后，Skills Seed 生成了面向 Medusa TypeScript monorepo 的项目级 Skill：入口 `SKILL.md` 统一路由项目知识和用户 Workflow，产品/领域规则、架构边界、能力入口和代码证据拆到 `references/` 中按需加载，测试、部署和验收流程从用户维护内容生成到 `workflows/`。
 
-仓库中的 `writing-docs`、`reviewing-prs` 等任务 Skill 负责固定流程和协作规则；Skills Seed 生成的项目 Skill 则在改代码前回答“这个项目应该怎么改、先读哪里、哪些规则有代码证据、该跑什么验证”。
+Skills Seed 生成的项目 Skill 在改代码前回答“这个项目应该怎么改、先读哪里、哪些规则有代码证据”，并在任务涉及测试、部署或验收时路由到匹配的用户 Workflow。源码学习不会自行推导这些流程。
 
 medusa-demo 样例的实际生成结果、与其他 Skills 的对比和适用场景见 [Medusa Demo 案例](docs/MEDUSA_DEMO_CASE.md)。
 
@@ -101,7 +101,7 @@ skills-seed sync
 |---|---|
 | AI 每次进项目都不知道该读哪些文件 | 生成入口 `SKILL.md`，按任务引导 Agent 读取相关 references |
 | 团队规范只存在于代码实现里 | 从当前代码、目录结构、显式上下文和源码证据中提取 patterns |
-| 老项目有能力入口、可复用工具和隐性边界 | 沉淀能力入口、模块职责、项目画像和验证建议 |
+| 老项目有能力入口、可复用工具和隐性边界 | 从源码证据沉淀能力入口和模式，从项目画像提供模块导航 |
 | workspace 下多个子项目上下文容易混乱 | 根仓负责路由，子项目独立学习和生成 Skills |
 | 后续改动需要持续更新知识 | 用 `sync` / hook 重新学习当前变更并刷新生成的 Skills |
 
@@ -115,7 +115,7 @@ current code / project context / repository structure
 ```
 
 1. `init` 创建 `.skills-seed/config.yaml`、本地数据库和可编辑项目上下文。
-2. `sync` 分析当前代码和项目上下文，保存 patterns、项目画像、能力入口和验证建议。
+2. `sync` 分阶段分析当前代码和项目上下文，保存已审查 patterns、能力入口、项目画像和权威规则覆盖。
 3. 生成的 `SKILL.md` 只作为入口，Agent 需要深入时再读取 `references/`。
 
 ## 它会生成什么
@@ -211,9 +211,9 @@ skills:
 
 `agent.model` 为空时不传模型参数，完全继承本机 Agent CLI 默认配置；填写后会在 skills-seed 调用 Claude 或 Codex CLI 时传入对应模型名。模型名格式由具体 Agent CLI 决定。
 
-当前 `sync` / `learn current` 会先做本地文件过滤，再做候选准备决定进入证据包规划的输入；大候选集可按 `learning.current.select_relevant_files_min_candidates` 阈值启用 AI 候选收敛，小范围变更使用本地保守候选准备，不按路径词表丢弃源码候选。默认 `provider: auto` 会优先使用 CodeGraph，并在缺少或异常的索引上自动初始化、同步或修复；当 CodeGraph 命令或索引不可用时会回退到内嵌 tree-sitter。候选/焦点文件清单会作为 runtime 输入文件按路径引用，不再直接堆进分析 prompt；证据包规划和学习 prompt 也带有稳定决策规则，减少相同输入下的输出漂移。终端只展示关键阶段和精简的过滤、候选结果，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
+当前 `sync` / `learn current` 会先做本地文件过滤，范围内候选会完整进入证据包规划，不按路径词表或模型猜测删除源码候选。默认 `provider: auto` 会优先使用 CodeGraph，并在缺少或异常的索引上自动初始化、同步或修复；当 CodeGraph 命令或索引不可用时会回退到内嵌 tree-sitter。候选/焦点文件清单会作为 runtime 输入文件按路径引用，不再直接堆进分析 prompt；证据包规划和学习 prompt 也带有稳定决策规则，减少相同输入下的输出漂移。终端只展示关键阶段和精简的过滤、候选结果，候选数量、耗时等排查细节写入运行时日志，避免大项目进度行被细节淹没。
 
-证据包规划会以只读方式读取 runtime 候选清单、结构上下文及必要的仓库源码，确保按路径引用的输入真实可用；当前学习的模式入库会先用 AI 做轻量合并优化，只让 AI 决定候选来源归属和规范化建议，再由本地规范化服务补齐字段、恢复覆盖、严格校验和写入。AI 失败或输出不合格时会降级到本地确定性路径，不重复扫描仓库，也不会让 AI 直接写模式库。`learn current` 会把分析结果、项目画像提交状态及已完成的规范化决策写入可恢复 checkpoint；本地校验或保存失败时使用 `sync --resume` 可直接重放，不会重跑已完成证据包。终端会分别显示 AI 合并优化、规范化校验和模式库写入，详细诊断写入 runtime 日志。
+证据包规划会以只读方式读取 runtime 候选清单、结构上下文及必要的仓库源码，确保按路径引用的输入真实可用；当前学习的独立知识审查按议程焦点串行执行，同一焦点的候选保持在一次调用中，每个焦点完成后立即保存 checkpoint。全部焦点通过后，再用 AI 做一次跨焦点轻量合并优化，只让 AI 决定候选来源归属和规范化建议，最后由本地规范化服务补齐字段、恢复覆盖、严格校验和写入。AI 失败或输出不合格时会降级到本地确定性路径，不重复扫描仓库，也不会让 AI 直接写模式库。`learn current` 会把分析结果、焦点审查结果、项目画像提交状态及已完成的规范化决策写入可恢复 checkpoint；本地校验或保存失败时使用 `sync --resume` 可直接重放，不会重跑已完成证据包或已审查焦点。终端按真实流水线分别展示议程规划、隔离源码证据分析、焦点级独立知识审查、知识准入与入库、权威规则与项目地图刷新；生成阶段还会显示 Skill 交付就绪校验，详细诊断写入 runtime 日志。
 
 从 0.13.2 开始，仓库通过 `staticcheck ./...` 清理静态检查噪音；除 `go test`、`go vet` 和构建外，发布前也建议运行 staticcheck 作为代码质量门禁。
 
@@ -238,6 +238,7 @@ skills:
 | `skills-seed workspace` | 管理 workspace 子项目 |
 | `skills-seed patterns` | 查看、补充、修订或整理模式规则 |
 | `skills-seed workflow` | 查看、添加或更新团队常用任务流程 |
+| `skills-seed rule` | 查看、增量维护或完整覆盖团队长期规则 |
 | `skills-seed hook` | 安装、卸载或手动运行 Git hook |
 | `skills-seed profile` | 查看或更新项目画像 |
 | `skills-seed preview` | 预览同步时可能纳入的文件范围 |
@@ -294,7 +295,6 @@ Skills Seed 不维护远端知识库；学习结果默认写入当前仓库。`s
 .skills-seed/context/
 ├── README.md
 ├── background.md
-├── constraints.md
 ├── terminology.md
 └── workspace.md
 ```
@@ -302,9 +302,9 @@ Skills Seed 不维护远端知识库；学习结果默认写入当前仓库。`s
 | 场景 | 推荐方式 |
 |---|---|
 | 代码看不到的项目事实或背景 | 写入 `.skills-seed/context/background.md` |
-| 长期团队规则、兼容性或禁止事项 | 写入 `.skills-seed/context/constraints.md` |
+| 长期团队规则、兼容性或禁止事项 | 使用 `skills-seed rule` 写入 `.skills-seed/rules/` |
 | 术语、别名、状态名 | 写入 `.skills-seed/context/terminology.md` |
-| workspace 跨项目背景和协作约束 | 写入 `.skills-seed/context/workspace.md` |
+| workspace 跨项目背景和共享事实 | 写入 `.skills-seed/context/workspace.md` |
 | 本次同步临时说明 | 使用 `skills-seed sync --context` |
 | 本次同步较长说明 | 使用 `skills-seed sync --context-path` |
 

@@ -13,7 +13,3 @@ type patternReader interface {
 type profileReader interface {
 	Get(context.Context) (*domain.ProjectProfile, error)
 }
-
-type projectSpecWriter interface {
-	SaveSpec(context.Context, *domain.ProjectSpec) error
-}

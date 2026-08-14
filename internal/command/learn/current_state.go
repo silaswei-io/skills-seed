@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -112,12 +111,6 @@ func displayCount(count int) string {
 		return "-"
 	}
 	return strconv.Itoa(count)
-}
-
-func learnCurrentStateMode(mode, scope string) string {
-	mode = string(config.NormalizeLearningMode(mode))
-	scope = string(config.NormalizeLearningScope(scope))
-	return mode + "|scope=" + scope
 }
 
 func learnCurrentInvocationHash(configRepo config.Reader, focusPaths []string, profileMode string, force bool) string {
@@ -349,9 +342,6 @@ func restoreCurrentState(
 		if err == commandstate.ErrStateNotFound {
 			return nil, nil
 		}
-		if errors.Is(err, commandstate.ErrUnsupportedSchemaVersion) {
-			return nil, repo.Clear()
-		}
 		return nil, err
 	}
 	if !canResumeCurrentState(state, projectName, language, mode, userContext, invocationHash) {
@@ -378,7 +368,6 @@ func loadOrCreateCurrentState(
 	projectRoot string,
 	language string,
 	mode string,
-	scope string,
 	focusRelPaths []string,
 	changes *fileanalysis.FileChanges,
 	inputSummary commandstate.InputSummary,
@@ -390,25 +379,28 @@ func loadOrCreateCurrentState(
 	if err != nil && err != commandstate.ErrStateNotFound {
 		return nil, err
 	}
-	stateMode := learnCurrentStateMode(mode, scope)
+	stateMode := string(config.NormalizeLearningMode(mode))
 	if canReuseCurrentState(state, changes, projectName, language, stateMode, userContext, invocationHash) {
 		return state, nil
 	}
 	var focuses []domain.EvidenceFocus
 	if len(focusRelPaths) > 0 {
-		focuses, err = analyzerSvc.PlanLearningAgenda(ctx, &analyzer.PlanLearningAgendaRequest{
-			ProjectName:   projectName,
-			RootPath:      projectRoot,
-			Language:      language,
-			LearningMode:  config.NormalizeLearningMode(mode),
-			LearningScope: config.NormalizeLearningScope(scope),
-			FocusPaths:    focusRelPaths,
-			UserContext:   userContext,
+		plan, planErr := analyzerSvc.PlanLearningAgenda(ctx, &analyzer.PlanLearningAgendaRequest{
+			ProjectName:  projectName,
+			RootPath:     projectRoot,
+			Language:     language,
+			LearningMode: config.NormalizeLearningMode(mode),
+			FocusPaths:   focusRelPaths,
+			UserContext:  userContext,
 		})
-		if err != nil {
-			return nil, err
+		if planErr != nil {
+			return nil, planErr
 		}
-		focuses = reconcileEvidenceFocuses(focuses, focusRelPaths)
+		selectedPaths := learningAgendaFocusPaths(plan.Focuses)
+		changes.ApplyLearningSelection(selectedPaths, plan.Reason)
+		focuses = reconcileEvidenceFocuses(plan.Focuses, selectedPaths)
+		inputSummary.SelectedFiles = len(selectedPaths)
+		inputSummary.SkippedFiles = len(plan.SkippedPaths)
 	}
 	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateFiles(changes), changes.Deleted, focuses).
 		WithInvocationHash(invocationHash).
@@ -420,18 +412,27 @@ func loadOrCreateCurrentState(
 	return state, nil
 }
 
+func learningAgendaFocusPaths(focuses []domain.EvidenceFocus) []string {
+	paths := make([]string, 0)
+	for _, focus := range focuses {
+		paths = append(paths, focus.EntryPaths...)
+		paths = append(paths, focus.RelatedPaths...)
+	}
+	return normalizeStatePaths(paths)
+}
+
 func pendingEvidenceFocuses(state *commandstate.State, changes *fileanalysis.FileChanges) []domain.EvidenceFocus {
 	if state == nil || changes == nil {
 		return nil
 	}
 	pending := pathSet(analysisCandidatePaths(changes))
-	var completed []domain.EvidenceFocus
+	var completed []commandstate.FocusKnowledgeCheckpoint
 	if state.Analysis != nil {
-		completed = state.Analysis.CompletedFocuses
+		completed = state.Analysis.FocusKnowledge
 	}
 	focuses := make([]domain.EvidenceFocus, 0, len(state.Agenda.Focuses))
 	for _, focus := range state.Agenda.Focuses {
-		if evidenceFocusIncluded(completed, focus) {
+		if focusKnowledgeIncluded(completed, focus) {
 			continue
 		}
 		if len(intersectFocusPaths(focus, pending)) == 0 {
@@ -442,6 +443,15 @@ func pendingEvidenceFocuses(state *commandstate.State, changes *fileanalysis.Fil
 	return focuses
 }
 
+func focusKnowledgeIncluded(units []commandstate.FocusKnowledgeCheckpoint, target domain.EvidenceFocus) bool {
+	for _, unit := range units {
+		if evidenceFocusSame(unit.Focus, target) {
+			return true
+		}
+	}
+	return false
+}
+
 func evidenceFocusIncluded(focuses []domain.EvidenceFocus, target domain.EvidenceFocus) bool {
 	for _, focus := range focuses {
 		if evidenceFocusSame(focus, target) {
@@ -449,26 +459,6 @@ func evidenceFocusIncluded(focuses []domain.EvidenceFocus, target domain.Evidenc
 		}
 	}
 	return false
-}
-
-func subtractStatePaths(all, selected []string) []string {
-	selectedSet := pathSet(selected)
-	out := make([]string, 0)
-	for _, path := range normalizeStatePaths(all) {
-		if !selectedSet[path] {
-			out = append(out, path)
-		}
-	}
-	return out
-}
-
-func sortedBoolPaths(paths map[string]bool) []string {
-	out := make([]string, 0, len(paths))
-	for path := range paths {
-		out = append(out, path)
-	}
-	sort.Strings(out)
-	return out
 }
 
 func evidenceFocusPaths(focus domain.EvidenceFocus, changes *fileanalysis.FileChanges) []string {

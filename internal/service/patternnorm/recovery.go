@@ -13,13 +13,7 @@ func recoverCurrentNormalization(assessment normalizationAssessment, candidates 
 	if result == nil {
 		result = &proposal{}
 	}
-	missing := patternsByID(candidates, assessment.Coverage.MissingIDs)
-	if len(missing) == 0 {
-		return result
-	}
-
-	recovered := keepCurrentCandidates(missing)
-	mergeRecoveredPatterns(result, recovered.Patterns)
+	mergeRecoveredPatterns(result, keepCurrentCandidates(patternsByID(candidates, assessment.Coverage.MissingIDs)).Patterns)
 	return result
 }
 
@@ -28,16 +22,14 @@ func recoverRecallProtectedDrops(result *proposal, candidates []domain.Pattern) 
 	if result == nil || len(result.Dropped) == 0 {
 		return result, nil
 	}
-
-	candidatesByID := make(map[string]domain.Pattern, len(candidates))
+	byID := make(map[string]domain.Pattern, len(candidates))
 	for _, candidate := range candidates {
-		candidatesByID[candidate.ID] = candidate
+		byID[candidate.ID] = candidate
 	}
-
 	protected := make([]domain.Pattern, 0)
 	dropped := result.Dropped[:0]
 	for _, item := range result.Dropped {
-		candidate, ok := candidatesByID[item.ID]
+		candidate, ok := byID[item.ID]
 		if ok && shouldRecoverDroppedCurrentCandidate(candidate, item) {
 			protected = append(protected, candidate)
 			continue
@@ -45,39 +37,27 @@ func recoverRecallProtectedDrops(result *proposal, candidates []domain.Pattern) 
 		dropped = append(dropped, item)
 	}
 	result.Dropped = dropped
-	if len(protected) == 0 {
-		return result, nil
+	mergeRecoveredPatterns(result, keepCurrentCandidates(protected).Patterns)
+	ids := make([]string, 0, len(protected))
+	for _, candidate := range protected {
+		ids = append(ids, candidate.ID)
 	}
-
-	recovered := keepCurrentCandidates(protected)
-	mergeRecoveredPatterns(result, recovered.Patterns)
-	recoveredIDs := make([]string, 0, len(protected))
-	for _, pattern := range protected {
-		recoveredIDs = append(recoveredIDs, pattern.ID)
-	}
-	sort.Strings(recoveredIDs)
-	return result, recoveredIDs
+	sort.Strings(ids)
+	return result, ids
 }
 
 func shouldRecoverDroppedCurrentCandidate(candidate domain.Pattern, dropped Drop) bool {
 	if !currentCandidateHasReusableEvidence(candidate) {
 		return false
 	}
-	switch dropped.ReasonCode {
-	case DropOverfilteredSourceBacked,
-		DropNoRouteableValue:
-		return true
-	default:
-		return false
-	}
+	return dropped.ReasonCode == DropOverfilteredSourceBacked || dropped.ReasonCode == DropNoRouteableValue
 }
 
 func currentCandidateHasReusableEvidence(candidate domain.Pattern) bool {
 	if !candidate.IsValid() || hasPlaceholderExample(candidate.GoodExample) || len(candidate.EvidenceLocations) == 0 {
 		return false
 	}
-	text := strings.TrimSpace(candidate.Name + " " + candidate.Description + " " + candidate.Rule)
-	return len([]rune(text)) >= 48
+	return len([]rune(strings.TrimSpace(candidate.Name+" "+candidate.Description+" "+candidate.Rule))) >= 48
 }
 
 func patternsByID(patterns []domain.Pattern, ids []string) []domain.Pattern {
@@ -101,9 +81,8 @@ func mergeRecoveredPatterns(result *proposal, recovered []domain.Pattern) {
 	}
 	for _, pattern := range recovered {
 		if index, ok := indexByID[pattern.ID]; ok {
-			current := &result.Patterns[index]
-			current.MergedFrom = stringx.UniqueNonEmpty(append(current.MergedFrom, pattern.MergedFrom...))
-			current.Merged = len(current.MergedFrom) > 1
+			result.Patterns[index].MergedFrom = stringx.UniqueNonEmpty(append(result.Patterns[index].MergedFrom, pattern.MergedFrom...))
+			result.Patterns[index].Merged = len(result.Patterns[index].MergedFrom) > 1
 			continue
 		}
 		indexByID[pattern.ID] = len(result.Patterns)

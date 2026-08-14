@@ -56,20 +56,18 @@ agent:
 
 ########################################################################
 # Learning
-# Controls the default scope for learn current
+# Controls the learning strategy and structural context for learn current
 ########################################################################
 learning:
   current:
-    # Learning strategy: normal balances quality and speed; fast keeps compact directly evidenced patterns; deep keeps more source-backed local business/code patterns
+    # All learning strategies use high-precision admission: fast narrows exploration, normal is the default, and deep broadens evidence exploration without lowering admission standards
     mode: "normal"
-    # Learning focus planning lens: flow is the default stable choice for workflows/resource actions; domain favors long-lived business responsibilities; module favors module/plugin/contract boundaries
-    scope: "flow"
-    # Maximum evidence focuses per AI call; 1 disables batching to reduce oversized outputs and cross-focus bleed
-    max_focuses_per_call: 1
-    # Enable AI candidate narrowing for large candidate sets before evidence-pack planning
-    select_relevant_files: true
-    # Minimum candidate file count required before AI candidate narrowing is called; smaller changes use conservative local preparation
-    select_relevant_files_min_candidates: 200
+    # Pattern candidate admission thresholds, each in (0, 1]
+    pattern_admission:
+      # Minimum confidence for candidates with evidence in multiple files
+      min_confidence: 0.75
+      # Minimum confidence for candidates with evidence in one file
+      min_single_evidence_confidence: 0.85
     structural:
       # Enable bounded structural context; it does not run without bounded inputs
       enabled: true

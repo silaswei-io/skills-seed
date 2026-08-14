@@ -13,6 +13,8 @@ import (
 func TestSelectFilesUsesOnePolicyForExcludeDocumentsAndSourceFiles(t *testing.T) {
 	root := t.TempDir()
 	writeSelectionFile(t, root, "main.go", "package main\n")
+	writeSelectionFile(t, root, "main_test.go", "package main\n")
+	writeSelectionFile(t, root, "deploy/values.yaml", "replicas: 1\n")
 	writeSelectionFile(t, root, "docs/examples/demo.go", "package examples\n")
 	writeSelectionFile(t, root, "README.MD", "# readme\n")
 	writeSelectionFile(t, root, "assets/logo.svg", "<svg></svg>\n")
@@ -24,10 +26,11 @@ func TestSelectFilesUsesOnePolicyForExcludeDocumentsAndSourceFiles(t *testing.T)
 	})
 
 	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"docs/examples/demo.go", "main.go"}, selection.Paths())
+	require.ElementsMatch(t, []string{"deploy/values.yaml", "docs/examples/demo.go", "main.go"}, selection.Paths())
 	require.Equal(t, 1, selection.SkippedCount(SkipReasonDocument))
 	require.Equal(t, 1, selection.SkippedCount(SkipReasonNonSource))
 	require.Equal(t, 1, selection.SkippedCount(SkipReasonExcluded))
+	require.Equal(t, 1, selection.SkippedCount(SkipReasonProcedure))
 }
 
 func TestSelectFilesKeepsOnlyFocusedAnalyzableFiles(t *testing.T) {

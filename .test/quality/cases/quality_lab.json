@@ -1,0 +1,468 @@
+{
+  "case": "quality_lab",
+  "fixture": {
+    "project_dir": "quality_lab"
+  },
+  "prompt_independence": {
+    "markers": [
+      "quality_lab",
+      "quality-lab",
+      "OrderPlaced",
+      "ErrOutcomeUncertain",
+      "ErrQueueFull",
+      "MaximumDiscount",
+      "QuoteBest",
+      "BestBenefit",
+      "ListAvailable",
+      "internal/fulfillment/service.go",
+      "internal/refund/service.go",
+      "internal/subscription/service.go",
+      "internal/shipment/planner.go"
+    ]
+  },
+  "run": {
+    "builder": ".test/quality/fixtures/quality_lab/build.sh",
+    "agent": "codex",
+    "init_args": [
+      "init",
+      "--locale", "zh-CN",
+      "--skills-locale", "en-US",
+      "--agent", "{agent}",
+      "--skills", "codex",
+      "--no-interactive"
+    ],
+    "initial_sync_args": ["sync", "--restart", "--no-interactive"],
+    "repeat_sync_args": ["sync", "--no-interactive"],
+    "repeat_sync": 2
+  },
+  "skill_roots": [
+    ".agents/skills/quality-lab-dev"
+  ],
+  "dimensions": {
+    "delivery": {"points": 15},
+    "authority": {"points": 20},
+    "capability": {"points": 20},
+    "behavior": {"points": 25},
+    "architecture": {"points": 10},
+    "loading": {"points": 10}
+  },
+  "thresholds": {
+    "total": 82,
+    "dimensions": {
+      "delivery": 100,
+      "authority": 80,
+      "capability": 60,
+      "behavior": 70,
+      "architecture": 70,
+      "loading": 70
+    }
+  },
+  "checks": [
+    {
+      "id": "required-output",
+      "type": "files_exist",
+      "dimension": "delivery",
+      "description": "The generated Skill contains its entry point and core references.",
+      "gate": true,
+      "score_cap": 30,
+      "weight": 3,
+      "paths": [
+        "SKILL.md",
+        "references/project-overview.md",
+        "references/project-spec.md",
+        "references/modules.md",
+        "references/business-methods.md"
+      ],
+      "hint": "Inspect generation readiness and reference planning before content quality."
+    },
+    {
+      "id": "local-links",
+      "type": "markdown_links_valid",
+      "dimension": "delivery",
+      "description": "Every generated local Markdown link resolves inside the Skill.",
+      "gate": true,
+      "score_cap": 40,
+      "weight": 2,
+      "minimum": 3,
+      "hint": "Fix reference planning or relative link construction."
+    },
+    {
+      "id": "repeat-run-stability",
+      "type": "output_stability",
+      "dimension": "delivery",
+      "description": "An unchanged project produces an identical Skill tree on a repeated sync.",
+      "gate": true,
+      "score_cap": 55,
+      "weight": 2,
+      "run_only": true,
+      "runs": [1, 2],
+      "minimum": 5,
+      "hint": "Inspect unstable timestamps, ordering, IDs, summaries, or non-deterministic projection logic."
+    },
+    {
+      "id": "source-paths",
+      "type": "source_paths_valid",
+      "dimension": "delivery",
+      "description": "Source paths cited by generated references exist in the fixture project.",
+      "gate": true,
+      "score_cap": 45,
+      "weight": 2,
+      "minimum": 8,
+      "prefixes": ["cmd/", "desc/", "docs/", "etc/", "internal/", "plugins/"],
+      "suffixes": [".api", ".go", ".md", ".yaml"],
+      "hint": "Verify AI locations against the source catalog before rendering."
+    },
+    {
+      "id": "authority-contract-ownership",
+      "type": "contains_groups",
+      "dimension": "authority",
+      "description": "The exact interface ownership and identifier rules survive authority extraction and project-map refresh.",
+      "gate": true,
+      "score_cap": 60,
+      "weight": 3,
+      "files": ["references/project-spec.md"],
+      "groups": [
+        ["identifiers?.{0,50}(?:string|text)", "(?:string|text).{0,50}identifiers?"],
+        ["desc/api"],
+        ["generated.{0,60}(?:must not|do not|never).{0,40}edit", "must not.{0,40}generated"]
+      ],
+      "hint": "Review authoritative-section coverage and rule projection."
+    },
+    {
+      "id": "authority-tenant-and-state",
+      "type": "contains_groups",
+      "dimension": "authority",
+      "description": "Tenant and state-transition constraints remain explicit and scoped.",
+      "gate": true,
+      "score_cap": 60,
+      "weight": 3,
+      "files": ["references/project-spec.md"],
+      "groups": [
+        ["validated tenant", "tenant context"],
+        ["order\\.Transition", "Transition"],
+        ["failed.{0,40}compensation", "compensation.{0,40}(?:failure|error)"]
+      ],
+      "hint": "Ensure every authoritative section returns a linked rule receipt."
+    },
+    {
+      "id": "authority-command-policy",
+      "type": "contains_groups",
+      "dimension": "authority",
+      "description": "Command authorization is visible from the entry Skill.",
+      "weight": 2,
+      "files": ["SKILL.md"],
+      "groups": [
+        ["requires_authorization"],
+        ["Deployment", "environment mutation"]
+      ],
+      "hint": "Project command policies should be routed from SKILL.md, not hidden in a deep reference."
+    },
+    {
+      "id": "capability-entries",
+      "type": "entry_contract",
+      "dimension": "capability",
+      "description": "High-value reusable entries are indexed with complete usage contracts.",
+      "weight": 4,
+      "files": ["references/business-methods.md"],
+      "entries": ["Place", "RequireID", "Transition", "Submit"],
+      "required_fields": [
+        "Current Location",
+        "Entry Signature",
+        "Prerequisites",
+        "Returns",
+        "Usage"
+      ],
+      "hint": "Improve capability selection and preserve semantic fields after symbol verification."
+    },
+    {
+      "id": "catalog-capability",
+      "type": "contains_groups",
+      "dimension": "capability",
+      "description": "The tenant-aware catalog entry remains discoverable.",
+      "weight": 1,
+      "files": ["references/business-methods.md", "references/patterns/**/*.md"],
+      "groups": [
+        ["ListAvailable"],
+        ["internal/catalog/service\\.go"]
+      ],
+      "hint": "Retain routeable module capabilities even when they are not top-level handlers."
+    },
+    {
+      "id": "generated-entries-excluded",
+      "type": "not_contains",
+      "dimension": "capability",
+      "description": "Generated handlers and type shells are not promoted as reusable capability entries.",
+      "weight": 2,
+      "files": ["references/business-methods.md"],
+      "patterns": [
+        "internal/handler/",
+        "internal/types/commerce/"
+      ],
+      "hint": "Prefer canonical handwritten owners over generated transport shells."
+    },
+    {
+      "id": "order-boundary",
+      "type": "contains_groups",
+      "dimension": "behavior",
+      "description": "Order placement includes its ownership, orchestration, and failure boundary.",
+      "weight": 3,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "groups": [
+        ["internal/order/service\\.go"],
+        ["Reserve", "inventory reservation"],
+        ["Release", "compensat"],
+        ["OrderPlaced", "publish placed order"]
+      ],
+      "hint": "Analyze connected state and external-effect paths as one careful focus."
+    },
+    {
+      "id": "dispatcher-boundary",
+      "type": "contains_groups",
+      "dimension": "behavior",
+      "description": "Queue overload and lifecycle ownership are retained as a bounded concurrency behavior.",
+      "weight": 2,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "groups": [
+        ["ErrQueueFull", "queue is full", "overload"],
+        ["ErrClosed", "dispatcher is closed"],
+        ["internal/job/dispatcher\\.go"]
+      ],
+      "hint": "Keep reusable overload and shutdown semantics, not only the channel mechanism."
+    },
+    {
+      "id": "payment-idempotency-boundary",
+      "type": "section_contract",
+      "dimension": "behavior",
+      "description": "Payment capture is learned as one idempotency and uncertain-outcome boundary.",
+      "weight": 3,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "anchors": ["internal/payment/service\\.go"],
+      "groups": [
+        ["idempotenc", "IdempotencyID"],
+        ["reus", "existing outcome", "already completed"],
+        ["conflict", "another payment"],
+        ["uncertain", "external.{0,50}success", "provider.{0,50}local"]
+      ],
+      "hint": "Keep idempotency reuse, conflict detection, and post-provider persistence failure in one source-backed pattern."
+    },
+    {
+      "id": "approval-stage-boundary",
+      "type": "section_contract",
+      "dimension": "behavior",
+      "description": "Approval extraction preserves stage ownership, amount threshold, and terminal states.",
+      "weight": 3,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "anchors": ["internal/approval/model\\.go"],
+      "groups": [
+        ["manager"],
+        ["finance"],
+        ["threshold", "amount"],
+        ["terminal", "approved.{0,40}rejected", "rejected.{0,40}approved"]
+      ],
+      "hint": "Model the state machine and reviewer ownership together instead of summarizing approval as a generic status update."
+    },
+    {
+      "id": "pricing-exclusive-benefit",
+      "type": "section_contract",
+      "dimension": "behavior",
+      "description": "Pricing extraction distinguishes exclusive best-benefit selection from discount stacking.",
+      "weight": 2,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "anchors": ["internal/pricing/service\\.go"],
+      "groups": [
+        ["best", "highest", "maximum"],
+        ["member"],
+        ["campaign"],
+        ["coupon"],
+        ["cap", "MaximumDiscount", "discount limit"]
+      ],
+      "hint": "Extract benefit exclusivity and the final discount cap, not a generic price calculation pattern."
+    },
+    {
+      "id": "fulfillment-partial-success",
+      "type": "section_contract",
+      "dimension": "behavior",
+      "description": "Fulfillment extraction preserves partial allocation results and non-rollback semantics.",
+      "weight": 2,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "anchors": ["internal/fulfillment/service\\.go"],
+      "groups": [
+        ["partial"],
+        ["allocation", "allocated"],
+        ["preserv", "return.{0,50}result", "results?.{0,50}return", "allocations?.{0,50}returned"],
+        ["not.{0,30}rollback", "does not.{0,30}rollback", "without rollback", "no.{0,40}rollback"]
+      ],
+      "hint": "Represent partial success and returned progress explicitly instead of claiming transactional rollback."
+    },
+    {
+      "id": "refund-cumulative-limit",
+      "type": "section_contract",
+      "dimension": "behavior",
+      "description": "Refund extraction keeps idempotency, cumulative refundable amount, and uncertain provider outcome together.",
+      "weight": 3,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "anchors": ["internal/refund/service\\.go"],
+      "aggregate_by_anchor": true,
+      "groups": [
+        ["idempotenc", "IdempotencyID"],
+        ["cumulative", "already refunded", "refunded amount"],
+        ["remaining", "captured.{0,50}refund", "refund.{0,50}captured", "cumulative.{0,50}captured"],
+        ["uncertain", "provider.{0,50}local", "external.{0,50}local"]
+      ],
+      "hint": "Treat a refund as a cumulative payment boundary; preserve replay handling, remaining amount validation, and post-provider persistence risk."
+    },
+    {
+      "id": "subscription-renewal-window",
+      "type": "section_contract",
+      "dimension": "behavior",
+      "description": "Subscription extraction preserves renewal base time, grace-period behavior, and suspension after expiry.",
+      "weight": 3,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "anchors": ["internal/subscription/service\\.go"],
+      "groups": [
+        ["renew", "renewal"],
+        ["expir", "ExpiresAt"],
+        ["grace", "GraceUntil", "past.due"],
+        ["suspend"],
+        ["current.{0,30}time", "later of", "base.{0,30}(?:expiry|expiration)"]
+      ],
+      "hint": "Extract the time-window state transition, including where a successful renewal starts and what a failed charge does before and after grace expiry."
+    },
+    {
+      "id": "shipment-split-decision",
+      "type": "section_contract",
+      "dimension": "behavior",
+      "description": "Shipment extraction keeps warehouse grouping, partial line routing, and rejected-line results in one decision pattern.",
+      "weight": 3,
+      "files": ["references/patterns/**/*.md", "references/business-methods.md"],
+      "anchors": ["internal/shipment/planner\\.go"],
+      "groups": [
+        ["warehouse"],
+        ["package", "shipment"],
+        ["partial", "insufficient stock"],
+        ["reject", "unavailable", "unshippable"],
+        ["preserv", "return.{0,40}plan", "result.{0,40}(?:error|failure)"]
+      ],
+      "hint": "Model routing per order line: group shippable quantities and retain rejected quantities instead of reducing the operation to all-or-nothing fulfillment."
+    },
+    {
+      "id": "no-business-overclaims",
+      "type": "not_contains",
+      "dimension": "behavior",
+      "description": "Generated knowledge does not invert the fixture's critical business boundaries.",
+      "gate": true,
+      "score_cap": 55,
+      "weight": 3,
+      "files": ["references/**/*.md"],
+      "patterns": [
+        "payments?.{0,80}(?:always|automatically).{0,40}retr(?:y|ies)",
+        "(?:can|may|should|must|will).{0,20}(?:stack|combine|accumulate).{0,80}(?:member|campaign|coupon).{0,50}(?:discount|benefit)",
+        "manager.{0,50}(?:approve|review).{0,50}(?:all|every).{0,30}(?:amount|request)",
+        "fulfillment.{0,80}(?:guarantees?|always).{0,40}rollback",
+        "refund.{0,80}(?:independent|per.request).{0,40}(?:limit|amount)",
+        "renewal.{0,80}(?:always|immediately).{0,40}suspend",
+        "shipment.{0,80}(?:all.or.nothing|single warehouse)"
+      ],
+      "hint": "Separate proven behavior from inferred guarantees and verify state, retry, and rollback claims against source."
+    },
+    {
+      "id": "no-false-atomicity",
+      "type": "not_contains",
+      "dimension": "behavior",
+      "description": "Independent repository operations are not overstated as atomic or guaranteed rollback.",
+      "gate": true,
+      "score_cap": 55,
+      "weight": 3,
+      "files": ["references/**/*.md"],
+      "patterns": [
+        "(?:ensures?|guarantees?).{0,80}(?:atomic|atomicity)",
+        "(?:ensures?|guarantees?).{0,80}(?:complete|successful).{0,30}rollback",
+        "fully atomic"
+      ],
+      "hint": "Separate observed compensation attempts from proven transactional guarantees."
+    },
+    {
+      "id": "audit-noise-not-routed",
+      "type": "files_absent",
+      "dimension": "behavior",
+      "description": "A generic audit helper does not create a synthetic business domain.",
+      "weight": 2,
+      "paths": ["references/patterns/business/audit*.md"],
+      "hint": "Business grouping must use explicit stable ownership, not broad keywords."
+    },
+    {
+      "id": "module-relations",
+      "type": "module_relations_valid",
+      "dimension": "architecture",
+      "description": "Module relations contain no self-links or unknown module targets.",
+      "gate": true,
+      "score_cap": 60,
+      "weight": 3,
+      "files": ["references/modules.md"],
+      "hint": "Resolve dependency identities against the verified module set before rendering."
+    },
+    {
+      "id": "module-ownership",
+      "type": "contains_groups",
+      "dimension": "architecture",
+      "description": "Core handwritten ownership boundaries remain navigable.",
+      "weight": 2,
+      "files": ["references/modules.md", "references/project-overview.md"],
+      "groups": [
+        ["internal/order"],
+        ["internal/tenant"],
+        ["internal/catalog"],
+        ["internal/job"],
+        ["internal/payment"],
+        ["internal/approval"],
+        ["internal/pricing"],
+        ["internal/fulfillment"],
+        ["internal/refund"],
+        ["internal/subscription"],
+        ["internal/shipment"]
+      ],
+      "hint": "Favor stable source ownership boundaries over framework layer labels."
+    },
+    {
+      "id": "progressive-routing",
+      "type": "contains_groups",
+      "dimension": "loading",
+      "description": "The entry Skill routes tasks to focused references instead of embedding all knowledge.",
+      "weight": 2,
+      "files": ["SKILL.md"],
+      "groups": [
+        ["Project Spec"],
+        ["Capability Entry Index"],
+        ["Business Pattern"]
+      ],
+      "hint": "Keep SKILL.md as a compact router with task-specific reference links."
+    },
+    {
+      "id": "project-spec-no-pattern-duplication",
+      "type": "not_contains",
+      "dimension": "loading",
+      "description": "Project spec does not duplicate the learned pattern catalog.",
+      "weight": 2,
+      "files": ["references/project-spec.md"],
+      "patterns": [
+        "Source-Learned Patterns",
+        "Learned Pattern Rules",
+        "## Pattern Guidance"
+      ],
+      "hint": "Render learned observations only in category references."
+    },
+    {
+      "id": "entry-size",
+      "type": "not_contains",
+      "dimension": "loading",
+      "description": "The entry Skill contains no copied source bodies or fixture-specific implementation dump.",
+      "weight": 1,
+      "files": ["SKILL.md"],
+      "patterns": [
+        "func \\(s \\*Service\\) Place",
+        "type Dispatcher struct"
+      ],
+      "hint": "Route to detailed references rather than copying implementation into SKILL.md."
+    }
+  ]
+}

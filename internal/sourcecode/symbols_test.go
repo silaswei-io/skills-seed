@@ -30,6 +30,22 @@ func TestCompatibleKindUsesCanonicalTagFamilies(t *testing.T) {
 	}
 }
 
+func TestSimpleSymbolNameKeepsQualifiedReceiverMethods(t *testing.T) {
+	tests := map[string]string{
+		"component.Check":          "Check",
+		"(*component.Worker).Run":  "Run",
+		"component::Worker::Start": "Start",
+		"component.Worker::Start":  "Start",
+		"func Invalid()":           "",
+	}
+
+	for input, expected := range tests {
+		t.Run(input, func(t *testing.T) {
+			require.Equal(t, expected, simpleSymbolName(input))
+		})
+	}
+}
+
 func TestExtractSymbolsDoesNotRetainDefinitions(t *testing.T) {
 	src := []byte("package service\n\nfunc Start() error { return nil }\n")
 	entry := grammars.DetectLanguage("service.go")

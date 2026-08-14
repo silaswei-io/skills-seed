@@ -12,9 +12,20 @@ description: {{.SkillDescription}}
 **Last updated**: {{.LastUpdated}}
 **Learned patterns**: {{.PatternCount}}
 
-{{if .HasKnowledge}}This project entry skill only routes tasks to the smallest necessary references. Read the matching reference before deciding from product/domain rules, architecture details, code evidence, test facts, or validation commands.{{else}}This project workflow entry skill routes matching tasks to user-maintained workflow documents.{{end}}
+{{if .HasKnowledge}}This project entry skill only routes tasks to the smallest necessary references. Read matching user rules and references before deciding from product/domain rules, architecture details, or code evidence.{{else}}This project resource entry skill routes matching tasks to user-maintained rule or workflow documents.{{end}}
+
+{{if .CommandRules}}## Command Execution Boundary
+
+These rules come from authoritative project files and must be followed for matching commands:
+
+{{range .CommandRules}}- **{{.Title}}** (`{{.CommandPolicy}}`): {{.Rule}}{{if .AppliesTo}}; applies to {{range $i, $scope := .AppliesTo}}{{if $i}}, {{end}}`{{$scope}}`{{end}}{{end}} (source: `{{.Source}}`{{if .Section}} / {{.Section}}{{end}})
+{{end}}
+{{end}}
 
 ## Task Routing
+
+{{if .RuleReferences}}Before routing, check "User Rules" below. When the task matches a listed project or path scope, read and follow the full rule first. Do not infer undeclared scope from its title.
+{{end}}
 
 {{if .HasKnowledge}}
 1. Read the smallest necessary reference set for the task. Do not load every reference at once. After entering a category pattern, check its "Related References" section first and continue when a cross-boundary hint matches the task.
@@ -22,10 +33,12 @@ description: {{.SkillDescription}}
 {{else}}2. For product/domain rules, state transitions, user actions, or cross-resource flows, inspect current code and reuse nearby implementations.
 {{end}}{{if .References.BusinessMethods}}3. For reusable capability entries, module extension points, cross-boundary orchestration, UI/command actions, or tool entries, read the [Capability Entry Index](./references/business-methods.md).
 {{else}}3. Confirm project-level capability entries from current code and module entry points.
-{{end}}4. For interfaces, messages, events, contracts, adapters, derived artifacts, or configuration conventions, read [Project Spec](./references/project-spec.md) and the related category pattern.
+{{end}}4. For interfaces, messages, events, contracts, adapters, derived artifacts, or configuration conventions, read the related category pattern and return to its evidence source; read [Project Spec](./references/project-spec.md) when an explicit constraint applies.
 {{if .References.KeyModules}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md).
 {{else}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md).
-{{end}}6. To validate a change, read [Validation Strategy](./references/validation.md){{if .References.Testing}}; when the change touches a detected test ecosystem, also read the [Test Matrix](./references/testing.md){{end}}.
+{{end}}{{if .WorkflowReferences}}6. For testing, deployment, release, or acceptance, choose the matching item under "User Workflows" below and read its full document.
+{{else}}6. No user-maintained testing, deployment, release, or acceptance Workflow is available. References do not define these procedures; follow the current user instruction.
+{{end}}
 {{else}}2. References were omitted from this generation. Read current code and prefer nearby implementations.
 {{end}}
 
@@ -36,7 +49,14 @@ description: {{.SkillDescription}}
 {{else}}1. No workflow is available; read the user request and current project context directly.
 {{end}}
 
-Workflows are user-maintained task procedures and can guide execution steps. When code patterns and the project profile are absent, do not invent project rules.
+Rules are explicit user-maintained constraints; workflows are user-maintained task procedures. When code patterns and the project profile are absent, do not invent project facts.
+{{end}}
+
+{{if .RuleReferences}}
+## User Rules
+
+{{range .RuleReferences}}- **[{{.Name}}]({{.Path}})**{{if .Paths}} - paths: {{range $i, $path := .Paths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{else}} - applies to the whole project{{end}}
+{{end}}
 {{end}}
 
 {{if .WorkflowReferences}}
@@ -53,11 +73,9 @@ Workflows are user-maintained task procedures and can guide execution steps. Whe
 {{if .HasKnowledge}}
 ## Reference Entry Points
 
-{{if .References.Enabled}}- **[Project Spec](./references/project-spec.md)** - Boundaries, rules, configuration, and touchpoints
+{{if .References.Enabled}}- **[Project Spec](./references/project-spec.md)** - Explicit authoritative rules and synchronization coverage
 - **[Project Overview](./references/project-overview.md)** - Architecture, technology stack, and key modules
-- **[Validation Strategy](./references/validation.md)** - Learned commands, applicability, and validation gaps
-{{if .References.Testing}}- **[Test Matrix](./references/testing.md)** - Test scope, commands, and test-file evidence
-{{end}}{{else}}*References were omitted from this generation.*
+{{else}}*References were omitted from this generation.*
 {{end}}{{if .OverviewReferences}}
 
 ### Project Details
@@ -76,7 +94,7 @@ Workflows are user-maintained task procedures and can guide execution steps. Whe
 
 - Check nearby code before introducing a pattern or abstraction.
 - Reuse project-specific entries and utilities from references when available.
-{{if .References.ProjectSpec}}- Follow [Project Spec](./references/project-spec.md) for derived artifacts, interface/message models, adapters, and configuration conventions.{{else}}- Follow current code and project configuration for derived artifacts, interface/message models, adapters, and configuration conventions.{{end}}
+- Follow the evidence source behind related patterns and current project configuration for derived artifacts, interface/message models, adapters, and configuration conventions; [Project Spec](./references/project-spec.md) only adds explicit authoritative constraints.
 - Current code wins when references disagree.
 
 {{if .KeyInsights}}### Key Insights

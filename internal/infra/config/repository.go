@@ -232,9 +232,9 @@ func (c *LearningConfig) UnmarshalYAML(value *yaml.Node) error {
 type LearningMode string
 
 const (
-	LearningModeFast   LearningMode = "fast"   // 更快，合并更多相近能力，只学习高价值稳定模式
-	LearningModeNormal LearningMode = "normal" // 默认，兼顾质量和速度
-	LearningModeDeep   LearningMode = "deep"   // 更深入，保留更多业务边界和细节
+	LearningModeFast   LearningMode = "fast"   // 缩小证据探索范围，只保留最清晰的高价值模式
+	LearningModeNormal LearningMode = "normal" // 默认，以高精准率准入模式库
+	LearningModeDeep   LearningMode = "deep"   // 扩大证据探索范围，不降低模式准入标准
 )
 
 // NormalizeLearningMode 把配置中的学习模式归一化为受支持的取值。
@@ -249,48 +249,30 @@ func NormalizeLearningMode(mode string) LearningMode {
 	}
 }
 
-// LearningScope 控制 learn current 规划学习焦点时采用的学习取向。
-type LearningScope string
-
-const (
-	LearningScopeDomain LearningScope = "domain" // 优先按产品/责任域合并能力，跨扩展、接口或模块也尽量归并
-	LearningScopeFlow   LearningScope = "flow"   // 按业务流程、资源动作或外部系统职责拆分
-	LearningScopeModule LearningScope = "module" // 允许按插件、接口、子模块等工程边界更细拆分
-)
-
-// NormalizeLearningScope 把配置中的学习范围归一化为受支持取值。
-func NormalizeLearningScope(scope string) LearningScope {
-	switch LearningScope(strings.ToLower(strings.TrimSpace(scope))) {
-	case LearningScopeDomain:
-		return LearningScopeDomain
-	case LearningScopeModule:
-		return LearningScopeModule
-	default:
-		return LearningScopeFlow
-	}
-}
-
 // CurrentLearningConfig 控制 learn current 的文件选择和结构化上下文。
 type CurrentLearningConfig struct {
-	Mode                             LearningMode     `yaml:"mode"`                                 // 学习模式：fast、normal、deep
-	Scope                            LearningScope    `yaml:"scope"`                                // 学习焦点规划取向：domain、flow、module
-	MaxFocusesPerCall                int              `yaml:"max_focuses_per_call"`                 // 单次 AI 调用最多分析的焦点数，1 表示不合批
-	SelectRelevantFiles              bool             `yaml:"select_relevant_files"`                // 是否在大候选集上启用 AI 候选收敛
-	SelectRelevantFilesMinCandidates int              `yaml:"select_relevant_files_min_candidates"` // 候选文件数达到该阈值时才调用 AI 候选收敛
-	Structural                       StructuralConfig `yaml:"structural"`                           // 结构化上下文配置
+	Mode             LearningMode           `yaml:"mode"`              // 学习模式：fast、normal、deep
+	PatternAdmission PatternAdmissionConfig `yaml:"pattern_admission"` // 模式候选入库阈值
+	Structural       StructuralConfig       `yaml:"structural"`        // 结构化上下文配置
 
 	defaultsApplied bool `yaml:"-"`
 }
 
+// PatternAdmissionConfig 控制当前代码候选模式进入模式库的最低置信度。
+type PatternAdmissionConfig struct {
+	MinConfidence               float64 `yaml:"min_confidence"`                 // 多文件证据候选最低置信度，取值 (0, 1]
+	MinSingleEvidenceConfidence float64 `yaml:"min_single_evidence_confidence"` // 单文件证据候选最低置信度，取值 (0, 1]
+}
+
 func defaultCurrentLearningConfig() CurrentLearningConfig {
 	return CurrentLearningConfig{
-		Mode:                             LearningModeNormal,
-		Scope:                            LearningScopeFlow,
-		MaxFocusesPerCall:                1,
-		SelectRelevantFiles:              true,
-		SelectRelevantFilesMinCandidates: 200,
-		Structural:                       defaultStructuralConfig(),
-		defaultsApplied:                  true,
+		Mode: LearningModeNormal,
+		PatternAdmission: PatternAdmissionConfig{
+			MinConfidence:               0.75,
+			MinSingleEvidenceConfidence: 0.85,
+		},
+		Structural:      defaultStructuralConfig(),
+		defaultsApplied: true,
 	}
 }
 
@@ -575,13 +557,7 @@ func normalizeLearningConfig(cfg *Config) {
 		cfg.Learning.Current.Structural = defaultStructuralConfig()
 	}
 	cfg.Learning.Current.Mode = NormalizeLearningMode(string(cfg.Learning.Current.Mode))
-	cfg.Learning.Current.Scope = NormalizeLearningScope(string(cfg.Learning.Current.Scope))
-	if cfg.Learning.Current.MaxFocusesPerCall <= 0 {
-		cfg.Learning.Current.MaxFocusesPerCall = 1
-	}
-	if cfg.Learning.Current.SelectRelevantFilesMinCandidates <= 0 {
-		cfg.Learning.Current.SelectRelevantFilesMinCandidates = 200
-	}
+	cfg.Learning.Current.PatternAdmission = normalizePatternAdmissionConfig(cfg.Learning.Current.PatternAdmission)
 	if cfg.Learning.Current.Structural.MaxSymbols <= 0 {
 		cfg.Learning.Current.Structural.MaxSymbols = 30
 	}
@@ -590,6 +566,17 @@ func normalizeLearningConfig(cfg *Config) {
 	}
 	cfg.Learning.Current.Structural.Provider = NormalizeStructuralProvider(string(cfg.Learning.Current.Structural.Provider))
 	cfg.Learning.Current.defaultsApplied = true
+}
+
+func normalizePatternAdmissionConfig(admission PatternAdmissionConfig) PatternAdmissionConfig {
+	defaults := defaultCurrentLearningConfig().PatternAdmission
+	if admission.MinConfidence <= 0 || admission.MinConfidence > 1 {
+		admission.MinConfidence = defaults.MinConfidence
+	}
+	if admission.MinSingleEvidenceConfidence <= 0 || admission.MinSingleEvidenceConfidence > 1 {
+		admission.MinSingleEvidenceConfidence = defaults.MinSingleEvidenceConfidence
+	}
+	return admission
 }
 
 func normalizeAgentConfig(cfg *Config) {

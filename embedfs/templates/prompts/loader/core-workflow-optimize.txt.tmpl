@@ -1,44 +1,37 @@
-You are the skills-seed workflow inferrer. Infer and organize a maintainable Markdown workflow that AI agents can execute from explicitly provided goals, constraints, background, paths, or rough notes.
+# Optimize User Workflow
 
-## Input
+Organize the user-maintained content below into a concise, executable Markdown workflow for future Agents working in the current project.
 
-- ID: `{{.ID}}`
-- Name: `{{if .Name}}{{.Name}}{{else}}not provided; generate from the new input{{end}}`
-- Language: `{{.Language}}`
-- Mode: `{{if .Overwrite}}overwrite{{else}}merge{{end}}`
+Project boundary:
+- name: {{.Project.Name}}
+- root: {{.Project.RootPath}}
+- language: {{.Project.Language}}
+- mode: {{.Project.Mode}}
 
-{{if .ExistingContent}}### Existing Content (for merge and deduplication)
+Workflow name: {{.Name}}
+Mode: {{if .Overwrite}}overwrite{{else if .ExistingContent}}merge{{else}}create{{end}}
+
+{{if .ExistingContent}}Existing workflow content:
 ```markdown
 {{.ExistingContent}}
 ```
-{{end}}
 
-### New Input
-```text
-{{.Context}}
+{{end}}New workflow content:
+```markdown
+{{.Content}}
 ```
 
-## Rules
+Requirements:
+- Preserve the user's intent, ordering, conditions, permissions, prohibitions, commands, paths, risks, and acceptance signals.
+- In merge mode, preserve valid existing content, incorporate the new content, and deduplicate only equivalent wording. Do not silently drop steps or choose one side of a conflict.
+- In overwrite mode, use only the new content. Do not restore steps from an earlier version.
+- You may inspect the repository read-only when the content names a path, symbol, command, or project concept that needs clarification. Stay within the project root and do not perform a broad survey.
+- Use repository evidence only to make the supplied workflow clearer and correctly routed. Do not invent commands, environments, services, tools, steps, guarantees, or deployment targets.
+- Never turn a descriptive example into a required step or an available command into permission to execute it.
+- Use headings and ordered steps only where they improve execution. Keep already clear content concise; do not force irrelevant sections.
+- If inputs conflict or information remains unresolved, preserve both positions and mark the point as `To confirm` instead of guessing.
+- Return the complete replacement Markdown body. Do not add commentary outside the result.
 
-- Infer development, testing, validation, code generation, release, or review steps from the new input. The user does not need to write step-by-step instructions.
-- If the user provides source or file paths, you may read those explicit paths to understand the workflow, but do not scan broad unmentioned directories.
-- Preserve the user's intent, order, constraints, and risks. Do not invent commands, environments, platforms, services, scripts, or deployment targets.
-- If no name is provided, generate a short human-readable `title` from the new input. If a name is provided, keep it or lightly normalize it for display.
-- Write "To confirm" when information is missing.
-- Use a structure that fits the workflow. Prefer these sections when applicable: `Applicability`, `Inputs And Prerequisites`, `Steps`, `Validation`, `Risks And Rollback`.
-- Omit or rename irrelevant sections when user intent is clearer without them. Do not force validation or rollback sections for documentation, analysis, planning, or development-support workflows that do not need acceptance gates.
-- Use an ordered list when a `Steps` section is present; write natural-language steps when commands are not confirmed.
-- Do not output a `Scripts` section; skills-seed generates the script index.
-- In merge mode, merge and deduplicate compatible content. Put incompatible existing and new requirements in `conflicts`; do not silently choose one side. Return an empty `conflicts` array when the workflow can be saved.
-- Treat structural differences such as section names, optional sections, and flexible document content formats as mergeable unless they require incompatible actions. If the new input relaxes or narrows a previous formatting or validation requirement, update the workflow body instead of reporting a conflict when the result can accurately represent the user's latest intent.
-- In overwrite mode, generate content only from the new input and do not preserve previous content.
-- Keep the workflow at an executable abstraction level: operational steps should name the condition, action, path/command if confirmed, and validation signal when relevant. Documentation or analysis workflows should focus on the information needed for development and avoid unrelated acceptance criteria.
-- For stable output, preserve existing step order when still valid, append new non-conflicting steps at the nearest matching phase, and do not rename the workflow or sections merely for wording variety.
+Return JSON only.
 
-## Output
-
-The JSON Schema below is generated from the AI output DTO and is the source of truth for field names, types, required fields, nested objects, arrays, descriptions, and examples. Return JSON only, no code fence.
-
-```json
 {{ jsonContract "OptimizeWorkflowOutput" }}
-```

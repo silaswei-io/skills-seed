@@ -12,20 +12,26 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	"github.com/silaswei-io/skills-seed/internal/knowledge"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
+	"github.com/silaswei-io/skills-seed/internal/service/repositoryscopeconfig"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
 type learnCurrentFocusResult struct {
-	index            int
-	focus            domain.EvidenceFocus
-	patterns         []domain.Pattern
-	refreshRecommend agent.ProfileRefreshRecommendation
-	completed        bool
+	index             int
+	focus             domain.EvidenceFocus
+	patterns          []domain.Pattern
+	retiredPatternIDs []string
+	refreshRecommend  agent.ProfileRefreshRecommendation
+	completed         bool
 }
 
 type learnCurrentBatch struct {
@@ -44,6 +50,11 @@ type indexedEvidenceFocus struct {
 	focus domain.EvidenceFocus
 }
 
+type knowledgeReviewTask struct {
+	index int
+	unit  commandstate.FocusKnowledgeCheckpoint
+}
+
 func (r *learnCurrentProjectRun) planLearningAgenda() error {
 	planStartedAt := time.Now()
 	planLabel := i18n.Get("ProgressLearnCurrentPlanFocuses")
@@ -60,7 +71,7 @@ func (r *learnCurrentProjectRun) planLearningAgenda() error {
 		}
 		if state == nil {
 			var err error
-			state, err = loadOrCreateCurrentState(r.ctx, r.stateRepo, r.cont.AnalyzerSvc, r.projectName, r.projectRoot, r.currentLanguage, r.learningMode, r.learningScope, focusRelPaths, r.incrementalChanges, currentStateInputSummary(r.incrementalChanges, r.selectionPlan, r.selectionSummary), r.changeProfile, r.opts.userContext, r.currentStateInvocationHash())
+			state, err = loadOrCreateCurrentState(r.ctx, r.stateRepo, r.cont.AnalyzerSvc, r.projectName, r.projectRoot, r.currentLanguage, r.learningMode, focusRelPaths, r.incrementalChanges, currentStateInputSummary(r.incrementalChanges, r.selectionPlan, r.selectionSummary), r.changeProfile, r.opts.userContext, r.currentStateInvocationHash())
 			if err != nil {
 				return err
 			}
@@ -98,7 +109,7 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 		if len(r.plannedFocuses) == 0 {
 			return r.completeAnalysis()
 		}
-		if r.analysisArtifactsCommitted() {
+		if r.patternsCommitted() {
 			return fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentArtifactsCommittedWithPendingFocuses", map[string]interface{}{"Count": len(r.plannedFocuses)}))
 		}
 		runContext, err := r.buildCodebaseRunContext()
@@ -170,31 +181,14 @@ func (r *learnCurrentProjectRun) buildCodebaseRunContext() (*analyzer.CodebaseRu
 }
 
 func (r *learnCurrentProjectRun) planAnalysisBatches(plannedFocuses []domain.EvidenceFocus) []learnCurrentBatch {
-	maxFocuses := r.maxFocusesPerBatch()
-	if maxFocuses < 1 {
-		maxFocuses = 1
-	}
-	batches := make([]learnCurrentBatch, 0, (len(plannedFocuses)+maxFocuses-1)/maxFocuses)
-	for start := 0; start < len(plannedFocuses); start += maxFocuses {
-		end := start + maxFocuses
-		if end > len(plannedFocuses) {
-			end = len(plannedFocuses)
-		}
-		batch := learnCurrentBatch{index: len(batches)}
-		for i := start; i < end; i++ {
-			batch.focuses = append(batch.focuses, indexedEvidenceFocus{index: i, focus: plannedFocuses[i]})
-		}
-		batches = append(batches, batch)
+	batches := make([]learnCurrentBatch, 0, len(plannedFocuses))
+	for index, focus := range plannedFocuses {
+		batches = append(batches, learnCurrentBatch{
+			index:   index,
+			focuses: []indexedEvidenceFocus{{index: index, focus: focus}},
+		})
 	}
 	return batches
-}
-
-func (r *learnCurrentProjectRun) maxFocusesPerBatch() int {
-	maxFocuses := r.cont.ConfigRepo.GetCurrentLearningConfig().MaxFocusesPerCall
-	if maxFocuses < 1 {
-		return 1
-	}
-	return maxFocuses
 }
 
 func (r *learnCurrentProjectRun) analysisParallelism(batchCount int) int {
@@ -518,7 +512,7 @@ func (r *learnCurrentProjectRun) analysisBatchRuntimeLabel(state *commandstate.S
 			}
 		}
 		if minAgendaIndex < len(state.Agenda.Focuses) {
-			index = minAgendaIndex / r.maxFocusesPerBatch()
+			index = minAgendaIndex
 		}
 	}
 	return fmt.Sprintf("batch-%03d", index+1)
@@ -534,11 +528,7 @@ func (r *learnCurrentProjectRun) analysisBatchProgressLabel(state *commandstate.
 	currentStart, allFocuses := learnCurrentFocusProgress(state, first.index+1, totalFocuses, first.focus)
 	currentEnd, _ := learnCurrentFocusProgress(state, last.index+1, totalFocuses, last.focus)
 	subjects := make([]string, 0, len(batch.focuses))
-	for i, item := range batch.focuses {
-		if i >= 2 {
-			subjects = append(subjects, fmt.Sprintf("+%d", len(batch.focuses)-i))
-			break
-		}
+	for _, item := range batch.focuses {
 		subjects = append(subjects, shortenRunes(learnCurrentProgressSubject(item.focus), 24))
 	}
 	if currentStart == currentEnd {
@@ -568,6 +558,26 @@ func buildAnalyzedFocusResult(focus domain.EvidenceFocus, index int, learnedPatt
 	}
 }
 
+func appendUniquePatternIDs(current []string, additions ...string) []string {
+	seen := make(map[string]bool, len(current)+len(additions))
+	out := make([]string, 0, len(current)+len(additions))
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	for _, id := range current {
+		add(id)
+	}
+	for _, id := range additions {
+		add(id)
+	}
+	return out
+}
+
 func (r *learnCurrentProjectRun) mergeFocusResults(results []learnCurrentFocusResult) int {
 	completed := 0
 	for _, result := range results {
@@ -589,22 +599,95 @@ func (r *learnCurrentProjectRun) commitCurrentAnalysis(ctx context.Context) erro
 }
 
 func (r *learnCurrentProjectRun) mergeFocusResult(result learnCurrentFocusResult) {
-	if len(result.patterns) > 0 {
-		r.patterns = append(r.patterns, result.patterns...)
-	}
 	if result.completed {
-		r.completedEvidenceFocuses = append(r.completedEvidenceFocuses, result.focus)
+		r.setFocusKnowledge(commandstate.FocusKnowledgeCheckpoint{
+			Focus:             result.focus,
+			Patterns:          append([]domain.Pattern(nil), result.patterns...),
+			RetiredPatternIDs: appendUniquePatternIDs(nil, result.retiredPatternIDs...),
+		})
 	}
 	if result.refreshRecommend.Needed {
 		r.profileRefreshRecommended = result.refreshRecommend
 	}
+	r.syncDerivedKnowledge()
+}
+
+func (r *learnCurrentProjectRun) reviewLearnedKnowledge() error {
+	label := i18n.Get("ProgressLearnCurrentReviewKnowledge")
+	pending := r.pendingKnowledgeReviews()
+	if len(pending) == 0 || r.patternsCommitted() {
+		label = i18n.Get("ProgressLearnCurrentReviewKnowledgeSkipped")
+	}
+	return r.steps.Run(label, func() error {
+		if len(pending) == 0 || r.patternsCommitted() {
+			return nil
+		}
+		return r.reviewKnowledgeFocuses(label, pending)
+	})
+}
+
+func (r *learnCurrentProjectRun) pendingKnowledgeReviews() []knowledgeReviewTask {
+	tasks := make([]knowledgeReviewTask, 0, len(r.focusKnowledge))
+	for index, unit := range r.focusKnowledge {
+		if unit.Reviewed {
+			continue
+		}
+		tasks = append(tasks, knowledgeReviewTask{index: index, unit: unit})
+	}
+	return tasks
+}
+
+func (r *learnCurrentProjectRun) reviewKnowledgeFocuses(label string, tasks []knowledgeReviewTask) error {
+	for completed, task := range tasks {
+		r.detail(label, "ProgressLearnCurrentReviewFocus", map[string]interface{}{
+			"Completed":   completed,
+			"Total":       len(tasks),
+			"Current":     task.index + 1,
+			"AgendaTotal": len(r.focusKnowledge),
+			"Name":        learnCurrentProgressSubject(task.unit.Focus),
+			"Candidates":  len(task.unit.Patterns),
+		})
+		patterns, err := r.reviewKnowledgeFocus(r.ctx, task)
+		if err != nil {
+			return fmt.Errorf("review learned knowledge for %s: %w", learnCurrentProgressSubject(task.unit.Focus), err)
+		}
+		r.applyKnowledgeReviewResult(task, patterns)
+		if err := r.saveAnalysisCheckpoint(); err != nil {
+			return err
+		}
+	}
+	r.detail(label, "ProgressLearnCurrentReviewComplete", map[string]interface{}{
+		"Completed": len(tasks),
+		"Total":     len(tasks),
+	})
+	return nil
+}
+
+func (r *learnCurrentProjectRun) reviewKnowledgeFocus(ctx context.Context, task knowledgeReviewTask) ([]domain.Pattern, error) {
+	patterns, err := r.cont.PatternNormSvc.ReviewCurrentKnowledge(ctx, patternnorm.ReviewRequest{
+		ProjectName: r.projectName,
+		RootPath:    r.projectRoot,
+		Language:    r.currentLanguage,
+		Focus:       task.unit.Focus,
+		Candidates:  task.unit.Patterns,
+		UserContext: r.opts.userContext,
+	})
+	return patterns, err
+}
+
+func (r *learnCurrentProjectRun) applyKnowledgeReviewResult(task knowledgeReviewTask, patterns []domain.Pattern) {
+	unit := task.unit
+	unit.Patterns = append([]domain.Pattern(nil), patterns...)
+	unit.Reviewed = true
+	r.setFocusKnowledge(unit)
+	r.syncDerivedKnowledge()
 }
 
 func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 	startedAt := time.Now()
 	stepLabel := i18n.Get("ProgressLearnCurrentNormalizeAndSavePatterns")
 	if err := r.steps.Run(stepLabel, func() error {
-		if !r.analysisArtifactsCommitted() && len(r.patterns) > 0 {
+		if !r.patternsCommitted() && (len(r.patterns) > 0 || len(r.retiredPatternIDs) > 0) {
 			hooks := patternnorm.ProgressHooks{
 				OnStepStart: func(label string) {
 					r.patternStageDetail(stepLabel, label)
@@ -619,32 +702,41 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 					r.patternStageDetail(stepLabel, label)
 				},
 			}
-			checkpoint := newCurrentDecisionCheckpoint(r.stateRepo, r.analysisState)
 			result, err := r.cont.PatternNormSvc.NormalizeAndStoreWithHooks(r.ctx, patternnorm.NormalizeRequest{
 				Operation:          patternnorm.OperationLearnCurrent,
 				ProjectName:        r.projectName,
 				RootPath:           r.projectRoot,
 				Language:           r.currentLanguage,
 				Candidates:         r.patterns,
-				DecisionCheckpoint: checkpoint,
+				RetiredPatternIDs:  r.retiredPatternIDs,
+				DecisionCheckpoint: newCurrentDecisionCheckpoint(r.stateRepo, r.analysisState),
 				UserContext:        r.opts.userContext,
 			}, hooks)
 			if err != nil {
 				return err
 			}
 			r.savedCount = len(result.Written)
+			r.retiredCount = len(result.RetiredPatternIDs)
 		}
-		if !r.analysisArtifactsCommitted() && r.analysisState != nil {
-			r.analysisState.ArtifactsCommitted = true
+		if !r.patternsCommitted() && r.analysisState != nil {
+			r.analysisState.MarkPatternsCommitted()
 			if err := r.stateRepo.Save(r.ctx, r.analysisState); err != nil {
 				return err
 			}
 		}
-		r.detail(stepLabel, "ProgressLearnCurrentCommitFiles", map[string]interface{}{
-			"Count": len(r.incrementalChanges.Records) + len(r.incrementalChanges.Deleted),
-		})
-		if err := r.commitCurrentAnalysis(r.ctx); err != nil {
-			return err
+		if !r.sourceBaselineCommitted() {
+			r.detail(stepLabel, "ProgressLearnCurrentCommitFiles", map[string]interface{}{
+				"Count": len(r.incrementalChanges.Records) + len(r.incrementalChanges.Deleted),
+			})
+			if err := r.commitCurrentAnalysis(r.ctx); err != nil {
+				return err
+			}
+			if r.analysisState != nil {
+				r.analysisState.MarkSourceBaselineCommitted()
+				if err := r.stateRepo.Save(r.ctx, r.analysisState); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}); err != nil {
@@ -655,9 +747,13 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 		"duration", time.Since(startedAt),
 		"patterns_count", len(r.patterns),
 		"saved_count", r.savedCount,
+		"retired_count", r.retiredCount,
 	)
-	if r.opts.showDetailedLogs && len(r.patterns) > 0 {
-		logger.Info(i18n.GetWithParams("LearnCurrentPatternsSaved", map[string]interface{}{"Count": r.savedCount}))
+	if r.opts.showDetailedLogs && (len(r.patterns) > 0 || len(r.retiredPatternIDs) > 0) {
+		logger.Info(i18n.GetWithParams("LearnCurrentPatternsSaved", map[string]interface{}{
+			"Saved":   r.savedCount,
+			"Retired": r.retiredCount,
+		}))
 	}
 	return nil
 }
@@ -671,9 +767,10 @@ func (r *learnCurrentProjectRun) completeAnalysis() error {
 
 func (r *learnCurrentProjectRun) validateCompletedAnalysis() error {
 	missing := make([]string, 0)
+	completed := r.completedEvidenceFocuses()
 	if r.analysisState != nil {
 		for _, focus := range r.analysisState.Agenda.Focuses {
-			if len(evidenceFocusPaths(focus, r.incrementalChanges)) == 0 || evidenceFocusIncluded(r.completedEvidenceFocuses, focus) {
+			if len(evidenceFocusPaths(focus, r.incrementalChanges)) == 0 || evidenceFocusIncluded(completed, focus) {
 				continue
 			}
 			missing = append(missing, learnCurrentProgressSubject(focus))
@@ -682,7 +779,7 @@ func (r *learnCurrentProjectRun) validateCompletedAnalysis() error {
 	if len(missing) > 0 {
 		return fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentAgendaIncomplete", map[string]interface{}{"Focuses": strings.Join(missing, ", ")}))
 	}
-	uncovered := uncoveredAnalysisPaths(r.completedEvidenceFocuses, analysisCandidatePaths(r.incrementalChanges))
+	uncovered := uncoveredAnalysisPaths(completed, analysisCandidatePaths(r.incrementalChanges))
 	if len(uncovered) == 0 {
 		return nil
 	}
@@ -695,12 +792,16 @@ func (r *learnCurrentProjectRun) patternStageDetail(baseLabel, detail string) {
 	})
 }
 
-func (r *learnCurrentProjectRun) analysisArtifactsCommitted() bool {
-	return r.analysisState != nil && r.analysisState.ArtifactsCommitted
+func (r *learnCurrentProjectRun) patternsCommitted() bool {
+	return r.analysisState != nil && r.analysisState.PatternsCommitComplete()
 }
 
-func (r *learnCurrentProjectRun) profileCommitted() bool {
-	return r.analysisState != nil && r.analysisState.ProfileCommitted
+func (r *learnCurrentProjectRun) sourceBaselineCommitted() bool {
+	return r.analysisState != nil && r.analysisState.SourceBaselineCommitComplete()
+}
+
+func (r *learnCurrentProjectRun) projectionsCommitted() bool {
+	return r.analysisState != nil && r.analysisState.ProjectionsCommitComplete()
 }
 
 func (r *learnCurrentProjectRun) saveAnalysisCheckpoint() error {
@@ -708,8 +809,7 @@ func (r *learnCurrentProjectRun) saveAnalysisCheckpoint() error {
 		return nil
 	}
 	r.analysisState.Analysis = &commandstate.AnalysisCheckpoint{
-		Patterns:             append([]domain.Pattern(nil), r.patterns...),
-		CompletedFocuses:     append([]domain.EvidenceFocus(nil), r.completedEvidenceFocuses...),
+		FocusKnowledge:       cloneFocusKnowledge(r.focusKnowledge),
 		ProfileRefreshNeeded: r.profileRefreshRecommended.Needed,
 		ProfileRefreshReason: r.profileRefreshRecommended.Reason,
 	}
@@ -721,31 +821,96 @@ func (r *learnCurrentProjectRun) restoreAnalysisCheckpoint() {
 		return
 	}
 	checkpoint := r.analysisState.Analysis
-	r.patterns = append(r.patterns, checkpoint.Patterns...)
-	r.completedEvidenceFocuses = append(r.completedEvidenceFocuses, checkpoint.CompletedFocuses...)
+	r.focusKnowledge = cloneFocusKnowledge(checkpoint.FocusKnowledge)
+	r.syncDerivedKnowledge()
 	r.profileRefreshRecommended = agent.ProfileRefreshRecommendation{
 		Needed: checkpoint.ProfileRefreshNeeded,
 		Reason: checkpoint.ProfileRefreshReason,
 	}
 }
 
+func (r *learnCurrentProjectRun) setFocusKnowledge(unit commandstate.FocusKnowledgeCheckpoint) {
+	for index, current := range r.focusKnowledge {
+		if evidenceFocusSame(current.Focus, unit.Focus) {
+			r.focusKnowledge[index] = cloneFocusKnowledgeUnit(unit)
+			return
+		}
+	}
+	r.focusKnowledge = append(r.focusKnowledge, cloneFocusKnowledgeUnit(unit))
+	r.orderFocusKnowledge()
+}
+
+func (r *learnCurrentProjectRun) orderFocusKnowledge() {
+	if r.analysisState == nil || len(r.analysisState.Agenda.Focuses) == 0 {
+		return
+	}
+	indexOf := func(target domain.EvidenceFocus) int {
+		for index, focus := range r.analysisState.Agenda.Focuses {
+			if evidenceFocusSame(focus, target) {
+				return index
+			}
+		}
+		return len(r.analysisState.Agenda.Focuses)
+	}
+	sort.SliceStable(r.focusKnowledge, func(i, j int) bool {
+		return indexOf(r.focusKnowledge[i].Focus) < indexOf(r.focusKnowledge[j].Focus)
+	})
+}
+
+func (r *learnCurrentProjectRun) syncDerivedKnowledge() {
+	r.orderFocusKnowledge()
+	r.patterns = r.patterns[:0]
+	r.retiredPatternIDs = r.retiredPatternIDs[:0]
+	for _, unit := range r.focusKnowledge {
+		r.patterns = append(r.patterns, unit.Patterns...)
+		r.retiredPatternIDs = appendUniquePatternIDs(r.retiredPatternIDs, unit.RetiredPatternIDs...)
+	}
+}
+
+func (r *learnCurrentProjectRun) completedEvidenceFocuses() []domain.EvidenceFocus {
+	focuses := make([]domain.EvidenceFocus, 0, len(r.focusKnowledge))
+	for _, unit := range r.focusKnowledge {
+		focuses = append(focuses, unit.Focus)
+	}
+	return focuses
+}
+
+func cloneFocusKnowledge(units []commandstate.FocusKnowledgeCheckpoint) []commandstate.FocusKnowledgeCheckpoint {
+	out := make([]commandstate.FocusKnowledgeCheckpoint, 0, len(units))
+	for _, unit := range units {
+		out = append(out, cloneFocusKnowledgeUnit(unit))
+	}
+	return out
+}
+
+func cloneFocusKnowledgeUnit(unit commandstate.FocusKnowledgeCheckpoint) commandstate.FocusKnowledgeCheckpoint {
+	unit.Patterns = append([]domain.Pattern(nil), unit.Patterns...)
+	unit.RetiredPatternIDs = append([]string(nil), unit.RetiredPatternIDs...)
+	return unit
+}
+
 func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	profileStartedAt := time.Now()
-	if r.refreshProfile && !r.profileCommitted() {
+	var profile *domain.ProjectProfile
+	if r.projectionsCommitted() {
+		return nil
+	}
+	if r.refreshProfile {
 		label := i18n.Get("ProgressLearnCurrentSaveProfile")
 		if err := r.steps.Run(label, func() error {
-			profile, err := r.refreshProjectProfile()
+			var err error
+			profile, err = r.refreshProjectProfile()
+			if err != nil {
+				return err
+			}
+			profile, err = r.verifyProjectProfile(r.ctx, profile)
 			if err != nil {
 				return err
 			}
 			if err := r.cont.ProfileRepo.Save(r.ctx, profile); err != nil {
 				return err
 			}
-			if r.analysisState == nil {
-				return nil
-			}
-			r.analysisState.ProfileCommitted = true
-			return r.stateRepo.Save(r.ctx, r.analysisState)
+			return r.markProjectionsCommitted()
 		}); err != nil {
 			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "command.learn_current.save_project_profile",
@@ -776,8 +941,57 @@ func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 		if r.opts.showDetailedLogs {
 			logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
 		}
+		profile = r.existingProfile
+		if profile == nil {
+			var err error
+			profile, err = r.cont.ProfileRepo.Get(r.ctx)
+			if err != nil && !errors.Is(err, profilestore.ErrProfileNotFound) {
+				return err
+			}
+		}
+		var err error
+		profile, err = r.verifyProjectProfile(r.ctx, profile)
+		if err != nil {
+			return err
+		}
+		if profile != nil && r.cont.ProfileRepo != nil {
+			if err := r.cont.ProfileRepo.Save(r.ctx, profile); err != nil {
+				return err
+			}
+		}
+		if err := r.markProjectionsCommitted(); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func (r *learnCurrentProjectRun) markProjectionsCommitted() error {
+	if r.analysisState == nil {
+		return nil
+	}
+	r.analysisState.MarkProjectionsCommitted()
+	return r.stateRepo.Save(r.ctx, r.analysisState)
+}
+
+func (r *learnCurrentProjectRun) verifyProjectProfile(ctx context.Context, profile *domain.ProjectProfile) (*domain.ProjectProfile, error) {
+	if profile == nil || r.cont == nil || r.cont.PatternReader == nil {
+		return profile, nil
+	}
+	patterns, err := r.cont.PatternReader.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	structuralConfig := config.StructuralConfig{Provider: config.StructuralProviderAuto}
+	if r.cont.ConfigRepo != nil {
+		structuralConfig = r.cont.ConfigRepo.GetCurrentLearningConfig().Structural
+	}
+	scope := repositoryscopeconfig.DefaultKnowledgeScope()
+	if r.cont.ConfigRepo != nil {
+		scope = repositoryscopeconfig.KnowledgeScope(r.cont.ConfigRepo, r.projectRoot)
+	}
+	verified, _, err := knowledge.VerifyProjectKnowledge(ctx, profile, domain.ActivePatterns(patterns), r.projectRoot, sourcecode.NewResolver(structuralConfig), scope)
+	return verified, err
 }
 
 func (r *learnCurrentProjectRun) refreshProjectProfile() (*domain.ProjectProfile, error) {
@@ -785,6 +999,9 @@ func (r *learnCurrentProjectRun) refreshProjectProfile() (*domain.ProjectProfile
 	if r.existingProfile != nil && len(r.effectiveFocusPaths) > 0 {
 		options.ExistingProfile = r.existingProfile
 		options.FocusPaths = r.effectiveFocusPaths
+	}
+	options.OnStage = func(label string) {
+		r.patternStageDetail(i18n.Get("ProgressLearnCurrentSaveProfile"), label)
 	}
 	return r.cont.AnalyzerSvc.RefreshProjectProfile(r.ctx, r.projectRoot, r.projectName, r.currentLanguage, options)
 }

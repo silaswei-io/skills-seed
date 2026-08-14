@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -17,21 +18,27 @@ import (
 type Service struct {
 	patternRepo patternStore
 	normalizer  agent.PatternNormalizer
-}
-
-// NewService 创建模式规范化入库服务。
-func NewService(repo patternStore) *Service {
-	return &Service{
-		patternRepo: repo,
-	}
+	reviewer    agent.KnowledgeReviewer
+	admission   AdmissionPolicy
 }
 
 // NewServiceWithNormalizer 创建带 AI 合并优化的模式规范化服务。
-func NewServiceWithNormalizer(repo patternStore, normalizer agent.PatternNormalizer) *Service {
-	return &Service{
-		patternRepo: repo,
-		normalizer:  normalizer,
+func NewServiceWithNormalizer(repo patternStore, normalizer agent.PatternNormalizer, admission ...AdmissionPolicy) *Service {
+	policy := DefaultAdmissionPolicy()
+	if len(admission) > 0 {
+		policy = admission[0]
 	}
+	reviewer, _ := normalizer.(agent.KnowledgeReviewer)
+	return &Service{patternRepo: repo, normalizer: normalizer, reviewer: reviewer, admission: policy}
+}
+
+// NewService 创建模式规范化入库服务。
+func NewService(repo patternStore, admission ...AdmissionPolicy) *Service {
+	policy := DefaultAdmissionPolicy()
+	if len(admission) > 0 {
+		policy = admission[0]
+	}
+	return &Service{patternRepo: repo, admission: policy}
 }
 
 // NormalizeAndStore 将候选模式规范化为可入库模式并写入模式库。
@@ -46,9 +53,10 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 	}
 	candidates := validateCandidates(req.Candidates)
 	if req.Operation == OperationLearnCurrent {
-		candidates = coalesceCurrentCandidates(validateCurrentCandidates(candidates))
+		candidates = coalesceCurrentCandidates(s.validateCurrentCandidates(candidates))
 	}
-	if len(candidates) == 0 {
+	retiredIDs := uniquePatternIDs(req.RetiredPatternIDs)
+	if len(candidates) == 0 && len(retiredIDs) == 0 {
 		return &NormalizeResult{
 			Summary: Summary{
 				TotalCandidates: len(req.Candidates),
@@ -60,8 +68,24 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("PatternNormLoadExistingPatternsFailed"), err)
 	}
-	existing = activeNormalizePatterns(existing)
-	retrieved := retrieveRelatedPatterns(candidates, existing, relatedPatternsPerCandidate)
+	retiredIDs = eligibleRetiredPatternIDs(retiredIDs, existing, nil)
+	activeExisting := activeNormalizePatterns(existing)
+	if len(candidates) == 0 {
+		if len(retiredIDs) > 0 {
+			if err := s.patternRepo.ApplyPatternMutation(ctx, domain.PatternMutation{DeleteIDs: retiredIDs}); err != nil {
+				return nil, fmt.Errorf("%s: %w", i18n.Get("PatternNormApplyPatternsFailed"), err)
+			}
+		}
+		return &NormalizeResult{
+			RetiredPatternIDs: retiredIDs,
+			Summary: Summary{
+				TotalCandidates: len(req.Candidates),
+				TotalExisting:   len(activeExisting),
+			},
+		}, nil
+	}
+
+	retrieved := retrieveRelatedPatterns(candidates, activeExisting)
 	var normalized *proposal
 	if req.Operation == OperationLearnCurrent {
 		normalized, err = s.normalizeCurrent(ctx, req, candidates, retrieved, hooks)
@@ -80,14 +104,16 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 	}
 
 	notifyProgress(hooks.OnStoreStart, i18n.Get("ProgressNormalizePatternsStore"))
-	written, err := applyNormalizedPatterns(ctx, s.patternRepo, normalized.Patterns, normalized.Dropped, retrieved.related, storeCandidates)
+	retiredIDs = eligibleRetiredPatternIDs(retiredIDs, existing, normalized.Patterns)
+	written, err := applyNormalizedPatterns(ctx, s.patternRepo, normalized.Patterns, normalized.Dropped, retrieved.related, retiredIDs, storeCandidates)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("PatternNormApplyPatternsFailed"), err)
 	}
 	return &NormalizeResult{
-		Written: written,
-		Dropped: normalized.Dropped,
-		Summary: summarizeNormalization(len(candidates), len(retrieved.related), written, normalized.Dropped),
+		Written:           written,
+		RetiredPatternIDs: retiredIDs,
+		Dropped:           normalized.Dropped,
+		Summary:           summarizeNormalization(len(candidates), len(retrieved.related), written, normalized.Dropped),
 	}, nil
 }
 
@@ -103,6 +129,41 @@ func activeNormalizePatterns(patterns []domain.Pattern) []domain.Pattern {
 		if pattern.IsActive() {
 			out = append(out, pattern)
 		}
+	}
+	return out
+}
+
+func uniquePatternIDs(ids []string) []string {
+	seen := make(map[string]bool, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
+}
+
+func eligibleRetiredPatternIDs(ids []string, existing, outputs []domain.Pattern) []string {
+	outputIDs := make(map[string]bool, len(outputs))
+	for _, pattern := range outputs {
+		outputIDs[pattern.ID] = true
+	}
+	existingByID := make(map[string]domain.Pattern, len(existing))
+	for _, pattern := range existing {
+		existingByID[pattern.ID] = pattern
+	}
+
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		pattern, ok := existingByID[id]
+		if !ok || outputIDs[id] || !pattern.CanBeRetiredFromCurrentLearning() {
+			continue
+		}
+		out = append(out, id)
 	}
 	return out
 }
@@ -147,7 +208,7 @@ func logNormalizationAssessment(operation Operation, assessment normalizationAss
 	if len(assessment.IgnoredDroppedIDs) == 0 && len(assessment.IgnoredConflictingDroppedIDs) == 0 && len(assessment.IgnoredMergedFromIDs) == 0 && len(assessment.IgnoredPatternIDs) == 0 && len(assessment.ResolvedOwnershipIDs) == 0 && assessment.Coverage.MissingCount() == 0 {
 		return
 	}
-	logger.Info(i18n.Get("LoggerPatternNormSanitized"),
+	logger.Diagnostic(i18n.Get("LoggerPatternNormSanitized"),
 		"operation", operation,
 		"ignored_dropped_ids", assessment.IgnoredDroppedIDs,
 		"ignored_conflicting_dropped_ids", assessment.IgnoredConflictingDroppedIDs,

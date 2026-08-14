@@ -32,8 +32,9 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelFocuses(t *testing.T
           "good_example": "func loginFailed() error {\n  return nil\n}",
           "bad_example": "",
           "rule": "登录失败达到阈值时锁定账号",
-          "confidence": 0.9,
-          "frequency": 1
+		  "confidence": 0.9,
+		  "frequency": 1,
+		  "knowledge_flags": ["operational_risk"]
         }
       ],
       "profile_refresh_recommended": {"needed": false, "reason": ""}
@@ -50,6 +51,70 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelFocuses(t *testing.T
 	require.Len(t, result.Focuses[0].Patterns, 1)
 	assert.Equal(t, "login-failure-lock-mechanism", result.Focuses[0].Patterns[0].ID)
 	assert.Equal(t, domain.SourceLearnedCurrent, result.Focuses[0].Patterns[0].Source)
+	assert.Equal(t, []string{domain.KnowledgeFlagOperationalRisk}, result.Focuses[0].Patterns[0].KnowledgeFlags)
+}
+
+func TestParseOptimizeContentResultTrimsMarkdown(t *testing.T) {
+	result, err := ParseOptimizeContentResult(`{"content":"  # Rule\n\nKeep the boundary.  "}`)
+
+	require.NoError(t, err)
+	require.Equal(t, "# Rule\n\nKeep the boundary.", result.Content)
+}
+
+func TestParsePlanLearningAgendaResultKeepsCoverageReceipt(t *testing.T) {
+	result, err := ParsePlanLearningAgendaResult(`{
+		"focuses":[{"id":"contract","name":"Contract","analysis_depth":"careful","entry_paths":["src/contract.ext"]}],
+		"skipped_paths":[{"path":"src/generated.ext","reason":"Generated projection without source-of-truth value."}],
+		"reason":"Keep source-owned decisions."
+	}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Focuses, 1)
+	require.Len(t, result.SkippedPaths, 1)
+	require.Equal(t, "src/generated.ext", result.SkippedPaths[0].Path)
+	require.Equal(t, "Keep source-owned decisions.", result.Reason)
+}
+
+func TestParseReviewKnowledgeResultKeepsRevision(t *testing.T) {
+	result, err := ParseReviewKnowledgeResult(`{"decisions":[{
+		"candidate_id":"bounded-behavior","verdict":"revise","reason_code":"overclaimed",
+		"reason":"Narrow the claim.","business_method_verdict":"remove",
+		"revision":{"name":"Bounded behavior","category":"business","description":"Observed locally.","rule":"Inspect before reuse.","confidence":0.86,"knowledge_flags":["operational_risk"]}
+	}]}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Decisions, 1)
+	require.NotNil(t, result.Decisions[0].Revision)
+	require.Equal(t, 0.86, result.Decisions[0].Revision.Confidence)
+	require.Equal(t, []string{domain.KnowledgeFlagOperationalRisk}, result.Decisions[0].Revision.KnowledgeFlags)
+}
+
+func TestParseReviewKnowledgeResultIgnoresInactiveConditionalFields(t *testing.T) {
+	result, err := ParseReviewKnowledgeResult(`{"decisions":[{
+		"candidate_id":"bounded-behavior","verdict":"accept","reason_code":"accepted",
+		"reason":"The evidence supports the candidate.","business_method_verdict":"remove",
+		"business_method":{"name":"Unused","code_location":{"current_location":"src/state.ext:24"},"description":"Unused.","usage":"Unused.","type":"domain","function":"Unused()","prerequisites":"None.","returns":"Nothing."},
+		"revision":{"name":"Unused","category":"business","description":"Unused.","rule":"Unused.","confidence":0.5,"knowledge_flags":[]}
+	}]}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Decisions, 1)
+	require.Nil(t, result.Decisions[0].Revision)
+	require.Nil(t, result.Decisions[0].BusinessMethod)
+}
+
+func TestParseReviewKnowledgeResultSetsBusinessMethod(t *testing.T) {
+	result, err := ParseReviewKnowledgeResult(`{"decisions":[{
+		"candidate_id":"state-transition","verdict":"accept","reason_code":"accepted",
+		"reason":"The entry is directly evidenced.","business_method_verdict":"set",
+		"business_method":{"name":"State.Transition","code_location":{"current_location":"src/state.ext:24"},"description":"Validates a transition.","usage":"Use for state changes.","type":"domain","function":"Transition(next State) error","prerequisites":"Allowed current and next states.","returns":"Nil or a validation error."}
+	}]}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Decisions, 1)
+	require.NotNil(t, result.Decisions[0].BusinessMethod)
+	require.Equal(t, "State.Transition", result.Decisions[0].BusinessMethod.Name)
+	require.Equal(t, "src/state.ext:24", result.Decisions[0].BusinessMethod.CodeLocation.CurrentLocation)
 }
 
 func TestParseWorkspaceSpecParsesStringChangeOrder(t *testing.T) {
@@ -97,11 +162,8 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
   "framework_patterns": ["cobra command wiring"],
   "structure": "internal/",
   "key_modules": [{"name":"service","path":"internal/service","description":"business layer","responsibilities":["orchestrate"],"dependencies":["domain"],"dependents":["command"],"key_methods":["Run()"]}],
-  "business_methods": [{"name":"Run","code_location":{"current_location":"internal/service/demo.go:10"},"description":"runs demo","usage":"demo flow","type":"domain","function":"func Run() error","prerequisites":"config loaded","returns":"error"}],
-  "common_utils": [{"name":"Ptr","file":"internal/utils/ptr.go","signature":"func Ptr[T any](v T) *T","description":"returns pointer","usage":"optional fields"}],
   "config_patterns": ["yaml config"],
   "dependencies": ["bbolt"],
-  "validation_commands": [{"command":"task verify","when":"after changing project code","source":"Taskfile.yml"}],
   "summary": "demo project"
 }`
 
@@ -113,12 +175,22 @@ func TestParseAnalyzeProjectResult_FullSchema(t *testing.T) {
 	assert.Len(t, result.Layers, 1)
 	assert.Len(t, result.KeyModules, 1)
 	assert.Equal(t, []string{"domain"}, result.KeyModules[0].Dependencies)
-	assert.Len(t, result.BusinessMethods, 1)
-	assert.Equal(t, "internal/service/demo.go:10", result.BusinessMethods[0].DisplayLocation())
-	assert.Equal(t, "func Ptr[T any](v T) *T", result.CommonUtils[0].Signature)
-	require.Len(t, result.ValidationCommands, 1)
-	assert.Equal(t, "task verify", result.ValidationCommands[0].Command)
-	assert.Equal(t, "Taskfile.yml", result.ValidationCommands[0].Source)
+}
+
+func TestParseExtractAuthorityResult(t *testing.T) {
+	result, err := ParseExtractAuthorityResult(`{
+		"authority_sections": [{
+			"section_id":"authority-contracts",
+			"rules":[{"title":"Preserve contract","rule":"Keep public interfaces compatible.","applies_to":["public interfaces"]}]
+		}]
+	}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.AuthoritySections, 1)
+	assert.Equal(t, "authority-contracts", result.AuthoritySections[0].SectionID)
+	require.Len(t, result.AuthoritySections[0].Rules, 1)
+	assert.Equal(t, "Preserve contract", result.AuthoritySections[0].Rules[0].Title)
+	assert.Empty(t, result.AuthoritySections[0].Rules[0].Source)
 }
 
 func TestParseAnalyzeProjectResultRepairsNonstandardJSON(t *testing.T) {
@@ -134,10 +206,6 @@ func TestParseAnalyzeProjectResultRepairsNonstandardJSON(t *testing.T) {
   framework_patterns: [],
   structure: 'internal/',
   key_modules: [],
-  business_methods: [],
-  common_utils: [
-    {name:'RawFieldNames', file:'core/stores/condition/adaptor.go', signature:'func RawFieldNames(in any) []string', description:'从结构体提取 db tag 对应的字段名列表', usage:'将 Go 结构体字段转为数据库列名列表'},
-  ],
   config_patterns: [],
   dependencies: [],
   summary: 'demo project',
@@ -148,11 +216,9 @@ func TestParseAnalyzeProjectResultRepairsNonstandardJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "demo", result.ProjectName)
 	require.Equal(t, []string{"cobra"}, result.Frameworks)
-	require.Len(t, result.CommonUtils, 1)
-	require.Equal(t, "RawFieldNames", result.CommonUtils[0].Name)
 }
 
-func TestParseAnalyzeProjectResultRejectsSemanticTypeMismatch(t *testing.T) {
+func TestParseAnalyzeProjectResultRejectsUnknownProfileField(t *testing.T) {
 	output := `{
   "project_name": "demo",
   "language": "go",
@@ -164,11 +230,9 @@ func TestParseAnalyzeProjectResultRejectsSemanticTypeMismatch(t *testing.T) {
   "framework_patterns": [],
   "structure": "internal/",
   "key_modules": [],
-  "business_methods": [],
-  "common_utils": [],
   "config_patterns": [],
   "dependencies": [],
-  "validation_commands": ["go test ./..."],
+  "unknown_field": ["unexpected"],
   "summary": "demo project"
 }`
 

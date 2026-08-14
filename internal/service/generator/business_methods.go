@@ -7,6 +7,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/knowledge"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 type businessMethodIndex struct {
@@ -98,7 +99,7 @@ func businessMethodGroupSummary(group businessMethodGroup, locale string) string
 }
 
 func businessMethodModule(method domain.BusinessMethod) string {
-	path := referencePathOnly(method.DisplayLocation())
+	path := pathx.CleanEvidenceLocationPath(method.DisplayLocation())
 	if path == "" || path == "." {
 		return ""
 	}

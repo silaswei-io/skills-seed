@@ -2,11 +2,7 @@
 {{else}}# {{.Title}}
 {{with .Summary}}
 {{.}}
-{{end}}{{if .Contexts}}
-## 上下文
-{{range .Contexts}}
-{{.}}
-{{end}}{{end}}{{end}}{{if .Scripts}}
+{{end}}{{end}}{{if .Scripts}}
 ## 脚本
 {{range .Scripts}}
 - `{{.}}`

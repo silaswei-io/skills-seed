@@ -31,11 +31,6 @@ func (o Operation) Valid() bool {
 	}
 }
 
-const (
-	// relatedPatternsPerCandidate 控制单个候选模式传给 AI 的相关历史模式上限。
-	relatedPatternsPerCandidate = 8
-)
-
 // NormalizeRequest 表示候选模式规范化入库请求。
 type NormalizeRequest struct {
 	Operation          Operation
@@ -43,8 +38,30 @@ type NormalizeRequest struct {
 	RootPath           string
 	Language           string
 	Candidates         []domain.Pattern
+	RetiredPatternIDs  []string
 	DecisionCheckpoint DecisionCheckpoint
 	UserContext        string
+}
+
+// ReviewRequest 表示一个完整证据焦点的独立知识审查请求。
+type ReviewRequest struct {
+	ProjectName string
+	RootPath    string
+	Language    string
+	Focus       domain.EvidenceFocus
+	Candidates  []domain.Pattern
+	UserContext string
+}
+
+// AdmissionPolicy 控制当前代码候选模式的最低入库置信度。
+type AdmissionPolicy struct {
+	MinConfidence               float64
+	MinSingleEvidenceConfidence float64
+}
+
+// DefaultAdmissionPolicy 返回未注入配置时的保守阈值，供独立服务和测试使用。
+func DefaultAdmissionPolicy() AdmissionPolicy {
+	return AdmissionPolicy{MinConfidence: 0.75, MinSingleEvidenceConfidence: 0.85}
 }
 
 // DecisionCheckpoint 保存已完成的规范化决策，使本地校验或入库失败后可以直接重放。
@@ -64,9 +81,10 @@ type ProgressHooks struct {
 
 // NormalizeResult 表示模式规范化入库结果。
 type NormalizeResult struct {
-	Written []domain.Pattern
-	Dropped []Drop
-	Summary Summary
+	Written           []domain.Pattern
+	RetiredPatternIDs []string
+	Dropped           []Drop
+	Summary           Summary
 }
 
 // Drop 描述一个明确不应入库的候选模式。

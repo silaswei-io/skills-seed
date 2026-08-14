@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,13 +12,53 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNormalizePatternsPromptDataWritesCapabilityEntryIdentity(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	pattern := *domain.NewPattern("dispatcher-submit", "Submit work", domain.CategoryBusiness)
+	pattern.BusinessMethod = &domain.BusinessMethod{
+		Name: " Submit ",
+		CodeLocation: domain.CodeLocation{
+			CurrentLocation:    " internal/job/dispatcher.go:41 ",
+			HistoricalLocation: " internal/job/dispatcher.go:17 ",
+		},
+	}
+
+	data, err := NormalizePatternsPromptData(session, &NormalizePatternsRequest{Candidates: []domain.Pattern{pattern}})
+
+	require.NoError(t, err)
+	path, ok := data["CandidatePatternsPath"].(string)
+	require.True(t, ok)
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.JSONEq(t, `[{"id":"dispatcher-submit","name":"Submit work","category":"business","capability_entry":{"name":"Submit","current_location":"internal/job/dispatcher.go:41","historical_location":"internal/job/dispatcher.go:17"}}]`, string(content))
+}
+
+func TestReviewKnowledgePromptDataWritesEvidenceFocus(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	focus := domain.EvidenceFocus{
+		ID:          "lifecycle",
+		Name:        "Lifecycle",
+		EntryPaths:  []string{"internal/lifecycle.ext"},
+		ScopeReason: "The transition and persistence boundary must be reviewed together.",
+	}
+
+	data, err := ReviewKnowledgePromptData(session, &ReviewKnowledgeRequest{EvidenceFocus: focus})
+
+	require.NoError(t, err)
+	path, ok := data["EvidenceFocusPath"].(string)
+	require.True(t, ok)
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"id":"lifecycle","name":"Lifecycle","entry_paths":["internal/lifecycle.ext"],"scope_reason":"The transition and persistence boundary must be reviewed together."}`, string(content))
+}
+
 func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
 	planData, err := PlanLearningAgendaPromptData(session, &PlanLearningAgendaRequest{})
 	require.NoError(t, err)
 	require.Equal(t, config.LearningModeNormal, planData["LearningMode"])
-	require.Equal(t, config.LearningScopeFlow, planData["LearningScope"])
+	require.NotContains(t, planData, "LearningScope")
 
 	currentData, err := AnalyzeCurrentCodebaseBatchPromptData(session, &AnalyzeCurrentCodebaseBatchRequest{
 		LearningMode: config.LearningModeDeep,
@@ -51,6 +90,10 @@ func TestPlanLearningAgendaPromptDataWritesFocusedPathList(t *testing.T) {
 
 	data, err := PlanLearningAgendaPromptData(session, &PlanLearningAgendaRequest{
 		FocusPaths: []string{"internal/key/create.go", "internal/auth/login.go", "internal/auth/login.go"},
+		SourceFacts: []PlanningSourceFact{{
+			Path: "internal/auth/login.go", SizeBytes: 128, LineCount: 8, NonBlankLines: 6, SymbolCount: 1,
+			Symbols: []PlanningSymbolFact{{Name: "Login", Kind: "function", Line: 3}},
+		}},
 	})
 	require.NoError(t, err)
 
@@ -63,63 +106,13 @@ func TestPlanLearningAgendaPromptDataWritesFocusedPathList(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "internal/auth/login.go\ninternal/key/create.go\n", string(content))
 	require.NotContains(t, data, "FocusPaths")
-}
 
-func TestSelectLearningCandidatesPromptDataWritesCandidateAndRequiredPathLists(t *testing.T) {
-	session := &PromptInputSession{dir: t.TempDir()}
-
-	data, err := SelectLearningCandidatesPromptData(session, &SelectLearningCandidatesRequest{
-		CandidatePaths: []string{"internal/key/create.go", "internal/auth/login.go", "internal/auth/login.go"},
-		RequiredPaths:  []string{"internal/auth/login.go"},
-	})
-	require.NoError(t, err)
-
-	candidatePath, ok := data["CandidatePathsPath"].(string)
+	factsPath, ok := data["SourceFactsPath"].(string)
 	require.True(t, ok)
-	require.Equal(t, filepath.Join(session.dir, "candidate-files.txt"), candidatePath)
-	require.Equal(t, 2, data["CandidatePathCount"])
-
-	requiredPath, ok := data["RequiredPathsPath"].(string)
-	require.True(t, ok)
-	require.Equal(t, filepath.Join(session.dir, "required-files.txt"), requiredPath)
-	require.Equal(t, 1, data["RequiredPathCount"])
-
-	content, err := os.ReadFile(candidatePath)
+	require.Equal(t, 1, data["SourceFactCount"])
+	facts, err := os.ReadFile(factsPath)
 	require.NoError(t, err)
-	require.Equal(t, "internal/auth/login.go\ninternal/key/create.go\n", string(content))
-	require.NotContains(t, data, "CandidatePaths")
-}
-
-func TestNormalizePatternsPromptDataWritesCompactPatternInputs(t *testing.T) {
-	session := &PromptInputSession{dir: t.TempDir()}
-	pattern := domain.NewPattern("p1", "Decode Boundary", domain.CategoryAPI)
-	pattern.SetDescription("HTML values are decoded before storage.")
-	pattern.SetRule("Inspect the decoded value handling before changing API persistence.")
-	pattern.GoodExample = "long example should not enter compact merge input"
-	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{
-		{Path: "internal/a.go", Line: 10, Symbol: "A"},
-		{Path: "internal/a.go", Line: 20, Symbol: "B"},
-	}
-
-	data, err := NormalizePatternsPromptData(session, &NormalizePatternsRequest{
-		ProjectName: "demo",
-		Candidates:  []domain.Pattern{*pattern},
-	})
-	require.NoError(t, err)
-
-	path, ok := data["CandidatePatternsPath"].(string)
-	require.True(t, ok)
-	require.Equal(t, 1, data["CandidatePatternCount"])
-
-	raw, err := os.ReadFile(path)
-	require.NoError(t, err)
-	require.NotContains(t, string(raw), "long example")
-	require.NotContains(t, string(raw), `"line"`)
-
-	var items []normalizePatternInput
-	require.NoError(t, json.Unmarshal(raw, &items))
-	require.Len(t, items, 1)
-	require.Equal(t, []string{"internal/a.go"}, items[0].EvidencePaths)
+	require.JSONEq(t, `[{"path":"internal/auth/login.go","size_bytes":128,"line_count":8,"non_blank_lines":6,"symbol_count":1,"symbols":[{"name":"Login","kind":"function","line":3}]}]`, string(facts))
 }
 
 func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {
@@ -162,10 +155,10 @@ func TestAnalyzeProjectPromptDataWritesFocusedPathList(t *testing.T) {
 	require.NotContains(t, data, "FocusPaths")
 }
 
-func TestAnalyzeProjectPromptDataWritesEngineeringKnowledgeList(t *testing.T) {
+func TestExtractAuthorityPromptDataWritesEngineeringKnowledgeList(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
-	data, err := AnalyzeProjectPromptData(session, &AnalyzeProjectRequest{
+	data, err := ExtractAuthorityPromptData(session, &ExtractAuthorityRequest{
 		EngineeringKnowledge: []string{"AGENTS.md", "Taskfile.yml"},
 	})
 
@@ -176,6 +169,28 @@ func TestAnalyzeProjectPromptDataWritesEngineeringKnowledgeList(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "AGENTS.md\nTaskfile.yml\n", string(content))
 	require.Equal(t, 2, data["EngineeringKnowledgeCount"])
+}
+
+func TestExtractAuthorityPromptDataWritesAuthoritySectionCatalog(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	sections := []AuthoritySection{
+		{ID: "authority-first", Source: "GUIDE.md", Section: "Contracts"},
+		{ID: "authority-second", Source: "Taskfile.yml"},
+	}
+
+	data, err := ExtractAuthorityPromptData(session, &ExtractAuthorityRequest{AuthoritySections: sections})
+
+	require.NoError(t, err)
+	path, ok := data["AuthoritySectionsPath"].(string)
+	require.True(t, ok)
+	require.Equal(t, filepath.Join(session.dir, "authority-sections.json"), path)
+	require.Equal(t, 2, data["AuthoritySectionCount"])
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.JSONEq(t, `[
+		{"section_id":"authority-first","source":"GUIDE.md","section":"Contracts"},
+		{"section_id":"authority-second","source":"Taskfile.yml"}
+	]`, string(content))
 }
 
 func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T) {
