@@ -176,7 +176,7 @@ type KnowledgeReviewDecisionOutput struct {
 	ReasonCode            string                   `json:"reason_code" jsonschema:"enum=accepted,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overclaimed,enum=incorrect_boundary" jsonschema_description:"structured reason for the verdict"`
 	Reason                string                   `json:"reason" jsonschema_description:"concise evidence-based review reason"`
 	BusinessMethodVerdict string                   `json:"business_method_verdict" jsonschema:"enum=remove,enum=set" jsonschema_description:"remove an absent or unsuitable entry, or set a complete source-backed entry"`
-	BusinessMethod        *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"complete reviewed capability entry required only when business_method_verdict is set; omit for remove"`
+	BusinessMethod        *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"complete reviewed capability entry required only when business_method_verdict is set; its source-confirmed location must come from this candidate's evidence locations or existing capability entry; omit for remove"`
 	Revision              *KnowledgeRevisionOutput `json:"revision,omitempty" jsonschema_description:"required only for revise; omit for accept and reject"`
 }
 

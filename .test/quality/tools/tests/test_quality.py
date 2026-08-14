@@ -162,6 +162,51 @@ class QualityRunTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires source anchors"):
             quality.QualityRun(self.root, self.config_path)
 
+    def test_frontmatter_contract_only_scores_the_entry_metadata(self):
+        (self.skill / "SKILL.md").write_text(
+            "---\n"
+            "name: demo-dev\n"
+            "description: Use for requirements, debugging, APIs, configuration, workflows, and verification.\n"
+            "---\n\n"
+            "The body mentions a business flow.\n",
+            encoding="utf-8",
+        )
+        run = self.run_quality_instance()
+        item = {
+            "files": ["SKILL.md"],
+            "required_fields": ["name", "description"],
+            "name_pattern": "^[a-z0-9-]+$",
+            "description_groups": [["requirements"], ["business flow"], ["APIs"], ["verification"]],
+            "max_description_length": 200,
+        }
+
+        ratio, details = run._frontmatter_contract(item)
+
+        self.assertLess(ratio, 1)
+        self.assertTrue(any("business flow" in detail for detail in details))
+
+    def test_frontmatter_contract_accepts_complete_trigger_description(self):
+        (self.skill / "SKILL.md").write_text(
+            "---\n"
+            "name: demo-dev\n"
+            "description: Use for requirements, business flows, APIs, configuration, workflows, and verification.\n"
+            "---\n",
+            encoding="utf-8",
+        )
+        run = self.run_quality_instance()
+        item = {
+            "files": ["SKILL.md"],
+            "required_fields": ["name", "description"],
+            "name_pattern": "^[a-z0-9-]+$",
+            "description_groups": [["requirements"], ["business flow"], ["APIs"], ["verification"]],
+            "max_description_length": 200,
+        }
+
+        ratio, details = run._frontmatter_contract(item)
+
+        self.assertEqual(1, ratio)
+        self.assertEqual([], details)
+
     def test_existing_project_and_skill_root_can_be_scored(self):
         external_project = self.root / "existing"
         external_skill = external_project / "skill"

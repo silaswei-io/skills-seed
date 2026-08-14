@@ -15,7 +15,7 @@ func TestWriteProjectsOriginalRuleTextWithoutRewriting(t *testing.T) {
 
 	require.NoError(t, Write([]domain.Rule{{ID: "foundation", Name: "底座代码保护", Content: content}}, output))
 
-	data, err := os.ReadFile(filepath.Join(output, "references", "rules", "foundation.md"))
+	data, err := os.ReadFile(filepath.Join(output, "rules", "foundation.md"))
 	require.NoError(t, err)
 	require.Equal(t, content+"\n", string(data))
 }

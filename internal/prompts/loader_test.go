@@ -245,6 +245,7 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, review, "current implementation, design intent, proven guarantee, and known risk")
 	require.Contains(t, review, "Removing the capability entry does not require rejecting")
 	require.Contains(t, review, "every retained entry must be self-contained")
+	require.Contains(t, review, "existing `business_method` location after you independently confirm that location against source")
 	require.Contains(t, review, "Do not accept routeable guidance while silently deleting or omitting")
 	require.Contains(t, review, "decision-bearing operands")
 	require.Contains(t, review, "one canonical entry")

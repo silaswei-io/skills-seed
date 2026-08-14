@@ -368,11 +368,15 @@ agents/
 references/
   project-overview.md
   project-spec.md
+  modules.md
+  business-methods.md
   patterns/*.md
-  examples/*.md
+rules/*.md
+workflows/*.md
+scripts/workflows/
 ```
 
-`SKILL.md` 会包含摘要阶段产出的关键洞察和改进建议（如果 Agent 返回了这些字段），用于补充入口 skill 中的项目判断依据。
+Agent 在加载正文前只用 `SKILL.md` frontmatter 的 `name` 和 `description` 判断是否命中。生成器会在 `description` 中保留项目名，并覆盖需求实现、问题排查、业务流程、接口与数据契约、配置、模块边界、Rule/Workflow、生成产物和验证等通用项目任务；正文只负责命中后的最小 reference 路由。`SKILL.md` 也会包含摘要阶段产出的关键洞察（如果 Agent 返回该字段），用于补充入口 skill 中的项目判断依据。
 
 #### 注意事项
 
@@ -555,7 +559,7 @@ skills-seed learn current --profile refresh
 
 ### `skills-seed rule`
 
-Rule 是用户维护的权威约束。当前 Agent 会在不改变权威语义和作用域的前提下，结合目标项目上下文整理 `--content`，随后保存到 `.skills-seed/rules/<id>/RULE.md`，再由 `generate skills` 投影到 `references/rules/<id>.md`。无范围参数时规则只归属当前项目或工作区根；使用 `--child`、`--project` 或 `--path` 可声明其他明确范围。Agent 不从规则原文猜测路径和归属。
+Rule 是用户维护的权威约束。当前 Agent 会在不改变权威语义和作用域的前提下，结合目标项目上下文整理 `--content`，随后保存到 `.skills-seed/rules/<id>/RULE.md`，再由 `generate skills` 投影到 `rules/<id>.md`。无范围参数时规则只归属当前项目或工作区根；使用 `--child`、`--project` 或 `--path` 可声明其他明确范围。Agent 不从规则原文猜测路径和归属。
 
 ```bash
 skills-seed rule --name foundation-code --content "未经明确授权不得修改底座代码。" --path "internal/platform/**"

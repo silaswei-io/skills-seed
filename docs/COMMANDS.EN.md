@@ -368,11 +368,15 @@ agents/
 references/
   project-overview.md
   project-spec.md
+  modules.md
+  business-methods.md
   patterns/*.md
-  examples/*.md
+rules/*.md
+workflows/*.md
+scripts/workflows/
 ```
 
-`SKILL.md` includes summary-stage key insights and improvement suggestions when the agent returns those fields, giving the entry skill extra project-specific judgment context.
+Before loading the body, an Agent uses only the `name` and `description` fields in `SKILL.md` frontmatter to decide whether the Skill applies. Generation keeps the project name in `description` and covers general project tasks such as requirements, debugging, business flows, API and data contracts, configuration, module boundaries, Rules/Workflows, generated artifacts, and verification. The body only routes a matched task to the smallest necessary references. `SKILL.md` also includes summary-stage key insights when the Agent returns them, giving the entry skill additional project-specific judgment context.
 
 #### Notes
 
@@ -555,7 +559,7 @@ skills-seed learn current --profile refresh
 
 ### `skills-seed rule`
 
-Rules are authoritative user-maintained constraints. The current Agent uses target-project context to organize `--content` without changing its authority or scope, stores it at `.skills-seed/rules/<id>/RULE.md`, and `generate skills` projects it to `references/rules/<id>.md`. Without scope flags, a rule belongs only to the current project or workspace root. Use `--child`, `--project`, or `--path` for other explicit scopes. The Agent does not infer ownership or paths from rule prose.
+Rules are authoritative user-maintained constraints. The current Agent uses target-project context to organize `--content` without changing its authority or scope, stores it at `.skills-seed/rules/<id>/RULE.md`, and `generate skills` projects it to `rules/<id>.md`. Without scope flags, a rule belongs only to the current project or workspace root. Use `--child`, `--project`, or `--path` for other explicit scopes. The Agent does not infer ownership or paths from rule prose.
 
 ```bash
 skills-seed rule --name foundation-code --content "Do not modify foundation code without explicit authorization." --path "internal/platform/**"

@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.1]
+
+### Changes
+
+- Broadened project and workspace Skill frontmatter triggers. Descriptions retain the project name as a scope signal and cover requirements, debugging, business flows, API and data contracts, configuration, module boundaries, Rules/Workflows, generated artifacts, impact analysis, and verification without narrowing first-match behavior to the project's language.
+- Added a configurable frontmatter contract to `.test/quality`, independently scoring the pre-load `name` and `description` for trigger coverage, naming, and length. The scoring engine contains no project-, language-, framework-, or business-specific decisions.
+- Moved generated user Rule projections to root-level `rules/` beside `workflows/`, updating generation plans, links, documentation, and regression coverage.
+
+### Fixes
+
+- Fixed broken authoritative-file symlinks being mislabeled as a failure to get the current directory during project preparation. Errors now retain the authority source path and original cause with locale-specific stage context.
+- Fixed independent knowledge review rejecting a complete capability entry when its location was already recorded by the candidate itself but not duplicated in ordinary evidence locations. Locations outside the candidate boundary remain rejected.
+
 ## [v0.20.0]
 
 ### Changes

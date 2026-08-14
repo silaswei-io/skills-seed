@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateSkillsProjectsRuleFromSeedIntoReference(t *testing.T) {
+func TestGenerateSkillsProjectsRuleFromSeedIntoSkillRoot(t *testing.T) {
 	seedPath := t.TempDir()
 	ruleRepo := rulestore.NewRepository(seedPath)
 	content := "# 底座代码保护\n\n未经明确授权不得修改 `internal/platform/**`。"
@@ -32,10 +32,19 @@ func TestGenerateSkillsProjectsRuleFromSeedIntoReference(t *testing.T) {
 
 	skill := readGeneratedFile(t, output, "SKILL.md")
 	require.Contains(t, skill, "## 用户规则")
-	require.Contains(t, skill, "./references/rules/foundation.md")
+	require.Contains(t, skill, "./rules/foundation.md")
 	require.Contains(t, skill, "internal/platform/**")
-	require.Equal(t, content+"\n", readGeneratedFile(t, output, "references", "rules", "foundation.md"))
+	require.Equal(t, content+"\n", readGeneratedFile(t, output, "rules", "foundation.md"))
 	require.FileExists(t, filepath.Join(seedPath, "rules", "foundation", "RULE.md"))
+}
+
+func TestProjectSpecRuleReferencesResolveFromReferencesDirectory(t *testing.T) {
+	refs := []RuleReference{{Path: "./rules/foundation.md"}}
+
+	got := projectSpecRuleReferences(refs)
+
+	require.Equal(t, "../rules/foundation.md", got[0].Path)
+	require.Equal(t, "./rules/foundation.md", refs[0].Path)
 }
 
 func TestGenerateSkillsRejectsDuplicateLocalAndProjectedRuleID(t *testing.T) {

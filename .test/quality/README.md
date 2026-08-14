@@ -69,6 +69,8 @@ The suite uses an explicit 100-point budget and separates hard delivery gates fr
 
 Delivery also includes repeat-run stability: unchanged inputs must produce byte-identical Skill files. Stability is evaluated generically from the output tree and has no project, language, or framework rules.
 
+Loading includes a frontmatter trigger contract because an Agent decides whether to load a Skill from `name` and `description` before it can see body routing. Each case declares the task semantics its entry description must cover; the scoring engine only validates structure and configured semantic groups.
+
 A check earns partial credit for the exact sub-assertions it satisfies. Hard gates additionally cap the final score, so unrelated strengths cannot hide broken links, fabricated paths, missing critical rules, invalid module relations, false atomicity, or inverted business guarantees.
 
 Business-pattern checks require a concrete source anchor and all expected semantics in the same generated knowledge block. Keywords scattered across unrelated sections do not satisfy a pattern contract. Link and source-path checks can also require a minimum amount of evidence, so an empty index cannot pass by vacuous truth.

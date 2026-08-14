@@ -162,7 +162,7 @@ class QualityRun:
             raise ValueError(f"dimension points must sum to 100, got {total_points}")
         known_types = {
             "files_exist", "files_absent", "contains_groups", "not_contains",
-            "markdown_links_valid", "source_paths_valid", "entry_contract",
+            "markdown_links_valid", "source_paths_valid", "frontmatter_contract", "entry_contract",
             "module_relations_valid", "max_overlap", "section_contract",
             "output_stability",
         }
@@ -209,6 +209,7 @@ class QualityRun:
             "not_contains": self._not_contains,
             "markdown_links_valid": self._markdown_links_valid,
             "source_paths_valid": self._source_paths_valid,
+            "frontmatter_contract": self._frontmatter_contract,
             "entry_contract": self._entry_contract,
             "module_relations_valid": self._module_relations_valid,
             "max_overlap": self._max_overlap,
@@ -360,6 +361,67 @@ class QualityRun:
             unique_findings.append(f"only {len(checked)} source paths found; expected at least {minimum}")
         evidence_ratio = self._fraction(min(len(checked), minimum), minimum)
         return self._fraction(len(checked) - len(missing_paths), len(checked)) * evidence_ratio, unique_findings
+
+    def _frontmatter_contract(self, item: dict) -> tuple[float, list[str]]:
+        files = self._files(item.get("files", ["SKILL.md"]))
+        if not files:
+            return 0, ["no Skill entry file matched the configured scope"]
+
+        matched = 0
+        total = 0
+        details = []
+        for path in files:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            block_match = re.match(r"\A---\s*\n(.*?)\n---(?:\s*\n|\Z)", text, re.DOTALL)
+            total += 1
+            if not block_match:
+                details.append(f"{self._display(path)} has no leading YAML frontmatter")
+                continue
+            matched += 1
+
+            fields = {}
+            for line in block_match.group(1).splitlines():
+                key, separator, value = line.partition(":")
+                if separator:
+                    fields[key.strip()] = value.strip().strip('"\'')
+
+            for field in item.get("required_fields", ["name", "description"]):
+                total += 1
+                if fields.get(field):
+                    matched += 1
+                else:
+                    details.append(f"{self._display(path)} frontmatter misses {field}")
+
+            name_pattern = item.get("name_pattern", "")
+            if name_pattern:
+                total += 1
+                if re.fullmatch(name_pattern, fields.get("name", "")):
+                    matched += 1
+                else:
+                    details.append(f"{self._display(path)} name does not match /{name_pattern}/")
+
+            description = fields.get("description", "")
+            for group in item.get("description_groups", []):
+                total += 1
+                alternatives = group if isinstance(group, list) else [group]
+                if any(re.search(pattern, description, re.IGNORECASE) for pattern in alternatives):
+                    matched += 1
+                else:
+                    details.append(
+                        f"{self._display(path)} frontmatter description misses: {' | '.join(alternatives)}"
+                    )
+
+            maximum = int(item.get("max_description_length", 0))
+            if maximum > 0:
+                total += 1
+                if 0 < len(description) <= maximum:
+                    matched += 1
+                else:
+                    details.append(
+                        f"{self._display(path)} description length is {len(description)}; expected 1-{maximum}"
+                    )
+
+        return self._fraction(matched, total), details
 
     def _entry_contract(self, item: dict) -> tuple[float, list[str]]:
         text = self._read(self._files(item.get("files")))

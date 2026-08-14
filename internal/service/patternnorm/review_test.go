@@ -60,6 +60,27 @@ func TestApplyKnowledgeReviewSetsVerifiedBusinessMethod(t *testing.T) {
 	require.Equal(t, method.Function, result[0].BusinessMethod.Function)
 }
 
+func TestApplyKnowledgeReviewAllowsCandidateBusinessMethodLocationOutsideGeneralEvidence(t *testing.T) {
+	candidate := currentPattern("state-transition", 0.95, "src/caller.ext")
+	candidate.BusinessMethod = &domain.BusinessMethod{
+		Name: "State.Transition", CodeLocation: domain.CodeLocation{CurrentLocation: "src/state.ext:24"},
+		Description: "Validates and applies a state transition.", Usage: "Use when changing the resource state.",
+		Type: "domain", Function: "Transition(next State) error",
+		Prerequisites: "The current and next states must form an allowed transition.",
+		Returns:       "Returns nil after applying the transition or a validation error.",
+	}
+	reviewed := *candidate.BusinessMethod
+	reviewed.Description = "Validates the requested transition before applying it."
+
+	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
+		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
+		Reason: "The candidate capability location is directly verified.", BusinessMethodVerdict: "set", BusinessMethod: &reviewed,
+	}})
+
+	require.NoError(t, err)
+	require.Equal(t, reviewed.Description, result[0].BusinessMethod.Description)
+}
+
 func TestApplyKnowledgeReviewRejectsBusinessMethodOutsideCandidateEvidence(t *testing.T) {
 	candidate := currentPattern("state-transition", 0.95, "src/state.ext")
 	method := &domain.BusinessMethod{

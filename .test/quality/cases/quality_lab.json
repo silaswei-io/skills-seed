@@ -424,6 +424,29 @@
       "hint": "Favor stable source ownership boundaries over framework layer labels."
     },
     {
+      "id": "entry-trigger-contract",
+      "type": "frontmatter_contract",
+      "dimension": "loading",
+      "description": "The entry frontmatter can trigger across the project task surface before the Skill body is loaded.",
+      "gate": true,
+      "score_cap": 70,
+      "weight": 2,
+      "files": ["SKILL.md"],
+      "required_fields": ["name", "description"],
+      "name_pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "max_description_length": 400,
+      "description_groups": [
+        ["requirements?", "implementation", "debugging", "review"],
+        ["business flows?", "domain"],
+        ["APIs?", "interfaces?", "data contracts?"],
+        ["configuration", "module boundaries?", "architecture"],
+        ["project rules?", "workflows?", "generated artifacts?"],
+        ["testing", "validation", "verification"],
+        ["ownership", "reusable capabilities", "impact analysis"]
+      ],
+      "hint": "Put comprehensive project-task triggers in frontmatter description; the Skill body is unavailable until after triggering."
+    },
+    {
       "id": "progressive-routing",
       "type": "contains_groups",
       "dimension": "loading",

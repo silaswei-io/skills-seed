@@ -53,7 +53,7 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 	locale := b.skillsLoader.GetLocale()
 	hasKnowledge := !opts.ResourceOnly
 	references := referenceAvailability(profile, patterns, hasKnowledge)
-	triggerDescription := skillTriggerDescription(templateProjectName, templateLanguage, locale, profile)
+	triggerDescription := skillTriggerDescription(templateProjectName, locale, profile)
 
 	// 准备模板数据
 	data := skillTemplateData{
@@ -172,7 +172,7 @@ func (b *planBuilder) appendProjectSpec(p *skillgen.Plan, spec *domain.ProjectSp
 func projectSpecRuleReferences(refs []RuleReference) []RuleReference {
 	out := make([]RuleReference, 0, len(refs))
 	for _, ref := range refs {
-		ref.Path = "./" + strings.TrimPrefix(strings.TrimPrefix(filepath.ToSlash(ref.Path), "./"), "references/")
+		ref.Path = filepath.ToSlash(filepath.Join("..", strings.TrimPrefix(filepath.ToSlash(ref.Path), "./")))
 		out = append(out, ref)
 	}
 	return out

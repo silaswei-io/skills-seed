@@ -134,14 +134,27 @@ func reviewedBusinessMethod(candidate domain.Pattern, decision agent.KnowledgeRe
 		if !domain.IsRouteableBusinessMethod(*method) || (method.Type != "domain" && method.Type != "common") {
 			return nil, fmt.Errorf("knowledge review decision %q sets an incomplete business method", candidate.ID)
 		}
-		location := pathx.CleanEvidenceLocationPath(method.DisplayLocation())
-		for _, evidence := range candidate.EvidenceLocations {
-			if location != "" && location == pathx.CleanEvidenceLocationPath(evidence.Path) {
-				return method, nil
-			}
+		if businessMethodWithinCandidateEvidence(candidate, *method) {
+			return method, nil
 		}
 		return nil, fmt.Errorf("knowledge review decision %q sets a business method outside candidate evidence", candidate.ID)
 	default:
 		return nil, fmt.Errorf("knowledge review decision %q has invalid business method verdict %q", candidate.ID, decision.BusinessMethodVerdict)
 	}
+}
+
+func businessMethodWithinCandidateEvidence(candidate domain.Pattern, method domain.BusinessMethod) bool {
+	location := pathx.CleanEvidenceLocationPath(method.DisplayLocation())
+	if location == "" {
+		return false
+	}
+	if candidate.BusinessMethod != nil && location == pathx.CleanEvidenceLocationPath(candidate.BusinessMethod.DisplayLocation()) {
+		return true
+	}
+	for _, evidence := range candidate.EvidenceLocations {
+		if location == pathx.CleanEvidenceLocationPath(evidence.Path) {
+			return true
+		}
+	}
+	return false
 }

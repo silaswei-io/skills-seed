@@ -446,9 +446,9 @@ func TestGenerateWorkspaceProjectsOnlyExplicitRulesToMatchingChildren(t *testing
 
 	require.NoError(t, generateWorkspaceChildSkillsWithOptions(context.Background(), cont, generateOptions{}))
 
-	require.FileExists(t, filepath.Join(workspaceRoot, "backend", ".agents", "skills", "backend-dev", "references", "rules", "backend-protection.md"))
-	require.FileExists(t, filepath.Join(workspaceRoot, "frontend", ".agents", "skills", "frontend-dev", "references", "rules", "backend-protection.md"))
-	require.NoFileExists(t, filepath.Join(workspaceRoot, "console", ".agents", "skills", "console-dev", "references", "rules", "backend-protection.md"))
+	require.FileExists(t, filepath.Join(workspaceRoot, "backend", ".agents", "skills", "backend-dev", "rules", "backend-protection.md"))
+	require.FileExists(t, filepath.Join(workspaceRoot, "frontend", ".agents", "skills", "frontend-dev", "rules", "backend-protection.md"))
+	require.NoFileExists(t, filepath.Join(workspaceRoot, "console", ".agents", "skills", "console-dev", "rules", "backend-protection.md"))
 	require.FileExists(t, filepath.Join(cont.SeedPath, "rules", "backend-protection", "RULE.md"))
 }
 

@@ -2072,6 +2072,9 @@ other = "Current-code incremental learning completed"
 [LearnCurrentFailed]
 other = "Current-code incremental learning failed: {{.Error}}"
 
+[LearnCurrentAuthorityRevisionFailed]
+other = "Failed to read the authoritative project knowledge revision"
+
 # ==================== 命令错误消息 ====================
 [ErrNotInitialized]
 other = "skills-seed not initialized, run 'skills-seed init' first"
@@ -2553,11 +2556,8 @@ other = ", "
 [GeneratorDefaultProjectName]
 other = "project"
 
-[GeneratorDefaultLanguageName]
-other = "code"
-
 [GeneratorSkillDescriptionDefault]
-other = "Use when modifying, debugging, testing, reviewing, or extending {{.Project}} {{.Language}} code, including interfaces and contracts, plugins and integrations, state/persistence, configuration and runtime behavior, or architecture analysis"
+other = "Use for requirements, debugging, implementation, testing, or review in the {{.Project}} project, including business flows, APIs and data contracts, configuration, module boundaries, project rules, workflows, generated artifacts, or impact analysis; routes ownership, reusable capabilities, and verification boundaries"
 
 [GeneratorCategorySummary]
 other = "{{.Category}} category contains {{.Count}} project-specific patterns: {{.Patterns}}."

@@ -189,7 +189,7 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		if r.projectRoot == "" {
 			r.projectRoot, err = os.Getwd()
 			if err != nil {
-				return err
+				return fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToGetCurrentDir", map[string]interface{}{"Error": err.Error()}))
 			}
 		}
 
@@ -221,7 +221,7 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		}
 		authorityRevision, revisionErr := analyzer.EngineeringKnowledgeRevision(r.projectRoot)
 		if revisionErr != nil {
-			return revisionErr
+			return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentAuthorityRevisionFailed"), revisionErr)
 		}
 		r.refreshProfile, err = shouldRefreshProfile(r.opts.profileMode, profileExists, profileAuthorityRevision(r.existingProfile), authorityRevision)
 		return err
@@ -231,7 +231,7 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 			"duration", time.Since(prepareStartedAt),
 			"error", err,
 		)
-		return fmt.Errorf("%s", i18n.GetWithParams("ErrFailedToGetCurrentDir", map[string]interface{}{"Error": err.Error()}))
+		return err
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current.prepare_project",

@@ -87,3 +87,16 @@ func TestEngineeringKnowledgeRevisionForPathsUsesActualAuthorityInput(t *testing
 	_, err = engineeringKnowledgeRevisionForPaths(root, []string{"../outside.md"})
 	require.ErrorContains(t, err, "invalid authority path")
 }
+
+func TestEngineeringKnowledgeRevisionNamesBrokenAuthoritySource(t *testing.T) {
+	root := t.TempDir()
+	missing := filepath.Join(t.TempDir(), "missing-authority.md")
+	if err := os.Symlink(missing, filepath.Join(root, "CLAUDE.md")); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+
+	_, err := EngineeringKnowledgeRevision(root)
+
+	require.ErrorContains(t, err, `resolve authority source "CLAUDE.md"`)
+	require.ErrorContains(t, err, "missing-authority.md")
+}

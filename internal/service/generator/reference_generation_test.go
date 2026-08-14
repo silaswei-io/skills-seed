@@ -387,7 +387,7 @@ func TestGenerateSkills_RendersCompactActionableSkillReferences(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
-	assert.Contains(t, skill, "description: 修改、调试、测试、审查或扩展 hsmwebapi go 代码时使用")
+	assert.Contains(t, skill, "description: 处理 hsmwebapi 项目的需求实现、问题排查、代码修改、测试或审查时使用")
 	assert.NotContains(t, skill, "平均置信度")
 	assert.NotContains(t, skill, "91.60000000000001")
 

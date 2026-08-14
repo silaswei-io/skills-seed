@@ -2072,6 +2072,9 @@ other = "当前代码增量学习完成"
 [LearnCurrentFailed]
 other = "当前代码增量学习失败: {{.Error}}"
 
+[LearnCurrentAuthorityRevisionFailed]
+other = "读取权威项目知识版本失败"
+
 # ==================== 命令错误消息 ====================
 [ErrNotInitialized]
 other = "skills-seed 未初始化，请先运行 'skills-seed init'"
@@ -2553,11 +2556,8 @@ other = "、"
 [GeneratorDefaultProjectName]
 other = "project"
 
-[GeneratorDefaultLanguageName]
-other = "code"
-
 [GeneratorSkillDescriptionDefault]
-other = "修改、调试、测试、审查或扩展 {{.Project}} {{.Language}} 代码时使用，包括接口与契约、插件与集成、状态/持久化、配置与运行期以及架构分析"
+other = "处理 {{.Project}} 项目的需求实现、问题排查、代码修改、测试或审查时使用，也适用于业务流程、接口与数据契约、配置、模块边界、项目规则、工作流、生成产物及影响分析；用于定位改动归属、复用现有能力并确认验证边界"
 
 [GeneratorCategorySummary]
 other = "{{.Category}} 分类包含 {{.Count}} 个项目特定模式：{{.Patterns}}。"

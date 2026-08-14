@@ -38,11 +38,11 @@ func engineeringKnowledgeRevisionForPaths(projectRoot string, paths []string) (s
 	for _, path := range paths {
 		resolved, err := projectpath.CanonicalWithinRoot(projectRoot, filepath.Join(projectRoot, filepath.FromSlash(path)))
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("resolve authority source %q: %w", path, err)
 		}
 		data, err := os.ReadFile(resolved)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("read authority source %q: %w", path, err)
 		}
 		hash.Write([]byte(path))
 		hash.Write([]byte{0})

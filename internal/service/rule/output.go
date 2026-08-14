@@ -9,7 +9,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 )
 
-const ruleOutputDir = "references/rules"
+const ruleOutputDir = "rules"
 
 // Reference 描述生成 Skill 中可引用的规则文档。
 type Reference struct {

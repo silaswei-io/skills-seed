@@ -204,12 +204,31 @@ func TestLoader_RenderWorkspaceSkillFromEmbedTemplate(t *testing.T) {
 	content, err := loader.Render("workspace-skill", data)
 	require.NoError(t, err)
 
-	require.Contains(t, content, "description: 修改、审查或扩展 demo 工作区代码时使用")
+	require.Contains(t, content, "description: 处理 demo 工作区中的需求、问题排查、修改、测试或审查时使用")
 	require.Contains(t, content, "[工作区概览](./references/workspace-overview.md)")
 	require.Contains(t, content, "[跨项目规则](./references/cross-project-rules.md)")
 	require.NotContains(t, content, "backend/.agents/skills/backend-dev/SKILL.md")
 	require.NotContains(t, content, "影响范围判断")
 	require.NotContains(t, content, "Use when modifying")
+}
+
+func TestLoader_RenderEnglishWorkspaceSkillHasBroadTriggerDescription(t *testing.T) {
+	loader := NewLoaderForAgent("codex", "en-US")
+	data := map[string]interface{}{
+		"ProgramVersion":      "v0.0.4",
+		"SkillsTemplatesHash": "hash",
+		"SkillName":           "demo-workspace-dev",
+		"WorkspaceName":       "demo",
+		"Projects":            []map[string]interface{}{},
+		"WorkflowReferences":  []map[string]string{},
+		"RuleReferences":      []map[string]string{},
+	}
+
+	content, err := loader.Render("workspace-skill", data)
+	require.NoError(t, err)
+
+	require.Contains(t, content, "description: Use for requirements, debugging, changes, testing, or review in the demo workspace")
+	require.Contains(t, content, "cross-project interfaces, shared resources, configuration, rules, workflows, or impact analysis")
 }
 
 func TestLoader_OmitsVisibleSkillsSeedGeneratedNoticeByDefault(t *testing.T) {
