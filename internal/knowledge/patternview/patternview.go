@@ -136,6 +136,9 @@ func MergeKeepingBest(left, right domain.Pattern) domain.Pattern {
 	if primary.BusinessMethod == nil {
 		primary.BusinessMethod = secondary.BusinessMethod
 	}
+	if primary.DevelopmentFocus == nil {
+		primary.DevelopmentFocus = secondary.DevelopmentFocus.Clone()
+	}
 	primary.EvidenceLocations = mergeEvidenceLocations(primary.EvidenceLocations, secondary.EvidenceLocations)
 	primary.RefreshMetrics()
 	return primary
@@ -148,6 +151,7 @@ func WithSources(pattern domain.Pattern, mergedFrom []string) domain.Pattern {
 	pattern.Merged = len(pattern.MergedFrom) > 1
 	pattern.KnowledgeFlags = append([]string(nil), pattern.KnowledgeFlags...)
 	pattern.BusinessMethod = cloneBusinessMethod(pattern.BusinessMethod)
+	pattern.DevelopmentFocus = pattern.DevelopmentFocus.Clone()
 	pattern.EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...)
 	return pattern
 }

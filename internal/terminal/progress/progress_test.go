@@ -123,6 +123,30 @@ func TestUpdateStepRefreshesActiveProgressLabel(t *testing.T) {
 	}
 }
 
+func TestTrackerRefreshesDetailPanelAsOneProgressBlock(t *testing.T) {
+	output := captureStdout(t, func() {
+		tracker := New(2)
+		tracker.enabled = true
+
+		tracker.StartStep("隔离源码证据分析与独立知识审查")
+		tracker.UpdateStepWithDetails("隔离源码证据分析与独立知识审查 · 完成 5/12 · 并发 2", []string{
+			"  batch-005 焦点 5/12 多租户架构 · 源码证据分析",
+			"  batch-007 焦点 7/12 模板管理 · 独立知识审查 · 候选 8",
+		})
+		tracker.UpdateStepWithDetails("隔离源码证据分析与独立知识审查 · 完成 6/12 · 并发 2", []string{
+			"  batch-007 焦点 7/12 模板管理 · 源码证据分析（第2次尝试）",
+			"  batch-008 焦点 8/12 审计边界 · 源码证据分析",
+		})
+		tracker.ClearDetails()
+		tracker.CompleteStep("隔离源码证据分析与独立知识审查")
+	})
+
+	require.Contains(t, output, "batch-005 焦点 5/12 多租户架构")
+	require.Contains(t, output, "batch-007 焦点 7/12 模板管理")
+	require.Contains(t, output, "batch-008 焦点 8/12 审计边界")
+	require.Contains(t, output, "\x1b[2F")
+}
+
 func TestRenderClipsLongProgressLineToTerminalWidth(t *testing.T) {
 	oldTerminalWidth := terminalWidth
 	terminalWidth = func() int { return 42 }
@@ -444,6 +468,7 @@ func resetConsoleState() {
 
 	progressActive = false
 	progressLineOpen = false
+	progressPhysicalLines = 0
 	pendingConsoleLines = nil
 }
 

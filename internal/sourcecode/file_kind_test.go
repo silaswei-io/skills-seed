@@ -72,6 +72,24 @@ func TestIsUserRuleAuthorityRequiresExactSeedShape(t *testing.T) {
 	require.False(t, IsUserRuleAuthority(".skills-seed/rules/foundation/metadata.yaml"))
 }
 
+func TestIsInstructionAuthorityExcludesAutomationSources(t *testing.T) {
+	tests := map[string]bool{
+		"AGENTS.md":                                  true,
+		"modules/payments/CLAUDE.md":                 true,
+		".skills-seed/rules/release/RULE.md":         true,
+		"Taskfile.yml":                               false,
+		".github/workflows/verify.yaml":              false,
+		"scripts/build.sh":                           false,
+		".skills-seed/workflows/release/WORKFLOW.md": false,
+	}
+
+	for path, expected := range tests {
+		t.Run(path, func(t *testing.T) {
+			require.Equal(t, expected, IsInstructionAuthority(path))
+		})
+	}
+}
+
 func TestIsEngineeringKnowledge(t *testing.T) {
 	tests := map[string]bool{
 		"AGENTS.md":                           true,

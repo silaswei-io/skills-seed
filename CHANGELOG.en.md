@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.4]
+
+### Changes
+
+- Upgraded authority synchronization to a complete two-stage extract-and-independent-review pipeline. The review Agent rereads only the same user-instruction sources and first-pass candidate, then returns a complete replacement set against the immutable section catalog; local code continues to validate source, section, scope, and command policy.
+- Final Skill development-focus routing now filters by known changed paths before supplementing request semantics. Multiple matches require reading every matching reference and resolving ownership from evidence; unresolved ambiguity is reported explicitly.
+
+### Fixes
+
+- Fixed unconditional “current code wins” guidance in entry Skills overriding explicit user authority. Explicit rules now define editable boundaries and command permissions; code only corrects a stale source-learned summary.
+- Fixed build, CI, and automation files being treated as authority for command permission, and “the user runs it manually” being projected as `requires_authorization`. Automation files no longer independently grant command permission, and the generated entry explicitly defines `forbidden`, `describe_only`, `requires_authorization`, and `allowed`.
+- Fixed temporary coverage focuses appearing in long-lived development navigation and equivalent authority-rule deduplication dropping distinct constraints.
+
 ## [v0.20.2]
 
 ### Changes

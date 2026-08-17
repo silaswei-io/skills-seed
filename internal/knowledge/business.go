@@ -18,13 +18,15 @@ const (
 )
 
 type BusinessGroup struct {
-	ID        string
-	Title     string
-	Path      string
-	Summary   BusinessGroupSummary
-	Patterns  []domain.Pattern
-	Locations []BusinessLocation
-	Signals   []string
+	ID                  string
+	Title               string
+	Path                string
+	Summary             BusinessGroupSummary
+	Patterns            []domain.Pattern
+	Locations           []BusinessLocation
+	Signals             []string
+	RouteTerms          []string
+	HasDevelopmentFocus bool
 }
 
 type BusinessGroupSummary struct {
@@ -54,9 +56,11 @@ func BusinessPatternGroups(locale string, patterns []domain.Pattern) []BusinessG
 		group, ok := groupsByID[key.ID]
 		if !ok {
 			group = &BusinessGroup{
-				ID:    key.ID,
-				Title: key.Title,
-				Path:  "./business/" + key.ID + ".md",
+				ID:                  key.ID,
+				Title:               key.Title,
+				Path:                "./business/" + key.ID + ".md",
+				RouteTerms:          append([]string(nil), key.RouteTerms...),
+				HasDevelopmentFocus: key.HasDevelopmentFocus,
 			}
 			groupsByID[key.ID] = group
 			order = append(order, key.ID)
@@ -64,6 +68,7 @@ func BusinessPatternGroups(locale string, patterns []domain.Pattern) []BusinessG
 		group.Patterns = append(group.Patterns, pattern)
 		group.Locations = mergeBusinessLocations(group.Locations, businessPatternLocations(pattern))
 		group.Signals = mergeBusinessSignals(group.Signals, businessPatternSignals(pattern))
+		group.RouteTerms = mergeBusinessSignals(group.RouteTerms, businessPatternRouteTerms(pattern))
 	}
 
 	sort.SliceStable(order, func(i, j int) bool {
@@ -87,11 +92,21 @@ func BusinessPatternGroups(locale string, patterns []domain.Pattern) []BusinessG
 }
 
 type businessGroupKey struct {
-	ID    string
-	Title string
+	ID                  string
+	Title               string
+	RouteTerms          []string
+	HasDevelopmentFocus bool
 }
 
 func businessPatternGroupKey(pattern domain.Pattern) businessGroupKey {
+	if focus := pattern.DevelopmentFocus.Clone(); focus != nil {
+		return businessGroupKey{
+			ID:                  focus.ID,
+			Title:               focus.Name,
+			RouteTerms:          focus.RouteTerms,
+			HasDevelopmentFocus: true,
+		}
+	}
 	if pattern.ScopePath != "" {
 		return businessGroupKeyFromPathText(pattern.ScopePath)
 	}
@@ -196,6 +211,9 @@ func buildBusinessGroupSummary(locale string, group BusinessGroup) BusinessGroup
 }
 
 func businessGroupKeywords(group BusinessGroup) []string {
+	if len(group.RouteTerms) > 0 {
+		return limitStrings(stringx.UniqueNonBlank(group.RouteTerms), maxBusinessGroupSignals)
+	}
 	keywords := SplitBusinessGroupWords(group.Title)
 	if len(keywords) == 0 {
 		keywords = SplitBusinessGroupWords(group.ID)
@@ -237,6 +255,13 @@ func businessPatternSignals(pattern domain.Pattern) []string {
 		pattern.Name,
 		pattern.ID,
 	})
+}
+
+func businessPatternRouteTerms(pattern domain.Pattern) []string {
+	if pattern.DevelopmentFocus == nil {
+		return nil
+	}
+	return pattern.DevelopmentFocus.RouteTerms
 }
 
 func mergeBusinessLocations(left, right []BusinessLocation) []BusinessLocation {

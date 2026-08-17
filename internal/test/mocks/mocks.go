@@ -16,6 +16,7 @@ type MockAgent struct {
 	UserDefinePatternFn       func(ctx context.Context, req *agent.UserDefinePatternRequest) (*agent.UserDefinePatternResult, error)
 	RefreshProjectProfileFn   func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	ExtractAuthorityFn        func(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error)
+	ReviewAuthorityFn         func(ctx context.Context, req *agent.ReviewAuthorityRequest) (*agent.ExtractAuthorityResult, error)
 	PlanLearningAgendaFn      func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error)
 	NormalizePatternsFn       func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error)
 	ReviewKnowledgeFn         func(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error)
@@ -111,6 +112,14 @@ func (m *MockAgent) ExtractAuthority(ctx context.Context, req *agent.ExtractAuth
 		})
 	}
 	return &agent.ExtractAuthorityResult{AuthoritySections: sections}, nil
+}
+
+// ReviewAuthority 模拟独立权威规则复核，默认保留初次候选。
+func (m *MockAgent) ReviewAuthority(ctx context.Context, req *agent.ReviewAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+	if m.ReviewAuthorityFn != nil {
+		return m.ReviewAuthorityFn(ctx, req)
+	}
+	return &req.Candidate, nil
 }
 
 // PlanLearningAgenda 模拟源码证据学习议程规划。

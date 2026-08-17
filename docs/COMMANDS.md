@@ -31,7 +31,7 @@
 | 初始化单项目 | `skills-seed init --mode project` → `skills-seed sync` | 创建配置、学习当前代码并生成 skills |
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
 | 日常增量更新 | `skills-seed sync` | 学习当前变更，有实际学习变化时生成 skills |
-| 只补充一条规则 | `skills-seed patterns add --context "<描述>"` → `skills-seed generate skills` | 用自然语言添加 pattern 后重新生成 |
+| 只补充一条规则 | `skills-seed patterns add --content "<内容>"` → `skills-seed generate skills` | 用自然语言添加 pattern 后重新生成 |
 | 查询任务工作流 | `skills-seed workflow show --format json` | 返回轻量摘要；按需用 `workflow show <id> --format json` 读取详情 |
 | 更新任务工作流 | `skills-seed workflow --name <名称> --content "<Markdown>"` → `skills-seed generate skills` | 同名时默认与已有内容合并优化；`--overwrite` 仅用于完整替换 |
 | 更新长期规则 | `skills-seed rule --name <名称> --content "<Markdown>"` → `skills-seed generate skills` | 同名时默认保留已有权威要求并增量优化；`--overwrite` 仅用于完整替换正文和范围 |
@@ -60,13 +60,13 @@
 | `skills-seed learn` | 从当前代码学习 | `current` | `--help, -h` = `false` |
 | `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
-| `skills-seed patterns` | 管理已学习的 patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
-| `skills-seed patterns add (--context <description> \| --context-path <path>)` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
+| `skills-seed patterns` | 管理已学习的 patterns | `add (--content <description> \| --content-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--content <description> \| --content-path <path>)` | `--help, -h` = `false` |
+| `skills-seed patterns add (--content <description> \| --content-path <path>)` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
 | `skills-seed patterns compact` | 整理相似 patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
 | `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | - | `--help, -h` = `false` |
 | `skills-seed patterns show [pattern-id]` | 查看已学习 pattern 的概览或完整详情 | - | `--format` = `table`<br>`--help, -h` = `false`<br>`--sort` = `updated` |
 | `skills-seed patterns stats` | 查看 pattern 质量指标 | - | `--help, -h` = `false` |
-| `skills-seed patterns update <pattern-id> (--context <description> \| --context-path <path>)` | 修订指定 pattern | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
+| `skills-seed patterns update <pattern-id> (--content <description> \| --content-path <path>)` | 修订指定 pattern | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | 预览分析输入 | `files` | `--help, -h` = `false` |
 | `skills-seed preview files` | 预览将被分析的文件 | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
 | `skills-seed profile` | 查看项目画像 | `show` | `--help, -h` = `false` |
@@ -438,8 +438,8 @@ skills-seed preview files --limit 500
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed patterns add --context <描述>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add --context "对外契约字段保持向后兼容" --category api` | 会调用 AI Agent |
-| `skills-seed patterns update <pattern-id> --context <说明>` | 修订指定 pattern，保留原 ID 和归属信息 | `skills-seed patterns update resp-extra-update-logging --context "补充审计日志要求"` | 会调用 AI Agent |
+| `skills-seed patterns add --content <内容>` | 用自然语言定义模式，AI 生成结构化 pattern | `skills-seed patterns add --content "对外契约字段保持向后兼容" --category api` | 会调用 AI Agent |
+| `skills-seed patterns update <pattern-id> --content <内容>` | 修订指定 pattern，保留原 ID 和归属信息 | `skills-seed patterns update resp-extra-update-logging --content "补充审计日志要求"` | 会调用 AI Agent |
 | `skills-seed patterns delete <pattern-id>` | 删除指定 pattern | `skills-seed patterns delete plugin-source-editing-rule` | workspace 根目录会同步删除已关联子项目模式 |
 | `skills-seed patterns compact` | 使用本地规则整理相似 patterns | `skills-seed patterns compact --category api --dry-run` | `--dry-run` 可先预览，不写数据库 |
 | `skills-seed patterns stats` | 查看模式质量指标 | `skills-seed patterns stats` | 不调用 AI Agent，不修改数据库 |
@@ -456,8 +456,8 @@ skills-seed preview files --limit 500
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--category`, `-c` | 空 | 指定模式分类，如 `business`、`api`、`testing`；留空由 AI 自动推断 |
-| `--context` | 空 | 用户输入的自然语言模式描述，必填 |
-| `--context-path` | 空 | 从文件或目录读取自然语言模式描述或一次性参考材料；可重复传入 |
+| `--content` | 空 | 用户输入的自然语言模式内容，必填 |
+| `--content-path` | 空 | 从文件或目录读取自然语言模式内容或一次性参考材料；可重复传入 |
 | `--help`, `-h` | `false` | 查看 `patterns add` 帮助 |
 
 workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果描述中命中子项目 id 或 path，也会同步写入对应子项目模式库。skills 由 `sync` 或显式 `generate skills` 统一重新生成。
@@ -467,8 +467,8 @@ workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
 | `--category`, `-c` | 空 | 指定修订后的模式分类；留空沿用现有分类 |
-| `--context` | 空 | 用户输入的自然语言修订说明，必填 |
-| `--context-path` | 空 | 从文件或目录读取自然语言修订说明或一次性参考材料；可重复传入 |
+| `--content` | 空 | 用户输入的自然语言修订内容，必填 |
+| `--content-path` | 空 | 从文件或目录读取自然语言修订内容或一次性参考材料；可重复传入 |
 | `--help`, `-h` | `false` | 查看 `patterns update` 帮助 |
 
 #### `patterns delete` 参数
@@ -502,11 +502,11 @@ workspace 根目录执行 `patterns add` 时，会先写入根模式库；如果
 #### 常用示例
 
 ```bash
-skills-seed patterns add --context "对外契约字段保持向后兼容"
-skills-seed patterns add --context "错误必须包装上下文" --category error
-skills-seed patterns add --context-path docs/pattern-notes.md --category database
-skills-seed patterns update resp-extra-update-logging --context "补充响应额外字段更新的审计日志要求"
-skills-seed patterns update resp-extra-update-logging --context-path docs/pattern-update.md
+skills-seed patterns add --content "对外契约字段保持向后兼容"
+skills-seed patterns add --content "错误必须包装上下文" --category error
+skills-seed patterns add --content-path docs/pattern-notes.md --category database
+skills-seed patterns update resp-extra-update-logging --content "补充响应额外字段更新的审计日志要求"
+skills-seed patterns update resp-extra-update-logging --content-path docs/pattern-update.md
 skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
@@ -556,6 +556,7 @@ skills-seed learn current --profile refresh
 
 1. `profile show` 适合快速确认当前画像内容。
 2. 权威规则与项目地图刷新属于当前学习流程；`auto` 根据项目地图是否存在及权威输入内容版本确定是否刷新，不依赖 Agent 回显输入边界。
+3. 刷新时先提取显式权威规则，再由独立 Agent 重读相同权威来源复核遗漏和候选表述；两阶段都返回完整章节结果。构建脚本、CI 和自动化声明可以描述现有实现，但不会单独授予 Agent 命令执行权限。
 
 ### `skills-seed rule`
 

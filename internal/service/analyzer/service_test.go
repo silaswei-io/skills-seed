@@ -165,7 +165,7 @@ func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testin
 		result: &agent.AnalyzeProjectResult{Language: "go"},
 		authorityFn: func(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
 			received = *req
-			require.Len(t, req.AuthoritySections, 2)
+			require.Len(t, req.AuthoritySections, 1)
 			return &agent.ExtractAuthorityResult{
 				AuthoritySections: []agent.AuthoritySectionResult{
 					{
@@ -175,7 +175,6 @@ func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testin
 							Rule:  "Run the project validation suite.",
 						}},
 					},
-					{SectionID: req.AuthoritySections[1].ID, NoRuleReason: "No project constraint was identified in this source."},
 				},
 			}, nil
 		},
@@ -191,16 +190,56 @@ func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testin
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, []string{"AGENTS.md", "Taskfile.yml"}, received.EngineeringKnowledge)
+	require.Equal(t, []string{"AGENTS.md"}, received.EngineeringKnowledge)
 	require.Equal(t, "AGENTS.md", received.AuthoritySections[0].Source)
-	require.Equal(t, "Taskfile.yml", received.AuthoritySections[1].Source)
 	require.Len(t, result.EngineeringRules, 1)
 	require.Equal(t, "AGENTS.md", result.EngineeringRules[0].Source)
 	require.Equal(t, []domain.AuthorityCoverage{
 		{Source: "AGENTS.md"},
-		{Source: "Taskfile.yml"},
 	}, result.AuthorityCoverage)
 	require.NotEmpty(t, result.AuthorityRevision)
+}
+
+func TestAnalyzeProjectProfileUsesIndependentlyReviewedAuthority(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("# Generated Files\nDo not edit derived output directly."), 0o644))
+	var received agent.ReviewAuthorityRequest
+	mockAgent := &mocks.MockAgent{
+		NameVal: "test", AvailableVal: true,
+		RefreshProjectProfileFn: func(context.Context, *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			return &agent.AnalyzeProjectResult{Language: "go"}, nil
+		},
+		ExtractAuthorityFn: func(_ context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+			return &agent.ExtractAuthorityResult{AuthoritySections: []agent.AuthoritySectionResult{{
+				SectionID:    req.AuthoritySections[0].ID,
+				NoRuleReason: "The first extraction missed the explicit constraint.",
+			}}}, nil
+		},
+		ReviewAuthorityFn: func(_ context.Context, req *agent.ReviewAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+			received = *req
+			return &agent.ExtractAuthorityResult{AuthoritySections: []agent.AuthoritySectionResult{{
+				SectionID: req.AuthoritySections[0].ID,
+				Rules: []domain.EngineeringRule{{
+					Title: "Derived output",
+					Rule:  "Do not edit derived output directly.",
+				}},
+			}}}, nil
+		},
+	}
+	svc := NewAnalyzerService(mockAgent, nil)
+
+	result, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{ProjectName: "test", RootPath: root})
+
+	require.NoError(t, err)
+	require.Len(t, received.Candidate.AuthoritySections, 1)
+	require.Contains(t, received.Candidate.AuthoritySections[0].NoRuleReason, "missed")
+	require.Equal(t, []domain.EngineeringRule{{
+		Title:    "Derived output",
+		Rule:     "Do not edit derived output directly.",
+		Source:   "AGENTS.md",
+		Section:  "Generated Files",
+		Evidence: []string{"AGENTS.md"},
+	}}, result.EngineeringRules)
 }
 
 func TestAnalyzeProjectProfileSkipsStructuralContextWithoutSeeds(t *testing.T) {
@@ -291,16 +330,6 @@ func TestAnalyzeProjectProfile_AIError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestValidateLearningAgendaCoverageAcceptsFocusAndSkipReceipt(t *testing.T) {
-	err := validateLearningAgendaCoverage(
-		[]string{"src/entry.ext", "src/support.ext"},
-		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
-		[]agent.LearningPathSkip{{Path: "src/support.ext", Reason: "No durable decision value."}},
-	)
-
-	require.NoError(t, err)
-}
-
 func TestPlanningSourceFactsExposeDensityAndBoundSymbolPreview(t *testing.T) {
 	root := t.TempDir()
 	maxSymbols := 4
@@ -334,79 +363,6 @@ func TestPlanningSourceFactsSharesConfiguredSymbolBudgetAcrossFiles(t *testing.T
 	require.Len(t, facts[1].Symbols, 2)
 	require.Equal(t, 3, facts[0].SymbolCount)
 	require.Equal(t, 3, facts[1].SymbolCount)
-}
-
-func TestValidateLearningAgendaCoverageRejectsMissingDecision(t *testing.T) {
-	err := validateLearningAgendaCoverage(
-		[]string{"src/entry.ext", "src/missing.ext"},
-		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
-		nil,
-	)
-
-	require.ErrorContains(t, err, "src/missing.ext")
-}
-
-func TestDropFocusedSkipReceiptsPrefersFocusDecision(t *testing.T) {
-	skipped := dropFocusedSkipReceipts(
-		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
-		[]agent.LearningPathSkip{
-			{Path: "src/entry.ext", Reason: "Redundant receipt."},
-			{Path: "src/support.ext", Reason: "No durable decision value."},
-		},
-	)
-
-	require.Equal(t, []agent.LearningPathSkip{{Path: "src/support.ext", Reason: "No durable decision value."}}, skipped)
-	require.NoError(t, validateLearningAgendaCoverage(
-		[]string{"src/entry.ext", "src/support.ext"},
-		[]domain.EvidenceFocus{{EntryPaths: []string{"src/entry.ext"}}},
-		skipped,
-	))
-}
-
-func TestCompleteLearningAgendaCoverageAddsOnlyOmittedInputs(t *testing.T) {
-	focuses := completeLearningAgendaCoverage(
-		[]string{"src/entry.ext", "src/omitted-a.ext", "src/omitted-b.ext", "src/skipped.ext"},
-		[]domain.EvidenceFocus{{ID: "existing", EntryPaths: []string{"src/entry.ext"}}},
-		[]agent.LearningPathSkip{{Path: "src/skipped.ext", Reason: "No durable decision value."}},
-	)
-
-	require.Len(t, focuses, 2)
-	require.Equal(t, "unassigned-evidence", focuses[1].ID)
-	require.Equal(t, []string{"src/omitted-a.ext", "src/omitted-b.ext"}, focuses[1].EntryPaths)
-	require.Empty(t, focuses[1].RouteTerms)
-	require.Empty(t, focuses[1].Attributes)
-	require.Empty(t, focuses[1].RiskSignals)
-	require.NoError(t, validateLearningAgendaCoverage(
-		[]string{"src/entry.ext", "src/omitted-a.ext", "src/omitted-b.ext", "src/skipped.ext"}, focuses,
-		[]agent.LearningPathSkip{{Path: "src/skipped.ext", Reason: "No durable decision value."}},
-	))
-}
-
-func TestRestrictLearningAgendaFocusesDropsUnlistedPathsAndEmptyFocuses(t *testing.T) {
-	focuses := restrictLearningAgendaFocuses(
-		[]string{"src/entry.ext", "src/related.ext"},
-		[]domain.EvidenceFocus{
-			{ID: "kept", EntryPaths: []string{"src/entry.ext", "src"}, RelatedPaths: []string{"src/related.ext", "src/entry.ext"}},
-			{ID: "dropped", EntryPaths: []string{"outside.ext"}},
-		},
-	)
-
-	require.Len(t, focuses, 1)
-	require.Equal(t, "kept", focuses[0].ID)
-	require.Equal(t, []string{"src/entry.ext"}, focuses[0].EntryPaths)
-	require.Equal(t, []string{"src/related.ext", "src/entry.ext"}, focuses[0].RelatedPaths)
-}
-
-func TestRestrictLearningAgendaSkipReceiptsDropsUnlistedPaths(t *testing.T) {
-	skipped := restrictLearningAgendaSkipReceipts(
-		[]string{"src/entry.ext", "src/support.ext"},
-		[]agent.LearningPathSkip{
-			{Path: "src/support.ext", Reason: "No durable decision value."},
-			{Path: "src/context-only.ext", Reason: "Not an input file."},
-		},
-	)
-
-	require.Equal(t, []agent.LearningPathSkip{{Path: "src/support.ext", Reason: "No durable decision value."}}, skipped)
 }
 
 func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {

@@ -46,11 +46,13 @@ func Cmd(cont *container.Container) *cobra.Command {
 
 func addCmd(cont *container.Container) *cobra.Command {
 	var category string
-	var userContext string
-	var contextPath []string
+	var content string
+	var contentPath []string
+	var legacyContext string
+	var legacyContextPath []string
 
 	cmd := &cobra.Command{
-		Use:     "add (--context <description> | --context-path <path>)",
+		Use:     "add (--content <description> | --content-path <path>)",
 		Short:   i18n.Get("PatternsAddShort"),
 		Long:    i18n.Get("PatternsAddLongDesc"),
 		Example: i18n.Get("PatternsAddExample"),
@@ -60,11 +62,16 @@ func addCmd(cont *container.Container) *cobra.Command {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
 
-			description, err := commandutil.ResolveRuntimeContext(userContext, contextPath...)
+			description, err := resolvePatternContent(patternContentInput{
+				Content:           content,
+				ContentPaths:      contentPath,
+				LegacyContext:     legacyContext,
+				LegacyContextPath: legacyContextPath,
+			})
 			if err != nil {
 				return err
 			}
-			description, err = resolvePatternContext(description, i18n.Get("PatternsAddRequireContext"))
+			description, err = requirePatternContent(description, i18n.Get("PatternsAddRequireContent"))
 			if err != nil {
 				return err
 			}
@@ -106,8 +113,11 @@ func addCmd(cont *container.Container) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsAddFlagCategory"))
-	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("PatternsAddFlagContext"))
-	cmd.Flags().StringArrayVar(&contextPath, "context-path", nil, i18n.Get("PatternsAddFlagContextPath"))
+	cmd.Flags().StringVar(&content, "content", "", i18n.Get("PatternsAddFlagContent"))
+	cmd.Flags().StringArrayVar(&contentPath, "content-path", nil, i18n.Get("PatternsAddFlagContentPath"))
+	cmd.Flags().StringVar(&legacyContext, "context", "", i18n.Get("PatternsAddFlagContent"))
+	cmd.Flags().StringArrayVar(&legacyContextPath, "context-path", nil, i18n.Get("PatternsAddFlagContentPath"))
+	markPatternLegacyContextFlags(cmd)
 	return cmd
 }
 
@@ -118,11 +128,13 @@ type workspacePatternTargetPlan struct {
 
 func updateCmd(cont *container.Container) *cobra.Command {
 	var category string
-	var userContext string
-	var contextPath []string
+	var content string
+	var contentPath []string
+	var legacyContext string
+	var legacyContextPath []string
 
 	cmd := &cobra.Command{
-		Use:     "update <pattern-id> (--context <description> | --context-path <path>)",
+		Use:     "update <pattern-id> (--content <description> | --content-path <path>)",
 		Short:   i18n.Get("PatternsUpdateShort"),
 		Long:    i18n.Get("PatternsUpdateLongDesc"),
 		Example: i18n.Get("PatternsUpdateExample"),
@@ -142,11 +154,16 @@ func updateCmd(cont *container.Container) *cobra.Command {
 			if err := commandutil.RequireAgentAvailable(cont); err != nil {
 				return err
 			}
-			description, err := commandutil.ResolveRuntimeContext(userContext, contextPath...)
+			description, err := resolvePatternContent(patternContentInput{
+				Content:           content,
+				ContentPaths:      contentPath,
+				LegacyContext:     legacyContext,
+				LegacyContextPath: legacyContextPath,
+			})
 			if err != nil {
 				return err
 			}
-			description, err = resolvePatternContext(description, i18n.Get("PatternsUpdateRequireContext"))
+			description, err = requirePatternContent(description, i18n.Get("PatternsUpdateRequireContent"))
 			if err != nil {
 				return err
 			}
@@ -184,15 +201,42 @@ func updateCmd(cont *container.Container) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&category, "category", "c", "", i18n.Get("PatternsAddFlagCategory"))
-	cmd.Flags().StringVar(&userContext, "context", "", i18n.Get("PatternsUpdateFlagContext"))
-	cmd.Flags().StringArrayVar(&contextPath, "context-path", nil, i18n.Get("PatternsUpdateFlagContextPath"))
+	cmd.Flags().StringVar(&content, "content", "", i18n.Get("PatternsUpdateFlagContent"))
+	cmd.Flags().StringArrayVar(&contentPath, "content-path", nil, i18n.Get("PatternsUpdateFlagContentPath"))
+	cmd.Flags().StringVar(&legacyContext, "context", "", i18n.Get("PatternsUpdateFlagContent"))
+	cmd.Flags().StringArrayVar(&legacyContextPath, "context-path", nil, i18n.Get("PatternsUpdateFlagContentPath"))
+	markPatternLegacyContextFlags(cmd)
 	return cmd
 }
 
-func resolvePatternContext(contextValue, message string) (string, error) {
-	description := strings.TrimSpace(contextValue)
-	if description != "" {
-		return description, nil
+type patternContentInput struct {
+	Content           string
+	ContentPaths      []string
+	LegacyContext     string
+	LegacyContextPath []string
+}
+
+func resolvePatternContent(input patternContentInput) (string, error) {
+	hasContent := strings.TrimSpace(input.Content) != "" || len(input.ContentPaths) > 0
+	hasLegacyContext := strings.TrimSpace(input.LegacyContext) != "" || len(input.LegacyContextPath) > 0
+	if hasContent && hasLegacyContext {
+		return "", fmt.Errorf("%s", i18n.Get("PatternsContentInputConflict"))
+	}
+	if hasContent {
+		return commandutil.ResolveRuntimeContext(input.Content, input.ContentPaths...)
+	}
+	return commandutil.ResolveRuntimeContext(input.LegacyContext, input.LegacyContextPath...)
+}
+
+func markPatternLegacyContextFlags(cmd *cobra.Command) {
+	_ = cmd.Flags().MarkDeprecated("context", i18n.Get("PatternsFlagContextDeprecated"))
+	_ = cmd.Flags().MarkDeprecated("context-path", i18n.Get("PatternsFlagContextPathDeprecated"))
+}
+
+func requirePatternContent(content, message string) (string, error) {
+	content = strings.TrimSpace(content)
+	if content != "" {
+		return content, nil
 	}
 	return "", fmt.Errorf("%s", message)
 }

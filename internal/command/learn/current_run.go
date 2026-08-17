@@ -132,9 +132,6 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if err := r.analyzeCodebase(); err != nil {
 		return nil, err
 	}
-	if err := r.reviewLearnedKnowledge(); err != nil {
-		return nil, err
-	}
 	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed {
 		r.refreshProfile = true
 	}
@@ -226,7 +223,7 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		r.refreshProfile, err = shouldRefreshProfile(r.opts.profileMode, profileExists, profileAuthorityRevision(r.existingProfile), authorityRevision)
 		return err
 	}); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.prepare_project",
 			"duration", time.Since(prepareStartedAt),
 			"error", err,
@@ -420,9 +417,6 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
 		return nil, err
 	}
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentReviewKnowledgeSkipped"), func() error { return nil }); err != nil {
-		return nil, err
-	}
 	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentNormalizeAndSavePatterns"), func() error { return nil }); err != nil {
 		return nil, err
 	}
@@ -458,7 +452,7 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 		}
 		return r.markProjectionsCommitted()
 	}); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.save_project_profile",
 			"duration", time.Since(profileStartedAt),
 			"error", err,

@@ -1,0 +1,30 @@
+# Review Authoritative Knowledge
+
+This is an independent authority-completeness review. Re-read only the supplied authoritative sources and compare them with the first extraction candidate. Do not build a project map, inspect unrelated source code, infer implementation patterns, or rely on hidden memory from other stages.
+
+Project:
+- name: {{.ProjectName}}
+- path: {{.RootPath}}
+
+Authoritative knowledge paths are available at `{{.EngineeringKnowledgePath}}` ({{.EngineeringKnowledgeCount}} files). Read every listed file.
+The immutable authority section catalog is available at `{{.AuthoritySectionsPath}}` ({{.AuthoritySectionCount}} sections). Each entry provides the only valid `section_id`, source, and section ownership.
+The first extraction candidate is available at `{{.CandidatePath}}`. It is evidence to review, not a source of authority.
+{{- if .UserContextPath}}
+User context is available at `{{.UserContextPath}}`. Treat it as authoritative only within the catalog entry assigned to user context; do not use it to rewrite or broaden another source.
+{{- end}}
+
+Review rules:
+- Return a complete replacement `authority_sections` result with exactly one entry for every catalog section. Do not return a diff, a patch, or only changed sections.
+- Independently account for every explicit instruction in each owned source section. Restore an omitted narrow constraint even when the candidate contains a broader rule.
+- Retain every candidate rule that is explicitly supported, normalize only its clarity and scope, and remove a candidate rule only when its owning source does not support it.
+- Extract only explicit instructions that constrain future changes. Do not turn source-code observations, common engineering practice, descriptive facts, inferred architecture, or repeated implementation shape into authority rules.
+- Keep every rule at the source's stated strength and scope. Put concrete governed tasks, paths, commands, modules, interfaces, fields, or operations in `applies_to` only when the source states them.
+- For command execution, use `forbidden` when the Agent must not execute, including when the user must perform it manually; use `requires_authorization` only when the source explicitly permits execution after current-turn approval; use `describe_only` for explain-only; use `allowed` only for explicit Agent execution permission. A command mention alone grants no permission.
+- Do not turn a source statement into a security, atomicity, correctness, reliability, or compatibility guarantee that it does not make.
+- When an owned section has no explicit constraint, return a concrete `no_rule_reason`. `rules` and `no_rule_reason` are mutually exclusive. Never use a placeholder.
+
+Before returning, verify one-to-one catalog coverage and verify every retained or restored rule against its exact owning section.
+
+Return JSON only.
+
+{{ jsonContract "AuthorityExtractionOutput" }}

@@ -27,14 +27,21 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt, outputC
 	return output, err
 }
 
+// callClaudeInConversation 在同一学习焦点会话中执行后续任务。
+func (c *ClaudeAgent) callClaudeInConversation(ctx context.Context, operation, prompt, outputContract string, conversation agent.Conversation, task ...agent.RuntimeTask) (string, agent.Conversation, error) {
+	result, err := c.callClaudeResult(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, conversation, task...)
+	return result.output, result.conversation, err
+}
+
 func (c *ClaudeAgent) callClaudeWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, task ...agent.RuntimeTask) (string, error) {
 	output, _, err := c.callClaudeWithArchiveWithOptions(ctx, operation, prompt, outputContract, opts, task...)
 	return output, err
 }
 
 type claudeCallResult struct {
-	output  string
-	archive agent.AgentOutputArchive
+	output       string
+	conversation agent.Conversation
+	archive      agent.AgentOutputArchive
 }
 
 func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prompt, outputContract string, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
@@ -42,13 +49,18 @@ func (c *ClaudeAgent) callClaudeWithArchive(ctx context.Context, operation, prom
 }
 
 func (c *ClaudeAgent) callClaudeWithArchiveWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, task ...agent.RuntimeTask) (string, agent.AgentOutputArchive, error) {
+	result, err := c.callClaudeResult(ctx, operation, prompt, outputContract, opts, agent.Conversation{}, task...)
+	return result.output, result.archive, err
+}
+
+func (c *ClaudeAgent) callClaudeResult(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (claudeCallResult, error) {
 	outputSchema, err := aicontract.StructuredOutputSchemaWithOptions(outputContract, opts)
 	if err != nil {
-		return "", agent.AgentOutputArchive{}, err
+		return claudeCallResult{}, err
 	}
 	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
-		return "", agent.AgentOutputArchive{}, err
+		return claudeCallResult{}, err
 	}
 
 	result, err := agent.RunRetryingCall(ctx, agent.RetryingCallOptions[claudeCallResult]{
@@ -56,11 +68,11 @@ func (c *ClaudeAgent) callClaudeWithArchiveWithOptions(ctx context.Context, oper
 		Operation: operation,
 		Policy:    c.retryCfg,
 		Call: func(attempt int) (claudeCallResult, string, time.Duration, bool, error) {
-			output, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, attempt, workDir, agent.FirstRuntimeTask(task))
-			return claudeCallResult{output: output, archive: archive}, output, duration, retryable, err
+			output, nextConversation, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, conversation, attempt, workDir, agent.FirstRuntimeTask(task))
+			return claudeCallResult{output: output, conversation: nextConversation, archive: archive}, output, duration, retryable, err
 		},
 	})
-	return result.output, result.archive, err
+	return result, err
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
@@ -69,11 +81,11 @@ func isRetryableError(stdout, stderr string) bool {
 }
 
 // 执行单次命令行调用
-func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outputSchema string, attempt int, workDir string, task agent.RuntimeTask) (string, agent.AgentOutputArchive, time.Duration, bool, error) {
+func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outputSchema string, conversation agent.Conversation, attempt int, workDir string, task agent.RuntimeTask) (string, agent.Conversation, agent.AgentOutputArchive, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	args := claudePrintArgs(c.allowUserPlugins, outputSchema, task.PromptOnly, c.runtime)
+	args := claudePrintArgsForConversation(c.allowUserPlugins, outputSchema, task.PromptOnly, c.runtime, conversation)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
 		"operation", operation,
@@ -116,7 +128,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 
 		if retryable {
 			reason := agent.RetryReasonFromOutput(stdoutStr, stderrStr)
-			logger.DiagnosticError(i18n.Get("LoggerAgentClaudeCallRetryable"),
+			logger.DiagnosticWarn(i18n.Get("LoggerAgentClaudeCallRetryable"),
 				"agent", c.Name(),
 				"operation", operation,
 				"attempt", attempt,
@@ -129,10 +141,10 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+			return stdoutStr + stderrStr, agent.Conversation{}, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 		}
 
-		logger.Error(i18n.Get("LoggerAgentClaudeCallFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerAgentClaudeCallFailed"),
 			"agent", c.Name(),
 			"operation", operation,
 			"attempt", attempt,
@@ -144,7 +156,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 			"stderr_path", archive.StderrPath,
 			"prompt_length", len(prompt),
 		)
-		return "", archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+		return "", agent.Conversation{}, archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 	}
 
 	rawOutput := stdout.String()
@@ -160,7 +172,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 			Stderr:    stderr.String(),
 		})
 		retryable := isRetryableError(rawOutput, stderr.String())
-		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
+		logFields := []any{
 			"agent", c.Name(),
 			"operation", operation,
 			"attempt", attempt,
@@ -169,11 +181,16 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 			"raw_output_path", archive.RawPath,
 			"stderr_path", archive.StderrPath,
 			"retryable", retryable,
-		)
-		if retryable || outputErr.invocation {
-			return rawOutput + stderr.String(), archive, duration, retryable, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, outputErr, rawOutput, stderr.String(), archive))
 		}
-		return "", archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, outputErr, rawOutput, archive))
+		if retryable {
+			logger.DiagnosticWarn(i18n.Get("LoggerAgentParseResultFailedNonFallback"), logFields...)
+		} else {
+			logger.DiagnosticError(i18n.Get("LoggerAgentParseResultFailedNonFallback"), logFields...)
+		}
+		if retryable || outputErr.invocation {
+			return rawOutput + stderr.String(), agent.Conversation{}, archive, duration, retryable, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, outputErr, rawOutput, stderr.String(), archive))
+		}
+		return "", agent.Conversation{}, archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, outputErr, rawOutput, archive))
 	}
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 		Agent:     c.Name(),
@@ -199,7 +216,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallComplete"), callCompleteFields...)
 
-	return output, archive, duration, false, nil
+	return output, claudeConversation(rawOutput, c.Name(), conversation), archive, duration, false, nil
 }
 
 type claudeOutputError struct {
@@ -249,6 +266,22 @@ func parseClaudeOutput(rawOutput string) (string, *claudeOutputError) {
 	return "", &claudeOutputError{cause: errors.New(i18n.Get("AgentClaudeStructuredOutputMissing"))}
 }
 
+func claudeConversation(rawOutput, provider string, requested agent.Conversation) agent.Conversation {
+	if requested.Provider != provider {
+		return agent.Conversation{}
+	}
+	if requested.Valid() {
+		return requested
+	}
+	var envelope struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(rawOutput)), &envelope); err != nil {
+		return agent.Conversation{}
+	}
+	return agent.Conversation{Provider: provider, ID: strings.TrimSpace(envelope.SessionID)}
+}
+
 func claudeStructuredResult(value string) (string, bool) {
 	raw := bytes.TrimSpace([]byte(stripJSONFence(value)))
 	if len(raw) == 0 {
@@ -290,17 +323,27 @@ func stripJSONFence(value string) string {
 }
 
 func claudePrintArgs(allowUserPlugins bool, outputSchema string, promptOnly bool, runtime config.AgentRuntimeOptions) []string {
+	return claudePrintArgsForConversation(allowUserPlugins, outputSchema, promptOnly, runtime, agent.Conversation{})
+}
+
+func claudePrintArgsForConversation(allowUserPlugins bool, outputSchema string, promptOnly bool, runtime config.AgentRuntimeOptions, conversation agent.Conversation) []string {
 	// 模型命令行常常在生成最终结构化结果之前尝试检查文件。
-	// 使用非持久化且只读的单次调用，避免上下文膨胀或写入权限审批。
-	args := []string{
-		"--print",
-		"--no-session-persistence",
+	// 默认使用非持久化的只读调用；焦点学习会显式传入会话以便后续审查续接。
+	args := []string{"--print"}
+	if conversation.Provider != "" {
+		if conversation.Valid() {
+			args = append(args, "--resume", conversation.ID)
+		}
+	} else {
+		args = append(args, "--no-session-persistence")
+	}
+	args = append(args,
 		"--disable-slash-commands",
 		"--output-format",
 		"json",
 		"--json-schema",
 		outputSchema,
-	}
+	)
 	args = append(args, claudeRuntimeArgs(runtime)...)
 	if !allowUserPlugins {
 		if settings := claudeDisableUserPluginSettings(); settings != "" {

@@ -82,7 +82,7 @@ func (c *ClaudeAgent) UserDefinePattern(ctx context.Context, req *agent.UserDefi
 
 	result, err := parser.ParseUserDefinePatternResult(output)
 	if err != nil {
-		logger.Error(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
+		logger.DiagnosticError(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
 			"method", "UserDefinePattern",
 			"error", err,
 		)

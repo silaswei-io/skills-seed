@@ -20,20 +20,32 @@ description: {{.SkillDescription}}
 
 {{range .CommandRules}}- **{{.Title}}** (`{{.CommandPolicy}}`)：{{.Rule}}{{if .AppliesTo}}；适用：{{range $i, $scope := .AppliesTo}}{{if $i}}、{{end}}`{{$scope}}`{{end}}{{end}}（来源：`{{.Source}}`{{if .Section}} / {{.Section}}{{end}}）
 {{end}}
+
+`forbidden` 表示不得执行；`describe_only` 表示只能说明；`requires_authorization` 仅在用户本轮明确授权后才可执行；`allowed` 仍须服从用户当次指令和运行环境。权威规则不能被代码或学习到的 reference 放宽。
+{{end}}
+
+{{if .DevelopmentFocuses}}## 开发焦点
+
+先以已知改动路径筛选下表，再用用户需求中的资源、动作、状态或外部系统词补充匹配。命中一个焦点时读取其首读参考；命中多个焦点时读取全部命中的参考，并以改动路径和各页证据入口确认归属。仍无法消歧时说明边界，不猜测优先级。焦点只是导航，不替代其中的源码证据和适用边界。
+
+| 焦点 | 需求命中词 | 首读参考 | 主要证据入口 |
+|---|---|---|---|
+{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}、{{end}}`{{$term}}`{{end}} | [进入焦点]({{.ReferencePath}}) | {{if .PrimaryPath}}`{{.PrimaryPath}}`{{else}}按焦点参考中的证据入口确认{{end}} |
+{{end}}
 {{end}}
 
 ## 任务路由
 
-{{if .RuleReferences}}路由前先检查下方“用户规则”：任务命中其项目或路径范围时，读取完整规则并遵守；不要根据标题猜测未声明的范围。
+{{if .RuleReferences}}路由前先检查下方“用户规则”：任务命中其项目或路径范围时，读取完整规则并遵守；不要根据标题猜测未声明的范围。显式规则定义可修改边界和命令权限，代码与学习到的 reference 不能放宽它。
 {{end}}
 
 {{if .HasKnowledge}}
-1. 先按任务类型读取最小必要参考，不要一次性读取所有 references。进入任何分类模式后，先检查其中的“相关参考”；任务命中跨边界提示时继续读取对应 reference。
+1. 先检查上方“开发焦点”；按其多命中规则读取参考。未命中或涉及横向约定时，再按下方任务类型读取最小必要参考。进入任何分类模式后，先检查其中的“相关参考”；任务命中跨边界提示时继续读取对应 reference。
 {{if .References.Enabled}}{{if .References.BusinessPatterns}}2. 产品/领域规则、状态流转、用户动作或跨资源流程：先读 [业务模式地图](./references/patterns/business.md)，再进入命中的详情页。
 {{else}}2. 产品/领域规则、状态流转、用户动作或跨资源流程：检查当前代码并复用附近实现。
 {{end}}{{if .References.BusinessMethods}}3. 可复用能力入口、模块级扩展点、跨边界编排、界面/命令动作或工具入口：读 [能力入口索引](./references/business-methods.md)。
 {{else}}3. 项目级能力入口：从当前代码和模块入口确认。
-{{end}}4. 接口、消息、事件、合约、适配层、派生产物或配置约定：读相关分类模式并回到其证据源码；命中明确约束时再读 [项目规范](./references/project-spec.md)。
+{{end}}4. 接口、消息、事件、合约、适配层、派生产物或配置约定：先读适用的用户规则和 [项目规范](./references/project-spec.md)，确认可直接修改的边界、派生关系与命令限制；再读相关分类模式并回到其证据源码。不得从现有代码推断可直接编辑或可执行生成命令。
 {{if .References.KeyModules}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md) 和 [关键模块](./references/modules.md)。
 {{else}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md)。
 {{end}}{{if .WorkflowReferences}}6. 测试、部署、发布和验收：从下方“用户工作流”选择匹配流程并读取完整文档。
@@ -42,7 +54,7 @@ description: {{.SkillDescription}}
 {{else}}2. 本次生成未写入 references；直接读取当前代码，并优先沿用附近已有实现。
 {{end}}
 
-{{if .References.ProjectSpec}}约束来源由 [项目规范](./references/project-spec.md) 区分；模式页用于按源码证据定位可复用实现。{{else}}约束来源以当前代码和项目配置确认；已学习模式只用于定位可复用实现。{{end}}references 与当前代码冲突时，以当前代码为准；缺少依据时说明缺口。
+{{if .References.ProjectSpec}}[项目规范](./references/project-spec.md) 记录显式权威约束；模式页用于按源码证据定位可复用实现。{{else}}约束来源以用户规则、当前代码和项目配置确认；已学习模式只用于定位可复用实现。{{end}}显式权威规则优先于当前代码和学习到的 reference；当前代码只可用于校正陈旧的源码学习摘要。缺少依据时说明缺口。
 {{else}}{{if .WorkflowReferences}}1. 先从“用户工作流”中选择与任务目标最匹配的流程。
 2. 读取对应 workflow 文档后再执行，不要根据列表摘要直接操作。
 3. 用户本次指令与已保存工作流冲突时，以用户本次指令为准，并说明偏离点。
@@ -94,8 +106,8 @@ description: {{.SkillDescription}}
 
 - 引入新模式或抽象前，先检查附近已有代码。
 - 如果参考中已有项目特定入口或工具方法，优先复用。
-- 派生产物、接口/消息模型、适配层和配置约定以相关模式的证据源码及当前项目配置为准；[项目规范](./references/project-spec.md) 只补充明确权威约束。
-- references 与实际代码不一致时，以当前代码为准。
+- 派生产物、接口/消息模型、适配层和配置约定先受用户规则与 [项目规范](./references/project-spec.md) 的边界约束；确认允许后，再以相关模式的证据源码及当前项目配置定位实现。
+- 显式权威规则优先于代码和学习到的 reference；当前代码只用于校正陈旧的源码学习摘要，不能推翻或放宽权威约束。
 
 {{if .KeyInsights}}### 关键洞察
 

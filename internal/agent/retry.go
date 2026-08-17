@@ -150,6 +150,22 @@ func WithRetryReporter(ctx context.Context, reporter RetryReporter) context.Cont
 	return context.WithValue(ctx, retryReporterKey{}, reporter)
 }
 
+// WithAdditionalRetryReporter 在保留现有重试报告器的基础上追加一个报告器。
+// 用于将同一次重试同时投影到通用进度与任务级明细面板。
+func WithAdditionalRetryReporter(ctx context.Context, reporter RetryReporter) context.Context {
+	if reporter == nil {
+		return ctx
+	}
+	existing := retryReporterFromContext(ctx)
+	if existing == nil {
+		return WithRetryReporter(ctx, reporter)
+	}
+	return WithRetryReporter(ctx, func(info RetryInfo) {
+		existing(info)
+		reporter(info)
+	})
+}
+
 // RetryReasonFromOutput 从 CLI 输出中提取适合终端展示的简短重试原因。
 func RetryReasonFromOutput(stdout, stderr string) string {
 	reason := retryReasonFromJSON(stdout)
@@ -225,7 +241,6 @@ func RunRetryingCall[T any](ctx context.Context, opts RetryingCallOptions[T]) (T
 		}
 	}
 
-	logger.Error(i18n.Get("LoggerAgentRetryExhausted"), "max_retries", maxRetries)
 	return zero, fmt.Errorf("%s: %d", i18n.Get("AgentRetryExhausted"), maxRetries)
 }
 
@@ -272,7 +287,7 @@ func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 	if info.CallDuration > 0 {
 		fields = append(fields, "call_duration_seconds", info.CallDuration.Seconds())
 	}
-	logger.ErrorAfterProgress(RetryConsoleMessage(info), fields...)
+	logger.WarnAfterProgress(RetryConsoleMessage(info), fields...)
 }
 
 func ReportRetryAttemptForContext(ctx context.Context, info RetryInfo) {

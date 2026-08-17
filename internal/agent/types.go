@@ -79,7 +79,14 @@ type ExtractAuthorityRequest struct {
 
 // ExtractAuthorityResult 描述逐章节提取的权威知识结果。
 type ExtractAuthorityResult struct {
-	AuthoritySections []AuthoritySectionResult
+	AuthoritySections []AuthoritySectionResult `json:"authority_sections"`
+}
+
+// ReviewAuthorityRequest 描述对权威规则候选的独立完整性复核输入。
+// 复核必须返回完整章节结果，而不是增量补丁，确保后续校验只面对一个事实集。
+type ReviewAuthorityRequest struct {
+	ExtractAuthorityRequest
+	Candidate ExtractAuthorityResult
 }
 
 // AuthoritySection 是由程序确定性生成的权威章节目录项。
@@ -91,9 +98,9 @@ type AuthoritySection struct {
 
 // AuthoritySectionResult 是 Agent 在指定权威章节下提取的规则，不携带归属字段。
 type AuthoritySectionResult struct {
-	SectionID    string
-	Rules        []domain.EngineeringRule
-	NoRuleReason string
+	SectionID    string                   `json:"section_id"`
+	Rules        []domain.EngineeringRule `json:"rules"`
+	NoRuleReason string                   `json:"no_rule_reason,omitempty"`
 }
 
 // SampleFile 示例文件路径
@@ -176,7 +183,8 @@ type AnalyzeCurrentEvidenceResult struct {
 
 // AnalyzeCurrentCodebaseBatchResult 是批量当前代码学习的结果。
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Focuses []AnalyzeCurrentEvidenceResult
+	Focuses      []AnalyzeCurrentEvidenceResult
+	Conversation Conversation
 }
 
 // AnalyzeCurrentDeltaFocus 描述增量学习中的单个 diff 锚定证据焦点输入。
@@ -215,6 +223,7 @@ func (r *AnalyzeCurrentDeltaBatchRequest) AllowedCategories() string {
 type AnalyzeCurrentDeltaBatchResult struct {
 	Changes                   []domain.KnowledgeChange
 	ProfileRefreshRecommended ProfileRefreshRecommendation
+	Conversation              Conversation
 }
 
 // LearningPathSkip 记录规划阶段明确跳过的输入路径及原因。
@@ -276,10 +285,12 @@ type ReviewKnowledgeRequest struct {
 	ProjectName     string
 	RootPath        string
 	Language        string
+	RuntimeLabel    string
 	EvidenceFocus   domain.EvidenceFocus
 	Candidates      []domain.Pattern
 	UserContext     string
 	UserContextPath string
+	Conversation    Conversation
 }
 
 // KnowledgeRevision 只允许修订知识表述，不改变程序持有的证据和归属。
@@ -398,6 +409,7 @@ type UserPatternDefiner interface {
 type ProjectAnalyzer interface {
 	RefreshProjectProfile(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
 	ExtractAuthority(ctx context.Context, req *ExtractAuthorityRequest) (*ExtractAuthorityResult, error)
+	ReviewAuthority(ctx context.Context, req *ReviewAuthorityRequest) (*ExtractAuthorityResult, error)
 	PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) (*PlanLearningAgendaResult, error)
 	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeCurrentDeltaBatch(ctx context.Context, req *AnalyzeCurrentDeltaBatchRequest) (*AnalyzeCurrentDeltaBatchResult, error)

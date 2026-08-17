@@ -84,7 +84,7 @@ func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectR
 	}
 
 	logger.Warn(i18n.Get("AnalyzerStructuralCollectFailed"))
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+	logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 		"operation", "analyzer.structural_collect",
 		"project_root", projectRoot,
 		"error", err,
@@ -217,7 +217,28 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 	if err := agent.RequireResult(authorityResult, "ExtractAuthority"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeProjectFailed"), err)
 	}
-	engineeringRules, err := expandAuthoritySections(authoritySections, authorityResult.AuthoritySections)
+	notifyProjectProfileStage(req, i18n.Get("ProgressLearnCurrentReviewAuthority"))
+	reviewedAuthority, err := s.agent.ReviewAuthority(ctx, &agent.ReviewAuthorityRequest{
+		ExtractAuthorityRequest: agent.ExtractAuthorityRequest{
+			ProjectName:          req.ProjectName,
+			RootPath:             req.RootPath,
+			EngineeringKnowledge: engineeringKnowledge,
+			AuthoritySections:    authoritySections,
+			UserContext:          req.UserContext,
+		},
+		Candidate: *authorityResult,
+	})
+	if err != nil {
+		return nil, domain.NewDomainError(
+			domain.ErrAIService,
+			i18n.Get("AnalyzerAnalyzeProjectFailed"),
+			err,
+		)
+	}
+	if err := agent.RequireResult(reviewedAuthority, "ReviewAuthority"); err != nil {
+		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeProjectFailed"), err)
+	}
+	engineeringRules, err := expandAuthoritySections(authoritySections, reviewedAuthority.AuthoritySections)
 	if err != nil {
 		return nil, fmt.Errorf("validate authoritative knowledge coverage: %w", err)
 	}
@@ -246,7 +267,7 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 	notifyProjectProfileStage(req, i18n.Get("ProgressLearnCurrentRefreshProjectMap"))
 	result, err := s.agent.RefreshProjectProfile(ctx, agentReq)
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_project",
 			"duration", time.Since(startedAt),
 			"error", err,
@@ -314,7 +335,8 @@ type AnalyzeCurrentEvidenceResult struct {
 }
 
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Focuses []AnalyzeCurrentEvidenceResult
+	Focuses      []AnalyzeCurrentEvidenceResult
+	Conversation agent.Conversation
 }
 
 type AnalyzeCurrentDeltaFocus struct {
@@ -335,6 +357,7 @@ type AnalyzeCurrentDeltaBatchOptions struct {
 type AnalyzeCurrentDeltaBatchResult struct {
 	Changes                   []domain.KnowledgeChange
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
+	Conversation              agent.Conversation
 }
 
 // PlanLearningAgendaRequest 请求按源码证据边界规划当前待学习文件。
@@ -392,17 +415,13 @@ func (s *AnalyzerService) PlanLearningAgenda(ctx context.Context, req *PlanLearn
 	if err := agent.RequireResult(result, "PlanLearningAgenda"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
-	inputs := newLearningAgendaInputSet(req.FocusPaths)
-	focuses := restrictLearningAgendaFocusesForInputs(inputs, result.Focuses)
-	skipped := restrictLearningAgendaSkipReceiptsForInputs(inputs, result.SkippedPaths)
-	skipped = dropFocusedSkipReceipts(focuses, skipped)
-	focuses = completeLearningAgendaCoverageForInputs(inputs, focuses, skipped)
-	if err := validateLearningAgendaCoverageForInputs(inputs, focuses, skipped); err != nil {
+	agenda, err := reconcileLearningAgenda(req.FocusPaths, result.Focuses, result.SkippedPaths)
+	if err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
 	return &LearningAgendaPlan{
-		Focuses:      focuses,
-		SkippedPaths: skipped,
+		Focuses:      agenda.Focuses,
+		SkippedPaths: agenda.Skipped,
 		Reason:       result.Reason,
 	}, nil
 }
@@ -437,210 +456,6 @@ func planningSourceFacts(ctx context.Context, projectRoot string, paths []string
 		})
 	}
 	return facts
-}
-
-// learningAgendaInputSet 是议程规划本次输入文件的精确边界。
-// 它只投影和校验路径，不解释任何项目语义。
-type learningAgendaInputSet map[string]struct{}
-
-func newLearningAgendaInputSet(paths []string) learningAgendaInputSet {
-	inputs := make(learningAgendaInputSet, len(paths))
-	for _, path := range paths {
-		path = cleanLearningAgendaPath(path)
-		if path != "" && path != "." {
-			inputs[path] = struct{}{}
-		}
-	}
-	return inputs
-}
-
-func (inputs learningAgendaInputSet) contains(path string) bool {
-	_, ok := inputs[cleanLearningAgendaPath(path)]
-	return ok
-}
-
-func (inputs learningAgendaInputSet) paths() []string {
-	paths := make([]string, 0, len(inputs))
-	for path := range inputs {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	return paths
-}
-
-// restrictLearningAgendaFocuses 只保留精确输入文件，避免模型返回目录或未提供的上下文路径。
-func restrictLearningAgendaFocuses(inputPaths []string, focuses []domain.EvidenceFocus) []domain.EvidenceFocus {
-	return restrictLearningAgendaFocusesForInputs(newLearningAgendaInputSet(inputPaths), focuses)
-}
-
-func restrictLearningAgendaFocusesForInputs(inputs learningAgendaInputSet, focuses []domain.EvidenceFocus) []domain.EvidenceFocus {
-	result := make([]domain.EvidenceFocus, 0, len(focuses))
-	for _, focus := range focuses {
-		focus.EntryPaths = restrictLearningAgendaPaths(focus.EntryPaths, inputs)
-		focus.RelatedPaths = restrictLearningAgendaPaths(focus.RelatedPaths, inputs)
-		if len(focus.EntryPaths) == 0 && len(focus.RelatedPaths) == 0 {
-			continue
-		}
-		result = append(result, focus)
-	}
-	return result
-}
-
-func restrictLearningAgendaPaths(paths []string, inputs learningAgendaInputSet) []string {
-	result := make([]string, 0, len(paths))
-	seen := make(map[string]struct{}, len(paths))
-	for _, path := range paths {
-		path = cleanLearningAgendaPath(path)
-		if !inputs.contains(path) {
-			continue
-		}
-		if _, ok := seen[path]; ok {
-			continue
-		}
-		seen[path] = struct{}{}
-		result = append(result, path)
-	}
-	return result
-}
-
-// restrictLearningAgendaSkipReceipts 只保留对本次输入文件作出的跳过决定。
-func restrictLearningAgendaSkipReceipts(inputPaths []string, skipped []agent.LearningPathSkip) []agent.LearningPathSkip {
-	return restrictLearningAgendaSkipReceiptsForInputs(newLearningAgendaInputSet(inputPaths), skipped)
-}
-
-func restrictLearningAgendaSkipReceiptsForInputs(inputs learningAgendaInputSet, skipped []agent.LearningPathSkip) []agent.LearningPathSkip {
-	result := make([]agent.LearningPathSkip, 0, len(skipped))
-	for _, item := range skipped {
-		if !inputs.contains(item.Path) {
-			continue
-		}
-		result = append(result, item)
-	}
-	return result
-}
-
-// dropFocusedSkipReceipts 保留焦点对路径的明确学习决定，并丢弃同一路径的冗余跳过回执。
-func dropFocusedSkipReceipts(focuses []domain.EvidenceFocus, skipped []agent.LearningPathSkip) []agent.LearningPathSkip {
-	focused := make(map[string]struct{})
-	for _, focus := range focuses {
-		for _, path := range append(append([]string(nil), focus.EntryPaths...), focus.RelatedPaths...) {
-			focused[cleanLearningAgendaPath(path)] = struct{}{}
-		}
-	}
-	out := make([]agent.LearningPathSkip, 0, len(skipped))
-	for _, item := range skipped {
-		if _, ok := focused[cleanLearningAgendaPath(item.Path)]; ok {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-// completeLearningAgendaCoverage 为遗漏的输入保留待验证证据焦点，不对其语义或价值作本地推断。
-func completeLearningAgendaCoverage(inputPaths []string, focuses []domain.EvidenceFocus, skipped []agent.LearningPathSkip) []domain.EvidenceFocus {
-	return completeLearningAgendaCoverageForInputs(newLearningAgendaInputSet(inputPaths), focuses, skipped)
-}
-
-func completeLearningAgendaCoverageForInputs(inputs learningAgendaInputSet, focuses []domain.EvidenceFocus, skipped []agent.LearningPathSkip) []domain.EvidenceFocus {
-	covered := make(map[string]struct{})
-	for _, focus := range focuses {
-		for _, path := range append(append([]string(nil), focus.EntryPaths...), focus.RelatedPaths...) {
-			covered[cleanLearningAgendaPath(path)] = struct{}{}
-		}
-	}
-	for _, item := range skipped {
-		covered[cleanLearningAgendaPath(item.Path)] = struct{}{}
-	}
-	missing := make([]string, 0)
-	for _, path := range inputs.paths() {
-		if _, ok := covered[path]; !ok {
-			missing = append(missing, path)
-		}
-	}
-	if len(missing) == 0 {
-		return focuses
-	}
-	sort.Strings(missing)
-	return append(focuses, domain.EvidenceFocus{
-		ID:            nextUnassignedEvidenceFocusID(focuses),
-		Name:          "remaining evidence requiring verification",
-		AnalysisDepth: domain.EvidenceFocusDepthStandard,
-		EntryPaths:    missing,
-		ScopeReason:   "The planning receipt omitted these input paths; inspect their source evidence before deciding whether they contain durable knowledge.",
-	})
-}
-
-func nextUnassignedEvidenceFocusID(focuses []domain.EvidenceFocus) string {
-	used := make(map[string]struct{}, len(focuses))
-	for _, focus := range focuses {
-		used[focus.ID] = struct{}{}
-	}
-	base := "unassigned-evidence"
-	if _, exists := used[base]; !exists {
-		return base
-	}
-	for index := 2; ; index++ {
-		candidate := fmt.Sprintf("%s-%d", base, index)
-		if _, exists := used[candidate]; !exists {
-			return candidate
-		}
-	}
-}
-
-func validateLearningAgendaCoverage(inputPaths []string, focuses []domain.EvidenceFocus, skipped []agent.LearningPathSkip) error {
-	return validateLearningAgendaCoverageForInputs(newLearningAgendaInputSet(inputPaths), focuses, skipped)
-}
-
-func validateLearningAgendaCoverageForInputs(inputs learningAgendaInputSet, focuses []domain.EvidenceFocus, skipped []agent.LearningPathSkip) error {
-	covered := make(map[string]struct{}, len(inputs))
-	add := func(path, owner string) error {
-		path = cleanLearningAgendaPath(path)
-		if !inputs.contains(path) {
-			return fmt.Errorf("learning plan %s references unknown path %q", owner, path)
-		}
-		covered[path] = struct{}{}
-		return nil
-	}
-	for _, focus := range focuses {
-		for _, path := range append(append([]string(nil), focus.EntryPaths...), focus.RelatedPaths...) {
-			if err := add(path, "focus"); err != nil {
-				return err
-			}
-		}
-	}
-	seenSkipped := make(map[string]struct{}, len(skipped))
-	for _, item := range skipped {
-		path := cleanLearningAgendaPath(item.Path)
-		if strings.TrimSpace(item.Reason) == "" {
-			return fmt.Errorf("learning plan skipped path %q has no reason", path)
-		}
-		if _, ok := seenSkipped[path]; ok {
-			return fmt.Errorf("learning plan repeats skipped path %q", path)
-		}
-		seenSkipped[path] = struct{}{}
-		if _, ok := covered[path]; ok {
-			return fmt.Errorf("learning plan path %q is both focused and skipped", path)
-		}
-		if err := add(path, "skip receipt"); err != nil {
-			return err
-		}
-	}
-	if len(covered) != len(inputs) {
-		missing := make([]string, 0, len(inputs)-len(covered))
-		for path := range inputs {
-			if _, ok := covered[path]; !ok {
-				missing = append(missing, path)
-			}
-		}
-		sort.Strings(missing)
-		return fmt.Errorf("learning plan has no decision for paths: %s", strings.Join(missing, ", "))
-	}
-	return nil
-}
-
-func cleanLearningAgendaPath(path string) string {
-	return strings.TrimSpace(filepath.ToSlash(filepath.Clean(path)))
 }
 
 func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCurrentCodebaseBatchOptions) (*AnalyzeCurrentCodebaseBatchResult, error) {
@@ -698,7 +513,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 
 	result, err := s.agent.AnalyzeCurrentCodebaseBatch(ctx, agentReq)
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_current_codebase_batch",
 			"duration", time.Since(startedAt),
 			"error", err,
@@ -758,7 +573,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		"duration", time.Since(startedAt),
 		"focuses_count", len(out),
 	)
-	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out}, nil
+	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out, Conversation: result.Conversation}, nil
 }
 
 func resolveBatchResultFocus(result agent.AnalyzeCurrentEvidenceResult, byID, byName map[string]domain.EvidenceFocus) (domain.EvidenceFocus, bool) {
@@ -829,7 +644,7 @@ func (s *AnalyzerService) GetProjectStructure(projectRoot string) (string, error
 	})
 
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.get_project_structure.walk",
 			"duration", time.Since(startedAt),
 			"error", err,
@@ -952,7 +767,7 @@ func (s *AnalyzerService) buildProjectProfileResult(ctx context.Context, project
 
 	result, err := s.analyzeProjectProfile(ctx, req)
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_project_full",
 			"duration", time.Since(startedAt),
 			"error", err,
@@ -1213,7 +1028,7 @@ func (s *AnalyzerService) collectSampleFilesFromRoots(projectRoot string, scanRo
 			FocusAbsPaths: []string{scanRoot},
 		})
 		if err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "analyzer.collect_sample_files",
 				"duration", time.Since(startedAt),
 				"scan_root", scanRoot,

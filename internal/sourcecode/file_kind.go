@@ -244,6 +244,13 @@ func IsEngineeringKnowledge(path string) bool {
 	return isWorkflow || IsUserRuleAuthority(normalized)
 }
 
+// IsInstructionAuthority 判断路径是否为用户维护的 Agent 指令原文。
+// 自动化脚本和构建声明可描述当前实现，但不能单独授予 Agent 命令权限。
+func IsInstructionAuthority(path string) bool {
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(filepath.ToSlash(path))))
+	return base == "agents.md" || base == "claude.md" || IsUserRuleAuthority(path)
+}
+
 // IsUserRuleAuthority 判断路径是否精确指向用户维护的 Rule 原文。
 func IsUserRuleAuthority(path string) bool {
 	parts := strings.Split(strings.ToLower(strings.Trim(filepath.ToSlash(path), "/")), "/")

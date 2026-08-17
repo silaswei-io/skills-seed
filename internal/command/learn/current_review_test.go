@@ -120,6 +120,30 @@ func TestReviewLearnedKnowledgeCheckpointsEmptyFocusWithoutAgentCall(t *testing.
 	require.True(t, state.Analysis.FocusKnowledge[0].Reviewed)
 }
 
+func TestReviewAnalyzedFocusUsesAnalysisConversation(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	focus := domain.EvidenceFocus{ID: "auth", Name: "认证", EntryPaths: []string{"internal/auth.go"}}
+	conversation := agent.Conversation{Provider: "test", ID: "focus-session"}
+	var received agent.Conversation
+	var receivedRuntimeLabel string
+	mockAgent := &mocks.MockAgent{ReviewKnowledgeFn: func(_ context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+		received = req.Conversation
+		receivedRuntimeLabel = req.RuntimeLabel
+		return acceptKnowledgeCandidates(req.Candidates), nil
+	}}
+	run := newKnowledgeReviewTestRun(t, []domain.EvidenceFocus{focus}, nil, mockAgent, nil)
+	result := buildAnalyzedFocusResult(focus, 0, []domain.Pattern{*admittedLearnCurrentPatternForTest("auth-rule", "Auth", domain.CategoryBusiness, "internal/auth.go")}, agent.ProfileRefreshRecommendation{}, conversation)
+
+	reviewed, err := run.reviewAnalyzedFocusResults(context.Background(), "analysis", run.analysisState, learnCurrentBatch{index: 0, focuses: []indexedEvidenceFocus{{index: 0, focus: focus}}}, []learnCurrentFocusResult{result}, false, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, conversation, received)
+	require.Equal(t, "batch-001", receivedRuntimeLabel)
+	require.True(t, reviewed[0].reviewed)
+	require.Empty(t, reviewed[0].conversation)
+	require.Equal(t, domain.DevelopmentFocusFromEvidenceFocus(focus), reviewed[0].patterns[0].DevelopmentFocus)
+}
+
 func TestDerivedKnowledgeFollowsAgendaOrder(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	focuses := []domain.EvidenceFocus{

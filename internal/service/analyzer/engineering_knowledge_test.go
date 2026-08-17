@@ -39,10 +39,10 @@ func TestEngineeringKnowledgePathsCollectsAuthorityFilesIndependently(t *testing
 
 	require.NoError(t, err)
 	require.Equal(t, []string{
-		".github/workflows/verify.yml",
 		".skills-seed/rules/foundation/RULE.md",
 		"AGENTS.md",
-		"Taskfile.yml",
+		"plugins/logger_manager/CLAUDE.md",
+		"services/api/AGENTS.md",
 	}, paths)
 }
 

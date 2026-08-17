@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/stretchr/testify/require"
 )
@@ -35,6 +36,21 @@ func TestCodexExecArgsUsesConfiguredModel(t *testing.T) {
 
 	require.Contains(t, args, "--model")
 	require.Equal(t, "gpt-5-mini", requireArgValue(t, args, "--model"))
+}
+
+func TestCodexExecArgsForConversationResumesPersistedSession(t *testing.T) {
+	conversation := agent.Conversation{Provider: "provider", ID: "thread-1"}
+	args := codexExecArgsForConversation(false, "/tmp/output-schema.json", config.AgentRuntimeOptions{}, conversation)
+
+	require.Contains(t, args, "resume")
+	require.Contains(t, args, conversation.ID)
+	require.NotContains(t, args, "--ephemeral")
+}
+
+func TestCodexConversationReadsThreadStartedEvent(t *testing.T) {
+	conversation := codexConversation("{\"type\":\"thread.started\",\"thread_id\":\"thread-1\"}", "provider", agent.Conversation{Provider: "provider"})
+
+	require.Equal(t, agent.Conversation{Provider: "provider", ID: "thread-1"}, conversation)
 }
 
 func TestCodexExecArgs_DisablesUserPluginsByDefault(t *testing.T) {

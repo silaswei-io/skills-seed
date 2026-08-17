@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -42,7 +44,7 @@ func validateEngineeringRules(root string, knowledge []string, hasUserContext bo
 			issues = append(issues, err)
 			continue
 		}
-		key := rule.Source + "\x00" + strings.ToLower(rule.Title) + "\x00" + rule.Rule
+		key := engineeringRuleIdentity(rule)
 		if seen[key] {
 			continue
 		}
@@ -50,6 +52,33 @@ func validateEngineeringRules(root string, knowledge []string, hasUserContext bo
 		out = append(out, rule)
 	}
 	return out, issues
+}
+
+// engineeringRuleIdentity 合并同一权威来源中内容等价的重复投影。
+// 不同规则即使标题、范围或策略相同，也必须保留各自的约束文字。
+func engineeringRuleIdentity(rule domain.EngineeringRule) string {
+	scopes := append([]string(nil), rule.AppliesTo...)
+	for index := range scopes {
+		scopes[index] = canonicalEngineeringRuleText(scopes[index])
+	}
+	sort.Strings(scopes)
+	return strings.Join([]string{
+		rule.Source,
+		canonicalEngineeringRuleText(rule.Title),
+		canonicalEngineeringRuleText(rule.Rule),
+		strings.TrimSpace(rule.CommandPolicy),
+		strings.Join(scopes, ","),
+	}, "\x00")
+}
+
+func canonicalEngineeringRuleText(value string) string {
+	var out strings.Builder
+	for _, char := range strings.ToLower(strings.TrimSpace(value)) {
+		if unicode.IsLetter(char) || unicode.IsDigit(char) {
+			out.WriteRune(char)
+		}
+	}
+	return out.String()
 }
 
 func validateEngineeringRule(root string, allowed map[string]bool, hasUserContext bool, index int, rule domain.EngineeringRule) (domain.EngineeringRule, error) {

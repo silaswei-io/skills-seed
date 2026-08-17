@@ -16,12 +16,13 @@ import (
 
 var (
 	// frames 是进度动画的固定帧序列。
-	frames              = []string{"|", "/", "-", "\\"}
-	consoleMu           sync.Mutex
-	progressActive      bool
-	progressLineOpen    bool
-	pendingConsoleLines []string
-	terminalWidth       = currentTerminalWidth
+	frames                = []string{"|", "/", "-", "\\"}
+	consoleMu             sync.Mutex
+	progressActive        bool
+	progressLineOpen      bool
+	progressPhysicalLines int
+	pendingConsoleLines   []string
+	terminalWidth         = currentTerminalWidth
 )
 
 // FastStepPause 是极短步骤完成后的最小停顿，避免进度行闪烁。
@@ -41,6 +42,7 @@ type Tracker struct {
 	frame     int
 	startedAt time.Time
 	elapsed   time.Duration
+	details   []string
 	stop      chan struct{}
 	stopped   chan struct{}
 }
@@ -266,28 +268,11 @@ func (t *MultiTracker) Render() {
 	t.mu.Lock()
 	width := terminalWidth()
 	lines := clipLinesToTerminal(t.renderLinesLocked(), width)
-	previousPhysicalLines := t.physicalLines
 	t.lines = len(lines)
 	t.physicalLines = renderedPhysicalLineCount(lines, width)
 	t.mu.Unlock()
 
-	consoleMu.Lock()
-	defer consoleMu.Unlock()
-
-	if previousPhysicalLines > 1 {
-		fmt.Fprintf(os.Stdout, "\033[%dF", previousPhysicalLines-1)
-	}
-	if previousPhysicalLines > 0 {
-		fmt.Fprint(os.Stdout, "\r\033[J")
-	}
-	for i, line := range lines {
-		if i > 0 {
-			fmt.Fprint(os.Stdout, "\n")
-		}
-		fmt.Fprintf(os.Stdout, "\r\033[2K%s", line)
-	}
-	progressActive = true
-	progressLineOpen = true
+	renderProgressLines(lines, false)
 }
 
 func (t *MultiTracker) tick(stop <-chan struct{}, stopped chan<- struct{}) {
@@ -322,6 +307,7 @@ func (t *MultiTracker) finish() {
 	}
 	progressActive = false
 	progressLineOpen = false
+	progressPhysicalLines = 0
 	flushPendingConsoleLinesLocked()
 }
 
@@ -502,6 +488,7 @@ func (t *Tracker) StartStep(label string) {
 
 	t.active = true
 	t.label = label
+	t.details = nil
 	t.frame = 0
 	t.startedAt = time.Now()
 	t.elapsed = 0
@@ -533,8 +520,17 @@ func (t *Tracker) CompleteStep(label string) {
 }
 
 func (t *Tracker) UpdateStep(label string) {
+	t.UpdateStepWithDetails(label, nil)
+}
+
+// UpdateStepWithDetails 刷新当前步骤及其可替换的明细面板。
+// 明细行始终与主进度行作为一个终端块刷新，避免并发状态互相覆盖。
+func (t *Tracker) UpdateStepWithDetails(label string, details []string) {
 	t.mu.Lock()
 	t.label = label
+	if details != nil {
+		t.details = append([]string(nil), details...)
+	}
 	if !t.enabled {
 		t.mu.Unlock()
 		PrintConsoleLine(label)
@@ -546,6 +542,19 @@ func (t *Tracker) UpdateStep(label string) {
 	}
 	t.renderLocked(false)
 	t.mu.Unlock()
+}
+
+// ClearDetails 收起当前步骤的明细面板。
+func (t *Tracker) ClearDetails() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.details) == 0 {
+		return
+	}
+	t.details = nil
+	if t.enabled && t.active {
+		t.renderLocked(false)
+	}
 }
 
 // FailStep 结束当前步骤并保留当前进度行，错误文案由调用方负责输出
@@ -614,20 +623,44 @@ func (t *Tracker) renderLocked(newline bool) {
 		elapsed = t.elapsed
 	}
 
+	line := formatProgressLine(t.done, step, t.total, t.width, frame, t.label, elapsed)
+	lines := append([]string{line}, t.details...)
+	renderProgressLines(lines, newline)
+}
+
+// renderProgressLines 刷新一个完整的终端进度块。Tracker 与 MultiTracker 共用
+// 这条路径，确保多行面板、普通单行进度和即时错误输出使用同一套光标边界。
+func renderProgressLines(lines []string, newline bool) {
+	width := terminalWidth()
+	lines = clipLinesToTerminal(lines, width)
+	physicalLines := renderedPhysicalLineCount(lines, width)
+
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 
-	line := formatProgressLine(t.done, step, t.total, t.width, frame, t.label, elapsed)
-	fmt.Fprintf(os.Stdout, "\r\033[2K%s", clipToDisplayWidth(line, terminalWidth()))
+	if progressPhysicalLines > 1 {
+		fmt.Fprintf(os.Stdout, "\033[%dF", progressPhysicalLines-1)
+	}
+	if progressPhysicalLines > 0 {
+		fmt.Fprint(os.Stdout, "\r\033[J")
+	}
+	for index, line := range lines {
+		if index > 0 {
+			fmt.Fprint(os.Stdout, "\n")
+		}
+		fmt.Fprintf(os.Stdout, "\r\033[2K%s", line)
+	}
 	if newline {
 		fmt.Fprintln(os.Stdout)
 		progressActive = false
 		progressLineOpen = false
+		progressPhysicalLines = 0
 		flushPendingConsoleLinesLocked()
 		return
 	}
 	progressActive = true
 	progressLineOpen = true
+	progressPhysicalLines = physicalLines
 }
 
 func formatProgressLine(done, step, total, width int, frame, label string, elapsed time.Duration) string {
@@ -702,8 +735,14 @@ func PrintConsoleLineNow(message string) {
 	defer consoleMu.Unlock()
 
 	if progressLineOpen {
-		fmt.Fprint(os.Stdout, "\r\033[2K")
+		if progressPhysicalLines > 1 {
+			fmt.Fprintf(os.Stdout, "\033[%dF\r\033[J", progressPhysicalLines-1)
+		} else {
+			fmt.Fprint(os.Stdout, "\r\033[2K")
+		}
+		progressActive = false
 		progressLineOpen = false
+		progressPhysicalLines = 0
 	}
 	fmt.Fprintln(os.Stdout, message)
 }

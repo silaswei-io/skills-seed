@@ -302,6 +302,20 @@ func ExtractAuthorityPromptData(session *PromptInputSession, req *ExtractAuthori
 	}, nil
 }
 
+// ReviewAuthorityPromptData 返回独立权威规则复核所需的提示词数据。
+func ReviewAuthorityPromptData(session *PromptInputSession, req *ReviewAuthorityRequest) (map[string]interface{}, error) {
+	data, err := ExtractAuthorityPromptData(session, &req.ExtractAuthorityRequest)
+	if err != nil {
+		return nil, err
+	}
+	candidatePath, err := writeJSONInput(session, "authority-candidate.json", req.Candidate)
+	if err != nil {
+		return nil, promptInputWriteError("authority-candidate.json", err)
+	}
+	data["CandidatePath"] = candidatePath
+	return data, nil
+}
+
 // AnalyzeCurrentCodebaseBatchPromptData 返回批量当前代码库分析所需的提示词数据。
 func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *AnalyzeCurrentCodebaseBatchRequest) (map[string]interface{}, error) {
 	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", stringx.NormalizeStructureSummary(req.Structure))

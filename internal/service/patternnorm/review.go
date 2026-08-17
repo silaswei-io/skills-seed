@@ -32,9 +32,11 @@ func (s *Service) reviewCurrentKnowledge(ctx context.Context, req ReviewRequest,
 		ProjectName:   req.ProjectName,
 		RootPath:      req.RootPath,
 		Language:      req.Language,
+		RuntimeLabel:  req.RuntimeLabel,
 		EvidenceFocus: req.Focus,
 		Candidates:    ordered,
 		UserContext:   req.UserContext,
+		Conversation:  req.Conversation,
 	})
 	if err != nil {
 		return nil, err
@@ -71,14 +73,7 @@ func applyKnowledgeReview(candidates []domain.Pattern, decisions []agent.Knowled
 		if strings.TrimSpace(decision.Reason) == "" || strings.TrimSpace(decision.ReasonCode) == "" {
 			return nil, fmt.Errorf("knowledge review decision %q has no reason", candidate.ID)
 		}
-		if decision.Verdict == "reject" && decision.BusinessMethod != nil {
-			return nil, fmt.Errorf("rejected knowledge %q unexpectedly contains a business method", candidate.ID)
-		}
-		method, err := reviewedBusinessMethod(candidate, decision)
-		if err != nil {
-			return nil, err
-		}
-		candidate.BusinessMethod = method
+		candidate.BusinessMethod = reviewedBusinessMethod(decision.BusinessMethod)
 		switch decision.Verdict {
 		case "accept":
 			if decision.Revision != nil {
@@ -119,16 +114,18 @@ func applyKnowledgeReview(candidates []domain.Pattern, decisions []agent.Knowled
 	return reviewed, nil
 }
 
-func reviewedBusinessMethod(candidate domain.Pattern, decision agent.KnowledgeReviewDecision) (*domain.BusinessMethod, error) {
-	if decision.BusinessMethod == nil {
-		return nil, nil
+// reviewedBusinessMethod 只保留可完整投影为能力入口的审查补充。
+// 能力入口是可选索引，字段不完整时不能影响已验证知识的准入。
+func reviewedBusinessMethod(method *domain.BusinessMethod) *domain.BusinessMethod {
+	if method == nil {
+		return nil
 	}
-	method := cloneBusinessMethod(decision.BusinessMethod)
+	method = cloneBusinessMethod(method)
 	if !domain.IsRouteableBusinessMethod(*method) || (method.Type != "domain" && method.Type != "common") {
-		return nil, fmt.Errorf("knowledge review decision %q sets an incomplete business method", candidate.ID)
+		return nil
 	}
 	if pathx.CleanEvidenceLocationPath(method.DisplayLocation()) == "" {
-		return nil, fmt.Errorf("knowledge review decision %q sets an invalid business method location", candidate.ID)
+		return nil
 	}
-	return method, nil
+	return method
 }

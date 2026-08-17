@@ -931,7 +931,7 @@ other = "learning agenda restored"
 other = "no candidate files"
 
 [ProgressLearnCurrentAnalyzeCodebase]
-other = "Isolated source evidence analysis"
+other = "Isolated source evidence analysis and independent knowledge review"
 
 [ProgressLearnCurrentPlanFocuses]
 other = "Learning agenda planning"
@@ -942,14 +942,29 @@ other = "Restoring learning agenda ({{.Focuses}} focuses)"
 [ProgressLearnCurrentAnalyzeFocus]
 other = "{{.Label}} · focus {{.Current}}/{{.Total}} · {{.Name}}"
 
+[ProgressLearnCurrentAnalyzePreparing]
+other = "{{.Label}} · preparing analysis context"
+
+[ProgressLearnCurrentAnalyzeSourceFocus]
+other = "{{.Base}} · source evidence analysis"
+
+[ProgressLearnCurrentAnalyzeReviewFocus]
+other = "{{.Base}} · independent knowledge review · candidates {{.Candidates}}"
+
 [ProgressLearnCurrentAnalyzeBatches]
 other = "{{.Label}} · focuses {{.Focuses}} · batches {{.Batches}} · parallelism {{.Parallelism}}"
 
 [ProgressLearnCurrentAnalyzeParallel]
-other = "{{.Label}} · completed {{.Completed}}/{{.Total}} · parallelism {{.Parallelism}} · active {{.Active}}"
+other = "{{.Label}} · completed {{.Completed}}/{{.Total}} · parallelism {{.Parallelism}}"
 
-[LearnCurrentParallelActiveNone]
-other = "-"
+[ProgressLearnCurrentAnalyzeParallelItem]
+other = "  • {{.Base}} · {{.Stage}} ({{.Elapsed}})"
+
+[LearnCurrentFocusStageSourceEvidence]
+other = "source evidence analysis"
+
+[LearnCurrentFocusStageKnowledgeReview]
+other = "independent knowledge review · candidates {{.Candidates}}"
 
 [LearnCurrentParallelActiveSingle]
 other = "{{.Batch}} focus {{.Current}}/{{.Total}} {{.Name}}"
@@ -998,6 +1013,9 @@ other = "Skipping authority rules and project map refresh"
 
 [ProgressLearnCurrentExtractAuthority]
 other = "Extracting authority rules"
+
+[ProgressLearnCurrentReviewAuthority]
+other = "Independently reviewing authority rules"
 
 [ProgressLearnCurrentRefreshProjectMap]
 other = "Refreshing project map"
@@ -1110,7 +1128,7 @@ other = "Additional guidance for this generate run, passed to the AI agent as ex
 other = "Manage learned patterns"
 
 [PatternsLongDesc]
-other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern through --context and normalize it before storage\n  update  - Update a specific pattern through --context\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
+other = "Manage learned code patterns.\n\nCurrently supported:\n  add     - Add a user-defined candidate pattern through --content and normalize it before storage\n  update  - Update a specific pattern through --content\n  delete  - Delete a pattern\n  compact - Compact existing patterns locally to reduce duplicate rules\n  show    - Show database fields, timestamps, and code-location metadata for patterns\n  stats   - Show quality and hit statistics.\n\nBefore compacting, consider running 'skills-seed patterns show' to inspect existing content."
 
 [PatternsExample]
 other = "  # Show pattern database fields\n  skills-seed patterns show\n\n  # Show one pattern in detail\n  skills-seed patterns show business-create-order\n\n  # Compact similar patterns in all categories\n  skills-seed patterns compact"
@@ -1137,22 +1155,22 @@ other = "Patterns compacted: input {{.TotalInput}}, written {{.TotalWritten}}, d
 other = "Add a user-defined pattern using natural language"
 
 [PatternsAddLongDesc]
-other = "Describe a coding convention or pattern in natural language through --context or --context-path, and AI will generate a structured Pattern combined with project context.\n\nAI auto-infers category, generates examples, and writes actionable rules. --context-path reads files or directories and is useful for longer notes, draft conventions, or one-shot reference material."
+other = "Describe a coding convention or pattern in natural language through --content or --content-path, and AI will generate a structured Pattern combined with project context.\n\nAI auto-infers category, generates examples, and writes actionable rules. --content-path reads files or directories and is useful for longer notes, draft conventions, or one-shot reference material."
 
 [PatternsAddExample]
-other = "  # Pass a description directly\n  skills-seed patterns add --context \"Capability entries must preserve the local error boundary\"\n\n  # Specify category\n  skills-seed patterns add --context \"Use limit/offset for pagination\" --category api\n\n  # Read longer context from files or directories; repeat --context-path for multiple sources\n  skills-seed patterns add --context-path docs/plan.md --context-path docs/specs --category api"
+other = "  # Pass content directly\n  skills-seed patterns add --content \"Capability entries must preserve the local error boundary\"\n\n  # Specify category\n  skills-seed patterns add --content \"Use limit/offset for pagination\" --category api\n\n  # Read longer content from files or directories; repeat --content-path for multiple sources\n  skills-seed patterns add --content-path docs/plan.md --content-path docs/specs --category api"
 
 [PatternsAddFlagCategory]
 other = "Category key: naming, error, structure, concurrency, testing, business(product/domain), api(interface/contract), database(state/persistence), utils, middleware(interception/pipeline), config"
 
-[PatternsAddFlagContext]
-other = "Natural-language pattern description from the user"
+[PatternsAddFlagContent]
+other = "Natural-language pattern content from the user"
 
-[PatternsAddFlagContextPath]
-other = "Read natural-language pattern description or one-shot reference material from files or directories; may be repeated"
+[PatternsAddFlagContentPath]
+other = "Read natural-language pattern content or one-shot reference material from files or directories; may be repeated"
 
-[PatternsAddRequireContext]
-other = "pattern description required through --context or --context-path: skills-seed patterns add --context \"rule description\""
+[PatternsAddRequireContent]
+other = "pattern content required through --content or --content-path: skills-seed patterns add --content \"rule content\""
 
 [PatternsAddComplete]
 other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
@@ -1161,22 +1179,31 @@ other = "User pattern added: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, s
 other = "Update a pattern"
 
 [PatternsUpdateLongDesc]
-other = "Update a specific pattern using natural language through --context or --context-path. The command reads the current pattern, asks AI to regenerate structured content from the update request, and preserves the original pattern ID, creation time, and workspace ownership."
+other = "Update a specific pattern using natural language through --content or --content-path. The command reads the current pattern, asks AI to regenerate structured content from the requested content, and preserves the original pattern ID, creation time, and workspace ownership."
 
 [PatternsUpdateExample]
-other = "  # Update one pattern\n  skills-seed patterns update resp-extra-update-logging --context \"Require audit logging when response extra fields change\"\n\n  # Read the update request from files or directories; repeat --context-path for multiple sources\n  skills-seed patterns update resp-extra-update-logging --context-path docs/plan.md --context-path docs/specs"
+other = "  # Update one pattern\n  skills-seed patterns update resp-extra-update-logging --content \"Require audit logging when response extra fields change\"\n\n  # Read update content from files or directories; repeat --content-path for multiple sources\n  skills-seed patterns update resp-extra-update-logging --content-path docs/plan.md --content-path docs/specs"
 
-[PatternsUpdateFlagContext]
-other = "Natural-language update request from the user"
+[PatternsUpdateFlagContent]
+other = "Natural-language update content from the user"
 
-[PatternsUpdateFlagContextPath]
-other = "Read natural-language update request or one-shot reference material from files or directories; may be repeated"
+[PatternsUpdateFlagContentPath]
+other = "Read natural-language update content or one-shot reference material from files or directories; may be repeated"
 
 [PatternsUpdateRequireID]
-other = "pattern ID required: skills-seed patterns update <pattern-id> --context \"update request\""
+other = "pattern ID required: skills-seed patterns update <pattern-id> --content \"update content\""
 
-[PatternsUpdateRequireContext]
-other = "update request required through --context or --context-path: skills-seed patterns update <pattern-id> --context \"update request\""
+[PatternsUpdateRequireContent]
+other = "update content required through --content or --content-path: skills-seed patterns update <pattern-id> --content \"update content\""
+
+[PatternsContentInputConflict]
+other = "--content/--content-path cannot be combined with deprecated --context/--context-path"
+
+[PatternsFlagContextDeprecated]
+other = "deprecated; use --content instead"
+
+[PatternsFlagContextPathDeprecated]
+other = "deprecated; use --content-path instead"
 
 [PatternsUpdateComplete]
 other = "Pattern updated: {{.PatternName}} [{{.Category}}] ({{.PatternID}}, source: {{.Source}})"
@@ -1808,9 +1835,6 @@ other = "Pattern normalization result contains invalid or duplicate decisions; c
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
 
-[LoggerAgentRetryExhausted]
-other = "Agent call retry attempts exhausted"
-
 [LoggerRuntimeInitialized]
 other = "Runtime logger initialized"
 
@@ -1918,6 +1942,12 @@ other = "The agent did not return a valid evidence focus, so skills-seed uses th
 
 [LearnCurrentFallbackFocusReasonWithGroup]
 other = "The agent did not assign {{.Group}} to an existing high-density evidence focus, so skills-seed uses this semantic path group as the fallback analysis scope"
+
+[LearnCurrentUnassignedEvidenceFocusName]
+other = "Remaining evidence requiring verification"
+
+[LearnCurrentUnassignedEvidenceFocusReason]
+other = "The planning receipt omitted these input paths; inspect their source evidence before deciding whether they contain durable knowledge."
 
 [LearnCurrentArtifactsCommittedWithPendingFocuses]
 other = "Analysis artifacts are committed with {{.Count}} pending evidence focuses"

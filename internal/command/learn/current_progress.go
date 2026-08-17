@@ -95,9 +95,13 @@ func evidenceFocusSame(a, b domain.EvidenceFocus) bool {
 }
 
 func (r *learnCurrentProjectRun) detail(baseLabel, detailKey string, params map[string]interface{}) string {
+	return r.detailWithLines(baseLabel, detailKey, params, nil)
+}
+
+func (r *learnCurrentProjectRun) detailWithLines(baseLabel, detailKey string, params map[string]interface{}, lines []string) string {
 	r.progressDetailMu.Lock()
 	defer r.progressDetailMu.Unlock()
-	return r.steps.Detail(baseLabel, learnCurrentProgressDetail(baseLabel, detailKey, params))
+	return r.steps.DetailWithLines(baseLabel, learnCurrentProgressDetail(baseLabel, detailKey, params), lines)
 }
 
 func (r *learnCurrentProjectRun) logFileSelectionSummary() {

@@ -175,6 +175,13 @@ func DiagnosticError(msg string, args ...any) {
 	}
 }
 
+// DiagnosticWarn 记录只写入文件的警告诊断，不输出到终端。
+func DiagnosticWarn(msg string, args ...any) {
+	if logger := currentLogger(); logger != nil {
+		logger.Warn(msg, args...)
+	}
+}
+
 // Info 记录一般信息，并同步写入控制台和文件
 func Info(msg string, args ...any) {
 	// 控制台蓝色输出（用户提示） - 只输出消息本身
@@ -201,6 +208,15 @@ func ErrorAfterProgress(msg string, args ...any) {
 
 	if logger := currentLogger(); logger != nil {
 		logger.Error(msg, args...)
+	}
+}
+
+// WarnAfterProgress 记录警告；终端输出等待当前进度刷新结束，文件使用 WARN 级别。
+func WarnAfterProgress(msg string, args ...any) {
+	progress.PrintConsoleLineAfterProgress(colorize(msg, ansiYellow))
+
+	if logger := currentLogger(); logger != nil {
+		logger.Warn(msg, args...)
 	}
 }
 

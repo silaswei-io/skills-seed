@@ -47,6 +47,7 @@ type skillTemplateData struct {
 	References          ReferenceAvailability
 	OverviewReferences  []skills.ReferenceItem
 	ReferenceGroups     []skills.ReferenceGroup
+	DevelopmentFocuses  []developmentFocusView
 	WorkflowReferences  []WorkflowReference
 	RuleReferences      []RuleReference
 	StateSummaries      []string

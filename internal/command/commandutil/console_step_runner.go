@@ -92,10 +92,23 @@ func (r *ConsoleStepRunner) Run(label string, fn func() error) error {
 
 // Detail 刷新顶层步骤内的详细动作标签，并返回该标签用于错误上下文。
 func (r *ConsoleStepRunner) Detail(baseLabel, detailLabel string) string {
+	return r.DetailWithLines(baseLabel, detailLabel, nil)
+}
+
+// DetailWithLines 刷新顶层步骤的详细动作标签及可替换的进度明细行。
+func (r *ConsoleStepRunner) DetailWithLines(baseLabel, detailLabel string, lines []string) string {
 	r.remember(baseLabel, detailLabel)
 	r.retryProgress.StartStep(detailLabel)
-	r.update(detailLabel)
+	r.updateWithLines(detailLabel, lines)
 	return detailLabel
+}
+
+// ClearDetails 收起当前顶层步骤的进度明细行。
+func (r *ConsoleStepRunner) ClearDetails() {
+	if r == nil || !r.showProgress {
+		return
+	}
+	r.tracker.ClearDetails()
 }
 
 // DisplayLabel 返回指定顶层步骤当前应展示的标签。
@@ -109,11 +122,15 @@ func (r *ConsoleStepRunner) DisplayLabel(baseLabel string) string {
 }
 
 func (r *ConsoleStepRunner) update(label string) {
+	r.updateWithLines(label, nil)
+}
+
+func (r *ConsoleStepRunner) updateWithLines(label string, lines []string) {
 	if r.onStepUpdate != nil {
 		r.onStepUpdate(label)
 	}
 	if r.showProgress {
-		r.tracker.UpdateStep(label)
+		r.tracker.UpdateStepWithDetails(label, lines)
 	}
 }
 

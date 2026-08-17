@@ -77,6 +77,7 @@ func patternForSave(pattern domain.Pattern) domain.Pattern {
 	pattern.MergedFrom = append([]string(nil), pattern.MergedFrom...)
 	pattern.KnowledgeFlags = append([]string(nil), pattern.KnowledgeFlags...)
 	pattern.BusinessMethod = cloneBusinessMethod(pattern.BusinessMethod)
+	pattern.DevelopmentFocus = pattern.DevelopmentFocus.Clone()
 	pattern.EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...)
 	pattern.CreatedAt = now
 	pattern.UpdatedAt = now

@@ -31,7 +31,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Initialize one project | `skills-seed init --mode project` → `skills-seed sync` | Create config, learn current code, and generate skills |
 | Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
 | Daily incremental update | `skills-seed sync` | Learns current changes and generates skills only when learning changed output |
-| Add one missed rule | `skills-seed patterns add --context "<description>"` → `skills-seed generate skills` | Adds a natural-language pattern, then regenerates |
+| Add one missed rule | `skills-seed patterns add --content "<content>"` → `skills-seed generate skills` | Adds a natural-language pattern, then regenerates |
 | Inspect task workflows | `skills-seed workflow show --format json` | Returns lightweight summaries; read details with `workflow show <id> --format json` as needed |
 | Update task workflow | `skills-seed workflow --name <name> --content "<Markdown>"` → `skills-seed generate skills` | Same-name content is merged and optimized by default; use `--overwrite` only for complete replacement |
 | Update a long-lived rule | `skills-seed rule --name <name> --content "<Markdown>"` → `skills-seed generate skills` | Existing authority is preserved and optimized with same-name additions by default; use `--overwrite` only to replace content and scope completely |
@@ -60,13 +60,13 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed learn` | Learn from current code | `current` | `--help, -h` = `false` |
 | `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
-| `skills-seed patterns` | Manage learned patterns | `add (--context <description> \| --context-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--context <description> \| --context-path <path>)` | `--help, -h` = `false` |
-| `skills-seed patterns add (--context <description> \| --context-path <path>)` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
+| `skills-seed patterns` | Manage learned patterns | `add (--content <description> \| --content-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--content <description> \| --content-path <path>)` | `--help, -h` = `false` |
+| `skills-seed patterns add (--content <description> \| --content-path <path>)` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
 | `skills-seed patterns compact` | Compact similar patterns | - | `--category, -c` = ``<br>`--dry-run` = `false`<br>`--help, -h` = `false` |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern | - | `--help, -h` = `false` |
 | `skills-seed patterns show [pattern-id]` | Show learned pattern overview or full details | - | `--format` = `table`<br>`--help, -h` = `false`<br>`--sort` = `updated` |
 | `skills-seed patterns stats` | Show learned pattern quality metrics | - | `--help, -h` = `false` |
-| `skills-seed patterns update <pattern-id> (--context <description> \| --context-path <path>)` | Update a pattern | - | `--category, -c` = ``<br>`--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false` |
+| `skills-seed patterns update <pattern-id> (--content <description> \| --content-path <path>)` | Update a pattern | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | Preview analysis inputs | `files` | `--help, -h` = `false` |
 | `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
 | `skills-seed profile` | Show the project profile | `show` | `--help, -h` = `false` |
@@ -438,8 +438,8 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed patterns add --context <description>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add --context "Keep external contract fields backward-compatible" --category api` | Calls the AI agent |
-| `skills-seed patterns update <pattern-id> --context <request>` | Update one pattern while preserving its original ID and ownership | `skills-seed patterns update resp-extra-update-logging --context "Require audit logging"` | Calls the AI agent |
+| `skills-seed patterns add --content <content>` | Define a pattern in natural language; AI generates a structured pattern | `skills-seed patterns add --content "Keep external contract fields backward-compatible" --category api` | Calls the AI agent |
+| `skills-seed patterns update <pattern-id> --content <content>` | Update one pattern while preserving its original ID and ownership | `skills-seed patterns update resp-extra-update-logging --content "Require audit logging"` | Calls the AI agent |
 | `skills-seed patterns delete <pattern-id>` | Delete a pattern by ID | `skills-seed patterns delete plugin-source-editing-rule` | Workspace root also deletes the linked child project pattern |
 | `skills-seed patterns compact` | Compact similar patterns with local rules | `skills-seed patterns compact --category api --dry-run` | Use `--dry-run` to preview without writing to the database |
 | `skills-seed patterns stats` | Show pattern quality metrics | `skills-seed patterns stats` | Does not call the AI agent or modify the database |
@@ -456,8 +456,8 @@ Manage learned patterns. Supports adding user-defined patterns, compacting seman
 | Flag | Default | Description |
 |---|---:|---|
 | `--category`, `-c` | empty | Specify a category, such as `business`, `api`, or `testing`; leave empty for AI auto-detection |
-| `--context` | empty | User-provided natural-language pattern description; required |
-| `--context-path` | empty | Read natural-language pattern description or one-shot reference material from files or directories; may be repeated |
+| `--content` | empty | User-provided natural-language pattern content; required |
+| `--content-path` | empty | Read natural-language pattern content or one-shot reference material from files or directories; may be repeated |
 | `--help`, `-h` | `false` | Show `patterns add` help |
 
 When run from a workspace root, `patterns add` writes the root pattern first. If the description mentions a child project id or path, it also writes the child project's pattern database. Skills are regenerated by `sync` or an explicit `generate skills` run.
@@ -467,8 +467,8 @@ When run from a workspace root, `patterns add` writes the root pattern first. If
 | Flag | Default | Description |
 |---|---:|---|
 | `--category`, `-c` | empty | Specify the revised category; empty keeps the existing category |
-| `--context` | empty | User-provided natural-language update request; required |
-| `--context-path` | empty | Read natural-language update request or one-shot reference material from files or directories; may be repeated |
+| `--content` | empty | User-provided natural-language update content; required |
+| `--content-path` | empty | Read natural-language update content or one-shot reference material from files or directories; may be repeated |
 | `--help`, `-h` | `false` | Show `patterns update` help |
 
 #### `patterns delete` Flags
@@ -502,11 +502,11 @@ When run from a workspace root, `patterns add` writes the root pattern first. If
 #### Common Examples
 
 ```bash
-skills-seed patterns add --context "Keep external contract fields backward-compatible"
-skills-seed patterns add --context "Errors must wrap context" --category error
-skills-seed patterns add --context-path docs/pattern-notes.md --category database
-skills-seed patterns update resp-extra-update-logging --context "Require audit logging for response extra field updates"
-skills-seed patterns update resp-extra-update-logging --context-path docs/pattern-update.md
+skills-seed patterns add --content "Keep external contract fields backward-compatible"
+skills-seed patterns add --content "Errors must wrap context" --category error
+skills-seed patterns add --content-path docs/pattern-notes.md --category database
+skills-seed patterns update resp-extra-update-logging --content "Require audit logging for response extra field updates"
+skills-seed patterns update resp-extra-update-logging --content-path docs/pattern-update.md
 skills-seed patterns delete plugin-source-editing-rule
 skills-seed patterns compact
 skills-seed patterns compact --category api
@@ -556,6 +556,7 @@ skills-seed learn current --profile refresh
 
 1. `profile show` is useful for quickly checking the current profile.
 2. Authority-rule and project-map refresh belongs to current learning. In `auto` mode, the decision uses project-map presence and authoritative input content versions rather than agent-reported input boundaries.
+3. Refresh first extracts explicit authority rules, then an independent Agent rereads the same authoritative sources to review omissions and candidate wording. Both stages return complete section results. Build scripts, CI, and automation declarations may describe current implementation, but cannot independently grant command-execution permission to an Agent.
 
 ### `skills-seed rule`
 

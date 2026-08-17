@@ -70,7 +70,7 @@ class QualityRun:
             results = [CheckResult(
                 check_id="generation-command",
                 dimension="delivery",
-                description="The configured generation command completed successfully.",
+                description="The configured generation command failed before Skill quality could be evaluated.",
                 passed=False,
                 gate=True,
                 weight=0,

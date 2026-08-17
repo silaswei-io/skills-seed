@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
@@ -201,6 +203,64 @@ func TestPendingEvidenceFocusesDerivesCompletionFromFocusKnowledge(t *testing.T)
 	pending := pendingEvidenceFocuses(state, changes)
 	require.Len(t, pending, 1)
 	require.Equal(t, "key", pending[0].ID)
+}
+
+func TestCheckpointFocusResultsMakesCompletedFocusRecoverable(t *testing.T) {
+	focuses := []domain.EvidenceFocus{
+		{ID: "first", Name: "First", EntryPaths: []string{"internal/first.go"}},
+		{ID: "second", Name: "Second", EntryPaths: []string{"internal/second.go"}},
+	}
+	changes := &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{
+		{Path: "internal/first.go"},
+		{Path: "internal/second.go"},
+	}}
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", changes.Records, nil, focuses)
+	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
+	run := &learnCurrentProjectRun{
+		ctx:           context.Background(),
+		stateRepo:     repo,
+		analysisState: state,
+	}
+
+	completed, err := run.checkpointFocusResults([]learnCurrentFocusResult{{
+		focus:     focuses[0],
+		completed: true,
+		reviewed:  true,
+	}})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, completed)
+	resumed, err := repo.Load(context.Background())
+	require.NoError(t, err)
+	require.Len(t, resumed.Analysis.FocusKnowledge, 1)
+	require.Equal(t, "first", resumed.Analysis.FocusKnowledge[0].Focus.ID)
+	require.True(t, resumed.Analysis.FocusKnowledge[0].Reviewed)
+	pending := pendingEvidenceFocuses(resumed, changes)
+	require.Len(t, pending, 1)
+	require.Equal(t, "second", pending[0].ID)
+}
+
+func TestParallelAnalysisProgressShowsFocusStageAndElapsedTime(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	focus := domain.EvidenceFocus{ID: "auth", Name: "认证授权", EntryPaths: []string{"internal/auth.go"}}
+	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, []domain.EvidenceFocus{focus})
+	progress := newLearnCurrentParallelAnalysisProgress(&learnCurrentProjectRun{}, "分析", state, []learnCurrentBatch{{
+		index:   0,
+		focuses: []indexedEvidenceFocus{{index: 0, focus: focus}},
+	}}, 1)
+	progress.active[0] = learnCurrentParallelFocusStatus{
+		base:      "batch-001 焦点 1/1 认证授权",
+		stage:     i18n.GetWithParams("LearnCurrentFocusStageKnowledgeReview", map[string]interface{}{"Candidates": 3}),
+		startedAt: time.Now().Add(-2 * time.Second),
+	}
+
+	lines := progress.activeLines()
+
+	require.Equal(t, 1, len(lines))
+	require.Contains(t, lines[0], "• batch-001")
+	require.Contains(t, lines[0], "焦点 1/1 认证授权")
+	require.Contains(t, lines[0], "独立知识审查 · 候选 3")
+	require.Contains(t, lines[0], "(2s)")
 }
 
 func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {

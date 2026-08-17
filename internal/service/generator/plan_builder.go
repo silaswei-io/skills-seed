@@ -72,6 +72,7 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 		References:          references,
 		OverviewReferences:  conditionalProfileReferenceItems(profile, locale, "./references/", references.Enabled),
 		ReferenceGroups:     conditionalCategoryReferenceGroups(patterns, locale, references.Enabled),
+		DevelopmentFocuses:  buildDevelopmentFocuses(patterns),
 		WorkflowReferences:  opts.WorkflowReferences,
 		RuleReferences:      opts.RuleReferences,
 		StateSummaries:      []string{},
@@ -84,7 +85,7 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 
 	if hasKnowledge {
 		if err := b.appendReferenceFiles(p, summaryResult.CategorySummaries, snapshot, references, opts.RuleReferences); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "generator.append_reference_files",
 				"duration", time.Since(startedAt),
 				"output_path", outputPath,

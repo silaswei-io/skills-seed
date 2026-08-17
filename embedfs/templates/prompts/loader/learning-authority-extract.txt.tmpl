@@ -20,7 +20,8 @@ Extraction rules:
 - Do not promote a local source into a broader rule. Ownership and evidence are assigned by the runtime from `section_id`; do not return source, section, or evidence fields.
 - Keep procedures owned by user-maintained workflows out of project knowledge. An explicit permission or prohibition governing whether a command may be executed is still an authority rule; a sequence of operational steps is not.
 - Put concrete governed tasks, paths, commands, modules, interfaces, fields, or operations in `applies_to` when the source states them. Never guess missing scope.
-- When a source explicitly governs command execution, set `command_policy` to exactly `forbidden`, `describe_only`, `requires_authorization`, or `allowed`. Omit it otherwise. Merely mentioning a command never implies `allowed`.
+- When a source explicitly governs command execution, set `command_policy` to exactly `forbidden`, `describe_only`, `requires_authorization`, or `allowed`. `forbidden` means the Agent must not execute it, including when the text says the user must perform it manually; `requires_authorization` applies only when the text explicitly permits execution after the user's current-turn approval; `describe_only` means explain but do not execute; `allowed` requires an explicit permission for the Agent to execute. Merely mentioning a command never implies `allowed`.
+- Preserve every distinct constraint, but use the same concise title, scope, and command policy for repeated wording from the same source so the deterministic consolidation can keep one canonical projection.
 - Describe what the source requires without strengthening it into a security, atomicity, correctness, reliability, or compatibility guarantee that the text does not make.
 - When a section has no explicit constraint, return a concrete `no_rule_reason`. `rules` and `no_rule_reason` are mutually exclusive. Never use a placeholder.
 

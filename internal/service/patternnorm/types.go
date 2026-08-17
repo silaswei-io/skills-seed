@@ -4,6 +4,7 @@ package patternnorm
 import (
 	"context"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
@@ -45,12 +46,14 @@ type NormalizeRequest struct {
 
 // ReviewRequest 表示一个完整证据焦点的独立知识审查请求。
 type ReviewRequest struct {
-	ProjectName string
-	RootPath    string
-	Language    string
-	Focus       domain.EvidenceFocus
-	Candidates  []domain.Pattern
-	UserContext string
+	ProjectName  string
+	RootPath     string
+	Language     string
+	RuntimeLabel string
+	Focus        domain.EvidenceFocus
+	Candidates   []domain.Pattern
+	UserContext  string
+	Conversation agent.Conversation
 }
 
 // AdmissionPolicy 控制当前代码候选模式的最低入库置信度。

@@ -74,6 +74,7 @@ func TestLoader_Render(t *testing.T) {
 				},
 			},
 		},
+		"DevelopmentFocuses": []map[string]interface{}{},
 	}
 
 	content, err := loader.Render("project-skill", data)
@@ -87,6 +88,8 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "generated-by: skills-seed v0.0.1")
 	assert.Contains(t, content, "skills-template-sha256: test-hash")
 	assert.Contains(t, content, "项目入口 skill")
+	assert.Contains(t, content, "显式权威规则优先于当前代码")
+	assert.Contains(t, content, "不得从现有代码推断可直接编辑")
 	assert.Contains(t, content, "业务模式地图")
 	assert.NotContains(t, content, "常用工作流")
 	assert.Contains(t, content, "部署工作流")
@@ -94,6 +97,7 @@ func TestLoader_Render(t *testing.T) {
 	assert.NotContains(t, content, "task verify")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")
 	assert.NotContains(t, content, "为外部调用补充超时测试")
+	assert.NotContains(t, content, "references 与当前代码冲突时，以当前代码为准")
 }
 
 // TestLoader_Render_English 测试英文模板渲染
@@ -129,6 +133,7 @@ func TestLoader_Render_English(t *testing.T) {
 		"CommandRules":       []domain.EngineeringRule{},
 		"References":         fullReferenceAvailability(),
 		"ReferenceGroups":    []ReferenceGroup{},
+		"DevelopmentFocuses": []map[string]interface{}{},
 	}
 
 	content, err := loader.Render("project-skill", data)
@@ -731,6 +736,7 @@ func fullSkillData() map[string]interface{} {
 				},
 			},
 		},
+		"DevelopmentFocuses": []map[string]interface{}{},
 	}
 }
 

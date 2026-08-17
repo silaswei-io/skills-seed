@@ -101,13 +101,7 @@ func engineeringKnowledgePaths(projectRoot string) ([]string, error) {
 
 func isProjectEngineeringAuthority(path string) bool {
 	path = strings.TrimPrefix(filepath.ToSlash(strings.TrimSpace(path)), "./")
-	if path == "" || !sourcecode.IsEngineeringKnowledge(path) {
-		return false
-	}
-	if strings.HasPrefix(path, ".github/workflows/") || sourcecode.IsUserRuleAuthority(path) {
-		return true
-	}
-	return !strings.Contains(path, "/")
+	return path != "" && sourcecode.IsInstructionAuthority(path)
 }
 
 func skipEngineeringKnowledgeDir(path string) bool {

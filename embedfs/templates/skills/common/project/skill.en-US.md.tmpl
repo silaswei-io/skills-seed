@@ -20,20 +20,32 @@ These rules come from authoritative project files and must be followed for match
 
 {{range .CommandRules}}- **{{.Title}}** (`{{.CommandPolicy}}`): {{.Rule}}{{if .AppliesTo}}; applies to {{range $i, $scope := .AppliesTo}}{{if $i}}, {{end}}`{{$scope}}`{{end}}{{end}} (source: `{{.Source}}`{{if .Section}} / {{.Section}}{{end}})
 {{end}}
+
+`forbidden` means do not execute; `describe_only` means explain only; `requires_authorization` permits execution only after explicit authorization in the current user turn; `allowed` still follows the current user instruction and runtime environment. Authoritative rules cannot be relaxed by code or learned references.
+{{end}}
+
+{{if .DevelopmentFocuses}}## Development Focuses
+
+Filter this table by known changed paths first, then supplement the match with resource, action, state, or external-system terms in the request. Read the first reference for one match. For multiple matches, read every matched reference and use changed paths and evidence entries to establish ownership. When ambiguity remains, report the boundary instead of guessing priority. A focus is navigation only; source evidence and applicability boundaries remain in the target reference.
+
+| Focus | Request terms | First reference | Primary evidence entry |
+|---|---|---|---|
+{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}} | [Open focus]({{.ReferencePath}}) | {{if .PrimaryPath}}`{{.PrimaryPath}}`{{else}}Confirm from the evidence entry in the focus reference{{end}} |
+{{end}}
 {{end}}
 
 ## Task Routing
 
-{{if .RuleReferences}}Before routing, check "User Rules" below. When the task matches a listed project or path scope, read and follow the full rule first. Do not infer undeclared scope from its title.
+{{if .RuleReferences}}Before routing, check "User Rules" below. When the task matches a listed project or path scope, read and follow the full rule first. Do not infer undeclared scope from its title. Explicit rules define editable boundaries and command permissions; code and learned references cannot relax them.
 {{end}}
 
 {{if .HasKnowledge}}
-1. Read the smallest necessary reference set for the task. Do not load every reference at once. After entering a category pattern, check its "Related References" section first and continue when a cross-boundary hint matches the task.
+1. Check "Development Focuses" above first and follow its multiple-match behavior. When no focus matches or the task concerns a cross-cutting convention, read the smallest necessary reference set by task type below. Do not load every reference at once. After entering a category pattern, check its "Related References" section first and continue when a cross-boundary hint matches the task.
 {{if .References.Enabled}}{{if .References.BusinessPatterns}}2. For product/domain rules, state transitions, user actions, or cross-resource flows, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.
 {{else}}2. For product/domain rules, state transitions, user actions, or cross-resource flows, inspect current code and reuse nearby implementations.
 {{end}}{{if .References.BusinessMethods}}3. For reusable capability entries, module extension points, cross-boundary orchestration, UI/command actions, or tool entries, read the [Capability Entry Index](./references/business-methods.md).
 {{else}}3. Confirm project-level capability entries from current code and module entry points.
-{{end}}4. For interfaces, messages, events, contracts, adapters, derived artifacts, or configuration conventions, read the related category pattern and return to its evidence source; read [Project Spec](./references/project-spec.md) when an explicit constraint applies.
+{{end}}4. For interfaces, messages, events, contracts, adapters, derived artifacts, or configuration conventions, first read applicable user rules and the [Project Spec](./references/project-spec.md) to confirm editable boundaries, derivation relationships, and command restrictions; then read the related category pattern and return to its evidence source. Do not infer permission to edit directly or run a generator from existing code.
 {{if .References.KeyModules}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md).
 {{else}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md).
 {{end}}{{if .WorkflowReferences}}6. For testing, deployment, release, or acceptance, choose the matching item under "User Workflows" below and read its full document.
@@ -42,7 +54,7 @@ These rules come from authoritative project files and must be followed for match
 {{else}}2. References were omitted from this generation. Read current code and prefer nearby implementations.
 {{end}}
 
-{{if .References.ProjectSpec}}[Project Spec](./references/project-spec.md) distinguishes constraint sources. Pattern pages locate reusable implementations from source evidence.{{else}}Confirm constraint sources from current code and project configuration. Learned patterns only locate reusable implementations.{{end}} Current code wins when it conflicts with a reference; report missing evidence.
+{{if .References.ProjectSpec}}[Project Spec](./references/project-spec.md) records explicit authoritative constraints. Pattern pages locate reusable implementations from source evidence.{{else}}Confirm constraint sources from user rules, current code, and project configuration. Learned patterns only locate reusable implementations.{{end}} Explicit authoritative rules outrank current code and learned references. Current code may only correct a stale source-learned summary; report missing evidence.
 {{else}}{{if .WorkflowReferences}}1. Choose the user workflow that best matches the task goal.
 2. Read the workflow document before acting; do not execute from the list summary alone.
 3. When the latest user instruction conflicts with the saved workflow, follow the latest instruction and call out the difference.
@@ -94,8 +106,8 @@ Rules are explicit user-maintained constraints; workflows are user-maintained ta
 
 - Check nearby code before introducing a pattern or abstraction.
 - Reuse project-specific entries and utilities from references when available.
-- Follow the evidence source behind related patterns and current project configuration for derived artifacts, interface/message models, adapters, and configuration conventions; [Project Spec](./references/project-spec.md) only adds explicit authoritative constraints.
-- Current code wins when references disagree.
+- For derived artifacts, interface/message models, adapters, and configuration conventions, apply boundaries from user rules and the [Project Spec](./references/project-spec.md) first. After permission is confirmed, use pattern evidence and current project configuration to locate the implementation.
+- Explicit authoritative rules outrank code and learned references. Current code only corrects a stale source-learned summary; it cannot override or relax authoritative constraints.
 
 {{if .KeyInsights}}### Key Insights
 

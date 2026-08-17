@@ -34,6 +34,13 @@ func TestAnalyzeCurrentCodebaseBatchOperationIncludesRuntimeLabel(t *testing.T) 
 	require.Equal(t, "focus-auth-login", OperationLabel(operation))
 }
 
+func TestReviewKnowledgeOperationIncludesRuntimeLabel(t *testing.T) {
+	operation := ReviewKnowledgeOperation(&ReviewKnowledgeRequest{RuntimeLabel: "batch-005"})
+
+	require.Equal(t, "ReviewKnowledge/batch-005", operation)
+	require.Equal(t, "batch-005", OperationLabel(operation))
+}
+
 func TestRuntimeSlugKeepsDistinctLabel(t *testing.T) {
 	slug := RuntimeSlug("learning-pack-analyze", "focus-auth")
 

@@ -54,6 +54,43 @@ func TestGenerateSkillsRendersBusinessPatternMapFromEvidenceLocations(t *testing
 	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "order.md"))
 }
 
+func TestGenerateSkillsRoutesDevelopmentFocusToBusinessDetail(t *testing.T) {
+	pattern := domain.NewPattern("certificate-status-transition", "Certificate Status Transition", domain.CategoryBusiness)
+	pattern.Confidence = 0.9
+	pattern.SetDescription("Applies the verified certificate status transition.")
+	pattern.SetRule("Reuse the verified transition boundary before adding a certificate state change.")
+	pattern.DevelopmentFocus = &domain.DevelopmentFocus{
+		ID:         "certificate-lifecycle",
+		Name:       "Certificate Lifecycle",
+		RouteTerms: []string{"certificate", "issue", "revoke", "status"},
+		EntryPaths: []string{"internal/certificate/lifecycle.go"},
+	}
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
+		Path:   "internal/certificate/lifecycle.go",
+		Line:   42,
+		Symbol: "ApplyTransition",
+		Kind:   "method",
+	}}
+
+	svc := newTestService(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return []domain.Pattern{*pattern}, nil },
+	})
+	tmpDir := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
+
+	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
+	require.Contains(t, skill, "开发焦点")
+	require.Contains(t, skill, "Certificate Lifecycle")
+	require.Contains(t, skill, "./references/patterns/business/certificate-lifecycle.md")
+	require.Contains(t, skill, "命中多个焦点时读取全部命中的参考")
+	require.Contains(t, skill, "不得从现有代码推断可直接编辑")
+
+	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
+	require.Contains(t, index, "Certificate Lifecycle")
+	require.Contains(t, index, "`certificate` `issue` `revoke` `status`")
+	require.FileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "certificate-lifecycle.md"))
+}
+
 func TestGenerateSkillsMarksHighRiskBusinessPatternsAsCheckpoints(t *testing.T) {
 	pattern := domain.NewPattern("resource-destroy", "Resource Destroy Command", domain.CategoryBusiness)
 	pattern.Confidence = 0.9

@@ -70,7 +70,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 
 	result, err := s.agent.AnalyzeCurrentDeltaBatch(ctx, agentReq)
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "analyzer.analyze_current_delta_batch",
 			"duration", time.Since(startedAt),
 			"error", err,
@@ -94,6 +94,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	return &AnalyzeCurrentDeltaBatchResult{
 		Changes:                   changes,
 		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
+		Conversation:              result.Conversation,
 	}, nil
 }
 

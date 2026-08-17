@@ -281,3 +281,44 @@ func TestValidateEngineeringRulesPreservesCommandPolicyAndScope(t *testing.T) {
 	require.Equal(t, domain.CommandPolicyRequiresAuthorization, got[0].CommandPolicy)
 	require.Equal(t, []string{"go test", "task build"}, got[0].AppliesTo)
 }
+
+func TestValidateEngineeringRulesConsolidatesOnlyEquivalentProjections(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("rules"), 0o644))
+	rules := []domain.EngineeringRule{
+		{
+			Title:         "Generated artifacts",
+			Rule:          "Do not edit derived files directly.",
+			Source:        "AGENTS.md",
+			Section:       "Generated Files",
+			AppliesTo:     []string{"generated output", "api"},
+			CommandPolicy: domain.CommandPolicyForbidden,
+			Evidence:      []string{"AGENTS.md"},
+		},
+		{
+			Title:         " generated-artifacts ",
+			Rule:          "Do not edit derived files directly.",
+			Source:        "AGENTS.md",
+			Section:       "Repeated wording",
+			AppliesTo:     []string{"api", "generated output"},
+			CommandPolicy: domain.CommandPolicyForbidden,
+			Evidence:      []string{"AGENTS.md"},
+		},
+		{
+			Title:         "Generated artifacts",
+			Rule:          "Request review before changing their source definition.",
+			Source:        "AGENTS.md",
+			Section:       "Generated Files",
+			AppliesTo:     []string{"api", "generated output"},
+			CommandPolicy: domain.CommandPolicyForbidden,
+			Evidence:      []string{"AGENTS.md"},
+		},
+	}
+
+	got, issues := validateEngineeringRules(root, []string{"AGENTS.md"}, false, rules)
+
+	require.Empty(t, issues)
+	require.Len(t, got, 2)
+	require.Equal(t, "Do not edit derived files directly.", got[0].Rule)
+	require.Equal(t, "Request review before changing their source definition.", got[1].Rule)
+}

@@ -11,7 +11,7 @@
 - This spec keeps authoritative constraints and their synchronization coverage. Source-learned findings are expanded only in category pattern references.
 - For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for capability entries read [Capability Entry Index](./business-methods.md){{end}}.
 - Authoritative rules only come from user-maintained or built-in constraints. Source-learned results are reuse and safety inspection entries only.
-- Trust current code when it conflicts with this spec.
+- Explicit authoritative rules outrank current code and learned references. Current code may only correct a stale source-learned summary; it cannot override or relax authoritative constraints.
 
 ## Table Of Contents
 

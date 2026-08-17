@@ -29,5 +29,5 @@ func splitBusinessPatternGroups(groups []patternGroup) (detailGroups []patternGr
 }
 
 func businessGroupNeedsDetail(group patternGroup) bool {
-	return len(group.Patterns) > 1
+	return group.HasDevelopmentFocus || len(group.Patterns) > 1
 }

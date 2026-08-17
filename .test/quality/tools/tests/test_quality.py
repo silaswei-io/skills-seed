@@ -134,7 +134,7 @@ class QualityRunTest(unittest.TestCase):
         self.assertFalse(report["passed"])
         self.assertIn("relations", report["gate_failures"])
 
-    def test_command_failure_has_zero_score_and_run_failed_status(self):
+    def test_command_failure_is_not_scored_and_reports_the_failure(self):
         report = quality.QualityRun(self.root, self.config_path).score(command_exit=1, failed_step="sync")
 
         self.assertFalse(report["passed"])
@@ -142,6 +142,7 @@ class QualityRunTest(unittest.TestCase):
         self.assertIsNone(report["total_score"])
         self.assertEqual("not_scored", report["grade"])
         self.assertEqual(1, len(report["checks"]))
+        self.assertIn("failed before Skill quality could be evaluated", report["checks"][0]["description"])
 
     def test_invalid_dimension_points_are_rejected(self):
         self.config["dimensions"]["delivery"]["points"] = 40

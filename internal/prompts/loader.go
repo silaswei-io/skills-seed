@@ -75,6 +75,7 @@ var knowledgePromptNames = map[string]bool{
 	"learning-pattern-normalize":  true,
 	"learning-profile-refresh":    true,
 	"learning-authority-extract":  true,
+	"learning-authority-review":   true,
 	"learning-knowledge-review":   true,
 }
 
@@ -154,7 +155,7 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 	l.mu.RUnlock()
 	if !loaded {
 		if err := l.loadWithLocale(name, locale); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "prompt.load",
 				"template", name,
 				"agent", l.agentName,
@@ -170,7 +171,7 @@ func (l *Loader) RenderForRuntimeTask(name string, data interface{}, task Runtim
 	l.mu.RUnlock()
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "prompt.render",
 			"template", name,
 			"agent", l.agentName,
@@ -434,7 +435,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 	dir := layout.New(l.seedPath).Runtime("rendered-prompts")
 	if config.DefaultAutoDeleteRenderedPrompts {
 		if err := os.RemoveAll(dir); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "prompt.rendered.cleanup",
 				"template", name,
 				"path", dir,
@@ -446,7 +447,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		return
 	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "prompt.rendered.mkdir",
 			"template", name,
 			"path", dir,
@@ -462,7 +463,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 	filename := runtimefiles.NameWithID(manifest.RuntimeID, slug) + ".md"
 	path := filepath.Join(dir, filename)
 	if err := os.WriteFile(path, []byte(content+"\n"), 0600); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "prompt.rendered.write",
 			"template", name,
 			"path", path,
@@ -473,7 +474,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 	manifestPath := strings.TrimSuffix(path, ".md") + ".manifest.json"
 	manifestData, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "prompt.rendered.manifest.marshal",
 			"template", name,
 			"path", manifestPath,
@@ -482,7 +483,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 		return
 	}
 	if err := os.WriteFile(manifestPath, append(manifestData, '\n'), 0600); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "prompt.rendered.manifest.write",
 			"template", name,
 			"path", manifestPath,

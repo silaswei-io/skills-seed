@@ -41,3 +41,11 @@ func AnalyzeCurrentDeltaBatchOperation(req *AnalyzeCurrentDeltaBatchRequest) str
 	}
 	return "AnalyzeCurrentDeltaBatch/" + req.RuntimeLabel
 }
+
+// ReviewKnowledgeOperation 返回独立知识审查的可读运行操作名。
+func ReviewKnowledgeOperation(req *ReviewKnowledgeRequest) string {
+	if req == nil || strings.TrimSpace(req.RuntimeLabel) == "" {
+		return "ReviewKnowledge"
+	}
+	return "ReviewKnowledge/" + req.RuntimeLabel
+}

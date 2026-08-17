@@ -99,7 +99,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 		resolvedOutputPath, resolveErr = s.resolveOutputPath(outputPath)
 		return resolveErr
 	}); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.resolve_output_path",
 			"duration", time.Since(startedAt),
 			"output_path", outputPath,
@@ -115,7 +115,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 		patterns = domain.ActivePatterns(patterns)
 		return loadErr
 	}); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.load_patterns",
 			"duration", time.Since(startedAt),
 			"error", err,
@@ -208,7 +208,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 			})
 		})
 	}); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "generator.generate_skills",
 			"duration", time.Since(startedAt),
 			"patterns_count", len(patterns),

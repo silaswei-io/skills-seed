@@ -46,6 +46,7 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 		sourceEvidence := evidenceFromSources(sources)
 		pattern.GoodExample, pattern.BadExample = currentExamples(sources)
 		pattern.BusinessMethod = firstCurrentBusinessMethod(sources)
+		pattern.DevelopmentFocus = firstCurrentDevelopmentFocus(sources)
 		hydrateCurrentProvenance(pattern, sources)
 
 		canonicalEvidence := make([]domain.PatternEvidenceLocation, 0, len(pattern.EvidenceLocations))
@@ -169,6 +170,15 @@ func firstCurrentBusinessMethod(sources []domain.Pattern) *domain.BusinessMethod
 	for _, source := range sources {
 		if source.BusinessMethod != nil {
 			return source.BusinessMethod
+		}
+	}
+	return nil
+}
+
+func firstCurrentDevelopmentFocus(sources []domain.Pattern) *domain.DevelopmentFocus {
+	for _, source := range sources {
+		if source.DevelopmentFocus != nil {
+			return source.DevelopmentFocus.Clone()
 		}
 	}
 	return nil

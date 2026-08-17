@@ -86,7 +86,7 @@ func (r *learnCurrentProjectRun) buildDeltaFocusResults(batch learnCurrentBatch,
 
 	results := make([]learnCurrentFocusResult, 0, len(batch.focuses))
 	for _, indexed := range batch.focuses {
-		result := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID])
+		result := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID], result.Conversation)
 		result.retiredPatternIDs = appendUniquePatternIDs(nil, retiredByFocus[indexed.focus.ID]...)
 		results = append(results, result)
 	}

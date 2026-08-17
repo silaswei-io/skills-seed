@@ -100,7 +100,7 @@ func TestApplyKnowledgeReviewAllowsReviewedDirectDependencyAsBusinessMethod(t *t
 	require.Equal(t, method.CodeLocation.CurrentLocation, result[0].BusinessMethod.CodeLocation.CurrentLocation)
 }
 
-func TestApplyKnowledgeReviewRejectsUnsafeBusinessMethodLocation(t *testing.T) {
+func TestApplyKnowledgeReviewDropsUnsafeBusinessMethodLocation(t *testing.T) {
 	candidate := currentPattern("state-transition", 0.95, "src/state.ext")
 	method := &domain.BusinessMethod{
 		Name: "State.Transition", CodeLocation: domain.CodeLocation{CurrentLocation: "/outside/project/state.ext:24"},
@@ -110,12 +110,32 @@ func TestApplyKnowledgeReviewRejectsUnsafeBusinessMethodLocation(t *testing.T) {
 		Returns:       "Returns nil after applying the transition or a validation error.",
 	}
 
-	_, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
+	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
 		Reason: "The source proves a reusable state transition entry.", BusinessMethod: method,
 	}})
 
-	require.ErrorContains(t, err, "invalid business method location")
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Nil(t, result[0].BusinessMethod)
+}
+
+func TestApplyKnowledgeReviewDropsIncompleteBusinessMethod(t *testing.T) {
+	candidate := currentPattern("incomplete-entry", 0.95, "src/state.ext")
+
+	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
+		CandidateID: candidate.ID,
+		Verdict:     "accept",
+		ReasonCode:  "accepted",
+		Reason:      "The source-backed knowledge is reusable, but the optional entry is incomplete.",
+		BusinessMethod: &domain.BusinessMethod{
+			Name: "State.Transition",
+		},
+	}})
+
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Nil(t, result[0].BusinessMethod)
 }
 
 func TestReviewCurrentKnowledgeKeepsCompleteFocusInOneRequest(t *testing.T) {
@@ -129,10 +149,12 @@ func TestReviewCurrentKnowledgeKeepsCompleteFocusInOneRequest(t *testing.T) {
 	var calls int
 	var receivedFocus domain.EvidenceFocus
 	var receivedIDs []string
+	var receivedRuntimeLabel string
 	service := NewService(&mocks.MockPatternRepository{})
 	service.reviewer = &mocks.MockAgent{ReviewKnowledgeFn: func(_ context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
 		calls++
 		receivedFocus = req.EvidenceFocus
+		receivedRuntimeLabel = req.RuntimeLabel
 		decisions := make([]agent.KnowledgeReviewDecision, 0, len(req.Candidates))
 		for _, candidate := range req.Candidates {
 			receivedIDs = append(receivedIDs, candidate.ID)
@@ -145,14 +167,16 @@ func TestReviewCurrentKnowledgeKeepsCompleteFocusInOneRequest(t *testing.T) {
 	}}
 
 	reviewed, err := service.ReviewCurrentKnowledge(context.Background(), ReviewRequest{
-		Focus:      focus,
-		Candidates: candidates,
+		RuntimeLabel: "batch-005",
+		Focus:        focus,
+		Candidates:   candidates,
 	})
 
 	require.NoError(t, err)
 	require.Len(t, reviewed, len(candidates))
 	require.Equal(t, 1, calls)
 	require.Equal(t, focus, receivedFocus)
+	require.Equal(t, "batch-005", receivedRuntimeLabel)
 	require.Equal(t, []string{"candidate-00", "candidate-01", "candidate-02"}, receivedIDs)
 }
 

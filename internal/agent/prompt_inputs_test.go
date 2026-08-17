@@ -193,6 +193,35 @@ func TestExtractAuthorityPromptDataWritesAuthoritySectionCatalog(t *testing.T) {
 	]`, string(content))
 }
 
+func TestReviewAuthorityPromptDataWritesInitialCandidate(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	request := &ReviewAuthorityRequest{
+		ExtractAuthorityRequest: ExtractAuthorityRequest{
+			EngineeringKnowledge: []string{"AGENTS.md"},
+			AuthoritySections:    []AuthoritySection{{ID: "authority-project", Source: "AGENTS.md", Section: "Generated Files"}},
+		},
+		Candidate: ExtractAuthorityResult{AuthoritySections: []AuthoritySectionResult{{
+			SectionID: "authority-project",
+			Rules:     []domain.EngineeringRule{{Title: "Derived artifacts", Rule: "Do not edit derived files directly."}},
+		}}},
+	}
+
+	data, err := ReviewAuthorityPromptData(session, request)
+
+	require.NoError(t, err)
+	path, ok := data["CandidatePath"].(string)
+	require.True(t, ok)
+	require.Equal(t, filepath.Join(session.dir, "authority-candidate.json"), path)
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"authority_sections":[{
+			"section_id":"authority-project",
+			"rules":[{"title":"Derived artifacts","rule":"Do not edit derived files directly.","source":""}]
+		}]
+	}`, string(content))
+}
+
 func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T) {
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)

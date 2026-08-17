@@ -69,7 +69,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	dir := layout.New(seedPath).Runtime("agent-outputs")
 	if config.DefaultAutoDeleteAgentOutputs {
 		if err := os.RemoveAll(dir); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "agent.output.cleanup",
 				"agent", opts.Agent,
 				"agent_operation", opts.Operation,
@@ -82,7 +82,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		return AgentOutputArchive{}
 	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "agent.output.mkdir",
 			"agent", opts.Agent,
 			"agent_operation", opts.Operation,
@@ -104,7 +104,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	if strings.TrimSpace(opts.Content) != "" {
 		path := filepath.Join(dir, base+".md")
 		if err := os.WriteFile(path, []byte(renderAgentOutputContent(opts.Content)+"\n"), 0600); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "agent.output.write",
 				"agent", opts.Agent,
 				"agent_operation", opts.Operation,
@@ -118,7 +118,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	if strings.TrimSpace(opts.RawOutput) != "" && opts.RawOutput != opts.Content {
 		path := filepath.Join(dir, base+".raw.txt")
 		if err := os.WriteFile(path, []byte(opts.RawOutput+"\n"), 0600); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "agent.output.raw.write",
 				"agent", opts.Agent,
 				"agent_operation", opts.Operation,
@@ -132,7 +132,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	if strings.TrimSpace(opts.Stderr) != "" {
 		path := filepath.Join(dir, base+".stderr.txt")
 		if err := os.WriteFile(path, []byte(opts.Stderr+"\n"), 0600); err != nil {
-			logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "agent.output.stderr.write",
 				"agent", opts.Agent,
 				"agent_operation", opts.Operation,
@@ -163,7 +163,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "agent.output.manifest.marshal",
 			"agent", opts.Agent,
 			"agent_operation", opts.Operation,
@@ -173,7 +173,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		return archive
 	}
 	if err := os.WriteFile(manifestPath, append(data, '\n'), 0600); err != nil {
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "agent.output.manifest.write",
 			"agent", opts.Agent,
 			"agent_operation", opts.Operation,

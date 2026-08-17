@@ -239,6 +239,12 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, authority, "complete one-to-one coverage")
 	require.Contains(t, authority, "never implies `allowed`")
 
+	authorityReview, err := loader.Render("learning-authority-review", sampleAuthorityReviewData(t))
+	require.NoError(t, err)
+	require.Contains(t, authorityReview, "independent authority-completeness review")
+	require.Contains(t, authorityReview, "complete replacement `authority_sections` result")
+	require.Contains(t, authorityReview, "candidate is available at")
+
 	review, err := loader.Render("learning-knowledge-review", sampleKnowledgeReviewData(t))
 	require.NoError(t, err)
 	require.Contains(t, review, "skeptical maintainer")
@@ -266,6 +272,7 @@ func currentPromptData(t *testing.T) map[string]interface{} {
 		"learning-delta-pack-analyze": sampleCurrentDeltaData(),
 		"learning-profile-refresh":    sampleProjectProfileData(t),
 		"learning-authority-extract":  sampleAuthorityExtractionData(t),
+		"learning-authority-review":   sampleAuthorityReviewData(t),
 		"learning-knowledge-review":   sampleKnowledgeReviewData(t),
 		"core-user-pattern":           sampleUserPatternData(),
 		"core-workspace-profile":      sampleWorkspaceData(),
@@ -312,6 +319,26 @@ func sampleAuthorityExtractionData(t *testing.T) map[string]interface{} {
 		AuthoritySections: []agent.AuthoritySection{
 			{ID: "authority-project", Source: "AGENTS.md", Section: "Constraints"},
 		},
+	})
+	require.NoError(t, err)
+	return data
+}
+
+func sampleAuthorityReviewData(t *testing.T) map[string]interface{} {
+	session := newPromptInputSessionForTest(t)
+	data, err := agent.ReviewAuthorityPromptData(session, &agent.ReviewAuthorityRequest{
+		ExtractAuthorityRequest: agent.ExtractAuthorityRequest{
+			ProjectName:          "demo",
+			RootPath:             "/repo",
+			EngineeringKnowledge: []string{"AGENTS.md"},
+			AuthoritySections: []agent.AuthoritySection{
+				{ID: "authority-project", Source: "AGENTS.md", Section: "Constraints"},
+			},
+		},
+		Candidate: agent.ExtractAuthorityResult{AuthoritySections: []agent.AuthoritySectionResult{{
+			SectionID:    "authority-project",
+			NoRuleReason: "The first pass found no explicit constraint.",
+		}}},
 	})
 	require.NoError(t, err)
 	return data

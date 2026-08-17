@@ -25,32 +25,48 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt, outputCon
 	return c.callCodexWithOptions(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, task...)
 }
 
+// callCodexInConversation 在同一学习焦点会话中执行后续任务。
+func (c *CodexAgent) callCodexInConversation(ctx context.Context, operation, prompt, outputContract string, conversation agent.Conversation, task ...agent.RuntimeTask) (string, agent.Conversation, error) {
+	result, err := c.callCodexResult(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, conversation, task...)
+	return result.output, result.conversation, err
+}
+
+type codexCallResult struct {
+	output       string
+	conversation agent.Conversation
+}
+
 func (c *CodexAgent) callCodexWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, task ...agent.RuntimeTask) (string, error) {
+	result, err := c.callCodexResult(ctx, operation, prompt, outputContract, opts, agent.Conversation{}, task...)
+	return result.output, err
+}
+
+func (c *CodexAgent) callCodexResult(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (codexCallResult, error) {
 	outputSchema, err := aicontract.StructuredOutputSchemaWithOptions(outputContract, opts)
 	if err != nil {
-		return "", err
+		return codexCallResult{}, err
 	}
 	schemaFile, err := os.CreateTemp("", "skills-seed-output-schema-*.json")
 	if err != nil {
-		return "", err
+		return codexCallResult{}, err
 	}
 	schemaPath := schemaFile.Name()
 	defer os.Remove(schemaPath)
 	if _, err := schemaFile.WriteString(outputSchema); err != nil {
 		_ = schemaFile.Close()
-		return "", err
+		return codexCallResult{}, err
 	}
 	if err := schemaFile.Close(); err != nil {
-		return "", err
+		return codexCallResult{}, err
 	}
 
-	return agent.RunRetryingCall(ctx, agent.RetryingCallOptions[string]{
+	return agent.RunRetryingCall(ctx, agent.RetryingCallOptions[codexCallResult]{
 		AgentName: c.Name(),
 		Operation: operation,
 		Policy:    c.retryCfg,
-		Call: func(attempt int) (string, string, time.Duration, bool, error) {
-			output, duration, retryable, err := c.doCallCodex(ctx, operation, prompt, schemaPath, attempt, agent.FirstRuntimeTask(task))
-			return output, output, duration, retryable, err
+		Call: func(attempt int) (codexCallResult, string, time.Duration, bool, error) {
+			output, nextConversation, duration, retryable, err := c.doCallCodex(ctx, operation, prompt, schemaPath, conversation, attempt, agent.FirstRuntimeTask(task))
+			return codexCallResult{output: output, conversation: nextConversation}, output, duration, retryable, err
 		},
 	})
 }
@@ -61,15 +77,15 @@ func isCodexRetryableError(stdout, stderr string) bool {
 }
 
 // doCallCodex 执行单次 Codex CLI 调用
-func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputSchemaPath string, attempt int, task agent.RuntimeTask) (string, time.Duration, bool, error) {
+func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputSchemaPath string, conversation agent.Conversation, attempt int, task agent.RuntimeTask) (string, agent.Conversation, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
-		return "", 0, false, err
+		return "", agent.Conversation{}, 0, false, err
 	}
-	args := codexExecArgs(c.allowUserPlugins, outputSchemaPath, c.runtime)
+	args := codexExecArgsForConversation(c.allowUserPlugins, outputSchemaPath, c.runtime, conversation)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
 		"operation", operation,
@@ -114,7 +130,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 
 		if retryable {
 			reason := agent.RetryReasonFromOutput(stdoutStr, stderrStr)
-			logger.DiagnosticError(i18n.Get("LoggerAgentCodexCallRetryable"),
+			logger.DiagnosticWarn(i18n.Get("LoggerAgentCodexCallRetryable"),
 				"agent", c.Name(),
 				"operation", operation,
 				"attempt", attempt,
@@ -127,10 +143,10 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+			return stdoutStr + stderrStr, agent.Conversation{}, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 		}
 
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"agent", c.Name(),
 			"operation", operation,
 			"duration", duration,
@@ -139,7 +155,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 			"raw_output_path", archive.RawPath,
 			"stderr_path", archive.StderrPath,
 		)
-		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+		return "", agent.Conversation{}, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 	}
 	duration := time.Since(startedAt)
 
@@ -165,7 +181,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 			RawOutput: rawOutput,
 			Stderr:    stderr.String(),
 		})
-		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationFailed"),
+		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"agent", c.Name(),
 			"operation", operation,
 			"duration", duration,
@@ -174,7 +190,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 			"raw_output_path", archive.RawPath,
 			"stderr_path", archive.StderrPath,
 		)
-		return "", duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, err, rawOutput, archive))
+		return "", agent.Conversation{}, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, err, rawOutput, archive))
 	}
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 		Agent:     c.Name(),
@@ -194,18 +210,39 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 		"raw_output_path", archive.RawPath,
 		"stderr_path", archive.StderrPath,
 	)
-	return content, duration, false, nil
+	return content, codexConversation(rawOutput, c.Name(), conversation), duration, false, nil
 }
 
 func codexExecArgs(allowUserPlugins bool, outputSchemaPath string, runtime config.AgentRuntimeOptions) []string {
-	// 已经把需要分析的结构和样例代码放进提示词。这里让模型以一次性、
-	// 只读、非交互模式在当前目录运行，避免写入文件或等待工具审批
+	return codexExecArgsForConversation(allowUserPlugins, outputSchemaPath, runtime, agent.Conversation{})
+}
+
+func codexExecArgsForConversation(allowUserPlugins bool, outputSchemaPath string, runtime config.AgentRuntimeOptions, conversation agent.Conversation) []string {
+	// 已经把需要分析的结构和样例代码放进提示词。默认使用一次性、
+	// 只读、非交互模式；焦点学习则按 CLI 的会话机制续接后续审查。
 	args := codexRuntimeArgs(runtime)
+	if !allowUserPlugins {
+		args = append(codexDisableUserPluginArgs(), args...)
+	}
+	if conversation.Valid() {
+		return append(args,
+			"exec", "resume", conversation.ID,
+			"--skip-git-repo-check",
+			"--ignore-rules",
+			"--json",
+			"--output-schema", outputSchemaPath,
+			"-",
+		)
+	}
 	args = append(args,
 		"--ask-for-approval", "never",
 		"exec",
 		"--skip-git-repo-check",
-		"--ephemeral",
+	)
+	if conversation.Provider == "" {
+		args = append(args, "--ephemeral")
+	}
+	args = append(args,
 		"--ignore-rules",
 		"--sandbox", "read-only",
 		"--color", "never",
@@ -213,9 +250,6 @@ func codexExecArgs(allowUserPlugins bool, outputSchemaPath string, runtime confi
 		"--output-schema", outputSchemaPath,
 		"-",
 	)
-	if !allowUserPlugins {
-		args = append(codexDisableUserPluginArgs(), args...)
-	}
 	return args
 }
 
@@ -315,6 +349,25 @@ func extractFinalContent(output string) (string, error) {
 	}
 
 	return "", fmt.Errorf("%s", i18n.Get("AgentCodexNoFinalMessage"))
+}
+
+func codexConversation(output, provider string, requested agent.Conversation) agent.Conversation {
+	if requested.Provider != provider {
+		return agent.Conversation{}
+	}
+	if requested.Valid() {
+		return requested
+	}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		var event struct {
+			Type     string `json:"type"`
+			ThreadID string `json:"thread_id"`
+		}
+		if json.Unmarshal([]byte(strings.TrimSpace(line)), &event) == nil && event.Type == "thread.started" && strings.TrimSpace(event.ThreadID) != "" {
+			return agent.Conversation{Provider: provider, ID: strings.TrimSpace(event.ThreadID)}
+		}
+	}
+	return agent.Conversation{}
 }
 
 func looksLikeJSONContent(content string) bool {

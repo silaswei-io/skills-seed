@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/stretchr/testify/require"
@@ -61,6 +62,20 @@ func TestClaudePrintArgsPromptOnlyDisablesRepositoryTools(t *testing.T) {
 
 	require.Contains(t, args, "--tools")
 	require.Empty(t, requireArgValue(t, args, "--tools"))
+}
+
+func TestClaudePrintArgsForConversationResumesWithoutDisablingPersistence(t *testing.T) {
+	conversation := agent.Conversation{Provider: "provider", ID: "00000000-0000-4000-8000-000000000001"}
+	args := claudePrintArgsForConversation(false, `{"type":"object"}`, false, config.AgentRuntimeOptions{}, conversation)
+
+	require.NotContains(t, args, "--no-session-persistence")
+	require.Equal(t, conversation.ID, requireArgValue(t, args, "--resume"))
+}
+
+func TestClaudeConversationReadsNewSessionID(t *testing.T) {
+	conversation := claudeConversation(`{"type":"result","session_id":"00000000-0000-4000-8000-000000000001"}`, "provider", agent.Conversation{Provider: "provider"})
+
+	require.Equal(t, agent.Conversation{Provider: "provider", ID: "00000000-0000-4000-8000-000000000001"}, conversation)
 }
 
 func TestClaudePrintArgsUsesConfiguredModel(t *testing.T) {

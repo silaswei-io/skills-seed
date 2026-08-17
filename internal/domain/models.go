@@ -292,6 +292,8 @@ type Pattern struct {
 	Generated      bool            // 是否已生成到 skills
 	BusinessMethod *BusinessMethod // 能力入口信息（可选，用于可复用入口定位）
 	KnowledgeFlags []string        `json:"knowledge_flags,omitempty"` // 经证据审查的受控知识标志
+	// DevelopmentFocus 复用学习阶段已审查的证据焦点，用于生成稳定的开发导航入口。
+	DevelopmentFocus *DevelopmentFocus `json:"development_focus,omitempty"`
 	// EvidenceLocations 是模式对应的通用源码证据位置，不等同于 BusinessMethod 的可调用位置。
 	EvidenceLocations []PatternEvidenceLocation `json:"evidence_locations,omitempty"`
 	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
@@ -337,6 +339,7 @@ func (p *Pattern) SetBusinessMethod(method *BusinessMethod) {
 func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 	p.KnowledgeFlags = CanonicalKnowledgeFlags(p.KnowledgeFlags)
 	p.Status = NormalizePatternStatus(p.Status)
+	p.DevelopmentFocus = p.DevelopmentFocus.Clone()
 	if previous != nil && !previous.CreatedAt.IsZero() {
 		p.CreatedAt = previous.CreatedAt
 	} else if p.CreatedAt.IsZero() {
@@ -363,6 +366,7 @@ func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 func (p *Pattern) NormalizeAfterLoad() {
 	p.KnowledgeFlags = CanonicalKnowledgeFlags(p.KnowledgeFlags)
 	p.Status = NormalizePatternStatus(p.Status)
+	p.DevelopmentFocus = p.DevelopmentFocus.Clone()
 	if p.LastSeenAt.IsZero() {
 		p.LastSeenAt = p.UpdatedAt
 		if p.LastSeenAt.IsZero() {

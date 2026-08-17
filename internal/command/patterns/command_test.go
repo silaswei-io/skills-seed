@@ -86,7 +86,7 @@ func TestAddCmdInWorkspaceRootDistributesPattern(t *testing.T) {
 		PatternNormSvc: patternnorm.NewService(rootPatternRepo),
 	}
 	cmd := addCmd(cont)
-	cmd.SetArgs([]string{"--context", "hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码"})
+	cmd.SetArgs([]string{"--content", "hsmwebapi 的 plugins 来自 plugins_custom.sh，改代码应修改源插件代码"})
 
 	require.NoError(t, cmd.Execute())
 
@@ -116,21 +116,21 @@ func TestAddCmdRejectsPositionalDescription(t *testing.T) {
 	require.Contains(t, err.Error(), "unknown command")
 }
 
-func TestAddCmdRequiresDescription(t *testing.T) {
+func TestAddCmdRequiresContent(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	cmd := addCmd(&container.Container{})
 
 	err := cmd.Execute()
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "需要通过 --context 或 --context-path 提供模式描述")
+	require.Contains(t, err.Error(), "需要通过 --content 或 --content-path 提供模式内容")
 }
 
-func TestAddCmdReadsContextPath(t *testing.T) {
+func TestAddCmdReadsContentPath(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	projectRoot := t.TempDir()
-	contextPath := filepath.Join(projectRoot, "pattern-notes.md")
-	require.NoError(t, os.WriteFile(contextPath, []byte("分页查询统一使用 limit/offset"), 0644))
+	contentPath := filepath.Join(projectRoot, "pattern-notes.md")
+	require.NoError(t, os.WriteFile(contentPath, []byte("分页查询统一使用 limit/offset"), 0644))
 	pattern := domain.NewPattern("pagination-limit-offset", "分页查询规范", domain.CategoryAPI)
 	pattern.SetDescription("分页查询统一使用 limit/offset")
 	pattern.SetRule("当实现分页查询时，应该使用 limit/offset")
@@ -153,7 +153,7 @@ func TestAddCmdReadsContextPath(t *testing.T) {
 		PatternNormSvc: patternnorm.NewService(patternRepo),
 	}
 	cmd := addCmd(cont)
-	cmd.SetArgs([]string{"--context-path", contextPath, "--category", "api"})
+	cmd.SetArgs([]string{"--content-path", contentPath, "--category", "api"})
 
 	require.NoError(t, cmd.Execute())
 	require.Nil(t, cmd.Flags().Lookup("files"))
@@ -197,7 +197,7 @@ func TestUpdateCmdRevisesExistingPatternAndPreservesIdentity(t *testing.T) {
 		Agent:       mockAgent,
 	}
 	cmd := updateCmd(cont)
-	cmd.SetArgs([]string{"resp-extra-update-logging", "--context", "补充审计日志"})
+	cmd.SetArgs([]string{"resp-extra-update-logging", "--content", "补充审计日志"})
 
 	require.NoError(t, cmd.Execute())
 	require.Nil(t, cmd.Flags().Lookup("files"))
@@ -212,11 +212,11 @@ func TestUpdateCmdRevisesExistingPatternAndPreservesIdentity(t *testing.T) {
 	require.Equal(t, "响应扩展字段审计日志", saved.Name)
 }
 
-func TestUpdateCmdReadsContextPath(t *testing.T) {
+func TestUpdateCmdReadsContentPath(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	projectRoot := t.TempDir()
-	contextPath := filepath.Join(projectRoot, "pattern-update.md")
-	require.NoError(t, os.WriteFile(contextPath, []byte("补充审计日志字段"), 0644))
+	contentPath := filepath.Join(projectRoot, "pattern-update.md")
+	require.NoError(t, os.WriteFile(contentPath, []byte("补充审计日志字段"), 0644))
 	existing := domain.NewPattern("resp-extra-update-logging", "响应扩展字段日志", domain.CategoryBusiness)
 	existing.SetDescription("响应扩展字段更新需要记录日志")
 	existing.SetRule("当响应扩展字段变化时，应该记录操作日志")
@@ -241,13 +241,13 @@ func TestUpdateCmdReadsContextPath(t *testing.T) {
 		PatternRepo: patternRepo,
 		Agent:       mockAgent,
 	})
-	cmd.SetArgs([]string{"resp-extra-update-logging", "--context-path", contextPath})
+	cmd.SetArgs([]string{"resp-extra-update-logging", "--content-path", contentPath})
 
 	require.NoError(t, cmd.Execute())
 	require.Nil(t, cmd.Flags().Lookup("files"))
 }
 
-func TestUpdateCmdRequiresContext(t *testing.T) {
+func TestUpdateCmdRequiresContent(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	projectRoot := t.TempDir()
 	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(projectRoot, ".skills-seed", "store", "project.db"))
@@ -262,7 +262,42 @@ func TestUpdateCmdRequiresContext(t *testing.T) {
 	err = cmd.Execute()
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "需要通过 --context 或 --context-path 提供修订说明")
+	require.Contains(t, err.Error(), "需要通过 --content 或 --content-path 提供修订内容")
+}
+
+func TestResolvePatternContentSupportsDeprecatedContextFlags(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	content, err := resolvePatternContent(patternContentInput{LegacyContext: "旧参数内容"})
+
+	require.NoError(t, err)
+	require.Equal(t, "旧参数内容", content)
+	cmd := addCmd(&container.Container{})
+	require.NotEmpty(t, cmd.Flags().Lookup("context").Deprecated)
+	require.NotEmpty(t, cmd.Flags().Lookup("context-path").Deprecated)
+}
+
+func TestPatternCommandHelpShowsContentFlagsOnly(t *testing.T) {
+	require.NoError(t, i18n.Init("en-US"))
+	cmd := addCmd(&container.Container{})
+	output := &bytes.Buffer{}
+	cmd.SetOut(output)
+	cmd.SetArgs([]string{"--help"})
+
+	require.NoError(t, cmd.Execute())
+	require.Contains(t, output.String(), "--content")
+	require.NotContains(t, output.String(), "--context")
+}
+
+func TestResolvePatternContentRejectsMixedLegacyAndContentFlags(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	_, err := resolvePatternContent(patternContentInput{
+		Content:       "新参数内容",
+		LegacyContext: "旧参数内容",
+	})
+
+	require.ErrorContains(t, err, "不能同时使用")
 }
 
 func TestDeleteCmdInProjectDeletesPattern(t *testing.T) {

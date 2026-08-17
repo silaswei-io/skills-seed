@@ -63,6 +63,20 @@ func TestReportRetryForContextInvokesReporterWithNormalizedReason(t *testing.T) 
 	require.Equal(t, "API Error: 529 overloaded_error", got.Reason)
 }
 
+func TestWithAdditionalRetryReporterPreservesExistingReporter(t *testing.T) {
+	var reports []string
+	ctx := WithRetryReporter(context.Background(), func(RetryInfo) {
+		reports = append(reports, "existing")
+	})
+	ctx = WithAdditionalRetryReporter(ctx, func(RetryInfo) {
+		reports = append(reports, "additional")
+	})
+
+	ReportRetryAttemptForContext(ctx, RetryInfo{Attempt: 2})
+
+	require.Equal(t, []string{"existing", "additional"}, reports)
+}
+
 func TestRetryProgressLabelShowsErrorDurationAndWait(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 

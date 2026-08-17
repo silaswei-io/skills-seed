@@ -947,8 +947,8 @@ func TestRunLearnCurrentResumesPendingFocusFromCachedPlan(t *testing.T) {
 	require.Contains(t, output, "本地过滤: 可学习 2，待处理 2")
 	require.Contains(t, output, "候选准备: 输入 2，保留 2")
 	require.Contains(t, output, "恢复后: 待分析 1，证据焦点 2")
-	require.Contains(t, output, "隔离源码证据分析 · 焦点 2/2 · 密钥创建")
-	require.NotContains(t, output, "隔离源码证据分析 · 焦点 1/2 · 认证登录")
+	require.Contains(t, output, currentAnalysisFocusLabel(2, 2, "密钥创建"))
+	require.NotContains(t, output, currentAnalysisFocusLabel(1, 2, "认证登录"))
 	require.NotContains(t, output, "增量文件变化:")
 	require.NotContains(t, output, "计划输入文件:")
 	require.NotContains(t, output, "候选准备结果:")
@@ -1461,9 +1461,13 @@ func TestRunLearnCurrentAnalyzesPlannedFocusesInParallelWhenConfigured(t *testin
 
 	updateMu.Lock()
 	defer updateMu.Unlock()
-	require.Contains(t, strings.Join(updateLabels, "\n"), "batch-001")
-	require.Contains(t, strings.Join(updateLabels, "\n"), "batch-002")
-	require.Contains(t, strings.Join(updateLabels, "\n"), "batch-003")
+	updates := strings.Join(updateLabels, "\n")
+	require.Contains(t, updates, i18n.GetWithParams("ProgressLearnCurrentAnalyzeParallel", map[string]interface{}{
+		"Label":       i18n.Get("ProgressLearnCurrentAnalyzeCodebase"),
+		"Completed":   3,
+		"Total":       3,
+		"Parallelism": 2,
+	}))
 }
 
 func TestRunLearnCurrentDoesNotReprocessFilesOmittedByAnalysisPlanner(t *testing.T) {
@@ -1541,7 +1545,7 @@ func TestRunLearnCurrentShowsEvidenceFocusProgressDetails(t *testing.T) {
 	})
 
 	require.Contains(t, output, "学习议程规划")
-	require.Contains(t, output, "隔离源码证据分析 · 焦点 1/2 · 认证登录")
+	require.Contains(t, output, currentAnalysisFocusLabel(1, 2, "认证登录"))
 	require.Contains(t, output, "知识准入与模式入库 · 提交 2 个文件状态")
 }
 
@@ -1571,9 +1575,9 @@ func TestRunLearnCurrentIncludesEvidenceFocusInFailure(t *testing.T) {
 	})
 
 	require.Error(t, runErr)
-	require.Contains(t, runErr.Error(), "隔离源码证据分析 · 焦点 1/1 · 认证登录")
+	require.Contains(t, runErr.Error(), currentAnalysisFocusLabel(1, 1, "认证登录"))
 	require.Contains(t, runErr.Error(), "解析结果失败")
-	require.Contains(t, output, "隔离源码证据分析 · 焦点 1/1 · 认证登录")
+	require.Contains(t, output, currentAnalysisFocusLabel(1, 1, "认证登录"))
 }
 
 func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
@@ -1996,7 +2000,7 @@ func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetaile
 	require.Contains(t, output, "准备项目上下文")
 	require.Contains(t, output, "本地文件过滤")
 	require.Contains(t, output, "学习议程规划")
-	require.Contains(t, output, "隔离源码证据分析 · 焦点 1/1 · 当前代码变更")
+	require.Contains(t, output, currentAnalysisFocusLabel(1, 1, "当前代码变更"))
 	require.Contains(t, output, "证据焦点完成：1/1 个")
 	require.Contains(t, output, "跳过权威规则与项目地图刷新")
 	require.NotContains(t, output, "代码分析 1/1 已完成")
@@ -2057,15 +2061,16 @@ func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.
 		requireRunLearnCurrentNoError(t, cont, opts)
 	})
 
-	retryLabel := "隔离源码证据分析 · 焦点 1/1 · 当前代码变更（API Error: 529 overloaded_error，本次调用 3m37s，15s 后重试）"
-	attemptLabel := "隔离源码证据分析 · 焦点 1/1 · 当前代码变更（第2次尝试）"
+	baseLabel := currentAnalysisFocusLabel(1, 1, "当前代码变更")
+	retryLabel := agent.RetryProgressLabel(baseLabel, agent.RetryInfo{Status: agent.RetryProgressStatusWaiting, Reason: "API Error: 529 overloaded_error", CallDuration: 3*time.Minute + 37*time.Second, WaitDuration: 15 * time.Second})
+	attemptLabel := agent.RetryAttemptProgressLabel(baseLabel, agent.RetryInfo{Attempt: 2})
 	require.Contains(t, output, retryLabel)
 	require.Contains(t, output, attemptLabel)
 	afterRetry := output[strings.Index(output, retryLabel)+len(retryLabel):]
 	attemptIndex := strings.Index(afterRetry, attemptLabel)
 	require.NotEqual(t, -1, attemptIndex, "expected retry attempt progress label after retry wait, got %q", output)
 	afterAttempt := afterRetry[attemptIndex+len(attemptLabel):]
-	restoredProgress := fmt.Sprintf("5/%d 隔离源码证据分析 · 焦点 1/1 · 当前代码变更\n", learnCurrentProjectStepTotal)
+	restoredProgress := fmt.Sprintf("5/%d %s\n", learnCurrentProjectStepTotal, baseLabel)
 	restoreIndex := strings.Index(afterAttempt, restoredProgress)
 	require.NotEqual(t, -1, restoreIndex, "expected retry progress label to be restored after a successful retry, got %q", output)
 }
@@ -2375,6 +2380,15 @@ func learnCurrentOptionsForTestWithContext(userContext string) learnCurrentOptio
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
 	opts.userContext = userContext
 	return opts
+}
+
+func currentAnalysisFocusLabel(current, total int, name string) string {
+	return i18n.GetWithParams("ProgressLearnCurrentAnalyzeFocus", map[string]interface{}{
+		"Label":   i18n.Get("ProgressLearnCurrentAnalyzeCodebase"),
+		"Current": current,
+		"Total":   total,
+		"Name":    name,
+	})
 }
 
 func readLearnFilePath(t *testing.T, path string) string {

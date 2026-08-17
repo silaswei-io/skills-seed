@@ -162,7 +162,7 @@ init -> learn current -> generate skills
 
 Starting in 0.10.6, running `skills-seed init` without flags opens an interactive initialization flow. The default path asks only for tool language, initialization type, Agent, Agent parallelism, and the execution plan; Skills language and Skills type live under optional advanced settings. Learning strategy defaults are written to `.skills-seed/config.yaml` and can be edited later. Running `skills-seed sync` without flags prompts to resume or restart when unfinished state exists. Use `--no-interactive` in scripts, and `sync --resume` / `sync --restart` to control resume behavior explicitly.
 
-Starting in 0.10.7, `patterns add` and user-pattern sync use `--context` for the natural-language description, `patterns update <id> --context "<request>"` can revise one pattern while preserving its ID and workspace ownership, and `patterns show` supports `--sort updated|score|category`. Model-output parsing now also repairs trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
+`patterns add` and `patterns update` use `--content` for durable user-authored pattern content and `--content-path` for longer notes. Their former `--context` and `--context-path` flags remain as deprecated compatibility aliases; one-shot learning context continues to use `--context`. `patterns update <id> --content "<content>"` revises one pattern while preserving its ID and workspace ownership, and `patterns show` supports `--sort updated|score|category`. Model-output parsing also repairs trailing commas, comments, single-quoted strings, Python-style literals, and missing commas between object fields or array values.
 
 Starting in 0.11.0, `learning.current.mode` supports `fast`, `normal`, and `deep` learning strategies. Generated skills now include related-reference routing, business-pattern importance layers, change-scope validation matrices, and module-grouped entry method indexes. Reference generation also validates source evidence paths before rendering, reducing links to files that do not exist.
 
@@ -350,8 +350,8 @@ Built-in targets:
 | `skills-seed workflow show --format json` | List existing workflow summaries |
 | `skills-seed workflow --name <name> --content "<Markdown>"` | Let the current Agent merge and organize same-name workflow content; use `--overwrite` only for complete replacement |
 | `skills-seed rule --name <name> --content "<Markdown>"` | Let the current Agent merge and organize a long-lived rule without weakening its authority |
-| `skills-seed patterns add --context "<description>"` | Add a user-defined pattern in natural language; use `--context-path` for longer notes |
-| `skills-seed patterns update <id> --context "<request>"` | Update a specific user pattern |
+| `skills-seed patterns add --content "<content>"` | Add a user-defined pattern in natural language; use `--content-path` for longer notes |
+| `skills-seed patterns update <id> --content "<content>"` | Update a specific user pattern |
 | `skills-seed patterns compact` | Explicitly compact similar stored patterns |
 | `skills-seed sync` | Learn current code in one command and generate skills when changes are found |
 | `skills-seed patterns stats` | Show pattern quality metrics |
