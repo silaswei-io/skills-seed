@@ -1,6 +1,6 @@
 ---
 name: skills-seed-cli
-description: Use when the user asks to operate skills-seed in a repository: initialize, learn or sync, generate or inspect Skills, maintain Patterns, Rules, or Workflows, preview input, or recover a run. Natural-language requests such as "添加工作流" or "修正规则" qualify; an exact CLI subcommand is not required. Do not use for skills-seed source development, code review, architecture discussion, or general questions.
+description: Use when the user asks to operate skills-seed: initialize, learn or sync a repository, generate or inspect Skills, maintain Patterns, Rules, or Workflows, preview input, recover a run, or update the installed CLI. Natural-language requests such as "添加工作流" or "修正规则" qualify; an exact CLI subcommand is not required. Do not use for skills-seed source development, code review, architecture discussion, or general questions.
 ---
 
 <!-- generated-by: skills-seed -->
@@ -42,6 +42,7 @@ This is a CLI operation Skill, not a project coding Skill. It teaches how to ope
 | Manage pre-commit integration | [Hook](./references/hook.md) |
 | Understand why files were or were not analyzed | [Preview](./references/preview.md) |
 | Inspect learned project profile state | [Profile](./references/profile.md) |
+| Update the installed Skills Seed executable | [Update](./references/update.md) |
 | Inspect help, version, logs, or fingerprints | [Log Help Version](./references/log-help-version.md) |
 | Install/update/remove this global CLI Skill | [CLI Skill Maintenance](./references/cli-skills.md) |
 
@@ -54,3 +55,4 @@ This is a CLI operation Skill, not a project coding Skill. It teaches how to ope
 5. Add a durable task process: `skills-seed workflow --name <name> --content "<Markdown>"`, then `skills-seed generate skills`.
 6. Debug file selection: `skills-seed preview files --mode incremental` before learning.
 7. Pre-commit workflow: install the hook with `skills-seed hook install`.
+8. Update the installed CLI: `skills-seed update`.

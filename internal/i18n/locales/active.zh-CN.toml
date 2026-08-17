@@ -2969,3 +2969,27 @@ other = "编码规范化决策失败"
 
 [PatternNormApplyPatternsFailed]
 other = "写入规范模式失败"
+
+[UpdateShort]
+other = "从官方发布资产更新 Skills Seed"
+
+[UpdateLongDesc]
+other = "下载并校验与当前平台匹配的官方发布资产，再替换当前 Skills Seed 可执行文件。\n\n默认更新到最新稳定版本；可通过 --version 指定发布版本。此命令不需要 Go，也不读取或修改项目 .skills-seed 状态。需要访问 GitHub Releases，且当前可执行文件所在目录必须可写。"
+
+[UpdateExample]
+other = "skills-seed update\nskills-seed update --version v0.20.7"
+
+[UpdateFlagVersion]
+other = "要安装的发布版本，默认 latest"
+
+[UpdateUnavailable]
+other = "更新服务不可用"
+
+[UpdateFailed]
+other = "更新 Skills Seed 失败"
+
+[UpdateCompleted]
+other = "Skills Seed 已更新到 {{.Version}}：{{.Path}}"
+
+[UpdateRestartRequired]
+other = "Skills Seed 已下载 {{.Version}}，将在当前进程退出后替换：{{.Path}}。请重新运行命令。"

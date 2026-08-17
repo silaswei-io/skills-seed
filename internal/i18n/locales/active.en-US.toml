@@ -2969,3 +2969,27 @@ other = "Failed to encode normalization decision"
 
 [PatternNormApplyPatternsFailed]
 other = "Failed to apply normalized patterns"
+
+[UpdateShort]
+other = "Update Skills Seed from official release assets"
+
+[UpdateLongDesc]
+other = "Download and verify the official release asset for the current platform, then replace the current Skills Seed executable.\n\nUpdates to the latest stable version by default; use --version to select a release. This command does not require Go and does not read or modify project .skills-seed state. It requires GitHub Releases access and write access to the current executable directory."
+
+[UpdateExample]
+other = "skills-seed update\nskills-seed update --version v0.20.7"
+
+[UpdateFlagVersion]
+other = "Release version to install; defaults to latest"
+
+[UpdateUnavailable]
+other = "Update service is unavailable"
+
+[UpdateFailed]
+other = "Failed to update Skills Seed"
+
+[UpdateCompleted]
+other = "Skills Seed updated to {{.Version}}: {{.Path}}"
+
+[UpdateRestartRequired]
+other = "Skills Seed downloaded {{.Version}} and will replace {{.Path}} after this process exits. Run the command again afterward."

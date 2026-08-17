@@ -20,6 +20,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Rule | [`skills-seed rule`](#skills-seed-rule) | Add or update authoritative user rules | `skills-seed rule --name <name> --content "<Markdown>"` |
 | Project Profile | [`skills-seed profile`](#skills-seed-profile) | Show the project profile | `skills-seed profile show` |
 | One-Step Sync | [`skills-seed sync`](#skills-seed-sync) | Learn current code and generate skills | `skills-seed sync` |
+| CLI Update | [`skills-seed update`](#skills-seed-update) | Update the installed CLI from official release assets | `skills-seed update` |
 | Change History | [`skills-seed log`](#skills-seed-log) | Show learned change history | `skills-seed log` |
 | Git Hook | [`skills-seed hook`](#skills-seed-hook) | Install, remove, or manually run the pre-commit hook | `skills-seed hook install` |
 | Help | [`skills-seed help`](#skills-seed-help) | Show help for any command path | `skills-seed help learn current` |
@@ -31,6 +32,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Initialize one project | `skills-seed init --mode project` → `skills-seed sync` | Create config, learn current code, and generate skills |
 | Initialize a workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | The root coordinates child learning, then generates child and root skills |
 | Daily incremental update | `skills-seed sync` | Learns current changes and generates skills only when learning changed output |
+| Update installed CLI | `skills-seed update` | Downloads and verifies an official binary; does not need Go or project state |
 | Add one missed rule | `skills-seed patterns add --content "<content>"` → `skills-seed generate skills` | Adds a natural-language pattern, then regenerates |
 | Inspect task workflows | `skills-seed workflow show --format json` | Returns lightweight summaries; read details with `workflow show <id> --format json` as needed |
 | Update task workflow | `skills-seed workflow --name <name> --content "<Markdown>"` → `skills-seed generate skills` | Same-name content is merged and optimized by default; use `--overwrite` only for complete replacement |
@@ -46,7 +48,7 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `rule`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed cli-skills` | Manage global skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | Install/update global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | Uninstall global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
@@ -75,6 +77,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed rule` | Manage authoritative user rules | `show [rule-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false`<br>`--path` = `[]`<br>`--project` = `[]` |
 | `skills-seed rule show [rule-id]` | Show existing rule scopes or full text | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed update` | Update Skills Seed from official release assets | - | `--help, -h` = `false`<br>`--version` = `latest` |
 | `skills-seed workflow` | Manage user workflows | `show [workflow-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workflow show [workflow-id]` | Show existing workflow summaries or full details | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | Manage workspace sub-projects | `add .\|project-id-or-path...` | `--help, -h` = `false` |
@@ -641,6 +644,19 @@ skills-seed sync --resume
 1. `sync` runs `learn current` first by default; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
 2. `sync --context` does not add a user pattern; it only affects this learning analysis. Use `patterns add` or `patterns update` to add user-defined patterns.
 3. Normalization decisions are checkpointed immediately. If local validation or storage later fails, `sync --resume` replays them without rerunning completed evidence packs.
+
+### `skills-seed update`
+
+Update the installed Skills Seed CLI without touching any project learning state.
+
+```bash
+skills-seed update
+skills-seed update --version v0.20.7
+```
+
+The command downloads the archive for the current operating system and architecture from the official GitHub Release, verifies it with that Release's `checksums.txt`, then replaces the current executable. It does not require Go, does not run `go install`, and does not read or modify project `.skills-seed` state.
+
+It requires GitHub Releases access and write permission for the current executable's directory. On Windows, replacement completes after the current process exits; restart the CLI before the next command.
 
 ### `skills-seed hook`
 

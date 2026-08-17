@@ -1,0 +1,23 @@
+# Update
+
+Use `skills-seed update` to replace the installed Skills Seed executable from the official GitHub Release. This command is for the CLI binary itself, not project knowledge.
+
+## Commands
+
+```bash
+# Install the latest compatible release.
+skills-seed update
+
+# Install one published release explicitly.
+skills-seed update --version v0.20.7
+```
+
+## Boundaries
+
+- It downloads the archive matching the current operating system and architecture from the official GitHub Releases API.
+- It verifies the downloaded archive against the release `checksums.txt` before replacing the executable.
+- It requires network access to GitHub Releases and write permission for the executable's installation directory.
+- It does not require Go, does not run `go install`, and does not read or modify any project's `.skills-seed` state.
+- On Windows, replacement completes after the current process exits; restart the CLI before the next command.
+
+Use `sync` to refresh one project's learned knowledge and generated Skills. Use `cli-skills install` only to refresh this global operation Skill after the CLI binary itself has been updated.

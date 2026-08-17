@@ -32,6 +32,7 @@ func TestInstallGlobalAtHomeWritesClaudeAndCodexSkillTrees(t *testing.T) {
 	require.FileExists(t, filepath.Join(codexRoot, "references", "preview.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "hook.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "profile.md"))
+	require.FileExists(t, filepath.Join(codexRoot, "references", "update.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "log-help-version.md"))
 	require.FileExists(t, filepath.Join(codexRoot, "references", "cli-skills.md"))
 
@@ -132,13 +133,15 @@ func TestRenderSkillDocumentsPublicCommands(t *testing.T) {
 		"./references/preview.md",
 		"./references/hook.md",
 		"./references/profile.md",
+		"./references/update.md",
 		"./references/log-help-version.md",
 		"./references/cli-skills.md",
 	} {
 		require.Contains(t, content, reference)
 	}
 	require.NotContains(t, content, "## Core Commands")
-	require.Contains(t, content, "Use when the user asks to operate skills-seed in a repository")
+	require.Contains(t, content, "Use when the user asks to operate skills-seed")
+	require.Contains(t, content, "update the installed CLI")
 	require.Contains(t, content, "maintain Patterns, Rules, or Workflows")
 	require.Contains(t, content, "添加工作流")
 	require.Contains(t, content, "an exact CLI subcommand is not required")
@@ -168,6 +171,7 @@ func TestRenderSkillTreeIncludesPerCommandReferences(t *testing.T) {
 		"references/preview.md",
 		"references/hook.md",
 		"references/profile.md",
+		"references/update.md",
 		"references/log-help-version.md",
 		"references/cli-skills.md",
 	} {

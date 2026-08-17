@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.7]
+
+### 变更
+
+- 新增 `skills-seed update`：从官方 GitHub Release 下载当前平台发布资产，校验 `checksums.txt` 后更新已安装的 CLI；支持 `--version` 指定版本，不读取或修改项目 `.skills-seed` 状态。
+- 为全局 `skills-seed-cli` 操作 Skill、命令参考、Wiki 和快速开始补充 CLI 更新路由、边界与恢复说明；普通用户安装和后续更新不再依赖 Go。
+
+### 修复
+
+- 为自更新链路增加发布资产命名、校验失败、缺失资产、损坏压缩包和平台不支持的保护，确保失败时保留原有可执行文件。
+
 ## [v0.20.6]
 
 ### 变更

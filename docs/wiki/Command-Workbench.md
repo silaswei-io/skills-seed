@@ -61,6 +61,7 @@
 | `hook install` | 在提交前提供交互式学习选择 | `skills-seed hook install` | 默认跳过；非交互环境不阻塞 |
 | `hook run` | 手动测试 hook 菜单 | `skills-seed hook run` | 只在交互环境有意义 |
 | `hook uninstall` | 移除当前项目 hook | `skills-seed hook uninstall` | 不删除学习数据 |
+| `update` | 更新已安装 CLI | `skills-seed update` | 仅替换可执行文件；不读取项目状态且不需要 Go |
 | `cli-skills install` | 安装全局 CLI 操作 Skill | `skills-seed cli-skills install --target auto` | 不管理项目生成 Skill |
 | `cli-skills uninstall` | 卸载该全局 CLI 操作 Skill | `skills-seed cli-skills uninstall --target codex` | 只删除固定全局目标 |
 | `log` | 查看最近学习与生成变更 | `skills-seed log` | 只读摘要，不是详细诊断日志 |

@@ -10,14 +10,19 @@
 - 已安装 `skills-seed`。
 - 已安装并可运行用于学习的 Agent CLI。分析 Agent 与生成 Skills 的目标可以不同。
 
-安装方式：
+从[最新发布](https://github.com/silaswei-io/skills-seed/releases/latest)下载当前系统和架构对应的压缩包，解压后将 `skills-seed`（Windows 为 `skills-seed.exe`）放入 `PATH`，再验证：
 
 ```bash
-go install github.com/silaswei-io/skills-seed/cmd/skills-seed@latest
 skills-seed --version
 ```
 
-从源码构建时：
+以后更新已安装 CLI：
+
+```bash
+skills-seed update
+```
+
+该命令下载并校验官方发布资产，不要求本机安装 Go，也不会影响项目 `.skills-seed`。从源码构建仅适用于开发者：
 
 ```bash
 go build -o skills-seed ./cmd/skills-seed

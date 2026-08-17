@@ -20,6 +20,7 @@
 | 规则 | [`skills-seed rule`](#skills-seed-rule) | 添加或更新用户权威规则 | `skills-seed rule --name <名称> --content "<Markdown>"` |
 | 项目画像 | [`skills-seed profile`](#skills-seed-profile) | 查看项目画像 | `skills-seed profile show` |
 | 一键同步 | [`skills-seed sync`](#skills-seed-sync) | 学习当前代码并生成 skills | `skills-seed sync` |
+| CLI 更新 | [`skills-seed update`](#skills-seed-update) | 从官方发布资产更新已安装 CLI | `skills-seed update` |
 | 变更记录 | [`skills-seed log`](#skills-seed-log) | 查看学习变更记录 | `skills-seed log` |
 | Git Hook | [`skills-seed hook`](#skills-seed-hook) | 安装、卸载或手动运行 pre-commit hook | `skills-seed hook install` |
 | 帮助 | [`skills-seed help`](#skills-seed-help) | 查看任意命令路径的帮助 | `skills-seed help learn current` |
@@ -31,6 +32,7 @@
 | 初始化单项目 | `skills-seed init --mode project` → `skills-seed sync` | 创建配置、学习当前代码并生成 skills |
 | 初始化 workspace | `skills-seed init --workspace` → `skills-seed workspace add .` → `skills-seed sync` | 根仓编排子项目学习，再生成子项目和根仓 skills |
 | 日常增量更新 | `skills-seed sync` | 学习当前变更，有实际学习变化时生成 skills |
+| 更新已安装 CLI | `skills-seed update` | 下载并校验官方发布二进制；不读取项目状态，也不需要 Go |
 | 只补充一条规则 | `skills-seed patterns add --content "<内容>"` → `skills-seed generate skills` | 用自然语言添加 pattern 后重新生成 |
 | 查询任务工作流 | `skills-seed workflow show --format json` | 返回轻量摘要；按需用 `workflow show <id> --format json` 读取详情 |
 | 更新任务工作流 | `skills-seed workflow --name <名称> --content "<Markdown>"` → `skills-seed generate skills` | 同名时默认与已有内容合并优化；`--overwrite` 仅用于完整替换 |
@@ -46,7 +48,7 @@
 
 | 命令 | 摘要 | 子命令 | 参数 |
 |---|---|---|---|
-| `skills-seed` | 为 AI 助手培育项目技能 | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `rule`, `sync`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | 为 AI 助手培育项目技能 | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed cli-skills` | 管理全局 skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | 安装/更新全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | 卸载全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
@@ -75,6 +77,7 @@
 | `skills-seed rule` | 管理用户权威规则 | `show [rule-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false`<br>`--path` = `[]`<br>`--project` = `[]` |
 | `skills-seed rule show [rule-id]` | 查看已有规则的范围或完整原文 | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed sync` | 一键同步 skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
+| `skills-seed update` | 从官方发布资产更新 Skills Seed | - | `--help, -h` = `false`<br>`--version` = `latest` |
 | `skills-seed workflow` | 管理用户工作流 | `show [workflow-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false` |
 | `skills-seed workflow show [workflow-id]` | 查看已有工作流的摘要或完整详情 | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed workspace` | 管理工作区子项目 | `add .\|project-id-or-path...` | `--help, -h` = `false` |
@@ -641,6 +644,19 @@ skills-seed sync --resume
 1. `sync` 默认会先执行 `learn current`；只有本轮学习写入新/更新模式或 workspace 关系产物变化时，才继续执行 `generate skills`。
 2. `sync --context` 不会添加用户模式，只影响本次学习分析；需要补充用户模式时使用 `patterns add` 或 `patterns update`。
 3. 规范化决策会立即写入 checkpoint；后续本地校验或入库失败时，`sync --resume` 会直接重放，不会重跑已完成证据包。
+
+### `skills-seed update`
+
+更新已安装的 Skills Seed CLI，不涉及任何项目学习状态。
+
+```bash
+skills-seed update
+skills-seed update --version v0.20.7
+```
+
+命令从官方 GitHub Release 下载当前系统和架构对应的发布包，并使用该 Release 的 `checksums.txt` 校验后再替换当前可执行文件。它不需要 Go、不会执行 `go install`，也不会读取或修改项目 `.skills-seed`。
+
+需要能够访问 GitHub Releases，且当前可执行文件所在目录可写。Windows 会在当前进程退出后完成替换；请重新启动 CLI 再执行下一条命令。
 
 ### `skills-seed hook`
 

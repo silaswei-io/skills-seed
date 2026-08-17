@@ -10,14 +10,19 @@ This page sets up one project. For a multi-repository root, see [Workspace](Work
 - Install `skills-seed`.
 - Install an Agent CLI that can perform learning. The analysis Agent and the generated-Skills target may differ.
 
-Install the CLI:
+Download the archive for the current system and architecture from the [latest release](https://github.com/silaswei-io/skills-seed/releases/latest), extract `skills-seed` (`skills-seed.exe` on Windows), and place it on `PATH`. Then verify it:
 
 ```bash
-go install github.com/silaswei-io/skills-seed/cmd/skills-seed@latest
 skills-seed --version
 ```
 
-Build from source:
+To update an installed CLI later:
+
+```bash
+skills-seed update
+```
+
+The command downloads and verifies an official release, requires no local Go installation, and does not affect project `.skills-seed` state. Building from source is for contributors:
 
 ```bash
 go build -o skills-seed ./cmd/skills-seed

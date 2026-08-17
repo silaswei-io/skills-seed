@@ -436,6 +436,7 @@ func renderSkillTree(provider string, meta metadataValues) ([]skillFile, error) 
 		{Template: "cli/references/preview", Output: "references/preview.md"},
 		{Template: "cli/references/hook", Output: "references/hook.md"},
 		{Template: "cli/references/profile", Output: "references/profile.md"},
+		{Template: "cli/references/update", Output: "references/update.md"},
 		{Template: "cli/references/log-help-version", Output: "references/log-help-version.md"},
 		{Template: "cli/references/cli-skills", Output: "references/cli-skills.md"},
 	}

@@ -19,6 +19,7 @@ import (
 	profilecmd "github.com/silaswei-io/skills-seed/internal/command/profile"
 	rulecmd "github.com/silaswei-io/skills-seed/internal/command/rule"
 	synccmd "github.com/silaswei-io/skills-seed/internal/command/sync"
+	updatecmd "github.com/silaswei-io/skills-seed/internal/command/update"
 	workflowcmd "github.com/silaswei-io/skills-seed/internal/command/workflow"
 	workspacecmd "github.com/silaswei-io/skills-seed/internal/command/workspace"
 	"github.com/silaswei-io/skills-seed/internal/container"
@@ -203,6 +204,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(previewcmd.Cmd(cont))
 	rootCmd.AddCommand(profilecmd.Cmd(cont))
 	rootCmd.AddCommand(hook.Cmd())
+	rootCmd.AddCommand(updatecmd.Cmd())
 }
 
 func commandNeedsProjectRuntime(args []string) bool {
@@ -242,6 +244,7 @@ var projectRuntimeExcludedCommands = map[string]struct{}{
 	"cli-skills": {},
 	"hook":       {},
 	"log":        {},
+	"update":     {},
 }
 
 var projectRuntimeCommands = map[string]struct{}{

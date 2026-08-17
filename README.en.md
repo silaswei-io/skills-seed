@@ -24,13 +24,12 @@ It is not a remote knowledge base, and it does not replace code review, tests, o
 Run this at a Git project root:
 
 ```bash
-go install github.com/silaswei-io/skills-seed/cmd/skills-seed@latest
 cd your-project
 skills-seed init
 skills-seed sync
 ```
 
-`init` selects project mode, analysis Agent, and output target. `sync` learns current code and refreshes generated Skills. See the [Getting Started Wiki page](docs/wiki/en/Getting-Started.md) for prerequisites, verification, and choosing between project and workspace mode.
+First download the binary for the current system and architecture from the [latest release](https://github.com/silaswei-io/skills-seed/releases/latest) and place it on `PATH`. `init` selects project mode, analysis Agent, and output target. `sync` learns current code and refreshes generated Skills. Later, `skills-seed update` downloads and verifies an official release without requiring Go. See the [Getting Started Wiki page](docs/wiki/en/Getting-Started.md) for prerequisites, verification, and choosing between project and workspace mode.
 
 ## What It Provides
 

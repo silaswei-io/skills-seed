@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.7]
+
+### Changes
+
+- Added `skills-seed update`: downloads the current platform asset from the official GitHub Release, verifies `checksums.txt`, and updates the installed CLI. It supports `--version` and never reads or modifies project `.skills-seed` state.
+- Added CLI-update routing, boundaries, and recovery guidance to the global `skills-seed-cli` operation Skill, command reference, Wiki, and quick start. Normal installation and future updates no longer require Go.
+
+### Fixes
+
+- Added safeguards for release-asset naming, checksum failure, missing assets, malformed archives, and unsupported platforms so a failed update preserves the existing executable.
+
 ## [v0.20.6]
 
 ### Changes

@@ -61,6 +61,7 @@ At a workspace root, a Rule's `--child`, `--project`, and `--path` must express 
 | `hook install` | Offering an interactive learning choice before commit | `skills-seed hook install` | Skips by default; never blocks non-interactive use |
 | `hook run` | Manually testing the hook menu | `skills-seed hook run` | Meaningful only interactively |
 | `hook uninstall` | Removing the current project's hook | `skills-seed hook uninstall` | Does not delete learned data |
+| `update` | Updating the installed CLI | `skills-seed update` | Replaces only the executable; needs neither Go nor project state |
 | `cli-skills install` | Installing the global CLI operation Skill | `skills-seed cli-skills install --target auto` | Does not manage generated project Skills |
 | `cli-skills uninstall` | Removing that global CLI operation Skill | `skills-seed cli-skills uninstall --target codex` | Deletes only the fixed global target |
 | `log` | Reading recent learning and generation changes | `skills-seed log` | Read-only summary, not detailed diagnostics |
