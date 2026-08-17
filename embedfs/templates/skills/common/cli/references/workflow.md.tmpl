@@ -4,6 +4,31 @@ Use `skills-seed workflow` to create or update durable task procedures.
 
 Workflows are for repeatable processes such as release, deployment, migration, code generation, review, or multi-step validation. They are rendered into generated Skills so future agents can follow them.
 
+## Path Base
+
+Use repository-relative paths throughout workflow content, including affected locations, verification targets, and script references:
+
+- A workspace-level workflow uses paths relative to the workspace root.
+- A project workflow, including a workspace `--child` workflow, uses paths relative to that target project's root.
+- Do not use paths relative to the current shell directory or absolute local-machine paths as workflow locations.
+
+The workflow's own `.skills-seed/` directory follows the same scope root.
+
+## Workflow Files and Scripts
+
+Each workflow owns its source directory:
+
+```text
+.skills-seed/workflows/<workflow-id>/
+├── WORKFLOW.md
+└── scripts/
+    └── <workflow-specific-script>
+```
+
+`WORKFLOW.md` is the procedure maintained by `skills-seed workflow`. When that procedure requires an executable helper, store the helper only under that workflow's `scripts/` directory. Do not place it in another workflow, a shared runtime directory, or generated Skill output.
+
+Use `skills-seed workflow show <workflow-id>` to confirm the stable ID before adding scripts. On `skills-seed generate skills`, the procedure is rendered to `workflows/<workflow-id>.md`; its scripts are copied to `scripts/workflows/<workflow-id>/`, preserving their relative paths, and the rendered workflow lists the copied script paths.
+
 ## Purpose
 
 `workflow` asks the configured Agent to organize user-maintained content into Markdown workflow knowledge:

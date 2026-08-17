@@ -147,13 +147,16 @@ func TestGenerateSkillsWritesReproducibleOutputManifest(t *testing.T) {
 	})
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
-	first, err := os.ReadFile(filepath.Join(outputPath, ".skills-seed-manifest.json"))
+	manifestPath := filepath.Join(projectRoot, ".skills-seed", "runtime", "generated-skills", "codex", "manifest.json")
+	first, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
+	require.NoFileExists(t, filepath.Join(outputPath, ".skills-seed-manifest.json"))
 	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
-	second, err := os.ReadFile(filepath.Join(outputPath, ".skills-seed-manifest.json"))
+	second, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
 	require.Equal(t, first, second)
 	require.Contains(t, string(second), "\"target_agent\": \"codex\"")
+	require.Contains(t, string(second), "\"output_path\": \".agents/skills/demo-dev\"")
 	require.Contains(t, string(second), "\"knowledge_snapshot_hash\"")
 }
 

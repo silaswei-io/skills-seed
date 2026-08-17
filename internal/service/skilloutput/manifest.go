@@ -11,9 +11,11 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
+	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 )
 
-const manifestFileName = ".skills-seed-manifest.json"
+const manifestFileName = "manifest.json"
 
 // Manifest 描述一次 Skills 输出对应的已核验知识和生成文件。
 type Manifest struct {
@@ -21,6 +23,7 @@ type Manifest struct {
 	KnowledgeSnapshotHash string         `json:"knowledge_snapshot_hash"`
 	ProgramVersion        string         `json:"program_version"`
 	TargetAgent           string         `json:"target_agent"`
+	OutputPath            string         `json:"output_path"`
 	TemplatesHash         string         `json:"templates_hash"`
 	OutputFiles           []ManifestFile `json:"output_files"`
 }
@@ -31,19 +34,25 @@ type ManifestFile struct {
 	SHA256 string `json:"sha256"`
 }
 
-// WriteManifest 在已完成的 staging 输出中写入可审计的版本清单。
-func WriteManifest(outputPath string, manifest Manifest) error {
+// RuntimeManifestPath 返回指定 Skills 目标的当前审计清单路径。
+func RuntimeManifestPath(seedPath, targetAgent string) string {
+	target := runtimefiles.SafePart(targetAgent, "agent")
+	return layout.New(seedPath).Runtime("generated-skills", target, manifestFileName)
+}
+
+// WriteManifest 根据 Skills 输出写入运行时审计清单。
+func WriteManifest(outputPath, manifestPath string, manifest Manifest) error {
 	files, err := outputFiles(outputPath)
 	if err != nil {
 		return err
 	}
-	manifest.SchemaVersion = 1
+	manifest.SchemaVersion = 2
 	manifest.OutputFiles = files
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return err
 	}
-	return fileio.WriteFileAtomic(filepath.Join(outputPath, manifestFileName), append(data, '\n'), 0o644)
+	return fileio.WriteFileAtomic(manifestPath, append(data, '\n'), 0o644)
 }
 
 func outputFiles(root string) ([]ManifestFile, error) {
@@ -52,7 +61,7 @@ func outputFiles(root string) ([]ManifestFile, error) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || entry.Name() == manifestFileName {
+		if entry.IsDir() {
 			return nil
 		}
 		info, err := entry.Info()

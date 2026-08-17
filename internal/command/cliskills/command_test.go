@@ -138,7 +138,10 @@ func TestRenderSkillDocumentsPublicCommands(t *testing.T) {
 		require.Contains(t, content, reference)
 	}
 	require.NotContains(t, content, "## Core Commands")
-	require.Contains(t, content, "Use only when the user explicitly asks to run, inspect, or troubleshoot a concrete skills-seed CLI command")
+	require.Contains(t, content, "Use when the user asks to operate skills-seed in a repository")
+	require.Contains(t, content, "maintain Patterns, Rules, or Workflows")
+	require.Contains(t, content, "添加工作流")
+	require.Contains(t, content, "an exact CLI subcommand is not required")
 	require.Contains(t, content, "Do not load it merely because a task mentions `skills-seed`")
 	require.NotContains(t, content, "operating, explaining, debugging, or automating")
 }
@@ -172,6 +175,11 @@ func TestRenderSkillTreeIncludesPerCommandReferences(t *testing.T) {
 	}
 	require.Contains(t, paths["references/operation-model.md"], "Command Groups")
 	require.Contains(t, paths["references/workflow.md"], "Use the detail form when complete workflow content is needed")
+	require.Contains(t, paths["references/workflow.md"], "workspace root")
+	require.Contains(t, paths["references/workflow.md"], "target project's root")
+	require.Contains(t, paths["references/workflow.md"], ".skills-seed/workflows/<workflow-id>/")
+	require.Contains(t, paths["references/workflow.md"], "└── scripts/")
+	require.Contains(t, paths["references/workflow.md"], "scripts/workflows/<workflow-id>/")
 	require.Contains(t, paths["references/rule.md"], ".skills-seed/rules/<id>/RULE.md")
 }
 

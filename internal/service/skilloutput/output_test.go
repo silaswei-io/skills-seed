@@ -11,28 +11,38 @@ import (
 
 func TestWriteManifestRecordsStableOutputHashes(t *testing.T) {
 	root := t.TempDir()
+	manifestPath := RuntimeManifestPath(filepath.Join(root, ".skills-seed"), "codex")
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "references"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte("skill\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "references", "example.md"), []byte("reference\n"), 0o644))
 
-	require.NoError(t, WriteManifest(root, Manifest{
+	require.NoError(t, WriteManifest(root, manifestPath, Manifest{
 		KnowledgeSnapshotHash: "knowledge-hash",
 		ProgramVersion:        "v1.2.3",
 		TargetAgent:           "codex",
+		OutputPath:            ".agents/skills/demo-dev",
 		TemplatesHash:         "templates-hash",
 	}))
 
-	data, err := os.ReadFile(filepath.Join(root, manifestFileName))
+	data, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
 	var manifest Manifest
 	require.NoError(t, json.Unmarshal(data, &manifest))
-	require.Equal(t, 1, manifest.SchemaVersion)
+	require.Equal(t, 2, manifest.SchemaVersion)
 	require.Equal(t, "knowledge-hash", manifest.KnowledgeSnapshotHash)
 	require.Equal(t, "codex", manifest.TargetAgent)
+	require.Equal(t, ".agents/skills/demo-dev", manifest.OutputPath)
+	require.NoFileExists(t, filepath.Join(root, manifestFileName))
 	require.Equal(t, []ManifestFile{
 		{Path: "SKILL.md", SHA256: "3088e5b60779a95389e4ed08d2ecee6eaac2311c590dab3f2e4beb3090a54f00"},
 		{Path: "references/example.md", SHA256: "4151674fad2310eaff3e54db63b6ee84a6c96a68dd46c0f8df5df620d57f899a"},
 	}, manifest.OutputFiles)
+}
+
+func TestRuntimeManifestPathUsesSafeTargetDirectory(t *testing.T) {
+	path := RuntimeManifestPath("/project/.skills-seed", "Custom Target/Agent")
+
+	require.Equal(t, "/project/.skills-seed/runtime/generated-skills/custom-target-agent/manifest.json", filepath.ToSlash(path))
 }
 
 func TestReplaceReplacesExistingDirectory(t *testing.T) {

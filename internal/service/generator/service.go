@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
@@ -154,6 +156,8 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 	}
 	templatesHash := metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS))
 	projectRoot := stringx.FirstNonBlank(projectConfig.RootPath, runtimecontext.ProjectRoot(ctx))
+	manifestPath := generatedSkillsManifestPath(projectRoot, targetAgent)
+	manifestOutputPath := generatedSkillsOutputPath(projectRoot, resolvedOutputPath)
 	snapshot := verifiedKnowledgeSnapshot{RenderProfile: profile}
 	if !resourceOnly {
 		var snapshotErr error
@@ -200,10 +204,14 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 			if err := skilloutput.AuditReadiness(staging, skillReadinessRequirements(plan, snapshot)); err != nil {
 				return err
 			}
-			return skilloutput.WriteManifest(staging, skilloutput.Manifest{
+			if manifestPath == "" {
+				return nil
+			}
+			return skilloutput.WriteManifest(staging, manifestPath, skilloutput.Manifest{
 				KnowledgeSnapshotHash: knowledgeSnapshotHash(snapshot),
 				ProgramVersion:        metadata.ProgramVersion,
 				TargetAgent:           targetAgent,
+				OutputPath:            manifestOutputPath,
 				TemplatesHash:         templatesHash,
 			})
 		})
@@ -228,6 +236,24 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 		"categories_count", len(domain.CategoryNamesWithPatterns(snapshot.Patterns)),
 	)
 	return nil
+}
+
+func generatedSkillsManifestPath(projectRoot, targetAgent string) string {
+	if strings.TrimSpace(projectRoot) == "" {
+		return ""
+	}
+	return skilloutput.RuntimeManifestPath(filepath.Join(projectRoot, ".skills-seed"), targetAgent)
+}
+
+func generatedSkillsOutputPath(projectRoot, outputPath string) string {
+	if strings.TrimSpace(projectRoot) == "" {
+		return ""
+	}
+	relative, err := filepath.Rel(projectRoot, outputPath)
+	if err != nil || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
+		return ""
+	}
+	return filepath.ToSlash(relative)
 }
 
 func skillReadinessRequirements(plan *skillgen.Plan, snapshot verifiedKnowledgeSnapshot) skilloutput.ReadinessRequirements {

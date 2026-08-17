@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.6]
+
+### 变更
+
+- 将生成 Skill 的审计清单从 Agent 消费目录迁移到 `.skills-seed/runtime/generated-skills/<target>/manifest.json`；清单现在记录实际输出目录，并继续校验完整生成文件哈希，避免运行时元数据污染生成 Skill。
+- 重构双语 Wiki 为按任务组织的操作手册，新增命令工作台、知识维护和学习失败人工修正路径，并统一页面的下一步、相关主题和语言导航。
+- 扩大全局 `skills-seed-cli` 的触发描述：初始化、学习、同步、生成、检查以及 Pattern、Rule、Workflow 维护等自然语言操作都会命中，无需用户准确说出 CLI 子命令。
+- 为 Workflow 明确脚本归属与路径基准：关联脚本保存于所属 `.skills-seed/workflows/<id>/scripts/`；workspace 工作流使用 workspace 根相对路径，项目及子项目工作流使用目标项目根相对路径，生成时脚本投影到 `scripts/workflows/<id>/`。
+
+### 修复
+
+- 修复全局 CLI Skill 对“添加工作流”“修正规则”等自然语言维护请求命中不足的问题，并统一 CLI Skill 中的增量文件预览示例。
+
 ## [v0.20.5]
 
 ### 修复

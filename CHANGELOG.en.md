@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.6]
+
+### Changes
+
+- Moved generated-Skill audit manifests out of Agent-consumed directories into `.skills-seed/runtime/generated-skills/<target>/manifest.json`. Manifests now record the actual output path while continuing to hash every generated file, so runtime metadata does not pollute generated Skills.
+- Reworked the bilingual Wiki into a task-oriented operating manual with Command Workbench, Knowledge Maintenance, and Learning Failures and Manual Repair paths, plus consistent Next, Related, and Language navigation.
+- Broadened the global `skills-seed-cli` trigger description. Natural-language operations for initialization, learning, sync, generation, inspection, and Pattern, Rule, or Workflow maintenance now match without requiring an exact CLI subcommand.
+- Defined Workflow script ownership and path bases: scripts belong in the owning `.skills-seed/workflows/<id>/scripts/`; workspace workflows use workspace-root-relative paths, while project and child workflows use target-project-root-relative paths. Generation projects scripts to `scripts/workflows/<id>/`.
+
+### Fixes
+
+- Fixed the global CLI Skill failing to match natural-language maintenance requests such as adding a Workflow or revising a Rule, and standardized its incremental file-preview examples.
+
 ## [v0.20.5]
 
 ### Fixes

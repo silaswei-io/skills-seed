@@ -51,7 +51,7 @@ The root workspace Skill routes tasks. Child Skills carry implementation rules. 
 
 If generated content looks stale:
 
-1. Run `skills-seed preview files --mode current`.
+1. Run `skills-seed preview files --mode incremental`.
 2. Run `skills-seed sync`, or `skills-seed learn current --force` when relearning is needed.
 3. Run `skills-seed generate skills`.
 4. Compare `skills-templates-sha256` metadata if template freshness is in doubt.
