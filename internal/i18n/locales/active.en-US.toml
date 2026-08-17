@@ -455,6 +455,9 @@ other = "{{.Label}} (attempt {{.Attempt}})"
 [AgentRetryReasonUnknown]
 other = "unknown reason"
 
+[AgentRetryReasonStructuredOutputRetriesExhausted]
+other = "Structured output repeatedly failed JSON Schema validation ({{.Subtype}})"
+
 [AgentRetryConsoleAgentFallback]
 other = "AI Agent"
 
@@ -1804,9 +1807,6 @@ other = "Pattern normalization result contains invalid or duplicate decisions; c
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "Project analysis prompt template rendering failed"
-
-[LoggerAgentRetry]
-other = "Agent call hit a retryable error, waiting before retry"
 
 [LoggerAgentRetryExhausted]
 other = "Agent call retry attempts exhausted"

@@ -19,6 +19,15 @@ func TestRetryReasonFromOutputExtractsClaudeAPIError(t *testing.T) {
 	require.NotContains(t, reason, "\n")
 }
 
+func TestRetryReasonFromOutputExplainsStructuredOutputExhaustion(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	stdout := `{"type":"result","subtype":"error_max_structured_output_retries","is_error":true,"result":""}`
+
+	reason := RetryReasonFromOutput(stdout, "")
+
+	require.Equal(t, "结构化输出多次未通过 JSON Schema 校验（error_max_structured_output_retries）", reason)
+}
+
 func TestHTTPStatusRetryableRegexRequiresHTTPContext(t *testing.T) {
 	require.False(t, HTTPStatusRetryableRegex.MatchString("line 429 in generated output"))
 	require.False(t, HTTPStatusRetryableRegex.MatchString("port 503 is used by the test server"))

@@ -168,6 +168,13 @@ func Diagnostic(msg string, args ...any) {
 	}
 }
 
+// DiagnosticError 记录只写入文件的错误诊断，不重复输出终端错误。
+func DiagnosticError(msg string, args ...any) {
+	if logger := currentLogger(); logger != nil {
+		logger.Error(msg, args...)
+	}
+}
+
 // Info 记录一般信息，并同步写入控制台和文件
 func Info(msg string, args ...any) {
 	// 控制台蓝色输出（用户提示） - 只输出消息本身
@@ -185,6 +192,15 @@ func InfoAfterProgress(msg string, args ...any) {
 
 	if logger := currentLogger(); logger != nil {
 		logger.Info(msg, args...)
+	}
+}
+
+// ErrorAfterProgress 记录错误；终端输出等待当前进度刷新结束，文件使用 ERROR 级别。
+func ErrorAfterProgress(msg string, args ...any) {
+	progress.PrintConsoleLineAfterProgress(colorize(msg, ansiRed))
+
+	if logger := currentLogger(); logger != nil {
+		logger.Error(msg, args...)
 	}
 }
 

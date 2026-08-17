@@ -115,11 +115,13 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 		})
 
 		if retryable {
-			logger.Diagnostic(i18n.Get("LoggerAgentClaudeCallRetryable"),
+			reason := agent.RetryReasonFromOutput(stdoutStr, stderrStr)
+			logger.DiagnosticError(i18n.Get("LoggerAgentClaudeCallRetryable"),
 				"agent", c.Name(),
 				"operation", operation,
 				"attempt", attempt,
 				"error", err,
+				"reason", reason,
 				"duration", duration,
 				"stdout_length", len(stdoutStr),
 				"stderr_length", len(stderrStr),

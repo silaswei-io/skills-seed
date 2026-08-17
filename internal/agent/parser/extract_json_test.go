@@ -78,7 +78,7 @@ func TestParsePlanLearningAgendaResultKeepsCoverageReceipt(t *testing.T) {
 func TestParseReviewKnowledgeResultKeepsRevision(t *testing.T) {
 	result, err := ParseReviewKnowledgeResult(`{"decisions":[{
 		"candidate_id":"bounded-behavior","verdict":"revise","reason_code":"overclaimed",
-		"reason":"Narrow the claim.","business_method_verdict":"remove",
+		"reason":"Narrow the claim.",
 		"revision":{"name":"Bounded behavior","category":"business","description":"Observed locally.","rule":"Inspect before reuse.","confidence":0.86,"knowledge_flags":["operational_risk"]}
 	}]}`)
 
@@ -89,11 +89,10 @@ func TestParseReviewKnowledgeResultKeepsRevision(t *testing.T) {
 	require.Equal(t, []string{domain.KnowledgeFlagOperationalRisk}, result.Decisions[0].Revision.KnowledgeFlags)
 }
 
-func TestParseReviewKnowledgeResultIgnoresInactiveConditionalFields(t *testing.T) {
+func TestParseReviewKnowledgeResultIgnoresRevisionOutsideRevise(t *testing.T) {
 	result, err := ParseReviewKnowledgeResult(`{"decisions":[{
 		"candidate_id":"bounded-behavior","verdict":"accept","reason_code":"accepted",
-		"reason":"The evidence supports the candidate.","business_method_verdict":"remove",
-		"business_method":{"name":"Unused","code_location":{"current_location":"src/state.ext:24"},"description":"Unused.","usage":"Unused.","type":"domain","function":"Unused()","prerequisites":"None.","returns":"Nothing."},
+		"reason":"The evidence supports the candidate.",
 		"revision":{"name":"Unused","category":"business","description":"Unused.","rule":"Unused.","confidence":0.5,"knowledge_flags":[]}
 	}]}`)
 
@@ -106,7 +105,7 @@ func TestParseReviewKnowledgeResultIgnoresInactiveConditionalFields(t *testing.T
 func TestParseReviewKnowledgeResultSetsBusinessMethod(t *testing.T) {
 	result, err := ParseReviewKnowledgeResult(`{"decisions":[{
 		"candidate_id":"state-transition","verdict":"accept","reason_code":"accepted",
-		"reason":"The entry is directly evidenced.","business_method_verdict":"set",
+		"reason":"The entry is directly evidenced.",
 		"business_method":{"name":"State.Transition","code_location":{"current_location":"src/state.ext:24"},"description":"Validates a transition.","usage":"Use for state changes.","type":"domain","function":"Transition(next State) error","prerequisites":"Allowed current and next states.","returns":"Nil or a validation error."}
 	}]}`)
 

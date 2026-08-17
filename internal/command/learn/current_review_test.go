@@ -166,7 +166,7 @@ func acceptKnowledgeCandidates(candidates []domain.Pattern) *agent.ReviewKnowled
 	for _, candidate := range candidates {
 		decisions = append(decisions, agent.KnowledgeReviewDecision{
 			CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-			Reason: "The evidence supports the candidate.", BusinessMethodVerdict: "remove",
+			Reason: "The evidence supports the candidate.",
 		})
 	}
 	return &agent.ReviewKnowledgeResult{Decisions: decisions}

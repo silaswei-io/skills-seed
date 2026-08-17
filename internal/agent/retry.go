@@ -261,7 +261,6 @@ func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 	if reporter := retryReporterFromContext(ctx); reporter != nil {
 		reporter(info)
 	}
-	logger.InfoAfterProgress(RetryConsoleMessage(info))
 	fields := []any{
 		"agent", info.AgentName,
 		"operation", info.Operation,
@@ -273,7 +272,7 @@ func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 	if info.CallDuration > 0 {
 		fields = append(fields, "call_duration_seconds", info.CallDuration.Seconds())
 	}
-	logger.Diagnostic(i18n.Get("LoggerAgentRetry"), fields...)
+	logger.ErrorAfterProgress(RetryConsoleMessage(info), fields...)
 }
 
 func ReportRetryAttemptForContext(ctx context.Context, info RetryInfo) {
@@ -378,6 +377,12 @@ func retryReasonFromJSON(output string) string {
 func retryReasonFromValue(value interface{}) string {
 	switch typed := value.(type) {
 	case map[string]interface{}:
+		if subtype, _ := typed["subtype"].(string); strings.HasPrefix(subtype, "error_") {
+			if subtype == "error_max_structured_output_retries" {
+				return i18n.GetWithParams("AgentRetryReasonStructuredOutputRetriesExhausted", map[string]interface{}{"Subtype": subtype})
+			}
+			return subtype
+		}
 		for _, key := range []string{"result", "message", "error", "stderr", "detail"} {
 			if reason := retryReasonFromValue(typed[key]); reason != "" {
 				return reason

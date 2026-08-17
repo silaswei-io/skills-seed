@@ -171,13 +171,12 @@ type KnowledgeRevisionOutput struct {
 }
 
 type KnowledgeReviewDecisionOutput struct {
-	CandidateID           string                   `json:"candidate_id" jsonschema_description:"exact id from one input candidate"`
-	Verdict               string                   `json:"verdict" jsonschema:"enum=accept,enum=revise,enum=reject" jsonschema_description:"accept|revise|reject"`
-	ReasonCode            string                   `json:"reason_code" jsonschema:"enum=accepted,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overclaimed,enum=incorrect_boundary" jsonschema_description:"structured reason for the verdict"`
-	Reason                string                   `json:"reason" jsonschema_description:"concise evidence-based review reason"`
-	BusinessMethodVerdict string                   `json:"business_method_verdict" jsonschema:"enum=remove,enum=set" jsonschema_description:"remove an absent or unsuitable entry, or set a complete source-backed entry"`
-	BusinessMethod        *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"complete reviewed capability entry required only when business_method_verdict is set; its source-confirmed location must come from this candidate's evidence locations or existing capability entry; omit for remove"`
-	Revision              *KnowledgeRevisionOutput `json:"revision,omitempty" jsonschema_description:"required only for revise; omit for accept and reject"`
+	CandidateID    string                   `json:"candidate_id" jsonschema_description:"exact id from one input candidate"`
+	Verdict        string                   `json:"verdict" jsonschema:"enum=accept,enum=revise,enum=reject" jsonschema_description:"accept|revise|reject"`
+	ReasonCode     string                   `json:"reason_code" jsonschema:"enum=accepted,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overclaimed,enum=incorrect_boundary" jsonschema_description:"structured reason for the verdict"`
+	Reason         string                   `json:"reason" jsonschema_description:"concise evidence-based review reason"`
+	BusinessMethod *BusinessMethodOutput    `json:"business_method,omitempty" jsonschema_description:"complete reviewed capability replacement independently confirmed from the candidate's evidence or its directly referenced source chain; omit to remove the entry, never to preserve it implicitly"`
+	Revision       *KnowledgeRevisionOutput `json:"revision,omitempty" jsonschema_description:"required only for revise; omit for accept and reject"`
 }
 
 type ReviewKnowledgeOutput struct {

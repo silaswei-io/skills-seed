@@ -71,8 +71,8 @@ func applyKnowledgeReview(candidates []domain.Pattern, decisions []agent.Knowled
 		if strings.TrimSpace(decision.Reason) == "" || strings.TrimSpace(decision.ReasonCode) == "" {
 			return nil, fmt.Errorf("knowledge review decision %q has no reason", candidate.ID)
 		}
-		if decision.Verdict == "reject" && decision.BusinessMethodVerdict != "remove" {
-			return nil, fmt.Errorf("rejected knowledge %q must remove its business method", candidate.ID)
+		if decision.Verdict == "reject" && decision.BusinessMethod != nil {
+			return nil, fmt.Errorf("rejected knowledge %q unexpectedly contains a business method", candidate.ID)
 		}
 		method, err := reviewedBusinessMethod(candidate, decision)
 		if err != nil {
@@ -120,41 +120,15 @@ func applyKnowledgeReview(candidates []domain.Pattern, decisions []agent.Knowled
 }
 
 func reviewedBusinessMethod(candidate domain.Pattern, decision agent.KnowledgeReviewDecision) (*domain.BusinessMethod, error) {
-	switch decision.BusinessMethodVerdict {
-	case "remove":
-		if decision.BusinessMethod != nil {
-			return nil, fmt.Errorf("knowledge review decision %q removes a business method but also returns a replacement", candidate.ID)
-		}
+	if decision.BusinessMethod == nil {
 		return nil, nil
-	case "set":
-		if decision.BusinessMethod == nil {
-			return nil, fmt.Errorf("knowledge review decision %q sets a business method without a replacement", candidate.ID)
-		}
-		method := cloneBusinessMethod(decision.BusinessMethod)
-		if !domain.IsRouteableBusinessMethod(*method) || (method.Type != "domain" && method.Type != "common") {
-			return nil, fmt.Errorf("knowledge review decision %q sets an incomplete business method", candidate.ID)
-		}
-		if businessMethodWithinCandidateEvidence(candidate, *method) {
-			return method, nil
-		}
-		return nil, fmt.Errorf("knowledge review decision %q sets a business method outside candidate evidence", candidate.ID)
-	default:
-		return nil, fmt.Errorf("knowledge review decision %q has invalid business method verdict %q", candidate.ID, decision.BusinessMethodVerdict)
 	}
-}
-
-func businessMethodWithinCandidateEvidence(candidate domain.Pattern, method domain.BusinessMethod) bool {
-	location := pathx.CleanEvidenceLocationPath(method.DisplayLocation())
-	if location == "" {
-		return false
+	method := cloneBusinessMethod(decision.BusinessMethod)
+	if !domain.IsRouteableBusinessMethod(*method) || (method.Type != "domain" && method.Type != "common") {
+		return nil, fmt.Errorf("knowledge review decision %q sets an incomplete business method", candidate.ID)
 	}
-	if candidate.BusinessMethod != nil && location == pathx.CleanEvidenceLocationPath(candidate.BusinessMethod.DisplayLocation()) {
-		return true
+	if pathx.CleanEvidenceLocationPath(method.DisplayLocation()) == "" {
+		return nil, fmt.Errorf("knowledge review decision %q sets an invalid business method location", candidate.ID)
 	}
-	for _, evidence := range candidate.EvidenceLocations {
-		if location == pathx.CleanEvidenceLocationPath(evidence.Path) {
-			return true
-		}
-	}
-	return false
+	return method, nil
 }

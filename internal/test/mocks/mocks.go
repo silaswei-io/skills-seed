@@ -63,16 +63,14 @@ func (m *MockAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowle
 	}
 	decisions := make([]agent.KnowledgeReviewDecision, 0, len(req.Candidates))
 	for _, candidate := range req.Candidates {
-		methodVerdict := "remove"
 		var method *domain.BusinessMethod
 		if candidate.BusinessMethod != nil && domain.IsRouteableBusinessMethod(*candidate.BusinessMethod) {
-			methodVerdict = "set"
 			copied := *candidate.BusinessMethod
 			method = &copied
 		}
 		decisions = append(decisions, agent.KnowledgeReviewDecision{
 			CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-			Reason: "Mock accepts the source-backed candidate.", BusinessMethodVerdict: methodVerdict, BusinessMethod: method,
+			Reason: "Mock accepts the source-backed candidate.", BusinessMethod: method,
 		})
 	}
 	return &agent.ReviewKnowledgeResult{Decisions: decisions}, nil

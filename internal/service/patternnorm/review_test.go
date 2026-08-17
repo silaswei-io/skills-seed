@@ -19,7 +19,7 @@ func TestApplyKnowledgeReviewRevisesTextAndPreservesOwnership(t *testing.T) {
 
 	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: "bounded-behavior", Verdict: "revise", ReasonCode: "overclaimed",
-		Reason: "The evidence supports local behavior, not a global guarantee.", BusinessMethodVerdict: "remove",
+		Reason: "The evidence supports local behavior, not a global guarantee.",
 		Revision: &agent.KnowledgeRevision{
 			Name: "Bounded behavior", Category: string(domain.CategoryBusiness),
 			Description: "The local implementation performs the observed behavior.",
@@ -51,7 +51,7 @@ func TestApplyKnowledgeReviewSetsVerifiedBusinessMethod(t *testing.T) {
 
 	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-		Reason: "The source proves a reusable state transition entry.", BusinessMethodVerdict: "set", BusinessMethod: method,
+		Reason: "The source proves a reusable state transition entry.", BusinessMethod: method,
 	}})
 
 	require.NoError(t, err)
@@ -74,14 +74,14 @@ func TestApplyKnowledgeReviewAllowsCandidateBusinessMethodLocationOutsideGeneral
 
 	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-		Reason: "The candidate capability location is directly verified.", BusinessMethodVerdict: "set", BusinessMethod: &reviewed,
+		Reason: "The candidate capability location is directly verified.", BusinessMethod: &reviewed,
 	}})
 
 	require.NoError(t, err)
 	require.Equal(t, reviewed.Description, result[0].BusinessMethod.Description)
 }
 
-func TestApplyKnowledgeReviewRejectsBusinessMethodOutsideCandidateEvidence(t *testing.T) {
+func TestApplyKnowledgeReviewAllowsReviewedDirectDependencyAsBusinessMethod(t *testing.T) {
 	candidate := currentPattern("state-transition", 0.95, "src/state.ext")
 	method := &domain.BusinessMethod{
 		Name: "State.Transition", CodeLocation: domain.CodeLocation{CurrentLocation: "src/other.ext:24"},
@@ -91,12 +91,31 @@ func TestApplyKnowledgeReviewRejectsBusinessMethodOutsideCandidateEvidence(t *te
 		Returns:       "Returns nil after applying the transition or a validation error.",
 	}
 
-	_, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
+	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-		Reason: "The source proves a reusable state transition entry.", BusinessMethodVerdict: "set", BusinessMethod: method,
+		Reason: "The candidate evidence calls the independently verified reusable state transition entry.", BusinessMethod: method,
 	}})
 
-	require.ErrorContains(t, err, "outside candidate evidence")
+	require.NoError(t, err)
+	require.Equal(t, method.CodeLocation.CurrentLocation, result[0].BusinessMethod.CodeLocation.CurrentLocation)
+}
+
+func TestApplyKnowledgeReviewRejectsUnsafeBusinessMethodLocation(t *testing.T) {
+	candidate := currentPattern("state-transition", 0.95, "src/state.ext")
+	method := &domain.BusinessMethod{
+		Name: "State.Transition", CodeLocation: domain.CodeLocation{CurrentLocation: "/outside/project/state.ext:24"},
+		Description: "Validates and applies a state transition.", Usage: "Use when changing the resource state.",
+		Type: "domain", Function: "Transition(next State) error",
+		Prerequisites: "The current and next states must form an allowed transition.",
+		Returns:       "Returns nil after applying the transition or a validation error.",
+	}
+
+	_, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
+		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
+		Reason: "The source proves a reusable state transition entry.", BusinessMethod: method,
+	}})
+
+	require.ErrorContains(t, err, "invalid business method location")
 }
 
 func TestReviewCurrentKnowledgeKeepsCompleteFocusInOneRequest(t *testing.T) {
@@ -119,7 +138,7 @@ func TestReviewCurrentKnowledgeKeepsCompleteFocusInOneRequest(t *testing.T) {
 			receivedIDs = append(receivedIDs, candidate.ID)
 			decisions = append(decisions, agent.KnowledgeReviewDecision{
 				CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-				Reason: "The evidence supports the candidate.", BusinessMethodVerdict: "remove",
+				Reason: "The evidence supports the candidate.",
 			})
 		}
 		return &agent.ReviewKnowledgeResult{Decisions: decisions}, nil
@@ -143,7 +162,7 @@ func TestApplyKnowledgeReviewRejectsUnknownFlag(t *testing.T) {
 
 	_, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-		Reason: "The evidence supports the candidate.", BusinessMethodVerdict: "remove",
+		Reason: "The evidence supports the candidate.",
 	}})
 
 	require.ErrorContains(t, err, "invalid flags")
@@ -154,7 +173,7 @@ func TestApplyKnowledgeReviewRejectsUnknownRevisionFlag(t *testing.T) {
 
 	_, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: candidate.ID, Verdict: "revise", ReasonCode: "overclaimed",
-		Reason: "The wording needs revision.", BusinessMethodVerdict: "remove",
+		Reason: "The wording needs revision.",
 		Revision: &agent.KnowledgeRevision{
 			Name: candidate.Name, Category: string(candidate.Category), Description: candidate.Description,
 			Rule: candidate.Rule, Confidence: candidate.Confidence, KnowledgeFlags: []string{"invented"},
@@ -169,7 +188,7 @@ func TestApplyKnowledgeReviewRejectsCandidate(t *testing.T) {
 
 	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
 		CandidateID: candidate.ID, Verdict: "reject", ReasonCode: "low_signal_boilerplate",
-		Reason: "The evidence is a thin forwarding wrapper.", BusinessMethodVerdict: "remove",
+		Reason: "The evidence is a thin forwarding wrapper.",
 	}})
 
 	require.NoError(t, err)

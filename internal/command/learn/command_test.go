@@ -619,7 +619,7 @@ func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testin
 		for _, candidate := range req.Candidates {
 			decisions = append(decisions, agent.KnowledgeReviewDecision{
 				CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
-				Reason: "The source supports the candidate.", BusinessMethodVerdict: "remove",
+				Reason: "The source supports the candidate.",
 			})
 		}
 		return &agent.ReviewKnowledgeResult{Decisions: decisions}, nil

@@ -294,13 +294,12 @@ type KnowledgeRevision struct {
 
 // KnowledgeReviewDecision 是单个候选的独立审查结论。
 type KnowledgeReviewDecision struct {
-	CandidateID           string
-	Verdict               string
-	ReasonCode            string
-	Reason                string
-	BusinessMethodVerdict string
-	BusinessMethod        *domain.BusinessMethod
-	Revision              *KnowledgeRevision
+	CandidateID    string
+	Verdict        string
+	ReasonCode     string
+	Reason         string
+	BusinessMethod *domain.BusinessMethod
+	Revision       *KnowledgeRevision
 }
 
 // ReviewKnowledgeResult 包含每个输入候选的一对一审查回执。

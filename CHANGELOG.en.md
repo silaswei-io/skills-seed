@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.2]
+
+### Changes
+
+- Simplified the capability-entry contract in independent knowledge review: a complete `business_method` sets or replaces the entry, while omission removes it. This eliminates contradictory state/object output combinations. The review prompt now requires opening an exactly defined entry from the directly related source chain and retaining its full signature, prerequisites, and result semantics.
+
+### Fixes
+
+- Fixed valid reusable entries being rejected when candidate evidence is in a caller while the capability definition is in a directly related implementation. Local validation still requires a complete capability contract and safe project-relative location; independent source review confirms semantic relevance.
+- Fixed retryable Claude/Codex failures being recorded as `ERROR` while displaying only truncated raw JSON. Structured-output Schema retry exhaustion is now recognized, and localized causes, invocation details, and raw archive paths are preserved for terminal and structured-log diagnostics.
+
 ## [v0.20.1]
 
 ### Changes

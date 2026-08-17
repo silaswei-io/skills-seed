@@ -60,14 +60,13 @@ func ParseReviewKnowledgeResult(output string) (*agent.ReviewKnowledgeResult, er
 	result := &agent.ReviewKnowledgeResult{Decisions: make([]agent.KnowledgeReviewDecision, 0, len(payload.Decisions))}
 	for _, item := range payload.Decisions {
 		decision := agent.KnowledgeReviewDecision{
-			CandidateID:           item.CandidateID,
-			Verdict:               item.Verdict,
-			ReasonCode:            item.ReasonCode,
-			Reason:                item.Reason,
-			BusinessMethodVerdict: item.BusinessMethodVerdict,
+			CandidateID: item.CandidateID,
+			Verdict:     item.Verdict,
+			ReasonCode:  item.ReasonCode,
+			Reason:      item.Reason,
 		}
-		// 可选字段由各自 verdict 激活，忽略 Agent 在其他分支返回的冗余对象。
-		if item.BusinessMethodVerdict == "set" {
+		// 能力入口只有“完整替换”与“省略即移除”两种状态，避免判定字段与对象互相矛盾。
+		if item.BusinessMethod != nil {
 			decision.BusinessMethod = businessMethodToDomain(item.BusinessMethod, now)
 		}
 		if item.Verdict == "revise" && item.Revision != nil {

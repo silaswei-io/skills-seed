@@ -455,6 +455,9 @@ other = "{{.Label}}（第{{.Attempt}}次尝试）"
 [AgentRetryReasonUnknown]
 other = "未捕获到具体原因"
 
+[AgentRetryReasonStructuredOutputRetriesExhausted]
+other = "结构化输出多次未通过 JSON Schema 校验（{{.Subtype}}）"
+
 [AgentRetryConsoleAgentFallback]
 other = "AI Agent"
 
@@ -1804,9 +1807,6 @@ other = "模式规范化结果包含无效或重复决策，已整理后继续"
 
 [LoggerAgentProjectPromptRenderFailed]
 other = "项目分析提示词模板渲染失败"
-
-[LoggerAgentRetry]
-other = "Agent 调用出现可重试错误，等待后重试"
 
 [LoggerAgentRetryExhausted]
 other = "Agent 调用重试次数已耗尽"

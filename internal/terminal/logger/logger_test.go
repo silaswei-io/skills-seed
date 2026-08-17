@@ -56,3 +56,21 @@ func TestWithScopedLogCapturesWorkerLogsAndFinalError(t *testing.T) {
 	require.Contains(t, text, wantErr.Error())
 	require.Contains(t, strings.ToLower(text), "error")
 }
+
+func TestErrorDiagnosticsUseErrorLevelAndPreserveReason(t *testing.T) {
+	logDir := t.TempDir()
+	require.NoError(t, Init(logDir, "retry", INFO))
+	logPath := CurrentLogPath()
+
+	DiagnosticError("agent invocation failed", "reason", "structured output schema validation exhausted")
+	ErrorAfterProgress("agent call will retry", "reason", "structured output schema validation exhausted")
+	require.NoError(t, Close())
+
+	content, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	text := string(content)
+	require.Equal(t, 2, strings.Count(text, `"level":"ERROR"`))
+	require.Contains(t, text, `"msg":"agent invocation failed"`)
+	require.Contains(t, text, `"msg":"agent call will retry"`)
+	require.Contains(t, text, `"reason":"structured output schema validation exhausted"`)
+}

@@ -113,12 +113,14 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 		})
 
 		if retryable {
-			logger.Diagnostic(i18n.Get("LoggerAgentCodexCallRetryable"),
+			reason := agent.RetryReasonFromOutput(stdoutStr, stderrStr)
+			logger.DiagnosticError(i18n.Get("LoggerAgentCodexCallRetryable"),
 				"agent", c.Name(),
 				"operation", operation,
 				"attempt", attempt,
 				"duration", duration,
 				"error", err,
+				"reason", reason,
 				"stdout_length", len(stdoutStr),
 				"stderr_length", len(stderrStr),
 				"raw_output_path", archive.RawPath,
