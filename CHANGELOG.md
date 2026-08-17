@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.5]
+
+### 修复
+
+- 修复 Codex 严格结构化输出提供方拒绝含可选字段的 JSON Schema。Codex 现在使用通用严格 Schema 投影：递归补全对象 `required`，并以可空值或空集合保留原始 DTO 的可选语义，同时校正可选枚举的 `null` 约束。
+
 ## [v0.20.4]
 
 ### 变更

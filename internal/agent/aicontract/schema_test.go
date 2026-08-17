@@ -43,6 +43,42 @@ func TestStructuredOutputSchemaOmitsUnsupportedMetaSchema(t *testing.T) {
 	}
 }
 
+func TestStrictStructuredOutputSchemaRequiresEveryObjectProperty(t *testing.T) {
+	for name := range outputTypes {
+		data, err := StrictStructuredOutputSchema(name)
+
+		require.NoError(t, err, name)
+		var schema map[string]any
+		require.NoError(t, json.Unmarshal([]byte(data), &schema), name)
+		requireStrictRequiredProperties(t, schema, name)
+	}
+}
+
+func TestStrictStructuredOutputSchemaKeepsOptionalFocusFieldsRepresentable(t *testing.T) {
+	plan := decodeStrictSchema(t, ContractPlanLearningAgenda)
+	focus := mustFindSchemaContainer(t, plan, "attributes")
+	requireRequiredFields(t, focus, "id", "name", "route_terms", "attributes", "risk_signals", "analysis_depth", "entry_paths", "related_paths", "scope_reason")
+
+	attributes, _, ok := findSchemaPropertyWithContainer(plan, "attributes")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"array", "null"}, schemaStringList(attributes["type"]))
+	require.Contains(t, attributes["description"], "Return an empty array when no value applies")
+
+	scopeReason, _, ok := findSchemaPropertyWithContainer(plan, "scope_reason")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"string", "null"}, schemaStringList(scopeReason["type"]))
+	require.Contains(t, scopeReason["description"], "Return null when no value applies")
+}
+
+func TestStrictStructuredOutputSchemaAllowsNullForOptionalEnums(t *testing.T) {
+	authority := decodeStrictSchema(t, ContractAuthorityExtraction)
+	commandPolicy, container, ok := findSchemaPropertyWithContainer(authority, "command_policy")
+	require.True(t, ok)
+	require.Contains(t, schemaStringList(container["required"]), "command_policy")
+	require.ElementsMatch(t, []string{"string", "null"}, schemaStringList(commandPolicy["type"]))
+	require.Contains(t, commandPolicy["enum"].([]any), nil)
+}
+
 func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	profile := decodeSchema(t, ContractProjectProfile)
 	profileProperties := profile["properties"].(map[string]any)
@@ -246,6 +282,43 @@ func decodeSchema(t *testing.T, name string) map[string]any {
 	var schema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(data), &schema))
 	return schema
+}
+
+func decodeStrictSchema(t *testing.T, name string) map[string]any {
+	t.Helper()
+	data, err := StrictStructuredOutputSchema(name)
+	require.NoError(t, err)
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+	return schema
+}
+
+func requireStrictRequiredProperties(t *testing.T, schema map[string]any, name string) {
+	t.Helper()
+	properties, _ := schema["properties"].(map[string]any)
+	if len(properties) > 0 {
+		names := make([]string, 0, len(properties))
+		for propertyName := range properties {
+			names = append(names, propertyName)
+		}
+		require.ElementsMatch(t, names, schemaStringList(schema["required"]), name)
+		for _, property := range properties {
+			propertySchema, ok := property.(map[string]any)
+			require.True(t, ok, name)
+			requireStrictRequiredProperties(t, propertySchema, name)
+		}
+	}
+	if items, ok := schema["items"].(map[string]any); ok {
+		requireStrictRequiredProperties(t, items, name)
+	}
+	for _, keyword := range []string{"allOf", "anyOf", "oneOf"} {
+		variants, _ := schema[keyword].([]any)
+		for _, variant := range variants {
+			if variantSchema, ok := variant.(map[string]any); ok {
+				requireStrictRequiredProperties(t, variantSchema, name)
+			}
+		}
+	}
 }
 
 func schemaStringList(value any) []string {

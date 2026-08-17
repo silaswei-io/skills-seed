@@ -42,7 +42,7 @@ func (c *CodexAgent) callCodexWithOptions(ctx context.Context, operation, prompt
 }
 
 func (c *CodexAgent) callCodexResult(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (codexCallResult, error) {
-	outputSchema, err := aicontract.StructuredOutputSchemaWithOptions(outputContract, opts)
+	outputSchema, err := aicontract.StrictStructuredOutputSchemaWithOptions(outputContract, opts)
 	if err != nil {
 		return codexCallResult{}, err
 	}

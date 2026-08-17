@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.5]
+
+### Fixes
+
+- Fixed strict Codex structured-output providers rejecting JSON Schemas with optional fields. Codex now uses a general strict-schema projection that recursively completes object `required` lists, preserves optional DTO semantics with nullable values or empty collections, and aligns optional enums with `null`.
+
 ## [v0.20.4]
 
 ### Changes
