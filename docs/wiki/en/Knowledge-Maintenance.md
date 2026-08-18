@@ -14,6 +14,21 @@
 | Release, acceptance, deployment, or other task steps | `workflow` | Let source learning infer it as fact |
 | Authority files, structure, or module map changed | `learn current --profile refresh` | Hand-edit profile JSON |
 
+## Reset Knowledge Before Relearning
+
+When incorrect or stale knowledge affects a whole set of resources and individual repair is no longer appropriate, use `reset` to clear the relevant source of truth before relearning. Selective reset keeps config, durable Context, and generated Skills; removed resources first move to `.skills-seed.backup/<timestamp>/knowledge/`.
+
+| Goal | Command | Next action |
+|---|---|---|
+| Relearn everything from clean knowledge | `skills-seed reset all` | `skills-seed sync` |
+| Relearn only source patterns, profiles, and analysis state | `skills-seed reset patterns` | `skills-seed sync` |
+| Remove only team Rules | `skills-seed reset rules` | Add needed `rule` resources again, then `generate skills` |
+| Remove only task Workflows | `skills-seed reset workflows` | Add needed `workflow` resources again, then `generate skills` |
+
+`patterns` also clears project profiles, file snapshots, resumable checkpoints, and learning history so the next `sync` cannot reuse stale analysis. Scopes can be combined, such as `skills-seed reset patterns rules`; `all` must stand alone, and a selective reset cannot be combined with `--mode`, `--workspace`, `--locale`, or `--skills-locale`.
+
+For one pattern, prefer `patterns update`; for interrupted learning, prefer `sync --resume`. Full `skills-seed reset` without a scope is for reinitializing or switching between project and workspace modes.
+
 ## Manual Pattern-Maintenance Loop
 
 1. Run `skills-seed patterns stats` to inspect count, categories, and quality indicators.

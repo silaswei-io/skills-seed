@@ -11,7 +11,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | Basics | [`skills-seed`](#skills-seed) | View global help, version, and template hashes | `skills-seed --help` |
 | Initialization | [`skills-seed init`](#skills-seed-init) | Initialize a single project or workspace root | `skills-seed init --mode project` |
 | Workspace | [`skills-seed workspace`](#skills-seed-workspace) | Add or manage workspace child projects | `skills-seed workspace add .` |
-| Reset | [`skills-seed reset`](#skills-seed-reset) | Back up and recreate `.skills-seed` | `skills-seed reset --mode workspace` |
+| Reset | [`skills-seed reset`](#skills-seed-reset) | Reinitialize or reset project knowledge by scope | `skills-seed reset all` |
 | Learning | [`skills-seed learn`](#skills-seed-learn) | Learn patterns from current code | `skills-seed learn current` |
 | Generation | [`skills-seed generate`](#skills-seed-generate) | Generate skills from verified knowledge and user resources | `skills-seed generate skills` |
 | Preview | [`skills-seed preview`](#skills-seed-preview) | Preview files selected for full or incremental analysis | `skills-seed preview files` |
@@ -48,7 +48,7 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed cli-skills` | Manage global skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | Install/update global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | Uninstall global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
@@ -73,7 +73,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
 | `skills-seed profile` | Show the project profile | `show` | `--help, -h` = `false` |
 | `skills-seed profile show` | Show the current project profile summary | - | `--help, -h` = `false` |
-| `skills-seed reset` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
+| `skills-seed reset [all\|patterns\|rules\|workflows]...` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
 | `skills-seed rule` | Manage authoritative user rules | `show [rule-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false`<br>`--path` = `[]`<br>`--project` = `[]` |
 | `skills-seed rule show [rule-id]` | Show existing rule scopes or full text | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed sync` | Sync skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
@@ -226,13 +226,15 @@ Manage sub-projects in workspace mode.
 
 #### Command Overview
 
-Back up and reset the current repository's `.skills-seed`. Existing data is moved to `.skills-seed.backup/<timestamp>`, then config and directories are recreated for the selected mode.
+`reset` has two explicit uses: without a scope, it backs up the whole `.skills-seed` directory and reinitializes it; with scope positionals, it resets only selected active knowledge.
 
 #### Command Forms
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed reset` | Reset the current repository initialization state | `skills-seed reset --mode workspace` | Backs up the old `.skills-seed`; still review the current worktree first |
+| `skills-seed reset` | Back up and reinitialize the current repository | `skills-seed reset --mode workspace` | Moves the complete `.skills-seed` state to a backup, then recreates config |
+| `skills-seed reset all` | Reset all resettable knowledge | `skills-seed reset all` | Keeps config, Context, and generated output; run `sync` afterward |
+| `skills-seed reset patterns rules workflows` | Reset only selected knowledge | `skills-seed reset patterns rules` | Multiple scopes can be combined |
 
 #### Flags
 
@@ -250,12 +252,16 @@ Back up and reset the current repository's `.skills-seed`. Existing data is move
 skills-seed reset --mode project
 skills-seed reset --mode workspace
 skills-seed reset --workspace
+skills-seed reset all
+skills-seed reset patterns rules workflows
 ```
 
 #### Notes
 
-1. Use `reset` to reinitialize or choose another mode.
-2. `profile.mode` is locked after learning or skill generation starts and should not be changed directly in config.
+1. Selective reset moves removed resources into `.skills-seed.backup/<timestamp>/knowledge/`; config, `.skills-seed/context/`, and generated Skills remain unchanged.
+2. After a selective reset, run `skills-seed sync` to relearn and replace stale generated output.
+3. `all`, `patterns`, `rules`, and `workflows` are composable except that `all` must stand alone; a scope cannot be combined with `--mode`, `--workspace`, `--locale`, or `--skills-locale`.
+4. `profile.mode` is locked after learning or skill generation starts and should not be changed directly in config. Use a full reset without a scope to switch modes.
 
 ### `skills-seed learn`
 

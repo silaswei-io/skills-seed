@@ -58,9 +58,10 @@ Always run `skills-seed generate skills` after correcting a pattern, Rule, or Wo
 |---|---|---|
 | Normal interruption, temporary Agent failure, or post-save local failure | `skills-seed sync --resume` | Reuses valid checkpoints and avoids duplicate calls |
 | Command-state version is incompatible, or candidate files/context are untrustworthy | `skills-seed sync --restart` | Explicitly clears only this run's recovery state before analysis |
+| You need to discard all learned knowledge plus user Rules and Workflows | `skills-seed reset all` → `skills-seed sync` | Selected resources move to a backup; config and Context remain |
 | Initialization state as a whole is unusable or mode must change | `skills-seed reset ...` | Backs up old state before reinitialization |
 
-Do not treat `--restart` as automatic retry, and do not use `reset` for one badly worded pattern. Both discard reusable work; the former only affects the current sync plan, while the latter backs up and rebuilds all initialization state.
+Do not treat `--restart` as automatic retry, and do not use `reset all` for one badly worded pattern. The former affects only the current sync plan; selective reset backs up and removes selected knowledge, while full reset backs up and rebuilds all initialization state. For one pattern, prefer `patterns update`.
 
 ## A Problem Remains After Generation
 

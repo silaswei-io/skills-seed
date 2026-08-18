@@ -14,6 +14,21 @@
 | 发布、验收、部署等任务步骤 | `workflow` | 让源码学习把过程推断为事实 |
 | 项目地图或权威文件已变化 | `learn current --profile refresh` | 手改 profile JSON |
 
+## 重新学习前重置知识
+
+当错误或过时的知识已成体系，不适合逐条修订时，使用 `reset` 清理对应事实源后重新学习。选择性重置不会删除配置、长期 Context 或已生成 Skills；实际移除的资源会先进入 `.skills-seed.backup/<timestamp>/knowledge/`。
+
+| 目标 | 命令 | 后续动作 |
+|---|---|---|
+| 从干净知识状态完整重新学习 | `skills-seed reset all` | `skills-seed sync` |
+| 仅重学源码模式、画像和分析状态 | `skills-seed reset patterns` | `skills-seed sync` |
+| 仅移除团队 Rule | `skills-seed reset rules` | 按需要重新添加 `rule`，再 `generate skills` |
+| 仅移除任务 Workflow | `skills-seed reset workflows` | 按需要重新添加 `workflow`，再 `generate skills` |
+
+`patterns` 会连带清理项目画像、文件快照、可恢复 checkpoint 和学习历史，确保下一次 `sync` 不会复用旧的分析结果。范围可组合，例如 `skills-seed reset patterns rules`；`all` 必须单独使用，且选择性重置不能与 `--mode`、`--workspace`、`--locale` 或 `--skills-locale` 同时使用。
+
+只需要修订一条模式时，优先使用 `patterns update`；只需要继续被中断的学习时，优先使用 `sync --resume`。完整 `skills-seed reset`（不带范围）用于重新初始化或切换 project/workspace 模式。
+
 ## 模式的人工维护闭环
 
 1. 用 `skills-seed patterns stats` 查看数量、分类和质量指标。

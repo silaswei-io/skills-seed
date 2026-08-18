@@ -290,7 +290,6 @@ func TestNoArgCommandsRejectPositionalHelpArgument(t *testing.T) {
 
 	commandPaths := [][]string{
 		{"init"},
-		{"reset"},
 		{"generate", "skills"},
 		{"learn", "current"},
 		{"log"},

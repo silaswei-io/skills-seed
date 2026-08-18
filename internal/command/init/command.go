@@ -20,6 +20,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	resetknowledge "github.com/silaswei-io/skills-seed/internal/service/knowledge"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
@@ -205,12 +206,19 @@ func isValidLocale(locale string) bool {
 func ResetCmd() *cobra.Command {
 	opts := commandOptions{mode: domain.ModeProject}
 	resetCmd := &cobra.Command{
-		Use:     "reset",
-		Short:   i18n.Get("ResetShort"),
-		Long:    i18n.Get("ResetLongDesc"),
-		Example: i18n.Get("ResetExample"),
-		Args:    cobra.NoArgs,
+		Use:       "reset [all|patterns|rules|workflows]...",
+		Short:     i18n.Get("ResetShort"),
+		Long:      i18n.Get("ResetLongDesc"),
+		Example:   i18n.Get("ResetExample"),
+		ValidArgs: []string{"all", "patterns", "rules", "workflows"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				scope, err := parseKnowledgeResetScope(args)
+				if err != nil {
+					return err
+				}
+				return runKnowledgeReset(cmd, scope)
+			}
 			if !isValidLocale(opts.locale) {
 				return fmt.Errorf("%s", i18n.Get("InitLocaleInvalid"))
 			}
@@ -232,6 +240,90 @@ func ResetCmd() *cobra.Command {
 	resetCmd.Flags().StringVar(&opts.mode, "mode", domain.ModeProject, i18n.Get("InitFlagMode"))
 	resetCmd.Flags().BoolVar(&opts.workspace, "workspace", false, i18n.Get("InitFlagWorkspace"))
 	return resetCmd
+}
+
+func parseKnowledgeResetScope(args []string) (resetknowledge.Scope, error) {
+	selected := make(map[string]bool, len(args))
+	for _, name := range args {
+		if selected[name] {
+			return resetknowledge.Scope{}, fmt.Errorf("%s", i18n.GetWithParams("ResetKnowledgeDuplicateScope", map[string]interface{}{"Scope": name}))
+		}
+		selected[name] = true
+	}
+	if selected["all"] {
+		if len(selected) != 1 {
+			return resetknowledge.Scope{}, fmt.Errorf("%s", i18n.Get("ResetKnowledgeAllExclusive"))
+		}
+		return resetknowledge.AllScope(), nil
+	}
+
+	scope := resetknowledge.Scope{}
+	for _, name := range args {
+		switch name {
+		case "patterns":
+			scope.Patterns = true
+			scope.Profiles = true
+			scope.Cache = true
+			scope.History = true
+		case "rules":
+			scope.Rules = true
+		case "workflows":
+			scope.Workflows = true
+		default:
+			return resetknowledge.Scope{}, fmt.Errorf("%s", i18n.GetWithParams("ResetKnowledgeUnknownScope", map[string]interface{}{"Scope": name}))
+		}
+	}
+	return scope, nil
+}
+
+func runKnowledgeReset(cmd *cobra.Command, scope resetknowledge.Scope) error {
+	if cmd.Flags().Changed("locale") || cmd.Flags().Changed("skills-locale") || cmd.Flags().Changed("mode") || cmd.Flags().Changed("workspace") {
+		return fmt.Errorf("%s", i18n.Get("ResetKnowledgeMixedOptions"))
+	}
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("%s: %w", i18n.Get("InitGetCurrentDirFailed"), err)
+	}
+	result, err := resetknowledge.Reset(filepath.Join(projectRoot, ".skills-seed"), scope)
+	if err != nil {
+		if errors.Is(err, resetknowledge.ErrSeedNotFound) {
+			return fmt.Errorf("%s", i18n.Get("ResetKnowledgeNotInitialized"))
+		}
+		return fmt.Errorf("%s: %w", i18n.Get("ResetKnowledgeFailed"), err)
+	}
+	if len(result.Resources) == 0 {
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), i18n.Get("ResetKnowledgeNothingToReset"))
+		return err
+	}
+	_, err = fmt.Fprintln(cmd.OutOrStdout(), i18n.GetWithParams("ResetKnowledgeCompleted", map[string]interface{}{
+		"Backup":    result.BackupPath,
+		"Resources": strings.Join(localizedKnowledgeResources(result.Resources), ", "),
+	}))
+	return err
+}
+
+func localizedKnowledgeResources(resources []string) []string {
+	keys := map[string]string{
+		"patterns":               "ResetKnowledgeResourcePatterns",
+		"rules":                  "ResetKnowledgeResourceRules",
+		"workflows":              "ResetKnowledgeResourceWorkflows",
+		"project-profile":        "ResetKnowledgeResourceProjectProfile",
+		"workspace-profile":      "ResetKnowledgeResourceWorkspaceProfile",
+		"workspace-spec":         "ResetKnowledgeResourceWorkspaceSpec",
+		"child-project-profiles": "ResetKnowledgeResourceChildProjectProfiles",
+		"file-snapshots":         "ResetKnowledgeResourceFileSnapshots",
+		"command-checkpoints":    "ResetKnowledgeResourceCommandCheckpoints",
+		"learning-history":       "ResetKnowledgeResourceLearningHistory",
+	}
+	localized := make([]string, 0, len(resources))
+	for _, resource := range resources {
+		if key, ok := keys[resource]; ok {
+			localized = append(localized, i18n.Get(key))
+			continue
+		}
+		localized = append(localized, resource)
+	}
+	return localized
 }
 
 func initializeSkillWithOptionsFromCWD(locale, skillsLocale, mode, agentEngine, agentModel, skillsTarget string, agentTotalParallelism int) error {

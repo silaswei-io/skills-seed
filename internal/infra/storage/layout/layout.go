@@ -38,6 +38,11 @@ func (l Layout) ProjectDB() string {
 	return l.Store("project.db")
 }
 
+// Config 返回项目初始化配置文件路径。
+func (l Layout) Config() string {
+	return filepath.Join(l.seedPath, "config.yaml")
+}
+
 // ProjectProfile returns the project profile document path.
 func (l Layout) ProjectProfile() string {
 	return l.StoreDocuments("project-profile.json")
@@ -81,4 +86,19 @@ func (l Layout) CommandState(command string) string {
 // RuntimeLogs returns the default runtime log directory.
 func (l Layout) RuntimeLogs() string {
 	return l.Runtime("logs")
+}
+
+// Rules 返回用户权威规则根目录。
+func (l Layout) Rules() string {
+	return filepath.Join(l.seedPath, "rules")
+}
+
+// Workflows 返回用户工作流根目录。
+func (l Layout) Workflows() string {
+	return filepath.Join(l.seedPath, "workflows")
+}
+
+// CommandStates 返回所有可恢复命令状态的缓存根目录。
+func (l Layout) CommandStates() string {
+	return l.Cache("commands")
 }

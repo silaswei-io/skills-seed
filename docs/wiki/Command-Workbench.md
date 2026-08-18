@@ -67,9 +67,11 @@
 | `log` | 查看最近学习与生成变更 | `skills-seed log` | 只读摘要，不是详细诊断日志 |
 | `sync --resume` | 从可恢复 checkpoint 继续 | `skills-seed sync --resume` | 优先于重新开始 |
 | `sync --restart` | 明确丢弃本次恢复状态并重来 | `skills-seed sync --restart` | 仅用于状态不兼容或输入已失真 |
-| `reset` | 备份后重置整个初始化状态 | `skills-seed reset --mode project` | 会移动旧 `.skills-seed` 至备份目录 |
+| `reset all` | 丢弃全部可重置知识后重新学习 | `skills-seed reset all` | 保留配置、Context 和生成输出；资源会进入备份目录 |
+| `reset patterns ...` | 只丢弃指定知识 | `skills-seed reset patterns rules` | 可组合 patterns、rules、workflows；patterns 会连带清理学习状态 |
+| `reset` | 备份后重置整个初始化状态或切换模式 | `skills-seed reset --mode project` | 会移动旧 `.skills-seed` 至备份目录 |
 
-`reset` 是重新初始化，不是普通故障恢复手段。学习中断或单个模式质量异常时，先看 [学习失败与人工修正](Learning-Failures-and-Manual-Repair.md)。
+选择性重置完成后立即执行 `skills-seed sync`。学习中断或单个模式质量异常时，先看 [学习失败与人工修正](Learning-Failures-and-Manual-Repair.md)；修正一条模式正文通常优先使用 `patterns update`。
 
 ---
 

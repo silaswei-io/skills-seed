@@ -2185,13 +2185,67 @@ other = "Child projects added"
 other = "Back up and reset skills-seed initialization state"
 
 [ResetLongDesc]
-other = "Reset the skills-seed initialization state in the current repository.\n\nThis command first backs up the existing .skills-seed directory to .skills-seed.backup/<timestamp>, then recreates config and directories for the requested mode. Use it when switching between project and workspace modes."
+other = "Reset skills-seed state in the current repository.\n\nWithout a scope, this command backs up the existing .skills-seed directory to .skills-seed.backup/<timestamp> and reinitializes the requested mode. With a scope such as all, patterns, rules, or workflows, it resets only selected knowledge while preserving config, Context, and generated output."
 
 [ResetExample]
-other = "  # Reset to single-project mode\n  skills-seed reset --mode project\n\n  # Reset to workspace mode\n  skills-seed reset --mode workspace\n\n  # Workspace shortcut\n  skills-seed reset --workspace"
+other = "  # Discard all resettable knowledge, then relearn\n  skills-seed reset all\n\n  # Discard only patterns and their learning state\n  skills-seed reset patterns\n\n  # Reset to workspace mode\n  skills-seed reset --mode workspace"
 
 [ResetBackupFailed]
 other = "Failed to back up .skills-seed"
+
+[ResetKnowledgeFailed]
+other = "Failed to reset knowledge"
+
+[ResetKnowledgeMixedOptions]
+other = "A knowledge scope cannot be combined with --mode, --workspace, --locale, or --skills-locale"
+
+[ResetKnowledgeUnknownScope]
+other = "Unknown knowledge scope: {{.Scope}}. Use all, patterns, rules, or workflows"
+
+[ResetKnowledgeDuplicateScope]
+other = "Knowledge scope {{.Scope}} may be specified only once"
+
+[ResetKnowledgeAllExclusive]
+other = "all cannot be combined with other knowledge scopes"
+
+[ResetKnowledgeNotInitialized]
+other = "The current directory is not initialized for skills-seed"
+
+[ResetKnowledgeNothingToReset]
+other = "The selected knowledge scope has nothing to reset"
+
+[ResetKnowledgeCompleted]
+other = "Reset knowledge: {{.Resources}}. Backup: {{.Backup}}. Run skills-seed sync to relearn and refresh Skills."
+
+[ResetKnowledgeResourcePatterns]
+other = "patterns"
+
+[ResetKnowledgeResourceRules]
+other = "rules"
+
+[ResetKnowledgeResourceWorkflows]
+other = "workflows"
+
+[ResetKnowledgeResourceProjectProfile]
+other = "project profile"
+
+[ResetKnowledgeResourceWorkspaceProfile]
+other = "workspace profile"
+
+[ResetKnowledgeResourceWorkspaceSpec]
+other = "workspace spec"
+
+[ResetKnowledgeResourceChildProjectProfiles]
+other = "child project profiles"
+
+[ResetKnowledgeResourceFileSnapshots]
+other = "file snapshots"
+
+[ResetKnowledgeResourceCommandCheckpoints]
+other = "command checkpoints"
+
+[ResetKnowledgeResourceLearningHistory]
+other = "learning history"
 
 [LogShort]
 other = "Show learned change history"

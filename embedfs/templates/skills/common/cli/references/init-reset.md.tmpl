@@ -45,8 +45,8 @@ Boundaries:
 
 Purpose:
 
-- Back up existing `.skills-seed` under `.skills-seed.backup/<timestamp>`.
-- Recreate local skills-seed state with selected project/workspace settings.
+- Without a scope, back up existing `.skills-seed` under `.skills-seed.backup/<timestamp>` and recreate local state with selected project/workspace settings.
+- With a scope positional, move only selected knowledge into `.skills-seed.backup/<timestamp>/knowledge/`.
 
 Flags:
 
@@ -54,20 +54,27 @@ Flags:
 - `--skills-locale`: generated Skill and learned natural-language content language.
 - `--mode`: `project` or `workspace`.
 - `--workspace`: shortcut for `--mode workspace`.
+- `all`: reset patterns, rules, workflows, profiles, learning cache, and history while preserving config, Context, and generated output.
+- `patterns`: reset patterns plus their profiles, learning cache, and history.
+- `rules`, `workflows`: reset only the selected user resources; scopes may be combined with `patterns`.
 
 Use cases:
 
 - Recreate project state: `skills-seed reset --mode project --locale zh-CN`
 - Convert to workspace mode: `skills-seed reset --workspace --locale zh-CN`
+- Relearn from a clean knowledge state: `skills-seed reset all`, then `skills-seed sync`
+- Discard only patterns and their dependent learning state: `skills-seed reset patterns`, then `skills-seed sync`
 
 Use reset when:
 
 - The local `.skills-seed` state is inconsistent.
 - You need to switch between project and workspace mode.
 - You want to recreate default config/context files while keeping a backup.
+- You intentionally want to discard learned patterns, Rules, Workflows, and related learning state without reinitializing configuration.
 
 Avoid reset when:
 
 - You only need to update generated Skills: use `skills-seed generate skills`.
 - You only need to learn current code: use `skills-seed sync` or `skills-seed learn current`.
 - You only need to update the global CLI Skill: use `skills-seed cli-skills install`.
+- Do not combine a knowledge scope with `--mode`, `--workspace`, `--locale`, or `--skills-locale`.

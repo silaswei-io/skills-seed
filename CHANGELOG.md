@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.8]
+
+### 变更
+
+- 新增可恢复的选择性知识重置：`skills-seed reset all` 可清空全部可重学知识，`skills-seed reset patterns rules workflows` 可按资源组合重置；被重置的资源会移入时间戳备份，配置、长期 Context 和生成输出保持不变。
+- 统一 `reset` 的命令形式为简短的位置范围参数，移除 `--all`、`--patterns`、`--rules`、`--workflows` 等重复 flag；补充中英文命令帮助、命令参考、Wiki 与全局 CLI Skill 指引。
+
+### 修复
+
+- 重置 patterns 时同步移除依赖的项目画像、文件快照、恢复 checkpoint 和学习历史，确保下一次 `sync` 从干净知识状态重新学习，而不是复用旧分析状态。
+- 为范围拼写错误、重复指定、`all` 混用和初始化参数冲突提供本地化校验，避免错误重置范围或把选择性重置误当成完整重新初始化。
+
 ## [v0.20.7]
 
 ### 变更

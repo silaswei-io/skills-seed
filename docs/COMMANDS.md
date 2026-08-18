@@ -11,7 +11,7 @@
 | 基础信息 | [`skills-seed`](#skills-seed) | 查看全局帮助、版本和模板 hash | `skills-seed --help` |
 | 初始化 | [`skills-seed init`](#skills-seed-init) | 初始化单项目或 workspace 根仓 | `skills-seed init --mode project` |
 | Workspace | [`skills-seed workspace`](#skills-seed-workspace) | 添加或管理 workspace 子项目 | `skills-seed workspace add .` |
-| 重置 | [`skills-seed reset`](#skills-seed-reset) | 备份并重新初始化 `.skills-seed` | `skills-seed reset --mode workspace` |
+| 重置 | [`skills-seed reset`](#skills-seed-reset) | 重新初始化或按范围重置项目知识 | `skills-seed reset all` |
 | 学习 | [`skills-seed learn`](#skills-seed-learn) | 从当前代码学习 patterns | `skills-seed learn current` |
 | 生成 | [`skills-seed generate`](#skills-seed-generate) | 根据已核验知识和用户资源生成 skills | `skills-seed generate skills` |
 | 预览 | [`skills-seed preview`](#skills-seed-preview) | 预览 full 或 incremental 分析会选中的文件 | `skills-seed preview files` |
@@ -48,7 +48,7 @@
 
 | 命令 | 摘要 | 子命令 | 参数 |
 |---|---|---|---|
-| `skills-seed` | 为 AI 助手培育项目技能 | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | 为 AI 助手培育项目技能 | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed cli-skills` | 管理全局 skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | 安装/更新全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | 卸载全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
@@ -73,7 +73,7 @@
 | `skills-seed preview files` | 预览将被分析的文件 | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
 | `skills-seed profile` | 查看项目画像 | `show` | `--help, -h` = `false` |
 | `skills-seed profile show` | 显示当前项目画像摘要 | - | `--help, -h` = `false` |
-| `skills-seed reset` | 备份并重置 skills-seed 初始化状态 | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
+| `skills-seed reset [all\|patterns\|rules\|workflows]...` | 备份并重置 skills-seed 初始化状态 | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
 | `skills-seed rule` | 管理用户权威规则 | `show [rule-id]` | `--child` = ``<br>`--content` = ``<br>`--help, -h` = `false`<br>`--name` = ``<br>`--overwrite` = `false`<br>`--path` = `[]`<br>`--project` = `[]` |
 | `skills-seed rule show [rule-id]` | 查看已有规则的范围或完整原文 | - | `--child` = ``<br>`--format` = `table`<br>`--help, -h` = `false` |
 | `skills-seed sync` | 一键同步 skills | - | `--context-path` = `[]`<br>`--context` = ``<br>`--help, -h` = `false`<br>`--no-interactive` = `false`<br>`--restart` = `false`<br>`--resume` = `false` |
@@ -226,13 +226,15 @@ skills-seed init --workspace --agent codex --skills codex
 
 #### 命令概述
 
-备份并重置当前仓库的 `.skills-seed`。旧数据会移动到 `.skills-seed.backup/<timestamp>`，再按指定模式重新初始化。
+`reset` 有两种明确用途：不带范围时，备份整个 `.skills-seed` 后重新初始化；带范围位置参数时，只重置选中的活跃知识。
 
 #### 命令形式
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed reset` | 重置当前仓库初始化状态 | `skills-seed reset --mode workspace` | 会备份旧 `.skills-seed`，但仍建议确认当前工作区状态 |
+| `skills-seed reset` | 备份并重新初始化当前仓库 | `skills-seed reset --mode workspace` | 移动整个 `.skills-seed` 到备份后重新创建配置 |
+| `skills-seed reset all` | 重置全部可重置知识 | `skills-seed reset all` | 保留配置、Context 和生成输出；完成后运行 `sync` |
+| `skills-seed reset patterns rules workflows` | 只重置指定知识 | `skills-seed reset patterns rules` | 可组合多个范围 |
 
 #### 参数
 
@@ -250,12 +252,16 @@ skills-seed init --workspace --agent codex --skills codex
 skills-seed reset --mode project
 skills-seed reset --mode workspace
 skills-seed reset --workspace
+skills-seed reset all
+skills-seed reset patterns rules workflows
 ```
 
 #### 注意事项
 
-1. `reset` 用于重新选择模式或恢复初始化状态。
-2. `profile.mode` 在学习或生成后会锁定，不能直接在配置中切换模式。
+1. 选择性重置会将实际移除的资源移动到 `.skills-seed.backup/<timestamp>/knowledge/`；配置、`.skills-seed/context/` 和已生成 Skills 保持不变。
+2. 选择性重置完成后运行 `skills-seed sync`，重新学习并覆盖旧生成输出。
+3. 范围 `all`、`patterns`、`rules`、`workflows` 可以组合，只有 `all` 必须单独使用；范围不能与 `--mode`、`--workspace`、`--locale` 或 `--skills-locale` 同时使用。
+4. `profile.mode` 在学习或生成后会锁定，不能直接在配置中切换模式；需要切换模式时使用不带范围的完整 `reset`。
 
 ### `skills-seed learn`
 

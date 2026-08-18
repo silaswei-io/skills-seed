@@ -2185,13 +2185,67 @@ other = "子项目添加完成"
 other = "备份并重置 skills-seed 初始化状态"
 
 [ResetLongDesc]
-other = "重置当前仓库的 skills-seed 初始化状态。\n\n此命令会先把现有 .skills-seed 备份到 .skills-seed.backup/<timestamp>，再按指定模式重新创建配置和目录结构。适用于需要在 project 和 workspace 模式之间切换的场景。"
+other = "重置当前仓库的 skills-seed 状态。\n\n不带范围时，此命令会先把现有 .skills-seed 备份到 .skills-seed.backup/<timestamp>，再按指定模式重新初始化。带 all、patterns、rules 或 workflows 等范围时，只重置选中的知识，保留配置、Context 和生成输出。"
 
 [ResetExample]
-other = "  # 重置为单项目模式\n  skills-seed reset --mode project\n\n  # 重置为 workspace 模式\n  skills-seed reset --mode workspace\n\n  # workspace 快捷写法\n  skills-seed reset --workspace"
+other = "  # 丢弃全部可重置知识后重新学习\n  skills-seed reset all\n\n  # 只丢弃模式及其学习状态\n  skills-seed reset patterns\n\n  # 重置为 workspace 模式\n  skills-seed reset --mode workspace"
 
 [ResetBackupFailed]
 other = "备份 .skills-seed 失败"
+
+[ResetKnowledgeFailed]
+other = "重置知识失败"
+
+[ResetKnowledgeMixedOptions]
+other = "知识范围不能与 --mode、--workspace、--locale 或 --skills-locale 同时使用"
+
+[ResetKnowledgeUnknownScope]
+other = "未知知识范围：{{.Scope}}。可用范围：all、patterns、rules、workflows"
+
+[ResetKnowledgeDuplicateScope]
+other = "知识范围 {{.Scope}} 只能指定一次"
+
+[ResetKnowledgeAllExclusive]
+other = "all 不能与其他知识范围同时使用"
+
+[ResetKnowledgeNotInitialized]
+other = "当前目录尚未完成 skills-seed 初始化"
+
+[ResetKnowledgeNothingToReset]
+other = "选中的知识范围没有可重置内容"
+
+[ResetKnowledgeCompleted]
+other = "已重置知识：{{.Resources}}。备份目录：{{.Backup}}。请运行 skills-seed sync 重新学习并刷新 Skills。"
+
+[ResetKnowledgeResourcePatterns]
+other = "模式"
+
+[ResetKnowledgeResourceRules]
+other = "规则"
+
+[ResetKnowledgeResourceWorkflows]
+other = "工作流"
+
+[ResetKnowledgeResourceProjectProfile]
+other = "项目画像"
+
+[ResetKnowledgeResourceWorkspaceProfile]
+other = "工作区画像"
+
+[ResetKnowledgeResourceWorkspaceSpec]
+other = "工作区规范"
+
+[ResetKnowledgeResourceChildProjectProfiles]
+other = "子项目画像"
+
+[ResetKnowledgeResourceFileSnapshots]
+other = "文件快照"
+
+[ResetKnowledgeResourceCommandCheckpoints]
+other = "命令恢复状态"
+
+[ResetKnowledgeResourceLearningHistory]
+other = "学习变更历史"
 
 [LogShort]
 other = "查看学习变更记录"

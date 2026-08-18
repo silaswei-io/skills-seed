@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.8]
+
+### Changes
+
+- Added recoverable selective knowledge reset: `skills-seed reset all` clears all relearnable knowledge, while `skills-seed reset patterns rules workflows` resets selected resource sets. Reset resources move into a timestamped backup while config, durable Context, and generated output remain intact.
+- Standardized `reset` on concise positional scopes, removing the redundant `--all`, `--patterns`, `--rules`, and `--workflows` flags. Updated bilingual CLI help, command references, Wiki pages, and the global CLI Skill guide.
+
+### Fixes
+
+- Resetting patterns now also removes dependent project profiles, file snapshots, resumable checkpoints, and learning history, so the next `sync` relearns from clean knowledge rather than reusing stale analysis state.
+- Added localized validation for unknown or duplicate scopes, mixing `all` with another scope, and conflicts with initialization flags, preventing ambiguous reset behavior.
+
 ## [v0.20.7]
 
 ### Changes

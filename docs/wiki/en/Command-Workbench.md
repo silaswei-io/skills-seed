@@ -67,9 +67,11 @@ At a workspace root, a Rule's `--child`, `--project`, and `--path` must express 
 | `log` | Reading recent learning and generation changes | `skills-seed log` | Read-only summary, not detailed diagnostics |
 | `sync --resume` | Continuing from a recoverable checkpoint | `skills-seed sync --resume` | Prefer over starting again |
 | `sync --restart` | Explicitly discarding this run's recovery state | `skills-seed sync --restart` | Use only for incompatible state or untrustworthy input |
-| `reset` | Backing up and resetting all initialization state | `skills-seed reset --mode project` | Moves old `.skills-seed` into a backup directory |
+| `reset all` | Discarding all resettable knowledge before relearning | `skills-seed reset all` | Preserves config, Context, and generated output; resources enter a backup |
+| `reset patterns ...` | Discarding only selected knowledge | `skills-seed reset patterns rules` | Combine patterns, rules, and workflows; patterns also clear dependent learning state |
+| `reset` | Backing up all initialization state or changing mode | `skills-seed reset --mode project` | Moves old `.skills-seed` into a backup directory |
 
-`reset` is reinitialization, not ordinary recovery. For an interrupted run or one poor pattern, start with [Learning Failures and Manual Repair](Learning-Failures-and-Manual-Repair.md).
+Run `skills-seed sync` immediately after a selective reset. For an interrupted run or one poor pattern, start with [Learning Failures and Manual Repair](Learning-Failures-and-Manual-Repair.md); correcting one pattern body usually starts with `patterns update`.
 
 ---
 
