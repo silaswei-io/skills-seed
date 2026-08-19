@@ -26,12 +26,18 @@ These rules come from authoritative project files and must be followed for match
 
 {{if .DevelopmentFocuses}}## Development Focuses
 
-Filter this table by known changed paths first, then supplement the match with resource, action, state, or external-system terms in the request. Read the first reference for one match. For multiple matches, read every matched reference and use changed paths and evidence entries to establish ownership. When ambiguity remains, report the boundary instead of guessing priority. A focus is navigation only; source evidence and applicability boundaries remain in the target reference.
+Use this table in the order “changed path -> request signal -> reference page -> source evidence”. For one match, read every listed reference; for multiple matches, read every matched reference and all matched focuses, then use paths and evidence entries to establish ownership. When ambiguity remains, report the boundary instead of guessing priority. A focus is navigation only; source evidence and applicability boundaries remain in the target reference.
 
-| Focus | Request terms | First reference | Primary evidence entry |
+| Focus | Request terms | References | Evidence entries |
 |---|---|---|---|
-{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}} | [Open focus]({{.ReferencePath}}) | {{if .PrimaryPath}}`{{.PrimaryPath}}`{{else}}Confirm from the evidence entry in the focus reference{{end}} |
+{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}} | {{range $i, $path := .ReferencePaths}}{{if $i}}, {{end}}[open]({{$path}}){{end}} | {{if .EntryPaths}}{{range $i, $path := .EntryPaths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{else}}Confirm from the evidence entries in the focus references{{end}} |
 {{end}}
+{{end}}
+
+{{if .DevelopmentFocuses}}### Focus Boundary Notes
+
+{{range .DevelopmentFocuses}}{{if or .ScopeReason .Attributes .RiskSignals}}- **{{.Title}}**{{if .ScopeReason}}: {{.ScopeReason}}{{end}}{{if .Attributes}}; attributes: {{range $i, $attribute := .Attributes}}{{if $i}}, {{end}}`{{$attribute}}`{{end}}{{end}}{{if .RiskSignals}}; risk signals: {{range $i, $signal := .RiskSignals}}{{if $i}}, {{end}}`{{$signal}}`{{end}}{{end}}
+{{end}}{{end}}
 {{end}}
 
 ## Task Routing
@@ -40,21 +46,14 @@ Filter this table by known changed paths first, then supplement the match with r
 {{end}}
 
 {{if .HasKnowledge}}
-1. Check "Development Focuses" above first and follow its multiple-match behavior. When no focus matches or the task concerns a cross-cutting convention, read the smallest necessary reference set by task type below. Do not load every reference at once. After entering a category pattern, check its "Related References" section first and continue when a cross-boundary hint matches the task.
-{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. For product/domain rules, state transitions, user actions, or cross-resource flows, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.
-{{else}}2. For product/domain rules, state transitions, user actions, or cross-resource flows, inspect current code and reuse nearby implementations.
-{{end}}{{if .References.BusinessMethods}}3. For reusable capability entries, module extension points, cross-boundary orchestration, UI/command actions, or tool entries, read the [Capability Entry Index](./references/business-methods.md).
-{{else}}3. Confirm project-level capability entries from current code and module entry points.
-{{end}}4. For interfaces, messages, events, contracts, adapters, derived artifacts, or configuration conventions, first read applicable user rules and the [Project Spec](./references/project-spec.md) to confirm editable boundaries, derivation relationships, and command restrictions; then read the related category pattern and return to its evidence source. Do not infer permission to edit directly or run a generator from existing code.
-{{if .References.KeyModules}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md) and [Modules](./references/modules.md).
-{{else}}5. For architecture, module boundaries, or dependencies, read [Project Overview](./references/project-overview.md).
-{{end}}{{if .WorkflowReferences}}6. For testing, deployment, release, or acceptance, choose the matching item under "User Workflows" below and read its full document.
-{{else}}6. No user-maintained testing, deployment, release, or acceptance Workflow is available. References do not define these procedures; follow the current user instruction.
-{{end}}
-{{else}}2. References were omitted from this generation. Read current code and prefer nearby implementations.
-{{end}}
-
-{{if .References.ProjectSpec}}[Project Spec](./references/project-spec.md) records explicit authoritative constraints. Pattern pages locate reusable implementations from source evidence.{{else}}Confirm constraint sources from user rules, current code, and project configuration. Learned patterns only locate reusable implementations.{{end}} Explicit authoritative rules outrank current code and learned references. Current code may only correct a stale source-learned summary; report missing evidence.
+1. Read applicable user rules first to confirm editable boundaries and command permissions.
+2. Filter "Development Focuses" by known changed paths; for a match, read every listed reference and evidence entry.
+After a focus match, stay within its references first; follow another reference only when its "Related References" explicitly indicates a cross-boundary concern.
+3. Without a focus match, use the resource, action, state, and external-dependency terms in the request to choose from "Reference Entry Points"; open the map/index first, then one relevant detail page instead of loading every pattern.
+{{if .References.BusinessPatterns}}For product/domain requests, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.{{end}}
+4. From the pattern page, check its "Related References" section first, then follow cross-boundary links and return to source code to verify applicability, inputs, outputs, and failure semantics.
+5. For interfaces, messages, derived artifacts, configuration, or generation boundaries, read [Project Spec](./references/project-spec.md) first. Do not infer permission to edit directly or run a generator from existing code.
+{{if .WorkflowReferences}}6. Use only the matching user workflow for testing, deployment, release, or acceptance.{{else}}6. No user-maintained testing, deployment, release, or acceptance workflow is available; confirm validation from the current user instruction.{{end}}
 {{else}}{{if .WorkflowReferences}}1. Choose the user workflow that best matches the task goal.
 2. Read the workflow document before acting; do not execute from the list summary alone.
 3. When the latest user instruction conflicts with the saved workflow, follow the latest instruction and call out the difference.
@@ -67,14 +66,14 @@ Rules are explicit user-maintained constraints; workflows are user-maintained ta
 {{if .RuleReferences}}
 ## User Rules
 
-{{range .RuleReferences}}- **[{{.Name}}]({{.Path}})**{{if .Paths}} - paths: {{range $i, $path := .Paths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{else}} - applies to the whole project{{end}}
+{{range .RuleReferences}}- **[{{.Name}}]({{.Path}})**{{if .Summary}} - {{.Summary}}{{end}}{{if .Paths}}; paths: {{range $i, $path := .Paths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{else}}; applies to the whole project{{end}}{{if .RouteTerms}}; match signals: {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 {{end}}
 
 {{if .WorkflowReferences}}
 ## User Workflows
 
-{{range .WorkflowReferences}}- **[{{.Name}}]({{.Path}})**{{if .Description}} - {{.Description}}{{end}}
+{{range .WorkflowReferences}}- **[{{.Name}}]({{.Path}})**{{if .Summary}} - {{.Summary}}{{else}}{{if .Description}} - {{.Description}}{{end}}{{end}}{{if .RouteTerms}}; task signals: {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 {{end}}{{if .StateSummaries}}
 ## State And Boundary Notes
@@ -107,7 +106,8 @@ Rules are explicit user-maintained constraints; workflows are user-maintained ta
 - Check nearby code before introducing a pattern or abstraction.
 - Reuse project-specific entries and utilities from references when available.
 - For derived artifacts, interface/message models, adapters, and configuration conventions, apply boundaries from user rules and the [Project Spec](./references/project-spec.md) first. After permission is confirmed, use pattern evidence and current project configuration to locate the implementation.
-- Explicit authoritative rules outrank code and learned references. Current code only corrects a stale source-learned summary; it cannot override or relax authoritative constraints.
+- [Project Spec](./references/project-spec.md) records explicit authoritative constraints; pattern pages only provide source-backed reuse navigation.
+- Explicit authoritative rules outrank current code and learned references. Current code only corrects a stale source-learned summary; it cannot override or relax authoritative constraints.
 
 {{if .KeyInsights}}### Key Insights
 

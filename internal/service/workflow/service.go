@@ -11,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 // Optimizer 整理用户提供的工作流正文。
@@ -60,8 +61,12 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 		return nil, err
 	}
 	existingContent := ""
+	existingSummary := ""
+	var existingRouteTerms []string
 	if existing != nil && !req.Overwrite {
 		existingContent = strings.TrimSpace(existing.Content)
+		existingSummary = strings.TrimSpace(existing.Summary)
+		existingRouteTerms = existing.RouteTerms
 	}
 	optimized, err := s.optimizer.OptimizeWorkflow(ctx, &agent.OptimizeWorkflowRequest{
 		Project:         s.project,
@@ -80,9 +85,17 @@ func (s *Service) UpsertWorkflow(ctx context.Context, req UpsertRequest) (*domai
 	if content == "" {
 		return nil, errors.New(i18n.Get("WorkflowOptimizerEmptyContent"))
 	}
+	summary := strings.TrimSpace(optimized.Summary)
+	routeTerms := stringx.UniqueNonBlank(optimized.RouteTerms)
+	if existing != nil && !req.Overwrite {
+		if summary == "" {
+			summary = existingSummary
+		}
+		routeTerms = stringx.UniqueNonBlank(append(existingRouteTerms, routeTerms...))
+	}
 
 	now := time.Now()
-	workflow := domain.Workflow{ID: id, Name: name, Content: content, CreatedAt: now, UpdatedAt: now}
+	workflow := domain.Workflow{ID: id, Name: name, Content: content, Summary: summary, RouteTerms: routeTerms, CreatedAt: now, UpdatedAt: now}
 	if existing != nil {
 		workflow.CreatedAt = existing.CreatedAt
 		workflow.Scripts = existing.Scripts

@@ -34,6 +34,10 @@ The actual layout changes with project mode, target Agent, learned knowledge, an
 4. When several focuses match, which references must be read together and how should path and evidence resolve ambiguity?
 5. Which impact boundaries or unknowns must be confirmed before implementation?
 
+After a focus matches, read all of its references and evidence entries first; follow another reference only when the target page explicitly identifies a cross-boundary relationship. Focus summaries, attributes, and risk signals explain boundaries but do not replace source verification.
+
+Rule and Workflow `summary` and `route_terms` are also entry-navigation metadata only; explicit scopes and the complete resource text still define boundaries and permissions.
+
 It must not make "current code wins" a blanket rule that overrides explicit user authority, nor treat a technical service name or incidental keyword as a stable business route.
 
 ## References, Rules, and Workflows

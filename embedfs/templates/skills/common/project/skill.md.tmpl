@@ -26,12 +26,18 @@ description: {{.SkillDescription}}
 
 {{if .DevelopmentFocuses}}## 开发焦点
 
-先以已知改动路径筛选下表，再用用户需求中的资源、动作、状态或外部系统词补充匹配。命中一个焦点时读取其首读参考；命中多个焦点时读取全部命中的参考，并以改动路径和各页证据入口确认归属。仍无法消歧时说明边界，不猜测优先级。焦点只是导航，不替代其中的源码证据和适用边界。
+按“改动路径 → 需求信号 → 参考页 → 源码证据”的顺序使用下表。命中一个焦点时读取其全部参考；命中多个焦点时读取全部命中的参考并读取全部命中焦点，再以路径和证据入口确认归属。仍无法消歧时说明边界，不猜测优先级。焦点只是导航，不替代其中的源码证据和适用边界。
 
-| 焦点 | 需求命中词 | 首读参考 | 主要证据入口 |
+| 焦点 | 需求命中词 | 参考页 | 证据入口 |
 |---|---|---|---|
-{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}、{{end}}`{{$term}}`{{end}} | [进入焦点]({{.ReferencePath}}) | {{if .PrimaryPath}}`{{.PrimaryPath}}`{{else}}按焦点参考中的证据入口确认{{end}} |
+{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}、{{end}}`{{$term}}`{{end}} | {{range $i, $path := .ReferencePaths}}{{if $i}}、{{end}}[打开]({{$path}}){{end}} | {{if .EntryPaths}}{{range $i, $path := .EntryPaths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{else}}按参考页中的证据入口确认{{end}} |
 {{end}}
+{{end}}
+
+{{if .DevelopmentFocuses}}### 焦点边界速记
+
+{{range .DevelopmentFocuses}}{{if or .ScopeReason .Attributes .RiskSignals}}- **{{.Title}}**{{if .ScopeReason}}：{{.ScopeReason}}{{end}}{{if .Attributes}}；属性：{{range $i, $attribute := .Attributes}}{{if $i}}、{{end}}`{{$attribute}}`{{end}}{{end}}{{if .RiskSignals}}；风险信号：{{range $i, $signal := .RiskSignals}}{{if $i}}、{{end}}`{{$signal}}`{{end}}{{end}}
+{{end}}{{end}}
 {{end}}
 
 ## 任务路由
@@ -40,21 +46,15 @@ description: {{.SkillDescription}}
 {{end}}
 
 {{if .HasKnowledge}}
-1. 先检查上方“开发焦点”；按其多命中规则读取参考。未命中或涉及横向约定时，再按下方任务类型读取最小必要参考。进入任何分类模式后，先检查其中的“相关参考”；任务命中跨边界提示时继续读取对应 reference。
-{{if .References.Enabled}}{{if .References.BusinessPatterns}}2. 产品/领域规则、状态流转、用户动作或跨资源流程：先读 [业务模式地图](./references/patterns/business.md)，再进入命中的详情页。
-{{else}}2. 产品/领域规则、状态流转、用户动作或跨资源流程：检查当前代码并复用附近实现。
-{{end}}{{if .References.BusinessMethods}}3. 可复用能力入口、模块级扩展点、跨边界编排、界面/命令动作或工具入口：读 [能力入口索引](./references/business-methods.md)。
-{{else}}3. 项目级能力入口：从当前代码和模块入口确认。
-{{end}}4. 接口、消息、事件、合约、适配层、派生产物或配置约定：先读适用的用户规则和 [项目规范](./references/project-spec.md)，确认可直接修改的边界、派生关系与命令限制；再读相关分类模式并回到其证据源码。不得从现有代码推断可直接编辑或可执行生成命令。
-{{if .References.KeyModules}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md) 和 [关键模块](./references/modules.md)。
-{{else}}5. 架构、模块边界或依赖关系：读 [项目概览](./references/project-overview.md)。
-{{end}}{{if .WorkflowReferences}}6. 测试、部署、发布和验收：从下方“用户工作流”选择匹配流程并读取完整文档。
-{{else}}6. 当前没有用户维护的测试、部署、发布或验收 Workflow；references 不定义这些操作流程，需以用户当次指令为准。
-{{end}}
-{{else}}2. 本次生成未写入 references；直接读取当前代码，并优先沿用附近已有实现。
-{{end}}
-
-{{if .References.ProjectSpec}}[项目规范](./references/project-spec.md) 记录显式权威约束；模式页用于按源码证据定位可复用实现。{{else}}约束来源以用户规则、当前代码和项目配置确认；已学习模式只用于定位可复用实现。{{end}}显式权威规则优先于当前代码和学习到的 reference；当前代码只可用于校正陈旧的源码学习摘要。缺少依据时说明缺口。
+1. 先读取适用的用户规则，确认可修改边界和命令权限。
+2. 用已知改动路径筛选“开发焦点”；命中后读取该焦点列出的全部参考页和证据入口。
+命中焦点后先停留在其参考页；只有该页的“相关参考”明确指向跨边界问题时，才继续读取其他 reference。
+3. 未命中焦点时，按需求中的资源、动作、状态和外部依赖选择下方“参考入口”，先读地图/索引，再进入唯一相关详情页；不要一次加载全部模式。
+{{if .References.BusinessPatterns}}产品/领域需求可先读 [业务模式地图](./references/patterns/business.md)，再进入命中的详情页。{{end}}
+4. 进入模式页后，先检查其中的“相关参考”，再沿相关参考处理跨边界问题，并回到源码验证适用范围、输入输出和失败语义。
+进入任何分类模式后，先检查其中的“相关参考”。
+5. 接口、消息、派生产物、配置或生成边界必须先读 [项目规范](./references/project-spec.md)；不得从现有代码推断可直接编辑或可执行生成命令。
+{{if .WorkflowReferences}}6. 测试、部署、发布和验收只按下方用户工作流执行。{{else}}6. 当前没有用户维护的测试、部署、发布或验收工作流，按用户当次指令确认验证方式。{{end}}
 {{else}}{{if .WorkflowReferences}}1. 先从“用户工作流”中选择与任务目标最匹配的流程。
 2. 读取对应 workflow 文档后再执行，不要根据列表摘要直接操作。
 3. 用户本次指令与已保存工作流冲突时，以用户本次指令为准，并说明偏离点。
@@ -67,14 +67,14 @@ description: {{.SkillDescription}}
 {{if .RuleReferences}}
 ## 用户规则
 
-{{range .RuleReferences}}- **[{{.Name}}]({{.Path}})**{{if .Paths}} - 路径：{{range $i, $path := .Paths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{else}} - 适用于整个项目{{end}}
+{{range .RuleReferences}}- **[{{.Name}}]({{.Path}})**{{if .Summary}} - {{.Summary}}{{end}}{{if .Paths}}；路径：{{range $i, $path := .Paths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{else}}；适用于整个项目{{end}}{{if .RouteTerms}}；命中信号：{{range $i, $term := .RouteTerms}}{{if $i}}、{{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 {{end}}
 
 {{if .WorkflowReferences}}
 ## 用户工作流
 
-{{range .WorkflowReferences}}- **[{{.Name}}]({{.Path}})**{{if .Description}} - {{.Description}}{{end}}
+{{range .WorkflowReferences}}- **[{{.Name}}]({{.Path}})**{{if .Summary}} - {{.Summary}}{{else}}{{if .Description}} - {{.Description}}{{end}}{{end}}{{if .RouteTerms}}；适用任务信号：{{range $i, $term := .RouteTerms}}{{if $i}}、{{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 {{end}}{{if .StateSummaries}}
 ## 状态与边界速记
@@ -107,7 +107,8 @@ description: {{.SkillDescription}}
 - 引入新模式或抽象前，先检查附近已有代码。
 - 如果参考中已有项目特定入口或工具方法，优先复用。
 - 派生产物、接口/消息模型、适配层和配置约定先受用户规则与 [项目规范](./references/project-spec.md) 的边界约束；确认允许后，再以相关模式的证据源码及当前项目配置定位实现。
-- 显式权威规则优先于代码和学习到的 reference；当前代码只用于校正陈旧的源码学习摘要，不能推翻或放宽权威约束。
+- [项目规范](./references/project-spec.md) 记录显式权威约束；模式页只提供有源码证据的复用导航。
+- 显式权威规则优先于当前代码和学习到的 reference；当前代码只用于校正陈旧的源码学习摘要，不能推翻或放宽权威约束。
 
 {{if .KeyInsights}}### 关键洞察
 

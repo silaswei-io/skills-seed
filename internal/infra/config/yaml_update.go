@@ -30,6 +30,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 
 	setYAMLString(doc, []string{"learning", "current", "mode"}, string(cfg.Learning.Current.Mode))
 	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "scope", "budget", "max_focuses_per_call", "select_relevant_files", "select_relevant_files_min_candidates")
+	setYAMLInt(doc, []string{"learning", "current", "agenda", "fallback_paths_per_focus"}, cfg.Learning.Current.Agenda.FallbackPathsPerFocus)
 	setYAMLBool(doc, []string{"learning", "current", "structural", "enabled"}, cfg.Learning.Current.Structural.Enabled)
 	setYAMLString(doc, []string{"learning", "current", "structural", "provider"}, string(cfg.Learning.Current.Structural.Provider))
 	setYAMLInt(doc, []string{"learning", "current", "structural", "max_symbols"}, cfg.Learning.Current.Structural.MaxSymbols)

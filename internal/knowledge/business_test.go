@@ -7,15 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBusinessPatternGroupsUseScopePathWhenSourcePathIsUnavailable(t *testing.T) {
+func TestBusinessPatternGroupsDoNotNameSingleScopeAsBusinessDomain(t *testing.T) {
 	pattern := domain.NewPattern("existing-capability", "Existing Capability", domain.CategoryBusiness)
 	pattern.ScopePath = "plugins/capability_lifecycle"
 
 	groups := BusinessPatternGroups("en-US", []domain.Pattern{*pattern})
 
 	require.Len(t, groups, 1)
-	require.Equal(t, "capability-lifecycle", groups[0].ID)
-	require.Equal(t, "Capability Lifecycle", groups[0].Title)
+	require.Equal(t, businessFallbackGroupID, groups[0].ID)
 }
 
 func TestBusinessPatternGroupsDoNotInventDomainFromPatternText(t *testing.T) {
@@ -45,10 +44,10 @@ func TestBusinessGroupKeywordsDoNotExpandFromBroadPatternSignals(t *testing.T) {
 	groups := BusinessPatternGroups("en-US", []domain.Pattern{*pattern})
 
 	require.Len(t, groups, 1)
-	require.Equal(t, []string{"billing"}, groups[0].Summary.Keywords)
+	require.Equal(t, []string{"Domain Action State", "domain-action-state"}, groups[0].Summary.Keywords)
 }
 
-func TestBusinessPatternGroupsUseExplicitScopeOverEvidencePath(t *testing.T) {
+func TestBusinessPatternGroupsDoNotUseSingleScopeOverEvidencePath(t *testing.T) {
 	pattern := domain.NewPattern("pattern", "Pattern", domain.CategoryBusiness)
 	pattern.ScopePath = "components/identity"
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "src/adapter/entry.ext"}}
@@ -56,7 +55,19 @@ func TestBusinessPatternGroupsUseExplicitScopeOverEvidencePath(t *testing.T) {
 	groups := BusinessPatternGroups("en-US", []domain.Pattern{*pattern})
 
 	require.Len(t, groups, 1)
-	require.Equal(t, "identity", groups[0].ID)
+	require.Equal(t, businessFallbackGroupID, groups[0].ID)
+}
+
+func TestBusinessPatternGroupsKeepRepeatedScopeInFallbackWithoutFocus(t *testing.T) {
+	first := domain.NewPattern("first", "First", domain.CategoryBusiness)
+	first.ScopePath = "components/identity"
+	second := domain.NewPattern("second", "Second", domain.CategoryBusiness)
+	second.ScopePath = "components/identity"
+
+	groups := BusinessPatternGroups("en-US", []domain.Pattern{*first, *second})
+
+	require.Len(t, groups, 1)
+	require.Equal(t, businessFallbackGroupID, groups[0].ID)
 }
 
 func TestTitleFromWordsPreservesUnicode(t *testing.T) {

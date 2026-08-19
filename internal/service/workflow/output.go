@@ -23,6 +23,8 @@ type Reference struct {
 	Name        string
 	Path        string
 	Description string
+	Summary     string
+	RouteTerms  []string
 }
 
 // LoadReferences 读取当前目标的工作流引用。
@@ -44,6 +46,8 @@ func LoadReferences(repo domain.WorkflowRepository, locale string) ([]Reference,
 			Name:        workflowDisplayName(workflow),
 			Path:        workflowReferencePath(workflow.ID),
 			Description: Summary(workflow, locale),
+			Summary:     strings.TrimSpace(workflow.Summary),
+			RouteTerms:  append([]string(nil), workflow.RouteTerms...),
 		})
 	}
 	return refs, nil
@@ -174,6 +178,9 @@ func workflowDisplayName(workflow domain.Workflow) string {
 
 // Summary 从标准工作流内容中提取适合列表展示和候选匹配的简短摘要。
 func Summary(workflow domain.Workflow, locale string) string {
+	if summary := strings.TrimSpace(workflow.Summary); summary != "" {
+		return summary
+	}
 	if description := summarizedWorkflowDescription(workflow.Content, locale); description != "" {
 		return description
 	}

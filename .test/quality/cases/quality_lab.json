@@ -461,6 +461,22 @@
       "hint": "Keep SKILL.md as a compact router with task-specific reference links."
     },
     {
+      "id": "focus-route-contract",
+      "type": "route_contract",
+      "dimension": "loading",
+      "description": "Development focuses connect request signals to local references and verified source evidence.",
+      "weight": 2,
+      "files": ["SKILL.md"],
+      "minimum_focuses": 1,
+      "requirements": [
+        ["changed path", "改动路径"],
+        ["request signal", "需求信号"],
+        ["every matched reference", "全部命中的参考"],
+        ["source evidence", "源码证据", "evidence entries", "证据入口"]
+      ],
+      "hint": "Keep one deterministic route from changed paths and request terms to every focus reference and source evidence entry."
+    },
+    {
       "id": "project-spec-no-pattern-duplication",
       "type": "not_contains",
       "dimension": "loading",

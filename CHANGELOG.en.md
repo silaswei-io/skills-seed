@@ -2,6 +2,19 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.10]
+
+### Changes
+
+- Strengthened the current-code evidence-focus pipeline: the agenda now organizes reusable source responsibility boundaries, while unassigned paths use configurable coverage-safety batches; terminal output distinguishes development focuses from coverage batches.
+- Improved interruption recovery: the agenda is persisted immediately after planning, and the resume fingerprint binds only the analysis scope, plan contract, and explicit forced reruns, so unrelated configuration changes do not trigger replanning.
+- Improved Rule, Workflow, project-focus, and capability-entry generation routing with incremental optimization, progressive loading, and expanded bilingual Wiki, configuration, and quality-lab regression coverage.
+
+### Fixes
+
+- Fixed boundary validation for agenda coverage receipts, empty candidate IDs, focus-level knowledge review, and structured-output contracts to keep invalid knowledge out of the pattern store.
+- Clarified that local source-analysis context preparation does not call the AI, and aligned terminal, runtime-state, and recovery wording across locales.
+
 ## [v0.20.9]
 
 ### Changes

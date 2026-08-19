@@ -208,6 +208,32 @@ class QualityRunTest(unittest.TestCase):
         self.assertEqual(1, ratio)
         self.assertEqual([], details)
 
+    def test_route_contract_requires_reference_and_evidence_for_each_focus(self):
+        (self.skill / "references" / "focus.md").write_text("focus evidence\n", encoding="utf-8")
+        (self.skill / "SKILL.md").write_text(
+            "## Development Focuses\n\n"
+            "Use changed path -> request signal -> reference page -> source evidence.\n"
+            "For multiple matches, read every matched reference.\n\n"
+            "| Focus | Request terms | References | Evidence entries |\n"
+            "|---|---|---|---|\n"
+            "| Orders | `order` | [open](./references/focus.md) | `internal/order/service.ext:1` |\n",
+            encoding="utf-8",
+        )
+        run = self.run_quality_instance()
+        ratio, details = run._route_contract({
+            "files": ["SKILL.md"],
+            "minimum_focuses": 1,
+            "requirements": [
+                ["changed path"],
+                ["request signal"],
+                ["every matched reference"],
+                ["source evidence"],
+            ],
+        })
+
+        self.assertEqual(1, ratio)
+        self.assertEqual([], details)
+
     def test_existing_project_and_skill_root_can_be_scored(self):
         external_project = self.root / "existing"
         external_skill = external_project / "skill"

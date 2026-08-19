@@ -16,6 +16,8 @@ type Reference struct {
 	ID               string
 	Name             string
 	Path             string
+	Summary          string
+	RouteTerms       []string
 	AffectedProjects []string
 	Paths            []string
 }
@@ -35,6 +37,8 @@ func References(rules []domain.Rule) []Reference {
 			ID:               rule.ID,
 			Name:             name,
 			Path:             "./" + filepath.ToSlash(filepath.Join(ruleOutputDir, rule.ID+".md")),
+			Summary:          strings.TrimSpace(rule.Summary),
+			RouteTerms:       append([]string(nil), rule.RouteTerms...),
 			AffectedProjects: append([]string(nil), rule.AffectedProjects...),
 			Paths:            append([]string(nil), rule.Paths...),
 		})

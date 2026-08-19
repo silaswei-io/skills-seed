@@ -55,8 +55,8 @@ func TestLoader_Render(t *testing.T) {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./references/business-methods.md", Description: "常用业务入口和可复用方法索引"},
 		},
-		"WorkflowReferences": []map[string]string{
-			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查"},
+		"WorkflowReferences": []map[string]interface{}{
+			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查", "Summary": "发布前后检查", "RouteTerms": []string{"发布", "验证"}},
 		},
 		"RuleReferences": []map[string]string{},
 		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
@@ -93,6 +93,8 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "业务模式地图")
 	assert.NotContains(t, content, "常用工作流")
 	assert.Contains(t, content, "部署工作流")
+	assert.Contains(t, content, "适用任务信号")
+	assert.Contains(t, content, "发布")
 	assert.NotContains(t, content, "验证策略")
 	assert.NotContains(t, content, "task verify")
 	assert.Contains(t, content, "错误处理是跨层一致性核心")

@@ -27,7 +27,7 @@ This is the workspace entry skill. It only decides task ownership, selects child
 ## Workspace Workflows
 
 {{range .WorkflowReferences}}
-- [{{.Name}}]({{.Path}}){{if .Description}}: {{.Description}}{{end}}
+- [{{.Name}}]({{.Path}}){{if .Summary}}: {{.Summary}}{{else}}{{if .Description}}: {{.Description}}{{end}}{{end}}{{if .RouteTerms}}; task signals: {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 
 {{end}}
@@ -35,7 +35,7 @@ This is the workspace entry skill. It only decides task ownership, selects child
 {{if .RuleReferences}}
 ## Workspace Rules
 
-{{range .RuleReferences}}- [{{.Name}}]({{.Path}}){{if .AffectedProjects}}; projects: {{range $i, $project := .AffectedProjects}}{{if $i}}, {{end}}`{{$project}}`{{end}}{{end}}{{if .Paths}}; paths: {{range $i, $path := .Paths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}}
+{{range .RuleReferences}}- [{{.Name}}]({{.Path}}){{if .Summary}}; {{.Summary}}{{end}}{{if .AffectedProjects}}; projects: {{range $i, $project := .AffectedProjects}}{{if $i}}, {{end}}`{{$project}}`{{end}}{{end}}{{if .Paths}}; paths: {{range $i, $path := .Paths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}}{{if .RouteTerms}}; match signals: {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 
 {{end}}

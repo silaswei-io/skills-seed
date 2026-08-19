@@ -277,6 +277,9 @@ func (r *learnCurrentProjectRun) detectChanges() error {
 }
 
 func (r *learnCurrentProjectRun) hasRestorableCurrentState() bool {
+	if r.opts.force {
+		return false
+	}
 	state, err := r.stateRepo.Load(r.ctx)
 	if err != nil {
 		return false
@@ -286,7 +289,11 @@ func (r *learnCurrentProjectRun) hasRestorableCurrentState() bool {
 
 func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) error {
 	r.detail(detectLabel, "ProgressLearnCurrentDetectRestoreState", nil)
-	session, err := restoreCurrentState(r.ctx, r.stateRepo, r.cont.FileTracker, r.projectName, r.currentLanguage, r.learningMode, r.opts.userContext, r.currentStateInvocationHash())
+	var session *currentStateSession
+	var err error
+	if !r.opts.force {
+		session, err = restoreCurrentState(r.ctx, r.stateRepo, r.cont.FileTracker, r.projectName, r.currentLanguage, r.learningMode, r.opts.userContext, r.currentStateInvocationHash())
+	}
 	if err != nil {
 		return err
 	}
@@ -302,9 +309,6 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 			}
 			session = nil
 			r.stateInvalidated = true
-			if r.opts.force {
-				detected = nil
-			}
 		}
 	}
 	if session != nil {
@@ -344,7 +348,7 @@ func (r *learnCurrentProjectRun) detectCurrentChanges(force bool) (*fileanalysis
 
 func (r *learnCurrentProjectRun) currentStateInvocationHash() string {
 	focusPaths := projectpath.Relative(r.projectRoot, r.resolvedFocusPaths)
-	return learnCurrentInvocationHash(r.cont.ConfigRepo, focusPaths, r.opts.profileMode, r.opts.force)
+	return learnCurrentInvocationHash(focusPaths, r.opts.force)
 }
 
 func (r *learnCurrentProjectRun) buildFileSelectionPlan() currentFileSelectionPlan {

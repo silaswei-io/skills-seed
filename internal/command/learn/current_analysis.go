@@ -61,8 +61,11 @@ func (r *learnCurrentProjectRun) planLearningAgenda() error {
 	planStartedAt := time.Now()
 	planLabel := i18n.Get("ProgressLearnCurrentPlanFocuses")
 	if r.stateSession != nil {
+		developmentFocuses, coverageFocuses := focusKindCounts(r.stateSession.State.Agenda.Focuses)
 		planLabel = i18n.GetWithParams("ProgressLearnCurrentPlanFocusesRestored", map[string]interface{}{
-			"Focuses": len(r.stateSession.State.Agenda.Focuses),
+			"Focuses":            len(r.stateSession.State.Agenda.Focuses),
+			"DevelopmentFocuses": developmentFocuses,
+			"CoverageFocuses":    coverageFocuses,
 		})
 	}
 	if err := r.steps.Run(planLabel, func() error {

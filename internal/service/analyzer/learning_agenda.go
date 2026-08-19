@@ -47,14 +47,14 @@ type reconciledLearningAgenda struct {
 
 // reconcileLearningAgenda 将 Agent 的规划回执收敛为每个输入路径唯一归属的议程。
 // 它只处理路径、重复和覆盖等结构性问题；焦点语义仍完全由 Agent 负责。
-func reconcileLearningAgenda(inputPaths []string, rawFocuses []domain.EvidenceFocus, rawSkipped []agent.LearningPathSkip) (reconciledLearningAgenda, error) {
+func reconcileLearningAgenda(inputPaths []string, rawFocuses []domain.EvidenceFocus, rawSkipped []agent.LearningPathSkip, fallbackPathsPerFocus int) (reconciledLearningAgenda, error) {
 	reconciler := learningAgendaReconciler{inputs: newLearningAgendaInputSet(inputPaths)}
 	focuses := reconciler.focuses(rawFocuses)
 	if err := validateLearningAgendaFocuses(focuses); err != nil {
 		return reconciledLearningAgenda{}, err
 	}
 	skipped := reconciler.skipped(rawSkipped, focuses)
-	focuses = reconciler.completeCoverage(focuses, skipped)
+	focuses = reconciler.completeCoverage(focuses, skipped, fallbackPathsPerFocus)
 	if err := validateLearningAgendaCoverageForInputs(reconciler.inputs, focuses, skipped); err != nil {
 		return reconciledLearningAgenda{}, err
 	}
@@ -118,7 +118,7 @@ func (r learningAgendaReconciler) skipped(raw []agent.LearningPathSkip, focuses 
 	return result
 }
 
-func (r learningAgendaReconciler) completeCoverage(focuses []domain.EvidenceFocus, skipped []agent.LearningPathSkip) []domain.EvidenceFocus {
+func (r learningAgendaReconciler) completeCoverage(focuses []domain.EvidenceFocus, skipped []agent.LearningPathSkip, fallbackPathsPerFocus int) []domain.EvidenceFocus {
 	claimed := focusPathSet(focuses)
 	for _, receipt := range skipped {
 		claimed[receipt.Path] = struct{}{}
@@ -132,14 +132,32 @@ func (r learningAgendaReconciler) completeCoverage(focuses []domain.EvidenceFocu
 	if len(missing) == 0 {
 		return focuses
 	}
-	return append(focuses, domain.EvidenceFocus{
-		ID:            nextUnassignedEvidenceFocusID(focuses),
-		Name:          i18n.Get("LearnCurrentUnassignedEvidenceFocusName"),
-		Purpose:       domain.EvidenceFocusPurposeCoverage,
-		AnalysisDepth: domain.EvidenceFocusDepthStandard,
-		EntryPaths:    missing,
-		ScopeReason:   i18n.Get("LearnCurrentUnassignedEvidenceFocusReason"),
-	})
+	if fallbackPathsPerFocus <= 0 {
+		fallbackPathsPerFocus = len(missing)
+	}
+	for batchIndex, start := 0, 0; start < len(missing); batchIndex, start = batchIndex+1, start+fallbackPathsPerFocus {
+		end := start + fallbackPathsPerFocus
+		if end > len(missing) {
+			end = len(missing)
+		}
+		batchNumber := batchIndex + 1
+		nameKey := "LearnCurrentUnassignedEvidenceFocusName"
+		reasonKey := "LearnCurrentUnassignedEvidenceFocusReason"
+		params := map[string]interface{}{"Batch": batchNumber}
+		if len(missing) > fallbackPathsPerFocus {
+			nameKey += "WithBatch"
+			reasonKey += "WithBatch"
+		}
+		focuses = append(focuses, domain.EvidenceFocus{
+			ID:            nextUnassignedEvidenceFocusID(focuses),
+			Name:          i18n.GetWithParams(nameKey, params),
+			Purpose:       domain.EvidenceFocusPurposeCoverage,
+			AnalysisDepth: domain.EvidenceFocusDepthStandard,
+			EntryPaths:    append([]string(nil), missing[start:end]...),
+			ScopeReason:   i18n.GetWithParams(reasonKey, params),
+		})
+	}
+	return focuses
 }
 
 func focusPathSet(focuses []domain.EvidenceFocus) map[string]struct{} {

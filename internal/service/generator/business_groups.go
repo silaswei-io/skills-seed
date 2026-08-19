@@ -29,5 +29,13 @@ func splitBusinessPatternGroups(groups []patternGroup) (detailGroups []patternGr
 }
 
 func businessGroupNeedsDetail(group patternGroup) bool {
-	return group.HasDevelopmentFocus || len(group.Patterns) > 1
+	if group.HasDevelopmentFocus || len(group.Patterns) > 1 {
+		return true
+	}
+	for _, pattern := range group.Patterns {
+		if domain.IsUsableBusinessMethod(pattern.BusinessMethod) {
+			return true
+		}
+	}
+	return false
 }

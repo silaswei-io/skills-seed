@@ -10,6 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestApplyKnowledgeReviewRejectsEmptyCandidateID(t *testing.T) {
+	_, err := applyKnowledgeReview([]domain.Pattern{currentPattern("candidate", 0.9, "src/candidate.ext")}, []agent.KnowledgeReviewDecision{{
+		CandidateID: "   ", Verdict: "reject", ReasonCode: "unsupported_evidence", Reason: "No source evidence.",
+	}})
+
+	require.ErrorContains(t, err, "空候选 ID")
+}
+
 func TestApplyKnowledgeReviewRevisesTextAndPreservesOwnership(t *testing.T) {
 	candidate := currentPattern("bounded-behavior", 0.9, "src/behavior.ext")
 	candidate.Source = domain.SourceLearnedCurrent

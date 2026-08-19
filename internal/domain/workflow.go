@@ -4,12 +4,14 @@ import "time"
 
 // Workflow 描述用户沉淀的任务工作流。
 type Workflow struct {
-	ID        string
-	Name      string
-	Content   string
-	Scripts   []WorkflowScript
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         string
+	Name       string
+	Content    string
+	Summary    string
+	RouteTerms []string
+	Scripts    []WorkflowScript
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // WorkflowScript 描述工作流关联脚本。

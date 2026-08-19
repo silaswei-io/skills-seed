@@ -937,13 +937,13 @@ other = "隔离源码证据分析与独立知识审查"
 other = "学习议程规划"
 
 [ProgressLearnCurrentPlanFocusesRestored]
-other = "恢复学习议程（{{.Focuses}} 个焦点）"
+other = "恢复学习议程（{{.Focuses}} 个焦点：开发 {{.DevelopmentFocuses}}，覆盖 {{.CoverageFocuses}}）"
 
 [ProgressLearnCurrentAnalyzeFocus]
 other = "{{.Label}} · 焦点 {{.Current}}/{{.Total}} · {{.Name}}"
 
 [ProgressLearnCurrentAnalyzePreparing]
-other = "{{.Label}} · 准备分析上下文"
+other = "{{.Label}} · 准备本地源码分析上下文"
 
 [ProgressLearnCurrentAnalyzeSourceFocus]
 other = "{{.Base}} · 源码证据分析"
@@ -989,6 +989,9 @@ other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} · 焦点 {{.Current}}/{
 
 [ProgressLearnCurrentReviewComplete]
 other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} 个焦点"
+
+[PatternReviewEmptyCandidateID]
+other = "知识审查返回了空候选 ID；每个决定必须引用输入候选 ID"
 
 [ProgressLearnCurrentPatternStageDetail]
 other = "{{.Label}} · {{.Detail}}"
@@ -1946,8 +1949,14 @@ other = "AI 未将 {{.Group}} 归入已有高密度证据焦点时，按该语�
 [LearnCurrentUnassignedEvidenceFocusName]
 other = "待核验的剩余证据"
 
+[LearnCurrentUnassignedEvidenceFocusNameWithBatch]
+other = "待核验的剩余证据（批次 {{.Batch}}）"
+
 [LearnCurrentUnassignedEvidenceFocusReason]
 other = "学习议程遗漏了这些输入路径；在判断其是否包含可沉淀知识前，需要核验源码证据。"
+
+[LearnCurrentUnassignedEvidenceFocusReasonWithBatch]
+other = "AI 只返回高价值焦点；该兜底批次包含尚未分配的输入路径，需要逐批核验源码，不代表这些路径已被判定为无价值。"
 
 [LearnCurrentArtifactsCommittedWithPendingFocuses]
 other = "分析产物已提交，但仍有 {{.Count}} 个证据焦点待处理"
@@ -1956,7 +1965,7 @@ other = "分析产物已提交，但仍有 {{.Count}} 个证据焦点待处理"
 other = "本地过滤统计:\n  • 文件范围: 扫描 {{.ScannedFiles}}，本地排除 {{.LocalSkippedFiles}}，可学习 {{.SourceFiles}}\n  • 增量候选: 新增/修改 {{.Changed}}，删除 {{.Deleted}}，未变化 {{.Unchanged}}\n  • 待处理候选: {{.LocalPlanInputs}}"
 
 [LearnCurrentResumeSummary]
-other = "恢复未完成的 {{.Command}} 执行计划:\n  • 本地过滤: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • 候选准备: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，证据焦点 {{.Focuses}}\n  • 本次复用已保存议程，不重复执行文件扫描、本地过滤和候选准备"
+other = "恢复未完成的 {{.Command}} 执行计划:\n  • 本地过滤: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • 候选准备: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，证据焦点 {{.Focuses}}（开发 {{.DevelopmentFocuses}}，覆盖 {{.CoverageFocuses}}）\n  • 本次复用已保存议程，不重复执行文件扫描、本地过滤和候选准备"
 
 [LearnCurrentNoFileChanges]
 other = "未检测到可学习文件变化，已跳过 patterns 学习"

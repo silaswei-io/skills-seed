@@ -26,6 +26,8 @@ func LoadWorkflowReferences(repo domain.WorkflowRepository, locale string) ([]Wo
 			Name:        ref.Name,
 			Path:        ref.Path,
 			Description: ref.Description,
+			Summary:     ref.Summary,
+			RouteTerms:  append([]string(nil), ref.RouteTerms...),
 		})
 	}
 	return result, nil

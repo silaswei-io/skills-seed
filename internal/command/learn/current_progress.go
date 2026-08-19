@@ -158,6 +158,8 @@ func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
 				"SelectedFiles":       r.resumeSummary.SelectedFiles,
 				"PendingAnalyzeFiles": r.resumeSummary.PendingAnalyzeFiles,
 				"Focuses":             r.resumeSummary.Focuses,
+				"DevelopmentFocuses":  r.resumeSummary.DevelopmentFocuses,
+				"CoverageFocuses":     r.resumeSummary.CoverageFocuses,
 			}))
 		} else {
 			logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{

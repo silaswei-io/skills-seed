@@ -15,9 +15,11 @@ func TestSplitBusinessPatternGroupsKeepsSparseGroupsInline(t *testing.T) {
 	one.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/logic/system/admin/create.go", Line: 48}}
 	twoA := domain.NewPattern("key-create", "密钥创建", domain.CategoryBusiness)
 	twoA.ScopePath = "plugins/key_manage"
+	twoA.DevelopmentFocus = &domain.DevelopmentFocus{ID: "key-manage", Name: "Key Manage", RouteTerms: []string{"key"}}
 	twoA.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "plugins/key_manage/internal/logic/key_manage/create.go", Line: 12}}
 	twoB := domain.NewPattern("key-delete", "密钥删除", domain.CategoryBusiness)
 	twoB.ScopePath = "plugins/key_manage"
+	twoB.DevelopmentFocus = twoA.DevelopmentFocus.Clone()
 	twoB.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "plugins/key_manage/internal/logic/key_manage/delete.go", Line: 12}}
 	groups := businessPatternGroups("zh-CN", []domain.Pattern{*one, *twoA, *twoB})
 
@@ -26,5 +28,5 @@ func TestSplitBusinessPatternGroupsKeepsSparseGroupsInline(t *testing.T) {
 	require.Len(t, detailGroups, 1)
 	assert.Equal(t, "Key Manage", detailGroups[0].Title)
 	require.Len(t, inlineGroups, 1)
-	assert.Equal(t, "Admin", inlineGroups[0].Title)
+	assert.Equal(t, "其他业务规则", inlineGroups[0].Title)
 }

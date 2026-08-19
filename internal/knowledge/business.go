@@ -1,7 +1,6 @@
 package knowledge
 
 import (
-	"path/filepath"
 	"sort"
 	"strings"
 	"unicode"
@@ -13,7 +12,6 @@ import (
 
 const (
 	businessFallbackGroupID = "other"
-	maxBusinessGroupWords   = 4
 	maxBusinessGroupSignals = 5
 )
 
@@ -107,34 +105,9 @@ func businessPatternGroupKey(pattern domain.Pattern) businessGroupKey {
 			HasDevelopmentFocus: true,
 		}
 	}
-	if pattern.ScopePath != "" {
-		return businessGroupKeyFromPathText(pattern.ScopePath)
-	}
+	// ScopePath 是项目边界信息，不等同于产品/领域名称；没有显式焦点时
+	// 统一进入 fallback，由模式名和源码证据继续定位，避免机械生成伪业务域。
 	return businessGroupKey{}
-}
-
-func businessGroupKeyFromPathText(location string) businessGroupKey {
-	path := filepath.ToSlash(strings.TrimSpace(location))
-	path = strings.Trim(path, "/")
-	if path == "" {
-		return businessGroupKey{}
-	}
-	return businessGroupKeyFromName(filepath.Base(path))
-}
-
-func businessGroupKeyFromName(name string) businessGroupKey {
-	words := SplitBusinessGroupWords(name)
-	if len(words) == 0 {
-		return businessGroupKey{}
-	}
-	if len(words) > maxBusinessGroupWords {
-		words = words[:maxBusinessGroupWords]
-	}
-	id := strings.Join(words, "-")
-	return businessGroupKey{
-		ID:    id,
-		Title: TitleFromWords(words),
-	}
 }
 
 func SplitBusinessGroupWords(text string) []string {
@@ -211,6 +184,9 @@ func buildBusinessGroupSummary(locale string, group BusinessGroup) BusinessGroup
 }
 
 func businessGroupKeywords(group BusinessGroup) []string {
+	if group.ID == businessFallbackGroupID && len(group.Signals) > 0 {
+		return limitStrings(stringx.UniqueNonBlank(group.Signals), maxBusinessGroupSignals)
+	}
 	if len(group.RouteTerms) > 0 {
 		return limitStrings(stringx.UniqueNonBlank(group.RouteTerms), maxBusinessGroupSignals)
 	}

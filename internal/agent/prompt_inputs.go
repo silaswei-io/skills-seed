@@ -84,9 +84,20 @@ func ReviewKnowledgePromptData(session *PromptInputSession, req *ReviewKnowledge
 		"EvidenceFocusPath": focusPath,
 		"CandidatesPath":    candidatesPath,
 		"CandidateCount":    len(req.Candidates),
+		"CandidateIDs":      reviewCandidateIDs(req.Candidates),
 		"UserContextPath":   userContextPath,
 		"AllowedCategories": domain.AllowedPatternCategoriesText(),
 	}, nil
+}
+
+func reviewCandidateIDs(candidates []domain.Pattern) []string {
+	ids := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if id := strings.TrimSpace(candidate.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func writeNormalizePatternsInput(session *PromptInputSession, name string, patterns []domain.Pattern) (string, error) {

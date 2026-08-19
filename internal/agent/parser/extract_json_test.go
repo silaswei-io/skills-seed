@@ -55,10 +55,12 @@ func TestParseAnalyzeCurrentCodebaseBatchResultKeepsTopLevelFocuses(t *testing.T
 }
 
 func TestParseOptimizeContentResultTrimsMarkdown(t *testing.T) {
-	result, err := ParseOptimizeContentResult(`{"content":"  # Rule\n\nKeep the boundary.  "}`)
+	result, err := ParseOptimizeContentResult(`{"content":"  # Rule\n\nKeep the boundary.  ","summary":"Use when the boundary changes.","route_terms":["boundary","change","boundary"]}`)
 
 	require.NoError(t, err)
 	require.Equal(t, "# Rule\n\nKeep the boundary.", result.Content)
+	require.Equal(t, "Use when the boundary changes.", result.Summary)
+	require.Equal(t, []string{"boundary", "change"}, result.RouteTerms)
 }
 
 func TestParsePlanLearningAgendaResultKeepsCoverageReceipt(t *testing.T) {

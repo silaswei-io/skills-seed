@@ -39,6 +39,10 @@ skills-seed generate skills
 
 Source can describe implementation dependencies and impact boundaries, but it cannot reliably determine which commands must run, who approves them, or when deployment occurs. Those are user-maintained Workflow concerns.
 
+## Routing metadata
+
+Optimization may produce `summary` and `route_terms` for a Rule or Workflow. `summary` is a short purpose description, while `route_terms` are a small set of request signals taken from the supplied content. They improve entry-Skill routing only; they are not new rules, steps, scopes, or command permissions. Rules still match explicit project/path scopes, and workflows still require reading the complete document before execution. Older resources without these fields remain compatible.
+
 ## Workflow Path Base
 
 Use repository-relative paths for affected locations, verification targets, and script references in workflow content. A workspace-level workflow is relative to the workspace root; a project workflow, including a `--child` workflow, is relative to the target project root. Do not use paths relative to the current terminal directory or absolute local-machine paths.

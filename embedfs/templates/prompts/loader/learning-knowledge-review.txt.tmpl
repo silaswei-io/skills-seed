@@ -9,10 +9,16 @@ Project:
 
 The evidence focus for this review is available at `{{.EvidenceFocusPath}}`. Candidate knowledge from that focus is available at `{{.CandidatesPath}}` ({{.CandidateCount}} items). Keep this focus together, and read each candidate and its referenced repository evidence. User context is available at `{{.UserContextPath}}`.
 
+Candidate IDs for this call (copy these values exactly into `candidate_id`):
+{{- range .CandidateIDs}}
+- `{{.}}`
+{{- end}}
+
 Allowed categories: {{.AllowedCategories}}
 
 Review contract:
 - Return exactly one decision for every candidate ID. Never invent, omit, duplicate, merge, or rewrite an ID.
+- `candidate_id` must be one of the listed non-empty IDs. Never emit an empty string, whitespace, placeholder, or display name. If the candidate list is empty, return `decisions: []`.
 - Judge semantic accuracy from the referenced evidence chain, not from the candidate's confidence, wording, filename, framework conventions, or common engineering expectations.
 - Distinguish current implementation, design intent, proven guarantee, and known risk. Reject or revise claims of atomicity, security, validation, consistency, reliability, compatibility, ordering, completeness, or prevention unless the evidence covers the relevant boundary and failure modes.
 - Confirm the applicability boundary. A local example cannot become a repository-wide practice; one branch cannot prove every variant; presentation or client behavior cannot prove enforcement by another boundary.

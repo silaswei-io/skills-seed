@@ -15,6 +15,8 @@ Skills Seed stores information with different confidence levels, owners, and pur
 | Pattern | Reusable practice with source evidence | Helps reuse established implementation knowledge | Must not promote incidental code into a standard |
 | Capability entry | Evidence-backed service, method, or utility | Avoids rebuilding existing behavior | Must not be detached from its declaration and source chain |
 
+Rule and Workflow `summary` and `route_terms` are navigation metadata. They may narrow entry-Skill retrieval, but cannot expand a Rule's project/path scope or turn a Workflow into command authorization.
+
 ## Authority Order
 
 An Agent resolves conflicts in this order:

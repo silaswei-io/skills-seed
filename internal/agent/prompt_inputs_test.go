@@ -52,6 +52,17 @@ func TestReviewKnowledgePromptDataWritesEvidenceFocus(t *testing.T) {
 	require.JSONEq(t, `{"id":"lifecycle","name":"Lifecycle","entry_paths":["internal/lifecycle.ext"],"scope_reason":"The transition and persistence boundary must be reviewed together."}`, string(content))
 }
 
+func TestReviewKnowledgePromptDataIncludesExactCandidateIDs(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	data, err := ReviewKnowledgePromptData(session, &ReviewKnowledgeRequest{Candidates: []domain.Pattern{
+		*domain.NewPattern(" state-transition ", "State transition", domain.CategoryBusiness),
+		*domain.NewPattern("", "Ignored", domain.CategoryBusiness),
+	}})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"state-transition"}, data["CandidateIDs"])
+}
+
 func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 

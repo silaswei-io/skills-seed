@@ -8,6 +8,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
@@ -52,7 +53,7 @@ func applyKnowledgeReview(candidates []domain.Pattern, decisions []agent.Knowled
 	for _, decision := range decisions {
 		id := strings.TrimSpace(decision.CandidateID)
 		if id == "" {
-			return nil, fmt.Errorf("knowledge review has empty candidate id")
+			return nil, fmt.Errorf("%s", i18n.Get("PatternReviewEmptyCandidateID"))
 		}
 		if _, exists := byID[id]; exists {
 			return nil, fmt.Errorf("knowledge review repeats candidate %q", id)

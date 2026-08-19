@@ -22,8 +22,8 @@ import (
 
 const (
 	commandStateLearnCurrent = "learn-current"
-	// currentAnalysisPlanContract 标识分析计划必须完整覆盖待分析文件的当前契约。
-	currentAnalysisPlanContract = "full-file-coverage-v1"
+	// currentAnalysisPlanContract 标识分析议程的输入与覆盖契约。
+	currentAnalysisPlanContract = "focused-routing-v2"
 )
 
 type currentStateSession struct {
@@ -40,6 +40,19 @@ type learnCurrentResumeSummary struct {
 	SelectedFiles       string
 	PendingAnalyzeFiles int
 	Focuses             int
+	DevelopmentFocuses  int
+	CoverageFocuses     int
+}
+
+func focusKindCounts(focuses []domain.EvidenceFocus) (development, coverage int) {
+	for _, focus := range focuses {
+		if focus.IsDevelopmentRouteable() {
+			development++
+		} else {
+			coverage++
+		}
+	}
+	return development, coverage
 }
 
 func learnCurrentStateRepo(seedPath, scope string) *commandstate.Repository {
@@ -78,6 +91,7 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 		selectionInputs = displayCount(len(session.State.Files))
 		selectedFiles = displayCount(len(session.State.Files) - selectionSkipped)
 	}
+	developmentFocuses, coverageFocuses := focusKindCounts(session.State.Agenda.Focuses)
 	return &learnCurrentResumeSummary{
 		Command:             session.State.Command,
 		CreatedAt:           session.State.CreatedAt,
@@ -87,6 +101,8 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 		SelectedFiles:       selectedFiles,
 		PendingAnalyzeFiles: pendingResumeAnalysisFiles(session),
 		Focuses:             len(session.State.Agenda.Focuses),
+		DevelopmentFocuses:  developmentFocuses,
+		CoverageFocuses:     coverageFocuses,
 	}
 }
 
@@ -113,26 +129,18 @@ func displayCount(count int) string {
 	return strconv.Itoa(count)
 }
 
-func learnCurrentInvocationHash(configRepo config.Reader, focusPaths []string, profileMode string, force bool) string {
+func learnCurrentInvocationHash(focusPaths []string, force bool) string {
 	type invocation struct {
-		PlanContract  string                       `json:"plan_contract"`
-		FocusPaths    []string                     `json:"focus_paths"`
-		ProfileMode   string                       `json:"profile_mode"`
-		Force         bool                         `json:"force"`
-		CurrentConfig config.CurrentLearningConfig `json:"current_config"`
-		ExcludeConfig config.ExcludeConfig         `json:"exclude_config"`
-		SkillsConfig  config.SkillsConfig          `json:"skills_config"`
+		PlanContract string   `json:"plan_contract"`
+		FocusPaths   []string `json:"focus_paths"`
+		Force        bool     `json:"force"`
 	}
+	// 这里只绑定会改变本轮分析范围或显式执行语义的参数。
+	// 兜底批次大小、准入阈值、画像选项和 Skills 输出配置均不应让已保存议程失效。
 	value := invocation{
 		PlanContract: currentAnalysisPlanContract,
 		FocusPaths:   normalizeStatePaths(focusPaths),
-		ProfileMode:  strings.ToLower(strings.TrimSpace(profileMode)),
 		Force:        force,
-	}
-	if configRepo != nil {
-		value.CurrentConfig = configRepo.GetCurrentLearningConfig()
-		value.ExcludeConfig = configRepo.GetExcludeConfig()
-		value.SkillsConfig = configRepo.GetSkillsConfig()
 	}
 	data, _ := json.Marshal(value)
 	return commandstate.HashText(string(data))
@@ -177,14 +185,16 @@ func canReuseCurrentState(state *commandstate.State, changes *fileanalysis.FileC
 }
 
 func canResumeCurrentState(state *commandstate.State, projectName, language, mode, userContext, invocationHash string) bool {
-	return state != nil &&
-		state.ProjectName == projectName &&
-		state.Language == language &&
-		state.Mode == mode &&
-		state.UserContext == commandstate.HashText(userContext) &&
-		state.InvocationHash == invocationHash &&
-		len(state.Agenda.Focuses) > 0 &&
-		currentStateInputCount(state) > 0
+	if state == nil ||
+		state.ProjectName != projectName ||
+		state.Language != language ||
+		state.Mode != mode ||
+		state.UserContext != commandstate.HashText(userContext) ||
+		len(state.Agenda.Focuses) == 0 ||
+		currentStateInputCount(state) == 0 {
+		return false
+	}
+	return state.InvocationHash == invocationHash
 }
 
 func currentChangesCoveredByState(state *commandstate.State, changes *fileanalysis.FileChanges) bool {

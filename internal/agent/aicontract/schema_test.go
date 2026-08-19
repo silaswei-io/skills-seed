@@ -150,9 +150,10 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	require.Contains(t, schemaStringList(reasonCode["enum"]), "overfiltered_source_backed")
 }
 
-func TestPlanningSchemaRequiresCoverageDecisionFields(t *testing.T) {
+func TestPlanningSchemaKeepsCoverageCompletionDeterministic(t *testing.T) {
 	plan := decodeSchema(t, ContractPlanLearningAgenda)
-	requireRequiredFields(t, plan, "focuses", "skipped_paths", "reason")
+	requireRequiredFields(t, plan, "focuses", "reason")
+	require.NotContains(t, schemaStringList(plan["required"]), "skipped_paths")
 	requireRequiredFields(t, mustFindSchemaContainer(t, plan, "id"), "id", "name")
 }
 
@@ -161,6 +162,9 @@ func TestKnowledgeReviewSchemaRequiresOneDecisionShape(t *testing.T) {
 	requireRequiredFields(t, review, "decisions")
 	decision := mustFindSchemaContainer(t, review, "candidate_id")
 	requireRequiredFields(t, decision, "candidate_id", "verdict", "reason_code", "reason")
+	candidateID, _, ok := findSchemaPropertyWithContainer(review, "candidate_id")
+	require.True(t, ok)
+	require.Equal(t, float64(1), candidateID["minLength"])
 	require.NotContains(t, schemaStringList(decision["required"]), "business_method")
 	decisionProperties := decision["properties"].(map[string]any)
 	require.NotContains(t, decisionProperties, "business_method_verdict")
@@ -215,12 +219,14 @@ func TestWorkspaceStructuredOutputSchemaConstrainsProjectIDs(t *testing.T) {
 	require.NotContains(t, data, "ntls-workspace")
 }
 
-func TestResourceOptimizationSchemasExposeOnlyContent(t *testing.T) {
+func TestResourceOptimizationSchemasRequireContentAndAllowRoutingMetadata(t *testing.T) {
 	for _, contract := range []string{ContractOptimizeWorkflow, ContractOptimizeRule} {
 		schema := decodeSchema(t, contract)
 		properties := schema["properties"].(map[string]any)
-		require.Len(t, properties, 1)
+		require.Len(t, properties, 3)
 		require.Contains(t, properties, "content")
+		require.Contains(t, properties, "summary")
+		require.Contains(t, properties, "route_terms")
 		require.Equal(t, []string{"content"}, schemaStringList(schema["required"]))
 	}
 }

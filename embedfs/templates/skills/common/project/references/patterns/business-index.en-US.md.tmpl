@@ -27,6 +27,7 @@ Match the request's business nouns, user actions, state changes, rules or polici
   - When to read: {{if .Summary.IsFallback}}Read when the task cannot be mapped to a specific domain but changes business rules, state transitions, runtime behavior, or cross-module flows.{{else}}Read when the task mentions {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}, uses synonymous business actions or state changes, or changes code under {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}}.{{end}}
   {{if .Summary.PrimaryPath}}- Primary evidence path: `{{.Summary.PrimaryPath}}`{{end}}
   {{if .Summary.Keywords}}- Keywords: {{range .Summary.Keywords}}`{{.}}` {{end}}{{end}}
+  {{if .Patterns}}- Pattern entries: {{range $i, $pattern := .Patterns}}{{if $i}}, {{end}}`{{$pattern.Name}}`{{end}}{{end}}
 {{end}}
 {{else}}
 No business domain currently needs a separate detail file; read the learned business rules below directly.

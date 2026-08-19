@@ -51,6 +51,8 @@ learning:
     pattern_admission:
       min_confidence: 0.75
       min_single_evidence_confidence: 0.85
+    agenda:
+      fallback_paths_per_focus: 256
     structural:
       enabled: true
       provider: "auto"
@@ -162,6 +164,7 @@ exclude:
 | Field | Default | Description |
 |---|---:|---|
 | `mode` | `normal` | All learning strategies use high-precision admission: `fast` narrows evidence exploration; `normal` is the default; `deep` broadens evidence exploration without lowering the pattern admission standard |
+| `agenda.fallback_paths_per_focus` | `256` | Maximum input paths in each deterministic fallback focus when AI leaves paths unassigned; controls request size and resumability, not path value |
 | `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
 | `structural.provider` | `auto` | Structural context and symbol-verification source: `auto` prefers CodeGraph and falls back to tree-sitter when unavailable; `codegraph` requires CodeGraph; `treesitter` explicitly selects the embedded parser |
 | `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |

@@ -51,6 +51,8 @@ learning:
     pattern_admission:
       min_confidence: 0.75
       min_single_evidence_confidence: 0.85
+    agenda:
+      fallback_paths_per_focus: 256
     structural:
       enabled: true
       provider: "auto"
@@ -162,6 +164,7 @@ exclude:
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `mode` | `normal` | 学习策略均以高精准率准入：`fast` 缩小证据探索范围；`normal` 为默认；`deep` 扩大证据探索范围，但不降低模式准入标准 |
+| `agenda.fallback_paths_per_focus` | `256` | AI 未分配路径时，每个确定性兜底焦点携带的最大输入路径数；用于控制请求体积和断点续跑，不表示路径价值判断 |
 | `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
 | `structural.provider` | `auto` | 结构化上下文与符号校验来源：`auto` 优先 CodeGraph 并在不可用时回退 tree-sitter；`codegraph` 强制使用 CodeGraph；`treesitter` 显式选择内嵌 parser |
 | `structural.max_symbols` | `30` | 输出到结构化上下文的最大符号数 |

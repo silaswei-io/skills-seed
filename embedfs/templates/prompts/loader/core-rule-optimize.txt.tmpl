@@ -33,6 +33,9 @@ Requirements:
 - Do not invent commands, paths, tools, guarantees, ownership, or execution permission. Do not convert descriptive facts into mandates.
 - Resolve wording and structure only when the evidence supports the same meaning. Keep already clear rules concise.
 - If inputs conflict or an ambiguity cannot be resolved without changing authority, preserve both positions and mark the point as `To confirm`.
+- Also return optional routing metadata. `summary` is one short sentence describing when this rule is useful; `route_terms` is a small list of concrete natural-language signals from the supplied inputs (resources, actions, states, task types, paths, or external dependencies).
+- Routing metadata is navigation only. It must not add facts, obligations, scope, command permissions, guarantees, or implied inheritance. Do not invent terms that are absent from the inputs. Keep the list small and specific; omit metadata when the inputs do not support it.
+- Preserve the explicit affected projects and paths exactly as supplied. Do not use routing metadata to widen or narrow those hard boundaries.
 - Return the complete replacement Markdown body. Do not add commentary outside the result.
 
 Return JSON only.

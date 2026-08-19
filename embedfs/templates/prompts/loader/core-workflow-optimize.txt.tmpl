@@ -30,6 +30,8 @@ Requirements:
 - Never turn a descriptive example into a required step or an available command into permission to execute it.
 - Use headings and ordered steps only where they improve execution. Keep already clear content concise; do not force irrelevant sections.
 - If inputs conflict or information remains unresolved, preserve both positions and mark the point as `To confirm` instead of guessing.
+- Also return optional routing metadata. `summary` is one short sentence describing the task goal this workflow serves; `route_terms` is a small list of concrete natural-language signals from the supplied inputs (resources, actions, states, task types, paths, or external dependencies).
+- Routing metadata is navigation only and never grants command permission. Do not invent terms, commands, environments, guarantees, or workflow scope that are absent from the supplied inputs. Keep the list small and specific; omit metadata when the inputs do not support it.
 - Return the complete replacement Markdown body. Do not add commentary outside the result.
 
 Return JSON only.

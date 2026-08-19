@@ -27,7 +27,7 @@ description: 处理 {{.WorkspaceName}} 工作区中的需求、问题排查、�
 ## 工作区工作流
 
 {{range .WorkflowReferences}}
-- [{{.Name}}]({{.Path}}){{if .Description}}：{{.Description}}{{end}}
+- [{{.Name}}]({{.Path}}){{if .Summary}}：{{.Summary}}{{else}}{{if .Description}}：{{.Description}}{{end}}{{end}}{{if .RouteTerms}}；适用任务信号：{{range $i, $term := .RouteTerms}}{{if $i}}、{{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 
 {{end}}
@@ -35,7 +35,7 @@ description: 处理 {{.WorkspaceName}} 工作区中的需求、问题排查、�
 {{if .RuleReferences}}
 ## 工作区规则
 
-{{range .RuleReferences}}- [{{.Name}}]({{.Path}}){{if .AffectedProjects}}；项目：{{range $i, $project := .AffectedProjects}}{{if $i}}、{{end}}`{{$project}}`{{end}}{{end}}{{if .Paths}}；路径：{{range $i, $path := .Paths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}
+{{range .RuleReferences}}- [{{.Name}}]({{.Path}}){{if .Summary}}；{{.Summary}}{{end}}{{if .AffectedProjects}}；项目：{{range $i, $project := .AffectedProjects}}{{if $i}}、{{end}}`{{$project}}`{{end}}{{end}}{{if .Paths}}；路径：{{range $i, $path := .Paths}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}{{if .RouteTerms}}；命中信号：{{range $i, $term := .RouteTerms}}{{if $i}}、{{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
 
 {{end}}

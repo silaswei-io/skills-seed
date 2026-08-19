@@ -382,11 +382,10 @@ func TestRestoreCurrentStateReportsUnsupportedSchemaWithoutDeletingIt(t *testing
 }
 
 func TestLearnCurrentInvocationHashIncludesExecutionOptions(t *testing.T) {
-	base := learnCurrentInvocationHash(nil, []string{"internal/auth"}, learnCurrentProfileAuto, false)
+	base := learnCurrentInvocationHash([]string{"internal/auth"}, false)
 
-	require.NotEqual(t, base, learnCurrentInvocationHash(nil, []string{"internal/key"}, learnCurrentProfileAuto, false))
-	require.NotEqual(t, base, learnCurrentInvocationHash(nil, []string{"internal/auth"}, learnCurrentProfileRefresh, false))
-	require.NotEqual(t, base, learnCurrentInvocationHash(nil, []string{"internal/auth"}, learnCurrentProfileAuto, true))
+	require.NotEqual(t, base, learnCurrentInvocationHash([]string{"internal/key"}, false))
+	require.NotEqual(t, base, learnCurrentInvocationHash([]string{"internal/auth"}, true))
 }
 
 func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
@@ -417,6 +416,8 @@ func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
 	require.Equal(t, "1", summary.SelectedFiles)
 	require.Equal(t, 1, summary.PendingAnalyzeFiles)
 	require.Equal(t, 1, summary.Focuses)
+	require.Equal(t, 1, summary.DevelopmentFocuses)
+	require.Equal(t, 0, summary.CoverageFocuses)
 }
 
 func TestBuildLearnCurrentResumeSummaryDerivesMissingMetrics(t *testing.T) {

@@ -68,6 +68,9 @@ learning:
       min_confidence: 0.75
       # 单文件证据候选的最低置信度
       min_single_evidence_confidence: 0.85
+    agenda:
+      # AI 未分配路径的确定性兜底焦点，每个焦点最多携带的输入路径数
+      fallback_paths_per_focus: 256
     structural:
       # 启用有边界的结构化上下文；无边界输入时不会运行
       enabled: true

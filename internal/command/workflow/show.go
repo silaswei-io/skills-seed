@@ -18,12 +18,13 @@ import (
 )
 
 type workflowSummaryView struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Target      string `json:"target"`
-	Summary     string `json:"summary,omitempty"`
-	ScriptCount int    `json:"script_count"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Target      string   `json:"target"`
+	Summary     string   `json:"summary,omitempty"`
+	RouteTerms  []string `json:"route_terms,omitempty"`
+	ScriptCount int      `json:"script_count"`
+	UpdatedAt   string   `json:"updated_at,omitempty"`
 }
 
 type workflowScriptView struct {
@@ -33,14 +34,15 @@ type workflowScriptView struct {
 }
 
 type workflowDetailView struct {
-	ID        string               `json:"id"`
-	Name      string               `json:"name"`
-	Target    string               `json:"target"`
-	Summary   string               `json:"summary,omitempty"`
-	Content   string               `json:"content"`
-	Scripts   []workflowScriptView `json:"scripts"`
-	CreatedAt string               `json:"created_at,omitempty"`
-	UpdatedAt string               `json:"updated_at,omitempty"`
+	ID         string               `json:"id"`
+	Name       string               `json:"name"`
+	Target     string               `json:"target"`
+	Summary    string               `json:"summary,omitempty"`
+	RouteTerms []string             `json:"route_terms,omitempty"`
+	Content    string               `json:"content"`
+	Scripts    []workflowScriptView `json:"scripts"`
+	CreatedAt  string               `json:"created_at,omitempty"`
+	UpdatedAt  string               `json:"updated_at,omitempty"`
 }
 
 func showCmd(cont *container.Container) *cobra.Command {
@@ -118,6 +120,7 @@ func newWorkflowSummaryView(workflow domain.Workflow, target, locale string) wor
 		Name:        workflow.Name,
 		Target:      target,
 		Summary:     workflowoutput.Summary(workflow, locale),
+		RouteTerms:  workflow.RouteTerms,
 		ScriptCount: len(workflow.Scripts),
 		UpdatedAt:   formatWorkflowTime(workflow.UpdatedAt),
 	}
@@ -133,14 +136,15 @@ func newWorkflowDetailView(workflow domain.Workflow, target, locale string) work
 		})
 	}
 	return workflowDetailView{
-		ID:        workflow.ID,
-		Name:      workflow.Name,
-		Target:    target,
-		Summary:   workflowoutput.Summary(workflow, locale),
-		Content:   workflow.Content,
-		Scripts:   scripts,
-		CreatedAt: formatWorkflowTime(workflow.CreatedAt),
-		UpdatedAt: formatWorkflowTime(workflow.UpdatedAt),
+		ID:         workflow.ID,
+		Name:       workflow.Name,
+		Target:     target,
+		Summary:    workflowoutput.Summary(workflow, locale),
+		RouteTerms: workflow.RouteTerms,
+		Content:    workflow.Content,
+		Scripts:    scripts,
+		CreatedAt:  formatWorkflowTime(workflow.CreatedAt),
+		UpdatedAt:  formatWorkflowTime(workflow.UpdatedAt),
 	}
 }
 

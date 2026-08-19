@@ -415,7 +415,11 @@ func (s *AnalyzerService) PlanLearningAgenda(ctx context.Context, req *PlanLearn
 	if err := agent.RequireResult(result, "PlanLearningAgenda"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
-	agenda, err := reconcileLearningAgenda(req.FocusPaths, result.Focuses, result.SkippedPaths)
+	fallbackPathsPerFocus := 0
+	if s.configRepo != nil {
+		fallbackPathsPerFocus = s.configRepo.GetCurrentLearningConfig().Agenda.FallbackPathsPerFocus
+	}
+	agenda, err := reconcileLearningAgenda(req.FocusPaths, result.Focuses, result.SkippedPaths, fallbackPathsPerFocus)
 	if err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}

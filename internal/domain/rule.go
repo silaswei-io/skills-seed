@@ -7,6 +7,8 @@ type Rule struct {
 	ID               string
 	Name             string
 	Content          string
+	Summary          string
+	RouteTerms       []string
 	AffectedProjects []string
 	Paths            []string
 	CreatedAt        time.Time

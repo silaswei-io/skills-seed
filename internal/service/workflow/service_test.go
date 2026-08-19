@@ -14,11 +14,13 @@ import (
 type optimizerStub struct {
 	request *agent.OptimizeWorkflowRequest
 	content string
+	summary string
+	terms   []string
 }
 
 func (s *optimizerStub) OptimizeWorkflow(_ context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeContentResult, error) {
 	s.request = req
-	return &agent.OptimizeContentResult{Content: s.content}, nil
+	return &agent.OptimizeContentResult{Content: s.content, Summary: s.summary, RouteTerms: s.terms}, nil
 }
 
 func TestUpsertWorkflowMergesByDefaultAndPreservesScripts(t *testing.T) {
@@ -41,6 +43,22 @@ func TestUpsertWorkflowMergesByDefaultAndPreservesScripts(t *testing.T) {
 	require.Len(t, saved.Scripts, 1)
 	require.Equal(t, "verify.sh", saved.Scripts[0].Path)
 	require.Equal(t, "demo", optimizer.request.Project.Name)
+}
+
+func TestUpsertWorkflowMergesRoutingMetadata(t *testing.T) {
+	repo := workflow.NewRepository(t.TempDir())
+	optimizer := &optimizerStub{content: "初次", summary: "执行验证。", terms: []string{"验证", "变更"}}
+	svc := NewService(repo, optimizer, agent.ProjectContext{})
+	_, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{Name: "verify", Content: "初始"})
+	require.NoError(t, err)
+
+	optimizer.content = "合并"
+	optimizer.summary = ""
+	optimizer.terms = []string{"变更", "结果"}
+	saved, err := svc.UpsertWorkflow(context.Background(), UpsertRequest{Name: "verify", Content: "新增"})
+	require.NoError(t, err)
+	require.Equal(t, "执行验证。", saved.Summary)
+	require.Equal(t, []string{"验证", "变更", "结果"}, saved.RouteTerms)
 }
 
 func TestUpsertWorkflowOverwriteDoesNotSendExistingContent(t *testing.T) {

@@ -5,10 +5,13 @@ import "strings"
 // DevelopmentFocus 是由证据焦点沉淀出的稳定开发导航信息。
 // 它只用于生成 Skill 的需求路由，不替代模式本身的源码证据和适用边界。
 type DevelopmentFocus struct {
-	ID         string   `json:"id,omitempty"`
-	Name       string   `json:"name,omitempty"`
-	RouteTerms []string `json:"route_terms,omitempty"`
-	EntryPaths []string `json:"entry_paths,omitempty"`
+	ID          string   `json:"id,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	RouteTerms  []string `json:"route_terms,omitempty"`
+	EntryPaths  []string `json:"entry_paths,omitempty"`
+	ScopeReason string   `json:"scope_reason,omitempty"`
+	Attributes  []string `json:"attributes,omitempty"`
+	RiskSignals []string `json:"risk_signals,omitempty"`
 }
 
 // DevelopmentFocusFromEvidenceFocus 提取可以长期用于导航的最小焦点信息。
@@ -19,10 +22,13 @@ func DevelopmentFocusFromEvidenceFocus(focus EvidenceFocus) *DevelopmentFocus {
 		return nil
 	}
 	return &DevelopmentFocus{
-		ID:         id,
-		Name:       name,
-		RouteTerms: uniqueDevelopmentFocusValues(focus.RouteTerms),
-		EntryPaths: uniqueDevelopmentFocusValues(focus.EntryPaths),
+		ID:          id,
+		Name:        name,
+		RouteTerms:  uniqueDevelopmentFocusValues(focus.RouteTerms),
+		EntryPaths:  uniqueDevelopmentFocusValues(focus.EntryPaths),
+		ScopeReason: strings.TrimSpace(focus.ScopeReason),
+		Attributes:  uniqueDevelopmentFocusValues(focus.Attributes),
+		RiskSignals: uniqueDevelopmentFocusValues(focus.RiskSignals),
 	}
 }
 
@@ -45,10 +51,13 @@ func (f *DevelopmentFocus) Clone() *DevelopmentFocus {
 		return nil
 	}
 	return &DevelopmentFocus{
-		ID:         strings.TrimSpace(f.ID),
-		Name:       strings.TrimSpace(f.Name),
-		RouteTerms: uniqueDevelopmentFocusValues(f.RouteTerms),
-		EntryPaths: uniqueDevelopmentFocusValues(f.EntryPaths),
+		ID:          strings.TrimSpace(f.ID),
+		Name:        strings.TrimSpace(f.Name),
+		RouteTerms:  uniqueDevelopmentFocusValues(f.RouteTerms),
+		EntryPaths:  uniqueDevelopmentFocusValues(f.EntryPaths),
+		ScopeReason: strings.TrimSpace(f.ScopeReason),
+		Attributes:  uniqueDevelopmentFocusValues(f.Attributes),
+		RiskSignals: uniqueDevelopmentFocusValues(f.RiskSignals),
 	}
 }
 

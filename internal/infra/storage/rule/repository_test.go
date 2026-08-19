@@ -15,6 +15,8 @@ func TestRepositoryPersistsRuleTextAndExplicitScope(t *testing.T) {
 		ID:               "foundation-code",
 		Name:             "底座代码保护",
 		Content:          "# 底座代码保护\n\n未经明确授权不得修改。",
+		Summary:          "保护受明确范围约束的代码。",
+		RouteTerms:       []string{"代码边界", "修改", "代码边界"},
 		AffectedProjects: []string{"backend", "frontend"},
 		Paths:            []string{"shared/contracts/**"},
 	}
@@ -25,6 +27,8 @@ func TestRepositoryPersistsRuleTextAndExplicitScope(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, rule.Name, stored.Name)
 	require.Equal(t, rule.Content, stored.Content)
+	require.Equal(t, rule.Summary, stored.Summary)
+	require.Equal(t, []string{"代码边界", "修改"}, stored.RouteTerms)
 	require.Equal(t, rule.AffectedProjects, stored.AffectedProjects)
 	require.Equal(t, rule.Paths, stored.Paths)
 	require.FileExists(t, filepath.Join(seedPath, "rules", rule.ID, "RULE.md"))

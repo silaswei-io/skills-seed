@@ -937,13 +937,13 @@ other = "Isolated source evidence analysis and independent knowledge review"
 other = "Learning agenda planning"
 
 [ProgressLearnCurrentPlanFocusesRestored]
-other = "Restoring learning agenda ({{.Focuses}} focuses)"
+other = "Restoring learning agenda ({{.Focuses}} focuses: {{.DevelopmentFocuses}} development, {{.CoverageFocuses}} coverage)"
 
 [ProgressLearnCurrentAnalyzeFocus]
 other = "{{.Label}} · focus {{.Current}}/{{.Total}} · {{.Name}}"
 
 [ProgressLearnCurrentAnalyzePreparing]
-other = "{{.Label}} · preparing analysis context"
+other = "{{.Label}} · preparing local source-analysis context"
 
 [ProgressLearnCurrentAnalyzeSourceFocus]
 other = "{{.Base}} · source evidence analysis"
@@ -989,6 +989,9 @@ other = "{{.Label}} · completed {{.Completed}}/{{.Total}} · focus {{.Current}}
 
 [ProgressLearnCurrentReviewComplete]
 other = "{{.Label}} · completed {{.Completed}}/{{.Total}} focuses"
+
+[PatternReviewEmptyCandidateID]
+other = "Knowledge review returned an empty candidate ID; every decision must reference an input candidate ID"
 
 [ProgressLearnCurrentPatternStageDetail]
 other = "{{.Label}} · {{.Detail}}"
@@ -1946,8 +1949,14 @@ other = "The agent did not assign {{.Group}} to an existing high-density evidenc
 [LearnCurrentUnassignedEvidenceFocusName]
 other = "Remaining evidence requiring verification"
 
+[LearnCurrentUnassignedEvidenceFocusNameWithBatch]
+other = "Remaining evidence requiring verification (batch {{.Batch}})"
+
 [LearnCurrentUnassignedEvidenceFocusReason]
 other = "The planning receipt omitted these input paths; inspect their source evidence before deciding whether they contain durable knowledge."
+
+[LearnCurrentUnassignedEvidenceFocusReasonWithBatch]
+other = "The agent returns only high-value focuses; this fallback batch contains unassigned input paths that still require source verification and is not a negative value decision."
 
 [LearnCurrentArtifactsCommittedWithPendingFocuses]
 other = "Analysis artifacts are committed with {{.Count}} pending evidence focuses"
@@ -1956,7 +1965,7 @@ other = "Analysis artifacts are committed with {{.Count}} pending evidence focus
 other = "Local filtering statistics:\n  • file scope: scanned {{.ScannedFiles}}, locally excluded {{.LocalSkippedFiles}}, learnable {{.SourceFiles}}\n  • incremental candidates: added/modified {{.Changed}}, deleted {{.Deleted}}, unchanged {{.Unchanged}}\n  • pending candidates: {{.LocalPlanInputs}}"
 
 [LearnCurrentResumeSummary]
-other = "Resuming unfinished {{.Command}} execution plan:\n  • local filtering: learnable {{.SourceFiles}}, pending {{.LocalPlanInputs}}\n  • candidate preparation: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • after resume: analysis files {{.PendingAnalyzeFiles}}, evidence focuses {{.Focuses}}\n  • this run reuses the saved agenda and will not repeat file scanning, local filtering, or candidate preparation"
+other = "Resuming unfinished {{.Command}} execution plan:\n  • local filtering: learnable {{.SourceFiles}}, pending {{.LocalPlanInputs}}\n  • candidate preparation: input {{.SelectionInputs}}, retained {{.SelectedFiles}}\n  • after resume: analysis files {{.PendingAnalyzeFiles}}, evidence focuses {{.Focuses}} ({{.DevelopmentFocuses}} development, {{.CoverageFocuses}} coverage)\n  • this run reuses the saved agenda and will not repeat file scanning, local filtering, or candidate preparation"
 
 [LearnCurrentNoFileChanges]
 other = "No learnable file changes detected; skipped pattern learning"

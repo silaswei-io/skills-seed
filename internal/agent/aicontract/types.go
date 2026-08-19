@@ -156,8 +156,8 @@ type EvidenceFocusOutput struct {
 }
 
 type PlanLearningAgendaOutput struct {
-	Focuses      []EvidenceFocusOutput    `json:"focuses" jsonschema_description:"learning focuses for this run; paths assigned here and skipped_paths together must cover every input path"`
-	SkippedPaths []LearningPathSkipOutput `json:"skipped_paths" jsonschema_description:"every input path intentionally excluded from learning, with a concrete evidence-value reason; must not overlap any focus path"`
+	Focuses      []EvidenceFocusOutput    `json:"focuses" jsonschema_description:"high-value learning focuses for this run; unassigned input paths receive a deterministic fallback focus"`
+	SkippedPaths []LearningPathSkipOutput `json:"skipped_paths,omitempty" jsonschema_description:"optional explicit skip receipts for concrete input files whose evidence value was directly checked; must not overlap focus paths"`
 	Reason       string                   `json:"reason" jsonschema_description:"one short sentence summarizing the planning boundary"`
 }
 
@@ -171,7 +171,7 @@ type KnowledgeRevisionOutput struct {
 }
 
 type KnowledgeReviewDecisionOutput struct {
-	CandidateID    string                   `json:"candidate_id" jsonschema_description:"exact id from one input candidate"`
+	CandidateID    string                   `json:"candidate_id" jsonschema:"minLength=1" jsonschema_description:"exact non-empty id from one input candidate; copy it literally and never use an empty or whitespace-only value"`
 	Verdict        string                   `json:"verdict" jsonschema:"enum=accept,enum=revise,enum=reject" jsonschema_description:"accept|revise|reject"`
 	ReasonCode     string                   `json:"reason_code" jsonschema:"enum=accepted,enum=unsupported_evidence,enum=contradictory,enum=unsafe_guidance,enum=no_routeable_value,enum=low_signal_boilerplate,enum=overclaimed,enum=incorrect_boundary" jsonschema_description:"structured reason for the verdict"`
 	Reason         string                   `json:"reason" jsonschema_description:"concise evidence-based review reason"`
@@ -273,7 +273,9 @@ type WorkspaceSpecOutput struct {
 	LoadMultipleSkillsWhen []WorkspaceLoadMultipleSkillOutput `json:"load_multiple_skills_when,omitempty" jsonschema_description:"when to load multiple child skills"`
 }
 
-// OptimizedContentOutput 是用户维护资源经 Agent 整理后的最小输出契约。
+// OptimizedContentOutput 是用户维护资源经 Agent 整理后的输出契约。
 type OptimizedContentOutput struct {
-	Content string `json:"content" jsonschema_description:"complete Markdown content preserving the user's intent and authority"`
+	Content    string   `json:"content" jsonschema_description:"complete Markdown content preserving the user's intent and authority"`
+	Summary    string   `json:"summary,omitempty" jsonschema_description:"short routing-oriented purpose summary; do not add new facts or obligations"`
+	RouteTerms []string `json:"route_terms,omitempty" jsonschema_description:"small set of concrete request terms for navigation only; do not imply permission or scope"`
 }

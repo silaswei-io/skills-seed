@@ -32,6 +32,8 @@ type Repository struct {
 type ruleMetadata struct {
 	ID               string   `yaml:"id"`
 	Name             string   `yaml:"name"`
+	Summary          string   `yaml:"summary,omitempty"`
+	RouteTerms       []string `yaml:"route_terms,omitempty"`
 	AffectedProjects []string `yaml:"affected_projects,omitempty"`
 	Paths            []string `yaml:"paths,omitempty"`
 	CreatedAt        string   `yaml:"created_at,omitempty"`
@@ -147,6 +149,8 @@ func ruleToMetadata(rule domain.Rule) ruleMetadata {
 	return ruleMetadata{
 		ID:               rule.ID,
 		Name:             strings.TrimSpace(rule.Name),
+		Summary:          strings.TrimSpace(rule.Summary),
+		RouteTerms:       stringx.UniqueNonBlank(rule.RouteTerms),
 		AffectedProjects: stringx.UniqueNonBlank(rule.AffectedProjects),
 		Paths:            stringx.UniqueNonBlank(rule.Paths),
 		CreatedAt:        formatTime(rule.CreatedAt),
@@ -158,6 +162,8 @@ func metadataToRule(meta ruleMetadata) domain.Rule {
 	return domain.Rule{
 		ID:               ruleID(meta.ID),
 		Name:             strings.TrimSpace(meta.Name),
+		Summary:          strings.TrimSpace(meta.Summary),
+		RouteTerms:       stringx.UniqueNonBlank(meta.RouteTerms),
 		AffectedProjects: stringx.UniqueNonBlank(meta.AffectedProjects),
 		Paths:            stringx.UniqueNonBlank(meta.Paths),
 		CreatedAt:        parseTime(meta.CreatedAt),

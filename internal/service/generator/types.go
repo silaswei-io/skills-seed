@@ -154,6 +154,8 @@ type WorkflowReference struct {
 	Name        string
 	Path        string
 	Description string
+	Summary     string
+	RouteTerms  []string
 }
 
 // RuleReference 描述 Skill 入口可路由的用户规则。
@@ -161,6 +163,8 @@ type RuleReference struct {
 	ID               string
 	Name             string
 	Path             string
+	Summary          string
+	RouteTerms       []string
 	AffectedProjects []string
 	Paths            []string
 }

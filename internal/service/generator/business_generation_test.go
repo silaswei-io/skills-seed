@@ -60,10 +60,13 @@ func TestGenerateSkillsRoutesDevelopmentFocusToBusinessDetail(t *testing.T) {
 	pattern.SetDescription("Applies the verified certificate status transition.")
 	pattern.SetRule("Reuse the verified transition boundary before adding a certificate state change.")
 	pattern.DevelopmentFocus = &domain.DevelopmentFocus{
-		ID:         "certificate-lifecycle",
-		Name:       "Certificate Lifecycle",
-		RouteTerms: []string{"certificate", "issue", "revoke", "status"},
-		EntryPaths: []string{"internal/certificate/lifecycle.go"},
+		ID:          "certificate-lifecycle",
+		Name:        "Certificate Lifecycle",
+		RouteTerms:  []string{"certificate", "issue", "revoke", "status"},
+		EntryPaths:  []string{"internal/certificate/lifecycle.go"},
+		ScopeReason: "Certificate state transitions and issuance boundaries are reviewed together.",
+		Attributes:  []string{"stateful", "cross_module"},
+		RiskSignals: []string{"external effect"},
 	}
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
 		Path:   "internal/certificate/lifecycle.go",
@@ -84,6 +87,8 @@ func TestGenerateSkillsRoutesDevelopmentFocusToBusinessDetail(t *testing.T) {
 	require.Contains(t, skill, "./references/patterns/business/certificate-lifecycle.md")
 	require.Contains(t, skill, "命中多个焦点时读取全部命中的参考")
 	require.Contains(t, skill, "不得从现有代码推断可直接编辑")
+	require.Contains(t, skill, "焦点边界速记")
+	require.Contains(t, skill, "stateful")
 
 	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	require.Contains(t, index, "Certificate Lifecycle")
@@ -292,6 +297,9 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 	patterns[0].ScopePath = "internal/application/billing"
 	patterns[1].ScopePath = "internal/application/billing"
 	patterns[2].ScopePath = "internal/application/notification"
+	billingFocus := &domain.DevelopmentFocus{ID: "billing", Name: "Billing", RouteTerms: []string{"billing"}}
+	patterns[0].DevelopmentFocus = billingFocus.Clone()
+	patterns[1].DevelopmentFocus = billingFocus.Clone()
 
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {

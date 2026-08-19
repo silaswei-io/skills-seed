@@ -25,6 +25,7 @@ func TestReconcileLearningAgendaNormalizesAndDeduplicatesPathDecisions(t *testin
 			{Path: "./src/support.ext", Reason: "Duplicate receipt."},
 			{Path: "context-only.ext", Reason: "Not an input file."},
 		},
+		64,
 	)
 
 	require.NoError(t, err)
@@ -48,6 +49,7 @@ func TestReconcileLearningAgendaPrefersFirstFocusedDecision(t *testing.T) {
 			{Path: "src/shared.ext", Reason: "Conflicts with focus."},
 			{Path: "src/skipped.ext", Reason: "No durable decision value."},
 		},
+		64,
 	)
 
 	require.NoError(t, err)
@@ -58,22 +60,25 @@ func TestReconcileLearningAgendaPrefersFirstFocusedDecision(t *testing.T) {
 	require.Equal(t, []agent.LearningPathSkip{{Path: "src/skipped.ext", Reason: "No durable decision value."}}, agenda.Skipped)
 }
 
-func TestReconcileLearningAgendaAddsOneFallbackFocusForOmittedInputs(t *testing.T) {
+func TestReconcileLearningAgendaSplitsFallbackFocusesForOmittedInputs(t *testing.T) {
 	require.NoError(t, i18n.Init(i18n.LocaleEnglish))
 	t.Cleanup(func() { require.NoError(t, i18n.Init(i18n.DefaultLocale)) })
 
 	agenda, err := reconcileLearningAgenda(
-		[]string{"src/entry.ext", "src/omitted-a.ext", "src/omitted-b.ext", "src/skipped.ext"},
+		[]string{"src/entry.ext", "src/omitted-a.ext", "src/omitted-b.ext", "src/omitted-c.ext", "src/skipped.ext"},
 		[]domain.EvidenceFocus{{ID: "existing", Name: "Existing", EntryPaths: []string{"src/entry.ext"}}},
 		[]agent.LearningPathSkip{{Path: "src/skipped.ext", Reason: "No durable decision value."}},
+		2,
 	)
 
 	require.NoError(t, err)
-	require.Len(t, agenda.Focuses, 2)
+	require.Len(t, agenda.Focuses, 3)
 	require.Equal(t, "unassigned-evidence", agenda.Focuses[1].ID)
-	require.Equal(t, i18n.Get("LearnCurrentUnassignedEvidenceFocusName"), agenda.Focuses[1].Name)
-	require.Equal(t, i18n.Get("LearnCurrentUnassignedEvidenceFocusReason"), agenda.Focuses[1].ScopeReason)
+	require.Equal(t, i18n.GetWithParams("LearnCurrentUnassignedEvidenceFocusNameWithBatch", map[string]interface{}{"Batch": 1}), agenda.Focuses[1].Name)
+	require.Equal(t, i18n.GetWithParams("LearnCurrentUnassignedEvidenceFocusReasonWithBatch", map[string]interface{}{"Batch": 1}), agenda.Focuses[1].ScopeReason)
 	require.Equal(t, []string{"src/omitted-a.ext", "src/omitted-b.ext"}, agenda.Focuses[1].EntryPaths)
+	require.Equal(t, "unassigned-evidence-2", agenda.Focuses[2].ID)
+	require.Equal(t, []string{"src/omitted-c.ext"}, agenda.Focuses[2].EntryPaths)
 	require.Equal(t, domain.EvidenceFocusPurposeCoverage, agenda.Focuses[1].Purpose)
 	require.Empty(t, agenda.Focuses[1].RouteTerms)
 	require.Empty(t, agenda.Focuses[1].Attributes)
@@ -114,7 +119,7 @@ func TestReconcileLearningAgendaRejectsInvalidDurableDecisions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := reconcileLearningAgenda([]string{"src/entry.ext", "src/second.ext"}, tt.focuses, tt.skipped)
+			_, err := reconcileLearningAgenda([]string{"src/entry.ext", "src/second.ext"}, tt.focuses, tt.skipped, 64)
 			require.ErrorContains(t, err, tt.want)
 		})
 	}

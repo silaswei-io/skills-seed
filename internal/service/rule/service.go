@@ -64,8 +64,12 @@ func (s *Service) UpsertRule(ctx context.Context, req UpsertRequest) (*domain.Ru
 	affectedProjects := stringx.UniqueNonBlank(req.AffectedProjects)
 	paths := stringx.UniqueNonBlank(req.Paths)
 	existingContent := ""
+	existingSummary := ""
+	existingRouteTerms := []string(nil)
 	if existing != nil && !req.Overwrite {
 		existingContent = strings.TrimSpace(existing.Content)
+		existingSummary = strings.TrimSpace(existing.Summary)
+		existingRouteTerms = existing.RouteTerms
 		affectedProjects = stringx.UniqueNonBlank(append(existing.AffectedProjects, affectedProjects...))
 		paths = stringx.UniqueNonBlank(append(existing.Paths, paths...))
 	}
@@ -88,11 +92,21 @@ func (s *Service) UpsertRule(ctx context.Context, req UpsertRequest) (*domain.Ru
 	if content == "" {
 		return nil, errors.New(i18n.Get("RuleOptimizerEmptyContent"))
 	}
+	summary := strings.TrimSpace(optimized.Summary)
+	routeTerms := stringx.UniqueNonBlank(optimized.RouteTerms)
+	if existing != nil && !req.Overwrite {
+		if summary == "" {
+			summary = existingSummary
+		}
+		routeTerms = stringx.UniqueNonBlank(append(existingRouteTerms, routeTerms...))
+	}
 	now := time.Now()
 	rule := domain.Rule{
 		ID:               id,
 		Name:             name,
 		Content:          content,
+		Summary:          summary,
+		RouteTerms:       routeTerms,
 		AffectedProjects: affectedProjects,
 		Paths:            paths,
 		CreatedAt:        now,

@@ -164,7 +164,7 @@ class QualityRun:
             "files_exist", "files_absent", "contains_groups", "not_contains",
             "markdown_links_valid", "source_paths_valid", "frontmatter_contract", "entry_contract",
             "module_relations_valid", "max_overlap", "section_contract",
-            "output_stability",
+            "output_stability", "route_contract",
         }
         seen = set()
         for item in self.config.get("checks", []):
@@ -215,6 +215,7 @@ class QualityRun:
             "max_overlap": self._max_overlap,
             "section_contract": self._section_contract,
             "output_stability": self._output_stability,
+            "route_contract": self._route_contract,
         }
         if kind not in handlers:
             raise ValueError(f"unknown quality check type: {kind}")
@@ -545,6 +546,67 @@ class QualityRun:
             else:
                 details.extend(f"best matching block misses: {group}" for group in best_missing)
         return best_score, details
+
+    def _route_contract(self, item: dict) -> tuple[float, list[str]]:
+        """检查入口是否把焦点、参考页和源码证据连成可执行路由。"""
+        files = self._files(item.get("files", ["SKILL.md"]))
+        if not files:
+            return 0, ["no Skill entry file matched the configured scope"]
+
+        text = self._read(files)
+        details = []
+        requirements = item.get("requirements", [])
+        matched = 0
+        for requirement in requirements:
+            alternatives = requirement if isinstance(requirement, list) else [requirement]
+            if any(re.search(pattern, text, re.IGNORECASE | re.MULTILINE) for pattern in alternatives):
+                matched += 1
+            else:
+                details.append(f"missing route contract: {' | '.join(alternatives)}")
+
+        heading = re.search(r"(?im)^##\s+(Development Focuses|开发焦点)\s*$", text)
+        if not heading:
+            minimum = int(item.get("minimum_focuses", 0))
+            if minimum > 0:
+                details.append("no development-focus route table found")
+                return self._fraction(matched, len(requirements) + 1), details
+            return self._fraction(matched, len(requirements)), details
+
+        table = text[heading.end():]
+        table = table.split("\n## ", 1)[0]
+        rows = []
+        for line in table.splitlines():
+            if not line.lstrip().startswith("|") or re.search(r"^\|\s*-", line):
+                continue
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if cells and cells[0].lower() not in {"focus", "焦点"}:
+                rows.append(cells)
+        minimum = int(item.get("minimum_focuses", 0))
+        if len(rows) < minimum:
+            details.append(f"only {len(rows)} focus rows found; expected at least {minimum}")
+        valid_rows = 0
+        entry_file = files[0]
+        for index, cells in enumerate(rows, 1):
+            if len(cells) < 4:
+                details.append(f"focus row {index} has {len(cells)} columns; expected at least 4")
+                continue
+            links = re.findall(r"\[[^\]]+\]\(([^)]+)\)", cells[2])
+            if not links:
+                details.append(f"focus row {index} has no reference link")
+                continue
+            missing = [target for target in links if not (entry_file.parent / target).resolve().exists()]
+            if missing:
+                details.append(f"focus row {index} references missing files: {', '.join(missing)}")
+                continue
+            if not re.search(r"`[^`]+`", cells[3]):
+                details.append(f"focus row {index} has no source evidence entry")
+                continue
+            valid_rows += 1
+
+        score = self._fraction(matched, len(requirements))
+        if minimum > 0:
+            score = (score + self._fraction(valid_rows, max(minimum, len(rows)))) / 2
+        return score, details
 
     def _output_stability(self, item: dict) -> tuple[float, list[str]]:
         run_indexes = item.get("runs", [1, 2])

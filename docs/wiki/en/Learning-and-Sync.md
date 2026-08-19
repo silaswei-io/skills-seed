@@ -21,6 +21,7 @@ See the complete [command reference](../../COMMANDS.EN.md) for flags.
 Prepare project context
   -> Local filtering and incremental candidates
   -> Learning-agenda planning
+     AI returns only high-value source focuses; unassigned paths are split into a small number of resumable coverage-safety batches by `learning.current.agenda.fallback_paths_per_focus`, not treated as low-value by omission
   -> Isolated source-evidence analysis
   -> Independent knowledge review
   -> Knowledge admission and persistence
@@ -33,9 +34,10 @@ Local code validates path scope, input coverage, structured contracts, source sa
 ## Focuses, Parallelism, and Review
 
 - Every focus centers on an evidence-backed responsibility or behavior boundary.
+- A focus is a resumable analysis batch, not a final Skill taxonomy. Merge neighboring responsibilities that share a future change boundary; split only clearly independent or high-risk boundaries.
 - Independent source analysis can run in parallel, controlled by `agent.parallelism`.
 - Independent knowledge review operates on a complete focus, rather than mechanically splitting by candidate count.
-- Finished focuses save recoverable state; cross-focus normalization and persistence happen afterward.
+- The agenda is persisted as soon as planning finishes, and each focus is checkpointed after source analysis and review. An interruption reuses the saved agenda and retries only unfinished focuses; changing the source scope or explicitly restarting replans it.
 
 Parallelism improves throughput but increases Agent pressure. Size it for provider limits and repository scale rather than maximizing the value.
 

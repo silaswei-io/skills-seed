@@ -20,6 +20,8 @@ type summaryView struct {
 	ID               string   `json:"id"`
 	Name             string   `json:"name"`
 	Target           string   `json:"target"`
+	Summary          string   `json:"summary,omitempty"`
+	RouteTerms       []string `json:"route_terms,omitempty"`
 	AffectedProjects []string `json:"affected_projects,omitempty"`
 	Paths            []string `json:"paths,omitempty"`
 	UpdatedAt        string   `json:"updated_at,omitempty"`
@@ -96,6 +98,8 @@ func newSummary(rule domain.Rule, target string) summaryView {
 		ID:               rule.ID,
 		Name:             rule.Name,
 		Target:           target,
+		Summary:          rule.Summary,
+		RouteTerms:       rule.RouteTerms,
 		AffectedProjects: rule.AffectedProjects,
 		Paths:            rule.Paths,
 		UpdatedAt:        formatTime(rule.UpdatedAt),

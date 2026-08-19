@@ -395,9 +395,11 @@ type OptimizeRuleRequest struct {
 	Overwrite        bool
 }
 
-// OptimizeContentResult 是资源优化后的完整 Markdown 内容。
+// OptimizeContentResult 是资源优化后的正文和导航元数据。
 type OptimizeContentResult struct {
-	Content string
+	Content    string
+	Summary    string
+	RouteTerms []string
 }
 
 // UserPatternDefiner 用户自定义模式接口

@@ -68,6 +68,9 @@ learning:
       min_confidence: 0.75
       # Minimum confidence for candidates with evidence in one file
       min_single_evidence_confidence: 0.85
+    agenda:
+      # Deterministic fallback focus size for paths omitted by AI planning
+      fallback_paths_per_focus: 256
     structural:
       # Enable bounded structural context; it does not run without bounded inputs
       enabled: true

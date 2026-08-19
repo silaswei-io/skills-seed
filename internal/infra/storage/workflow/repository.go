@@ -14,6 +14,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/fileio"
 	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,10 +33,12 @@ type Repository struct {
 }
 
 type workflowMetadata struct {
-	ID        string `yaml:"id"`
-	Name      string `yaml:"name"`
-	CreatedAt string `yaml:"created_at,omitempty"`
-	UpdatedAt string `yaml:"updated_at,omitempty"`
+	ID         string   `yaml:"id"`
+	Name       string   `yaml:"name"`
+	Summary    string   `yaml:"summary,omitempty"`
+	RouteTerms []string `yaml:"route_terms,omitempty"`
+	CreatedAt  string   `yaml:"created_at,omitempty"`
+	UpdatedAt  string   `yaml:"updated_at,omitempty"`
 }
 
 // NewRepository 创建工作流仓储。
@@ -243,19 +246,23 @@ func renderWorkflowMetadata(workflow domain.Workflow) []byte {
 
 func workflowToMetadata(workflow domain.Workflow) workflowMetadata {
 	return workflowMetadata{
-		ID:        workflow.ID,
-		Name:      strings.TrimSpace(workflow.Name),
-		CreatedAt: formatWorkflowTime(workflow.CreatedAt),
-		UpdatedAt: formatWorkflowTime(workflow.UpdatedAt),
+		ID:         workflow.ID,
+		Name:       strings.TrimSpace(workflow.Name),
+		Summary:    strings.TrimSpace(workflow.Summary),
+		RouteTerms: stringx.UniqueNonBlank(workflow.RouteTerms),
+		CreatedAt:  formatWorkflowTime(workflow.CreatedAt),
+		UpdatedAt:  formatWorkflowTime(workflow.UpdatedAt),
 	}
 }
 
 func metadataToWorkflow(meta workflowMetadata) domain.Workflow {
 	return domain.Workflow{
-		ID:        workflowID(meta.ID),
-		Name:      strings.TrimSpace(meta.Name),
-		CreatedAt: parseWorkflowTime(meta.CreatedAt),
-		UpdatedAt: parseWorkflowTime(meta.UpdatedAt),
+		ID:         workflowID(meta.ID),
+		Name:       strings.TrimSpace(meta.Name),
+		Summary:    strings.TrimSpace(meta.Summary),
+		RouteTerms: stringx.UniqueNonBlank(meta.RouteTerms),
+		CreatedAt:  parseWorkflowTime(meta.CreatedAt),
+		UpdatedAt:  parseWorkflowTime(meta.UpdatedAt),
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 // ParseUserDefinePatternResult 解析用户自定义模式结果。
@@ -28,7 +29,11 @@ func ParseOptimizeContentResult(output string) (*agent.OptimizeContentResult, er
 	if err := parseJSONPayload(output, &result); err != nil {
 		return nil, err
 	}
-	return &agent.OptimizeContentResult{Content: strings.TrimSpace(result.Content)}, nil
+	return &agent.OptimizeContentResult{
+		Content:    strings.TrimSpace(result.Content),
+		Summary:    strings.TrimSpace(result.Summary),
+		RouteTerms: stringx.UniqueNonBlank(result.RouteTerms),
+	}, nil
 }
 
 // ParseAnalyzeProjectResult 解析项目分析结果。
@@ -60,7 +65,7 @@ func ParseReviewKnowledgeResult(output string) (*agent.ReviewKnowledgeResult, er
 	result := &agent.ReviewKnowledgeResult{Decisions: make([]agent.KnowledgeReviewDecision, 0, len(payload.Decisions))}
 	for _, item := range payload.Decisions {
 		decision := agent.KnowledgeReviewDecision{
-			CandidateID: item.CandidateID,
+			CandidateID: strings.TrimSpace(item.CandidateID),
 			Verdict:     item.Verdict,
 			ReasonCode:  item.ReasonCode,
 			Reason:      item.Reason,

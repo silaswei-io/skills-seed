@@ -11,7 +11,7 @@ import (
 
 func TestRepositorySaveReplacesPairAndPreservesScripts(t *testing.T) {
 	repo := NewRepository(t.TempDir())
-	require.NoError(t, repo.Save(domain.Workflow{ID: "deploy", Name: "Deploy", Content: "old"}))
+	require.NoError(t, repo.Save(domain.Workflow{ID: "deploy", Name: "Deploy", Content: "old", Summary: "验证变更。", RouteTerms: []string{"验证", "变更", "验证"}}))
 	scriptPath := filepath.Join(repo.ScriptsDir("deploy"), "run.sh")
 	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\n"), 0o755))
 
@@ -21,5 +21,7 @@ func TestRepositorySaveReplacesPairAndPreservesScripts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Deploy v2", workflow.Name)
 	require.Equal(t, "new", workflow.Content)
+	require.Equal(t, "", workflow.Summary)
+	require.Empty(t, workflow.RouteTerms)
 	require.FileExists(t, scriptPath)
 }

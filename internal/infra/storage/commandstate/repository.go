@@ -74,7 +74,7 @@ type State struct {
 	Mode          string `json:"mode,omitempty"`
 	ChangeProfile string `json:"change_profile,omitempty"`
 	UserContext   string `json:"user_context_hash,omitempty"`
-	// InvocationHash 绑定影响分析范围和计划的命令参数及配置，防止不兼容调用复用旧状态。
+	// InvocationHash 绑定影响本轮分析范围的参数，防止不兼容调用复用旧状态。
 	InvocationHash string                      `json:"invocation_hash,omitempty"`
 	CreatedAt      string                      `json:"created_at"`
 	InputSummary   *InputSummary               `json:"input_summary,omitempty"`

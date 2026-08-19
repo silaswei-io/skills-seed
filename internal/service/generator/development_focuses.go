@@ -8,12 +8,15 @@ import (
 )
 
 type developmentFocusView struct {
-	ID            string
-	Title         string
-	RouteTerms    []string
-	PrimaryPath   string
-	ReferencePath string
-	PatternCount  int
+	ID             string
+	Title          string
+	RouteTerms     []string
+	EntryPaths     []string
+	ReferencePaths []string
+	ScopeReason    string
+	Attributes     []string
+	RiskSignals    []string
+	PatternCount   int
 }
 
 func buildDevelopmentFocuses(patterns []domain.Pattern) []developmentFocusView {
@@ -26,22 +29,22 @@ func buildDevelopmentFocuses(patterns []domain.Pattern) []developmentFocusView {
 		view, ok := byID[focus.ID]
 		if !ok {
 			view = &developmentFocusView{
-				ID:            focus.ID,
-				Title:         focus.Name,
-				RouteTerms:    append([]string(nil), focus.RouteTerms...),
-				PrimaryPath:   firstDevelopmentFocusPath(focus, pattern),
-				ReferencePath: developmentFocusReferencePath(focus.ID, pattern.Category),
+				ID:         focus.ID,
+				Title:      focus.Name,
+				RouteTerms: append([]string(nil), focus.RouteTerms...),
 			}
 			byID[focus.ID] = view
 		}
 		view.PatternCount++
 		view.RouteTerms = mergeDevelopmentFocusTerms(view.RouteTerms, focus.RouteTerms)
-		if view.PrimaryPath == "" {
-			view.PrimaryPath = firstDevelopmentFocusPath(focus, pattern)
+		view.EntryPaths = mergeDevelopmentFocusPaths(view.EntryPaths, focus.EntryPaths)
+		view.EntryPaths = mergeDevelopmentFocusPaths(view.EntryPaths, patternEvidencePaths(pattern))
+		view.ReferencePaths = mergeDevelopmentFocusPaths(view.ReferencePaths, []string{developmentFocusReferencePath(focus.ID, pattern.Category)})
+		if view.ScopeReason == "" {
+			view.ScopeReason = focus.ScopeReason
 		}
-		if pattern.Category == domain.CategoryBusiness {
-			view.ReferencePath = developmentFocusReferencePath(focus.ID, pattern.Category)
-		}
+		view.Attributes = mergeDevelopmentFocusTerms(view.Attributes, focus.Attributes)
+		view.RiskSignals = mergeDevelopmentFocusTerms(view.RiskSignals, focus.RiskSignals)
 	}
 
 	result := make([]developmentFocusView, 0, len(byID))
@@ -67,14 +70,14 @@ func developmentFocusReferencePath(focusID string, category domain.Category) str
 	return "./references/patterns/" + string(category) + ".md"
 }
 
-func firstDevelopmentFocusPath(focus *domain.DevelopmentFocus, pattern domain.Pattern) string {
-	if focus != nil && len(focus.EntryPaths) > 0 {
-		return focus.EntryPaths[0]
+func patternEvidencePaths(pattern domain.Pattern) []string {
+	paths := make([]string, 0, len(pattern.EvidenceLocations))
+	for _, evidence := range pattern.EvidenceLocations {
+		if path := strings.TrimSpace(evidence.DisplayLocation()); path != "" {
+			paths = append(paths, path)
+		}
 	}
-	if len(pattern.EvidenceLocations) > 0 {
-		return pattern.EvidenceLocations[0].DisplayLocation()
-	}
-	return ""
+	return paths
 }
 
 func mergeDevelopmentFocusTerms(left, right []string) []string {
@@ -93,5 +96,25 @@ func mergeDevelopmentFocusTerms(left, right []string) []string {
 			result = append(result, term)
 		}
 	}
+	return result
+}
+
+func mergeDevelopmentFocusPaths(left, right []string) []string {
+	seen := make(map[string]struct{}, len(left)+len(right))
+	result := make([]string, 0, len(left)+len(right))
+	for _, paths := range [][]string{left, right} {
+		for _, path := range paths {
+			path = strings.TrimSpace(path)
+			if path == "" {
+				continue
+			}
+			if _, exists := seen[path]; exists {
+				continue
+			}
+			seen[path] = struct{}{}
+			result = append(result, path)
+		}
+	}
+	sort.Strings(result)
 	return result
 }
