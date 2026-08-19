@@ -662,7 +662,7 @@ skills-seed update --version v0.20.7
 
 命令从官方 GitHub Release 下载当前系统和架构对应的发布包，并使用该 Release 的 `checksums.txt` 校验后再替换当前可执行文件。它不需要 Go、不会执行 `go install`，也不会读取或修改项目 `.skills-seed`。
 
-需要能够访问 GitHub Releases，且当前可执行文件所在目录可写。Windows 会在当前进程退出后完成替换；请重新启动 CLI 再执行下一条命令。
+需要能够访问 GitHub Releases，且当前可执行文件所在目录可写。网络请求会继承 `HTTPS_PROXY`、`HTTP_PROXY`、`NO_PROXY` 环境变量；每个请求最长等待 2 分钟。运行时会动态展示查询、下载、校验和安装四个阶段，下载阶段显示已下载大小、总大小和百分比（服务器未提供总大小时显示已下载大小）。Windows 会在当前进程退出后完成替换；请重新启动 CLI 再执行下一条命令。
 
 ### `skills-seed hook`
 

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +30,10 @@ func TestUpdateDownloadsVerifiesAndReplacesExecutable(t *testing.T) {
 	executable := writeExecutable(t, []byte("old executable"))
 	service := testService(server.URL, executable, "linux", "amd64")
 
-	result, err := service.Update(context.Background(), "latest")
+	events := make([]ProgressEvent, 0, 4)
+	result, err := service.UpdateWithProgress(context.Background(), "latest", func(event ProgressEvent) {
+		events = append(events, event)
+	})
 	require.NoError(t, err)
 	require.Equal(t, version, result.Version)
 	resolvedExecutable, err := filepath.EvalSymlinks(executable)
@@ -40,6 +44,33 @@ func TestUpdateDownloadsVerifiesAndReplacesExecutable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("new executable"), content)
 	require.Equal(t, []string{"/releases/latest", "/assets/" + assetName, "/assets/checksums.txt"}, *requested)
+	require.Equal(t, []Stage{StageResolveRelease, StageDownloadAsset, StageVerifyAsset, StageInstallAsset}, uniqueStages(events))
+	require.NotEmpty(t, events)
+	var downloadEvent ProgressEvent
+	for _, event := range events {
+		if event.Stage == StageDownloadAsset && event.Downloaded > 0 {
+			downloadEvent = event
+			break
+		}
+	}
+	require.Greater(t, downloadEvent.Downloaded, int64(0))
+	require.Greater(t, downloadEvent.Total, int64(0))
+}
+
+func uniqueStages(events []ProgressEvent) []Stage {
+	stages := make([]Stage, 0, len(events))
+	for _, event := range events {
+		if len(stages) == 0 || stages[len(stages)-1] != event.Stage {
+			stages = append(stages, event.Stage)
+		}
+	}
+	return stages
+}
+
+func TestNewUsesBoundedHTTPClient(t *testing.T) {
+	service := New()
+	require.NotNil(t, service.httpClient)
+	require.Equal(t, 2*time.Minute, service.httpClient.Timeout)
 }
 
 func TestUpdateExplicitVersionUsesTagEndpoint(t *testing.T) {

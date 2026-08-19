@@ -61,7 +61,7 @@
 | `hook install` | 在提交前提供交互式学习选择 | `skills-seed hook install` | 默认跳过；非交互环境不阻塞 |
 | `hook run` | 手动测试 hook 菜单 | `skills-seed hook run` | 只在交互环境有意义 |
 | `hook uninstall` | 移除当前项目 hook | `skills-seed hook uninstall` | 不删除学习数据 |
-| `update` | 更新已安装 CLI | `skills-seed update` | 仅替换可执行文件；不读取项目状态且不需要 Go |
+| `update` | 更新已安装 CLI | `skills-seed update` | 通过 GitHub Releases 下载并校验；动态展示查询、下载、校验、安装阶段；不读取项目状态且不需要 Go |
 | `cli-skills install` | 安装全局 CLI 操作 Skill | `skills-seed cli-skills install --target auto` | 不管理项目生成 Skill |
 | `cli-skills uninstall` | 卸载该全局 CLI 操作 Skill | `skills-seed cli-skills uninstall --target codex` | 只删除固定全局目标 |
 | `log` | 查看最近学习与生成变更 | `skills-seed log` | 只读摘要，不是详细诊断日志 |
@@ -72,6 +72,8 @@
 | `reset` | 备份后重置整个初始化状态或切换模式 | `skills-seed reset --mode project` | 会移动旧 `.skills-seed` 至备份目录 |
 
 选择性重置完成后立即执行 `skills-seed sync`。学习中断或单个模式质量异常时，先看 [学习失败与人工修正](Learning-Failures-and-Manual-Repair.md)；修正一条模式正文通常优先使用 `patterns update`。
+
+`update` 使用系统 `HTTPS_PROXY`、`HTTP_PROXY`、`NO_PROXY` 环境变量访问 GitHub Releases。下载阶段会显示已下载大小、总大小和百分比；每个网络请求最多等待 2 分钟。如果停在某个阶段后报错，先检查对应网络连接或代理，再重试。
 
 ---
 

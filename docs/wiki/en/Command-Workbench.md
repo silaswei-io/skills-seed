@@ -61,7 +61,7 @@ At a workspace root, a Rule's `--child`, `--project`, and `--path` must express 
 | `hook install` | Offering an interactive learning choice before commit | `skills-seed hook install` | Skips by default; never blocks non-interactive use |
 | `hook run` | Manually testing the hook menu | `skills-seed hook run` | Meaningful only interactively |
 | `hook uninstall` | Removing the current project's hook | `skills-seed hook uninstall` | Does not delete learned data |
-| `update` | Updating the installed CLI | `skills-seed update` | Replaces only the executable; needs neither Go nor project state |
+| `update` | Updating the installed CLI | `skills-seed update` | Downloads and verifies from GitHub Releases; animates lookup, download, verification, and installation; needs neither Go nor project state |
 | `cli-skills install` | Installing the global CLI operation Skill | `skills-seed cli-skills install --target auto` | Does not manage generated project Skills |
 | `cli-skills uninstall` | Removing that global CLI operation Skill | `skills-seed cli-skills uninstall --target codex` | Deletes only the fixed global target |
 | `log` | Reading recent learning and generation changes | `skills-seed log` | Read-only summary, not detailed diagnostics |
@@ -72,6 +72,8 @@ At a workspace root, a Rule's `--child`, `--project`, and `--path` must express 
 | `reset` | Backing up all initialization state or changing mode | `skills-seed reset --mode project` | Moves old `.skills-seed` into a backup directory |
 
 Run `skills-seed sync` immediately after a selective reset. For an interrupted run or one poor pattern, start with [Learning Failures and Manual Repair](Learning-Failures-and-Manual-Repair.md); correcting one pattern body usually starts with `patterns update`.
+
+`update` uses the system `HTTPS_PROXY`, `HTTP_PROXY`, and `NO_PROXY` environment variables to reach GitHub Releases. The download stage shows bytes downloaded, total size, and percentage; each request waits for at most two minutes. If it fails after pausing at a stage, check the corresponding network path or proxy before retrying.
 
 ---
 

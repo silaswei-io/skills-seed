@@ -3028,7 +3028,7 @@ other = "Failed to apply normalized patterns"
 other = "Update Skills Seed from official release assets"
 
 [UpdateLongDesc]
-other = "Download and verify the official release asset for the current platform, then replace the current Skills Seed executable.\n\nUpdates to the latest stable version by default; use --version to select a release. This command does not require Go and does not read or modify project .skills-seed state. It requires GitHub Releases access and write access to the current executable directory."
+other = "Download and verify the official release asset for the current platform, then replace the current Skills Seed executable.\n\nUpdates to the latest stable version by default; use --version to select a release. This command does not require Go and does not read or modify project .skills-seed state. It downloads from GitHub Releases and uses the system HTTPS_PROXY, HTTP_PROXY, and NO_PROXY environment variables; each network request waits for at most two minutes. The current executable directory must be writable."
 
 [UpdateExample]
 other = "skills-seed update\nskills-seed update --version v0.20.7"
@@ -3041,6 +3041,24 @@ other = "Update service is unavailable"
 
 [UpdateFailed]
 other = "Failed to update Skills Seed"
+
+[UpdateProgressResolveRelease]
+other = "Checking available release"
+
+[UpdateProgressDownloadAsset]
+other = "Downloading update"
+
+[UpdateProgressDownloadAssetDetail]
+other = "Downloading update {{.Downloaded}} / {{.Total}} ({{.Percent}}%)"
+
+[UpdateProgressDownloadAssetBytes]
+other = "Downloading update {{.Downloaded}}"
+
+[UpdateProgressVerifyAsset]
+other = "Verifying release asset"
+
+[UpdateProgressInstallAsset]
+other = "Installing update"
 
 [UpdateCompleted]
 other = "Skills Seed updated to {{.Version}}: {{.Path}}"

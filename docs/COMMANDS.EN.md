@@ -662,7 +662,7 @@ skills-seed update --version v0.20.7
 
 The command downloads the archive for the current operating system and architecture from the official GitHub Release, verifies it with that Release's `checksums.txt`, then replaces the current executable. It does not require Go, does not run `go install`, and does not read or modify project `.skills-seed` state.
 
-It requires GitHub Releases access and write permission for the current executable's directory. On Windows, replacement completes after the current process exits; restart the CLI before the next command.
+It requires GitHub Releases access and write permission for the current executable's directory. Requests inherit the `HTTPS_PROXY`, `HTTP_PROXY`, and `NO_PROXY` environment variables, and each request waits for at most two minutes. The command animates four stages: release lookup, download, verification, and installation; the download stage shows bytes downloaded, total size, and percentage when the server provides a total. On Windows, replacement completes after the current process exits; restart the CLI before the next command.
 
 ### `skills-seed hook`
 

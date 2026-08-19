@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 )
@@ -30,6 +31,8 @@ const (
 	checksumAssetName = "checksums.txt"
 	// latestVersion 是 GitHub Releases 最新稳定版本的选择标记。
 	latestVersion = "latest"
+	// defaultHTTPTimeout 限制一次自更新请求，避免不可达网络无限等待。
+	defaultHTTPTimeout = 2 * time.Minute
 )
 
 var (
@@ -48,6 +51,30 @@ type Result struct {
 	RestartRequired bool
 }
 
+// Stage 表示自更新流程中可展示的稳定阶段。
+type Stage string
+
+const (
+	// StageResolveRelease 查询目标版本和对应发布资产。
+	StageResolveRelease Stage = "resolve-release"
+	// StageDownloadAsset 下载当前平台的发布资产。
+	StageDownloadAsset Stage = "download-asset"
+	// StageVerifyAsset 下载校验和并验证发布资产。
+	StageVerifyAsset Stage = "verify-asset"
+	// StageInstallAsset 解压并替换当前可执行文件。
+	StageInstallAsset Stage = "install-asset"
+)
+
+// ProgressEvent 描述自更新阶段及下载进度。
+type ProgressEvent struct {
+	Stage      Stage
+	Downloaded int64
+	Total      int64
+}
+
+// ProgressReporter 接收自更新进度；nil 表示调用方不需要进度。
+type ProgressReporter func(ProgressEvent)
+
 // Service 下载、校验并替换当前可执行文件。
 type Service struct {
 	apiBaseURL string
@@ -61,7 +88,7 @@ type Service struct {
 func New() *Service {
 	return &Service{
 		apiBaseURL: defaultAPIBaseURL,
-		httpClient: http.DefaultClient,
+		httpClient: &http.Client{Timeout: defaultHTTPTimeout},
 		executable: os.Executable,
 		goos:       runtime.GOOS,
 		goarch:     runtime.GOARCH,
@@ -70,6 +97,11 @@ func New() *Service {
 
 // Update 将当前 CLI 更新到 latest 或指定发布版本。
 func (s *Service) Update(ctx context.Context, version string) (Result, error) {
+	return s.UpdateWithProgress(ctx, version, nil)
+}
+
+// UpdateWithProgress 将当前 CLI 更新到 latest 或指定发布版本，并报告阶段变化。
+func (s *Service) UpdateWithProgress(ctx context.Context, version string, report ProgressReporter) (Result, error) {
 	if s == nil {
 		return Result{}, errors.New("update service is unavailable")
 	}
@@ -81,6 +113,7 @@ func (s *Service) Update(ctx context.Context, version string) (Result, error) {
 		version = latestVersion
 	}
 
+	reportStage(report, ProgressEvent{Stage: StageResolveRelease})
 	release, err := s.loadRelease(ctx, version)
 	if err != nil {
 		return Result{}, err
@@ -102,7 +135,7 @@ func (s *Service) Update(ctx context.Context, version string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	restartRequired, err := s.install(ctx, executablePath, asset, checksums, assetName, binaryName)
+	restartRequired, err := s.install(ctx, executablePath, asset, checksums, assetName, binaryName, report)
 	if err != nil {
 		return Result{}, err
 	}
@@ -169,7 +202,7 @@ func (s *Service) loadRelease(ctx context.Context, version string) (release, err
 	return value, nil
 }
 
-func (s *Service) install(ctx context.Context, executablePath string, asset, checksums releaseAsset, assetName, binaryName string) (bool, error) {
+func (s *Service) install(ctx context.Context, executablePath string, asset, checksums releaseAsset, assetName, binaryName string, report ProgressReporter) (bool, error) {
 	executableInfo, err := os.Stat(executablePath)
 	if err != nil {
 		return false, fmt.Errorf("inspect current executable: %w", err)
@@ -183,10 +216,12 @@ func (s *Service) install(ctx context.Context, executablePath string, asset, che
 	archiveFile.Close()
 	defer os.Remove(archivePath)
 
-	digest, err := s.downloadTo(ctx, asset.URL, archivePath)
+	reportStage(report, ProgressEvent{Stage: StageDownloadAsset})
+	digest, err := s.downloadTo(ctx, asset.URL, archivePath, report)
 	if err != nil {
 		return false, fmt.Errorf("download %s: %w", assetName, err)
 	}
+	reportStage(report, ProgressEvent{Stage: StageVerifyAsset})
 	checksumData, err := s.download(ctx, checksums.URL)
 	if err != nil {
 		return false, fmt.Errorf("download %s: %w", checksumAssetName, err)
@@ -215,6 +250,7 @@ func (s *Service) install(ctx context.Context, executablePath string, asset, che
 		}
 	}()
 
+	reportStage(report, ProgressEvent{Stage: StageInstallAsset})
 	if err := extractBinary(archivePath, assetName, binaryName, candidatePath, executableInfo.Mode().Perm()); err != nil {
 		return false, err
 	}
@@ -226,6 +262,12 @@ func (s *Service) install(ctx context.Context, executablePath string, asset, che
 		cleanupCandidate = false
 	}
 	return replacementDeferred, nil
+}
+
+func reportStage(report ProgressReporter, event ProgressEvent) {
+	if report != nil {
+		report(event)
+	}
 }
 
 func (s *Service) executablePath() (string, error) {
@@ -267,7 +309,7 @@ func (s *Service) download(ctx context.Context, assetURL string) ([]byte, error)
 	return io.ReadAll(response.Body)
 }
 
-func (s *Service) downloadTo(ctx context.Context, assetURL, path string) (string, error) {
+func (s *Service) downloadTo(ctx context.Context, assetURL, path string, report ProgressReporter) (string, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, assetURL, nil)
 	if err != nil {
 		return "", err
@@ -286,14 +328,48 @@ func (s *Service) downloadTo(ctx context.Context, assetURL, path string) (string
 		return "", err
 	}
 	hash := sha256.New()
-	if _, err := io.Copy(io.MultiWriter(file, hash), response.Body); err != nil {
+	var downloaded int64
+	lastReportAt := time.Time{}
+	lastReportedBytes := int64(0)
+	notifyProgress := func(force bool) {
+		if report == nil {
+			return
+		}
+		now := time.Now()
+		if !force && !lastReportAt.IsZero() && now.Sub(lastReportAt) < 100*time.Millisecond && downloaded-lastReportedBytes < 32*1024 {
+			return
+		}
+		lastReportAt = now
+		lastReportedBytes = downloaded
+		report(ProgressEvent{Stage: StageDownloadAsset, Downloaded: downloaded, Total: response.ContentLength})
+	}
+	notifyProgress(false)
+	reader := progressReader{reader: response.Body, onRead: func(size int) {
+		downloaded += int64(size)
+		notifyProgress(false)
+	}}
+	if _, err := io.Copy(io.MultiWriter(file, hash), reader); err != nil {
 		_ = file.Close()
 		return "", err
 	}
+	notifyProgress(true)
 	if err := file.Close(); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+type progressReader struct {
+	reader io.Reader
+	onRead func(int)
+}
+
+func (r progressReader) Read(buffer []byte) (int, error) {
+	size, err := r.reader.Read(buffer)
+	if size > 0 && r.onRead != nil {
+		r.onRead(size)
+	}
+	return size, err
 }
 
 func releaseAssetName(version, goos, goarch string) (string, string, error) {

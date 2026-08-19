@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.9]
+
+### Changes
+
+- Added real download progress to `skills-seed update`: the download stage shows bytes downloaded, total size, and percentage while retaining animated lookup, verification, and installation stages.
+- Added a two-minute timeout for self-update network requests and documented inheritance of `HTTPS_PROXY`, `HTTP_PROXY`, and `NO_PROXY`; unreachable networks no longer wait indefinitely.
+- Updated the bilingual command reference, Wiki, and CLI help with the download source, proxy configuration, progress display, and timeout behavior.
+
+### Fixes
+
+- Fixed the download stage showing only a spinner with no indication that bytes were still transferring; progress events are throttled by time and byte thresholds to avoid terminal churn.
+
 ## [v0.20.8]
 
 ### Changes
