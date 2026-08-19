@@ -449,6 +449,12 @@ other = "{{.Label}}（{{.Reason}}，{{.Wait}} 后重试）"
 [AgentRetryProgressNoteWithDuration]
 other = "{{.Label}}（{{.Reason}}，本次调用 {{.CallDuration}}，{{.Wait}} 后重试）"
 
+[AgentRetryProgressNoteDiagnostics]
+other = "{{.Label}}（{{.Reason}}，{{.Wait}} 后重试；详见 {{.DiagnosticsPath}}）"
+
+[AgentRetryProgressNoteWithDurationDiagnostics]
+other = "{{.Label}}（{{.Reason}}，本次调用 {{.CallDuration}}，{{.Wait}} 后重试；详见 {{.DiagnosticsPath}}）"
+
 [AgentRetryAttemptProgressNote]
 other = "{{.Label}}（第{{.Attempt}}次尝试）"
 
@@ -466,6 +472,12 @@ other = "{{.Agent}} 遇到可重试错误，{{.Wait}} 后重试：{{.Reason}}"
 
 [AgentRetryConsoleNoteWithDuration]
 other = "{{.Agent}} 遇到可重试错误（本次调用 {{.CallDuration}}），{{.Wait}} 后重试：{{.Reason}}"
+
+[AgentRetryConsoleNoteDiagnostics]
+other = "{{.Agent}} 遇到可重试错误，{{.Wait}} 后重试：{{.Reason}}；完整诊断：{{.DiagnosticsPath}}"
+
+[AgentRetryConsoleNoteWithDurationDiagnostics]
+other = "{{.Agent}} 遇到可重试错误（本次调用 {{.CallDuration}}），{{.Wait}} 后重试：{{.Reason}}；完整诊断：{{.DiagnosticsPath}}"
 
 [AgentCodexPrepareWorkDirFailed]
 other = "准备 Codex 临时工作目录失败"
@@ -669,7 +681,7 @@ other = "解析 JSON 失败"
 other = "AI 输出缺少必填字段 {{.Field}}"
 
 [AgentDiagnosticError]
-other = "Agent 诊断: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
+other = "Agent 诊断: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, schema={{.SchemaPath}}, manifest={{.ManifestPath}}"
 
 [AgentAnalyzeCodebaseFailedSummary]
 other = "代码库分析失败"

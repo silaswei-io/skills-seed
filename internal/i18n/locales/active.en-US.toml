@@ -449,6 +449,12 @@ other = "{{.Label}} ({{.Reason}}, retry in {{.Wait}})"
 [AgentRetryProgressNoteWithDuration]
 other = "{{.Label}} ({{.Reason}}, call {{.CallDuration}}, retry in {{.Wait}})"
 
+[AgentRetryProgressNoteDiagnostics]
+other = "{{.Label}} ({{.Reason}}, retry in {{.Wait}}; see {{.DiagnosticsPath}})"
+
+[AgentRetryProgressNoteWithDurationDiagnostics]
+other = "{{.Label}} ({{.Reason}}, call {{.CallDuration}}, retry in {{.Wait}}; see {{.DiagnosticsPath}})"
+
 [AgentRetryAttemptProgressNote]
 other = "{{.Label}} (attempt {{.Attempt}})"
 
@@ -466,6 +472,12 @@ other = "{{.Agent}} hit a retryable error; retrying in {{.Wait}}: {{.Reason}}"
 
 [AgentRetryConsoleNoteWithDuration]
 other = "{{.Agent}} hit a retryable error after {{.CallDuration}}; retrying in {{.Wait}}: {{.Reason}}"
+
+[AgentRetryConsoleNoteDiagnostics]
+other = "{{.Agent}} hit a retryable error; retrying in {{.Wait}}: {{.Reason}}; full diagnostics: {{.DiagnosticsPath}}"
+
+[AgentRetryConsoleNoteWithDurationDiagnostics]
+other = "{{.Agent}} hit a retryable error after {{.CallDuration}}; retrying in {{.Wait}}: {{.Reason}}; full diagnostics: {{.DiagnosticsPath}}"
 
 [AgentCodexPrepareWorkDirFailed]
 other = "Failed to prepare Codex temporary work directory"
@@ -669,7 +681,7 @@ other = "Failed to unmarshal JSON"
 other = "AI output is missing required field {{.Field}}"
 
 [AgentDiagnosticError]
-other = "Agent diagnostics: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, manifest={{.ManifestPath}}"
+other = "Agent diagnostics: type={{.Kind}}, agent={{.Agent}}, operation={{.Operation}}, attempt={{.Attempt}}, cause={{.Cause}}, output_len={{.OutputLength}}, stderr_len={{.StderrLength}}, output_preview={{.OutputPreview}}, stderr_preview={{.StderrPreview}}, content={{.ContentPath}}, raw={{.RawPath}}, stderr={{.StderrPath}}, schema={{.SchemaPath}}, manifest={{.ManifestPath}}"
 
 [AgentAnalyzeCodebaseFailedSummary]
 other = "Failed to analyze codebase"

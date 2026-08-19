@@ -39,6 +39,8 @@ type RetryInfo struct {
 	WaitDuration time.Duration
 	CallDuration time.Duration
 	Reason       string
+	// DiagnosticsPath 指向本次失败的完整归档清单。
+	DiagnosticsPath string
 }
 
 // RetryReporter 接收重试事件，让命令进度 UI 可以实时更新。
@@ -56,6 +58,8 @@ type RetryingCallOptions[T any] struct {
 	Operation string
 	Policy    RetryPolicy
 	Call      func(attempt int) (result T, retryOutput string, duration time.Duration, retryable bool, err error)
+	// RetryDetail 从失败结果提取可供终端定位完整诊断的路径。
+	RetryDetail func(result T) string
 }
 
 type RetryProgressBinder struct {
@@ -225,13 +229,14 @@ func RunRetryingCall[T any](ctx context.Context, opts RetryingCallOptions[T]) (T
 			waitDuration = opts.Policy.WaitDuration(attempt)
 		}
 		ReportRetryForContext(ctx, RetryInfo{
-			AgentName:    opts.AgentName,
-			Operation:    opts.Operation,
-			Attempt:      attemptNumber,
-			MaxRetries:   maxRetries,
-			WaitDuration: waitDuration,
-			CallDuration: callDuration,
-			Reason:       RetryReasonFromOutput(retryOutput, ""),
+			AgentName:       opts.AgentName,
+			Operation:       opts.Operation,
+			Attempt:         attemptNumber,
+			MaxRetries:      maxRetries,
+			WaitDuration:    waitDuration,
+			CallDuration:    callDuration,
+			Reason:          RetryReasonFromOutput(retryOutput, ""),
+			DiagnosticsPath: retryDiagnosticsPath(opts.RetryDetail, result),
 		})
 
 		select {
@@ -287,6 +292,9 @@ func ReportRetryForContext(ctx context.Context, info RetryInfo) {
 	if info.CallDuration > 0 {
 		fields = append(fields, "call_duration_seconds", info.CallDuration.Seconds())
 	}
+	if info.DiagnosticsPath != "" {
+		fields = append(fields, "diagnostics_path", info.DiagnosticsPath)
+	}
 	logger.WarnAfterProgress(RetryConsoleMessage(info), fields...)
 }
 
@@ -317,15 +325,22 @@ func RetryProgressLabel(label string, info RetryInfo) string {
 		reason = i18n.Get("AgentRetryReasonUnknown")
 	}
 	params := map[string]interface{}{
-		"Label":      label,
-		"Reason":     reason,
-		"Attempt":    info.Attempt,
-		"MaxRetries": info.MaxRetries,
-		"Wait":       info.WaitDuration.Truncate(time.Second).String(),
+		"Label":           label,
+		"Reason":          reason,
+		"Attempt":         info.Attempt,
+		"MaxRetries":      info.MaxRetries,
+		"Wait":            info.WaitDuration.Truncate(time.Second).String(),
+		"DiagnosticsPath": info.DiagnosticsPath,
 	}
 	if info.CallDuration > 0 {
 		params["CallDuration"] = info.CallDuration.Truncate(time.Second).String()
+		if info.DiagnosticsPath != "" {
+			return i18n.GetWithParams("AgentRetryProgressNoteWithDurationDiagnostics", params)
+		}
 		return i18n.GetWithParams("AgentRetryProgressNoteWithDuration", params)
+	}
+	if info.DiagnosticsPath != "" {
+		return i18n.GetWithParams("AgentRetryProgressNoteDiagnostics", params)
 	}
 	return i18n.GetWithParams("AgentRetryProgressNote", params)
 }
@@ -351,17 +366,31 @@ func RetryConsoleMessage(info RetryInfo) string {
 		agentName = i18n.Get("AgentRetryConsoleAgentFallback")
 	}
 	params := map[string]interface{}{
-		"Agent":        agentName,
-		"Reason":       reason,
-		"Attempt":      info.Attempt,
-		"MaxRetries":   info.MaxRetries,
-		"Wait":         info.WaitDuration.Truncate(time.Second).String(),
-		"CallDuration": info.CallDuration.Truncate(time.Second).String(),
+		"Agent":           agentName,
+		"Reason":          reason,
+		"Attempt":         info.Attempt,
+		"MaxRetries":      info.MaxRetries,
+		"Wait":            info.WaitDuration.Truncate(time.Second).String(),
+		"CallDuration":    info.CallDuration.Truncate(time.Second).String(),
+		"DiagnosticsPath": info.DiagnosticsPath,
 	}
 	if info.CallDuration > 0 {
+		if info.DiagnosticsPath != "" {
+			return i18n.GetWithParams("AgentRetryConsoleNoteWithDurationDiagnostics", params)
+		}
 		return i18n.GetWithParams("AgentRetryConsoleNoteWithDuration", params)
 	}
+	if info.DiagnosticsPath != "" {
+		return i18n.GetWithParams("AgentRetryConsoleNoteDiagnostics", params)
+	}
 	return i18n.GetWithParams("AgentRetryConsoleNote", params)
+}
+
+func retryDiagnosticsPath[T any](detail func(T) string, result T) string {
+	if detail == nil {
+		return ""
+	}
+	return strings.TrimSpace(detail(result))
 }
 
 func retryReporterFromContext(ctx context.Context) RetryReporter {
@@ -392,16 +421,18 @@ func retryReasonFromJSON(output string) string {
 func retryReasonFromValue(value interface{}) string {
 	switch typed := value.(type) {
 	case map[string]interface{}:
+		// provider 若返回 errors/result 中的具体校验路径，优先保留它；
+		// 只有缺少细节时才回退到通用 error_* subtype。
+		for _, key := range []string{"errors", "result", "message", "error", "stderr", "detail"} {
+			if reason := retryReasonFromValue(typed[key]); reason != "" {
+				return reason
+			}
+		}
 		if subtype, _ := typed["subtype"].(string); strings.HasPrefix(subtype, "error_") {
 			if subtype == "error_max_structured_output_retries" {
 				return i18n.GetWithParams("AgentRetryReasonStructuredOutputRetriesExhausted", map[string]interface{}{"Subtype": subtype})
 			}
 			return subtype
-		}
-		for _, key := range []string{"result", "message", "error", "stderr", "detail"} {
-			if reason := retryReasonFromValue(typed[key]); reason != "" {
-				return reason
-			}
 		}
 		return retryReasonFromErrorMap(typed)
 	case []interface{}:

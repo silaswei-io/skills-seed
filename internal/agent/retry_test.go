@@ -28,6 +28,15 @@ func TestRetryReasonFromOutputExplainsStructuredOutputExhaustion(t *testing.T) {
 	require.Equal(t, "结构化输出多次未通过 JSON Schema 校验（error_max_structured_output_retries）", reason)
 }
 
+func TestRetryReasonFromOutputPrefersProviderValidationDetails(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	stdout := `{"type":"result","subtype":"error_max_structured_output_retries","errors":["decisions[2].revision: required property missing"]}`
+
+	reason := RetryReasonFromOutput(stdout, "")
+
+	require.Equal(t, "decisions[2].revision: required property missing", reason)
+}
+
 func TestHTTPStatusRetryableRegexRequiresHTTPContext(t *testing.T) {
 	require.False(t, HTTPStatusRetryableRegex.MatchString("line 429 in generated output"))
 	require.False(t, HTTPStatusRetryableRegex.MatchString("port 503 is used by the test server"))
@@ -124,6 +133,19 @@ func TestRetryConsoleMessageShowsRetryReason(t *testing.T) {
 	require.Contains(t, message, "15s 后重试")
 	require.Contains(t, message, "API Error: 529 overloaded_error")
 	require.NotContains(t, message, "\n")
+}
+
+func TestRetryConsoleMessageShowsDiagnosticsPath(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	message := RetryConsoleMessage(RetryInfo{
+		AgentName:       "claude",
+		WaitDuration:    15 * time.Second,
+		Reason:          "结构化输出多次未通过 JSON Schema 校验",
+		DiagnosticsPath: "/tmp/runtime/attempt.manifest.json",
+	})
+
+	require.Contains(t, message, "完整诊断：/tmp/runtime/attempt.manifest.json")
 }
 
 func TestRetryProgressBinderRestoresBaseLabelAfterRecoveredRetry(t *testing.T) {

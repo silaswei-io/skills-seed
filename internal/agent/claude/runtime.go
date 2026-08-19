@@ -71,8 +71,21 @@ func (c *ClaudeAgent) callClaudeResult(ctx context.Context, operation, prompt, o
 			output, nextConversation, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, conversation, attempt, workDir, agent.FirstRuntimeTask(task))
 			return claudeCallResult{output: output, conversation: nextConversation, archive: archive}, output, duration, retryable, err
 		},
+		RetryDetail: func(result claudeCallResult) string {
+			return agentArchiveDiagnosticPath(result.archive)
+		},
 	})
 	return result, err
+}
+
+func agentArchiveDiagnosticPath(archive agent.AgentOutputArchive) string {
+	if archive.ManifestPath != "" {
+		return archive.ManifestPath
+	}
+	if archive.RawPath != "" {
+		return archive.RawPath
+	}
+	return archive.SchemaPath
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
@@ -123,6 +136,8 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 			Attempt:   attempt,
 			RawOutput: stdoutStr,
 			Stderr:    stderrStr,
+			Schema:    outputSchema,
+			Error:     err.Error(),
 			ExitError: true,
 		})
 
@@ -170,6 +185,8 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 			Attempt:   attempt,
 			RawOutput: rawOutput,
 			Stderr:    stderr.String(),
+			Schema:    outputSchema,
+			Error:     outputErr.Error(),
 		})
 		retryable := isRetryableError(rawOutput, stderr.String())
 		logFields := []any{
@@ -201,6 +218,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 		Content:   output,
 		RawOutput: rawOutput,
 		Stderr:    stderr.String(),
+		Schema:    outputSchema,
 	})
 	callCompleteFields := []any{
 		"agent", c.Name(),

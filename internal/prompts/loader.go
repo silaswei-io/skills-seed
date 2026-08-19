@@ -116,7 +116,7 @@ func (l *Loader) loadWithLocale(name, locale string) error {
 		return err
 	}
 
-	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap(locale)).Parse(string(data))
+	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap(locale, l.agentName)).Parse(string(data))
 	if err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func (l *Loader) outputContractGuard(locale, promptName string) string {
 	if err != nil {
 		return ""
 	}
-	tmpl, err := template.New("output-contract-guard").Option("missingkey=error").Funcs(funcMap(locale)).Parse(string(data))
+	tmpl, err := template.New("output-contract-guard").Option("missingkey=error").Funcs(funcMap(locale, l.agentName)).Parse(string(data))
 	if err != nil {
 		return ""
 	}
@@ -316,7 +316,7 @@ func (l *Loader) renderAppendTemplate(locale, name string) string {
 	if err != nil {
 		return ""
 	}
-	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap(locale)).Parse(string(data))
+	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap(locale, l.agentName)).Parse(string(data))
 	if err != nil {
 		return ""
 	}
@@ -500,7 +500,7 @@ func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromp
 	)
 }
 
-func funcMap(locale string) template.FuncMap {
+func funcMap(locale, agentName string) template.FuncMap {
 	outputLanguage := outputLanguageSpec(locale)
 	return template.FuncMap{
 		"upper": func(v interface{}) string {
@@ -516,9 +516,20 @@ func funcMap(locale string) template.FuncMap {
 			return "Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed."
 		},
 		"jsonContract": func(name string) (string, error) {
-			return aicontract.JSONSchema(name)
+			return renderJSONContract(agentName, name, nil)
+		},
+		"jsonContractWithProjectIDs": func(name string, projectIDs []string) (string, error) {
+			return renderJSONContract(agentName, name, projectIDs)
 		},
 	}
+}
+
+func renderJSONContract(agentName, name string, projectIDs []string) (string, error) {
+	opts := aicontract.StructuredOutputOptions{ProjectIDs: projectIDs}
+	if strings.EqualFold(strings.TrimSpace(agentName), "codex") {
+		return aicontract.StrictStructuredOutputSchemaWithOptions(name, opts)
+	}
+	return aicontract.StructuredOutputSchemaWithOptions(name, opts)
 }
 
 type outputLanguage struct {

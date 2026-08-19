@@ -42,6 +42,7 @@ func (e *DiagnosticError) Error() string {
 		"ContentPath":   e.Archive.ContentPath,
 		"RawPath":       e.Archive.RawPath,
 		"StderrPath":    e.Archive.StderrPath,
+		"SchemaPath":    e.Archive.SchemaPath,
 		"ManifestPath":  e.Archive.ManifestPath,
 	})
 }

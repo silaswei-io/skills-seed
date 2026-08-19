@@ -24,14 +24,17 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 		Content:   `{"patterns":[]}`,
 		RawOutput: `{"type":"result","result":"{\"patterns\":[]}"}`,
 		Stderr:    "warning",
+		Schema:    `{"type":"object","required":["patterns"]}`,
 	})
 
 	require.Contains(t, filepath.ToSlash(archive.ContentPath), ".skills-seed/runtime/agent-outputs/")
 	require.Contains(t, filepath.ToSlash(archive.RawPath), ".skills-seed/runtime/agent-outputs/")
 	require.Contains(t, filepath.ToSlash(archive.StderrPath), ".skills-seed/runtime/agent-outputs/")
+	require.Contains(t, filepath.ToSlash(archive.SchemaPath), ".skills-seed/runtime/agent-outputs/")
 	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.md$`, filepath.Base(archive.ContentPath))
 	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.raw\.txt$`, filepath.Base(archive.RawPath))
 	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.stderr\.txt$`, filepath.Base(archive.StderrPath))
+	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-claude-analyzecurrentcodebase\.schema\.json$`, filepath.Base(archive.SchemaPath))
 
 	content, err := os.ReadFile(archive.ContentPath)
 	require.NoError(t, err)
@@ -54,6 +57,7 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 		ContentPath string `json:"content_path"`
 		RawPath     string `json:"raw_path"`
 		StderrPath  string `json:"stderr_path"`
+		SchemaPath  string `json:"schema_path"`
 	}
 	data, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
@@ -63,6 +67,7 @@ func TestSaveAgentOutputForContextStoresFilesUnderRuntimeMemory(t *testing.T) {
 	require.Equal(t, archive.ContentPath, manifest.ContentPath)
 	require.Equal(t, archive.RawPath, manifest.RawPath)
 	require.Equal(t, archive.StderrPath, manifest.StderrPath)
+	require.Equal(t, archive.SchemaPath, manifest.SchemaPath)
 	require.NotContains(t, string(data), "token_usage")
 	require.NotContains(t, string(data), "tokens")
 }

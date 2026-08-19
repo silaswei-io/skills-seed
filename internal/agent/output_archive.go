@@ -23,6 +23,7 @@ type AgentOutputArchive struct {
 	ContentPath  string
 	RawPath      string
 	StderrPath   string
+	SchemaPath   string
 	ManifestPath string
 }
 
@@ -36,10 +37,12 @@ type agentOutputManifest struct {
 	ContentPath      string `json:"content_path,omitempty"`
 	RawPath          string `json:"raw_path,omitempty"`
 	StderrPath       string `json:"stderr_path,omitempty"`
+	SchemaPath       string `json:"schema_path,omitempty"`
 	ContentLength    int    `json:"content_length,omitempty"`
 	RawOutputLength  int    `json:"raw_output_length,omitempty"`
 	StderrLength     int    `json:"stderr_length,omitempty"`
 	ExitError        bool   `json:"exit_error,omitempty"`
+	Error            string `json:"error,omitempty"`
 	CreatedAtRFC3339 string `json:"created_at"`
 }
 
@@ -54,6 +57,8 @@ type AgentOutputArchiveOptions struct {
 	Content   string
 	RawOutput string
 	Stderr    string
+	Schema    string
+	Error     string
 	ExitError bool
 }
 
@@ -143,6 +148,20 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		}
 		archive.StderrPath = path
 	}
+	if strings.TrimSpace(opts.Schema) != "" {
+		path := filepath.Join(dir, base+".schema.json")
+		if err := os.WriteFile(path, []byte(opts.Schema+"\n"), 0600); err != nil {
+			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
+				"operation", "agent.output.schema.write",
+				"agent", opts.Agent,
+				"agent_operation", opts.Operation,
+				"path", path,
+				"error", err,
+			)
+			return archive
+		}
+		archive.SchemaPath = path
+	}
 
 	manifestPath := filepath.Join(dir, base+".manifest.json")
 	manifest := agentOutputManifest{
@@ -155,10 +174,12 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		ContentPath:      archive.ContentPath,
 		RawPath:          archive.RawPath,
 		StderrPath:       archive.StderrPath,
+		SchemaPath:       archive.SchemaPath,
 		ContentLength:    len(opts.Content),
 		RawOutputLength:  len(opts.RawOutput),
 		StderrLength:     len(opts.Stderr),
 		ExitError:        opts.ExitError,
+		Error:            opts.Error,
 		CreatedAtRFC3339: time.Now().Format(time.RFC3339Nano),
 	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
@@ -192,6 +213,7 @@ func SaveAgentOutputForContext(ctx context.Context, opts AgentOutputArchiveOptio
 		"path", archive.ContentPath,
 		"raw_path", archive.RawPath,
 		"stderr_path", archive.StderrPath,
+		"schema_path", archive.SchemaPath,
 		"manifest_path", manifestPath,
 		"content_length", len(opts.Content),
 		"raw_output_length", len(opts.RawOutput),

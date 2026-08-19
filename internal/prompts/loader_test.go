@@ -30,6 +30,15 @@ func TestLoaderRendersCurrentPromptSet(t *testing.T) {
 	}
 }
 
+func TestWorkspacePromptUsesRuntimeProjectIDConstraints(t *testing.T) {
+	loader := New("claude", "en-US", "")
+	prompt, err := loader.Render("core-workspace-profile", sampleWorkspaceData())
+
+	require.NoError(t, err)
+	require.Regexp(t, `"enum": \[\s+"backend",\s+"worker"`, prompt)
+	require.NotContains(t, prompt, `"$schema"`)
+}
+
 func TestPromptJSONContractsResolveToSchemas(t *testing.T) {
 	contractPattern := regexp.MustCompile(`jsonContract\s+"([^"]+)"`)
 	entries, err := embedfs.FS.ReadDir("templates/prompts/loader")

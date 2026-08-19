@@ -80,6 +80,8 @@ func isCodexRetryableError(stdout, stderr string) bool {
 func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputSchemaPath string, conversation agent.Conversation, attempt int, task agent.RuntimeTask) (string, agent.Conversation, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	schemaBytes, _ := os.ReadFile(outputSchemaPath)
+	outputSchema := string(schemaBytes)
 
 	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
@@ -125,6 +127,8 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 			Attempt:   attempt,
 			RawOutput: stdoutStr,
 			Stderr:    stderrStr,
+			Schema:    outputSchema,
+			Error:     err.Error(),
 			ExitError: true,
 		})
 
@@ -180,6 +184,8 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 			Attempt:   attempt,
 			RawOutput: rawOutput,
 			Stderr:    stderr.String(),
+			Schema:    outputSchema,
+			Error:     err.Error(),
 		})
 		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"agent", c.Name(),
@@ -201,6 +207,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 		Content:   content,
 		RawOutput: rawOutput,
 		Stderr:    stderr.String(),
+		Schema:    outputSchema,
 	})
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentParseComplete"),
 		"agent", c.Name(),

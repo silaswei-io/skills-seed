@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.11]
+
+### Changes
+
+- Improved Agent failure diagnostics by archiving the output Schema, error cause, and complete manifest, and showing the diagnostic location in retry messages.
+- Generate runtime structured-output contracts according to Agent capabilities; workspace profile and specification Schemas now constrain project IDs to the currently valid set, reducing invalid output during recovery and cross-project routing.
+- Added bilingual regression coverage for retry reasons, diagnostic archives, and workspace project-ID constraints.
+
 ## [v0.20.10]
 
 ### Changes
