@@ -2,6 +2,15 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.12]
+
+### Changes
+
+- Added one-to-one structured constraints for independent knowledge review: the current candidate IDs become a dynamic enum, the decision count must equal the candidate count, and local validation still rejects duplicates, omissions, and unknown IDs.
+- Clarified that `business_method` and `revision` must be sibling fields inside each decision object, preventing malformed nesting that causes strict parsing failures.
+- Reduced generated Skill development-focus entries to a primary reference and representative evidence entry, limiting context growth caused by overlapping keywords.
+- Clarified the responsibilities of `project-spec`, business patterns, and the capability entry index, with synchronized bilingual prompt, configuration, Wiki, and regression-test updates.
+
 ## [v0.20.11]
 
 ### Changes

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,9 +28,8 @@ func (c *ClaudeAgent) callClaude(ctx context.Context, operation, prompt, outputC
 	return output, err
 }
 
-// callClaudeInConversation 在同一学习焦点会话中执行后续任务。
-func (c *ClaudeAgent) callClaudeInConversation(ctx context.Context, operation, prompt, outputContract string, conversation agent.Conversation, task ...agent.RuntimeTask) (string, agent.Conversation, error) {
-	result, err := c.callClaudeResult(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, conversation, task...)
+func (c *ClaudeAgent) callClaudeInConversationWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (string, agent.Conversation, error) {
+	result, err := c.callClaudeResult(ctx, operation, prompt, outputContract, opts, conversation, task...)
 	return result.output, result.conversation, err
 }
 
@@ -357,6 +357,7 @@ func claudePrintArgsForConversation(allowUserPlugins bool, outputSchema string, 
 	}
 	args = append(args,
 		"--disable-slash-commands",
+		"--strict-mcp-config",
 		"--output-format",
 		"json",
 		"--json-schema",
@@ -376,9 +377,12 @@ func claudePrintArgsForConversation(allowUserPlugins bool, outputSchema string, 
 }
 
 func claudeRuntimeArgs(runtime config.AgentRuntimeOptions) []string {
-	args := make([]string, 0)
+	args := make([]string, 0, 4)
 	if model := strings.TrimSpace(runtime.Model); model != "" {
 		args = append(args, "--model", model)
+	}
+	if runtime.MaxTurns > 0 {
+		args = append(args, "--max-turns", strconv.Itoa(runtime.MaxTurns))
 	}
 	return args
 }

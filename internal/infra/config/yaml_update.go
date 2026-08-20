@@ -39,6 +39,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLString(doc, []string{"agent", "engine"}, cfg.Agent.Engine)
 	setYAMLStringMap(doc, []string{"agent", "commands"}, cfg.Agent.Commands)
 	setYAMLInt(doc, []string{"agent", "timeout"}, cfg.Agent.Timeout)
+	setYAMLInt(doc, []string{"agent", "max_turns"}, cfg.Agent.MaxTurns)
 	setYAMLBool(doc, []string{"agent", "allow_user_plugins"}, cfg.Agent.AllowUserPlugins)
 	setYAMLInt(doc, []string{"agent", "parallelism"}, cfg.Agent.Parallelism)
 	setYAMLString(doc, []string{"agent", "model"}, cfg.Agent.Model)

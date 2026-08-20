@@ -735,6 +735,7 @@ func TestRepository_GetAgentConfig(t *testing.T) {
 	assert.Equal(t, "claude", agentCfg.Commands["claude"])
 	assert.Equal(t, "codex", agentCfg.Commands["codex"])
 	assert.Equal(t, 1800, agentCfg.Timeout)
+	assert.Equal(t, DefaultAgentMaxTurns, agentCfg.MaxTurns)
 	assert.False(t, agentCfg.AllowUserPlugins)
 	assert.Empty(t, agentCfg.Model)
 }

@@ -25,9 +25,8 @@ func (c *CodexAgent) callCodex(ctx context.Context, operation, prompt, outputCon
 	return c.callCodexWithOptions(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, task...)
 }
 
-// callCodexInConversation 在同一学习焦点会话中执行后续任务。
-func (c *CodexAgent) callCodexInConversation(ctx context.Context, operation, prompt, outputContract string, conversation agent.Conversation, task ...agent.RuntimeTask) (string, agent.Conversation, error) {
-	result, err := c.callCodexResult(ctx, operation, prompt, outputContract, aicontract.StructuredOutputOptions{}, conversation, task...)
+func (c *CodexAgent) callCodexInConversationWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (string, agent.Conversation, error) {
+	result, err := c.callCodexResult(ctx, operation, prompt, outputContract, opts, conversation, task...)
 	return result.output, result.conversation, err
 }
 

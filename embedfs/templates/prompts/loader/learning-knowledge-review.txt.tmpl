@@ -32,6 +32,7 @@ Review contract:
 - Review `knowledge_flags` independently from wording and analysis depth. `operational_risk` is valid only when evidence proves the candidate itself involves irreversible, privileged, state/resource-changing, or externally visible behavior. Sensitive vocabulary, filenames, planning risk signals, or a critical focus are insufficient. Remove an unsupported flag and add a missing proven flag through `revise`; never output another flag.
 - Use `accept` only when the current text and flag set are already bounded and accurate. Use `revise` when accurate knowledge can be preserved by narrowing or correcting its name, category, description, guidance, confidence, or flag set. Use `reject` when the evidence does not support a useful candidate.
 - For `revise`, return a complete revision. For `accept` and `reject`, omit `revision`. A rejected candidate must omit `business_method`.
+- In each decision object, `business_method` and `revision` are optional sibling fields. Never place `business_method` inside `revision`, inside a candidate, or at the top level.
 - Never propose changes to evidence locations, source ownership, project scope, workspace ownership, timestamps, metrics, or candidate IDs; the runtime owns those fields.
 
 Before returning, audit one-to-one candidate coverage and verify that every accepted or revised claim and every `operational_risk` flag can be pointed back to its evidence without relying on hidden context.

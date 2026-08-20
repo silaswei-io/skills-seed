@@ -108,4 +108,5 @@ func TestNewContainerPassesAgentModelToFactory(t *testing.T) {
 	defer cont.Close()
 
 	require.Equal(t, "low-cost-model", capturedRuntime.Model)
+	require.Equal(t, config.DefaultAgentMaxTurns, capturedRuntime.MaxTurns)
 }

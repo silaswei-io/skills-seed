@@ -31,7 +31,7 @@ func (c *ClaudeAgent) NormalizePatterns(ctx context.Context, req *agent.Normaliz
 
 func (c *ClaudeAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-knowledge-review", req.RuntimeLabel))
-	output, _, err := c.callCurrentLearning(ctx, agent.ReviewKnowledgeOperation(req), "learning-knowledge-review", agent.RuntimePromptInputPrefix("skills-seed-learning-knowledge-review", req.RuntimeLabel), aicontract.ContractReviewKnowledge, task, req.Conversation, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, _, err := c.callCurrentLearningWithOptions(ctx, agent.ReviewKnowledgeOperation(req), "learning-knowledge-review", agent.RuntimePromptInputPrefix("skills-seed-learning-knowledge-review", req.RuntimeLabel), aicontract.ContractReviewKnowledge, aicontract.StructuredOutputOptions{CandidateIDs: agent.ReviewKnowledgeCandidateIDs(req.Candidates)}, task, req.Conversation, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.ReviewKnowledgePromptData(inputs, req)
 	})
 	if err != nil {
@@ -119,8 +119,12 @@ func (c *ClaudeAgent) ReviewAuthority(ctx context.Context, req *agent.ReviewAuth
 }
 
 func (c *ClaudeAgent) callCurrentLearning(ctx context.Context, operation, templateName, inputPrefix, outputContract string, task agent.RuntimeTask, conversation agent.Conversation, build func(*agent.PromptInputSession) (map[string]interface{}, error)) (string, agent.Conversation, error) {
+	return c.callCurrentLearningWithOptions(ctx, operation, templateName, inputPrefix, outputContract, aicontract.StructuredOutputOptions{}, task, conversation, build)
+}
+
+func (c *ClaudeAgent) callCurrentLearningWithOptions(ctx context.Context, operation, templateName, inputPrefix, outputContract string, opts aicontract.StructuredOutputOptions, task agent.RuntimeTask, conversation agent.Conversation, build func(*agent.PromptInputSession) (map[string]interface{}, error)) (string, agent.Conversation, error) {
 	runner := structuredtask.NewWithResult(c.promptLoader, func(ctx context.Context, operation, prompt, contract string, runtime agent.RuntimeTask) (structuredtask.Result, error) {
-		output, nextConversation, err := c.callClaudeInConversation(ctx, operation, prompt, contract, conversation, runtime)
+		output, nextConversation, err := c.callClaudeInConversationWithOptions(ctx, operation, prompt, contract, opts, conversation, runtime)
 		return structuredtask.Result{Output: output, Conversation: nextConversation}, err
 	})
 	result, err := runner.RunResult(ctx, structuredtask.Task{

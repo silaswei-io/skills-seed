@@ -31,10 +31,10 @@ The actual layout changes with project mode, target Agent, learned knowledge, an
 1. Which project, module, or development focus owns the task?
 2. Does an explicit Rule or Workflow constrain the task first?
 3. Which project references, capability entries, and source locations must be read?
-4. When several focuses match, which references must be read together and how should path and evidence resolve ambiguity?
+4. When several focuses match, how should the primary focus be selected and when should related references be expanded?
 5. Which impact boundaries or unknowns must be confirmed before implementation?
 
-After a focus matches, read all of its references and evidence entries first; follow another reference only when the target page explicitly identifies a cross-boundary relationship. Focus summaries, attributes, and risk signals explain boundaries but do not replace source verification.
+After a focus matches, read the primary focus reference and representative evidence entry first; follow another reference only when the target page explicitly identifies a cross-boundary relationship. A generic verb or technical term alone cannot select a focus. Focus summaries, attributes, and risk signals explain boundaries but do not replace source verification.
 
 Rule and Workflow `summary` and `route_terms` are also entry-navigation metadata only; explicit scopes and the complete resource text still define boundaries and permissions.
 

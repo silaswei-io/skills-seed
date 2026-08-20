@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildDevelopmentFocusesPreservesAllRoutes(t *testing.T) {
+func TestBuildDevelopmentFocusesProjectsPrimaryRoute(t *testing.T) {
 	first := domain.NewPattern("issue", "Issue", domain.CategoryBusiness)
 	first.DevelopmentFocus = &domain.DevelopmentFocus{
 		ID:         "certificate-lifecycle",
@@ -29,14 +29,6 @@ func TestBuildDevelopmentFocusesPreservesAllRoutes(t *testing.T) {
 
 	require.Len(t, views, 1)
 	require.Equal(t, []string{"issue", "status"}, views[0].RouteTerms)
-	require.Equal(t, []string{
-		"desc/certificate.api:4",
-		"internal/certificate/issue.go",
-		"internal/certificate/service.go:10",
-		"internal/certificate/status.go",
-	}, views[0].EntryPaths)
-	require.Equal(t, []string{
-		"./references/patterns/api.md",
-		"./references/patterns/business/certificate-lifecycle.md",
-	}, views[0].ReferencePaths)
+	require.Equal(t, "internal/certificate/issue.go", views[0].PrimaryPath)
+	require.Equal(t, "./references/patterns/business/certificate-lifecycle.md", views[0].ReferencePath)
 }

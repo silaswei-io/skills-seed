@@ -26,11 +26,11 @@ These rules come from authoritative project files and must be followed for match
 
 {{if .DevelopmentFocuses}}## Development Focuses
 
-Use this table in the order “changed path -> request signal -> reference page -> source evidence”. For one match, read every listed reference; for multiple matches, read every matched reference and all matched focuses, then use paths and evidence entries to establish ownership. When ambiguity remains, report the boundary instead of guessing priority. A focus is navigation only; source evidence and applicability boundaries remain in the target reference.
+Use this table in the order “changed path -> composite request signal -> primary reference -> source evidence”. Select one primary focus by changed path first, then use resource, action, state, actor, policy, or external-system terms from the request. A generic verb or technical term alone cannot select a focus; when several focuses match, prefer path ownership and report the boundary when it remains ambiguous. A focus is navigation only; source evidence and applicability boundaries remain in the target reference.
 
-| Focus | Request terms | References | Evidence entries |
+| Focus | Request terms | Primary reference | Representative evidence |
 |---|---|---|---|
-{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}} | {{range $i, $path := .ReferencePaths}}{{if $i}}, {{end}}[open]({{$path}}){{end}} | {{if .EntryPaths}}{{range $i, $path := .EntryPaths}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{else}}Confirm from the evidence entries in the focus references{{end}} |
+{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}} | [open focus]({{.ReferencePath}}) | {{if .PrimaryPath}}`{{.PrimaryPath}}`{{else}}Confirm from the focus reference{{end}} |
 {{end}}
 {{end}}
 
@@ -47,13 +47,13 @@ Use this table in the order “changed path -> request signal -> reference page 
 
 {{if .HasKnowledge}}
 1. Read applicable user rules first to confirm editable boundaries and command permissions.
-2. Filter "Development Focuses" by known changed paths; for a match, read every listed reference and evidence entry.
-After a focus match, stay within its references first; follow another reference only when its "Related References" explicitly indicates a cross-boundary concern.
-3. Without a focus match, use the resource, action, state, and external-dependency terms in the request to choose from "Reference Entry Points"; open the map/index first, then one relevant detail page instead of loading every pattern.
+2. Select one primary focus by changed path; when the path is not decisive, use composite request signals. Open the primary focus reference and representative evidence entry.
+3. Follow another reference only when the primary focus page's "Related References" explicitly indicates a cross-boundary concern; do not load multiple focuses because of overlapping keywords.
+4. Without a focus match, use the resource, action, state, and external-dependency terms in the request to choose from "Reference Entry Points"; open the map/index first, then one relevant detail page instead of loading every pattern.
 {{if .References.BusinessPatterns}}For product/domain requests, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.{{end}}
-4. From the pattern page, check its "Related References" section first, then follow cross-boundary links and return to source code to verify applicability, inputs, outputs, and failure semantics.
-5. For interfaces, messages, derived artifacts, configuration, or generation boundaries, read [Project Spec](./references/project-spec.md) first. Do not infer permission to edit directly or run a generator from existing code.
-{{if .WorkflowReferences}}6. Use only the matching user workflow for testing, deployment, release, or acceptance.{{else}}6. No user-maintained testing, deployment, release, or acceptance workflow is available; confirm validation from the current user instruction.{{end}}
+5. From the pattern page, check its "Related References" section first, then follow cross-boundary links and return to source code to verify applicability, inputs, outputs, and failure semantics.
+6. For interfaces, messages, derived artifacts, configuration, or generation boundaries, read [Project Spec](./references/project-spec.md) first. Do not infer permission to edit directly or run a generator from existing code.
+{{if .WorkflowReferences}}7. Use only the matching user workflow for testing, deployment, release, or acceptance.{{else}}7. No user-maintained testing, deployment, release, or acceptance workflow is available; confirm validation from the current user instruction.{{end}}
 {{else}}{{if .WorkflowReferences}}1. Choose the user workflow that best matches the task goal.
 2. Read the workflow document before acting; do not execute from the list summary alone.
 3. When the latest user instruction conflicts with the saved workflow, follow the latest instruction and call out the difference.

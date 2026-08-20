@@ -37,6 +37,7 @@ agent:
     claude: "claude"
     codex: "codex"
   timeout: 1800
+  max_turns: 80
   allow_user_plugins: false
   parallelism: 0
   model: ""
@@ -232,12 +233,15 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 | `engine` | `claude` | 执行分析、学习和生成摘要的 Agent 引擎，对应 `commands` 的 key |
 | `commands` | `claude: claude`、`codex: codex` | engine 到 CLI 命令的映射 |
 | `timeout` | `1800` | 单次 AI 请求超时时间，单位秒 |
+| `max_turns` | `80` | 单次 Agent 调用允许的最大探索轮数；达到上限后结束调用，避免上下文无限增长；当前由 Claude CLI 使用 |
 | `allow_user_plugins` | `false` | 是否允许 Agent 加载用户插件；默认关闭，避免批处理被用户插件影响 |
 | `parallelism` | `0` | Agent 并发数；workspace 根配置控制子项目并发，普通 project 配置控制证据焦点批次并发，`0` 表示自动 |
 | `model` | 空 | skills-seed 调用 Agent CLI 时使用的模型名；空值不传模型参数，继承本机 Agent CLI 默认配置 |
 | `retry.max_retries` | `3` | 可重试错误的最大重试次数；配置为 `0` 时使用默认值 `3` |
 | `retry.initial_interval` | `15` | 首次重试等待秒数；配置为 `0` 时使用默认值 `15` |
 | `retry.max_interval` | `120` | 指数退避最大等待秒数；配置为 `0` 时使用默认值 `120` |
+
+`max_turns` 由 Claude CLI 用于限制单次调用的 Agent 探索轮数。学习调用默认使用严格 MCP 配置，只允许提示词声明的只读工具；未声明或被拒绝的工具不会被反复尝试。Codex 不接收该 Claude 专用参数。
 
 #### `parallelism` 说明
 

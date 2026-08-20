@@ -135,6 +135,7 @@ type AgentConfig struct {
 	Engine           string            `yaml:"engine"`             // Agent 引擎
 	Commands         map[string]string `yaml:"commands"`           // engine -> CLI 命令
 	Timeout          int               `yaml:"timeout"`            // 超时时间（秒）
+	MaxTurns         int               `yaml:"max_turns"`          // 单次 Agent 调用允许的最大探索轮数，仅 Claude 引擎生效
 	AllowUserPlugins bool              `yaml:"allow_user_plugins"` // 是否加载用户插件
 	Parallelism      int               `yaml:"parallelism"`        // 并发 Agent 数，0 表示自动
 	Model            string            `yaml:"model"`              // skills-seed 专用模型名，空值继承 Agent CLI 默认配置
@@ -143,8 +144,11 @@ type AgentConfig struct {
 
 // AgentRuntimeOptions 是传给具体 provider 的有效运行参数。
 type AgentRuntimeOptions struct {
-	Model string
+	Model    string
+	MaxTurns int
 }
+
+const DefaultAgentMaxTurns = 80
 
 // RetryConfig 可重试错误（429/529 等）的重试配置
 type RetryConfig struct {
@@ -199,7 +203,11 @@ func (r RetryConfig) WaitDuration(attempt int) time.Duration {
 
 // RuntimeOptions 返回传给 Agent CLI 的有效运行参数。
 func (c AgentConfig) RuntimeOptions() AgentRuntimeOptions {
-	return AgentRuntimeOptions{Model: strings.TrimSpace(c.Model)}
+	maxTurns := c.MaxTurns
+	if maxTurns <= 0 {
+		maxTurns = DefaultAgentMaxTurns
+	}
+	return AgentRuntimeOptions{Model: strings.TrimSpace(c.Model), MaxTurns: maxTurns}
 }
 
 // LearningConfig 控制 learn current 的默认学习范围。
@@ -613,6 +621,9 @@ func normalizeAgentConfig(cfg *Config) {
 	if cfg.Agent.Timeout == 0 {
 		cfg.Agent.Timeout = 1800
 	}
+	if cfg.Agent.MaxTurns <= 0 {
+		cfg.Agent.MaxTurns = DefaultAgentMaxTurns
+	}
 }
 
 func normalizeSkillsConfig(cfg *Config) {
@@ -669,6 +680,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 				"agent": "agent",
 			},
 			Timeout:          1800,
+			MaxTurns:         DefaultAgentMaxTurns,
 			AllowUserPlugins: false,
 			Parallelism:      0,
 		},

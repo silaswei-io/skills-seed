@@ -39,6 +39,43 @@ func TestWorkspacePromptUsesRuntimeProjectIDConstraints(t *testing.T) {
 	require.NotContains(t, prompt, `"$schema"`)
 }
 
+func TestPromptLanguageGuardMatchesSkillsLocale(t *testing.T) {
+	tests := []struct {
+		name           string
+		locale         string
+		mustContain    string
+		mustNotContain string
+	}{
+		{
+			name:           "Chinese",
+			locale:         "zh-CN",
+			mustContain:    "所有面向用户的自然语言字段必须使用简体中文（zh-CN）",
+			mustNotContain: "All user-facing natural-language fields must be written in English (en-US)",
+		},
+		{
+			name:           "English",
+			locale:         "en-US",
+			mustContain:    "All user-facing natural-language fields must be written in English (en-US)",
+			mustNotContain: "所有面向用户的自然语言字段必须使用简体中文（zh-CN）",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loader := New("codex", tt.locale, "")
+			prompt, err := loader.Render("core-user-pattern", sampleUserPatternData())
+
+			require.NoError(t, err)
+			require.Contains(t, prompt, tt.mustContain)
+			require.NotContains(t, prompt, tt.mustNotContain)
+			if tt.locale == "zh-CN" {
+				require.Contains(t, prompt, "在必要时保持框架名称、库名称、命令、文件路径")
+				require.NotContains(t, prompt, "Preserve framework names, library names, commands, file paths")
+			}
+		})
+	}
+}
+
 func TestPromptJSONContractsResolveToSchemas(t *testing.T) {
 	contractPattern := regexp.MustCompile(`jsonContract\s+"([^"]+)"`)
 	entries, err := embedfs.FS.ReadDir("templates/prompts/loader")
@@ -210,6 +247,8 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, batch, "Run a decision-value discovery pass")
 	require.Contains(t, batch, "Pack-local refinement")
 	require.Contains(t, batch, "Return a pattern only when all of these are true")
+	require.Contains(t, batch, "Use only tools explicitly available in this invocation")
+	require.Contains(t, batch, "Stop exploration once the listed evidence is sufficient to decide")
 	require.Contains(t, batch, "verified reusable capability entry")
 	require.Contains(t, batch, "decision-bearing calculations")
 	require.Contains(t, batch, "attaching `business_method` to the candidate owned by that entry is required")
@@ -227,6 +266,8 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	delta, err := loader.Render("learning-delta-pack-analyze", sampleCurrentDeltaData())
 	require.NoError(t, err)
 	require.Contains(t, delta, "isolated diff-pack analysis runtime call")
+	require.Contains(t, delta, "Use only tools explicitly available in this invocation")
+	require.Contains(t, delta, "Stop exploration once the listed diff evidence is sufficient to decide")
 	require.Contains(t, delta, "Changed hunks are the source anchor")
 	require.Contains(t, delta, "proposal.business_method")
 	require.Contains(t, delta, "changed decision-bearing calculations")
@@ -270,6 +311,7 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, review, "decision-bearing operands")
 	require.Contains(t, review, "one canonical entry")
 	require.Contains(t, review, "no compensation or rollback path")
+	require.Contains(t, review, "`business_method` and `revision` are optional sibling fields")
 
 	normalize, err := loader.Render("learning-pattern-normalize", sampleNormalizePatternsData(t))
 	require.NoError(t, err)

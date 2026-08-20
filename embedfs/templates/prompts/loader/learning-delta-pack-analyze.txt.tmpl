@@ -71,6 +71,8 @@ Diff boundary:
 - Do not rely on hidden context from planning, previous full learning, other packs, authority extraction, project-map refresh, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
 - Every decision must be triggered by a listed diff or changed focus path.
 - Changed hunks are the source anchor. Unchanged context files can explain meaning but cannot independently create a new pattern.
+- Use only tools explicitly available in this invocation. Do not attempt unavailable or denied tools, and do not retry a denied tool call.
+- Stop exploration once the listed diff evidence is sufficient to decide. If the evidence boundary cannot establish a change, return `no_change` for that pack instead of expanding the search.
 - `focus_action: "new"` means the diff revealed a new reusable boundary inside a listed pack; it does not authorize scanning beyond listed diffs and direct context.
 - Prefer `update` or `reinforce` when the diff fits a related existing pattern.
 - For `careful` focuses, verify the changed state/contract/generated/cross-module boundary. For `critical` focuses, also verify changed guards, cleanup and lifecycle handling, return/error checks, authorization or privilege boundaries, and external effects wherever applicable. Depth increases scrutiny, not output count.

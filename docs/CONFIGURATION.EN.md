@@ -37,6 +37,7 @@ agent:
     claude: "claude"
     codex: "codex"
   timeout: 1800
+  max_turns: 80
   allow_user_plugins: false
   parallelism: 0
   model: ""
@@ -232,12 +233,15 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 | `engine` | `claude` | Agent engine used for analysis, learning, and generation summaries; matches keys in `commands` |
 | `commands` | `claude: claude`, `codex: codex` | Engine-to-CLI command mapping |
 | `timeout` | `1800` | AI request timeout in seconds |
+| `max_turns` | `80` | Maximum exploration turns for one Agent call; stops at the limit to bound context growth; currently used by Claude CLI |
 | `allow_user_plugins` | `false` | Whether agents may load user plugins; disabled by default for stable batch runs |
 | `parallelism` | `0` | Agent parallelism; workspace root configs use it for child projects, ordinary project configs use it for evidence-focus batches, `0` means automatic |
 | `model` | empty | Model name passed to the Agent CLI for skills-seed calls; empty passes no model flag and inherits the local Agent CLI default |
 | `retry.max_retries` | `3` | Maximum retry attempts for retryable errors; `0` uses the default `3` |
 | `retry.initial_interval` | `15` | Initial retry wait in seconds; `0` uses the default `15` |
 | `retry.max_interval` | `120` | Maximum exponential-backoff wait in seconds; `0` uses the default `120` |
+
+`max_turns` is used by Claude CLI to bound Agent exploration turns for one call. Learning calls use strict MCP configuration by default and allow only the read-only tools declared by the invocation; unavailable or denied tools are not retried. Codex does not receive this Claude-specific argument.
 
 #### `parallelism` Notes
 

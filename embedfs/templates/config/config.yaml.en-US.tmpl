@@ -39,6 +39,9 @@ agent:
     codex: "codex"
   # AI request timeout (seconds)
   timeout: 1800
+  # Maximum exploration turns for one Agent call; stops at the limit to bound context growth
+  # Applies only to the Claude engine; other engines ignore this setting
+  max_turns: 80
   # Whether agents may load user plugins; disabled by default for batch stability
   allow_user_plugins: false
   # Agent parallelism; workspace roots use it for child projects, project configs use it for evidence-focus batches, 0 means automatic

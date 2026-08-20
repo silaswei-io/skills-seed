@@ -85,10 +85,12 @@ func TestGenerateSkillsRoutesDevelopmentFocusToBusinessDetail(t *testing.T) {
 	require.Contains(t, skill, "开发焦点")
 	require.Contains(t, skill, "Certificate Lifecycle")
 	require.Contains(t, skill, "./references/patterns/business/certificate-lifecycle.md")
-	require.Contains(t, skill, "命中多个焦点时读取全部命中的参考")
+	require.Contains(t, skill, "按改动路径选择一个主焦点")
+	require.Contains(t, skill, "通用动词或技术词不能单独命中焦点")
 	require.Contains(t, skill, "不得从现有代码推断可直接编辑")
 	require.Contains(t, skill, "焦点边界速记")
 	require.Contains(t, skill, "stateful")
+	require.NotContains(t, skill, "internal/certificate/lifecycle.go:42")
 
 	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	require.Contains(t, index, "Certificate Lifecycle")

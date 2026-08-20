@@ -87,6 +87,8 @@ Pack boundary:
 - Do not rely on hidden context from planning, other packs, authority extraction, project-map refresh, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
 - Treat the explicit pack fields, runtime files, structural context, and listed source/diff files as the complete input.
 - Do not scan outside listed pack files and directly referenced context. If evidence is insufficient, return that pack with `patterns: []`.
+- Use only tools explicitly available in this invocation. Do not attempt unavailable or denied tools, and do not retry a denied tool call.
+- Stop exploration once the listed evidence is sufficient to decide. If the evidence boundary cannot establish a candidate, return `patterns: []` instead of expanding the search.
 - A focus with purpose `coverage` is a deterministic safety-net batch, not a claim that its files are low value. Inspect the listed files for routeable business behavior, reusable capability entries, contracts, state boundaries, utilities, and operational or security constraints before returning an empty result.
 - Pack IDs and names are execution provenance for this response only; do not copy them into pattern fields or infer a Workflow from them.
 - For `careful` focuses, verify ownership plus the connected state/contract/generated/cross-module boundary before deciding. For `critical` focuses, additionally verify guards, cleanup and lifecycle handling, return/error checks, authorization or privilege boundaries, and external effects wherever those cues apply. Depth increases evidence scrutiny, not the number of retained patterns.

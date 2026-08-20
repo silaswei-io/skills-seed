@@ -8,8 +8,9 @@
 
 ## Usage
 
-- This spec keeps authoritative constraints and their synchronization coverage. Source-learned findings are expanded only in category pattern references.
+- This spec is the authoritative-rule entry point and keeps only current constraints and synchronization coverage. Source-learned content is routed by responsibility to the project overview, business patterns, and capability entry index.
 - For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for capability entries read [Capability Entry Index](./business-methods.md){{end}}.
+- Category patterns describe behavioral patterns and reuse boundaries; {{if .References.BusinessMethods}}the [Capability Entry Index](./business-methods.md){{else}}the capability entry index{{end}} describes verified capabilities, signatures, prerequisites, return semantics, and usage scenarios.
 - Authoritative rules only come from user-maintained or built-in constraints. Source-learned results are reuse and safety inspection entries only.
 - Explicit authoritative rules outrank current code and learned references. Current code may only correct a stale source-learned summary; it cannot override or relax authoritative constraints.
 

@@ -39,6 +39,9 @@ agent:
     codex: "codex"
   # AI 请求超时时间(秒)
   timeout: 1800
+  # 单次 Agent 调用允许的最大探索轮数；达到上限后停止，避免上下文无限增长
+  # 仅 Claude 引擎生效，其他引擎忽略此配置
+  max_turns: 80
   # 是否允许 Agent 加载用户插件；默认关闭以避免批处理被插件干扰
   allow_user_plugins: false
   # Agent 并发数；workspace 根配置控制子项目并发，project 配置控制证据焦点批次并发，0 表示自动

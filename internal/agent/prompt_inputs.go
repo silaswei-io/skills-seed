@@ -84,13 +84,14 @@ func ReviewKnowledgePromptData(session *PromptInputSession, req *ReviewKnowledge
 		"EvidenceFocusPath": focusPath,
 		"CandidatesPath":    candidatesPath,
 		"CandidateCount":    len(req.Candidates),
-		"CandidateIDs":      reviewCandidateIDs(req.Candidates),
+		"CandidateIDs":      ReviewKnowledgeCandidateIDs(req.Candidates),
 		"UserContextPath":   userContextPath,
 		"AllowedCategories": domain.AllowedPatternCategoriesText(),
 	}, nil
 }
 
-func reviewCandidateIDs(candidates []domain.Pattern) []string {
+// ReviewKnowledgeCandidateIDs 返回当前审查批次的规范候选 ID，供提示词和结构化契约共同使用。
+func ReviewKnowledgeCandidateIDs(candidates []domain.Pattern) []string {
 	ids := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
 		if id := strings.TrimSpace(candidate.ID); id != "" {

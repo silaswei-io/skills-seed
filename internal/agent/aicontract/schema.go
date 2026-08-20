@@ -45,6 +45,9 @@ var outputTypes = map[string]reflect.Type{
 type StructuredOutputOptions struct {
 	// ProjectIDs 是工作区模式下配置声明的唯一合法子项目 ID。
 	ProjectIDs []string
+	// CandidateIDs 是知识审查本次调用允许返回的候选 ID。
+	// 非 nil 时会将审查结果收窄为一对一的候选回执。
+	CandidateIDs []string
 }
 
 // JSONSchema 返回指定 AI 输出 DTO 的 JSON Schema。
@@ -125,19 +128,55 @@ func reflectSchema(name string) (*jsonschema.Schema, error) {
 
 func constrainStructuredOutputSchema(name, data string, opts StructuredOutputOptions) (string, error) {
 	projectIDs := cleanSchemaEnumValues(opts.ProjectIDs)
-	if len(projectIDs) == 0 || (name != ContractWorkspaceProfile && name != ContractWorkspaceSpec) {
+	var schema map[string]any
+	if len(projectIDs) > 0 && (name == ContractWorkspaceProfile || name == ContractWorkspaceSpec) {
+		if err := json.Unmarshal([]byte(data), &schema); err != nil {
+			return "", err
+		}
+		applyProjectIDEnum(schema, projectIDs)
+	}
+	candidateIDs := cleanSchemaEnumValues(opts.CandidateIDs)
+	if name == ContractReviewKnowledge && opts.CandidateIDs != nil {
+		if schema == nil {
+			if err := json.Unmarshal([]byte(data), &schema); err != nil {
+				return "", err
+			}
+		}
+		applyCandidateReviewConstraints(schema, candidateIDs)
+	}
+	if schema == nil {
 		return data, nil
 	}
-	var schema map[string]any
-	if err := json.Unmarshal([]byte(data), &schema); err != nil {
-		return "", err
-	}
-	applyProjectIDEnum(schema, projectIDs)
 	constrained, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return "", err
 	}
 	return string(constrained), nil
+}
+
+func applyCandidateReviewConstraints(schema map[string]any, candidateIDs []string) {
+	properties := schemaProperties(schema)
+	decisions, ok := properties["decisions"].(map[string]any)
+	if !ok {
+		return
+	}
+	count := len(candidateIDs)
+	decisions["minItems"] = count
+	decisions["maxItems"] = count
+	decisions["uniqueItems"] = true
+	if count == 0 {
+		return
+	}
+	items, ok := decisions["items"].(map[string]any)
+	if !ok {
+		return
+	}
+	decisionProperties := schemaProperties(items)
+	candidateID, ok := decisionProperties["candidate_id"].(map[string]any)
+	if !ok {
+		return
+	}
+	candidateID["enum"] = schemaEnumValues(candidateIDs)
 }
 
 func applyProjectIDEnum(schema map[string]any, projectIDs []string) {

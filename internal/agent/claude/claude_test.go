@@ -46,6 +46,7 @@ func TestClaudePrintArgs_ReadOnlyToolsAndUserPluginsDisabledByDefault(t *testing
 		"--print",
 		"--no-session-persistence",
 		"--disable-slash-commands",
+		"--strict-mcp-config",
 		"--output-format",
 		"json",
 		"--json-schema",
@@ -83,6 +84,12 @@ func TestClaudePrintArgsUsesConfiguredModel(t *testing.T) {
 
 	require.Contains(t, args, "--model")
 	require.Equal(t, "sonnet", requireArgValue(t, args, "--model"))
+}
+
+func TestClaudePrintArgsUsesConfiguredMaxTurns(t *testing.T) {
+	args := claudePrintArgs(false, `{"type":"object"}`, false, config.AgentRuntimeOptions{MaxTurns: 24})
+
+	require.Equal(t, "24", requireArgValue(t, args, "--max-turns"))
 }
 
 func TestClaudePrintArgs_AllowsUserPluginsWhenConfigured(t *testing.T) {

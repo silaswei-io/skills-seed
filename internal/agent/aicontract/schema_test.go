@@ -176,6 +176,36 @@ func TestKnowledgeReviewSchemaRequiresOneDecisionShape(t *testing.T) {
 	requireRequiredFields(t, revision, "name", "category", "description", "rule", "confidence", "knowledge_flags")
 }
 
+func TestKnowledgeReviewSchemaConstrainsCandidateIDsOneToOne(t *testing.T) {
+	data, err := StructuredOutputSchemaWithOptions(ContractReviewKnowledge, StructuredOutputOptions{
+		CandidateIDs: []string{"cert-b", "cert-a", "cert-a"},
+	})
+	require.NoError(t, err)
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+	decisions := schema["properties"].(map[string]any)["decisions"].(map[string]any)
+	require.Equal(t, float64(2), decisions["minItems"])
+	require.Equal(t, float64(2), decisions["maxItems"])
+	require.Equal(t, true, decisions["uniqueItems"])
+	candidateID, _, ok := findSchemaPropertyWithContainer(schema, "candidate_id")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"cert-a", "cert-b"}, schemaStringList(candidateID["enum"]))
+}
+
+func TestKnowledgeReviewSchemaConstrainsEmptyCandidateSet(t *testing.T) {
+	data, err := StrictStructuredOutputSchemaWithOptions(ContractReviewKnowledge, StructuredOutputOptions{
+		CandidateIDs: []string{},
+	})
+	require.NoError(t, err)
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+	decisions := schema["properties"].(map[string]any)["decisions"].(map[string]any)
+	require.Equal(t, float64(0), decisions["minItems"])
+	require.Equal(t, float64(0), decisions["maxItems"])
+}
+
 func TestWorkspaceContractsKeepIdentityOutOfAIOutput(t *testing.T) {
 	profile := decodeSchema(t, ContractWorkspaceProfile)
 	profileProperties := profile["properties"].(map[string]any)
