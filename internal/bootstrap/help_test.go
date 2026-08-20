@@ -268,6 +268,7 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "patterns parent help", args: []string{"patterns"}, want: false},
 		{name: "patterns stats", args: []string{"patterns", "stats"}, want: true},
 		{name: "patterns compact", args: []string{"patterns", "compact"}, want: true},
+		{name: "patterns update", args: []string{"patterns", "update", "ldap-cert-publish"}, want: true},
 		{name: "patterns delete", args: []string{"patterns", "delete", "plugin-source-edit-rule"}, want: true},
 		{name: "patterns rm alias", args: []string{"patterns", "rm", "plugin-source-edit-rule"}, want: true},
 		{name: "patterns show", args: []string{"patterns", "show"}, want: true},

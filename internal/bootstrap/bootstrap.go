@@ -258,7 +258,7 @@ var projectRuntimeCommands = map[string]struct{}{
 var projectRuntimeSubcommands = map[string]map[string]struct{}{
 	"generate":  {"skills": {}},
 	"learn":     {"current": {}},
-	"patterns":  {"stats": {}, "compact": {}, "add": {}, "delete": {}, "remove": {}, "rm": {}, "show": {}},
+	"patterns":  {"stats": {}, "compact": {}, "add": {}, "update": {}, "delete": {}, "remove": {}, "rm": {}, "show": {}},
 	"preview":   {"files": {}},
 	"profile":   {"show": {}},
 	"workspace": {"add": {}},

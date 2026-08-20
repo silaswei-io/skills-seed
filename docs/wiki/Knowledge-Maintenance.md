@@ -29,6 +29,8 @@
 
 只需要修订一条模式时，优先使用 `patterns update`；只需要继续被中断的学习时，优先使用 `sync --resume`。完整 `skills-seed reset`（不带范围）用于重新初始化或切换 project/workspace 模式。
 
+`patterns update` 是项目范围命令，必须在已初始化的项目或工作区目录中执行；如果只需要查看帮助，可直接使用 `skills-seed patterns update --help`，不会打开项目运行时。
+
 ## 模式的人工维护闭环
 
 1. 用 `skills-seed patterns stats` 查看数量、分类和质量指标。

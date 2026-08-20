@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.13]
+
+### Fixes
+
+- Fixed `patterns update` missing from project-runtime detection; the command now loads the project container correctly in an initialized repository.
+- Added a startup-detection regression test for `patterns update` so command help, runtime initialization, and execution remain aligned.
+
 ## [v0.20.12]
 
 ### Changes

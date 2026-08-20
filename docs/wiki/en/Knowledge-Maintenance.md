@@ -29,6 +29,8 @@ When incorrect or stale knowledge affects a whole set of resources and individua
 
 For one pattern, prefer `patterns update`; for interrupted learning, prefer `sync --resume`. Full `skills-seed reset` without a scope is for reinitializing or switching between project and workspace modes.
 
+`patterns update` is project-scoped and must run from an initialized project or workspace directory. To read its help without opening project runtime state, use `skills-seed patterns update --help`.
+
 ## Manual Pattern-Maintenance Loop
 
 1. Run `skills-seed patterns stats` to inspect count, categories, and quality indicators.
