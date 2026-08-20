@@ -8,8 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,11 +24,10 @@ func TestUpdateDownloadsVerifiesAndReplacesExecutable(t *testing.T) {
 	assetName, binaryName, err := releaseAssetName(version, "linux", "amd64")
 	require.NoError(t, err)
 	archive := tarGzAsset(t, assetName, binaryName, []byte("new executable"))
-	server, requested := releaseServer(t, version, assetName, archive)
-	defer server.Close()
+	client, transport := releaseClient(version, assetName, archive, hexDigest(archive))
 
 	executable := writeExecutable(t, []byte("old executable"))
-	service := testService(server.URL, executable, "linux", "amd64")
+	service := testService(client, executable, "linux", "amd64")
 
 	events := make([]ProgressEvent, 0, 4)
 	result, err := service.UpdateWithProgress(context.Background(), "latest", func(event ProgressEvent) {
@@ -43,7 +42,7 @@ func TestUpdateDownloadsVerifiesAndReplacesExecutable(t *testing.T) {
 	content, err := os.ReadFile(executable)
 	require.NoError(t, err)
 	require.Equal(t, []byte("new executable"), content)
-	require.Equal(t, []string{"/releases/latest", "/assets/" + assetName, "/assets/checksums.txt"}, *requested)
+	require.Equal(t, []string{"/releases/latest", "/assets/" + assetName, "/assets/checksums.txt"}, transport.requested)
 	require.Equal(t, []Stage{StageResolveRelease, StageDownloadAsset, StageVerifyAsset, StageInstallAsset}, uniqueStages(events))
 	require.NotEmpty(t, events)
 	var downloadEvent ProgressEvent
@@ -78,13 +77,12 @@ func TestUpdateExplicitVersionUsesTagEndpoint(t *testing.T) {
 	assetName, binaryName, err := releaseAssetName(version, "linux", "amd64")
 	require.NoError(t, err)
 	archive := tarGzAsset(t, assetName, binaryName, []byte("new executable"))
-	server, requested := releaseServer(t, version, assetName, archive)
-	defer server.Close()
+	client, transport := releaseClient(version, assetName, archive, hexDigest(archive))
 
-	service := testService(server.URL, writeExecutable(t, []byte("old executable")), "linux", "amd64")
+	service := testService(client, writeExecutable(t, []byte("old executable")), "linux", "amd64")
 	_, err = service.Update(context.Background(), version)
 	require.NoError(t, err)
-	require.Equal(t, "/releases/tags/"+version, (*requested)[0])
+	require.Equal(t, "/releases/tags/"+version, transport.requested[0])
 }
 
 func TestUpdateChecksumMismatchDoesNotReplaceExecutable(t *testing.T) {
@@ -92,11 +90,10 @@ func TestUpdateChecksumMismatchDoesNotReplaceExecutable(t *testing.T) {
 	assetName, binaryName, err := releaseAssetName(version, "linux", "amd64")
 	require.NoError(t, err)
 	archive := tarGzAsset(t, assetName, binaryName, []byte("new executable"))
-	server, _ := releaseServerWithChecksum(t, version, assetName, archive, strings.Repeat("0", sha256.Size*2))
-	defer server.Close()
+	client, _ := releaseClient(version, assetName, archive, strings.Repeat("0", sha256.Size*2))
 
 	executable := writeExecutable(t, []byte("old executable"))
-	service := testService(server.URL, executable, "linux", "amd64")
+	service := testService(client, executable, "linux", "amd64")
 
 	_, err = service.Update(context.Background(), "latest")
 	require.ErrorIs(t, err, ErrChecksumMismatch)
@@ -110,11 +107,10 @@ func TestUpdateMalformedArchiveDoesNotReplaceExecutable(t *testing.T) {
 	assetName, _, err := releaseAssetName(version, "linux", "amd64")
 	require.NoError(t, err)
 	archive := []byte("not a gzip archive")
-	server, _ := releaseServer(t, version, assetName, archive)
-	defer server.Close()
+	client, _ := releaseClient(version, assetName, archive, hexDigest(archive))
 
 	executable := writeExecutable(t, []byte("old executable"))
-	service := testService(server.URL, executable, "linux", "amd64")
+	service := testService(client, executable, "linux", "amd64")
 
 	_, err = service.Update(context.Background(), "latest")
 	require.Error(t, err)
@@ -124,23 +120,17 @@ func TestUpdateMalformedArchiveDoesNotReplaceExecutable(t *testing.T) {
 }
 
 func TestUpdateRejectsUnsupportedPlatformBeforeNetworkAccess(t *testing.T) {
-	service := testService("http://127.0.0.1:1", writeExecutable(t, []byte("old executable")), "plan9", "amd64")
+	service := testService(http.DefaultClient, writeExecutable(t, []byte("old executable")), "plan9", "amd64")
 
 	_, err := service.Update(context.Background(), "latest")
 	require.ErrorIs(t, err, ErrUnsupportedPlatform)
 }
 
 func TestUpdateMissingAssetDoesNotReplaceExecutable(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/releases/latest" {
-			t.Errorf("unexpected request: %s", request.URL.Path)
-		}
-		_, _ = fmt.Fprint(writer, `{"tag_name":"v1.2.3","assets":[]}`)
-	}))
-	defer server.Close()
+	client, _ := releaseClientMissingAsset("v1.2.3")
 
 	executable := writeExecutable(t, []byte("old executable"))
-	service := testService(server.URL, executable, "linux", "amd64")
+	service := testService(client, executable, "linux", "amd64")
 
 	_, err := service.Update(context.Background(), "latest")
 	require.ErrorIs(t, err, ErrReleaseAssetMissing)
@@ -171,10 +161,13 @@ func TestReleaseAssetNameMatchesReleaseWorkflow(t *testing.T) {
 	}
 }
 
-func testService(apiBaseURL, executable, goos, goarch string) *Service {
+func testService(client *http.Client, executable, goos, goarch string) *Service {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	return &Service{
-		apiBaseURL: apiBaseURL,
-		httpClient: http.DefaultClient,
+		apiBaseURL: "https://example.invalid",
+		httpClient: client,
 		executable: func() (string, error) {
 			return executable, nil
 		},
@@ -190,34 +183,62 @@ func writeExecutable(t *testing.T, content []byte) string {
 	return path
 }
 
-func releaseServer(t *testing.T, version, assetName string, archive []byte) (*httptest.Server, *[]string) {
-	t.Helper()
-	digest := sha256.Sum256(archive)
-	return releaseServerWithChecksum(t, version, assetName, archive, hex.EncodeToString(digest[:]))
+func releaseClient(version, assetName string, archive []byte, checksum string) (*http.Client, *releaseTransport) {
+	transport := &releaseTransport{
+		version:   version,
+		assetName: assetName,
+		archive:   archive,
+		checksum:  checksum,
+	}
+	return &http.Client{Transport: transport}, transport
 }
 
-func releaseServerWithChecksum(t *testing.T, version, assetName string, archive []byte, checksum string) (*httptest.Server, *[]string) {
-	t.Helper()
-	requested := make([]string, 0, 3)
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		requested = append(requested, request.URL.Path)
-		switch request.URL.Path {
-		case "/releases/latest", "/releases/tags/" + version:
-			_, _ = fmt.Fprintf(writer, `{"tag_name":%q,"assets":[{"name":%q,"browser_download_url":%q},{"name":"checksums.txt","browser_download_url":%q}]}`,
-				version, assetName, serverURL(request, "/assets/"+assetName), serverURL(request, "/assets/checksums.txt"))
-		case "/assets/" + assetName:
-			_, _ = writer.Write(archive)
-		case "/assets/checksums.txt":
-			_, _ = fmt.Fprintf(writer, "%s  %s\n", checksum, assetName)
-		default:
-			http.NotFound(writer, request)
+func releaseClientMissingAsset(version string) (*http.Client, *releaseTransport) {
+	transport := &releaseTransport{version: version}
+	return &http.Client{Transport: transport}, transport
+}
+
+type releaseTransport struct {
+	version   string
+	assetName string
+	archive   []byte
+	checksum  string
+	requested []string
+}
+
+func (t *releaseTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	t.requested = append(t.requested, request.URL.Path)
+	switch request.URL.Path {
+	case "/releases/latest", "/releases/tags/" + t.version:
+		if t.assetName == "" {
+			return newHTTPResponse(http.StatusOK, []byte(fmt.Sprintf(`{"tag_name":%q,"assets":[]}`, t.version))), nil
 		}
-	}))
-	return server, &requested
+		body := fmt.Sprintf(`{"tag_name":%q,"assets":[{"name":%q,"browser_download_url":%q},{"name":"checksums.txt","browser_download_url":%q}]}`,
+			t.version, t.assetName, "https://example.invalid/assets/"+t.assetName, "https://example.invalid/assets/checksums.txt")
+		return newHTTPResponse(http.StatusOK, []byte(body)), nil
+	case "/assets/" + t.assetName:
+		return newHTTPResponse(http.StatusOK, t.archive), nil
+	case "/assets/checksums.txt":
+		body := fmt.Sprintf("%s  %s\n", t.checksum, t.assetName)
+		return newHTTPResponse(http.StatusOK, []byte(body)), nil
+	default:
+		return newHTTPResponse(http.StatusNotFound, []byte("not found")), nil
+	}
 }
 
-func serverURL(request *http.Request, path string) string {
-	return "http://" + request.Host + path
+func newHTTPResponse(status int, body []byte) *http.Response {
+	return &http.Response{
+		StatusCode:    status,
+		Status:        fmt.Sprintf("%d %s", status, http.StatusText(status)),
+		Header:        make(http.Header),
+		Body:          io.NopCloser(bytes.NewReader(body)),
+		ContentLength: int64(len(body)),
+	}
+}
+
+func hexDigest(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func tarGzAsset(t *testing.T, assetName, binaryName string, content []byte) []byte {

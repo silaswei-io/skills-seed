@@ -160,7 +160,7 @@ func TestChineseHelpDoesNotExposeEnglishCommandDescriptions(t *testing.T) {
 		{
 			name:    "preview files",
 			args:    []string{"preview", "files", "--help"},
-			want:    []string{"预览 full 或 incremental 分析会选中的源文件", "只预览这些路径下的文件", "最大输出文件数量"},
+			want:    []string{"预览 full 或 incremental 分析会选中的源文件", "只预览这些路径下的文件", "并把完整结果写入 runtime 目录"},
 			notWant: []string{"Preview files selected for analysis", "only preview files under these paths", "maximum included files to print"},
 		},
 		{
@@ -253,6 +253,7 @@ func TestProjectIndependentCommandsDoNotRequireRuntime(t *testing.T) {
 		{name: "help reset", args: []string{"help", "reset"}, want: false},
 		{name: "subcommand help", args: []string{"learn", "current", "--help"}, want: false},
 		{name: "init", args: []string{"init"}, want: false},
+		{name: "clear runtime", args: []string{"clear", "runtime"}, want: true},
 		{name: "reset", args: []string{"reset"}, want: true},
 		{name: "reset help positional arg", args: []string{"reset", "help"}, want: true},
 		{name: "reset help flag", args: []string{"reset", "--help"}, want: false},
@@ -291,6 +292,7 @@ func TestNoArgCommandsRejectPositionalHelpArgument(t *testing.T) {
 
 	commandPaths := [][]string{
 		{"init"},
+		{"clear", "runtime"},
 		{"generate", "skills"},
 		{"learn", "current"},
 		{"log"},

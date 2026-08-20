@@ -308,6 +308,7 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 | `.skills-seed/runtime/logs/` | 运行日志 |
 | `.skills-seed/runtime/rendered-prompts/` | 渲染后的 prompt 和 manifest |
 | `.skills-seed/runtime/agent-outputs/` | Agent 输出归档 |
+| `.skills-seed/runtime/` | 可重建运行时总目录；`skills-seed clear runtime` 会删除它，`runtime.cleanup_before_reanalysis` 控制重新分析前是否自动清理 |
 
 ### `.skills-seed/context/`
 
@@ -344,6 +345,14 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 4. 新增自定义 engine 或 target 时，应分别添加 `agent.commands.<engine>` 和 `skills.paths.<target>`。
 
 运行时 AI prompt 模板统一维护为英文单源模板，最终输出契约跟随 `skills.locale`；`profile.locale` 只影响工具输出、配置模板和 seed context 模板语言。
+
+### `runtime`
+
+#### 字段
+
+| 字段 | 默认值 | 说明 |
+|---|---:|---|
+| `cleanup_before_reanalysis` | `true` | 在重新分析前清理 `.skills-seed/runtime/`；`resume` 流程不会触发 |
 
 ### `logging`
 

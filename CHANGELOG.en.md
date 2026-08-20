@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.16]
+
+### Fixes
+
+- Added `skills-seed clear runtime` to clean runtime data under `.skills-seed/runtime`; by default it only clears runtime and leaves store/cache untouched.
+- Added a configurable runtime pre-clean step for reanalysis. It is enabled by default, but conservatively skipped on resume paths to avoid deleting data that is still being restored.
+- Clarified the boundary between terminal progress output and runtime artifacts, reducing confusion when logs, prompts, and AI results are mixed together.
+
+## [v0.20.15]
+
+### Fixes
+
+- Changed `preview files` to write a Markdown review page under `.skills-seed/runtime/preview/files/`, while the terminal prints only the report path and marks it as deletable for manual review of the full file scope.
+- Standardized the workspace child-step prefixes to “Learning / Generating” so live progress is clearer and runtime prompts do not mix Chinese and English.
+- Unified AI runtime prompt prose to English while keeping final Skills output language controlled by configuration, so prompt language and output language stay separate.
+
 ## [v0.20.14]
 
 ### Fixes

@@ -290,13 +290,13 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 		result, err := dependencies.LearnCurrent(childCont, learnReq, LearnCurrentOptions{
 			Quiet: true,
 			OnStepStart: func(label string) {
-				childProgress.Start(progressName, label)
+				childProgress.Start(progressName, workspacePhaseStepLabel("ProgressSyncWorkspacePhaseLearn", label))
 			},
 			OnStepUpdate: func(label string) {
-				childProgress.Update(progressName, label)
+				childProgress.Update(progressName, workspacePhaseStepLabel("ProgressSyncWorkspacePhaseLearn", label))
 			},
 			OnStepComplete: func(label string) {
-				childProgress.CompleteStep(progressName, label)
+				childProgress.CompleteStep(progressName, workspacePhaseStepLabel("ProgressSyncWorkspacePhaseLearn", label))
 			},
 		})
 		if err != nil {
@@ -307,13 +307,13 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 		if shouldGenerate {
 			if err := dependencies.GenerateChild(childCont, GenerateChildOptions{
 				OnStepStart: func(label string) {
-					childProgress.Start(progressName, label)
+					childProgress.Start(progressName, workspacePhaseStepLabel("ProgressSyncWorkspacePhaseGenerate", label))
 				},
 				OnStepUpdate: func(label string) {
-					childProgress.Update(progressName, label)
+					childProgress.Update(progressName, workspacePhaseStepLabel("ProgressSyncWorkspacePhaseGenerate", label))
 				},
 				OnStepComplete: func(label string) {
-					childProgress.CompleteStep(progressName, label)
+					childProgress.CompleteStep(progressName, workspacePhaseStepLabel("ProgressSyncWorkspacePhaseGenerate", label))
 				},
 			}); err != nil {
 				childProgress.Fail(progressName, i18n.Get("GenerateWorkspaceProjectProgressFailed"))
@@ -372,6 +372,14 @@ func workspaceProjectScope(project config.WorkspaceProjectConfig) string {
 		return strings.TrimSpace(project.ID)
 	}
 	return strings.TrimSpace(project.Path)
+}
+
+func workspacePhaseStepLabel(phaseKey, label string) string {
+	phase := i18n.Get(phaseKey)
+	if strings.TrimSpace(label) == "" {
+		return phase
+	}
+	return phase + " · " + label
 }
 
 func syncGeneratedSkillMissing(cont *container.Container) bool {

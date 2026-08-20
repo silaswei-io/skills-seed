@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
+	clearcmd "github.com/silaswei-io/skills-seed/internal/command/clear"
 	cliskillscmd "github.com/silaswei-io/skills-seed/internal/command/cliskills"
 	"github.com/silaswei-io/skills-seed/internal/command/generate"
 	"github.com/silaswei-io/skills-seed/internal/command/hook"
@@ -171,6 +172,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(initcmd.Cmd())
 	rootCmd.AddCommand(initcmd.ResetCmd())
 	rootCmd.AddCommand(cliskillscmd.Cmd())
+	rootCmd.AddCommand(clearcmd.Cmd(cont))
 	rootCmd.AddCommand(workspacecmd.Cmd(cont, workspacecmd.Dependencies{
 		EnsureChildInitialized: initcmd.EnsureWorkspaceChildInitializedAt,
 	}))
@@ -257,6 +259,7 @@ var projectRuntimeCommands = map[string]struct{}{
 
 var projectRuntimeSubcommands = map[string]map[string]struct{}{
 	"generate":  {"skills": {}},
+	"clear":     {"runtime": {}},
 	"learn":     {"current": {}},
 	"patterns":  {"stats": {}, "compact": {}, "add": {}, "update": {}, "delete": {}, "remove": {}, "rm": {}, "show": {}},
 	"preview":   {"files": {}},

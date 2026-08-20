@@ -18,6 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/runtimeclean"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
@@ -257,6 +258,9 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 }
 
 func (r *learnCurrentProjectRun) detectChanges() error {
+	if err := r.maybeCleanRuntimeBeforeFreshAnalysis(); err != nil {
+		return err
+	}
 	detectStartedAt := time.Now()
 	detectLabel := i18n.Get("ProgressLearnCurrentDetectChanges")
 	if r.hasRestorableCurrentState() {
@@ -274,6 +278,27 @@ func (r *learnCurrentProjectRun) detectChanges() error {
 	}
 	r.selectionPlan = r.buildFileSelectionPlan()
 	return nil
+}
+
+func (r *learnCurrentProjectRun) maybeCleanRuntimeBeforeFreshAnalysis() error {
+	if r.opts.skipRuntimeCleanup {
+		return nil
+	}
+	if !r.cont.ConfigRepo.GetRuntimeConfig().CleanupBeforeReanalysis {
+		return nil
+	}
+	if r.hasRestorableCurrentState() {
+		return nil
+	}
+	if err := logger.Close(); err != nil {
+		return err
+	}
+	if err := runtimeclean.Clear(r.cont.SeedPath); err != nil {
+		return err
+	}
+	loggingConfig := r.cont.ConfigRepo.GetLoggingConfig()
+	logDir := filepath.Join(r.cont.SeedPath, loggingConfig.LogsPath)
+	return logger.InitWithRetention(logDir, r.stateRepo.Command(), logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles)
 }
 
 func (r *learnCurrentProjectRun) hasRestorableCurrentState() bool {

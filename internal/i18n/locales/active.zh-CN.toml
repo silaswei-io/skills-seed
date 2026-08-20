@@ -1038,6 +1038,12 @@ other = "刷新项目地图"
 [ProgressLearnWorkspaceProjects]
 other = "学习工作区子项目"
 
+[ProgressSyncWorkspacePhaseLearn]
+other = "学习"
+
+[ProgressSyncWorkspacePhaseGenerate]
+other = "生成"
+
 [ProgressUserDefinePatternAI]
 other = "生成用户定义模式"
 
@@ -1513,10 +1519,22 @@ other = "skills-seed preview files\nskills-seed preview files --mode incremental
 other = "预览将被分析的文件"
 
 [PreviewFilesLongDesc]
-other = "预览 full 或 incremental 分析会选中的源文件。默认跳过文档文件，但保留 docs/ 下的源代码文件。"
+other = "预览 full 或 incremental 分析会选中的源文件，并把完整结果写入 runtime 目录；终端只输出报告目录和报告文件名。默认跳过文档文件，但保留 docs/ 下的源代码文件。"
 
 [PreviewFilesExample]
 other = "skills-seed preview files --mode full\nskills-seed preview files --mode incremental --focus internal/service"
+
+[PreviewFilesReportTitle]
+other = "文件预览报告"
+
+[PreviewFilesReportSummary]
+other = "审查摘要"
+
+[PreviewFilesReportIncludedTree]
+other = "已包含文件树"
+
+[PreviewFilesReportDeletedTree]
+other = "已删除文件树"
 
 [PreviewFilesFlagMode]
 other = "分析模式：full 或 incremental"
@@ -1524,8 +1542,8 @@ other = "分析模式：full 或 incremental"
 [PreviewFilesFlagFocus]
 other = "只预览这些路径下的文件"
 
-[PreviewFilesFlagLimit]
-other = "最大输出文件数量"
+[PreviewFilesOutputSavedReport]
+other = "结果输出到 {{.Dir}}，报告文件 {{.File}}（可删除）"
 
 [PreviewFilesUnsupportedMode]
 other = "不支持的 preview 模式 {{.Mode}}"
@@ -1551,8 +1569,14 @@ other = "已包含文件"
 [PreviewFilesOutputDeletedFiles]
 other = "已删除文件"
 
+[PreviewFilesOutputNone]
+other = "无"
+
 [PreviewFilesOutputMore]
 other = "... 还有 {{.Count}} 个文件"
+
+[PreviewFilesReportDisposableNote]
+other = "此报告位于 runtime 目录，可删除。"
 
 # workspace
 [WorkspaceShort]
@@ -3086,3 +3110,36 @@ other = "Skills Seed 已更新到 {{.Version}}：{{.Path}}"
 
 [UpdateRestartRequired]
 other = "Skills Seed 已下载 {{.Version}}，将在当前进程退出后替换：{{.Path}}。请重新运行命令。"
+
+[ClearShort]
+other = "清理可重建运行时数据"
+
+[ClearLongDesc]
+other = "清理 .skills-seed 下可重建的运行时数据。此命令只处理 runtime 目录，不会触碰 store 或 cache。"
+
+[ClearExample]
+other = "skills-seed clear runtime\nskills-seed clear runtime --dry-run"
+
+[ClearRuntimeShort]
+other = "清理 runtime 目录"
+
+[ClearRuntimeLongDesc]
+other = "删除 .skills-seed/runtime 下的全部运行时工件，包括日志、渲染后的提示词、Agent 输出、预览报告和临时输入。此命令不会删除 store 或 cache。"
+
+[ClearRuntimeExample]
+other = "skills-seed clear runtime\nskills-seed clear runtime --dry-run\nskills-seed clear runtime --force"
+
+[ClearRuntimeFlagDryRun]
+other = "只预览将要删除的 runtime 目录"
+
+[ClearRuntimeFlagForce]
+other = "跳过确认，直接清理 runtime 目录"
+
+[ClearRuntimeConfirmTitle]
+other = "确认清理 runtime 目录？"
+
+[ClearRuntimeDryRun]
+other = "将要清理 runtime 目录：{{.Path}}"
+
+[ClearRuntimeCompleted]
+other = "runtime 目录已清理：{{.Path}}"

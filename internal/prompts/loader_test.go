@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -41,22 +42,19 @@ func TestWorkspacePromptUsesRuntimeProjectIDConstraints(t *testing.T) {
 
 func TestPromptLanguageGuardMatchesSkillsLocale(t *testing.T) {
 	tests := []struct {
-		name           string
-		locale         string
-		mustContain    string
-		mustNotContain string
+		name        string
+		locale      string
+		mustContain string
 	}{
 		{
-			name:           "Chinese",
-			locale:         "zh-CN",
-			mustContain:    "所有面向用户的自然语言字段必须使用简体中文（zh-CN）",
-			mustNotContain: "All user-facing natural-language fields must be written in English (en-US)",
+			name:        "Chinese",
+			locale:      "zh-CN",
+			mustContain: "All user-facing natural-language fields must be written in Simplified Chinese (zh-CN).",
 		},
 		{
-			name:           "English",
-			locale:         "en-US",
-			mustContain:    "All user-facing natural-language fields must be written in English (en-US)",
-			mustNotContain: "所有面向用户的自然语言字段必须使用简体中文（zh-CN）",
+			name:        "English",
+			locale:      "en-US",
+			mustContain: "All user-facing natural-language fields must be written in English (en-US)",
 		},
 	}
 
@@ -67,10 +65,8 @@ func TestPromptLanguageGuardMatchesSkillsLocale(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Contains(t, prompt, tt.mustContain)
-			require.NotContains(t, prompt, tt.mustNotContain)
-			if tt.locale == "zh-CN" {
-				require.Contains(t, prompt, "在必要时保持框架名称、库名称、命令、文件路径")
-				require.NotContains(t, prompt, "Preserve framework names, library names, commands, file paths")
+			for _, r := range prompt {
+				require.False(t, unicode.Is(unicode.Han, r), "prompt contains Han rune %q", r)
 			}
 		})
 	}

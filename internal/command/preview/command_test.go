@@ -41,20 +41,42 @@ func TestBuildFullFilesPreviewSkipsDocumentsButKeepsDocsSource(t *testing.T) {
 	require.Equal(t, 2, preview.SkippedDocuments)
 }
 
-func TestWriteFilesPreview(t *testing.T) {
+func TestWriteFilesPreviewReport(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
-	var buf bytes.Buffer
-	err := writeFilesPreview(&buf, &filesPreview{
+	root := t.TempDir()
+	seedPath := filepath.Join(root, ".skills-seed")
+	reportPath, err := writeFilesPreviewReport(seedPath, &filesPreview{
 		Mode:             "full",
-		Included:         []string{"main.go"},
+		Included:         []string{"main.go", "docs/examples/demo.go"},
+		Deleted:          []string{"old.go"},
 		SkippedDocuments: 2,
-	}, 10)
+	})
 
 	require.NoError(t, err)
-	text := buf.String()
-	require.Contains(t, text, "已包含文件数")
-	require.Contains(t, text, "main.go")
-	require.Contains(t, text, "跳过文档数")
+	require.FileExists(t, reportPath)
+	require.Contains(t, filepath.ToSlash(reportPath), "/.skills-seed/runtime/preview/files/")
+
+	var buf bytes.Buffer
+	err = writeFilesPreviewPath(&buf, previewReportDisplayPath(root, filepath.Dir(reportPath)), filepath.Base(reportPath))
+	require.NoError(t, err)
+	require.Contains(t, buf.String(), ".skills-seed/runtime/preview/files")
+	require.Contains(t, buf.String(), filepath.Base(reportPath))
+	require.Contains(t, buf.String(), "可删除")
+
+	content, err := os.ReadFile(reportPath)
+	require.NoError(t, err)
+	text := string(content)
+	require.Contains(t, text, "# 文件预览报告")
+	require.Contains(t, text, "## 审查摘要")
+	require.Contains(t, text, "| 模式 | full |")
+	require.Contains(t, text, "| --- | --- |")
+	require.Contains(t, text, "## 已包含文件树")
+	require.Contains(t, text, "```text")
+	require.Contains(t, text, "├── docs/")
+	require.Contains(t, text, "└── main.go")
+	require.Contains(t, text, "## 已删除文件树")
+	require.Contains(t, text, "old.go")
+	require.Contains(t, text, "可删除")
 	require.NotContains(t, text, "included")
 	require.NotContains(t, text, "skipped_documents")
 }

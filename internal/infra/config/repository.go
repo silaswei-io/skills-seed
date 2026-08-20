@@ -21,6 +21,7 @@ type Config struct {
 	Workspace WorkspaceConfig `yaml:"workspace"`
 	Agent     AgentConfig     `yaml:"agent"`
 	Learning  LearningConfig  `yaml:"learning"`
+	Runtime   RuntimeConfig   `yaml:"runtime"`
 	Skills    SkillsConfig    `yaml:"skills"`
 	Logging   LoggingConfig   `yaml:"logging"`
 	Exclude   ExcludeConfig   `yaml:"exclude"` // 全局排除配置
@@ -321,6 +322,32 @@ type SkillsConfig struct {
 	Paths  map[string]string `yaml:"paths"`  // target -> Skills 输出路径
 }
 
+// RuntimeConfig 控制 runtime 目录的清理策略。
+type RuntimeConfig struct {
+	CleanupBeforeReanalysis bool `yaml:"cleanup_before_reanalysis"` // 是否在重新分析前清理 runtime
+
+	defaultsApplied bool `yaml:"-"`
+}
+
+func defaultRuntimeConfig() RuntimeConfig {
+	return RuntimeConfig{
+		CleanupBeforeReanalysis: true,
+		defaultsApplied:         true,
+	}
+}
+
+// UnmarshalYAML 在应用默认值的同时保留显式设置的 false 值。
+func (c *RuntimeConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawRuntimeConfig RuntimeConfig
+	defaults := rawRuntimeConfig(defaultRuntimeConfig())
+	if err := value.Decode(&defaults); err != nil {
+		return err
+	}
+	*c = RuntimeConfig(defaults)
+	c.defaultsApplied = true
+	return nil
+}
+
 func EffectiveSkillsTarget(agent AgentConfig, skills SkillsConfig) string {
 	if strings.TrimSpace(skills.Target) != "" {
 		return strings.TrimSpace(skills.Target)
@@ -588,6 +615,9 @@ func normalizeLearningConfig(cfg *Config) {
 	}
 	cfg.Learning.Current.Structural.Provider = NormalizeStructuralProvider(string(cfg.Learning.Current.Structural.Provider))
 	cfg.Learning.Current.defaultsApplied = true
+	if !cfg.Runtime.defaultsApplied {
+		cfg.Runtime = defaultRuntimeConfig()
+	}
 }
 
 func normalizePatternAdmissionConfig(admission PatternAdmissionConfig) PatternAdmissionConfig {
@@ -685,6 +715,7 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			Parallelism:      0,
 		},
 		Learning: defaultLearningConfig(),
+		Runtime:  defaultRuntimeConfig(),
 		Skills: SkillsConfig{
 			Target: "agent",
 			Locale: DefaultSkillsLocale,
@@ -708,6 +739,7 @@ type Reader interface {
 	GetWorkspaceConfig() WorkspaceConfig
 	GetAgentConfig() AgentConfig
 	GetLearningConfig() LearningConfig
+	GetRuntimeConfig() RuntimeConfig
 	GetCurrentLearningConfig() CurrentLearningConfig
 	GetSkillsConfig() SkillsConfig
 	GetLoggingConfig() LoggingConfig
@@ -740,6 +772,11 @@ func (r *Repository) GetAgentConfig() AgentConfig {
 // GetLearningConfig 获取学习配置
 func (r *Repository) GetLearningConfig() LearningConfig {
 	return r.config.Learning
+}
+
+// GetRuntimeConfig 获取 runtime 配置。
+func (r *Repository) GetRuntimeConfig() RuntimeConfig {
+	return r.config.Runtime
 }
 
 // GetCurrentLearningConfig 获取 learn current 配置。

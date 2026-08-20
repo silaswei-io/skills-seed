@@ -48,7 +48,9 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `clear`, `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed clear` | Clear rebuildable runtime data | `runtime` | `--help, -h` = `false` |
+| `skills-seed clear runtime` | Clear the runtime directory | - | `--dry-run` = `false`<br>`--force` = `false`<br>`--help, -h` = `false` |
 | `skills-seed cli-skills` | Manage global skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | Install/update global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | Uninstall global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
@@ -70,7 +72,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed patterns stats` | Show learned pattern quality metrics | - | `--help, -h` = `false` |
 | `skills-seed patterns update <pattern-id> (--content <description> \| --content-path <path>)` | Update a pattern | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | Preview analysis inputs | `files` | `--help, -h` = `false` |
-| `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
+| `skills-seed preview files` | Preview files selected for analysis | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--mode` = `full` |
 | `skills-seed profile` | Show the project profile | `show` | `--help, -h` = `false` |
 | `skills-seed profile show` | Show the current project profile summary | - | `--help, -h` = `false` |
 | `skills-seed reset [all\|patterns\|rules\|workflows]...` | Back up and reset skills-seed initialization state | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
@@ -404,7 +406,7 @@ Preview files that would enter full or incremental analysis under the current co
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed preview files` | Preview files that would be analyzed | `skills-seed preview files --mode incremental --focus internal/service` | Prints file-filtering results only; does not learn patterns |
+| `skills-seed preview files` | Preview files that would be analyzed | `skills-seed preview files --mode incremental --focus internal/service` | Writes the result to the runtime directory and prints only the report directory and file name; does not learn patterns |
 
 #### `preview` Flags
 
@@ -418,7 +420,6 @@ Preview files that would enter full or incremental analysis under the current co
 |---|---:|---|
 | `--mode` | `full` | Preview mode: `full`/`first` for full selection, `incremental`/`current` for current snapshot diffs |
 | `--focus`, `-f` | empty | Preview only files under these paths; may be repeated |
-| `--limit` | `200` | Maximum number of files to print |
 | `--help`, `-h` | `false` | Show `preview files` help |
 
 #### Common Examples
@@ -428,14 +429,13 @@ skills-seed preview files
 skills-seed preview files --mode full
 skills-seed preview files --mode incremental
 skills-seed preview files --mode incremental --focus internal/service
-skills-seed preview files --limit 500
 ```
 
 #### Notes
 
 1. `preview files` shares the file-filtering policy used by `learn current`, so it shows which files would enter learning analysis.
 2. `--mode incremental` shows added, modified, and deleted candidates from the current file snapshot. Without an existing snapshot, the result is close to first-run learning scope.
-3. Skipped counts help confirm whether documents, configured excludes, or Git ignore rules filtered the expected files.
+3. The preview result is written to `.skills-seed/runtime/preview/files/`, and the terminal prints only the report directory and file name. You can delete the report after inspection.
 
 ### `skills-seed patterns`
 

@@ -111,6 +111,14 @@ logging:
   max_log_files: 30
 
 ########################################################################
+# Runtime
+# Controls cleanup for rebuildable runtime data
+########################################################################
+runtime:
+  # Clear runtime before reanalysis; enabled by default and skipped by resume flows
+  cleanup_before_reanalysis: true
+
+########################################################################
 # Global Exclusions
 # Controls file boundaries shared by learning, preview, and structural analysis
 ########################################################################

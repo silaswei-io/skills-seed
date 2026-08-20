@@ -1038,6 +1038,12 @@ other = "Refreshing project map"
 [ProgressLearnWorkspaceProjects]
 other = "Learning workspace child projects"
 
+[ProgressSyncWorkspacePhaseLearn]
+other = "Learning"
+
+[ProgressSyncWorkspacePhaseGenerate]
+other = "Generating"
+
 [ProgressUserDefinePatternAI]
 other = "Generate user-defined pattern"
 
@@ -1513,10 +1519,22 @@ other = "skills-seed preview files\nskills-seed preview files --mode incremental
 other = "Preview files selected for analysis"
 
 [PreviewFilesLongDesc]
-other = "Preview source files selected for full or incremental analysis. Document files are skipped by default; source files under docs/ are kept."
+other = "Preview source files selected for full or incremental analysis and write the full result to the runtime directory; the terminal prints only the report directory and report file name. Document files are skipped by default; source files under docs/ are kept."
 
 [PreviewFilesExample]
 other = "skills-seed preview files --mode full\nskills-seed preview files --mode incremental --focus internal/service"
+
+[PreviewFilesReportTitle]
+other = "File Preview Report"
+
+[PreviewFilesReportSummary]
+other = "Review Summary"
+
+[PreviewFilesReportIncludedTree]
+other = "Included File Tree"
+
+[PreviewFilesReportDeletedTree]
+other = "Deleted File Tree"
 
 [PreviewFilesFlagMode]
 other = "analysis mode: full or incremental"
@@ -1524,8 +1542,8 @@ other = "analysis mode: full or incremental"
 [PreviewFilesFlagFocus]
 other = "only preview files under these paths"
 
-[PreviewFilesFlagLimit]
-other = "maximum included files to print"
+[PreviewFilesOutputSavedReport]
+other = "Result written to {{.Dir}}, report file {{.File}} (deletable)"
 
 [PreviewFilesUnsupportedMode]
 other = "unsupported preview mode {{.Mode}}"
@@ -1551,8 +1569,14 @@ other = "INCLUDED_FILES"
 [PreviewFilesOutputDeletedFiles]
 other = "DELETED_FILES"
 
+[PreviewFilesOutputNone]
+other = "none"
+
 [PreviewFilesOutputMore]
 other = "... {{.Count}} more"
+
+[PreviewFilesReportDisposableNote]
+other = "This report lives in the runtime directory and can be deleted after inspection."
 
 # workspace
 [WorkspaceShort]
@@ -3086,3 +3110,36 @@ other = "Skills Seed updated to {{.Version}}: {{.Path}}"
 
 [UpdateRestartRequired]
 other = "Skills Seed downloaded {{.Version}} and will replace {{.Path}} after this process exits. Run the command again afterward."
+
+[ClearShort]
+other = "Clear rebuildable runtime data"
+
+[ClearLongDesc]
+other = "Clear rebuildable runtime data under .skills-seed. This command only touches the runtime directory and never modifies store or cache."
+
+[ClearExample]
+other = "skills-seed clear runtime\nskills-seed clear runtime --dry-run"
+
+[ClearRuntimeShort]
+other = "Clear the runtime directory"
+
+[ClearRuntimeLongDesc]
+other = "Delete all runtime artifacts under .skills-seed/runtime, including logs, rendered prompts, Agent outputs, preview reports, and temporary inputs. This command does not delete store or cache."
+
+[ClearRuntimeExample]
+other = "skills-seed clear runtime\nskills-seed clear runtime --dry-run\nskills-seed clear runtime --force"
+
+[ClearRuntimeFlagDryRun]
+other = "Preview the runtime directory that will be removed"
+
+[ClearRuntimeFlagForce]
+other = "Skip confirmation and clear the runtime directory directly"
+
+[ClearRuntimeConfirmTitle]
+other = "Clear the runtime directory?"
+
+[ClearRuntimeDryRun]
+other = "Will clear the runtime directory: {{.Path}}"
+
+[ClearRuntimeCompleted]
+other = "Runtime directory cleared: {{.Path}}"

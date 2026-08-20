@@ -539,18 +539,17 @@ type outputLanguage struct {
 }
 
 func outputLanguageSpec(locale string) outputLanguage {
+	targetLanguage := "English (en-US)"
+	translationTarget := "English"
 	switch config.NormalizeSkillsLocale(locale) {
 	case i18n.LocaleChinese:
-		return outputLanguage{
-			instruction:                       "所有面向用户的自然语言字段必须使用简体中文（zh-CN）。必要时，技术标识、框架名称、库名称、命令、文件路径、函数签名、配置键、环境变量、枚举值和代码标识必须保持不变。",
-			translationInstruction:            "如果前置上下文、现有 Skills 文件、已学习模式、README 文本、注释或用户提供的提示词片段包含英文或其他语言，请在保留技术标识的同时，将自然语言改写为简体中文。",
-			preserveTechnicalTermsInstruction: "在必要时保持框架名称、库名称、命令、文件路径、函数签名、配置键、环境变量和代码标识不变。",
-		}
+		targetLanguage = "Simplified Chinese (zh-CN)"
+		translationTarget = "Simplified Chinese"
 	default:
-		return outputLanguage{
-			instruction:                       "All user-facing natural-language fields must be written in English (en-US). Technical identifiers, framework names, library names, commands, file paths, function signatures, config keys, environment variables, enum values, and code identifiers must remain unchanged when needed.",
-			translationInstruction:            "If earlier context, existing Skills files, learned patterns, README text, comments, or user-provided prompt fragments contain Chinese or another language, translate or rewrite prose into English while preserving technical identifiers.",
-			preserveTechnicalTermsInstruction: "Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.",
-		}
+	}
+	return outputLanguage{
+		instruction:                       "All user-facing natural-language fields must be written in " + targetLanguage + ". Technical identifiers, framework names, library names, commands, file paths, function signatures, config keys, environment variables, enum values, and code identifiers must remain unchanged when needed.",
+		translationInstruction:            "If earlier context, existing Skills files, learned patterns, README text, comments, or user-provided prompt fragments contain English or another language, translate or rewrite prose into " + translationTarget + " while preserving technical identifiers.",
+		preserveTechnicalTermsInstruction: "Preserve framework names, library names, commands, file paths, function signatures, config keys, environment variables, and code identifiers exactly when needed.",
 	}
 }

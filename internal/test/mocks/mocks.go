@@ -647,6 +647,7 @@ type MockConfigReader struct {
 	WorkspaceCfg config.WorkspaceConfig
 	AgentCfg     config.AgentConfig
 	LearningCfg  config.LearningConfig
+	RuntimeCfg   config.RuntimeConfig
 	SkillsCfg    config.SkillsConfig
 	LoggingCfg   config.LoggingConfig
 	ExcludeCfg   config.ExcludeConfig
@@ -664,6 +665,9 @@ func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentC
 
 // GetLearningConfig 模拟获取学习配置
 func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.LearningCfg }
+
+// GetRuntimeConfig 模拟获取 runtime 配置。
+func (m *MockConfigReader) GetRuntimeConfig() config.RuntimeConfig { return m.RuntimeCfg }
 
 // GetCurrentLearningConfig 模拟获取 learn current 配置
 func (m *MockConfigReader) GetCurrentLearningConfig() config.CurrentLearningConfig {

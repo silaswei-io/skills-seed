@@ -48,7 +48,9 @@
 
 | 命令 | 摘要 | 子命令 | 参数 |
 |---|---|---|---|
-| `skills-seed` | 为 AI 助手培育项目技能 | `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | 为 AI 助手培育项目技能 | `clear`, `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed clear` | 清理可重建运行时数据 | `runtime` | `--help, -h` = `false` |
+| `skills-seed clear runtime` | 清理 runtime 目录 | - | `--dry-run` = `false`<br>`--force` = `false`<br>`--help, -h` = `false` |
 | `skills-seed cli-skills` | 管理全局 skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | 安装/更新全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | 卸载全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
@@ -70,7 +72,7 @@
 | `skills-seed patterns stats` | 查看 pattern 质量指标 | - | `--help, -h` = `false` |
 | `skills-seed patterns update <pattern-id> (--content <description> \| --content-path <path>)` | 修订指定 pattern | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
 | `skills-seed preview` | 预览分析输入 | `files` | `--help, -h` = `false` |
-| `skills-seed preview files` | 预览将被分析的文件 | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--limit` = `200`<br>`--mode` = `full` |
+| `skills-seed preview files` | 预览将被分析的文件 | - | `--focus, -f` = `[]`<br>`--help, -h` = `false`<br>`--mode` = `full` |
 | `skills-seed profile` | 查看项目画像 | `show` | `--help, -h` = `false` |
 | `skills-seed profile show` | 显示当前项目画像摘要 | - | `--help, -h` = `false` |
 | `skills-seed reset [all\|patterns\|rules\|workflows]...` | 备份并重置 skills-seed 初始化状态 | - | `--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--skills-locale` = ``<br>`--workspace` = `false` |
@@ -404,7 +406,7 @@ Agent 在加载正文前只用 `SKILL.md` frontmatter 的 `name` 和 `descriptio
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed preview files` | 预览将被分析的文件 | `skills-seed preview files --mode incremental --focus internal/service` | 只输出文件选择结果，不学习 patterns |
+| `skills-seed preview files` | 预览将被分析的文件 | `skills-seed preview files --mode incremental --focus internal/service` | 结果会写入 runtime 目录，终端只输出报告目录和文件名，不学习 patterns |
 
 #### `preview` 参数
 
@@ -418,7 +420,6 @@ Agent 在加载正文前只用 `SKILL.md` frontmatter 的 `name` 和 `descriptio
 |---|---:|---|
 | `--mode` | `full` | 预览模式：`full`/`first` 预览全量选择，`incremental`/`current` 预览当前快照 diff |
 | `--focus`, `-f` | 空 | 只预览这些路径下的文件；可重复使用 |
-| `--limit` | `200` | 最多输出的文件数量 |
 | `--help`, `-h` | `false` | 查看 `preview files` 帮助 |
 
 #### 常用示例
@@ -428,14 +429,13 @@ skills-seed preview files
 skills-seed preview files --mode full
 skills-seed preview files --mode incremental
 skills-seed preview files --mode incremental --focus internal/service
-skills-seed preview files --limit 500
 ```
 
 #### 注意事项
 
 1. `preview files` 和 `learn current` 共用文件过滤策略，可用于确认哪些文件会进入学习分析。
 2. `--mode incremental` 会基于当前文件快照展示新增、修改和删除候选；如果还没有快照，结果会接近首次学习范围。
-3. 输出中的 skipped 计数可帮助判断文档、排除规则或 Git ignore 是否过滤了预期文件。
+3. 预览结果会写入 `.skills-seed/runtime/preview/files/`，终端只输出报告目录和文件名；确认后可删除该报告文件。
 
 ### `skills-seed patterns`
 

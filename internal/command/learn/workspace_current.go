@@ -226,17 +226,18 @@ func (r *learnWorkspaceCurrentRun) runChild(ctx context.Context, childCont *cont
 		logPath = scopedLogPath
 		var err error
 		result, err = runLearnCurrentProjectWithOptions(scopedCtx, childCont, learnCurrentProjectOptions{
-			showProgress:     r.showDetails,
-			showDetailedLogs: r.showDetails,
-			onStepStart:      projectProgress.start,
-			onStepUpdate:     projectProgress.update,
-			onStepComplete:   projectProgress.completeStep,
-			userContext:      r.opts.userContext,
-			language:         r.opts.language,
-			focusPaths:       r.opts.focusPaths,
-			profileMode:      r.opts.profileMode,
-			stateScope:       r.opts.stateScope,
-			force:            r.opts.force,
+			showProgress:       r.showDetails,
+			showDetailedLogs:   r.showDetails,
+			onStepStart:        projectProgress.start,
+			onStepUpdate:       projectProgress.update,
+			onStepComplete:     projectProgress.completeStep,
+			userContext:        r.opts.userContext,
+			skipRuntimeCleanup: true,
+			language:           r.opts.language,
+			focusPaths:         r.opts.focusPaths,
+			profileMode:        r.opts.profileMode,
+			stateScope:         r.opts.stateScope,
+			force:              r.opts.force,
 		})
 		return err
 	})

@@ -32,6 +32,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestWorkspacePhaseStepLabel(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	require.Equal(t, "学习 · 解析输出目录", workspacePhaseStepLabel("ProgressSyncWorkspacePhaseLearn", "解析输出目录"))
+	require.Equal(t, "生成", workspacePhaseStepLabel("ProgressSyncWorkspacePhaseGenerate", ""))
+}
+
 func TestSyncLearnAfterLearnGeneratesWhenLearnChanged(t *testing.T) {
 	generateCalled := false
 

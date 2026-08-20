@@ -345,6 +345,14 @@ These files are merged with built-in prompts; they do not replace built-in promp
 
 Runtime AI prompt templates are maintained as English-only source templates. Their final output contract follows `skills.locale`; `profile.locale` only affects tool output, config templates, and seed-context templates.
 
+### `runtime`
+
+#### Fields
+
+| Field | Default | Description |
+|---|---:|---|
+| `cleanup_before_reanalysis` | `true` | Clear `.skills-seed/runtime/` before reanalysis; `resume` flows do not trigger it |
+
 ### `logging`
 
 #### Fields

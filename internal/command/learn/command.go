@@ -172,17 +172,18 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 }
 
 type learnCurrentProjectOptions struct {
-	showProgress     bool
-	showDetailedLogs bool
-	userContext      string
-	onStepStart      func(label string)
-	onStepComplete   func(label string)
-	onStepUpdate     func(label string)
-	language         string
-	focusPaths       []string
-	profileMode      string
-	stateScope       string
-	force            bool
+	showProgress       bool
+	showDetailedLogs   bool
+	userContext        string
+	skipRuntimeCleanup bool
+	onStepStart        func(label string)
+	onStepComplete     func(label string)
+	onStepUpdate       func(label string)
+	language           string
+	focusPaths         []string
+	profileMode        string
+	stateScope         string
+	force              bool
 }
 
 type learnCurrentProjectResult struct {

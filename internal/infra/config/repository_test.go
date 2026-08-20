@@ -132,6 +132,7 @@ func TestRepository_Get(t *testing.T) {
 	assert.True(t, cfg.Learning.Current.Structural.Enabled)
 	assert.Equal(t, 30, cfg.Learning.Current.Structural.MaxSymbols)
 	assert.Equal(t, 512, cfg.Learning.Current.Structural.MaxFileSize)
+	assert.True(t, cfg.Runtime.CleanupBeforeReanalysis)
 	assert.Equal(t, "claude", cfg.Skills.Target)
 	assert.Equal(t, "en-US", cfg.Skills.Locale)
 	assert.Equal(t, ".claude/skills/skills-seed-skills", cfg.Skills.Paths["claude"])
@@ -295,10 +296,12 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	require.NotContains(t, content, `- "**/*.gen.go"`)
 	require.Contains(t, content, `- "dist/**"`)
 	require.Contains(t, content, `- "*.log"`)
-	require.NotContains(t, content, `analysis:`)
+	require.NotContains(t, content, "\nanalysis:")
 	require.NotContains(t, content, `ai_file_selector:`)
 	require.NotContains(t, content, "select_relevant_files")
 	require.Contains(t, content, `enabled: true`)
+	require.Contains(t, content, "# 运行时\n# 控制可重建运行时数据的清理策略")
+	require.Contains(t, content, "# 在重新分析前清理 runtime；默认开启，resume 流程不会触发\n  cleanup_before_reanalysis: true")
 	require.Contains(t, content, "# 全局排除\n# 控制学习、预览、结构化分析等命令共享的文件边界")
 	require.Contains(t, content, "# 是否排除 Git ignore 命中的文件\n  gitignore: true")
 	require.Contains(t, content, "# 项目名称，init 时自动填充\n  name: \"demo-workspace\"")
@@ -308,7 +311,7 @@ func TestRepository_RenderWorkspaceConfigPreservesTemplateStyle(t *testing.T) {
 	assertTopLevelModuleBannersHaveBlankLineBefore(t, content)
 	assertCommentLinesDoNotEndWithFullStops(t, content)
 	require.NotContains(t, content, `name: "demo-workspace" #`)
-	require.NotContains(t, content, `analysis:`)
+	require.NotContains(t, content, "\nanalysis:")
 	require.NotContains(t, content, `enabled: false #`)
 	require.NotContains(t, content, `exclude: #`)
 	require.NotContains(t, content, `- "dist/**" #`)
@@ -454,7 +457,7 @@ exclude:
 	require.NotContains(t, text, `shared:`)
 	require.NotContains(t, text, `contracts:`)
 	require.NotContains(t, text, `infra:`)
-	require.NotContains(t, text, `analysis:`)
+	require.NotContains(t, text, "\nanalysis:")
 	require.NotContains(t, text, `enabled: false # 自定义结构化分析注释`)
 	require.NotContains(t, text, `- ".*" # 保留点号文件注释`)
 
@@ -614,6 +617,7 @@ exclude:
 	require.True(t, cfg.Enabled)
 	require.Equal(t, 30, cfg.MaxSymbols)
 	require.Equal(t, 512, cfg.MaxFileSize)
+	require.True(t, repo.GetRuntimeConfig().CleanupBeforeReanalysis)
 }
 
 func TestRepository_PreservesPatternAdmissionThresholds(t *testing.T) {
