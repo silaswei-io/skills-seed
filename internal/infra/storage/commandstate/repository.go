@@ -56,13 +56,21 @@ type DecisionCheckpoint struct {
 	Decision      json.RawMessage `json:"decision"`
 }
 
+// PatternCommitSummary 保存 Pattern 入库阶段的可恢复摘要。
+type PatternCommitSummary struct {
+	Found   int `json:"found,omitempty"`
+	Saved   int `json:"saved,omitempty"`
+	Retired int `json:"retired,omitempty"`
+}
+
 // KnowledgeCommitCheckpoint 记录知识事实的分阶段提交结果。
 // ID 与本次恢复状态的输入绑定，用于审计和避免将不同调用的提交结果混用。
 type KnowledgeCommitCheckpoint struct {
-	ID                      string `json:"id"`
-	PatternsCommitted       bool   `json:"patterns_committed,omitempty"`
-	SourceBaselineCommitted bool   `json:"source_baseline_committed,omitempty"`
-	ProjectionsCommitted    bool   `json:"projections_committed,omitempty"`
+	ID                      string               `json:"id"`
+	PatternsCommitted       bool                 `json:"patterns_committed,omitempty"`
+	PatternSummary          PatternCommitSummary `json:"pattern_summary,omitempty"`
+	SourceBaselineCommitted bool                 `json:"source_baseline_committed,omitempty"`
+	ProjectionsCommitted    bool                 `json:"projections_committed,omitempty"`
 }
 
 // State 是命令未完成执行的可恢复状态。
@@ -231,11 +239,21 @@ func (s *State) ProjectionsCommitComplete() bool {
 	return checkpoint != nil && checkpoint.ProjectionsCommitted
 }
 
-// MarkPatternsCommitted 标记 Pattern mutation 已完成。
-func (s *State) MarkPatternsCommitted() {
+// MarkPatternsCommitted 标记 Pattern mutation 已完成，并保存本次提交摘要。
+func (s *State) MarkPatternsCommitted(summary PatternCommitSummary) {
 	if checkpoint := s.KnowledgeCommitCheckpoint(); checkpoint != nil {
 		checkpoint.PatternsCommitted = true
+		checkpoint.PatternSummary = normalizePatternCommitSummary(summary)
 	}
+}
+
+// CommittedPatternSummary 返回已提交 Pattern mutation 的摘要。
+func (s *State) CommittedPatternSummary() PatternCommitSummary {
+	checkpoint := s.KnowledgeCommitCheckpoint()
+	if checkpoint == nil || !checkpoint.PatternsCommitted {
+		return PatternCommitSummary{}
+	}
+	return normalizePatternCommitSummary(checkpoint.PatternSummary)
 }
 
 // MarkSourceBaselineCommitted 标记源码快照与文件指纹均已完成。
@@ -259,6 +277,19 @@ func (s *State) ensureKnowledgeCommitID() {
 	if strings.TrimSpace(s.KnowledgeCommit.ID) == "" {
 		s.KnowledgeCommit.ID = s.knowledgeCommitID()
 	}
+}
+
+func normalizePatternCommitSummary(summary PatternCommitSummary) PatternCommitSummary {
+	if summary.Found < 0 {
+		summary.Found = 0
+	}
+	if summary.Saved < 0 {
+		summary.Saved = 0
+	}
+	if summary.Retired < 0 {
+		summary.Retired = 0
+	}
+	return summary
 }
 
 func (s *State) knowledgeCommitID() string {

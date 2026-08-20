@@ -206,6 +206,36 @@ func TestKnowledgeReviewSchemaConstrainsEmptyCandidateSet(t *testing.T) {
 	require.Equal(t, float64(0), decisions["maxItems"])
 }
 
+func TestAuthorityExtractionSchemaConstrainsSectionIDsOneToOne(t *testing.T) {
+	data, err := StructuredOutputSchemaWithOptions(ContractAuthorityExtraction, StructuredOutputOptions{
+		AuthoritySectionIDs: []string{"authority-b", "authority-a", "authority-a"},
+	})
+	require.NoError(t, err)
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+	sections := schema["properties"].(map[string]any)["authority_sections"].(map[string]any)
+	require.Equal(t, float64(2), sections["minItems"])
+	require.Equal(t, float64(2), sections["maxItems"])
+	require.Equal(t, true, sections["uniqueItems"])
+	sectionID, _, ok := findSchemaPropertyWithContainer(schema, "section_id")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"authority-a", "authority-b"}, schemaStringList(sectionID["enum"]))
+}
+
+func TestAuthorityExtractionSchemaConstrainsEmptySectionSet(t *testing.T) {
+	data, err := StrictStructuredOutputSchemaWithOptions(ContractAuthorityExtraction, StructuredOutputOptions{
+		AuthoritySectionIDs: []string{},
+	})
+	require.NoError(t, err)
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+	sections := schema["properties"].(map[string]any)["authority_sections"].(map[string]any)
+	require.Equal(t, float64(0), sections["minItems"])
+	require.Equal(t, float64(0), sections["maxItems"])
+}
+
 func TestWorkspaceContractsKeepIdentityOutOfAIOutput(t *testing.T) {
 	profile := decodeSchema(t, ContractWorkspaceProfile)
 	profileProperties := profile["properties"].(map[string]any)

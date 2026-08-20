@@ -928,7 +928,11 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 			r.retiredCount = len(result.RetiredPatternIDs)
 		}
 		if !r.patternsCommitted() && r.analysisState != nil {
-			r.analysisState.MarkPatternsCommitted()
+			r.analysisState.MarkPatternsCommitted(commandstate.PatternCommitSummary{
+				Found:   len(r.patterns),
+				Saved:   r.savedCount,
+				Retired: r.retiredCount,
+			})
 			if err := r.stateRepo.Save(r.ctx, r.analysisState); err != nil {
 				return err
 			}
@@ -1036,6 +1040,31 @@ func (r *learnCurrentProjectRun) restoreAnalysisCheckpoint() {
 		Needed: checkpoint.ProfileRefreshNeeded,
 		Reason: checkpoint.ProfileRefreshReason,
 	}
+}
+
+func (r *learnCurrentProjectRun) restoreKnowledgeCommitCheckpoint() {
+	if r.analysisState == nil {
+		return
+	}
+	r.restoreAnalysisCheckpoint()
+	if !r.analysisState.PatternsCommitComplete() {
+		return
+	}
+	summary := r.analysisState.CommittedPatternSummary()
+	r.savedCount = summary.Saved
+	r.retiredCount = summary.Retired
+}
+
+func (r *learnCurrentProjectRun) resultPatternCount() int {
+	count := len(r.patterns)
+	if r.analysisState == nil || !r.analysisState.PatternsCommitComplete() {
+		return count
+	}
+	summary := r.analysisState.CommittedPatternSummary()
+	if summary.Found > count {
+		return summary.Found
+	}
+	return count
 }
 
 func (r *learnCurrentProjectRun) setFocusKnowledge(unit commandstate.FocusKnowledgeCheckpoint) {

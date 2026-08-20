@@ -43,7 +43,7 @@ func TestRepositoryRejectsNilState(t *testing.T) {
 func TestRepositoryPersistsStableKnowledgeCommitCheckpoint(t *testing.T) {
 	repo := NewRepository(t.TempDir(), "learn-current")
 	state := NewState("learn-current", "demo", "go", "", []domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}}, nil, []domain.EvidenceFocus{{ID: "main", EntryPaths: []string{"main.go"}}})
-	state.MarkPatternsCommitted()
+	state.MarkPatternsCommitted(PatternCommitSummary{Found: 3, Saved: 2, Retired: 1})
 	state.MarkSourceBaselineCommitted()
 	state.MarkProjectionsCommitted()
 
@@ -55,6 +55,7 @@ func TestRepositoryPersistsStableKnowledgeCommitCheckpoint(t *testing.T) {
 	require.NotNil(t, checkpoint)
 	require.NotEmpty(t, checkpoint.ID)
 	require.True(t, checkpoint.PatternsCommitted)
+	require.Equal(t, PatternCommitSummary{Found: 3, Saved: 2, Retired: 1}, loaded.CommittedPatternSummary())
 	require.True(t, checkpoint.SourceBaselineCommitted)
 	require.True(t, checkpoint.ProjectionsCommitted)
 	firstID := checkpoint.ID

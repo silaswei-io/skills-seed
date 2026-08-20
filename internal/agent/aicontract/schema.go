@@ -45,6 +45,9 @@ var outputTypes = map[string]reflect.Type{
 type StructuredOutputOptions struct {
 	// ProjectIDs 是工作区模式下配置声明的唯一合法子项目 ID。
 	ProjectIDs []string
+	// AuthoritySectionIDs 是权威知识提取或复核本次调用必须逐一返回的章节 ID。
+	// 非 nil 时会将权威章节结果收窄为一对一的章节回执。
+	AuthoritySectionIDs []string
 	// CandidateIDs 是知识审查本次调用允许返回的候选 ID。
 	// 非 nil 时会将审查结果收窄为一对一的候选回执。
 	CandidateIDs []string
@@ -135,6 +138,15 @@ func constrainStructuredOutputSchema(name, data string, opts StructuredOutputOpt
 		}
 		applyProjectIDEnum(schema, projectIDs)
 	}
+	authoritySectionIDs := cleanSchemaEnumValues(opts.AuthoritySectionIDs)
+	if name == ContractAuthorityExtraction && opts.AuthoritySectionIDs != nil {
+		if schema == nil {
+			if err := json.Unmarshal([]byte(data), &schema); err != nil {
+				return "", err
+			}
+		}
+		applyAuthoritySectionConstraints(schema, authoritySectionIDs)
+	}
 	candidateIDs := cleanSchemaEnumValues(opts.CandidateIDs)
 	if name == ContractReviewKnowledge && opts.CandidateIDs != nil {
 		if schema == nil {
@@ -152,6 +164,31 @@ func constrainStructuredOutputSchema(name, data string, opts StructuredOutputOpt
 		return "", err
 	}
 	return string(constrained), nil
+}
+
+func applyAuthoritySectionConstraints(schema map[string]any, sectionIDs []string) {
+	properties := schemaProperties(schema)
+	sections, ok := properties["authority_sections"].(map[string]any)
+	if !ok {
+		return
+	}
+	count := len(sectionIDs)
+	sections["minItems"] = count
+	sections["maxItems"] = count
+	sections["uniqueItems"] = true
+	if count == 0 {
+		return
+	}
+	items, ok := sections["items"].(map[string]any)
+	if !ok {
+		return
+	}
+	sectionProperties := schemaProperties(items)
+	sectionID, ok := sectionProperties["section_id"].(map[string]any)
+	if !ok {
+		return
+	}
+	sectionID["enum"] = schemaEnumValues(sectionIDs)
 }
 
 func applyCandidateReviewConstraints(schema map[string]any, candidateIDs []string) {

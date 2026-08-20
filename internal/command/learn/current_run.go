@@ -313,6 +313,8 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 	}
 	if session != nil {
 		r.stateSession = session
+		r.analysisState = session.State
+		r.restoreKnowledgeCommitCheckpoint()
 		r.incrementalChanges = session.Changes
 		focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
 		r.effectiveFocusPaths = resolveIncrementalFocusPaths(r.projectRoot, focusRelPaths)
@@ -474,8 +476,9 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "command.learn_current",
 		"duration", time.Since(r.startedAt),
-		"patterns_count", 0,
-		"saved_count", 0,
+		"patterns_count", r.resultPatternCount(),
+		"saved_count", r.savedCount,
+		"retired_count", r.retiredCount,
 		"skipped", true,
 	)
 	if recoveredKnowledge {
@@ -486,22 +489,35 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 			return nil, err
 		}
 	}
-	return r.buildResult(true), nil
+	return r.buildResult(!recoveredKnowledge), nil
 }
 
 func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectResult {
+	changedCount := len(r.incrementalChanges.AddedOrModified)
+	deletedCount := len(r.incrementalChanges.Deleted)
+	if state := r.recoveredSourceState(); state != nil {
+		changedCount = len(state.Files)
+		deletedCount = len(state.Deleted)
+	}
 	result := &learnCurrentProjectResult{
 		projectName:   r.projectName,
-		changedCount:  len(r.incrementalChanges.AddedOrModified),
-		deletedCount:  len(r.incrementalChanges.Deleted),
+		changedCount:  changedCount,
+		deletedCount:  deletedCount,
 		skippedCount:  len(r.incrementalChanges.Skipped),
-		patternsCount: len(r.patterns),
+		patternsCount: r.resultPatternCount(),
 		savedCount:    r.savedCount,
 		retiredCount:  r.retiredCount,
 		skipped:       skipped,
 		duration:      time.Since(r.startedAt),
 	}
 	return result
+}
+
+func (r *learnCurrentProjectRun) recoveredSourceState() *commandstate.State {
+	if r.stateSession == nil || r.stateSession.State == nil || !r.stateSession.State.SourceBaselineCommitComplete() {
+		return nil
+	}
+	return r.stateSession.State
 }
 
 func resolveIncrementalFocusPaths(projectRoot string, relPaths []string) []string {

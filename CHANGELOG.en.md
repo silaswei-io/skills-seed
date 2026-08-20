@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.14]
+
+### Fixes
+
+- Fixed lost learning summaries when `sync` resumes only the remaining post-analysis stages. Pattern found/saved counts and the original change scope are now persisted with the recovery state, so resumed completion no longer reports zeros or skips generation as if nothing changed.
+- Added one-to-one structured constraints to authority extraction: every authority section in the current input must return a coverage receipt, preventing missing sections from failing later during authority-rule and project-map refresh.
+- Added regression coverage for resumed learning summaries, command-state commit summaries, and authority-section Schemas, with synchronized Wiki updates.
+
 ## [v0.20.13]
 
 ### Fixes

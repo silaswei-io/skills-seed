@@ -34,6 +34,8 @@ skills-seed sync --resume
 
 Resumption should reuse completed filtering, agenda, and focus checkpoints. Restart only when state versions are incompatible, inputs are no longer trustworthy, or the user explicitly requests it. The CLI should report incompatibility rather than silently deleting all state.
 
+If interruption happened after pattern admission, resumption can show `0` pending analysis files. That is normal: the CLI continues the source baseline, authority rules, and project-map refresh, while the final learning summary keeps the committed pattern counts and original change scope.
+
 ## Agent and Structured-Output Failures
 
 Use this order:

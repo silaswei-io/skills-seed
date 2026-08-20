@@ -141,13 +141,14 @@ func TestReconcileEvidenceFocusesDropsEmptyFocusWithoutInventingFallback(t *test
 
 func TestCommandStatePreservesCommittedArtifactPhase(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", []domain.FileAnalysisRecord{{Path: "main.go", Hash: "hash"}}, nil, []domain.EvidenceFocus{{ID: "all", EntryPaths: []string{"main.go"}}})
-	state.MarkPatternsCommitted()
+	state.MarkPatternsCommitted(commandstate.PatternCommitSummary{Found: 2, Saved: 1, Retired: 1})
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	require.NoError(t, repo.Save(context.Background(), state))
 
 	loaded, err := repo.Load(context.Background())
 	require.NoError(t, err)
 	require.True(t, loaded.PatternsCommitComplete())
+	require.Equal(t, commandstate.PatternCommitSummary{Found: 2, Saved: 1, Retired: 1}, loaded.CommittedPatternSummary())
 }
 
 func TestCommandStatePreservesAnalysisCheckpoint(t *testing.T) {

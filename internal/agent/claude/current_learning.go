@@ -91,9 +91,22 @@ func (c *ClaudeAgent) RefreshProjectProfile(ctx context.Context, req *agent.Anal
 }
 
 func (c *ClaudeAgent) ExtractAuthority(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
-	output, _, err := c.callCurrentLearning(ctx, "LearningAuthorityExtract", "learning-authority-extract", "skills-seed-learning-authority-extract", aicontract.ContractAuthorityExtraction, agent.NewRuntimeTask(agent.RuntimeSlug("learning-authority-extract", "")), agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
-		return agent.ExtractAuthorityPromptData(inputs, req)
-	})
+	opts := aicontract.StructuredOutputOptions{
+		AuthoritySectionIDs: agent.AuthoritySectionIDs(req.AuthoritySections),
+	}
+	output, _, err := c.callCurrentLearningWithOptions(
+		ctx,
+		"LearningAuthorityExtract",
+		"learning-authority-extract",
+		"skills-seed-learning-authority-extract",
+		aicontract.ContractAuthorityExtraction,
+		opts,
+		agent.NewRuntimeTask(agent.RuntimeSlug("learning-authority-extract", "")),
+		agent.Conversation{},
+		func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+			return agent.ExtractAuthorityPromptData(inputs, req)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +118,22 @@ func (c *ClaudeAgent) ExtractAuthority(ctx context.Context, req *agent.ExtractAu
 }
 
 func (c *ClaudeAgent) ReviewAuthority(ctx context.Context, req *agent.ReviewAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
-	output, _, err := c.callCurrentLearning(ctx, "LearningAuthorityReview", "learning-authority-review", "skills-seed-learning-authority-review", aicontract.ContractAuthorityExtraction, agent.NewRuntimeTask(agent.RuntimeSlug("learning-authority-review", "")), agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
-		return agent.ReviewAuthorityPromptData(inputs, req)
-	})
+	opts := aicontract.StructuredOutputOptions{
+		AuthoritySectionIDs: agent.AuthoritySectionIDs(req.AuthoritySections),
+	}
+	output, _, err := c.callCurrentLearningWithOptions(
+		ctx,
+		"LearningAuthorityReview",
+		"learning-authority-review",
+		"skills-seed-learning-authority-review",
+		aicontract.ContractAuthorityExtraction,
+		opts,
+		agent.NewRuntimeTask(agent.RuntimeSlug("learning-authority-review", "")),
+		agent.Conversation{},
+		func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+			return agent.ReviewAuthorityPromptData(inputs, req)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

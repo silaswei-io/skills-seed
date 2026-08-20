@@ -103,6 +103,17 @@ type AuthoritySectionResult struct {
 	NoRuleReason string                   `json:"no_rule_reason,omitempty"`
 }
 
+// AuthoritySectionIDs 返回权威章节目录中的稳定 ID 列表，供运行时 Schema 收窄回执范围。
+func AuthoritySectionIDs(sections []AuthoritySection) []string {
+	ids := make([]string, 0, len(sections))
+	for _, section := range sections {
+		if section.ID != "" {
+			ids = append(ids, section.ID)
+		}
+	}
+	return ids
+}
+
 // SampleFile 示例文件路径
 type SampleFile struct {
 	Path string // 文件路径

@@ -685,7 +685,7 @@ func TestRunLearnCurrentResumeAfterProfileSaveFailureDoesNotReanalyze(t *testing
 		analyzeCalls++
 		return &agent.AnalyzeCurrentCodebaseResult{
 			Patterns: []domain.Pattern{
-				*learnCurrentPatternForTest("profile-after-normalization", "Profile After Normalization", domain.CategoryBusiness, "main.go"),
+				*admittedLearnCurrentPatternForTest("profile-after-normalization", "Profile After Normalization", domain.CategoryBusiness, "main.go"),
 			},
 			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{Needed: true, Reason: "module boundary changed"},
 		}, nil
@@ -711,10 +711,14 @@ func TestRunLearnCurrentResumeAfterProfileSaveFailureDoesNotReanalyze(t *testing
 	require.False(t, state.ProjectionsCommitComplete())
 
 	require.NoError(t, os.Remove(profileDocumentsPath))
-	_, err = runLearnCurrent(cont, opts)
+	result, err := runLearnCurrent(cont, opts)
 	require.NoError(t, err)
 	require.Equal(t, 1, analyzeCalls)
 	require.Equal(t, 2, profileCalls)
+	require.False(t, result.Summary.NoFileChanges)
+	require.Greater(t, result.Summary.ChangedFiles, 0)
+	require.Equal(t, 1, result.Summary.PatternsFound)
+	require.Equal(t, 1, result.Summary.PatternsSaved)
 	profile, err := cont.ProfileRepo.Get(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, "updated", profile.Summary)
