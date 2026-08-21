@@ -269,6 +269,7 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, delta, "changed decision-bearing calculations")
 	require.Contains(t, delta, "pure or stateless decision-bearing calculation")
 	require.Contains(t, delta, "filling `proposal.business_method`")
+	require.Contains(t, delta, "exactly one knowledge-change decision for every input focus ID")
 	require.Contains(t, delta, "one canonical entry")
 	require.Contains(t, delta, "concrete operation or payload identity")
 	require.Contains(t, delta, "without compensation or rollback")
@@ -435,6 +436,7 @@ func sampleCurrentDeltaData() map[string]interface{} {
 		"RuntimeLabel":          "delta",
 		"SharedContextPath":     "/tmp/shared-context.md",
 		"Focuses":               []agent.AnalyzeCurrentDeltaFocus{sampleDeltaFocus()},
+		"FocusIDs":              []string{"user-flow"},
 		"StructurePath":         "/tmp/focused-structure.txt",
 		"StructuralContextPath": "/tmp/structural-context.md",
 		"UserContextPath":       "",

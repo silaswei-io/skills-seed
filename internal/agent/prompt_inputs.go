@@ -380,6 +380,7 @@ func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *Analyz
 		"RuntimeLabel":          req.RuntimeLabel,
 		"SharedContextPath":     strings.TrimSpace(req.SharedContextPath),
 		"Focuses":               req.Focuses,
+		"FocusIDs":              focusIDs(req.Focuses),
 		"StructurePath":         structurePath,
 		"StructuralContextPath": structuralContextPath,
 		"UserContextPath":       userContextPath,
@@ -387,4 +388,14 @@ func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *Analyz
 		"LearningMode":          promptLearningMode(req.LearningMode),
 		"ChangeProfile":         req.ChangeProfile,
 	}, nil
+}
+
+func focusIDs(focuses []AnalyzeCurrentDeltaFocus) []string {
+	ids := make([]string, 0, len(focuses))
+	for _, focus := range focuses {
+		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }

@@ -516,16 +516,18 @@ func funcMap(locale, agentName string) template.FuncMap {
 			return outputLanguage.preserveTechnicalTermsInstruction
 		},
 		"jsonContract": func(name string) (string, error) {
-			return renderJSONContract(agentName, name, nil)
+			return renderJSONContract(agentName, name, aicontract.StructuredOutputOptions{})
 		},
 		"jsonContractWithProjectIDs": func(name string, projectIDs []string) (string, error) {
-			return renderJSONContract(agentName, name, projectIDs)
+			return renderJSONContract(agentName, name, aicontract.StructuredOutputOptions{ProjectIDs: projectIDs})
+		},
+		"jsonContractWithFocusIDs": func(name string, focusIDs []string) (string, error) {
+			return renderJSONContract(agentName, name, aicontract.StructuredOutputOptions{FocusIDs: focusIDs})
 		},
 	}
 }
 
-func renderJSONContract(agentName, name string, projectIDs []string) (string, error) {
-	opts := aicontract.StructuredOutputOptions{ProjectIDs: projectIDs}
+func renderJSONContract(agentName, name string, opts aicontract.StructuredOutputOptions) (string, error) {
 	if strings.EqualFold(strings.TrimSpace(agentName), "codex") {
 		return aicontract.StrictStructuredOutputSchemaWithOptions(name, opts)
 	}

@@ -45,6 +45,8 @@ var outputTypes = map[string]reflect.Type{
 type StructuredOutputOptions struct {
 	// ProjectIDs 是工作区模式下配置声明的唯一合法子项目 ID。
 	ProjectIDs []string
+	// FocusIDs 是一次增量分析必须逐一返回的证据焦点 ID。
+	FocusIDs []string
 	// AuthoritySectionIDs 是权威知识提取或复核本次调用必须逐一返回的章节 ID。
 	// 非 nil 时会将权威章节结果收窄为一对一的章节回执。
 	AuthoritySectionIDs []string
@@ -131,12 +133,21 @@ func reflectSchema(name string) (*jsonschema.Schema, error) {
 
 func constrainStructuredOutputSchema(name, data string, opts StructuredOutputOptions) (string, error) {
 	projectIDs := cleanSchemaEnumValues(opts.ProjectIDs)
+	focusIDs := cleanSchemaEnumValues(opts.FocusIDs)
 	var schema map[string]any
 	if len(projectIDs) > 0 && (name == ContractWorkspaceProfile || name == ContractWorkspaceSpec) {
 		if err := json.Unmarshal([]byte(data), &schema); err != nil {
 			return "", err
 		}
 		applyProjectIDEnum(schema, projectIDs)
+	}
+	if len(focusIDs) > 0 && name == ContractAnalyzeCurrentDeltaBatch {
+		if schema == nil {
+			if err := json.Unmarshal([]byte(data), &schema); err != nil {
+				return "", err
+			}
+		}
+		applyDeltaBatchConstraints(schema, focusIDs)
 	}
 	authoritySectionIDs := cleanSchemaEnumValues(opts.AuthoritySectionIDs)
 	if name == ContractAuthorityExtraction && opts.AuthoritySectionIDs != nil {
@@ -214,6 +225,31 @@ func applyCandidateReviewConstraints(schema map[string]any, candidateIDs []strin
 		return
 	}
 	candidateID["enum"] = schemaEnumValues(candidateIDs)
+}
+
+func applyDeltaBatchConstraints(schema map[string]any, focusIDs []string) {
+	properties := schemaProperties(schema)
+	changes, ok := properties["knowledge_changes"].(map[string]any)
+	if !ok {
+		return
+	}
+	count := len(focusIDs)
+	changes["minItems"] = count
+	changes["maxItems"] = count
+	changes["uniqueItems"] = true
+	if count == 0 {
+		return
+	}
+	items, ok := changes["items"].(map[string]any)
+	if !ok {
+		return
+	}
+	changeProperties := schemaProperties(items)
+	focusID, ok := changeProperties["focus_id"].(map[string]any)
+	if !ok {
+		return
+	}
+	focusID["enum"] = schemaEnumValues(focusIDs)
 }
 
 func applyProjectIDEnum(schema map[string]any, projectIDs []string) {

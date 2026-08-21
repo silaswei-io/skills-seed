@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.17]
+
+### 修复
+
+- 为 `learning-delta-pack-analyze` 增加按焦点的一对一结构约束，`knowledge_changes` 现在会按输入焦点 ID 收窄，减少增量分析遗漏焦点的概率。
+- 同步收紧 delta prompt 文案，明确要求每个输入焦点都必须返回一条决策，包括 `no_change`。
+- 补充 delta schema 与 prompt 渲染回归测试，避免后续再次退回成“少一条就整体失败”的松散契约。
+
 ## [v0.20.16]
 
 ### 修复

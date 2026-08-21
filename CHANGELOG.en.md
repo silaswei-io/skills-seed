@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.17]
+
+### Fixes
+
+- Added a one-to-one structured constraint to `learning-delta-pack-analyze` so `knowledge_changes` is narrowed by input focus IDs, reducing the chance of missing a focus during incremental analysis.
+- Tightened the delta prompt wording to require one decision per input focus, including `no_change`.
+- Added regression coverage for the delta schema and prompt rendering so the contract does not regress back to an underspecified batch shape.
+
 ## [v0.20.16]
 
 ### Fixes

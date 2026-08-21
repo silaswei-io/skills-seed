@@ -83,6 +83,7 @@ Diff boundary:
 - Return `no_change` for testing, deployment, release, or acceptance files, commands, procedures, or ordering. User-maintained Workflows own that knowledge.
 - Use `no_change` for pure implementation movement, formatting, trivial CRUD, repeated known behavior, or context-only observations. Do not confuse a pure or stateless decision-bearing calculation with implementation movement: changed selection, ranking, precedence, min/max choice, caps, rounding, fallback/base choice, aggregation, eligibility, or boundary comparisons can require durable knowledge.
 - If evidence is insufficient to prove a reusable change, return `no_change` for that pack rather than speculating.
+- Return exactly one knowledge-change decision for every input focus ID in this pack, including `no_change` decisions when the diff does not establish a reusable change.
 
 Pack-local decision quality:
 - Compare the diff against related existing patterns before adding a new proposal.
@@ -114,4 +115,4 @@ Pre-output validation:
 
 Return JSON only.
 
-{{ jsonContract "AnalyzeCurrentDeltaBatchOutput" }}
+{{ jsonContractWithFocusIDs "AnalyzeCurrentDeltaBatchOutput" .FocusIDs }}
