@@ -2304,6 +2304,33 @@ other = "  # 查看最近学习变更\n  skills-seed log"
 [LogNoChanges]
 other = "暂无变更记录，记录文件: {{.Path}}"
 
+[LogRecord]
+other = "记录"
+
+[LogRecordDate]
+other = "时间"
+
+[LogRecordCommand]
+other = "命令"
+
+[LogRecordScope]
+other = "作用域"
+
+[LogRecordLogPath]
+other = "日志"
+
+[LogRecordChildren]
+other = "子记录"
+
+[LogScopeProject]
+other = "项目"
+
+[LogScopeWorkspace]
+other = "工作区"
+
+[LogScopeChild]
+other = "子项目"
+
 [ChangeLogSummarySync]
 other = "同步当前代码并更新 skills"
 
@@ -2336,6 +2363,30 @@ other = "已生成 skills"
 
 [ChangeLogGenerateSkippedNoChanges]
 other = "未检测到学习变化，跳过 skills 生成"
+
+[LearnJournalSummaryCounts]
+other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}，发现 {{.Patterns}}，保存 {{.Saved}}，移除 {{.Retired}}"
+
+[LearnJournalWorkspaceSummary]
+other = "处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有变化"
+
+[LearnJournalWriteFailed]
+other = "学习运行记录写入失败：{{.Error}}"
+
+[GenerateJournalOutputPath]
+other = "输出路径 {{.Path}}"
+
+[GenerateJournalWriteFailed]
+other = "生成运行记录写入失败：{{.Error}}"
+
+[SyncJournalLearnSummary]
+other = "学习摘要：处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有变化；变更 {{.Changed}}，删除 {{.Deleted}}，发现 {{.Patterns}}，保存 {{.Saved}}"
+
+[SyncJournalWorkspaceRelationshipsChanged]
+other = "workspace 关系产物已更新"
+
+[SyncJournalWriteFailed]
+other = "同步运行记录写入失败：{{.Error}}"
 
 [ChangeLogPatternAdded]
 other = "已添加用户模式: {{.PatternName}} [{{.Category}}]"

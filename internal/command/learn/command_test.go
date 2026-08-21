@@ -290,6 +290,24 @@ func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
 	require.Contains(t, output, fmt.Sprintf("%d/%d", learnCurrentProjectStepTotal, learnCurrentProjectStepTotal))
 }
 
+func TestRunLearnCurrentSkipsKnowledgeVerificationWhenFilesUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	// 若无变化路径仍尝试核验知识，这个仓储会让重学失败；无变化时应直接复用已有投影。
+	cont.PatternReader = &mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+			return nil, errors.New("knowledge verification should be skipped")
+		},
+	}
+
+	result := requireRunLearnCurrentNoError(t, cont, opts)
+	require.True(t, result.Summary.NoFileChanges)
+}
+
 func TestRunLearnCurrentRefreshesMissingProfileWhenFilesUnchanged(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)

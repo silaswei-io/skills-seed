@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.19]
+
+### 修复
+
+- 将运行记录从变更摘要中拆出，改为写入 `.skills-seed/runtime/journal/`；`skills-seed log` 现在优先读取该运行记录层。
+- 工作区根目录的 `log` 会合并子项目运行记录，并按时间倒序输出，避免只看到根项目摘要而丢失子项细节。
+- `learn`、`generate` 和 `sync` 的运行作用域现在显式传递，不再依赖项目模式推断，减少子项目与根项目记录混写。
+
 ## [v0.20.18]
 
 ### 修复

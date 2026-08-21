@@ -10,6 +10,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/spf13/cobra"
 )
 
@@ -36,6 +37,7 @@ type learnCurrentOptions struct {
 	contextPath    []string
 	userContext    string
 	stateScope     string
+	scopeKind      runjournal.ScopeKind
 	force          bool
 	quiet          bool
 	onStepStart    func(label string)
@@ -87,17 +89,29 @@ func Cmd(cont *container.Container) *cobra.Command {
 
 // RunLearnCurrent 导出：从当前代码库学习，并返回学习摘要。
 func RunLearnCurrent(cont *container.Container) (domain.LearnCurrentResult, error) {
-	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto})
+	return runLearnCurrent(cont, learnCurrentOptions{
+		profileMode: learnCurrentProfileAuto,
+		scopeKind:   runjournal.ScopeProject,
+	})
 }
 
 // RunLearnCurrentWithContext 导出：从当前代码库学习，附加一次性用户上下文，并返回学习摘要。
 func RunLearnCurrentWithContext(cont *container.Container, userContext string) (domain.LearnCurrentResult, error) {
-	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext})
+	return runLearnCurrent(cont, learnCurrentOptions{
+		profileMode: learnCurrentProfileAuto,
+		userContext: userContext,
+		scopeKind:   runjournal.ScopeProject,
+	})
 }
 
 // RunLearnCurrentWithStateScope 从当前代码库学习，并使用指定恢复状态 scope。
 func RunLearnCurrentWithStateScope(cont *container.Container, stateScope string, userContext string) (domain.LearnCurrentResult, error) {
-	return runLearnCurrent(cont, learnCurrentOptions{profileMode: learnCurrentProfileAuto, userContext: userContext, stateScope: stateScope})
+	return runLearnCurrent(cont, learnCurrentOptions{
+		profileMode: learnCurrentProfileAuto,
+		userContext: userContext,
+		stateScope:  stateScope,
+		scopeKind:   runjournal.ScopeProject,
+	})
 }
 
 // CurrentRunOptions 描述外部命令调用 learn current 时允许覆盖的执行选项。
@@ -106,6 +120,7 @@ type CurrentRunOptions struct {
 	Force bool
 	// Quiet 表示作为上层工作区流程的子步骤运行，不直接输出项目级进度和详细日志。
 	Quiet          bool
+	ScopeKind      runjournal.ScopeKind
 	OnStepStart    func(label string)
 	OnStepUpdate   func(label string)
 	OnStepComplete func(label string)
@@ -117,6 +132,7 @@ func RunLearnCurrentWithStateScopeOptions(cont *container.Container, stateScope 
 		profileMode:    learnCurrentProfileAuto,
 		userContext:    userContext,
 		stateScope:     stateScope,
+		scopeKind:      opts.ScopeKind,
 		force:          opts.Force,
 		quiet:          opts.Quiet,
 		onStepStart:    opts.OnStepStart,
@@ -128,6 +144,9 @@ func RunLearnCurrentWithStateScopeOptions(cont *container.Container, stateScope 
 func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	if opts.profileMode == "" {
 		opts.profileMode = learnCurrentProfileAuto
+	}
+	if opts.scopeKind == "" {
+		opts.scopeKind = runjournal.ScopeProject
 	}
 	if opts.userContext == "" {
 		userContext, err := commandutil.ResolveRuntimeContext(opts.contextText, opts.contextPath...)
@@ -154,6 +173,7 @@ func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions)
 		focusPaths:       opts.focusPaths,
 		profileMode:      opts.profileMode,
 		stateScope:       opts.stateScope,
+		scopeKind:        opts.scopeKind,
 		force:            opts.force,
 	})
 	if err != nil {
@@ -183,6 +203,7 @@ type learnCurrentProjectOptions struct {
 	focusPaths         []string
 	profileMode        string
 	stateScope         string
+	scopeKind          runjournal.ScopeKind
 	force              bool
 }
 

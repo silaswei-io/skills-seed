@@ -45,19 +45,19 @@ type Request struct {
 }
 
 // Run 执行当前代码学习，并在必要时生成 skills。
-func (s Service) Run(ctx context.Context, req Request) error {
+func (s Service) Run(ctx context.Context, req Request) (domain.LearnCurrentResult, error) {
 	startedAt := time.Now()
 	if s.LearnCurrent == nil {
-		return fmt.Errorf("sync learn dependency is not configured")
+		return domain.LearnCurrentResult{}, fmt.Errorf("sync learn dependency is not configured")
 	}
 	if s.Generate == nil {
-		return fmt.Errorf("sync generate dependency is not configured")
+		return domain.LearnCurrentResult{}, fmt.Errorf("sync generate dependency is not configured")
 	}
 
 	logger.Info(i18n.Get("SyncStepLearn"))
 	result, err := s.LearnCurrent(ctx, req.Learn)
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
+		return domain.LearnCurrentResult{}, fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
 	logger.InfoAfterProgress(i18n.GetWithParams("SyncLearnCompleted", map[string]interface{}{
 		"Changed":  result.Summary.ChangedFiles,
@@ -72,7 +72,7 @@ func (s Service) Run(ctx context.Context, req Request) error {
 	if s.OutputMissing != nil {
 		outputMissing = s.OutputMissing()
 	}
-	return RunAfterLearn(result, outputMissing, func() error {
+	return result, RunAfterLearn(result, outputMissing, func() error {
 		return s.Generate(ctx)
 	}, req.Change)
 }

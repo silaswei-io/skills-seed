@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -13,6 +15,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
 	ruleoutput "github.com/silaswei-io/skills-seed/internal/service/rule"
@@ -99,6 +102,7 @@ func RunGenerateWorkspaceRoot(cont *container.Container) error {
 	if cont == nil {
 		return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 	}
+	startedAt := time.Now()
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
 	if err := commandutil.LockConfiguredMode(ctx, cont); err != nil {
 		return err
@@ -106,11 +110,18 @@ func RunGenerateWorkspaceRoot(cont *container.Container) error {
 	if err := cont.WorkspaceGeneratorSvc.GenerateWorkspaceSkillsWithOptions(ctx, ws.WorkspaceGenerateOptions{}); err != nil {
 		return err
 	}
-	return commandutil.MarkSkillsGenerated(ctx, cont)
+	if err := commandutil.MarkSkillsGenerated(ctx, cont); err != nil {
+		return err
+	}
+	if err := recordGenerateJournal(cont, outputPathForCurrentTarget(cont), startedAt, runjournal.ScopeProject); err != nil {
+		logger.Warn(i18n.GetWithParams("GenerateJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))
+	}
+	return nil
 }
 
 func runGenerate(cont *container.Container, opts generateOptions) error {
 	ctx := runtimecontext.WithSeedPath(context.Background(), cont.SeedPath)
+	startedAt := time.Now()
 
 	if !opts.quiet {
 		logger.Info(i18n.Get("GenerateStarting"))
@@ -193,6 +204,9 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 	}
 	if err := commandutil.MarkSkillsGenerated(ctx, cont); err != nil {
 		return err
+	}
+	if err := recordGenerateJournal(cont, generatedOutputPath, startedAt, runjournal.ScopeProject); err != nil {
+		logger.Warn(i18n.GetWithParams("GenerateJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))
 	}
 
 	return nil
@@ -351,15 +365,23 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 		childCtx := runtimecontext.WithoutUserContext(ctx)
 		childCtx = runtimecontext.WithSeedPath(childCtx, childCont.SeedPath)
 		childOutputPath := outputPathForCurrentTarget(childCont)
-		if err := childCont.GeneratorSvc.GenerateSkillsWithOptions(childCtx, childOutputPath, generator.GenerateOptions{
-			Progress: generator.GenerateProgressHooks{
-				OnStepStart:    startStep,
-				OnStepUpdate:   updateStep,
-				OnStepComplete: completeStep,
-			},
-			ProjectedRules: ruleoutput.ApplicableToProject(workspaceRules, project.ID, project.Path),
+		childStartedAt := time.Now()
+		loggingConfig := childCont.ConfigRepo.GetLoggingConfig()
+		childLogDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
+		if err := logger.WithScopedLog(childCtx, childLogDir, "generate", logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles, func(scopedCtx context.Context, _ string) error {
+			return childCont.GeneratorSvc.GenerateSkillsWithOptions(scopedCtx, childOutputPath, generator.GenerateOptions{
+				Progress: generator.GenerateProgressHooks{
+					OnStepStart:    startStep,
+					OnStepUpdate:   updateStep,
+					OnStepComplete: completeStep,
+				},
+				ProjectedRules: ruleoutput.ApplicableToProject(workspaceRules, project.ID, project.Path),
+			})
 		}); err != nil {
 			return err
+		}
+		if err := recordGenerateJournal(childCont, childOutputPath, childStartedAt, runjournal.ScopeChild); err != nil {
+			logger.Warn(i18n.GetWithParams("GenerateJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))
 		}
 		logger.Info(i18n.GetWithParams("GenerateWorkspaceChildGenerated", map[string]interface{}{"ProjectName": project.ID}))
 		if multiTracker != nil {
@@ -379,4 +401,40 @@ func outputPathForCurrentTarget(cont *container.Container) string {
 
 func pauseAfterFastGenerateChildStep(startedAt time.Time) {
 	progress.PauseAfterFastStep(startedAt, sleepAfterGenerateChildStep)
+}
+
+func recordGenerateJournal(cont *container.Container, outputPath string, startedAt time.Time, scopeKind runjournal.ScopeKind) error {
+	if cont == nil || cont.ConfigRepo == nil {
+		return nil
+	}
+	projectConfig := cont.ConfigRepo.GetProjectConfig()
+	scope := runjournal.Scope{
+		Kind:        runjournal.ScopeProject,
+		Name:        projectConfig.Name,
+		ProjectPath: projectConfig.RootPath,
+	}
+	if scopeKind != "" {
+		scope.Kind = scopeKind
+	} else if projectConfig.Mode == domain.ModeWorkspace {
+		scope.Kind = runjournal.ScopeChild
+	}
+	if strings.TrimSpace(outputPath) == "" {
+		outputPath = outputPathForCurrentTarget(cont)
+	}
+	return runjournal.Append(cont.SeedPath, runjournal.Entry{
+		Command:    "generate skills",
+		Scope:      scope,
+		Summary:    i18n.Get("ChangeLogSummaryGenerateSkills"),
+		Details:    []string{i18n.GetWithParams("GenerateJournalOutputPath", map[string]interface{}{"Path": outputPath})},
+		LogPath:    currentGenerateLogPath(),
+		StartedAt:  startedAt,
+		FinishedAt: time.Now(),
+	})
+}
+
+func currentGenerateLogPath() string {
+	if path := logger.CurrentScopedLogPath(); path != "" {
+		return path
+	}
+	return logger.CurrentLogPath()
 }

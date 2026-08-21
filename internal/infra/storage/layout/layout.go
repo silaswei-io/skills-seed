@@ -88,6 +88,11 @@ func (l Layout) RuntimeLogs() string {
 	return l.Runtime("logs")
 }
 
+// RuntimeJournal returns the runtime run journal directory.
+func (l Layout) RuntimeJournal() string {
+	return l.Runtime("journal")
+}
+
 // Rules 返回用户权威规则根目录。
 func (l Layout) Rules() string {
 	return filepath.Join(l.seedPath, "rules")

@@ -206,7 +206,7 @@ func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
 	}
 	stateScope := commandutil.CommandStateScope("sync")
 
-	err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil, commandDependenciesForTest())
+	_, err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil, commandDependenciesForTest())
 
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
@@ -292,7 +292,7 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 		GeneratorSvc:   generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil, nil),
 	}
 
-	err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())
+	_, err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())
 
 	require.NoError(t, err)
 	require.Equal(t, 1, planCalls)
@@ -332,7 +332,7 @@ func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
 	initSyncWorkspaceFlowChild(t, workspaceRoot, project)
 
 	var calls []string
-	err := syncLearn(context.Background(), cont, "sync", "", syncRunAuto, nil, Dependencies{
+	_, err := syncLearn(context.Background(), cont, "sync", "", syncRunAuto, nil, Dependencies{
 		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			require.True(t, opts.Quiet)
 			require.NotNil(t, opts.OnStepStart)
@@ -543,7 +543,7 @@ func TestSyncCmdOnlyExposesSyncFlags(t *testing.T) {
 
 func TestSyncLearnPassesStateScopeAndForceToLearning(t *testing.T) {
 	var received syncflow.LearnCurrentRequest
-	err := syncLearn(context.Background(), nil, "sync", "context", syncRunRestart, nil, Dependencies{
+	_, err := syncLearn(context.Background(), nil, "sync", "context", syncRunRestart, nil, Dependencies{
 		LearnCurrent: func(_ *container.Container, req syncflow.LearnCurrentRequest, _ LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			received = req
 			return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, nil

@@ -55,6 +55,8 @@ skills-seed patterns stats
 skills-seed log
 ```
 
+`skills-seed log` 读取 `.skills-seed/runtime/journal/` 中的运行记录；在工作区根目录下会合并子项目记录后展示。
+
 完整的人工修正决策见 [学习失败与人工修正](Learning-Failures-and-Manual-Repair.md)；诊断命令与参数见 [命令参考](../COMMANDS.md)，配置细节见 [配置参考](../CONFIGURATION.md)。
 
 ---

@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.19]
+
+### Fixes
+
+- Split runtime records out of change summaries and store them under `.skills-seed/runtime/journal/`; `skills-seed log` now prefers this runtime record layer.
+- Workspace-root `log` now merges child-project runtime records and prints them in reverse chronological order, so child details are no longer hidden behind the root summary.
+- `learn`, `generate`, and `sync` now pass run scope explicitly instead of inferring it from project mode, reducing mixed root/child record writes.
+
 ## [v0.20.18]
 
 ### Fixes

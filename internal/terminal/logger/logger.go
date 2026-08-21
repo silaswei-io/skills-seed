@@ -258,6 +258,17 @@ func CurrentLogPath() string {
 	return logPath
 }
 
+// CurrentScopedLogPath 返回当前 goroutine 绑定的 scoped log 路径。
+func CurrentScopedLogPath() string {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if scoped := scopedLogs[currentGoroutineID()]; scoped != nil {
+		return scoped.logPath
+	}
+	return ""
+}
+
 // CurrentLevel 返回当前日志级别
 func CurrentLevel() Level {
 	mu.Lock()

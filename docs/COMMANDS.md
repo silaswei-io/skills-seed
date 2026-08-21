@@ -711,7 +711,7 @@ skills-seed hook run
 
 #### 命令概述
 
-查看最近沉淀到项目技能中的变更记录。此命令读取 `.skills-seed/store/documents/change-log.json`，输出形式类似 `git log`，不打印详细诊断日志。
+查看最近沉淀到项目技能中的变更记录。此命令优先读取 `.skills-seed/runtime/journal/` 中的运行记录；如需兼容旧数据，仍会回读历史变更记录。输出形式类似 `git log`，不打印详细诊断日志。
 
 #### 命令形式
 
@@ -733,8 +733,9 @@ skills-seed log
 
 #### 注意事项
 
-1. `sync`、`learn current`、`generate skills` 会写入学习变更记录。
-2. 详细诊断日志仍保留在 `.skills-seed/runtime/logs/`，用于排障。
+1. `sync`、`learn current`、`generate skills` 会写入运行记录。
+2. 工作区根目录会合并子项目运行记录后再展示。
+3. 详细诊断日志仍保留在 `.skills-seed/runtime/logs/`，用于排障。
 
 ### `skills-seed help`
 

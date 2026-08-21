@@ -13,6 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
@@ -128,12 +129,16 @@ func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) 
 		"duration", time.Since(r.startedAt),
 		"projects_count", len(r.workspaceConfig.Projects),
 	)
-	return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{
+	result := domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{
 		Projects:         len(r.workspaceConfig.Projects),
 		ChangedProjects:  len(r.changedProjects),
 		WorkspaceChanged: relationshipsChanged,
 		NoFileChanges:    !relationshipsChanged && len(r.changedProjects) == 0,
-	}}, nil
+	}}
+	if err := recordWorkspaceLearnJournal(r.cont, result, r.startedAt); err != nil {
+		logger.Warn(i18n.GetWithParams("LearnJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))
+	}
+	return result, nil
 }
 
 func (r *learnWorkspaceCurrentRun) prepare() error {
@@ -237,6 +242,7 @@ func (r *learnWorkspaceCurrentRun) runChild(ctx context.Context, childCont *cont
 			focusPaths:         r.opts.focusPaths,
 			profileMode:        r.opts.profileMode,
 			stateScope:         r.opts.stateScope,
+			scopeKind:          runjournal.ScopeChild,
 			force:              r.opts.force,
 		})
 		return err
@@ -316,6 +322,27 @@ func (p *workspaceProjectProgress) fail() {
 func workspaceProjectLogDir(cont *container.Container) string {
 	loggingConfig := cont.ConfigRepo.GetLoggingConfig()
 	return filepath.Join(cont.SeedPath, loggingConfig.LogsPath)
+}
+
+func recordWorkspaceLearnJournal(cont *container.Container, result domain.LearnCurrentResult, startedAt time.Time) error {
+	if cont == nil || cont.ConfigRepo == nil {
+		return nil
+	}
+	projectConfig := cont.ConfigRepo.GetProjectConfig()
+	scope := runjournal.Scope{
+		Kind:        runjournal.ScopeWorkspace,
+		Name:        projectConfig.Name,
+		ProjectPath: projectConfig.RootPath,
+	}
+	return runjournal.Append(cont.SeedPath, runjournal.Entry{
+		Command:    "learn current",
+		Scope:      scope,
+		Summary:    i18n.Get("ChangeLogSummaryLearnCurrent"),
+		Details:    []string{i18n.GetWithParams("LearnJournalWorkspaceSummary", map[string]interface{}{"Projects": result.Summary.Projects, "ChangedProjects": result.Summary.ChangedProjects})},
+		LogPath:    logger.CurrentLogPath(),
+		StartedAt:  startedAt,
+		FinishedAt: time.Now(),
+	})
 }
 
 func pauseAfterFastWorkspaceChildStep(startedAt time.Time) {

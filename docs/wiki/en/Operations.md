@@ -55,6 +55,8 @@ skills-seed patterns stats
 skills-seed log
 ```
 
+`skills-seed log` reads runtime records under `.skills-seed/runtime/journal/`; workspace roots merge child-project records before display.
+
 See [Learning Failures and Manual Repair](Learning-Failures-and-Manual-Repair.md) for the full repair decision process, and the [command reference](../../COMMANDS.EN.md) and [configuration reference](../../CONFIGURATION.EN.md) for details.
 
 ---

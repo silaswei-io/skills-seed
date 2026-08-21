@@ -711,7 +711,7 @@ skills-seed hook run
 
 #### Command Overview
 
-Show recent changes recorded into project skills. This command reads `.skills-seed/store/documents/change-log.json`, prints a git-log-like history, and does not print diagnostic logs.
+Show recent changes recorded into project skills. This command prefers runtime records under `.skills-seed/runtime/journal/`; it still falls back to legacy change history for compatibility. It prints a git-log-like history and does not print diagnostic logs.
 
 #### Command Forms
 
@@ -733,8 +733,9 @@ skills-seed log
 
 #### Notes
 
-1. `sync`, `learn current`, and `generate skills` write learned change records.
-2. Detailed diagnostic logs remain under `.skills-seed/runtime/logs/` for troubleshooting.
+1. `sync`, `learn current`, and `generate skills` write runtime records.
+2. Workspace roots merge child-project runtime records before display.
+3. Detailed diagnostic logs remain under `.skills-seed/runtime/logs/` for troubleshooting.
 
 ### `skills-seed help`
 

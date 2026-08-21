@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	stdsync "sync"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
@@ -16,6 +17,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
@@ -44,6 +46,7 @@ type Dependencies struct {
 // LearnCurrentOptions 描述 sync 命令层对子项目学习过程的展示控制。
 type LearnCurrentOptions struct {
 	Quiet          bool
+	ScopeKind      runjournal.ScopeKind
 	OnStepStart    func(label string)
 	OnStepUpdate   func(label string)
 	OnStepComplete func(label string)
@@ -80,6 +83,7 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
+			startedAt := time.Now()
 			ctx := cmd.Context()
 			stateScope := commandutil.CommandStateScopeForCobra(cmd)
 			resolvedContext, err := commandutil.ResolveRuntimeContext(userContext, contextPath...)
@@ -121,8 +125,12 @@ func Cmd(cont *container.Container, deps ...Dependencies) *cobra.Command {
 				}
 			}
 			change := changelog.Start(cont.SeedPath, "sync")
-			if err := syncLearn(ctx, cont, stateScope, inputs.UserContext, resolvedMode, change, dependencies); err != nil {
+			result, err := syncLearn(ctx, cont, stateScope, inputs.UserContext, resolvedMode, change, dependencies)
+			if err != nil {
 				return err
+			}
+			if err := recordSyncJournal(cont, result, startedAt, runjournal.ScopeWorkspace); err != nil {
+				logger.Warn(i18n.GetWithParams("SyncJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))
 			}
 			return change.Save(i18n.Get("ChangeLogSummarySync"))
 		},
@@ -199,7 +207,7 @@ func clearSyncCommandStates(cont *container.Container, stateScope string) error 
 }
 
 // syncLearn 路径 A：学习当前代码 → 生成 Skills。
-func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder, deps ...Dependencies) error {
+func syncLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder, deps ...Dependencies) (domain.LearnCurrentResult, error) {
 	dependencies := Dependencies{}
 	if len(deps) > 0 {
 		dependencies = deps[0]
@@ -210,7 +218,7 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 	var learnCurrent syncflow.LearnCurrentFunc
 	if dependencies.LearnCurrent != nil {
 		learnCurrent = func(ctx context.Context, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
-			return dependencies.LearnCurrent(cont, req, LearnCurrentOptions{})
+			return dependencies.LearnCurrent(cont, req, LearnCurrentOptions{ScopeKind: runjournal.ScopeProject})
 		}
 	}
 	var generate syncflow.GenerateFunc
@@ -226,7 +234,7 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 			return syncGeneratedSkillMissing(cont)
 		},
 	}
-	return service.Run(ctx, syncflow.Request{
+	result, err := service.Run(ctx, syncflow.Request{
 		Learn: syncflow.LearnCurrentRequest{
 			StateScope:  stateScope,
 			UserContext: userContext,
@@ -234,25 +242,29 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 		},
 		Change: change,
 	})
+	if err != nil {
+		return domain.LearnCurrentResult{}, err
+	}
+	return result, nil
 }
 
-func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder, dependencies Dependencies) error {
+func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateScope string, userContext string, mode syncRunMode, change *changelog.Builder, dependencies Dependencies) (domain.LearnCurrentResult, error) {
 	if dependencies.LearnCurrent == nil {
-		return fmt.Errorf("sync learn dependency is not configured")
+		return domain.LearnCurrentResult{}, fmt.Errorf("sync learn dependency is not configured")
 	}
 	if dependencies.GenerateChild == nil {
-		return fmt.Errorf("sync child generate dependency is not configured")
+		return domain.LearnCurrentResult{}, fmt.Errorf("sync child generate dependency is not configured")
 	}
 	if dependencies.LearnWorkspaceRelationships == nil {
-		return fmt.Errorf("sync workspace relationships dependency is not configured")
+		return domain.LearnCurrentResult{}, fmt.Errorf("sync workspace relationships dependency is not configured")
 	}
 	if dependencies.GenerateWorkspaceRoot == nil {
-		return fmt.Errorf("sync workspace root generate dependency is not configured")
+		return domain.LearnCurrentResult{}, fmt.Errorf("sync workspace root generate dependency is not configured")
 	}
 
 	workspaceConfig := cont.ConfigRepo.GetWorkspaceConfig()
 	if len(workspaceConfig.Projects) == 0 {
-		return fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
+		return domain.LearnCurrentResult{}, fmt.Errorf("%s", i18n.Get("WorkspaceProjectsMissing"))
 	}
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
 	projectRoot := projectConfig.RootPath
@@ -260,7 +272,7 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 		var err error
 		projectRoot, err = os.Getwd()
 		if err != nil {
-			return err
+			return domain.LearnCurrentResult{}, err
 		}
 	}
 
@@ -288,7 +300,8 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 
 		progressName := commandutil.WorkspaceProjectProgressName(project)
 		result, err := dependencies.LearnCurrent(childCont, learnReq, LearnCurrentOptions{
-			Quiet: true,
+			Quiet:     true,
+			ScopeKind: runjournal.ScopeChild,
 			OnStepStart: func(label string) {
 				childProgress.Start(progressName, workspacePhaseStepLabel("ProgressSyncWorkspacePhaseLearn", label))
 			},
@@ -334,12 +347,12 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 		mu.Unlock()
 		return nil
 	}); err != nil {
-		return err
+		return domain.LearnCurrentResult{}, err
 	}
 
 	relationshipsChanged, err := dependencies.LearnWorkspaceRelationships(cont, userContext)
 	if err != nil {
-		return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
+		return domain.LearnCurrentResult{}, fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
 	result := domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{
 		Projects:         len(workspaceConfig.Projects),
@@ -350,9 +363,12 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 	syncflow.RecordLearnSummary(change, result)
 
 	rootMissing := syncSkillOutputMissing(projectConfig.RootPath, cont.ConfigRepo.GetEffectiveSkillsPath())
-	return syncflow.RunAfterLearn(result, childGenerated || rootMissing, func() error {
+	if err := syncflow.RunAfterLearn(result, childGenerated || rootMissing, func() error {
 		return dependencies.GenerateWorkspaceRoot(cont)
-	}, change)
+	}, change); err != nil {
+		return domain.LearnCurrentResult{}, err
+	}
+	return result, nil
 }
 
 func syncOpenWorkspaceChild(ctx context.Context, projectRoot string, project config.WorkspaceProjectConfig) (*container.Container, error) {
@@ -425,4 +441,55 @@ func syncSkillOutputMissing(projectRoot, outputPath string) bool {
 func syncSkillFileMissing(outputPath string) bool {
 	_, err := os.Stat(filepath.Join(outputPath, "SKILL.md"))
 	return errors.Is(err, os.ErrNotExist)
+}
+
+func recordSyncJournal(cont *container.Container, result domain.LearnCurrentResult, startedAt time.Time, scopeKind runjournal.ScopeKind) error {
+	if cont == nil || cont.ConfigRepo == nil {
+		return nil
+	}
+	projectConfig := cont.ConfigRepo.GetProjectConfig()
+	scope := runjournal.Scope{
+		Kind:        runjournal.ScopeProject,
+		Name:        projectConfig.Name,
+		ProjectPath: projectConfig.RootPath,
+	}
+	if scopeKind != "" {
+		scope.Kind = scopeKind
+	} else if projectConfig.Mode == domain.ModeWorkspace {
+		scope.Kind = runjournal.ScopeWorkspace
+	}
+	if strings.TrimSpace(scope.Name) == "" {
+		scope.Name = projectConfig.Name
+	}
+	details := []string{}
+	if result.Summary.Projects > 0 {
+		details = append(details, i18n.GetWithParams("SyncJournalLearnSummary", map[string]interface{}{
+			"Projects":        result.Summary.Projects,
+			"ChangedProjects": result.Summary.ChangedProjects,
+			"Changed":         result.Summary.ChangedFiles,
+			"Deleted":         result.Summary.DeletedFiles,
+			"Patterns":        result.Summary.PatternsFound,
+			"Saved":           result.Summary.PatternsSaved,
+		}))
+	} else {
+		details = append(details, i18n.GetWithParams("ChangeLogLearnProjectSummary", map[string]interface{}{
+			"Changed":  result.Summary.ChangedFiles,
+			"Deleted":  result.Summary.DeletedFiles,
+			"Skipped":  result.Summary.SkippedFiles,
+			"Patterns": result.Summary.PatternsFound,
+			"Saved":    result.Summary.PatternsSaved,
+		}))
+	}
+	if result.Summary.WorkspaceChanged {
+		details = append(details, i18n.Get("SyncJournalWorkspaceRelationshipsChanged"))
+	}
+	return runjournal.Append(cont.SeedPath, runjournal.Entry{
+		Command:    "sync",
+		Scope:      scope,
+		Summary:    i18n.Get("ChangeLogSummarySync"),
+		Details:    details,
+		LogPath:    logger.CurrentLogPath(),
+		StartedAt:  startedAt,
+		FinishedAt: time.Now(),
+	})
 }

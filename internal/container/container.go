@@ -15,7 +15,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/git"
-	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	rulestore "github.com/silaswei-io/skills-seed/internal/infra/storage/rule"
@@ -39,7 +38,7 @@ type Container struct {
 	Config                *config.Config
 	ConfigRepo            *config.Repository
 	GitRepo               *git.Repository
-	PatternRepo           *boltdb.PatternRepository
+	PatternRepo           patternStore
 	PatternReader         domain.PatternRepository
 	FileTracker           domain.FileAnalysisTracker
 	PatternStats          domain.PatternStatsRepository
@@ -137,10 +136,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 
 	// 4. 创建 BoltDB 仓储
 	dbPath := layout.New(seedPath).ProjectDB()
-	patternRepo, err := boltdb.NewPatternRepository(dbPath)
-	if err != nil {
-		return nil, patternRepositoryError(err)
-	}
+	patternRepo := newLazyPatternStore(dbPath)
 
 	profileRepo := profilestore.NewRepository(seedPath)
 	stateRepo := statestore.NewRepository(seedPath)
@@ -247,7 +243,7 @@ func (c *Container) Close() error {
 }
 
 // GetPatternRepository 获取 Pattern 仓储
-func (c *Container) GetPatternRepository() *boltdb.PatternRepository {
+func (c *Container) GetPatternRepository() patternStore {
 	return c.PatternRepo
 }
 

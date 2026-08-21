@@ -18,6 +18,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/runtimeclean"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
@@ -161,7 +162,11 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 			return nil, err
 		}
 	}
-	return r.buildResult(false), nil
+	result := r.buildResult(false)
+	if err := recordLearnJournal(r.cont, result, r.startedAt, r.opts.scopeKind); err != nil {
+		logger.Warn(i18n.GetWithParams("LearnJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))
+	}
+	return result, nil
 }
 
 func (r *learnCurrentProjectRun) runPlanningStage() error {
@@ -464,6 +469,10 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 			if err != nil {
 				return err
 			}
+		} else if r.stateSession == nil {
+			// 无文件变化且不是断点恢复时，已有 Profile 与知识快照仍然有效。
+			// 跳过再次解析符号，避免重学在最后一步触发 CodeGraph 同步。
+			return r.markProjectionsCommitted()
 		} else if r.cont.ProfileRepo != nil {
 			var err error
 			profile, err = r.cont.ProfileRepo.Get(r.ctx)
@@ -514,7 +523,11 @@ func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectRes
 			return nil, err
 		}
 	}
-	return r.buildResult(!recoveredKnowledge), nil
+	result := r.buildResult(!recoveredKnowledge)
+	if err := recordLearnJournal(r.cont, result, r.startedAt, r.opts.scopeKind); err != nil {
+		logger.Warn(i18n.GetWithParams("LearnJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))
+	}
+	return result, nil
 }
 
 func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectResult {
@@ -592,6 +605,50 @@ func recordLearnCurrentSummary(change *changelog.Builder, result domain.LearnCur
 		"Saved":    summary.PatternsSaved,
 		"Retired":  summary.PatternsRetired,
 	}))
+}
+
+func recordLearnJournal(cont *container.Container, result *learnCurrentProjectResult, startedAt time.Time, scopeKind runjournal.ScopeKind) error {
+	if cont == nil || cont.ConfigRepo == nil || result == nil {
+		return nil
+	}
+	projectConfig := cont.ConfigRepo.GetProjectConfig()
+	scope := runjournal.Scope{
+		Kind:        runjournal.ScopeProject,
+		Name:        result.projectName,
+		ProjectPath: projectConfig.RootPath,
+	}
+	if scopeKind != "" {
+		scope.Kind = scopeKind
+	} else if projectConfig.Mode == domain.ModeWorkspace {
+		scope.Kind = runjournal.ScopeChild
+	}
+	summary := i18n.Get("ChangeLogSummaryLearnCurrent")
+	details := []string{
+		i18n.GetWithParams("LearnJournalSummaryCounts", map[string]interface{}{
+			"Changed":  result.changedCount,
+			"Deleted":  result.deletedCount,
+			"Skipped":  result.skippedCount,
+			"Patterns": result.patternsCount,
+			"Saved":    result.savedCount,
+			"Retired":  result.retiredCount,
+		}),
+	}
+	return runjournal.Append(cont.SeedPath, runjournal.Entry{
+		Command:    "learn current",
+		Scope:      scope,
+		Summary:    summary,
+		Details:    details,
+		LogPath:    currentRunLogPath(),
+		StartedAt:  startedAt,
+		FinishedAt: time.Now(),
+	})
+}
+
+func currentRunLogPath() string {
+	if path := logger.CurrentScopedLogPath(); path != "" {
+		return path
+	}
+	return logger.CurrentLogPath()
 }
 
 func resolveFocusPaths(projectRoot string, paths []string) ([]string, error) {

@@ -188,10 +188,14 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 		},
 		Generate: generate.RunGenerate,
 		GenerateChild: func(cont *container.Container, opts synccmd.GenerateChildOptions) error {
-			return generate.RunGenerateQuietWithProgress(cont, generator.GenerateProgressHooks{
-				OnStepStart:    opts.OnStepStart,
-				OnStepUpdate:   opts.OnStepUpdate,
-				OnStepComplete: opts.OnStepComplete,
+			loggingConfig := cont.ConfigRepo.GetLoggingConfig()
+			logDir := filepath.Join(cont.SeedPath, loggingConfig.LogsPath)
+			return logger.WithScopedLog(context.Background(), logDir, "generate", logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles, func(context.Context, string) error {
+				return generate.RunGenerateQuietWithProgress(cont, generator.GenerateProgressHooks{
+					OnStepStart:    opts.OnStepStart,
+					OnStepUpdate:   opts.OnStepUpdate,
+					OnStepComplete: opts.OnStepComplete,
+				})
 			})
 		},
 		LearnWorkspaceRelationships: learn.RunWorkspaceRelationships,

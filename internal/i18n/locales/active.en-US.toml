@@ -2304,6 +2304,33 @@ other = "  # Show recent learned changes\n  skills-seed log"
 [LogNoChanges]
 other = "No change records yet. Record file: {{.Path}}"
 
+[LogRecord]
+other = "Record"
+
+[LogRecordDate]
+other = "Time"
+
+[LogRecordCommand]
+other = "Command"
+
+[LogRecordScope]
+other = "Scope"
+
+[LogRecordLogPath]
+other = "Log"
+
+[LogRecordChildren]
+other = "Children"
+
+[LogScopeProject]
+other = "Project"
+
+[LogScopeWorkspace]
+other = "Workspace"
+
+[LogScopeChild]
+other = "Child project"
+
 [ChangeLogSummarySync]
 other = "Synced current code and updated skills"
 
@@ -2336,6 +2363,30 @@ other = "generated skills"
 
 [ChangeLogGenerateSkippedNoChanges]
 other = "no learned changes detected; skipped skills generation"
+
+[LearnJournalSummaryCounts]
+other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}, found {{.Patterns}}, saved {{.Saved}}, retired {{.Retired}}"
+
+[LearnJournalWorkspaceSummary]
+other = "processed {{.Projects}} projects; {{.ChangedProjects}} changed"
+
+[LearnJournalWriteFailed]
+other = "failed to write learn run record: {{.Error}}"
+
+[GenerateJournalOutputPath]
+other = "output path {{.Path}}"
+
+[GenerateJournalWriteFailed]
+other = "failed to write generate run record: {{.Error}}"
+
+[SyncJournalLearnSummary]
+other = "learn summary: processed {{.Projects}} projects; {{.ChangedProjects}} changed; changed {{.Changed}}, deleted {{.Deleted}}, found {{.Patterns}}, saved {{.Saved}}"
+
+[SyncJournalWorkspaceRelationshipsChanged]
+other = "workspace relationship artifacts updated"
+
+[SyncJournalWriteFailed]
+other = "failed to write sync run record: {{.Error}}"
 
 [ChangeLogPatternAdded]
 other = "added user pattern: {{.PatternName}} [{{.Category}}]"

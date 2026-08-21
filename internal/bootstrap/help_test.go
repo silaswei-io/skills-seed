@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -348,7 +349,7 @@ func TestRunHelpDoesNotOpenLockedProjectRuntime(t *testing.T) {
 	require.NoError(t, Run())
 }
 
-func TestInitContainerAndLoggerReportsLockedPatternDBHint(t *testing.T) {
+func TestInitContainerAndLoggerDoesNotOpenPatternDBEagerly(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 
 	projectRoot := t.TempDir()
@@ -362,15 +363,16 @@ func TestInitContainerAndLoggerReportsLockedPatternDBHint(t *testing.T) {
 
 	lockedRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
 	require.NoError(t, err)
-	defer lockedRepo.Close()
 
 	cont, err := initContainerAndLogger(seedPath)
 
-	require.Nil(t, cont)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "创建容器失败")
-	require.Contains(t, err.Error(), "创建模式仓储失败")
-	require.Contains(t, err.Error(), "数据库文件可能正在被其他 skills-seed 命令使用，请等待当前命令结束后重试")
+	require.NoError(t, err)
+	require.NotNil(t, cont)
+	require.NotNil(t, cont.PatternRepo)
+	require.NoError(t, lockedRepo.Close())
+	_, err = cont.PatternRepo.Count(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, cont.PatternRepo.Close())
 }
 
 func requireHelpText(t *testing.T, fieldName, commandName, value string) {
