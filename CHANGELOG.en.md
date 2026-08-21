@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.18]
+
+### Fixes
+
+- Tightened the optional-context wording for `user_context`; when it is absent, prompts now say so explicitly instead of implying an unprovided user context exists.
+- Added one-to-one focus constraints to the current-code batch contract so every input focus is returned and validated independently instead of silently allowing missing or reused focus IDs.
+- Added matching prompt, schema, and regression updates so this contract stays consistent across the chain.
+
 ## [v0.20.17]
 
 ### Fixes

@@ -10,7 +10,11 @@ Project:
 Inputs:
 - candidate patterns: `{{.CandidatePatternsPath}}` ({{.CandidatePatternCount}} items)
 - related existing patterns: `{{.RelatedPatternsPath}}` ({{.RelatedPatternCount}} items)
+{{- if .UserContextPath}}
 - user context: `{{.UserContextPath}}`
+{{- else}}
+- no user context is available for this run
+{{- end}}
 
 Allowed categories: {{.AllowedCategories}}
 

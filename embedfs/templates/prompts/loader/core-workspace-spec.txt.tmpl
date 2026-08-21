@@ -34,6 +34,10 @@ Read these files by path. Do not expect their contents to be embedded in this pr
 
 Use the context only to interpret workspace background facts; do not treat it as an authoritative rule source, copy it verbatim, or persist long paraphrased passages into the workspace spec.
 {{- end}}
+{{- if not .UserContextPath}}
+
+Do not use `user_context` as a rule source. When no one-shot user context is provided for this run, workspace rules may only use `workspace_profile` or a repository-relative authoritative source path.
+{{- end}}
 
 Prefer repository evidence that includes paths and project IDs. Do not invent relationships that cannot be confirmed.
 The AI call is non-interactive; do not ask the user outside the JSON. If an unconfirmed relationship affects execution, make the rule require asking the user during task execution.

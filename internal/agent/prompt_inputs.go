@@ -349,6 +349,7 @@ func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *Ana
 		"RuntimeLabel":          req.RuntimeLabel,
 		"SharedContextPath":     strings.TrimSpace(req.SharedContextPath),
 		"Focuses":               req.Focuses,
+		"FocusIDs":              focusIDsFromEvidence(req.Focuses),
 		"StructurePath":         structurePath,
 		"StructuralContextPath": structuralContextPath,
 		"MainFiles":             req.MainFiles,
@@ -391,6 +392,16 @@ func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *Analyz
 }
 
 func focusIDs(focuses []AnalyzeCurrentDeltaFocus) []string {
+	ids := make([]string, 0, len(focuses))
+	for _, focus := range focuses {
+		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func focusIDsFromEvidence(focuses []AnalyzeCurrentEvidenceFocus) []string {
 	ids := make([]string, 0, len(focuses))
 	for _, focus := range focuses {
 		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {

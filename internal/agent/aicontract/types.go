@@ -249,7 +249,7 @@ type WorkspaceRuleOutput struct {
 	Title       string                     `json:"title" jsonschema_description:"rule title"`
 	Description string                     `json:"description" jsonschema_description:"actionable workspace rule"`
 	AppliesTo   []WorkspaceReferenceOutput `json:"applies_to,omitempty" jsonschema_description:"typed project, role, or path scopes"`
-	Source      string                     `json:"source" jsonschema_description:"workspace_profile, user_context, or a repository-relative authoritative source path"`
+	Source      string                     `json:"source" jsonschema_description:"workspace_profile, user_context only when this run provides one, or a repository-relative authoritative source path"`
 	Evidence    []string                   `json:"evidence,omitempty" jsonschema_description:"repository-relative files supporting the rule"`
 }
 

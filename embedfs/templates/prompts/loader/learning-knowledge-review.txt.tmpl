@@ -7,7 +7,12 @@ Project:
 - root: {{.RootPath}}
 - language: {{.Language}}
 
-The evidence focus for this review is available at `{{.EvidenceFocusPath}}`. Candidate knowledge from that focus is available at `{{.CandidatesPath}}` ({{.CandidateCount}} items). Keep this focus together, and read each candidate and its referenced repository evidence. User context is available at `{{.UserContextPath}}`.
+The evidence focus for this review is available at `{{.EvidenceFocusPath}}`. Candidate knowledge from that focus is available at `{{.CandidatesPath}}` ({{.CandidateCount}} items). Keep this focus together, and read each candidate and its referenced repository evidence.
+{{- if .UserContextPath}}
+User context is available at `{{.UserContextPath}}`; use it only to interpret intent, and do not treat it as source evidence.
+{{- else}}
+No user context is available for this run.
+{{- end}}
 
 Candidate IDs for this call (copy these values exactly into `candidate_id`):
 {{- range .CandidateIDs}}

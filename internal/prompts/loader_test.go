@@ -201,6 +201,9 @@ func TestKnowledgePromptsStartWithSharedGoalContract(t *testing.T) {
 			require.True(t, strings.HasPrefix(prompt, "# Skills Seed Knowledge Objective"))
 			require.Contains(t, prompt, "Explicit project instructions and user-maintained Rule resources are authoritative rules.")
 			require.Contains(t, prompt, "Source-backed behavior is reusable knowledge or a navigation boundary, not authority.")
+			if name == "core-workspace-spec" {
+				require.Contains(t, prompt, "Do not use `user_context` as a rule source")
+			}
 			require.Less(t, strings.Index(prompt, "# Skills Seed Knowledge Objective"), strings.Index(prompt, "# Mandatory Final Output Rules"))
 		})
 	}
@@ -418,6 +421,7 @@ func sampleCurrentBatchData() map[string]interface{} {
 		"RuntimeLabel":          "current",
 		"SharedContextPath":     "/tmp/shared-context.md",
 		"Focuses":               []agent.AnalyzeCurrentEvidenceFocus{sampleEvidenceFocus()},
+		"FocusIDs":              []string{"user-flow"},
 		"StructurePath":         "/tmp/project-structure.txt",
 		"StructuralContextPath": "/tmp/structural-context.md",
 		"MainFiles":             []string{"cmd/demo/main.go"},

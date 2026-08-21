@@ -149,6 +149,14 @@ func constrainStructuredOutputSchema(name, data string, opts StructuredOutputOpt
 		}
 		applyDeltaBatchConstraints(schema, focusIDs)
 	}
+	if len(focusIDs) > 0 && name == ContractAnalyzeCurrentCodebaseBatch {
+		if schema == nil {
+			if err := json.Unmarshal([]byte(data), &schema); err != nil {
+				return "", err
+			}
+		}
+		applyCodebaseBatchConstraints(schema, focusIDs)
+	}
 	authoritySectionIDs := cleanSchemaEnumValues(opts.AuthoritySectionIDs)
 	if name == ContractAuthorityExtraction && opts.AuthoritySectionIDs != nil {
 		if schema == nil {
@@ -246,6 +254,31 @@ func applyDeltaBatchConstraints(schema map[string]any, focusIDs []string) {
 	}
 	changeProperties := schemaProperties(items)
 	focusID, ok := changeProperties["focus_id"].(map[string]any)
+	if !ok {
+		return
+	}
+	focusID["enum"] = schemaEnumValues(focusIDs)
+}
+
+func applyCodebaseBatchConstraints(schema map[string]any, focusIDs []string) {
+	properties := schemaProperties(schema)
+	focuses, ok := properties["focuses"].(map[string]any)
+	if !ok {
+		return
+	}
+	count := len(focusIDs)
+	focuses["minItems"] = count
+	focuses["maxItems"] = count
+	focuses["uniqueItems"] = true
+	if count == 0 {
+		return
+	}
+	items, ok := focuses["items"].(map[string]any)
+	if !ok {
+		return
+	}
+	focusProperties := schemaProperties(items)
+	focusID, ok := focusProperties["focus_id"].(map[string]any)
 	if !ok {
 		return
 	}

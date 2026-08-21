@@ -210,6 +210,23 @@ func TestDeltaSchemaConstrainsFocusIDsOneToOne(t *testing.T) {
 	require.ElementsMatch(t, []string{"auth", "frontend-routing"}, schemaStringList(focusID["enum"]))
 }
 
+func TestCodebaseBatchSchemaConstrainsFocusIDsOneToOne(t *testing.T) {
+	data, err := StructuredOutputSchemaWithOptions(ContractAnalyzeCurrentCodebaseBatch, StructuredOutputOptions{
+		FocusIDs: []string{"frontend-routing", "auth", "auth"},
+	})
+	require.NoError(t, err)
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+	focuses := schema["properties"].(map[string]any)["focuses"].(map[string]any)
+	require.Equal(t, float64(2), focuses["minItems"])
+	require.Equal(t, float64(2), focuses["maxItems"])
+	require.Equal(t, true, focuses["uniqueItems"])
+	focusID, _, ok := findSchemaPropertyWithContainer(schema, "focus_id")
+	require.True(t, ok)
+	require.ElementsMatch(t, []string{"auth", "frontend-routing"}, schemaStringList(focusID["enum"]))
+}
+
 func TestKnowledgeReviewSchemaConstrainsEmptyCandidateSet(t *testing.T) {
 	data, err := StrictStructuredOutputSchemaWithOptions(ContractReviewKnowledge, StructuredOutputOptions{
 		CandidateIDs: []string{},
