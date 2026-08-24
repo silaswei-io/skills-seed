@@ -6,7 +6,7 @@ Rule 和 Workflow 解决的是源码学习无法可靠推导的问题：团队�
 
 ## Context：背景与一次性说明
 
-`.skills-seed/context/` 用于项目背景、术语和代码看不到的长期事实。长期强制约束应使用 Rule，不应隐藏在 Context 中。
+`.skills-seed/context/` 是非权威背景层，用于项目背景、术语和代码看不到的长期事实。它不能授予命令权限、覆盖 Rule 或定义 Workflow；长期强制约束应使用 Rule，不应隐藏在 Context 中。
 
 仅影响当前学习任务的说明使用 `sync --context` 或 `sync --context-path`；它们不会写入长期 Context，也不会成为生成 Skill 的永久规则。Context 文件布局和输入处理细节以 [配置参考](Reference.md) 链接的权威文档为准。
 

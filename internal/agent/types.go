@@ -5,6 +5,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 )
 
 // DiffFileRef 指向 runtime 目录中的文件 diff。
@@ -48,6 +49,7 @@ type AnalyzeProjectRequest struct {
 	FocusPaths            []string // 指定增量分析范围
 	UserContext           string   // 本次学习传入的一次性用户上下文
 	UserContextPath       string   // 本次学习传入的一次性用户上下文文件路径
+	MaintainedGuidance    maintained.Snapshot
 }
 
 // AnalyzeProjectResult 项目分析结果
@@ -75,6 +77,7 @@ type ExtractAuthorityRequest struct {
 	AuthoritySections    []AuthoritySection
 	UserContext          string
 	UserContextPath      string
+	MaintainedGuidance   maintained.Snapshot
 }
 
 // ExtractAuthorityResult 描述逐章节提取的权威知识结果。
@@ -142,6 +145,7 @@ type AnalyzeCurrentCodebaseRequest struct {
 	DirCount              int
 	UserContext           string
 	UserContextPath       string
+	MaintainedGuidance    maintained.Snapshot
 	LearningMode          config.LearningMode
 	ChangeProfile         string
 }
@@ -175,6 +179,7 @@ type AnalyzeCurrentCodebaseBatchRequest struct {
 	MainFiles             []string
 	UserContext           string
 	UserContextPath       string
+	MaintainedGuidance    maintained.Snapshot
 	LearningMode          config.LearningMode
 	ChangeProfile         string
 }
@@ -221,6 +226,7 @@ type AnalyzeCurrentDeltaBatchRequest struct {
 	StructuralContextPath string
 	UserContext           string
 	UserContextPath       string
+	MaintainedGuidance    maintained.Snapshot
 	LearningMode          config.LearningMode
 	ChangeProfile         string
 }
@@ -270,6 +276,7 @@ type PlanLearningAgendaRequest struct {
 	StructuralContext     string // 结构化分析上下文
 	StructuralContextPath string // 结构化分析上下文文件路径
 	UserContext           string
+	MaintainedGuidance    maintained.Snapshot
 	LearningMode          config.LearningMode
 }
 
@@ -282,26 +289,28 @@ type PlanLearningAgendaResult struct {
 
 // NormalizePatternsRequest 请求把当前学习得到的候选模式合并为稳定的入库决策。
 type NormalizePatternsRequest struct {
-	ProjectName     string
-	RootPath        string
-	Language        string
-	Candidates      []domain.Pattern
-	RelatedPatterns []domain.Pattern
-	UserContext     string
-	UserContextPath string
+	ProjectName        string
+	RootPath           string
+	Language           string
+	Candidates         []domain.Pattern
+	RelatedPatterns    []domain.Pattern
+	UserContext        string
+	UserContextPath    string
+	MaintainedGuidance maintained.Snapshot
 }
 
 // ReviewKnowledgeRequest 请求独立复核当前源码学习候选。
 type ReviewKnowledgeRequest struct {
-	ProjectName     string
-	RootPath        string
-	Language        string
-	RuntimeLabel    string
-	EvidenceFocus   domain.EvidenceFocus
-	Candidates      []domain.Pattern
-	UserContext     string
-	UserContextPath string
-	Conversation    Conversation
+	ProjectName        string
+	RootPath           string
+	Language           string
+	RuntimeLabel       string
+	EvidenceFocus      domain.EvidenceFocus
+	Candidates         []domain.Pattern
+	UserContext        string
+	UserContextPath    string
+	MaintainedGuidance maintained.Snapshot
+	Conversation       Conversation
 }
 
 // KnowledgeRevision 只允许修订知识表述，不改变程序持有的证据和归属。

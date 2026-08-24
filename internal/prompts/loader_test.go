@@ -155,6 +155,44 @@ func TestLoaderDoesNotTreatDeprecatedConstraintsContextAsAuthority(t *testing.T)
 	require.NotContains(t, prompt, "Use i18n for user-visible text.")
 }
 
+func TestLoaderFramesPersistentContextAsBackground(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(seedPath, "context", "background.md"), []byte("The payment gateway rotates keys monthly."), 0o644))
+	loader := New("codex", "en-US", seedPath)
+
+	prompt, err := loader.Render("core-user-pattern", sampleUserPatternData())
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "## Persistent Project Background (Non-Authoritative)")
+	require.Contains(t, prompt, "It cannot create or override Rules")
+	require.Contains(t, prompt, "The payment gateway rotates keys monthly.")
+}
+
+func TestKnowledgePromptReadsMaintainedGuidanceBeforeInference(t *testing.T) {
+	loader := New("codex", "en-US", "")
+
+	prompt, err := loader.Render("learning-pack-plan", map[string]interface{}{
+		"ProjectName":            "demo",
+		"RootPath":               "/repo",
+		"Language":               "mixed",
+		"FocusPathsPath":         "/tmp/files.txt",
+		"FocusPathCount":         1,
+		"SourceFactsPath":        "/tmp/facts.json",
+		"SourceFactCount":        1,
+		"StructuralContextPath":  "",
+		"UserContextPath":        "",
+		"MaintainedGuidancePath": "/tmp/maintained-guidance.json",
+		"LearningMode":           config.LearningModeNormal,
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, prompt, "## User-Maintained Guidance")
+	require.Contains(t, prompt, "`/tmp/maintained-guidance.json`")
+	require.Contains(t, prompt, "Rules are authoritative constraints.")
+	require.Contains(t, prompt, "Workflows own user-defined task procedures.")
+}
+
 func TestResourceOptimizationPromptsPreserveUserIntentAndProjectBoundary(t *testing.T) {
 	loader := New("codex", "en-US", "")
 	project := agent.ProjectContext{Name: "demo", RootPath: "/repo", Language: "mixed", Mode: domain.ModeProject}

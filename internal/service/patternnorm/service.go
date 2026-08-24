@@ -11,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
@@ -20,6 +21,14 @@ type Service struct {
 	normalizer  agent.PatternNormalizer
 	reviewer    agent.KnowledgeReviewer
 	admission   AdmissionPolicy
+	guidance    maintained.Provider
+}
+
+// WithMaintainedGuidance 为审查和规范化调用注入持久化 Rule 与 Workflow。
+// 只应在容器构造阶段、服务开始处理请求前调用。
+func (s *Service) WithMaintainedGuidance(provider maintained.Provider) *Service {
+	s.guidance = provider
+	return s
 }
 
 // NewServiceWithNormalizer 创建带 AI 合并优化的模式规范化服务。

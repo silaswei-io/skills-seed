@@ -11,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
@@ -36,6 +37,29 @@ type normalizeCapabilityEntryInput struct {
 	HistoricalLocation string `json:"historical_location,omitempty"`
 }
 
+type maintainedGuidanceInput struct {
+	Rules     []maintainedRuleInput     `json:"rules,omitempty"`
+	Workflows []maintainedWorkflowInput `json:"workflows,omitempty"`
+}
+
+type maintainedRuleInput struct {
+	ID               string   `json:"id"`
+	Name             string   `json:"name,omitempty"`
+	Summary          string   `json:"summary,omitempty"`
+	RouteTerms       []string `json:"route_terms,omitempty"`
+	AffectedProjects []string `json:"affected_projects,omitempty"`
+	Paths            []string `json:"paths,omitempty"`
+	Content          string   `json:"content"`
+}
+
+type maintainedWorkflowInput struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name,omitempty"`
+	Summary    string   `json:"summary,omitempty"`
+	RouteTerms []string `json:"route_terms,omitempty"`
+	Content    string   `json:"content"`
+}
+
 // NormalizePatternsPromptData 返回当前模式合并优化所需的提示词数据。
 func NormalizePatternsPromptData(session *PromptInputSession, req *NormalizePatternsRequest) (map[string]interface{}, error) {
 	candidatesPath, err := writeNormalizePatternsInput(session, "candidate-patterns.json", req.Candidates)
@@ -50,16 +74,21 @@ func NormalizePatternsPromptData(session *PromptInputSession, req *NormalizePatt
 	if err != nil {
 		return nil, promptInputWriteError("user-context.md", err)
 	}
+	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"CandidatePatternsPath": candidatesPath,
-		"CandidatePatternCount": len(req.Candidates),
-		"RelatedPatternsPath":   relatedPath,
-		"RelatedPatternCount":   len(req.RelatedPatterns),
-		"UserContextPath":       userContextPath,
-		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
+		"ProjectName":            req.ProjectName,
+		"RootPath":               req.RootPath,
+		"Language":               req.Language,
+		"CandidatePatternsPath":  candidatesPath,
+		"CandidatePatternCount":  len(req.Candidates),
+		"RelatedPatternsPath":    relatedPath,
+		"RelatedPatternCount":    len(req.RelatedPatterns),
+		"UserContextPath":        userContextPath,
+		"MaintainedGuidancePath": guidancePath,
+		"AllowedCategories":      domain.AllowedPatternCategoriesText(),
 	}, nil
 }
 
@@ -77,16 +106,21 @@ func ReviewKnowledgePromptData(session *PromptInputSession, req *ReviewKnowledge
 	if err != nil {
 		return nil, promptInputWriteError("user-context.md", err)
 	}
+	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
-		"ProjectName":       req.ProjectName,
-		"RootPath":          req.RootPath,
-		"Language":          req.Language,
-		"EvidenceFocusPath": focusPath,
-		"CandidatesPath":    candidatesPath,
-		"CandidateCount":    len(req.Candidates),
-		"CandidateIDs":      ReviewKnowledgeCandidateIDs(req.Candidates),
-		"UserContextPath":   userContextPath,
-		"AllowedCategories": domain.AllowedPatternCategoriesText(),
+		"ProjectName":            req.ProjectName,
+		"RootPath":               req.RootPath,
+		"Language":               req.Language,
+		"EvidenceFocusPath":      focusPath,
+		"CandidatesPath":         candidatesPath,
+		"CandidateCount":         len(req.Candidates),
+		"CandidateIDs":           ReviewKnowledgeCandidateIDs(req.Candidates),
+		"UserContextPath":        userContextPath,
+		"MaintainedGuidancePath": guidancePath,
+		"AllowedCategories":      domain.AllowedPatternCategoriesText(),
 	}, nil
 }
 
@@ -220,6 +254,41 @@ func writeJSONInput(session *PromptInputSession, name string, value any) (string
 	return session.Write(name, string(data))
 }
 
+func writeMaintainedGuidanceInput(session *PromptInputSession, guidance maintained.Snapshot) (string, error) {
+	if len(guidance.Rules) == 0 && len(guidance.Workflows) == 0 {
+		return "", nil
+	}
+	input := maintainedGuidanceInput{
+		Rules:     make([]maintainedRuleInput, 0, len(guidance.Rules)),
+		Workflows: make([]maintainedWorkflowInput, 0, len(guidance.Workflows)),
+	}
+	for _, rule := range guidance.Rules {
+		input.Rules = append(input.Rules, maintainedRuleInput{
+			ID:               strings.TrimSpace(rule.ID),
+			Name:             strings.TrimSpace(rule.Name),
+			Summary:          strings.TrimSpace(rule.Summary),
+			RouteTerms:       append([]string(nil), rule.RouteTerms...),
+			AffectedProjects: append([]string(nil), rule.AffectedProjects...),
+			Paths:            append([]string(nil), rule.Paths...),
+			Content:          strings.TrimSpace(rule.Content),
+		})
+	}
+	for _, workflow := range guidance.Workflows {
+		input.Workflows = append(input.Workflows, maintainedWorkflowInput{
+			ID:         strings.TrimSpace(workflow.ID),
+			Name:       strings.TrimSpace(workflow.Name),
+			Summary:    strings.TrimSpace(workflow.Summary),
+			RouteTerms: append([]string(nil), workflow.RouteTerms...),
+			Content:    strings.TrimSpace(workflow.Content),
+		})
+	}
+	path, err := writeJSONInput(session, "maintained-guidance.json", input)
+	if err != nil {
+		return "", promptInputWriteError("maintained-guidance.json", err)
+	}
+	return path, nil
+}
+
 // PlanLearningAgendaPromptData 返回源码证据学习议程规划所需的提示词数据。
 func PlanLearningAgendaPromptData(session *PromptInputSession, req *PlanLearningAgendaRequest) (map[string]interface{}, error) {
 	focusPathsPath, focusPathCount, err := writePathListInput(session, "analysis-files.txt", req.FocusPaths)
@@ -238,17 +307,22 @@ func PlanLearningAgendaPromptData(session *PromptInputSession, req *PlanLearning
 	if err != nil {
 		return nil, promptInputWriteError("user-context.md", err)
 	}
+	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"FocusPathsPath":        focusPathsPath,
-		"FocusPathCount":        focusPathCount,
-		"SourceFactsPath":       sourceFactsPath,
-		"SourceFactCount":       len(req.SourceFacts),
-		"StructuralContextPath": structuralContextPath,
-		"UserContextPath":       userContextPath,
-		"LearningMode":          promptLearningMode(req.LearningMode),
+		"ProjectName":            req.ProjectName,
+		"RootPath":               req.RootPath,
+		"Language":               req.Language,
+		"FocusPathsPath":         focusPathsPath,
+		"FocusPathCount":         focusPathCount,
+		"SourceFactsPath":        sourceFactsPath,
+		"SourceFactCount":        len(req.SourceFacts),
+		"StructuralContextPath":  structuralContextPath,
+		"UserContextPath":        userContextPath,
+		"MaintainedGuidancePath": guidancePath,
+		"LearningMode":           promptLearningMode(req.LearningMode),
 	}, nil
 }
 
@@ -274,18 +348,23 @@ func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRe
 	if err != nil {
 		return nil, promptInputWriteError("user-context.md", err)
 	}
+	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"StructurePath":         structurePath,
-		"StructuralContextPath": structuralContextPath,
-		"ReadmePath":            req.ReadmePath,
-		"MainFiles":             req.MainFiles,
-		"ExistingProfilePath":   existingProfilePath,
-		"FocusPathsPath":        focusPathsPath,
-		"FocusPathCount":        focusPathCount,
-		"UserContextPath":       userContextPath,
+		"ProjectName":            req.ProjectName,
+		"RootPath":               req.RootPath,
+		"Language":               req.Language,
+		"StructurePath":          structurePath,
+		"StructuralContextPath":  structuralContextPath,
+		"ReadmePath":             req.ReadmePath,
+		"MainFiles":              req.MainFiles,
+		"ExistingProfilePath":    existingProfilePath,
+		"FocusPathsPath":         focusPathsPath,
+		"FocusPathCount":         focusPathCount,
+		"UserContextPath":        userContextPath,
+		"MaintainedGuidancePath": guidancePath,
 	}, nil
 }
 
@@ -303,6 +382,10 @@ func ExtractAuthorityPromptData(session *PromptInputSession, req *ExtractAuthori
 	if err != nil {
 		return nil, promptInputWriteError("user-context.md", err)
 	}
+	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
 		"ProjectName":               req.ProjectName,
 		"RootPath":                  req.RootPath,
@@ -311,6 +394,7 @@ func ExtractAuthorityPromptData(session *PromptInputSession, req *ExtractAuthori
 		"AuthoritySectionsPath":     sectionsPath,
 		"AuthoritySectionCount":     len(req.AuthoritySections),
 		"UserContextPath":           userContextPath,
+		"MaintainedGuidancePath":    guidancePath,
 	}, nil
 }
 
@@ -342,21 +426,26 @@ func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *Ana
 	if err != nil {
 		return nil, promptInputWriteError("user-context.md", err)
 	}
+	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"RuntimeLabel":          req.RuntimeLabel,
-		"SharedContextPath":     strings.TrimSpace(req.SharedContextPath),
-		"Focuses":               req.Focuses,
-		"FocusIDs":              focusIDsFromEvidence(req.Focuses),
-		"StructurePath":         structurePath,
-		"StructuralContextPath": structuralContextPath,
-		"MainFiles":             req.MainFiles,
-		"UserContextPath":       userContextPath,
-		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
-		"LearningMode":          promptLearningMode(req.LearningMode),
-		"ChangeProfile":         req.ChangeProfile,
+		"ProjectName":            req.ProjectName,
+		"RootPath":               req.RootPath,
+		"Language":               req.Language,
+		"RuntimeLabel":           req.RuntimeLabel,
+		"SharedContextPath":      strings.TrimSpace(req.SharedContextPath),
+		"Focuses":                req.Focuses,
+		"FocusIDs":               focusIDsFromEvidence(req.Focuses),
+		"StructurePath":          structurePath,
+		"StructuralContextPath":  structuralContextPath,
+		"MainFiles":              req.MainFiles,
+		"UserContextPath":        userContextPath,
+		"MaintainedGuidancePath": guidancePath,
+		"AllowedCategories":      domain.AllowedPatternCategoriesText(),
+		"LearningMode":           promptLearningMode(req.LearningMode),
+		"ChangeProfile":          req.ChangeProfile,
 	}, nil
 }
 
@@ -374,20 +463,25 @@ func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *Analyz
 	if err != nil {
 		return nil, promptInputWriteError("user-context.md", err)
 	}
+	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{
-		"ProjectName":           req.ProjectName,
-		"RootPath":              req.RootPath,
-		"Language":              req.Language,
-		"RuntimeLabel":          req.RuntimeLabel,
-		"SharedContextPath":     strings.TrimSpace(req.SharedContextPath),
-		"Focuses":               req.Focuses,
-		"FocusIDs":              focusIDs(req.Focuses),
-		"StructurePath":         structurePath,
-		"StructuralContextPath": structuralContextPath,
-		"UserContextPath":       userContextPath,
-		"AllowedCategories":     domain.AllowedPatternCategoriesText(),
-		"LearningMode":          promptLearningMode(req.LearningMode),
-		"ChangeProfile":         req.ChangeProfile,
+		"ProjectName":            req.ProjectName,
+		"RootPath":               req.RootPath,
+		"Language":               req.Language,
+		"RuntimeLabel":           req.RuntimeLabel,
+		"SharedContextPath":      strings.TrimSpace(req.SharedContextPath),
+		"Focuses":                req.Focuses,
+		"FocusIDs":               focusIDs(req.Focuses),
+		"StructurePath":          structurePath,
+		"StructuralContextPath":  structuralContextPath,
+		"UserContextPath":        userContextPath,
+		"MaintainedGuidancePath": guidancePath,
+		"AllowedCategories":      domain.AllowedPatternCategoriesText(),
+		"LearningMode":           promptLearningMode(req.LearningMode),
+		"ChangeProfile":          req.ChangeProfile,
 	}, nil
 }
 

@@ -711,7 +711,7 @@ skills-seed hook run
 
 #### Command Overview
 
-Show recent changes recorded into project skills. This command prefers runtime records under `.skills-seed/runtime/journal/`; it still falls back to legacy change history for compatibility. It prints a git-log-like history and does not print diagnostic logs.
+Show recent changes recorded into project skills. This command reads runtime records under `.skills-seed/store/journal/`. It prints a git-log-like history and does not print diagnostic logs.
 
 #### Command Forms
 

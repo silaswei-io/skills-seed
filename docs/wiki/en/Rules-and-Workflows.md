@@ -6,7 +6,7 @@ Rules and Workflows cover information source learning cannot reliably derive: ma
 
 ## Context: Background and One-Time Guidance
 
-Use `.skills-seed/context/` for project background, terminology, and durable facts that source cannot show. Put long-lived mandatory constraints in Rules rather than hiding them in Context.
+`.skills-seed/context/` is a non-authoritative background layer for project background, terminology, and durable facts unavailable in source. It cannot grant command permission, override a Rule, or define a Workflow. Put long-lived mandatory constraints in Rules rather than hiding them in Context.
 
 Use `sync --context` or `sync --context-path` for guidance that affects only the current learning task. It is not written into durable Context and does not become a permanent generated-Skill rule. The [configuration reference](Reference.md) remains canonical for Context layout and input-processing details.
 

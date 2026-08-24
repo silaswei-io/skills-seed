@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.20]
+
+### 变更
+
+- 将 `.skills-seed/context/` 明确收敛为非权威背景层：只能补充术语、业务背景与源码不可见事实，不能覆盖 Rule、命令权限、Workflow 或源码证据。
+- 学习议程、源码/差异分析、独立知识审查、模式规范化、项目地图和权威规则提取现在都会读取用户维护的 Rule 与 Workflow 快照；Rule 约束推断边界，Workflow 不再被错误沉淀为源码模式或权威规则。
+- 学习提示词只接收最小化的用户资源投影，移除时间戳和脚本元数据，避免无关信息扩大上下文。
+
+### 修复
+
+- 将 `skills-seed log` 的持久运行记录从可清理的 `.skills-seed/runtime/journal/` 移至 `.skills-seed/store/journal/`，不再回读已废弃的变更摘要，避免 runtime 清理后丢失历史记录。
+
 ## [v0.20.19]
 
 ### 修复

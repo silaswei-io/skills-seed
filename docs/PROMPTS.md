@@ -8,6 +8,8 @@ The runtime goal contract has a single source of truth under `embedfs/templates/
 
 `embedfs/templates/prompts/append/output-contract-guard.txt.tmpl` is not called as a standalone task prompt. `Loader.Render` / `RenderForRuntimeTask` append it to every runtime prompt, after any project context fragments, so final JSON shape, escaping, stable output, and language rules are enforced consistently.
 
+For knowledge-producing calls, the runtime also writes current user Rules and Workflows into a typed `maintained-guidance.json` input and prepends a shared guidance contract. Rules constrain source inference and command semantics; Workflows remain user-owned procedures and cannot become source-learned patterns or authority rules. Persistent files under `.skills-seed/context/` are a separate non-authoritative background layer for terminology and facts unavailable in source.
+
 Files under `embedfs/templates/prompts/append/` are reusable mandatory fragments selected by prompt name in `internal/prompts`; their directory name is historical and does not imply that every fragment is placed at the end. The knowledge goal is prepended to knowledge-producing prompts, while the output-contract guard is appended globally. Current-code candidate normalization is coordinated by `internal/service/patternnorm`, with AI limited to semantic merge proposals.
 
 | Template | Main production callers | Scenario |

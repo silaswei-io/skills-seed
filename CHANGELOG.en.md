@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.20]
+
+### Changes
+
+- Narrowed `.skills-seed/context/` into a non-authoritative background layer: it may provide terminology, business background, and facts unavailable in source, but cannot override Rules, command permission, Workflows, or source evidence.
+- Learning agendas, source/delta analysis, independent knowledge review, pattern normalization, project maps, and authority extraction now receive a snapshot of user-maintained Rules and Workflows. Rules constrain inference; Workflows can no longer be incorrectly persisted as source patterns or authority rules.
+- Learning prompts now receive a minimal projection of user-maintained resources without timestamps or script metadata, avoiding irrelevant context growth.
+
+### Fixes
+
+- Moved persistent `skills-seed log` run records from disposable `.skills-seed/runtime/journal/` to `.skills-seed/store/journal/` and removed the deprecated change-summary fallback, so runtime cleanup no longer loses history.
+
 ## [v0.20.19]
 
 ### Fixes

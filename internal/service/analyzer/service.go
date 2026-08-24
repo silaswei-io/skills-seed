@@ -26,6 +26,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
@@ -42,10 +43,11 @@ type AnalyzerService struct {
 	configRepo          config.Reader
 	symbolResolver      sourcecode.Resolver
 	structuralCollector structuralCollector
+	maintainedGuidance  maintained.Provider
 }
 
 // NewAnalyzerService 创建分析服务
-func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerService {
+func NewAnalyzerService(ag agent.Agent, configRepo config.Reader, guidance ...maintained.Provider) *AnalyzerService {
 	structuralConfig := config.StructuralConfig{Provider: config.StructuralProviderAuto}
 	if configRepo != nil {
 		structuralConfig = configRepo.GetCurrentLearningConfig().Structural
@@ -61,7 +63,14 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader) *AnalyzerServi
 			svc.structuralCollector = newStructuralCollector(cfg)
 		}
 	}
+	if len(guidance) > 0 {
+		svc.maintainedGuidance = guidance[0]
+	}
 	return svc
+}
+
+func (s *AnalyzerService) loadMaintainedGuidance() (maintained.Snapshot, error) {
+	return s.maintainedGuidance.Load()
 }
 
 func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
@@ -198,6 +207,10 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AnalyzerCollectEngineeringKnowledgeFailed"), err)
 	}
 	authoritySections := buildAuthoritySections(authorityCoverage, req.UserContext != "")
+	guidance, err := s.loadMaintainedGuidance()
+	if err != nil {
+		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	}
 
 	notifyProjectProfileStage(req, i18n.Get("ProgressLearnCurrentExtractAuthority"))
 	authorityResult, err := s.agent.ExtractAuthority(ctx, &agent.ExtractAuthorityRequest{
@@ -206,6 +219,7 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 		EngineeringKnowledge: engineeringKnowledge,
 		AuthoritySections:    authoritySections,
 		UserContext:          req.UserContext,
+		MaintainedGuidance:   guidance,
 	})
 	if err != nil {
 		return nil, domain.NewDomainError(
@@ -225,6 +239,7 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 			EngineeringKnowledge: engineeringKnowledge,
 			AuthoritySections:    authoritySections,
 			UserContext:          req.UserContext,
+			MaintainedGuidance:   guidance,
 		},
 		Candidate: *authorityResult,
 	})
@@ -262,6 +277,7 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 		ExistingProfileJSON: req.ExistingProfileJSON,
 		FocusPaths:          req.FocusPaths,
 		UserContext:         req.UserContext,
+		MaintainedGuidance:  guidance,
 	}
 
 	notifyProjectProfileStage(req, i18n.Get("ProgressLearnCurrentRefreshProjectMap"))
@@ -398,15 +414,20 @@ func (s *AnalyzerService) PlanLearningAgenda(ctx context.Context, req *PlanLearn
 	if s.configRepo != nil {
 		maxSymbols = s.configRepo.GetCurrentLearningConfig().Structural.MaxSymbols
 	}
+	guidance, err := s.loadMaintainedGuidance()
+	if err != nil {
+		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	}
 	agentReq := &agent.PlanLearningAgendaRequest{
-		ProjectName:       req.ProjectName,
-		RootPath:          req.RootPath,
-		Language:          req.Language,
-		LearningMode:      req.LearningMode,
-		FocusPaths:        req.FocusPaths,
-		SourceFacts:       planningSourceFacts(ctx, req.RootPath, req.FocusPaths, maxSymbols),
-		StructuralContext: structuralContext,
-		UserContext:       req.UserContext,
+		ProjectName:        req.ProjectName,
+		RootPath:           req.RootPath,
+		Language:           req.Language,
+		LearningMode:       req.LearningMode,
+		FocusPaths:         req.FocusPaths,
+		SourceFacts:        planningSourceFacts(ctx, req.RootPath, req.FocusPaths, maxSymbols),
+		StructuralContext:  structuralContext,
+		UserContext:        req.UserContext,
+		MaintainedGuidance: guidance,
 	}
 	result, err := s.agent.PlanLearningAgenda(ctx, agentReq)
 	if err != nil {
@@ -487,20 +508,25 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		focusByID[focus.EvidenceFocus.ID] = focus.EvidenceFocus
 		focusByName[focus.EvidenceFocus.Name] = focus.EvidenceFocus
 	}
+	guidance, err := s.loadMaintainedGuidance()
+	if err != nil {
+		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	}
 
 	agentReq := &agent.AnalyzeCurrentCodebaseBatchRequest{
-		ProjectName:       projectName,
-		RootPath:          projectRoot,
-		Language:          language,
-		LearningMode:      opts.LearningMode,
-		RuntimeLabel:      opts.RuntimeLabel,
-		SharedContextPath: opts.SharedContextPath,
-		Focuses:           focuses,
-		Structure:         runContext.ProjectStructure,
-		MainFiles:         append([]string(nil), runContext.MainFiles...),
-		UserContext:       runtimecontext.UserContext(ctx),
-		ChangeProfile:     opts.ChangeProfile,
-		StructuralContext: "",
+		ProjectName:        projectName,
+		RootPath:           projectRoot,
+		Language:           language,
+		LearningMode:       opts.LearningMode,
+		RuntimeLabel:       opts.RuntimeLabel,
+		SharedContextPath:  opts.SharedContextPath,
+		Focuses:            focuses,
+		Structure:          runContext.ProjectStructure,
+		MainFiles:          append([]string(nil), runContext.MainFiles...),
+		UserContext:        runtimecontext.UserContext(ctx),
+		MaintainedGuidance: guidance,
+		ChangeProfile:      opts.ChangeProfile,
+		StructuralContext:  "",
 	}
 
 	structuralContext, err := s.collectStructuralContext(ctx, projectRoot, structuralContextRequest{

@@ -8,6 +8,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
@@ -61,6 +62,24 @@ func TestReviewKnowledgePromptDataIncludesExactCandidateIDs(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []string{"state-transition"}, data["CandidateIDs"])
+}
+
+func TestLearningPromptDataWritesMaintainedGuidanceSeparately(t *testing.T) {
+	session := &PromptInputSession{dir: t.TempDir()}
+	data, err := AnalyzeCurrentCodebaseBatchPromptData(session, &AnalyzeCurrentCodebaseBatchRequest{
+		MaintainedGuidance: maintained.Snapshot{
+			Rules:     []domain.Rule{{ID: "api-boundary", Content: "Keep API identifiers as text."}},
+			Workflows: []domain.Workflow{{ID: "verify", Content: "Run the verification workflow."}},
+		},
+	})
+
+	require.NoError(t, err)
+	path, ok := data["MaintainedGuidancePath"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, path)
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"rules":[{"id":"api-boundary","content":"Keep API identifiers as text."}],"workflows":[{"id":"verify","content":"Run the verification workflow."}]}`, string(content))
 }
 
 func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {

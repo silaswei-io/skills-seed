@@ -192,7 +192,7 @@ Starting in 0.9.11, file filtering also applies Git ignore rules by default. Sta
 
 ### Prompt Runtime Debugging
 
-Project context is read from `.skills-seed/context/`, and rendering filters default metadata, empty scaffolding, and unfilled placeholder text. Only user-authored context is kept.
+The project background layer is read from `.skills-seed/context/`, and rendering filters default metadata, empty scaffolding, and unfilled placeholder text. It cannot create or override Rules, command permission, Workflow procedures, or source evidence.
 
 Rendered prompts are saved by default under `.skills-seed/runtime/rendered-prompts/` with a neighboring `.manifest.json`. The manifest records whether built-in, context, and output-contract fragments were merged, plus raw and final lengths, so you can inspect the exact context sent to the Agent. Large inputs such as candidate files, focused files, and structural context are preferably stored in prompt input directories under `.skills-seed/runtime/`, and rendered prompts reference them by path. The final output contract is appended from a separate append template and forces JSON prompts to return exactly one parseable JSON object while keeping semantic output and deterministic ordering stable for identical inputs.
 
@@ -311,7 +311,7 @@ When skills are generated, workflows are written to output `workflows/`, and mat
 
 ### `.skills-seed/context/`
 
-`.skills-seed/context/` is not a `config.yaml` field, but it is created by `skills-seed init` as editable project context. Use it for project background, terminology, and workspace background. Mandatory long-lived rules are maintained separately under `.skills-seed/rules/`.
+`.skills-seed/context/` is not a `config.yaml` field, but it is created by `skills-seed init` as an editable, non-authoritative project background layer. Use it only for project background, terminology, and workspace background. Mandatory long-lived rules are maintained separately under `.skills-seed/rules/`; task procedures are maintained under `.skills-seed/workflows/`.
 
 Common paths:
 
@@ -323,7 +323,7 @@ Common paths:
 
 These files are merged with built-in prompts; they do not replace built-in prompts. Skills Seed appends a built-in final output contract after the merged fragments to protect the JSON / Markdown format expected by parsers.
 
-`--context` and `--context-path` are one-time learning flags. They affect only the current `learn current` run, are not written to `.skills-seed/context/`, and are not passed to `generate skills`. Maintain long-lived rules with `skills-seed rule`; use `learn current --context` or `learn current --context-path` for temporary guidance.
+`--context` and `--context-path` are one-time background inputs. They affect only the current `learn current` run, are not written to `.skills-seed/context/`, and are not passed to `generate skills`. Maintain long-lived rules with `skills-seed rule`, task procedures with `skills-seed workflow`, and temporary background with `learn current --context` or `learn current --context-path`.
 
 ### `skills`
 

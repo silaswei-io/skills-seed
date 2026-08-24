@@ -192,7 +192,7 @@ exclude:
 
 ### Prompt 运行时调试
 
-项目上下文从 `.skills-seed/context/` 读取，渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的上下文。
+项目背景层从 `.skills-seed/context/` 读取，渲染时会过滤默认元数据、空脚手架和未填写占位内容，只保留用户实际写入的背景信息。它不能创建或覆盖 Rule、命令权限、Workflow 步骤或源码证据。
 
 渲染后的 prompt 默认保存在 `.skills-seed/runtime/rendered-prompts/`，并生成同名 `.manifest.json`。manifest 会记录内置模板、context 片段和输出契约等片段是否参与合并、原始长度和最终长度，方便排查 Agent 实际收到的上下文。候选文件、焦点文件和结构化上下文等大块输入会优先保存到 `.skills-seed/runtime/` 下的 prompt input 目录，渲染后的 prompt 通过路径引用它们。最终输出契约由独立的 append 模板追加，并对 JSON 型 prompt 强制要求最终响应只能是单个可解析 JSON 对象，同时要求相同输入下保持语义稳定和确定性排序。
 
@@ -312,7 +312,7 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 
 ### `.skills-seed/context/`
 
-`.skills-seed/context/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级可编辑上下文目录。它用于项目背景、术语和 workspace 背景；必须遵守的长期规则由 `.skills-seed/rules/` 独立维护。
+`.skills-seed/context/` 不是 `config.yaml` 字段，但由 `skills-seed init` 创建，属于项目级非权威背景层。它仅用于项目背景、术语和 workspace 背景；必须遵守的长期规则由 `.skills-seed/rules/` 独立维护，任务步骤由 `.skills-seed/workflows/` 独立维护。
 
 常见路径：
 
@@ -324,7 +324,7 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 
 这些文件会与内置 prompt 合并，不会替换内置 prompt。合并后还会追加一个内置最终输出契约，保护 AI 返回的 JSON / Markdown 格式，避免用户上下文破坏解析。
 
-`--context` 和 `--context-path` 是学习阶段的一次性命令参数，只影响当前 `learn current` 运行，不会写入 `.skills-seed/context/`，也不会传给 `generate skills`。长期规则使用 `skills-seed rule` 维护；临时说明使用 `learn current --context` 或 `learn current --context-path`。
+`--context` 和 `--context-path` 是学习阶段的一次性背景说明，只影响当前 `learn current` 运行，不会写入 `.skills-seed/context/`，也不会传给 `generate skills`。长期规则使用 `skills-seed rule` 维护；任务流程使用 `skills-seed workflow` 维护；临时背景使用 `learn current --context` 或 `learn current --context-path`。
 
 ### `skills`
 

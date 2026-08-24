@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -43,17 +44,22 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	}
 
 	focusPaths := batchDeltaFocusPaths(focuses)
+	guidance, err := s.loadMaintainedGuidance()
+	if err != nil {
+		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	}
 	agentReq := &agent.AnalyzeCurrentDeltaBatchRequest{
-		ProjectName:       projectName,
-		RootPath:          projectRoot,
-		Language:          language,
-		LearningMode:      opts.LearningMode,
-		RuntimeLabel:      opts.RuntimeLabel,
-		SharedContextPath: opts.SharedContextPath,
-		Focuses:           focuses,
-		Structure:         focusedStructure(focusPaths),
-		UserContext:       runtimecontext.UserContext(ctx),
-		ChangeProfile:     opts.ChangeProfile,
+		ProjectName:        projectName,
+		RootPath:           projectRoot,
+		Language:           language,
+		LearningMode:       opts.LearningMode,
+		RuntimeLabel:       opts.RuntimeLabel,
+		SharedContextPath:  opts.SharedContextPath,
+		Focuses:            focuses,
+		Structure:          focusedStructure(focusPaths),
+		UserContext:        runtimecontext.UserContext(ctx),
+		MaintainedGuidance: guidance,
+		ChangeProfile:      opts.ChangeProfile,
 	}
 
 	structuralContext, err := s.collectStructuralContext(ctx, projectRoot, structuralContextRequest{

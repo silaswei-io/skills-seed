@@ -3,9 +3,9 @@
 <!-- context-type: readme -->
 <!-- editable: true -->
 
-# Context Guide
+# Background Layer Guide
 
-This directory stores long-lived information that is not visible in code but should guide AI learning, checks, and generated skills. It is not a prompt override directory; built-in task prompts are still maintained by skills-seed.
+This is a non-authoritative background layer for durable information unavailable in source that helps AI interpret terminology and business context. It is not a Rule, Workflow, or prompt override directory; built-in task prompts are still maintained by skills-seed.
 
 ## Files
 
@@ -15,8 +15,9 @@ This directory stores long-lived information that is not visible in code but sho
 
 ## Writing Rules
 
-- Put information here only when it should apply to future runs.
+- Put only durable background information here.
 - Maintain mandatory long-lived rules under `.skills-seed/rules/` with `skills-seed rule`, not in context.
+- Context cannot grant command permission, override a Rule, define an execution procedure, or replace source evidence.
 - Use `--context` or `--context-path` for one-time learning or sync guidance.
 - Do not paste code, long README excerpts, or temporary debugging notes here.
 - Empty sections are fine; default placeholder text is filtered out before Agent input.

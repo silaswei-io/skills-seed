@@ -21,6 +21,7 @@ import (
 	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/generator"
@@ -157,11 +158,12 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	}
 
 	// 7. 创建服务
-	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo)
+	maintainedGuidance := maintained.New(ruleRepo, workflowRepo)
+	analyzerSvc := analyzer.NewAnalyzerService(agentImpl, configRepo, maintainedGuidance)
 	patternNormSvc := patternnorm.NewServiceWithNormalizer(patternRepo, agentImpl, patternnorm.AdmissionPolicy{
 		MinConfidence:               cfg.Learning.Current.PatternAdmission.MinConfidence,
 		MinSingleEvidenceConfidence: cfg.Learning.Current.PatternAdmission.MinSingleEvidenceConfidence,
-	})
+	}).WithMaintainedGuidance(maintainedGuidance)
 
 	projectContext := agent.ProjectContext{
 		Name:     cfg.Project.Name,

@@ -52,7 +52,7 @@ var entrySeq atomic.Uint64
 
 // Path 返回运行记录目录。
 func Path(seedPath string) string {
-	return layout.New(seedPath).RuntimeJournal()
+	return layout.New(seedPath).RunJournal()
 }
 
 // Append 追加一条运行记录。

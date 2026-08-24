@@ -8,6 +8,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 	"github.com/silaswei-io/skills-seed/internal/knowledge/patternview"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
@@ -23,8 +24,12 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 		}
 		return finalizeCurrentNormalization(proposalFromDecision(result), candidates, retrieved.related)
 	}
+	guidance, err := s.guidance.Load()
+	if err != nil {
+		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	}
 
-	if result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, hooks); result != nil {
+	if result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, guidance, hooks); result != nil {
 		result, err = finalizeCurrentNormalization(result, candidates, retrieved.related)
 		if err == nil {
 			err = validateNormalizeResultForOperation(OperationLearnCurrent, result, candidates, retrieved.related)
@@ -45,19 +50,20 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 	return result, nil
 }
 
-func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, hooks ProgressHooks) *proposal {
+func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, guidance maintained.Snapshot, hooks ProgressHooks) *proposal {
 	if s.normalizer == nil {
 		return nil
 	}
 	label := i18n.Get("ProgressNormalizePatternsAI")
 	notifyProgress(hooks.OnStepStart, label)
 	result, err := s.normalizer.NormalizePatterns(ctx, &agent.NormalizePatternsRequest{
-		ProjectName:     req.ProjectName,
-		RootPath:        req.RootPath,
-		Language:        req.Language,
-		Candidates:      candidates,
-		RelatedPatterns: retrieved.related,
-		UserContext:     req.UserContext,
+		ProjectName:        req.ProjectName,
+		RootPath:           req.RootPath,
+		Language:           req.Language,
+		Candidates:         candidates,
+		RelatedPatterns:    retrieved.related,
+		UserContext:        req.UserContext,
+		MaintainedGuidance: guidance,
 	})
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "error", err)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
-	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
@@ -44,15 +43,8 @@ func run(cmd *cobra.Command) error {
 		entries = mergeEntries(entries, workspaceEntries)
 	}
 	if len(entries) == 0 {
-		legacyEntries, legacyErr := changelog.Recent(seedPath, 0)
-		if legacyErr != nil {
-			return legacyErr
-		}
-		if len(legacyEntries) == 0 {
-			_, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.GetWithParams("LogNoChanges", map[string]interface{}{"Path": runjournal.Path(seedPath)}))
-			return err
-		}
-		entries = legacyEntriesToRunJournalEntries(legacyEntries)
+		_, err := fmt.Fprintln(cmd.OutOrStdout(), i18n.GetWithParams("LogNoChanges", map[string]interface{}{"Path": runjournal.Path(seedPath)}))
+		return err
 	}
 	return printEntries(cmd.OutOrStdout(), entries)
 }
@@ -208,20 +200,4 @@ func formatScope(scope runjournal.Scope) string {
 		label += " (" + path + ")"
 	}
 	return label
-}
-
-func legacyEntriesToRunJournalEntries(entries []changelog.Entry) []runjournal.Entry {
-	out := make([]runjournal.Entry, 0, len(entries))
-	for _, entry := range entries {
-		out = append(out, runjournal.Entry{
-			ID:         entry.ID,
-			Command:    entry.Command,
-			Scope:      runjournal.Scope{Kind: runjournal.ScopeProject},
-			Summary:    entry.Summary,
-			Details:    append([]string(nil), entry.Details...),
-			StartedAt:  entry.CreatedAt,
-			FinishedAt: entry.CreatedAt,
-		})
-	}
-	return out
 }

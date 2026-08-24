@@ -711,7 +711,7 @@ skills-seed hook run
 
 #### 命令概述
 
-查看最近沉淀到项目技能中的变更记录。此命令优先读取 `.skills-seed/runtime/journal/` 中的运行记录；如需兼容旧数据，仍会回读历史变更记录。输出形式类似 `git log`，不打印详细诊断日志。
+查看最近沉淀到项目技能中的变更记录。此命令读取 `.skills-seed/store/journal/` 中的运行记录。输出形式类似 `git log`，不打印详细诊断日志。
 
 #### 命令形式
 

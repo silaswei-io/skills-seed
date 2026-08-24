@@ -88,9 +88,9 @@ func (l Layout) RuntimeLogs() string {
 	return l.Runtime("logs")
 }
 
-// RuntimeJournal returns the runtime run journal directory.
-func (l Layout) RuntimeJournal() string {
-	return l.Runtime("journal")
+// RunJournal returns the persistent run journal directory.
+func (l Layout) RunJournal() string {
+	return l.Store("journal")
 }
 
 // Rules 返回用户权威规则根目录。

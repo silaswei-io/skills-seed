@@ -28,16 +28,21 @@ func (s *Service) reviewCurrentKnowledge(ctx context.Context, req ReviewRequest,
 	sort.SliceStable(ordered, func(i, j int) bool {
 		return ordered[i].ID < ordered[j].ID
 	})
+	guidance, err := s.guidance.Load()
+	if err != nil {
+		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	}
 
 	result, err := s.reviewer.ReviewKnowledge(ctx, &agent.ReviewKnowledgeRequest{
-		ProjectName:   req.ProjectName,
-		RootPath:      req.RootPath,
-		Language:      req.Language,
-		RuntimeLabel:  req.RuntimeLabel,
-		EvidenceFocus: req.Focus,
-		Candidates:    ordered,
-		UserContext:   req.UserContext,
-		Conversation:  req.Conversation,
+		ProjectName:        req.ProjectName,
+		RootPath:           req.RootPath,
+		Language:           req.Language,
+		RuntimeLabel:       req.RuntimeLabel,
+		EvidenceFocus:      req.Focus,
+		Candidates:         ordered,
+		UserContext:        req.UserContext,
+		MaintainedGuidance: guidance,
+		Conversation:       req.Conversation,
 	})
 	if err != nil {
 		return nil, err
