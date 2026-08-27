@@ -188,6 +188,21 @@ func TestReviewCurrentKnowledgeKeepsCompleteFocusInOneRequest(t *testing.T) {
 	require.Equal(t, []string{"candidate-00", "candidate-01", "candidate-02"}, receivedIDs)
 }
 
+func TestReviewCurrentKnowledgeResetsInheritedSources(t *testing.T) {
+	candidate := currentPattern("config-driven-resource-initialization", 0.9, "internal/config/bootstrap.go")
+	candidate.Merged = true
+	candidate.MergedFrom = []string{"runconfiguredhealthchecks", "registerconfiguredresources"}
+
+	reviewed, err := NewService(&mocks.MockPatternRepository{}).ReviewCurrentKnowledge(context.Background(), ReviewRequest{
+		Candidates: []domain.Pattern{candidate},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, reviewed, 1)
+	require.False(t, reviewed[0].Merged)
+	require.Equal(t, []string{candidate.ID}, reviewed[0].MergedFrom)
+}
+
 func TestApplyKnowledgeReviewRejectsUnknownFlag(t *testing.T) {
 	candidate := currentPattern("bounded-behavior", 0.9, "src/behavior.ext")
 	candidate.KnowledgeFlags = []string{"invented"}

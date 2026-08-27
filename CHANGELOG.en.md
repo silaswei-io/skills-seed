@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.23]
+
+### Fixes
+
+- Fixed local fallback treating inherited `MergedFrom` lineage on a current source candidate as current ownership and consequently conflating distinct capability entries. Every current candidate now rebuilds source identity from its own Pattern ID, so historical merge lineage cannot flow back into current inputs.
+- Unified current-candidate preparation across independent knowledge review and final normalization, with regression coverage for the reported `RunConfiguredHealthChecks`, `RegisterConfiguredResources`, and `config-driven-resource-initialization` case.
+- Clarified that `sync --resume` automatically discards stale execution state and replans the agenda when target-repository source fingerprints no longer match the checkpoint; upgrading the CLI alone does not trigger this behavior.
+
 ## [v0.20.22]
 
 ### Fixes

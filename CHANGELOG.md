@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.23]
+
+### 修复
+
+- 修复当前源码候选继承既有 `MergedFrom` 后，本地回退仍把不同能力入口误视为同一 Pattern 来源的问题；本轮候选现在统一以自己的 Pattern ID 重建来源身份，历史归并谱系不再回流为当前输入归属。
+- 统一独立知识审查与最终规范化的当前候选准备边界，并补充 `RunConfiguredHealthChecks`、`RegisterConfiguredResources` 和 `config-driven-resource-initialization` 的真实失败回归测试。
+- 明确 `sync --resume` 会在目标仓库源码与 checkpoint 指纹不一致时自动丢弃旧执行态并重新规划议程；CLI 升级本身不会触发该行为。
+
 ## [v0.20.22]
 
 ### 修复

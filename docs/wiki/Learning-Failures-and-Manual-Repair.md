@@ -57,6 +57,7 @@ skills-seed preview files --mode incremental --focus <path>
 | 情况 | 操作 | 原因 |
 |---|---|---|
 | 正常中断、临时 Agent 失败、本地保存后失败 | `skills-seed sync --resume` | 复用有效 checkpoint，避免重复调用 |
+| checkpoint 保存后目标仓库源码发生变化 | `skills-seed sync --resume` | 自动判定旧状态失效并重新规划；`--resume` 不会强制复用不匹配的议程 |
 | 续跑时已保存的规范化决策合并了不同能力入口 | `skills-seed sync --resume` | 自动保留独立候选并替换非法 checkpoint |
 | 命令状态版本不兼容、候选文件或上下文已不可信 | `skills-seed sync --restart` | 显式清理本次恢复状态，再重新分析 |
 | 需要丢弃全部已学习知识及用户 Rule、Workflow | `skills-seed reset all` → `skills-seed sync` | 选中资源会先移入备份；配置和 Context 保留 |

@@ -60,9 +60,11 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 	if !req.Operation.Valid() || req.Operation == OperationCompact {
 		return nil, fmt.Errorf("%s", i18n.GetWithParams("PatternNormUnsupportedOperation", map[string]interface{}{"Operation": req.Operation}))
 	}
-	candidates := validateCandidates(req.Candidates)
+	var candidates []domain.Pattern
 	if req.Operation == OperationLearnCurrent {
-		candidates = coalesceCurrentCandidates(s.validateCurrentCandidates(candidates))
+		candidates = s.prepareCurrentCandidates(req.Candidates)
+	} else {
+		candidates = validateCandidates(req.Candidates)
 	}
 	retiredIDs := uniquePatternIDs(req.RetiredPatternIDs)
 	if len(candidates) == 0 && len(retiredIDs) == 0 {

@@ -15,8 +15,7 @@ import (
 // ReviewCurrentKnowledge 对一个完整证据焦点的候选知识执行独立审查。
 // 跨焦点合并留给后续全局规范化，避免审查阶段丢失证据边界。
 func (s *Service) ReviewCurrentKnowledge(ctx context.Context, req ReviewRequest) ([]domain.Pattern, error) {
-	candidates := validateCandidates(req.Candidates)
-	candidates = coalesceCurrentCandidates(s.validateCurrentCandidates(candidates))
+	candidates := s.prepareCurrentCandidates(req.Candidates)
 	return s.reviewCurrentKnowledge(ctx, req, candidates)
 }
 

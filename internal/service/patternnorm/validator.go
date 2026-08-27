@@ -38,6 +38,16 @@ func (s *Service) validateCurrentCandidates(candidates []domain.Pattern) []domai
 	return valid
 }
 
+// prepareCurrentCandidates 将本轮源码候选整理为独立的规范化输入。
+// MergedFrom 是既有规范化结果的输出谱系，不能作为新一轮源码事实的输入身份。
+func (s *Service) prepareCurrentCandidates(candidates []domain.Pattern) []domain.Pattern {
+	candidates = s.validateCurrentCandidates(validateCandidates(candidates))
+	for index := range candidates {
+		candidates[index] = patternview.WithSources(candidates[index], []string{candidates[index].ID})
+	}
+	return coalesceCurrentCandidates(candidates)
+}
+
 func coalesceCurrentCandidates(candidates []domain.Pattern) []domain.Pattern {
 	coalesced := make([]domain.Pattern, 0, len(candidates))
 	indexByID := make(map[string]int, len(candidates))

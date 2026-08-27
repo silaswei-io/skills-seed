@@ -219,6 +219,39 @@ func TestNormalizeAndStoreUsesCurrentCandidateForSamePatternID(t *testing.T) {
 	require.Equal(t, candidate.EvidenceLocations, result.Written[0].EvidenceLocations)
 }
 
+func TestNormalizeAndStoreResetsInheritedCurrentCandidateSources(t *testing.T) {
+	healthChecks := currentPattern("runconfiguredhealthchecks", 0.9, "internal/config/health.go")
+	healthChecks.Source = domain.SourceLearnedCurrent
+	healthChecks.BusinessMethod = &domain.BusinessMethod{
+		Name:         "RunConfiguredHealthChecks",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/config/health.go:41"},
+	}
+	register := currentPattern("registerconfiguredresources", 0.9, "internal/config/resources.go")
+	register.Source = domain.SourceLearnedCurrent
+	register.BusinessMethod = &domain.BusinessMethod{
+		Name:         "RegisterConfiguredResources",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/config/resources.go:27"},
+	}
+	candidate := currentPattern("config-driven-resource-initialization", 0.9, "internal/config/bootstrap.go")
+	candidate.Merged = true
+	candidate.MergedFrom = []string{healthChecks.ID, register.ID}
+	candidate.BusinessMethod = healthChecks.BusinessMethod
+
+	result, err := NewService(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{healthChecks, register}, nil
+		},
+	}).NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{candidate},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, candidate.ID, result.Written[0].ID)
+	require.Equal(t, []string{candidate.ID}, result.Written[0].MergedFrom)
+}
+
 func TestNormalizeAndStoreAllowsMergeForSameCapabilityEntry(t *testing.T) {
 	first := currentPattern("submit-behavior", 0.9, "internal/job/dispatcher.go")
 	first.BusinessMethod = &domain.BusinessMethod{
