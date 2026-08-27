@@ -12,26 +12,21 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 	if result == nil {
 		return fmt.Errorf("normalization result is nil")
 	}
-	inputs := make(map[string][]domain.Pattern, len(candidates)+len(existing))
-	for _, pattern := range append(append([]domain.Pattern(nil), candidates...), existing...) {
-		inputs[pattern.ID] = append(inputs[pattern.ID], pattern)
-	}
+	inputs := indexNormalizationSources(candidates, existing)
 	for i := range result.Patterns {
 		pattern := &result.Patterns[i]
 		var sources []domain.Pattern
 		allowedEvidence := make(map[string]domain.PatternEvidenceLocation)
 		for _, sourceID := range pattern.MergedFrom {
-			mergedSources, ok := inputs[sourceID]
+			source, ok := inputs[sourceID]
 			if !ok {
 				return fmt.Errorf("normalized pattern %q references unknown source %q", pattern.ID, sourceID)
 			}
-			for _, source := range mergedSources {
-				sources = append(sources, source)
-				for _, location := range source.EvidenceLocations {
-					key := evidenceKey(location)
-					if _, exists := allowedEvidence[key]; !exists {
-						allowedEvidence[key] = location
-					}
+			sources = append(sources, source)
+			for _, location := range source.EvidenceLocations {
+				key := evidenceKey(location)
+				if _, exists := allowedEvidence[key]; !exists {
+					allowedEvidence[key] = location
 				}
 			}
 		}

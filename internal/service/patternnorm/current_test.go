@@ -186,6 +186,39 @@ func TestNormalizeAndStoreReplacesInvalidCheckpointDecision(t *testing.T) {
 	require.Len(t, checkpoint.saved.Patterns, 2)
 }
 
+func TestNormalizeAndStoreUsesCurrentCandidateForSamePatternID(t *testing.T) {
+	existing := currentPattern("config-driven-resource-initialization", 0.9, "internal/config/resources.go")
+	existing.Source = domain.SourceLearnedCurrent
+	existing.BusinessMethod = &domain.BusinessMethod{
+		Name:         "RegisterConfiguredResources",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/config/resources.go:27"},
+	}
+	existing.EvidenceLocations[0].Line = 27
+	existing.EvidenceLocations[0].Symbol = "RegisterConfiguredResources"
+
+	candidate := currentPattern("config-driven-resource-initialization", 0.9, "internal/config/resources.go")
+	candidate.BusinessMethod = &domain.BusinessMethod{
+		Name:         "RunConfiguredHealthChecks",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/config/resources.go:64"},
+	}
+	candidate.EvidenceLocations[0].Line = 64
+	candidate.EvidenceLocations[0].Symbol = "RunConfiguredHealthChecks"
+
+	result, err := NewService(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{existing}, nil
+		},
+	}).NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{candidate},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 1)
+	require.Equal(t, "RunConfiguredHealthChecks", result.Written[0].BusinessMethod.Name)
+	require.Equal(t, candidate.EvidenceLocations, result.Written[0].EvidenceLocations)
+}
+
 func TestNormalizeAndStoreAllowsMergeForSameCapabilityEntry(t *testing.T) {
 	first := currentPattern("submit-behavior", 0.9, "internal/job/dispatcher.go")
 	first.BusinessMethod = &domain.BusinessMethod{

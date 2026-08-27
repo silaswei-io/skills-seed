@@ -84,17 +84,12 @@ func validateCapabilityEntryMerges(result *proposal, candidates, existing []doma
 		return fmt.Errorf("normalization result is nil")
 	}
 
-	inputs := make(map[string][]domain.Pattern, len(candidates)+len(existing))
-	for _, pattern := range append(append([]domain.Pattern(nil), candidates...), existing...) {
-		inputs[pattern.ID] = append(inputs[pattern.ID], pattern)
-	}
+	inputs := indexNormalizationSources(candidates, existing)
 	for _, pattern := range result.Patterns {
 		var entries []capabilityEntryIdentity
 		for _, sourceID := range pattern.MergedFrom {
-			for _, source := range inputs[sourceID] {
-				if entry, ok := newCapabilityEntryIdentity(source.BusinessMethod); ok {
-					entries = append(entries, entry)
-				}
+			if entry, ok := newCapabilityEntryIdentity(inputs[sourceID].BusinessMethod); ok {
+				entries = append(entries, entry)
 			}
 		}
 		for left := 0; left < len(entries); left++ {

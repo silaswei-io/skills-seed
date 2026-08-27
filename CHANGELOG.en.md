@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.22]
+
+### Fixes
+
+- Fixed a current candidate sharing a Pattern ID with an existing stored record being misclassified as a merge across capability entries. The current candidate is now the single effective version of that Pattern during validation and hydration.
+- Unified normalization validation and hydration on one source index so an existing record cannot leak capability, evidence, or knowledge fields into its current replacement, with regression coverage using the reported capability names.
+
 ## [v0.20.21]
 
 ### Fixes
