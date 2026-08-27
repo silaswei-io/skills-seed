@@ -135,6 +135,23 @@ func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot 
 	scope := repositoryscopeconfig.KnowledgeScope(s.configRepo, projectRoot)
 
 	validated := make([]domain.KnowledgeChange, 0, len(changes))
+	admittedScopes := make(map[string]bool, len(focusByID))
+	type scopedFallback struct {
+		scopeID string
+		change  domain.KnowledgeChange
+	}
+	fallbacks := make([]scopedFallback, 0)
+	appendAdmitted := func(change domain.KnowledgeChange) {
+		validated = append(validated, change)
+		if scopeID, ok := deltaChangeScopeID(change, focusByID); ok {
+			admittedScopes[scopeID] = true
+		}
+	}
+	appendFallback := func(change domain.KnowledgeChange) {
+		if scopeID, ok := deltaChangeScopeID(change, focusByID); ok {
+			fallbacks = append(fallbacks, scopedFallback{scopeID: scopeID, change: noChangeDeltaDecision(change)})
+		}
+	}
 	for _, change := range changes {
 		if change.PatternAction == domain.KnowledgePatternRetire {
 			pattern, ok := relatedByFocus[change.FocusID][strings.TrimSpace(change.PatternID)]
@@ -144,29 +161,52 @@ func (s *AnalyzerService) validateDeltaChanges(ctx context.Context, projectRoot 
 				!anchorsTouchPatternEvidence(change.Anchors, pattern.EvidenceLocations) ||
 				retirementValidator == nil ||
 				retirementValidator.hasLiveEvidence(pattern.EvidenceLocations, scope) {
+				appendFallback(change)
 				continue
 			}
-			validated = append(validated, change)
+			appendAdmitted(change)
 			continue
 		}
 		if !change.CarriesPattern() {
-			if deltaChangeScoped(change, focusByID) {
-				validated = append(validated, change)
+			if change.PatternAction == domain.KnowledgePatternNoChange {
+				if _, ok := deltaChangeScopeID(change, focusByID); ok {
+					appendAdmitted(change)
+				}
+			} else {
+				appendFallback(change)
 			}
 			continue
 		}
 		if !deltaChangeAnchored(change, focusByID) {
+			appendFallback(change)
 			continue
 		}
 		pattern, ok := validByID[change.Proposal.ID]
 		if !ok {
+			appendFallback(change)
 			continue
 		}
 		pattern.DiffAnchors = append([]domain.PatternDiffAnchor(nil), change.Anchors...)
 		change.Proposal = &pattern
-		validated = append(validated, change)
+		appendAdmitted(change)
+	}
+	addedFallbacks := make(map[string]bool, len(fallbacks))
+	for _, fallback := range fallbacks {
+		if admittedScopes[fallback.scopeID] || addedFallbacks[fallback.scopeID] {
+			continue
+		}
+		validated = append(validated, fallback.change)
+		addedFallbacks[fallback.scopeID] = true
 	}
 	return validated, nil
+}
+
+func noChangeDeltaDecision(change domain.KnowledgeChange) domain.KnowledgeChange {
+	change.FocusAction = domain.KnowledgeFocusNoChange
+	change.PatternAction = domain.KnowledgePatternNoChange
+	change.PatternID = ""
+	change.Proposal = nil
+	return change
 }
 
 func relatedPatternIndex(patterns []domain.Pattern) map[string]domain.Pattern {
@@ -212,11 +252,27 @@ func anchorsTouchPatternEvidence(anchors []domain.PatternDiffAnchor, locations [
 	return false
 }
 
-func deltaChangeScoped(change domain.KnowledgeChange, focusByID map[string]map[string]bool) bool {
+func deltaChangeScopeID(change domain.KnowledgeChange, focusByID map[string]map[string]bool) (string, bool) {
 	if _, ok := focusByID[change.FocusID]; ok {
-		return true
+		return change.FocusID, true
 	}
-	return deltaChangeAnchored(change, focusByID)
+	matched := ""
+	for _, anchor := range change.Anchors {
+		path := normalizeRelPath(anchor.Path)
+		if path == "" {
+			continue
+		}
+		for focusID, paths := range focusByID {
+			if !paths[path] {
+				continue
+			}
+			if matched != "" && matched != focusID {
+				return "", false
+			}
+			matched = focusID
+		}
+	}
+	return matched, matched != ""
 }
 
 func deltaChangeAnchored(change domain.KnowledgeChange, focusByID map[string]map[string]bool) bool {

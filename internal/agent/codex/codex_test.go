@@ -1,12 +1,17 @@
 package codex
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -127,6 +132,86 @@ func TestExtractFinalContent_PrefersLastJSONMessageOverProgressMessages(t *testi
 
 	require.NoError(t, err)
 	require.Equal(t, `{"patterns":[],"profile_refresh_recommended":{"needed":false}}`, content)
+}
+
+func TestAnalyzeCurrentDeltaBatchConstrainsRuntimeSchemaToInputFocus(t *testing.T) {
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "schema.json")
+	commandPath := filepath.Join(dir, "codex")
+	command := `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = "--output-schema" ]; then
+		cp "$2" "$CAPTURE_SCHEMA_PATH"
+		break
+	fi
+	shift
+done
+printf '%s\n' '{"type":"thread.started","thread_id":"thread-test"}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"knowledge_changes\":[{\"focus_action\":\"no_change\",\"focus_id\":\"api-contract-design\",\"focus_name\":\"API contract design\",\"pattern_action\":\"no_change\",\"pattern_id\":\"\",\"proposal\":null,\"anchors\":[],\"reason\":\"No reusable change.\"}],\"profile_refresh_recommended\":{\"needed\":false,\"reason\":\"\"}}"}}'
+`
+	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
+	t.Setenv("CAPTURE_SCHEMA_PATH", schemaPath)
+	t.Setenv("CODEX_HOME", t.TempDir())
+
+	ag := New(commandPath, 5*time.Second, promptloader.New("codex", "en", ""), false, config.DefaultRetryConfig(), config.AgentRuntimeOptions{})
+	result, err := ag.AnalyzeCurrentDeltaBatch(context.Background(), &agent.AnalyzeCurrentDeltaBatchRequest{
+		Focuses: []agent.AnalyzeCurrentDeltaFocus{{
+			EvidenceFocus: domain.EvidenceFocus{ID: "api-contract-design", Name: "API contract design"},
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Changes, 1)
+	data, err := os.ReadFile(schemaPath)
+	require.NoError(t, err)
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal(data, &schema))
+	changes := schema["properties"].(map[string]any)["knowledge_changes"].(map[string]any)
+	require.Equal(t, float64(1), changes["minItems"])
+	require.Equal(t, float64(1), changes["maxItems"])
+	items := changes["items"].(map[string]any)
+	focusID := items["properties"].(map[string]any)["focus_id"].(map[string]any)
+	require.Equal(t, []any{"api-contract-design"}, focusID["enum"])
+}
+
+func TestAnalyzeCurrentCodebaseBatchConstrainsRuntimeSchemaToInputFocus(t *testing.T) {
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "schema.json")
+	commandPath := filepath.Join(dir, "codex")
+	command := `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = "--output-schema" ]; then
+		cp "$2" "$CAPTURE_SCHEMA_PATH"
+		break
+	fi
+	shift
+done
+printf '%s\n' '{"type":"thread.started","thread_id":"thread-test"}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"focuses\":[{\"focus_id\":\"api-contract-design\",\"focus_name\":\"API contract design\",\"patterns\":[],\"profile_refresh_recommended\":{\"needed\":false,\"reason\":\"\"}}]}"}}'
+`
+	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
+	t.Setenv("CAPTURE_SCHEMA_PATH", schemaPath)
+	t.Setenv("CODEX_HOME", t.TempDir())
+
+	ag := New(commandPath, 5*time.Second, promptloader.New("codex", "en", ""), false, config.DefaultRetryConfig(), config.AgentRuntimeOptions{})
+	result, err := ag.AnalyzeCurrentCodebaseBatch(context.Background(), &agent.AnalyzeCurrentCodebaseBatchRequest{
+		Focuses: []agent.AnalyzeCurrentEvidenceFocus{{
+			EvidenceFocus: domain.EvidenceFocus{ID: "api-contract-design", Name: "API contract design"},
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Focuses, 1)
+	data, err := os.ReadFile(schemaPath)
+	require.NoError(t, err)
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal(data, &schema))
+	focuses := schema["properties"].(map[string]any)["focuses"].(map[string]any)
+	require.Equal(t, float64(1), focuses["minItems"])
+	require.Equal(t, float64(1), focuses["maxItems"])
+	items := focuses["items"].(map[string]any)
+	focusID := items["properties"].(map[string]any)["focus_id"].(map[string]any)
+	require.Equal(t, []any{"api-contract-design"}, focusID["enum"])
 }
 
 func requireArgValue(t *testing.T, args []string, name string) string {

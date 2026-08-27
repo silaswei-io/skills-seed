@@ -1,14 +1,18 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -187,6 +191,82 @@ func TestParseClaudeOutput_RejectsErrorEnvelope(t *testing.T) {
 
 func TestStructuredOutputRetryExhaustionIsRetryable(t *testing.T) {
 	require.True(t, isRetryableError(`{"type":"result","subtype":"error_max_structured_output_retries","is_error":true}`, ""))
+}
+
+func TestAnalyzeCurrentDeltaBatchConstrainsRuntimeSchemaToInputFocus(t *testing.T) {
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "schema.json")
+	commandPath := filepath.Join(dir, "claude")
+	command := `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = "--json-schema" ]; then
+		printf '%s' "$2" > "$CAPTURE_SCHEMA_PATH"
+		break
+	fi
+	shift
+done
+printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured_output":{"knowledge_changes":[{"focus_action":"no_change","focus_id":"api-contract-design","focus_name":"API contract design","pattern_action":"no_change","pattern_id":"","proposal":null,"anchors":[],"reason":"No reusable change."}],"profile_refresh_recommended":{"needed":false,"reason":""}}}'
+`
+	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
+	t.Setenv("CAPTURE_SCHEMA_PATH", schemaPath)
+
+	ag := New(commandPath, 5*time.Second, promptloader.New("claude", "en", ""), false, config.DefaultRetryConfig(), config.AgentRuntimeOptions{})
+	result, err := ag.AnalyzeCurrentDeltaBatch(context.Background(), &agent.AnalyzeCurrentDeltaBatchRequest{
+		Focuses: []agent.AnalyzeCurrentDeltaFocus{{
+			EvidenceFocus: domain.EvidenceFocus{ID: "api-contract-design", Name: "API contract design"},
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Changes, 1)
+	data, err := os.ReadFile(schemaPath)
+	require.NoError(t, err)
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal(data, &schema))
+	changes := schema["properties"].(map[string]any)["knowledge_changes"].(map[string]any)
+	require.Equal(t, float64(1), changes["minItems"])
+	require.Equal(t, float64(1), changes["maxItems"])
+	items := changes["items"].(map[string]any)
+	focusID := items["properties"].(map[string]any)["focus_id"].(map[string]any)
+	require.Equal(t, []any{"api-contract-design"}, focusID["enum"])
+}
+
+func TestAnalyzeCurrentCodebaseBatchConstrainsRuntimeSchemaToInputFocus(t *testing.T) {
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "schema.json")
+	commandPath := filepath.Join(dir, "claude")
+	command := `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = "--json-schema" ]; then
+		printf '%s' "$2" > "$CAPTURE_SCHEMA_PATH"
+		break
+	fi
+	shift
+done
+printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured_output":{"focuses":[{"focus_id":"api-contract-design","focus_name":"API contract design","patterns":[],"profile_refresh_recommended":{"needed":false,"reason":""}}]}}'
+`
+	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
+	t.Setenv("CAPTURE_SCHEMA_PATH", schemaPath)
+
+	ag := New(commandPath, 5*time.Second, promptloader.New("claude", "en", ""), false, config.DefaultRetryConfig(), config.AgentRuntimeOptions{})
+	result, err := ag.AnalyzeCurrentCodebaseBatch(context.Background(), &agent.AnalyzeCurrentCodebaseBatchRequest{
+		Focuses: []agent.AnalyzeCurrentEvidenceFocus{{
+			EvidenceFocus: domain.EvidenceFocus{ID: "api-contract-design", Name: "API contract design"},
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Focuses, 1)
+	data, err := os.ReadFile(schemaPath)
+	require.NoError(t, err)
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal(data, &schema))
+	focuses := schema["properties"].(map[string]any)["focuses"].(map[string]any)
+	require.Equal(t, float64(1), focuses["minItems"])
+	require.Equal(t, float64(1), focuses["maxItems"])
+	items := focuses["items"].(map[string]any)
+	focusID := items["properties"].(map[string]any)["focus_id"].(map[string]any)
+	require.Equal(t, []any{"api-contract-design"}, focusID["enum"])
 }
 
 func writeClaudeJSON(t *testing.T, path string, value interface{}) {

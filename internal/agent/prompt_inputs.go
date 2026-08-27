@@ -437,7 +437,7 @@ func AnalyzeCurrentCodebaseBatchPromptData(session *PromptInputSession, req *Ana
 		"RuntimeLabel":           req.RuntimeLabel,
 		"SharedContextPath":      strings.TrimSpace(req.SharedContextPath),
 		"Focuses":                req.Focuses,
-		"FocusIDs":               focusIDsFromEvidence(req.Focuses),
+		"FocusIDs":               req.FocusIDs(),
 		"StructurePath":          structurePath,
 		"StructuralContextPath":  structuralContextPath,
 		"MainFiles":              req.MainFiles,
@@ -474,7 +474,7 @@ func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *Analyz
 		"RuntimeLabel":           req.RuntimeLabel,
 		"SharedContextPath":      strings.TrimSpace(req.SharedContextPath),
 		"Focuses":                req.Focuses,
-		"FocusIDs":               focusIDs(req.Focuses),
+		"FocusIDs":               req.FocusIDs(),
 		"StructurePath":          structurePath,
 		"StructuralContextPath":  structuralContextPath,
 		"UserContextPath":        userContextPath,
@@ -483,24 +483,4 @@ func AnalyzeCurrentDeltaBatchPromptData(session *PromptInputSession, req *Analyz
 		"LearningMode":           promptLearningMode(req.LearningMode),
 		"ChangeProfile":          req.ChangeProfile,
 	}, nil
-}
-
-func focusIDs(focuses []AnalyzeCurrentDeltaFocus) []string {
-	ids := make([]string, 0, len(focuses))
-	for _, focus := range focuses {
-		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
-func focusIDsFromEvidence(focuses []AnalyzeCurrentEvidenceFocus) []string {
-	ids := make([]string, 0, len(focuses))
-	for _, focus := range focuses {
-		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {
-			ids = append(ids, id)
-		}
-	}
-	return ids
 }

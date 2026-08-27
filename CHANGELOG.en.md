@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.24]
+
+### Fixes
+
+- Fixed full and delta current-source analysis declaring focus constraints in prompts without passing the focus IDs into the Claude/Codex runtime Schema. Provider invocations now constrain both the focus enum and result count to the current batch.
+- Fixed local evidence admission dropping an entire delta-focus decision when its proposed candidate was rejected. When no other decision is admitted for that focus, the pipeline now retains exactly one `no_change` receipt instead of misreporting “no admissible Pattern” as an omitted evidence focus.
+- Added regression coverage for the actual Claude and Codex CLI Schemas and delta-admission fallback using the reported `api-contract-design` case.
+
 ## [v0.20.23]
 
 ### Fixes

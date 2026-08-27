@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -189,6 +190,20 @@ func (r *AnalyzeCurrentCodebaseBatchRequest) AllowedCategories() string {
 	return domain.AllowedPatternCategoriesText()
 }
 
+// FocusIDs 返回本次源码分析必须逐一回执的证据焦点 ID。
+func (r *AnalyzeCurrentCodebaseBatchRequest) FocusIDs() []string {
+	if r == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(r.Focuses))
+	for _, focus := range r.Focuses {
+		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // AnalyzeCurrentEvidenceResult 是批量当前代码学习返回的单个证据焦点结果。
 type AnalyzeCurrentEvidenceResult struct {
 	FocusID                   string
@@ -234,6 +249,20 @@ type AnalyzeCurrentDeltaBatchRequest struct {
 // AllowedCategories 返回提示词可展示的合法模式分类列表。
 func (r *AnalyzeCurrentDeltaBatchRequest) AllowedCategories() string {
 	return domain.AllowedPatternCategoriesText()
+}
+
+// FocusIDs 返回本次增量分析必须逐一回执的证据焦点 ID。
+func (r *AnalyzeCurrentDeltaBatchRequest) FocusIDs() []string {
+	if r == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(r.Focuses))
+	for _, focus := range r.Focuses {
+		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // AnalyzeCurrentDeltaBatchResult 是 diff 锚定增量学习的结构化结果。

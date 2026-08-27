@@ -46,7 +46,7 @@ func (c *CodexAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowl
 
 func (c *CodexAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-analyze", req.RuntimeLabel))
-	output, conversation, err := c.callCurrentLearning(ctx, agent.AnalyzeCurrentCodebaseBatchOperation(req), "learning-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentCodebaseBatch, task, agent.Conversation{Provider: c.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, conversation, err := c.callCurrentLearningWithOptions(ctx, agent.AnalyzeCurrentCodebaseBatchOperation(req), "learning-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentCodebaseBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{Provider: c.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.AnalyzeCurrentCodebaseBatchPromptData(inputs, req)
 	})
 	if err != nil {
@@ -62,7 +62,7 @@ func (c *CodexAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent
 
 func (c *CodexAgent) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-delta-pack-analyze", req.RuntimeLabel))
-	output, conversation, err := c.callCurrentLearning(ctx, agent.AnalyzeCurrentDeltaBatchOperation(req), "learning-delta-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-delta-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentDeltaBatch, task, agent.Conversation{Provider: c.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, conversation, err := c.callCurrentLearningWithOptions(ctx, agent.AnalyzeCurrentDeltaBatchOperation(req), "learning-delta-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-delta-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentDeltaBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{Provider: c.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.AnalyzeCurrentDeltaBatchPromptData(inputs, req)
 	})
 	if err != nil {

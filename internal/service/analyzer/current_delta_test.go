@@ -141,7 +141,38 @@ func TestValidateDeltaChangesKeepsPatternWhenItsEvidenceStillExists(t *testing.T
 	})
 
 	require.NoError(t, err)
-	require.Empty(t, validated)
+	require.Len(t, validated, 1)
+	require.Equal(t, domain.KnowledgePatternNoChange, validated[0].PatternAction)
+	require.Empty(t, validated[0].PatternID)
+}
+
+func TestValidateDeltaChangesKeepsFocusDecisionWhenProposalFailsAdmission(t *testing.T) {
+	root := t.TempDir()
+	svc := NewAnalyzerService(&mocks.MockAgent{NameVal: "test", AvailableVal: true}, nil)
+	proposal := domain.NewPattern("api-contract", "API Contract", domain.CategoryAPI)
+	change := domain.KnowledgeChange{
+		FocusAction:   domain.KnowledgeFocusExisting,
+		FocusID:       "api-contract-design",
+		PatternAction: domain.KnowledgePatternAdd,
+		Proposal:      proposal,
+		Anchors:       []domain.PatternDiffAnchor{{Path: "internal/api/types.go"}},
+		Reason:        "The diff appears to change a reusable contract.",
+	}
+
+	second := change
+	second.PatternAction = domain.KnowledgePatternUpdate
+	second.PatternID = "missing-api-contract"
+	second.Proposal = domain.NewPattern("missing-api-contract", "Missing API Contract", domain.CategoryAPI)
+
+	validated, err := svc.validateDeltaChanges(context.Background(), root, []domain.KnowledgeChange{change, second}, map[string]map[string]bool{
+		"api-contract-design": {"internal/api/types.go": true},
+	}, nil)
+
+	require.NoError(t, err)
+	require.Len(t, validated, 1)
+	require.Equal(t, "api-contract-design", validated[0].FocusID)
+	require.Equal(t, domain.KnowledgePatternNoChange, validated[0].PatternAction)
+	require.Nil(t, validated[0].Proposal)
 }
 
 func TestAnalyzeCurrentCodebaseBatchPassesSharedContextPath(t *testing.T) {
