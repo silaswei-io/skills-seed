@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.21]
+
+### Fixes
+
+- Fixed current-code learning replaying a saved pattern-normalization decision without applying capability-entry ownership validation. An invalid merge now falls back to separate candidates and replaces the checkpoint instead of failing `sync --resume` during admission.
+- Added regression coverage for replaying an invalid checkpoint, ensuring distinct capability entries cannot be merged into one Pattern by a historical decision.
+- Ignored this repository's generated root `.skills-seed/` state so release staging cannot accidentally commit local learning data.
+
 ## [v0.20.20]
 
 ### Changes

@@ -26,6 +26,7 @@ coverage.html
 Thumbs.db
 
 # Project specific
+/.skills-seed/
 *.db
 *.log
 AGENTS.md

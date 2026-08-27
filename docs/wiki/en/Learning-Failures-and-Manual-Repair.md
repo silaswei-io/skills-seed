@@ -57,6 +57,7 @@ Always run `skills-seed generate skills` after correcting a pattern, Rule, or Wo
 | Situation | Action | Why |
 |---|---|---|
 | Normal interruption, temporary Agent failure, or post-save local failure | `skills-seed sync --resume` | Reuses valid checkpoints and avoids duplicate calls |
+| A saved normalization decision merges distinct capability entries during resumption | `skills-seed sync --resume` | Automatically retains separate candidates and replaces the invalid checkpoint |
 | Command-state version is incompatible, or candidate files/context are untrustworthy | `skills-seed sync --restart` | Explicitly clears only this run's recovery state before analysis |
 | You need to discard all learned knowledge plus user Rules and Workflows | `skills-seed reset all` → `skills-seed sync` | Selected resources move to a backup; config and Context remain |
 | Initialization state as a whole is unusable or mode must change | `skills-seed reset ...` | Backs up old state before reinitialization |

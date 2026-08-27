@@ -149,6 +149,43 @@ func TestNormalizeAndStoreRejectsMergeAcrossDistinctCapabilityEntries(t *testing
 	require.ElementsMatch(t, []string{submit.ID, closeDispatcher.ID}, patternIDs(result.Written))
 }
 
+func TestNormalizeAndStoreReplacesInvalidCheckpointDecision(t *testing.T) {
+	submit := currentPattern("cluster.runconfiguredtransition", 0.9, "internal/cluster/transition.go")
+	submit.BusinessMethod = &domain.BusinessMethod{
+		Name:         "Cluster.RunConfiguredTransition",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/cluster/transition.go:41"},
+	}
+	register := currentPattern("registerconfiguredresources", 0.9, "internal/bootstrap/resources.go")
+	register.BusinessMethod = &domain.BusinessMethod{
+		Name:         "RegisterConfiguredResources",
+		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/bootstrap/resources.go:27"},
+	}
+	checkpoint := &decisionCheckpointStub{decision: &Decision{Patterns: []DecisionPattern{{
+		ID:          "config-driven-resource-initialization",
+		Name:        "Config-driven resource initialization",
+		Category:    string(domain.CategoryBusiness),
+		Description: "Initializes configured resources.",
+		Rule:        "Initialize configured resources through the relevant entry.",
+		Confidence:  0.9,
+		SourceIDs:   []string{submit.ID, register.ID},
+	}}}}
+	service := NewService(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) { return nil, nil },
+	})
+
+	result, err := service.NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:          OperationLearnCurrent,
+		Candidates:         []domain.Pattern{submit, register},
+		DecisionCheckpoint: checkpoint,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 2)
+	require.ElementsMatch(t, []string{submit.ID, register.ID}, patternIDs(result.Written))
+	require.NotNil(t, checkpoint.saved)
+	require.Len(t, checkpoint.saved.Patterns, 2)
+}
+
 func TestNormalizeAndStoreAllowsMergeForSameCapabilityEntry(t *testing.T) {
 	first := currentPattern("submit-behavior", 0.9, "internal/job/dispatcher.go")
 	first.BusinessMethod = &domain.BusinessMethod{
@@ -280,6 +317,20 @@ type normalizePatternsFunc func(context.Context, *agent.NormalizePatternsRequest
 
 func (f normalizePatternsFunc) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
 	return f(ctx, req)
+}
+
+type decisionCheckpointStub struct {
+	decision *Decision
+	saved    *Decision
+}
+
+func (s *decisionCheckpointStub) Load(context.Context, string) (*Decision, bool, error) {
+	return s.decision, s.decision != nil, nil
+}
+
+func (s *decisionCheckpointStub) Save(_ context.Context, _ string, decision *Decision) error {
+	s.saved = decision
+	return nil
 }
 
 func mergedNormalization(id string, sources ...domain.Pattern) *agent.NormalizePatternsResult {

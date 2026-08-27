@@ -38,6 +38,7 @@ Local code validates path scope, input coverage, structured contracts, source sa
 - Independent source analysis can run in parallel, controlled by `agent.parallelism`.
 - Independent knowledge review operates on a complete focus, rather than mechanically splitting by candidate count.
 - The agenda is persisted as soon as planning finishes, and each focus is checkpointed after source analysis and review. An interruption reuses the saved agenda and retries only unfinished focuses; changing the source scope or explicitly restarting replans it.
+- Resumption revalidates saved Pattern-normalization decisions. If a decision merges distinct capability entries, the CLI retains separate candidates and replaces that checkpoint instead of admitting the merge or interrupting persistence.
 - Pattern admission, the source baseline, and project-map refresh commit in phases. If interruption happens after patterns were stored, resumption restores the committed found/saved counts and the original change scope, so `sync` still decides Skills generation from the completed learning result.
 
 Parallelism improves throughput but increases Agent pressure. Size it for provider limits and repository scale rather than maximizing the value.

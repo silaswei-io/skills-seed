@@ -34,6 +34,8 @@ skills-seed sync --resume
 
 Resumption should reuse completed filtering, agenda, and focus checkpoints. Restart only when state versions are incompatible, inputs are no longer trustworthy, or the user explicitly requests it. The CLI should report incompatibility rather than silently deleting all state.
 
+Resumption revalidates saved Pattern-normalization decisions. If one merges distinct capability entries, the CLI retains separate candidates and replaces that checkpoint. This repair does not require `--restart`.
+
 If interruption happened after pattern admission, resumption can show `0` pending analysis files. That is normal: the CLI continues the source baseline, authority rules, and project-map refresh, while the final learning summary keeps the committed pattern counts and original change scope.
 
 ## Agent and Structured-Output Failures
@@ -55,7 +57,7 @@ skills-seed patterns stats
 skills-seed log
 ```
 
-`skills-seed log` reads runtime records under `.skills-seed/runtime/journal/`; workspace roots merge child-project records before display.
+`skills-seed log` reads runtime records under `.skills-seed/store/journal/`; workspace roots merge child-project records before display.
 
 See [Learning Failures and Manual Repair](Learning-Failures-and-Manual-Repair.md) for the full repair decision process, and the [command reference](../../COMMANDS.EN.md) and [configuration reference](../../CONFIGURATION.EN.md) for details.
 

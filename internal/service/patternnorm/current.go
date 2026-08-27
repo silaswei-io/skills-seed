@@ -22,7 +22,12 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 		if err != nil {
 			return nil, err
 		}
-		return finalizeCurrentNormalization(proposalFromDecision(result), candidates, retrieved.related)
+		if result, err := finalizeAndValidateCurrentNormalization(proposalFromDecision(result), candidates, retrieved.related); err == nil {
+			return result, nil
+		} else {
+			logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "source", "checkpoint", "error", err)
+		}
+		return fallbackCurrentNormalization(ctx, req.DecisionCheckpoint, decisionKey, candidates, retrieved.related)
 	}
 	guidance, err := s.guidance.Load()
 	if err != nil {
@@ -30,10 +35,7 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 	}
 
 	if result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, guidance, hooks); result != nil {
-		result, err = finalizeCurrentNormalization(result, candidates, retrieved.related)
-		if err == nil {
-			err = validateNormalizeResultForOperation(OperationLearnCurrent, result, candidates, retrieved.related)
-		}
+		result, err = finalizeAndValidateCurrentNormalization(result, candidates, retrieved.related)
 		if err == nil {
 			if err := saveNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, decisionFromProposal(result)); err != nil {
 				return nil, err
@@ -43,8 +45,27 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 		logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
 	}
 
-	result := keepCurrentCandidates(candidates)
-	if err := saveNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, decisionFromProposal(result)); err != nil {
+	return fallbackCurrentNormalization(ctx, req.DecisionCheckpoint, decisionKey, candidates, retrieved.related)
+}
+
+// fallbackCurrentNormalization 用逐条保留候选的方式替代不可用的规范化决策。
+func fallbackCurrentNormalization(ctx context.Context, checkpoint DecisionCheckpoint, decisionKey string, candidates, existing []domain.Pattern) (*proposal, error) {
+	result, err := finalizeAndValidateCurrentNormalization(keepCurrentCandidates(candidates), candidates, existing)
+	if err != nil {
+		return nil, fmt.Errorf("validate local fallback normalization: %w", err)
+	}
+	if err := saveNormalizationDecision(ctx, checkpoint, decisionKey, decisionFromProposal(result)); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func finalizeAndValidateCurrentNormalization(result *proposal, candidates, existing []domain.Pattern) (*proposal, error) {
+	result, err := finalizeCurrentNormalization(result, candidates, existing)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateNormalizeResultForOperation(OperationLearnCurrent, result, candidates, existing); err != nil {
 		return nil, err
 	}
 	return result, nil
