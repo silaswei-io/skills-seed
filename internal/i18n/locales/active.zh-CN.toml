@@ -1492,7 +1492,7 @@ other = "[sync] 未检测到学习变化，跳过 skills 生成"
 other = "[sync] 完成！"
 
 [SyncLearnCompleted]
-other = "[sync] 学习阶段完成：变更 {{.Changed}} 个，删除 {{.Deleted}} 个，发现模式 {{.Patterns}} 个，保存 {{.Saved}} 个，用时 {{.Duration}}"
+other = "[sync] 学习阶段完成：变更 {{.Changed}} 个，删除 {{.Deleted}} 个，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，用时 {{.Duration}}"
 
 [SyncGenerateCompleted]
 other = "[sync] 生成阶段完成，用时 {{.Duration}}"
@@ -2076,7 +2076,7 @@ other = "focus 路径 {{.Path}} 不可访问"
 other = "无效的项目画像策略 {{.Mode}}，可选值为 auto、skip 或 refresh"
 
 [LearnCurrentResult]
-other = "分析结果:\n  • 新增或更新模式数: {{.PatternsCount}}"
+other = "分析结果:\n  • 审查后候选模式数: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeFocusesSummary]
 other = "证据焦点完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}} 个，项目内并发 {{.Parallelism}}"
@@ -2347,7 +2347,7 @@ other = "学习当前代码"
 other = "生成 skills"
 
 [ChangeLogLearnProjectSummary]
-other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}；发现 {{.Patterns}} 个 patterns，保存 {{.Saved}} 个，移除过期 {{.Retired}} 个"
+other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}；发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除过期 {{.Retired}} 个"
 
 [ChangeLogLearnWorkspaceSummary]
 other = "处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有模式变化"
@@ -2365,7 +2365,7 @@ other = "已生成 skills"
 other = "未检测到学习变化，跳过 skills 生成"
 
 [LearnJournalSummaryCounts]
-other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}，发现 {{.Patterns}}，保存 {{.Saved}}，移除 {{.Retired}}"
+other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除 {{.Retired}} 个"
 
 [LearnJournalWorkspaceSummary]
 other = "处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有变化"
@@ -2380,7 +2380,7 @@ other = "输出路径 {{.Path}}"
 other = "生成运行记录写入失败：{{.Error}}"
 
 [SyncJournalLearnSummary]
-other = "学习摘要：处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有变化；变更 {{.Changed}}，删除 {{.Deleted}}，发现 {{.Patterns}}，保存 {{.Saved}}"
+other = "学习摘要：处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有变化；变更 {{.Changed}}，删除 {{.Deleted}}，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个"
 
 [SyncJournalWorkspaceRelationshipsChanged]
 other = "workspace 关系产物已更新"

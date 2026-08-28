@@ -1492,7 +1492,7 @@ other = "[sync] No learned changes detected; skipping skills generation"
 other = "[sync] Complete!"
 
 [SyncLearnCompleted]
-other = "[sync] Learn step completed: {{.Changed}} changed, {{.Deleted}} deleted, {{.Patterns}} patterns found, {{.Saved}} saved, duration {{.Duration}}"
+other = "[sync] Learn step completed: {{.Changed}} changed, {{.Deleted}} deleted, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, duration {{.Duration}}"
 
 [SyncGenerateCompleted]
 other = "[sync] Generate step completed, duration {{.Duration}}"
@@ -2076,7 +2076,7 @@ other = "Focus path {{.Path}} is not accessible"
 other = "Invalid project profile strategy {{.Mode}}; expected auto, skip, or refresh"
 
 [LearnCurrentResult]
-other = "Analysis result:\n  • new or updated patterns: {{.PatternsCount}}"
+other = "Analysis result:\n  • candidate patterns after review: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeFocusesSummary]
 other = "Evidence focuses completed: {{.Completed}}/{{.Total}}, batches {{.Batches}}, in-project parallelism {{.Parallelism}}"
@@ -2347,7 +2347,7 @@ other = "Learned current code"
 other = "Generated skills"
 
 [ChangeLogLearnProjectSummary]
-other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}; found {{.Patterns}} patterns, saved {{.Saved}}, retired {{.Retired}}"
+other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}; {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, {{.Retired}} retired"
 
 [ChangeLogLearnWorkspaceSummary]
 other = "processed {{.Projects}} projects; {{.ChangedProjects}} changed patterns"
@@ -2365,7 +2365,7 @@ other = "generated skills"
 other = "no learned changes detected; skipped skills generation"
 
 [LearnJournalSummaryCounts]
-other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}, found {{.Patterns}}, saved {{.Saved}}, retired {{.Retired}}"
+other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, {{.Retired}} retired"
 
 [LearnJournalWorkspaceSummary]
 other = "processed {{.Projects}} projects; {{.ChangedProjects}} changed"
@@ -2380,7 +2380,7 @@ other = "output path {{.Path}}"
 other = "failed to write generate run record: {{.Error}}"
 
 [SyncJournalLearnSummary]
-other = "learn summary: processed {{.Projects}} projects; {{.ChangedProjects}} changed; changed {{.Changed}}, deleted {{.Deleted}}, found {{.Patterns}}, saved {{.Saved}}"
+other = "learn summary: processed {{.Projects}} projects; {{.ChangedProjects}} changed; {{.Changed}} files changed, {{.Deleted}} deleted, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written"
 
 [SyncJournalWorkspaceRelationshipsChanged]
 other = "workspace relationship artifacts updated"

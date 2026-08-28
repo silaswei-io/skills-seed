@@ -116,3 +116,39 @@ func TestGetWithParamsNonExisting(t *testing.T) {
 	})
 	assert.Equal(t, "NonExistingKey99999", result)
 }
+
+func TestLearningSummariesDistinguishCandidatesFromNormalizedWrites(t *testing.T) {
+	params := map[string]interface{}{
+		"Projects":        1,
+		"ChangedProjects": 1,
+		"Changed":         39,
+		"Deleted":         0,
+		"Skipped":         0,
+		"Patterns":        5,
+		"Saved":           7,
+		"Retired":         0,
+		"Duration":        "5s",
+	}
+	keys := []string{
+		"SyncLearnCompleted",
+		"ChangeLogLearnProjectSummary",
+		"LearnJournalSummaryCounts",
+		"SyncJournalLearnSummary",
+	}
+
+	for _, key := range keys {
+		t.Run(key, func(t *testing.T) {
+			chinese := GetForLocaleWithParams(LocaleChinese, key, params)
+			require.Contains(t, chinese, "发现候选模式 5 个")
+			require.Contains(t, chinese, "规范化写入 7 个")
+
+			english := GetForLocaleWithParams(LocaleEnglish, key, params)
+			require.Contains(t, english, "5 candidate patterns found")
+			require.Contains(t, english, "7 normalized patterns written")
+		})
+	}
+
+	analysisParams := map[string]interface{}{"PatternsCount": 5}
+	require.Contains(t, GetForLocaleWithParams(LocaleChinese, "LearnCurrentResult", analysisParams), "审查后候选模式数: 5")
+	require.Contains(t, GetForLocaleWithParams(LocaleEnglish, "LearnCurrentResult", analysisParams), "candidate patterns after review: 5")
+}

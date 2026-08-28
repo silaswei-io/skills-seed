@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.26]
+
+### Fixes
+
+- Unified learning-summary terminology: review output is now labeled “candidate patterns found,” while the final upsert count, including related existing Patterns, is labeled “normalized patterns written.” This avoids implying that a `5 found / 7 written` result created more new Patterns than were discovered.
+- Updated bilingual wording across analysis results, live `sync` summaries, learn/sync journals, and changelog details, with i18n regression coverage.
+
 ## [v0.20.25]
 
 ### Fixes
