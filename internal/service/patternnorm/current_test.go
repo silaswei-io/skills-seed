@@ -219,6 +219,50 @@ func TestNormalizeAndStoreUsesCurrentCandidateForSamePatternID(t *testing.T) {
 	require.Equal(t, candidate.EvidenceLocations, result.Written[0].EvidenceLocations)
 }
 
+func TestNormalizeAndStoreRevalidatesExpandedExistingLineage(t *testing.T) {
+	existing := currentPattern("heartbeat-driven-node-registration-and-sync", 0.9, "internal/hotback/heartbeat.go")
+	existing.Source = domain.SourceLearnedCurrent
+	existing.Merged = true
+	existing.MergedFrom = []string{existing.ID, "heartbeat-driven-node-lifecycle"}
+	candidate := currentPattern("heartbeat-test-sync-mode", 0.9, "internal/hotback/heartbeat.go")
+
+	service := NewServiceWithNormalizer(&mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+			return []domain.Pattern{existing}, nil
+		},
+	}, normalizePatternsFunc(func(context.Context, *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+		return &agent.NormalizePatternsResult{Patterns: []agent.PatternNormalization{
+			{
+				ID:          existing.ID,
+				Name:        existing.Name,
+				Category:    string(existing.Category),
+				Description: existing.Description,
+				Rule:        existing.Rule,
+				Confidence:  existing.Confidence,
+				SourceIDs:   []string{existing.ID},
+			},
+			{
+				ID:          candidate.ID,
+				Name:        candidate.Name,
+				Category:    string(candidate.Category),
+				Description: candidate.Description,
+				Rule:        candidate.Rule,
+				Confidence:  candidate.Confidence,
+				SourceIDs:   []string{candidate.ID},
+			},
+		}}, nil
+	}))
+
+	result, err := service.NormalizeAndStore(context.Background(), NormalizeRequest{
+		Operation:  OperationLearnCurrent,
+		Candidates: []domain.Pattern{candidate},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Written, 2)
+	require.ElementsMatch(t, existing.MergedFrom, result.Written[0].MergedFrom)
+}
+
 func TestNormalizeAndStoreResetsInheritedCurrentCandidateSources(t *testing.T) {
 	healthChecks := currentPattern("runconfiguredhealthchecks", 0.9, "internal/config/health.go")
 	healthChecks.Source = domain.SourceLearnedCurrent

@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.25]
+
+### 修复
+
+- 修复当前代码规范化结果第一次水合展开已有 Pattern 的历史 `MergedFrom` 谱系后，入库前重复校验把该合法谱系误判为未知来源的问题。
+- 来源索引现在只将无歧义的历史谱系回指到当前有效 Pattern，并按主 Pattern ID 去重水合来源；当前候选仍覆盖同 ID 旧记录，存在多重归属的谱系仍会被拒绝。
+- 补充 `heartbeat-driven-node-registration-and-sync` / `heartbeat-driven-node-lifecycle` 现场回归测试，以及唯一和歧义谱系的索引边界测试。
+
 ## [v0.20.24]
 
 ### 修复

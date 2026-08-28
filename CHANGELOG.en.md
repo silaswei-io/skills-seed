@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.25]
+
+### Fixes
+
+- Fixed current-code normalization expanding an existing Pattern's historical `MergedFrom` lineage during initial hydration and then misclassifying that valid lineage as an unknown source during pre-storage revalidation.
+- The source index now resolves only unambiguous historical lineage to the effective Pattern and deduplicates hydrated sources by canonical Pattern ID. Current candidates still replace same-ID stored records, and lineage with multiple owners remains rejected.
+- Added regression coverage for the reported `heartbeat-driven-node-registration-and-sync` / `heartbeat-driven-node-lifecycle` case and source-index boundaries for unique and ambiguous lineage.
+
 ## [v0.20.24]
 
 ### Fixes

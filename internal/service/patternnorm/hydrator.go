@@ -16,12 +16,17 @@ func hydrateNormalizeResult(result *proposal, candidates, existing []domain.Patt
 	for i := range result.Patterns {
 		pattern := &result.Patterns[i]
 		var sources []domain.Pattern
+		seenSources := make(map[string]struct{}, len(pattern.MergedFrom))
 		allowedEvidence := make(map[string]domain.PatternEvidenceLocation)
 		for _, sourceID := range pattern.MergedFrom {
 			source, ok := inputs[sourceID]
 			if !ok {
 				return fmt.Errorf("normalized pattern %q references unknown source %q", pattern.ID, sourceID)
 			}
+			if _, seen := seenSources[source.ID]; seen {
+				continue
+			}
+			seenSources[source.ID] = struct{}{}
 			sources = append(sources, source)
 			for _, location := range source.EvidenceLocations {
 				key := evidenceKey(location)
