@@ -38,6 +38,23 @@ func TestWorkspacePhaseStepLabel(t *testing.T) {
 	require.Equal(t, "生成", workspacePhaseStepLabel("ProgressSyncWorkspacePhaseGenerate", ""))
 }
 
+func TestSyncWorkspaceProjectProgressLabelDistinguishesOutcomes(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	changed := syncWorkspaceProjectProgressLabel(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{
+		ChangedFiles:    39,
+		DeletedFiles:    1,
+		PatternsFound:   5,
+		PatternsSaved:   7,
+		PatternsRetired: 2,
+	}}, false)
+	require.Equal(t, "完成 · 变更 39 · 删除 1 · 候选 5 · 写入 7 · 移除 2", changed)
+
+	unchanged := domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}
+	require.Equal(t, "完成 · 无学习变化 · 跳过生成", syncWorkspaceProjectProgressLabel(unchanged, false))
+	require.Equal(t, "完成 · 无学习变化 · 补全 skills", syncWorkspaceProjectProgressLabel(unchanged, true))
+}
+
 func TestSyncLearnAfterLearnGeneratesWhenLearnChanged(t *testing.T) {
 	generateCalled := false
 
@@ -332,7 +349,15 @@ func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
 	initSyncWorkspaceFlowChild(t, workspaceRoot, project)
 
 	var calls []string
-	_, err := syncLearn(context.Background(), cont, "sync", "", syncRunAuto, nil, Dependencies{
+	wantSummary := domain.LearnCurrentSummary{
+		ChangedFiles:    39,
+		DeletedFiles:    1,
+		SkippedFiles:    2,
+		PatternsFound:   5,
+		PatternsSaved:   7,
+		PatternsRetired: 2,
+	}
+	result, err := syncLearn(context.Background(), cont, "sync", "", syncRunAuto, nil, Dependencies{
 		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			require.True(t, opts.Quiet)
 			require.NotNil(t, opts.OnStepStart)
@@ -340,7 +365,7 @@ func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
 			calls = append(calls, "learn:"+cont.ConfigRepo.GetProjectConfig().Name)
 			opts.OnStepStart("learn")
 			opts.OnStepComplete("learn")
-			return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{PatternsSaved: 1}}, nil
+			return domain.LearnCurrentResult{Summary: wantSummary}, nil
 		},
 		Generate: func(cont *container.Container) error {
 			calls = append(calls, "generate-default:"+cont.ConfigRepo.GetProjectConfig().Name)
@@ -368,6 +393,9 @@ func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []string{"learn:backend", "generate:backend", "relationships", "generate:workspace"}, calls)
+	wantSummary.Projects = 1
+	wantSummary.ChangedProjects = 1
+	require.Equal(t, wantSummary, result.Summary)
 }
 
 func newSyncWorkspaceFlowTestContainer(t *testing.T, workspaceRoot string, projects []config.WorkspaceProjectConfig) *container.Container {

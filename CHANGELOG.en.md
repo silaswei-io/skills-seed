@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.27]
+
+### Changes
+
+- Improved workspace `sync` child-project terminal states to distinguish learned-change counts, no learned changes with generation skipped, and no learned changes with missing Skills restored, replacing ambiguous completion and globally prefixed skip messages.
+- Workspace-level learning results now aggregate file changes, candidate patterns, normalized writes, and retired Patterns across all children and preserve those totals in terminal summaries, changelog details, and sync journals. Unchanged workspace relationships no longer obscure child learning output.
+- Added regression coverage for workspace sync outcomes and bilingual statistics, with matching updates to configuration documentation and both Wiki locales.
+
 ## [v0.20.26]
 
 ### Fixes

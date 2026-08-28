@@ -126,6 +126,11 @@ func RecordLearnSummary(change ChangeRecorder, result domain.LearnCurrentResult)
 		change.Detail(i18n.GetWithParams("ChangeLogLearnWorkspaceSummary", map[string]interface{}{
 			"Projects":        summary.Projects,
 			"ChangedProjects": summary.ChangedProjects,
+			"Changed":         summary.ChangedFiles,
+			"Deleted":         summary.DeletedFiles,
+			"Patterns":        summary.PatternsFound,
+			"Saved":           summary.PatternsSaved,
+			"Retired":         summary.PatternsRetired,
 		}))
 		if summary.WorkspaceChanged {
 			change.Detail(i18n.Get("ChangeLogWorkspaceRelationshipsChanged"))

@@ -13,7 +13,7 @@ import (
 
 const (
 	// ProgramVersion 是 `skills-seed --version` 展示的 CLI 版本
-	ProgramVersion = "v0.20.26"
+	ProgramVersion = "v0.20.27"
 
 	UnavailableHash = "unavailable"
 

@@ -1044,6 +1044,15 @@ other = "学习"
 [ProgressSyncWorkspacePhaseGenerate]
 other = "生成"
 
+[SyncWorkspaceProjectProgressChanged]
+other = "完成 · 变更 {{.Changed}} · 删除 {{.Deleted}} · 候选 {{.Patterns}} · 写入 {{.Saved}} · 移除 {{.Retired}}"
+
+[SyncWorkspaceProjectProgressUnchanged]
+other = "完成 · 无学习变化 · 跳过生成"
+
+[SyncWorkspaceProjectProgressRestored]
+other = "完成 · 无学习变化 · 补全 skills"
+
 [ProgressUserDefinePatternAI]
 other = "生成用户定义模式"
 
@@ -1493,6 +1502,9 @@ other = "[sync] 完成！"
 
 [SyncLearnCompleted]
 other = "[sync] 学习阶段完成：变更 {{.Changed}} 个，删除 {{.Deleted}} 个，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，用时 {{.Duration}}"
+
+[SyncWorkspaceLearnCompleted]
+other = "[sync] 工作区学习阶段完成：子项目 {{.Projects}} 个，{{.ChangedProjects}} 个有学习变化；变更 {{.Changed}} 个，删除 {{.Deleted}} 个，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除 {{.Retired}} 个"
 
 [SyncGenerateCompleted]
 other = "[sync] 生成阶段完成，用时 {{.Duration}}"
@@ -2350,7 +2362,7 @@ other = "生成 skills"
 other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}；发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除过期 {{.Retired}} 个"
 
 [ChangeLogLearnWorkspaceSummary]
-other = "处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有模式变化"
+other = "处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有学习变化；变更 {{.Changed}}，删除 {{.Deleted}}，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除 {{.Retired}} 个"
 
 [ChangeLogLearnNoFileChanges]
 other = "未检测到需要学习的文件变化"
@@ -2380,7 +2392,7 @@ other = "输出路径 {{.Path}}"
 other = "生成运行记录写入失败：{{.Error}}"
 
 [SyncJournalLearnSummary]
-other = "学习摘要：处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有变化；变更 {{.Changed}}，删除 {{.Deleted}}，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个"
+other = "学习摘要：处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有学习变化；变更 {{.Changed}}，删除 {{.Deleted}}，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除 {{.Retired}} 个"
 
 [SyncJournalWorkspaceRelationshipsChanged]
 other = "workspace 关系产物已更新"

@@ -131,7 +131,9 @@ func TestLearningSummariesDistinguishCandidatesFromNormalizedWrites(t *testing.T
 	}
 	keys := []string{
 		"SyncLearnCompleted",
+		"SyncWorkspaceLearnCompleted",
 		"ChangeLogLearnProjectSummary",
+		"ChangeLogLearnWorkspaceSummary",
 		"LearnJournalSummaryCounts",
 		"SyncJournalLearnSummary",
 	}

@@ -1044,6 +1044,15 @@ other = "Learning"
 [ProgressSyncWorkspacePhaseGenerate]
 other = "Generating"
 
+[SyncWorkspaceProjectProgressChanged]
+other = "done · changed {{.Changed}} · deleted {{.Deleted}} · candidates {{.Patterns}} · written {{.Saved}} · retired {{.Retired}}"
+
+[SyncWorkspaceProjectProgressUnchanged]
+other = "done · no learned changes · generation skipped"
+
+[SyncWorkspaceProjectProgressRestored]
+other = "done · no learned changes · skills restored"
+
 [ProgressUserDefinePatternAI]
 other = "Generate user-defined pattern"
 
@@ -1493,6 +1502,9 @@ other = "[sync] Complete!"
 
 [SyncLearnCompleted]
 other = "[sync] Learn step completed: {{.Changed}} changed, {{.Deleted}} deleted, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, duration {{.Duration}}"
+
+[SyncWorkspaceLearnCompleted]
+other = "[sync] Workspace learning completed: {{.Projects}} projects, {{.ChangedProjects}} with learned changes; {{.Changed}} changed, {{.Deleted}} deleted, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, {{.Retired}} retired"
 
 [SyncGenerateCompleted]
 other = "[sync] Generate step completed, duration {{.Duration}}"
@@ -2350,7 +2362,7 @@ other = "Generated skills"
 other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}; {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, {{.Retired}} retired"
 
 [ChangeLogLearnWorkspaceSummary]
-other = "processed {{.Projects}} projects; {{.ChangedProjects}} changed patterns"
+other = "processed {{.Projects}} projects; {{.ChangedProjects}} with learned changes; {{.Changed}} changed, {{.Deleted}} deleted, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, {{.Retired}} retired"
 
 [ChangeLogLearnNoFileChanges]
 other = "no learnable file changes detected"
@@ -2380,7 +2392,7 @@ other = "output path {{.Path}}"
 other = "failed to write generate run record: {{.Error}}"
 
 [SyncJournalLearnSummary]
-other = "learn summary: processed {{.Projects}} projects; {{.ChangedProjects}} changed; {{.Changed}} files changed, {{.Deleted}} deleted, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written"
+other = "learn summary: processed {{.Projects}} projects; {{.ChangedProjects}} with learned changes; {{.Changed}} changed, {{.Deleted}} deleted, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, {{.Retired}} retired"
 
 [SyncJournalWorkspaceRelationshipsChanged]
 other = "workspace relationship artifacts updated"

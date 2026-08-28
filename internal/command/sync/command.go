@@ -284,6 +284,7 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 	}
 	var mu stdsync.Mutex
 	changedProjects := map[string]bool{}
+	childTotals := domain.LearnCurrentSummary{}
 	childGenerated := false
 	childProgress := progress.NewMulti(commandutil.WorkspaceProjectProgressNames(workspaceConfig.Projects))
 	defer childProgress.Stop()
@@ -316,7 +317,9 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 			childProgress.Fail(progressName, i18n.Get("LearnWorkspaceProjectProgressFailed"))
 			return fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 		}
-		shouldGenerate := syncflow.ShouldGenerateAfterLearn(result) || syncGeneratedSkillMissing(childCont)
+		learnChanged := syncflow.ShouldGenerateAfterLearn(result)
+		outputMissing := syncGeneratedSkillMissing(childCont)
+		shouldGenerate := learnChanged || outputMissing
 		if shouldGenerate {
 			if err := dependencies.GenerateChild(childCont, GenerateChildOptions{
 				OnStepStart: func(label string) {
@@ -332,13 +335,12 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 				childProgress.Fail(progressName, i18n.Get("GenerateWorkspaceProjectProgressFailed"))
 				return fmt.Errorf("%s: %w", i18n.Get("SyncGenerateFailed"), err)
 			}
-			childProgress.Complete(progressName, i18n.Get("GenerateWorkspaceProjectProgressComplete"))
-		} else {
-			childProgress.Complete(progressName, i18n.Get("SyncGenerateSkippedNoChanges"))
 		}
+		childProgress.Complete(progressName, syncWorkspaceProjectProgressLabel(result, outputMissing))
 
 		mu.Lock()
-		if syncflow.ShouldGenerateAfterLearn(result) {
+		mergeProjectLearnSummary(&childTotals, result.Summary)
+		if learnChanged {
 			changedProjects[workspaceProjectScope(project)] = true
 		}
 		if shouldGenerate {
@@ -354,12 +356,20 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 	if err != nil {
 		return domain.LearnCurrentResult{}, fmt.Errorf("%s: %w", i18n.Get("SyncLearnFailed"), err)
 	}
-	result := domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{
-		Projects:         len(workspaceConfig.Projects),
-		ChangedProjects:  len(changedProjects),
-		WorkspaceChanged: relationshipsChanged,
-		NoFileChanges:    !relationshipsChanged && len(changedProjects) == 0,
-	}}
+	childTotals.Projects = len(workspaceConfig.Projects)
+	childTotals.ChangedProjects = len(changedProjects)
+	childTotals.WorkspaceChanged = relationshipsChanged
+	childTotals.NoFileChanges = !relationshipsChanged && len(changedProjects) == 0
+	result := domain.LearnCurrentResult{Summary: childTotals}
+	logger.InfoAfterProgress(i18n.GetWithParams("SyncWorkspaceLearnCompleted", map[string]interface{}{
+		"Projects":        childTotals.Projects,
+		"ChangedProjects": childTotals.ChangedProjects,
+		"Changed":         childTotals.ChangedFiles,
+		"Deleted":         childTotals.DeletedFiles,
+		"Patterns":        childTotals.PatternsFound,
+		"Saved":           childTotals.PatternsSaved,
+		"Retired":         childTotals.PatternsRetired,
+	}))
 	syncflow.RecordLearnSummary(change, result)
 
 	rootMissing := syncSkillOutputMissing(projectConfig.RootPath, cont.ConfigRepo.GetEffectiveSkillsPath())
@@ -396,6 +406,32 @@ func workspacePhaseStepLabel(phaseKey, label string) string {
 		return phase
 	}
 	return phase + " · " + label
+}
+
+func syncWorkspaceProjectProgressLabel(result domain.LearnCurrentResult, outputMissing bool) string {
+	if syncflow.ShouldGenerateAfterLearn(result) {
+		summary := result.Summary
+		return i18n.GetWithParams("SyncWorkspaceProjectProgressChanged", map[string]interface{}{
+			"Changed":  summary.ChangedFiles,
+			"Deleted":  summary.DeletedFiles,
+			"Patterns": summary.PatternsFound,
+			"Saved":    summary.PatternsSaved,
+			"Retired":  summary.PatternsRetired,
+		})
+	}
+	if outputMissing {
+		return i18n.Get("SyncWorkspaceProjectProgressRestored")
+	}
+	return i18n.Get("SyncWorkspaceProjectProgressUnchanged")
+}
+
+func mergeProjectLearnSummary(total *domain.LearnCurrentSummary, project domain.LearnCurrentSummary) {
+	total.ChangedFiles += project.ChangedFiles
+	total.DeletedFiles += project.DeletedFiles
+	total.SkippedFiles += project.SkippedFiles
+	total.PatternsFound += project.PatternsFound
+	total.PatternsSaved += project.PatternsSaved
+	total.PatternsRetired += project.PatternsRetired
 }
 
 func syncGeneratedSkillMissing(cont *container.Container) bool {
@@ -470,6 +506,7 @@ func recordSyncJournal(cont *container.Container, result domain.LearnCurrentResu
 			"Deleted":         result.Summary.DeletedFiles,
 			"Patterns":        result.Summary.PatternsFound,
 			"Saved":           result.Summary.PatternsSaved,
+			"Retired":         result.Summary.PatternsRetired,
 		}))
 	} else {
 		details = append(details, i18n.GetWithParams("ChangeLogLearnProjectSummary", map[string]interface{}{
