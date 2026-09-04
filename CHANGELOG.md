@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.29]
+
+### 修复
+
+- 收窄 Markdown readiness 链接识别的代码索引豁免范围，仅忽略带引号或数字索引的源码表达式，同时继续检查紧邻书写的真实 Markdown 链接，避免校验器漏报坏链接。
+
 ## [v0.20.28]
 
 ### 修复

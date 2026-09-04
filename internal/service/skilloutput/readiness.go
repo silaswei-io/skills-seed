@@ -168,10 +168,15 @@ func markdownInlineLinkTargets(line string) []string {
 			i = j
 			continue
 		}
-		if inlineCodeDelimiter == 0 && line[i] == '[' && (i == 0 || !isMarkdownLinkEmbeddedChar(line[i-1])) {
+		if inlineCodeDelimiter == 0 && line[i] == '[' {
 			if endLabel := strings.IndexByte(line[i+1:], ']'); endLabel >= 0 {
 				close := i + 1 + endLabel
 				if close+1 < len(line) && line[close+1] == '(' {
+					label := line[i+1 : close]
+					if i > 0 && isMarkdownLinkEmbeddedChar(line[i-1]) && looksLikeCodeIndexLabel(label) {
+						i = close + 1
+						continue
+					}
 					if endTarget := strings.IndexByte(line[close+2:], ')'); endTarget >= 0 {
 						targets = append(targets, line[close+2:close+2+endTarget])
 						i = close + 3 + endTarget
@@ -186,7 +191,23 @@ func markdownInlineLinkTargets(line string) []string {
 }
 
 func isMarkdownLinkEmbeddedChar(char byte) bool {
-	return char == '_' || char == '-' || char == '"' || char == '\'' || char == ']' || char == ')' || char == '`' || (char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+	return char == '_' || char == ')' || (char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+}
+
+func looksLikeCodeIndexLabel(label string) bool {
+	label = strings.TrimSpace(label)
+	if len(label) >= 2 && ((label[0] == '"' && label[len(label)-1] == '"') || (label[0] == '\'' && label[len(label)-1] == '\'')) {
+		return true
+	}
+	if label == "" {
+		return false
+	}
+	for i := 0; i < len(label); i++ {
+		if label[i] < '0' || label[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func localMarkdownTarget(raw string) string {

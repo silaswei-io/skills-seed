@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.29]
+
+### Fixes
+
+- Narrowed the Markdown readiness link parser's code-index exemption to quoted or numeric source indices while continuing to check adjacent real Markdown links, preventing the validator from missing broken links.
+
 ## [v0.20.28]
 
 ### Fixes

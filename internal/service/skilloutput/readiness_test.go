@@ -42,6 +42,15 @@ func TestAuditReadinessIgnoresCodeLikeIndexExpression(t *testing.T) {
 	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
 }
 
+func TestAuditReadinessChecksAdjacentMarkdownLink(t *testing.T) {
+	root := t.TempDir()
+	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\nprefix[Missing](./missing.md)\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+	err := AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}})
+	require.ErrorContains(t, err, "broken link")
+}
+
 func TestAuditReadinessIgnoresCodeSpansAndFences(t *testing.T) {
 	root := t.TempDir()
 	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\n`[Missing](./missing.md)`\n\n```go\n[Missing](./missing.md)\n```\n"
