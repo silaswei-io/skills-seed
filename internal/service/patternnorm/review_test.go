@@ -230,6 +230,29 @@ func TestApplyKnowledgeReviewRejectsUnknownRevisionFlag(t *testing.T) {
 	require.ErrorContains(t, err, "invalid flags")
 }
 
+func TestApplyKnowledgeReviewRejectsInvalidReasonCode(t *testing.T) {
+	candidate := currentPattern("bounded-behavior", 0.9, "src/behavior.ext")
+
+	_, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
+		CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "unknown",
+		Reason: "The evidence supports the candidate.",
+	}})
+
+	require.ErrorContains(t, err, "invalid reason_code")
+}
+
+func TestApplyKnowledgeReviewTrimsDecisionFields(t *testing.T) {
+	candidate := currentPattern("bounded-behavior", 0.9, "src/behavior.ext")
+
+	result, err := applyKnowledgeReview([]domain.Pattern{candidate}, []agent.KnowledgeReviewDecision{{
+		CandidateID: candidate.ID, Verdict: " accept ", ReasonCode: " accepted ",
+		Reason: "  The evidence supports the candidate.  ",
+	}})
+
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+}
+
 func TestApplyKnowledgeReviewRejectsCandidate(t *testing.T) {
 	candidate := currentPattern("boilerplate", 0.9, "src/wrapper.ext")
 

@@ -32,7 +32,7 @@ Learning persists recoverable state. After a normal interruption, recoverable Ag
 skills-seed sync --resume
 ```
 
-Resumption should reuse completed filtering, agenda, and focus checkpoints. Restart only when state versions are incompatible, inputs are no longer trustworthy, or the user explicitly requests it. The CLI should report incompatibility rather than silently deleting all state.
+Resumption should consume the saved candidates, agenda, and focus checkpoints directly. It does not rerun candidate selection or agenda planning, and processes only unfinished focuses. Restart only when state versions are incompatible, inputs are no longer trustworthy, or the user explicitly requests it. The CLI should report incompatibility rather than silently deleting all state.
 
 Resumption revalidates saved Pattern-normalization decisions. If one merges distinct capability entries, the CLI retains separate candidates and replaces that checkpoint. This repair does not require `--restart`.
 

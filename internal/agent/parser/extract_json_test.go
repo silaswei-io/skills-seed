@@ -2,6 +2,7 @@ package parser
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -63,6 +64,70 @@ func TestParseOptimizeContentResultTrimsMarkdown(t *testing.T) {
 	require.Equal(t, []string{"boundary", "change"}, result.RouteTerms)
 }
 
+func TestParseSimpleResultsRejectInvalidJSON(t *testing.T) {
+	for name, parse := range map[string]func(string) error{
+		"optimize":  func(output string) error { _, err := ParseOptimizeContentResult(output); return err },
+		"authority": func(output string) error { _, err := ParseExtractAuthorityResult(output); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Error(t, parse("not json"))
+		})
+	}
+}
+
+func TestParseUserDefinePatternResultValidatesCommonPatternContract(t *testing.T) {
+	result, err := ParseUserDefinePatternResult(`{"id":"pattern","name":"Pattern","category":" business ","description":"Observed behavior.","good_example":"example","bad_example":"","rule":"Reuse the boundary.","confidence":0.8,"frequency":1,"knowledge_flags":[]}`)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, domain.CategoryBusiness, result.Pattern.Category)
+}
+
+func TestParseUserDefinePatternResultRejectsInvalidJSON(t *testing.T) {
+	result, err := ParseUserDefinePatternResult("not json")
+
+	require.Error(t, err)
+	require.Nil(t, result)
+}
+
+func TestParseUserDefinePatternResultRejectsInvalidCommonPatternContract(t *testing.T) {
+	output := `{"id":"pattern","name":"Pattern","category":"business","description":"","good_example":"example","bad_example":"","rule":"rule","confidence":0.8,"frequency":1,"knowledge_flags":[]}`
+
+	result, err := ParseUserDefinePatternResult(output)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "description")
+}
+
+func TestParseUserDefinePatternResultRejectsInvalidPatternValues(t *testing.T) {
+	base := `{"id":"pattern","name":"Pattern","category":"business","description":"description","good_example":"example","bad_example":"","rule":"rule","confidence":0.8,"frequency":1,"knowledge_flags":[]}`
+	tests := []struct {
+		name string
+		find string
+		repl string
+		want string
+	}{
+		{name: "empty id", find: `"id":"pattern"`, repl: `"id":""`, want: "id"},
+		{name: "empty name", find: `"name":"Pattern"`, repl: `"name":""`, want: "name"},
+		{name: "invalid category", find: `"category":"business"`, repl: `"category":"unknown"`, want: "category"},
+		{name: "empty rule", find: `"rule":"rule"`, repl: `"rule":""`, want: "rule"},
+		{name: "invalid confidence", find: `"confidence":0.8`, repl: `"confidence":1.1`, want: "confidence"},
+		{name: "invalid frequency", find: `"frequency":1`, repl: `"frequency":0`, want: "frequency"},
+		{name: "invalid flags", find: `"knowledge_flags":[]`, repl: `"knowledge_flags":["unknown"]`, want: "knowledge flags"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := ParseUserDefinePatternResult(strings.Replace(base, test.find, test.repl, 1))
+
+			require.Error(t, err)
+			require.Nil(t, result)
+			require.ErrorContains(t, err, test.want)
+		})
+	}
+}
+
 func TestParsePlanLearningAgendaResultKeepsCoverageReceipt(t *testing.T) {
 	result, err := ParsePlanLearningAgendaResult(`{
 		"focuses":[{"id":"contract","name":"Contract","analysis_depth":"careful","entry_paths":["src/contract.ext"]}],
@@ -116,6 +181,108 @@ func TestParseReviewKnowledgeResultSetsBusinessMethod(t *testing.T) {
 	require.NotNil(t, result.Decisions[0].BusinessMethod)
 	require.Equal(t, "State.Transition", result.Decisions[0].BusinessMethod.Name)
 	require.Equal(t, "src/state.ext:24", result.Decisions[0].BusinessMethod.CodeLocation.CurrentLocation)
+}
+
+func TestParseReviewKnowledgeResultRejectsMissingDecisions(t *testing.T) {
+	result, err := ParseReviewKnowledgeResult(`{}`)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "decisions")
+}
+
+func TestParseReviewKnowledgeResultRejectsInvalidDecisionFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "empty verdict",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"","reason_code":"accepted","reason":"checked"}]}`,
+			want:   `invalid verdict`,
+		},
+		{
+			name:   "empty candidate id",
+			output: `{"decisions":[{"candidate_id":"  ","verdict":"reject","reason_code":"unsupported_evidence","reason":"checked"}]}`,
+			want:   "candidate_id",
+		},
+		{
+			name:   "invalid reason code",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"accept","reason_code":"unknown","reason":"checked"}]}`,
+			want:   `invalid reason_code`,
+		},
+		{
+			name:   "empty reason",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"accept","reason_code":"accepted","reason":"  "}]}`,
+			want:   `reason`,
+		},
+		{
+			name:   "missing revision",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"revise","reason_code":"overclaimed","reason":"narrow it"}]}`,
+			want:   `revision`,
+		},
+		{
+			name:   "invalid revision category",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"revise","reason_code":"overclaimed","reason":"narrow it","revision":{"name":"name","category":"unknown","description":"description","rule":"rule","confidence":0.8,"knowledge_flags":[]}}]}`,
+			want:   `revision category`,
+		},
+		{
+			name:   "empty revision name",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"revise","reason_code":"overclaimed","reason":"narrow it","revision":{"name":"","category":"business","description":"description","rule":"rule","confidence":0.8,"knowledge_flags":[]}}]}`,
+			want:   "revision.name",
+		},
+		{
+			name:   "empty revision description",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"revise","reason_code":"overclaimed","reason":"narrow it","revision":{"name":"name","category":"business","description":"","rule":"rule","confidence":0.8,"knowledge_flags":[]}}]}`,
+			want:   "revision.description",
+		},
+		{
+			name:   "empty revision rule",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"revise","reason_code":"overclaimed","reason":"narrow it","revision":{"name":"name","category":"business","description":"description","rule":"","confidence":0.8,"knowledge_flags":[]}}]}`,
+			want:   "revision.rule",
+		},
+		{
+			name:   "invalid revision confidence",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"revise","reason_code":"overclaimed","reason":"narrow it","revision":{"name":"name","category":"business","description":"description","rule":"rule","confidence":1.1,"knowledge_flags":[]}}]}`,
+			want:   `confidence`,
+		},
+		{
+			name:   "invalid revision flag",
+			output: `{"decisions":[{"candidate_id":"candidate","verdict":"revise","reason_code":"overclaimed","reason":"narrow it","revision":{"name":"name","category":"business","description":"description","rule":"rule","confidence":0.8,"knowledge_flags":["unknown"]}}]}`,
+			want:   `revision flags`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := ParseReviewKnowledgeResult(test.output)
+
+			require.Error(t, err)
+			require.Nil(t, result)
+			require.ErrorContains(t, err, test.want)
+		})
+	}
+}
+
+func TestParseReviewKnowledgeResultTrimsDecisionEnumsAndText(t *testing.T) {
+	result, err := ParseReviewKnowledgeResult(`{"decisions":[{"candidate_id":"  candidate  ","verdict":" accept ","reason_code":" accepted ","reason":"  checked  "}]}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Decisions, 1)
+	require.Equal(t, "candidate", result.Decisions[0].CandidateID)
+	require.Equal(t, "accept", result.Decisions[0].Verdict)
+	require.Equal(t, "accepted", result.Decisions[0].ReasonCode)
+	require.Equal(t, "checked", result.Decisions[0].Reason)
+}
+
+func TestParseReviewKnowledgeResultUsesTrimmedVerdictForRevision(t *testing.T) {
+	result, err := ParseReviewKnowledgeResult(`{"decisions":[{"candidate_id":"candidate","verdict":" revise ","reason_code":" overclaimed ","reason":" narrow it ","revision":{"name":"name","category":"business","description":"description","rule":"rule","confidence":0.8,"knowledge_flags":[]}}]}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Decisions, 1)
+	require.Equal(t, "revise", result.Decisions[0].Verdict)
+	require.NotNil(t, result.Decisions[0].Revision)
 }
 
 func TestParseWorkspaceSpecParsesStringChangeOrder(t *testing.T) {
@@ -270,6 +437,87 @@ func TestParseAnalyzeCurrentCodebaseBatchResultRejectsStringCodeLocation(t *test
 
 	require.Error(t, err)
 	require.Nil(t, result)
+}
+
+func TestParseAnalyzeCurrentCodebaseBatchResultRejectsMissingFocusFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "missing focuses",
+			output: `{}`,
+			want:   "focuses",
+		},
+		{
+			name:   "missing focus id",
+			output: `{"focuses":[{"focus_name":"Focus","patterns":[],"profile_refresh_recommended":{"needed":false}}]}`,
+			want:   "focus_id",
+		},
+		{
+			name:   "missing focus name",
+			output: `{"focuses":[{"focus_id":"focus","patterns":[],"profile_refresh_recommended":{"needed":false}}]}`,
+			want:   "focus_name",
+		},
+		{
+			name:   "missing patterns",
+			output: `{"focuses":[{"focus_id":"focus","focus_name":"Focus","profile_refresh_recommended":{"needed":false}}]}`,
+			want:   "patterns",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := ParseAnalyzeCurrentCodebaseBatchResult(test.output)
+
+			require.Error(t, err)
+			require.Nil(t, result)
+			require.ErrorContains(t, err, test.want)
+		})
+	}
+}
+
+func TestParseAnalyzeCurrentCodebaseBatchResultRejectsInvalidPattern(t *testing.T) {
+	result, err := ParseAnalyzeCurrentCodebaseBatchResult(currentBatchOutput(`[{"id":"pattern","name":"Pattern","category":"business","description":"","good_example":"example","bad_example":"","rule":"rule","confidence":0.8,"frequency":1,"knowledge_flags":[]}]`))
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "description")
+}
+
+func TestParseAnalyzeCurrentDeltaBatchResultMapsChangesAndAnchors(t *testing.T) {
+	result, err := ParseAnalyzeCurrentDeltaBatchResult(`{
+  "knowledge_changes":[{
+    "focus_action":"extend","focus_id":"focus","focus_name":"Focus",
+    "pattern_action":"update","pattern_id":"pattern",
+    "proposal":{"id":"pattern","name":"Pattern","category":"business","description":"description","good_example":"example","bad_example":"","rule":"rule","confidence":0.8,"frequency":1,"knowledge_flags":[]},
+    "anchors":[{"path":"src/change.go","line":12,"symbol":"Run","change_kind":"modified","description":"changed"}],
+    "reason":"changed behavior"
+  }],
+  "profile_refresh_recommended":{"needed":false}
+}`)
+
+	require.NoError(t, err)
+	require.Len(t, result.Changes, 1)
+	require.Equal(t, "focus", result.Changes[0].FocusID)
+	require.Len(t, result.Changes[0].Anchors, 1)
+	require.NotNil(t, result.Changes[0].Proposal)
+}
+
+func TestParseAnalyzeCurrentDeltaBatchResultRejectsInvalidJSON(t *testing.T) {
+	result, err := ParseAnalyzeCurrentDeltaBatchResult("not json")
+
+	require.Error(t, err)
+	require.Nil(t, result)
+}
+
+func TestParseAnalyzeCurrentDeltaBatchResultRejectsMissingChanges(t *testing.T) {
+	result, err := ParseAnalyzeCurrentDeltaBatchResult(`{"profile_refresh_recommended":{"needed":false}}`)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "knowledge_changes")
 }
 
 func TestParseAnalyzeCurrentCodebaseBatchResultWithBusinessMethod(t *testing.T) {

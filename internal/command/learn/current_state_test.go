@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
@@ -204,6 +205,43 @@ func TestPendingEvidenceFocusesDerivesCompletionFromFocusKnowledge(t *testing.T)
 	pending := pendingEvidenceFocuses(state, changes)
 	require.Len(t, pending, 1)
 	require.Equal(t, "key", pending[0].ID)
+}
+
+func TestRunPlanningStageConsumesPersistedAgendaOnResume(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	focuses := []domain.EvidenceFocus{
+		{ID: "first", Name: "第一焦点", EntryPaths: []string{"first.go"}},
+		{ID: "second", Name: "第二焦点", EntryPaths: []string{"second.go"}},
+	}
+	state := commandstate.NewStateWithMode(commandStateLearnCurrent, "demo", "go", "normal", "", []domain.FileAnalysisRecord{
+		{Path: "first.go", Hash: "first"},
+		{Path: "second.go", Hash: "second"},
+	}, nil, focuses)
+	state.Analysis = &commandstate.AnalysisCheckpoint{
+		FocusKnowledge: []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0], Reviewed: true}},
+	}
+	run := &learnCurrentProjectRun{
+		stateSession: &currentStateSession{
+			State: state,
+			Changes: &fileanalysis.FileChanges{
+				Records:         append([]domain.FileAnalysisRecord(nil), state.Files...),
+				AddedOrModified: []string{"first.go", "second.go"},
+			},
+		},
+		incrementalChanges: &fileanalysis.FileChanges{
+			Records:         append([]domain.FileAnalysisRecord(nil), state.Files...),
+			AddedOrModified: []string{"first.go", "second.go"},
+		},
+		selectionPlan: currentFileSelectionPlan{Candidates: []string{"first.go", "second.go"}},
+		steps:         commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{TotalSteps: 1}),
+	}
+
+	require.NoError(t, run.runPlanningStage())
+
+	require.Len(t, run.plannedFocuses, 1)
+	require.Equal(t, "second", run.plannedFocuses[0].ID)
+	require.Same(t, state, run.analysisState)
+	require.NotEmpty(t, run.selectionSummary.Status)
 }
 
 func TestCheckpointFocusResultsMakesCompletedFocusRecoverable(t *testing.T) {

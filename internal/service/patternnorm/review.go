@@ -78,6 +78,15 @@ func applyKnowledgeReview(candidates []domain.Pattern, decisions []agent.Knowled
 		if strings.TrimSpace(decision.Reason) == "" || strings.TrimSpace(decision.ReasonCode) == "" {
 			return nil, fmt.Errorf("knowledge review decision %q has no reason", candidate.ID)
 		}
+		decision.Verdict = strings.TrimSpace(decision.Verdict)
+		decision.ReasonCode = strings.TrimSpace(decision.ReasonCode)
+		decision.Reason = strings.TrimSpace(decision.Reason)
+		if !agent.ValidKnowledgeReviewVerdict(decision.Verdict) {
+			return nil, fmt.Errorf("knowledge review decision %q has invalid verdict %q", candidate.ID, decision.Verdict)
+		}
+		if !agent.ValidKnowledgeReviewReasonCode(decision.ReasonCode) {
+			return nil, fmt.Errorf("knowledge review decision %q has invalid reason_code %q", candidate.ID, decision.ReasonCode)
+		}
 		candidate.BusinessMethod = reviewedBusinessMethod(decision.BusinessMethod)
 		switch decision.Verdict {
 		case "accept":

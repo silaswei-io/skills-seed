@@ -34,6 +34,22 @@ func TestAuditReadinessRejectsBrokenLocalLink(t *testing.T) {
 	require.ErrorContains(t, err, "broken link")
 }
 
+func TestAuditReadinessIgnoresCodeLikeIndexExpression(t *testing.T) {
+	root := t.TempDir()
+	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\nctx deadline uses params[\"deadline\"](RFC3339Nano).\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
+}
+
+func TestAuditReadinessIgnoresCodeSpansAndFences(t *testing.T) {
+	root := t.TempDir()
+	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\n`[Missing](./missing.md)`\n\n```go\n[Missing](./missing.md)\n```\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
+}
+
 func TestAuditReadinessRejectsMissingCriticalProjection(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte("---\nname: demo-dev\ndescription: Demo skill\n---\n"), 0o644))

@@ -15,7 +15,7 @@ func patternToDomain(p aicontract.PatternOutput, source domain.Source, now time.
 	pattern := domain.Pattern{
 		ID:                p.ID,
 		Name:              p.Name,
-		Category:          domain.Category(p.Category),
+		Category:          domain.NormalizePatternCategory(domain.Category(p.Category)),
 		Description:       p.Description,
 		GoodExample:       p.GoodExample,
 		BadExample:        p.BadExample,

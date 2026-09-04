@@ -649,7 +649,7 @@ skills-seed sync --resume
 
 1. `sync` 默认会先执行 `learn current`；只有本轮学习写入新/更新模式或 workspace 关系产物变化时，才继续执行 `generate skills`。
 2. `sync --context` 不会添加用户模式，只影响本次学习分析；需要补充用户模式时使用 `patterns add` 或 `patterns update`。
-3. 规范化决策会立即写入 checkpoint；后续本地校验或入库失败时，`sync --resume` 会直接重放，不会重跑已完成证据包。
+3. 规范化决策会立即写入 checkpoint；后续本地校验或入库失败时，`sync --resume` 会直接复用已保存候选和议程，只重放尚未完成焦点，不会重新执行候选筛选、议程规划或已完成证据包。
 4. 如果续跑只剩后续提交阶段，学习摘要会使用 checkpoint 中已提交的模式数量和原始变更范围，避免误显示为 0 或跳过必要生成。
 
 ### `skills-seed update`

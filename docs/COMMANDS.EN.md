@@ -649,7 +649,7 @@ skills-seed sync --resume
 
 1. `sync` runs `learn current` first by default; it continues to `generate skills` only when this run writes new/updated patterns or changes workspace relationship artifacts.
 2. `sync --context` does not add a user pattern; it only affects this learning analysis. Use `patterns add` or `patterns update` to add user-defined patterns.
-3. Normalization decisions are checkpointed immediately. If local validation or storage later fails, `sync --resume` replays them without rerunning completed evidence packs.
+3. Normalization decisions are checkpointed immediately. If local validation or storage later fails, `sync --resume` reuses the saved candidates and agenda, replays only unfinished focuses, and does not rerun candidate selection, agenda planning, or completed evidence packs.
 4. If resumption only has post-analysis commit stages left, the learning summary uses the checkpointed pattern counts and original change scope instead of reporting zeros or skipping required generation.
 
 ### `skills-seed update`

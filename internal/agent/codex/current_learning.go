@@ -2,11 +2,13 @@ package codex
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
 	"github.com/silaswei-io/skills-seed/internal/agent/structuredtask"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
 func (c *CodexAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
@@ -39,7 +41,10 @@ func (c *CodexAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowl
 	}
 	result, err := parser.ParseReviewKnowledgeResult(output)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
+	}
+	if err := agent.ValidateKnowledgeReviewCandidates(result.Decisions, agent.ReviewKnowledgeCandidateIDs(req.Candidates)); err != nil {
+		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
 	}
 	return result, agent.RequireResult(result, "ReviewKnowledge")
 }

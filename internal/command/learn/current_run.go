@@ -170,6 +170,27 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 }
 
 func (r *learnCurrentProjectRun) runPlanningStage() error {
+	if r.stateSession != nil {
+		// 恢复运行只消费已持久化的候选和议程，禁止重新执行本地筛选或调用议程规划。
+		if r.selectionSummary.Status == "" {
+			r.selectionSummary = fileSelectionSummary{
+				Status: i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
+					"Reason": r.selectionPlan.SkipReason,
+				}),
+			}
+		}
+		developmentFocuses, coverageFocuses := focusKindCounts(r.stateSession.State.Agenda.Focuses)
+		planLabel := i18n.GetWithParams("ProgressLearnCurrentPlanFocusesRestored", map[string]interface{}{
+			"Focuses":            len(r.stateSession.State.Agenda.Focuses),
+			"DevelopmentFocuses": developmentFocuses,
+			"CoverageFocuses":    coverageFocuses,
+		})
+		return r.steps.Run(planLabel, func() error {
+			r.analysisState = r.stateSession.State
+			r.plannedFocuses = pendingEvidenceFocuses(r.analysisState, r.incrementalChanges)
+			return nil
+		})
+	}
 	if err := r.narrowLearningCandidates(); err != nil {
 		return err
 	}
@@ -350,11 +371,19 @@ func (r *learnCurrentProjectRun) restoreOrDetectChanges(detectLabel string) erro
 		r.effectiveFocusPaths = resolveIncrementalFocusPaths(r.projectRoot, focusRelPaths)
 		r.selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(focusRelPaths, r.incrementalChanges.AddedOrModified))
 		r.resumeSummary = buildLearnCurrentResumeSummary(session)
+		pendingFocuses := pendingEvidenceFocuses(session.State, session.Changes)
+		completedFocuses := 0
+		if session.State.Analysis != nil {
+			completedFocuses = len(session.State.Analysis.FocusKnowledge)
+		}
 		logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 			"operation", "command.learn_current.resume_state",
 			"state_scope", r.stateRepo.Command(),
 			"inputs_count", currentStateInputCount(session.State),
-			"pending_count", len(r.incrementalChanges.AddedOrModified)+len(r.incrementalChanges.Deleted),
+			"pending_count", len(pendingFocuses),
+			"pending_input_count", len(r.incrementalChanges.AddedOrModified)+len(r.incrementalChanges.Deleted),
+			"completed_focus_count", completedFocuses,
+			"pending_focus_count", len(pendingFocuses),
 			"focuses_count", len(session.State.Agenda.Focuses),
 		)
 		return nil

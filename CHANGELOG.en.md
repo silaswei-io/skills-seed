@@ -2,6 +2,15 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.28]
+
+### Fixes
+
+- Fixed `sync --resume` entering the normal candidate-selection and agenda-planning stages, which made a resumed run look like it started from zero. Resumption now consumes the saved candidates and agenda directly and processes only unfinished evidence focuses.
+- Corrected resume diagnostics to distinguish input files, completed focuses, and pending focuses so progress cannot be misread.
+- Strengthened the shared boundary validation for AI structured results to reject empty verdicts, invalid reason codes, missing fields, out-of-range confidence, and invalid knowledge flags, with regression coverage for parsing and cross-run recovery.
+- Fixed generation readiness misclassifying source index expressions such as `params["deadline"](RFC3339Nano)` as Markdown links, while continuing to validate real local links and ignoring link-shaped text in code spans and fences.
+
 ## [v0.20.27]
 
 ### Changes
