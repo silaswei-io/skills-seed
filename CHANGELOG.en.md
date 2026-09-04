@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.30]
+
+### Documentation
+
+- Documented that generation readiness checks real local Markdown references while ignoring inline code, fenced code, and source index expressions, making generated-content failures easier to distinguish from validator false positives.
+
 ## [v0.20.29]
 
 ### Fixes
