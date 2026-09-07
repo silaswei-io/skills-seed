@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
 
@@ -193,6 +195,79 @@ func TestStructuredOutputRetryExhaustionIsRetryable(t *testing.T) {
 	require.True(t, isRetryableError(`{"type":"result","subtype":"error_max_structured_output_retries","is_error":true}`, ""))
 }
 
+func TestReviewKnowledgeRetriesClaudeSuccessEnvelopeWithInvalidResult(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	commandPath := filepath.Join(projectRoot, "claude")
+	attemptPath := filepath.Join(projectRoot, "attempts")
+	writeClaudeReviewCommand(t, commandPath, true)
+	t.Setenv("CLAUDE_REVIEW_ATTEMPT_PATH", attemptPath)
+
+	ag := New(commandPath, 5*time.Second, promptloader.New("claude", "en", ""), false, immediateRetryConfig(), config.AgentRuntimeOptions{})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	result, err := ag.ReviewKnowledge(ctx, reviewKnowledgeRequest())
+
+	require.NoError(t, err)
+	require.Equal(t, "2", readTestFile(t, attemptPath))
+	require.Len(t, result.Decisions, 1)
+	require.Equal(t, "accept", result.Decisions[0].Verdict)
+	manifests := readAgentOutputManifests(t, seedPath)
+	require.Len(t, manifests, 2)
+	require.Contains(t, manifests[1].Error, "verdict")
+	require.Empty(t, manifests[2].Error)
+}
+
+func TestReviewKnowledgePreservesEveryInvalidResultAttempt(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	commandPath := filepath.Join(projectRoot, "claude")
+	attemptPath := filepath.Join(projectRoot, "attempts")
+	writeClaudeReviewCommand(t, commandPath, false)
+	t.Setenv("CLAUDE_REVIEW_ATTEMPT_PATH", attemptPath)
+
+	ag := New(commandPath, 5*time.Second, promptloader.New("claude", "en", ""), false, immediateRetryConfig(), config.AgentRuntimeOptions{})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	_, err := ag.ReviewKnowledge(ctx, reviewKnowledgeRequest())
+
+	require.Error(t, err)
+	require.Equal(t, "2", readTestFile(t, attemptPath))
+	var diagnostic *agent.DiagnosticError
+	require.ErrorAs(t, err, &diagnostic)
+	require.Equal(t, agent.DiagnosticResultInvalid, diagnostic.Kind)
+	require.Equal(t, 2, diagnostic.Attempt)
+	require.NotEmpty(t, diagnostic.Archive.ManifestPath)
+	manifests := readAgentOutputManifests(t, seedPath)
+	require.Len(t, manifests, 2)
+	require.Contains(t, manifests[1].Error, "verdict")
+	require.Contains(t, manifests[2].Error, "verdict")
+}
+
+func TestClaudeInvocationTimeoutRetriesCurrentCall(t *testing.T) {
+	dir := t.TempDir()
+	commandPath := filepath.Join(dir, "claude")
+	attemptPath := filepath.Join(dir, "attempts")
+	command := `#!/bin/sh
+if [ ! -f "$CLAUDE_TIMEOUT_ATTEMPT_PATH" ]; then
+	printf '%s\n' '1' > "$CLAUDE_TIMEOUT_ATTEMPT_PATH"
+	exec sleep 10
+fi
+printf '%s\n' '2' >> "$CLAUDE_TIMEOUT_ATTEMPT_PATH"
+printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured_output":{"content":"ok"}}'
+`
+	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
+	t.Setenv("CLAUDE_TIMEOUT_ATTEMPT_PATH", attemptPath)
+
+	ag := New(commandPath, 2*time.Second, promptloader.New("claude", "en", ""), false, immediateRetryConfig(), config.AgentRuntimeOptions{})
+	output, err := ag.callClaude(context.Background(), "OptimizeRule", "prompt", aicontract.ContractOptimizeRule)
+
+	if err != nil {
+		attempts, _ := os.ReadFile(attemptPath)
+		t.Fatalf("callClaude failed after attempts %q: %v", string(attempts), err)
+	}
+	require.Equal(t, `{"content":"ok"}`, output)
+	require.Equal(t, "1\n2\n", readTestFile(t, attemptPath))
+}
+
 func TestAnalyzeCurrentDeltaBatchConstrainsRuntimeSchemaToInputFocus(t *testing.T) {
 	dir := t.TempDir()
 	schemaPath := filepath.Join(dir, "schema.json")
@@ -275,6 +350,70 @@ func writeClaudeJSON(t *testing.T, path string, value interface{}) {
 	data, err := json.Marshal(value)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, data, 0644))
+}
+
+func writeClaudeReviewCommand(t *testing.T, path string, recoverOnSecondAttempt bool) {
+	t.Helper()
+	secondResult := `printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured_output":null,"result":"{\"decisions\":[{\"candidate_id\":\"app-boot-auth-chain-init-guard\",\"reason_code\":\"accepted\",\"reason\":\"Evidence supports the candidate.\"}]}"}'`
+	if recoverOnSecondAttempt {
+		secondResult = `printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured_output":null,"result":"{\"decisions\":[{\"candidate_id\":\"app-boot-auth-chain-init-guard\",\"verdict\":\"accept\",\"reason_code\":\"accepted\",\"reason\":\"Evidence supports the candidate.\"}]}"}'`
+	}
+	command := `#!/bin/sh
+attempt=0
+if [ -f "$CLAUDE_REVIEW_ATTEMPT_PATH" ]; then
+	attempt=$(sed -n '1p' "$CLAUDE_REVIEW_ATTEMPT_PATH")
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$CLAUDE_REVIEW_ATTEMPT_PATH"
+if [ "$attempt" -eq 1 ]; then
+	printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured_output":null,"result":"{\"decisions\":[{\"candidate_id\":\"app-boot-auth-chain-init-guard\",\"reason_code\":\"accepted\",\"reason\":\"Evidence supports the candidate.\",\"revision\":{\"name\":\"Guard\",\"category\":\"business\",\"description\":\"Guard boot auth.\",\"rule\":\"Reuse the guard.\",\"confidence\":0.9,\"knowledge_flags\":[]}}]}"}'
+	exit 0
+fi
+` + secondResult + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(command), 0o755))
+}
+
+func reviewKnowledgeRequest() *agent.ReviewKnowledgeRequest {
+	return &agent.ReviewKnowledgeRequest{
+		ProjectName:  "kmc-admin-web",
+		RootPath:     ".",
+		Language:     "TypeScript",
+		RuntimeLabel: "batch-001",
+		EvidenceFocus: domain.EvidenceFocus{
+			ID:   "login-auth-session-access-control",
+			Name: "Login authentication and session access control",
+		},
+		Candidates: []domain.Pattern{{ID: "app-boot-auth-chain-init-guard"}},
+	}
+}
+
+func immediateRetryConfig() config.RetryConfig {
+	return config.RetryConfig{MaxRetries: 1, InitialInterval: -1, MaxInterval: -1}
+}
+
+type testAgentOutputManifest struct {
+	Attempt int    `json:"attempt"`
+	Error   string `json:"error"`
+}
+
+func readAgentOutputManifests(t *testing.T, seedPath string) map[int]testAgentOutputManifest {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(seedPath, "runtime", "agent-outputs", "*-claude-learning-knowledge-review-batch-001*.manifest.json"))
+	require.NoError(t, err)
+	out := make(map[int]testAgentOutputManifest, len(paths))
+	for _, path := range paths {
+		var manifest testAgentOutputManifest
+		require.NoError(t, json.Unmarshal([]byte(readTestFile(t, path)), &manifest))
+		out[manifest.Attempt] = manifest
+	}
+	return out
+}
+
+func readTestFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(data)
 }
 
 func requireArgValue(t *testing.T, args []string, name string) string {

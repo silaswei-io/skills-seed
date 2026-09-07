@@ -66,11 +66,12 @@ func NewInvocationDiagnosticError(agentName, operation string, attempt int, caus
 	}
 }
 
-func NewResultContractError(agentName, operation string, cause error, output string, archive AgentOutputArchive) error {
+func NewResultContractError(agentName, operation string, attempt int, cause error, output string, archive AgentOutputArchive) error {
 	return &DiagnosticError{
 		Kind:          DiagnosticResultInvalid,
 		Agent:         agentName,
 		Operation:     operation,
+		Attempt:       attempt,
 		Cause:         cause,
 		OutputLength:  len(output),
 		OutputPreview: DiagnosticPreview(output),

@@ -30,9 +30,11 @@ Check `exclude.paths`, `exclude.gitignore`, focus paths, and the Git working tre
 
 An error's `raw`, `stderr`, and `manifest` paths identify concrete archives beneath `.skills-seed/runtime/agent-outputs/`. Use this order:
 
+Even when an Agent CLI reports success, Skills Seed revalidates the result against the call's dynamic JSON Schema and corresponding business parser. Missing required fields, invalid enums, incomplete candidate receipts, JSON extraction failures, and invocation timeouts are retried within the current focus according to `agent.retry`. Every failed attempt keeps a separate archive; the retry does not replan focuses or rerun completed focuses. The error returns to `sync` only after retries are exhausted.
+
 1. Read the original error and classify authentication, rate limiting, proxy, service overload, CLI invocation, or structured-output failure.
 2. Confirm that the configured Agent CLI, model, and network/proxy are usable locally.
-3. For recoverable rate-limit or temporary-service errors, keep checkpoints and run `sync --resume`.
+3. For rate limits, invocation timeouts, or temporary-service errors that exhaust automatic retries, keep checkpoints and run `sync --resume`.
 4. For JSON Schema, input-coverage, or source-scope validation, first correct the invocation, prompt, configuration, or version incompatibility. Repeating unchanged input is usually ineffective.
 5. After correction, run `sync --resume` and verify that completed focuses were reused.
 

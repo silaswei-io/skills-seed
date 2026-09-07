@@ -30,9 +30,11 @@ skills-seed preview files --mode incremental --focus <path>
 
 错误信息中的 `raw`、`stderr`、`manifest` 会指向 `.skills-seed/runtime/agent-outputs/` 下的具体归档。按以下顺序处理：
 
+Agent CLI 报告成功后，Skills Seed 仍会使用本次动态 JSON Schema 和对应业务 parser 重新校验结果。缺少必填字段、枚举越界、候选回执不完整、JSON 提取失败或调用自身超时，都会先在当前焦点内按 `agent.retry` 自动重试；每次失败保留独立 attempt 归档，不会重新规划焦点或重跑已完成焦点。只有重试耗尽后，错误才返回到 `sync`。
+
 1. 阅读原始错误，区分认证、限流、代理、服务过载、CLI 调用失败与结构化输出失败。
 2. 确认当前配置的 Agent CLI、模型与网络代理在本机可用。
-3. 对限流、短暂服务故障等可恢复原因，保留 checkpoint 后使用 `sync --resume`。
+3. 对自动重试耗尽后的限流、调用超时、短暂服务故障等可恢复原因，保留 checkpoint 后使用 `sync --resume`。
 4. 对 JSON Schema、输入覆盖或来源范围校验失败，先修复对应的调用、提示词、配置或版本不兼容原因；重复同一输入通常无效。
 5. 修复后使用 `sync --resume`，并检查是否复用了已经完成的焦点。
 

@@ -12,6 +12,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/stretchr/testify/require"
 )
 
@@ -132,6 +133,54 @@ func TestExtractFinalContent_PrefersLastJSONMessageOverProgressMessages(t *testi
 
 	require.NoError(t, err)
 	require.Equal(t, `{"patterns":[],"profile_refresh_recommended":{"needed":false}}`, content)
+}
+
+func TestReviewKnowledgeRetriesInvalidStructuredResult(t *testing.T) {
+	projectRoot := t.TempDir()
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	commandPath := filepath.Join(projectRoot, "codex")
+	attemptPath := filepath.Join(projectRoot, "attempts")
+	command := `#!/bin/sh
+attempt=0
+if [ -f "$CODEX_REVIEW_ATTEMPT_PATH" ]; then
+	attempt=$(sed -n '1p' "$CODEX_REVIEW_ATTEMPT_PATH")
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$CODEX_REVIEW_ATTEMPT_PATH"
+printf '%s\n' '{"type":"thread.started","thread_id":"thread-test"}'
+if [ "$attempt" -eq 1 ]; then
+	printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"decisions\":[{\"candidate_id\":\"app-boot-auth-chain-init-guard\",\"reason_code\":\"accepted\",\"reason\":\"Evidence supports the candidate.\",\"business_method\":null,\"revision\":null}]}"}}'
+	exit 0
+fi
+printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"decisions\":[{\"candidate_id\":\"app-boot-auth-chain-init-guard\",\"verdict\":\"accept\",\"reason_code\":\"accepted\",\"reason\":\"Evidence supports the candidate.\",\"business_method\":null,\"revision\":null}]}"}}'
+`
+	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
+	t.Setenv("CODEX_REVIEW_ATTEMPT_PATH", attemptPath)
+	t.Setenv("CODEX_HOME", t.TempDir())
+
+	ag := New(commandPath, 5*time.Second, promptloader.New("codex", "en", ""), false, config.RetryConfig{MaxRetries: 1, InitialInterval: -1, MaxInterval: -1}, config.AgentRuntimeOptions{})
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	result, err := ag.ReviewKnowledge(ctx, &agent.ReviewKnowledgeRequest{
+		ProjectName:  "kmc-admin-web",
+		RootPath:     ".",
+		Language:     "TypeScript",
+		RuntimeLabel: "batch-001",
+		EvidenceFocus: domain.EvidenceFocus{
+			ID:   "login-auth-session-access-control",
+			Name: "Login authentication and session access control",
+		},
+		Candidates: []domain.Pattern{{ID: "app-boot-auth-chain-init-guard"}},
+	})
+
+	require.NoError(t, err)
+	attemptData, err := os.ReadFile(attemptPath)
+	require.NoError(t, err)
+	require.Equal(t, "2", string(attemptData))
+	require.Len(t, result.Decisions, 1)
+	require.Equal(t, "accept", result.Decisions[0].Verdict)
+	paths, err := filepath.Glob(filepath.Join(seedPath, "runtime", "agent-outputs", "*-codex-learning-knowledge-review-batch-001*.manifest.json"))
+	require.NoError(t, err)
+	require.Len(t, paths, 2)
 }
 
 func TestAnalyzeCurrentDeltaBatchConstrainsRuntimeSchemaToInputFocus(t *testing.T) {

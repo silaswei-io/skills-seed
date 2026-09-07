@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,4 +28,10 @@ func TestNormalizeInvocationErrorKeepsCommandFailure(t *testing.T) {
 	runErr := errors.New("exit status 1")
 
 	require.Same(t, runErr, NormalizeInvocationError(runErr, nil, 30*time.Minute))
+}
+
+func TestIsRetryableInvocationErrorOnlyAcceptsTimeout(t *testing.T) {
+	require.True(t, IsRetryableInvocationError(fmt.Errorf("provider timeout: %w", context.DeadlineExceeded)))
+	require.False(t, IsRetryableInvocationError(fmt.Errorf("user canceled: %w", context.Canceled)))
+	require.False(t, IsRetryableInvocationError(errors.New("exit status 1")))
 }

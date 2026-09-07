@@ -16,6 +16,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
+	"github.com/silaswei-io/skills-seed/internal/agent/parser"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
@@ -33,6 +34,7 @@ func (c *CodexAgent) callCodexInConversationWithOptions(ctx context.Context, ope
 type codexCallResult struct {
 	output       string
 	conversation agent.Conversation
+	archive      agent.AgentOutputArchive
 }
 
 func (c *CodexAgent) callCodexWithOptions(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, task ...agent.RuntimeTask) (string, error) {
@@ -42,6 +44,10 @@ func (c *CodexAgent) callCodexWithOptions(ctx context.Context, operation, prompt
 
 func (c *CodexAgent) callCodexResult(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (codexCallResult, error) {
 	outputSchema, err := aicontract.StrictStructuredOutputSchemaWithOptions(outputContract, opts)
+	if err != nil {
+		return codexCallResult{}, err
+	}
+	outputValidator, err := parser.CompileContractValidator(outputContract, outputSchema, opts)
 	if err != nil {
 		return codexCallResult{}, err
 	}
@@ -64,10 +70,27 @@ func (c *CodexAgent) callCodexResult(ctx context.Context, operation, prompt, out
 		Operation: operation,
 		Policy:    c.retryCfg,
 		Call: func(attempt int) (codexCallResult, string, time.Duration, bool, error) {
-			output, nextConversation, duration, retryable, err := c.doCallCodex(ctx, operation, prompt, schemaPath, conversation, attempt, agent.FirstRuntimeTask(task))
-			return codexCallResult{output: output, conversation: nextConversation}, output, duration, retryable, err
+			output, nextConversation, archive, duration, retryable, err := c.doCallCodex(ctx, operation, prompt, schemaPath, outputValidator.Validate, conversation, attempt, agent.FirstRuntimeTask(task))
+			retryOutput := output
+			if err != nil && strings.TrimSpace(retryOutput) == "" {
+				retryOutput = err.Error()
+			}
+			return codexCallResult{output: output, conversation: nextConversation, archive: archive}, retryOutput, duration, retryable, err
+		},
+		RetryDetail: func(result codexCallResult) string {
+			return codexArchiveDiagnosticPath(result.archive)
 		},
 	})
+}
+
+func codexArchiveDiagnosticPath(archive agent.AgentOutputArchive) string {
+	if archive.ManifestPath != "" {
+		return archive.ManifestPath
+	}
+	if archive.RawPath != "" {
+		return archive.RawPath
+	}
+	return archive.SchemaPath
 }
 
 // isRetryableError 检测是否为可重试错误（速率限制、过载等）
@@ -76,7 +99,7 @@ func isCodexRetryableError(stdout, stderr string) bool {
 }
 
 // doCallCodex 执行单次 Codex CLI 调用
-func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputSchemaPath string, conversation agent.Conversation, attempt int, task agent.RuntimeTask) (string, agent.Conversation, time.Duration, bool, error) {
+func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputSchemaPath string, validateOutput func(string) error, conversation agent.Conversation, attempt int, task agent.RuntimeTask) (string, agent.Conversation, agent.AgentOutputArchive, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	schemaBytes, _ := os.ReadFile(outputSchemaPath)
@@ -84,7 +107,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 
 	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
-		return "", agent.Conversation{}, 0, false, err
+		return "", agent.Conversation{}, agent.AgentOutputArchive{}, 0, false, err
 	}
 	args := codexExecArgsForConversation(c.allowUserPlugins, outputSchemaPath, c.runtime, conversation)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
@@ -117,7 +140,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
-		retryable := isCodexRetryableError(stdoutStr, stderrStr)
+		retryable := agent.IsRetryableInvocationError(err) || isCodexRetryableError(stdoutStr, stderrStr)
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 			Agent:     c.Name(),
 			Operation: operation,
@@ -146,7 +169,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 				"stderr_path", archive.StderrPath,
 				"retryable", true,
 			)
-			return stdoutStr + stderrStr, agent.Conversation{}, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+			return stdoutStr + stderrStr, agent.Conversation{}, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexRetryable"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 		}
 
 		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -158,7 +181,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 			"raw_output_path", archive.RawPath,
 			"stderr_path", archive.StderrPath,
 		)
-		return "", agent.Conversation{}, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
+		return "", agent.Conversation{}, archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, err, stdoutStr, stderrStr, archive))
 	}
 	duration := time.Since(startedAt)
 
@@ -195,7 +218,33 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 			"raw_output_path", archive.RawPath,
 			"stderr_path", archive.StderrPath,
 		)
-		return "", agent.Conversation{}, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, err, rawOutput, archive))
+		return "", agent.Conversation{}, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentCodexExtractFinalContentWarn"), agent.NewResultContractError(c.Name(), operation, attempt, err, rawOutput, archive))
+	}
+	if err := validateOutput(content); err != nil {
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:     c.Name(),
+			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
+			Attempt:   attempt,
+			Content:   content,
+			RawOutput: rawOutput,
+			Stderr:    stderr.String(),
+			Schema:    outputSchema,
+			Error:     err.Error(),
+		})
+		logger.DiagnosticWarn(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
+			"agent", c.Name(),
+			"operation", operation,
+			"attempt", attempt,
+			"error", err,
+			"duration", duration,
+			"output_path", archive.ContentPath,
+			"raw_output_path", archive.RawPath,
+			"schema_path", archive.SchemaPath,
+			"retryable", true,
+		)
+		return "", agent.Conversation{}, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, attempt, err, content, archive))
 	}
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 		Agent:     c.Name(),
@@ -216,7 +265,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 		"raw_output_path", archive.RawPath,
 		"stderr_path", archive.StderrPath,
 	)
-	return content, codexConversation(rawOutput, c.Name(), conversation), duration, false, nil
+	return content, codexConversation(rawOutput, c.Name(), conversation), archive, duration, false, nil
 }
 
 func codexExecArgs(allowUserPlugins bool, outputSchemaPath string, runtime config.AgentRuntimeOptions) []string {

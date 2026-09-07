@@ -2,6 +2,15 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.31]
+
+### Fixes
+
+- Unified JSON Schema and business-parser validation for structured Agent output inside each call's retry boundary. Even when a CLI incorrectly reports success, missing verdicts, invalid enums, incomplete receipts, and other contract errors no longer terminate the current learning focus directly.
+- Classified provider invocation timeouts as retryable errors. Every failed attempt keeps an independent diagnostic archive, and exhausted retries remain resumable with `sync --resume` without rerunning completed focuses.
+- Aligned optional DTO fields that are explicitly returned as `null` with both the runtime Schema and Go decoding semantics, preventing false local validation failures.
+- Added Claude and Codex regressions for pseudo-success structured output, business-semantic errors, timeout retries, and diagnostic archives, with increased parser-path coverage.
+
 ## [v0.20.30]
 
 ### Documentation

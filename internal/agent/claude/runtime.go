@@ -16,6 +16,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
+	"github.com/silaswei-io/skills-seed/internal/agent/parser"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
@@ -58,6 +59,10 @@ func (c *ClaudeAgent) callClaudeResult(ctx context.Context, operation, prompt, o
 	if err != nil {
 		return claudeCallResult{}, err
 	}
+	outputValidator, err := parser.CompileContractValidator(outputContract, outputSchema, opts)
+	if err != nil {
+		return claudeCallResult{}, err
+	}
 	workDir, err := agent.WorkDirForContext(ctx)
 	if err != nil {
 		return claudeCallResult{}, err
@@ -68,8 +73,12 @@ func (c *ClaudeAgent) callClaudeResult(ctx context.Context, operation, prompt, o
 		Operation: operation,
 		Policy:    c.retryCfg,
 		Call: func(attempt int) (claudeCallResult, string, time.Duration, bool, error) {
-			output, nextConversation, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, conversation, attempt, workDir, agent.FirstRuntimeTask(task))
-			return claudeCallResult{output: output, conversation: nextConversation, archive: archive}, output, duration, retryable, err
+			output, nextConversation, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, outputValidator.Validate, conversation, attempt, workDir, agent.FirstRuntimeTask(task))
+			retryOutput := output
+			if err != nil && strings.TrimSpace(retryOutput) == "" {
+				retryOutput = err.Error()
+			}
+			return claudeCallResult{output: output, conversation: nextConversation, archive: archive}, retryOutput, duration, retryable, err
 		},
 		RetryDetail: func(result claudeCallResult) string {
 			return agentArchiveDiagnosticPath(result.archive)
@@ -94,7 +103,7 @@ func isRetryableError(stdout, stderr string) bool {
 }
 
 // 执行单次命令行调用
-func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outputSchema string, conversation agent.Conversation, attempt int, workDir string, task agent.RuntimeTask) (string, agent.Conversation, agent.AgentOutputArchive, time.Duration, bool, error) {
+func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outputSchema string, validateOutput func(string) error, conversation agent.Conversation, attempt int, workDir string, task agent.RuntimeTask) (string, agent.Conversation, agent.AgentOutputArchive, time.Duration, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -127,7 +136,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
-		retryable := isRetryableError(stdoutStr, stderrStr)
+		retryable := agent.IsRetryableInvocationError(err) || isRetryableError(stdoutStr, stderrStr)
 		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 			Agent:     c.Name(),
 			Operation: operation,
@@ -207,7 +216,33 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 		if retryable || outputErr.invocation {
 			return rawOutput + stderr.String(), agent.Conversation{}, archive, duration, retryable, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, outputErr, rawOutput, stderr.String(), archive))
 		}
-		return "", agent.Conversation{}, archive, duration, false, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, outputErr, rawOutput, archive))
+		return "", agent.Conversation{}, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, attempt, outputErr, rawOutput, archive))
+	}
+	if err := validateOutput(output); err != nil {
+		archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
+			Agent:     c.Name(),
+			Operation: operation,
+			RuntimeID: task.ID,
+			Slug:      task.Slug,
+			Attempt:   attempt,
+			Content:   output,
+			RawOutput: rawOutput,
+			Stderr:    stderr.String(),
+			Schema:    outputSchema,
+			Error:     err.Error(),
+		})
+		logger.DiagnosticWarn(i18n.Get("LoggerAgentParseResultFailedNonFallback"),
+			"agent", c.Name(),
+			"operation", operation,
+			"attempt", attempt,
+			"error", err,
+			"duration", duration,
+			"output_path", archive.ContentPath,
+			"raw_output_path", archive.RawPath,
+			"schema_path", archive.SchemaPath,
+			"retryable", true,
+		)
+		return "", agent.Conversation{}, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, attempt, err, output, archive))
 	}
 	archive := agent.SaveAgentOutputForContext(ctx, agent.AgentOutputArchiveOptions{
 		Agent:     c.Name(),

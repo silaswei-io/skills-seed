@@ -2,6 +2,15 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.31]
+
+### 修复
+
+- 将 Agent 结构化输出的 JSON Schema 校验与业务 parser 语义校验统一纳入每次调用的重试边界；即使 CLI 错误报告 success，缺少 verdict、非法枚举、回执不完整或其他契约错误也不会直接终止当前学习焦点。
+- 将 Agent 自身调用超时纳入可重试错误分类；每次失败保留独立 attempt 诊断归档，重试耗尽后仍可通过 `sync --resume` 复用已完成焦点。
+- 让可选 DTO 字段显式返回 `null` 时与运行时 Schema 和 Go 解码语义一致，避免本地校验制造误报。
+- 补充 Claude、Codex 伪成功结构化输出、业务语义错误、超时重试和诊断归档回归测试，并提高解析链路覆盖率。
+
 ## [v0.20.30]
 
 ### 文档

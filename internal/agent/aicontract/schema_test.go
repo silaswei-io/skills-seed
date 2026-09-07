@@ -79,6 +79,18 @@ func TestStrictStructuredOutputSchemaAllowsNullForOptionalEnums(t *testing.T) {
 	require.Contains(t, commandPolicy["enum"].([]any), nil)
 }
 
+func TestStructuredOutputSchemaAllowsExplicitNullForOptionalFields(t *testing.T) {
+	data, err := StructuredOutputSchema(ContractAnalyzeCurrentDeltaBatch)
+	require.NoError(t, err)
+
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(data), &schema))
+	changes := schema["properties"].(map[string]any)["knowledge_changes"].(map[string]any)
+	items := changes["items"].(map[string]any)
+	proposal := items["properties"].(map[string]any)["proposal"].(map[string]any)
+	require.ElementsMatch(t, []any{"object", "null"}, proposal["type"])
+}
+
 func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	profile := decodeSchema(t, ContractProjectProfile)
 	profileProperties := profile["properties"].(map[string]any)

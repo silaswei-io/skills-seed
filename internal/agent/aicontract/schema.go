@@ -88,6 +88,16 @@ func StructuredOutputSchemaWithOptions(name string, opts StructuredOutputOptions
 	if err != nil {
 		return "", err
 	}
+	var schemaDocument map[string]any
+	if err := json.Unmarshal([]byte(data), &schemaDocument); err != nil {
+		return "", err
+	}
+	makeOptionalSchemaPropertiesNullable(schemaDocument)
+	dataBytes, err := json.MarshalIndent(schemaDocument, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	data = string(dataBytes)
 	return constrainStructuredOutputSchema(name, data, opts)
 }
 
@@ -309,6 +319,36 @@ func applyProjectIDEnum(schema map[string]any, projectIDs []string) {
 func schemaProperties(schema map[string]any) map[string]any {
 	properties, _ := schema["properties"].(map[string]any)
 	return properties
+}
+
+// makeOptionalSchemaPropertiesNullable 让 Schema 与 encoding/json 的 DTO 解码语义一致：
+// 可省略字段在显式返回 null 时也视为未提供，避免 provider 与本地校验产生分歧。
+func makeOptionalSchemaPropertiesNullable(schema map[string]any) {
+	properties := schemaProperties(schema)
+	if len(properties) > 0 {
+		required := schemaRequiredFields(schema)
+		for name, property := range properties {
+			propertySchema, ok := property.(map[string]any)
+			if !ok {
+				continue
+			}
+			makeOptionalSchemaPropertiesNullable(propertySchema)
+			if !required[name] {
+				addSchemaNullType(propertySchema)
+			}
+		}
+	}
+	if items, ok := schema["items"].(map[string]any); ok {
+		makeOptionalSchemaPropertiesNullable(items)
+	}
+	for _, keyword := range []string{"allOf", "anyOf", "oneOf"} {
+		variants, _ := schema[keyword].([]any)
+		for _, variant := range variants {
+			if variantSchema, ok := variant.(map[string]any); ok {
+				makeOptionalSchemaPropertiesNullable(variantSchema)
+			}
+		}
+	}
 }
 
 // makeSchemaStrict 将常规 JSON Schema 投影为严格结构化输出方言。
