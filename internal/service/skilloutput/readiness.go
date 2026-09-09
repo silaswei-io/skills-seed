@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 	"gopkg.in/yaml.v3"
 )
 
@@ -111,83 +114,46 @@ func auditMarkdownLinks(root string) error {
 	})
 }
 
-// markdownLinkTargets 提取 Markdown 内联链接目标。
-// 不能用简单正则匹配：源码示例中的 map/index 表达式（例如 params["deadline"](RFC3339Nano)）
-// 也包含方括号和圆括号，必须跳过行内代码、围栏代码及嵌入标识符的方括号。
+// markdownLinkTargets 从 Markdown AST 提取链接目标。
+// 标准解析器负责区分链接与代码、普通括号等语法，避免把源码调用参数误当成本地路径。
 func markdownLinkTargets(content string) []string {
-	var targets []string
-	inFence := false
-	var fenceChar byte
-	for _, rawLine := range strings.SplitAfter(content, "\n") {
-		line := strings.TrimLeft(rawLine, " \t")
-		if inFence {
-			if isMarkdownFenceClose(line, fenceChar) {
-				inFence = false
-			}
-			continue
-		}
-		if char, ok := markdownFenceStart(line); ok {
-			inFence = true
-			fenceChar = char
-			continue
-		}
-		targets = append(targets, markdownInlineLinkTargets(rawLine)...)
-	}
+	source := []byte(content)
+	document := goldmark.DefaultParser().Parse(text.NewReader(source))
+	targets := make([]string, 0)
+	collectMarkdownLinkTargets(document, source, &targets)
 	return targets
 }
 
-func markdownFenceStart(line string) (byte, bool) {
-	if len(line) < 3 || (line[0] != '`' && line[0] != '~') || line[1] != line[0] || line[2] != line[0] {
-		return 0, false
+func collectMarkdownLinkTargets(node ast.Node, source []byte, targets *[]string) {
+	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+		if target, ok := markdownNodeLinkTarget(child); ok && !isEmbeddedCodeIndexLink(child, source) {
+			*targets = append(*targets, string(target))
+		}
+		collectMarkdownLinkTargets(child, source, targets)
 	}
-	return line[0], true
 }
 
-func isMarkdownFenceClose(line string, fenceChar byte) bool {
-	if len(line) < 3 || line[0] != fenceChar || line[1] != fenceChar || line[2] != fenceChar {
+func markdownNodeLinkTarget(node ast.Node) ([]byte, bool) {
+	switch link := node.(type) {
+	case *ast.Link:
+		return link.Destination, true
+	case *ast.Image:
+		return link.Destination, true
+	default:
+		return nil, false
+	}
+}
+
+func isEmbeddedCodeIndexLink(node ast.Node, source []byte) bool {
+	label, ok := node.FirstChild().(*ast.Text)
+	if !ok || label.Segment.Start == 0 {
 		return false
 	}
-	return strings.TrimSpace(line[3:]) == ""
-}
-
-func markdownInlineLinkTargets(line string) []string {
-	var targets []string
-	inlineCodeDelimiter := 0
-	for i := 0; i < len(line); {
-		if line[i] == '`' {
-			j := i
-			for j < len(line) && line[j] == '`' {
-				j++
-			}
-			delimiter := j - i
-			if inlineCodeDelimiter == 0 {
-				inlineCodeDelimiter = delimiter
-			} else if delimiter == inlineCodeDelimiter {
-				inlineCodeDelimiter = 0
-			}
-			i = j
-			continue
-		}
-		if inlineCodeDelimiter == 0 && line[i] == '[' {
-			if endLabel := strings.IndexByte(line[i+1:], ']'); endLabel >= 0 {
-				close := i + 1 + endLabel
-				if close+1 < len(line) && line[close+1] == '(' {
-					label := line[i+1 : close]
-					if i > 0 && isMarkdownLinkEmbeddedChar(line[i-1]) && looksLikeCodeIndexLabel(label) {
-						i = close + 1
-						continue
-					}
-					if endTarget := strings.IndexByte(line[close+2:], ')'); endTarget >= 0 {
-						targets = append(targets, line[close+2:close+2+endTarget])
-						i = close + 3 + endTarget
-						continue
-					}
-				}
-			}
-		}
-		i++
+	open := label.Segment.Start - 1
+	if open == 0 || source[open] != '[' || !isMarkdownLinkEmbeddedChar(source[open-1]) {
+		return false
 	}
-	return targets
+	return looksLikeCodeIndexLabel(string(label.Segment.Value(source)))
 }
 
 func isMarkdownLinkEmbeddedChar(char byte) bool {

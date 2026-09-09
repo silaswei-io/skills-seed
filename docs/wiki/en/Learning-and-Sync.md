@@ -51,7 +51,7 @@ Parallelism improves throughput but increases Agent pressure. Size it for provid
 
 A successful learning run does not prove all project code correct. It means the admitted knowledge passed source, scope, evidence, and structural checks. Generation consumes persisted results and does not make another Agent call.
 
-Generation also runs a delivery-readiness check: real local Markdown references must resolve to files inside the generated directory, while link-shaped text in inline code, fenced code, and source index expressions is ignored. When this check fails, inspect the concrete generated file and archived output first.
+Generation also runs a delivery-readiness check: local inline links, reference links, and images recognized by standard Markdown syntax must resolve to files inside the generated directory. Inline code, fenced code, source index expressions, Go generic calls, and other non-Markdown links are ignored. When this check fails, inspect the concrete generated file and archived output first.
 
 On Agent failures, Schema incompatibility, or input-coverage failures, partial conclusions must not be written directly into the pattern store. Inspect runtime evidence and recovery guidance in [Learning Failures and Manual Repair](Learning-Failures-and-Manual-Repair.md).
 

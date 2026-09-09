@@ -2,6 +2,7 @@ package skilloutput
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,6 +46,25 @@ func TestRuntimeManifestPathUsesSafeTargetDirectory(t *testing.T) {
 	require.Equal(t, "/project/.skills-seed/runtime/generated-skills/custom-target-agent/manifest.json", filepath.ToSlash(path))
 }
 
+func TestWriteManifestRejectsMissingOutput(t *testing.T) {
+	root := t.TempDir()
+
+	err := WriteManifest(filepath.Join(root, "missing"), filepath.Join(root, "manifest.json"), Manifest{})
+
+	require.Error(t, err)
+}
+
+func TestOutputFilesSkipsNonRegularEntries(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte("skill\n"), 0o644))
+	require.NoError(t, os.Symlink(filepath.Join(root, "SKILL.md"), filepath.Join(root, "skill-link")))
+
+	files, err := outputFiles(root)
+
+	require.NoError(t, err)
+	require.Equal(t, []ManifestFile{{Path: "SKILL.md", SHA256: "3088e5b60779a95389e4ed08d2ecee6eaac2311c590dab3f2e4beb3090a54f00"}}, files)
+}
+
 func TestReplaceReplacesExistingDirectory(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "skill")
 	require.NoError(t, os.MkdirAll(root, 0o755))
@@ -56,6 +76,47 @@ func TestReplaceReplacesExistingDirectory(t *testing.T) {
 	}))
 	require.NoFileExists(t, oldPath)
 	require.FileExists(t, filepath.Join(root, "SKILL.md"))
+}
+
+func TestReplaceReturnsBuildError(t *testing.T) {
+	wantErr := errors.New("build failed")
+
+	err := Replace(filepath.Join(t.TempDir(), "skill"), func(string) error { return wantErr })
+
+	require.ErrorIs(t, err, wantErr)
+}
+
+func TestReplaceWithinRootPublishesOutput(t *testing.T) {
+	projectRoot := t.TempDir()
+	outputPath := filepath.Join(projectRoot, ".agents", "skills", "demo-dev")
+
+	err := ReplaceWithinRoot(projectRoot, outputPath, func(staging string) error {
+		return os.WriteFile(filepath.Join(staging, "SKILL.md"), []byte("new\n"), 0o644)
+	})
+
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
+}
+
+func TestReplaceWithinRootSupportsUnscopedOutput(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "skill")
+
+	err := ReplaceWithinRoot("", outputPath, func(staging string) error {
+		return os.WriteFile(filepath.Join(staging, "SKILL.md"), []byte("new\n"), 0o644)
+	})
+
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
+}
+
+func TestReplaceWithinRootRejectsOutputOutsideProject(t *testing.T) {
+	root := t.TempDir()
+	projectRoot := filepath.Join(root, "project")
+	require.NoError(t, os.Mkdir(projectRoot, 0o755))
+
+	err := ReplaceWithinRoot(projectRoot, filepath.Join(root, "outside"), func(string) error { return nil })
+
+	require.Error(t, err)
 }
 
 func TestRemoveDeletesConfiguredDirectory(t *testing.T) {

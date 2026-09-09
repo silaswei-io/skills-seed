@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.32]
+
+### Fixes
+
+- Replaced the handwritten Markdown link scanner in Skills readiness with a standards-based Markdown AST parser. Go generic calls such as `SetCtxValue[bool](ctx, ...)` and ordinary source-code parentheses are no longer misclassified as local links, while real inline links, reference links, and images remain validated.
+- Added coverage for frontmatter, link boundaries, output replacement, and manifest failure paths, raising the `skilloutput` package coverage to 95.1%.
+
 ## [v0.20.31]
 
 ### Fixes

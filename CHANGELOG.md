@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.32]
+
+### 修复
+
+- 将 Skills readiness 的手写 Markdown 链接扫描替换为标准 Markdown AST 解析，避免把 `SetCtxValue[bool](ctx, ...)` 等 Go 泛型调用和普通源码括号误判为本地链接，同时继续校验真实的内联链接、引用链接与图片。
+- 补充 frontmatter、链接边界、输出替换和 manifest 异常路径测试，`skilloutput` 包覆盖率提高到 95.1%。
+
 ## [v0.20.31]
 
 ### 修复
