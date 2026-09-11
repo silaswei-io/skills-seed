@@ -1,8 +1,11 @@
 package metadata
 
 import (
+	"errors"
 	"testing"
 	"testing/fstest"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestEmbeddedTreeHashDeterministic(t *testing.T) {
@@ -26,6 +29,50 @@ func TestEmbeddedTreeHashDeterministic(t *testing.T) {
 	if len(first) != 64 {
 		t.Fatalf("hash length = %d, want 64", len(first))
 	}
+}
+
+func TestTemplateProviderFallbacks(t *testing.T) {
+	require.Equal(t, []string{"codex", "common"}, TemplateProviderFallbacks(" CODEX "))
+	require.Equal(t, []string{"common"}, TemplateProviderFallbacks("common"))
+	require.Equal(t, []string{"common"}, TemplateProviderFallbacks(""))
+	require.Equal(t, []string{"claude", "loader"}, PromptTemplateProviderFallbacks("Claude"))
+	require.Equal(t, []string{"loader"}, PromptTemplateProviderFallbacks("loader"))
+}
+
+func TestTemplatePaths(t *testing.T) {
+	require.Equal(t, "templates/prompts/codex/analyze.txt.tmpl", PromptTemplatePath("codex", "analyze", ""))
+	require.Equal(t, "templates/prompts/codex/analyze.en-US.txt.tmpl", PromptTemplatePath("codex", "analyze", "en-US"))
+	require.Equal(t, "templates/prompts/append/guard.txt.tmpl", PromptAppendTemplatePath("guard", ""))
+	require.Equal(t, "templates/prompts/append/guard.en-US.txt.tmpl", PromptAppendTemplatePath("guard", "en-US"))
+	require.Equal(t, "templates/skills/codex/SKILL.md.tmpl", SkillsTemplatePath("codex", "SKILL", "", ""))
+	require.Equal(t, "templates/skills/codex/SKILL.en-US.txt.tmpl", SkillsTemplatePath("codex", "SKILL", "en-US", ".txt.tmpl"))
+	require.Equal(t, "templates/skills/codex/agents", SkillsAgentMetadataDir("codex"))
+}
+
+func TestTemplateTreeHashWrappers(t *testing.T) {
+	fsys := fstest.MapFS{
+		"templates/prompts/a.txt": {Data: []byte("prompt")},
+		"templates/seed/a.txt":    {Data: []byte("seed")},
+		"templates/skills/a.txt":  {Data: []byte("skill")},
+	}
+	for _, hash := range []func(fstest.MapFS) (string, error){
+		func(f fstest.MapFS) (string, error) { return PromptTemplatesHash(f) },
+		func(f fstest.MapFS) (string, error) { return SeedTemplatesHash(f) },
+		func(f fstest.MapFS) (string, error) { return SkillsTemplatesHash(f) },
+	} {
+		value, err := hash(fsys)
+		require.NoError(t, err)
+		require.Len(t, value, 64)
+	}
+
+	_, err := EmbeddedTreeHash(fsys, "missing")
+	require.Error(t, err)
+}
+
+func TestHashOrUnavailable(t *testing.T) {
+	require.Equal(t, "hash", HashOrUnavailable("hash", nil))
+	require.Equal(t, UnavailableHash, HashOrUnavailable("", nil))
+	require.Equal(t, UnavailableHash, HashOrUnavailable("hash", errors.New("failure")))
 }
 
 func TestEmbeddedTreeHashTracksContentAndPath(t *testing.T) {

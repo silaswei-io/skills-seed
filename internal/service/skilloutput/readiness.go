@@ -2,14 +2,17 @@ package skilloutput
 
 import (
 	"fmt"
+	"go/parser"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
+	markdownast "github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 	"gopkg.in/yaml.v3"
 )
@@ -109,6 +112,9 @@ func auditMarkdownLinks(root string) error {
 			if err != nil || !info.Mode().IsRegular() {
 				return fmt.Errorf("skill readiness: broken link %q in %q", rawTarget, filepath.ToSlash(path))
 			}
+			if _, err := projectpath.CanonicalWithinRoot(root, resolved); err != nil {
+				return fmt.Errorf("skill readiness: link %q in %q escapes skill root", rawTarget, filepath.ToSlash(path))
+			}
 		}
 		return nil
 	})
@@ -124,56 +130,52 @@ func markdownLinkTargets(content string) []string {
 	return targets
 }
 
-func collectMarkdownLinkTargets(node ast.Node, source []byte, targets *[]string) {
+func collectMarkdownLinkTargets(node markdownast.Node, source []byte, targets *[]string) {
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
-		if target, ok := markdownNodeLinkTarget(child); ok && !isEmbeddedCodeIndexLink(child, source) {
+		if target, ok := markdownNodeLinkTarget(child); ok && !isEmbeddedSourceExpressionLink(child, source) {
 			*targets = append(*targets, string(target))
 		}
 		collectMarkdownLinkTargets(child, source, targets)
 	}
 }
 
-func markdownNodeLinkTarget(node ast.Node) ([]byte, bool) {
+func markdownNodeLinkTarget(node markdownast.Node) ([]byte, bool) {
 	switch link := node.(type) {
-	case *ast.Link:
+	case *markdownast.Link:
 		return link.Destination, true
-	case *ast.Image:
+	case *markdownast.Image:
 		return link.Destination, true
 	default:
 		return nil, false
 	}
 }
 
-func isEmbeddedCodeIndexLink(node ast.Node, source []byte) bool {
-	label, ok := node.FirstChild().(*ast.Text)
-	if !ok || label.Segment.Start == 0 {
+// isEmbeddedSourceExpressionLink 识别被 CommonMark 解释为链接的索引、泛型和调用表达式。
+// 只有完整结构能被 Go 语法接受时才豁免；单引号下标先规范化，以兼容常见的 JS/Python 源码。
+func isEmbeddedSourceExpressionLink(node markdownast.Node, source []byte) bool {
+	link, ok := node.(*markdownast.Link)
+	if !ok {
+		return false
+	}
+	label, ok := link.FirstChild().(*markdownast.Text)
+	if !ok || label != link.LastChild() || label.Segment.Start == 0 {
 		return false
 	}
 	open := label.Segment.Start - 1
 	if open == 0 || source[open] != '[' || !isMarkdownLinkEmbeddedChar(source[open-1]) {
 		return false
 	}
-	return looksLikeCodeIndexLabel(string(label.Segment.Value(source)))
+	index := strings.TrimSpace(string(label.Segment.Value(source)))
+	if len(index) >= 2 && index[0] == '\'' && index[len(index)-1] == '\'' {
+		index = strconv.Quote(index[1 : len(index)-1])
+	}
+	candidate := "value[" + index + "](" + string(link.Destination) + ")"
+	_, err := parser.ParseExpr(candidate)
+	return err == nil
 }
 
 func isMarkdownLinkEmbeddedChar(char byte) bool {
 	return char == '_' || char == ')' || (char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
-}
-
-func looksLikeCodeIndexLabel(label string) bool {
-	label = strings.TrimSpace(label)
-	if len(label) >= 2 && ((label[0] == '"' && label[len(label)-1] == '"') || (label[0] == '\'' && label[len(label)-1] == '\'')) {
-		return true
-	}
-	if label == "" {
-		return false
-	}
-	for i := 0; i < len(label); i++ {
-		if label[i] < '0' || label[i] > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 func localMarkdownTarget(raw string) string {

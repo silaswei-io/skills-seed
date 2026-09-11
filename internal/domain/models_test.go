@@ -387,6 +387,130 @@ func TestPattern_RefreshMetricsScoresProjectSpecificPatternHigherThanGeneric(t *
 	assert.Greater(t, specific.Metrics.EffectiveScore, generic.Metrics.EffectiveScore)
 }
 
+func TestPatternCategoryDescriptions(t *testing.T) {
+	text := AllowedPatternCategoriesText()
+	for _, category := range AllowedPatternCategoryNames() {
+		assert.Contains(t, text, category+" (")
+	}
+	assert.Equal(t, "custom", patternCategoryPromptDescription(Category("custom")))
+}
+
+func TestPatternEvidenceLocationDisplayLocation(t *testing.T) {
+	assert.Empty(t, (PatternEvidenceLocation{Path: "  "}).DisplayLocation())
+	assert.Equal(t, "main.go", (PatternEvidenceLocation{Path: " main.go "}).DisplayLocation())
+	assert.Equal(t, "main.go:12", (PatternEvidenceLocation{Path: "main.go", Line: 12}).DisplayLocation())
+}
+
+func TestPatternNormalizeForSave(t *testing.T) {
+	createdAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	lastSeenAt := createdAt.Add(time.Hour)
+	now := createdAt.Add(2 * time.Hour)
+	previous := &Pattern{
+		CreatedAt:  createdAt,
+		LastSeenAt: lastSeenAt,
+		BusinessMethod: &BusinessMethod{CodeLocation: CodeLocation{
+			CurrentLocation: "old.go:4",
+			Status:          CodeLocationStatusMoved,
+			CreatedAt:       createdAt,
+		}},
+	}
+	pattern := &Pattern{
+		Status:         " INVALID ",
+		KnowledgeFlags: []string{"high_risk_operational", "high_risk_operational"},
+		BusinessMethod: &BusinessMethod{Name: "Run"},
+	}
+
+	pattern.NormalizeForSave(previous, now)
+
+	assert.Equal(t, PatternStatusActive, pattern.Status)
+	assert.Equal(t, createdAt, pattern.CreatedAt)
+	assert.Equal(t, lastSeenAt, pattern.LastSeenAt)
+	assert.Equal(t, now, pattern.UpdatedAt)
+	assert.Equal(t, "old.go:4", pattern.BusinessMethod.DisplayLocation())
+	assert.Equal(t, createdAt, pattern.BusinessMethod.CodeLocation.CreatedAt)
+}
+
+func TestPatternNormalizeForSaveUsesCurrentDefaults(t *testing.T) {
+	now := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
+	pattern := &Pattern{}
+	pattern.NormalizeForSave(nil, now)
+
+	assert.Equal(t, now, pattern.CreatedAt)
+	assert.Equal(t, now, pattern.LastSeenAt)
+	assert.Equal(t, now, pattern.UpdatedAt)
+}
+
+func TestPatternNormalizeAfterLoad(t *testing.T) {
+	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	updatedAt := createdAt.Add(time.Hour)
+	pattern := &Pattern{
+		Status:         PatternStatus(" STALE "),
+		CreatedAt:      createdAt,
+		UpdatedAt:      updatedAt,
+		BusinessMethod: &BusinessMethod{CodeLocation: CodeLocation{HistoricalLocation: "legacy.go:8"}},
+	}
+	pattern.NormalizeAfterLoad()
+	assert.Equal(t, PatternStatusStale, pattern.Status)
+	assert.Equal(t, updatedAt, pattern.LastSeenAt)
+	assert.Equal(t, "legacy.go:8", pattern.BusinessMethod.DisplayLocation())
+	assert.Equal(t, CodeLocationStatusValid, pattern.BusinessMethod.CodeLocation.Status)
+
+	pattern = &Pattern{CreatedAt: createdAt}
+	pattern.NormalizeAfterLoad()
+	assert.Equal(t, createdAt, pattern.LastSeenAt)
+}
+
+func TestPatternCanBeRetiredFromCurrentLearning(t *testing.T) {
+	for _, source := range []Source{SourceLearned, SourceLearnedCurrent, SourceInit} {
+		assert.True(t, (Pattern{Source: source}).CanBeRetiredFromCurrentLearning(), source)
+	}
+	for _, source := range []Source{SourceUserDefined, SourceDefault, Source("unknown")} {
+		assert.False(t, (Pattern{Source: source}).CanBeRetiredFromCurrentLearning(), source)
+	}
+}
+
+func TestBusinessMethodLocationFallbacks(t *testing.T) {
+	method := BusinessMethod{CodeLocation: CodeLocation{HistoricalLocation: "old.go:3"}}
+	assert.Equal(t, "old.go:3", method.DisplayLocation())
+	assert.Empty(t, method.HistoricalDisplayLocation())
+	assert.Equal(t, string(CodeLocationStatusUnknown), method.LocationStatus())
+
+	method.CodeLocation.CurrentLocation = "new.go:9"
+	assert.Equal(t, "old.go:3", method.HistoricalDisplayLocation())
+	method.CodeLocation.Status = CodeLocationStatusMoved
+	assert.Equal(t, string(CodeLocationStatusMoved), method.LocationStatus())
+
+	assert.Empty(t, (BusinessMethod{}).LocationStatus())
+}
+
+func TestBusinessMethodNormalizeCodeLocationFallbacks(t *testing.T) {
+	now := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
+	previous := &BusinessMethod{CodeLocation: CodeLocation{
+		CurrentLocation:    "previous.go:10",
+		HistoricalLocation: "origin.go:2",
+		Status:             CodeLocationStatusChanged,
+	}}
+	method := &BusinessMethod{}
+	method.NormalizeCodeLocation(previous, now)
+
+	assert.Equal(t, "previous.go:10", method.CodeLocation.CurrentLocation)
+	assert.Equal(t, "origin.go:2", method.CodeLocation.HistoricalLocation)
+	assert.Equal(t, CodeLocationStatusChanged, method.CodeLocation.Status)
+	assert.Equal(t, now, method.CodeLocation.CreatedAt)
+	assert.Equal(t, now, method.CodeLocation.UpdatedAt)
+
+	empty := &BusinessMethod{}
+	empty.NormalizeCodeLocation(nil, time.Time{})
+	assert.Equal(t, CodeLocationStatusUnknown, empty.CodeLocation.Status)
+	(*BusinessMethod)(nil).NormalizeCodeLocation(nil, now)
+}
+
+func TestClamp01Bounds(t *testing.T) {
+	assert.Equal(t, 0.0, clamp01(-0.1))
+	assert.Equal(t, 0.5, clamp01(0.5))
+	assert.Equal(t, 1.0, clamp01(1.1))
+}
+
 // ==================== Issue 测试 ====================
 
 func TestNewIssue(t *testing.T) {

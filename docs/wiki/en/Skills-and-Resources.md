@@ -61,6 +61,8 @@ Review against real development decisions:
 - Does the module map describe real responsibility and dependencies rather than self-dependencies or guessed paths?
 - Does output contain only valid projections with working plans and links?
 
+Generation readiness parses real Markdown links and confirms, after symlink resolution, that every local target remains inside the current Skill root. Missing or escaping targets block delivery, while valid generic, index, and call expressions in source text are not treated as local links.
+
 See [Quality and Contributing](Quality-and-Contributing.md) for quality testing and maintenance.
 
 ---

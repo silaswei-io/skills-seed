@@ -3,10 +3,12 @@ package skilloutput
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yuin/goldmark/ast"
+	markdownast "github.com/yuin/goldmark/ast"
 )
 
 func TestAuditReadinessAcceptsCompleteSkill(t *testing.T) {
@@ -49,6 +51,56 @@ func TestAuditReadinessIgnoresGoGenericCall(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
 
 	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
+}
+
+func TestAuditReadinessIgnoresExtremeCodeLikeExpressions(t *testing.T) {
+	tests := []struct {
+		name       string
+		expression string
+	}{
+		{name: "single generic argument", expression: "factory.New[Client](ctx)"},
+		{name: "multiple generic arguments", expression: "factory.New[Key,Value](ctx)"},
+		{name: "multiple call arguments", expression: "factory.New[Client](ctx,opts)"},
+		{name: "nested call argument", expression: "factory.New[Client](resolve(ctx))"},
+		{name: "numeric index invocation", expression: "handlers[0](ctx)"},
+		{name: "double quoted index invocation", expression: `params["deadline"](RFC3339Nano)`},
+		{name: "single quoted index invocation", expression: "params['deadline'](RFC3339Nano)"},
+		{name: "chained index invocation", expression: `registry.Lookup()["handler"](ctx)`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\n" + test.expression + "\n"
+			require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+			require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
+		})
+	}
+}
+
+func TestAuditReadinessStillChecksAdjacentRealLinks(t *testing.T) {
+	tests := []struct {
+		name string
+		link string
+	}{
+		{name: "word label", link: "prefix[Missing](./missing.md)"},
+		{name: "generic shaped label", link: "prefix[Client](./missing.md)"},
+		{name: "numeric label", link: "prefix[0](./missing.md)"},
+		{name: "quoted label", link: `prefix["key"](./missing.md)`},
+		{name: "formatted label", link: "prefix[*Client*](./missing.md)"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\n" + test.link + "\n"
+			require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+			err := AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}})
+
+			require.ErrorContains(t, err, "broken link")
+			require.ErrorContains(t, err, "./missing.md")
+		})
+	}
 }
 
 func TestAuditReadinessAcceptsLinkWithTitle(t *testing.T) {
@@ -202,6 +254,63 @@ func TestAuditReadinessAcceptsLocalLinkFragment(t *testing.T) {
 	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
 }
 
+func TestAuditReadinessFindsBrokenLinkAtEndOfLargeDocument(t *testing.T) {
+	root := t.TempDir()
+	var content strings.Builder
+	content.WriteString("---\nname: demo-dev\ndescription: Demo skill\n---\n\n")
+	for range 4096 {
+		content.WriteString("factory.New[Client](ctx)\n")
+	}
+	content.WriteString("\n[Missing](./missing.md)\n")
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content.String()), 0o644))
+
+	err := AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}})
+
+	require.ErrorContains(t, err, "broken link")
+	require.ErrorContains(t, err, "./missing.md")
+}
+
+func TestAuditReadinessRejectsMarkdownSymlinkEscapingSkillRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows 创建符号链接需要额外权限")
+	}
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside.md")
+	require.NoError(t, os.WriteFile(outside, []byte("outside\n"), 0o644))
+	require.NoError(t, os.Symlink(outside, filepath.Join(root, "outside.md")))
+	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\n[Outside](./outside.md)\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+	err := AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}})
+
+	require.ErrorContains(t, err, "escapes skill root")
+}
+
+func TestAuditReadinessAcceptsMarkdownSymlinkWithinSkillRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows 创建符号链接需要额外权限")
+	}
+	root := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(root, "references"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "references", "spec.md"), []byte("# Spec\n"), 0o644))
+	require.NoError(t, os.Symlink(filepath.Join(root, "references", "spec.md"), filepath.Join(root, "spec.md")))
+	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\n[Spec](./spec.md)\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
+}
+
+func TestAuditReadinessReportsUnreadableMarkdownEntry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows 创建符号链接需要额外权限")
+	}
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte("---\nname: demo-dev\ndescription: Demo skill\n---\n"), 0o644))
+	require.NoError(t, os.Symlink(filepath.Join(root, "missing-target"), filepath.Join(root, "broken.md")))
+
+	require.Error(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
+}
+
 func TestMarkdownLinkTargetsPreservesCommonMarkSemantics(t *testing.T) {
 	content := "[Inline](inline.md) ![Image](image.png) [Reference][spec]\n\n[spec]: reference.md\n"
 
@@ -214,16 +323,8 @@ func TestAuditMarkdownLinksRejectsMissingRoot(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestEmbeddedCodeIndexLinkRequiresTextLabel(t *testing.T) {
-	require.False(t, isEmbeddedCodeIndexLink(ast.NewLink(), nil))
-}
-
-func TestLooksLikeCodeIndexLabel(t *testing.T) {
-	require.True(t, looksLikeCodeIndexLabel("\"key\""))
-	require.True(t, looksLikeCodeIndexLabel("'key'"))
-	require.True(t, looksLikeCodeIndexLabel("42"))
-	require.False(t, looksLikeCodeIndexLabel(""))
-	require.False(t, looksLikeCodeIndexLabel("key"))
+func TestEmbeddedSourceExpressionLinkRequiresTextLabel(t *testing.T) {
+	require.False(t, isEmbeddedSourceExpressionLink(markdownast.NewLink(), nil))
 }
 
 func TestCleanAuditPaths(t *testing.T) {

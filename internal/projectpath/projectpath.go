@@ -120,6 +120,15 @@ func ResolveOutput(projectRoot, outputPath string) (string, error) {
 	return pathAbs, nil
 }
 
+// ResolveCanonicalOutput 解析输出路径并返回已消解符号链接的项目内目标。
+func ResolveCanonicalOutput(projectRoot, outputPath string) (string, error) {
+	resolved, err := ResolveOutput(projectRoot, outputPath)
+	if err != nil {
+		return "", err
+	}
+	return CanonicalWithinRoot(projectRoot, resolved)
+}
+
 // ResolveWithinRoot 解析现有符号链接，并确保目标的真实路径位于根目录内。
 // 目标尚不存在时，从最近存在的父目录开始解析，避免中间符号链接绕过边界。
 func ResolveWithinRoot(root, target string) (string, error) {

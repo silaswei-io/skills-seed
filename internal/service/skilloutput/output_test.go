@@ -3,10 +3,14 @@ package skilloutput
 import (
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"testing/fstest"
 
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,6 +58,16 @@ func TestWriteManifestRejectsMissingOutput(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestWriteManifestReturnsEncodingError(t *testing.T) {
+	wantErr := errors.New("encode manifest")
+
+	err := writeManifest(filepath.Join(t.TempDir(), "manifest.json"), Manifest{}, nil, func(Manifest) ([]byte, error) {
+		return nil, wantErr
+	})
+
+	require.ErrorIs(t, err, wantErr)
+}
+
 func TestOutputFilesSkipsNonRegularEntries(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte("skill\n"), 0o644))
@@ -63,6 +77,37 @@ func TestOutputFilesSkipsNonRegularEntries(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []ManifestFile{{Path: "SKILL.md", SHA256: "3088e5b60779a95389e4ed08d2ecee6eaac2311c590dab3f2e4beb3090a54f00"}}, files)
+}
+
+func TestOutputFilesReturnsEntryInfoError(t *testing.T) {
+	base := fstest.MapFS{"broken.md": {Data: []byte("content\n")}}
+	info, err := fs.Stat(base, "broken.md")
+	require.NoError(t, err)
+	wantErr := errors.New("entry info")
+	fileSystem := controlledOutputFS{
+		FS:      base,
+		entries: []fs.DirEntry{controlledDirEntry{name: "broken.md", info: info, err: wantErr}},
+	}
+
+	_, err = outputFilesFS(fileSystem)
+
+	require.ErrorIs(t, err, wantErr)
+}
+
+func TestOutputFilesReturnsReadError(t *testing.T) {
+	base := fstest.MapFS{"broken.md": {Data: []byte("content\n")}}
+	info, err := fs.Stat(base, "broken.md")
+	require.NoError(t, err)
+	wantErr := errors.New("read file")
+	fileSystem := controlledOutputFS{
+		FS:        base,
+		entries:   []fs.DirEntry{controlledDirEntry{name: "broken.md", info: info}},
+		openError: map[string]error{"broken.md": wantErr},
+	}
+
+	_, err = outputFilesFS(fileSystem)
+
+	require.ErrorIs(t, err, wantErr)
 }
 
 func TestReplaceReplacesExistingDirectory(t *testing.T) {
@@ -119,6 +164,42 @@ func TestReplaceWithinRootRejectsOutputOutsideProject(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestReplaceWithinRootRejectsOutputPathChangedDuringBuild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows 创建符号链接需要额外权限")
+	}
+	projectRoot := t.TempDir()
+	outputPath := filepath.Join(projectRoot, "skill")
+	redirectPath := filepath.Join(projectRoot, "redirect")
+	require.NoError(t, os.Mkdir(redirectPath, 0o755))
+
+	err := ReplaceWithinRoot(projectRoot, outputPath, func(staging string) error {
+		require.NoError(t, os.WriteFile(filepath.Join(staging, "SKILL.md"), []byte("new\n"), 0o644))
+		return os.Symlink(redirectPath, outputPath)
+	})
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, i18n.Get("SkillOutputPathChanged"))
+	require.NoFileExists(t, filepath.Join(redirectPath, "SKILL.md"))
+}
+
+func TestReplaceWithinRootRejectsOutputEscapingDuringBuild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows 创建符号链接需要额外权限")
+	}
+	projectRoot := t.TempDir()
+	outputPath := filepath.Join(projectRoot, "skill")
+	outside := t.TempDir()
+
+	err := ReplaceWithinRoot(projectRoot, outputPath, func(staging string) error {
+		require.NoError(t, os.WriteFile(filepath.Join(staging, "SKILL.md"), []byte("new\n"), 0o644))
+		return os.Symlink(outside, outputPath)
+	})
+
+	require.Error(t, err)
+	require.NoFileExists(t, filepath.Join(outside, "SKILL.md"))
+}
+
 func TestRemoveDeletesConfiguredDirectory(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte("existing\n"), 0o644))
@@ -127,3 +208,34 @@ func TestRemoveDeletesConfiguredDirectory(t *testing.T) {
 	require.NoDirExists(t, root)
 	require.NoError(t, Remove(root))
 }
+
+type controlledOutputFS struct {
+	fs.FS
+	entries   []fs.DirEntry
+	openError map[string]error
+}
+
+func (f controlledOutputFS) Open(name string) (fs.File, error) {
+	if err := f.openError[name]; err != nil {
+		return nil, err
+	}
+	return f.FS.Open(name)
+}
+
+func (f controlledOutputFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if name == "." {
+		return f.entries, nil
+	}
+	return fs.ReadDir(f.FS, name)
+}
+
+type controlledDirEntry struct {
+	name string
+	info fs.FileInfo
+	err  error
+}
+
+func (e controlledDirEntry) Name() string               { return e.name }
+func (e controlledDirEntry) IsDir() bool                { return false }
+func (e controlledDirEntry) Type() fs.FileMode          { return e.info.Mode().Type() }
+func (e controlledDirEntry) Info() (fs.FileInfo, error) { return e.info, e.err }

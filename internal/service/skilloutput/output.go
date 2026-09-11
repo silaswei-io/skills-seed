@@ -20,10 +20,7 @@ func ReplaceWithinRoot(projectRoot, outputPath string, build func(staging string
 	if strings.TrimSpace(projectRoot) == "" {
 		return Replace(outputPath, build)
 	}
-	if _, err := projectpath.ResolveOutput(projectRoot, outputPath); err != nil {
-		return err
-	}
-	canonicalTarget, err := projectpath.CanonicalWithinRoot(projectRoot, outputPath)
+	canonicalTarget, err := projectpath.ResolveCanonicalOutput(projectRoot, outputPath)
 	if err != nil {
 		return err
 	}

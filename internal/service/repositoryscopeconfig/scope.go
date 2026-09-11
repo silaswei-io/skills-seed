@@ -59,7 +59,7 @@ func GeneratedSkillDirs(configRepo config.Reader, projectRoot string) []string {
 			if outputPath == "" {
 				continue
 			}
-			resolved, err := projectpath.Resolve(projectRoot, outputPath)
+			resolved, err := projectpath.ResolveOutput(projectRoot, outputPath)
 			if err != nil {
 				continue
 			}

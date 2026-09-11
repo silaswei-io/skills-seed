@@ -46,18 +46,32 @@ func WriteManifest(outputPath, manifestPath string, manifest Manifest) error {
 	if err != nil {
 		return err
 	}
+	return writeManifest(manifestPath, manifest, files, encodeManifest)
+}
+
+type manifestEncoder func(Manifest) ([]byte, error)
+
+func encodeManifest(manifest Manifest) ([]byte, error) {
+	return json.MarshalIndent(manifest, "", "  ")
+}
+
+func writeManifest(path string, manifest Manifest, files []ManifestFile, encode manifestEncoder) error {
 	manifest.SchemaVersion = 2
 	manifest.OutputFiles = files
-	data, err := json.MarshalIndent(manifest, "", "  ")
+	data, err := encode(manifest)
 	if err != nil {
 		return err
 	}
-	return fileio.WriteFileAtomic(manifestPath, append(data, '\n'), 0o644)
+	return fileio.WriteFileAtomic(path, append(data, '\n'), 0o644)
 }
 
 func outputFiles(root string) ([]ManifestFile, error) {
+	return outputFilesFS(os.DirFS(root))
+}
+
+func outputFilesFS(fileSystem fs.FS) ([]ManifestFile, error) {
 	files := make([]ManifestFile, 0)
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	err := fs.WalkDir(fileSystem, ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -71,17 +85,13 @@ func outputFiles(root string) ([]ManifestFile, error) {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(root, path)
+		content, err := fs.ReadFile(fileSystem, path)
 		if err != nil {
 			return err
 		}
 		sum := sha256.Sum256(content)
 		files = append(files, ManifestFile{
-			Path:   filepath.ToSlash(rel),
+			Path:   filepath.ToSlash(path),
 			SHA256: hex.EncodeToString(sum[:]),
 		})
 		return nil

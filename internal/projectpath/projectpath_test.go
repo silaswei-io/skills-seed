@@ -168,6 +168,24 @@ func TestResolveOutputRejectsSymlinkEscape(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestResolveCanonicalOutputReturnsResolvedTarget(t *testing.T) {
+	parent := t.TempDir()
+	projectRoot := filepath.Join(parent, "repo")
+	realOutputParent := filepath.Join(projectRoot, "generated")
+	require.NoError(t, os.MkdirAll(realOutputParent, 0o755))
+	require.NoError(t, os.Symlink(realOutputParent, filepath.Join(projectRoot, ".agents")))
+
+	resolved, err := ResolveCanonicalOutput(projectRoot, ".agents/skills/demo")
+
+	require.NoError(t, err)
+	expected, err := filepath.EvalSymlinks(realOutputParent)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(expected, "skills", "demo"), resolved)
+
+	_, err = ResolveCanonicalOutput(projectRoot, "../outside")
+	require.Error(t, err)
+}
+
 func TestRelative(t *testing.T) {
 	projectRoot := filepath.Join("tmp", "project")
 	paths := []string{

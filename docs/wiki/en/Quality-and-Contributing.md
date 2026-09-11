@@ -37,6 +37,13 @@ staticcheck ./...
 go build ./cmd/skills-seed
 ```
 
+When extending error branches, path boundaries, or persistence behavior, also generate one repository-wide coverage report and confirm that the new tests execute the intended branches:
+
+```bash
+go test ./... -coverprofile=coverage.out
+go tool cover -func=coverage.out
+```
+
 Release iterations use `.test/release-iterate.sh`, which updates version metadata, runs quality gates, commits, tags, and pushes. Add a new current-version entry to both changelogs before release; historical entries must not be rewritten.
 
 ## Documentation Contributions

@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.33]
+
+### Fixes
+
+- Unified Skill output-directory and local Markdown-link validation on canonical paths after symlink resolution. Generated directories configured outside the project, output targets replaced with escaping symlinks during a build, and links escaping the generated Skill root are now rejected.
+- Switched CommonMark source-expression exemptions to Go syntax parsing so complex generic, index, and call expressions no longer produce false positives while adjacent real links remain fully validated.
+
+### Tests
+
+- Expanded critical branch coverage across the CLI entrypoint, retry lifecycle, file-change classification, knowledge-evidence verification, domain models, output manifests, repositories, and synchronization flows, raising whole-repository statement coverage to 75.3%.
+- Added regressions for path traversal, symlink replacement, encoding and filesystem errors, cancellation and recovery, and bilingual output; race, vet, and staticcheck checks all pass.
+
 ## [v0.20.32]
 
 ### Fixes

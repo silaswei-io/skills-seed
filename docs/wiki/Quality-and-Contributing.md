@@ -37,6 +37,13 @@ staticcheck ./...
 go build ./cmd/skills-seed
 ```
 
+扩展错误分支、路径边界或持久化行为时，应同时生成统一覆盖率报告，确认新增测试确实进入目标分支：
+
+```bash
+go test ./... -coverprofile=coverage.out
+go tool cover -func=coverage.out
+```
+
 发布迭代遵循仓库的 `.test/release-iterate.sh`，它会更新版本、执行质量门禁、提交、打标签并推送。发布前必须先补充当前版本的中英文更新日志，且不能改写历史版本记录。
 
 ## 文档贡献
