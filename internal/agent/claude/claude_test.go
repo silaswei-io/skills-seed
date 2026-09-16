@@ -242,7 +242,7 @@ func TestReviewKnowledgePreservesEveryInvalidResultAttempt(t *testing.T) {
 	require.Contains(t, manifests[2].Error, "verdict")
 }
 
-func TestClaudeInvocationTimeoutRetriesCurrentCall(t *testing.T) {
+func TestClaudeStageTimeoutDoesNotResetForRetry(t *testing.T) {
 	dir := t.TempDir()
 	commandPath := filepath.Join(dir, "claude")
 	attemptPath := filepath.Join(dir, "attempts")
@@ -260,12 +260,9 @@ printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"structured
 	ag := New(commandPath, 2*time.Second, promptloader.New("claude", "en", ""), false, immediateRetryConfig(), config.AgentRuntimeOptions{})
 	output, err := ag.callClaude(context.Background(), "OptimizeRule", "prompt", aicontract.ContractOptimizeRule)
 
-	if err != nil {
-		attempts, _ := os.ReadFile(attemptPath)
-		t.Fatalf("callClaude failed after attempts %q: %v", string(attempts), err)
-	}
-	require.Equal(t, `{"content":"ok"}`, output)
-	require.Equal(t, "1\n2\n", readTestFile(t, attemptPath))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Empty(t, output)
+	require.Equal(t, "1\n", readTestFile(t, attemptPath))
 }
 
 func TestAnalyzeCurrentDeltaBatchConstrainsRuntimeSchemaToInputFocus(t *testing.T) {

@@ -135,7 +135,7 @@ func (c *StructuralConfig) UnmarshalYAML(value *yaml.Node) error {
 type AgentConfig struct {
 	Engine           string            `yaml:"engine"`             // Agent 引擎
 	Commands         map[string]string `yaml:"commands"`           // engine -> CLI 命令
-	Timeout          int               `yaml:"timeout"`            // 超时时间（秒）
+	Timeout          int               `yaml:"timeout"`            // 单阶段总预算（秒），包含排队、执行、退避和结构修复
 	MaxTurns         int               `yaml:"max_turns"`          // 单次 Agent 调用允许的最大探索轮数，仅 Claude 引擎生效
 	AllowUserPlugins bool              `yaml:"allow_user_plugins"` // 是否加载用户插件
 	Parallelism      int               `yaml:"parallelism"`        // 并发 Agent 数，0 表示自动
@@ -317,6 +317,7 @@ type LoggingConfig struct {
 
 // SkillsConfig 控制生成的 Skills 类型、输出路径和 AI/Skills 内容语言。
 type SkillsConfig struct {
+	Name   string            `yaml:"name"`   // 显式 Skill 名称；留空时按项目或工作区名称生成
 	Target string            `yaml:"target"` // 目标 Agent Skills 类型
 	Locale string            `yaml:"locale"` // AI 输出、沉淀内容和生成 Skills 的语言：zh-CN, en-US
 	Paths  map[string]string `yaml:"paths"`  // target -> Skills 输出路径
@@ -429,6 +430,9 @@ func (r *Repository) load() (*Config, error) {
 	}
 
 	r.normalizeConfig(&cfg)
+	if err := ValidateSkillsName(cfg.Skills.Name); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
 }
 
@@ -451,6 +455,9 @@ func rejectDeprecatedConfigKeys(data []byte) error {
 
 // save 保存配置（保留注释）
 func (r *Repository) save(cfg *Config) error {
+	if err := ValidateSkillsName(cfg.Skills.Name); err != nil {
+		return err
+	}
 	// 确保目录存在
 	if err := os.MkdirAll(filepath.Dir(r.configPath), 0755); err != nil {
 		return fmt.Errorf("%s: %w", i18n.Get("ConfigCreateDirFailed"), err)
@@ -666,6 +673,9 @@ func normalizeSkillsConfig(cfg *Config) {
 	}
 	if cfg.Skills.Paths[cfg.Skills.Target] == "" {
 		cfg.Skills.Paths[cfg.Skills.Target] = DefaultSkillsPathForTarget(cfg.Skills.Target)
+		if cfg.Skills.Name != "" {
+			cfg.Skills.Paths[cfg.Skills.Target] = filepath.ToSlash(filepath.Join(filepath.Dir(cfg.Skills.Paths[cfg.Skills.Target]), cfg.Skills.Name))
+		}
 	}
 }
 

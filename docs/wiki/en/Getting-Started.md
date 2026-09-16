@@ -43,6 +43,8 @@ Interactive initialization selects project mode, analysis Agent, Skills target, 
 skills-seed init --mode project --agent codex --skills codex --locale en-US --no-interactive
 ```
 
+Use `skills-seed init --skills-name team-guide` to choose the generated Skill name, or enter it during interactive initialization. The exact name is used in `SKILL.md` frontmatter and the final output directory, such as `.claude/skills/team-guide/`; no `-dev` suffix is appended. Names must contain 1–64 lowercase letters, digits, or hyphens, with no leading, trailing, or consecutive hyphens. Omit it to keep the project-derived default.
+
 After initialization, `.skills-seed/` is the local working area for project knowledge. It holds configuration, user resources, learning state, runtime archives, and local data. Teams decide which collaborative files belong in version control.
 
 ## Choose an Analysis Agent and Output Target

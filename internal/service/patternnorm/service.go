@@ -206,8 +206,13 @@ func saveNormalizationDecision(ctx context.Context, checkpoint DecisionCheckpoin
 	return nil
 }
 
-func normalizationDecisionKey(candidates []domain.Pattern) (string, error) {
-	data, err := json.Marshal(candidates)
+func normalizationDecisionKey(candidates, related []domain.Pattern, userContext string, guidance maintained.Snapshot) (string, error) {
+	data, err := json.Marshal(struct {
+		Candidates  []domain.Pattern
+		Related     []domain.Pattern
+		UserContext string
+		Guidance    maintained.Snapshot
+	}{candidates, related, userContext, guidance})
 	if err != nil {
 		return "", fmt.Errorf("hash normalization candidates: %w", err)
 	}

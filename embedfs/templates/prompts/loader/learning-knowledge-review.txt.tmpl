@@ -8,6 +8,9 @@ Project:
 - language: {{.Language}}
 
 The evidence focus for this review is available at `{{.EvidenceFocusPath}}`. Candidate knowledge from that focus is available at `{{.CandidatesPath}}` ({{.CandidateCount}} items). Keep this focus together, and read each candidate and its referenced repository evidence.
+{{- if .LearningEvidencePath}}
+The program-supplied source paths, diff references, and structural facts used during analysis are available at `{{.LearningEvidencePath}}`. Reuse these facts to locate and verify the exact source boundary. They contain no analysis conversation or reasoning. Read additional source only when needed to resolve a concrete evidence gap; do not repeat repository-wide discovery.
+{{- end}}
 {{- if .UserContextPath}}
 User context is available at `{{.UserContextPath}}`; use it only to interpret intent, and do not treat it as source evidence.
 {{- else}}

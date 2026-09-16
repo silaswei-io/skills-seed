@@ -14,7 +14,10 @@ import (
 
 func TestNewLearnCurrentProjectRunPreservesParentCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	run := newLearnCurrentProjectRun(ctx, &container.Container{SeedPath: t.TempDir()}, learnCurrentProjectOptions{})
+	seedPath := t.TempDir()
+	repo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	run := newLearnCurrentProjectRun(ctx, &container.Container{SeedPath: seedPath, ConfigRepo: repo}, learnCurrentProjectOptions{})
 	cancel()
 
 	require.ErrorIs(t, run.ctx.Err(), context.Canceled)

@@ -15,9 +15,11 @@ type EvidenceFocus struct {
 	Attributes    []string `json:"attributes,omitempty"`
 	RiskSignals   []string `json:"risk_signals,omitempty"`
 	AnalysisDepth string   `json:"analysis_depth,omitempty"`
-	EntryPaths    []string `json:"entry_paths,omitempty"`
-	RelatedPaths  []string `json:"related_paths,omitempty"`
-	ScopeReason   string   `json:"scope_reason,omitempty"`
+	// EntryPaths 是本焦点独占的学习责任，只有这些路径计入议程覆盖。
+	EntryPaths []string `json:"entry_paths,omitempty"`
+	// RelatedPaths 是可跨焦点共享的只读证据，不承担学习覆盖责任。
+	RelatedPaths []string `json:"related_paths,omitempty"`
+	ScopeReason  string   `json:"scope_reason,omitempty"`
 }
 
 const (

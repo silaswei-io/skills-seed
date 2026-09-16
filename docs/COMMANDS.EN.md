@@ -60,7 +60,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook install` | Install Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | Run the pre-commit hook manually | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
-| `skills-seed init` | Initialize skills-seed project | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed init` | Initialize skills-seed project | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills-name` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | Learn from current code | `current` | `--help, -h` = `false` |
 | `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
@@ -170,6 +170,7 @@ Initialize `.skills-seed/`, default config, database, project context, and skill
 | `--agent` | empty | Execution Agent engine to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
 | `--agent-model` | empty | Model name passed to the Agent CLI for skills-seed calls; empty inherits the local Agent CLI default |
 | `--skills` | empty | Skills output type to write during initialization, for example `claude` or `codex`; empty uses the built-in default |
+| `--skills-name` | empty | Generated Skill name, used unchanged for the entry name and output directory; empty derives it from the project name |
 | `--workspace` | `false` | Shortcut for `--mode workspace` |
 | `--locale`, `-l` | empty | Tool output, config-template, and seed-context template language: `zh-CN` or `en-US`; empty uses the built-in default `zh-CN` |
 | `--skills-locale` | empty | Language for AI output, persisted learned content, and generated Skills: `zh-CN` or `en-US`; empty uses the built-in default `en-US` |
@@ -191,7 +192,7 @@ skills-seed init --workspace --agent codex --skills codex
 1. `--agent` sets `agent.engine` and ensures the engine exists in `agent.commands`.
 2. `--skills` sets `skills.target` and ensures `skills.paths` contains the target's default output directory.
 3. `--workspace` initializes the root and the child repositories detected at that time.
-4. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `agent.model`, `skills.target`, and `skills.paths`.
+4. Newly initialized child repositories inherit root `agent.engine`, `agent.commands`, `agent.model`, and `skills.target`; their Skill names and directories derive from each child, without inheriting root `skills.name`.
 5. Already initialized children are skipped. If a child agent differs from the root, it is reported and preserved.
 6. A successful init prints the relative `.skills-seed` location and the README URL for the current version tag.
 7. Workspace child discovery only treats first-level independent Git repositories as children; marker files classify type and language only.

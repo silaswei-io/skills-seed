@@ -41,7 +41,7 @@ func (s *Service) reviewCurrentKnowledge(ctx context.Context, req ReviewRequest,
 		Candidates:         ordered,
 		UserContext:        req.UserContext,
 		MaintainedGuidance: guidance,
-		Conversation:       req.Conversation,
+		Evidence:           req.Evidence.Clone(),
 	})
 	if err != nil {
 		return nil, err

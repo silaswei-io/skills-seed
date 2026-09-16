@@ -71,7 +71,7 @@ func TestResolveFocusPaths(t *testing.T) {
 func requireRunLearnCurrentNoError(t *testing.T, cont *container.Container, opts learnCurrentOptions) domain.LearnCurrentResult {
 	t.Helper()
 
-	result, err := runLearnCurrent(cont, opts)
+	result, err := runLearnCurrent(context.Background(), cont, opts)
 	require.NoError(t, err)
 	return result
 }
@@ -147,7 +147,7 @@ func TestRunLearnCurrentReportsProjectSummaryWhenPatternsSaved(t *testing.T) {
 		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
 	}
 
-	result, err := runLearnCurrent(cont, opts)
+	result, err := runLearnCurrent(context.Background(), cont, opts)
 
 	require.NoError(t, err)
 	require.Equal(t, 1, result.Summary.PatternsSaved)
@@ -255,7 +255,7 @@ func TestRunLearnCurrentReportsWorkspaceChangedProjectsWhenPatternsSaved(t *test
 	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
 	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
 
-	result, err := runLearnCurrent(cont, opts)
+	result, err := runLearnCurrent(context.Background(), cont, opts)
 
 	require.NoError(t, err)
 	require.Equal(t, 1, result.Summary.ChangedProjects)
@@ -610,7 +610,7 @@ func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternStoreFails(t *tes
 		},
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), i18n.Get("PatternNormLoadExistingPatternsFailed"))
@@ -660,7 +660,7 @@ func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testin
 	patternNormSvc := patternnorm.NewServiceWithNormalizer(patternRepo, mockAgent)
 	cont.PatternNormSvc = patternNormSvc
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 	require.ErrorContains(t, err, "pattern store failed")
 	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
 	state, stateErr := stateRepo.Load(context.Background())
@@ -676,7 +676,7 @@ func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testin
 	require.Equal(t, 0, profileCalls)
 
 	failStore = false
-	_, err = runLearnCurrent(cont, opts)
+	_, err = runLearnCurrent(context.Background(), cont, opts)
 	require.NoError(t, err)
 	require.Equal(t, 1, analyzeCalls)
 	require.Equal(t, 1, reviewCalls)
@@ -717,7 +717,7 @@ func TestRunLearnCurrentResumeAfterProfileSaveFailureDoesNotReanalyze(t *testing
 	require.NoError(t, os.RemoveAll(profileDocumentsPath))
 	require.NoError(t, os.WriteFile(profileDocumentsPath, []byte("blocks profile writes\n"), 0o644))
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 
 	require.Error(t, err)
 	require.Equal(t, 1, analyzeCalls)
@@ -729,7 +729,7 @@ func TestRunLearnCurrentResumeAfterProfileSaveFailureDoesNotReanalyze(t *testing
 	require.False(t, state.ProjectionsCommitComplete())
 
 	require.NoError(t, os.Remove(profileDocumentsPath))
-	result, err := runLearnCurrent(cont, opts)
+	result, err := runLearnCurrent(context.Background(), cont, opts)
 	require.NoError(t, err)
 	require.Equal(t, 1, analyzeCalls)
 	require.Equal(t, 2, profileCalls)
@@ -772,7 +772,7 @@ func TestRunLearnCurrentResumeAfterFingerprintFailureDoesNotReanalyze(t *testing
 		DeleteAnalyzedFilesFn: originalTracker.DeleteAnalyzedFiles,
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 	require.ErrorContains(t, err, "fingerprint store failed")
 	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
 	state, stateErr := stateRepo.Load(context.Background())
@@ -780,7 +780,7 @@ func TestRunLearnCurrentResumeAfterFingerprintFailureDoesNotReanalyze(t *testing
 	require.True(t, state.PatternsCommitComplete())
 
 	failFingerprint = false
-	_, err = runLearnCurrent(cont, opts)
+	_, err = runLearnCurrent(context.Background(), cont, opts)
 	require.NoError(t, err)
 	require.Equal(t, 1, analyzeCalls)
 	_, stateErr = stateRepo.Load(context.Background())
@@ -820,7 +820,7 @@ func TestRunLearnCurrentResumeAfterFinalizationFailureDoesNotReanalyze(t *testin
 		},
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 	require.ErrorContains(t, err, "finalization failed")
 	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
 	state, stateErr := stateRepo.Load(context.Background())
@@ -828,7 +828,7 @@ func TestRunLearnCurrentResumeAfterFinalizationFailureDoesNotReanalyze(t *testin
 	require.True(t, state.PatternsCommitComplete())
 
 	failFinalization = false
-	_, err = runLearnCurrent(cont, opts)
+	_, err = runLearnCurrent(context.Background(), cont, opts)
 	require.NoError(t, err)
 	require.Equal(t, 1, analyzeCalls)
 	_, stateErr = stateRepo.Load(context.Background())
@@ -866,13 +866,13 @@ func TestRunLearnCurrentInvalidatesRecoveryStateWhenNewFileAppears(t *testing.T)
 		DeleteAnalyzedFilesFn: originalTracker.DeleteAnalyzedFiles,
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 	require.ErrorContains(t, err, "fingerprint store failed")
 	writeLearnFile(t, projectRoot, "internal/new.go", "package internal\n")
 	gitAddAll(t, projectRoot)
 	failFingerprint = false
 
-	_, err = runLearnCurrent(cont, opts)
+	_, err = runLearnCurrent(context.Background(), cont, opts)
 	require.NoError(t, err)
 	require.Equal(t, 2, analyzeCalls)
 	require.Contains(t, analyzedPaths[1], "internal/new.go")
@@ -919,7 +919,7 @@ func TestRunLearnCurrentResumesPendingFocusFromCachedPlan(t *testing.T) {
 		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 	require.Error(t, err)
 	require.Equal(t, 1, planCalls)
 	require.Equal(t, [][]string{{"internal/auth/login.go"}, {"internal/key/create.go"}}, analyzed)
@@ -1014,7 +1014,7 @@ func TestRunLearnCurrentCheckpointsSuccessfulSerialBatch(t *testing.T) {
 		}}}, nil
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 	require.ErrorContains(t, err, "key analysis failed")
 
 	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
@@ -1084,7 +1084,7 @@ func TestRunLearnCurrentDoesNotCommitSnapshotsUntilAllFocusesSucceed(t *testing.
 		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 
 	require.Error(t, err)
 	require.Equal(t, []string{"internal/auth/login.go"}, receivedDiffs["auth"])
@@ -1277,7 +1277,7 @@ func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
 		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
 	}
 
-	_, err := runLearnCurrent(cont, opts)
+	_, err := runLearnCurrent(context.Background(), cont, opts)
 	require.Error(t, err)
 	require.Equal(t, []config.LearningMode{config.LearningModeDeep}, planModes)
 	require.Equal(t, []config.LearningMode{config.LearningModeDeep, config.LearningModeDeep}, analyzeModes)
@@ -1593,7 +1593,7 @@ func TestRunLearnCurrentIncludesEvidenceFocusInFailure(t *testing.T) {
 
 	var runErr error
 	output := captureLearnStdout(t, func() {
-		_, runErr = runLearnCurrent(cont, opts)
+		_, runErr = runLearnCurrent(context.Background(), cont, opts)
 	})
 
 	require.Error(t, runErr)
@@ -1649,7 +1649,7 @@ func TestRunLearnCurrentWithContextPassesUserContextToAnalysis(t *testing.T) {
 		}, nil
 	}
 
-	_, err := RunLearnCurrentWithContext(cont, "私有化部署，不是 SaaS")
+	_, err := RunLearnCurrentWithContext(context.Background(), cont, "私有化部署，不是 SaaS")
 	require.NoError(t, err)
 
 	require.Equal(t, "私有化部署，不是 SaaS", receivedContext)
@@ -2172,7 +2172,7 @@ func TestRunLearnWorkspaceCurrentMarksFailedChildProgress(t *testing.T) {
 	}
 
 	output := captureLearnStdout(t, func() {
-		_, err := runLearnCurrent(cont, opts)
+		_, err := runLearnCurrent(context.Background(), cont, opts)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "front")
 		require.Contains(t, err.Error(), "profile overloaded")
@@ -2191,7 +2191,7 @@ func TestRunLearnWorkspaceCurrentRequiresInitializedChildProject(t *testing.T) {
 	require.NoError(t, os.MkdirAll(childRoot, 0755))
 	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
 
-	_, err := runLearnCurrent(cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
+	_, err := runLearnCurrent(context.Background(), cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backend")
@@ -2211,7 +2211,7 @@ func TestRunLearnWorkspaceCurrentRequiresChildGitRepository(t *testing.T) {
 	cfg.Project.Mode = domain.ModeProject
 	require.NoError(t, childConfigRepo.Update(cfg))
 
-	_, err = runLearnCurrent(cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
+	_, err = runLearnCurrent(context.Background(), cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "backend")

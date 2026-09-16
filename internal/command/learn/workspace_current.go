@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -70,11 +71,11 @@ type workspaceProjectProgress struct {
 	startedAt time.Time
 }
 
-func runLearnWorkspaceCurrent(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
+func runLearnWorkspaceCurrent(ctx context.Context, cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	run := &learnWorkspaceCurrentRun{
 		cont:      cont,
 		opts:      opts,
-		ctx:       runtimecontext.WithUserContext(runtimecontext.WithSeedPath(context.Background(), cont.SeedPath), opts.userContext),
+		ctx:       runtimecontext.WithUserContext(runtimecontext.WithSeedPath(ctx, cont.SeedPath), opts.userContext),
 		startedAt: time.Now(),
 	}
 	return run.execute()
@@ -111,6 +112,7 @@ func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) 
 		defer r.tracker.Stop()
 	}
 	r.logStart()
+	r.ctx = agent.WithCallBudget(r.ctx, r.parallelism)
 	if err := workspacediscovery.RunProjectTasks(r.ctx, r.workspaceConfig.Projects, r.parallelism, r.runProject); err != nil {
 		return domain.LearnCurrentResult{}, err
 	}

@@ -103,10 +103,21 @@ func Int(title string, defaultValue, minValue int) (int, error) {
 
 // Text 显示文本输入框并返回去除首尾空白后的值。
 func Text(title, defaultValue string) (string, error) {
+	return TextWithValidation(title, defaultValue, nil)
+}
+
+// TextWithValidation 在提交前校验文本，允许用户直接修正无效输入。
+func TextWithValidation(title, defaultValue string, validate func(string) error) (string, error) {
 	text := defaultValue
 	err := huh.NewInput().
 		Title(title).
 		Value(&text).
+		Validate(func(value string) error {
+			if validate != nil {
+				return validate(strings.TrimSpace(value))
+			}
+			return nil
+		}).
 		WithWidth(promptWidth()).
 		WithTheme(promptTheme()).
 		Run()

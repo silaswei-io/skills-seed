@@ -214,8 +214,7 @@ type AnalyzeCurrentEvidenceResult struct {
 
 // AnalyzeCurrentCodebaseBatchResult 是批量当前代码学习的结果。
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Focuses      []AnalyzeCurrentEvidenceResult
-	Conversation Conversation
+	Focuses []AnalyzeCurrentEvidenceResult
 }
 
 // AnalyzeCurrentDeltaFocus 描述增量学习中的单个 diff 锚定证据焦点输入。
@@ -269,7 +268,6 @@ func (r *AnalyzeCurrentDeltaBatchRequest) FocusIDs() []string {
 type AnalyzeCurrentDeltaBatchResult struct {
 	Changes                   []domain.KnowledgeChange
 	ProfileRefreshRecommended ProfileRefreshRecommendation
-	Conversation              Conversation
 }
 
 // LearningPathSkip 记录规划阶段明确跳过的输入路径及原因。
@@ -339,7 +337,7 @@ type ReviewKnowledgeRequest struct {
 	UserContext        string
 	UserContextPath    string
 	MaintainedGuidance maintained.Snapshot
-	Conversation       Conversation
+	Evidence           domain.LearningEvidence
 }
 
 // KnowledgeRevision 只允许修订知识表述，不改变程序持有的证据和归属。

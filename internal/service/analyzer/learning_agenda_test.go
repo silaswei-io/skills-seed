@@ -34,7 +34,9 @@ func TestReconcileLearningAgendaNormalizesAndDeduplicatesPathDecisions(t *testin
 		Name:         "Primary evidence",
 		EntryPaths:   []string{"src/entry.ext"},
 		RelatedPaths: []string{"src/related.ext"},
-	}}, agenda.Focuses)
+	}}, agenda.Focuses[:1])
+	require.Len(t, agenda.Focuses, 2)
+	require.Equal(t, []string{"src/related.ext"}, agenda.Focuses[1].EntryPaths)
 	require.Equal(t, []agent.LearningPathSkip{{Path: "src/support.ext", Reason: "First receipt."}}, agenda.Skipped)
 }
 
@@ -58,6 +60,23 @@ func TestReconcileLearningAgendaPrefersFirstFocusedDecision(t *testing.T) {
 		{ID: "second", Name: "Second", EntryPaths: []string{"src/second.ext"}},
 	}, agenda.Focuses)
 	require.Equal(t, []agent.LearningPathSkip{{Path: "src/skipped.ext", Reason: "No durable decision value."}}, agenda.Skipped)
+}
+
+func TestLearningAgendaRelatedEvidenceDoesNotClaimOwnership(t *testing.T) {
+	for _, reversed := range []bool{false, true} {
+		focuses := []domain.EvidenceFocus{
+			{ID: "a", Name: "A", EntryPaths: []string{"a.go"}, RelatedPaths: []string{"b.go", "shared.go"}},
+			{ID: "b", Name: "B", EntryPaths: []string{"b.go"}, RelatedPaths: []string{"a.go", "shared.go"}},
+		}
+		if reversed {
+			focuses[0], focuses[1] = focuses[1], focuses[0]
+		}
+		agenda, err := reconcileLearningAgenda([]string{"a.go", "b.go", "shared.go"}, focuses, nil, 64)
+		require.NoError(t, err)
+		require.Len(t, agenda.Focuses, 3)
+		require.Equal(t, focuses, agenda.Focuses[:2])
+		require.Equal(t, []string{"shared.go"}, agenda.Focuses[2].EntryPaths)
+	}
 }
 
 func TestReconcileLearningAgendaSplitsFallbackFocusesForOmittedInputs(t *testing.T) {

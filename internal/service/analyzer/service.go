@@ -345,14 +345,14 @@ type AnalyzeCurrentCodebaseBatchOptions struct {
 }
 
 type AnalyzeCurrentEvidenceResult struct {
+	Evidence                  domain.LearningEvidence
 	EvidenceFocus             domain.EvidenceFocus
 	Patterns                  []domain.Pattern
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
 }
 
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Focuses      []AnalyzeCurrentEvidenceResult
-	Conversation agent.Conversation
+	Focuses []AnalyzeCurrentEvidenceResult
 }
 
 type AnalyzeCurrentDeltaFocus struct {
@@ -371,9 +371,9 @@ type AnalyzeCurrentDeltaBatchOptions struct {
 }
 
 type AnalyzeCurrentDeltaBatchResult struct {
+	Evidence                  map[string]domain.LearningEvidence
 	Changes                   []domain.KnowledgeChange
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
-	Conversation              agent.Conversation
 }
 
 // PlanLearningAgendaRequest 请求按源码证据边界规划当前待学习文件。
@@ -499,11 +499,12 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 	focusByName := make(map[string]domain.EvidenceFocus, len(opts.Focuses))
 	for _, focus := range opts.Focuses {
 		focusPaths := projectpath.Relative(projectRoot, focus.FocusAbsPaths)
+		evidencePaths := append(append([]string(nil), focusPaths...), focus.EvidenceFocus.RelatedPaths...)
 		focuses = append(focuses, agent.AnalyzeCurrentEvidenceFocus{
 			EvidenceFocus: focus.EvidenceFocus,
 			FocusPaths:    focusPaths,
-			SampleFiles:   filterSampleFilesByFocus(runContext.SampleFiles, focusPaths),
-			DiffFiles:     filterDiffFilesByFocus(runContext.DiffFiles, focusPaths),
+			SampleFiles:   filterSampleFilesByFocus(runContext.SampleFiles, evidencePaths),
+			DiffFiles:     filterDiffFilesByFocus(runContext.DiffFiles, evidencePaths),
 		})
 		focusByID[focus.EvidenceFocus.ID] = focus.EvidenceFocus
 		focusByName[focus.EvidenceFocus.Name] = focus.EvidenceFocus
@@ -589,10 +590,11 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		return nil, err
 	}
 	out := make([]AnalyzeCurrentEvidenceResult, 0, len(opts.Focuses))
-	for _, requested := range opts.Focuses {
+	for index, requested := range opts.Focuses {
 		focusResult := mergedResults[requested.EvidenceFocus.ID]
 		patterns := validator.validatePatterns(focusResult.Patterns)
 		out = append(out, AnalyzeCurrentEvidenceResult{
+			Evidence:                  learningEvidence(focuses[index].SampleFiles, focuses[index].DiffFiles, structuralContext),
 			EvidenceFocus:             requested.EvidenceFocus,
 			Patterns:                  patterns,
 			ProfileRefreshRecommended: focusResult.ProfileRefreshRecommended,
@@ -603,7 +605,18 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		"duration", time.Since(startedAt),
 		"focuses_count", len(out),
 	)
-	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out, Conversation: result.Conversation}, nil
+	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out}, nil
+}
+
+func learningEvidence(files []agent.SampleFile, diffs []agent.DiffFileRef, structuralContext string) domain.LearningEvidence {
+	evidence := domain.LearningEvidence{StructuralContext: structuralContext}
+	for _, file := range files {
+		evidence.SourcePaths = append(evidence.SourcePaths, file.Path)
+	}
+	for _, diff := range diffs {
+		evidence.DiffPaths = append(evidence.DiffPaths, diff.DiffPath)
+	}
+	return evidence
 }
 
 func resolveBatchResultFocus(result agent.AnalyzeCurrentEvidenceResult, byID, byName map[string]domain.EvidenceFocus) (domain.EvidenceFocus, bool) {

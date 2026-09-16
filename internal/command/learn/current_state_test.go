@@ -264,7 +264,6 @@ func TestCheckpointFocusResultsMakesCompletedFocusRecoverable(t *testing.T) {
 	completed, err := run.checkpointFocusResults([]learnCurrentFocusResult{{
 		focus:     focuses[0],
 		completed: true,
-		reviewed:  true,
 	}})
 
 	require.NoError(t, err)
@@ -273,7 +272,7 @@ func TestCheckpointFocusResultsMakesCompletedFocusRecoverable(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resumed.Analysis.FocusKnowledge, 1)
 	require.Equal(t, "first", resumed.Analysis.FocusKnowledge[0].Focus.ID)
-	require.True(t, resumed.Analysis.FocusKnowledge[0].Reviewed)
+	require.False(t, resumed.Analysis.FocusKnowledge[0].Reviewed)
 	pending := pendingEvidenceFocuses(resumed, changes)
 	require.Len(t, pending, 1)
 	require.Equal(t, "second", pending[0].ID)
@@ -310,7 +309,7 @@ func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {
 	run := &learnCurrentProjectRun{
 		analysisState:      commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses),
 		incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
-		focusKnowledge:     []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0]}},
+		focusKnowledge:     []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0], Reviewed: true}},
 	}
 
 	err := run.validateCompletedAnalysis()

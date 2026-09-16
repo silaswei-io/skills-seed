@@ -43,6 +43,9 @@ func (c *CodexAgent) callCodexWithOptions(ctx context.Context, operation, prompt
 }
 
 func (c *CodexAgent) callCodexResult(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (codexCallResult, error) {
+	// 同一阶段的排队、执行、退避与结构修复共享预算，重试不重置截止时间。
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	outputSchema, err := aicontract.StrictStructuredOutputSchemaWithOptions(outputContract, opts)
 	if err != nil {
 		return codexCallResult{}, err
@@ -65,12 +68,14 @@ func (c *CodexAgent) callCodexResult(ctx context.Context, operation, prompt, out
 		return codexCallResult{}, err
 	}
 
+	repair := agent.NewResultRepair(prompt)
 	return agent.RunRetryingCall(ctx, agent.RetryingCallOptions[codexCallResult]{
 		AgentName: c.Name(),
 		Operation: operation,
 		Policy:    c.retryCfg,
 		Call: func(attempt int) (codexCallResult, string, time.Duration, bool, error) {
-			output, nextConversation, archive, duration, retryable, err := c.doCallCodex(ctx, operation, prompt, schemaPath, outputValidator.Validate, conversation, attempt, agent.FirstRuntimeTask(task))
+			output, nextConversation, archive, duration, retryable, err := c.doCallCodex(ctx, operation, repair.Prompt(), schemaPath, outputValidator.Validate, conversation, attempt, agent.FirstRuntimeTask(task))
+			retryable = repair.Prepare(err, retryable)
 			retryOutput := output
 			if err != nil && strings.TrimSpace(retryOutput) == "" {
 				retryOutput = err.Error()

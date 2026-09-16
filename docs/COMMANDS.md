@@ -60,7 +60,7 @@
 | `skills-seed hook install` | 安装 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook run` | 手动运行 pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
-| `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
+| `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills-name` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | 从当前代码学习 | `current` | `--help, -h` = `false` |
 | `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
@@ -170,6 +170,7 @@ skills-templates-sha256: <hash>
 | `--agent` | 空 | 初始化时写入的执行 Agent engine，例如 `claude` 或 `codex`；留空时使用内置默认值 |
 | `--agent-model` | 空 | skills-seed 调用 Agent CLI 时使用的模型名；留空继承本机 Agent CLI 默认配置 |
 | `--skills` | 空 | 初始化时写入的 skills 输出类型，例如 `claude` 或 `codex`；留空时使用内置默认值 |
+| `--skills-name` | 空 | 生成的 Skill 名称；原样设置入口名称和目标目录名，留空按项目名生成 |
 | `--workspace` | `false` | `--mode workspace` 的快捷参数 |
 | `--locale`, `-l` | 空 | 工具输出、配置模板与 seed context 模板语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `zh-CN` |
 | `--skills-locale` | 空 | AI 输出、沉淀内容和生成 Skills 语言：`zh-CN` 或 `en-US`；留空时使用内置默认值 `en-US` |
@@ -191,7 +192,7 @@ skills-seed init --workspace --agent codex --skills codex
 1. `--agent` 会设置 `agent.engine`，并确保 `agent.commands` 中存在对应 engine。
 2. `--skills` 会设置 `skills.target`，并确保 `skills.paths` 中存在对应 target 的默认输出目录。
 3. `--workspace` 会初始化根仓，并同步初始化当前检测到的子仓。
-4. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands`、`agent.model` 和 `skills.target`、`skills.paths`。
+4. 新初始化的子仓会继承根仓 `agent.engine`、`agent.commands`、`agent.model` 和 `skills.target`；Skill 名称及目录按子项目生成，不继承根的 `skills.name`。
 5. 已初始化的子仓会跳过；如果子仓 agent 与根仓不同，只提示，不覆盖。
 6. 初始化成功后会输出相对 `.skills-seed` 位置和当前版本 tag 对应的 README 文档地址。
 7. workspace 子仓发现只认根目录第一层的独立 Git 仓库；标记文件只用于识别类型和语言。

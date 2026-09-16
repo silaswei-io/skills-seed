@@ -72,8 +72,13 @@ func (r learningAgendaReconciler) focuses(raw []domain.EvidenceFocus) []domain.E
 		focus.ID = strings.TrimSpace(focus.ID)
 		focus.Name = strings.TrimSpace(focus.Name)
 		focus.EntryPaths = r.claimPaths(focus.EntryPaths, claimed)
-		focus.RelatedPaths = r.claimPaths(focus.RelatedPaths, claimed)
-		if len(focus.EntryPaths) == 0 && len(focus.RelatedPaths) == 0 {
+		// 关联证据仅在焦点内部去重，不能抢占其他焦点的学习责任。
+		local := make(map[string]struct{}, len(focus.EntryPaths))
+		for _, path := range focus.EntryPaths {
+			local[path] = struct{}{}
+		}
+		focus.RelatedPaths = r.claimPaths(focus.RelatedPaths, local)
+		if len(focus.EntryPaths) == 0 {
 			continue
 		}
 		focuses = append(focuses, focus)
@@ -163,7 +168,7 @@ func (r learningAgendaReconciler) completeCoverage(focuses []domain.EvidenceFocu
 func focusPathSet(focuses []domain.EvidenceFocus) map[string]struct{} {
 	paths := make(map[string]struct{})
 	for _, focus := range focuses {
-		for _, path := range append(append([]string(nil), focus.EntryPaths...), focus.RelatedPaths...) {
+		for _, path := range focus.EntryPaths {
 			paths[cleanLearningAgendaPath(path)] = struct{}{}
 		}
 	}
@@ -212,13 +217,21 @@ func validateLearningAgendaCoverageForInputs(inputs learningAgendaInputSet, focu
 		if !inputs.contains(path) {
 			return fmt.Errorf("learning plan %s references unknown path %q", owner, path)
 		}
+		if _, exists := covered[path]; exists {
+			return fmt.Errorf("learning plan repeats ownership for path %q", path)
+		}
 		covered[path] = struct{}{}
 		return nil
 	}
 	for _, focus := range focuses {
-		for _, path := range append(append([]string(nil), focus.EntryPaths...), focus.RelatedPaths...) {
+		for _, path := range focus.EntryPaths {
 			if err := add(path, "focus"); err != nil {
 				return err
+			}
+		}
+		for _, path := range focus.RelatedPaths {
+			if !inputs.contains(path) {
+				return fmt.Errorf("learning plan evidence references unknown path %q", path)
 			}
 		}
 	}

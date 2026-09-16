@@ -86,9 +86,10 @@ func (r *learnCurrentProjectRun) buildDeltaFocusResults(batch learnCurrentBatch,
 
 	results := make([]learnCurrentFocusResult, 0, len(batch.focuses))
 	for _, indexed := range batch.focuses {
-		result := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID], result.Conversation)
-		result.retiredPatternIDs = appendUniquePatternIDs(nil, retiredByFocus[indexed.focus.ID]...)
-		results = append(results, result)
+		focusResult := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID])
+		focusResult.evidence = result.Evidence[indexed.focus.ID].Clone()
+		focusResult.retiredPatternIDs = appendUniquePatternIDs(nil, retiredByFocus[indexed.focus.ID]...)
+		results = append(results, focusResult)
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].index < results[j].index })
 	return results, nil
@@ -131,9 +132,6 @@ func newDeltaFocusResolver(projectRoot string, focuses []analyzer.AnalyzeCurrent
 			resolver.byFocus[normalizeStatePath(path)] = focus
 		}
 		for _, path := range focus.EntryPaths {
-			resolver.byFocus[normalizeStatePath(path)] = focus
-		}
-		for _, path := range focus.RelatedPaths {
 			resolver.byFocus[normalizeStatePath(path)] = focus
 		}
 	}

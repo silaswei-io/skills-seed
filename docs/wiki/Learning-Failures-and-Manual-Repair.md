@@ -30,7 +30,7 @@ skills-seed preview files --mode incremental --focus <path>
 
 错误信息中的 `raw`、`stderr`、`manifest` 会指向 `.skills-seed/runtime/agent-outputs/` 下的具体归档。按以下顺序处理：
 
-Agent CLI 报告成功后，Skills Seed 仍会使用本次动态 JSON Schema 和对应业务 parser 重新校验结果。缺少必填字段、枚举越界、候选回执不完整、JSON 提取失败或调用自身超时，都会先在当前焦点内按 `agent.retry` 自动重试；每次失败保留独立 attempt 归档，不会重新规划焦点或重跑已完成焦点。只有重试耗尽后，错误才返回到 `sync`。
+Agent CLI 报告成功后，Skills Seed 仍会使用动态 JSON Schema 和业务 parser 校验结果。结构错误最多执行一次带原输出和校验原因的修复；瞬时服务错误按 `agent.retry` 退避。每次失败保留独立 attempt 归档，同一阶段的执行、等待和修复共享 `agent.timeout` 总预算。预算或修复次数耗尽后返回错误；若源码分析已保存，`sync --resume` 只补独立审查，不重复分析。
 
 1. 阅读原始错误，区分认证、限流、代理、服务过载、CLI 调用失败与结构化输出失败。
 2. 确认当前配置的 Agent CLI、模型与网络代理在本机可用。
@@ -59,6 +59,8 @@ Agent CLI 报告成功后，Skills Seed 仍会使用本次动态 JSON Schema 和
 | 情况 | 操作 | 原因 |
 |---|---|---|
 | 正常中断、临时 Agent 失败、本地保存后失败 | `skills-seed sync --resume` | 复用有效 checkpoint，避免重复调用 |
+| 升级到 v0.20.34 后仍有旧格式 checkpoint | `skills-seed sync --restart` | schema 5 不迁移旧执行状态，需要重新规划与分析 |
+| 源码分析完成但独立审查失败 | `skills-seed sync --resume` | 复用候选与事实材料，只执行未完成审查 |
 | checkpoint 保存后目标仓库源码发生变化 | `skills-seed sync --resume` | 自动判定旧状态失效并重新规划；`--resume` 不会强制复用不匹配的议程 |
 | 续跑时已保存的规范化决策合并了不同能力入口 | `skills-seed sync --resume` | 自动保留独立候选并替换非法 checkpoint |
 | 规范化结果把已有 Pattern 的历史谱系报告为未知来源 | 升级后执行 `skills-seed sync --resume` | 复用已完成焦点和规范化 checkpoint；无歧义历史谱系会在重复校验时回指当前有效 Pattern |

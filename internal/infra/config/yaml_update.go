@@ -46,6 +46,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	removeYAMLMappingKeys(doc, []string{"agent"}, "profile", "effort", "max_budget_usd", "provider_options")
 
 	setYAMLString(doc, []string{"skills", "target"}, cfg.Skills.Target)
+	setYAMLString(doc, []string{"skills", "name"}, cfg.Skills.Name)
 	setYAMLString(doc, []string{"skills", "locale"}, cfg.Skills.Locale)
 	setYAMLStringMap(doc, []string{"skills", "paths"}, cfg.Skills.Paths)
 

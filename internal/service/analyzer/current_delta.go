@@ -32,11 +32,12 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	relatedByFocus := make(map[string]map[string]domain.Pattern, len(opts.Focuses))
 	for _, focus := range opts.Focuses {
 		focusPaths := projectpath.Relative(projectRoot, focus.FocusAbsPaths)
+		evidencePaths := append(append([]string(nil), focusPaths...), focus.EvidenceFocus.RelatedPaths...)
 		focuses = append(focuses, agent.AnalyzeCurrentDeltaFocus{
 			EvidenceFocus:   focus.EvidenceFocus,
 			FocusPaths:      focusPaths,
-			ContextFiles:    filterSampleFilesByFocus(runContext.SampleFiles, focusPaths),
-			DiffFiles:       filterDiffFilesByFocus(runContext.DiffFiles, focusPaths),
+			ContextFiles:    filterSampleFilesByFocus(runContext.SampleFiles, evidencePaths),
+			DiffFiles:       filterDiffFilesByFocus(runContext.DiffFiles, evidencePaths),
 			RelatedPatterns: append([]domain.Pattern(nil), focus.RelatedPatterns...),
 		})
 		focusByID[focus.EvidenceFocus.ID] = relPathSet(focusPaths)
@@ -97,10 +98,14 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 		"changes_count", len(changes),
 		"profile_refresh_recommended", result.ProfileRefreshRecommended.Needed,
 	)
+	evidence := make(map[string]domain.LearningEvidence, len(focuses))
+	for _, focus := range focuses {
+		evidence[focus.EvidenceFocus.ID] = learningEvidence(focus.ContextFiles, focus.DiffFiles, structuralContext)
+	}
 	return &AnalyzeCurrentDeltaBatchResult{
+		Evidence:                  evidence,
 		Changes:                   changes,
 		ProfileRefreshRecommended: result.ProfileRefreshRecommended,
-		Conversation:              result.Conversation,
 	}, nil
 }
 

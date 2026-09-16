@@ -43,6 +43,8 @@ skills-seed init
 skills-seed init --mode project --agent codex --skills codex --locale zh-CN --no-interactive
 ```
 
+可用 `skills-seed init --skills-name team-guide` 指定生成的 Skill 名称，交互式初始化也可填写。名称原样用于 `SKILL.md` 的 `name` 和目标目录末级，例如 `.claude/skills/team-guide/`；不会自动追加 `-dev`。名称限 1–64 个小写字母、数字或连字符，不能以连字符开头、结尾或包含连续连字符。不指定时仍按项目名生成。
+
 初始化后，`.skills-seed/` 是项目知识的本地工作区。它保存配置、用户资源、学习状态、运行归档和本地数据；是否提交其中的可协作内容由团队 Git 策略决定。
 
 ## 选择分析 Agent 与产物目标

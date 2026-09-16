@@ -232,7 +232,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 		selfManagedConfigPath := filepath.ToSlash(filepath.Join(project.Path, ".skills-seed", "config.yaml"))
 		projects = append(projects, workspaceProjectTemplateData{
 			WorkspaceProjectConfig: project,
-			SkillName:              skillgen.GeneratedSkillName(project.ID),
+			SkillName:              target.SkillName,
 			SkillPath:              skillPath,
 			ProjectSpecPath:        filepath.ToSlash(filepath.Join(childSkillDir, "references", "project-spec.md")),
 			SkillSummary:           childSkillSummary(filepath.Join(target.OutputPath, "SKILL.md")),
@@ -291,7 +291,7 @@ func (g *WorkspaceGenerator) workspaceTemplateData(ctx context.Context, projectC
 	return workspaceSkillTemplateData{
 		ProgramVersion:      metadata.ProgramVersion,
 		SkillsTemplatesHash: metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS)),
-		SkillName:           skillgen.GeneratedWorkspaceSkillName(name),
+		SkillName:           skillgen.ConfiguredSkillName(config.ProjectConfig{Name: name, Mode: domain.ModeWorkspace}, g.configRepo.GetSkillsConfig()),
 		ProjectName:         name,
 		WorkspaceName:       name,
 		WorkspaceFacts:      summary,

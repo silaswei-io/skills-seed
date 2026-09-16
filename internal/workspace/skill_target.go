@@ -12,6 +12,7 @@ import (
 
 // ChildSkillTarget 是工作区子项目 Skill 的规范输出位置。
 type ChildSkillTarget struct {
+	SkillName       string // 子项目自己的 Skill 名称，不继承工作区根名称
 	OutputPath      string
 	UsesChildConfig bool
 	ConfigPath      string
@@ -29,16 +30,26 @@ func ResolveChildSkillTarget(workspaceRoot string, project config.WorkspaceProje
 	}
 	configReader := rootConfig
 	projectName := project.ID
+	skillName := skillgen.GeneratedSkillName(projectName)
 	if exists {
 		configReader = childConfig
 		projectName = firstConfiguredName(childConfig.GetProjectConfig().Name, project.ID)
+		projectConfig := childConfig.GetProjectConfig()
+		projectConfig.Name = projectName
+		skillName = skillgen.ConfiguredSkillName(projectConfig, childConfig.GetSkillsConfig())
 	}
 	outputPath, err := projectpath.ConfiguredSkillOutput(projectRoot, configReader)
 	if err != nil {
 		return ChildSkillTarget{}, err
 	}
+	if !exists && rootConfig != nil && rootConfig.GetSkillsConfig().Name != "" {
+		outputPath = filepath.Join(filepath.Dir(outputPath), skillName)
+	} else if !exists || childConfig.GetSkillsConfig().Name == "" {
+		outputPath = normalizeLegacySkillPath(outputPath, projectName)
+	}
 	return ChildSkillTarget{
-		OutputPath:      normalizeLegacySkillPath(outputPath, projectName),
+		SkillName:       skillName,
+		OutputPath:      outputPath,
 		UsesChildConfig: exists,
 		ConfigPath:      configPath,
 	}, nil

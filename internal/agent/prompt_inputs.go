@@ -94,6 +94,10 @@ func NormalizePatternsPromptData(session *PromptInputSession, req *NormalizePatt
 
 // ReviewKnowledgePromptData 返回独立知识审查所需的提示词数据。
 func ReviewKnowledgePromptData(session *PromptInputSession, req *ReviewKnowledgeRequest) (map[string]interface{}, error) {
+	evidencePath, err := writeJSONInput(session, "learning-evidence.json", req.Evidence)
+	if err != nil {
+		return nil, promptInputWriteError("learning-evidence.json", err)
+	}
 	focusPath, err := writeJSONInput(session, "evidence-focus.json", req.EvidenceFocus)
 	if err != nil {
 		return nil, promptInputWriteError("evidence-focus.json", err)
@@ -115,6 +119,7 @@ func ReviewKnowledgePromptData(session *PromptInputSession, req *ReviewKnowledge
 		"RootPath":               req.RootPath,
 		"Language":               req.Language,
 		"EvidenceFocusPath":      focusPath,
+		"LearningEvidencePath":   evidencePath,
 		"CandidatesPath":         candidatesPath,
 		"CandidateCount":         len(req.Candidates),
 		"CandidateIDs":           ReviewKnowledgeCandidateIDs(req.Candidates),

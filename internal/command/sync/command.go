@@ -10,6 +10,7 @@ import (
 	stdsync "sync"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -36,7 +37,7 @@ const (
 
 // Dependencies 描述 sync 命令需要调用的应用用例。
 type Dependencies struct {
-	LearnCurrent                func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error)
+	LearnCurrent                func(ctx context.Context, cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error)
 	Generate                    func(cont *container.Container) error
 	GenerateChild               func(cont *container.Container, opts GenerateChildOptions) error
 	LearnWorkspaceRelationships func(cont *container.Container, userContext string) (bool, error)
@@ -218,7 +219,7 @@ func syncLearn(ctx context.Context, cont *container.Container, stateScope string
 	var learnCurrent syncflow.LearnCurrentFunc
 	if dependencies.LearnCurrent != nil {
 		learnCurrent = func(ctx context.Context, req syncflow.LearnCurrentRequest) (domain.LearnCurrentResult, error) {
-			return dependencies.LearnCurrent(cont, req, LearnCurrentOptions{ScopeKind: runjournal.ScopeProject})
+			return dependencies.LearnCurrent(ctx, cont, req, LearnCurrentOptions{ScopeKind: runjournal.ScopeProject})
 		}
 	}
 	var generate syncflow.GenerateFunc
@@ -277,6 +278,7 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 	}
 
 	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeWorkspace, cont.ConfigRepo.GetAgentConfig().Parallelism, len(workspaceConfig.Projects))
+	ctx = agent.WithCallBudget(ctx, parallelism)
 	learnReq := syncflow.LearnCurrentRequest{
 		StateScope:  stateScope,
 		UserContext: userContext,
@@ -300,7 +302,7 @@ func syncWorkspaceLearn(ctx context.Context, cont *container.Container, stateSco
 		defer childCont.Close()
 
 		progressName := commandutil.WorkspaceProjectProgressName(project)
-		result, err := dependencies.LearnCurrent(childCont, learnReq, LearnCurrentOptions{
+		result, err := dependencies.LearnCurrent(ctx, childCont, learnReq, LearnCurrentOptions{
 			Quiet:     true,
 			ScopeKind: runjournal.ScopeChild,
 			OnStepStart: func(label string) {

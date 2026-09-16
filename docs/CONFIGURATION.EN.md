@@ -232,10 +232,10 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 |---|---:|---|
 | `engine` | `claude` | Agent engine used for analysis, learning, and generation summaries; matches keys in `commands` |
 | `commands` | `claude: claude`, `codex: codex` | Engine-to-CLI command mapping |
-| `timeout` | `1800` | AI request timeout in seconds |
+| `timeout` | `1800` | Total budget in seconds for one Agent stage, including queueing, execution, backoff, and result repair; retries do not reset the deadline |
 | `max_turns` | `80` | Maximum exploration turns for one Agent call; stops at the limit to bound context growth; currently used by Claude CLI |
 | `allow_user_plugins` | `false` | Whether agents may load user plugins; disabled by default for stable batch runs |
-| `parallelism` | `0` | Agent parallelism; workspace root configs use it for child projects, ordinary project configs use it for evidence-focus batches, `0` means automatic |
+| `parallelism` | `0` | Agent concurrency limit; workspace roots cap both child tasks and shared Agent calls. Child settings cannot enlarge the shared budget. Analysis and serial knowledge review share slots; `0` means automatic |
 | `model` | empty | Model name passed to the Agent CLI for skills-seed calls; empty passes no model flag and inherits the local Agent CLI default |
 | `retry.max_retries` | `3` | Maximum retry attempts for retryable errors; `0` uses the default `3` |
 | `retry.initial_interval` | `15` | Initial retry wait in seconds; `0` uses the default `15` |
@@ -248,12 +248,13 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 1. In `project` mode, `agent.parallelism > 1` lets `learn current` analyze independent evidence-focus batches concurrently. Each batch uses its own runtime call, then results are merged and checkpointed in agenda order.
 2. In `workspace` mode, automatic parallelism is the child project count, capped at `6`.
 3. A positive value is used as the explicit concurrency limit.
-4. Workspace child project tasks run through a goroutine worker pool. Evidence-focus concurrency inside each child project is controlled by that child project's `agent.parallelism`.
+4. Workspace children run through a goroutine worker pool. Each child controls focus scheduling, but all actual Agent calls share the root budget, and knowledge-review calls remain serial across children.
 
 #### `retry` Notes
 
 1. Retry currently applies to retryable Agent CLI errors such as 429 / 529 / overloaded.
 2. Wait time starts at `initial_interval`, doubles after each retry, and is capped by `max_interval`.
+   Structure validation failures skip service backoff and get at most one repair with the previous output and error; repair still counts against `max_retries`. All attempts share the stage `timeout`, and no new attempt starts after expiry.
 3. Long-running steps such as `learn current` update the active progress line with the agent error, failed call duration, and backoff wait; the terminal also prints a stable retry notice with the wait duration and extracted API reason.
 4. When the next call starts, the progress line switches to `attempt N`; final CLI call failures are shown only for exhausted retries or non-retryable errors.
 
@@ -332,6 +333,7 @@ These files are merged with built-in prompts; they do not replace built-in promp
 | Field | Default | Description |
 |---|---:|---|
 | `target` | `agent.engine` | Generated Skills target type; can differ from `agent.engine` |
+| `name` | empty | Explicit Skill name; empty uses the project default, or the workspace default for a workspace root |
 | `locale` | `en-US` | Language used for AI learning output, persisted content, and generated Skills |
 | `paths.claude` | `.claude/skills/<project-name>-dev` | Claude Code skills output directory; workspace roots default to `<workspace-name>-workspace-dev` |
 | `paths.codex` | `.agents/skills/<project-name>-dev` | Codex skills output directory; workspace roots default to `<workspace-name>-workspace-dev` |
@@ -342,6 +344,8 @@ These files are merged with built-in prompts; they do not replace built-in promp
 2. Use `skills-seed generate skills --output <path>` to override the output directory for one run.
 3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; it controls runtime AI natural-language output, persisted learned content, and the language of `generate skills` artifacts.
 4. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
+
+Use `skills-seed init --skills-name team-guide` to set both `skills.name` and target output paths during initialization. Explicit names are used unchanged, without a `-dev` suffix. They must contain 1–64 lowercase letters, digits, or hyphens, with no leading, trailing, or consecutive hyphens. This does not change `profile.name` or project ownership, and a root name is not inherited by children. When renaming manually after initialization, also update the directory names in `skills.paths`; configuration changes do not move existing artifacts.
 
 Runtime AI prompt templates are maintained as English-only source templates. Their final output contract follows `skills.locale`; `profile.locale` only affects tool output, config templates, and seed-context templates.
 

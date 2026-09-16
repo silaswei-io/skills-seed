@@ -318,8 +318,8 @@ func TestSyncRestartForcesCurrentLearning(t *testing.T) {
 
 func commandDependenciesForTest() Dependencies {
 	return Dependencies{
-		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
-			return learncmd.RunLearnCurrentWithStateScopeOptions(cont, req.StateScope, req.UserContext, learncmd.CurrentRunOptions{
+		LearnCurrent: func(ctx context.Context, cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
+			return learncmd.RunLearnCurrentWithStateScopeOptions(ctx, cont, req.StateScope, req.UserContext, learncmd.CurrentRunOptions{
 				Force:          req.Force,
 				Quiet:          opts.Quiet,
 				OnStepStart:    opts.OnStepStart,
@@ -358,7 +358,7 @@ func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
 		PatternsRetired: 2,
 	}
 	result, err := syncLearn(context.Background(), cont, "sync", "", syncRunAuto, nil, Dependencies{
-		LearnCurrent: func(cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
+		LearnCurrent: func(ctx context.Context, cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			require.True(t, opts.Quiet)
 			require.NotNil(t, opts.OnStepStart)
 			require.NotNil(t, opts.OnStepComplete)
@@ -572,7 +572,7 @@ func TestSyncCmdOnlyExposesSyncFlags(t *testing.T) {
 func TestSyncLearnPassesStateScopeAndForceToLearning(t *testing.T) {
 	var received syncflow.LearnCurrentRequest
 	_, err := syncLearn(context.Background(), nil, "sync", "context", syncRunRestart, nil, Dependencies{
-		LearnCurrent: func(_ *container.Container, req syncflow.LearnCurrentRequest, _ LearnCurrentOptions) (domain.LearnCurrentResult, error) {
+		LearnCurrent: func(_ context.Context, _ *container.Container, req syncflow.LearnCurrentRequest, _ LearnCurrentOptions) (domain.LearnCurrentResult, error) {
 			received = req
 			return domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}, nil
 		},

@@ -30,7 +30,7 @@ Check `exclude.paths`, `exclude.gitignore`, focus paths, and the Git working tre
 
 An error's `raw`, `stderr`, and `manifest` paths identify concrete archives beneath `.skills-seed/runtime/agent-outputs/`. Use this order:
 
-Even when an Agent CLI reports success, Skills Seed revalidates the result against the call's dynamic JSON Schema and corresponding business parser. Missing required fields, invalid enums, incomplete candidate receipts, JSON extraction failures, and invocation timeouts are retried within the current focus according to `agent.retry`. Every failed attempt keeps a separate archive; the retry does not replan focuses or rerun completed focuses. The error returns to `sync` only after retries are exhausted.
+Even after CLI success, Skills Seed validates the dynamic JSON Schema and business parser. Invalid structure gets at most one repair using the previous output and validation error; transient service failures use `agent.retry` backoff. Each failure retains its attempt archive. Execution, waiting, and repair share the stage's `agent.timeout` budget. Exhausting either budget returns an error. When source analysis is already checkpointed, `sync --resume` retries only independent review.
 
 1. Read the original error and classify authentication, rate limiting, proxy, service overload, CLI invocation, or structured-output failure.
 2. Confirm that the configured Agent CLI, model, and network/proxy are usable locally.
@@ -59,6 +59,8 @@ Always run `skills-seed generate skills` after correcting a pattern, Rule, or Wo
 | Situation | Action | Why |
 |---|---|---|
 | Normal interruption, temporary Agent failure, or post-save local failure | `skills-seed sync --resume` | Reuses valid checkpoints and avoids duplicate calls |
+| An old-format checkpoint remains after upgrading to v0.20.34 | `skills-seed sync --restart` | Schema 5 does not migrate old execution state; planning and analysis must restart |
+| Source analysis completed but independent review failed | `skills-seed sync --resume` | Reuses candidates and evidence, executing only unfinished review |
 | Target-repository source changed after the checkpoint was saved | `skills-seed sync --resume` | Automatically invalidates stale state and replans; `--resume` does not force reuse of a mismatched agenda |
 | A saved normalization decision merges distinct capability entries during resumption | `skills-seed sync --resume` | Automatically retains separate candidates and replaces the invalid checkpoint |
 | Normalization reports an existing Pattern's historical lineage as an unknown source | Upgrade, then run `skills-seed sync --resume` | Reuses completed focuses and the normalization checkpoint; unambiguous historical lineage resolves to the effective Pattern during repeated validation |

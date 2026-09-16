@@ -232,10 +232,10 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 |---|---:|---|
 | `engine` | `claude` | 执行分析、学习和生成摘要的 Agent 引擎，对应 `commands` 的 key |
 | `commands` | `claude: claude`、`codex: codex` | engine 到 CLI 命令的映射 |
-| `timeout` | `1800` | 单次 AI 请求超时时间，单位秒 |
+| `timeout` | `1800` | 单个 Agent 阶段的总预算，单位秒；包含排队、执行、退避和结构修复，重试不重置截止时间 |
 | `max_turns` | `80` | 单次 Agent 调用允许的最大探索轮数；达到上限后结束调用，避免上下文无限增长；当前由 Claude CLI 使用 |
 | `allow_user_plugins` | `false` | 是否允许 Agent 加载用户插件；默认关闭，避免批处理被用户插件影响 |
-| `parallelism` | `0` | Agent 并发数；workspace 根配置控制子项目并发，普通 project 配置控制证据焦点批次并发，`0` 表示自动 |
+| `parallelism` | `0` | Agent 并发上限；workspace 根配置同时限制子项目数和共享 Agent 调用数，子项目配置不能放大共享额度。项目内分析和审查共享额度，知识审查串行；`0` 表示自动 |
 | `model` | 空 | skills-seed 调用 Agent CLI 时使用的模型名；空值不传模型参数，继承本机 Agent CLI 默认配置 |
 | `retry.max_retries` | `3` | 可重试错误的最大重试次数；配置为 `0` 时使用默认值 `3` |
 | `retry.initial_interval` | `15` | 首次重试等待秒数；配置为 `0` 时使用默认值 `15` |
@@ -248,12 +248,13 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 1. `project` 模式下，`agent.parallelism > 1` 时，`learn current` 会并发分析独立证据焦点批次；每个批次使用独立 runtime 调用，结果回到主流程后按议程顺序合并和 checkpoint。
 2. `workspace` 模式下，自动值为子项目数，上限 `6`。
 3. 设置为大于 `0` 的数字时，使用该数字作为并发上限。
-4. workspace 子项目任务会通过 goroutine worker 池并行执行；每个子项目内部是否并发分析证据焦点，由该子项目配置的 `agent.parallelism` 决定。
+4. workspace 子项目任务通过 goroutine worker 池执行；子项目配置控制其焦点调度，但所有真实 Agent 调用仍受根配置的共享额度约束，知识审查在子项目之间也保持串行。
 
 #### `retry` 说明
 
 1. 当前会对 429 / 529 / overloaded 等可重试 Agent CLI 错误进行指数退避重试。
 2. 等待时间从 `initial_interval` 开始，每次翻倍，并受 `max_interval` 限制。
+   结构校验失败不使用服务退避：最多执行一次附带前次结果与错误的结构修复，仍计入 `max_retries`。所有尝试共享阶段 `timeout`，超时后不发起新尝试。
 3. `learn current` 等长耗时步骤会在进度行实时显示 Agent 错误、本次调用耗时和退避等待；同时终端会输出一条稳定的重试提示，包含等待时间和提取到的 API 原因。
 4. 等待结束并进入下一次调用时，进度行会切换为“第 N 次尝试”；只有重试耗尽或不可重试错误才会显示最终 CLI 调用失败。
 
@@ -333,6 +334,7 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `target` | `agent.engine` | 生成的 Skills 目标类型；可与 `agent.engine` 不同 |
+| `name` | 空 | 显式 Skill 名称；为空时使用项目默认名，workspace 根使用工作区默认名 |
 | `locale` | `en-US` | AI 学习输出、沉淀内容和生成 Skills 使用的语言 |
 | `paths.claude` | `.claude/skills/<project-name>-dev` | Claude Code skills 输出目录；workspace 根默认为 `<workspace-name>-workspace-dev` |
 | `paths.codex` | `.agents/skills/<project-name>-dev` | Codex skills 输出目录；workspace 根默认为 `<workspace-name>-workspace-dev` |
@@ -343,6 +345,8 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 2. 可通过 `skills-seed generate skills --output <path>` 临时指定输出目录。
 3. `skills.locale` 支持 `zh-CN` 和 `en-US`，默认英文；它统一控制运行时 AI 自然语言输出、沉淀内容以及 `generate skills` 产物语言。
 4. 新增自定义 engine 或 target 时，应分别添加 `agent.commands.<engine>` 和 `skills.paths.<target>`。
+
+初始化时用 `skills-seed init --skills-name team-guide` 同时设置 `skills.name` 和各目标输出路径。显式名称原样使用，不追加 `-dev`，限 1–64 个小写字母、数字或连字符，不能以连字符开头、结尾或包含连续连字符。名称不会改变 `profile.name` 或项目归属，也不会由工作区根传给子项目。初始化后手动改名时，应同时调整 `skills.paths` 的目录名；修改配置不会迁移已有产物。
 
 运行时 AI prompt 模板统一维护为英文单源模板，最终输出契约跟随 `skills.locale`；`profile.locale` 只影响工具输出、配置模板和 seed context 模板语言。
 

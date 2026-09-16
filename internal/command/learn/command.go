@@ -66,7 +66,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if cont == nil {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
-			result, err := runLearnCurrent(cont, currentOpts)
+			result, err := runLearnCurrent(cmd.Context(), cont, currentOpts)
 			if err != nil {
 				return err
 			}
@@ -88,16 +88,16 @@ func Cmd(cont *container.Container) *cobra.Command {
 }
 
 // RunLearnCurrent 导出：从当前代码库学习，并返回学习摘要。
-func RunLearnCurrent(cont *container.Container) (domain.LearnCurrentResult, error) {
-	return runLearnCurrent(cont, learnCurrentOptions{
+func RunLearnCurrent(ctx context.Context, cont *container.Container) (domain.LearnCurrentResult, error) {
+	return runLearnCurrent(ctx, cont, learnCurrentOptions{
 		profileMode: learnCurrentProfileAuto,
 		scopeKind:   runjournal.ScopeProject,
 	})
 }
 
 // RunLearnCurrentWithContext 导出：从当前代码库学习，附加一次性用户上下文，并返回学习摘要。
-func RunLearnCurrentWithContext(cont *container.Container, userContext string) (domain.LearnCurrentResult, error) {
-	return runLearnCurrent(cont, learnCurrentOptions{
+func RunLearnCurrentWithContext(ctx context.Context, cont *container.Container, userContext string) (domain.LearnCurrentResult, error) {
+	return runLearnCurrent(ctx, cont, learnCurrentOptions{
 		profileMode: learnCurrentProfileAuto,
 		userContext: userContext,
 		scopeKind:   runjournal.ScopeProject,
@@ -105,8 +105,8 @@ func RunLearnCurrentWithContext(cont *container.Container, userContext string) (
 }
 
 // RunLearnCurrentWithStateScope 从当前代码库学习，并使用指定恢复状态 scope。
-func RunLearnCurrentWithStateScope(cont *container.Container, stateScope string, userContext string) (domain.LearnCurrentResult, error) {
-	return runLearnCurrent(cont, learnCurrentOptions{
+func RunLearnCurrentWithStateScope(ctx context.Context, cont *container.Container, stateScope string, userContext string) (domain.LearnCurrentResult, error) {
+	return runLearnCurrent(ctx, cont, learnCurrentOptions{
 		profileMode: learnCurrentProfileAuto,
 		userContext: userContext,
 		stateScope:  stateScope,
@@ -127,8 +127,8 @@ type CurrentRunOptions struct {
 }
 
 // RunLearnCurrentWithStateScopeOptions 从当前代码库学习，并允许调用方指定运行选项。
-func RunLearnCurrentWithStateScopeOptions(cont *container.Container, stateScope string, userContext string, opts CurrentRunOptions) (domain.LearnCurrentResult, error) {
-	return runLearnCurrent(cont, learnCurrentOptions{
+func RunLearnCurrentWithStateScopeOptions(ctx context.Context, cont *container.Container, stateScope string, userContext string, opts CurrentRunOptions) (domain.LearnCurrentResult, error) {
+	return runLearnCurrent(ctx, cont, learnCurrentOptions{
 		profileMode:    learnCurrentProfileAuto,
 		userContext:    userContext,
 		stateScope:     stateScope,
@@ -141,7 +141,7 @@ func RunLearnCurrentWithStateScopeOptions(cont *container.Container, stateScope 
 	})
 }
 
-func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
+func runLearnCurrent(ctx context.Context, cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	if opts.profileMode == "" {
 		opts.profileMode = learnCurrentProfileAuto
 	}
@@ -156,13 +156,13 @@ func runLearnCurrent(cont *container.Container, opts learnCurrentOptions) (domai
 		opts.userContext = userContext
 	}
 	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
-		return runLearnWorkspaceCurrent(cont, opts)
+		return runLearnWorkspaceCurrent(ctx, cont, opts)
 	}
-	return runLearnCurrentProject(cont, opts)
+	return runLearnCurrentProject(ctx, cont, opts)
 }
 
-func runLearnCurrentProject(cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
-	result, err := runLearnCurrentProjectWithOptions(context.Background(), cont, learnCurrentProjectOptions{
+func runLearnCurrentProject(ctx context.Context, cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
+	result, err := runLearnCurrentProjectWithOptions(ctx, cont, learnCurrentProjectOptions{
 		showProgress:     !opts.quiet,
 		showDetailedLogs: !opts.quiet,
 		onStepStart:      opts.onStepStart,

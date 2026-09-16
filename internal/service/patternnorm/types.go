@@ -4,7 +4,6 @@ package patternnorm
 import (
 	"context"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
@@ -53,7 +52,7 @@ type ReviewRequest struct {
 	Focus        domain.EvidenceFocus
 	Candidates   []domain.Pattern
 	UserContext  string
-	Conversation agent.Conversation
+	Evidence     domain.LearningEvidence
 }
 
 // AdmissionPolicy 控制当前代码候选模式的最低入库置信度。

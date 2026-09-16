@@ -2,6 +2,8 @@
 
 This is an isolated pack-analysis runtime call. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return only high-confidence repository knowledge that clears the admission bar. Precision is primary: source evidence alone does not justify a pattern, and later normalization cannot turn a weak candidate into useful knowledge.
 
+Extract knowledge for the owned `entry_paths`. `related_paths` are shared read-only evidence for verifying callers, contracts, and dependencies; they do not transfer another focus's learning responsibility to this pack.
+
 Project:
 - name: {{.ProjectName}}
 - path: {{.RootPath}}

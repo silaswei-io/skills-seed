@@ -2109,7 +2109,7 @@ other = "Authority rules and project map refresh skipped"
 other = "Failed to sync project profile: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "Starting workspace incremental learning: {{.Projects}} projects, project parallelism {{.Parallelism}}; evidence-focus concurrency inside each child is controlled by the child config"
+other = "Starting workspace incremental learning: {{.Projects}} projects, project parallelism {{.Parallelism}}; Agent calls share this limit and knowledge review is serial"
 
 [LearnWorkspaceProjectInfo]
 other = "Project root: {{.ProjectRoot}}\nProject name: {{.ProjectName}}\nLanguage: {{.Language}}\nChild project path: {{.Path}}"
@@ -2201,6 +2201,18 @@ other = "Tool output and config template language: zh-CN or en-US; defaults to z
 
 [InitFlagSkillsLocale]
 other = "Language for AI output, persisted learned content, and generated Skills: zh-CN or en-US; defaults to en-US when omitted"
+
+[InitFlagSkillsName]
+other = "Generated Skill name; defaults to the project-derived name"
+
+[SkillsNameInvalid]
+other = "Skill name must be 1–64 lowercase letters, digits, or hyphens, with no leading, trailing, or consecutive hyphens"
+
+[InteractiveInitSkillsName]
+other = "Skill name (leave empty to derive from the project name)"
+
+[InteractiveInitSummarySkillsName]
+other = "Skill name"
 
 [InitFlagAgent]
 other = "Agent engine to write during initialization, for example claude or codex"
@@ -2578,7 +2590,7 @@ other = "Write only the Codex global Skills directory."
 other = "Project: agent.parallelism>1 analyzes independent evidence-focus batches concurrently"
 
 [InteractiveInitParallelismPlanWorkspace]
-other = "Workspace: detected {{.Projects}} child projects, root agent.parallelism={{.WorkspaceParallelism}} controls child-project concurrency; evidence-focus concurrency inside each child is controlled by the child config"
+other = "Workspace: detected {{.Projects}} child projects, root agent.parallelism={{.WorkspaceParallelism}} caps child-project concurrency and shared Agent calls; knowledge review is serial"
 
 [InteractiveInitSummaryTitle]
 other = "Execution plan"

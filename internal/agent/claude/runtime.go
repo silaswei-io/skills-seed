@@ -55,6 +55,9 @@ func (c *ClaudeAgent) callClaudeWithArchiveWithOptions(ctx context.Context, oper
 }
 
 func (c *ClaudeAgent) callClaudeResult(ctx context.Context, operation, prompt, outputContract string, opts aicontract.StructuredOutputOptions, conversation agent.Conversation, task ...agent.RuntimeTask) (claudeCallResult, error) {
+	// 同一阶段的排队、执行、退避与结构修复共享预算，重试不重置截止时间。
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	outputSchema, err := aicontract.StructuredOutputSchemaWithOptions(outputContract, opts)
 	if err != nil {
 		return claudeCallResult{}, err
@@ -68,12 +71,14 @@ func (c *ClaudeAgent) callClaudeResult(ctx context.Context, operation, prompt, o
 		return claudeCallResult{}, err
 	}
 
+	repair := agent.NewResultRepair(prompt)
 	result, err := agent.RunRetryingCall(ctx, agent.RetryingCallOptions[claudeCallResult]{
 		AgentName: c.Name(),
 		Operation: operation,
 		Policy:    c.retryCfg,
 		Call: func(attempt int) (claudeCallResult, string, time.Duration, bool, error) {
-			output, nextConversation, archive, duration, retryable, err := c.doCallClaude(ctx, operation, prompt, outputSchema, outputValidator.Validate, conversation, attempt, workDir, agent.FirstRuntimeTask(task))
+			output, nextConversation, archive, duration, retryable, err := c.doCallClaude(ctx, operation, repair.Prompt(), outputSchema, outputValidator.Validate, conversation, attempt, workDir, agent.FirstRuntimeTask(task))
+			retryable = repair.Prepare(err, retryable)
 			retryOutput := output
 			if err != nil && strings.TrimSpace(retryOutput) == "" {
 				retryOutput = err.Error()
@@ -212,6 +217,9 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 			logger.DiagnosticWarn(i18n.Get("LoggerAgentParseResultFailedNonFallback"), logFields...)
 		} else {
 			logger.DiagnosticError(i18n.Get("LoggerAgentParseResultFailedNonFallback"), logFields...)
+		}
+		if strings.Contains(rawOutput, `"error_max_structured_output_retries"`) {
+			return "", agent.Conversation{}, archive, duration, true, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), agent.NewResultContractError(c.Name(), operation, attempt, outputErr, rawOutput, archive))
 		}
 		if retryable || outputErr.invocation {
 			return rawOutput + stderr.String(), agent.Conversation{}, archive, duration, retryable, fmt.Errorf("%s: %w", i18n.Get("AgentClaudeCLIFailed"), agent.NewInvocationDiagnosticError(c.Name(), operation, attempt, outputErr, rawOutput, stderr.String(), archive))

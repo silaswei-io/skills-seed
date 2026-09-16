@@ -13,6 +13,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
+	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +50,7 @@ func hasAnyChangedInitFlag(cmd *cobra.Command) bool {
 	if cmd == nil {
 		return false
 	}
-	for _, name := range []string{"locale", "skills-locale", "mode", "agent", "agent-model", "skills", "workspace"} {
+	for _, name := range []string{"locale", "skills-locale", "skills-name", "mode", "agent", "agent-model", "skills", "workspace"} {
 		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
 			return true
 		}
@@ -82,6 +83,12 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 	}
 	resolved.mode = mode
 	resolved.workspace = mode == domain.ModeWorkspace
+
+	skillsName, err := interactive.TextWithValidation(i18n.Get("InteractiveInitSkillsName"), resolved.skillsName, config.ValidateSkillsName)
+	if err != nil {
+		return resolved, err
+	}
+	resolved.skillsName = skillsName
 
 	agent, err := interactive.Select(i18n.Get("InteractiveInitAgent"), agentOptions(), resolved.agent)
 	if err != nil {
@@ -139,6 +146,11 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 	}
 
 	projectCount := detectedWorkspaceProjectCount(resolved.mode)
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		return resolved, err
+	}
+	effectiveSkillsName := skillgen.ConfiguredSkillName(config.ProjectConfig{Name: filepath.Base(projectRoot), Mode: resolved.mode}, config.SkillsConfig{Name: resolved.skillsName})
 	interactive.PrintSummary(cmd.OutOrStdout(), i18n.Get("InteractiveInitSummaryTitle"), []interactive.SummaryItem{
 		{Label: i18n.Get("InteractiveInitSummaryMode"), Value: localizedInitMode(resolved.mode)},
 		{Label: i18n.Get("InteractiveInitSummaryToolLocale"), Value: resolved.locale},
@@ -148,6 +160,7 @@ func resolveInteractiveInit(cmd *cobra.Command, opts commandOptions) (commandOpt
 		{Label: i18n.Get("InteractiveInitSummaryAgentTotalParallelism"), Value: fmt.Sprintf("%d", resolved.agentTotalParallelism)},
 		{Label: i18n.Get("InteractiveInitSummaryParallelismPlan"), Value: initParallelismPlanSummary(resolved.mode, resolved.agentTotalParallelism, projectCount)},
 		{Label: i18n.Get("InteractiveInitSummarySkills"), Value: resolved.skills},
+		{Label: i18n.Get("InteractiveInitSummarySkillsName"), Value: effectiveSkillsName},
 		{Label: i18n.Get("InteractiveInitSummaryGlobalCLISkills"), Value: localizedGlobalCLISkillsTarget(resolved)},
 	})
 

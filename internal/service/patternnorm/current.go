@@ -14,7 +14,11 @@ import (
 )
 
 func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, hooks ProgressHooks) (*proposal, error) {
-	decisionKey, err := normalizationDecisionKey(candidates)
+	guidance, err := s.guidance.Load()
+	if err != nil {
+		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	}
+	decisionKey, err := normalizationDecisionKey(candidates, retrieved.related, req.UserContext, guidance)
 	if err != nil {
 		return nil, err
 	}
@@ -29,12 +33,11 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 		}
 		return fallbackCurrentNormalization(ctx, req.DecisionCheckpoint, decisionKey, candidates, retrieved.related)
 	}
-	guidance, err := s.guidance.Load()
-	if err != nil {
-		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
+	result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, guidance, hooks)
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-
-	if result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, guidance, hooks); result != nil {
+	if result != nil {
 		result, err = finalizeAndValidateCurrentNormalization(result, candidates, retrieved.related)
 		if err == nil {
 			if err := saveNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, decisionFromProposal(result)); err != nil {
@@ -65,15 +68,39 @@ func finalizeAndValidateCurrentNormalization(result *proposal, candidates, exist
 	if err != nil {
 		return nil, err
 	}
+	preserveReviewedSingletons(result, candidates, existing)
 	if err := validateNormalizeResultForOperation(OperationLearnCurrent, result, candidates, existing); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
+// preserveReviewedSingletons 只允许真正的合并产生新表述。
+// 单一来源必须保留已审查文本、置信度和身份，规范化不再重复承担知识审查职责。
+func preserveReviewedSingletons(result *proposal, candidates, existing []domain.Pattern) {
+	inputs := indexNormalizationSources(candidates, existing)
+	for index, pattern := range result.Patterns {
+		var source domain.Pattern
+		owners := make(map[string]struct{})
+		for _, id := range pattern.MergedFrom {
+			if input, ok := inputs[id]; ok {
+				owners[input.ID] = struct{}{}
+				source = input
+			}
+		}
+		if len(owners) == 1 {
+			result.Patterns[index] = patternview.WithSources(source, pattern.MergedFrom)
+		}
+	}
+}
+
 func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, guidance maintained.Snapshot, hooks ProgressHooks) *proposal {
 	if s.normalizer == nil {
 		return nil
+	}
+	mergeCandidates := relatedNormalizationCandidates(candidates, retrieved)
+	if len(mergeCandidates) == 0 {
+		return keepCurrentCandidates(candidates)
 	}
 	label := i18n.Get("ProgressNormalizePatternsAI")
 	notifyProgress(hooks.OnStepStart, label)
@@ -81,7 +108,7 @@ func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeReque
 		ProjectName:        req.ProjectName,
 		RootPath:           req.RootPath,
 		Language:           req.Language,
-		Candidates:         candidates,
+		Candidates:         mergeCandidates,
 		RelatedPatterns:    retrieved.related,
 		UserContext:        req.UserContext,
 		MaintainedGuidance: guidance,
@@ -92,6 +119,29 @@ func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeReque
 	}
 	notifyProgress(hooks.OnStepComplete, label)
 	return proposalFromNormalizePatternsResult(result)
+}
+
+// relatedNormalizationCandidates 复用已有关系策略，只把有合并对象的候选交给 Agent。
+// 无关联候选由全局覆盖校验原样保留，避免对独立知识重复付费改写。
+func relatedNormalizationCandidates(candidates []domain.Pattern, retrieved retrievalResult) []domain.Pattern {
+	related := make(map[string]bool, len(candidates))
+	for _, candidate := range candidates {
+		related[candidate.ID] = len(retrieved.existingByCandidate[candidate.ID]) > 0
+	}
+	for i, left := range candidates {
+		for _, right := range candidates[i+1:] {
+			if patternview.Relate(left, right).Exists() {
+				related[left.ID], related[right.ID] = true, true
+			}
+		}
+	}
+	var result []domain.Pattern
+	for _, candidate := range candidates {
+		if related[candidate.ID] {
+			result = append(result, candidate)
+		}
+	}
+	return result
 }
 
 func keepCurrentCandidates(candidates []domain.Pattern) *proposal {

@@ -29,6 +29,8 @@ skills-seed init
 skills-seed sync
 ```
 
+初始化时可用 `skills-seed init --skills-name team-guide` 自定义 Skill 名称；不指定则按项目名生成。
+
 先从[最新发布](https://github.com/silaswei-io/skills-seed/releases/latest)下载当前系统和架构对应的二进制，将其放入 `PATH` 后再执行以上命令。`init` 设置项目模式、分析 Agent 与生成目标；`sync` 学习当前代码并刷新生成的 Skills。后续可执行 `skills-seed update` 自动下载并校验官方发布，不需要 Go。完整前置条件、结果验证、单项目与 workspace 选择见 [快速开始 Wiki](docs/wiki/Getting-Started.md)。
 
 ## 它提供什么

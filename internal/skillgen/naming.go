@@ -1,6 +1,22 @@
 package skillgen
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+)
+
+// ConfiguredSkillName 统一解析入口、输出目录和工作区路由使用的 Skill 名称。
+func ConfiguredSkillName(project config.ProjectConfig, skills config.SkillsConfig) string {
+	if skills.Name != "" {
+		return skills.Name
+	}
+	if project.Mode == domain.ModeWorkspace {
+		return GeneratedWorkspaceSkillName(project.Name)
+	}
+	return GeneratedSkillName(project.Name)
+}
 
 // GeneratedSkillName 把项目名规整为 skills-seed 生成 skill 使用的稳定目录名。
 func GeneratedSkillName(projectName string) string {

@@ -206,7 +206,12 @@ func RunRetryingCall[T any](ctx context.Context, opts RetryingCallOptions[T]) (T
 				MaxRetries: maxRetries,
 			})
 		}
+		release, err := acquireCall(ctx, opts.Operation)
+		if err != nil {
+			return zero, err
+		}
 		result, retryOutput, callDuration, retryable, err := opts.Call(attemptNumber)
+		release()
 		if err == nil {
 			if retried {
 				ReportRetryRecoveredForContext(ctx, RetryInfo{
@@ -225,7 +230,7 @@ func RunRetryingCall[T any](ctx context.Context, opts RetryingCallOptions[T]) (T
 
 		retried = true
 		waitDuration := time.Duration(0)
-		if opts.Policy != nil {
+		if opts.Policy != nil && resultContractDiagnostic(err) == nil {
 			waitDuration = opts.Policy.WaitDuration(attempt)
 		}
 		ReportRetryForContext(ctx, RetryInfo{

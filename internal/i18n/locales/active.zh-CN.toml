@@ -2109,7 +2109,7 @@ other = "权威规则与项目地图刷新已跳过"
 other = "权威规则与项目地图刷新失败: {{.Error}}"
 
 [LearnWorkspaceStart]
-other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并发 {{.Parallelism}}；子项目内证据焦点并发由子项目配置控制"
+other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并发 {{.Parallelism}}；Agent 调用共享此上限，知识审查串行"
 
 [LearnWorkspaceProjectInfo]
 other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}\n子项目路径: {{.Path}}"
@@ -2201,6 +2201,18 @@ other = "工具输出与配置模板语言：zh-CN 或 en-US；不指定时默�
 
 [InitFlagSkillsLocale]
 other = "AI 输出、沉淀内容和生成 Skills 语言：zh-CN 或 en-US；不指定时默认 en-US"
+
+[InitFlagSkillsName]
+other = "生成的 Skill 名称；不指定时根据项目名生成"
+
+[SkillsNameInvalid]
+other = "Skill 名称须为 1–64 个小写字母、数字或连字符，不能以连字符开头、结尾或包含连续连字符"
+
+[InteractiveInitSkillsName]
+other = "Skill 名称（留空根据项目名生成）"
+
+[InteractiveInitSummarySkillsName]
+other = "Skill 名称"
 
 [InitFlagAgent]
 other = "初始化时写入的 Agent engine，例如 claude 或 codex"
@@ -2578,7 +2590,7 @@ other = "只写入 Codex 的全局 Skills 目录。"
 other = "单项目：agent.parallelism>1 时并发分析独立证据焦点批次"
 
 [InteractiveInitParallelismPlanWorkspace]
-other = "工作区：检测到 {{.Projects}} 个子项目，根 agent.parallelism={{.WorkspaceParallelism}} 控制子项目并发；子项目内证据焦点并发由子项目配置控制"
+other = "工作区：检测到 {{.Projects}} 个子项目，根 agent.parallelism={{.WorkspaceParallelism}} 控制子项目并发与共享 Agent 调用上限；知识审查串行"
 
 [InteractiveInitSummaryTitle]
 other = "即将执行"

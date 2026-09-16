@@ -47,7 +47,7 @@ func TestReviewLearnedKnowledgeUsesSerialFocusBoundaries(t *testing.T) {
 		progressLabels = append(progressLabels, label)
 	})
 
-	require.NoError(t, run.reviewLearnedKnowledge())
+	require.NoError(t, run.reviewRemainingKnowledge("analysis"))
 
 	require.Equal(t, []string{"auth", "key"}, focusCalls)
 	require.Equal(t, [][]string{{"auth-rule"}, {"key-create", "key-rotate"}}, candidateCalls)
@@ -81,7 +81,7 @@ func TestReviewLearnedKnowledgeResumesOnlyUnreviewedFocus(t *testing.T) {
 	}}
 	run := newKnowledgeReviewTestRun(t, focuses, units, mockAgent, nil)
 
-	err := run.reviewLearnedKnowledge()
+	err := run.reviewRemainingKnowledge("analysis")
 	require.ErrorContains(t, err, "review failed")
 	require.Equal(t, []string{"first", "second"}, firstRunCalls)
 	checkpoint, loadErr := run.stateRepo.Load(context.Background())
@@ -99,7 +99,7 @@ func TestReviewLearnedKnowledgeResumesOnlyUnreviewedFocus(t *testing.T) {
 	run.patterns = nil
 	run.restoreAnalysisCheckpoint()
 
-	require.NoError(t, run.reviewLearnedKnowledge())
+	require.NoError(t, run.reviewRemainingKnowledge("analysis"))
 	require.Equal(t, []string{"second"}, resumedCalls)
 }
 
@@ -113,35 +113,37 @@ func TestReviewLearnedKnowledgeCheckpointsEmptyFocusWithoutAgentCall(t *testing.
 	}}
 	run := newKnowledgeReviewTestRun(t, []domain.EvidenceFocus{focus}, []commandstate.FocusKnowledgeCheckpoint{{Focus: focus}}, mockAgent, nil)
 
-	require.NoError(t, run.reviewLearnedKnowledge())
+	require.NoError(t, run.reviewRemainingKnowledge("analysis"))
 	require.Zero(t, calls)
 	state, err := run.stateRepo.Load(context.Background())
 	require.NoError(t, err)
 	require.True(t, state.Analysis.FocusKnowledge[0].Reviewed)
 }
 
-func TestReviewAnalyzedFocusUsesAnalysisConversation(t *testing.T) {
+func TestReviewAnalyzedFocusUsesCheckpointEvidence(t *testing.T) {
 	require.NoError(t, i18n.Init("zh-CN"))
 	focus := domain.EvidenceFocus{ID: "auth", Name: "认证", EntryPaths: []string{"internal/auth.go"}}
-	conversation := agent.Conversation{Provider: "test", ID: "focus-session"}
-	var received agent.Conversation
+	evidence := domain.LearningEvidence{SourcePaths: []string{"internal/auth.go"}, StructuralContext: "Auth calls Verify"}
+	var received domain.LearningEvidence
 	var receivedRuntimeLabel string
 	mockAgent := &mocks.MockAgent{ReviewKnowledgeFn: func(_ context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
-		received = req.Conversation
+		received = req.Evidence
 		receivedRuntimeLabel = req.RuntimeLabel
 		return acceptKnowledgeCandidates(req.Candidates), nil
 	}}
 	run := newKnowledgeReviewTestRun(t, []domain.EvidenceFocus{focus}, nil, mockAgent, nil)
-	result := buildAnalyzedFocusResult(focus, 0, []domain.Pattern{*admittedLearnCurrentPatternForTest("auth-rule", "Auth", domain.CategoryBusiness, "internal/auth.go")}, agent.ProfileRefreshRecommendation{}, conversation)
+	result := buildAnalyzedFocusResult(focus, 0, []domain.Pattern{*admittedLearnCurrentPatternForTest("auth-rule", "Auth", domain.CategoryBusiness, "internal/auth.go")}, agent.ProfileRefreshRecommendation{})
+	result.evidence = evidence
+	_, err := run.checkpointFocusResult(result)
+	require.NoError(t, err)
 
-	reviewed, err := run.reviewAnalyzedFocusResults(context.Background(), "analysis", run.analysisState, learnCurrentBatch{index: 0, focuses: []indexedEvidenceFocus{{index: 0, focus: focus}}}, []learnCurrentFocusResult{result}, false, nil)
+	err = run.reviewRemainingKnowledge("analysis")
 
 	require.NoError(t, err)
-	require.Equal(t, conversation, received)
+	require.Equal(t, evidence, received)
 	require.Equal(t, "batch-001", receivedRuntimeLabel)
-	require.True(t, reviewed[0].reviewed)
-	require.Empty(t, reviewed[0].conversation)
-	require.Equal(t, domain.DevelopmentFocusFromEvidenceFocus(focus), reviewed[0].patterns[0].DevelopmentFocus)
+	require.True(t, run.focusKnowledge[0].Reviewed)
+	require.Equal(t, domain.DevelopmentFocusFromEvidenceFocus(focus), run.patterns[0].DevelopmentFocus)
 }
 
 func TestDerivedKnowledgeFollowsAgendaOrder(t *testing.T) {

@@ -26,25 +26,27 @@ import (
 )
 
 type learnCurrentFocusResult struct {
+	evidence          domain.LearningEvidence
 	index             int
 	focus             domain.EvidenceFocus
 	patterns          []domain.Pattern
 	retiredPatternIDs []string
 	refreshRecommend  agent.ProfileRefreshRecommendation
 	completed         bool
-	reviewed          bool
-	conversation      agent.Conversation
+}
+
+// checkpoint 只表示源码分析完成；只有独立审查结果能设置 Reviewed。
+func (result learnCurrentFocusResult) checkpoint() commandstate.FocusKnowledgeCheckpoint {
+	return commandstate.FocusKnowledgeCheckpoint{
+		Focus: result.focus, Evidence: result.evidence.Clone(),
+		Patterns:          append([]domain.Pattern(nil), result.patterns...),
+		RetiredPatternIDs: appendUniquePatternIDs(nil, result.retiredPatternIDs...),
+	}
 }
 
 type learnCurrentBatch struct {
 	index   int
 	focuses []indexedEvidenceFocus
-}
-
-type learnCurrentBatchAnalysisResult struct {
-	batchIndex int
-	results    []learnCurrentFocusResult
-	err        error
 }
 
 type indexedEvidenceFocus struct {
@@ -112,6 +114,17 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 		}
 		r.restoreAnalysisCheckpoint()
 		if len(r.plannedFocuses) == 0 {
+			// 仅补审查时也要准备待提交快照，避免文件指纹前进而 diff 基线滞后。
+			if !r.sourceBaselineCommitted() && r.incrementalChanges != nil {
+				var err error
+				r.codebaseRunContext, err = r.buildCodebaseRunContext()
+				if err != nil {
+					return err
+				}
+			}
+			if err := r.reviewRemainingKnowledge(analyzeLabel); err != nil {
+				return err
+			}
 			return r.completeAnalysis()
 		}
 		if r.patternsCommitted() {
@@ -159,7 +172,8 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 
 func (r *learnCurrentProjectRun) analyzePlannedFocuses(analyzeLabel string, state *commandstate.State, plannedFocuses []domain.EvidenceFocus) (int, error) {
 	batches := r.planAnalysisBatches(plannedFocuses)
-	parallelism := r.analysisParallelism(len(batches))
+	totalFocuses := len(plannedFocuses) + len(r.pendingKnowledgeReviews())
+	parallelism := r.analysisParallelism(totalFocuses)
 	if parallelism <= 1 || len(batches) <= 1 {
 		r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeBatches", map[string]interface{}{
 			"Focuses":     len(plannedFocuses),
@@ -173,7 +187,7 @@ func (r *learnCurrentProjectRun) analyzePlannedFocuses(analyzeLabel string, stat
 	}
 	logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentAnalyzeFocusesSummary", map[string]interface{}{
 		"Completed":   completedFocuses,
-		"Total":       len(plannedFocuses),
+		"Total":       totalFocuses,
 		"Batches":     len(batches),
 		"Parallelism": parallelism,
 	}))
@@ -214,101 +228,6 @@ func (r *learnCurrentProjectRun) analysisParallelism(batchCount int) int {
 	return parallelism
 }
 
-func (r *learnCurrentProjectRun) analyzePlannedBatches(analyzeLabel string, state *commandstate.State, batches []learnCurrentBatch, parallelism int) (int, error) {
-	if parallelism <= 1 || len(batches) <= 1 {
-		return r.analyzePlannedBatchesSerial(analyzeLabel, state, batches)
-	}
-	return r.analyzePlannedBatchesParallel(analyzeLabel, state, batches, parallelism)
-}
-
-func (r *learnCurrentProjectRun) analyzePlannedBatchesSerial(analyzeLabel string, state *commandstate.State, batches []learnCurrentBatch) (int, error) {
-	completedFocuses := 0
-	for _, batch := range batches {
-		results, err := r.analyzeBatch(r.ctx, analyzeLabel, state, batch, true, nil)
-		if err != nil {
-			return completedFocuses, err
-		}
-		completed, err := r.checkpointFocusResults(results)
-		if err != nil {
-			return completedFocuses, err
-		}
-		completedFocuses += completed
-	}
-	return completedFocuses, nil
-}
-
-func (r *learnCurrentProjectRun) analyzePlannedBatchesParallel(analyzeLabel string, state *commandstate.State, batches []learnCurrentBatch, parallelism int) (int, error) {
-	ctx, cancel := context.WithCancelCause(r.ctx)
-	defer cancel(nil)
-
-	progress := newLearnCurrentParallelAnalysisProgress(r, analyzeLabel, state, batches, parallelism)
-	defer r.steps.ClearDetails()
-	defer progress.stopElapsedUpdates()
-	ctx = agent.WithAdditionalRetryReporter(ctx, progress.reportRetry)
-	progress.update()
-	progress.startElapsedUpdates()
-
-	jobs := make(chan learnCurrentBatch)
-	results := make(chan learnCurrentBatchAnalysisResult, len(batches))
-	var wg sync.WaitGroup
-	for i := 0; i < parallelism; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for batch := range jobs {
-				progress.start(batch)
-				batchResults, err := r.analyzeBatch(ctx, analyzeLabel, state, batch, false, func(candidates int) {
-					progress.review(batch, candidates)
-				})
-				if err != nil {
-					progress.stop(batch)
-					results <- learnCurrentBatchAnalysisResult{batchIndex: batch.index, err: err}
-					cancel(err)
-					return
-				}
-				progress.finish(batch)
-				results <- learnCurrentBatchAnalysisResult{batchIndex: batch.index, results: batchResults}
-			}
-		}()
-	}
-
-	go func() {
-		defer close(jobs)
-		for _, batch := range batches {
-			select {
-			case <-ctx.Done():
-				return
-			case jobs <- batch:
-			}
-		}
-	}()
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	var firstErr error
-	completedFocuses := 0
-	for result := range results {
-		if result.err != nil {
-			firstErr = preferredBatchError(firstErr, result.err)
-			continue
-		}
-		completed, err := r.checkpointFocusResults(result.results)
-		if err != nil {
-			firstErr = preferredBatchError(firstErr, err)
-			cancel(err)
-			continue
-		}
-		completedFocuses += completed
-	}
-	if firstErr != nil {
-		return completedFocuses, firstErr
-	}
-	return completedFocuses, nil
-}
-
 func preferredBatchError(current, candidate error) error {
 	if candidate == nil {
 		return current
@@ -336,10 +255,11 @@ type learnCurrentParallelAnalysisProgress struct {
 }
 
 type learnCurrentParallelFocusStatus struct {
-	base       string
-	stage      string
-	retryStage string
-	startedAt  time.Time
+	runtimeLabel string
+	base         string
+	stage        string
+	retryStage   string
+	startedAt    time.Time
 }
 
 func newLearnCurrentParallelAnalysisProgress(run *learnCurrentProjectRun, baseLabel string, state *commandstate.State, batches []learnCurrentBatch, parallelism int) *learnCurrentParallelAnalysisProgress {
@@ -361,9 +281,10 @@ func (p *learnCurrentParallelAnalysisProgress) start(batch learnCurrentBatch) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.active[batch.index] = learnCurrentParallelFocusStatus{
-		base:      p.run.analysisBatchProgressLabel(p.state, batch, p.total),
-		stage:     i18n.Get("LearnCurrentFocusStageSourceEvidence"),
-		startedAt: time.Now(),
+		runtimeLabel: p.run.analysisBatchRuntimeLabel(p.state, batch),
+		base:         p.run.analysisBatchProgressLabel(p.state, batch, p.total),
+		stage:        i18n.Get("LearnCurrentFocusStageSourceEvidence"),
+		startedAt:    time.Now(),
 	}
 	p.updateLocked()
 }
@@ -387,6 +308,15 @@ func (p *learnCurrentParallelAnalysisProgress) review(batch learnCurrentBatch, c
 		status.startedAt = time.Now()
 	}
 	p.active[batch.index] = status
+	if p.parallelism == 1 && len(batch.focuses) == 1 {
+		focus := batch.focuses[0]
+		current, total := learnCurrentFocusProgress(p.state, focus.index+1, p.total, focus.focus)
+		p.run.detail(p.baseLabel, "ProgressLearnCurrentReviewFocus", map[string]interface{}{
+			"Completed": p.completed, "Total": p.total, "Current": current, "AgendaTotal": total,
+			"Name": learnCurrentProgressSubject(focus.focus), "Candidates": candidates,
+		})
+		return
+	}
 	p.updateLocked()
 }
 
@@ -401,7 +331,7 @@ func (p *learnCurrentParallelAnalysisProgress) stop(batch learnCurrentBatch) {
 const parallelProgressElapsedRefreshInterval = time.Second
 
 func (p *learnCurrentParallelAnalysisProgress) startElapsedUpdates() {
-	if !p.run.opts.showProgress {
+	if !p.run.opts.showProgress || p.parallelism <= 1 {
 		return
 	}
 	p.mu.Lock()
@@ -455,6 +385,10 @@ func (p *learnCurrentParallelAnalysisProgress) update() {
 }
 
 func (p *learnCurrentParallelAnalysisProgress) reportRetry(info agent.RetryInfo) {
+	// 串行进度由既有 step binder 维护，避免覆盖当前焦点和重试原因。
+	if p.parallelism == 1 {
+		return
+	}
 	label := agent.OperationLabel(info.Operation)
 	if label == "" {
 		return
@@ -462,8 +396,7 @@ func (p *learnCurrentParallelAnalysisProgress) reportRetry(info agent.RetryInfo)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for index, status := range p.active {
-		batch := learnCurrentBatch{index: index}
-		if p.run.analysisBatchRuntimeLabel(p.state, batch) != label {
+		if status.runtimeLabel != label {
 			continue
 		}
 		switch info.Status {
@@ -526,7 +459,7 @@ func (r *learnCurrentProjectRun) focusProgressParams(state *commandstate.State, 
 	}
 }
 
-func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool, onReview func(int)) ([]learnCurrentFocusResult, error) {
+func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool) ([]learnCurrentFocusResult, error) {
 	var batchFocuses []analyzer.AnalyzeCurrentEvidenceFocus
 	results := make([]learnCurrentFocusResult, 0, len(batch.focuses))
 	pendingByID := make(map[string]indexedEvidenceFocus, len(batch.focuses))
@@ -588,7 +521,7 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 	}
 	if r.useDeltaAnalysis() {
 		sort.Slice(results, func(i, j int) bool { return results[i].index < results[j].index })
-		return r.reviewAnalyzedFocusResults(ctx, analyzeLabel, state, batch, results, showDetails, onReview)
+		return results, nil
 	}
 
 	seen := make(map[string]bool, len(analyzeResult.Focuses))
@@ -600,7 +533,8 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 		if !ok {
 			return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentAnalyzeBatchUnknownFocus", map[string]interface{}{"Focus": focusResult.EvidenceFocus.ID}))
 		}
-		result := buildAnalyzedFocusResult(indexed.focus, indexed.index, focusResult.Patterns, focusResult.ProfileRefreshRecommended, analyzeResult.Conversation)
+		result := buildAnalyzedFocusResult(indexed.focus, indexed.index, focusResult.Patterns, focusResult.ProfileRefreshRecommended)
+		result.evidence = focusResult.Evidence
 		results = append(results, result)
 		seen[indexed.focus.ID] = true
 	}
@@ -614,57 +548,7 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 		}
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].index < results[j].index })
-	return r.reviewAnalyzedFocusResults(ctx, analyzeLabel, state, batch, results, showDetails, onReview)
-}
-
-func (r *learnCurrentProjectRun) reviewAnalyzedFocusResults(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, results []learnCurrentFocusResult, showDetails bool, onReview func(int)) ([]learnCurrentFocusResult, error) {
-	for index := range results {
-		result := &results[index]
-		if !result.completed {
-			continue
-		}
-		if onReview != nil {
-			onReview(len(result.patterns))
-		} else if showDetails {
-			total := len(results)
-			if state != nil && len(state.Agenda.Focuses) > 0 {
-				total = len(state.Agenda.Focuses)
-			}
-			r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeReviewFocus", map[string]interface{}{
-				"Base":       r.analysisBatchProgressLabel(state, batch, total),
-				"Candidates": len(result.patterns),
-			})
-		}
-		patterns, err := r.reviewCurrentFocusResult(ctx, *result, r.analysisBatchRuntimeLabel(state, batch))
-		if err != nil {
-			return nil, fmt.Errorf("review learned knowledge for %s: %w", learnCurrentProgressSubject(result.focus), err)
-		}
-		result.patterns = patterns
-		result.reviewed = true
-		result.conversation = agent.Conversation{}
-	}
 	return results, nil
-}
-
-func (r *learnCurrentProjectRun) reviewCurrentFocusResult(ctx context.Context, result learnCurrentFocusResult, runtimeLabel string) ([]domain.Pattern, error) {
-	patterns, err := r.cont.PatternNormSvc.ReviewCurrentKnowledge(ctx, patternnorm.ReviewRequest{
-		ProjectName:  r.projectName,
-		RootPath:     r.projectRoot,
-		Language:     r.currentLanguage,
-		RuntimeLabel: runtimeLabel,
-		Focus:        result.focus,
-		Candidates:   result.patterns,
-		UserContext:  r.opts.userContext,
-		Conversation: result.conversation,
-	})
-	if err != nil {
-		return nil, err
-	}
-	focus := domain.DevelopmentFocusFromEvidenceFocus(result.focus)
-	for index := range patterns {
-		patterns[index].DevelopmentFocus = focus.Clone()
-	}
-	return patterns, nil
 }
 
 func (r *learnCurrentProjectRun) batchFocusProgressParams(state *commandstate.State, indexed indexedEvidenceFocus) map[string]interface{} {
@@ -724,14 +608,13 @@ func (r *learnCurrentProjectRun) analysisBatchProgressLabel(state *commandstate.
 	})
 }
 
-func buildAnalyzedFocusResult(focus domain.EvidenceFocus, index int, learnedPatterns []domain.Pattern, refreshRecommend agent.ProfileRefreshRecommendation, conversation agent.Conversation) learnCurrentFocusResult {
+func buildAnalyzedFocusResult(focus domain.EvidenceFocus, index int, learnedPatterns []domain.Pattern, refreshRecommend agent.ProfileRefreshRecommendation) learnCurrentFocusResult {
 	return learnCurrentFocusResult{
 		index:            index,
 		focus:            focus,
 		patterns:         learnedPatterns,
 		refreshRecommend: refreshRecommend,
 		completed:        true,
-		conversation:     conversation,
 	}
 }
 
@@ -799,12 +682,7 @@ func (r *learnCurrentProjectRun) commitCurrentAnalysis(ctx context.Context) erro
 
 func (r *learnCurrentProjectRun) mergeFocusResult(result learnCurrentFocusResult) {
 	if result.completed {
-		r.setFocusKnowledge(commandstate.FocusKnowledgeCheckpoint{
-			Focus:             result.focus,
-			Patterns:          append([]domain.Pattern(nil), result.patterns...),
-			RetiredPatternIDs: appendUniquePatternIDs(nil, result.retiredPatternIDs...),
-			Reviewed:          result.reviewed,
-		})
+		r.setFocusKnowledge(result.checkpoint())
 	}
 	if result.refreshRecommend.Needed {
 		r.profileRefreshRecommended = result.refreshRecommend
@@ -817,13 +695,8 @@ func (r *learnCurrentProjectRun) reviewRemainingKnowledge(label string) error {
 	if len(pending) == 0 || r.patternsCommitted() {
 		return nil
 	}
-	return r.reviewKnowledgeFocuses(label, pending)
-}
-
-// reviewLearnedKnowledge 保留给旧检查点恢复和直接服务测试使用。
-// 正常学习已在每个焦点完成源码分析后立即审查，不再占用独立顶层步骤。
-func (r *learnCurrentProjectRun) reviewLearnedKnowledge() error {
-	return r.reviewRemainingKnowledge(i18n.Get("ProgressLearnCurrentReviewKnowledge"))
+	_, err := r.analyzePlannedBatches(label, r.analysisState, nil, 1)
+	return err
 }
 
 func (r *learnCurrentProjectRun) pendingKnowledgeReviews() []knowledgeReviewTask {
@@ -835,32 +708,6 @@ func (r *learnCurrentProjectRun) pendingKnowledgeReviews() []knowledgeReviewTask
 		tasks = append(tasks, knowledgeReviewTask{index: index, unit: unit})
 	}
 	return tasks
-}
-
-func (r *learnCurrentProjectRun) reviewKnowledgeFocuses(label string, tasks []knowledgeReviewTask) error {
-	for completed, task := range tasks {
-		r.detail(label, "ProgressLearnCurrentReviewFocus", map[string]interface{}{
-			"Completed":   completed,
-			"Total":       len(tasks),
-			"Current":     task.index + 1,
-			"AgendaTotal": len(r.focusKnowledge),
-			"Name":        learnCurrentProgressSubject(task.unit.Focus),
-			"Candidates":  len(task.unit.Patterns),
-		})
-		patterns, err := r.reviewKnowledgeFocus(r.ctx, task)
-		if err != nil {
-			return fmt.Errorf("review learned knowledge for %s: %w", learnCurrentProgressSubject(task.unit.Focus), err)
-		}
-		r.applyKnowledgeReviewResult(task, patterns)
-		if err := r.saveAnalysisCheckpoint(); err != nil {
-			return err
-		}
-	}
-	r.detail(label, "ProgressLearnCurrentReviewComplete", map[string]interface{}{
-		"Completed": len(tasks),
-		"Total":     len(tasks),
-	})
-	return nil
 }
 
 func (r *learnCurrentProjectRun) reviewKnowledgeFocus(ctx context.Context, task knowledgeReviewTask) ([]domain.Pattern, error) {
@@ -875,6 +722,7 @@ func (r *learnCurrentProjectRun) reviewKnowledgeFocus(ctx context.Context, task 
 		RuntimeLabel: runtimeLabel,
 		Focus:        task.unit.Focus,
 		Candidates:   task.unit.Patterns,
+		Evidence:     task.unit.Evidence.Clone(),
 		UserContext:  r.opts.userContext,
 	})
 	return patterns, err
@@ -896,6 +744,9 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 	startedAt := time.Now()
 	stepLabel := i18n.Get("ProgressLearnCurrentNormalizeAndSavePatterns")
 	if err := r.steps.Run(stepLabel, func() error {
+		if len(r.pendingKnowledgeReviews()) > 0 {
+			return fmt.Errorf("cannot store knowledge before all focuses are reviewed")
+		}
 		if !r.patternsCommitted() && (len(r.patterns) > 0 || len(r.retiredPatternIDs) > 0) {
 			hooks := patternnorm.ProgressHooks{
 				OnStepStart: func(label string) {
@@ -979,6 +830,9 @@ func (r *learnCurrentProjectRun) completeAnalysis() error {
 }
 
 func (r *learnCurrentProjectRun) validateCompletedAnalysis() error {
+	if len(r.pendingKnowledgeReviews()) > 0 {
+		return fmt.Errorf("cannot complete analysis with unreviewed focuses")
+	}
 	missing := make([]string, 0)
 	completed := r.completedEvidenceFocuses()
 	if r.analysisState != nil {
@@ -1100,6 +954,9 @@ func (r *learnCurrentProjectRun) syncDerivedKnowledge() {
 	r.patterns = r.patterns[:0]
 	r.retiredPatternIDs = r.retiredPatternIDs[:0]
 	for _, unit := range r.focusKnowledge {
+		if !unit.Reviewed {
+			continue
+		}
 		r.patterns = append(r.patterns, unit.Patterns...)
 		r.retiredPatternIDs = appendUniquePatternIDs(r.retiredPatternIDs, unit.RetiredPatternIDs...)
 	}
@@ -1122,6 +979,7 @@ func cloneFocusKnowledge(units []commandstate.FocusKnowledgeCheckpoint) []comman
 }
 
 func cloneFocusKnowledgeUnit(unit commandstate.FocusKnowledgeCheckpoint) commandstate.FocusKnowledgeCheckpoint {
+	unit.Evidence = unit.Evidence.Clone()
 	unit.Patterns = append([]domain.Pattern(nil), unit.Patterns...)
 	unit.RetiredPatternIDs = append([]string(nil), unit.RetiredPatternIDs...)
 	return unit

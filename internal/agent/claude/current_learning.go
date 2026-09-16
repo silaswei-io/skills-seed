@@ -33,7 +33,7 @@ func (c *ClaudeAgent) NormalizePatterns(ctx context.Context, req *agent.Normaliz
 
 func (c *ClaudeAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-knowledge-review", req.RuntimeLabel))
-	output, _, err := c.callCurrentLearningWithOptions(ctx, agent.ReviewKnowledgeOperation(req), "learning-knowledge-review", agent.RuntimePromptInputPrefix("skills-seed-learning-knowledge-review", req.RuntimeLabel), aicontract.ContractReviewKnowledge, aicontract.StructuredOutputOptions{CandidateIDs: agent.ReviewKnowledgeCandidateIDs(req.Candidates)}, task, req.Conversation, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, _, err := c.callCurrentLearningWithOptions(ctx, agent.ReviewKnowledgeOperation(req), "learning-knowledge-review", agent.RuntimePromptInputPrefix("skills-seed-learning-knowledge-review", req.RuntimeLabel), aicontract.ContractReviewKnowledge, aicontract.StructuredOutputOptions{CandidateIDs: agent.ReviewKnowledgeCandidateIDs(req.Candidates)}, task, agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.ReviewKnowledgePromptData(inputs, req)
 	})
 	if err != nil {
@@ -51,7 +51,7 @@ func (c *ClaudeAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnow
 
 func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-analyze", req.RuntimeLabel))
-	output, conversation, err := c.callCurrentLearningWithOptions(ctx, agent.AnalyzeCurrentCodebaseBatchOperation(req), "learning-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentCodebaseBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{Provider: c.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, _, err := c.callCurrentLearningWithOptions(ctx, agent.AnalyzeCurrentCodebaseBatchOperation(req), "learning-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentCodebaseBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.AnalyzeCurrentCodebaseBatchPromptData(inputs, req)
 	})
 	if err != nil {
@@ -61,13 +61,12 @@ func (c *ClaudeAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agen
 	if err != nil {
 		return nil, err
 	}
-	result.Conversation = conversation
 	return result, agent.RequireResult(result, "AnalyzeCurrentCodebaseBatch")
 }
 
 func (c *ClaudeAgent) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-delta-pack-analyze", req.RuntimeLabel))
-	output, conversation, err := c.callCurrentLearningWithOptions(ctx, agent.AnalyzeCurrentDeltaBatchOperation(req), "learning-delta-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-delta-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentDeltaBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{Provider: c.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+	output, _, err := c.callCurrentLearningWithOptions(ctx, agent.AnalyzeCurrentDeltaBatchOperation(req), "learning-delta-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-delta-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentDeltaBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.AnalyzeCurrentDeltaBatchPromptData(inputs, req)
 	})
 	if err != nil {
@@ -77,7 +76,6 @@ func (c *ClaudeAgent) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.A
 	if err != nil {
 		return nil, err
 	}
-	result.Conversation = conversation
 	return result, agent.RequireResult(result, "AnalyzeCurrentDeltaBatch")
 }
 

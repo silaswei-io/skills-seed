@@ -29,6 +29,8 @@ skills-seed init
 skills-seed sync
 ```
 
+Use `skills-seed init --skills-name team-guide` to choose a custom Skill name during initialization; omit it to derive the name from the project.
+
 First download the binary for the current system and architecture from the [latest release](https://github.com/silaswei-io/skills-seed/releases/latest) and place it on `PATH`. `init` selects project mode, analysis Agent, and output target. `sync` learns current code and refreshes generated Skills. Later, `skills-seed update` downloads and verifies an official release without requiring Go. See the [Getting Started Wiki page](docs/wiki/en/Getting-Started.md) for prerequisites, verification, and choosing between project and workspace mode.
 
 ## What It Provides

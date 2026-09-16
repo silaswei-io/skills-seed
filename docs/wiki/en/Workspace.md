@@ -26,6 +26,8 @@ skills-seed sync
 
 Interactive behavior and flags are defined in the [command reference](../../COMMANDS.EN.md).
 
+Use `skills-seed init --workspace --skills-name team-guide` to name the root Skill. The name applies only to the root; children retain their own default or custom names, and root routing reads their configuration. To customize a child name, run `skills-seed init --skills-name backend-guide` inside that child before initializing the workspace or adding the child. Existing child configurations are preserved.
+
 ## Responsibility Split
 
 | Location | Owns |
@@ -39,8 +41,8 @@ A root Rule does not automatically become every child's Rule. Resource ownership
 
 ## Runtime Strategy
 
-- Root `agent.parallelism` controls child-project parallelism.
-- Each child controls its own focus-analysis parallelism with its own configuration.
+- Root `agent.parallelism` caps both child-project concurrency and total Agent calls shared across children.
+- Each child config controls focus scheduling without enlarging the root budget. Source analysis and review share slots; knowledge-review calls remain serial across children.
 - Cross-project work routes from the root Skill to affected child Skills and source.
 - Resumption should reuse plans and checkpoints instead of rescanning unchanged children.
 

@@ -26,6 +26,8 @@ skills-seed sync
 
 实际交互和参数以 [命令参考](../COMMANDS.md) 为准。
 
+用 `skills-seed init --workspace --skills-name team-guide` 可命名工作区根 Skill。该名称只作用于根，子项目仍使用各自的默认名或自定义名；根 Skill 的路由会读取子项目配置。若需要自定义子项目名称，先在该子项目执行 `skills-seed init --skills-name backend-guide`，再初始化工作区或添加子项目，已有子项目配置会保留。
+
 ## 责任划分
 
 | 位置 | 负责内容 |
@@ -39,8 +41,8 @@ skills-seed sync
 
 ## 运行策略
 
-- 根配置的 `agent.parallelism` 控制子项目并发。
-- 每个子项目内部的焦点分析并发由其自身配置控制。
+- 根配置的 `agent.parallelism` 同时限制子项目并发和所有子项目共享的 Agent 调用总数。
+- 子项目配置控制其焦点调度，但不能放大根级额度；源码分析与审查共享额度，知识审查跨子项目串行。
 - 跨项目任务先由根 Skill 识别受影响项目，再进入子项目 Skill 与源码。
 - 中断后优先恢复已有计划与 checkpoint，避免重新扫描无变化子项目。
 

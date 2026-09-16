@@ -88,6 +88,7 @@ func (r *learnCurrentProjectRun) hasDecisionCheckpoint() bool {
 }
 
 func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) *learnCurrentProjectRun {
+	ctx = agent.WithCallBudget(ctx, cont.ConfigRepo.GetAgentConfig().Parallelism)
 	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
 	steps := commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{

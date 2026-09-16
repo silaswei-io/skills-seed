@@ -166,7 +166,7 @@ func TestInteractiveInitParallelismPlanSummary(t *testing.T) {
 		initParallelismPlanSummary(domain.ModeProject, 4, 0),
 	)
 	require.Equal(t,
-		"工作区：检测到 3 个子项目，根 agent.parallelism=3 控制子项目并发；子项目内证据焦点并发由子项目配置控制",
+		"工作区：检测到 3 个子项目，根 agent.parallelism=3 控制子项目并发与共享 Agent 调用上限；知识审查串行",
 		initParallelismPlanSummary(domain.ModeWorkspace, 6, 3),
 	)
 }

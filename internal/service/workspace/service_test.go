@@ -45,6 +45,36 @@ func TestGenerateWorkspaceSkills_RendersOnlyWorkspaceRoot(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(projectRoot, "backend", ".agents", "skills", "skills-seed-skills", "references", "project-spec.md"))
 }
 
+func TestGenerateWorkspaceSkillsUsesRootAndChildNames(t *testing.T) {
+	root := t.TempDir()
+	childRepo, err := config.NewRepository(filepath.Join(root, "backend", ".skills-seed"), "en-US")
+	require.NoError(t, err)
+	childCfg := childRepo.Get()
+	childCfg.Project.Name = "actual-backend"
+	childCfg.Skills = config.SkillsConfig{Name: "backend-guide", Target: "codex"}
+	require.NoError(t, childRepo.Update(childCfg))
+	cfg := &mocks.MockConfigReader{
+		ProjectCfg: config.ProjectConfig{Name: "actual-workspace", Mode: domain.ModeWorkspace, RootPath: root},
+		WorkspaceCfg: config.WorkspaceConfig{Projects: []config.WorkspaceProjectConfig{
+			{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		}},
+		SkillsCfg: config.SkillsConfig{Name: "team-guide", Target: "codex", Paths: map[string]string{"codex": ".agents/skills/team-guide"}},
+	}
+	svc := NewWorkspaceGenerator(skills.NewLoaderForAgent("codex", "en-US"), cfg, nil, nil, nil, nil)
+	require.NoError(t, svc.GenerateWorkspaceSkills(context.Background()))
+	content, err := os.ReadFile(filepath.Join(root, ".agents", "skills", "team-guide", "SKILL.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(content), "\nname: team-guide\n")
+	require.Contains(t, string(content), "actual-workspace")
+	overview, err := os.ReadFile(filepath.Join(root, ".agents", "skills", "team-guide", "references", "workspace-overview.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(overview), "backend/.agents/skills/backend-guide/SKILL.md")
+	require.NotContains(t, string(overview), "backend-dev/SKILL.md")
+	data, err := svc.workspaceTemplateData(context.Background(), cfg.ProjectCfg, cfg.WorkspaceCfg, nil, nil, WorkspaceGenerateOptions{})
+	require.NoError(t, err)
+	require.Equal(t, "backend-guide", data.Projects[0].SkillName)
+}
+
 func TestGenerateWorkspaceSkillsWithOptionsUsesRootOutputOverride(t *testing.T) {
 	projectRoot := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "backend"), 0755))

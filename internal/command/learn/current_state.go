@@ -23,7 +23,7 @@ import (
 const (
 	commandStateLearnCurrent = "learn-current"
 	// currentAnalysisPlanContract 标识分析议程的输入与覆盖契约。
-	currentAnalysisPlanContract = "focused-routing-v2"
+	currentAnalysisPlanContract = "owned-evidence-v3"
 )
 
 type currentStateSession struct {
@@ -426,7 +426,6 @@ func learningAgendaFocusPaths(focuses []domain.EvidenceFocus) []string {
 	paths := make([]string, 0)
 	for _, focus := range focuses {
 		paths = append(paths, focus.EntryPaths...)
-		paths = append(paths, focus.RelatedPaths...)
 	}
 	return normalizeStatePaths(paths)
 }
@@ -509,7 +508,6 @@ func pathSet(paths []string) map[string]bool {
 
 func intersectFocusPaths(focus domain.EvidenceFocus, allowed map[string]bool) []string {
 	paths := append([]string{}, focus.EntryPaths...)
-	paths = append(paths, focus.RelatedPaths...)
 	paths = normalizeStatePaths(paths)
 	out := make([]string, 0, len(paths))
 	for _, path := range paths {

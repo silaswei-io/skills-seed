@@ -18,7 +18,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 )
 
-const schemaVersion = 4
+// schemaVersion 绑定独立审查事实材料和焦点归属契约，不迁移旧运行状态。
+const schemaVersion = 5
 
 var (
 	ErrStateNotFound            = errors.New("command state not found")
@@ -37,10 +38,11 @@ type InputSummary struct {
 // FocusKnowledgeCheckpoint 保存单个证据焦点的分析和审查结果。
 // 焦点是独立审查与恢复的最小单元，不写入最终 Pattern 事实。
 type FocusKnowledgeCheckpoint struct {
-	Focus             domain.EvidenceFocus `json:"focus"`
-	Patterns          []domain.Pattern     `json:"patterns,omitempty"`
-	RetiredPatternIDs []string             `json:"retired_pattern_ids,omitempty"`
-	Reviewed          bool                 `json:"reviewed,omitempty"`
+	Evidence          domain.LearningEvidence `json:"evidence"`
+	Focus             domain.EvidenceFocus    `json:"focus"`
+	Patterns          []domain.Pattern        `json:"patterns,omitempty"`
+	RetiredPatternIDs []string                `json:"retired_pattern_ids,omitempty"`
+	Reviewed          bool                    `json:"reviewed,omitempty"`
 }
 
 // AnalysisCheckpoint 保存高成本分析的焦点结果，供失败后从未完成焦点继续。

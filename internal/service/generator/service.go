@@ -183,7 +183,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 				return err
 			}
 			plan, err := s.planBuilder.Build(staging, snapshot, summaryResult, PlanOptions{
-				SkillName:           skillgen.GeneratedSkillName(projectConfig.Name),
+				SkillName:           skillgen.ConfiguredSkillName(projectConfig, s.configRepo.GetSkillsConfig()),
 				ProjectName:         projectConfig.Name,
 				Language:            projectConfig.Language,
 				ProgramVersion:      metadata.ProgramVersion,

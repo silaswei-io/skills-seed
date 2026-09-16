@@ -16,6 +16,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
+	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
@@ -50,6 +51,33 @@ func TestGenerateSkills_NoPatterns(t *testing.T) {
 	tmpDir := t.TempDir()
 	err := svc.GenerateSkills(context.Background(), tmpDir)
 	assert.NoError(t, err)
+}
+
+func TestGenerateSkillsUsesConfiguredName(t *testing.T) {
+	for _, target := range []string{"claude", "codex"} {
+		t.Run(target, func(t *testing.T) {
+			root := t.TempDir()
+			repo, err := config.NewRepository(filepath.Join(root, ".skills-seed"), "en-US")
+			require.NoError(t, err)
+			cfg := repo.Get()
+			cfg.Project = config.ProjectConfig{Name: "actual-project", RootPath: root}
+			cfg.Skills = config.SkillsConfig{Name: "team-guide", Target: target}
+			require.NoError(t, repo.Update(cfg))
+			repo, err = config.NewRepository(filepath.Join(root, ".skills-seed"), "en-US")
+			require.NoError(t, err)
+			profileRepo := &mocks.MockProjectProfileRepository{GetFn: func(context.Context) (*domain.ProjectProfile, error) {
+				return &domain.ProjectProfile{ProjectName: "actual-project", Language: "go"}, nil
+			}}
+			svc := newGeneratorService(&mocks.MockPatternRepository{}, profileRepo, skills.NewLoaderForAgent(target, "en-US"), repo)
+			output, err := projectpath.ConfiguredSkillOutput(root, repo)
+			require.NoError(t, err)
+			require.NoError(t, svc.GenerateSkills(context.Background(), output))
+			content := readGeneratedFile(t, output, "SKILL.md")
+			require.Contains(t, content, "\nname: team-guide\n")
+			require.Contains(t, content, "actual-project")
+			require.Equal(t, "team-guide", filepath.Base(output))
+		})
+	}
 }
 
 func TestGenerateSkillsProjectsAuthoritativeCommandPolicyAndCoverage(t *testing.T) {

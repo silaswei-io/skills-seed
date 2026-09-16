@@ -2,6 +2,28 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.34]
+
+### Added
+
+- `init --skills-name <name>` and interactive initialization now accept a custom Skill name, persisted as `skills.name` and used for the generated entry and output directory. Explicit names receive no `-dev` suffix, and workspace roots and children keep independent names.
+- Name validation rejects path separators, invalid characters, and excessive length before writing configuration or backing up reset state. Workspace routing reads each child's configured Skill name and path.
+
+### Improvements
+
+- Source analysis and independent knowledge review now have separate resumable checkpoints. Successful analysis immediately saves candidates and evidence; resumption after review failure retries only review, while successful in-flight analyses are retained to avoid duplicate calls.
+- Source analysis and serial review run as a pipeline sharing the Agent call budget. Workspace children cannot multiply root concurrency. Review uses an independent session with source paths, diff references, and structural facts.
+- Separated exclusive learning responsibility from shared read-only evidence. Isolated candidates skip Agent normalization, single-source patterns retain their reviewed identity, wording, and confidence, and normalization checkpoints bind related knowledge and user context.
+- Invalid structured output gets at most one repair carrying the previous result and validation error. Queueing, execution, backoff, and repair share one stage timeout instead of extending the deadline on every retry.
+
+### Upgrade Notes
+
+- Checkpoints now use schema 5 without migrating old execution state. For an unfinished run from an earlier version, use `skills-seed sync --restart` after upgrading.
+
+### Tests and Documentation
+
+- Added regressions for stage recovery, cancellation and concurrency budgets, result repair, normalization fidelity, custom-name persistence, and workspace boundaries. Updated bilingual command, configuration, getting-started, learning, and troubleshooting documentation.
+
 ## [v0.20.33]
 
 ### Fixes

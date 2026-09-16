@@ -60,3 +60,29 @@ func TestResolveChildSkillTargetNormalizesLegacyDefault(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(projectRoot, ".agents/skills/backend-dev"), target.OutputPath)
 }
+
+func TestResolveChildSkillTargetDoesNotInheritRootName(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "backend"), 0o755))
+	cfg := &mocks.MockConfigReader{SkillsCfg: config.SkillsConfig{
+		Name: "team-guide", Target: "codex", Paths: map[string]string{"codex": ".agents/skills/team-guide"},
+	}}
+	target, err := ResolveChildSkillTarget(root, config.WorkspaceProjectConfig{ID: "backend", Path: "backend"}, cfg)
+	require.NoError(t, err)
+	require.Equal(t, "backend-dev", target.SkillName)
+	require.Equal(t, filepath.Join(root, "backend", ".agents", "skills", "backend-dev"), target.OutputPath)
+}
+
+func TestResolveChildSkillTargetPreservesExplicitLegacyName(t *testing.T) {
+	root := t.TempDir()
+	repo, err := config.NewRepository(filepath.Join(root, "backend", ".skills-seed"), "en-US")
+	require.NoError(t, err)
+	cfg := repo.Get()
+	cfg.Project.Name = "backend"
+	cfg.Skills = config.SkillsConfig{Name: "skills-seed-skills", Target: "codex"}
+	require.NoError(t, repo.Update(cfg))
+	target, err := ResolveChildSkillTarget(root, config.WorkspaceProjectConfig{ID: "backend", Path: "backend"}, &mocks.MockConfigReader{})
+	require.NoError(t, err)
+	require.Equal(t, "skills-seed-skills", target.SkillName)
+	require.Equal(t, filepath.Join(root, "backend", ".agents", "skills", "skills-seed-skills"), target.OutputPath)
+}
