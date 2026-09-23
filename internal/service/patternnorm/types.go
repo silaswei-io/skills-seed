@@ -89,6 +89,8 @@ type NormalizeResult struct {
 	RetiredPatternIDs []string
 	Dropped           []Drop
 	Summary           Summary
+	// AISkipped 表示本轮因无合并关系未调用规范化 Agent（确定性保留）。
+	AISkipped bool
 }
 
 // Drop 描述一个明确不应入库的候选模式。

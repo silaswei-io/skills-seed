@@ -53,6 +53,9 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 				r.savedCount = len(result.Written)
 				r.retiredCount = len(result.RetiredPatternIDs)
 				r.dropped = append([]patternnorm.Drop(nil), result.Dropped...)
+				if result.AISkipped {
+					r.observer.noteSkip(skipNormalizeNoRelation)
+				}
 			} else {
 				// 早停：无候选且无退役，跳过规范化 AI/入库，仍继续提交源码基线。
 				r.observer.noteSkip(skipNormalizeEmpty)

@@ -23,6 +23,9 @@ func (r *learnCurrentProjectRun) saveProfileIfNeeded() error {
 	if r.projectionsCommitted() {
 		return nil
 	}
+	if !r.refreshProfile {
+		r.observer.noteSkip(skipProfileUnchanged)
+	}
 	if r.refreshProfile {
 		label := i18n.Get("ProgressLearnCurrentSaveProfile")
 		if err := r.steps.Run(label, func() error {
