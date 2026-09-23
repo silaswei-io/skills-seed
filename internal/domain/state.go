@@ -23,6 +23,16 @@ type LearnCurrentSummary struct {
 	ChangedProjects  int
 	WorkspaceChanged bool
 	NoFileChanges    bool
+	// AgentCallTotal 是本轮结构化 Agent 调用总次数（可选度量）。
+	AgentCallTotal int
+	// SkippedStages 是本轮短路跳过的阶段（如 review_empty）。
+	SkippedStages []string
+	// AnalysisMode 是 full、delta、mixed 或 none。
+	AnalysisMode string
+	// Resumed 表示从检查点恢复。
+	Resumed bool
+	// WallMs 是墙钟耗时毫秒。
+	WallMs int64
 }
 
 // LearnCurrentResult 描述 learn current 的运行结果。

@@ -124,3 +124,72 @@ func (r *learnCurrentProjectRun) applyKnowledgeReviewResult(task knowledgeReview
 	r.setFocusKnowledge(unit)
 	r.syncDerivedKnowledge()
 }
+
+// analyzedFocusRouting 是一批分析结果的审查路由结果。
+type analyzedFocusRouting struct {
+	ai             []knowledgeReviewTask
+	localCompleted int
+}
+
+// routeAnalyzedFocuses 按策略分流：空候选 / standard 本地硬闸 / AI 审查。
+// progress 用于把本地收口计入并行进度完成数，避免 UI 卡在 0/N。
+func (r *learnCurrentProjectRun) routeAnalyzedFocuses(results []learnCurrentFocusResult, progress *learnCurrentParallelAnalysisProgress) analyzedFocusRouting {
+	out := analyzedFocusRouting{}
+	for _, analyzed := range results {
+		if !analyzed.completed {
+			continue
+		}
+		switch routeFocusReview(analyzed.focus, analyzed.patterns) {
+		case reviewRouteNone:
+			r.applyLocalEmptyReview(analyzed)
+			r.observer.noteSkip(skipReviewEmpty)
+			out.localCompleted++
+			if progress != nil {
+				progress.finish(localReviewProgressBatch(analyzed))
+			}
+		case reviewRouteLocalStandard:
+			r.applyLocalStandardReview(analyzed)
+			r.observer.noteSkip(skipReviewLocalStandard)
+			out.localCompleted++
+			if progress != nil {
+				progress.finish(localReviewProgressBatch(analyzed))
+			}
+		default:
+			out.ai = append(out.ai, knowledgeReviewTask{index: analyzed.index, unit: analyzed.checkpoint()})
+		}
+	}
+	return out
+}
+
+// localReviewProgressBatch 构造仅用于进度完成计数的虚拟批次，不进入 active 集合。
+func localReviewProgressBatch(result learnCurrentFocusResult) learnCurrentBatch {
+	return learnCurrentBatch{
+		index:   -(result.index + 1),
+		focuses: []indexedEvidenceFocus{{index: result.index, focus: result.focus}},
+	}
+}
+
+// applyLocalEmptyReview 对无候选焦点完成本地审查收口。
+func (r *learnCurrentProjectRun) applyLocalEmptyReview(result learnCurrentFocusResult) {
+	unit := result.checkpoint()
+	unit.Patterns = nil
+	unit.Reviewed = true
+	r.setFocusKnowledge(unit)
+	r.syncDerivedKnowledge()
+}
+
+// applyLocalStandardReview 对 standard 且通过硬闸的候选本地接受（S3）。
+// 保留分析产出的表述与证据，不调用 Agent；careful/critical 与 operational_risk 不会进入此路径。
+func (r *learnCurrentProjectRun) applyLocalStandardReview(result learnCurrentFocusResult) {
+	unit := result.checkpoint()
+	focus := domain.DevelopmentFocusFromEvidenceFocus(unit.Focus)
+	patterns := append([]domain.Pattern(nil), unit.Patterns...)
+	for index := range patterns {
+		patterns[index].DevelopmentFocus = focus.Clone()
+		patterns[index].KnowledgeFlags = domain.CanonicalKnowledgeFlags(patterns[index].KnowledgeFlags)
+	}
+	unit.Patterns = patterns
+	unit.Reviewed = true
+	r.setFocusKnowledge(unit)
+	r.syncDerivedKnowledge()
+}

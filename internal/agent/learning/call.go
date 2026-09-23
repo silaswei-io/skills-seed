@@ -7,6 +7,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/structuredtask"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 )
 
 func call(
@@ -48,5 +49,8 @@ func callWithOptions(
 		Runtime:        task,
 		Build:          build,
 	})
+	if err == nil {
+		runtimecontext.AgentCalls(ctx).Add(operation)
+	}
 	return result.Output, result.Conversation, err
 }

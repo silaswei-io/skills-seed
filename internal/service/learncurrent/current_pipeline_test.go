@@ -228,8 +228,11 @@ func TestDeltaAnchorResolvesOwnerInsteadOfRelatedEvidence(t *testing.T) {
 
 func pipelineSourceResult(req *agent.AnalyzeCurrentCodebaseBatchRequest) *agent.AnalyzeCurrentCodebaseBatchResult {
 	focus := req.Focuses[0]
+	pattern := *admittedLearnCurrentPatternForTest("pattern-"+focus.EvidenceFocus.ID, "Source boundary", domain.CategoryBusiness, focus.FocusPaths[0])
+	// 流水线并发/续跑测试需要真正走 AI 审查；operational_risk 强制 AI 路由。
+	pattern.KnowledgeFlags = []string{domain.KnowledgeFlagOperationalRisk}
 	return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: []agent.AnalyzeCurrentEvidenceResult{{
 		FocusID: focus.EvidenceFocus.ID, FocusName: focus.EvidenceFocus.Name,
-		Patterns: []domain.Pattern{*admittedLearnCurrentPatternForTest("pattern-"+focus.EvidenceFocus.ID, "Source boundary", domain.CategoryBusiness, focus.FocusPaths[0])},
+		Patterns: []domain.Pattern{pattern},
 	}}}
 }

@@ -104,10 +104,11 @@ func (r *learnCurrentProjectRun) analyzePlannedBatches(label string, state *comm
 		} else {
 			_, err = r.checkpointFocusResults(result.analyzed)
 			if err == nil {
-				for _, analyzed := range result.analyzed {
-					if analyzed.completed {
-						reviews = append(reviews, knowledgeReviewTask{index: analyzed.index, unit: analyzed.checkpoint()})
-					}
+				routed := r.routeAnalyzedFocuses(result.analyzed, progress)
+				reviews = append(reviews, routed.ai...)
+				completed += routed.localCompleted
+				if routed.localCompleted > 0 {
+					err = r.saveAnalysisCheckpoint()
 				}
 			}
 		}

@@ -98,11 +98,14 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 
 	retrieved := retrieveRelatedPatterns(candidates, activeExisting)
 	var normalized *proposal
+	aiSkipped := false
 	if req.Operation == OperationLearnCurrent {
-		normalized, err = s.normalizeCurrent(ctx, req, candidates, retrieved, hooks)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", i18n.Get("PatternNormLearnCurrentFailed"), err)
+		outcome, normErr := s.normalizeCurrent(ctx, req, candidates, retrieved, hooks)
+		if normErr != nil {
+			return nil, fmt.Errorf("%s: %w", i18n.Get("PatternNormLearnCurrentFailed"), normErr)
 		}
+		normalized = outcome.proposal
+		aiSkipped = outcome.aiSkipped
 	} else {
 		normalized = deterministicNormalize(candidates, retrieved.related)
 	}
@@ -115,8 +118,13 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 	}
 
 	notifyProgress(hooks.OnStoreStart, i18n.Get("ProgressNormalizePatternsStore"))
-	retiredIDs = eligibleRetiredPatternIDs(retiredIDs, existing, normalized.Patterns)
-	written, err := applyNormalizedPatterns(ctx, s.patternRepo, normalized.Patterns, normalized.Dropped, retrieved.related, retiredIDs, storeCandidates)
+	// A2：入库前证据硬闸，丢弃无法在项目根验证的证据归属。
+	gatedPatterns, evidenceDrops := gateEvidenceForPersistence(req.RootPath, normalized.Patterns)
+	if len(evidenceDrops) > 0 {
+		normalized.Dropped = append(normalized.Dropped, evidenceDrops...)
+	}
+	retiredIDs = eligibleRetiredPatternIDs(retiredIDs, existing, gatedPatterns)
+	written, err := applyNormalizedPatterns(ctx, s.patternRepo, gatedPatterns, normalized.Dropped, retrieved.related, retiredIDs, storeCandidates)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("PatternNormApplyPatternsFailed"), err)
 	}
@@ -125,6 +133,7 @@ func (s *Service) NormalizeAndStoreWithHooks(ctx context.Context, req NormalizeR
 		RetiredPatternIDs: retiredIDs,
 		Dropped:           normalized.Dropped,
 		Summary:           summarizeNormalization(len(candidates), len(retrieved.related), written, normalized.Dropped),
+		AISkipped:         aiSkipped,
 	}, nil
 }
 

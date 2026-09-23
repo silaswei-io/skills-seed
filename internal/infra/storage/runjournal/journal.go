@@ -34,6 +34,40 @@ type Scope struct {
 	ProjectPath string    `json:"project_path,omitempty"`
 }
 
+// Metrics 是 learn/sync 等运行的结构化度量，便于对比速度与产出。
+type Metrics struct {
+	// WallMs 是整次运行墙钟耗时（毫秒）。
+	WallMs int64 `json:"wall_ms,omitempty"`
+	// StageMs 是各顶层阶段耗时（毫秒），键为稳定阶段名。
+	StageMs map[string]int64 `json:"stage_ms,omitempty"`
+	// AgentCalls 按 operation 统计的结构化 Agent 调用次数。
+	AgentCalls map[string]int `json:"agent_calls,omitempty"`
+	// AgentCallTotal 是 AgentCalls 的合计。
+	AgentCallTotal int `json:"agent_call_total,omitempty"`
+	// Focuses 是本轮议程焦点数量。
+	Focuses int `json:"focuses,omitempty"`
+	// CandidatesFound 是审查后候选模式数。
+	CandidatesFound int `json:"candidates_found,omitempty"`
+	// Saved 是规范化写入数。
+	Saved int `json:"saved,omitempty"`
+	// Retired 是移除的过期模式数。
+	Retired int `json:"retired,omitempty"`
+	// Dropped 是规范化丢弃的候选数。
+	Dropped int `json:"dropped,omitempty"`
+	// DropReasonCodes 是丢弃原因码分布。
+	DropReasonCodes map[string]int `json:"drop_reason_codes,omitempty"`
+	// AnalysisMode 是焦点分析材料模式：full、delta、mixed 或 none。
+	AnalysisMode string `json:"analysis_mode,omitempty"`
+	// ChangeProfile 是增量变更画像。
+	ChangeProfile string `json:"change_profile,omitempty"`
+	// LearningMode 是配置的学习模式。
+	LearningMode string `json:"learning_mode,omitempty"`
+	// Resumed 表示本轮从检查点恢复。
+	Resumed bool `json:"resumed,omitempty"`
+	// SkippedStages 是本轮短路跳过的阶段名（如 review_empty、normalize_empty）。
+	SkippedStages []string `json:"skipped_stages,omitempty"`
+}
+
 // Entry 描述一次运行记录。
 type Entry struct {
 	ID         string    `json:"id"`
@@ -44,6 +78,7 @@ type Entry struct {
 	Details    []string  `json:"details,omitempty"`
 	LogPath    string    `json:"log_path,omitempty"`
 	Children   []Entry   `json:"children,omitempty"`
+	Metrics    *Metrics  `json:"metrics,omitempty"`
 	StartedAt  time.Time `json:"started_at"`
 	FinishedAt time.Time `json:"finished_at"`
 }

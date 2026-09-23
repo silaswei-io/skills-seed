@@ -13,7 +13,12 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
-func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, hooks ProgressHooks) (*proposal, error) {
+type currentNormalizeOutcome struct {
+	proposal  *proposal
+	aiSkipped bool
+}
+
+func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, hooks ProgressHooks) (*currentNormalizeOutcome, error) {
 	guidance, err := s.guidance.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
@@ -27,13 +32,17 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 			return nil, err
 		}
 		if result, err := finalizeAndValidateCurrentNormalization(proposalFromDecision(result), candidates, retrieved.related); err == nil {
-			return result, nil
+			return &currentNormalizeOutcome{proposal: result}, nil
 		} else {
 			logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "source", "checkpoint", "error", err)
 		}
-		return fallbackCurrentNormalization(ctx, req.DecisionCheckpoint, decisionKey, candidates, retrieved.related)
+		fallback, err := fallbackCurrentNormalization(ctx, req.DecisionCheckpoint, decisionKey, candidates, retrieved.related)
+		if err != nil {
+			return nil, err
+		}
+		return &currentNormalizeOutcome{proposal: fallback}, nil
 	}
-	result := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, guidance, hooks)
+	result, aiSkipped := s.normalizeCurrentWithAI(ctx, req, candidates, retrieved, guidance, hooks)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -43,12 +52,16 @@ func (s *Service) normalizeCurrent(ctx context.Context, req NormalizeRequest, ca
 			if err := saveNormalizationDecision(ctx, req.DecisionCheckpoint, decisionKey, decisionFromProposal(result)); err != nil {
 				return nil, err
 			}
-			return result, nil
+			return &currentNormalizeOutcome{proposal: result, aiSkipped: aiSkipped}, nil
 		}
 		logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
 	}
 
-	return fallbackCurrentNormalization(ctx, req.DecisionCheckpoint, decisionKey, candidates, retrieved.related)
+	fallback, err := fallbackCurrentNormalization(ctx, req.DecisionCheckpoint, decisionKey, candidates, retrieved.related)
+	if err != nil {
+		return nil, err
+	}
+	return &currentNormalizeOutcome{proposal: fallback}, nil
 }
 
 // fallbackCurrentNormalization 用逐条保留候选的方式替代不可用的规范化决策。
@@ -94,13 +107,14 @@ func preserveReviewedSingletons(result *proposal, candidates, existing []domain.
 	}
 }
 
-func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, guidance maintained.Snapshot, hooks ProgressHooks) *proposal {
+func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, guidance maintained.Snapshot, hooks ProgressHooks) (*proposal, bool) {
 	if s.normalizer == nil {
-		return nil
+		return nil, false
 	}
 	mergeCandidates := relatedNormalizationCandidates(candidates, retrieved)
 	if len(mergeCandidates) == 0 {
-		return keepCurrentCandidates(candidates)
+		// S2：无合并关系时确定性保留，不调用 Agent。
+		return keepCurrentCandidates(candidates), true
 	}
 	label := i18n.Get("ProgressNormalizePatternsAI")
 	notifyProgress(hooks.OnStepStart, label)
@@ -115,10 +129,10 @@ func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeReque
 	})
 	if err != nil {
 		logger.Diagnostic(i18n.Get("LoggerPatternNormAIFallback"), "error", err)
-		return nil
+		return nil, false
 	}
 	notifyProgress(hooks.OnStepComplete, label)
-	return proposalFromNormalizePatternsResult(result)
+	return proposalFromNormalizePatternsResult(result), false
 }
 
 // relatedNormalizationCandidates 复用已有关系策略，只把有合并对象的候选交给 Agent。

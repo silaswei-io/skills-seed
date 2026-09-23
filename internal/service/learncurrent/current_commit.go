@@ -21,37 +21,45 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 		if len(r.pendingKnowledgeReviews()) > 0 {
 			return fmt.Errorf("cannot store knowledge before all focuses are reviewed")
 		}
-		if !r.patternsCommitted() && (len(r.patterns) > 0 || len(r.retiredPatternIDs) > 0) {
-			hooks := patternnorm.ProgressHooks{
-				OnStepStart: func(label string) {
-					r.patternStageDetail(stepLabel, label)
-				},
-				OnStepUpdate: func(label string) {
-					r.patternStageDetail(stepLabel, label)
-				},
-				OnValidationStart: func(label string) {
-					r.patternStageDetail(stepLabel, label)
-				},
-				OnStoreStart: func(label string) {
-					r.patternStageDetail(stepLabel, label)
-				},
+		if !r.patternsCommitted() {
+			if knowledgeNeedsNormalizeStore(r.patterns, r.retiredPatternIDs) {
+				hooks := patternnorm.ProgressHooks{
+					OnStepStart: func(label string) {
+						r.patternStageDetail(stepLabel, label)
+					},
+					OnStepUpdate: func(label string) {
+						r.patternStageDetail(stepLabel, label)
+					},
+					OnValidationStart: func(label string) {
+						r.patternStageDetail(stepLabel, label)
+					},
+					OnStoreStart: func(label string) {
+						r.patternStageDetail(stepLabel, label)
+					},
+				}
+				result, err := r.cont.PatternNormSvc.NormalizeAndStoreWithHooks(r.ctx, patternnorm.NormalizeRequest{
+					Operation:          patternnorm.OperationLearnCurrent,
+					ProjectName:        r.projectName,
+					RootPath:           r.projectRoot,
+					Language:           r.currentLanguage,
+					Candidates:         r.patterns,
+					RetiredPatternIDs:  r.retiredPatternIDs,
+					DecisionCheckpoint: newCurrentDecisionCheckpoint(r.stateRepo, r.analysisState),
+					UserContext:        r.opts.userContext,
+				}, hooks)
+				if err != nil {
+					return err
+				}
+				r.savedCount = len(result.Written)
+				r.retiredCount = len(result.RetiredPatternIDs)
+				r.dropped = append([]patternnorm.Drop(nil), result.Dropped...)
+				if result.AISkipped {
+					r.observer.noteSkip(skipNormalizeNoRelation)
+				}
+			} else {
+				// 早停：无候选且无退役，跳过规范化 AI/入库，仍继续提交源码基线。
+				r.observer.noteSkip(skipNormalizeEmpty)
 			}
-			result, err := r.cont.PatternNormSvc.NormalizeAndStoreWithHooks(r.ctx, patternnorm.NormalizeRequest{
-				Operation:          patternnorm.OperationLearnCurrent,
-				ProjectName:        r.projectName,
-				RootPath:           r.projectRoot,
-				Language:           r.currentLanguage,
-				Candidates:         r.patterns,
-				RetiredPatternIDs:  r.retiredPatternIDs,
-				DecisionCheckpoint: newCurrentDecisionCheckpoint(r.stateRepo, r.analysisState),
-				UserContext:        r.opts.userContext,
-			}, hooks)
-			if err != nil {
-				return err
-			}
-			r.savedCount = len(result.Written)
-			r.retiredCount = len(result.RetiredPatternIDs)
-			r.dropped = append([]patternnorm.Drop(nil), result.Dropped...)
 		}
 		if !r.patternsCommitted() && r.analysisState != nil {
 			r.analysisState.MarkPatternsCommitted(commandstate.PatternCommitSummary{

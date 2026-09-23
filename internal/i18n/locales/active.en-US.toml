@@ -2394,6 +2394,9 @@ other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}, {{.Pa
 [LearnJournalDroppedPatterns]
 other = "dropped {{.Count}} candidates during normalization: {{.Reasons}}"
 
+[LearnJournalRunMetrics]
+other = "run metrics: wall {{.WallMs}}ms, agent calls {{.AgentCalls}}, analysis mode {{.AnalysisMode}}, skipped stages {{.SkippedStages}}"
+
 [ChangeLogLearnDroppedPatterns]
 other = "dropped {{.Count}} candidate patterns: {{.Reasons}}"
 

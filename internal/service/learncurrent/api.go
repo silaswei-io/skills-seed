@@ -174,6 +174,16 @@ func runLearnCurrentProject(ctx context.Context, cont *container.Container, opts
 		PatternsDropped: result.droppedCount,
 		DropReasons:     dropReasonSummaries(result.dropped),
 		NoFileChanges:   result.skipped,
+		SkippedStages:   append([]string(nil), result.skippedStages...),
+		AnalysisMode:    result.analysisMode,
+		Resumed:         result.resumed,
+		WallMs:          result.duration.Milliseconds(),
+	}
+	if result.metrics != nil {
+		summary.AgentCallTotal = result.metrics.AgentCallTotal
+		if summary.WallMs == 0 {
+			summary.WallMs = result.metrics.WallMs
+		}
 	}
 	return domain.LearnCurrentResult{Summary: summary}, nil
 }
@@ -235,4 +245,11 @@ type learnCurrentProjectResult struct {
 	dropped       []patternnorm.Drop
 	skipped       bool
 	duration      time.Duration
+	focusCount    int
+	changeProfile string
+	learningMode  string
+	analysisMode  string
+	resumed       bool
+	skippedStages []string
+	metrics       *runjournal.Metrics
 }

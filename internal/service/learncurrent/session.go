@@ -23,6 +23,8 @@ type learnDeps struct {
 	ctx       context.Context
 	startedAt time.Time
 	steps     *commandutil.ConsoleStepRunner
+	// observer 只记录运行事实，不参与编排决策。
+	observer *learnRunObserver
 }
 
 // learnProjectCtx 描述本轮项目身份与画像刷新意图。

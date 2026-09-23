@@ -51,6 +51,8 @@ func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, o
 	ctx = agent.WithCallBudget(ctx, cont.ConfigRepo.GetAgentConfig().Parallelism)
 	ctx = runtimecontext.WithSeedPath(ctx, cont.SeedPath)
 	ctx = runtimecontext.WithUserContext(ctx, opts.userContext)
+	agentCalls := runtimecontext.NewAgentCallCounter()
+	ctx = runtimecontext.WithAgentCallCounter(ctx, agentCalls)
 	steps := commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
 		TotalSteps:     learnCurrentProjectStepTotal,
 		ShowProgress:   opts.showProgress,
@@ -68,11 +70,19 @@ func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, o
 			ctx:       ctx,
 			startedAt: time.Now(),
 			steps:     steps,
+			observer:  newLearnRunObserver(agentCalls),
 		},
 		learnAgendaCtx: learnAgendaCtx{
 			conversations: make(map[string]agent.Conversation),
 		},
 	}
+}
+
+// runObservedStage 统一记录顶层阶段耗时，避免各阶段散落计时逻辑。
+func (r *learnCurrentProjectRun) runObservedStage(name string, fn func() error) error {
+	r.observer.startStage(name)
+	defer r.observer.endStage(name)
+	return fn()
 }
 
 func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
@@ -85,28 +95,28 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 		"seed_path", r.cont.SeedPath,
 	)
 
-	if err := r.prepareProject(); err != nil {
+	if err := r.runObservedStage(stagePrepare, r.prepareProject); err != nil {
 		return nil, err
 	}
-	if err := r.detectChanges(); err != nil {
+	if err := r.runObservedStage(stageDetect, r.detectChanges); err != nil {
 		return nil, err
 	}
-	if err := r.runPlanningStage(); err != nil {
+	if err := r.runObservedStage(stagePlan, r.runPlanningStage); err != nil {
 		return nil, err
 	}
 	if !r.incrementalChanges.HasChanges() {
 		return r.finishWithoutChanges()
 	}
-	if err := r.analyzeCodebase(); err != nil {
+	if err := r.runObservedStage(stageAnalyze, r.analyzeCodebase); err != nil {
 		return nil, err
 	}
 	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed {
 		r.refreshProfile = true
 	}
-	if err := r.normalizeAndSavePatternsStep(); err != nil {
+	if err := r.runObservedStage(stageNormalize, r.normalizeAndSavePatternsStep); err != nil {
 		return nil, err
 	}
-	if err := r.saveProfileIfNeeded(); err != nil {
+	if err := r.runObservedStage(stageProfile, r.saveProfileIfNeeded); err != nil {
 		return nil, err
 	}
 
@@ -119,6 +129,8 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 		"patterns_count", len(r.patterns),
 		"saved_count", r.savedCount,
 		"retired_count", r.retiredCount,
+		"skipped_stages", r.observer.skippedList(),
+		"agent_calls", r.observer.agentCallTotal(),
 	)
 	if err := commandutil.MarkLearned(r.ctx, r.cont); err != nil {
 		return nil, err
@@ -509,6 +521,10 @@ func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectR
 		changedCount = len(state.Files)
 		deletedCount = len(state.Deleted)
 	}
+	focusCount := 0
+	if r.analysisState != nil {
+		focusCount = len(r.analysisState.Agenda.Focuses)
+	}
 	result := &learnCurrentProjectResult{
 		projectName:   r.projectName,
 		changedCount:  changedCount,
@@ -521,7 +537,14 @@ func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectR
 		dropped:       append([]patternnorm.Drop(nil), r.dropped...),
 		skipped:       skipped,
 		duration:      time.Since(r.startedAt),
+		focusCount:    focusCount,
+		changeProfile: string(r.changeProfile),
+		learningMode:  r.learningMode,
+		analysisMode:  r.observer.analysisModeValue(),
+		resumed:       r.stateSession != nil,
+		skippedStages: r.observer.skippedList(),
 	}
+	result.metrics = r.observer.buildJournalMetrics(result, result.duration)
 	return result
 }
 
@@ -619,15 +642,33 @@ func recordLearnJournal(cont *container.Container, result *learnCurrentProjectRe
 			"Reasons": strings.Join(dropReasonSummaries(result.dropped), "; "),
 		}))
 	}
+	if result.metrics != nil {
+		if result.metrics.AgentCallTotal > 0 || len(result.metrics.SkippedStages) > 0 {
+			details = append(details, i18n.GetWithParams("LearnJournalRunMetrics", map[string]interface{}{
+				"WallMs":        result.metrics.WallMs,
+				"AgentCalls":    result.metrics.AgentCallTotal,
+				"AnalysisMode":  emptyMetricDash(result.metrics.AnalysisMode),
+				"SkippedStages": emptyMetricDash(strings.Join(result.metrics.SkippedStages, ",")),
+			}))
+		}
+	}
 	return runjournal.Append(cont.SeedPath, runjournal.Entry{
 		Command:    "learn current",
 		Scope:      scope,
 		Summary:    summary,
 		Details:    details,
 		LogPath:    currentRunLogPath(),
+		Metrics:    result.metrics,
 		StartedAt:  startedAt,
 		FinishedAt: time.Now(),
 	})
+}
+
+func emptyMetricDash(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "-"
+	}
+	return value
 }
 
 func currentRunLogPath() string {
