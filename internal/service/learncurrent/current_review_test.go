@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -132,7 +132,7 @@ func TestReviewAnalyzedFocusUsesCheckpointEvidence(t *testing.T) {
 		return acceptKnowledgeCandidates(req.Candidates), nil
 	}}
 	run := newKnowledgeReviewTestRun(t, []domain.EvidenceFocus{focus}, nil, mockAgent, nil)
-	result := buildAnalyzedFocusResult(focus, 0, []domain.Pattern{*admittedLearnCurrentPatternForTest("auth-rule", "Auth", domain.CategoryBusiness, "internal/auth.go")}, agent.ProfileRefreshRecommendation{})
+	result := buildAnalyzedFocusResult(focus, 0, []domain.Pattern{*admittedLearnCurrentPatternForTest("auth-rule", "Auth", domain.CategoryBusiness, "internal/auth.go")}, agent.ProfileRefreshRecommendation{}, agent.Conversation{})
 	result.evidence = evidence
 	_, err := run.checkpointFocusResult(result)
 	require.NoError(t, err)

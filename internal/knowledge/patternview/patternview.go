@@ -167,7 +167,8 @@ func SourceIDs(pattern domain.Pattern) []string {
 	return []string{pattern.ID}
 }
 
-// Normalize 补齐模式合并前需要的稳定字段。
+// Normalize 是模式进入合并/入库链路前的唯一业务规范化入口。
+// 负责补齐稳定字段并清除不应长期保留的运行短暂态。
 func Normalize(pattern domain.Pattern) domain.Pattern {
 	pattern.ID = strings.TrimSpace(pattern.ID)
 	pattern.Name = strings.TrimSpace(pattern.Name)
@@ -180,6 +181,9 @@ func Normalize(pattern domain.Pattern) domain.Pattern {
 	pattern.WorkspaceRole = strings.TrimSpace(pattern.WorkspaceRole)
 	pattern.KnowledgeFlags = domain.CanonicalKnowledgeFlags(pattern.KnowledgeFlags)
 	pattern.Category = domain.NormalizePatternCategory(pattern.Category)
+	pattern.Status = domain.NormalizePatternStatus(pattern.Status)
+	// DiffAnchors 属于 learn 运行短暂态，规范化后不得继续向下传递。
+	pattern.DiffAnchors = nil
 	if pattern.Source == "" {
 		pattern.Source = domain.SourceLearned
 	}

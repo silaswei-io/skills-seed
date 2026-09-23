@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"strings"

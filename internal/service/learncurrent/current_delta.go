@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -86,7 +86,7 @@ func (r *learnCurrentProjectRun) buildDeltaFocusResults(batch learnCurrentBatch,
 
 	results := make([]learnCurrentFocusResult, 0, len(batch.focuses))
 	for _, indexed := range batch.focuses {
-		focusResult := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID])
+		focusResult := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID], agent.Conversation{})
 		focusResult.evidence = result.Evidence[indexed.focus.ID].Clone()
 		focusResult.retiredPatternIDs = appendUniquePatternIDs(nil, retiredByFocus[indexed.focus.ID]...)
 		results = append(results, focusResult)

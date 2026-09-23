@@ -19,11 +19,10 @@ See the complete [command reference](../../COMMANDS.EN.md) for flags.
 
 ```text
 Prepare project context
-  -> Local filtering and incremental candidates
+  -> Local filtering and incremental candidates (candidates enter the agenda directly; no separate selection step)
   -> Learning-agenda planning
      AI returns only high-value source focuses; unassigned paths are split into a small number of resumable coverage-safety batches by `learning.current.agenda.fallback_paths_per_focus`, not treated as low-value by omission
-  -> Isolated source-evidence analysis
-  -> Independent knowledge review
+  -> Isolated source-evidence analysis and independent knowledge review (full/delta share one Mode selector for input materials)
   -> Knowledge admission and persistence
   -> Authority and project-map refresh
   -> Skills generation

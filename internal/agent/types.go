@@ -214,7 +214,8 @@ type AnalyzeCurrentEvidenceResult struct {
 
 // AnalyzeCurrentCodebaseBatchResult 是批量当前代码学习的结果。
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Focuses []AnalyzeCurrentEvidenceResult
+	Focuses      []AnalyzeCurrentEvidenceResult
+	Conversation Conversation
 }
 
 // AnalyzeCurrentDeltaFocus 描述增量学习中的单个 diff 锚定证据焦点输入。
@@ -338,6 +339,7 @@ type ReviewKnowledgeRequest struct {
 	UserContextPath    string
 	MaintainedGuidance maintained.Snapshot
 	Evidence           domain.LearningEvidence
+	Conversation       Conversation
 }
 
 // KnowledgeRevision 只允许修订知识表述，不改变程序持有的证据和归属。

@@ -340,6 +340,8 @@ func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 	p.KnowledgeFlags = CanonicalKnowledgeFlags(p.KnowledgeFlags)
 	p.Status = NormalizePatternStatus(p.Status)
 	p.DevelopmentFocus = p.DevelopmentFocus.Clone()
+	// DiffAnchors 仅服务增量学习验收，禁止进入长期模式库。
+	p.DiffAnchors = nil
 	if previous != nil && !previous.CreatedAt.IsZero() {
 		p.CreatedAt = previous.CreatedAt
 	} else if p.CreatedAt.IsZero() {
