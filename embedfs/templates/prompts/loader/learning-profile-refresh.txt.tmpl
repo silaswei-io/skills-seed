@@ -34,12 +34,16 @@ Entry files:
 {{end}}
 {{- end}}
 
+Speed and precision:
+- Prefer stable navigation over exhaustive inventory. Stop reading source once ownership and routing facts for the focused boundary are confirmed.
+- Preserve valid existing entries unchanged. Add/update/remove only when this turn's evidence supports the change.
+- Empty or unchanged collections are valid when nothing navigable changed.
+
 Profile rules:
 - Return a complete profile JSON.
 - Use only explicit runtime files, structural context, user context, and direct source evidence from this turn.
 - Preserve existing IDs, names, and ordering when still valid.
-- Add, update, or remove entries only when focused paths, structural context, user context, or direct source evidence support the change.
-- Language, framework, architecture, and module facts are profile routing aids, not learned patterns or hard constraints. Include or update them only when they are evidenced and useful for future navigation or change routing. Framework and configuration descriptions must name the concrete source owner to inspect and must not use mandatory wording such as "must", "always", or "never".
+- Language, framework, architecture, and module facts are profile routing aids, not learned patterns or hard constraints. Include or update them only when evidenced and useful for future navigation or change routing. Framework and configuration descriptions must name the concrete source owner to inspect and must not use mandatory wording such as "must", "always", or "never".
 - `key_modules` requires confirmed repository-relative paths. Include stable handwritten ownership boundaries that future work must navigate for product/domain behavior, contracts, state, external effects, concurrency/lifecycle, or reusable capability entries, even when a boundary is small or also belongs to a broader architecture layer. Prefer these decision-bearing owners over generic layer labels; omit uncertain or purely generated directories.
 - Do not extract capability entries or reusable utilities in this stage. They are source-learned knowledge and must pass the independent knowledge review before publication.
 - Module descriptions may summarize responsibilities, but reusable product/domain rules, state transitions, authorization, audit, external dependency contracts, interaction behavior, and lifecycle policies belong to learned patterns rather than profile prose.

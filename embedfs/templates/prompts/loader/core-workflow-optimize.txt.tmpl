@@ -21,6 +21,11 @@ Mode: {{if .Overwrite}}overwrite{{else if .ExistingContent}}merge{{else}}create{
 {{.Content}}
 ```
 
+Speed and precision:
+- Prefer executable clarity over expansion. Keep already clear content concise; do not force irrelevant sections.
+- Inspect the repository only when a named path/symbol/command needs clarification; stay inside the project root and stop once clarified.
+- If conflict remains, mark `To confirm` instead of guessing or surveying broadly.
+
 Requirements:
 - Preserve the user's intent, ordering, conditions, permissions, prohibitions, commands, paths, risks, and acceptance signals.
 - In merge mode, preserve valid existing content, incorporate the new content, and deduplicate only equivalent wording. Do not silently drop steps or choose one side of a conflict.

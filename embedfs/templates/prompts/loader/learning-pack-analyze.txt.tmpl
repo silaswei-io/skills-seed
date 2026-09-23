@@ -1,8 +1,8 @@
 # Analyze Learning Pack
 
-This is an isolated pack-analysis runtime call. Analyze only the evidence packs listed in this turn, refine the pack-local candidates internally, and return only high-confidence repository knowledge that clears the admission bar. Precision is primary: source evidence alone does not justify a pattern, and later normalization cannot turn a weak candidate into useful knowledge.
+This is an isolated pack-analysis runtime call. Analyze only the evidence packs listed in this turn, refine pack-local candidates internally, and return only high-confidence repository knowledge that clears the admission bar. Precision is primary: source evidence alone does not justify a pattern.
 
-Extract knowledge for the owned `entry_paths`. `related_paths` are shared read-only evidence for verifying callers, contracts, and dependencies; they do not transfer another focus's learning responsibility to this pack.
+Extract knowledge for owned `entry_paths`. `related_paths` are shared read-only evidence for callers, contracts, and dependencies; they do not transfer another focus's learning responsibility.
 
 Project:
 - name: {{.ProjectName}}
@@ -12,24 +12,27 @@ Project:
 - change profile: {{if .ChangeProfile}}{{.ChangeProfile}}{{else}}incremental{{end}}
 - allowed categories: {{.AllowedCategories}}
 
-Learning strategy guidance:
-- `fast`: reduce exploration cost while returning only clear decision-bearing patterns.
-- `normal`: use the default high-precision admission bar.
-- `deep`: inspect more evidence before deciding; it does not lower the admission bar or retain weak local observations.
-- The mode changes exploration breadth only. It is not a fixed output count, file budget, or permission to promote weak evidence.
-- Interpret category names abstractly across project types: `business` means product/domain behavior, `api` means any interface or contract, `database` means state/storage/persistence, `middleware` means interception or pipeline behavior, and `utils` means reusable domain-neutral helpers.
+Speed and precision:
+- Stop exploration once listed evidence is enough to decide. If the boundary cannot establish a candidate, return `patterns: []` for that pack.
+- Prefer empty results over weak candidates. Later normalization cannot rescue weak admission.
+- Learning strategy guidance:
+  - `fast`: return only clear decision-bearing patterns.
+  - `normal`: default high-precision bar.
+  - `deep`: inspect more evidence before deciding; still no weak local observations.
+  - The mode changes exploration breadth only. It is not a fixed output count or permission to promote weak evidence.
+- Category names are abstract: `business`=product/domain behavior, `api`=interface/contract, `database`=state/storage, `middleware`=interception/pipeline, `utils`=domain-neutral helpers.
 {{- if .StructurePath}}
 
-Project structure is available at `{{.StructurePath}}`; use it only for boundaries and ownership.
+Project structure: `{{.StructurePath}}` — boundaries and ownership only.
 {{- end}}
 {{- if .SharedContextPath}}
-Shared planning context is available at `{{.SharedContextPath}}`; read it as the run baseline before inspecting pack evidence.
+Shared planning context: `{{.SharedContextPath}}` — run baseline before pack evidence.
 {{- end}}
 {{- if .StructuralContextPath}}
-Structural context is available at `{{.StructuralContextPath}}`; use it only to choose direct source evidence inside the listed packs.
+Structural context: `{{.StructuralContextPath}}` — choose direct source evidence inside listed packs only.
 {{- end}}
 {{- if .UserContextPath}}
-User context is available at `{{.UserContextPath}}`; it is not source evidence.
+User context: `{{.UserContextPath}}` — not source evidence.
 {{- end}}
 {{- if .MainFiles}}
 
@@ -84,63 +87,57 @@ Evidence packs:
 {{- end}}
 {{end}}
 
-Pack boundary:
+Boundary:
 - An evidence focus is only an internal grouping of source that must be inspected together. It is not a work procedure, a user-maintained Workflow, or development instructions. Extract knowledge from the code; do not turn the focus name into steps for the future Agent.
-- Do not rely on hidden context from planning, other packs, authority extraction, project-map refresh, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
-- Treat the explicit pack fields, runtime files, structural context, and listed source/diff files as the complete input.
-- Do not scan outside listed pack files and directly referenced context. If evidence is insufficient, return that pack with `patterns: []`.
-- Use only tools explicitly available in this invocation. Do not attempt unavailable or denied tools, and do not retry a denied tool call.
-- Stop exploration once the listed evidence is sufficient to decide. If the evidence boundary cannot establish a candidate, return `patterns: []` instead of expanding the search.
-- A focus with purpose `coverage` is a deterministic safety-net batch, not a claim that its files are low value. Inspect the listed files for routeable business behavior, reusable capability entries, contracts, state boundaries, utilities, and operational or security constraints before returning an empty result.
-- Pack IDs and names are execution provenance for this response only; do not copy them into pattern fields or infer a Workflow from them.
-- For `careful` focuses, verify ownership plus the connected state/contract/generated/cross-module boundary before deciding. For `critical` focuses, additionally verify guards, cleanup and lifecycle handling, return/error checks, authorization or privilege boundaries, and external effects wherever those cues apply. Depth increases evidence scrutiny, not the number of retained patterns.
+- No hidden context from planning, other packs, authority, profile refresh, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
+- Use only tools explicitly available in this invocation. Do not attempt unavailable/denied tools or retry denied calls.
+- Do not scan outside listed pack files and directly referenced context.
+- A focus with purpose `coverage` is a deterministic safety-net batch, not a claim that files are low value. Still inspect for routeable behavior, capability entries, contracts, state boundaries, utilities, and operational/security constraints before empty results.
+- Pack IDs/names are execution provenance only; do not copy them into pattern fields.
+- Depth: `careful` → verify ownership plus connected state/contract/generated/cross-module boundary. `critical` → also guards, cleanup/lifecycle, return/error checks, auth/privilege, external effects. Depth raises scrutiny, not pattern count.
 
-Candidate discovery:
-- Run a decision-value discovery pass before judging candidates. For each pack, ask what future developer decision this evidence changes: where to edit, which verified capability entry to reuse, which boundary to preserve, which generated/config/framework/language convention to follow, or which product/domain rule, state, policy, interaction, or integration behavior to avoid breaking.
-- Return a pattern only when all of these are true: its source evidence is verifiable; it changes a specific future implementation, navigation, safety, or maintenance decision; it names a routeable boundary or verified source entry; and it is not already fully represented by another candidate or known pattern.
-- A single-file rule, local convention, config file, interface contract, error path, interaction entry, or utility helper can qualify, but source backing, locality, or a complete example alone are not enough.
-- Preserve distinct capabilities as distinct candidates when their resource, state lifecycle, user/system action, policy, external dependency, audit semantics, operational risk, or correctness boundary differs.
-- Separate current implementation, stated design intent, proven guarantees, and known risks. A local mechanism proves only its observed behavior unless the complete failure and concurrency boundary establishes a stronger property. Rewrite unsupported guarantees as bounded observations or omit the candidate.
-- For product/domain patterns, cross-boundary orchestration patterns, adapters, UI/command actions, jobs/tasks, and reusable utility patterns, identify the canonical source entry when the listed evidence directly provides a function, method, component, command, job, resolver, declarative config, route, or equivalent source-level entry. When the name, current location, complete signature or concrete declaration, purpose, prerequisites, and return/error/result semantics are all verifiable from this turn, attaching `business_method` to the candidate owned by that entry is required. Leave it null only when at least one required contract field cannot be verified; technical, lifecycle, or non-product vocabulary is not a reason to omit it.
-- If a retained candidate's name, description, or rule tells a future Agent to call, use, prefer, extend, replace, or preserve a named callable or declarative entry, that candidate must carry the complete `business_method` whenever the listed evidence establishes its contract. Do not present an entry as the reuse route while omitting the corresponding capability contract.
-- Treat a routeable operation as a capability entry when future work would reasonably need to call, extend, replace, or preserve its contract. This includes public task submission, lifecycle, dispatch, resolver, adapter, and boundary methods; do not reserve capability entries for product-facing or orchestration methods only.
-- When one canonical entry owns a multi-step correctness boundary, prefer one complete candidate for that entry: include the input guard or prerequisite, idempotent reuse and conflict checks when present, the returned success or partial result, distinct failure outcomes, and the point at which external or persistent effects may already have occurred. Do not scatter essential call semantics across unrelated candidates merely because they have different categories; split only when they have independently routeable change triggers or applicability boundaries.
-- Preserve decision-bearing calculations exactly enough for future changes: include the operands, comparison or precedence rule, fallback/base selection, and boundary condition when they determine limits, eligibility, time windows, state transitions, retries, partial results, or external effects. A summary of the outcome is not a substitute for the formula or ordering proven by source.
-- For selection or pricing-like calculations, preserve whether alternatives are combined or mutually exclusive, how the winning value is chosen, and any final cap, floor, or fallback. The fact that a calculation is pure, stateless, or uses predefined inputs does not lower its decision value.
-- When a verified external effect publishes a message, event, command, request, or equivalent payload, preserve its concrete operation or payload identity and its ordering relative to state changes. Generic wording such as "publishes an event" is insufficient when the source proves which event is emitted.
-- When earlier progress or side effects survive a later failure and the source performs no compensation or rollback, state that absence explicitly together with the returned partial result or observable state. Do not imply atomicity, and do not use "partial result" as a substitute for the proven no-compensation boundary.
-- Set `scope_path` only when the evidence establishes a stable repository ownership boundary useful for future routing. Do not derive it mechanically from a single evidence filename or a generic containing directory; leave it empty when ownership is uncertain.
-- A `business_method` is a legacy field name for a reusable capability entry. It is not limited to business category patterns: use `type: "domain"` for product/domain or orchestration entries and `type: "common"` for reusable project utilities. Do not create it for ordinary CRUD shells, generated wrappers, startup registration, or thin forwarding unless the entry is the routeable source of a repository-specific rule.
-- Keep high-value reusable technical boundaries when they encode repository behavior: interface/request/response/message contracts, language/runtime usage, framework integration shape, error taxonomy, transaction or state consistency boundary, idempotency boundary, generated source, configuration convention, integration adapter contract, concurrency/lifecycle rule, rendering/interaction convention, logging/audit convention, security-sensitive handling, and common utilities.
-- Return no pattern for testing, deployment, release, or acceptance files, commands, procedures, or ordering. User-maintained Workflows own that knowledge.
-- Keep destructive, irreversible, privileged, environment-mutating, or externally visible operational behavior only when the evidence identifies a concrete safeguard, inspection point, or correctness boundary that future work must preserve. Phrase it as a bounded observation, not as advice to repeat the operation.
-- Set `knowledge_flags` to `["operational_risk"]` only when the returned pattern itself is proven to involve irreversible, privileged, state/resource-changing, or externally visible behavior. Planning depth, risk signals, filenames, vocabulary, or a security-sensitive subject alone are not proof. Return `knowledge_flags: []` otherwise; never invent another flag.
-- Drop ordinary CRUD, simple field mapping, generic builders, thin wrappers, framework registration, model aggregation, boilerplate, and observations with uncertain decision value. A pack may correctly return no patterns.
+Admission gate (all required):
+1. Verifiable source evidence in this turn.
+2. Changes a specific future implementation, navigation, safety, or maintenance decision.
+3. Names a routeable boundary or verified source entry.
+4. Not already fully represented by another candidate in this pack.
+- Source backing, locality, or a complete example alone are not enough.
+- Drop ordinary CRUD, simple mapping, generic builders, thin wrappers, framework registration, model aggregation, boilerplate, and uncertain decision value. A pack may correctly return no patterns.
+- Return no pattern for testing, deployment, release, or acceptance files/commands/procedures/ordering.
+
+Discovery and quality:
+- Run a decision-value discovery pass before judging candidates: where to edit, which verified entry to reuse, which boundary to preserve, which convention to follow, or which product/domain/state/policy/integration behavior not to break.
+- Preserve distinct capabilities when resource, lifecycle, action, policy, dependency, audit, operational risk, or correctness boundary differs.
+- Separate current implementation, design intent, proven guarantees, and known risks. Rewrite unsupported guarantees as bounded observations or omit.
+- When a retained candidate tells a future Agent to call/use/prefer/extend/replace/preserve a named entry, attaching `business_method` to the candidate owned by that entry is required whenever name, location, complete signature/declaration, purpose, prerequisites, and return/error semantics are all verifiable. Leave null only when a required contract field cannot be verified. Do not present an entry as the reuse route while omitting the corresponding capability contract.
+- Treat routeable operations as capability entries when future work would call, extend, replace, or preserve their contract (including task submission, lifecycle, dispatch, resolver, adapter, boundary methods).
+- Prefer one complete candidate for one canonical entry that owns a multi-step correctness boundary (guards, idempotent reuse/conflict, success/partial results, distinct failures, post-effect uncertainty). Split only for independently routeable change triggers.
+- Preserve decision-bearing calculations: operands, comparison/precedence, fallback/base selection, boundary conditions for limits, eligibility, windows, transitions, retries, partial results, or external effects. For selection/pricing-like logic, preserve mutual exclusivity vs combination, winning-value rule, and final cap/floor/fallback.
+- When a verified external effect publishes a message/event/command/request, preserve concrete operation or payload identity and ordering relative to state changes.
+- When earlier progress survives later failure and source performs no compensation or rollback, state that absence explicitly with the partial result; never imply atomicity.
+- `scope_path` only for stable ownership useful for routing; never mechanical single-file/directory derivation.
+- `business_method` is a legacy name for reusable capability entry: `type: "domain"` for product/orchestration, `type: "common"` for project utilities. Not for ordinary CRUD shells, generated wrappers, startup registration, or thin forwarding unless it is the routeable source of a repository-specific rule.
+- Keep high-value technical boundaries: contracts, language/runtime usage, framework shape, error taxonomy, transaction/consistency, idempotency, generated source, config convention, adapter contract, concurrency/lifecycle, rendering/interaction, logging/audit, security-sensitive handling, common utilities.
+- Keep destructive/irreversible/privileged/environment-mutating/externally visible operational behavior only with a concrete safeguard or correctness boundary; phrase as bounded observation, not advice to repeat.
+- `knowledge_flags`: `["operational_risk"]` only when the pattern itself is proven irreversible, privileged, state/resource-changing, or externally visible. Planning depth, risk signals, filenames, or vocabulary alone are not proof. Otherwise `[]`; never invent other flags.
 
 Pack-local refinement:
-- Internally merge exact duplicates within the same pack before output.
-- Merge only equivalent applicability, behavior, and evidence. Shared vocabulary, adjacent layers, sibling lifecycle actions, or reducing output count are not sufficient reasons to merge.
-- If a candidate is similar to an existing learned behavior mentioned in the pack input or structural context, phrase it as the same reusable boundary instead of inventing a sibling pattern.
-- Do not output a candidate merely because it is source-backed, domain-specific, technology-specific, local, configuration-only, interface/contract-only, error-handling-only, or utility-focused. It must independently clear the admission bar.
-- If source evidence shows destructive schema/data behavior, bootstrap-only setup, or historical compatibility code, describe it as a bounded implementation observation. Do not phrase it as a recommended migration or production change pattern unless authoritative project guidance explicitly says to repeat it.
-- If source evidence shows destructive commands, privileged administration, external side effects, or irreversible operational behavior, return a scoped safety or operational-boundary pattern even when it lives in one command file.
-- If source evidence shows security-sensitive handling, describe only the observed boundary and required source inspection. Do not claim a mitigation unless the evidence proves it; decoding or unescaping input is not automatically XSS, injection, or authorization protection.
-- Avoid exact counts such as number of paths, cases, enum members, key types, statuses, exclusions, routes, or business variants unless you verified the full closed set from direct source evidence in this turn and the number changes a future implementation decision. Prefer "multiple", "a set of", or representative values.
+- Merge exact duplicates within the pack only when applicability, behavior, and evidence are equivalent.
+- Shared vocabulary, adjacent layers, sibling lifecycle actions, or reducing count are not merge reasons.
+- Security/reliability wording must be conservative. Decoding/unescaping is not automatically XSS/injection/auth protection.
+- Avoid exact counts unless the full closed set is verified in this turn and the number changes a future decision.
 
 Pre-output validation:
-- Return exactly one result object for every requested pack. Never repeat a `focus_id`; place all retained patterns for that focus in its single `patterns` array.
-- Every returned pattern has routeable wording, minimal evidence locations, and a concise source-backed example.
-- Return `patterns: []` for a pack whenever any admission condition is uncertain. Do not use low confidence to retain an otherwise weak candidate.
-- When a returned pattern has a verified reusable capability entry, `business_method.code_location.current_location` uses the same repository-relative file and 1-based line style as evidence, and `business_method.function` contains the complete real signature or declaration. If any of those fields is uncertain, omit `business_method`.
-- For every verified routeable entry that owns retained knowledge, confirm that one retained candidate carries its complete `business_method`; omission is valid only when the source does not establish the required contract fields.
-- No retained candidate instructs a future Agent to use a named entry while omitting a verifiable `business_method` for that entry.
-- Pattern names identify the reusable behavior, not only a directory, framework, or file.
-- Descriptions state the solved problem, trigger, observed behavior, and applicability boundary.
-- Rules are non-mandatory reuse guidance: inspect/prefer the verified entry and preserve the relevant boundary unless the current task does not fit.
-- Avoid broad applicability phrasing such as "any scenario", "all cases", "general use", or "whenever needed". Use project-routeable wording tied to the verified entry, resource, operation, state, policy, external dependency, or configuration boundary.
-- No pattern invents evidence, statistics, framework facts, language/runtime facts, security properties, or unsupported cross-project generalization.
-- Every pattern returns the complete `knowledge_flags` array. `operational_risk` is present only when the pattern evidence proves that operational boundary.
-- Every requested pack appears in the output. If a pack has no strong candidate, return that pack with `patterns: []`.
+- Exactly one result object per requested pack; never repeat a `focus_id`.
+- Every pattern has routeable wording, minimal evidence locations, and a concise source-backed example.
+- Uncertain admission → `patterns: []` for that pack (do not use low confidence to retain weak items).
+- Verified capability entry → `business_method.code_location.current_location` is repo-relative file:1-based-line; `business_method.function` is the complete real signature/declaration.
+- No retained candidate instructs using a named entry while omitting a verifiable `business_method`.
+- Names identify reusable behavior, not only directory/framework/file.
+- Descriptions: problem, trigger, observed behavior, applicability boundary.
+- Rules are non-mandatory reuse guidance (inspect/prefer verified entry; preserve boundary unless task does not fit). Avoid "any/all/general/whenever" applicability.
+- No invented evidence, statistics, framework/language facts, security properties, or unsupported cross-project generalization.
+- Every pattern returns complete `knowledge_flags`. Every requested pack appears; empty packs use `patterns: []`.
 
 Return JSON only.
 

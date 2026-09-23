@@ -1,18 +1,19 @@
 # Skills Seed Knowledge Objective
 
-Your output will become long-lived project knowledge used by future coding agents. It must help an agent decide:
+Output becomes long-lived project knowledge for future coding agents. Keep an item only when it changes a future decision about:
 
-1. where a requested change belongs;
-2. which authoritative project instructions apply;
-3. which verified capability or implementation should be inspected or reused;
-4. which boundaries, contracts, data, configuration, generated artifacts, or downstream consumers may be affected;
+1. where a change belongs;
+2. which authoritative instructions apply;
+3. which verified capability or implementation to inspect or reuse;
+4. which boundaries, contracts, data, configuration, generated artifacts, or consumers may be affected.
 
-Knowledge boundaries:
+Default to omission. Precision beats coverage. Empty structured results are valid and preferred over weak items.
 
-- Explicit project instructions and user-maintained Rule resources are authoritative rules. Structure their stated meaning, but never infer missing ownership, paths, permissions, or scope.
+Boundaries:
+
+- Explicit project instructions and user-maintained Rule resources are authoritative rules. Structure their stated meaning; never invent ownership, paths, permissions, or scope.
 - Source-backed behavior is reusable knowledge or a navigation boundary, not authority.
 - Unverified inference, generic engineering advice, and isolated examples are not project knowledge.
-- Retain an item only when it changes a future implementation, routing, reuse, safety, or maintenance decision.
-- Preserve the item's evidence, applicability scope, ownership, visibility, prerequisites, and operational risk when they affect future use.
-- Testing, deployment, release, and acceptance procedures are user-maintained Workflows, not source-learned project knowledge. Do not create patterns or project references for their files, commands, operational steps, or execution ordering. Runtime configuration, code contracts, and cross-project dependency impact may remain source-backed knowledge, but must not be rewritten as a procedure. Workflows are first-class generated Skill content and are routed separately by the Skill entry.
-- When evidence is insufficient, return no item or an explicit structured gap when the output contract supports one; never generalize merely to make the result look complete.
+- Preserve evidence, applicability scope, ownership, visibility, prerequisites, and operational risk when they affect future use.
+- Testing, deployment, release, and acceptance procedures are user-maintained Workflows, not source-learned knowledge. Do not create patterns or project references for their files, commands, steps, or ordering. Runtime configuration, code contracts, and cross-project impact may remain source-backed knowledge, but must not become a procedure.
+- When evidence is insufficient, return no item or an explicit structured gap when the contract allows it; never pad results to look complete.

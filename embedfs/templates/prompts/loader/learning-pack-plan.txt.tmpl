@@ -1,6 +1,6 @@
 # Plan Learning Packs
 
-This is the routing-only planning runtime call for current-code learning. Identify high-value input files and build self-contained evidence packs for their decision-bearing boundaries. The deterministic learning pipeline completes coverage for input files that are not assigned here; do not spend output on a path-by-path inventory. Do not inspect source bodies or call MCP, CodeGraph, or other repository tools in this planning pass; source-body verification belongs to isolated pack analysis.
+This is the routing-only planning runtime call for current-code learning. Identify high-value input files and build self-contained evidence packs for their decision-bearing boundaries. The deterministic learning pipeline completes coverage for unassigned inputs; do not spend output on a path-by-path inventory. Do not inspect source bodies or call MCP, CodeGraph, or other repository tools in this planning pass; source-body verification belongs to isolated pack analysis.
 
 Project:
 - name: {{.ProjectName}}
@@ -8,76 +8,57 @@ Project:
 - language: {{.Language}}
 - learning mode: {{.LearningMode}}
 
-Learning strategy guidance:
-- `fast`: reduce exploration cost and plan only the clearest boundaries.
-- `normal`: use the default high-precision planning bar.
-- `deep`: inspect more connected paths before deciding; it does not create packs for weak or merely local observations.
-- The mode changes exploration breadth only. It is not a fixed count, file budget, or permission to invent weak packs.
-- Treat the agenda as a compact set of review batches, not a taxonomy of every capability. Consolidate neighboring responsibilities when they share the same future change boundary and evidence can be verified together. Before returning, merge overlapping or duplicate boundaries; keep a focus separate only when it has an independent high-risk or externally observable decision boundary. Never create one focus per file, package, service, technical lane, or symbol family.
+Speed and precision:
+- Prefer the smallest focus set that preserves materially different future decisions. Merge neighboring responsibilities that share one change boundary; split only for independent high-risk or externally observable boundaries.
+- Never create one focus per file, package, service, technical lane, or symbol family.
+- Leave ambiguous paths unassigned so deterministic fallback can cover them. Omission is not a negative value judgment.
+- Learning strategy guidance:
+  - `fast`: plan only the clearest boundaries.
+  - `normal`: default high-precision bar.
+  - `deep`: inspect more connected paths before deciding; still no weak packs.
+  - Mode changes exploration breadth only, not admission quality or fixed counts.
 
-Input files are available at `{{.FocusPathsPath}}` ({{.FocusPathCount}} paths).
-Deterministic per-file source facts are available at `{{.SourceFactsPath}}` ({{.SourceFactCount}} files). They contain only file density and declaration evidence, not semantic conclusions.
+Input files: `{{.FocusPathsPath}}` ({{.FocusPathCount}} paths).
+Deterministic per-file source facts: `{{.SourceFactsPath}}` ({{.SourceFactCount}} files). Density and declaration evidence only, not semantic conclusions.
 {{- if .StructuralContextPath}}
-Structural context is available at `{{.StructuralContextPath}}`; use it only for entry, symbol, import, call, dependency, and ownership clues.
+Structural context: `{{.StructuralContextPath}}` — entry, symbol, import, call, dependency, ownership clues only.
 {{- end}}
 {{- if .UserContextPath}}
-User context is available at `{{.UserContextPath}}`; use it only to interpret intent.
+User context: `{{.UserContextPath}}` — intent only.
 {{- end}}
 
-Planning rules:
-- `entry_paths` are the focus's exclusive learning responsibility. Assign each input to at most one focus's `entry_paths`. `related_paths` are read-only supporting evidence and may be shared across focuses; they never discharge another input's learning responsibility. Every focus needs at least one owned entry path. Inputs without an owner or explicit skip receipt receive fallback coverage.
-- A focus is the minimum source-evidence set that must be inspected together to validate a conclusion useful for a future development decision. It is temporary learning orchestration, not a permanent taxonomy, Workflow, work procedure, or development instruction.
-- Choose each focus boundary from source responsibilities, capabilities, resource actions, state transitions, contracts, integrations, and cross-cutting mechanisms; do not impose one classification lens on the repository.
-- A focus must represent a specific reusable source boundary: a subsystem responsibility, verified capability family, resource action, evidenced state transition, interface/contract, external integration, security/policy boundary, generated-source family, or cross-cutting implementation mechanism.
-- Treat a behavior as a state transition only when source evidence shows multiple states/phases or meaningful transition, ordering, exception, or compensation semantics. A handler-to-service call chain alone is not enough.
-- Create a focus only when the listed evidence suggests a future implementation, navigation, reuse, safety, or maintenance decision that differs from nearby knowledge. Do not create packs merely to account for files.
-- Do not create a separate focus for a low-density leaf unless it changes a distinct reusable decision. Assign it to the nearest higher-level focus's entry paths when it belongs to that boundary; use related paths only for additional read-only references. The deterministic learning pipeline covers inputs without an entry-path owner or explicit skip receipt.
-- Every evidence pack must be self-contained enough for a later isolated pack-analysis runtime call: name the product/domain/interaction/technical route terms, entry paths, related paths, and a precise scope reason.
-- Treat the focus `id`, `name`, and `route_terms` as future Skill navigation metadata as well as this run's analysis input. Name a stable responsibility, resource action, capability family, lifecycle, contract, or integration boundary in the output locale. Use terms a developer can recognize from a request or project vocabulary; do not name a focus after a language, framework, architecture layer, directory basename, filename, or generic implementation role. Keep `route_terms` concrete and discriminating: resource, action, state, actor, policy, protocol, or external-system terms evidenced by the source. Do not add generic implementation words merely because they occur in a symbol or path.
-- Do not plan a directory inventory. Group files that are likely to contain knowledge with future implementation, routing, reuse, reusable capability-entry selection, debugging, or agent navigation value.
-- Preserve these knowledge lanes when present in the input: product/domain behavior, UI or command actions, interface/contract shape, error handling, state or storage behavior, configuration, framework/language/runtime integration, generated-source boundaries, security-sensitive handling, jobs/tasks, adapters, and reusable utilities.
-- Knowledge lanes are evidence to combine, not a required focus for each lane. Keep a lane separate only when it has a distinct future change boundary, routeable entry, or risk that cannot be verified with a neighboring focus.
-- Product/domain specificity is not the admission test. Keep a technical mechanism when its callable or declarative boundary has repository-visible overload, cancellation, retry, partial-result, error-taxonomy, ordering, synchronization, cleanup, shutdown, lifecycle, persistence, or external-effect semantics that future work must preserve. Do not skip such a boundary merely because its implementation technique is common or it has no product vocabulary.
+Focus contract:
+- A focus is the minimum source-evidence set that must be inspected together for one future development decision. It is temporary orchestration, not a permanent taxonomy, Workflow, work procedure, or development instruction.
+- `entry_paths` are exclusive learning responsibility (each input in at most one focus). `related_paths` are shared read-only evidence and never discharge another input's ownership. Every focus needs ≥1 owned entry path.
+- Create a focus only when listed evidence suggests a future implementation, navigation, reuse, safety, or maintenance decision that differs from nearby knowledge. Do not create packs merely to account for files.
+- Name stable responsibilities with routeable `id`, `name`, and `route_terms` in the output locale. Use resource/action/state/actor/policy/protocol/external-system terms from source. Do not name focuses after languages, frameworks, layers, directory basenames, filenames, or generic roles.
+- Product/domain specificity is not the admission test. Keep technical mechanisms with repository-visible overload, cancellation, retry, partial-result, error-taxonomy, ordering, synchronization, cleanup, shutdown, lifecycle, persistence, or external-effect semantics.
+- Stateless or pure calculation does not mean decision-free. Selection, ranking, precedence, caps, rounding, fallback/base choice, aggregation, eligibility, and boundary comparisons can be decision-bearing.
+- Do not plan a directory inventory. Preserve these knowledge lanes when present: product/domain behavior, UI/command actions, interface/contract shape, error handling, state/storage, configuration, framework/language/runtime integration, generated-source boundaries, security-sensitive handling, jobs/tasks, adapters, reusable utilities. Lanes are evidence to combine, not a required focus each.
 - Do not create focuses for test sources, fixtures, mocks, CI definitions, or testing, deployment, release, and acceptance responsibilities. Those are user-maintained Workflow concerns.
-- Before grouping, scan for decision-bearing cues: actors, users, resources/entities, operations/capabilities, verified callable or declarative entries, states/phases, policies/rules, permissions, audit records, configuration gates, external systems, protocols/contracts, generated source inputs, framework/language/runtime usage conventions, jobs/tasks, operational lifecycle paths, exceptions, and compensation behavior.
-- Stateless or pure calculation does not mean decision-free. Inspect selection, ranking, precedence, min/max choice, caps, rounding, fallback/base choice, aggregation, eligibility, and boundary comparisons when they determine an externally visible or downstream result. Never skip an implemented source solely because it has no state mutation, external call, or complex control flow.
-- Use the source-facts inventory as the complete first-pass receipt. Do not make a negative source-content claim in this routing pass. When facts are ambiguous, leave the path unassigned so the deterministic fallback focus can verify it later. Do not omit a business entry, reusable capability, contract, state boundary, security-sensitive path, or utility method merely because its filename or directory looks generic.
-- Never label a file empty, placeholder-only, boilerplate-only, or unimplemented from its path, directory, role, naming convention, sibling shape, or an incomplete structural search result. Such a claim requires direct file evidence; if that evidence is unavailable or ambiguous, retain the file in a focused pack for isolated analysis.
-- Do not let central framework, startup, generated wrapper, or interception paths crowd out decision-bearing product/domain or code-pattern paths. Include separate packs for materially different boundaries even when they share the same entry, component, service, adapter, storage, extension, or generated-code shape.
-- Plan horizontal packs when the input contains reusable cross-cutting repository behavior such as interface/request/response/message contracts, error taxonomy, utility helpers, reusable entry families, generated-source files, configuration conventions, logging/audit conventions, state/storage construction, or rendering/interaction conventions. These packs are useful even when they are not a product subdomain.
-- Include only entry and related paths from the exact input file list. Structural context may explain relationships but cannot expand the input boundary.
-- Merge files into one pack only when a future request would naturally inspect or modify them together and the same source boundary explains the behavior.
-- Never group unrelated sibling services, components, commands, jobs, or adapters only because they share an architecture layer or directory role. When siblings own different resources, actions, state machines, partial-result contracts, lifecycle rules, or external effects, plan separate focused packs even if each implementation is small.
-- Prefer the smallest set of high-density packs that preserves materially different decisions. Do not merge distinct resources, capabilities, permissions, states, protocols, ownership boundaries, or lifecycle risks merely to reduce focus count.
-- Split packs when route terms, state/data boundaries, authorization/audit semantics, external dependency contracts, operational risk, or change triggers are materially different.
-- Classify every focus with `attributes`, concrete `risk_signals`, and `analysis_depth`. Use `standard` for a bounded direct chain, `careful` for stateful, contract, generated-source, or cross-module behavior, and `critical` for authentication/authorization, cryptography/keys/certificates, secrets, privileged administration, destructive or irreversible operations, external side effects, or migrations. File count never lowers the required depth.
-- `analysis_depth` controls how carefully the later isolated analysis must verify the focus; it does not increase output count or lower admission quality.
-- If the input is a small diff-oriented set, prefer compact packs anchored to the changed files instead of planning a broad project learning run.
-- Use deterministic ordering: business routeability first, then changed/source entry importance, then path vocabulary, then lexicographic path order.
+- Before grouping, scan decision-bearing cues: actors, resources, operations, verified callable or declarative entries, states, policies, permissions, audit, configuration gates, external systems, contracts, generated inputs, jobs, lifecycle paths, exceptions, compensation.
+- Use source-facts as the complete first-pass receipt. Never label a file empty, placeholder-only, boilerplate-only, or unimplemented from path/role/siblings; that claim requires direct file evidence. If ambiguous, leave unassigned.
+- Never group unrelated sibling services/components/commands/jobs/adapters only because they share a layer. Prefer smallest high-density packs; split when route terms, state/data boundaries, auth/audit, external contracts, operational risk, or change triggers differ.
+- Classify every focus with `attributes`, concrete `risk_signals`, and `analysis_depth` (`standard` | `careful` | `critical`). File count never lowers depth. Depth controls later scrutiny only, not output count.
+- Small diff-oriented inputs: prefer compact packs anchored to changed files.
+- Deterministic ordering: business routeability → changed/source entry importance → path vocabulary → lexicographic path.
+
+Skipped paths:
+- Optional and small. Only exact input paths whose learning value was directly checked and intentionally excluded.
+- Must not overlap owned entry paths. Shared related references do not assign ownership.
+- Concrete reason tied to future implementation/routing/reuse/safety/maintenance value. No generic quota, type, language, framework, or directory excuses.
+- No skipped-path reason dismisses a source as generic/standard/common/technical-only/non-business without checking call, failure, result, synchronization, and lifecycle semantics.
+- Do not treat purity, statelessness, predefined inputs, or absence of external effects as proof of no durable decision value.
+- Do not enumerate every unassigned input path. The deterministic learning pipeline covers omitted paths with bounded fallback focuses.
 
 Pre-output self-check:
-- No focus is named only as a generic workflow/process, handling flow, management flow, development guide, or work procedure. Names identify a concrete responsibility, resource action, state boundary, contract, integration, capability, or mechanism.
-- No focus contains steps telling a future Agent how to perform development work; the later analysis extracts source-backed knowledge for that purpose.
-- No pack is only a vague directory, framework, or layer summary.
-- No skipped-path reason dismisses a source as generic, standard, common, technical-only, or non-business without first checking its concrete call, failure, result, synchronization, and lifecycle semantics.
-- No skipped-path reason treats purity, statelessness, predefined inputs, or absence of external effects as proof that a calculation has no durable decision value.
-- Every skipped-path reason that claims absence of implementation is consistent with the source-facts inventory; declaration-bearing or materially non-empty input is never dismissed by assumption.
-- No pack exists only to inventory a language, framework, or module when no future decision value is visible.
-- No low-density support island is promoted to an independent focus when a nearby higher-level focus can carry it as related evidence.
-- No two packs are duplicates with different names.
-- Every `careful` or `critical` pack names the evidence cues in `risk_signals`; every `critical` pack has at least one security, privilege, destructive, irreversible, external-effect, or migration cue.
-- `skipped_paths` is optional and should contain only a small number of exact input file paths whose learning value was directly checked and intentionally excluded. It must not overlap owned entry paths; a shared read-only reference does not assign learning ownership.
-- Every explicit skipped path needs a concrete reason tied to its value for future implementation, routing, reuse, safety, or maintenance decisions. Do not use generic quota, file type, language, framework, or directory-based reasons.
-- Every skipped path is one exact input file path. Never add a supporting, discovered, or structural-context-only path to `skipped_paths`.
-- Do not enumerate every unassigned input path. The deterministic learning pipeline records omitted paths and distributes them into bounded, resumable fallback evidence focuses; omission from this response is not a negative value decision.
-- Every path in a focus is one exact input file path. Never output directories, directory prefixes, globs, or structural-context-only paths.
-- Pack IDs and names are stable, routeable, and do not use sequence numbers as meaning.
-
-Output rules:
-- Use only repository-relative paths from the exact input list. Never output absolute paths, directories, globs, `..` paths, or invented paths.
-- `focuses` contains only high-value evidence boundaries; omitted input paths are completed by the deterministic learning pipeline.
-- Sort paths inside focuses and `skipped_paths` lexicographically. Keep focus ordering deterministic according to the planning rules above.
-- `reason` summarizes the overall planning boundary in one short sentence.
+- No generic workflow/process/management/development-guide names; names identify concrete responsibility, resource action, state boundary, contract, integration, capability, or mechanism.
+- No steps telling a future Agent how to perform development work.
+- No vague directory/framework/layer-only packs; no duplicate packs under different names.
+- Every `careful`/`critical` pack names evidence cues in `risk_signals`; every `critical` pack has security, privilege, destructive, irreversible, external-effect, or migration cue.
+- Every path is one exact input file path (never directories, globs, `..`, absolute, or structural-only paths).
+- Pack IDs/names are stable and routeable; sequence numbers are not meaning.
+- `reason` is one short sentence on the overall planning boundary.
 
 Return JSON only.
 

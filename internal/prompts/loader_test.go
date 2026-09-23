@@ -252,14 +252,12 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 
 	plan, err := loader.Render("learning-pack-plan", samplePlanData(t))
 	require.NoError(t, err)
-	require.Contains(t, plan, "planning runtime call")
 	require.Contains(t, plan, "routing-only planning runtime call")
 	require.Contains(t, plan, "Do not inspect source bodies or call MCP")
 	require.Contains(t, plan, "self-contained evidence packs")
 	require.Contains(t, plan, "deterministic learning pipeline")
 	require.Contains(t, plan, "Do not enumerate every unassigned input path")
 	require.Contains(t, plan, "Do not plan a directory inventory")
-	require.Contains(t, plan, "Preserve these knowledge lanes")
 	require.Contains(t, plan, "Product/domain specificity is not the admission test")
 	require.Contains(t, plan, "overload, cancellation, retry, partial-result")
 	require.Contains(t, plan, "Never group unrelated sibling services")
@@ -277,27 +275,30 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, plan, "Do not create focuses for test sources")
 	require.Contains(t, plan, "testing, deployment, release, and acceptance responsibilities")
 	require.Contains(t, plan, "Those are user-maintained Workflow concerns")
+	require.Contains(t, plan, "Speed and precision")
+	require.Contains(t, plan, "smallest focus set")
 
 	batch, err := loader.Render("learning-pack-analyze", sampleCurrentBatchData())
 	require.NoError(t, err)
 	require.Contains(t, batch, "isolated pack-analysis runtime call")
 	require.Contains(t, batch, "Run a decision-value discovery pass")
 	require.Contains(t, batch, "Pack-local refinement")
-	require.Contains(t, batch, "Return a pattern only when all of these are true")
+	require.Contains(t, batch, "Admission gate")
 	require.Contains(t, batch, "Use only tools explicitly available in this invocation")
-	require.Contains(t, batch, "Stop exploration once the listed evidence is sufficient to decide")
-	require.Contains(t, batch, "verified reusable capability entry")
+	require.Contains(t, batch, "Stop exploration once listed evidence is enough to decide")
+	require.Contains(t, batch, "verified source entry")
 	require.Contains(t, batch, "decision-bearing calculations")
 	require.Contains(t, batch, "attaching `business_method` to the candidate owned by that entry is required")
 	require.Contains(t, batch, "Do not present an entry as the reuse route while omitting the corresponding capability contract")
-	require.Contains(t, batch, "prefer one complete candidate for that entry")
-	require.Contains(t, batch, "mutually exclusive")
+	require.Contains(t, batch, "Prefer one complete candidate for one canonical entry")
+	require.Contains(t, batch, "mutual exclusivity")
 	require.Contains(t, batch, "concrete operation or payload identity")
 	require.Contains(t, batch, "performs no compensation or rollback")
-	require.Contains(t, batch, "No retained candidate instructs a future Agent to use a named entry while omitting")
+	require.Contains(t, batch, "No retained candidate instructs using a named entry while omitting")
 	require.Contains(t, batch, "fallback/base selection")
 	require.Contains(t, batch, "The mode changes exploration breadth only")
 	require.Contains(t, batch, "not a work procedure, a user-maintained Workflow, or development instructions")
+	require.Contains(t, batch, "Prefer empty results over weak candidates")
 	require.NotContains(t, batch, "pattern-evidence-rules")
 
 	delta, err := loader.Render("learning-delta-pack-analyze", sampleCurrentDeltaData())
@@ -310,19 +311,21 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, delta, "changed decision-bearing calculations")
 	require.Contains(t, delta, "pure or stateless decision-bearing calculation")
 	require.Contains(t, delta, "filling `proposal.business_method`")
-	require.Contains(t, delta, "exactly one knowledge-change decision for every input focus ID")
+	require.Contains(t, delta, "Exactly one knowledge-change decision for every input focus ID")
 	require.Contains(t, delta, "one canonical entry")
 	require.Contains(t, delta, "concrete operation or payload identity")
 	require.Contains(t, delta, "without compensation or rollback")
 	require.Contains(t, delta, "Do not infer a new language, framework, architecture, or domain inventory")
 	require.Contains(t, delta, "permission to learn outside the diff boundary")
 	require.Contains(t, delta, "not a work procedure, a user-maintained Workflow, or development instructions")
+	require.Contains(t, delta, "Default to `no_change`")
 
 	profile, err := loader.Render("learning-profile-refresh", sampleProjectProfileData(t))
 	require.NoError(t, err)
 	require.Contains(t, profile, "bounded profile-sync runtime call")
 	require.Contains(t, profile, "Do not inventory the project for completeness")
 	require.Contains(t, profile, "Avoid exact capability counts")
+	require.Contains(t, profile, "Prefer stable navigation over exhaustive inventory")
 	require.NotContains(t, profile, "authority section catalog")
 
 	authority, err := loader.Render("learning-authority-extract", sampleAuthorityExtractionData(t))
@@ -330,19 +333,21 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, authority, "bounded authority-extraction runtime call")
 	require.Contains(t, authority, "complete one-to-one coverage")
 	require.Contains(t, authority, "never implies `allowed`")
+	require.Contains(t, authority, "Stay inside the catalog and listed files")
 
 	authorityReview, err := loader.Render("learning-authority-review", sampleAuthorityReviewData(t))
 	require.NoError(t, err)
 	require.Contains(t, authorityReview, "independent authority-completeness review")
 	require.Contains(t, authorityReview, "complete replacement `authority_sections` result")
 	require.Contains(t, authorityReview, "candidate is available at")
+	require.Contains(t, authorityReview, "Prefer the cheapest correct complete result")
 
 	review, err := loader.Render("learning-knowledge-review", sampleKnowledgeReviewData(t))
 	require.NoError(t, err)
 	require.Contains(t, review, "skeptical maintainer")
 	require.Contains(t, review, "current implementation, design intent, proven guarantee, and known risk")
 	require.Contains(t, review, "Removing the capability entry does not require rejecting")
-	require.Contains(t, review, "every retained entry must be self-contained")
+	require.Contains(t, review, "Every retained entry must be self-contained")
 	require.Contains(t, review, "its evidence directly calls or references that entry")
 	require.Contains(t, review, "Open the entry's exact source definition")
 	require.Contains(t, review, "Do not accept routeable guidance while silently deleting or omitting")
@@ -350,12 +355,63 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, review, "one canonical entry")
 	require.Contains(t, review, "no compensation or rollback path")
 	require.Contains(t, review, "`business_method` and `revision` are optional sibling fields")
+	require.Contains(t, review, "Prefer the cheapest correct verdict")
+	require.Contains(t, review, "Rejection is success")
 
 	normalize, err := loader.Render("learning-pattern-normalize", sampleNormalizePatternsData(t))
 	require.NoError(t, err)
 	require.Contains(t, normalize, "Treat each nonempty `capability_entry` identity as an ownership boundary")
 	require.Contains(t, normalize, "No output pattern combines distinct nonempty `capability_entry` identities")
+	require.Contains(t, normalize, "Do not rewrite single-source candidates for style")
+	require.Contains(t, normalize, "Default keep")
 
+}
+
+func TestLearningPromptSpeedAccuracyContractsArePresent(t *testing.T) {
+	loader := New("codex", "en-US", "")
+	goal, err := loader.Render("learning-pack-plan", samplePlanData(t))
+	require.NoError(t, err)
+	require.Contains(t, goal, "Default to omission")
+	require.Contains(t, goal, "Precision beats coverage")
+	require.Contains(t, goal, "Empty structured results are valid")
+	require.Contains(t, goal, "# Mandatory Final Output Rules")
+	require.Less(t, strings.Index(goal, "# Skills Seed Knowledge Objective"), strings.Index(goal, "# Mandatory Final Output Rules"))
+}
+
+func TestRemainingPromptsCarrySpeedAccuracyPosture(t *testing.T) {
+	loader := New("codex", "en-US", "")
+
+	workspaceProfile, err := loader.Render("core-workspace-profile", sampleWorkspaceData())
+	require.NoError(t, err)
+	require.Contains(t, workspaceProfile, "Prefer confirmed cross-project facts only")
+	require.Contains(t, workspaceProfile, "Do not inventory child-project internals")
+
+	workspaceSpec, err := loader.Render("core-workspace-spec", sampleWorkspaceData())
+	require.NoError(t, err)
+	require.Contains(t, workspaceSpec, "Prefer the smallest set of cross-project rules")
+	require.Contains(t, workspaceSpec, "Do not use `user_context` as a rule source")
+
+	userPattern, err := loader.Render("core-user-pattern", sampleUserPatternData())
+	require.NoError(t, err)
+	require.Contains(t, userPattern, "Prefer one clear pattern")
+	require.Contains(t, userPattern, "Do not invent file paths")
+
+	workflow, err := loader.Render("core-workflow-optimize", agent.OptimizeWorkflowRequest{
+		Project: agent.ProjectContext{Name: "demo", RootPath: "/repo", Language: "go", Mode: "project"},
+		Name:    "release", Content: "Build the release.", ExistingContent: "Validate the release.",
+	})
+	require.NoError(t, err)
+	require.Contains(t, workflow, "Prefer executable clarity over expansion")
+	require.Contains(t, workflow, "available command into permission")
+
+	rule, err := loader.Render("core-rule-optimize", agent.OptimizeRuleRequest{
+		Project: agent.ProjectContext{Name: "demo", RootPath: "/repo", Language: "go", Mode: "project"},
+		Name:    "ownership", Content: "Confirm ownership before changes.",
+		ExistingContent: "Keep ownership explicit.", AffectedProjects: []string{"service-a"}, Paths: []string{"platform/**"},
+	})
+	require.NoError(t, err)
+	require.Contains(t, rule, "Prefer structure and clarity over expansion")
+	require.Contains(t, rule, "Never infer a new rule")
 }
 
 func currentPromptData(t *testing.T) map[string]interface{} {
