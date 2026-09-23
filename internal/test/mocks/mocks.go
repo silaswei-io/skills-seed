@@ -150,6 +150,83 @@ func (m *MockAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.Analy
 	return &agent.AnalyzeCurrentCodebaseResult{}, nil
 }
 
+// AnalyzeCurrentFocusBatch 模拟统一焦点分析入口。
+func (m *MockAgent) AnalyzeCurrentFocusBatch(ctx context.Context, req *agent.AnalyzeCurrentFocusBatchRequest) (*agent.AnalyzeCurrentFocusBatchResult, error) {
+	if req == nil {
+		return &agent.AnalyzeCurrentFocusBatchResult{Mode: agent.FocusAnalysisModeFull}, nil
+	}
+	mode := req.Mode
+	if mode == "" {
+		mode = agent.FocusAnalysisModeFull
+	}
+	if mode == agent.FocusAnalysisModeDelta {
+		deltaReq := &agent.AnalyzeCurrentDeltaBatchRequest{
+			ProjectName:       req.ProjectName,
+			RootPath:          req.RootPath,
+			Language:          req.Language,
+			RuntimeLabel:      req.RuntimeLabel,
+			SharedContextPath: req.SharedContextPath,
+			Structure:         req.Structure,
+			StructuralContext: req.StructuralContext,
+			UserContext:       req.UserContext,
+			LearningMode:      req.LearningMode,
+			ChangeProfile:     req.ChangeProfile,
+			Focuses:           make([]agent.AnalyzeCurrentDeltaFocus, 0, len(req.Focuses)),
+		}
+		for _, focus := range req.Focuses {
+			deltaReq.Focuses = append(deltaReq.Focuses, agent.AnalyzeCurrentDeltaFocus{
+				EvidenceFocus:   focus.EvidenceFocus,
+				FocusPaths:      focus.FocusPaths,
+				ContextFiles:    focus.SampleFiles,
+				DiffFiles:       focus.DiffFiles,
+				RelatedPatterns: focus.RelatedPatterns,
+			})
+		}
+		result, err := m.AnalyzeCurrentDeltaBatch(ctx, deltaReq)
+		if err != nil {
+			return nil, err
+		}
+		out := &agent.AnalyzeCurrentFocusBatchResult{Mode: agent.FocusAnalysisModeDelta}
+		if result != nil {
+			out.Changes = result.Changes
+			out.ProfileRefreshRecommended = result.ProfileRefreshRecommended
+		}
+		return out, nil
+	}
+	fullReq := &agent.AnalyzeCurrentCodebaseBatchRequest{
+		ProjectName:       req.ProjectName,
+		RootPath:          req.RootPath,
+		Language:          req.Language,
+		RuntimeLabel:      req.RuntimeLabel,
+		SharedContextPath: req.SharedContextPath,
+		Structure:         req.Structure,
+		StructuralContext: req.StructuralContext,
+		MainFiles:         req.MainFiles,
+		UserContext:       req.UserContext,
+		LearningMode:      req.LearningMode,
+		ChangeProfile:     req.ChangeProfile,
+		Focuses:           make([]agent.AnalyzeCurrentEvidenceFocus, 0, len(req.Focuses)),
+	}
+	for _, focus := range req.Focuses {
+		fullReq.Focuses = append(fullReq.Focuses, agent.AnalyzeCurrentEvidenceFocus{
+			EvidenceFocus: focus.EvidenceFocus,
+			FocusPaths:    focus.FocusPaths,
+			SampleFiles:   focus.SampleFiles,
+			DiffFiles:     focus.DiffFiles,
+		})
+	}
+	result, err := m.AnalyzeCurrentCodebaseBatch(ctx, fullReq)
+	if err != nil {
+		return nil, err
+	}
+	out := &agent.AnalyzeCurrentFocusBatchResult{Mode: agent.FocusAnalysisModeFull}
+	if result != nil {
+		out.Focuses = result.Focuses
+		out.Conversation = result.Conversation
+	}
+	return out, nil
+}
+
 // AnalyzeCurrentCodebaseBatch 模拟当前代码库批量分析。
 func (m *MockAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 	if m.AnalyzeCurrentBatchFn != nil {

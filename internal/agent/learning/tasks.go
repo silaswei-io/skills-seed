@@ -7,6 +7,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/agent/parser"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
@@ -49,6 +50,99 @@ func ReviewKnowledge(ctx context.Context, rt agent.LearningRuntime, req *agent.R
 		return nil, fmt.Errorf("%s: %w", i18n.Get("AgentParseResultFailed"), err)
 	}
 	return result, agent.RequireResult(result, "ReviewKnowledge")
+}
+
+// AnalyzeCurrentFocusBatch 按 Mode 分发到 full 或 delta 分析实现。
+func AnalyzeCurrentFocusBatch(ctx context.Context, rt agent.LearningRuntime, req *agent.AnalyzeCurrentFocusBatchRequest) (*agent.AnalyzeCurrentFocusBatchResult, error) {
+	if req == nil {
+		return nil, fmt.Errorf("AnalyzeCurrentFocusBatch request is nil")
+	}
+	mode := req.Mode
+	if mode == "" {
+		mode = agent.FocusAnalysisModeFull
+	}
+	switch mode {
+	case agent.FocusAnalysisModeDelta:
+		deltaReq := &agent.AnalyzeCurrentDeltaBatchRequest{
+			ProjectName:           req.ProjectName,
+			RootPath:              req.RootPath,
+			Language:              req.Language,
+			RuntimeLabel:          req.RuntimeLabel,
+			SharedContextPath:     req.SharedContextPath,
+			Structure:             req.Structure,
+			StructurePath:         req.StructurePath,
+			StructuralContext:     req.StructuralContext,
+			StructuralContextPath: req.StructuralContextPath,
+			UserContext:           req.UserContext,
+			UserContextPath:       req.UserContextPath,
+			MaintainedGuidance:    req.MaintainedGuidance,
+			LearningMode:          req.LearningMode,
+			ChangeProfile:         req.ChangeProfile,
+			Focuses:               make([]agent.AnalyzeCurrentDeltaFocus, 0, len(req.Focuses)),
+		}
+		for _, focus := range req.Focuses {
+			deltaReq.Focuses = append(deltaReq.Focuses, agent.AnalyzeCurrentDeltaFocus{
+				EvidenceFocus:   focus.EvidenceFocus,
+				FocusPaths:      append([]string(nil), focus.FocusPaths...),
+				ContextFiles:    append([]agent.SampleFile(nil), focus.SampleFiles...),
+				DiffFiles:       append([]agent.DiffFileRef(nil), focus.DiffFiles...),
+				RelatedPatterns: append([]domain.Pattern(nil), focus.RelatedPatterns...),
+			})
+		}
+		result, err := AnalyzeCurrentDeltaBatch(ctx, rt, deltaReq)
+		if err != nil {
+			return nil, err
+		}
+		out := &agent.AnalyzeCurrentFocusBatchResult{Mode: agent.FocusAnalysisModeDelta}
+		if result != nil {
+			out.Changes = result.Changes
+			out.ProfileRefreshRecommended = result.ProfileRefreshRecommended
+		}
+		return out, nil
+	default:
+		fullReq := &agent.AnalyzeCurrentCodebaseBatchRequest{
+			ProjectName:           req.ProjectName,
+			RootPath:              req.RootPath,
+			Language:              req.Language,
+			RuntimeLabel:          req.RuntimeLabel,
+			SharedContextPath:     req.SharedContextPath,
+			Structure:             req.Structure,
+			StructurePath:         req.StructurePath,
+			StructuralContext:     req.StructuralContext,
+			StructuralContextPath: req.StructuralContextPath,
+			MainFiles:             append([]string(nil), req.MainFiles...),
+			UserContext:           req.UserContext,
+			UserContextPath:       req.UserContextPath,
+			MaintainedGuidance:    req.MaintainedGuidance,
+			LearningMode:          req.LearningMode,
+			ChangeProfile:         req.ChangeProfile,
+			Focuses:               make([]agent.AnalyzeCurrentEvidenceFocus, 0, len(req.Focuses)),
+		}
+		for _, focus := range req.Focuses {
+			fullReq.Focuses = append(fullReq.Focuses, agent.AnalyzeCurrentEvidenceFocus{
+				EvidenceFocus: focus.EvidenceFocus,
+				FocusPaths:    append([]string(nil), focus.FocusPaths...),
+				SampleFiles:   append([]agent.SampleFile(nil), focus.SampleFiles...),
+				DiffFiles:     append([]agent.DiffFileRef(nil), focus.DiffFiles...),
+			})
+		}
+		result, err := AnalyzeCurrentCodebaseBatch(ctx, rt, fullReq)
+		if err != nil {
+			return nil, err
+		}
+		out := &agent.AnalyzeCurrentFocusBatchResult{Mode: agent.FocusAnalysisModeFull}
+		if result != nil {
+			out.Focuses = result.Focuses
+			out.Conversation = result.Conversation
+			for _, focus := range result.Focuses {
+				if focus.ProfileRefreshRecommended.Needed {
+					out.ProfileRefreshRecommended = focus.ProfileRefreshRecommended
+					break
+				}
+			}
+		}
+		return out, nil
+	}
 }
 
 // AnalyzeCurrentCodebaseBatch 批量分析当前代码学习焦点。

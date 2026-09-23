@@ -31,6 +31,10 @@ func (c *CodexAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowl
 	return learning.ReviewKnowledge(ctx, c, req)
 }
 
+func (c *CodexAgent) AnalyzeCurrentFocusBatch(ctx context.Context, req *agent.AnalyzeCurrentFocusBatchRequest) (*agent.AnalyzeCurrentFocusBatchResult, error) {
+	return learning.AnalyzeCurrentFocusBatch(ctx, c, req)
+}
+
 func (c *CodexAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 	return learning.AnalyzeCurrentCodebaseBatch(ctx, c, req)
 }

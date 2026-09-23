@@ -178,29 +178,36 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 	}
 
 	batchLabel := r.analysisBatchRuntimeLabel(state, batch)
-	// 焦点分析只保留一种编排语义：按 Mode 选择材料路径，避免调用点散落布尔分支。
+	// 编排层只通过统一 Mode 入口分析；full/delta 结果形状差异在本函数内消化。
 	mode := analyzer.SelectFocusAnalysisMode(r.useDeltaAnalysis())
-	var analyzeResult *analyzer.AnalyzeCurrentCodebaseBatchResult
-	err := func() error {
-		if mode == analyzer.FocusAnalysisModeDelta {
-			deltaResults, err := r.analyzeDeltaBatch(ctx, batch, batchFocuses)
-			if err != nil {
-				return err
-			}
-			results = append(results, deltaResults...)
-			return nil
-		}
+	focusOpts := analyzer.AnalyzeCurrentFocusBatchOptions{
+		Mode:              mode,
+		RuntimeLabel:      batchLabel,
+		LearningMode:      r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		ChangeProfile:     string(r.changeProfile),
+		RunContext:        r.codebaseRunContext,
+		SharedContextPath: r.sharedLearningContextPath,
+	}
+	var related map[string][]domain.Pattern
+	if mode == analyzer.FocusAnalysisModeDelta {
 		var err error
-		analyzeResult, err = r.cont.AnalyzerSvc.AnalyzeCurrentCodebaseBatch(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCurrentCodebaseBatchOptions{
-			RuntimeLabel:      batchLabel,
-			LearningMode:      r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-			ChangeProfile:     string(r.changeProfile),
-			RunContext:        r.codebaseRunContext,
-			SharedContextPath: r.sharedLearningContextPath,
-			Focuses:           batchFocuses,
-		})
-		return err
-	}()
+		related, err = r.relatedPatternsByFocus(ctx, batchFocuses)
+		if err != nil {
+			return nil, err
+		}
+		deltaFocuses := make([]analyzer.AnalyzeCurrentDeltaFocus, 0, len(batchFocuses))
+		for _, focus := range batchFocuses {
+			deltaFocuses = append(deltaFocuses, analyzer.AnalyzeCurrentDeltaFocus{
+				EvidenceFocus:   focus.EvidenceFocus,
+				FocusAbsPaths:   focus.FocusAbsPaths,
+				RelatedPatterns: related[focus.EvidenceFocus.ID],
+			})
+		}
+		focusOpts.DeltaFocuses = deltaFocuses
+	} else {
+		focusOpts.FullFocuses = batchFocuses
+	}
+	batchResult, err := r.cont.AnalyzerSvc.AnalyzeCurrentFocusBatch(ctx, r.projectRoot, r.projectName, r.currentLanguage, focusOpts)
 	if err != nil {
 		if len(batchFocuses) == 1 {
 			focusID := batchFocuses[0].EvidenceFocus.ID
@@ -211,10 +218,18 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 		return nil, err
 	}
 	if mode == analyzer.FocusAnalysisModeDelta {
+		deltaResults, err := r.buildDeltaFocusResults(batch, batchFocuses, related, batchResult.Delta)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, deltaResults...)
 		sort.Slice(results, func(i, j int) bool { return results[i].index < results[j].index })
 		return results, nil
 	}
-
+	analyzeResult := batchResult.Full
+	if analyzeResult == nil {
+		analyzeResult = &analyzer.AnalyzeCurrentCodebaseBatchResult{}
+	}
 	seen := make(map[string]bool, len(analyzeResult.Focuses))
 	for _, focusResult := range analyzeResult.Focuses {
 		indexed, ok := pendingByID[focusResult.EvidenceFocus.ID]

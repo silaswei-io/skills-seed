@@ -271,6 +271,75 @@ type AnalyzeCurrentDeltaBatchResult struct {
 	ProfileRefreshRecommended ProfileRefreshRecommendation
 }
 
+// FocusAnalysisMode 表示当前焦点分析使用的材料模式。
+type FocusAnalysisMode string
+
+const (
+	// FocusAnalysisModeFull 使用完整源码样本与结构上下文分析。
+	FocusAnalysisModeFull FocusAnalysisMode = "full"
+	// FocusAnalysisModeDelta 使用 diff 锚定与相关既有知识分析。
+	FocusAnalysisModeDelta FocusAnalysisMode = "delta"
+)
+
+// AnalyzeCurrentFocusInput 是 full/delta 共享的单个焦点输入。
+type AnalyzeCurrentFocusInput struct {
+	EvidenceFocus   domain.EvidenceFocus
+	FocusPaths      []string
+	SampleFiles     []SampleFile
+	DiffFiles       []DiffFileRef
+	RelatedPatterns []domain.Pattern // 仅 delta 模式使用
+}
+
+// AnalyzeCurrentFocusBatchRequest 是统一的焦点分析请求；Mode 决定材料与契约。
+type AnalyzeCurrentFocusBatchRequest struct {
+	Mode                  FocusAnalysisMode
+	ProjectName           string
+	RootPath              string
+	Language              string
+	RuntimeLabel          string
+	SharedContextPath     string
+	Focuses               []AnalyzeCurrentFocusInput
+	Structure             string
+	StructurePath         string
+	StructuralContext     string
+	StructuralContextPath string
+	MainFiles             []string
+	UserContext           string
+	UserContextPath       string
+	MaintainedGuidance    maintained.Snapshot
+	LearningMode          config.LearningMode
+	ChangeProfile         string
+}
+
+// AllowedCategories 返回提示词可展示的合法模式分类列表。
+func (r *AnalyzeCurrentFocusBatchRequest) AllowedCategories() string {
+	return domain.AllowedPatternCategoriesText()
+}
+
+// FocusIDs 返回本次分析必须逐一回执的证据焦点 ID。
+func (r *AnalyzeCurrentFocusBatchRequest) FocusIDs() []string {
+	if r == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(r.Focuses))
+	for _, focus := range r.Focuses {
+		if id := strings.TrimSpace(focus.EvidenceFocus.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// AnalyzeCurrentFocusBatchResult 是统一焦点分析的结果信封。
+// full 填充 Focuses；delta 填充 Changes；调用方按 Mode 读取对应字段。
+type AnalyzeCurrentFocusBatchResult struct {
+	Mode                      FocusAnalysisMode
+	Focuses                   []AnalyzeCurrentEvidenceResult
+	Changes                   []domain.KnowledgeChange
+	Conversation              Conversation
+	ProfileRefreshRecommended ProfileRefreshRecommendation
+}
+
 // LearningPathSkip 记录规划阶段明确跳过的输入路径及原因。
 type LearningPathSkip struct {
 	Path   string
@@ -462,6 +531,8 @@ type ProjectAnalyzer interface {
 	ExtractAuthority(ctx context.Context, req *ExtractAuthorityRequest) (*ExtractAuthorityResult, error)
 	ReviewAuthority(ctx context.Context, req *ReviewAuthorityRequest) (*ExtractAuthorityResult, error)
 	PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) (*PlanLearningAgendaResult, error)
+	// AnalyzeCurrentFocusBatch 是焦点分析的统一入口；Mode 选择 full 或 delta 材料与契约。
+	AnalyzeCurrentFocusBatch(ctx context.Context, req *AnalyzeCurrentFocusBatchRequest) (*AnalyzeCurrentFocusBatchResult, error)
 	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeCurrentDeltaBatch(ctx context.Context, req *AnalyzeCurrentDeltaBatchRequest) (*AnalyzeCurrentDeltaBatchResult, error)
 	NormalizePatterns(ctx context.Context, req *NormalizePatternsRequest) (*NormalizePatternsResult, error)
