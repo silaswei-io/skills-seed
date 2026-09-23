@@ -6,6 +6,7 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
+	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/prompts"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +30,30 @@ func (f fakeLearningRuntime) PromptRenderer() prompts.Renderer { return renderer
 
 func (f fakeLearningRuntime) InvokeStructured(ctx context.Context, in agent.StructuredInvoke) (agent.StructuredResult, error) {
 	return f.invoke(ctx, in)
+}
+
+func TestAnalyzeCurrentFocusBatchDispatchesFullMode(t *testing.T) {
+	rt := fakeLearningRuntime{
+		name: "fake",
+		invoke: func(_ context.Context, in agent.StructuredInvoke) (agent.StructuredResult, error) {
+			require.Equal(t, aicontract.ContractAnalyzeCurrentCodebaseBatch, in.OutputContract)
+			return agent.StructuredResult{Output: `{"focuses":[{"focus_id":"f1","focus_name":"core","patterns":[],"profile_refresh_recommended":{"needed":false}}]}`}, nil
+		},
+	}
+	result, err := AnalyzeCurrentFocusBatch(context.Background(), rt, &agent.AnalyzeCurrentFocusBatchRequest{
+		Mode:        agent.FocusAnalysisModeFull,
+		ProjectName: "demo",
+		RootPath:    "/tmp",
+		Language:    "go",
+		Focuses: []agent.AnalyzeCurrentFocusInput{{
+			EvidenceFocus: domain.EvidenceFocus{ID: "f1", Name: "core", EntryPaths: []string{"main.go"}},
+			FocusPaths:    []string{"main.go"},
+		}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, agent.FocusAnalysisModeFull, result.Mode)
+	require.Len(t, result.Focuses, 1)
+	require.Equal(t, "f1", result.Focuses[0].FocusID)
 }
 
 func TestPlanLearningAgendaUsesSharedContract(t *testing.T) {
