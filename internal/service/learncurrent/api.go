@@ -9,6 +9,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 )
 
 const (
@@ -170,9 +171,40 @@ func runLearnCurrentProject(ctx context.Context, cont *container.Container, opts
 		PatternsFound:   result.patternsCount,
 		PatternsSaved:   result.savedCount,
 		PatternsRetired: result.retiredCount,
+		PatternsDropped: result.droppedCount,
+		DropReasons:     dropReasonSummaries(result.dropped),
 		NoFileChanges:   result.skipped,
 	}
 	return domain.LearnCurrentResult{Summary: summary}, nil
+}
+
+func dropReasonSummaries(dropped []patternnorm.Drop) []string {
+	if len(dropped) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(dropped))
+	for _, item := range dropped {
+		reason := string(item.ReasonCode)
+		if item.Reason != "" {
+			if reason != "" {
+				reason = reason + ": " + item.Reason
+			} else {
+				reason = item.Reason
+			}
+		}
+		if item.ID != "" && reason != "" {
+			out = append(out, item.ID+" ("+reason+")")
+			continue
+		}
+		if item.ID != "" {
+			out = append(out, item.ID)
+			continue
+		}
+		if reason != "" {
+			out = append(out, reason)
+		}
+	}
+	return out
 }
 
 type learnCurrentProjectOptions struct {
@@ -199,6 +231,8 @@ type learnCurrentProjectResult struct {
 	patternsCount int
 	savedCount    int
 	retiredCount  int
+	droppedCount  int
+	dropped       []patternnorm.Drop
 	skipped       bool
 	duration      time.Duration
 }

@@ -51,6 +51,7 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 			}
 			r.savedCount = len(result.Written)
 			r.retiredCount = len(result.RetiredPatternIDs)
+			r.dropped = append([]patternnorm.Drop(nil), result.Dropped...)
 		}
 		if !r.patternsCommitted() && r.analysisState != nil {
 			r.analysisState.MarkPatternsCommitted(commandstate.PatternCommitSummary{

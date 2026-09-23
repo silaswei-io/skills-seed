@@ -2391,6 +2391,12 @@ other = "未检测到学习变化，跳过 skills 生成"
 [LearnJournalSummaryCounts]
 other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除 {{.Retired}} 个"
 
+[LearnJournalDroppedPatterns]
+other = "规范化丢弃 {{.Count}} 个候选：{{.Reasons}}"
+
+[ChangeLogLearnDroppedPatterns]
+other = "丢弃候选模式 {{.Count}} 个：{{.Reasons}}"
+
 [LearnJournalWorkspaceSummary]
 other = "处理 {{.Projects}} 个子项目，{{.ChangedProjects}} 个有变化"
 
