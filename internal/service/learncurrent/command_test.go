@@ -1,0 +1,2478 @@
+package learncurrent
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/container"
+	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
+	"github.com/silaswei-io/skills-seed/internal/infra/config"
+	"github.com/silaswei-io/skills-seed/internal/infra/git"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
+	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
+	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
+	workspacestore "github.com/silaswei-io/skills-seed/internal/infra/storage/workspace"
+	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
+	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
+	"github.com/silaswei-io/skills-seed/internal/test/mocks"
+	"github.com/stretchr/testify/require"
+)
+
+func TestFlagsDefaultsMatchProfileModes(t *testing.T) {
+	require.Equal(t, "auto", learnCurrentProfileAuto)
+	require.Equal(t, "skip", learnCurrentProfileSkip)
+	require.Equal(t, "refresh", learnCurrentProfileRefresh)
+	require.Equal(t, 6, learnCurrentProjectStepTotal)
+}
+
+func TestResolveFocusPaths(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "internal", "agent"), 0755))
+
+	paths, err := resolveFocusPaths(projectRoot, []string{"internal/agent"})
+	require.NoError(t, err)
+	require.Equal(t, []string{filepath.Join(projectRoot, "internal", "agent")}, paths)
+
+	_, err = resolveFocusPaths(projectRoot, []string{"../outside"})
+	require.Error(t, err)
+}
+
+func requireRunLearnCurrentNoError(t *testing.T, cont *container.Container, opts learnCurrentOptions) domain.LearnCurrentResult {
+	t.Helper()
+
+	result, err := runLearnCurrent(context.Background(), cont, opts)
+	require.NoError(t, err)
+	return result
+}
+
+func learnCurrentPatternForTest(id, name string, category domain.Category, path string) *domain.Pattern {
+	pattern := domain.NewPattern(id, name, category)
+	pattern.Rule = "When changing this behavior, preserve the evidenced project constraint."
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: path, Kind: "file"}}
+	return pattern
+}
+
+func admittedLearnCurrentPatternForTest(id, name string, category domain.Category, path string) *domain.Pattern {
+	pattern := learnCurrentPatternForTest(id, name, category, path)
+	pattern.Confidence = 0.9
+	pattern.Frequency = 1
+	return pattern
+}
+
+func TestShouldRefreshProfile(t *testing.T) {
+	tests := []struct {
+		name            string
+		mode            string
+		profileExists   bool
+		storedRevision  string
+		currentRevision string
+		want            bool
+		wantErr         bool
+	}{
+		{name: "full scan skips existing profile", mode: learnCurrentProfileAuto, profileExists: true, want: false},
+		{name: "missing profile refreshes", mode: learnCurrentProfileAuto, profileExists: false, want: true},
+		{name: "unchanged authority skips", mode: learnCurrentProfileAuto, profileExists: true, storedRevision: "same", currentRevision: "same", want: false},
+		{name: "changed authority refreshes", mode: learnCurrentProfileAuto, profileExists: true, storedRevision: "old", currentRevision: "new", want: true},
+		{name: "new authority refreshes legacy profile", mode: learnCurrentProfileAuto, profileExists: true, currentRevision: "new", want: true},
+		{name: "removed authority refreshes", mode: learnCurrentProfileAuto, profileExists: true, storedRevision: "old", want: true},
+		{name: "skip mode skips", mode: learnCurrentProfileSkip, profileExists: false, want: false},
+		{name: "refresh mode refreshes", mode: learnCurrentProfileRefresh, profileExists: true, want: true},
+		{name: "invalid mode fails", mode: "later", profileExists: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := shouldRefreshProfile(tt.mode, tt.profileExists, tt.storedRevision, tt.currentRevision)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRunLearnCurrentWritesSnapshotsAfterFirstLearning(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	content, err := os.ReadFile(filepath.Join(cont.SeedPath, "cache", "snapshots", "main.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package main\n", string(content))
+}
+
+func TestRunLearnCurrentReportsProjectSummaryWhenPatternsSaved(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		pattern := admittedLearnCurrentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+
+	result, err := runLearnCurrent(context.Background(), cont, opts)
+
+	require.NoError(t, err)
+	require.Equal(t, 1, result.Summary.PatternsSaved)
+}
+
+func TestRunLearnCurrentForceRelearnsUnchangedFiles(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		pattern := admittedLearnCurrentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+	requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	opts.force = true
+	output := captureLearnStdout(t, func() {
+		result := requireRunLearnCurrentNoError(t, cont, opts)
+		require.False(t, result.Summary.NoFileChanges)
+		require.Greater(t, result.Summary.ChangedFiles, 0)
+		require.Greater(t, result.Summary.PatternsSaved, 0)
+	})
+
+	require.NotContains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnCurrentWithFocusUpdatesFocusedSnapshotsAfterAnalysis(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/deleted.go", "package internal\n")
+	gitAddAll(t, projectRoot)
+	requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "internal", "deleted.go")))
+	gitAddAll(t, projectRoot)
+	snapshotDir := filepath.Join(cont.SeedPath, "cache", "snapshots")
+	require.NoError(t, os.WriteFile(filepath.Join(snapshotDir, "stale.go"), []byte("stale snapshot\n"), 0644))
+
+	opts := learnCurrentOptionsForTest("", []string{"main.go", "internal"}, learnCurrentProfileSkip)
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	content, err := os.ReadFile(filepath.Join(snapshotDir, "main.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package main\n", string(content))
+	require.NoFileExists(t, filepath.Join(snapshotDir, "internal", "deleted.go"))
+	staleContent, err := os.ReadFile(filepath.Join(snapshotDir, "stale.go"))
+	require.NoError(t, err)
+	require.Equal(t, "stale snapshot\n", string(staleContent))
+}
+
+func TestRunLearnWorkspaceCurrentKeepsProjectLogsAfterProfileStep(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{
+		ID:       "backend",
+		Path:     "backend",
+		Type:     "backend",
+		Language: "go",
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	profileSavedIndex := strings.LastIndex(output, "权威规则与项目地图刷新已跳过")
+	delegatedIndex := strings.LastIndex(output, "子项目 backend 独立执行完成")
+	require.NotEqual(t, -1, profileSavedIndex)
+	require.NotEqual(t, -1, delegatedIndex)
+	require.Greater(t, delegatedIndex, profileSavedIndex)
+	require.NotContains(t, output, "Token 消耗")
+
+	rootRecords, err := cont.FileTracker.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{})
+	require.NoError(t, err)
+	require.Empty(t, rootRecords)
+
+	childRepo, err := boltdb.NewPatternRepository(filepath.Join(childRoot, ".skills-seed", "store", "project.db"))
+	require.NoError(t, err)
+	defer func() { require.NoError(t, childRepo.Close()) }()
+	childRecords, err := childRepo.ListAnalyzedFiles(context.Background(), domain.FileAnalysisScope{})
+	require.NoError(t, err)
+	require.Len(t, childRecords, 1)
+}
+
+func TestRunLearnCurrentReportsWorkspaceChangedProjectsWhenPatternsSaved(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		pattern := admittedLearnCurrentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	})
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	result, err := runLearnCurrent(context.Background(), cont, opts)
+
+	require.NoError(t, err)
+	require.Equal(t, 1, result.Summary.ChangedProjects)
+}
+
+func TestRunLearnCurrentSkipsAIWhenFilesUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	analyzeCalls := 0
+	profileCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Zero(t, analyzeCalls)
+	require.Zero(t, profileCalls)
+	require.Contains(t, output, "未检测到可学习文件变化")
+	require.Contains(t, output, fmt.Sprintf("%d/%d", learnCurrentProjectStepTotal, learnCurrentProjectStepTotal))
+}
+
+func TestRunLearnCurrentSkipsKnowledgeVerificationWhenFilesUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	// 若无变化路径仍尝试核验知识，这个仓储会让重学失败；无变化时应直接复用已有投影。
+	cont.PatternReader = &mocks.MockPatternRepository{
+		GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+			return nil, errors.New("knowledge verification should be skipped")
+		},
+	}
+
+	result := requireRunLearnCurrentNoError(t, cont, opts)
+	require.True(t, result.Summary.NoFileChanges)
+}
+
+func TestRunLearnCurrentRefreshesMissingProfileWhenFilesUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.NoError(t, os.Remove(filepath.Join(cont.SeedPath, "store", "documents", "project-profile.json")))
+
+	analyzeCalls := 0
+	profileCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "rebuilt profile"}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Zero(t, analyzeCalls)
+	require.Equal(t, 1, profileCalls)
+	profile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "rebuilt profile", profile.Summary)
+}
+
+func TestRunLearnCurrentAutoRefreshesChangedAuthorityAndPersistsRevision(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	autoOpts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "AGENTS.md"), []byte("first rule\n"), 0o644))
+	gitAddAll(t, projectRoot)
+
+	profileCalls := 0
+	cont.Agent.(*mocks.MockAgent).ExtractAuthorityFn = func(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+		require.Len(t, req.AuthoritySections, 1)
+		return &agent.ExtractAuthorityResult{AuthoritySections: noRuleAuthoritySectionResults(req.AuthoritySections)}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{
+			Language: "go",
+			Summary:  "profile",
+		}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, autoOpts)
+	require.Equal(t, 1, profileCalls)
+	firstProfile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.NotEmpty(t, firstProfile.AuthorityRevision)
+
+	requireRunLearnCurrentNoError(t, cont, autoOpts)
+	require.Equal(t, 1, profileCalls)
+
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "AGENTS.md"), []byte("second rule\n"), 0o644))
+	gitAddAll(t, projectRoot)
+	requireRunLearnCurrentNoError(t, cont, autoOpts)
+	require.Equal(t, 2, profileCalls)
+	secondProfile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.NotEqual(t, firstProfile.AuthorityRevision, secondProfile.AuthorityRevision)
+	wantRevision, err := analyzer.EngineeringKnowledgeRevision(projectRoot)
+	require.NoError(t, err)
+	require.Equal(t, wantRevision, secondProfile.AuthorityRevision)
+
+	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "AGENTS.md"), []byte("third rule\n"), 0o644))
+	gitAddAll(t, projectRoot)
+	requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+	require.Equal(t, 2, profileCalls)
+	skippedProfile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, secondProfile.AuthorityRevision, skippedProfile.AuthorityRevision)
+}
+
+func TestRunLearnCurrentAutoRefreshesProfileWhenRecommended(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "main.go", "package main\nconst changed = true\n")
+	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+
+	var patternFocus []string
+	profileCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		patternFocus = append([]string{}, req.FocusPaths...)
+		pattern := learnCurrentPatternForTest("p2", "Changed File Pattern", domain.CategoryStructure, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{*pattern},
+			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{
+				Needed: true,
+				Reason: "module boundary changed",
+			},
+		}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Equal(t, []string{"main.go"}, patternFocus)
+	require.Equal(t, 1, profileCalls)
+	profile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "profile", profile.Summary)
+}
+
+func TestRunLearnCurrentRefreshesProfileAfterNormalization(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	var events []string
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		pattern := learnCurrentPatternForTest("normalized-before-profile", "Normalized Before Profile", domain.CategoryBusiness, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{*pattern},
+			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{
+				Needed: true,
+				Reason: "business pattern changed",
+			},
+		}, nil
+	}
+	mockAgent.RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		events = append(events, "profile")
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Equal(t, []string{"profile"}, events)
+}
+
+func TestRunLearnCurrentAutoSkipsExistingProfileWhenNoPatternsSaved(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "main.go", "package main\nconst changed = true\n")
+	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+
+	profileCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: nil,
+		}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Zero(t, profileCalls)
+}
+
+func TestRunLearnCurrentRefreshProfileUsesChangedFilesAsFocusPaths(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileRefresh)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	writeLearnFile(t, cont.ConfigRepo.GetProjectConfig().RootPath, "main.go", "package main\nconst changed = true\n")
+	gitAddAll(t, cont.ConfigRepo.GetProjectConfig().RootPath)
+
+	var patternFocus []string
+	var profileFocus []string
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		patternFocus = append([]string{}, req.FocusPaths...)
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileFocus = append([]string{}, req.FocusPaths...)
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Equal(t, []string{"main.go"}, patternFocus)
+	require.Equal(t, []string{"main.go"}, profileFocus)
+}
+
+func TestRunLearnCurrentLocalCandidateSelectionKeepsAllAnalysisFiles(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/logic/create.go", "package logic\nconst selected = true\n")
+	writeLearnFile(t, projectRoot, "internal/types/types.go", "package types\nconst alsoSelected = true\n")
+	gitAddAll(t, projectRoot)
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	var savedRecords []domain.FileAnalysisRecord
+	originalTracker := cont.FileTracker
+	cont.FileTracker = &mocks.MockFileAnalysisTracker{
+		ListAnalyzedFilesFn: originalTracker.ListAnalyzedFiles,
+		SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
+			savedRecords = append([]domain.FileAnalysisRecord(nil), records...)
+			return originalTracker.SaveAnalyzedFiles(ctx, records)
+		},
+		DeleteAnalyzedFilesFn: originalTracker.DeleteAnalyzedFiles,
+	}
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		received = *req
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.ElementsMatch(t, []string{"internal/logic/create.go", "internal/types/types.go"}, received.FocusPaths)
+	require.Len(t, received.SampleFiles, 2)
+	require.Len(t, savedRecords, 2)
+	require.ElementsMatch(t, []string{"internal/logic/create.go", "internal/types/types.go"}, fileAnalysisRecordPaths(savedRecords))
+	savedByPath := fileAnalysisRecordByPath(savedRecords)
+	require.Equal(t, domain.FileAnalysisStatusAnalyzed, savedByPath["internal/logic/create.go"].AnalysisStatus)
+	require.Equal(t, domain.FileAnalysisStatusAnalyzed, savedByPath["internal/types/types.go"].AnalysisStatus)
+	require.Empty(t, savedByPath["internal/types/types.go"].SelectionReason)
+	require.Contains(t, output, "候选准备结果:")
+	require.Contains(t, output, "候选准备: 输入 2，保留 2")
+	require.Contains(t, output, "状态: 本地保守候选准备")
+	require.Contains(t, output, "最终待分析: 2")
+	// 候选应用已并入规划前静默步骤，不再单独占用“本地候选准备”控制台阶段。
+	require.NotContains(t, output, "本地候选准备")
+	selectionSummaryIndex := strings.Index(output, "候选准备结果:")
+	planningIndex := strings.Index(output, "学习议程规划")
+	require.NotEqual(t, -1, selectionSummaryIndex)
+	require.NotEqual(t, -1, planningIndex)
+	require.Less(t, selectionSummaryIndex, planningIndex)
+	require.NotContains(t, output, "文件指纹提交计划")
+}
+
+func TestRunLearnCurrentLocalCandidateSelectionCommitsPreparedFileFingerprintsAfterSuccess(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/logic/create.go", "package logic\nconst selected = true\n")
+	writeLearnFile(t, projectRoot, "internal/types/types.go", "package types\nconst skipped = true\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	analyzeCalls := 0
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Zero(t, analyzeCalls)
+	require.Contains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnCurrentDoesNotCommitFileFingerprintWhenPatternStoreFails(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		pattern := admittedLearnCurrentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+	cont.PatternRepo.Close()
+	cont.FileTracker = &mocks.MockFileAnalysisTracker{
+		ListAnalyzedFilesFn: func(ctx context.Context, scope domain.FileAnalysisScope) ([]domain.FileAnalysisRecord, error) {
+			return []domain.FileAnalysisRecord{}, nil
+		},
+		SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
+			t.Fatalf("file fingerprint should not be committed when pattern save fails: %#v", records)
+			return nil
+		},
+		DeleteAnalyzedFilesFn: func(ctx context.Context, scope domain.FileAnalysisScope, paths []string) error {
+			return nil
+		},
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), i18n.Get("PatternNormLoadExistingPatternsFailed"))
+}
+
+func TestRunLearnCurrentResumeAfterPatternStoreFailureDoesNotReanalyze(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	analyzeCalls := 0
+	reviewCalls := 0
+	profileCalls := 0
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{
+			*admittedLearnCurrentPatternForTest("resume-after-store", "Resume After Store", domain.CategoryBusiness, "main.go"),
+		}}, nil
+	}
+	mockAgent.ReviewKnowledgeFn = func(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+		reviewCalls++
+		decisions := make([]agent.KnowledgeReviewDecision, 0, len(req.Candidates))
+		for _, candidate := range req.Candidates {
+			decisions = append(decisions, agent.KnowledgeReviewDecision{
+				CandidateID: candidate.ID, Verdict: "accept", ReasonCode: "accepted",
+				Reason: "The source supports the candidate.",
+			})
+		}
+		return &agent.ReviewKnowledgeResult{Decisions: decisions}, nil
+	}
+	mockAgent.RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "checkpoint profile"}, nil
+	}
+
+	failStore := true
+	patternRepo := &mocks.MockPatternRepository{
+		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) { return nil, nil },
+		ApplyPatternMutationFn: func(ctx context.Context, mutation domain.PatternMutation) error {
+			if failStore {
+				return errors.New("pattern store failed")
+			}
+			return nil
+		},
+	}
+	patternNormSvc := patternnorm.NewServiceWithNormalizer(patternRepo, mockAgent)
+	cont.PatternNormSvc = patternNormSvc
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+	require.ErrorContains(t, err, "pattern store failed")
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	state, stateErr := stateRepo.Load(context.Background())
+	require.NoError(t, stateErr)
+	require.NotNil(t, state.Analysis)
+	require.Len(t, state.Analysis.FocusKnowledge, 1)
+	require.True(t, state.Analysis.FocusKnowledge[0].Reviewed)
+	require.False(t, state.PatternsCommitComplete())
+	require.False(t, state.ProjectionsCommitComplete())
+	require.Len(t, state.Analysis.FocusKnowledge[0].Patterns, 1)
+	require.Equal(t, 1, analyzeCalls)
+	require.Equal(t, 1, reviewCalls)
+	require.Equal(t, 0, profileCalls)
+
+	failStore = false
+	_, err = runLearnCurrent(context.Background(), cont, opts)
+	require.NoError(t, err)
+	require.Equal(t, 1, analyzeCalls)
+	require.Equal(t, 1, reviewCalls)
+	require.Equal(t, 1, profileCalls)
+	_, stateErr = stateRepo.Load(context.Background())
+	require.ErrorIs(t, stateErr, commandstate.ErrStateNotFound)
+}
+
+func TestRunLearnCurrentResumeAfterProfileSaveFailureDoesNotReanalyze(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "main.go", "package main\nconst changed = true\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	analyzeCalls := 0
+	profileCalls := 0
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{
+				*admittedLearnCurrentPatternForTest("profile-after-normalization", "Profile After Normalization", domain.CategoryBusiness, "main.go"),
+			},
+			ProfileRefreshRecommended: agent.ProfileRefreshRecommendation{Needed: true, Reason: "module boundary changed"},
+		}, nil
+	}
+	mockAgent.RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		profileCalls++
+		return &agent.AnalyzeProjectResult{Language: "go", Summary: "updated"}, nil
+	}
+
+	profileDocumentsPath := filepath.Join(cont.SeedPath, "store", "documents")
+	require.NoError(t, os.RemoveAll(profileDocumentsPath))
+	require.NoError(t, os.WriteFile(profileDocumentsPath, []byte("blocks profile writes\n"), 0o644))
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+
+	require.Error(t, err)
+	require.Equal(t, 1, analyzeCalls)
+	require.Equal(t, 1, profileCalls)
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	state, stateErr := stateRepo.Load(context.Background())
+	require.NoError(t, stateErr)
+	require.True(t, state.PatternsCommitComplete())
+	require.False(t, state.ProjectionsCommitComplete())
+
+	require.NoError(t, os.Remove(profileDocumentsPath))
+	result, err := runLearnCurrent(context.Background(), cont, opts)
+	require.NoError(t, err)
+	require.Equal(t, 1, analyzeCalls)
+	require.Equal(t, 2, profileCalls)
+	require.False(t, result.Summary.NoFileChanges)
+	require.Greater(t, result.Summary.ChangedFiles, 0)
+	require.Equal(t, 1, result.Summary.PatternsFound)
+	require.Equal(t, 1, result.Summary.PatternsSaved)
+	profile, err := cont.ProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "updated", profile.Summary)
+	_, stateErr = stateRepo.Load(context.Background())
+	require.ErrorIs(t, stateErr, commandstate.ErrStateNotFound)
+}
+
+func TestRunLearnCurrentResumeAfterFingerprintFailureDoesNotReanalyze(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	analyzeCalls := 0
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{
+			*learnCurrentPatternForTest("resume-pattern", "Resume Pattern", domain.CategoryBusiness, "main.go"),
+		}}, nil
+	}
+
+	originalTracker := cont.FileTracker
+	failFingerprint := true
+	cont.FileTracker = &mocks.MockFileAnalysisTracker{
+		GetAnalyzedFileFn:   originalTracker.GetAnalyzedFile,
+		ListAnalyzedFilesFn: originalTracker.ListAnalyzedFiles,
+		SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
+			if failFingerprint {
+				return errors.New("fingerprint store failed")
+			}
+			return originalTracker.SaveAnalyzedFiles(ctx, records)
+		},
+		DeleteAnalyzedFilesFn: originalTracker.DeleteAnalyzedFiles,
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+	require.ErrorContains(t, err, "fingerprint store failed")
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	state, stateErr := stateRepo.Load(context.Background())
+	require.NoError(t, stateErr)
+	require.True(t, state.PatternsCommitComplete())
+
+	failFingerprint = false
+	_, err = runLearnCurrent(context.Background(), cont, opts)
+	require.NoError(t, err)
+	require.Equal(t, 1, analyzeCalls)
+	_, stateErr = stateRepo.Load(context.Background())
+	require.ErrorIs(t, stateErr, commandstate.ErrStateNotFound)
+}
+
+func TestRunLearnCurrentResumeAfterFinalizationFailureDoesNotReanalyze(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	analyzeCalls := 0
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{
+			*learnCurrentPatternForTest("finalize-pattern", "Finalize Pattern", domain.CategoryBusiness, "main.go"),
+		}}, nil
+	}
+
+	originalTracker := cont.FileTracker
+	require.NoError(t, originalTracker.SaveAnalyzedFiles(context.Background(), []domain.FileAnalysisRecord{{
+		Path:           "obsolete.go",
+		Hash:           "obsolete",
+		AnalysisStatus: domain.FileAnalysisStatusAnalyzed,
+	}}))
+	failFinalization := true
+	cont.FileTracker = &mocks.MockFileAnalysisTracker{
+		GetAnalyzedFileFn:   originalTracker.GetAnalyzedFile,
+		ListAnalyzedFilesFn: originalTracker.ListAnalyzedFiles,
+		SaveAnalyzedFilesFn: originalTracker.SaveAnalyzedFiles,
+		DeleteAnalyzedFilesFn: func(ctx context.Context, scope domain.FileAnalysisScope, paths []string) error {
+			if failFinalization {
+				return errors.New("finalization failed")
+			}
+			return originalTracker.DeleteAnalyzedFiles(ctx, scope, paths)
+		},
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+	require.ErrorContains(t, err, "finalization failed")
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	state, stateErr := stateRepo.Load(context.Background())
+	require.NoError(t, stateErr)
+	require.True(t, state.PatternsCommitComplete())
+
+	failFinalization = false
+	_, err = runLearnCurrent(context.Background(), cont, opts)
+	require.NoError(t, err)
+	require.Equal(t, 1, analyzeCalls)
+	_, stateErr = stateRepo.Load(context.Background())
+	require.ErrorIs(t, stateErr, commandstate.ErrStateNotFound)
+}
+
+func TestRunLearnCurrentInvalidatesRecoveryStateWhenNewFileAppears(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+
+	analyzeCalls := 0
+	var analyzedPaths [][]string
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		analyzeCalls++
+		analyzedPaths = append(analyzedPaths, append([]string{}, req.FocusPaths...))
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{
+			*learnCurrentPatternForTest("recovery-pattern", "Recovery Pattern", domain.CategoryBusiness, "main.go"),
+		}}, nil
+	}
+
+	originalTracker := cont.FileTracker
+	failFingerprint := true
+	cont.FileTracker = &mocks.MockFileAnalysisTracker{
+		GetAnalyzedFileFn:   originalTracker.GetAnalyzedFile,
+		ListAnalyzedFilesFn: originalTracker.ListAnalyzedFiles,
+		SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
+			if failFingerprint {
+				return errors.New("fingerprint store failed")
+			}
+			return originalTracker.SaveAnalyzedFiles(ctx, records)
+		},
+		DeleteAnalyzedFilesFn: originalTracker.DeleteAnalyzedFiles,
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+	require.ErrorContains(t, err, "fingerprint store failed")
+	writeLearnFile(t, projectRoot, "internal/new.go", "package internal\n")
+	gitAddAll(t, projectRoot)
+	failFingerprint = false
+
+	_, err = runLearnCurrent(context.Background(), cont, opts)
+	require.NoError(t, err)
+	require.Equal(t, 2, analyzeCalls)
+	require.Contains(t, analyzedPaths[1], "internal/new.go")
+}
+
+func TestRunLearnCurrentResumesPendingFocusFromCachedPlan(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	planCalls := 0
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		planCalls++
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	var analyzed [][]string
+	var labels []string
+	var focuses []string
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		labels = append(labels, req.RuntimeLabel)
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, 1)
+		for _, unit := range req.Focuses {
+			analyzed = append(analyzed, append([]string{}, unit.FocusPaths...))
+			focuses = append(focuses, unit.EvidenceFocus.ID)
+			if unit.EvidenceFocus.ID == "auth" {
+				pattern := admittedLearnCurrentPatternForTest("p-"+strings.ReplaceAll(unit.FocusPaths[0], "/", "-"), "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+				results = append(results, agent.AnalyzeCurrentEvidenceResult{
+					FocusID:   unit.EvidenceFocus.ID,
+					FocusName: unit.EvidenceFocus.Name,
+					Patterns:  []domain.Pattern{*pattern},
+				})
+			}
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+	require.Error(t, err)
+	require.Equal(t, 1, planCalls)
+	require.Equal(t, [][]string{{"internal/auth/login.go"}, {"internal/key/create.go"}}, analyzed)
+	require.Equal(t, []string{"batch-001", "batch-002"}, labels)
+	require.Equal(t, []string{"auth", "key"}, focuses)
+
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	stateBytes, err := os.ReadFile(stateRepo.Path())
+	require.NoError(t, err)
+	var cachedState commandstate.State
+	require.NoError(t, json.Unmarshal(stateBytes, &cachedState))
+	require.Equal(t, commandStateLearnCurrent, cachedState.Command)
+	require.Equal(t, string(config.LearningModeNormal), cachedState.Mode)
+	require.Len(t, cachedState.Agenda.Focuses, 2)
+	require.NotNil(t, cachedState.Analysis)
+	require.Len(t, cachedState.Analysis.FocusKnowledge, 1)
+	require.Equal(t, cachedState.Agenda.Focuses[0], cachedState.Analysis.FocusKnowledge[0].Focus)
+	require.Len(t, cachedState.Analysis.FocusKnowledge[0].Patterns, 1)
+
+	analyzed = nil
+	labels = nil
+	focuses = nil
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		labels = append(labels, req.RuntimeLabel)
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+		for _, unit := range req.Focuses {
+			analyzed = append(analyzed, append([]string{}, unit.FocusPaths...))
+			focuses = append(focuses, unit.EvidenceFocus.ID)
+			pattern := admittedLearnCurrentPatternForTest("p-resumed", "Resumed Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+				Patterns:  []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+	require.Equal(t, 1, planCalls, "cached state should be reused without replanning")
+	require.Equal(t, [][]string{{"internal/key/create.go"}}, analyzed)
+	require.Equal(t, []string{"batch-002"}, labels)
+	require.Equal(t, []string{"key"}, focuses)
+	require.Contains(t, output, "恢复未完成的 learn-current 执行计划")
+	require.Contains(t, output, "本地过滤: 可学习 2，待处理 2")
+	require.Contains(t, output, "候选准备: 输入 2，保留 2")
+	require.Contains(t, output, "恢复后: 待分析 1，证据焦点 2")
+	require.Contains(t, output, currentAnalysisFocusLabel(2, 2, "密钥创建"))
+	require.NotContains(t, output, currentAnalysisFocusLabel(1, 2, "认证登录"))
+	require.NotContains(t, output, "增量文件变化:")
+	require.NotContains(t, output, "计划输入文件:")
+	require.NotContains(t, output, "候选准备结果:")
+	require.NoFileExists(t, stateRepo.Path())
+	patterns, err := cont.PatternRepo.GetAll(context.Background())
+	require.NoError(t, err)
+	require.Len(t, patterns, 2)
+}
+
+func TestRunLearnCurrentCheckpointsSuccessfulSerialBatch(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	planCalls := 0
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		planCalls++
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	authDone := make(chan struct{})
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		unit := req.Focuses[0]
+		if unit.EvidenceFocus.ID == "key" {
+			<-authDone
+			return nil, errors.New("key analysis failed")
+		}
+		pattern := admittedLearnCurrentPatternForTest("p-auth", "Auth Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+		close(authDone)
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: []agent.AnalyzeCurrentEvidenceResult{{
+			FocusID: unit.EvidenceFocus.ID, FocusName: unit.EvidenceFocus.Name, Patterns: []domain.Pattern{*pattern},
+		}}}, nil
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+	require.ErrorContains(t, err, "key analysis failed")
+
+	stateRepo := learnCurrentStateRepo(cont.SeedPath, commandStateLearnCurrent)
+	state, err := stateRepo.Load(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, state.Analysis)
+	require.Len(t, state.Analysis.FocusKnowledge, 1)
+	require.Equal(t, "auth", state.Analysis.FocusKnowledge[0].Focus.ID)
+	require.Len(t, state.Analysis.FocusKnowledge[0].Patterns, 1)
+
+	var resumedFocuses []string
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		unit := req.Focuses[0]
+		resumedFocuses = append(resumedFocuses, unit.EvidenceFocus.ID)
+		pattern := admittedLearnCurrentPatternForTest("p-key", "Key Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: []agent.AnalyzeCurrentEvidenceResult{{
+			FocusID: unit.EvidenceFocus.ID, FocusName: unit.EvidenceFocus.Name, Patterns: []domain.Pattern{*pattern},
+		}}}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.Equal(t, 1, planCalls)
+	require.Equal(t, []string{"key"}, resumedFocuses)
+	patterns, err := cont.PatternRepo.GetAll(context.Background())
+	require.NoError(t, err)
+	require.Len(t, patterns, 2)
+}
+
+func TestRunLearnCurrentDoesNotCommitSnapshotsUntilAllFocusesSucceed(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\nconst login = false\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\nconst create = false\n")
+	gitAddAll(t, projectRoot)
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\nconst login = true\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\nconst create = true\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	receivedDiffs := map[string][]string{}
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		var results []agent.AnalyzeCurrentEvidenceResult
+		for _, unit := range req.Focuses {
+			for _, diff := range unit.DiffFiles {
+				receivedDiffs[unit.EvidenceFocus.ID] = append(receivedDiffs[unit.EvidenceFocus.ID], diff.Path)
+			}
+			if unit.EvidenceFocus.ID == "auth" {
+				pattern := learnCurrentPatternForTest("p-"+unit.EvidenceFocus.ID, "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+				results = append(results, agent.AnalyzeCurrentEvidenceResult{
+					FocusID:   unit.EvidenceFocus.ID,
+					FocusName: unit.EvidenceFocus.Name,
+					Patterns:  []domain.Pattern{*pattern},
+				})
+			}
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+
+	require.Error(t, err)
+	require.Equal(t, []string{"internal/auth/login.go"}, receivedDiffs["auth"])
+	require.Equal(t, []string{"internal/key/create.go"}, receivedDiffs["key"])
+	snapshotDir := filepath.Join(cont.SeedPath, "cache", "snapshots")
+	authSnapshot, err := os.ReadFile(filepath.Join(snapshotDir, "internal", "auth", "login.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package auth\nconst login = false\n", string(authSnapshot))
+	keySnapshot, err := os.ReadFile(filepath.Join(snapshotDir, "internal", "key", "create.go"))
+	require.NoError(t, err)
+	require.Equal(t, "package key\nconst create = false\n", string(keySnapshot))
+}
+
+func TestBuildDeltaFocusResultsRequiresDecisionForEveryFocus(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	run := &learnCurrentProjectRun{}
+	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{
+		{index: 0, focus: domain.EvidenceFocus{ID: "auth", Name: "认证登录"}},
+		{index: 1, focus: domain.EvidenceFocus{ID: "key", Name: "密钥创建"}},
+	}}
+	batchFocuses := []analyzer.AnalyzeCurrentEvidenceFocus{
+		{EvidenceFocus: batch.focuses[0].focus},
+		{EvidenceFocus: batch.focuses[1].focus},
+	}
+
+	_, err := run.buildDeltaFocusResults(batch, batchFocuses, nil, &analyzer.AnalyzeCurrentDeltaBatchResult{
+		Changes: []domain.KnowledgeChange{{
+			FocusAction:   domain.KnowledgeFocusExisting,
+			FocusID:       "auth",
+			FocusName:     "认证登录",
+			PatternAction: domain.KnowledgePatternNoChange,
+			Anchors:       []domain.PatternDiffAnchor{{Path: "internal/auth/login.go"}},
+		}},
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), i18n.GetWithParams("LearnCurrentDeltaBatchMissedFocus", map[string]interface{}{"Focus": "key"}))
+
+	results, err := run.buildDeltaFocusResults(batch, batchFocuses, nil, &analyzer.AnalyzeCurrentDeltaBatchResult{
+		Changes: []domain.KnowledgeChange{
+			{FocusAction: domain.KnowledgeFocusExisting, FocusID: "auth", FocusName: "认证登录", PatternAction: domain.KnowledgePatternNoChange, Anchors: []domain.PatternDiffAnchor{{Path: "internal/auth/login.go"}}},
+			{FocusAction: domain.KnowledgeFocusExisting, FocusID: "key", FocusName: "密钥创建", PatternAction: domain.KnowledgePatternNoChange, Anchors: []domain.PatternDiffAnchor{{Path: "internal/key/create.go"}}},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.True(t, results[0].completed)
+	require.True(t, results[1].completed)
+	require.Empty(t, results[0].patterns)
+	require.Empty(t, results[1].patterns)
+}
+
+func TestBuildDeltaFocusResultsMapsNewFocusByAnchor(t *testing.T) {
+	run := &learnCurrentProjectRun{
+		learnProjectCtx: learnProjectCtx{
+			projectRoot: "/repo",
+		},
+	}
+	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{
+		{index: 0, focus: domain.EvidenceFocus{ID: "payment", Name: "支付流程"}},
+	}}
+	batchFocuses := []analyzer.AnalyzeCurrentEvidenceFocus{{
+		EvidenceFocus: batch.focuses[0].focus,
+		FocusAbsPaths: []string{"/repo/internal/payment/pay.go"},
+	}}
+
+	results, err := run.buildDeltaFocusResults(batch, batchFocuses, nil, &analyzer.AnalyzeCurrentDeltaBatchResult{
+		Changes: []domain.KnowledgeChange{{
+			FocusAction:   domain.KnowledgeFocusNew,
+			FocusID:       "new-payment-policy",
+			FocusName:     "新支付策略",
+			PatternAction: domain.KnowledgePatternAdd,
+			Proposal: &domain.Pattern{
+				ID:       "payment-policy",
+				Name:     "支付策略",
+				Category: domain.CategoryBusiness,
+			},
+			Anchors: []domain.PatternDiffAnchor{{Path: "internal/payment/pay.go"}},
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Len(t, results[0].patterns, 1)
+	require.Equal(t, "payment", results[0].focus.ID)
+	require.Equal(t, "支付流程", results[0].focus.Name)
+}
+
+func TestBuildDeltaFocusResultsAcceptsNoChangeDecisionWithoutAnchor(t *testing.T) {
+	run := &learnCurrentProjectRun{
+		learnProjectCtx: learnProjectCtx{
+			projectRoot: "/repo",
+		},
+	}
+	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{
+		{index: 0, focus: domain.EvidenceFocus{ID: "app-config", Name: "应用配置"}},
+	}}
+	batchFocuses := []analyzer.AnalyzeCurrentEvidenceFocus{{
+		EvidenceFocus: batch.focuses[0].focus,
+		FocusAbsPaths: []string{"/repo/src/common/init.ts"},
+	}}
+
+	results, err := run.buildDeltaFocusResults(batch, batchFocuses, nil, &analyzer.AnalyzeCurrentDeltaBatchResult{
+		Changes: []domain.KnowledgeChange{{
+			FocusAction:   domain.KnowledgeFocusNoChange,
+			FocusID:       "app-config",
+			FocusName:     "应用配置",
+			PatternAction: domain.KnowledgePatternNoChange,
+			Reason:        "diff does not reveal reusable knowledge",
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.True(t, results[0].completed)
+	require.Empty(t, results[0].patterns)
+}
+
+func TestBuildDeltaFocusResultsRetiresOnlyEligibleRelatedPattern(t *testing.T) {
+	run := &learnCurrentProjectRun{
+		learnProjectCtx: learnProjectCtx{
+			projectRoot: "/repo",
+		},
+	}
+	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{{
+		index: 0,
+		focus: domain.EvidenceFocus{ID: "auth", Name: "认证登录"},
+	}}}
+	batchFocuses := []analyzer.AnalyzeCurrentEvidenceFocus{{
+		EvidenceFocus: batch.focuses[0].focus,
+		FocusAbsPaths: []string{"/repo/internal/auth/login.go"},
+	}}
+	learned := domain.NewPattern("legacy-auth-flow", "旧认证流程", domain.CategoryBusiness)
+	learned.Source = domain.SourceLearnedCurrent
+	userDefined := domain.NewPattern("explicit-auth-policy", "认证策略", domain.CategoryBusiness)
+	userDefined.Source = domain.SourceUserDefined
+
+	results, err := run.buildDeltaFocusResults(batch, batchFocuses, map[string][]domain.Pattern{
+		"auth": {*learned, *userDefined},
+	}, &analyzer.AnalyzeCurrentDeltaBatchResult{
+		Changes: []domain.KnowledgeChange{
+			{
+				FocusID:       "auth",
+				PatternAction: domain.KnowledgePatternRetire,
+				PatternID:     learned.ID,
+				Anchors:       []domain.PatternDiffAnchor{{Path: "internal/auth/login.go"}},
+			},
+			{
+				FocusID:       "auth",
+				PatternAction: domain.KnowledgePatternRetire,
+				PatternID:     userDefined.ID,
+				Anchors:       []domain.PatternDiffAnchor{{Path: "internal/auth/login.go"}},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, []string{learned.ID}, results[0].retiredPatternIDs)
+}
+
+func TestRunLearnCurrentReplansWhenLearningModeChanges(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	cfg := cont.ConfigRepo.Get()
+	cfg.Learning.Current.Mode = config.LearningModeDeep
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	planModes := []config.LearningMode{}
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		planModes = append(planModes, req.LearningMode)
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	analyzeModes := []config.LearningMode{}
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		analyzeModes = append(analyzeModes, req.LearningMode)
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, 1)
+		for _, unit := range req.Focuses {
+			if unit.EvidenceFocus.ID != "auth" {
+				continue
+			}
+			pattern := learnCurrentPatternForTest("p-"+unit.EvidenceFocus.ID, "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+				Patterns:  []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, opts)
+	require.Error(t, err)
+	require.Equal(t, []config.LearningMode{config.LearningModeDeep}, planModes)
+	require.Equal(t, []config.LearningMode{config.LearningModeDeep, config.LearningModeDeep}, analyzeModes)
+
+	cfg = cont.ConfigRepo.Get()
+	cfg.Learning.Current.Mode = config.LearningModeFast
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+
+	analyzeModes = nil
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		analyzeModes = append(analyzeModes, req.LearningMode)
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+		for _, unit := range req.Focuses {
+			pattern := learnCurrentPatternForTest("p-"+unit.EvidenceFocus.ID, "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+				Patterns:  []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.Equal(t, []config.LearningMode{config.LearningModeDeep, config.LearningModeFast}, planModes)
+	require.Equal(t, []config.LearningMode{config.LearningModeFast, config.LearningModeFast}, analyzeModes)
+}
+
+func TestRunLearnCurrentAnalyzesPlannedFocusesOnePerCallByDefault(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	var batches []agent.AnalyzeCurrentCodebaseBatchRequest
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		batches = append(batches, *req)
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+		for _, unit := range req.Focuses {
+			pattern := learnCurrentPatternForTest("p-"+unit.EvidenceFocus.ID, "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+				Patterns:  []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Len(t, batches, 2)
+	require.Equal(t, "batch-001", batches[0].RuntimeLabel)
+	require.Len(t, batches[0].Focuses, 1)
+	require.Equal(t, "auth", batches[0].Focuses[0].EvidenceFocus.ID)
+	require.Equal(t, []string{"internal/auth/login.go"}, batches[0].Focuses[0].FocusPaths)
+	require.Equal(t, "batch-002", batches[1].RuntimeLabel)
+	require.Len(t, batches[1].Focuses, 1)
+	require.Equal(t, "key", batches[1].Focuses[0].EvidenceFocus.ID)
+	require.Equal(t, []string{"internal/key/create.go"}, batches[1].Focuses[0].FocusPaths)
+}
+
+func TestRunLearnCurrentKeepsFocusesIndependent(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+	var batches []agent.AnalyzeCurrentCodebaseBatchRequest
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		batches = append(batches, *req)
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+		for _, unit := range req.Focuses {
+			pattern := learnCurrentPatternForTest("p-"+unit.EvidenceFocus.ID, "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+				Patterns:  []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Len(t, batches, 2)
+	require.Equal(t, "batch-001", batches[0].RuntimeLabel)
+	require.Len(t, batches[0].Focuses, 1)
+	require.Equal(t, "auth", batches[0].Focuses[0].EvidenceFocus.ID)
+	require.Equal(t, "batch-002", batches[1].RuntimeLabel)
+	require.Len(t, batches[1].Focuses, 1)
+	require.Equal(t, "key", batches[1].Focuses[0].EvidenceFocus.ID)
+}
+
+func TestRunLearnCurrentAnalyzesPlannedFocusesInParallelWhenConfigured(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	var updateMu sync.Mutex
+	var updateLabels []string
+	opts := learnCurrentProjectOptions{
+		showProgress:     true,
+		showDetailedLogs: true,
+		profileMode:      learnCurrentProfileSkip,
+		onStepUpdate: func(label string) {
+			updateMu.Lock()
+			defer updateMu.Unlock()
+			updateLabels = append(updateLabels, label)
+		},
+	}
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/service.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/service.go", "package key\n")
+	writeLearnFile(t, projectRoot, "internal/audit/service.go", "package audit\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/service.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/service.go"}},
+			{ID: "audit", Name: "审计日志", EntryPaths: []string{"internal/audit/service.go"}},
+		}}, nil
+	}
+
+	var mu sync.Mutex
+	active := 0
+	maxActive := 0
+	var batches []string
+	bothStarted := make(chan struct{})
+	var closeBothStarted sync.Once
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		mu.Lock()
+		active++
+		if active > maxActive {
+			maxActive = active
+		}
+		batches = append(batches, req.RuntimeLabel)
+		if active == 2 {
+			closeBothStarted.Do(func() { close(bothStarted) })
+		}
+		mu.Unlock()
+
+		select {
+		case <-bothStarted:
+		case <-time.After(500 * time.Millisecond):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		defer func() {
+			mu.Lock()
+			active--
+			mu.Unlock()
+		}()
+
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+		for _, unit := range req.Focuses {
+			pattern := learnCurrentPatternForTest("p-"+unit.EvidenceFocus.ID, "Unit Pattern", domain.CategoryBusiness, unit.FocusPaths[0])
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+				Patterns:  []domain.Pattern{*pattern},
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	_, err := runLearnCurrentProjectWithOptions(context.Background(), cont, opts)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, 2, maxActive)
+	require.ElementsMatch(t, []string{"batch-001", "batch-002", "batch-003"}, batches)
+
+	updateMu.Lock()
+	defer updateMu.Unlock()
+	updates := strings.Join(updateLabels, "\n")
+	require.Contains(t, updates, i18n.GetWithParams("ProgressLearnCurrentAnalyzeParallel", map[string]interface{}{
+		"Label":       i18n.Get("ProgressLearnCurrentAnalyzeCodebase"),
+		"Completed":   3,
+		"Total":       3,
+		"Parallelism": 2,
+	}))
+}
+
+func TestRunLearnCurrentDoesNotReprocessFilesOmittedByAnalysisPlanner(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/uncovered.go", "package internal\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	planCalls := 0
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		planCalls++
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{{
+			ID:         "main",
+			Name:       "Main",
+			EntryPaths: []string{"main.go"},
+		}}, SkippedPaths: []agent.LearningPathSkip{{
+			Path:   "internal/uncovered.go",
+			Reason: "The file does not contain durable decision-bearing knowledge.",
+		}}}, nil
+	}
+	var analyzedPaths []string
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		results := make([]agent.AnalyzeCurrentEvidenceResult, 0, len(req.Focuses))
+		for _, unit := range req.Focuses {
+			analyzedPaths = append(analyzedPaths, unit.FocusPaths...)
+			results = append(results, agent.AnalyzeCurrentEvidenceResult{
+				FocusID:   unit.EvidenceFocus.ID,
+				FocusName: unit.EvidenceFocus.Name,
+			})
+		}
+		return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: results}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	require.Equal(t, 1, planCalls)
+	require.Equal(t, []string{"main.go"}, analyzedPaths)
+
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		t.Fatal("PlanLearningAgenda should not be called when files are unchanged")
+		return nil, nil
+	}
+	mockAgent.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		t.Fatal("AnalyzeCurrentCodebaseBatch should not be called when files are unchanged")
+		return nil, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+}
+
+func TestRunLearnCurrentShowsEvidenceFocusProgressDetails(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	writeLearnFile(t, projectRoot, "internal/key/create.go", "package key\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+			{ID: "key", Name: "密钥创建", EntryPaths: []string{"internal/key/create.go"}},
+		}}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Contains(t, output, "学习议程规划")
+	require.Contains(t, output, currentAnalysisFocusLabel(1, 2, "认证登录"))
+	require.Contains(t, output, "知识准入与模式入库 · 提交 2 个文件状态")
+}
+
+func TestRunLearnCurrentIncludesEvidenceFocusInFailure(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "main.go")))
+	writeLearnFile(t, projectRoot, "internal/auth/login.go", "package auth\n")
+	gitAddAll(t, projectRoot)
+
+	mockAgent := cont.Agent.(*mocks.MockAgent)
+	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
+			{ID: "auth", Name: "认证登录", EntryPaths: []string{"internal/auth/login.go"}},
+		}}, nil
+	}
+	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		return nil, assertAnError("解析结果失败")
+	}
+
+	var runErr error
+	output := captureLearnStdout(t, func() {
+		_, runErr = runLearnCurrent(context.Background(), cont, opts)
+	})
+
+	require.Error(t, runErr)
+	require.Contains(t, runErr.Error(), currentAnalysisFocusLabel(1, 1, "认证登录"))
+	require.Contains(t, runErr.Error(), "解析结果失败")
+	require.Contains(t, output, currentAnalysisFocusLabel(1, 1, "认证登录"))
+}
+
+func TestRunLearnCurrentSendsDeletedFilesAsDiffs(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+	projectRoot := cont.ConfigRepo.GetProjectConfig().RootPath
+	writeLearnFile(t, projectRoot, "internal/deleted.go", "package internal\n")
+	gitAddAll(t, projectRoot)
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.NoError(t, os.Remove(filepath.Join(projectRoot, "internal", "deleted.go")))
+	gitAddAll(t, projectRoot)
+
+	var received agent.AnalyzeCurrentCodebaseRequest
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		received = *req
+		return &agent.AnalyzeCurrentCodebaseResult{}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Equal(t, []string{"internal/deleted.go"}, received.FocusPaths)
+	require.Len(t, received.DiffFiles, 1)
+	require.Equal(t, "internal/deleted.go", received.DiffFiles[0].Path)
+	diffContent := readLearnFilePath(t, received.DiffFiles[0].DiffPath)
+	require.Contains(t, diffContent, "-package internal")
+}
+
+func TestRunLearnCurrentWithContextPassesUserContextToAnalysis(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
+
+	var receivedContext string
+	var receivedProfileContext string
+	cont.Agent.(*mocks.MockAgent).AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		receivedContext = req.UserContext
+		pattern := learnCurrentPatternForTest("p-context", "Context Boundary", domain.CategoryBusiness, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).RefreshProjectProfileFn = func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+		receivedProfileContext = req.UserContext
+		return &agent.AnalyzeProjectResult{
+			Language: "go",
+		}, nil
+	}
+
+	_, err := RunWithContext(context.Background(), cont, "私有化部署，不是 SaaS")
+	require.NoError(t, err)
+
+	require.Equal(t, "私有化部署，不是 SaaS", receivedContext)
+	require.Equal(t, "私有化部署，不是 SaaS", receivedProfileContext)
+}
+
+func TestRunLearnWorkspaceCurrentDelegatesIncrementalSkipToChildProject(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Zero(t, atomic.LoadInt32(&learnWorkspaceMockAnalyzeCalls))
+	require.Contains(t, output, "未检测到可学习文件变化")
+}
+
+func TestRunLearnWorkspaceCurrentPropagatesForceToChildProject(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	opts.force = true
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.Positive(t, atomic.LoadInt32(&learnWorkspaceMockAnalyzeCalls))
+}
+
+func TestRunLearnWorkspaceCurrentAnalyzesAndSavesWorkspaceArtifacts(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	registerLearnWorkspaceMockAgentFactoryWithHandlers(t, learnWorkspaceMockHandlers{
+		analyzeProject: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			return &agent.AnalyzeProjectResult{
+				Language:   "go",
+				Frameworks: []string{"Gin"},
+				Summary:    "backend 是私有化部署主后端。",
+				KeyModules: []domain.ModuleInfo{
+					{Name: "api", Path: "internal/api", Description: "管理 API 入口"},
+				},
+			}, nil
+		},
+	})
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "shared"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, "internal", "api"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(childRoot, "internal", "api", "handler.go"), []byte("package api\n"), 0644))
+	require.DirExists(t, childRoot)
+
+	var profileReq *agent.AnalyzeWorkspaceProfileRequest
+	var specReq *agent.AnalyzeWorkspaceSpecRequest
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceProfileFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+		profileReq = req
+		workspaceInput := readLearnFilePath(t, req.WorkspaceInputPath)
+		userContext := readLearnFilePath(t, req.UserContextPath)
+		require.Contains(t, workspaceInput, `"project_profile_path"`)
+		require.Contains(t, workspaceInput, `"project_ref": "project:backend"`)
+		require.Contains(t, workspaceInput, `"path_ref": "path:backend"`)
+		require.Contains(t, workspaceInput, "backend 是私有化部署主后端。")
+		require.Contains(t, workspaceInput, "internal/api: 管理 API 入口")
+		require.Contains(t, userContext, "工作区用于离线交付")
+		return &domain.WorkspaceProfile{
+			Summary: "学习阶段分析：工作区用于离线交付。",
+			Projects: []domain.WorkspaceProject{
+				{ID: "backend", Responsibility: "负责管理 API", Frameworks: []string{"Gin"}},
+			},
+			Shared: []domain.WorkspacePath{
+				{Path: "shared", Description: "离线交付共享配置", Consumers: []string{"backend"}},
+			},
+		}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceSpecFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+		specReq = req
+		profileInput := readLearnFilePath(t, req.WorkspaceProfilePath)
+		userContext := readLearnFilePath(t, req.UserContextPath)
+		require.Contains(t, profileInput, "学习阶段分析：工作区用于离线交付。")
+		require.Contains(t, userContext, "工作区用于离线交付")
+		return &domain.WorkspaceSpec{
+			Rules: []domain.WorkspaceRule{
+				{
+					Title:       "离线交付边界",
+					Description: "变更 backend 时必须保留离线安装包验证。",
+					AppliesTo:   []domain.WorkspaceReference{{Kind: domain.WorkspaceReferenceProject, Value: "backend"}},
+					Source:      "user_context",
+				},
+			},
+		}, nil
+	}
+
+	requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTestWithContext("工作区用于离线交付"))
+
+	require.NotNil(t, profileReq)
+	require.NotNil(t, specReq)
+	require.NotEmpty(t, profileReq.UserContextPath)
+	require.Equal(t, profileReq.UserContextPath, specReq.UserContextPath)
+	require.NoFileExists(t, profileReq.WorkspaceInputPath)
+	require.NoFileExists(t, profileReq.UserContextPath)
+	require.NoFileExists(t, specReq.WorkspaceProfilePath)
+
+	profile, err := cont.WorkspaceProfileRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "学习阶段分析：工作区用于离线交付。", profile.Summary)
+	require.Equal(t, "负责管理 API", profile.Projects[0].Responsibility)
+	require.Equal(t, []string{"Gin"}, profile.Projects[0].Frameworks)
+	require.Equal(t, "shared", profile.Shared[0].Path)
+
+	spec, err := cont.WorkspaceSpecRepo.Get(context.Background())
+	require.NoError(t, err)
+	require.Len(t, spec.Rules, 2)
+	require.Equal(t, domain.WorkspaceRuleAuthoritySystem, spec.Rules[0].Authority)
+	require.Equal(t, "离线交付边界", spec.Rules[1].Title)
+	require.Contains(t, spec.Rules[1].Description, "离线安装包验证")
+}
+
+func TestRunLearnWorkspaceCurrentShowsRootAnalysisProgress(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+	})
+
+	profileIndex := strings.Index(output, "分析工作区画像")
+	specIndex := strings.Index(output, "分析工作区规范")
+	saveIndex := strings.Index(output, "保存工作区关系")
+	completeIndex := strings.LastIndex(output, "工作区增量学习完成")
+	require.NotEqual(t, -1, profileIndex, "expected workspace profile analysis progress in output: %q", output)
+	require.NotEqual(t, -1, specIndex, "expected workspace spec analysis progress in output: %q", output)
+	require.NotEqual(t, -1, saveIndex, "expected workspace relationship save progress in output: %q", output)
+	require.NotEqual(t, -1, completeIndex, "expected workspace completion in output: %q", output)
+	require.Less(t, profileIndex, specIndex)
+	require.Less(t, specIndex, saveIndex)
+	require.Less(t, saveIndex, completeIndex)
+}
+
+func TestRunLearnWorkspaceCurrentSkipsWorkspaceArtifactsWhenInputUnchanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceProfileFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+		t.Fatal("workspace profile analysis should be skipped when input fingerprint is unchanged")
+		return nil, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceSpecFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+		t.Fatal("workspace spec analysis should be skipped when input fingerprint is unchanged")
+		return nil, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Contains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
+}
+
+func TestRunLearnWorkspaceCurrentRefreshesWorkspaceArtifactsWhenFingerprintChanged(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+	ctx := context.Background()
+	require.NoError(t, cont.FileTracker.SaveAnalyzedFiles(ctx, []domain.FileAnalysisRecord{
+		{
+			ProjectID:      workspaceRelationshipFingerprintScope().ProjectID,
+			ScopePath:      workspaceRelationshipFingerprintScope().ScopePath,
+			Path:           "workspace-relationships.json",
+			Hash:           "legacy-fingerprint",
+			HashAlgorithm:  domain.FileAnalysisHashMD5,
+			Source:         domain.FileAnalysisSourceInputDigest,
+			AnalysisStatus: domain.FileAnalysisStatusInputDigest,
+			LastAnalyzedAt: time.Now().Format(time.RFC3339),
+		},
+	}))
+	profileCalls := 0
+	specCalls := 0
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceProfileFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceProfileRequest) (*domain.WorkspaceProfile, error) {
+		profileCalls++
+		return &domain.WorkspaceProfile{Projects: []domain.WorkspaceProject{{ID: "backend"}}}, nil
+	}
+	cont.Agent.(*mocks.MockAgent).AnalyzeWorkspaceSpecFn = func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error) {
+		specCalls++
+		return &domain.WorkspaceSpec{}, nil
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.NotContains(t, output, "工作区关系输入未变化，已跳过工作区画像和规范分析")
+	require.Equal(t, 1, profileCalls)
+	require.Equal(t, 1, specCalls)
+	record, err := cont.FileTracker.GetAnalyzedFile(ctx, workspaceRelationshipFingerprintScope(), "workspace-relationships.json")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	require.NotEqual(t, "legacy-fingerprint", record.Hash)
+}
+
+func TestRunLearnWorkspaceCurrentWritesChildDetailsToChildLog(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	workspaceLogDir := filepath.Join(cont.SeedPath, "runtime/logs")
+	require.NoError(t, logger.InitWithRetention(workspaceLogDir, "learn", logger.INFO, 0))
+	workspaceLogPath := logger.CurrentLogPath()
+	defer logger.Close()
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	childLogs := readLearnLogFiles(t, filepath.Join(childRoot, ".skills-seed", "runtime/logs"))
+	require.NotEmpty(t, childLogs)
+	require.Contains(t, strings.Join(childLogs, "\n"), `"operation":"command.learn_current"`)
+
+	require.NoError(t, logger.Close())
+	workspaceLog, err := os.ReadFile(workspaceLogPath)
+	require.NoError(t, err)
+	require.NotContains(t, string(workspaceLog), `"operation":"command.learn_current"`)
+	require.Contains(t, string(workspaceLog), "子项目 backend 开始增量学习")
+	require.Contains(t, string(workspaceLog), "子项目 backend 独立执行完成")
+	require.Contains(t, output, "子项目 backend 开始增量学习")
+	require.Contains(t, output, filepath.Join(childRoot, ".skills-seed", "runtime/logs"))
+}
+
+func TestRunLearnWorkspaceCurrentUsesConfiguredParallelism(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	var active int32
+	var maxActive int32
+	provider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		current := atomic.AddInt32(&active, 1)
+		for {
+			previous := atomic.LoadInt32(&maxActive)
+			if current <= previous || atomic.CompareAndSwapInt32(&maxActive, previous, current) {
+				break
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		pattern := learnCurrentPatternForTest(req.ProjectName+"-pattern", "Error Handling", domain.CategoryError, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
+	})
+
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", provider)
+	}
+
+	requireRunLearnCurrentNoError(t, cont, opts)
+
+	require.GreaterOrEqual(t, atomic.LoadInt32(&maxActive), int32(2))
+}
+
+func TestRunLearnWorkspaceCurrentSuppressesChildNextSteps(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.NotContains(t, output, "后续可执行:")
+	require.NotContains(t, output, "查看模式: skills-seed view patterns")
+	require.NotContains(t, output, "查看模式: skills-seed patterns show")
+}
+
+func TestRunLearnWorkspaceCurrentParallelModeShowsPerChildProgressWithoutDetailedLogs(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "frontend", Path: "frontend", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Contains(t, output, "backend")
+	require.Contains(t, output, "frontend")
+	require.Contains(t, output, "准备项目上下文")
+	require.Contains(t, output, "本地文件过滤")
+	require.Contains(t, output, "学习议程规划")
+	require.Contains(t, output, currentAnalysisFocusLabel(1, 1, "当前代码变更"))
+	require.Contains(t, output, "证据焦点完成：1/1 个")
+	require.Contains(t, output, "跳过权威规则与项目地图刷新")
+	require.NotContains(t, output, "代码分析 1/1 已完成")
+	require.NotContains(t, output, "项目根路径:")
+	require.NotContains(t, output, "本地过滤统计:")
+	require.NotContains(t, output, "后续可执行:")
+	require.NotContains(t, output, "开始增量学习")
+	require.NotContains(t, output, "未检测到可学习文件变化")
+	require.NotContains(t, output, "独立执行完成")
+}
+
+func TestRunLearnWorkspaceCurrentShowsRetryReasonInChildProgressLine(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	provider := registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+		agent.ReportRetryForContext(ctx, agent.RetryInfo{
+			AgentName:    "claude",
+			Operation:    "AnalyzeCurrentCodebase",
+			Attempt:      1,
+			MaxRetries:   3,
+			WaitDuration: 15 * time.Second,
+			CallDuration: 217 * time.Second,
+			Reason:       "API Error: 529 overloaded_error",
+		})
+		agent.ReportRetryAttemptForContext(ctx, agent.RetryInfo{
+			AgentName:  "claude",
+			Operation:  "AnalyzeCurrentCodebase",
+			Attempt:    2,
+			MaxRetries: 3,
+		})
+		agent.ReportRetryRecoveredForContext(ctx, agent.RetryInfo{
+			AgentName:  "claude",
+			Operation:  "AnalyzeCurrentCodebase",
+			Attempt:    2,
+			MaxRetries: 3,
+		})
+		pattern := learnCurrentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go")
+		return &agent.AnalyzeCurrentCodebaseResult{
+			Patterns: []domain.Pattern{*pattern},
+		}, nil
+	})
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "front", Path: "front", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", provider)
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	baseLabel := currentAnalysisFocusLabel(1, 1, "当前代码变更")
+	retryLabel := agent.RetryProgressLabel(baseLabel, agent.RetryInfo{Status: agent.RetryProgressStatusWaiting, Reason: "API Error: 529 overloaded_error", CallDuration: 3*time.Minute + 37*time.Second, WaitDuration: 15 * time.Second})
+	attemptLabel := agent.RetryAttemptProgressLabel(baseLabel, agent.RetryInfo{Attempt: 2})
+	require.Contains(t, output, retryLabel)
+	require.Contains(t, output, attemptLabel)
+	afterRetry := output[strings.Index(output, retryLabel)+len(retryLabel):]
+	attemptIndex := strings.Index(afterRetry, attemptLabel)
+	require.NotEqual(t, -1, attemptIndex, "expected retry attempt progress label after retry wait, got %q", output)
+	afterAttempt := afterRetry[attemptIndex+len(attemptLabel):]
+	// 分析/审查是第 4 步（准备、检测、议程、分析、入库、画像）。
+	restoredProgress := fmt.Sprintf("4/%d %s\n", learnCurrentProjectStepTotal, baseLabel)
+	restoreIndex := strings.Index(afterAttempt, restoredProgress)
+	require.NotEqual(t, -1, restoreIndex, "expected retry progress label to be restored after a successful retry, got %q", output)
+}
+
+func TestRunLearnWorkspaceCurrentShowsPerChildProgressLines(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	restoreFactory := registerLearnWorkspaceMockAgentFactory(t)
+	defer restoreFactory()
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
+	var pauseDurations []time.Duration
+	var pauseMu sync.Mutex
+	restorePause := setWorkspaceChildStepPauseForTest(func(duration time.Duration) {
+		pauseMu.Lock()
+		pauseDurations = append(pauseDurations, duration)
+		pauseMu.Unlock()
+	})
+	defer restorePause()
+
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "front", Path: "front", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProject(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n")
+	}
+
+	output := captureLearnStdout(t, func() {
+		requireRunLearnCurrentNoError(t, cont, opts)
+	})
+
+	require.Contains(t, output, "backend")
+	require.Contains(t, output, "front")
+	require.Contains(t, output, "隔离源码证据分析")
+	require.Contains(t, output, "backend")
+	require.Contains(t, output, fmt.Sprintf("%d/%d", learnCurrentProjectStepTotal, learnCurrentProjectStepTotal))
+	require.Contains(t, output, "完成")
+	require.Contains(t, output, "学习工作区子项目")
+	require.NotContains(t, output, "0/2 | backend")
+	require.NotContains(t, output, "0/2 | front")
+	require.NotContains(t, output, "开始增量学习")
+	require.NotContains(t, output, "未检测到可学习文件变化")
+	require.NotContains(t, output, "独立执行完成")
+	pauseMu.Lock()
+	require.NotEmpty(t, pauseDurations)
+	require.Equal(t, progress.FastStepPause, pauseDurations[0])
+	pauseMu.Unlock()
+}
+
+func TestRunLearnWorkspaceCurrentMarksFailedChildProgress(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+	restorePause := setWorkspaceChildStepPauseForTest(func(time.Duration) {})
+	defer restorePause()
+
+	provider := registerLearnWorkspaceMockAgentFactoryWithHandlers(t, learnWorkspaceMockHandlers{
+		analyzeProject: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			if req.ProjectName == "front" {
+				return nil, assertAnError("profile overloaded")
+			}
+			return &agent.AnalyzeProjectResult{Language: "go", Summary: "profile"}, nil
+		},
+	})
+	projects := []config.WorkspaceProjectConfig{
+		{ID: "backend", Path: "backend", Type: "backend", Language: "go"},
+		{ID: "front", Path: "front", Type: "frontend", Language: "typescript"},
+	}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, projects)
+	cfg := cont.ConfigRepo.Get()
+	cfg.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(cfg))
+	for _, project := range projects {
+		initLearnWorkspaceChildProjectWithProvider(t, cont.ConfigRepo.GetProjectConfig().RootPath, project, "package main\n", provider)
+	}
+
+	output := captureLearnStdout(t, func() {
+		_, err := runLearnCurrent(context.Background(), cont, opts)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "front")
+		require.Contains(t, err.Error(), "profile overloaded")
+	})
+
+	require.Contains(t, output, fmt.Sprintf("front        %d/%d 失败", learnCurrentProjectStepTotal, learnCurrentProjectStepTotal))
+	require.Contains(t, output, "学习工作区子项目")
+}
+
+func TestRunLearnWorkspaceCurrentRequiresInitializedChildProject(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend")
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
+
+	_, err := runLearnCurrent(context.Background(), cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "backend")
+	require.Contains(t, err.Error(), "skills-seed workspace add")
+}
+
+func TestRunLearnWorkspaceCurrentRequiresChildGitRepository(t *testing.T) {
+	require.NoError(t, i18n.Init("zh-CN"))
+
+	project := config.WorkspaceProjectConfig{ID: "backend", Path: "backend", Type: "backend", Language: "go"}
+	cont := newLearnCurrentTestContainer(t, domain.ModeWorkspace, []config.WorkspaceProjectConfig{project})
+	childRoot := filepath.Join(cont.ConfigRepo.GetProjectConfig().RootPath, "backend")
+	require.NoError(t, os.MkdirAll(filepath.Join(childRoot, ".skills-seed"), 0755))
+	childConfigRepo, err := config.NewRepository(filepath.Join(childRoot, ".skills-seed"), "zh-CN")
+	require.NoError(t, err)
+	cfg := childConfigRepo.Get()
+	cfg.Project.Mode = domain.ModeProject
+	require.NoError(t, childConfigRepo.Update(cfg))
+
+	_, err = runLearnCurrent(context.Background(), cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto))
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "backend")
+	require.Contains(t, err.Error(), "不是独立 Git 仓库")
+	require.Contains(t, err.Error(), childRoot)
+}
+
+func newLearnCurrentTestContainer(t *testing.T, mode string, projects []config.WorkspaceProjectConfig) *container.Container {
+	t.Helper()
+
+	projectRoot := initLearnGitRepo(t)
+	writeLearnFile(t, projectRoot, "main.go", "package main\n")
+	gitAddAll(t, projectRoot)
+	seedPath := filepath.Join(projectRoot, ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+
+	cfg := configRepo.Get()
+	cfg.Project.Name = "demo"
+	cfg.Project.Mode = mode
+	cfg.Project.Language = "go"
+	cfg.Project.RootPath = projectRoot
+	cfg.Project.Locale = "zh-CN"
+	cfg.Agent.Engine = "mock"
+	cfg.Agent.Commands = map[string]string{"mock": "mock"}
+	cfg.Workspace.Projects = projects
+	require.NoError(t, configRepo.Update(cfg))
+
+	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, patternRepo.Close()) })
+
+	mockAgent := &mocks.MockAgent{
+		NameVal:      "mock",
+		AvailableVal: true,
+		AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+			pattern := learnCurrentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go")
+			return &agent.AnalyzeCurrentCodebaseResult{
+				Patterns: []domain.Pattern{*pattern},
+			}, nil
+		},
+		RefreshProjectProfileFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+			return &agent.AnalyzeProjectResult{
+				Language: "go",
+				Summary:  "profile",
+			}, nil
+		},
+	}
+	gitRepo := git.NewRepository(projectRoot)
+	patternNormSvc := patternnorm.NewService(patternRepo)
+
+	return &container.Container{
+		SeedPath:             seedPath,
+		Config:               configRepo.Get(),
+		ConfigRepo:           configRepo,
+		GitRepo:              gitRepo,
+		PatternRepo:          patternRepo,
+		ProfileRepo:          profilestore.NewRepository(seedPath),
+		StateRepo:            statestore.NewRepository(seedPath),
+		WorkspaceProfileRepo: workspacestore.NewProfileRepository(seedPath),
+		WorkspaceSpecRepo:    workspacestore.NewSpecRepository(seedPath),
+		Agent:                mockAgent,
+		AnalyzerSvc:          analyzer.NewAnalyzerService(mockAgent, configRepo),
+		FileTracker:          patternRepo,
+		PatternNormSvc:       patternNormSvc,
+	}
+}
+
+var learnWorkspaceMockAnalyzeCalls int32
+var learnWorkspaceFactoryMu sync.Mutex
+
+type learnWorkspaceMockHandlers struct {
+	analyzeCurrent func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
+	analyzeProject func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
+}
+
+func registerLearnWorkspaceMockAgentFactory(t *testing.T) func() {
+	t.Helper()
+
+	registerLearnWorkspaceMockAgentFactoryWithAnalyze(t, nil)
+	return func() {
+		atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	}
+}
+
+func registerLearnWorkspaceMockAgentFactoryWithAnalyze(t *testing.T, analyzeFn func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)) string {
+	t.Helper()
+	return registerLearnWorkspaceMockAgentFactoryWithHandlers(t, learnWorkspaceMockHandlers{analyzeCurrent: analyzeFn})
+}
+
+func registerLearnWorkspaceMockAgentFactoryWithHandlers(t *testing.T, handlers learnWorkspaceMockHandlers) string {
+	t.Helper()
+	provider := "mock-workspace-learn-" + strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
+	learnWorkspaceFactoryMu.Lock()
+	restoreFactory := container.RegisterAgentFactoryForTest(provider, func(opts container.AgentFactoryOptions) agent.Agent {
+		return &mocks.MockAgent{
+			NameVal:      provider,
+			AvailableVal: true,
+			AnalyzeCurrentCodebaseFn: func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
+				if handlers.analyzeCurrent != nil {
+					return handlers.analyzeCurrent(ctx, req)
+				}
+				atomic.AddInt32(&learnWorkspaceMockAnalyzeCalls, 1)
+				pattern := learnCurrentPatternForTest("p1", "Error Handling", domain.CategoryError, "main.go")
+				return &agent.AnalyzeCurrentCodebaseResult{
+					Patterns: []domain.Pattern{*pattern},
+				}, nil
+			},
+			RefreshProjectProfileFn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+				if handlers.analyzeProject != nil {
+					return handlers.analyzeProject(ctx, req)
+				}
+				return &agent.AnalyzeProjectResult{
+					Language: "go",
+					Summary:  "profile",
+				}, nil
+			},
+		}
+	})
+	t.Cleanup(restoreFactory)
+	learnWorkspaceFactoryMu.Unlock()
+	atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	t.Cleanup(func() {
+		atomic.StoreInt32(&learnWorkspaceMockAnalyzeCalls, 0)
+	})
+	return provider
+}
+
+func noRuleAuthoritySectionResults(sections []agent.AuthoritySection) []agent.AuthoritySectionResult {
+	results := make([]agent.AuthoritySectionResult, len(sections))
+	for i, section := range sections {
+		results[i] = agent.AuthoritySectionResult{
+			SectionID:    section.ID,
+			NoRuleReason: "The test fixture does not define a durable project constraint in this authority section.",
+		}
+	}
+	return results
+}
+
+func assertAnError(message string) error {
+	return errors.New(message)
+}
+
+func initLearnWorkspaceChildProject(t *testing.T, workspaceRoot string, project config.WorkspaceProjectConfig, mainContent string) string {
+	t.Helper()
+	return initLearnWorkspaceChildProjectWithProvider(t, workspaceRoot, project, mainContent, "mock-workspace-learn-"+strings.NewReplacer("/", "-", " ", "-").Replace(t.Name()))
+}
+
+func initLearnWorkspaceChildProjectWithProvider(t *testing.T, workspaceRoot string, project config.WorkspaceProjectConfig, mainContent string, provider string) string {
+	t.Helper()
+
+	childRoot := filepath.Join(workspaceRoot, filepath.FromSlash(project.Path))
+	require.NoError(t, os.MkdirAll(childRoot, 0755))
+	require.NoError(t, exec.Command("git", "-C", childRoot, "init").Run())
+	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.email", "test@example.com").Run())
+	require.NoError(t, exec.Command("git", "-C", childRoot, "config", "user.name", "Test User").Run())
+	writeLearnFile(t, childRoot, "main.go", mainContent)
+	gitAddAll(t, childRoot)
+
+	childSeedPath := filepath.Join(childRoot, ".skills-seed")
+	childConfigRepo, err := config.NewRepository(childSeedPath, "zh-CN")
+	require.NoError(t, err)
+	cfg := childConfigRepo.Get()
+	cfg.Project.Name = project.ID
+	cfg.Project.Mode = domain.ModeProject
+	cfg.Project.Language = project.Language
+	cfg.Project.RootPath = childRoot
+	cfg.Project.Locale = "zh-CN"
+	cfg.Agent.Engine = provider
+	cfg.Agent.Commands = map[string]string{provider: provider}
+	cfg.Learning.Current.Structural.Enabled = false
+	require.NoError(t, childConfigRepo.Update(cfg))
+	return childRoot
+}
+
+func learnCurrentOptionsForTest(testLanguage string, testFocusPaths []string, testProfileMode string) learnCurrentOptions {
+	if testProfileMode == "" {
+		testProfileMode = learnCurrentProfileAuto
+	}
+	return learnCurrentOptions{
+		language:    testLanguage,
+		focusPaths:  testFocusPaths,
+		profileMode: testProfileMode,
+	}
+}
+
+func learnCurrentOptionsForTestWithContext(userContext string) learnCurrentOptions {
+	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileAuto)
+	opts.userContext = userContext
+	return opts
+}
+
+func currentAnalysisFocusLabel(current, total int, name string) string {
+	return i18n.GetWithParams("ProgressLearnCurrentAnalyzeFocus", map[string]interface{}{
+		"Label":   i18n.Get("ProgressLearnCurrentAnalyzeCodebase"),
+		"Current": current,
+		"Total":   total,
+		"Name":    name,
+	})
+}
+
+func readLearnFilePath(t *testing.T, path string) string {
+	t.Helper()
+	require.NotEmpty(t, path)
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(content)
+}
+
+func fileAnalysisRecordPaths(records []domain.FileAnalysisRecord) []string {
+	paths := make([]string, 0, len(records))
+	for _, record := range records {
+		paths = append(paths, record.Path)
+	}
+	return paths
+}
+
+func fileAnalysisRecordByPath(records []domain.FileAnalysisRecord) map[string]domain.FileAnalysisRecord {
+	byPath := make(map[string]domain.FileAnalysisRecord, len(records))
+	for _, record := range records {
+		byPath[record.Path] = record
+	}
+	return byPath
+}
+
+func setWorkspaceChildStepPauseForTest(fn func(time.Duration)) func() {
+	previous := sleepAfterWorkspaceChildStep
+	sleepAfterWorkspaceChildStep = fn
+	return func() {
+		sleepAfterWorkspaceChildStep = previous
+	}
+}
+
+func captureLearnStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	tempFile, err := os.CreateTemp(t.TempDir(), "stdout")
+	require.NoError(t, err)
+
+	originalStdout := os.Stdout
+	os.Stdout = tempFile
+	defer func() {
+		os.Stdout = originalStdout
+	}()
+
+	fn()
+
+	require.NoError(t, tempFile.Close())
+	data, err := os.ReadFile(tempFile.Name())
+	require.NoError(t, err)
+	return string(data)
+}
+
+func readLearnLogFiles(t *testing.T, logDir string) []string {
+	t.Helper()
+
+	matches, err := filepath.Glob(filepath.Join(logDir, "learn-*.log"))
+	require.NoError(t, err)
+	contents := make([]string, 0, len(matches))
+	for _, match := range matches {
+		data, err := os.ReadFile(match)
+		require.NoError(t, err)
+		contents = append(contents, string(data))
+	}
+	return contents
+}

@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -55,6 +55,25 @@ func TestLearningResumesReviewWithoutRepeatingSourceAnalysis(t *testing.T) {
 	require.Equal(t, 1, sourceCalls)
 	require.Equal(t, 2, reviewCalls)
 	require.FileExists(t, cont.SeedPath+"/cache/snapshots/main.go")
+}
+
+func TestLearningReusesSourceConversationForSameFocusReview(t *testing.T) {
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, nil)
+	mock := cont.Agent.(*mocks.MockAgent)
+	cont.PatternNormSvc = patternnorm.NewServiceWithNormalizer(cont.PatternRepo, mock)
+	want := agent.Conversation{Provider: "claude", ID: "focus-session"}
+	mock.AnalyzeCurrentBatchFn = func(_ context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+		result := pipelineSourceResult(req)
+		result.Conversation = want
+		return result, nil
+	}
+	mock.ReviewKnowledgeFn = func(_ context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+		require.Equal(t, want, req.Conversation)
+		return acceptKnowledgeCandidates(req.Candidates), nil
+	}
+
+	_, err := runLearnCurrent(context.Background(), cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+	require.NoError(t, err)
 }
 
 func TestLearningDrainsSuccessfulAnalysisAfterSiblingFailure(t *testing.T) {

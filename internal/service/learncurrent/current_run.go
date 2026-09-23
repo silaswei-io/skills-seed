@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -24,52 +23,13 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 type currentFileSelectionPlan struct {
 	Candidates []string
 	SkipReason string
-}
-
-type learnCurrentProjectRun struct {
-	cont      *container.Container
-	opts      learnCurrentProjectOptions
-	stateRepo *commandstate.Repository
-	ctx       context.Context
-	startedAt time.Time
-	steps     *commandutil.ConsoleStepRunner
-
-	projectRoot        string
-	projectName        string
-	currentLanguage    string
-	learningMode       string
-	resolvedFocusPaths []string
-	refreshProfile     bool
-	existingProfile    *domain.ProjectProfile
-
-	incrementalChanges  *fileanalysis.FileChanges
-	effectiveFocusPaths []string
-	selectedFiles       []domain.FileInfo
-	selectionSummary    fileSelectionSummary
-	selectionPlan       currentFileSelectionPlan
-	stateSession        *currentStateSession
-	stateInvalidated    bool
-	resumeSummary       *learnCurrentResumeSummary
-	changeProfile       currentChangeProfile
-	analysisState       *commandstate.State
-	plannedFocuses      []domain.EvidenceFocus
-
-	patterns                   []domain.Pattern
-	retiredPatternIDs          []string
-	focusKnowledge             []commandstate.FocusKnowledgeCheckpoint
-	profileRefreshRecommended  agent.ProfileRefreshRecommendation
-	codebaseRunContext         *analyzer.CodebaseRunContext
-	sharedLearningContextPath  string
-	savedCount                 int
-	retiredCount               int
-	progressDetailMu           sync.Mutex
-	fileSelectionSummaryLogged bool
 }
 
 func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
@@ -101,12 +61,17 @@ func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, o
 	ctx = steps.WithContext(ctx)
 
 	return &learnCurrentProjectRun{
-		cont:      cont,
-		opts:      opts,
-		stateRepo: learnCurrentStateRepo(cont.SeedPath, opts.stateScope),
-		ctx:       ctx,
-		startedAt: time.Now(),
-		steps:     steps,
+		learnDeps: learnDeps{
+			cont:      cont,
+			opts:      opts,
+			stateRepo: learnCurrentStateRepo(cont.SeedPath, opts.stateScope),
+			ctx:       ctx,
+			startedAt: time.Now(),
+			steps:     steps,
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			conversations: make(map[string]agent.Conversation),
+		},
 	}
 }
 
@@ -172,14 +137,8 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 
 func (r *learnCurrentProjectRun) runPlanningStage() error {
 	if r.stateSession != nil {
-		// 恢复运行只消费已持久化的候选和议程，禁止重新执行本地筛选或调用议程规划。
-		if r.selectionSummary.Status == "" {
-			r.selectionSummary = fileSelectionSummary{
-				Status: i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
-					"Reason": r.selectionPlan.SkipReason,
-				}),
-			}
-		}
+		// 恢复运行只消费已持久化的候选和议程，禁止重新调用议程规划。
+		r.applyLearningCandidates()
 		developmentFocuses, coverageFocuses := focusKindCounts(r.stateSession.State.Agenda.Focuses)
 		planLabel := i18n.GetWithParams("ProgressLearnCurrentPlanFocusesRestored", map[string]interface{}{
 			"Focuses":            len(r.stateSession.State.Agenda.Focuses),
@@ -192,9 +151,8 @@ func (r *learnCurrentProjectRun) runPlanningStage() error {
 			return nil
 		})
 	}
-	if err := r.narrowLearningCandidates(); err != nil {
-		return err
-	}
+	// 候选已由增量检测确定，直接进入议程规划，不再单独占用控制台步骤。
+	r.applyLearningCandidates()
 	r.logFileSelectionSummaryOnce()
 	if !r.incrementalChanges.HasChanges() {
 		return nil
@@ -303,7 +261,6 @@ func (r *learnCurrentProjectRun) detectChanges() error {
 	if r.stateSession != nil && r.stateSession.State != nil && strings.TrimSpace(r.stateSession.State.ChangeProfile) != "" {
 		r.changeProfile = normalizeCurrentChangeProfile(r.stateSession.State.ChangeProfile)
 	}
-	r.selectionPlan = r.buildFileSelectionPlan()
 	return nil
 }
 
@@ -413,62 +370,47 @@ func (r *learnCurrentProjectRun) currentStateInvocationHash() string {
 	return learnCurrentInvocationHash(focusPaths, r.opts.force)
 }
 
-func (r *learnCurrentProjectRun) buildFileSelectionPlan() currentFileSelectionPlan {
+// applyLearningCandidates 把增量检测得到的路径直接作为本轮学习候选。
+// 不再单独占用控制台步骤；恢复场景只回填摘要，不重复改写变更集。
+func (r *learnCurrentProjectRun) applyLearningCandidates() {
 	focusRelPaths := analysisCandidatePaths(r.incrementalChanges)
+	r.selectionPlan = currentFileSelectionPlan{Candidates: focusRelPaths}
 	if r.stateSession != nil {
-		return currentFileSelectionPlan{
-			Candidates: focusRelPaths,
-			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipRestored"),
+		r.selectionSummary = fileSelectionSummary{
+			CandidateCount: len(focusRelPaths),
+			SelectedCount:  len(focusRelPaths),
+			Status: i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
+				"Reason": i18n.Get("ProgressLearnCurrentFileSelectionSkipRestored"),
+			}),
 		}
+		r.selectionPlan.SkipReason = i18n.Get("ProgressLearnCurrentFileSelectionSkipRestored")
+		return
 	}
 	if len(focusRelPaths) == 0 {
-		return currentFileSelectionPlan{
-			Candidates: focusRelPaths,
-			SkipReason: i18n.Get("ProgressLearnCurrentFileSelectionSkipNoCandidates"),
-		}
-	}
-	return currentFileSelectionPlan{Candidates: focusRelPaths}
-}
-
-func (r *learnCurrentProjectRun) narrowLearningCandidates() error {
-	if r.stateSession != nil || len(r.selectionPlan.Candidates) == 0 {
+		r.selectionPlan.SkipReason = i18n.Get("ProgressLearnCurrentFileSelectionSkipNoCandidates")
 		r.selectionSummary = fileSelectionSummary{
 			Status: i18n.GetWithParams("LearnCurrentFileSelectionSkipped", map[string]interface{}{
 				"Reason": r.selectionPlan.SkipReason,
 			}),
 		}
-		return r.steps.Run(r.selectionPlan.SkipReason, func() error { return nil })
+		return
 	}
-	selectStartedAt := time.Now()
-	selectLabel := r.candidateSelectionProgressLabel()
-	selectedPaths := normalizeStatePaths(r.selectionPlan.Candidates)
-	if err := r.steps.Run(selectLabel, func() error {
-		return nil
-	}); err != nil {
-		return err
-	}
+	selectedPaths := normalizeStatePaths(focusRelPaths)
 	r.effectiveFocusPaths = resolveIncrementalFocusPaths(r.projectRoot, selectedPaths)
 	r.selectedFiles = fileanalysis.PathsToFileInfos(intersectPaths(selectedPaths, r.incrementalChanges.AddedOrModified))
 	r.incrementalChanges.ApplyLearningSelection(selectedPaths, "")
 	r.selectionSummary = fileSelectionSummary{
 		Applied:        true,
-		CandidateCount: len(r.selectionPlan.Candidates),
+		CandidateCount: len(focusRelPaths),
 		SelectedCount:  len(selectedPaths),
 		Status:         i18n.Get("LearnCurrentFileSelectionLocalReason"),
 	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "command.learn_current.select_learning_candidates",
-		"duration", time.Since(selectStartedAt),
-		"candidate_count", len(r.selectionPlan.Candidates),
+		"operation", "command.learn_current.apply_learning_candidates",
+		"candidate_count", len(focusRelPaths),
 		"selected_count", len(selectedPaths),
-		"skipped_count", 0,
 		"fingerprint_record_count", len(r.incrementalChanges.Records),
 	)
-	return nil
-}
-
-func (r *learnCurrentProjectRun) candidateSelectionProgressLabel() string {
-	return i18n.Get("ProgressLearnCurrentLocalFileSelection")
 }
 
 func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectResult, error) {
@@ -575,6 +517,8 @@ func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectR
 		patternsCount: r.resultPatternCount(),
 		savedCount:    r.savedCount,
 		retiredCount:  r.retiredCount,
+		droppedCount:  len(r.dropped),
+		dropped:       append([]patternnorm.Drop(nil), r.dropped...),
 		skipped:       skipped,
 		duration:      time.Since(r.startedAt),
 	}
@@ -635,6 +579,12 @@ func recordLearnCurrentSummary(change *changelog.Builder, result domain.LearnCur
 		"Saved":    summary.PatternsSaved,
 		"Retired":  summary.PatternsRetired,
 	}))
+	if summary.PatternsDropped > 0 {
+		change.Detail(i18n.GetWithParams("ChangeLogLearnDroppedPatterns", map[string]interface{}{
+			"Count":   summary.PatternsDropped,
+			"Reasons": strings.Join(summary.DropReasons, "; "),
+		}))
+	}
 }
 
 func recordLearnJournal(cont *container.Container, result *learnCurrentProjectResult, startedAt time.Time, scopeKind runjournal.ScopeKind) error {
@@ -662,6 +612,12 @@ func recordLearnJournal(cont *container.Container, result *learnCurrentProjectRe
 			"Saved":    result.savedCount,
 			"Retired":  result.retiredCount,
 		}),
+	}
+	if result.droppedCount > 0 {
+		details = append(details, i18n.GetWithParams("LearnJournalDroppedPatterns", map[string]interface{}{
+			"Count":   result.droppedCount,
+			"Reasons": strings.Join(dropReasonSummaries(result.dropped), "; "),
+		}))
 	}
 	return runjournal.Append(cont.SeedPath, runjournal.Entry{
 		Command:    "learn current",

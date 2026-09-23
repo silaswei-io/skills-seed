@@ -352,7 +352,8 @@ type AnalyzeCurrentEvidenceResult struct {
 }
 
 type AnalyzeCurrentCodebaseBatchResult struct {
-	Focuses []AnalyzeCurrentEvidenceResult
+	Focuses      []AnalyzeCurrentEvidenceResult
+	Conversation agent.Conversation
 }
 
 type AnalyzeCurrentDeltaFocus struct {
@@ -605,7 +606,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		"duration", time.Since(startedAt),
 		"focuses_count", len(out),
 	)
-	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out}, nil
+	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out, Conversation: result.Conversation}, nil
 }
 
 func learningEvidence(files []agent.SampleFile, diffs []agent.DiffFileRef, structuralContext string) domain.LearningEvidence {

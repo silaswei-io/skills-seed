@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -132,7 +132,7 @@ func TestReviewAnalyzedFocusUsesCheckpointEvidence(t *testing.T) {
 		return acceptKnowledgeCandidates(req.Candidates), nil
 	}}
 	run := newKnowledgeReviewTestRun(t, []domain.EvidenceFocus{focus}, nil, mockAgent, nil)
-	result := buildAnalyzedFocusResult(focus, 0, []domain.Pattern{*admittedLearnCurrentPatternForTest("auth-rule", "Auth", domain.CategoryBusiness, "internal/auth.go")}, agent.ProfileRefreshRecommendation{})
+	result := buildAnalyzedFocusResult(focus, 0, []domain.Pattern{*admittedLearnCurrentPatternForTest("auth-rule", "Auth", domain.CategoryBusiness, "internal/auth.go")}, agent.ProfileRefreshRecommendation{}, agent.Conversation{})
 	result.evidence = evidence
 	_, err := run.checkpointFocusResult(result)
 	require.NoError(t, err)
@@ -170,18 +170,26 @@ func newKnowledgeReviewTestRun(t *testing.T, focuses []domain.EvidenceFocus, uni
 	require.NoError(t, stateRepo.Save(context.Background(), state))
 	service := patternnorm.NewServiceWithNormalizer(&mocks.MockPatternRepository{}, reviewer)
 	run := &learnCurrentProjectRun{
-		ctx:             context.Background(),
-		cont:            &container.Container{PatternNormSvc: service},
-		stateRepo:       stateRepo,
-		analysisState:   state,
-		projectName:     "demo",
-		projectRoot:     t.TempDir(),
-		currentLanguage: "mixed",
-		focusKnowledge:  cloneFocusKnowledge(units),
-		steps: commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
-			TotalSteps:   1,
-			OnStepUpdate: onUpdate,
-		}),
+		learnDeps: learnDeps{
+			ctx:       context.Background(),
+			cont:      &container.Container{PatternNormSvc: service},
+			stateRepo: stateRepo,
+			steps: commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
+				TotalSteps:   1,
+				OnStepUpdate: onUpdate,
+			}),
+		},
+		learnProjectCtx: learnProjectCtx{
+			projectName:     "demo",
+			projectRoot:     t.TempDir(),
+			currentLanguage: "mixed",
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			analysisState: state,
+		},
+		learnKnowledgeCtx: learnKnowledgeCtx{
+			focusKnowledge: cloneFocusKnowledge(units),
+		},
 	}
 	run.syncDerivedKnowledge()
 	return run

@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -13,36 +13,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/knowledge/patternview"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 )
-
-func (r *learnCurrentProjectRun) analyzeDeltaBatch(ctx context.Context, batch learnCurrentBatch, batchFocuses []analyzer.AnalyzeCurrentEvidenceFocus) ([]learnCurrentFocusResult, error) {
-	related, err := r.relatedPatternsByFocus(ctx, batchFocuses)
-	if err != nil {
-		return nil, err
-	}
-	deltaFocuses := make([]analyzer.AnalyzeCurrentDeltaFocus, 0, len(batchFocuses))
-	for _, focus := range batchFocuses {
-		deltaFocuses = append(deltaFocuses, analyzer.AnalyzeCurrentDeltaFocus{
-			EvidenceFocus:   focus.EvidenceFocus,
-			FocusAbsPaths:   focus.FocusAbsPaths,
-			RelatedPatterns: related[focus.EvidenceFocus.ID],
-		})
-	}
-
-	batchLabel := r.analysisBatchRuntimeLabel(r.analysisState, batch)
-	result, err := r.cont.AnalyzerSvc.AnalyzeCurrentDeltaBatch(ctx, r.projectRoot, r.projectName, r.currentLanguage, analyzer.AnalyzeCurrentDeltaBatchOptions{
-		RuntimeLabel:      batchLabel,
-		LearningMode:      r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-		ChangeProfile:     string(r.changeProfile),
-		RunContext:        r.codebaseRunContext,
-		SharedContextPath: r.sharedLearningContextPath,
-		Focuses:           deltaFocuses,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return r.buildDeltaFocusResults(batch, batchFocuses, related, result)
-}
 
 func (r *learnCurrentProjectRun) buildDeltaFocusResults(batch learnCurrentBatch, batchFocuses []analyzer.AnalyzeCurrentEvidenceFocus, related map[string][]domain.Pattern, result *analyzer.AnalyzeCurrentDeltaBatchResult) ([]learnCurrentFocusResult, error) {
 	if result == nil {
@@ -86,7 +56,7 @@ func (r *learnCurrentProjectRun) buildDeltaFocusResults(batch learnCurrentBatch,
 
 	results := make([]learnCurrentFocusResult, 0, len(batch.focuses))
 	for _, indexed := range batch.focuses {
-		focusResult := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID])
+		focusResult := buildAnalyzedFocusResult(indexed.focus, indexed.index, patternsByFocus[indexed.focus.ID], refreshByFocus[indexed.focus.ID], agent.Conversation{})
 		focusResult.evidence = result.Evidence[indexed.focus.ID].Clone()
 		focusResult.retiredPatternIDs = appendUniquePatternIDs(nil, retiredByFocus[indexed.focus.ID]...)
 		results = append(results, focusResult)

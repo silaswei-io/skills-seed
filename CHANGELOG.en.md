@@ -2,6 +2,27 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.35]
+
+### Improvements
+
+- Converged Claude/Codex current-learning tasks into a shared `agent/learning` implementation so providers only keep process and session differences.
+- Moved learning orchestration into `service/learncurrent`, leaving the `learn` command as a CLI adapter, and split analyze/review/commit/profile stages into focused files.
+- Grouped learn-session fields by dependencies, project, change, agenda, and knowledge to reduce orchestration coupling.
+- Removed the hollow file-selection console step and reduced project-level `learn current` top-level stages to six.
+- Orchestrated focus analysis through a unified `Mode` (`full`/`delta`) entry point instead of scattered boolean branches.
+- Recorded normalization drops in the run journal and changelog, and exposed drop counts and reasons on the learning summary.
+- Split the Pattern domain model into its own file; `patternview.Normalize` and `NormalizeForSave` clear run-ephemeral fields such as `DiffAnchors`.
+- Skill generation can derive DevelopmentFocus navigation from evidence paths when a reviewed focus is missing; derived focuses use category-level references to avoid dead links.
+
+### Fixes
+
+- Moved `LearningRuntime` out of the `agent` package to eliminate the `agent` ↔ `prompts` import cycle in tests.
+
+### Tests and Documentation
+
+- Added regressions for FocusBatch dispatch, learncurrent session structure, and generated focus derivation. Updated the bilingual Learning-and-Sync wiki.
+
 ## [v0.20.34]
 
 ### Added

@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -17,19 +17,25 @@ import (
 func TestCommitCurrentAnalysisDoesNotSaveFingerprintWhenSnapshotFails(t *testing.T) {
 	saved := false
 	run := &learnCurrentProjectRun{
-		cont: &container.Container{FileTracker: &mocks.MockFileAnalysisTracker{
-			SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
-				saved = true
-				return nil
-			},
-		}},
-		incrementalChanges: &fileanalysis.FileChanges{
-			Records: []domain.FileAnalysisRecord{{Path: "../outside.go"}},
+		learnDeps: learnDeps{
+			cont: &container.Container{FileTracker: &mocks.MockFileAnalysisTracker{
+				SaveAnalyzedFilesFn: func(ctx context.Context, records []domain.FileAnalysisRecord) error {
+					saved = true
+					return nil
+				},
+			}},
 		},
-		codebaseRunContext: &analyzer.CodebaseRunContext{SnapshotFlow: &snapshotflow.Result{
-			CurrentFiles: map[string]string{"../outside.go": "package outside\n"},
-			Repository:   snapshotstore.NewRepository(t.TempDir()),
-		}},
+		learnChangeCtx: learnChangeCtx{
+			incrementalChanges: &fileanalysis.FileChanges{
+				Records: []domain.FileAnalysisRecord{{Path: "../outside.go"}},
+			},
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			codebaseRunContext: &analyzer.CodebaseRunContext{SnapshotFlow: &snapshotflow.Result{
+				CurrentFiles: map[string]string{"../outside.go": "package outside\n"},
+				Repository:   snapshotstore.NewRepository(t.TempDir()),
+			}},
+		},
 	}
 
 	err := run.commitCurrentAnalysis(context.Background())

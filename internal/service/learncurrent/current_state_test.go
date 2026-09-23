@@ -1,4 +1,4 @@
-package learn
+package learncurrent
 
 import (
 	"context"
@@ -221,19 +221,23 @@ func TestRunPlanningStageConsumesPersistedAgendaOnResume(t *testing.T) {
 		FocusKnowledge: []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0], Reviewed: true}},
 	}
 	run := &learnCurrentProjectRun{
-		stateSession: &currentStateSession{
-			State: state,
-			Changes: &fileanalysis.FileChanges{
+		learnDeps: learnDeps{
+			steps: commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{TotalSteps: 1}),
+		},
+		learnChangeCtx: learnChangeCtx{
+			stateSession: &currentStateSession{
+				State: state,
+				Changes: &fileanalysis.FileChanges{
+					Records:         append([]domain.FileAnalysisRecord(nil), state.Files...),
+					AddedOrModified: []string{"first.go", "second.go"},
+				},
+			},
+			incrementalChanges: &fileanalysis.FileChanges{
 				Records:         append([]domain.FileAnalysisRecord(nil), state.Files...),
 				AddedOrModified: []string{"first.go", "second.go"},
 			},
+			selectionPlan: currentFileSelectionPlan{Candidates: []string{"first.go", "second.go"}},
 		},
-		incrementalChanges: &fileanalysis.FileChanges{
-			Records:         append([]domain.FileAnalysisRecord(nil), state.Files...),
-			AddedOrModified: []string{"first.go", "second.go"},
-		},
-		selectionPlan: currentFileSelectionPlan{Candidates: []string{"first.go", "second.go"}},
-		steps:         commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{TotalSteps: 1}),
 	}
 
 	require.NoError(t, run.runPlanningStage())
@@ -256,9 +260,13 @@ func TestCheckpointFocusResultsMakesCompletedFocusRecoverable(t *testing.T) {
 	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", changes.Records, nil, focuses)
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	run := &learnCurrentProjectRun{
-		ctx:           context.Background(),
-		stateRepo:     repo,
-		analysisState: state,
+		learnDeps: learnDeps{
+			ctx:       context.Background(),
+			stateRepo: repo,
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			analysisState: state,
+		},
 	}
 
 	completed, err := run.checkpointFocusResults([]learnCurrentFocusResult{{
@@ -307,9 +315,15 @@ func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {
 		{ID: "key", Name: "Key", EntryPaths: []string{"internal/shared.go"}},
 	}
 	run := &learnCurrentProjectRun{
-		analysisState:      commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses),
-		incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
-		focusKnowledge:     []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0], Reviewed: true}},
+		learnChangeCtx: learnChangeCtx{
+			incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/shared.go"}}},
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			analysisState: commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, focuses),
+		},
+		learnKnowledgeCtx: learnKnowledgeCtx{
+			focusKnowledge: []commandstate.FocusKnowledgeCheckpoint{{Focus: focuses[0], Reviewed: true}},
+		},
 	}
 
 	err := run.validateCompletedAnalysis()
@@ -321,10 +335,16 @@ func TestCompleteAnalysisDoesNotCheckpointIncompletePlan(t *testing.T) {
 	unit := domain.EvidenceFocus{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}
 	repo := commandstate.NewRepository(t.TempDir(), commandStateLearnCurrent)
 	run := &learnCurrentProjectRun{
-		ctx:                context.Background(),
-		stateRepo:          repo,
-		analysisState:      commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, []domain.EvidenceFocus{unit}),
-		incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/key.go"}}},
+		learnDeps: learnDeps{
+			ctx:       context.Background(),
+			stateRepo: repo,
+		},
+		learnChangeCtx: learnChangeCtx{
+			incrementalChanges: &fileanalysis.FileChanges{Records: []domain.FileAnalysisRecord{{Path: "internal/key.go"}}},
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			analysisState: commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, []domain.EvidenceFocus{unit}),
+		},
 	}
 
 	err := run.completeAnalysis()

@@ -17,6 +17,8 @@ type LearnCurrentSummary struct {
 	PatternsFound    int
 	PatternsSaved    int
 	PatternsRetired  int
+	PatternsDropped  int
+	DropReasons      []string
 	Projects         int
 	ChangedProjects  int
 	WorkspaceChanged bool

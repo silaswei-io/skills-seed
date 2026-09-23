@@ -2391,6 +2391,12 @@ other = "no learned changes detected; skipped skills generation"
 [LearnJournalSummaryCounts]
 other = "changed {{.Changed}}, deleted {{.Deleted}}, skipped {{.Skipped}}, {{.Patterns}} candidate patterns found, {{.Saved}} normalized patterns written, {{.Retired}} retired"
 
+[LearnJournalDroppedPatterns]
+other = "dropped {{.Count}} candidates during normalization: {{.Reasons}}"
+
+[ChangeLogLearnDroppedPatterns]
+other = "dropped {{.Count}} candidate patterns: {{.Reasons}}"
+
 [LearnJournalWorkspaceSummary]
 other = "processed {{.Projects}} projects; {{.ChangedProjects}} changed"
 
