@@ -2,7 +2,7 @@
 
 Runtime prompt templates live under `embedfs/templates/prompts/loader/`. They are rendered by `internal/prompts.Loader` and sent through both Claude and Codex agent implementations unless noted otherwise.
 
-`embedfs/templates/prompts/append/knowledge-goal-contract.txt.tmpl` is prepended to every runtime prompt that can create long-lived project or workspace knowledge. It is a compact, stable projection of `docs/ULTIMATE_GOAL.md`: future-agent decision value, authority boundaries, evidence requirements, scope, and risk must survive every learning stage. Stage templates remain responsible for task-specific discovery and output rules.
+`embedfs/templates/prompts/append/knowledge-goal-contract.txt.tmpl` is prepended to every runtime prompt that can create long-lived project or workspace knowledge. It is a compact, stable projection of `docs/ULTIMATE_GOAL.md`: future-agent decision value, authority boundaries, evidence requirements, scope, and risk must survive every learning stage. It also states the shared speed/accuracy default: omit weak items, prefer empty structured results over padded coverage. Stage templates remain responsible for task-specific discovery and output rules.
 
 The runtime goal contract has a single source of truth under `embedfs/templates/prompts/append/`; `docs/ULTIMATE_GOAL.md` is an acceptance and design document and is never loaded as prompt text. Project-specific facts are passed through typed runtime inputs instead of allowing the model to generate an unconstrained replacement prompt.
 
@@ -26,6 +26,18 @@ Files under `embedfs/templates/prompts/append/` are reusable mandatory fragments
 | `core-user-pattern` | `CodexAgent.UserDefinePattern`, `ClaudeAgent.UserDefinePattern` | Convert user-provided pattern descriptions into structured pattern output. |
 
 Planning and learning stages retain read-only repository tools because their prompts intentionally reference runtime candidate lists, structural context, diffs, and repository paths. Cross-stage memory is explicit runtime data, not command-wide hidden conversation state.
+
+## Speed and accuracy posture (learning chain)
+
+Current learning stage templates share these posture rules (in addition to the goal contract):
+
+- **Plan**: smallest focus set that preserves distinct future decisions; leave ambiguous paths unassigned for deterministic fallback; no per-file taxonomy.
+- **Analyze (full)**: stop when listed evidence is enough; prefer `patterns: []` over weak admission; explicit four-point admission gate before retaining candidates.
+- **Analyze (delta)**: default `no_change` unless a listed diff proves a reusable decision; one decision per focus ID.
+- **Review**: cheapest correct verdict (`accept` when already accurate; reject is success); no repository re-discovery.
+- **Normalize**: default keep; no style rewrites of single-source reviewed candidates; merge only on clear equivalence.
+
+These rules reduce exploration and token load while keeping evidence and authority boundaries intact.
 
 ## Redundancy Status
 
