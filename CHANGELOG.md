@@ -2,6 +2,27 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.20.35]
+
+### 优化
+
+- 将 Claude/Codex 当前学习任务收敛到共享 `agent/learning` 实现，Provider 只保留进程与会话差异。
+- 学习编排下沉到 `service/learncurrent`，`learn` 命令仅保留 CLI 适配；焦点分析/审查/入库/画像按阶段拆分文件。
+- 学习会话字段按依赖、项目、变更、议程、知识分组，降低编排对象耦合。
+- 拆除空心文件筛选控制台步骤，项目级 learn current 顶层阶段调整为 6 步。
+- 焦点分析通过统一 `Mode`（full/delta）入口编排，避免调用点散落布尔分支。
+- 规范化丢弃的候选写入 run journal 与 changelog，并在学习摘要中暴露丢弃数量与原因。
+- Pattern 领域模型拆至独立文件；`patternview.Normalize` / `NormalizeForSave` 清空 `DiffAnchors` 等运行短暂态。
+- Skill 生成在缺少已审查 DevelopmentFocus 时，可从证据路径派生导航入口，派生焦点只挂分类级引用避免死链。
+
+### 修复
+
+- 将 `LearningRuntime` 移出 `agent` 包，消除 `agent` ↔ `prompts` 在测试中的导入环。
+
+### 测试与文档
+
+- 补充 FocusBatch 分发、learncurrent 会话结构与生成焦点派生相关回归；同步更新中英文 Learning-and-Sync Wiki。
+
 ## [v0.20.34]
 
 ### 新增
