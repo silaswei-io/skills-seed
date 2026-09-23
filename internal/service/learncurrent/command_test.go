@@ -1124,7 +1124,11 @@ func TestBuildDeltaFocusResultsRequiresDecisionForEveryFocus(t *testing.T) {
 }
 
 func TestBuildDeltaFocusResultsMapsNewFocusByAnchor(t *testing.T) {
-	run := &learnCurrentProjectRun{projectRoot: "/repo"}
+	run := &learnCurrentProjectRun{
+		learnProjectCtx: learnProjectCtx{
+			projectRoot: "/repo",
+		},
+	}
 	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{
 		{index: 0, focus: domain.EvidenceFocus{ID: "payment", Name: "支付流程"}},
 	}}
@@ -1156,7 +1160,11 @@ func TestBuildDeltaFocusResultsMapsNewFocusByAnchor(t *testing.T) {
 }
 
 func TestBuildDeltaFocusResultsAcceptsNoChangeDecisionWithoutAnchor(t *testing.T) {
-	run := &learnCurrentProjectRun{projectRoot: "/repo"}
+	run := &learnCurrentProjectRun{
+		learnProjectCtx: learnProjectCtx{
+			projectRoot: "/repo",
+		},
+	}
 	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{
 		{index: 0, focus: domain.EvidenceFocus{ID: "app-config", Name: "应用配置"}},
 	}}
@@ -1182,7 +1190,11 @@ func TestBuildDeltaFocusResultsAcceptsNoChangeDecisionWithoutAnchor(t *testing.T
 }
 
 func TestBuildDeltaFocusResultsRetiresOnlyEligibleRelatedPattern(t *testing.T) {
-	run := &learnCurrentProjectRun{projectRoot: "/repo"}
+	run := &learnCurrentProjectRun{
+		learnProjectCtx: learnProjectCtx{
+			projectRoot: "/repo",
+		},
+	}
 	batch := learnCurrentBatch{focuses: []indexedEvidenceFocus{{
 		index: 0,
 		focus: domain.EvidenceFocus{ID: "auth", Name: "认证登录"},

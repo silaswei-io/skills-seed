@@ -170,18 +170,26 @@ func newKnowledgeReviewTestRun(t *testing.T, focuses []domain.EvidenceFocus, uni
 	require.NoError(t, stateRepo.Save(context.Background(), state))
 	service := patternnorm.NewServiceWithNormalizer(&mocks.MockPatternRepository{}, reviewer)
 	run := &learnCurrentProjectRun{
-		ctx:             context.Background(),
-		cont:            &container.Container{PatternNormSvc: service},
-		stateRepo:       stateRepo,
-		analysisState:   state,
-		projectName:     "demo",
-		projectRoot:     t.TempDir(),
-		currentLanguage: "mixed",
-		focusKnowledge:  cloneFocusKnowledge(units),
-		steps: commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
-			TotalSteps:   1,
-			OnStepUpdate: onUpdate,
-		}),
+		learnDeps: learnDeps{
+			ctx:       context.Background(),
+			cont:      &container.Container{PatternNormSvc: service},
+			stateRepo: stateRepo,
+			steps: commandutil.NewConsoleStepRunner(commandutil.ConsoleStepRunnerOptions{
+				TotalSteps:   1,
+				OnStepUpdate: onUpdate,
+			}),
+		},
+		learnProjectCtx: learnProjectCtx{
+			projectName:     "demo",
+			projectRoot:     t.TempDir(),
+			currentLanguage: "mixed",
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			analysisState: state,
+		},
+		learnKnowledgeCtx: learnKnowledgeCtx{
+			focusKnowledge: cloneFocusKnowledge(units),
+		},
 	}
 	run.syncDerivedKnowledge()
 	return run

@@ -14,17 +14,23 @@ import (
 func TestEnsureSharedLearningContextWritesRuntimeFile(t *testing.T) {
 	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
 	run := &learnCurrentProjectRun{
-		cont:            &container.Container{SeedPath: seedPath},
-		projectName:     "demo",
-		projectRoot:     "/repo",
-		currentLanguage: "go",
-		learningMode:    "normal",
-		analysisState: &commandstate.State{
-			Agenda: domain.LearningAgenda{Focuses: []domain.EvidenceFocus{{
-				ID:         "auth",
-				Name:       "Auth",
-				EntryPaths: []string{"internal/auth.go"},
-			}}},
+		learnDeps: learnDeps{
+			cont: &container.Container{SeedPath: seedPath},
+		},
+		learnProjectCtx: learnProjectCtx{
+			projectName:     "demo",
+			projectRoot:     "/repo",
+			currentLanguage: "go",
+			learningMode:    "normal",
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			analysisState: &commandstate.State{
+				Agenda: domain.LearningAgenda{Focuses: []domain.EvidenceFocus{{
+					ID:         "auth",
+					Name:       "Auth",
+					EntryPaths: []string{"internal/auth.go"},
+				}}},
+			},
 		},
 	}
 

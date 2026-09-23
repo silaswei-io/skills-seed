@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
@@ -24,54 +23,13 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
+	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
 type currentFileSelectionPlan struct {
 	Candidates []string
 	SkipReason string
-}
-
-type learnCurrentProjectRun struct {
-	cont      *container.Container
-	opts      learnCurrentProjectOptions
-	stateRepo *commandstate.Repository
-	ctx       context.Context
-	startedAt time.Time
-	steps     *commandutil.ConsoleStepRunner
-
-	projectRoot        string
-	projectName        string
-	currentLanguage    string
-	learningMode       string
-	resolvedFocusPaths []string
-	refreshProfile     bool
-	existingProfile    *domain.ProjectProfile
-
-	incrementalChanges  *fileanalysis.FileChanges
-	effectiveFocusPaths []string
-	selectedFiles       []domain.FileInfo
-	selectionSummary    fileSelectionSummary
-	selectionPlan       currentFileSelectionPlan
-	stateSession        *currentStateSession
-	stateInvalidated    bool
-	resumeSummary       *learnCurrentResumeSummary
-	changeProfile       currentChangeProfile
-	analysisState       *commandstate.State
-	plannedFocuses      []domain.EvidenceFocus
-
-	patterns          []domain.Pattern
-	retiredPatternIDs []string
-	focusKnowledge    []commandstate.FocusKnowledgeCheckpoint
-	// conversations 仅在当前进程内保存焦点会话，检查点不会持久化模型会话标识。
-	conversations              map[string]agent.Conversation
-	profileRefreshRecommended  agent.ProfileRefreshRecommendation
-	codebaseRunContext         *analyzer.CodebaseRunContext
-	sharedLearningContextPath  string
-	savedCount                 int
-	retiredCount               int
-	progressDetailMu           sync.Mutex
-	fileSelectionSummaryLogged bool
 }
 
 func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
@@ -103,13 +61,17 @@ func newLearnCurrentProjectRun(ctx context.Context, cont *container.Container, o
 	ctx = steps.WithContext(ctx)
 
 	return &learnCurrentProjectRun{
-		cont:          cont,
-		opts:          opts,
-		stateRepo:     learnCurrentStateRepo(cont.SeedPath, opts.stateScope),
-		ctx:           ctx,
-		startedAt:     time.Now(),
-		steps:         steps,
-		conversations: make(map[string]agent.Conversation),
+		learnDeps: learnDeps{
+			cont:      cont,
+			opts:      opts,
+			stateRepo: learnCurrentStateRepo(cont.SeedPath, opts.stateScope),
+			ctx:       ctx,
+			startedAt: time.Now(),
+			steps:     steps,
+		},
+		learnAgendaCtx: learnAgendaCtx{
+			conversations: make(map[string]agent.Conversation),
+		},
 	}
 }
 
@@ -555,6 +517,8 @@ func (r *learnCurrentProjectRun) buildResult(skipped bool) *learnCurrentProjectR
 		patternsCount: r.resultPatternCount(),
 		savedCount:    r.savedCount,
 		retiredCount:  r.retiredCount,
+		droppedCount:  len(r.dropped),
+		dropped:       append([]patternnorm.Drop(nil), r.dropped...),
 		skipped:       skipped,
 		duration:      time.Since(r.startedAt),
 	}
@@ -615,6 +579,12 @@ func recordLearnCurrentSummary(change *changelog.Builder, result domain.LearnCur
 		"Saved":    summary.PatternsSaved,
 		"Retired":  summary.PatternsRetired,
 	}))
+	if summary.PatternsDropped > 0 {
+		change.Detail(i18n.GetWithParams("ChangeLogLearnDroppedPatterns", map[string]interface{}{
+			"Count":   summary.PatternsDropped,
+			"Reasons": strings.Join(summary.DropReasons, "; "),
+		}))
+	}
 }
 
 func recordLearnJournal(cont *container.Container, result *learnCurrentProjectResult, startedAt time.Time, scopeKind runjournal.ScopeKind) error {
@@ -642,6 +612,12 @@ func recordLearnJournal(cont *container.Container, result *learnCurrentProjectRe
 			"Saved":    result.savedCount,
 			"Retired":  result.retiredCount,
 		}),
+	}
+	if result.droppedCount > 0 {
+		details = append(details, i18n.GetWithParams("LearnJournalDroppedPatterns", map[string]interface{}{
+			"Count":   result.droppedCount,
+			"Reasons": strings.Join(dropReasonSummaries(result.dropped), "; "),
+		}))
 	}
 	return runjournal.Append(cont.SeedPath, runjournal.Entry{
 		Command:    "learn current",
