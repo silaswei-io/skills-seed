@@ -124,3 +124,13 @@ func (r *learnCurrentProjectRun) applyKnowledgeReviewResult(task knowledgeReview
 	r.setFocusKnowledge(unit)
 	r.syncDerivedKnowledge()
 }
+
+// applyLocalEmptyReview 对无候选焦点完成本地审查收口（S1 早停）。
+// 不调用 Agent；由调用方批量落盘检查点并通知观察者。
+func (r *learnCurrentProjectRun) applyLocalEmptyReview(result learnCurrentFocusResult) {
+	unit := result.checkpoint()
+	unit.Patterns = nil
+	unit.Reviewed = true
+	r.setFocusKnowledge(unit)
+	r.syncDerivedKnowledge()
+}

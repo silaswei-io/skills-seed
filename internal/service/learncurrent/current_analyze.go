@@ -180,6 +180,7 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 	batchLabel := r.analysisBatchRuntimeLabel(state, batch)
 	// 编排层只通过统一 Mode 入口分析；full/delta 结果形状差异在本函数内消化。
 	mode := analyzer.SelectFocusAnalysisMode(r.useDeltaAnalysis())
+	r.observer.noteAnalysisMode(string(mode))
 	focusOpts := analyzer.AnalyzeCurrentFocusBatchOptions{
 		Mode:              mode,
 		RuntimeLabel:      batchLabel,

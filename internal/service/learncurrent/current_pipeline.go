@@ -104,10 +104,23 @@ func (r *learnCurrentProjectRun) analyzePlannedBatches(label string, state *comm
 		} else {
 			_, err = r.checkpointFocusResults(result.analyzed)
 			if err == nil {
+				localReviewed := 0
 				for _, analyzed := range result.analyzed {
-					if analyzed.completed {
-						reviews = append(reviews, knowledgeReviewTask{index: analyzed.index, unit: analyzed.checkpoint()})
+					if !analyzed.completed {
+						continue
 					}
+					// 早停：无候选焦点本地标为已审查，不进入 AI 审查队列。
+					if !focusNeedsIndependentReview(analyzed.patterns) {
+						r.applyLocalEmptyReview(analyzed)
+						localReviewed++
+						completed++
+						continue
+					}
+					reviews = append(reviews, knowledgeReviewTask{index: analyzed.index, unit: analyzed.checkpoint()})
+				}
+				if localReviewed > 0 {
+					r.observer.noteSkip(skipReviewEmpty)
+					err = r.saveAnalysisCheckpoint()
 				}
 			}
 		}

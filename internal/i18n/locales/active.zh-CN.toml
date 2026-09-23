@@ -2394,6 +2394,9 @@ other = "变更 {{.Changed}}，删除 {{.Deleted}}，跳过 {{.Skipped}}，发�
 [LearnJournalDroppedPatterns]
 other = "规范化丢弃 {{.Count}} 个候选：{{.Reasons}}"
 
+[LearnJournalRunMetrics]
+other = "运行度量：耗时 {{.WallMs}}ms，Agent 调用 {{.AgentCalls}}，分析模式 {{.AnalysisMode}}，跳过阶段 {{.SkippedStages}}"
+
 [ChangeLogLearnDroppedPatterns]
 other = "丢弃候选模式 {{.Count}} 个：{{.Reasons}}"
 
