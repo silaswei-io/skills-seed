@@ -11,7 +11,7 @@ import (
 
 func call(
 	ctx context.Context,
-	rt agent.LearningRuntime,
+	rt Runtime,
 	operation, templateName, inputPrefix, outputContract string,
 	task agent.RuntimeTask,
 	conversation agent.Conversation,
@@ -22,7 +22,7 @@ func call(
 
 func callWithOptions(
 	ctx context.Context,
-	rt agent.LearningRuntime,
+	rt Runtime,
 	operation, templateName, inputPrefix, outputContract string,
 	opts aicontract.StructuredOutputOptions,
 	task agent.RuntimeTask,

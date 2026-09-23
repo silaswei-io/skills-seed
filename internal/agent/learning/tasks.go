@@ -12,7 +12,7 @@ import (
 )
 
 // PlanLearningAgenda 规划当前代码学习的证据焦点议程。
-func PlanLearningAgenda(ctx context.Context, rt agent.LearningRuntime, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
+func PlanLearningAgenda(ctx context.Context, rt Runtime, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
 	output, _, err := call(ctx, rt, "LearningPackPlan", "learning-pack-plan", "skills-seed-learning-pack-plan", aicontract.ContractPlanLearningAgenda, agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-plan", "")), agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.PlanLearningAgendaPromptData(inputs, req)
 	})
@@ -23,7 +23,7 @@ func PlanLearningAgenda(ctx context.Context, rt agent.LearningRuntime, req *agen
 }
 
 // NormalizePatterns 归并当前学习候选模式。
-func NormalizePatterns(ctx context.Context, rt agent.LearningRuntime, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
+func NormalizePatterns(ctx context.Context, rt Runtime, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
 	output, _, err := call(ctx, rt, "LearningPatternNormalize", "learning-pattern-normalize", "skills-seed-learning-pattern-normalize", aicontract.ContractNormalizePatterns, agent.NewRuntimeTask(agent.RuntimeSlug("learning-pattern-normalize", "")), agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.NormalizePatternsPromptData(inputs, req)
 	})
@@ -34,7 +34,7 @@ func NormalizePatterns(ctx context.Context, rt agent.LearningRuntime, req *agent
 }
 
 // ReviewKnowledge 独立复核源码学习候选。
-func ReviewKnowledge(ctx context.Context, rt agent.LearningRuntime, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+func ReviewKnowledge(ctx context.Context, rt Runtime, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-knowledge-review", req.RuntimeLabel))
 	output, _, err := callWithOptions(ctx, rt, agent.ReviewKnowledgeOperation(req), "learning-knowledge-review", agent.RuntimePromptInputPrefix("skills-seed-learning-knowledge-review", req.RuntimeLabel), aicontract.ContractReviewKnowledge, aicontract.StructuredOutputOptions{CandidateIDs: agent.ReviewKnowledgeCandidateIDs(req.Candidates)}, task, req.Conversation, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.ReviewKnowledgePromptData(inputs, req)
@@ -53,7 +53,7 @@ func ReviewKnowledge(ctx context.Context, rt agent.LearningRuntime, req *agent.R
 }
 
 // AnalyzeCurrentFocusBatch 按 Mode 分发到 full 或 delta 分析实现。
-func AnalyzeCurrentFocusBatch(ctx context.Context, rt agent.LearningRuntime, req *agent.AnalyzeCurrentFocusBatchRequest) (*agent.AnalyzeCurrentFocusBatchResult, error) {
+func AnalyzeCurrentFocusBatch(ctx context.Context, rt Runtime, req *agent.AnalyzeCurrentFocusBatchRequest) (*agent.AnalyzeCurrentFocusBatchResult, error) {
 	if req == nil {
 		return nil, fmt.Errorf("AnalyzeCurrentFocusBatch request is nil")
 	}
@@ -146,7 +146,7 @@ func AnalyzeCurrentFocusBatch(ctx context.Context, rt agent.LearningRuntime, req
 }
 
 // AnalyzeCurrentCodebaseBatch 批量分析当前代码学习焦点。
-func AnalyzeCurrentCodebaseBatch(ctx context.Context, rt agent.LearningRuntime, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
+func AnalyzeCurrentCodebaseBatch(ctx context.Context, rt Runtime, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-analyze", req.RuntimeLabel))
 	output, conversation, err := callWithOptions(ctx, rt, agent.AnalyzeCurrentCodebaseBatchOperation(req), "learning-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentCodebaseBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{Provider: rt.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.AnalyzeCurrentCodebaseBatchPromptData(inputs, req)
@@ -163,7 +163,7 @@ func AnalyzeCurrentCodebaseBatch(ctx context.Context, rt agent.LearningRuntime, 
 }
 
 // AnalyzeCurrentDeltaBatch 基于 diff 判断知识变化。
-func AnalyzeCurrentDeltaBatch(ctx context.Context, rt agent.LearningRuntime, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
+func AnalyzeCurrentDeltaBatch(ctx context.Context, rt Runtime, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-delta-pack-analyze", req.RuntimeLabel))
 	output, _, err := callWithOptions(ctx, rt, agent.AnalyzeCurrentDeltaBatchOperation(req), "learning-delta-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-delta-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentDeltaBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.AnalyzeCurrentDeltaBatchPromptData(inputs, req)
@@ -179,7 +179,7 @@ func AnalyzeCurrentDeltaBatch(ctx context.Context, rt agent.LearningRuntime, req
 }
 
 // RefreshProjectProfile 刷新项目画像。
-func RefreshProjectProfile(ctx context.Context, rt agent.LearningRuntime, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
+func RefreshProjectProfile(ctx context.Context, rt Runtime, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
 	output, _, err := call(ctx, rt, "LearningProfileRefresh", "learning-profile-refresh", "skills-seed-learning-profile-refresh", aicontract.ContractProjectProfile, agent.NewRuntimeTask(agent.RuntimeSlug("learning-profile-refresh", "")), agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
 		return agent.AnalyzeProjectPromptData(inputs, req)
 	})
@@ -194,7 +194,7 @@ func RefreshProjectProfile(ctx context.Context, rt agent.LearningRuntime, req *a
 }
 
 // ExtractAuthority 从权威文件提取工程规则。
-func ExtractAuthority(ctx context.Context, rt agent.LearningRuntime, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+func ExtractAuthority(ctx context.Context, rt Runtime, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
 	opts := aicontract.StructuredOutputOptions{
 		AuthoritySectionIDs: agent.AuthoritySectionIDs(req.AuthoritySections),
 	}
@@ -223,7 +223,7 @@ func ExtractAuthority(ctx context.Context, rt agent.LearningRuntime, req *agent.
 }
 
 // ReviewAuthority 复核权威规则提取结果。
-func ReviewAuthority(ctx context.Context, rt agent.LearningRuntime, req *agent.ReviewAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
+func ReviewAuthority(ctx context.Context, rt Runtime, req *agent.ReviewAuthorityRequest) (*agent.ExtractAuthorityResult, error) {
 	opts := aicontract.StructuredOutputOptions{
 		AuthoritySectionIDs: agent.AuthoritySectionIDs(req.AuthoritySections),
 	}
