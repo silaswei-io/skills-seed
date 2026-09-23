@@ -13,6 +13,11 @@ The first extraction candidate is available at `{{.CandidatePath}}`. It is evide
 User context is available at `{{.UserContextPath}}`. Treat it as authoritative only within the catalog entry assigned to user context; do not use it to rewrite or broaden another source.
 {{- end}}
 
+Speed and precision:
+- Prefer the cheapest correct complete result: keep supported candidate rules, restore only omitted explicit constraints, remove only unsupported ones.
+- Do not rewrite for style when meaning and scope are already accurate.
+- Stay on catalog sections and listed files; no repository survey.
+
 Review rules:
 - Return a complete replacement `authority_sections` result with exactly one entry for every catalog section. Do not return a diff, a patch, or only changed sections.
 - Independently account for every explicit instruction in each owned source section. Restore an omitted narrow constraint even when the candidate contains a broader rule.

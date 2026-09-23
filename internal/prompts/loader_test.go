@@ -325,6 +325,7 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, profile, "bounded profile-sync runtime call")
 	require.Contains(t, profile, "Do not inventory the project for completeness")
 	require.Contains(t, profile, "Avoid exact capability counts")
+	require.Contains(t, profile, "Prefer stable navigation over exhaustive inventory")
 	require.NotContains(t, profile, "authority section catalog")
 
 	authority, err := loader.Render("learning-authority-extract", sampleAuthorityExtractionData(t))
@@ -332,12 +333,14 @@ func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
 	require.Contains(t, authority, "bounded authority-extraction runtime call")
 	require.Contains(t, authority, "complete one-to-one coverage")
 	require.Contains(t, authority, "never implies `allowed`")
+	require.Contains(t, authority, "Stay inside the catalog and listed files")
 
 	authorityReview, err := loader.Render("learning-authority-review", sampleAuthorityReviewData(t))
 	require.NoError(t, err)
 	require.Contains(t, authorityReview, "independent authority-completeness review")
 	require.Contains(t, authorityReview, "complete replacement `authority_sections` result")
 	require.Contains(t, authorityReview, "candidate is available at")
+	require.Contains(t, authorityReview, "Prefer the cheapest correct complete result")
 
 	review, err := loader.Render("learning-knowledge-review", sampleKnowledgeReviewData(t))
 	require.NoError(t, err)
@@ -373,6 +376,42 @@ func TestLearningPromptSpeedAccuracyContractsArePresent(t *testing.T) {
 	require.Contains(t, goal, "Empty structured results are valid")
 	require.Contains(t, goal, "# Mandatory Final Output Rules")
 	require.Less(t, strings.Index(goal, "# Skills Seed Knowledge Objective"), strings.Index(goal, "# Mandatory Final Output Rules"))
+}
+
+func TestRemainingPromptsCarrySpeedAccuracyPosture(t *testing.T) {
+	loader := New("codex", "en-US", "")
+
+	workspaceProfile, err := loader.Render("core-workspace-profile", sampleWorkspaceData())
+	require.NoError(t, err)
+	require.Contains(t, workspaceProfile, "Prefer confirmed cross-project facts only")
+	require.Contains(t, workspaceProfile, "Do not inventory child-project internals")
+
+	workspaceSpec, err := loader.Render("core-workspace-spec", sampleWorkspaceData())
+	require.NoError(t, err)
+	require.Contains(t, workspaceSpec, "Prefer the smallest set of cross-project rules")
+	require.Contains(t, workspaceSpec, "Do not use `user_context` as a rule source")
+
+	userPattern, err := loader.Render("core-user-pattern", sampleUserPatternData())
+	require.NoError(t, err)
+	require.Contains(t, userPattern, "Prefer one clear pattern")
+	require.Contains(t, userPattern, "Do not invent file paths")
+
+	workflow, err := loader.Render("core-workflow-optimize", agent.OptimizeWorkflowRequest{
+		Project: agent.ProjectContext{Name: "demo", RootPath: "/repo", Language: "go", Mode: "project"},
+		Name:    "release", Content: "Build the release.", ExistingContent: "Validate the release.",
+	})
+	require.NoError(t, err)
+	require.Contains(t, workflow, "Prefer executable clarity over expansion")
+	require.Contains(t, workflow, "available command into permission")
+
+	rule, err := loader.Render("core-rule-optimize", agent.OptimizeRuleRequest{
+		Project: agent.ProjectContext{Name: "demo", RootPath: "/repo", Language: "go", Mode: "project"},
+		Name:    "ownership", Content: "Confirm ownership before changes.",
+		ExistingContent: "Keep ownership explicit.", AffectedProjects: []string{"service-a"}, Paths: []string{"platform/**"},
+	})
+	require.NoError(t, err)
+	require.Contains(t, rule, "Prefer structure and clarity over expansion")
+	require.Contains(t, rule, "Never infer a new rule")
 }
 
 func currentPromptData(t *testing.T) map[string]interface{} {

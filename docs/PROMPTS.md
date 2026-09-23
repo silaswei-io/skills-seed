@@ -27,15 +27,19 @@ Files under `embedfs/templates/prompts/append/` are reusable mandatory fragments
 
 Planning and learning stages retain read-only repository tools because their prompts intentionally reference runtime candidate lists, structural context, diffs, and repository paths. Cross-stage memory is explicit runtime data, not command-wide hidden conversation state.
 
-## Speed and accuracy posture (learning chain)
+## Speed and accuracy posture
 
-Current learning stage templates share these posture rules (in addition to the goal contract):
+All knowledge-producing and resource-optimize templates share these posture rules (in addition to the goal contract):
 
 - **Plan**: smallest focus set that preserves distinct future decisions; leave ambiguous paths unassigned for deterministic fallback; no per-file taxonomy.
 - **Analyze (full)**: stop when listed evidence is enough; prefer `patterns: []` over weak admission; explicit four-point admission gate before retaining candidates.
 - **Analyze (delta)**: default `no_change` unless a listed diff proves a reusable decision; one decision per focus ID.
 - **Review**: cheapest correct verdict (`accept` when already accurate; reject is success); no repository re-discovery.
 - **Normalize**: default keep; no style rewrites of single-source reviewed candidates; merge only on clear equivalence.
+- **Profile refresh**: navigation map only; no inventory-for-completeness; preserve valid existing entries; stop once focused ownership/routing is confirmed.
+- **Authority extract/review**: catalog-bound only; empty section with concrete `no_rule_reason` is success; review restores omitted explicit constraints without style rewrites.
+- **Workspace profile/spec**: cross-project facts only; empty arrays valid; do not inventory child internals or invent relationships.
+- **User pattern / rule / workflow optimize**: one clear result; no invented evidence; repository inspection only for named clarification; mark `To confirm` instead of guessing.
 
 These rules reduce exploration and token load while keeping evidence and authority boundaries intact.
 

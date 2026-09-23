@@ -11,6 +11,12 @@ Separate these facts carefully:
 1. **Workspace facts**: child project boundaries, project roles, dependency direction, shared paths, contract paths, runtime configuration paths, and cross-project impact.
 2. **Child project facts**: one project's internal layout, coding style, framework usage, and capability entries. Do not put these in the workspace profile unless they affect another project.
 
+# Speed and precision
+
+- Prefer confirmed cross-project facts only. Empty arrays are valid when evidence is missing.
+- Stop once project index, shared/contracts/infra, dependency direction, and impact routes needed for routing are established.
+- Do not inventory child-project internals for completeness.
+
 # Required Findings
 
 1. Project index: ID, path, responsibility, role, primary language, and key framework/runtime.

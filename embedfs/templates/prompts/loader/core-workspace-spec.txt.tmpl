@@ -12,6 +12,12 @@ The workspace spec must answer:
 4. The evidence-backed dependency order across contract sources, shared libraries, implementations, adapters, consumers, and runtime config.
 5. Which rules are workspace-level rules and which must remain in a child project's project spec.
 
+# Speed and precision
+
+- Prefer the smallest set of cross-project rules that changes future routing or write boundaries.
+- Do not invent relationships; empty arrays and fewer rules are valid when evidence is thin.
+- Do not duplicate default child-project routes already implied by the workspace profile.
+
 # Input Interpretation
 
 You may receive:

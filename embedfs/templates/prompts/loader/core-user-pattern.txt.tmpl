@@ -19,6 +19,12 @@ You are a code pattern analysis expert. Your task is to generate a structured co
 Suggested category: {{.Category}}
 {{- end}}
 
+# Speed and precision
+
+- Prefer one clear pattern that matches the user's intent. Do not invent multiple variants.
+- Fill evidence and capability fields only from real project-code evidence. Empty/illustrative examples and `null` capability entries are valid when evidence is missing.
+- Stop repository inspection once the described convention is grounded or confirmed unsupported.
+
 # Analysis Steps
 
 1. Understand the user's natural language description and identify the coding convention or pattern they want to express
@@ -41,7 +47,6 @@ Before returning JSON, validate the result internally:
 6. Fill `business_method` only when real source evidence supports a reusable capability entry, and include a real signature or declaration plus location. Otherwise use `null`.
 7. Lower `confidence` when evidence is weak or the user description is broad. Do not invent facts, evidence paths, or line numbers.
 8. Return the complete `knowledge_flags` array. Use `["operational_risk"]` only when the user's explicit requirement or real source evidence establishes irreversible, privileged, state/resource-changing, or externally visible behavior; otherwise use `[]`. Never invent another flag.
-
 
 # Output Format
 

@@ -12,6 +12,11 @@ The immutable authority section catalog is available at `{{.AuthoritySectionsPat
 User context is available at `{{.UserContextPath}}`. Treat it as authoritative only within the catalog entry assigned to user context; do not use it to rewrite or broaden another source.
 {{- end}}
 
+Speed and precision:
+- Stay inside the catalog and listed files. Stop once every section has either explicit rules or a concrete `no_rule_reason`.
+- Prefer omission of weak paraphrases: extract only explicit constraints at their stated strength.
+- Empty `rules` with a concrete `no_rule_reason` is a valid success for a section with no normative text.
+
 Extraction rules:
 - Return exactly one `authority_sections` result for every catalog entry. Never invent, omit, duplicate, or rewrite a section ID.
 - Extract only explicit instructions that constrain future changes. Keep advisory, conditional, local, and operation-specific wording at its stated strength and scope.
