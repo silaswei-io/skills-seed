@@ -17,6 +17,7 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
+	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
@@ -352,12 +353,22 @@ func TestResolveOutputPathRejectsPathsOutsideProjectRoot(t *testing.T) {
 		ProjectCfg: config.ProjectConfig{RootPath: projectRoot},
 	})
 
-	inside, err := svc.resolveOutputPath(".agents/skills/demo")
+	inside, err := svc.resolveOutputPath(context.Background(), ".agents/skills/demo")
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(projectRoot, ".agents", "skills", "demo"), inside)
 
-	_, err = svc.resolveOutputPath("../outside")
+	_, err = svc.resolveOutputPath(context.Background(), "../outside")
 	require.Error(t, err)
+}
+
+func TestGenerateSkillsResolvesRelativeOutputWithUnconfiguredProjectRoot(t *testing.T) {
+	projectRoot := t.TempDir()
+	ctx := runtimecontext.WithSeedPath(context.Background(), filepath.Join(projectRoot, ".skills-seed"))
+	svc := newTestService(&mocks.MockPatternRepository{})
+	output := filepath.Join(".agents", "skills", "test-dev")
+
+	require.NoError(t, svc.GenerateSkills(ctx, output))
+	require.FileExists(t, filepath.Join(projectRoot, output, "SKILL.md"))
 }
 
 func TestGenerateSkillsWithOptionsReportsProjectSteps(t *testing.T) {

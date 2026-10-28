@@ -143,7 +143,7 @@ exclude:
 | `language` | 自动识别或空 | 项目主要语言；init 识别不到时留空，可按项目设置 |
 | `locale` | `zh-CN` | 工具输出、配置模板与 seed context 模板语言 |
 | `git_remote` | 自动填充或空 | Git 远程仓库地址 |
-| `root_path` | 当前项目绝对路径 | init 时写入，供运行时定位项目根目录 |
+| `root_path` | 当前项目绝对路径或空 | init 通常写入绝对路径；为空时运行时从当前 `.skills-seed` 所在目录推导项目根目录 |
 | `initialized_at` | init 时间 | 初始化时间 |
 
 #### 说明
@@ -365,6 +365,7 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 2. 可通过 `skills-seed generate skills --output <path>` 临时指定输出目录。
 3. `skills.locale` 支持 `zh-CN` 和 `en-US`，默认英文；它统一控制运行时 AI 自然语言输出、沉淀内容以及 `generate skills` 产物语言。
 4. 新增自定义 engine 或 target 时，应分别添加 `agent.commands.<engine>` 和 `skills.paths.<target>`。
+5. 相对 `skills.paths` 和 `--output` 按当前项目根目录解析；workspace 子项目使用各自的根目录。输出目标必须留在该项目内，包括经过符号链接解析后的真实路径。
 
 初始化时用 `skills-seed init --skills-name team-guide` 同时设置 `skills.name` 和各目标输出路径。显式名称原样使用，不追加 `-dev`，限 1–64 个小写字母、数字或连字符，不能以连字符开头、结尾或包含连续连字符。名称不会改变 `profile.name` 或项目归属，也不会由工作区根传给子项目。初始化后手动改名时，应同时调整 `skills.paths` 的目录名；修改配置不会迁移已有产物。
 

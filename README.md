@@ -60,10 +60,10 @@ skills-seed sync
 ## 开发
 
 ```bash
+make build
 go test ./...
 go vet ./...
 staticcheck ./...
-go build ./cmd/skills-seed
 ```
 
 ---

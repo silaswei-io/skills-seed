@@ -143,7 +143,7 @@ exclude:
 | `language` | auto-detected or empty | Primary project language; left empty when init cannot detect it |
 | `locale` | `zh-CN` | Language for tool output, config templates, and seed context templates |
 | `git_remote` | auto-filled or empty | Git remote URL |
-| `root_path` | current project absolute path | Written during init and used to locate the project root |
+| `root_path` | current project absolute path or empty | Init normally writes the absolute path; when empty, the runtime derives the project root from the current `.skills-seed` directory |
 | `initialized_at` | init time | Initialization time |
 
 #### Notes
@@ -364,6 +364,7 @@ These files are merged with built-in prompts; they do not replace built-in promp
 2. Use `skills-seed generate skills --output <path>` to override the output directory for one run.
 3. `skills.locale` supports `zh-CN` and `en-US` and defaults to English; it controls runtime AI natural-language output, persisted learned content, and the language of `generate skills` artifacts.
 4. For a custom engine or target, add `agent.commands.<engine>` and `skills.paths.<target>` respectively.
+5. Relative `skills.paths` and `--output` values resolve from the current project root. Workspace children use their own roots. The output must remain inside that project, including after symlink resolution.
 
 Use `skills-seed init --skills-name team-guide` to set both `skills.name` and target output paths during initialization. Explicit names are used unchanged, without a `-dev` suffix. They must contain 1–64 lowercase letters, digits, or hyphens, with no leading, trailing, or consecutive hyphens. This does not change `profile.name` or project ownership, and a root name is not inherited by children. When renaming manually after initialization, also update the directory names in `skills.paths`; configuration changes do not move existing artifacts.
 

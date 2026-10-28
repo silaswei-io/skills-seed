@@ -25,7 +25,7 @@ func ReplaceWithinRoot(projectRoot, outputPath string, build func(staging string
 		return err
 	}
 	validate := func() error {
-		current, err := projectpath.CanonicalWithinRoot(projectRoot, outputPath)
+		current, err := projectpath.ResolveCanonicalOutput(projectRoot, outputPath)
 		if err != nil {
 			return err
 		}

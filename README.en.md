@@ -60,10 +60,10 @@ See the [Wiki source guide](docs/wiki/README.md) for the ownership and maintenan
 ## Development
 
 ```bash
+make build
 go test ./...
 go vet ./...
 staticcheck ./...
-go build ./cmd/skills-seed
 ```
 
 ---

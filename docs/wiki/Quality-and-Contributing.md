@@ -31,10 +31,10 @@
 提交前至少运行：
 
 ```bash
+make build
 go test ./...
 go vet ./...
 staticcheck ./...
-go build ./cmd/skills-seed
 ```
 
 扩展错误分支、路径边界或持久化行为时，应同时生成统一覆盖率报告，确认新增测试确实进入目标分支：

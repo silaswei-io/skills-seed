@@ -2,6 +2,22 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v1.0.0]
+
+### Release Baseline
+
+- A local CodeGraph index supplies source structure, call relationships, and capability navigation. AI is used only when important business semantics cannot be determined from local evidence, with independent review of the result.
+- Generated Skills use a concise entry and on-demand details for business methods, patterns, rules, and workflows, helping future Agents find the right owner, reuse existing capabilities, and check impact boundaries.
+- Learning supports interruption and resumption. Diagnostic files are written on demand, file logging is disabled by default, and code snapshots are no longer maintained.
+
+### Fixes
+
+- Fixed workspace child projects with an empty `profile.root_path`: relative `skills.paths` no longer resolve from the workspace root and fail as outside the project. Generation and output safety checks now use the current child-project root consistently.
+
+### Tests and Documentation
+
+- Added regressions for Skill generation and relative output replacement with an unset root path; updated bilingual configuration, operations, and development-build documentation.
+
 ## [v0.20.35]
 
 ### Improvements

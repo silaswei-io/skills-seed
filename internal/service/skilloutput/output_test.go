@@ -143,6 +143,18 @@ func TestReplaceWithinRootPublishesOutput(t *testing.T) {
 	require.FileExists(t, filepath.Join(outputPath, "SKILL.md"))
 }
 
+func TestReplaceWithinRootResolvesRelativeOutputFromProjectRoot(t *testing.T) {
+	projectRoot := t.TempDir()
+	relativeOutput := filepath.Join(".agents", "skills", "demo-dev")
+
+	err := ReplaceWithinRoot(projectRoot, relativeOutput, func(staging string) error {
+		return os.WriteFile(filepath.Join(staging, "SKILL.md"), []byte("new\n"), 0o644)
+	})
+
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(projectRoot, relativeOutput, "SKILL.md"))
+}
+
 func TestReplaceWithinRootSupportsUnscopedOutput(t *testing.T) {
 	outputPath := filepath.Join(t.TempDir(), "skill")
 

@@ -16,14 +16,12 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
-	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/navigation"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
-	"github.com/silaswei-io/skills-seed/internal/utils/stringx"
 )
 
 // GeneratorService 生成服务
@@ -103,7 +101,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 	var resolvedOutputPath string
 	if err := runStep(i18n.Get("ProgressGenerateResolveOutput"), func() error {
 		var resolveErr error
-		resolvedOutputPath, resolveErr = s.resolveOutputPath(outputPath)
+		resolvedOutputPath, resolveErr = s.resolveOutputPath(ctx, outputPath)
 		return resolveErr
 	}); err != nil {
 		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
@@ -160,7 +158,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 		targetAgent = s.configRepo.GetEffectiveSkillsTarget()
 	}
 	templatesHash := metadata.HashOrUnavailable(metadata.SkillsTemplatesHash(embedfs.FS))
-	projectRoot := stringx.FirstNonBlank(projectConfig.RootPath, runtimecontext.ProjectRoot(ctx))
+	projectRoot := s.projectRoot(ctx)
 	manifestPath := generatedSkillsManifestPath(projectRoot, targetAgent)
 	manifestOutputPath := generatedSkillsOutputPath(projectRoot, resolvedOutputPath)
 	var navigationIndex *codegraph.Index

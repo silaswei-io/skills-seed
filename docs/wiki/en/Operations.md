@@ -12,6 +12,7 @@ By default, `sync` / `learn current` scan locally with bundled CodeGraph, then s
 | Agenda or source-analysis failure | Runtime inputs, rendered prompt, Agent-output archive | Correct Agent, model, Schema, or input boundary, then resume |
 | Independent-review failure | Current focus candidates and evidence archive | Check whether output violates structure or evidence scope |
 | Generation failure | Stored profile, rules, patterns, and templates | Correct data or template, then regenerate |
+| Child-project Skill output reported outside the project | Child `profile.root_path`, `skills.paths`, and target symlinks | Relative paths resolve from the child root; confirm the real target still lies inside it |
 | Incompatible command state | Runtime and command-state diagnostic | Restart explicitly; do not silently clear state |
 
 ## Runtime Archives
@@ -20,9 +21,9 @@ By default, `sync` / `learn current` scan locally with bundled CodeGraph, then s
 
 - Rendered prompts and manifests.
 - Agent raw output, final content, stderr, and call manifests.
-- Candidate files, focus inputs, recovery state, and checkpoints.
-- Generated-Skills manifests with version, template, knowledge-snapshot, and file-hash metadata.
-- Execution logs and error diagnostics.
+- Candidate files, focus inputs, and error diagnostics; resumable checkpoints live under `.skills-seed/cache/`.
+- Generated-Skills manifests with version, template, knowledge, and file-hash metadata.
+- Execution logs when file logging is explicitly enabled.
 
 The `raw`, `stderr`, and `manifest` paths in an error are first-hand evidence. Read their concrete upstream error before guessing from a top-level "Agent call failed" message.
 

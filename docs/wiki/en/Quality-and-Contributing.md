@@ -31,10 +31,10 @@ The [ultimate goal](../../ULTIMATE_GOAL.md) is the shared acceptance criterion f
 Run at least:
 
 ```bash
+make build
 go test ./...
 go vet ./...
 staticcheck ./...
-go build ./cmd/skills-seed
 ```
 
 When extending error branches, path boundaries, or persistence behavior, also generate one repository-wide coverage report and confirm that the new tests execute the intended branches:

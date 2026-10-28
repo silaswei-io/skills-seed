@@ -12,6 +12,7 @@
 | 议程或源码分析失败 | runtime 输入、渲染 prompt、Agent 输出归档 | 修正 Agent、模型、Schema 或输入边界后续跑 |
 | 独立审查失败 | 当前焦点的候选与证据归档 | 确认返回是否违反结构或证据范围 |
 | 生成失败 | 已保存 profile、rules、patterns 与模板 | 修正数据或模板后重新生成 |
+| 子项目 Skills 输出路径越界 | 子项目 `profile.root_path`、`skills.paths` 和目标符号链接 | 相对路径按子项目根目录解析；确认目标真实路径仍在子项目内 |
 | 命令状态不兼容 | runtime / command state 版本诊断 | 按报错显式重来，不应静默清除状态 |
 
 ## Runtime 归档
@@ -20,9 +21,9 @@
 
 - 渲染后的 prompt 与 manifest。
 - Agent 原始输出、最终内容、stderr 与调用 manifest。
-- 候选文件、焦点输入、恢复状态与 checkpoint。
-- 已生成 Skills 的版本、模板、知识快照和文件哈希清单。
-- 执行日志与错误诊断。
+- 候选文件、焦点输入与错误诊断；可恢复 checkpoint 保存在 `.skills-seed/cache/`。
+- 已生成 Skills 的版本、模板、知识与文件哈希清单。
+- 显式开启文件日志后产生的执行日志。
 
 错误信息中的 `raw`、`stderr`、`manifest` 路径是第一手证据。优先阅读其中的具体上游错误，而不是仅根据顶层“Agent 调用失败”猜测原因。
 
